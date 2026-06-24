@@ -50,7 +50,7 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | test-strategy | orchestrator | MT-009 / MT-024 の runtime routing failure が policy matrix ではなく `_classify_task_kind` の substring heuristic に起因する | Option A: 否定文除外のみ; Option B: evidence-based classifier; Option C: explicit `task_kind` / `risk_tags` schema | Option B をこの issue で採用し、Option C は follow-up 候補にする | Option B は2つの FAIL を同時に解消でき、変更範囲を `context_packets.py` と CLI routing regression tests に閉じられる | promoted_to_design / promoted_to_plan | `discussions/20260624t062220z-disc-routing-repair-design-options.md`, `requirement.md`, `design.md`, `plan.md` | explicit field 化は follow-up 候補 |
-| D-002 | resolved | test-strategy | code-reviewer | S02 classifier fix に reviewer-directed regression を追加する必要があり、当初の S02 allowed paths が production file のみに狭すぎた | A: tests 追加を戻す; B: S02 allowed paths を reviewer-directed regression に限って拡張 | B を採用し、`tests/cli_runtime/test_workflow_context_routing.py` への S02 reviewer-directed regression 追加だけを許可する | reviewer finding の false-negative 経路を再発防止するには public CLI regression が必要。変更範囲は既存 S01 test file に限定される | promoted_to_plan / applied | `plan.md`, code-reviewer finding, targeted pytest 22 passed | none |
+| D-002 | resolved | test-strategy | code-reviewer / qa-reviewer | S02 classifier fix に reviewer / QA-directed regression を追加する必要があり、当初の S02 allowed paths が production file のみに狭すぎた | A: tests 追加を戻す; B: S02 allowed paths を reviewer / QA-directed regression に限って拡張 | B を採用し、`tests/cli_runtime/test_workflow_context_routing.py` への S02 reviewer / QA-directed regression 追加だけを許可する | reviewer / QA finding の false-negative / false-positive 経路を再発防止するには public CLI regression が必要。変更範囲は既存 S01 test file に限定される | promoted_to_plan / applied | `plan.md`, code-reviewer findings, qa-reviewer finding, targeted pytest 26 passed | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -219,7 +219,7 @@ expected Red: 2 failed, 16 passed
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | pending commit | `tests/cli_runtime/test_workflow_context_routing.py`, `report.md` S01 evidence | this S01 ledger entry | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | `tests/cli_runtime/test_workflow_context_routing.py`, `report.md` S01 evidence | `145bd1ae` | `git status --short --branch` -> clean after S01 commit | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `tests/cli_runtime/test_workflow_context_routing.py` - routing classifier regression / guard tests
@@ -248,7 +248,7 @@ expected Red: 2 failed, 16 passed
 ```bash
 uv run pytest tests/cli_runtime/test_workflow_context_routing.py
 
-22 passed in 34.28s
+26 passed in 40.17s
 
 git diff --check
 
@@ -258,7 +258,7 @@ pass
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S02 | Green | tc-237-001〜tc-237-006 Green | targeted pytest: 22 passed | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | S01 Red と reviewer-directed regressions が Green |
+| S02 | Green | tc-237-001〜tc-237-006 Green | targeted pytest: 26 passed | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | S1 Red、reviewer-directed regressions、QA/code-reviewer-directed EC-002 regressions が Green |
 | S02 | Refactor | classifier helper は allowed file 内に限定 | `git diff --check` pass; allowed file only | command / diff inspection | pass | no policy matrix change |
 
 #### 発見されたテスト / リスク（Discovered Tests）
@@ -267,11 +267,13 @@ pass
 | S02 | classifier は heuristic のまま | dev-coder / design risk | follow-up candidate として既存 D-001 / design に維持 | N/A | no | explicit `task_kind` / `risk_tags` field 化は scope 外 |
 | S02 | same-line guard phrase による high-risk false negative | code-reviewer | reviewer-directed regression を追加し classifier を explicit negated evidence span 判定へ修正 | reviewer-directed | no | code-reviewer finding; targeted pytest 22 passed |
 | S02 | weak phrase と同じ行の explicit docs-only marker false negative | code-reviewer | reviewer-directed regression を追加し explicit marker を優先 | reviewer-directed | no | code-reviewer finding; targeted pytest 22 passed |
+| S02 | forbidden / stop-condition label 行だけの high-risk / migration evidence が affirmative として扱われる | qa-reviewer | QA-directed regression を追加し、明示 label 行の evidence を除外 | QA-directed | no | qa-reviewer finding; targeted pytest 26 passed |
+| S02 | forbidden / stop-condition section 配下の high-risk / migration evidence が affirmative として扱われる | code-reviewer | nested list regression を追加し、除外 label の子リストを evidence scan から除外 | code-reviewer-directed | no | code-reviewer finding; targeted pytest 26 passed |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S02 | tc-237-001〜tc-237-006 | classifier changed and tests Green; AC/EC 全対応 | `context_packets.py` changed; targeted pytest 22 passed; `git diff --check` pass | pass | reviewer-directed regressions included |
+| S02 | tc-237-001〜tc-237-006 | classifier changed and tests Green; AC/EC 全対応 | `context_packets.py` changed; targeted pytest 26 passed; `git diff --check` pass | pass | reviewer-directed, QA-directed, and nested-section regressions included |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -281,7 +283,7 @@ pass
 | tc-237-003 / `test_workflow_next_affirmative_authz_terms_still_escalate` | S02 | yes | covered-existing | S01 pass | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | security true positive preserved |
 | tc-237-004 / `test_workflow_next_explicit_docs_only_still_routes_to_doc_writer` | S02 | yes | covered-existing | S01 pass | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | docs-only true positive preserved |
 | tc-237-005 / `test_workflow_next_affirmative_migration_terms_still_route_to_rollback_plan` | S02 | yes | covered-existing | S01 pass | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | migration true positive preserved |
-| tc-237-006 / targeted routing suite | S02 | yes | covered-existing | S01 expected Red | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | full targeted suite Green: 22 passed |
+| tc-237-006 / targeted routing suite | S02 | yes | covered-existing | S01 expected Red | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | full targeted suite Green: 26 passed |
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
@@ -295,21 +297,27 @@ pass
 | reviewer-directed same-line security guard | S02 | targeted pytest | pass | prevents high-risk false negative |
 | reviewer-directed same-line docs-only weak phrase | S02 | targeted pytest | pass | preserves explicit docs-only true positive |
 | reviewer-directed same-line migration guard | S02 | targeted pytest | pass | preserves migration true positive |
+| QA-directed forbidden authz label | S02 | targeted pytest | pass | EC-002 forbidden-only high-risk terms do not escalate |
+| QA-directed stop-condition migration label | S02 | targeted pytest | pass | EC-002 stop-condition-only migration terms do not route to migration |
+| code-reviewer-directed nested forbidden authz section | S02 | targeted pytest | pass | EC-002 forbidden section child high-risk terms do not escalate |
+| code-reviewer-directed nested stop-condition migration section | S02 | targeted pytest | pass | EC-002 stop-condition section child migration terms do not route to migration |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| added | reviewer-directed same-line regressions | `test_workflow_next_affirmative_authz_terms_with_unrelated_guard_still_escalate`; `test_workflow_next_explicit_docs_only_marker_with_weak_phrase_still_routes_to_doc_writer`; `test_workflow_next_affirmative_migration_terms_with_unrelated_guard_still_route_to_rollback_plan`; `test_workflow_next_affirmative_migration_terms_after_unrelated_guard_still_route_to_rollback_plan` | tc-237-003 / tc-237-004 / tc-237-005 | code-reviewer finding への bounded fix | yes: S02 allowed paths を reviewer-directed regression に限って拡張 | yes, S02 re-review |
+| added | reviewer-directed same-line regressions | `test_workflow_next_affirmative_authz_terms_with_unrelated_guard_still_escalate`; `test_workflow_next_explicit_docs_only_marker_with_weak_phrase_still_routes_to_doc_writer`; `test_workflow_next_affirmative_migration_terms_with_unrelated_guard_still_route_to_rollback_plan`; `test_workflow_next_affirmative_migration_terms_after_unrelated_guard_still_route_to_rollback_plan` | tc-237-003 / tc-237-004 / tc-237-005 | code-reviewer finding への bounded fix | yes: S02 allowed paths を reviewer / QA-directed regression に限って拡張 | yes, S02 re-review |
+| added | QA-directed forbidden / stop-condition regressions | `test_workflow_next_forbidden_change_authz_terms_do_not_escalate`; `test_workflow_next_stop_condition_migration_terms_do_not_route_to_migration` | tc-237-002 / EC-002 | qa-reviewer finding への bounded fix | no: amended S02 test path covers reviewer/QA-directed regressions | yes, QA re-review |
+| added | nested forbidden / stop-condition regressions | `test_workflow_next_nested_forbidden_change_authz_terms_do_not_escalate`; `test_workflow_next_nested_stop_condition_migration_terms_do_not_route_to_migration` | tc-237-002 / EC-002 | code-reviewer P1 finding への bounded fix | no: amended S02 test path covers reviewer/QA-directed regressions | yes, code-reviewer re-review |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S02 | delegated | production classifier change plus reviewer-directed regressions | dev-coder | evidence-based `_classify_task_kind`; reviewer-directed same-line regression tests | `plan.md` S02 amended allowed paths | `context_packets.py`; `tests/cli_runtime/test_workflow_context_routing.py` reviewer-directed regressions only | domain routing matrix / workflow_state / docs templates | targeted pytest Green | policy matrix change required | changed files, verification, risks | pass |
+| S02 | delegated | production classifier change plus reviewer / QA-directed regressions | dev-coder | evidence-based `_classify_task_kind`; reviewer / QA-directed regression tests | `plan.md` S02 amended allowed paths | `context_packets.py`; `tests/cli_runtime/test_workflow_context_routing.py` reviewer / QA-directed regressions only | domain routing matrix / workflow_state / docs templates | targeted pytest Green | policy matrix change required | changed files, verification, risks | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S02 | dev-coder | `_classify_task_kind` を evidence-based precedence に変更し、reviewer-directed same-line regressions を追加 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`, `tests/cli_runtime/test_workflow_context_routing.py` | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` -> 22 passed; `git diff --check` -> pass | code-reviewer pass | heuristic risk remains | accepted |
+| S02 | dev-coder | `_classify_task_kind` を evidence-based precedence に変更し、reviewer/QA-directed regressions を追加 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`, `tests/cli_runtime/test_workflow_context_routing.py` | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` -> 26 passed; `git diff --check` -> pass | code-reviewer re-review pass; QA re-review pass | heuristic risk remains | accepted |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
@@ -319,163 +327,55 @@ pass
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | pending review / commit | `context_packets.py`, `tests/cli_runtime/test_workflow_context_routing.py`, `plan.md` S02 amendment, `report.md` S02 evidence | this S02 ledger entry | pending | N/A | N/A | N/A | N/A |
+| S02 | committed + QA/code-reviewer follow-up pending final commit | `context_packets.py`, `tests/cli_runtime/test_workflow_context_routing.py`, `plan.md` S02 amendment, `report.md` S02 evidence | `6116f867` + final QA follow-up commit pending | `git status --short --branch` -> clean after S02 commit; current QA/code-reviewer follow-up still uncommitted | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py` - evidence-based task kind classifier
-- `tests/cli_runtime/test_workflow_context_routing.py` - reviewer-directed same-line regression tests
-- `spec-dock/active/issue/plan.md` - S02 allowed paths amendment for reviewer-directed regressions
+- `tests/cli_runtime/test_workflow_context_routing.py` - reviewer / QA-directed regression tests
+- `spec-dock/active/issue/plan.md` - S02 allowed paths amendment for reviewer / QA-directed regressions
 - `spec-dock/active/issue/report.md` - S02 execution evidence
 
 #### メモ
 - operator-visible docs update は不要。explicit field 化は follow-up candidate のまま。
-
-### セッションログ（2026-06-24 HH:MM - HH:MM）
-
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
-
-#### 実施内容
-- ...
-
-#### 実行コマンド / 結果
-```bash
-<command>
-
-<result>
-```
-
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
-
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
-
-| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
-|---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00237 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
-
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
-#### レビューゲート状態（Reviewer Gate Status）
-| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
-
-#### ステップ commit ゲート（Step Commit Gate）
-| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
-
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
-
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
-
-### セッションログ（2026-06-24 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | no | N/A | operator-visible contract 変更なし。`_classify_task_kind` private classifier と regression tests のみ。`./spec-dock/scripts/spec-dock validate` -> ok nodes=149 | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | targeted CLI + domain routing tests sufficient | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py tests/unit/domain/test_context_routing.py` -> 33 passed; `./spec-dock/scripts/spec-dock validate` -> ok; subagent `019ef8a3-1855-7c93-8bae-ec543c899a54` no findings | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | nested forbidden / stop-condition section finding fixed; stale S02 commit evidence marked pending final follow-up commit | 5 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | S02/final commit scope aligned with pending diff; placeholder session logs removed; subagent `019ef8aa-b524-7030-97d0-3af601bc94cf` no findings | 2 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final QA/spec evidence recorded | `context_packets.py`, `tests/cli_runtime/test_workflow_context_routing.py`, `plan.md`, `report.md` final QA/code-review/spec evidence | final response; PR/push not requested | ready for commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: S02 後の `workflow next issue-execution` は `workflow-plan-unselectable` を返した。
+  - 解決: S01/S02 の実装ステップは完了済みで、残りは S90/S99 の final gate として report に記録して進める。plan amendment と final spec review で整合を確認する。
+- 問題: S02 reviewer から high-risk evidence と guard phrase の同一行 false negative、QA/code-reviewer から forbidden / stop-condition context の false positive を指摘された。
+  - 解決: window-based exclusion をやめ、明示的な negated evidence span と forbidden / stop-condition context だけを除外し、reviewer / QA-directed regression tests を追加した。
 
 ## 学んだこと (任意)
-- ...
+- task kind heuristic は、行単位の否定処理では安全側の true positive を壊しやすい。
 
 ## 今後の推奨事項 (任意)
-- ...
+- follow-up 候補として、Issue plan step への explicit `task_kind` / `risk_tags` field 導入を検討する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
