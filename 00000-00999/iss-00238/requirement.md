@@ -3,7 +3,7 @@
 ID: "iss-00238"
 タイトル: "Use Stdout Runbook Handoff Instead Of Generated Workflow Files"
 関連GitHub: ["#238"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-24"
 親: ["epic-00224", "init-local-00003"]

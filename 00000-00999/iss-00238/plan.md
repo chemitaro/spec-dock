@@ -3,7 +3,7 @@
 ID: "iss-00238"
 タイトル: "Use Stdout Runbook Handoff Instead Of Generated Workflow Files"
 関連GitHub: ["#238"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-24"
 依存: ["requirement.md", "design.md"]
@@ -113,6 +113,10 @@ ID: "iss-00238"
 | tc-004 | S02 | stale projection independence | 回帰 | AC-007 | stale `current-runbook.*` を読まず現在 state から guidance を生成 | stale projection + active issue | stale handoff | yes | red-required | report step closure |
 | tc-005 | S03 | skill handoff | inspect | AC-006 | Skill が `guidance <target>` と checklist 登録を要求する | provider / installed Skill text | skill drift | yes | inspect-only | report step closure |
 | tc-006 | S99 | issue-wide regression | 統合 | 全 AC / EC | focused unit / CLI / installer tests が通る | branch diff | integration regression | yes | covered-existing | final quality gate |
+| tc-007 | S01 | no-active guidance | 否定系 | EC-001 | active issue がない場合に `issue-start-required` guidance を返す | initialized repo without active issue | authoring/execution starts without active issue | yes | red-required | report step closure |
+| tc-008 | S01 | assurance blocked guidance | 否定系 | EC-003 | malformed assurance / stale source binding を classification required / blocked guidance として返す | malformed or stale `assurance.json` | invalid assurance treated as ready | yes | red-required | report step closure |
+| tc-009 | S02 | context packet fail-closed | 回帰 | EC-004 | context packet write failure は既存どおり fail-closed を維持する | issue-execution with context packet write failure | projection non-blocking change weakens execution handoff safety | yes | covered-existing | report step closure |
+| tc-010 | S02 | ignored projection | 受け入れ | AC-005 | projection が生成されても tracked diff を作らず human-only warning を持つ | Git initialized repo after guidance command | human projection becomes agent authority or tracked artifact | yes | red-required | report step closure |
 
 ## レビュー / QA ゲート方針
 
@@ -167,7 +171,7 @@ ID: "iss-00238"
     - 出力は引数なしの Markdown に固定する。今回の issue では JSON output contract を追加しない。
     - `workflow next` tests を `guidance` contract に置き換える。
   - テスト義務:
-    - closure id: tc-001, tc-002
+    - closure id: tc-001, tc-002, tc-007, tc-008
     - coverage rationale:
       - command name / target validation / output shape が今回の主要 contract であるため、CLI runtime test で固定する。
   - Red / 代替証跡の要件:
@@ -246,13 +250,30 @@ ID: "iss-00238"
   - 前提: initialized repo。
   - 操作: `guidance unknown-target`。
   - 期待結果: invalid choice / non-zero、projection file を作らない。
+  - 失敗検出: unknown target が default target として処理される、または失敗時に projection side effect が出る回帰を検出する。
   - 検証方法: CLI runtime test。
   - 関連 closure id: tc-002
+
+- `tc-s01-004` negative: no active issue
+  - 前提: initialized repo に active issue がない。
+  - 操作: `guidance issue-planning` と `guidance issue-execution`。
+  - 期待結果: `issue-start-required` guidance を stdout に返し、authoring / execution を開始しない。
+  - 失敗検出: active issue なしで ready guidance を返す、または stale projection の issue を active と誤認する回帰を検出する。
+  - 検証方法: CLI runtime test。
+  - 関連 closure id: tc-007
+
+- `tc-s01-005` negative: malformed assurance / stale source binding
+  - 前提: active issue に malformed assurance、または requirement と一致しない stale source binding がある。
+  - 操作: `guidance issue-planning`。
+  - 期待結果: classification required / blocked state を Markdown stdout で返す。
+  - 失敗検出: invalid assurance を ready と扱い、design / plan / execution へ進める回帰を検出する。
+  - 検証方法: CLI runtime test。
+  - 関連 closure id: tc-008
 
 #### ステップ完了契約
 
 - closure id:
-  - tc-001, tc-002
+  - tc-001, tc-002, tc-007, tc-008
 - close 条件:
   - `guidance` CLI tests が pass。
   - `workflow next` を primary とする tests が残っていない。
@@ -298,7 +319,7 @@ ID: "iss-00238"
     - Projection error は `WorkflowState(kind="blocked", reason_code="runbook-write-failure")` に変換しない。
     - Context packet write failure は既存どおり fail-closed を維持する。
   - テスト義務:
-    - closure id: tc-003, tc-004
+    - closure id: tc-003, tc-004, tc-009, tc-010
     - coverage rationale:
       - stale / write failure が本 issue の主要 bug class。
   - Red / 代替証跡の要件:
@@ -329,6 +350,15 @@ ID: "iss-00238"
 
 - 委任ロール:
   - dev-coder。
+- 入力 docs:
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
+  - `spec-dock/docs/workflow_issue.md`
+  - `tests/cli_runtime/test_workflow.py`
+  - `tests/unit/infra/test_runbook_store.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/runbook_store.py`
 - 許可 paths:
   - S02 対象ファイル。
 - 禁止 changes:
@@ -343,6 +373,9 @@ ID: "iss-00238"
   - code-reviewer: failure handling、observability、context packet distinction。
 - 停止条件:
   - projection write error を握り潰して観測不能にする設計になる。
+- 必須出力:
+  - changed files、verification result、projection failure / stale projection / context packet fail-closed の観測結果、unresolved risks。
+  - material decision がある場合は Ledger Note、ない場合は `No material implementation decisions beyond the approved plan.`。
 
 #### 具体テストケース一覧
 
@@ -350,6 +383,7 @@ ID: "iss-00238"
   - 前提: failing RunbookStore。
   - 操作: guidance use case を実行。
   - 期待結果: original state / runbook が返り、`runbook-write-failure` blocked state にならない。
+  - 失敗検出: projection write failure が agent-facing blocked state に変換され、stdout guidance が失われる回帰を検出する。
   - 検証方法: unit test。
   - 関連 closure id: tc-003
 
@@ -357,20 +391,30 @@ ID: "iss-00238"
   - 前提: stale `current-runbook.json` が別 issue を指す。
   - 操作: `guidance issue-planning`。
   - 期待結果: stdout payload は current active issue を示す。
+  - 失敗検出: command が current state ではなく stale projection を読み、別 issue / 古い next action を返す回帰を検出する。
   - 検証方法: CLI runtime test。
   - 関連 closure id: tc-004
 
 - `tc-s02-003` acceptance: projection remains ignored human artifact
   - 前提: Git initialized target repo。
   - 操作: `guidance issue-planning`。
-  - 期待結果: projection が生成されても `git status --short` は空。
+  - 期待結果: projection が生成されても `git status --short` は空で、projection header / payload は human-only artifact であることを示す。
+  - 失敗検出: projection が tracked diff として残る、または agent handoff authority と読める文面になる回帰を検出する。
   - 検証方法: CLI runtime test。
-  - 関連 closure id: tc-004
+  - 関連 closure id: tc-010
+
+- `tc-s02-004` regression: context packet write failure remains fail-closed
+  - 前提: issue-execution で context packet write が失敗する fixture。
+  - 操作: `guidance issue-execution`。
+  - 期待結果: context packet failure は実行 handoff payload failure として fail-closed を維持する。
+  - 失敗検出: projection non-blocking 化に巻き込まれて context packet failure まで success 扱いになる回帰を検出する。
+  - 検証方法: CLI runtime / context routing test。
+  - 関連 closure id: tc-009
 
 #### ステップ完了契約
 
 - closure id:
-  - tc-003, tc-004
+  - tc-003, tc-004, tc-009, tc-010
 - close 条件:
   - Projection failure / stale projection tests が pass。
   - Context packet fail-closed tests が維持される。
@@ -442,6 +486,15 @@ ID: "iss-00238"
 
 - 委任ロール:
   - doc-writer。
+- 入力 docs:
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
+  - `spec-dock/docs/workflow_issue.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`
+  - `tests/unit/infra/test_init_update.py`
+  - `tests/cli_runtime/test_wrappers.py`
 - 許可 paths:
   - S03 対象ファイル。
 - 禁止 changes:
@@ -456,6 +509,9 @@ ID: "iss-00238"
   - spec-reviewer: skill wording、authority boundary、task checklist 登録。
 - 停止条件:
   - Skill が dynamic guidance を読まず static docs primary に戻る。
+- 必須出力:
+  - changed files、focused pytest / rg inspection result、skill wording summary、unresolved risks。
+  - material decision がある場合は Ledger Note、ない場合は `No material implementation decisions beyond the approved plan.`。
 
 #### 具体テストケース一覧
 
@@ -463,6 +519,7 @@ ID: "iss-00238"
   - 前提: provider Skill asset。
   - 操作: text を読む。
   - 期待結果: `guidance issue-planning` と task checklist 登録要求がある。
+  - 失敗検出: Skill が `workflow next issue-planning`、projection path、または static docs primary handoff を agent-facing primary として残す回帰を検出する。
   - 検証方法: unit/infra assertion。
   - 関連 closure id: tc-005
 
@@ -470,6 +527,7 @@ ID: "iss-00238"
   - 前提: provider Skill asset。
   - 操作: text を読む。
   - 期待結果: `guidance issue-execution` と projection non-handoff warning がある。
+  - 失敗検出: execution Skill が returned guidance の checklist 登録を促さない、または projection を handoff authority として読ませる回帰を検出する。
   - 検証方法: unit/infra assertion。
   - 関連 closure id: tc-005
 
@@ -558,6 +616,6 @@ ID: "iss-00238"
 - final commit 完了:
   - 実装・docs・report が commit 済み。
 - 必須 closure id 完了:
-  - tc-001〜tc-006。
+  - tc-001〜tc-010。
 - final clean state:
   - no unintended staged / unstaged changes。
