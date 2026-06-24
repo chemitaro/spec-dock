@@ -3,268 +3,313 @@
 ID: "iss-00237"
 タイトル: "Analyze Manual Test Routing Failures"
 関連GitHub: ["#237"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-24"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00224", "init-local-00003"]
 ---
 
-# iss-00237 Analyze Manual Test Routing Failures — 実装計画（実行契約 / Execution Contract）
-
-> このテンプレートは executable scaffold です。`plan.md` は計画済み契約（planned contract）と、実装者が step を上から順に実行できる command queue を書く場所です。実行結果、逸脱、発見された tests、reviewer verdict、commit/no-op evidence は `report.md` の観測証跡台帳（observed evidence ledger）に記録する。workflow authority は skills / `workflow_issue.md` が持ち、Issue 計画の field semantics と詳しい書き方は `phase_plan_issue.md` と `docs/authoring/issue-plan.md` を detail-reference として参照する。
+# iss-00237 Analyze Manual Test Routing Failures — 実装計画
 
 ## この計画で満たす要件ID
 - AC:
-  - ...
+  - AC-001: runtime evidence と `docs-only verification` phrase が同居しても runtime routing になる。
+  - AC-002: 否定文だけでは `security-sensitive` / `xhigh` に昇格しない。
+  - AC-003: 肯定的な authentication / authorization / permissions / security evidence は引き続き `security-sensitive` / `xhigh` になる。
+  - AC-004: explicit docs-only は既存 docs-only routing を維持する。
+  - AC-005: migration / rollback の肯定的 evidence は既存 migration routing を維持する。
+  - AC-006: targeted pytest が成功する。
 - EC:
-  - ...
+  - EC-001: runtime evidence は docs-only weak phrase より優先する。
+  - EC-002: forbidden / stop condition / negated high-risk word だけでは security-sensitive にしない。
+  - EC-003: affirmative security evidence は runtime evidence より優先する。
 - 制約:
-  - ...
+  - routing policy matrix、assurance classification policy、PR observation、`workflow_state.py`、explicit task field schema は変更しない。
 
 ## 依存関係から導く実装順序
-- 依存関係の参照元:
-  - `design.md` の依存関係、図、ファイル変更計画
-- 順序ルール:
-  - prerequisite / lower-dependency slice から先に閉じる
-  - downstream slice は前提が固定されてから置く
-- step 依存サマリー:
-  - S01:
-    - 依存:
-    - unblock:
-    - 対象ファイル:
+- S01:
+  - 依存: `requirement.md` / `design.md`
+  - unblock: classifier 実装修正の Red evidence
+  - 対象ファイル: `tests/cli_runtime/test_workflow_context_routing.py`
+- S02:
+  - 依存: S01
+  - unblock: AC-001〜AC-005 の Green evidence
+  - 対象ファイル: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
+- S90:
+  - 依存: S02
+  - unblock: docs impact の有無確認
+  - 対象ファイル: 原則なし
+- S99:
+  - 依存: S01 / S02 / S90
+  - unblock: Issue 完了判断
+  - 対象ファイル: `report.md`
 
 ## ステップ一覧
 - S01:
-  - 観測可能な振る舞い:
-  - 依存:
-  - unblock:
-  - 対象ファイル:
-  - 閉じる要件:
-  - レビューゲート:
+  - 観測可能な振る舞い: 現行 classifier が MT-009 / MT-024 の failure を再現する。
+  - 依存: なし
+  - unblock: S02
+  - 対象ファイル: `tests/cli_runtime/test_workflow_context_routing.py`
+  - 閉じる要件: AC-001〜AC-002 の Red fixture と AC-003〜AC-005 の covered-existing guards
+  - レビューゲート: code-reviewer
 - S02:
-  - ...
+  - 観測可能な振る舞い: evidence-based classifier により routing regression tests が Green になる。
+  - 依存: S01
+  - unblock: S90 / S99
+  - 対象ファイル: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
+  - 閉じる要件: AC-001〜AC-006、EC-001〜EC-003
+  - レビューゲート: code-reviewer
+- S90:
+  - 観測可能な振る舞い: この修正に必要な docs update がないこと、または follow-up に切り出すことが明確になっている。
+  - 依存: S02
+  - unblock: S99
+  - 対象ファイル: 原則なし。必要が出た場合のみ plan amendment。
+  - 閉じる要件: scope constraint
+  - レビューゲート: spec-reviewer
+- S99:
+  - 観測可能な振る舞い: Issue の実装証跡、検証結果、残リスクが `report.md` に記録される。
+  - 依存: S01 / S02 / S90
+  - unblock: Issue finish
+  - 対象ファイル: `report.md`
+  - 閉じる要件: AC-006、final evidence
+  - レビューゲート: qa-reviewer / spec-reviewer
 
 ## 要件 ↔ ステップ対応
-- AC-001 -> S01
-- EC-001 -> S02
+- AC-001 -> S01 / S02
+- AC-002 -> S01 / S02
+- AC-003 -> S01 / S02
+- AC-004 -> S01 / S02
+- AC-005 -> S01 / S02
+- AC-006 -> S02 / S99
+- EC-001 -> S01 / S02
+- EC-002 -> S01 / S02
+- EC-003 -> S01 / S02
 
 ## 仕様固定クロージャ索引（Spec-Locked Closure Index）
-
-> これは Issue 全体のテスト一覧ではなく、仕様を縮小解釈・後付けテスト・過剰実装しないための coverage ledger です。実際の step-local obligation と concrete seeds は各 implementation step の `具体テストケース一覧` に置く。
-
 | 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | <behavior> | 受け入れ（acceptance） | AC-001 | ... | ... | 仕様 drift（spec drift） | yes | red-required | ステップ完了証跡（report step closure） |
-| tc-002 | S01 | <behavior> | 否定系（negative） | EC-001 | ... | ... | 沈黙失敗（silent failure） | yes | inspect-only | ステップ完了証跡（report step closure） |
-
-- 証跡レベル（evidence level）:
-  - red-required: 実装前に失敗する新規 test / characterization を固定する。
-  - covered-existing: 既存 test が対象 behavior を検出できる根拠を固定する。
-  - inspect-only: docs / template / config などを inspection、structural assertion、review evidence で閉じる。
-  - manual-required: 自動化できない確認手順、期待結果、記録先を固定する。
-- 詳細化方針:
-  - 件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk から必要な obligation を決める。
-  - private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない。
+| tc-237-001 | S01/S02 | runtime-over-docs-only-phrase | 受け入れ | AC-001, EC-001 | runtime step は `dev-coder` / `medium` / `unit_tests` / `code-reviewer` | runtime paths、`unit_tests`、`dev-coder`、`code-reviewer`、`docs-only verification` が同居する plan step | docs-only over-match による過小分類 | yes | red-required | `report.md` Step/Test Contract Closure |
+| tc-237-002 | S01/S02 | negated-security | 否定系 | AC-002, EC-002 | 否定文だけでは `security-sensitive` / `xhigh` にしない | `security/privacy-sensitive として過剰に分類しない` を含み、肯定的 security evidence はない plan step | negated high-risk word の過剰分類 | yes | red-required | `report.md` Step/Test Contract Closure |
+| tc-237-003 | S01/S02 | affirmative-security | 回帰防止 | AC-003, EC-003 | 肯定的 security evidence は `security-sensitive` / `xhigh` | authentication / authorization / permissions / `security_review` / `privacy_review` を含む plan step | security false negative | yes | covered-existing | `report.md` Step/Test Contract Closure |
+| tc-237-004 | S01/S02 | explicit-docs-only | 回帰防止 | AC-004 | explicit docs-only は `doc-writer` / `low` / `docs_inspection` / `spec-reviewer` | `Task marker: docs-only` を含む plan step | docs-only true positive の破壊 | yes | covered-existing | `report.md` Step/Test Contract Closure |
+| tc-237-005 | S01/S02 | affirmative-migration | 回帰防止 | AC-005 | migration / rollback evidence は `migration` routing を維持し、`rollback_plan` を要求する | `Task marker: migration rollback` を含む plan step | migration true positive の破壊 | yes | covered-existing | `report.md` Step/Test Contract Closure |
+| tc-237-006 | S99 | targeted-routing-suite | 受け入れ | AC-006 | targeted pytest が成功する | routing CLI test suite | 実装と既存投影 contract の不整合 | yes | covered-existing | `report.md` Final Verification |
 
 ## レビュー / QA ゲート方針
 - RG1 step review:
-  - 実施タイミング: 各 implementation step の commit 前
-  - reviewer: code-reviewer（code / runtime / tests / scaffold behavior）; spec-reviewer（docs-only / template-only / skill-text-only）
-  - pass 条件: review_status: pass
+  - 実施タイミング: S01 / S02 の implementation step 完了後。
+  - reviewer: code-reviewer。
+  - pass 条件: classifier precedence、false positive / false negative、test sensitivity に blocking 指摘がないこと。
 - QG1 final QA:
-  - reviewer: qa-reviewer
-  - 範囲: Issue 全体の obligation coverage、missing high-value tests、manual / integration test 要否
+  - reviewer: qa-reviewer。
+  - 範囲: AC/EC coverage、追加すべき high-value test の有無、manual test failure 再発リスク。
 - SG1 final spec review:
-  - reviewer: spec-reviewer
-  - 範囲: requirement / design / plan / report / docs 整合
+  - reviewer: spec-reviewer。
+  - 範囲: requirement / design / plan / report の整合、scope 外項目の切り分け。
 
 ## 実行ルール（全ステップ共通）
-- 各 implementation step は 1 behavior slice / 1 review scope / 1 commit boundary とする。例外が必要な場合は実装前に plan amendment と fresh re-review を通し、final review / final commit で per-step review / commit を代替しない。
-- `plan.md` には planned requirements、evidence destination、closure 条件だけを書く。observed result は `report.md` に書く。
-- docs-only / inspect-only / manual-required step は code test 前提にせず、代替 evidence path と rationale を implementation 前に固定する。
-- implementation 中に新しい仕様、bug class、外部 contract risk、未計画の closure が見つかった場合は、report 記録だけで足りるか、plan amendment と re-review が必要かを判断する。
+- 各 implementation step は 1 behavior slice / 1 review scope / 1 commit boundary とする。
+- `plan.md` には planned contract を置き、観測結果は `report.md` に記録する。
+- routing policy matrix に手を入れる必要が出た場合は、実装を止めて plan amendment と再レビューを行う。
+- explicit `task_kind` / `risk_tags` field が必要と判明した場合は、この issue では実装せず follow-up 化する。
 
 ## 実装ステップ
 
-### 実装ステップ S01 — <観測可能な振る舞い>
-- 振る舞いの目標（behavior goal）:
-  - ...
+### 実装ステップ S01 — routing classifier regression を赤で固定する
+- 振る舞いの目標:
+  - MT-009 / MT-024 の routing failure を CLI runtime test で再現できるようにする。
 - design 参照:
-  - ...
+  - `design.md` の「分類 precedence」「テスト戦略」。
 - 依存:
-  - ...
+  - なし。
 - unblock:
-  - ...
+  - S02。
 - 対象ファイル:
-  - ...
-- 計画済み契約（planned contract）:
+  - `tests/cli_runtime/test_workflow_context_routing.py`
+- 計画済み契約:
   - scope:
-    - 実装・文書化する範囲:
-  - テスト義務（test obligation）:
+    - CLI runtime fixture を追加し、`workflow next issue-execution --format json` の public output を assert する。
+  - テスト義務:
     - closure id:
-      - tc-001
+      - tc-237-001
+      - tc-237-002
+      - tc-237-003
+      - tc-237-004
+      - tc-237-005
     - coverage rationale:
-      - AC / changed contract / failure mode / regression risk / invariant / manual risk から必要性を書く:
+      - 手動テスト failure の再発を、private helper ではなく public CLI surface で検出する。
   - Red / 代替証跡の要件:
-    - red-required / covered-existing:
-      - 実装前に確認する failing test、characterization、または既存 test sensitivity:
-    - docs-only / inspect-only / manual-required:
-      - code test を置かない理由:
-      - 代替 evidence path:
-      - manual 手順と期待結果:
-  - 実装範囲（implementation scope）:
+    - red-required:
+      - S02 実装前に少なくとも tc-237-001 または tc-237-002 が失敗することを確認する。
+      - tc-237-003 / tc-237-004 / tc-237-005 は existing true positive を守る covered-existing evidence として固定する。
+  - 実装範囲:
     - allowed paths:
-      - ...
+      - `tests/cli_runtime/test_workflow_context_routing.py`
     - forbidden changes:
-      - ...
+      - production code。
+      - routing policy matrix。
   - Green 検証:
-    - command / inspection / manual evidence:
-      - ...
-  - Refactor / cleanup ガードレール:
-    - 目的:
-    - 禁止する広がり:
+    - S01 単独では failure が期待される。結果は `report.md` に Red evidence として記録する。
   - closure 証跡要件:
-    - Step Contract Closure:
-    - Test Contract Closure:
-    - Closure Coverage:
-  - report 証跡の記録先:
-    - `report.md` の対象 section / ledger:
-  - amendment trigger（plan amendment が必要になる契機）:
-    - plan amendment と re-review が必要になる発見:
+    - Step Contract Closure: tests added。
+    - Test Contract Closure: Red evidence recorded。
+    - Closure Coverage: tc-237-001〜tc-237-005 linked。
+  - amendment trigger:
+    - CLI fixture では再現できず private function test が必要になる場合。
 
-#### 委任契約（delegation contract）
-- 委任ロール（delegated role）:
-  - dev-coder / doc-writer / other named worker / N/A
-  - N/A は read-only / approved-no-op step、または `workflow_issue.md` に従う事前承認済み Parent Implementation Exception だけに使う。file mutation を伴う通常の implementation success path として使わない。
+#### 委任契約（S01）
+- 委任ロール:
+  - dev-coder
 - 入力 docs:
   - `requirement.md`
   - `design.md`
   - `plan.md`
-  - workflow / authoring docs:
-  - current target files:
+  - `spec-dock/active/issue/discussions/20260624t062220z-disc-routing-repair-design-options.md`
 - 許可 paths:
-  - ...
+  - `tests/cli_runtime/test_workflow_context_routing.py`
 - 禁止 changes:
-  - ...
+  - `src/spec_dock/**`
+  - `spec-dock/**` の canonical docs 以外
 - 受け入れ条件:
-  - closure id / step close condition:
-- 必須 tests または docs-only verification:
-  - targeted command / inspection / docs diff / manual evidence:
+  - tc-237-001〜tc-237-005 の test fixture が存在する。
+  - S02 前に Red evidence を観測できる。
+- 必須 tests:
+  - `uv run pytest tests/cli_runtime/test_workflow_context_routing.py`
 - reviewer focus:
-  - code-reviewer（code / runtime / tests / scaffold behavior）; spec-reviewer（docs-only / template-only / skill-text-only docs/spec alignment）
-- 必須出力（output required）:
-  - changed files:
-  - verification result:
-  - report evidence to update:
-  - unresolved risks:
-- 停止条件（stop conditions）:
-  - input docs conflict / path outside allowed scope / verification cannot run / acceptance cannot be met:
+  - tests が current implementation details に過剰結合せず、public CLI output を見ていること。
+- 停止条件:
+  - fixture で active issue / plan step selection を安定再現できない。
 
-#### 具体テストケース一覧
+#### 具体テストケース一覧（S01）
+- `tc-s01-001` acceptance: runtime paths override docs-only verification phrase
+  - 前提: plan step に runtime paths、`unit_tests`、`dev-coder`、`code-reviewer`、`docs-only verification` が同居する。
+  - 操作: `workflow next issue-execution --format json`
+  - 期待結果: `task_kind=runtime`、`worker=dev-coder`、`reasoning_effort=medium`、`verification=["unit_tests"]`、`reviewers=["code-reviewer"]`
+  - 失敗検出: `doc-writer` / `low` / `docs_inspection` になる。
+  - 関連 closure id: tc-237-001
+- `tc-s01-002` negative: negated security phrase does not escalate
+  - 前提: plan step に `security/privacy-sensitive として過剰に分類しない` があるが、肯定的 security evidence はない。
+  - 操作: `workflow next issue-execution --format json`
+  - 期待結果: `task_kind` は `security-sensitive` ではなく、`reasoning_effort` は `xhigh` ではない。
+  - 失敗検出: `security-sensitive` / `xhigh` になる。
+  - 関連 closure id: tc-237-002
+- `tc-s01-003` regression: affirmative authz terms still escalate
+  - 前提: plan step に authentication / authorization / permissions / `security_review` / `privacy_review` がある。
+  - 操作: `workflow next issue-execution --format json`
+  - 期待結果: `task_kind=security-sensitive`、`reasoning_effort=xhigh`、verification に `security_review` と `privacy_review` が含まれる。
+  - 失敗検出: runtime / medium に落ちる。
+  - 関連 closure id: tc-237-003
+- `tc-s01-004` regression: explicit docs-only still routes to doc-writer
+  - 前提: plan step に explicit `Task marker: docs-only` がある。
+  - 操作: `workflow next issue-execution --format json`
+  - 期待結果: `worker=doc-writer`、`reasoning_effort=low`、`verification=["docs_inspection"]`、`reviewers=["spec-reviewer"]`
+  - 失敗検出: runtime / dev-coder になる。
+  - 関連 closure id: tc-237-004
+- `tc-s01-005` regression: affirmative migration still routes to migration obligations
+  - 前提: plan step に explicit `Task marker: migration rollback` がある。
+  - 操作: `workflow next issue-execution --format json`
+  - 期待結果: `task_kind=migration`、`worker=dev-coder`、`reasoning_effort=high`、verification に `rollback_plan` が含まれる。
+  - 失敗検出: runtime / medium または docs-only に落ちる。
+  - 関連 closure id: tc-237-005
 
-> この欄は full test inventory ではありません。step-local obligation と concrete red / characterization / inspect / manual seeds を、実装前に固定するための欄です。
+### 実装ステップ S02 — evidence-based classifier を実装する
+- 振る舞いの目標:
+  - S01 の Red tests を Green にし、既存 routing tests を維持する。
+- design 参照:
+  - `design.md` の「採用方針」「分類 precedence」「インターフェース契約」。
+- 依存:
+  - S01。
+- unblock:
+  - S90 / S99。
+- 対象ファイル:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
+- 計画済み契約:
+  - scope:
+    - `_classify_task_kind` を evidence-based precedence に変更する。
+    - 必要な private helper を同ファイルに追加する。
+  - テスト義務:
+    - closure id:
+      - tc-237-001
+      - tc-237-002
+      - tc-237-003
+      - tc-237-004
+      - tc-237-005
+      - tc-237-006
+  - 実装範囲:
+    - allowed paths:
+      - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
+    - forbidden changes:
+      - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/context_routing.py`
+      - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/workflow_state.py`
+      - PR observation scripts
+      - docs/templates/system-wide schema changes
+  - Green 検証:
+    - `uv run pytest tests/cli_runtime/test_workflow_context_routing.py`
+  - Refactor / cleanup ガードレール:
+    - 目的: classifier の evidence 判定を読みやすく保つ。
+    - 禁止する広がり: selection algorithm、completion detection、packet writing、policy matrix への拡大。
+  - closure 証跡要件:
+    - Step Contract Closure: classifier changed and tests Green。
+    - Test Contract Closure: tc-237-001〜tc-237-006 observed。
+    - Closure Coverage: AC/EC 全対応。
+  - amendment trigger:
+    - true positive を守るために policy matrix 変更が必要と判明した場合。
+    - explicit schema field なしでは誤分類を安全に解消できないと判明した場合。
 
-- `tc-s01-001` acceptance: <短い説明>
-  - 前提: ...
-  - 操作: ...
-  - 期待結果: ...
-  - 失敗検出: ...
-  - 検証方法: ...
-  - 関連 closure id: tc-001
+#### 委任契約（S02）
+- 委任ロール:
+  - dev-coder
+- 入力 docs:
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
+  - `tests/cli_runtime/test_workflow_context_routing.py`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
+- 許可 paths:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
+- 禁止 changes:
+  - S02 allowed paths 以外。
+- 受け入れ条件:
+  - S01 tests と既存 routing tests が成功する。
+- 必須 tests:
+  - `uv run pytest tests/cli_runtime/test_workflow_context_routing.py`
+- reviewer focus:
+  - precedence が AC/EC と一致していること。
+  - negation handling が broad すぎないこと。
+  - runtime fallback が docs-only true positive を壊していないこと。
+- 停止条件:
+  - security true positive が壊れる。
+  - policy matrix 変更なしでは実装できない。
 
-- `tc-s01-002` inspect-only / manual-required: <短い説明>
-  - テスト不要理由: <自動テスト不要の理由>
-  - 代替検証方法: <確認手順>
-  - 期待結果: <期待される状態>
-  - 記録先: <証跡の保存先>
-  - 関連 closure id: tc-002
-
-#### ステップ完了契約（step closure contract）
-- closure id:
-  - tc-001
-- close 条件:
-  - ...
-- 検証 evidence:
-  - targeted command / inspection / manual evidence:
-- report evidence:
-  - Step Contract Closure:
-  - Test Contract Closure:
-  - Closure Coverage:
-  - Closure Delta:
-- 残リスク:
-  - ...
-
-#### ステップゲート（step gate）
-- step reviewer gate:
-  - reviewer:
-  - review 範囲:
-  - pass 条件: review_status: pass
-  - re-review rule: 指摘を修正し pass まで再実行
-- commit / no-op gate:
-  - closure 状態: committed / approved-no-op
-  - commit 範囲:
-  - no-op の場合の確認対象、差分なし確認コマンド、read-only evidence:
-
-### 実装ステップ Sxx — <次に観測可能な振る舞い>
-- S01 の subsections を複製して記入する。
-- `planned contract`、`delegation contract`、`具体テストケース一覧`、`step closure contract`、`step gate` がない implementation step は implementation-ready ではない。
-
-### ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）
+### ドキュメント影響の解消ステップ S90
 - 対象:
   - docs / templates / README / workflow / skill / migration notes / none
 - 対応:
-  - ...
-- doc update owner:
-  - doc-writer when updates are required
+  - 今回の修正は private classifier の bug fix であり、operator-visible contract は変えない想定。
+  - docs update が必要な場合は、変更前に plan amendment を行う。
+  - MT-003、MT-004、MT-015 はこの issue の実装修正対象外であり、必要なら follow-up issue に残す。
 - spec/doc review:
-  - reviewer: spec-reviewer
-  - pass 条件: docs が requirement / design / plan と整合し、未解決の必須 docs 影響が残っていない
+  - spec-reviewer が scope 外項目の切り分けを確認する。
 
-### 最終品質ゲートステップ S99（final quality gate）
-- branch diff 範囲:
-  - ...
-- 必須 validation:
-  - ...
-- final QA gate:
-  - reviewer: qa-reviewer
-  - 範囲: Issue 全体の obligation coverage と integration test 要否
-  - pass 条件: reviewer pass
-- final code review ゲート:
-  - reviewer: code-reviewer
-  - 範囲: issue-wide integrated diff、構造、責務境界、回帰リスク、保守性
-  - pass 条件: review_status: pass
-- final spec review ゲート:
-  - reviewer: spec-reviewer
-  - 範囲: requirement / design / plan / report / implementation / tests / docs 整合
-  - pass 条件: reviewer pass
-- final commit gate:
-  - commit 範囲:
-  - final report ledger:
-  - post-commit external evidence destination:
-
-## 未確定事項
-- Q-001:
-  - 質問:
-  - 推奨案:
-  - 影響範囲:
-
-## 最終完了条件
-- AC/EC 達成:
-  - ...
-- docs 影響解決:
-  - ...
-- 全 implementation step 完了:
-  - committed / approved-no-op:
-- final quality gate pass:
+### 最終確認ステップ S99
+- 対象:
+  - `report.md`
+  - routing regression suite
+- 対応:
+  - Red / Green / closure evidence を `report.md` に記録する。
+  - targeted pytest の結果を記録する。
+  - 未解決リスクと follow-up 候補を記録する。
+- 最終検証:
+  - `uv run pytest tests/cli_runtime/test_workflow_context_routing.py`
+- final gates:
   - qa-reviewer:
-  - issue-wide code-reviewer:
+    - AC/EC coverage と追加 test gap を確認する。
   - spec-reviewer:
-- final commit 完了:
-  - ...
-- 必須 closure id 完了:
-  - Step Contract Closure:
-  - Test Contract Closure:
-  - Closure Coverage:
-- final clean state:
-  - no unintended staged / unstaged changes:
+    - `requirement.md` / `design.md` / `plan.md` / `report.md` の整合を確認する。
+
+## フォローアップ候補
+- Issue plan step schema への explicit `task_kind` / `risk_tags` field 導入 ADR / issue。
+- `--github-issue` docs cleanup。
+- symlink abuse fresh trial retest。
+- `validate` / `doctor` の empty workspace semantics docs 明記。
