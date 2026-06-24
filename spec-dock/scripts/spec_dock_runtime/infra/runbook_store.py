@@ -13,12 +13,15 @@ if TYPE_CHECKING:
     from spec_dock_runtime.domain.runbook import Runbook
 
 
-CURRENT_RUNBOOK_PATHS: tuple[str, ...] = (
+RUNBOOK_STATE_PATHS: tuple[str, ...] = (
     "spec-dock/.agent/runbooks/current-runbook.json",
     "spec-dock/.agent/runbooks/current-runbook.md",
+)
+ACTIVE_RUNBOOK_PATHS: tuple[str, ...] = (
     "spec-dock/active/current-runbook.json",
     "spec-dock/active/current-runbook.md",
 )
+CURRENT_RUNBOOK_PATHS: tuple[str, ...] = RUNBOOK_STATE_PATHS + ACTIVE_RUNBOOK_PATHS
 
 
 class RunbookStore:

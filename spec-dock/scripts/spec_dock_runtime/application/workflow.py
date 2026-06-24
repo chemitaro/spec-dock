@@ -115,7 +115,12 @@ def workflow_next(
     )
     projection = runbook_store.write_current(runbook)
     if projection.written:
-        return WorkflowResult(operation="next", state=state, runbook=runbook, projection=projection)
+        return WorkflowResult(
+            operation="next",
+            state=state,
+            runbook=runbook,
+            projection=projection,
+        )
     blocked_state = WorkflowState(
         kind="blocked",
         active_issue_id=state.active_issue_id,

@@ -100,10 +100,7 @@ def _result_payload(result: AssuranceResult) -> dict[str, Any]:
         payload["classification"] = classification
     if result.contract is not None:
         payload["contract"] = result.contract.to_dict()
-    readiness = _auto_lite_readiness_payload(result)
-    if readiness is not None:
-        payload["auto_lite_readiness"] = readiness
-    return payload
+    return _with_auto_lite_readiness(payload, result)
 
 
 def _classification_payload(result: AssuranceResult) -> dict[str, Any] | None:
@@ -120,6 +117,13 @@ def _classification_payload(result: AssuranceResult) -> dict[str, Any] | None:
             "unknown_facts": [],
         }
     return None
+
+
+def _with_auto_lite_readiness(payload: dict[str, Any], result: AssuranceResult) -> dict[str, Any]:
+    readiness = _auto_lite_readiness_payload(result)
+    if readiness is not None:
+        payload["auto_lite_readiness"] = readiness
+    return payload
 
 
 def _auto_lite_readiness_payload(result: AssuranceResult) -> dict[str, object] | None:
