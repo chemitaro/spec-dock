@@ -156,20 +156,24 @@ ID: "iss-00238"
   - なし。
 - unblock:
   - S02, S03。
-- 対象ファイル:
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py`
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/workflow.py`
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/guidance.py`（追加する場合）
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py`
-  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/workflow.py`
-  - `tests/cli_runtime/test_workflow.py`
-  - `tests/cli_runtime/test_workflow_context_routing.py`
+  - 対象ファイル:
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/workflow.py`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/guidance.py`（追加する場合）
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py`
+    - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/workflow.py`
+    - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`
+    - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`
+    - `tests/cli_runtime/test_workflow.py`
+    - `tests/cli_runtime/test_workflow_context_routing.py`
+    - `tests/unit/infra/test_init_update.py`
 - 計画済み契約（planned contract）:
   - scope:
     - `guidance` command を public entrypoint とする。
     - `issue-planning` / `issue-execution` target を受ける。
     - 出力は引数なしの Markdown に固定する。今回の issue では JSON output contract を追加しない。
     - `workflow next` tests を `guidance` contract に置き換える。
+    - `workflow next` 削除と同じ atomic step で Issue Planning / Execution Skill の first-read handoff を `guidance <target>` に切り替える。
   - テスト義務:
     - closure id: tc-001, tc-002, tc-007, tc-008
     - coverage rationale:
@@ -214,7 +218,8 @@ ID: "iss-00238"
   - S01 対象ファイル。
 - 禁止 changes:
   - Assurance / context packet policy。
-  - Skill asset 更新（S03 で実施）。
+    - Skill asset 更新（S03 で実施）。
+      - 例外: `workflow next` 削除で shipped Skill が壊れるため、Issue Planning / Execution Skill の first-read handoff だけは S01 reviewer-directed fix として同一 commit で更新する。
 - 受け入れ条件:
   - AC-001, AC-002, AC-003, EC-001, EC-002, EC-003。
 - 必須 tests:
