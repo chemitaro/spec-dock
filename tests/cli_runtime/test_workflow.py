@@ -46,6 +46,11 @@ class TestCliWorkflow(CliRuntimeHarness):
             status_payload = json.loads(status.stdout)
             next_payload = self._read_projected_runbook(target)
             assert status_payload["state"] == "requirement-capture"
+            assert "- state: requirement-capture" in next_result.stdout
+            assert "- next_action: requirement-capture-required" in next_result.stdout
+            assert "- reason_code: requirement-scaffold" in next_result.stdout
+            assert "- `./spec-dock/scripts/spec-dock active show`" in next_result.stdout
+            assert "- Do not classify assurance or start execution from a scaffold requirement." in next_result.stdout
             assert next_payload["state"] == "requirement-capture"
             assert next_payload["next_action"] == "requirement-capture-required"
 
