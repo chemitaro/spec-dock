@@ -126,9 +126,106 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S01 では runtime routing failure を再現する CLI runtime regression tests を追加した。
+- S02 では `_classify_task_kind` を evidence-based classifier に変更し、S01 の Red を Green にする予定。
 
 ## 実装記録（セッションログ） (必須)
+
+### セッションログ（2026-06-24 16:16 JST - S01）
+
+#### 対象
+- Step: S01
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, EC-001, EC-002, EC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S01 — routing classifier regression を赤で固定する`
+  - closure ids: tc-237-001, tc-237-002, tc-237-003, tc-237-004, tc-237-005
+
+#### 実施内容
+- `tests/cli_runtime/test_workflow_context_routing.py` に CLI public output を使う regression / characterization tests を追加した。
+- tc-237-001 / tc-237-002 は現行 production code に対して expected Red として観測した。
+- tc-237-003 / tc-237-004 / tc-237-005 は existing true positive guard として同じ targeted run 内で pass した。
+- Material implementation decisions: No material implementation decisions beyond the approved plan.
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_workflow_context_routing.py
+
+expected Red: 2 failed, 16 passed
+- tc-237-001: expected `runtime`, actual `docs-only`
+- tc-237-002: expected not `security-sensitive`, actual `security-sensitive`
+- tc-237-003〜tc-237-005: covered-existing guards pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S01 | Red / alternative | tc-237-001〜tc-237-002 red-required; tc-237-003〜tc-237-005 covered-existing | targeted pytest: 2 failed, 16 passed | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | S01 は expected Red。Green 化は S02 の対象 |
+| S01 | Refactor | guardrail satisfied | production code 変更なし、test-only diff | diff inspection / code-reviewer | pass | allowed path のみ変更 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S01 | none | dev-coder / orchestrator | recorded | N/A | no | S01 approved test list のみ |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S01 | tc-237-001〜tc-237-005 | tests added; Red evidence recorded; closure coverage linked | tests added in `tests/cli_runtime/test_workflow_context_routing.py`; targeted pytest expected Red; code-reviewer pass | pass | S02 が Green 化を担当 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-237-001 / `test_workflow_next_runtime_paths_override_docs_only_verification_phrase` | S01 | yes | red-required | expected Red | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | fail as expected | actual `docs-only` |
+| tc-237-002 / `test_workflow_next_negated_security_phrase_does_not_escalate` | S01 | yes | red-required | expected Red | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | fail as expected | actual `security-sensitive` |
+| tc-237-003 / `test_workflow_next_affirmative_authz_terms_still_escalate` | S01 | yes | covered-existing | true positive guard | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | security true positive preserved |
+| tc-237-004 / `test_workflow_next_explicit_docs_only_still_routes_to_doc_writer` | S01 | yes | covered-existing | true positive guard | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | docs-only true positive preserved |
+| tc-237-005 / `test_workflow_next_affirmative_migration_terms_still_route_to_rollback_plan` | S01 | yes | covered-existing | true positive guard | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | migration true positive preserved |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-237-001 | S01 | targeted pytest | pass | expected Red captured |
+| tc-237-002 | S01 | targeted pytest | pass | expected Red captured |
+| tc-237-003 | S01 | targeted pytest | pass | covered-existing guard |
+| tc-237-004 | S01 | targeted pytest | pass | covered-existing guard |
+| tc-237-005 | S01 | targeted pytest | pass | covered-existing guard |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | tc-237-001〜tc-237-005 | N/A | tc-237-001〜tc-237-005 | approved plan 通り | no | no |
+
+#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
+| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| user instruction / issue-execution workflow | `/Users/iwasawayuuta/.codex/worktrees/dbca/spec-dock` | iss-00237 | current session | dev-coder, code-reviewer | S01 allowed path only; no production code; no push / PR | issue complete / scope change / user revocation | none | proceed to S02 after S01 commit gate |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | test-only runtime regression slice | dev-coder | tc-237-001〜tc-237-005 tests | `plan.md` S01 | `tests/cli_runtime/test_workflow_context_routing.py` | production code / `src_spec_dock/**` / canonical docs/report | targeted pytest expected Red | fixture cannot reproduce | changed files, tests, verification, risks | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S01 | dev-coder | tc-237-001〜tc-237-005 の CLI regression / guard tests を追加 | `tests/cli_runtime/test_workflow_context_routing.py` | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` -> expected Red: 2 failed, 16 passed | code-reviewer pass | S01 単独では Red。S02 で Green 化 | accepted |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | code-reviewer | fresh | passed | N/A | proceed | subagent `019ef87b-1299-7f90-a9a9-004279d81564`, no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | pending commit | `tests/cli_runtime/test_workflow_context_routing.py`, `report.md` S01 evidence | this S01 ledger entry | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_workflow_context_routing.py` - routing classifier regression / guard tests
+- `spec-dock/active/issue/report.md` - S01 execution evidence
+
+#### メモ
+- S01 の Red は approved plan 通り。S02 で production code を変更し Green 化する。
 
 ### セッションログ（2026-06-24 HH:MM - HH:MM）
 
