@@ -12,7 +12,7 @@ ID: "iss-00238"
 
 # iss-00238 Use Stdout Runbook Handoff Instead Of Generated Workflow Files — 実装報告
 
-この report は `iss-00238` の観測証跡台帳である。現時点では Issue Planning phase と S01 implementation step の証跡を記録している。
+この report は `iss-00238` の観測証跡台帳である。現時点では S01 / S02 / S03 / S90 / S99 の実装・検証・レビュー証跡を記録している。
 
 ## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger）
 
@@ -278,6 +278,67 @@ uv run spec-dock update .
 |---|---|---|---|---|---|---|---|
 | S90 | docs / mirror impact review | spec-reviewer | fresh | passed | no | S90 can be committed | Findings: none. Reviewer confirmed dogfooding context packet change is acceptable mirror parity from update step. |
 
+### セッションログ（2026-06-24 23:30 - 23:55 JST）
+
+#### 対象
+- Step: S99
+- Scope: final quality gate / issue-wide integrated diff
+- Closure IDs: tc-006
+
+#### 実施内容
+- issue-wide focused regression suites を再実行した。
+- `tests/unit tests/cli_runtime` の広範囲 pytest を実行し、dogfooding `.meta.json` snapshot drift 1件だけが失敗することを確認した。
+- `iss-00237` / `iss-00238` / `iss-00239` の checked-in dogfooding `.meta.json` path snapshot を追加し、該当 failure を解消した。
+- Provider / mirror context routing helper の lint 指摘を最小修正した。
+- Full ruff は repo 既存の `setup.py` import ordering と dogfooding mirror 既存 Unicode literal で失敗するため、changed-file ruff を品質証跡として採用した。
+
+#### 検証
+
+```bash
+uv run pytest tests/unit tests/cli_runtime
+# 1 failed, 1533 passed, 76 skipped
+# failure: test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+# cause: dogfooding meta snapshot did not include iss-00237 / iss-00238 / iss-00239.
+
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+# 1 passed
+
+uv run pytest tests/unit/infra/test_init_update.py
+# 515 passed
+
+uv run pytest tests/unit/domain/test_context_routing.py tests/cli_runtime/test_workflow_context_routing.py tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+# 34 passed
+
+uv run pytest tests/cli_runtime/test_wrappers.py
+# 6 passed
+
+uv run pytest tests/cli_runtime/test_workflow.py::TestCliWorkflow::test_workflow_status_and_next_detect_scaffold_requirement tests/cli_runtime/test_workflow.py
+# 11 passed
+
+uv run ruff check src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py spec-dock/scripts/spec_dock_runtime/application/context_packets.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/runbook_store.py spec-dock/scripts/spec_dock_runtime/infra/runbook_store.py tests/unit/infra/test_init_update.py
+# All checks passed
+
+uv run ruff check tests/cli_runtime/test_workflow.py
+# All checks passed
+
+uv run ruff check src spec-dock/scripts tests setup.py
+# failed on existing broader lint surface: setup.py import ordering and dogfooding mirror existing ambiguous Unicode literals outside this issue's changed files.
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=151
+
+git diff --check
+# pass
+```
+
+#### レビューゲート状態（Reviewer Gate Status）
+
+| step / phase | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S99 | final QA review | qa-reviewer | fresh | passed | no | P2 addressed before final commit | P2 finding: planning guidance test asserted state mostly through projection. Added direct stdout assertions and reran `tests/cli_runtime/test_workflow.py` -> `11 passed`. |
+| S99 | final code review | code-reviewer | fresh | passed | no | S99 can proceed to final spec review | Findings: none. |
+| S99 | final spec review | spec-reviewer | fresh | passed | no | S99 can be committed | P3 finding: stale report summary / final gate prose. This report update resolves it before commit. |
+
 ## ステップ契約の完了証跡（Step Contract Closure）
 
 | step | closure ids | close condition from plan | observed evidence | result | notes |
@@ -286,6 +347,7 @@ uv run spec-dock update .
 | S02 | tc-003, tc-004, tc-009, tc-010 | Projection failure / stale projection tests pass; context packet fail-closed tests are maintained. | `uv run pytest tests/unit/infra/test_runbook_store.py` -> `5 passed`; `uv run pytest tests/cli_runtime/test_workflow.py` -> `11 passed`; `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` -> `26 passed`. | passed | Projection errors remain observable via `result.projection.errors` / Markdown `Projection Errors`; they no longer change guidance state. |
 | S03 | tc-005 | Provider / installed Issue Planning / Execution Skill tests pass and Skill text uses `guidance <target>` with task checklist registration. | `rg` inspection confirms `guidance issue-planning`, `guidance issue-execution`, task checklist registration, and projection non-authority text; `uv run pytest tests/unit/infra/test_init_update.py -k "issue_skills or guidance or workflow_next"` -> `8 passed`; `uv run pytest tests/cli_runtime/test_wrappers.py` -> `6 passed`. | passed | No additional code changes were required because S01 already updated Skill handoff atomically with command removal. Fresh spec-reviewer re-review passed. |
 | S90 | docs / mirror impact | Provider docs / Skill handoff / dogfooding mirror no longer expose `workflow next` as active agent handoff; local dogfooding runtime supports `guidance`. | `uv run spec-dock update .`; `./spec-dock/scripts/spec-dock --help`; `./spec-dock/scripts/spec-dock guidance issue-planning`; `./spec-dock/scripts/spec-dock guidance issue-execution`; `rg` inspection. | passed | Dogfooding mirror includes one pre-existing provider-side context routing update from the source asset; spec-reviewer confirmed it is acceptable mirror parity. |
+| S99 | tc-006 | issue-wide tests / docs / specs are integrated and remaining failures are either fixed or recorded with scope. | `tests/unit/infra/test_init_update.py` -> `515 passed`; context/workflow focused suites pass; `tests/cli_runtime/test_workflow.py` -> `11 passed`; changed-file ruff pass; validate pass; diff check pass; final QA/code/spec review pass. | passed | Full `tests/unit tests/cli_runtime` initially failed only on dogfooding meta snapshot drift, then the snapshot failure was fixed and the owning suite passed. Full ruff remains blocked by broader existing lint surface outside changed files. |
 
 ## テスト契約の完了証跡（Test Contract Closure）
 
@@ -300,6 +362,7 @@ uv run spec-dock update .
 | tc-009 | S02 | yes | covered-existing | Existing context packet write failure test already asserted `context-packet-write-failure`. | `tests/cli_runtime/test_workflow_context_routing.py` | pass: `26 passed` | Context packet failure remains fail-closed while projection remains best-effort. |
 | tc-010 | S02 | yes | red-required | Updated projection tests failed because old projection payload lacked human-only metadata. | `tests/unit/infra/test_runbook_store.py`; `tests/cli_runtime/test_workflow.py` | pass | Projection remains ignored and marks audience=`human`, authority=`non-canonical`, refresh command. |
 | tc-005 | S03 | yes | inspect-only | S01 reviewer-directed fix changed Skill handoff before S03 to avoid breaking shipped skills. | `tests/unit/infra/test_init_update.py -k "issue_skills or guidance or workflow_next"`; `tests/cli_runtime/test_wrappers.py`; `rg` inspection | pass | Skill handoff contract is implemented; report closure evidence added after initial S03 spec-reviewer finding and fresh re-review passed. |
+| tc-006 | S99 | yes | issue-wide | Full pytest found one dogfooding meta snapshot failure after S90 created/retained new issue meta paths; snapshot was updated. QA P2 stdout assertion gap was also fixed. | `tests/unit/infra/test_init_update.py`; focused workflow/context suites; `tests/cli_runtime/test_workflow.py`; changed-file ruff; validate; diff check | pass | Full `tests/unit tests/cli_runtime` was not fully rerun after snapshot fix because the owning full init-update suite and affected focused suites passed. Final QA/code/spec review passed. |
 
 ## クロージャ網羅（Closure Coverage）
 
@@ -314,7 +377,7 @@ uv run spec-dock update .
 | tc-009 | S02 | EC-004 | pass | Context routing suite confirms context packet write failure remains fail-closed. |
 | tc-010 | S02 | AC-005 | pass | Unit / CLI tests confirm ignored human projection metadata and no tracked diff. |
 | tc-005 | S03 | AC-006 | pass | Skill handoff text and init-update / wrapper tests verify `guidance <target>`, task checklist registration, and projection non-authority wording; fresh spec-reviewer re-review passed. |
-| tc-006 | S99 | 全 AC / EC | not started | Pending final quality gate. |
+| tc-006 | S99 | 全 AC / EC | pass | Issue-wide focused tests, init-update full suite, validate, diff check, changed-file ruff, final QA review, final code review, and final spec review pass. |
 
 ## クロージャ差分（Closure Delta）
 
@@ -334,6 +397,7 @@ uv run spec-dock update .
 | S02 | delegated | projection non-blocking / stale projection independence / human-only projection metadata | dev-coder | application workflow; runbook store; presentation; focused tests | Context packet semantics, assurance policy, `workflow next` alias | `5 passed`; `37 passed`; `git diff --check` pass | passed | Human projection warning wording can be final-inspected in S99. | Commit S02, then confirm S03 closure. |
 | S03 | approved-no-op | Skill handoff closure confirmation | orchestrator inspection + spec-reviewer | report only; Skill assets already changed in S01 | Runtime behavior changes; new static workflow text; projection authority wording | `8 passed`; `6 passed`; `rg` inspection; `git diff --check` pass | passed | None. | Commit report-only closure, then run S90 docs impact inspection. |
 | S90 | delegated-to-command | docs impact and dogfooding mirror refresh | orchestrator + `uv run spec-dock update .` | provider projection heading; dogfooding `.agents/skills`; dogfooding runtime mirror; report | Canonical docs broad rewrite; unrelated manual edits | `update` ok; dogfooding `guidance` ok | passed | mirror includes provider asset parity for context routing classifier from existing provider source | Commit S90, then run final quality gate. |
+| S99 | orchestrated | final quality gate and report closeout | orchestrator + final reviewers | report; snapshot test; lint cleanup; stdout assertion test | Feature behavior changes outside issue scope | init-update full pass; focused workflow/context tests pass; `tests/cli_runtime/test_workflow.py` pass; changed-file ruff pass; validate pass; diff check pass; QA/code/spec review pass | passed | Full ruff has broader existing failures outside changed files; full unit/cli pytest was not fully rerun after snapshot fix. | Commit S99 closeout. |
 
 ## 委任 worker 証跡（Delegated Worker Evidence）
 
@@ -344,14 +408,15 @@ uv run spec-dock update .
 | S02 | dev-coder | Made runbook projection best-effort for guidance, added human-only projection metadata, and covered stale projection independence. | application workflow; runbook store; presentation; unit / CLI runtime tests | `uv run pytest tests/unit/infra/test_runbook_store.py` -> `5 passed`; `uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` -> `37 passed`; `git diff --check` -> pass | fresh code-reviewer passed | wording can be final-inspected in S99 | accepted |
 | S03 | orchestrator | Confirmed Skill handoff closure as approved-no-op because S01 already made the required atomic Skill asset changes. | report; Skill assets; init-update / wrapper tests | `rg` inspection; `uv run pytest tests/unit/infra/test_init_update.py -k "issue_skills or guidance or workflow_next"` -> `8 passed`; `uv run pytest tests/cli_runtime/test_wrappers.py` -> `6 passed` | fresh spec-reviewer re-review passed | none | accepted |
 | S90 | orchestrator | Refreshed dogfooding workspace from provider assets and adjusted projection heading to `Guidance Projection`. | `.agents/skills`; `spec-dock/scripts/spec_dock_runtime`; provider runbook store; report | `uv run spec-dock update .`; dogfooding `--help`; dogfooding `guidance issue-planning`; dogfooding `guidance issue-execution` | fresh spec-reviewer passed | mirror includes pre-existing provider context routing parity update | accepted |
+| S99 | orchestrator | Ran final verification, fixed dogfooding meta snapshot drift, cleaned changed-file lint findings, and addressed QA stdout assertion gap. | report; `tests/unit/infra/test_init_update.py`; provider / mirror context packet helpers; `tests/cli_runtime/test_workflow.py` | `tests/unit/infra/test_init_update.py` -> `515 passed`; context/workflow focused suites pass; `tests/cli_runtime/test_workflow.py` -> `11 passed`; changed-file ruff pass; validate pass; diff check pass | final QA/code/spec review passed | full ruff broader existing failures; full unit/cli pytest not rerun after snapshot fix | accepted |
 
 ## 親実装例外（Parent Implementation Exception）
 
-なし。S01 implementation は delegated worker に委任した。
+なし。S01/S02 implementation は delegated worker に委任し、S03/S90/S99 は report / dogfooding verification / snapshot maintenance の範囲で orchestrator が実施した。
 
 ## 最終品質ゲート（Final Quality Gate）
 
-Final QA / code review / spec review gates are not started. They are planned in S99 and will be executed after S01-S03 and S90 are closed.
+Final QA, code review, and spec review gates passed. S99 is ready to commit.
 
 ## 省略/例外メモ
 

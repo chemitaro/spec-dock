@@ -317,7 +317,7 @@ def _is_placeholder_step(title: str, block: str) -> bool:
 
 def _completed_step_ids(report_text: str) -> set[str]:
     completed_ids: set[str] = set()
-    session_matches = list(re.finditer(r"^###\s+セッションログ（[^\n]*$", report_text, re.MULTILINE))
+    session_matches = list(re.finditer(r"^###\s+セッションログ\uff08[^\n]*$", report_text, re.MULTILINE))
     heading_starts = [heading.start() for heading in re.finditer(r"^###\s+", report_text, re.MULTILINE)]
     for match in session_matches:
         block_end = next((start for start in heading_starts if start > match.start()), len(report_text))
@@ -498,7 +498,7 @@ def _contains_affirmative_evidence(line: str, evidence: tuple[str, ...]) -> bool
         start = lowered.find(item)
         while start >= 0:
             end = start + len(item)
-            if not _is_negated_evidence_occurrence(lowered, start, end, negated_spans):
+            if not _is_negated_evidence_occurrence(start, end, negated_spans):
                 return True
             start = lowered.find(item, end)
     return False
@@ -506,14 +506,14 @@ def _contains_affirmative_evidence(line: str, evidence: tuple[str, ...]) -> bool
 
 def _excluded_evidence_context_value(line: str) -> str | None:
     normalized = line.strip().lower().lstrip("-*").strip()
-    label, separator, _value = normalized.partition(":")
+    label, separator, value = normalized.partition(":")
     if not separator:
-        label, separator, _value = normalized.partition("：")
+        label, separator, value = normalized.partition("\uff1a")
     if not separator:
         return None
     if label.strip() not in _EXCLUDED_EVIDENCE_LABELS:
         return None
-    return _value.strip()
+    return value.strip()
 
 
 def _leading_space_count(line: str) -> int:
@@ -539,7 +539,6 @@ def _negated_evidence_spans(line: str, evidence: tuple[str, ...]) -> tuple[tuple
 
 
 def _is_negated_evidence_occurrence(
-    line: str,
     start: int,
     end: int,
     negated_spans: tuple[tuple[int, int], ...],
@@ -551,7 +550,7 @@ def _contains_explicit_docs_only_evidence(line: str) -> bool:
     lowered = line.lower()
     if "task marker: docs-only" in lowered:
         return True
-    if lowered.strip().strip("-:： ") == "docs-only":
+    if lowered.strip().strip("-:\uff1a ") == "docs-only":
         return True
     if any(item in lowered for item in _WEAK_DOCS_ONLY_EVIDENCE):
         return False
