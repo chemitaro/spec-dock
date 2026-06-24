@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     import argparse
 
 WorkflowStatusFormat = Literal["text", "json"]
-WorkflowNextFormat = Literal["markdown", "json"]
 WorkflowTarget = Literal["issue-planning", "issue-execution"]
 
 
@@ -26,9 +25,8 @@ class WorkflowStatusArgs(CommandArgs):
 
 
 @dataclass(frozen=True)
-class WorkflowNextArgs(CommandArgs):
+class GuidanceArgs(CommandArgs):
     workflow_target: WorkflowTarget
-    output_format: WorkflowNextFormat
 
 
 def command_specs() -> dict[str, CommandSpec]:
@@ -38,10 +36,10 @@ def command_specs() -> dict[str, CommandSpec]:
             args_factory=_status_args,
             run=_run_status,
         ),
-        "workflow_next": CommandSpec(
-            add_arguments=_add_next_arguments,
-            args_factory=_next_args,
-            run=_run_next,
+        "guidance": CommandSpec(
+            add_arguments=_add_guidance_arguments,
+            args_factory=_guidance_args,
+            run=_run_guidance,
         ),
     }
 
@@ -50,9 +48,8 @@ def _add_status_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--format", choices=("text", "json"), default="text", help="Output format")
 
 
-def _add_next_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("workflow_target", choices=("issue-planning", "issue-execution"), help="Workflow target")
-    parser.add_argument("--format", choices=("markdown", "json"), default="markdown", help="Output format")
+def _add_guidance_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("workflow_target", choices=("issue-planning", "issue-execution"), help="Guidance target")
 
 
 def _status_args(ns: argparse.Namespace) -> CommandArgs:
@@ -60,12 +57,8 @@ def _status_args(ns: argparse.Namespace) -> CommandArgs:
     return WorkflowStatusArgs(output_format="json" if output_format == "json" else "text")
 
 
-def _next_args(ns: argparse.Namespace) -> CommandArgs:
-    output_format = getattr(ns, "format", "markdown")
-    return WorkflowNextArgs(
-        workflow_target=ns.workflow_target,
-        output_format="json" if output_format == "json" else "markdown",
-    )
+def _guidance_args(ns: argparse.Namespace) -> CommandArgs:
+    return GuidanceArgs(workflow_target=ns.workflow_target)
 
 
 def _run_status(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
@@ -78,13 +71,10 @@ def _run_status(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     return CommandOutcome(exit_code=0, text=text)
 
 
-def _run_next(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
-    typed = _expect_next_args(args)
+def _run_guidance(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    typed = _expect_guidance_args(args)
     result = use_cases.workflow_next(WorkflowNextRequest(workflow_target=typed.workflow_target))
-    if typed.output_format == "json":
-        text = CliText(stdout_lines=[render_workflow_json(result)], stderr_lines=[], warnings=[])
-    else:
-        text = render_workflow_markdown(result)
+    text = render_workflow_markdown(result)
     return CommandOutcome(exit_code=0, text=text)
 
 
@@ -94,7 +84,7 @@ def _expect_status_args(args: CommandArgs) -> WorkflowStatusArgs:
     return args
 
 
-def _expect_next_args(args: CommandArgs) -> WorkflowNextArgs:
-    if not isinstance(args, WorkflowNextArgs):
-        raise RuntimeError("Invalid command args for workflow next")
+def _expect_guidance_args(args: CommandArgs) -> GuidanceArgs:
+    if not isinstance(args, GuidanceArgs):
+        raise RuntimeError("Invalid command args for guidance")
     return args

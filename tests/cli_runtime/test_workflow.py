@@ -9,18 +9,19 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 class TestCliWorkflow(CliRuntimeHarness):
-    def test_workflow_next_no_active_returns_issue_start_guidance_only(self) -> None:
+    def test_guidance_no_active_returns_issue_start_guidance_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            assert result.stdout.startswith("# Guidance: issue-execution")
+            payload = self._read_projected_runbook(target)
             assert payload["state"] == "no-active"
             assert payload["next_action"] == "issue-start-required"
             assert payload["commands"] == ["./spec-dock/scripts/spec-dock issue start <issue-id>"]
@@ -37,18 +38,18 @@ class TestCliWorkflow(CliRuntimeHarness):
             status = self._run_runtime_capture(target, ["workflow", "status", "--format", "json"])
             next_result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-planning", "--format", "json"],
+                ["guidance", "issue-planning"],
             )
 
             assert status.returncode == 0, status.stdout + status.stderr
             assert next_result.returncode == 0, next_result.stdout + next_result.stderr
             status_payload = json.loads(status.stdout)
-            next_payload = json.loads(next_result.stdout)
+            next_payload = self._read_projected_runbook(target)
             assert status_payload["state"] == "requirement-capture"
             assert next_payload["state"] == "requirement-capture"
             assert next_payload["next_action"] == "requirement-capture-required"
 
-    def test_workflow_next_missing_assurance_uses_strict_legacy_execution_authority(self) -> None:
+    def test_guidance_missing_assurance_uses_strict_legacy_execution_authority(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -58,7 +59,7 @@ class TestCliWorkflow(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "markdown"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
@@ -67,7 +68,7 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert "authorized_profile=strict" in result.stdout
             assert "execution-ready" in result.stdout
 
-    def test_workflow_next_malformed_assurance_fails_closed(self) -> None:
+    def test_guidance_malformed_assurance_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -77,11 +78,11 @@ class TestCliWorkflow(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assert payload["state"] == "classification-required"
             assert payload["reason_code"] == "authority-invalid"
             assert payload["authority"]["obligation_source"] == "authorized_profile"
@@ -90,21 +91,21 @@ class TestCliWorkflow(CliRuntimeHarness):
 
             markdown = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "markdown"],
+                ["guidance", "issue-execution"],
             )
 
             assert markdown.returncode == 0, markdown.stdout + markdown.stderr
             assert "## Details" in markdown.stdout
             assert "line=1" in markdown.stdout
 
-    def test_workflow_next_unknown_target_is_rejected(self) -> None:
+    def test_guidance_unknown_target_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "unknown-target", "--format", "json"],
+                ["guidance", "unknown-target"],
             )
 
             assert result.returncode != 0
@@ -140,7 +141,7 @@ class TestCliWorkflow(CliRuntimeHarness):
         assert payload["authority"]["obligation_source"] == "authorized_profile"
 
     @pytest.mark.parametrize("filename", ["requirement.md", "design.md", "plan.md"])
-    def test_workflow_next_blocks_stale_source_binding(self, filename: str) -> None:
+    def test_guidance_blocks_stale_source_binding(self, filename: str) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -172,17 +173,17 @@ class TestCliWorkflow(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assert payload["state"] == "classification-required"
             assert payload["reason_code"] == "authority-invalid"
             assert payload["next_action"] == "assurance-classification-required"
             assert filename.removesuffix(".md") in " ".join(payload["details"])
 
-    def test_workflow_next_writes_ignored_runbook_projection_without_tracked_diff(self) -> None:
+    def test_guidance_writes_ignored_runbook_projection_without_tracked_diff(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -191,11 +192,12 @@ class TestCliWorkflow(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-planning", "--format", "json"],
+                ["guidance", "issue-planning"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            assert result.stdout.startswith("# Guidance: issue-planning")
+            payload = self._read_projected_runbook(target)
             assert payload["projection"]["written"] is True
             assert payload["projection"]["paths"] == [
                 "spec-dock/.agent/runbooks/current-runbook.json",
@@ -218,6 +220,9 @@ class TestCliWorkflow(CliRuntimeHarness):
                 check=True,
             )
             assert status.stdout == ""
+
+    def _read_projected_runbook(self, target: Path) -> dict:
+        return json.loads((target / "spec-dock/.agent/runbooks/current-runbook.json").read_text(encoding="utf-8"))
 
     def _create_workflow_fixture(self, target: Path, *, issue_number: int, title: str) -> Path:
         self._create_same_repo_linked_hierarchy(

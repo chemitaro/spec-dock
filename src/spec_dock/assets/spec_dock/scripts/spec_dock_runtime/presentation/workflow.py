@@ -37,7 +37,7 @@ def render_workflow_markdown(result: WorkflowResult) -> CliText:
         return render_workflow_text(result)
     runbook = result.runbook
     lines = [
-        f"# Workflow Runbook: {runbook.workflow_target}",
+        f"# Guidance: {runbook.workflow_target}",
         "",
         f"- state: {runbook.state}",
         f"- next_action: {runbook.next_action}",
