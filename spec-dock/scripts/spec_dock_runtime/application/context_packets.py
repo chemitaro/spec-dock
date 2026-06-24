@@ -20,7 +20,7 @@ from spec_dock_runtime.domain.context_routing import (
     role_context_contract,
 )
 
-_STEP_HEADING_RE = re.compile(r"^#{2,3}\s+実装ステップ\s+(S\d+)\s+[—-]\s+(.+)$", re.MULTILINE)
+_STEP_HEADING_RE = re.compile(r"^#{2,3}\s+(?:実装ステップ\s+)?(S\d+)\s+(?:[—-]\s+)?(.+)$", re.MULTILINE)
 _ANY_HEADING_RE = re.compile(r"^#{2,3}\s+", re.MULTILINE)
 
 
