@@ -224,6 +224,7 @@ ID: "iss-00237"
   - S90 / S99。
 - 対象ファイル:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
+  - `tests/cli_runtime/test_workflow_context_routing.py`（reviewer-directed regression の追加のみ）
 - 計画済み契約:
   - scope:
     - `_classify_task_kind` を evidence-based precedence に変更する。
@@ -239,6 +240,7 @@ ID: "iss-00237"
   - 実装範囲:
     - allowed paths:
       - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
+      - `tests/cli_runtime/test_workflow_context_routing.py`（S02 reviewer finding を閉じる regression のみ）
     - forbidden changes:
       - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/context_routing.py`
       - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/workflow_state.py`
@@ -268,6 +270,7 @@ ID: "iss-00237"
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
 - 許可 paths:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
+  - `tests/cli_runtime/test_workflow_context_routing.py`（S02 reviewer-directed regression のみ）
 - 禁止 changes:
   - S02 allowed paths 以外。
 - 受け入れ条件:

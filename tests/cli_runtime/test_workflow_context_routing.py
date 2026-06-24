@@ -306,6 +306,35 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert assurance["verification"] == ["unit_tests", "security_review", "privacy_review"]
             assert assurance["reviewers"] == ["code-reviewer", "qa-reviewer", "spec-reviewer"]
 
+    def test_workflow_next_affirmative_authz_terms_with_unrelated_guard_still_escalate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_single_step_plan_and_empty_report(
+                issue_dir,
+                "without public output changes, authentication authorization permissions\n"
+                "- 対象ファイル: src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/auth.py\n"
+                "- 委任ロール: dev-coder\n"
+                "- Green 検証: unit_tests\n"
+                "- レビューゲート: code-reviewer\n",
+            )
+            self._classify(target)
+            self._commit_baseline(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assurance = payload["step_assurance"]
+            assert assurance["selected_step"]["task_kind"] == "security-sensitive"
+            assert assurance["reasoning_effort"] == "xhigh"
+            assert assurance["verification"] == ["unit_tests", "security_review", "privacy_review"]
+
     def test_workflow_next_explicit_docs_only_still_routes_to_doc_writer(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -331,6 +360,28 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert assurance["verification"] == ["docs_inspection"]
             assert assurance["reviewers"] == ["spec-reviewer"]
 
+    def test_workflow_next_explicit_docs_only_marker_with_weak_phrase_still_routes_to_doc_writer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_single_step_plan_and_empty_report(issue_dir, "docs-only docs-only verification")
+            self._classify(target)
+            self._commit_baseline(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assurance = payload["step_assurance"]
+            assert assurance["selected_step"]["task_kind"] == "docs-only"
+            assert assurance["worker"] == "doc-writer"
+            assert assurance["verification"] == ["docs_inspection"]
+
     def test_workflow_next_affirmative_migration_terms_still_route_to_rollback_plan(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -352,6 +403,54 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert assurance["selected_step"]["id"] == "S01"
             assert assurance["selected_step"]["task_kind"] == "migration"
             assert assurance["worker"] == "dev-coder"
+            assert assurance["reasoning_effort"] == "high"
+            assert assurance["verification"] == ["unit_tests", "integration_tests", "rollback_plan"]
+
+    def test_workflow_next_affirmative_migration_terms_with_unrelated_guard_still_route_to_rollback_plan(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_single_step_plan_and_empty_report(issue_dir, "migration rollback without data loss")
+            self._classify(target)
+            self._commit_baseline(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assurance = payload["step_assurance"]
+            assert assurance["selected_step"]["task_kind"] == "migration"
+            assert assurance["reasoning_effort"] == "high"
+            assert assurance["verification"] == ["unit_tests", "integration_tests", "rollback_plan"]
+
+    def test_workflow_next_affirmative_migration_terms_after_unrelated_guard_still_route_to_rollback_plan(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_single_step_plan_and_empty_report(issue_dir, "no data loss; migration rollback")
+            self._classify(target)
+            self._commit_baseline(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assurance = payload["step_assurance"]
+            assert assurance["selected_step"]["task_kind"] == "migration"
             assert assurance["reasoning_effort"] == "high"
             assert assurance["verification"] == ["unit_tests", "integration_tests", "rollback_plan"]
 
