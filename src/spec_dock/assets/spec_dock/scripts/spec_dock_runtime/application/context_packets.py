@@ -449,10 +449,35 @@ _WEAK_DOCS_ONLY_EVIDENCE = (
     "docs-only verification",
     "tests または docs-only verification",
 )
+_EXCLUDED_EVIDENCE_LABELS = (
+    "forbidden changes",
+    "forbidden change",
+    "stop conditions",
+    "stop condition",
+    "禁止 changes",
+    "禁止変更",
+    "禁止",
+    "停止条件",
+)
 
 
 def _has_affirmative_evidence(text: str, evidence: tuple[str, ...]) -> bool:
-    return any(_contains_affirmative_evidence(line, evidence) for line in text.splitlines())
+    excluded_section_indent: int | None = None
+    for line in text.splitlines():
+        if excluded_section_indent is not None and line.strip():
+            indent = _leading_space_count(line)
+            if indent <= excluded_section_indent:
+                excluded_section_indent = None
+            else:
+                continue
+        excluded_context = _excluded_evidence_context_value(line)
+        if excluded_context is not None:
+            if not excluded_context:
+                excluded_section_indent = _leading_space_count(line)
+            continue
+        if _contains_affirmative_evidence(line, evidence):
+            return True
+    return False
 
 
 def _has_runtime_evidence(text: str) -> bool:
@@ -465,6 +490,8 @@ def _has_explicit_docs_only_evidence(text: str) -> bool:
 
 
 def _contains_affirmative_evidence(line: str, evidence: tuple[str, ...]) -> bool:
+    if _excluded_evidence_context_value(line) is not None:
+        return False
     lowered = line.lower()
     negated_spans = _negated_evidence_spans(lowered, evidence)
     for item in evidence:
@@ -475,6 +502,22 @@ def _contains_affirmative_evidence(line: str, evidence: tuple[str, ...]) -> bool
                 return True
             start = lowered.find(item, end)
     return False
+
+
+def _excluded_evidence_context_value(line: str) -> str | None:
+    normalized = line.strip().lower().lstrip("-*").strip()
+    label, separator, _value = normalized.partition(":")
+    if not separator:
+        label, separator, _value = normalized.partition("：")
+    if not separator:
+        return None
+    if label.strip() not in _EXCLUDED_EVIDENCE_LABELS:
+        return None
+    return _value.strip()
+
+
+def _leading_space_count(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
 
 
 def _negated_evidence_spans(line: str, evidence: tuple[str, ...]) -> tuple[tuple[int, int], ...]:

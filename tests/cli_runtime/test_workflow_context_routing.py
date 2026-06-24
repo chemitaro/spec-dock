@@ -335,6 +335,132 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert assurance["reasoning_effort"] == "xhigh"
             assert assurance["verification"] == ["unit_tests", "security_review", "privacy_review"]
 
+    def test_workflow_next_forbidden_change_authz_terms_do_not_escalate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_single_step_plan_and_empty_report(
+                issue_dir,
+                "runtime behavior\n"
+                "- 対象ファイル: tests/cli_runtime/test_workflow_context_routing.py\n"
+                "- 委任ロール: dev-coder\n"
+                "- Green 検証: unit_tests\n"
+                "- レビューゲート: code-reviewer\n"
+                "- 禁止 changes: authentication / authorization\n",
+            )
+            self._classify(target)
+            self._commit_baseline(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assurance = payload["step_assurance"]
+            assert assurance["selected_step"]["task_kind"] == "runtime"
+            assert assurance["worker"] == "dev-coder"
+            assert assurance["reasoning_effort"] == "medium"
+            assert assurance["verification"] == ["unit_tests"]
+
+    def test_workflow_next_nested_forbidden_change_authz_terms_do_not_escalate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_single_step_plan_and_empty_report(
+                issue_dir,
+                "runtime behavior\n"
+                "- 対象ファイル: tests/cli_runtime/test_workflow_context_routing.py\n"
+                "- 委任ロール: dev-coder\n"
+                "- Green 検証: unit_tests\n"
+                "- レビューゲート: code-reviewer\n"
+                "- forbidden changes:\n"
+                "  - authentication / authorization\n",
+            )
+            self._classify(target)
+            self._commit_baseline(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assurance = payload["step_assurance"]
+            assert assurance["selected_step"]["task_kind"] == "runtime"
+            assert assurance["worker"] == "dev-coder"
+            assert assurance["reasoning_effort"] == "medium"
+            assert assurance["verification"] == ["unit_tests"]
+
+    def test_workflow_next_stop_condition_migration_terms_do_not_route_to_migration(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_single_step_plan_and_empty_report(
+                issue_dir,
+                "runtime behavior\n"
+                "- 対象ファイル: tests/cli_runtime/test_workflow_context_routing.py\n"
+                "- 委任ロール: dev-coder\n"
+                "- Green 検証: unit_tests\n"
+                "- レビューゲート: code-reviewer\n"
+                "- stop conditions: migration rollback requires plan amendment\n",
+            )
+            self._classify(target)
+            self._commit_baseline(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assurance = payload["step_assurance"]
+            assert assurance["selected_step"]["task_kind"] == "runtime"
+            assert assurance["worker"] == "dev-coder"
+            assert assurance["reasoning_effort"] == "medium"
+            assert assurance["verification"] == ["unit_tests"]
+
+    def test_workflow_next_nested_stop_condition_migration_terms_do_not_route_to_migration(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
+            self._write_substantive_requirement(issue_dir)
+            self._write_single_step_plan_and_empty_report(
+                issue_dir,
+                "runtime behavior\n"
+                "- 対象ファイル: tests/cli_runtime/test_workflow_context_routing.py\n"
+                "- 委任ロール: dev-coder\n"
+                "- Green 検証: unit_tests\n"
+                "- レビューゲート: code-reviewer\n"
+                "- stop conditions:\n"
+                "  - migration rollback requires plan amendment\n",
+            )
+            self._classify(target)
+            self._commit_baseline(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["workflow", "next", "issue-execution", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assurance = payload["step_assurance"]
+            assert assurance["selected_step"]["task_kind"] == "runtime"
+            assert assurance["worker"] == "dev-coder"
+            assert assurance["reasoning_effort"] == "medium"
+            assert assurance["verification"] == ["unit_tests"]
+
     def test_workflow_next_explicit_docs_only_still_routes_to_doc_writer(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
