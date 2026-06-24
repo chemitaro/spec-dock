@@ -94,7 +94,7 @@ ID: "iss-00237"
 | tc-237-003 | S01/S02 | affirmative-security | 回帰防止 | AC-003, EC-003 | 肯定的 security evidence は `security-sensitive` / `xhigh` | authentication / authorization / permissions / `security_review` / `privacy_review` を含む plan step | security false negative | yes | covered-existing | `report.md` Step/Test Contract Closure |
 | tc-237-004 | S01/S02 | explicit-docs-only | 回帰防止 | AC-004 | explicit docs-only は `doc-writer` / `low` / `docs_inspection` / `spec-reviewer` | `Task marker: docs-only` を含む plan step | docs-only true positive の破壊 | yes | covered-existing | `report.md` Step/Test Contract Closure |
 | tc-237-005 | S01/S02 | affirmative-migration | 回帰防止 | AC-005 | migration / rollback evidence は `migration` routing を維持し、`rollback_plan` を要求する | `Task marker: migration rollback` を含む plan step | migration true positive の破壊 | yes | covered-existing | `report.md` Step/Test Contract Closure |
-| tc-237-006 | S99 | targeted-routing-suite | 受け入れ | AC-006 | targeted pytest が成功する | routing CLI test suite | 実装と既存投影 contract の不整合 | yes | covered-existing | `report.md` Final Verification |
+| tc-237-006 | S02/S99 | targeted-routing-suite | 受け入れ | AC-006 | targeted pytest が成功する | routing CLI test suite | 実装と既存投影 contract の不整合 | yes | covered-existing | `report.md` Step/Test Contract Closure and Final Verification |
 
 ## レビュー / QA ゲート方針
 - RG1 step review:
@@ -224,7 +224,7 @@ ID: "iss-00237"
   - S90 / S99。
 - 対象ファイル:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
-  - `tests/cli_runtime/test_workflow_context_routing.py`（reviewer-directed regression の追加のみ）
+  - `tests/cli_runtime/test_workflow_context_routing.py`（reviewer / QA-directed regression の追加のみ）
 - 計画済み契約:
   - scope:
     - `_classify_task_kind` を evidence-based precedence に変更する。
@@ -240,7 +240,7 @@ ID: "iss-00237"
   - 実装範囲:
     - allowed paths:
       - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
-      - `tests/cli_runtime/test_workflow_context_routing.py`（S02 reviewer finding を閉じる regression のみ）
+      - `tests/cli_runtime/test_workflow_context_routing.py`（S02 reviewer / QA finding を閉じる regression のみ）
     - forbidden changes:
       - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/context_routing.py`
       - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/workflow_state.py`
@@ -270,7 +270,7 @@ ID: "iss-00237"
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
 - 許可 paths:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/context_packets.py`
-  - `tests/cli_runtime/test_workflow_context_routing.py`（S02 reviewer-directed regression のみ）
+  - `tests/cli_runtime/test_workflow_context_routing.py`（S02 reviewer / QA finding を閉じる regression のみ）
 - 禁止 changes:
   - S02 allowed paths 以外。
 - 受け入れ条件:
