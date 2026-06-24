@@ -157,7 +157,7 @@ def _runbook_payload(runbook: Runbook) -> dict[str, Any]:
 
 def _runbook_markdown(runbook: Runbook) -> str:
     lines = [
-        f"# Workflow Runbook: {runbook.workflow_target}",
+        f"# Guidance Projection: {runbook.workflow_target}",
         "",
         "> Human-facing projection; not agent handoff authority. Refresh with "
         f"`./spec-dock/scripts/spec-dock guidance {runbook.workflow_target}`.",
