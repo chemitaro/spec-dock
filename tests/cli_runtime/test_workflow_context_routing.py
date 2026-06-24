@@ -9,7 +9,7 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 class TestWorkflowContextRouting(CliRuntimeHarness):
-    def test_workflow_next_issue_execution_includes_step_assurance_and_context_packets(self) -> None:
+    def test_guidance_issue_execution_includes_step_assurance_and_context_packets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -21,11 +21,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assert payload["state"] == "ready"
             assert payload["step_assurance"]["selected_step"]["id"] == "S02"
             assert payload["step_assurance"]["worker"] == "dev-coder"
@@ -71,7 +71,7 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             )
             assert status.stdout == ""
 
-    def test_workflow_next_dirty_worktree_forces_bounded_continuation(self) -> None:
+    def test_guidance_dirty_worktree_forces_bounded_continuation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -84,11 +84,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assert payload["step_assurance"]["selected_step"]["id"] == "S02"
             assert payload["step_assurance"]["context_mode"] == "bounded_packet"
             assert payload["step_assurance"]["continuation"] == {
@@ -101,7 +101,7 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             )
             assert event["context_mode"] == "bounded_packet"
 
-    def test_workflow_next_does_not_skip_step_from_scaffold_report_text(self) -> None:
+    def test_guidance_does_not_skip_step_from_scaffold_report_text(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -125,14 +125,14 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assert payload["step_assurance"]["selected_step"]["id"] == "S01"
 
-    def test_workflow_next_does_not_skip_step_from_red_phase_pass_only(self) -> None:
+    def test_guidance_does_not_skip_step_from_red_phase_pass_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -154,14 +154,14 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assert payload["step_assurance"]["selected_step"]["id"] == "S01"
 
-    def test_workflow_next_routes_plan_derived_task_kinds(self) -> None:
+    def test_guidance_routes_plan_derived_task_kinds(self) -> None:
         cases = [
             ("docs-only", "doc-writer", "low", "minimal_packet", ["docs_inspection"], ["spec-reviewer"]),
             (
@@ -193,11 +193,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
                 result = self._run_runtime_capture(
                     target,
-                    ["workflow", "next", "issue-execution", "--format", "json"],
+                    ["guidance", "issue-execution"],
                 )
 
                 assert result.returncode == 0, result.stdout + result.stderr
-                payload = json.loads(result.stdout)
+                payload = self._read_projected_runbook(target)
                 assert payload["step_assurance"]["selected_step"]["id"] == "S01"
                 assert payload["step_assurance"]["worker"] == worker
                 assert payload["step_assurance"]["reasoning_effort"] == reasoning_effort
@@ -209,7 +209,7 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
                 )
                 assert event["reasoning_effort"] == reasoning_effort
 
-    def test_workflow_next_runtime_paths_override_docs_only_verification_phrase(self) -> None:
+    def test_guidance_runtime_paths_override_docs_only_verification_phrase(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -229,11 +229,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["id"] == "S01"
             assert assurance["selected_step"]["task_kind"] == "runtime"
@@ -242,7 +242,7 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert assurance["verification"] == ["unit_tests"]
             assert assurance["reviewers"] == ["code-reviewer"]
 
-    def test_workflow_next_negated_security_phrase_does_not_escalate(self) -> None:
+    def test_guidance_negated_security_phrase_does_not_escalate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -262,11 +262,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["id"] == "S01"
             assert assurance["selected_step"]["task_kind"] != "security-sensitive"
@@ -274,7 +274,7 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert assurance["worker"] == "dev-coder"
             assert assurance["verification"] == ["unit_tests"]
 
-    def test_workflow_next_affirmative_authz_terms_still_escalate(self) -> None:
+    def test_guidance_affirmative_authz_terms_still_escalate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -293,11 +293,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["id"] == "S01"
             assert assurance["selected_step"]["task_kind"] == "security-sensitive"
@@ -306,7 +306,7 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert assurance["verification"] == ["unit_tests", "security_review", "privacy_review"]
             assert assurance["reviewers"] == ["code-reviewer", "qa-reviewer", "spec-reviewer"]
 
-    def test_workflow_next_affirmative_authz_terms_with_unrelated_guard_still_escalate(self) -> None:
+    def test_guidance_affirmative_authz_terms_with_unrelated_guard_still_escalate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -325,17 +325,17 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["task_kind"] == "security-sensitive"
             assert assurance["reasoning_effort"] == "xhigh"
             assert assurance["verification"] == ["unit_tests", "security_review", "privacy_review"]
 
-    def test_workflow_next_forbidden_change_authz_terms_do_not_escalate(self) -> None:
+    def test_guidance_forbidden_change_authz_terms_do_not_escalate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -355,18 +355,18 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["task_kind"] == "runtime"
             assert assurance["worker"] == "dev-coder"
             assert assurance["reasoning_effort"] == "medium"
             assert assurance["verification"] == ["unit_tests"]
 
-    def test_workflow_next_nested_forbidden_change_authz_terms_do_not_escalate(self) -> None:
+    def test_guidance_nested_forbidden_change_authz_terms_do_not_escalate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -387,18 +387,18 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["task_kind"] == "runtime"
             assert assurance["worker"] == "dev-coder"
             assert assurance["reasoning_effort"] == "medium"
             assert assurance["verification"] == ["unit_tests"]
 
-    def test_workflow_next_stop_condition_migration_terms_do_not_route_to_migration(self) -> None:
+    def test_guidance_stop_condition_migration_terms_do_not_route_to_migration(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -418,18 +418,18 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["task_kind"] == "runtime"
             assert assurance["worker"] == "dev-coder"
             assert assurance["reasoning_effort"] == "medium"
             assert assurance["verification"] == ["unit_tests"]
 
-    def test_workflow_next_nested_stop_condition_migration_terms_do_not_route_to_migration(self) -> None:
+    def test_guidance_nested_stop_condition_migration_terms_do_not_route_to_migration(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -450,18 +450,18 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["task_kind"] == "runtime"
             assert assurance["worker"] == "dev-coder"
             assert assurance["reasoning_effort"] == "medium"
             assert assurance["verification"] == ["unit_tests"]
 
-    def test_workflow_next_explicit_docs_only_still_routes_to_doc_writer(self) -> None:
+    def test_guidance_explicit_docs_only_still_routes_to_doc_writer(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -473,11 +473,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["id"] == "S01"
             assert assurance["selected_step"]["task_kind"] == "docs-only"
@@ -486,7 +486,7 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert assurance["verification"] == ["docs_inspection"]
             assert assurance["reviewers"] == ["spec-reviewer"]
 
-    def test_workflow_next_explicit_docs_only_marker_with_weak_phrase_still_routes_to_doc_writer(self) -> None:
+    def test_guidance_explicit_docs_only_marker_with_weak_phrase_still_routes_to_doc_writer(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -498,17 +498,17 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["task_kind"] == "docs-only"
             assert assurance["worker"] == "doc-writer"
             assert assurance["verification"] == ["docs_inspection"]
 
-    def test_workflow_next_affirmative_migration_terms_still_route_to_rollback_plan(self) -> None:
+    def test_guidance_affirmative_migration_terms_still_route_to_rollback_plan(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -520,11 +520,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["id"] == "S01"
             assert assurance["selected_step"]["task_kind"] == "migration"
@@ -532,7 +532,7 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             assert assurance["reasoning_effort"] == "high"
             assert assurance["verification"] == ["unit_tests", "integration_tests", "rollback_plan"]
 
-    def test_workflow_next_affirmative_migration_terms_with_unrelated_guard_still_route_to_rollback_plan(
+    def test_guidance_affirmative_migration_terms_with_unrelated_guard_still_route_to_rollback_plan(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -546,17 +546,17 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["task_kind"] == "migration"
             assert assurance["reasoning_effort"] == "high"
             assert assurance["verification"] == ["unit_tests", "integration_tests", "rollback_plan"]
 
-    def test_workflow_next_affirmative_migration_terms_after_unrelated_guard_still_route_to_rollback_plan(
+    def test_guidance_affirmative_migration_terms_after_unrelated_guard_still_route_to_rollback_plan(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -570,17 +570,17 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assurance = payload["step_assurance"]
             assert assurance["selected_step"]["task_kind"] == "migration"
             assert assurance["reasoning_effort"] == "high"
             assert assurance["verification"] == ["unit_tests", "integration_tests", "rollback_plan"]
 
-    def test_workflow_next_markdown_includes_step_assurance_and_packet_refs(self) -> None:
+    def test_guidance_markdown_includes_step_assurance_and_packet_refs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -591,7 +591,7 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "markdown"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
@@ -610,11 +610,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assert payload["state"] == "ready"
             assert payload["reason_code"] == "strict-legacy-missing-assurance"
             assert payload["authority"]["authorized_profile"] == "strict"
@@ -635,11 +635,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assert payload["step_assurance"]["policy"]["status"] == "invalid"
             assert payload["step_assurance"]["context_mode"] == "bounded_packet"
             reviewer_event = next(
@@ -663,11 +663,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assert payload["step_assurance"]["worker"] == "doc-writer"
             assert payload["step_assurance"]["policy"]["status"] == "invalid"
             assert payload["step_assurance"]["context_mode"] == "bounded_packet"
@@ -689,11 +689,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assert payload["state"] == "blocked"
             assert payload["reason_code"] == "context-packet-write-failure"
             assert payload["context_packets"]["written"] is False
@@ -714,11 +714,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             reviewer_event = next(
                 event for event in payload["context_packets"]["invocation_events"] if event["role"] == "code-reviewer"
             )
@@ -736,11 +736,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assert payload["state"] == "blocked"
             assert payload["next_action"] == "issue-planning-required"
             assert payload["reason_code"] == "workflow-plan-unselectable"
@@ -761,11 +761,11 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
 
             result = self._run_runtime_capture(
                 target,
-                ["workflow", "next", "issue-execution", "--format", "json"],
+                ["guidance", "issue-execution"],
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
-            payload = json.loads(result.stdout)
+            payload = self._read_projected_runbook(target)
             assert payload["state"] == "blocked"
             assert payload["reason_code"] == "workflow-plan-unselectable"
             assert payload["step_assurance"]["selected_step"]["id"] == "issue-wide"
@@ -777,6 +777,9 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             ["assurance", "classify", "--stage", "requirement", "--format", "json"],
         )
         assert classify.returncode == 0, classify.stdout + classify.stderr
+
+    def _read_projected_runbook(self, target: Path) -> dict:
+        return json.loads((target / "spec-dock/.agent/runbooks/current-runbook.json").read_text(encoding="utf-8"))
 
     def _create_workflow_fixture(self, target: Path, *, issue_number: int, title: str) -> Path:
         self._create_same_repo_linked_hierarchy(
