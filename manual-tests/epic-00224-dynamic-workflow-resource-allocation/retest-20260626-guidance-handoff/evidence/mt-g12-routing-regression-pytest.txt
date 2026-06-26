@@ -1,0 +1,9 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.6, pytest-9.0.3, pluggy-1.6.0
+rootdir: /Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/dbca/spec-dock
+configfile: pyproject.toml
+collected 26 items / 22 deselected / 4 selected
+
+tests/cli_runtime/test_workflow_context_routing.py ....                  [100%]
+
+======================= 4 passed, 22 deselected in 6.67s =======================
