@@ -31936,6 +31936,37 @@ esac
 
         assert namespace["required_check_rollup_status"]("owner/repo", "13", 1.0) is None
 
+    def test_issue_233_required_check_rollup_uses_required_checks_before_rollup(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        provider_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py"
+        )
+        module = ast.parse(provider_path.read_text(encoding="utf-8"))
+        selected = [
+            node
+            for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name == "required_check_rollup_status"
+        ]
+
+        class FakeCompleted:
+            returncode = 0
+            stdout = json.dumps([
+                {"name": "required", "state": "SUCCESS", "bucket": "pass"},
+            ])
+
+        class FakeSubprocess:
+            TimeoutExpired = TimeoutError
+
+            @staticmethod
+            def run(*_args, **_kwargs):
+                return FakeCompleted()
+
+        namespace = {"json": json, "subprocess": FakeSubprocess}
+        exec(compile(ast.Module(body=selected, type_ignores=[]), str(provider_path), "exec"), namespace)
+
+        assert namespace["required_check_rollup_status"]("owner/repo", "13", 1.0) is None
+
     def test_issue_233_required_check_rollup_scans_failure_when_not_mergeable(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         provider_path = (
