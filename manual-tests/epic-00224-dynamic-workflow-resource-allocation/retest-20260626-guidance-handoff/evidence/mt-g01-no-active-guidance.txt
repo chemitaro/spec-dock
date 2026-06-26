@@ -1,0 +1,27 @@
+# Guidance: issue-execution
+
+- state: no-active
+- next_action: issue-start-required
+- reason_code: active-issue-missing
+- active_issue: (none)
+- authority: authorized_profile=strict, lite_candidate=false, obligation_source=authorized_profile
+
+## Commands
+- `./spec-dock/scripts/spec-dock issue start <issue-id>`
+
+## Notes
+- Start an issue before continuing.
+
+## Stop Conditions
+- No active issue is selected.
+
+## Projection
+- audience: human
+- authority: non-canonical
+- note: Human-facing projection; not agent handoff authority.
+- refresh_command: `./spec-dock/scripts/spec-dock guidance issue-execution`
+- written: true
+- `spec-dock/.agent/runbooks/current-runbook.json`
+- `spec-dock/.agent/runbooks/current-runbook.md`
+- `spec-dock/active/current-runbook.json`
+- `spec-dock/active/current-runbook.md`

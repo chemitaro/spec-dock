@@ -1,0 +1,10 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.6, pytest-9.0.3, pluggy-1.6.0
+rootdir: /Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/dbca/spec-dock
+configfile: pyproject.toml
+collected 17 items
+
+tests/cli_runtime/test_workflow.py ...........                           [ 64%]
+tests/cli_runtime/test_wrappers.py ......                                [100%]
+
+============================= 17 passed in 15.83s ==============================
