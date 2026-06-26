@@ -70,6 +70,20 @@ def compile_runbook(
             stop_conditions=("Do not start implementation until assurance verification succeeds.",),
         )
     if state.kind == "blocked":
+        if state.reason_code == "context-packet-write-failure":
+            return _runbook(
+                target,
+                state,
+                next_action="context-packet-repair-required",
+                commands=(
+                    "./spec-dock/scripts/spec-dock active show",
+                    "Inspect and repair spec-dock/.agent/context-packets before rerunning guidance.",
+                ),
+                notes=("Context packet write failed; repair the agent handoff packet storage before continuing.",),
+                stop_conditions=("Do not continue issue execution until context packets can be written.",),
+                step_assurance=step_assurance,
+                context_packets=context_packets,
+            )
         if state.reason_code == "workflow-plan-unselectable":
             return _runbook(
                 target,

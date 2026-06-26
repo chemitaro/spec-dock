@@ -35,3 +35,37 @@ def test_lite_candidate_with_standard_authority_does_not_reduce_obligations() ->
     joined = "\n".join([*runbook.commands, *runbook.notes, *runbook.stop_conditions]).lower()
     assert "lite procedure" not in joined
     assert "lite-only" not in joined
+
+
+def test_draft_requirement_frontmatter_is_not_substantive() -> None:
+    _runbook_module, workflow_state = _workflow_modules()
+
+    readiness = workflow_state.classify_requirement_text(
+        "---\n"
+        "種別: 要件定義書（Issue）\n"
+        '状態: "draft"\n'
+        "---\n\n"
+        "# Requirement\n\n"
+        "## 目的\n"
+        "- Concrete requirement text has been written.\n"
+    )
+
+    assert readiness == "scaffold"
+
+
+def test_context_packet_failure_runbook_points_to_packet_repair() -> None:
+    runbook_module, workflow_state = _workflow_modules()
+    state = workflow_state.WorkflowState(
+        kind="blocked",
+        active_issue_id="iss-00301",
+        reason_code="context-packet-write-failure",
+        artifact_readiness="substantive",
+        authority=workflow_state.STRICT_LEGACY_AUTHORITY,
+    )
+
+    runbook = runbook_module.compile_runbook("issue-execution", state)
+
+    assert runbook.next_action == "context-packet-repair-required"
+    joined = "\n".join([*runbook.commands, *runbook.notes, *runbook.stop_conditions])
+    assert "context-packets" in joined
+    assert ".agent/runbooks" not in joined
