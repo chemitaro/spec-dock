@@ -3447,6 +3447,7 @@ class TestRuntimeSyncS07:
             "node_blockers",
             "satisfied_dependencies",
             "dependency_contexts",
+            "direct_node_dependencies",
             "nodes",
             "warnings",
         } <= set(payload)
@@ -3490,6 +3491,76 @@ class TestRuntimeSyncS07:
                 "dependency_disposition": "blocking",
                 "disposition_basis": "empty_open_container",
             },
+        ]
+        assert payload["direct_node_dependencies"] == []
+
+    def test_deps_check_json_includes_direct_node_dependencies(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            _app_ports,
+            _app_sync_state,
+            domain_models,
+            _infra_artifact_writer,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        presentation_json_state = _presentation_json_state_module()
+
+        inspection = domain_models.TargetDepsInspection(
+            target_id=domain_models.NodeId("init-00101"),
+            evaluation=domain_models.DepsEvaluation(
+                ready=False,
+                guard_reason="blocked",
+                blockers=["epic-00201"],
+                blockers_top=[],
+                closure=[],
+            ),
+            node_states={},
+            effective_depends_on=[],
+            warnings=[],
+            direct_node_dependencies=[
+                domain_models.DepsDirectNodeDependency(
+                    source_node_id="init-00101",
+                    source_node_kind="initiative",
+                    target_node_id="epic-00201",
+                    target_node_kind="epic",
+                    target_issue_ids=(),
+                    expansion="empty",
+                    lifecycle_state="open",
+                    lifecycle_source="local",
+                    dependency_disposition="blocking",
+                    disposition_basis="empty_open_container",
+                )
+            ],
+        )
+        result = app_contracts.DepsCheckResult(
+            target=app_contracts.TargetRef(
+                kind="id",
+                node_id="init-00101",
+                github_issue_number=None,
+            ),
+            inspection=inspection,
+            warnings=[],
+        )
+
+        payload = json.loads(presentation_json_state.render_deps_check_json(result))
+
+        assert payload["ready"] is False
+        assert payload["blockers"] == ["epic-00201"]
+        assert payload["direct_node_dependencies"] == [
+            {
+                "source_node_id": "init-00101",
+                "source_node_kind": "initiative",
+                "target_node_id": "epic-00201",
+                "target_node_kind": "epic",
+                "target_issue_ids": [],
+                "expansion": "empty",
+                "lifecycle_state": "open",
+                "lifecycle_source": "local",
+                "dependency_disposition": "blocking",
+                "disposition_basis": "empty_open_container",
+            }
         ]
 
     def test_sync_exit_behavior_regression(self) -> None:
