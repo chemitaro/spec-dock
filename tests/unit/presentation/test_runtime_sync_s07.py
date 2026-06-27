@@ -3459,6 +3459,8 @@ class TestRuntimeSyncS07:
 
         artifact = presentation_json_state.render_index_artifact(state)
         index_all = json.loads(artifact.all_json_text)
+        deps_issues = json.loads(presentation_json_state.render_deps_issues_artifact(state).json_text)
+        deps_raw_puml = presentation_json_state.render_deps_raw_artifact(state).puml_text
 
         assert index_all["deps"]["raw_direct_edges"] == [
             {
@@ -3469,6 +3471,10 @@ class TestRuntimeSyncS07:
                 "relation": "raw_direct",
             }
         ]
+        assert "raw_direct_edges" not in deps_issues
+        assert "raw_direct_edges" not in deps_issues["deps"]
+        assert "Nepic_00002 --> Ninit_00001 : raw_direct" not in deps_raw_puml
+        assert 'note "No raw direct dependencies to render" as Empty' in deps_raw_puml
 
     def test_deps_check_json_includes_lifecycle_and_disposition_context(self) -> None:
         (
