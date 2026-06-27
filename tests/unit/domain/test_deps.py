@@ -644,6 +644,7 @@ class TestDepsDomain:
 
         assert inspection.evaluation.ready
         assert inspection.effective_depends_on == []
+        assert inspection.direct_node_dependencies == []
         assert inspection.node_states["iss-00003"].ready
         assert inspection.node_states["iss-00003"].effective_depends_on == []
 

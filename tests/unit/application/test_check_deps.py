@@ -627,6 +627,8 @@ class TestCheckDepsApplication:
         assert not result.inspection.evaluation.ready
         assert result.inspection.evaluation.guard_reason == "blocked"
         assert result.inspection.evaluation.blockers == ["epic-00203"]
+        assert result.inspection.effective_depends_on == []
+        assert result.inspection.direct_node_dependencies == []
         assert result.inspection.evaluation.issue_blockers == []
         assert [(b.node_id, b.reason, b.state, b.state_source) for b in result.inspection.evaluation.node_blockers] == [
             ("epic-00203", "empty_open", "open", "github")
@@ -663,6 +665,8 @@ class TestCheckDepsApplication:
 
         assert result.inspection.evaluation.ready
         assert result.inspection.evaluation.blockers == []
+        assert result.inspection.effective_depends_on == []
+        assert result.inspection.direct_node_dependencies == []
         assert result.inspection.evaluation.node_blockers == []
         assert [(c.target_node_id, c.expansion) for c in result.inspection.evaluation.satisfied_dependencies] == [
             ("epic-00203", "empty")

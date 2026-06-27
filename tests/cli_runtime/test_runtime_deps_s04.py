@@ -398,6 +398,169 @@ class TestRuntimeDepsS04:
             }
         ]
 
+    def test_cli_deps_check_json_keeps_non_empty_source_direct_status_separate(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            from spec_dock.cli import main
+
+            assert main(["init", str(repo_root)]) == 0
+            marker = {"managed": True, "do_not_edit": True, "edit_via": "spec-dock"}
+            timestamp = "2026-06-27T00:00:00+09:00"
+            initiatives_dir = repo_root / "spec-dock" / "initiatives"
+            _materialize_node(
+                initiatives_dir / "init-local-00001-source-initiative",
+                {
+                    "schema_version": 1,
+                    "type": "initiative",
+                    "id": "init-local-00001",
+                    "title": "Source initiative",
+                    "slug": "source-initiative",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "parent_id": None,
+                    "initiative_id": None,
+                    "epic_id": None,
+                    "depends_on": ["epic-local-00002"],
+                    "_spec_dock": marker,
+                },
+            )
+            _materialize_node(
+                initiatives_dir / "init-local-00001-source-initiative" / "epics" / "epic-local-00001-source-epic",
+                {
+                    "schema_version": 1,
+                    "type": "epic",
+                    "id": "epic-local-00001",
+                    "title": "Source epic",
+                    "slug": "source-epic",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "parent_id": "init-local-00001",
+                    "initiative_id": "init-local-00001",
+                    "epic_id": None,
+                    "depends_on": [],
+                    "_spec_dock": marker,
+                },
+            )
+            _materialize_node(
+                initiatives_dir
+                / "init-local-00001-source-initiative"
+                / "epics"
+                / "epic-local-00001-source-epic"
+                / "issues"
+                / "iss-local-00001-source-issue",
+                {
+                    "schema_version": 1,
+                    "type": "issue",
+                    "id": "iss-local-00001",
+                    "title": "Source issue",
+                    "slug": "source-issue",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "parent_id": "epic-local-00001",
+                    "initiative_id": "init-local-00001",
+                    "epic_id": "epic-local-00001",
+                    "depends_on": [],
+                    "_spec_dock": marker,
+                },
+            )
+            _materialize_node(
+                initiatives_dir / "init-local-00002-target-initiative",
+                {
+                    "schema_version": 1,
+                    "type": "initiative",
+                    "id": "init-local-00002",
+                    "title": "Target initiative",
+                    "slug": "target-initiative",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "parent_id": None,
+                    "initiative_id": None,
+                    "epic_id": None,
+                    "depends_on": [],
+                    "_spec_dock": marker,
+                },
+            )
+            _materialize_node(
+                initiatives_dir / "init-local-00002-target-initiative" / "epics" / "epic-local-00002-target-epic",
+                {
+                    "schema_version": 1,
+                    "type": "epic",
+                    "id": "epic-local-00002",
+                    "title": "Target epic",
+                    "slug": "target-epic",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "parent_id": "init-local-00002",
+                    "initiative_id": "init-local-00002",
+                    "epic_id": None,
+                    "depends_on": [],
+                    "_spec_dock": marker,
+                },
+            )
+            _materialize_node(
+                initiatives_dir
+                / "init-local-00002-target-initiative"
+                / "epics"
+                / "epic-local-00002-target-epic"
+                / "issues"
+                / "iss-local-00002-target-issue",
+                {
+                    "schema_version": 1,
+                    "type": "issue",
+                    "id": "iss-local-00002",
+                    "title": "Target issue",
+                    "slug": "target-issue",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "parent_id": "epic-local-00002",
+                    "initiative_id": "init-local-00002",
+                    "epic_id": "epic-local-00002",
+                    "depends_on": [],
+                    "_spec_dock": marker,
+                },
+            )
+
+            result = _run_runtime_capture(
+                repo_root,
+                ["deps", "check", "--id", "init-local-00001", "--no-github", "--json"],
+            )
+
+        assert result.returncode == 3, result.stdout + result.stderr
+        assert result.stderr == ""
+        payload = json.loads(result.stdout)
+        assert payload["target"] == "init-local-00001"
+        assert payload["ready"] is False
+        assert payload["effective_depends_on"] == ["iss-local-00002"]
+        assert payload["blockers"] == ["epic-local-00002", "iss-local-00002"]
+        assert payload["dependency_contexts"] == [
+            {
+                "source_node_id": "init-local-00001",
+                "source_issue_id": "iss-local-00001",
+                "target_node_id": "epic-local-00002",
+                "target_node_kind": "epic",
+                "target_issue_ids": ["iss-local-00002"],
+                "expansion": "expanded",
+                "lifecycle_state": "open",
+                "lifecycle_source": "descendant_aggregate",
+                "dependency_disposition": "blocking",
+                "disposition_basis": "descendant_issue_open",
+            }
+        ]
+        assert payload["direct_node_dependencies"] == [
+            {
+                "source_node_id": "init-local-00001",
+                "source_node_kind": "initiative",
+                "target_node_id": "epic-local-00002",
+                "target_node_kind": "epic",
+                "target_issue_ids": ["iss-local-00002"],
+                "expansion": "expanded",
+                "lifecycle_state": "open",
+                "lifecycle_source": "descendant_aggregate",
+                "dependency_disposition": "blocking",
+                "disposition_basis": "descendant_issue_open",
+            }
+        ]
+
     def test_cli_sync_no_github_writes_index_all_raw_direct_edges_for_high_level_source(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             repo_root = Path(td)
