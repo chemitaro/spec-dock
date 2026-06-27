@@ -1162,7 +1162,6 @@ class TestCliDeps(CliRuntimeHarness):
                 "node_blockers",
                 "satisfied_dependencies",
                 "dependency_contexts",
-                "direct_node_dependencies",
                 "nodes",
                 "warnings",
             ]
@@ -1170,7 +1169,7 @@ class TestCliDeps(CliRuntimeHarness):
             assert data["target"] == "iss-00301"
             assert not data["ready"]
             assert data["effective_depends_on"] == ["iss-00401", "iss-00403"]
-            assert data["blockers"] == ["epic-00202", "iss-00401", "iss-00403"]
+            assert data["blockers"] == ["iss-00401", "iss-00403"]
             assert data["issue_blockers"] == ["iss-00401", "iss-00403"]
             assert data["node_blockers"] == []
             assert data["satisfied_dependencies"] == []
@@ -1178,20 +1177,6 @@ class TestCliDeps(CliRuntimeHarness):
                 {
                     "source_node_id": "iss-00301",
                     "source_issue_id": "iss-00301",
-                    "target_node_id": "epic-00202",
-                    "target_node_kind": "epic",
-                    "target_issue_ids": ["iss-00401", "iss-00402"],
-                    "expansion": "expanded",
-                    "lifecycle_state": "open",
-                    "lifecycle_source": "github",
-                    "dependency_disposition": "blocking",
-                    "disposition_basis": "descendant_issue_open",
-                }
-            ]
-            assert data["direct_node_dependencies"] == [
-                {
-                    "source_node_id": "iss-00301",
-                    "source_node_kind": "issue",
                     "target_node_id": "epic-00202",
                     "target_node_kind": "epic",
                     "target_issue_ids": ["iss-00401", "iss-00402"],

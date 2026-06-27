@@ -37,8 +37,6 @@
 - empty initiative / epic dependency は raw node-level validation を通れば保存できます。storage format は変えず、`.meta.json.depends_on` は raw direct dependency の保存場所のままです。
 - issue-level expansion が空の場合でも、readiness は high-level node status を評価します。open / unknown の empty initiative / epic は node-level blocker になり、done / closed / all-descendant-done の context は satisfied dependency として扱います。
 - GitHub の `open` / `closed` は lifecycle fact であり、SpecDock dependency readiness の `blocking` / `satisfied` / `indeterminate` と同義ではありません。readiness は `dependency_disposition` と `disposition_basis` で説明します。
-- `deps check --json` は checked target node 自体の saved direct dependency を additive top-level `direct_node_dependencies` に出力します。これは source / target node id と kind、target expansion、lifecycle、disposition、basis を持つ raw-direct-source inspection field です。
-- `effective_depends_on` と `dependency_contexts` は issue readiness projection の field です。high-level source node 自体の direct dependency は `direct_node_dependencies` で確認し、`effective_depends_on` の意味には混ぜません。
 - `deps-issues.*` は readiness / blocker authority で、`deps-raw.puml` は active raw direct visual/debug artifact です。`deps-raw.puml` に high-level state/source が表示されても readiness authority ではありません。
 - `deps-issues.puml` と `deps-raw.puml` は active view です。done / closed / satisfied-only context は `.agent/deps-issues.json` の machine-readable context に残しつつ、図では表示ノイズとして省くことがあります。
 - add/remove は `.meta.json` だけを書き換え、write failure 時も partial write を残さない atomic replace を前提にします。
@@ -145,14 +143,12 @@ unknown は fail-closed です。unknown high-level target や unknown descendan
 
 - `deps check`、`active set`、`validate`、`sync`、`delete` は compiled dependency result を消費する downstream consumer です。
 - `deps check` / `active set` / `issue start` / `sync` の readiness interpretation は、issue blockers、node blockers、satisfied dependencies、unknown fail-closed を含む同じ readiness evaluation に基づきます。
-- `deps check --json` の top-level `direct_node_dependencies` は、checked target node 直下 `.meta.json.depends_on` に保存された direct dependency を source-node view で返します。unresolved direct dependency は `ready=false` と `blockers` に反映されますが、`effective_depends_on` は issue readiness projection のままです。
 - `.agent/deps-issues.json` は schema v2 の readiness / blocker context artifact です。`projection` は `issue-readiness-with-dependency-context`、`source.sync_state` は `readiness_evaluation` です。
 - `deps-issues` には typed issue blockers、typed node blockers、satisfied dependencies が含まれます。todo-only `index.json` の再パース結果ではありません。
 - `.agent/deps-issues.json` の `nodes` / `edges` は active readiness graph です。done / closed / satisfied-only context は active graph から省かれることがあります。
 - `.agent/deps-issues.json` の `dependency_contexts` は evaluated high-level dependency context を保持します。GitHub-open all-descendant-done high-level dependency など、図に出ない satisfied context の確認先です。
 - `sync` が生成する `deps-issues.puml` は active readiness / blocker view です。blocking edge は user-facing label `blocks` で表示し、done / closed / satisfied-only edge は表示ノイズとして省きます。
 - `sync` が生成する `deps-raw.puml` は `.meta.json.depends_on` の active raw direct dependency を可視化する確認用 artifact です。high-level node の state / source を表示できますが、readiness / blocker 判定の authority は `deps-issues.*` 側にあります。complete raw metadata audit は `.meta.json.depends_on` と `.agent/index-all.json` を確認します。
-- `.agent/index-all.json` は full-history raw audit surface として `deps.raw_direct_edges` を持ちます。各 entry は `from`, `from_kind`, `to`, `to_kind`, `relation: "raw_direct"` で、done / closed / satisfied dependency も raw audit からは消しません。
 - raw node-level cycle などの deps preflight failure や disabled path は fail-closed です。`sync --force` では stale graph を残さない placeholder が出力され、partial readiness authority として読んではいけません。
 - 運用では `deps add/remove` の後に `./spec-dock/scripts/spec-dock deps check <target>`、`./spec-dock/scripts/spec-dock validate`、`./spec-dock/scripts/spec-dock sync` を順に実行して、標準の GitHub live state で整合を確認します。GitHub を呼ばない cache/local 確認が必要な場合だけ `--no-github` を指定します。
 - この文書は `.meta.json` schema / reader / `deps check` / `deps add/remove` の command contract を固定するもので、downstream parity や hard cutover 完了を意味しません。

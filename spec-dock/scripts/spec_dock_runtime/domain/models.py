@@ -140,20 +140,6 @@ class DepsDependencyContext:
 
 
 @dataclass(frozen=True)
-class DepsDirectNodeDependency:
-    source_node_id: str
-    source_node_kind: SpecNodeKind
-    target_node_id: str
-    target_node_kind: SpecNodeKind
-    target_issue_ids: tuple[str, ...]
-    expansion: Literal["issue", "expanded", "empty"]
-    lifecycle_state: DepsLifecycleState
-    lifecycle_source: str
-    dependency_disposition: DepsDependencyDisposition
-    disposition_basis: DepsDispositionBasis
-
-
-@dataclass(frozen=True)
 class DepsHighLevelStatus:
     node_id: str
     state: DepsLifecycleState
@@ -195,7 +181,6 @@ class TargetDepsInspection:
     effective_depends_on: list[str]
     warnings: list[str]
     issue_statuses: dict[str, IssueStatusSnapshot] = field(default_factory=dict)
-    direct_node_dependencies: list[DepsDirectNodeDependency] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

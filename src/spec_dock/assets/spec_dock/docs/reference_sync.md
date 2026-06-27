@@ -67,10 +67,6 @@ uninstall との関係:
 - `issue_edges: [{from,to,kind?}]`
 - `edge_direction: "depends_on (dependent -> prerequisite)"`
 
-`.agent/index-all.json` の `deps` は full-history raw audit surface として `raw_direct_edges` も持ちます。`raw_direct_edges` は `.meta.json.depends_on` 由来の direct node edge を source / target kind 付きで返し、entry shape は `{from, from_kind, to, to_kind, relation: "raw_direct"}` です。readiness 上 satisfied / done / closed になった dependency も raw audit からは消しません。
-
-`.agent/index.json`, `.agent/tree*.json`, `.agent/deps-issues.json`, `deps-issues.puml`, `deps-raw.puml` は complete raw audit surface ではありません。
-
 issueノードには `deps`（`ready`, `depends_on`, `blockers_top`）を統合します。
 
 `spec-dock/.agent/deps-issues.json` は `index.json` の todo issue-only graph を再パースした派生物ではありません。`sync_state` の readiness evaluation から生成する schema v2 artifact です。GitHub `open` / `closed` は lifecycle fact であり、dependency readiness の `blocking` / `satisfied` / `indeterminate` は `dependency_disposition` と `disposition_basis` で表します。
@@ -90,7 +86,6 @@ high-level dependency の主な判定:
 - unknown は fail-closed です。unknown high-level target や unknown descendant issue は indeterminate として扱います。
 
 `.meta.json.depends_on` は raw storage のままです。empty initiative / epic dependency は raw validation を通れば保存できますが、readiness evaluation では open / unknown の empty high-level target が node blocker になり、done / closed / all-descendant-done の context は satisfied dependency として扱われます。
-checked target node 自体の saved direct dependency を調べる場合、`deps check --json` は `direct_node_dependencies` を返します。この field は `effective_depends_on` / `dependency_contexts` とは別の source-node direct dependency inspection です。
 
 ## 4. `sync --force`（deps preflight失敗時）
 
@@ -141,7 +136,6 @@ raw node-level cycle などで deps preflight が失敗した場合、この pla
 `deps-issues.*` は readiness / blocker 判定に使う authority です。schema v2 の `deps-issues` は typed issue blockers、typed node blockers、satisfied dependencies を含み、todo-only `index.json` から消える context も `dependency_contexts` に保持します。
 `deps-issues.puml` は active readiness / blocker view です。done / closed / satisfied-only node/edge は `.agent/deps-issues.json` に context を残し、図では表示ノイズとして省きます。blocking edge は `blocks` として表示します。
 `deps-raw.puml` は initiative / epic / issue を含む active raw direct dependency の visual/debug artifact です。high-level participant の state / source を表示できますが、readiness authority ではありません。done / closed / satisfied-only raw context は active raw view から省かれることがあります。complete raw metadata audit は `.meta.json.depends_on` と `.agent/index-all.json` を確認してください。
-complete raw metadata audit を machine-readable に読む場合は `.agent/index-all.json` の `deps.raw_direct_edges` を使います。
 同じ依存を、機械向けと可視化向けで向きを分けて表現しています。
 
 ## 8. 処理フロー（PlantUML）
