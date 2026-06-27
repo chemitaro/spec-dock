@@ -97,6 +97,9 @@ ID: "iss-00241"
 | tc-006 | S04 | issue-239-supersession | docs/lifecycle | AC-008 | `iss-00239` は superseded / closed evidence を持つ | SpecDock/GitHub issue state | open corrective scaffold | yes | inspect-only | report + command evidence |
 | tc-007 | S90 | guidance-epic-reflection | docs/spec | AC-004, AC-005, EC-005 | Epic 正本は guidance stdout authority / projection human-only を示す | Epic docs | stale `workflow next` authority | yes | inspect-only | docs diff + spec review |
 | tc-008 | S90 | epic-closure-ledger | docs/spec | AC-009, AC-010 | Epic report は corrective issues と gate status を矛盾なく示す | Epic report | false completion / missing trace | yes | inspect-only | traceability table + spec review |
+| tc-010 | S90/S99 | issue-step-closure-audit | docs/spec | AC-010 | 全 Issue report の Step Contract Closure / Reviewer Gate Status / Step Commit Gate は pass / explicit human gate / formal supersede で閉じる | implementation issue reports / corrective issue reports | skipped step review / uncommitted step / false pass | yes | inspect-only | Epic traceability ledger + spec review |
+| tc-011 | S90/S99 | context-routing-evidence-audit | docs/spec | AC-010 | context packet / clean-room reviewer or consultant / bounded return evidence は確認済みまたは explicit gate として記録される | issue plans / reports / discussion artifacts | delegated work without bounded context evidence | yes | inspect-only | Epic traceability ledger + spec review |
+| tc-012 | S90/S99 | auto-lite-readiness-audit | docs/spec | AC-010 | Auto-Lite readiness、automatic Lite default disabled、efficiency evidence or missing-metrics gate が記録される | Auto-Lite docs / runtime output / issue reports / Epic report | unsafe Lite default / unmeasured resource allocation claim | yes | inspect-only | Epic traceability ledger + QA/spec review |
 
 ## レビュー / QA ゲート方針
 - RG1 step review:
@@ -456,6 +459,9 @@ ID: "iss-00241"
   - Generated projection は human/debug-only / non-canonical と明記する。
   - `iss-00237` / `iss-00238` / `iss-00239` / `iss-00241` を corrective issue inclusion gate に含める。
   - E-RQ / E-AC / accepted ADR / discussion decision -> implementation / tests / docs / report evidence の traceability ledger を追加する。
+  - 全 Issue report の Step Contract Closure / Reviewer Gate Status / Step Commit Gate を横断監査し、pass / explicit human gate / formal supersede のいずれかで閉じる。
+  - context packet / clean-room reviewer or consultant / bounded return evidence を横断監査し、context routing の証跡不足を false pass にしない。
+  - Auto-Lite readiness / automatic Lite default disabled / efficiency evidence or missing-metrics gate を横断監査し、resource allocation の安全側初期状態を明記する。
   - Epic `report.md` の completed / blocked / next action を current state に再構成する。
 - doc update owner:
   - doc-writer
@@ -491,10 +497,13 @@ ID: "iss-00241"
   - Editing historical ADR decisions to hide the original wording; use current docs/report reflection instead.
   - Marking Epic complete while failed / partial / needs-verification entries remain unresolved.
 - acceptance criteria:
-  - `tc-007`, `tc-008`
+  - `tc-007`, `tc-008`, `tc-010`, `tc-011`, `tc-012`
 - required tests or docs-only verification:
   - `rg "workflow next" spec-dock/active/epic/{requirement.md,design.md,plan.md,report.md}` inspection with only historical/superseded usage allowed.
   - Traceability table inspection covering E-RQ / E-AC / ADR / corrective issues.
+  - Traceability table inspection covering step closure / reviewer gate / commit gate for all Issue reports.
+  - Traceability table inspection covering context packet / clean-room reviewer or consultant / bounded return evidence.
+  - Traceability table inspection covering Auto-Lite readiness / automatic Lite default disabled / efficiency evidence or missing-metrics gate.
   - Fresh `spec-reviewer` docs/spec alignment pass.
 - reviewer focus:
   - spec-reviewer: Epic正本が current runtime/skill/test contract と矛盾せず、corrective issue status を矛盾なく示すこと。
@@ -519,10 +528,31 @@ ID: "iss-00241"
   - 失敗検出: report が pass と blocked を同時に示す回帰を検出する。
   - 検証方法: docs inspection / spec-reviewer。
   - 関連 closure id: `tc-008`
+- `tc-s90-003` inspect-only: Epic closure ledger includes all issue step/review/commit gates
+  - 前提: Epic report and all Issue reports exist.
+  - 操作: 各 Issue report の Step Contract Closure / Reviewer Gate Status / Step Commit Gate を Epic traceability ledger へ照合する。
+  - 期待結果: 各 gate は pass / explicit human gate / formal supersede のいずれかとして記録され、未確認のまま pass 扱いされない。
+  - 失敗検出: step review や commit gate を通していない Issue が Epic complete として扱われる回帰を検出する。
+  - 検証方法: docs inspection / spec-reviewer。
+  - 関連 closure id: `tc-010`
+- `tc-s90-004` inspect-only: Epic closure ledger includes context routing evidence
+  - 前提: Issue plans / reports / discussions contain delegated work evidence where applicable.
+  - 操作: context packet、clean-room reviewer or consultant、bounded return evidence を Epic traceability ledger へ照合する。
+  - 期待結果: context routing evidence は確認済み、または explicit human gate / formal supersede として記録される。
+  - 失敗検出: Epic で要求した context routing が Issue 実装へ落ちていないのに pass する回帰を検出する。
+  - 検証方法: docs inspection / spec-reviewer。
+  - 関連 closure id: `tc-011`
+- `tc-s90-005` inspect-only: Epic closure ledger includes Auto-Lite readiness and disabled-default evidence
+  - 前提: Auto-Lite readiness / resource allocation evidence exists or missing metrics are known.
+  - 操作: Auto-Lite readiness、`automatic_lite_default_enabled=false`、efficiency evidence or missing-metrics gate を Epic traceability ledger へ照合する。
+  - 期待結果: Lite 自動化の安全側初期状態と、効果測定の証跡または不足時の gate が明示される。
+  - 失敗検出: Auto-Lite が安全側初期状態・効果測定なしに完了扱いされる回帰を検出する。
+  - 検証方法: docs inspection / qa-reviewer / spec-reviewer。
+  - 関連 closure id: `tc-012`
 
 #### ステップ完了契約
 - close 条件:
-  - `tc-007`, `tc-008` pass。
+  - `tc-007`, `tc-008`, `tc-010`, `tc-011`, `tc-012` pass。
   - spec-reviewer docs/spec alignment pass。
 - commit gate:
   - S90 scope のみ commit。
@@ -539,6 +569,10 @@ ID: "iss-00241"
   - `./spec-dock/scripts/spec-dock sync`
   - `./spec-dock/scripts/spec-dock validate` if available and within current repo constraints。
   - `rg` inspections for stale `workflow next` current-entrypoint wording and fixed bare-body skill wording。
+  - S90 traceability ledger inspection for `tc-010`, `tc-011`, `tc-012`:
+    - all Issue Step Contract Closure / Reviewer Gate Status / Step Commit Gate.
+    - context packet / clean-room reviewer or consultant / bounded return evidence.
+    - Auto-Lite readiness / automatic Lite default disabled / efficiency evidence or missing-metrics gate.
 - final QA gate:
   - reviewer: qa-reviewer
   - 範囲: AC/EC coverage、negative tests、docs-only evidence、manual test要否。
@@ -562,6 +596,8 @@ ID: "iss-00241"
   - AC-001〜AC-010、EC-001〜EC-005 が closure evidence に紐付く。
 - docs 影響解決:
   - Epic docs / report / skill text / issue reports が current contract と一致する。
+- Epic traceability gate:
+  - `tc-010` / `tc-011` / `tc-012` が S90/S99 で pass または explicit human gate / formal supersede として記録される。
 - 全 implementation step 完了:
   - S01〜S04、S90、S99 が committed または正当な approved-no-op。
 - final quality gate pass:

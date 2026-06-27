@@ -148,7 +148,11 @@ ID: "iss-00241"
   - アクター: Spec reviewer / Epic closer。
   - 前提: Epic close 前。
   - 操作: E-RQ / E-AC / accepted ADR / live discussion decisions を implementation / tests / docs / reports へ照合する。
-  - 期待結果: failed / partial / needs-verification entry は 0、または explicit human gate / formal supersede として記録される。
+  - 期待結果:
+    - failed / partial / needs-verification entry は 0、または explicit human gate / formal supersede として記録される。
+    - 全 implementation Issue report の Step Contract Closure / Reviewer Gate Status / Step Commit Gate を横断確認し、未完了・矛盾・証跡不足を残さない。
+    - context packet / clean-room reviewer or consultant / bounded return evidence を横断確認し、Epic で要求した context routing が Issue 実装に落ちていることを記録する。
+    - Auto-Lite readiness / automatic Lite default disabled / efficiency evidence or missing-metrics human gate を横断確認し、resource allocation の安全側初期状態と今後の有効化条件を記録する。
   - 観測点: Epic plan/report traceability table、spec-reviewer pass。
 
 ## 例外・エッジケース

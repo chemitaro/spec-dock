@@ -30,6 +30,7 @@ ID: "iss-00241"
 | EAL-004 | adopted | ADR / issue evidence | `requirement.md`, `design.md`, `plan.md` | Fixed skill kernel の current operational surface を `guidance <target>` stdout authority として反映した | `../../discussions/20260623t074441z-adr-fixed-skill-kernel-compiled-runbook-authority.md`, `../iss-00238-stdout-runbook-handoff-instead-of-generated-workflow-files/discussions/20260624t083737z-research-stdout-runbook-handoff-current-state.md`, `../iss-00238-stdout-runbook-handoff-instead-of-generated-workflow-files/report.md` | S90 |
 | EAL-005 | adopted | research | `requirement.md`, `design.md`, `plan.md` | `iss-00239` の placeholder scaffold 推奨案を、吸収 scope として AC-006 / AC-007 / S03 へ採用した | `../iss-00239-compose-issue-planning-templates-after-assurance-classification/discussions/20260624t113051z-research-assurance-compose-scaffold-analysis.md` | S03 |
 | EAL-006 | adopted | interview | `requirement.md`, `design.md`, `plan.md`, Epic report | `iss-00239` を `iss-00241` に吸収するユーザー判断を採用した | `discussions/20260627t031736z-interview-corrective-issue-scope-confirmation.md` | S04 |
+| EAL-007 | adopted | user cross-check / audit refinement | `requirement.md`, `design.md`, `plan.md` | QG-006〜QG-008 は AC-010 に包括されるだけでなく、S90/S99 の必須 traceability ledger 項目として明示する必要がある | current planning chat cross-check, Epic audit QG-006〜QG-008 | S90/S99 |
 
 ## 目的整合台帳
 
@@ -41,9 +42,9 @@ ID: "iss-00241"
 
 | phase | investigated facts | open questions / answers | adoption decision | reviewer verdict | blocking | promotion / next_action |
 |---|---|---|---|---|---|---|
-| requirement | Epic requirement/design/plan/report、accepted ADR、Epic audit、spec-reviewer report、Issue 239 research、Issue 241 interview、current runtime / skill / tests search | `iss-00239` の扱いは user-approved: `iss-00241` に吸収 | EAL-001〜006 を採用して `requirement.md` を具体化 | passed: fresh `spec-reviewer` final re-review returned no findings, review_status=pass, confidence=0.88 | no | promoted to implementation-ready planning package with design/plan |
-| design | reviewer-pass済み requirement package、現行 provider/dogfooding skill/script、runtime guidance、artifact composer/new issue tests、Issue 239 research | 追加質問なし | 同じ証跡を `design.md` へ反映し、module/file boundaries と test strategy を固定 | passed: fresh `spec-reviewer` final re-review returned no findings, review_status=pass, confidence=0.88 | no | promoted to implementation-ready planning package with plan |
-| plan | reviewer-pass済み requirement/design package、workflow_spec_authoring、phase_plan_issue、authoring/issue-plan、workflow_issue | 追加質問なし | S01〜S04/S90/S99 の executable step contract と closure index を作成 | passed: fresh `spec-reviewer` final re-review returned no findings, review_status=pass, confidence=0.88 | no | ready for issue execution handoff |
+| requirement | Epic requirement/design/plan/report、accepted ADR、Epic audit、spec-reviewer report、Issue 239 research、Issue 241 interview、current runtime / skill / tests search | `iss-00239` の扱いは user-approved: `iss-00241` に吸収 | EAL-001〜007 を採用して `requirement.md` を具体化 | passed: post-amendment `spec-reviewer` final re-review returned no findings, review_status=pass, confidence=0.92 | no | promoted to implementation-ready planning package with design/plan |
+| design | reviewer-pass済み requirement package、現行 provider/dogfooding skill/script、runtime guidance、artifact composer/new issue tests、Issue 239 research、QG-006〜QG-008 refinement | 追加質問なし | 同じ証跡を `design.md` へ反映し、Epic Traceability Gate Detail を固定 | passed: post-amendment `spec-reviewer` final re-review returned no findings, review_status=pass, confidence=0.92 | no | promoted to implementation-ready planning package with plan |
+| plan | reviewer-pass済み requirement/design package、workflow_spec_authoring、phase_plan_issue、authoring/issue-plan、workflow_issue、QG-006〜QG-008 refinement | 追加質問なし | S01〜S04/S90/S99 の executable step contract と closure index を作成し、`tc-010`〜`tc-012` を追加 | passed: post-amendment `spec-reviewer` final re-review returned no findings, review_status=pass, confidence=0.92 | no | ready for issue execution handoff |
 
 ## 委任ドラフト証跡
 - 委任 authoring の使用:
@@ -75,7 +76,13 @@ ID: "iss-00241"
 - 指摘を受け、plan の S01 seeds、S02/S04/S90 delegation contract、report の evidence path と authoring gate記録を修正した。
 - Fresh `spec-reviewer` attempt 2 は `review_status=fail`。EAL relative path の誤りが指摘されたため、Epic discussion references を `../../discussions/...` に修正し、shell で file existence を確認した。
 - Fresh `spec-reviewer` attempt 3 は `review_status=fail`。EC-004 marker-preserved direct-edit の S03 coverage が不足していたため、closure `tc-009` と `tc-s03-004` negative test seed を追加した。
-- Fresh `spec-reviewer` final re-review は findings なし、`review_status=pass`、confidence 0.88。
+- Fresh `spec-reviewer` final re-review は findings なし、`review_status=pass`、confidence 0.88。これは QG-006〜QG-008 明示化前の planning package に対する verdict。
+- 実装開始前の追加再確認で、QG-006 step closure audit、QG-007 context routing evidence audit、QG-008 Auto-Lite readiness audit が AC-010 に包括されている一方、S90/S99 の具体チェックとしては抽象的であると確認した。
+- 指摘を受け、AC-010 の期待結果、design の Epic Traceability Gate Detail、plan の closure `tc-010` / `tc-011` / `tc-012` と S90/S99 必須検証を追加した。
+- Fresh `spec-reviewer` post-amendment review は `review_status=fail`。missing metrics が通常 follow-up で閉じられるように読める design wording と、post-amendment reviewer verdict の記録不足が指摘されたため修正した。
+- Fresh `spec-reviewer` post-amendment re-review 2 は `review_status=fail`。authoring gate 表に pre-amendment pass を現行 readiness と誤読できる記録が残っていたため、current review pending として修正した。
+- Fresh `spec-reviewer` post-amendment re-review 3 は `review_status=fail`。メモ欄に pre-amendment pass に基づく stale implementation-ready claim が残っていたため、post-amendment pass まで blocked として修正した。
+- Fresh `spec-reviewer` post-amendment final re-review は findings なし、`review_status=pass`、confidence 0.92。
 
 #### 実行コマンド / 結果
 ```bash
@@ -90,7 +97,7 @@ ID: "iss-00241"
 
 #### メモ
 - `--force` は unfinished active issue guard bypass として使われた。依存未解決を bypass したものではない。
-- Requirement / design / plan / report は final fresh `spec-reviewer` pass を受け、planning package として implementation handoff ready。
+- Requirement / design / plan / report は QG-006〜QG-008 明示化後の post-amendment `spec-reviewer` pass を受け、planning package として implementation handoff ready。
 - 実装着手時は `spec-dock-issue-execution` workflow に従い、plan の S01 から順に step review / commit gate を通す。
 
 ## 最終品質ゲート
@@ -113,4 +120,4 @@ ID: "iss-00241"
 ### 最終 spec review ゲート
 | reviewer | 範囲 | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / Epic docs alignment | attempt 1: delegation contract / seeds / evidence path findings; attempt 2: EAL path finding; attempt 3: EC-004 marker-preserved direct-edit coverage finding; final: no findings | 3 | pass |
+| spec-reviewer | requirement / design / plan / report / Epic docs alignment | attempt 1: delegation contract / seeds / evidence path findings; attempt 2: EAL path finding; attempt 3: EC-004 marker-preserved direct-edit coverage finding; pre-amendment final: no findings; post-amendment attempt 1: missing-metrics gate wording and reviewer-pass ledger findings; post-amendment attempt 2: current-readiness ledger finding; post-amendment attempt 3: stale implementation-ready memo finding; post-amendment final: no findings | 6 | pass |
