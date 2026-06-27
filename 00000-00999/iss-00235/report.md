@@ -536,6 +536,108 @@ pass
 
 ---
 
+### セッションログ（2026-06-27 S05）
+
+#### 対象
+- Step: S05 CLI `sync --no-github` Raw Audit Reproduction
+- AC/EC: AC-003, EC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S05 — CLI sync --no-github Raw Audit Reproduction`
+  - closure ids: `cl-ac003-index-all-raw`, `cl-ec003-satisfied-raw-audit`
+
+#### 実施内容
+- hermetic temp repo を `spec-dock init` で作成し、high-level source initiative が high-level epic に raw `depends_on` を持つ reduced fixture を追加した。
+- public runtime script 経由で `sync --no-github --no-update-active` を実行し、`.agent/index-all.json` の `deps.raw_direct_edges` を assert した。
+- Non-goal artifact guard として `.agent/index.json` と `.agent/deps-issues.json` top-level / nested `deps` へ `raw_direct_edges` を追加しないことを assert した。
+- 初回 sync 後の cache を closed high-level target に加工して再度 `sync --no-github --no-update-active` を実行し、closed target でも `.agent/index-all.json` の raw direct edge が残ることを assert した。
+- S05 は test-only reproduction として完了し、runtime/source implementation は変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_runtime_deps_s04.py
+
+30 passed in 0.99s
+```
+
+```bash
+git diff --check
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S05 | 赤フェーズ | red-required / characterization allowed after S03 | dev-coder reported the reduced scenario was already fixed by S03 and `.agent/index-all.json` currently contains `deps.raw_direct_edges` for `init-local-00001 -> epic-local-00001`; `.agent/index.json` lacks `raw_direct_edges`. | delegated worker record | pass | No fabricated Red; S05 records public CLI sync characterization after earlier fix. |
+| S05 | 緑フェーズ | public CLI sync artifact reproduction passes | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` -> 30 passed in 0.99s | command | pass | Parent-run verification after reviewer finding fixes. |
+| S05 | リファクタリング | guardrail satisfied | Diff stayed within `tests/cli_runtime/test_runtime_deps_s04.py`; no runtime/source implementation files changed. | diff inspection | pass | `git diff --check` passed. |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S05 | `deps-raw.puml` already contains existing debug `raw_direct` labels, so absence assertion would over-constrain a non-primary artifact. | dev-coder ledger note | kept S05 focused on `.agent/index-all.json` and JSON non-goal guards for `.agent/index.json` / `.agent/deps-issues.json`; did not add `deps-raw.puml` absence assertion | N/A | no | worker ledger note; design non-goal is no contract expansion, not absence of existing debug labels |
+| S05 | `.agent/deps-issues.json` nested `deps.raw_direct_edges` expansion was not guarded. | code-reviewer | added assertion that `raw_direct_edges` is absent from both top-level deps-issues payload and nested `deps` object | N/A | no | first S05 code-reviewer P1 finding |
+| S05 | S05 CLI evidence did not cover closed/satisfied target raw audit before claiming EC-003. | code-reviewer | added second `sync --no-github --no-update-active` run with cached closed high-level target and asserted raw direct edge remains in `.agent/index-all.json` | cl-ec003-satisfied-raw-audit | no | first S05 code-reviewer P1 finding |
+| S05 | Closed-target rerun did not prove the target remained closed, and `.agent/index.json` top-level guard was missing. | code-reviewer | added target epic GitHub linkage, asserted rerun preserves `github.state="CLOSED"`, and added top-level `.agent/index.json` raw edge absence guard | cl-ec003-satisfied-raw-audit | no | second S05 code-reviewer P1/P2 findings |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S05 | cl-ac003-index-all-raw | public CLI sync writes `.agent/index-all.json` raw direct high-level edge audit. | Test asserts `deps.raw_direct_edges` with `from`, `from_kind`, `to`, `to_kind`, and `relation`. | pass | Public artifact surface. |
+| S05 | cl-ec003-satisfied-raw-audit | raw audit is maintained as full-history artifact independent of satisfied / closed target status. | Test mutates cached target epic state to `closed`, reruns `sync --no-github`, and asserts `.agent/index-all.json` still contains the same raw direct edge. | pass | Non-goal JSON artifacts also remain without `raw_direct_edges`. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-ac003-index-all-raw | S05 | yes | characterization | delegated characterization: fixed by S03 | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` | pass, 30 passed in 0.99s | Public sync artifact. |
+| cl-ec003-satisfied-raw-audit | S05 | yes | characterization | delegated characterization: full-history index carries raw edge | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` | pass, 30 passed in 0.99s | Closed cached target raw edge remains in index-all, with target state asserted as `CLOSED`. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-ac003-index-all-raw | S05 | CLI runtime sync test | pass | `.agent/index-all.json` has raw direct edge. |
+| cl-ec003-satisfied-raw-audit | S05 | CLI runtime sync test and S03 presentation test | pass | S05 checks public artifact with cached closed high-level target; S03 checks presentation-level closed retention. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| boundary note | N/A | deps-raw absence assertion | N/A | Existing `deps-raw.puml` debug output can contain `raw_direct`; S05 primary contract is `.agent/index-all.json` raw audit and JSON non-goal guard. | no | yes, step review required |
+| reviewer finding fix | N/A | deps-issues nested guard | N/A | S05 non-goal guard must cover nested `deps` object in `.agent/deps-issues.json`. | no | yes, re-review required |
+| reviewer finding fix | cl-ec003-satisfied-raw-audit | closed target CLI artifact evidence | cl-ec003-satisfied-raw-audit | S05 closure claim now has public CLI sync evidence for a cached closed high-level target. | no | yes, re-review required |
+| reviewer finding fix | cl-ec003-satisfied-raw-audit | closed target state assertion | cl-ec003-satisfied-raw-audit | S05 closed-target evidence now asserts the rerun artifact preserves `github.state="CLOSED"`. | no | yes, re-review required |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S05 | delegated | CLI runtime sync artifact reproduction test | dev-coder | S05 CLI `sync --no-github` Raw Audit Reproduction | `plan.md` S05 | `tests/cli_runtime/test_runtime_deps_s04.py`; optional `tests/cli_runtime/test_sync.py` was not needed | runtime/source implementation, live GitHub, external repo mutation, `deps-issues.json` / `deps-raw.puml` contract expansion | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` | implementation file change required or artifact contract expansion needed | changed files, characterization evidence, verification, ledger note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S05 | dev-coder | Added hermetic public CLI sync reduced reproduction for `.agent/index-all.json` `deps.raw_direct_edges`; reviewer findings added nested deps-issues guard, cached closed-target re-sync, closed-state assertion, and top-level index guard. | `tests/cli_runtime/test_runtime_deps_s04.py` | delegated: `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` -> 30 passed; parent after fixes: same command -> 30 passed | fresh re-review passed | S07 integration guard remains pending | accepted for commit gate |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S05 | step reviewer | code-reviewer | fresh | passed | no | proceed to commit gate | First review found nested deps-issues guard gap and missing closed/satisfied CLI evidence; second review found missing closed-state assertion and top-level index guard; after fixes fresh re-review passed, confidence 0.91. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S05 | committed | S05 test/report files | S05 test commit, amended with this final commit-gate evidence | `git status --short --branch` -> clean after S05 commit before final evidence amendment; clean check must be rerun after amend | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_runtime_deps_s04.py` - public CLI sync artifact reduced reproduction.
+- `spec-dock/active/issue/report.md` - S05 observed evidence ledger.
+
+#### コミット
+- S05 test commit amended with final commit-gate evidence.
+
+#### メモ
+- `deps-raw.puml` の既存 debug 表示は S05 の primary artifact contract ではないため、absence assertion は追加しない。
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
