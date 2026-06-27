@@ -94,7 +94,10 @@ def compose_assurance(
 ) -> AssuranceResult:
     target = store.resolve_issue_target(request.issue)
     store_result = store.verify_contract(target)
-    if store_result.status != "valid" or store_result.contract is None:
+    stale_store_result = None
+    if store_result.reason == "stale_source_binding" and store_result.contract is not None:
+        stale_store_result = store_result
+    elif store_result.status != "valid" or store_result.contract is None:
         return _compose_invalid_result(store_result)
 
     contract = store_result.contract
@@ -118,13 +121,18 @@ def compose_assurance(
 
     if any(not result.ok for _, result in composed):
         views = tuple(_compose_artifact_view(artifact, result) for artifact, result in composed)
+        reason = (
+            "substantive_content_conflict"
+            if any(error.kind == "substantive_content_conflict" for _, result in composed for error in result.errors)
+            else "marker_conflict"
+        )
         return AssuranceResult(
             operation="compose",
             ok=False,
             status="invalid",
             target=_target_view(target),
             mode=contract.mode.value,
-            reason="marker_conflict",
+            reason=reason,
             details=tuple(error for view in views for error in view.errors),
             contract=contract,
             authorized_profile=contract.classification.authorized_profile.value,
@@ -132,6 +140,9 @@ def compose_assurance(
             artifacts=views,
             errors=tuple(error for view in views for error in view.errors),
         )
+
+    if stale_store_result is not None:
+        return _compose_invalid_result(stale_store_result)
 
     changed = [(artifact, result) for artifact, result in composed if result.changed]
     if not request.dry_run:

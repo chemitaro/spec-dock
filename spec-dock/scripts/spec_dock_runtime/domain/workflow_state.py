@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import re
 from typing import Literal
 
 WorkflowStateKind = Literal["no-active", "requirement-capture", "classification-required", "ready", "blocked"]
 WorkflowArtifactReadiness = Literal["missing", "scaffold", "substantive"]
-WorkflowProfile = Literal["lite", "standard", "strict", "critical"]
-WorkflowObligationSource = Literal["authorized_profile"]
+WorkflowProfile = Literal["lite", "standard", "strict", "critical", "unavailable"]
+WorkflowObligationSource = Literal["authorized_profile", "unavailable"]
 
 
 @dataclass(frozen=True)
@@ -33,6 +32,12 @@ STRICT_LEGACY_AUTHORITY = RunbookAuthority(
     obligation_source="authorized_profile",
 )
 
+UNAVAILABLE_AUTHORITY = RunbookAuthority(
+    authorized_profile="unavailable",
+    lite_candidate=False,
+    obligation_source="unavailable",
+)
+
 
 def classify_requirement_text(text: str) -> WorkflowArtifactReadiness:
     stripped = text.strip()
@@ -52,7 +57,5 @@ def classify_requirement_text(text: str) -> WorkflowArtifactReadiness:
         "draft | approved",
     )
     if any(marker in stripped for marker in placeholder_markers):
-        return "scaffold"
-    if re.search(r'(?mi)^\s*(?:状態|status)\s*:\s*["\']?draft["\']?\s*$', stripped):
         return "scaffold"
     return "substantive"

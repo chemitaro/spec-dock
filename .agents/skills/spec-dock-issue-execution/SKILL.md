@@ -14,7 +14,8 @@ This skill is a fixed kernel. It must not carry state-specific generated Runbook
 - First ask the runtime for current execution guidance:
   - `./spec-dock/scripts/spec-dock guidance issue-execution`
 - Treat the command stdout as current guidance only. It is not canonical authority, and must not be edited as source of truth.
-- Register the returned `state`, `next_action`, commands, stop conditions, selected step when present, and verification / reviewer gate when present in your task checklist before acting.
+- Register the returned `state`, `next_action`, `reason_code`, `authority`, `may_execute_approved_plan`, commands, and stop conditions in your task checklist before acting.
+- Do not expect or derive the current implementation step, worker, reviewer, verification, or context packet from runtime guidance. Read execution order and step obligations from the approved `plan.md`, and record observed evidence in `report.md`.
 - If runtime guidance cannot be generated, is malformed, or contradicts canonical docs, stop and fall back to `spec-dock/docs/workflow_issue.md` and the active issue docs instead of guessing the next step.
 - Generated projections such as `spec-dock/.agent/runbooks/current-runbook.*` or `spec-dock/active/current-runbook.*` are ignored human/debug output. Do not read, edit, or manage them as handoff authority.
 
