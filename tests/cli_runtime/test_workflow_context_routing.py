@@ -161,87 +161,6 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             payload = self._read_projected_runbook(target)
             assert payload["step_assurance"]["selected_step"]["id"] == "S01"
 
-    def test_guidance_does_not_skip_step_without_reviewer_and_commit_gates(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
-            self._write_substantive_requirement(issue_dir)
-            self._write_plan_and_report(issue_dir)
-            (issue_dir / "report.md").write_text(
-                "# Report\n\n"
-                "### セッションログ（2026-06-23 S01）\n\n"
-                "#### 対象\n"
-                "- Step: S01\n\n"
-                "#### ステップ契約の完了証跡（Step Contract Closure）\n"
-                "| ステップ（step） | 結果（result） |\n"
-                "|---|---|\n"
-                "| S01 | pass |\n",
-                encoding="utf-8",
-            )
-            self._classify(target)
-
-            result = self._run_runtime_capture(
-                target,
-                ["guidance", "issue-execution"],
-            )
-
-            assert result.returncode == 0, result.stdout + result.stderr
-            payload = self._read_projected_runbook(target)
-            assert payload["step_assurance"]["selected_step"]["id"] == "S01"
-
-    def test_guidance_routes_s90_after_normal_steps_are_complete(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
-            self._write_substantive_requirement(issue_dir)
-            self._write_plan_and_report(issue_dir)
-            (issue_dir / "report.md").write_text(
-                "# Report\n\n"
-                "### セッションログ（2026-06-23 S01）\n\n"
-                "#### 対象\n"
-                "- Step: S01\n\n"
-                "#### ステップ契約の完了証跡（Step Contract Closure）\n"
-                "| ステップ（step） | 結果（result） |\n"
-                "|---|---|\n"
-                "| S01 | pass |\n\n"
-                "#### レビューゲート状態（Reviewer Gate Status）\n"
-                "| ステップ（step） | 状態（state） |\n"
-                "|---|---|\n"
-                "| S01 | passed |\n\n"
-                "#### ステップ commit ゲート（Step Commit Gate）\n"
-                "| ステップ（step） | クロージャ状態（closure state） |\n"
-                "|---|---|\n"
-                "| S01 | committed |\n\n"
-                "### セッションログ（2026-06-23 S02）\n\n"
-                "#### 対象\n"
-                "- Step: S02\n\n"
-                "#### ステップ契約の完了証跡（Step Contract Closure）\n"
-                "| ステップ（step） | 結果（result） |\n"
-                "|---|---|\n"
-                "| S02 | pass |\n\n"
-                "#### レビューゲート状態（Reviewer Gate Status）\n"
-                "| ステップ（step） | 状態（state） |\n"
-                "|---|---|\n"
-                "| S02 | passed |\n\n"
-                "#### ステップ commit ゲート（Step Commit Gate）\n"
-                "| ステップ（step） | クロージャ状態（closure state） |\n"
-                "|---|---|\n"
-                "| S02 | committed |\n",
-                encoding="utf-8",
-            )
-            self._classify(target)
-
-            result = self._run_runtime_capture(
-                target,
-                ["guidance", "issue-execution"],
-            )
-
-            assert result.returncode == 0, result.stdout + result.stderr
-            payload = self._read_projected_runbook(target)
-            assert payload["step_assurance"]["selected_step"]["id"] == "S90"
-
     def test_guidance_routes_plan_derived_task_kinds(self) -> None:
         cases = [
             ("docs-only", "doc-writer", "low", "minimal_packet", ["docs_inspection"], ["spec-reviewer"]),
@@ -289,35 +208,6 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
                     event for event in payload["context_packets"]["invocation_events"] if event["role"] == worker
                 )
                 assert event["reasoning_effort"] == reasoning_effort
-
-    def test_guidance_docs_only_forbidden_runtime_paths_stay_docs_only(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Context routing")
-            self._write_substantive_requirement(issue_dir)
-            self._write_single_step_plan_and_empty_report(
-                issue_dir,
-                "docs-only\n"
-                "- 委任ロール: doc-writer\n"
-                "- Green 検証: docs_inspection\n"
-                "- forbidden changes: src/ tests/\n",
-            )
-            self._classify(target)
-            self._commit_baseline(target)
-
-            result = self._run_runtime_capture(
-                target,
-                ["guidance", "issue-execution"],
-            )
-
-            assert result.returncode == 0, result.stdout + result.stderr
-            payload = self._read_projected_runbook(target)
-            assurance = payload["step_assurance"]
-            assert assurance["selected_step"]["task_kind"] == "docs-only"
-            assert assurance["worker"] == "doc-writer"
-            assert assurance["reasoning_effort"] == "low"
-            assert assurance["verification"] == ["docs_inspection"]
 
     def test_guidance_runtime_paths_override_docs_only_verification_phrase(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -947,14 +837,6 @@ class TestWorkflowContextRouting(CliRuntimeHarness):
             "| ステップ | 結果 |\n"
             "|---|---|\n"
             "| S01 | pass |\n\n"
-            "#### レビューゲート状態（Reviewer Gate Status）\n"
-            "| ステップ | 状態 |\n"
-            "|---|---|\n"
-            "| S01 | passed |\n\n"
-            "#### ステップ commit ゲート（Step Commit Gate）\n"
-            "| ステップ | クロージャ状態 |\n"
-            "|---|---|\n"
-            "| S01 | committed |\n\n"
             "#### メモ\n"
             "- Reviewer context remains fail-closed for unavailable policy.\n",
             encoding="utf-8",

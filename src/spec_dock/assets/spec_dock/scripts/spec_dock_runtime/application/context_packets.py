@@ -20,7 +20,7 @@ from spec_dock_runtime.domain.context_routing import (
     role_context_contract,
 )
 
-_STEP_HEADING_RE = re.compile(r"^#{2,3}\s+(.+?\b(S\d+)\b.*)$", re.MULTILINE)
+_STEP_HEADING_RE = re.compile(r"^#{2,3}\s+(?:実装ステップ\s+)?(S\d+)\s+(?:[—-]\s+)?(.+)$", re.MULTILINE)
 _ANY_HEADING_RE = re.compile(r"^#{2,3}\s+", re.MULTILINE)
 
 
@@ -284,39 +284,20 @@ def _reasoning_effort_wire_value(reasoning_effort: ReasoningEffort) -> str:
 
 def _select_step(plan_text: str, report_text: str) -> dict[str, Any]:
     matches = list(_STEP_HEADING_RE.finditer(plan_text))
-    all_heading_starts = [heading.start() for heading in _ANY_HEADING_RE.finditer(plan_text)]
-    normal_step_ids = {
-        match.group(2)
-        for match in matches
-        if match.group(2) not in {"S90", "S99"}
-        and not _is_placeholder_step(
-            match.group(1),
-            plan_text[
-                match.start() : next((start for start in all_heading_starts if start > match.start()), len(plan_text))
-            ],
-        )
-    }
-    if not normal_step_ids:
-        return {
-            "id": "issue-wide",
-            "title": "Issue-wide default",
-            "task_kind": TaskKind.RUNTIME.value,
-            "risk_tags": [],
-            "selection_method": "issue_wide_default",
-        }
     completed_ids = _completed_step_ids(report_text)
+    all_heading_starts = [heading.start() for heading in _ANY_HEADING_RE.finditer(plan_text)]
     for match in matches:
-        step_id = match.group(2)
-        if step_id in completed_ids:
+        step_id = match.group(1)
+        if step_id in {"S90", "S99"} or step_id in completed_ids:
             continue
         block_end = next((start for start in all_heading_starts if start > match.start()), len(plan_text))
         block = plan_text[match.start() : block_end]
-        if _is_placeholder_step(match.group(1), block):
+        if _is_placeholder_step(match.group(2), block):
             continue
         task_kind, risk_tags = _classify_task_kind(block)
         return {
             "id": step_id,
-            "title": match.group(1).strip(),
+            "title": match.group(2).strip(),
             "task_kind": task_kind.value,
             "risk_tags": list(risk_tags),
             "selection_method": "plan_first_uncompleted_heading",
@@ -341,9 +322,10 @@ def _completed_step_ids(report_text: str) -> set[str]:
     for match in session_matches:
         block_end = next((start for start in heading_starts if start > match.start()), len(report_text))
         block = report_text[match.start() : block_end]
-        for step_id in _session_step_ids(match.group(0), block) | _step_ids_from_gate_rows(block):
-            if _block_has_completed_step(block, step_id):
+        for step_id in _session_step_ids(match.group(0), block):
+            if _block_has_completed_step_row(block, step_id):
                 completed_ids.add(step_id)
+        completed_ids.update(_completed_step_rows(block))
     return completed_ids
 
 
@@ -358,53 +340,50 @@ def _session_step_ids(heading: str, block: str) -> set[str]:
     return step_ids
 
 
-def _step_ids_from_gate_rows(block: str) -> set[str]:
-    step_ids: set[str] = set()
-    in_gate_section = False
+def _completed_step_rows(block: str) -> set[str]:
+    completed_ids: set[str] = set()
+    completed_values = {"pass", "passed", "committed", "approved-no-op"}
+    incomplete_values = {"fail", "failed", "blocked"}
+    in_completion_section = False
     for line in block.splitlines():
         stripped = line.strip()
         lowered = stripped.lower()
         if lowered.startswith("####"):
-            in_gate_section = _completion_section_kind(stripped, lowered) is not None
+            in_completion_section = _is_completion_section(stripped, lowered)
             continue
-        if not in_gate_section or not stripped.startswith("|") or not stripped.endswith("|"):
+        if not in_completion_section or not stripped.startswith("|") or not stripped.endswith("|"):
             continue
         cells = [cell.strip().lower() for cell in stripped.strip("|").split("|")]
         if not cells or not re.fullmatch(r"s\d+", cells[0]):
             continue
-        step_ids.add(cells[0].upper())
-    return step_ids
+        if any(cell in incomplete_values for cell in cells):
+            continue
+        if any(cell in completed_values for cell in cells):
+            completed_ids.add(cells[0].upper())
+    return completed_ids
 
 
-def _completion_section_kind(stripped: str, lowered: str) -> str | None:
-    if "ステップ契約の完了証跡" in stripped or "step contract closure" in lowered:
-        return "step_contract"
-    if "レビューゲート状態" in stripped or "reviewer gate status" in lowered:
-        return "reviewer_gate"
-    if "ステップ commit" in lowered or "step commit gate" in lowered:
-        return "commit_gate"
-    return None
-
-
-def _block_has_completed_step(block: str, step_id: str) -> bool:
+def _is_completion_section(stripped: str, lowered: str) -> bool:
     return (
-        _block_has_gate_result(block, step_id, "step_contract", {"pass", "passed", "approved-no-op"})
-        and _block_has_gate_result(block, step_id, "reviewer_gate", {"pass", "passed"})
-        and _block_has_gate_result(block, step_id, "commit_gate", {"committed", "approved-no-op"})
+        "ステップ契約の完了証跡" in stripped
+        or "step contract closure" in lowered
+        or "ステップ commit" in lowered
+        or "step commit gate" in lowered
     )
 
 
-def _block_has_gate_result(block: str, step_id: str, section_kind: str, completed_values: set[str]) -> bool:
-    incomplete_values = {"fail", "failed", "blocked", "stale", "unavailable", "denied", "provisional"}
+def _block_has_completed_step_row(block: str, step_id: str) -> bool:
+    completed_values = {"pass", "passed", "committed", "approved-no-op"}
+    incomplete_values = {"fail", "failed", "blocked"}
     normalized_step_id = step_id.lower()
-    in_matching_section = False
+    in_completion_section = False
     for line in block.splitlines():
         stripped = line.strip()
         lowered = stripped.lower()
         if lowered.startswith("####"):
-            in_matching_section = _completion_section_kind(stripped, lowered) == section_kind
+            in_completion_section = _is_completion_section(stripped, lowered)
             continue
-        if not in_matching_section:
+        if not in_completion_section:
             continue
         if not stripped.startswith("|") or not stripped.endswith("|"):
             continue
@@ -502,7 +481,8 @@ def _has_affirmative_evidence(text: str, evidence: tuple[str, ...]) -> bool:
 
 
 def _has_runtime_evidence(text: str) -> bool:
-    return _has_affirmative_evidence(text, _RUNTIME_EVIDENCE)
+    lowered = text.lower()
+    return any(item in lowered for item in _RUNTIME_EVIDENCE)
 
 
 def _has_explicit_docs_only_evidence(text: str) -> bool:

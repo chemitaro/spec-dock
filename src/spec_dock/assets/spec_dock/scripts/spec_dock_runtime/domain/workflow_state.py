@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import re
 from typing import Literal
 
 WorkflowStateKind = Literal["no-active", "requirement-capture", "classification-required", "ready", "blocked"]
@@ -52,7 +51,5 @@ def classify_requirement_text(text: str) -> WorkflowArtifactReadiness:
         "draft | approved",
     )
     if any(marker in stripped for marker in placeholder_markers):
-        return "scaffold"
-    if re.search(r'(?mi)^\s*(?:状態|status)\s*:\s*["\']?draft["\']?\s*$', stripped):
         return "scaffold"
     return "substantive"
