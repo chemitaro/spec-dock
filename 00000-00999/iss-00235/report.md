@@ -734,6 +734,104 @@ pass
 
 ---
 
+### セッションログ（2026-06-27 S07）
+
+#### 対象
+- Step: S07 Non-Goal Boundary Hardening
+- Boundary closures: `cl-boundary-artifacts`, `cl-boundary-storage-source`, `cl-boundary-external`
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S07 — Non-Goal Boundary Hardening`
+
+#### 実施内容
+- `.agent/index-all.json` は `deps.raw_direct_edges` を保持しつつ、`.agent/index.json` / `.agent/deps-issues.json` には `raw_direct_edges` を出さないことを追加 assertion で補強した。
+- closed/satisfied 相当の high-level raw edge が `deps-raw.puml` の active visual surface に出ず、empty note になることを presentation / CLI reduced fixture の両方で固定した。
+- `sync --no-github` 後も `.meta.json.depends_on` が source/target ともに保存形式のまま残ることを assert した。
+- S07 は test-only boundary hardening として完了し、runtime/source implementation は変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py
+
+92 passed in 1.56s
+```
+
+```bash
+git diff --check
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S07 | 赤フェーズ | inspect-only / covered-existing | dev-coder reported pre-change required command passed with 92 tests; S07 adds boundary assertions without known failing behavior. | delegated worker record | pass | No fabricated Red; boundary characterization step. |
+| S07 | 緑フェーズ | non-goal boundary assertions pass | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` -> 92 passed in 1.56s | command | pass | Parent-run verification on current worktree. |
+| S07 | リファクタリング | guardrail satisfied | Diff stayed within allowed test files; no implementation files, dogfooding generated runtime, storage migration, or external mutation. | diff inspection | pass | `git diff --check` passed. |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S07 | Existing reduced fixtures needed explicit boundary assertions for storage and non-goal artifacts. | implementation | added assertions to S03/S05 reduced coverage surfaces | cl-boundary-artifacts / cl-boundary-storage-source | no | `tests/unit/presentation/test_runtime_sync_s07.py`, `tests/cli_runtime/test_runtime_deps_s04.py` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S07 | cl-boundary-artifacts | Non-goal artifacts do not become complete raw audit surfaces. | Tests assert `raw_direct_edges` is absent from `.agent/index.json`, `.agent/deps-issues.json`, and `deps-raw.puml` active visual output for closed/satisfied raw edge. | pass | `deps-raw.puml` may still show existing debug raw edges in other contexts; not promoted to complete audit. |
+| S07 | cl-boundary-storage-source | `.meta.json.depends_on` storage format is not migrated by sync. | CLI reduced fixture asserts source `.meta.json.depends_on == ["epic-local-00001"]` and target remains `[]` after sync. | pass | Storage remains source of truth. |
+| S07 | cl-boundary-external | Reduced flows remain hermetic and do not require live GitHub/external repo mutation. | Tests use temp repo and `--no-github`; no implementation or external mutation code added. | pass | Final QA may still inspect full diff. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-boundary-artifacts | S07 | yes | characterization | delegated pre-change command passed with 92 tests | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` | pass, 92 passed in 1.56s | Non-goal artifact boundary. |
+| cl-boundary-storage-source | S07 | yes | characterization | delegated pre-change command passed with 92 tests | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` | pass, 92 passed in 1.56s | Storage format preserved. |
+| cl-boundary-external | S07 | yes | characterization | delegated pre-change command passed with 92 tests | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` | pass, 92 passed in 1.56s | Hermetic no-github reduced flows. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-boundary-artifacts | S07 | presentation/CLI runtime tests | pass | index-all is audit surface; non-goal artifacts are not complete audit surfaces. |
+| cl-boundary-storage-source | S07 | CLI runtime test | pass | `.meta.json.depends_on` remains unchanged. |
+| cl-boundary-external | S07 | CLI runtime test and diff inspection | pass | No live GitHub/external repo mutation added. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | S07 | N/A | N/A | Planned boundary closure ids were used as-is. | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S07 | delegated | boundary hardening | dev-coder | S07 Non-Goal Boundary Hardening | `plan.md` S07 | presentation/CLI runtime test files | artifact contract expansion, storage migration, dogfooding generated runtime implementation edits, external mutation | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` | boundary conflict or approved implementation defect | changed files, boundary evidence, verification, no-decision statement | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S07 | dev-coder | Added non-goal artifact, storage, and external-boundary assertions to existing reduced fixtures. | `tests/unit/presentation/test_runtime_sync_s07.py`, `tests/cli_runtime/test_runtime_deps_s04.py` | delegated: required command -> 92 passed; parent: required command -> 92 passed | fresh review passed | S90 docs impact and S99 final QA remain pending | accepted for commit gate |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S07 | step reviewer | code-reviewer | fresh | passed | no | proceed to commit gate | Fresh code-reviewer pass, confidence 0.90. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S07 | committed | S07 test/report files | S07 test commit, amended with this final commit-gate evidence | `git status --short --branch` -> clean after S07 commit before final evidence amendment; clean check must be rerun after amend | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/unit/presentation/test_runtime_sync_s07.py` - non-goal artifact boundary assertions.
+- `tests/cli_runtime/test_runtime_deps_s04.py` - storage/external boundary assertions.
+- `spec-dock/active/issue/report.md` - S07 observed evidence ledger.
+
+#### コミット
+- S07 test commit amended with final commit-gate evidence.
+
+#### メモ
+- `deps-raw.puml` は既存 debug raw view を持つため、全面的な absence contract ではなく complete raw audit surface に昇格しない境界として固定した。
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
