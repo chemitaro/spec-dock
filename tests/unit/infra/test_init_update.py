@@ -11908,8 +11908,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     assert os.access(mirror_path, os.X_OK), f"mirror script not executable: {rel_path}"
 
         skill_text = (
-            repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md"
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md"
         ).read_text(encoding="utf-8")
         trigger_text = (
             repo_root
@@ -12641,18 +12640,16 @@ else:
         policy_hash = hashlib.sha256(policy_text.encode("utf-8")).hexdigest()
         base_sha = "b" * 40
         head_sha = "a" * 40
-        body = "\n".join(
-            (
-                "@codex review",
-                "",
-                "Trusted review policy:",
-                f"- source: owner/repo@{base_sha}:.github/codex/review-policy.md",
-                f"- policy_sha256: {policy_hash}",
-                f"- reviewed_head_sha: {head_sha}",
-                "",
-                policy_text.rstrip(),
-            )
-        )
+        body = "\n".join((
+            "@codex review",
+            "",
+            "Trusted review policy:",
+            f"- source: owner/repo@{base_sha}:.github/codex/review-policy.md",
+            f"- policy_sha256: {policy_hash}",
+            f"- reviewed_head_sha: {head_sha}",
+            "",
+            policy_text.rstrip(),
+        ))
         return {
             "base_sha": base_sha,
             "policy_content": base64.b64encode(policy_text.encode("utf-8")).decode("ascii"),
