@@ -19,6 +19,7 @@ ID: "iss-00241"
 | D-001 | resolved | scope | user / orchestrator | `iss-00239` が scaffold のまま残り Epic close readiness を block している | A: `iss-00241` に吸収; B: 独立 Issue として残す; C: defer | `iss-00241` に吸収し、`iss-00239` は superseded / closed として扱う | ユーザーが一つの corrective Issue で複数の取りこぼしを解決する方針を明示した | promoted_to_requirement / promoted_to_design / promoted_to_plan | `discussions/20260627t031736z-interview-corrective-issue-scope-confirmation.md` | `iss-00239` supersession evidence を S04 で記録する |
 | D-002 | resolved | interpretation | spec-reviewer / audit | trusted base policy failure が fallback success として実装・テスト固定されている | A: fallback 維持; B: head policy fallback; C: POST なし human gate | POST なし human gate | Accepted ADR と Epic requirement が fail-closed を要求する | promoted_to_requirement / promoted_to_design / promoted_to_plan | Epic audit / spec reviewer report | S01 で実装 |
 | D-003 | resolved | interpretation | issue 238 / audit | `workflow next` と generated projection authority の stale wording が Epic 正本に残る | A: `workflow next` alias 追加; B: docs を `guidance <target>` に更新 | `guidance <target>` stdoutを agent handoff authority とし、projection は human/debug-only | Current runtime / skills / tests は guidance model へ移行済み | promoted_to_requirement / promoted_to_design / promoted_to_plan | `iss-00238` evidence, Epic audit | S90 で反映 |
+| D-004 | resolved | implementation-boundary | dev-coder / orchestrator / code-reviewer | assurance compose の既存 stale source binding gate が design / plan direct edit を composer の no-overwrite conflict として観測する前に止めていた | A: 既存どおり stale_source_binding のみ; B: design / plan direct edit は composer conflict を優先し、conflict がなければ stale_source_binding を維持 | B を採用 | S03 は destructive overwrite 防止を compose 境界で観測可能にする必要がある。requirement stale protection は維持され、code-reviewer が S03 slice 内で必要かつ安全と判定した | applied_to_s03 | S03 code-reviewer pass, `tests/cli_runtime/test_assurance_compose.py` | issue-local decision; no broader contract change |
 
 ## 証跡採用台帳
 
@@ -109,6 +110,7 @@ ID: "iss-00241"
 |---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | runtime / tests / shipped asset behavior を含むため | dev-coder | Trusted review trigger failure path only | provider/dogfooding `trigger_codex_review.sh`, focused trigger tests | head policy fallback, caller-provided body, broad PR observation refactor, S02+ docs/templates | focused pytest, provider/dogfooding script parity, code-reviewer pass | fake gh POST なし判定不能、JSON consumer impact不明 | passed: worker returned bounded S01 diff, no material decisions beyond approved plan |
 | S02 | delegated | shipped skill text / public contract と text assertion を含むため | doc-writer | PR observation skill contract wording only | provider/dogfooding `github-pr-observation/SKILL.md`, focused text assertion | runtime script changes, PR trigger behavior changes, S03+ templates/docs | focused pytest, stale wording inspection, provider/dogfooding skill parity, spec-reviewer pass | S01 behavior と skill wording が一致しない | passed: worker returned bounded S02 diff, no material decisions beyond approved plan |
+| S03 | delegated | runtime / scaffold behavior / tests を含むため | dev-coder | Issue design/plan awaiting-compose placeholder and compose materialization | issue design/plan templates, artifact composer, assurance compose orchestration needed to expose no-overwrite conflicts, focused CLI runtime tests | removing design/plan files, broad validator/active/sync rewrite, S04/S90 docs | focused and broader CLI runtime tests, code-reviewer pass | placeholder cannot satisfy active/sync/validate without broader migration | passed: worker returned bounded S03 diff; D-004 adopted as issue-local implementation-boundary decision |
 
 ### Step Contract Closure
 
@@ -117,6 +119,9 @@ ID: "iss-00241"
 | S01 | tc-001 | base SHA missing / policy missing / invalid / non-UTF-8 / oversized / unreadable は POST なし human gate | focused pytest `trigger_helper and (policy or base_sha or trusted_base)`、broader `trigger_helper`、code-reviewer pass | pass |
 | S01 | tc-002 | valid base policy は deterministic multiline body を投稿 | focused pytest `trigger_helper and (policy or base_sha or trusted_base)`、broader `trigger_helper`、code-reviewer pass | pass |
 | S02 | tc-003 | skill text は deterministic body / human gate を説明し、fixed bare body を唯一の write として説明しない | text assertion、stale wording `rg` inspection、provider/dogfooding skill parity、spec-reviewer pass | pass |
+| S03 | tc-004 | new issue の design / plan は awaiting-assurance-compose placeholder | new issue CLI test, broader S03 runtime test, code-reviewer pass | pass |
+| S03 | tc-005 | compose は placeholder を materialize し、substantive content を上書きしない | compose placeholder/no-overwrite tests, broader S03 runtime test, code-reviewer pass | pass |
+| S03 | tc-009 | marker が残った direct edit は conflict / fail-closed になり上書きされない | marker-plus-direct-edit compose test, code-reviewer pass | pass |
 
 ### Test Contract Closure
 
@@ -125,6 +130,9 @@ ID: "iss-00241"
 | tc-001 | S01 | red-required | dev-coder 実装前 characterization: `5 failed, 1 passed, 509 deselected`; old behavior posted bare `@codex review` for failure paths | `uv run pytest tests/unit/infra/test_init_update.py -k "trigger_helper and (policy or base_sha or trusted_base)"` | pass: `6 passed, 509 deselected` |
 | tc-002 | S01 | covered-existing | valid trusted policy path existed and was preserved while failure paths changed | `uv run pytest tests/unit/infra/test_init_update.py -k "trigger_helper"` | pass: `21 passed, 494 deselected` |
 | tc-003 | S02 | inspect-only | stale skill wording existed: fixed bare body was described as the only write contract | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_231_trigger_helper or issue_176_s01_trigger_helper_blocks_when_base_sha_missing'` | pass: `7 passed, 508 deselected` |
+| tc-004 | S03 | red-required | dev-coder characterization: new issue still produced normal scaffold, not placeholder | `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_assurance_compose.py -k "placeholder or substantive or stale_requirement"` | pass: `4 passed, 53 deselected` |
+| tc-005 | S03 | red-required | dev-coder characterization: substantive non-placeholder content was not exposed as the planned compose no-overwrite conflict; reviewer follow-up found placeholder body remained after compose (`1 failed, 3 passed`) | `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_assurance_compose.py tests/cli_runtime/test_workflow.py -k "issue or compose or guidance"` | pass: `32 passed, 2 skipped, 34 deselected` |
+| tc-009 | S03 | red-required | marker plus direct edit lacked explicit S03 conflict coverage before new test | `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_assurance_compose.py -k "placeholder or substantive or stale_requirement"` | pass: `4 passed, 53 deselected` |
 
 ### Closure Coverage
 
@@ -133,6 +141,15 @@ ID: "iss-00241"
 | tc-001 | AC-001 / EC-001〜EC-003: trusted base policy failure is POSTなし human gate | tests assert no POST, `success=false`, `overall_status=human_gate`, `normalized_status=human_gate`, `recommended_next_action=human_gate`, `trigger.action=blocked`, blocking limitations | pass |
 | tc-002 | AC-002: valid base policy posts deterministic multiline body | tests assert source, policy hash, reviewed head SHA, and posted body match expected multiline trigger | pass |
 | tc-003 | AC-003: skill public contract matches runtime behavior | text assertion requires runtime-composed deterministic body, trusted policy evidence, no comment on base policy failure, caller-provided body prohibition; stale fixed-bare-body phrases absent by `rg` | pass |
+| tc-004 | AC-006: new issue design/plan are assurance compose placeholders | new issue test asserts `artifact_state: awaiting-assurance-compose`, `assurance classify --stage requirement`, `assurance compose --artifact all`, and no managed sections yet | pass |
+| tc-005 | AC-007: compose safely materializes placeholder / does not overwrite substantive content | compose tests assert marker and placeholder body are removed, managed sections are added, substantive non-placeholder content remains unchanged on conflict | pass |
+| tc-009 | EC-004: marker plus direct edit is not overwritten | compose test asserts `substantive_content_conflict` and unchanged artifact text | pass |
+
+### Closure Delta
+
+| step | added / changed closure | reason | re-review |
+|---|---|---|---|
+| S03 | direct edits to `design.md` / `plan.md` now surface as `substantive_content_conflict`; stale requirement still surfaces as `stale_source_binding` | make S03 no-overwrite safety observable at compose boundary while preserving requirement stale protection | code-reviewer pass |
 
 ### Reviewer Gate Status
 
@@ -140,6 +157,7 @@ ID: "iss-00241"
 |---|---|---|---|---|---|
 | S01 code review | code-reviewer | fresh uncommitted S01 diff after focused tests | passed | none | S01 eligible for Step Commit Gate |
 | S02 spec review | spec-reviewer | fresh uncommitted S02 diff after focused tests and inspections | passed | none | S02 eligible for Step Commit Gate |
+| S03 code review | code-reviewer | fresh uncommitted S03 diff after P1 fix and focused/broader tests | passed | none | S03 eligible for Step Commit Gate |
 
 ### Step Commit Gate
 
@@ -147,6 +165,7 @@ ID: "iss-00241"
 |---|---|---|---|---|---|---|
 | S01 | trigger helper scripts and focused trigger tests | code-reviewer pass, no findings, confidence 0.89 | S01 runtime/test/report evidence only | committed | S01 scope commit created; exact hash is external git evidence | pass: post-commit `git status --short` clean |
 | S02 | PR observation skill text and focused text assertion | spec-reviewer pass, no findings, confidence 0.88 | pending | ready_to_commit | pending | pending |
+| S03 | issue design/plan placeholders, compose materialization/no-overwrite behavior, focused CLI runtime tests | code-reviewer pass after one P1 fix, no findings, confidence 0.88 | S03 runtime/template/test/report evidence only | committed | S03 scope commit created; exact hash is external git evidence | pass: post-commit `git status --short` clean except this report amendment |
 
 ## 最終品質ゲート
 
