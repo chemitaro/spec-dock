@@ -103,6 +103,134 @@ class TestDepsDomain:
             ),
         ])
 
+    def _direct_high_level_graph(self):
+        _domain_deps, domain_models, domain_tree = _runtime_modules()
+        source_root = Path("/repo/spec-dock/initiatives/init-00010-source")
+        target_root = Path("/repo/spec-dock/initiatives/init-00020-target")
+        target_epic = target_root / "epics" / "epic-00020-target"
+        empty_target_epic = target_root / "epics" / "epic-00030-empty-target"
+        return domain_tree.build_graph([
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-00010",
+                title="Source",
+                slug="source",
+                path=source_root,
+                meta_path=source_root / ".meta.json",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=10,
+            ),
+            domain_models.SpecNodeSeed(
+                kind="initiative",
+                id="init-00020",
+                title="Target",
+                slug="target",
+                path=target_root,
+                meta_path=target_root / ".meta.json",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=20,
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-00020",
+                title="Target epic",
+                slug="target-epic",
+                path=target_epic,
+                meta_path=target_epic / ".meta.json",
+                parent_id="init-00020",
+                initiative_id="init-00020",
+                epic_id=None,
+                github_issue_number=21,
+            ),
+            domain_models.SpecNodeSeed(
+                kind="issue",
+                id="iss-00021",
+                title="Target issue",
+                slug="target-issue",
+                path=target_epic / "issues" / "iss-00021-target-issue",
+                meta_path=target_epic / "issues" / "iss-00021-target-issue" / ".meta.json",
+                parent_id="epic-00020",
+                initiative_id="init-00020",
+                epic_id="epic-00020",
+                github_issue_number=22,
+            ),
+            domain_models.SpecNodeSeed(
+                kind="epic",
+                id="epic-00030",
+                title="Empty target epic",
+                slug="empty-target-epic",
+                path=empty_target_epic,
+                meta_path=empty_target_epic / ".meta.json",
+                parent_id="init-00020",
+                initiative_id="init-00020",
+                epic_id=None,
+                github_issue_number=23,
+            ),
+        ])
+
+    def test_inspect_target_deps_blocks_empty_initiative_direct_node_dependency(self) -> None:
+        domain_deps, domain_models, _domain_tree = _runtime_modules()
+        graph = self._direct_high_level_graph()
+
+        inspection = domain_deps.inspect_target_deps(
+            graph,
+            issue_depends_on_map={},
+            target_id=domain_models.NodeId("init-00010"),
+            issue_statuses={},
+            active_issue_id=None,
+            raw_node_depends_on_map={"init-00010": ["epic-00030"]},
+            high_level_statuses_by_node_id={
+                "epic-00030": domain_models.DepsHighLevelStatus(
+                    node_id="epic-00030",
+                    state="open",
+                    source="local",
+                )
+            },
+        )
+
+        assert not inspection.evaluation.ready
+        assert inspection.evaluation.guard_reason == "blocked"
+        assert inspection.evaluation.blockers == ["epic-00030"]
+        assert inspection.effective_depends_on == []
+        assert [(dep.source_node_id, dep.target_node_id) for dep in inspection.direct_node_dependencies] == [
+            ("init-00010", "epic-00030")
+        ]
+        assert inspection.direct_node_dependencies[0].dependency_disposition == "blocking"
+        assert inspection.direct_node_dependencies[0].disposition_basis == "empty_open_container"
+
+    def test_inspect_target_deps_keeps_non_empty_direct_node_status_out_of_effective_deps(self) -> None:
+        domain_deps, domain_models, _domain_tree = _runtime_modules()
+        graph = self._direct_high_level_graph()
+
+        inspection = domain_deps.inspect_target_deps(
+            graph,
+            issue_depends_on_map={},
+            target_id=domain_models.NodeId("init-00010"),
+            issue_statuses={"iss-00021": _issue_status(domain_models, "iss-00021", "done")},
+            active_issue_id=None,
+            raw_node_depends_on_map={"init-00010": ["epic-00020"]},
+            high_level_statuses_by_node_id={
+                "epic-00020": domain_models.DepsHighLevelStatus(
+                    node_id="epic-00020",
+                    state="done",
+                    source="descendant_aggregate",
+                )
+            },
+        )
+
+        assert inspection.evaluation.ready
+        assert inspection.evaluation.blockers == []
+        assert inspection.effective_depends_on == []
+        assert [(dep.target_issue_ids, dep.expansion) for dep in inspection.direct_node_dependencies] == [
+            (("iss-00021",), "expanded")
+        ]
+        assert inspection.direct_node_dependencies[0].dependency_disposition == "satisfied"
+        assert inspection.direct_node_dependencies[0].disposition_basis == "all_descendant_issues_done"
+
     def test_inspect_target_deps_classifies_ready_blocked_done_and_unknown_without_cli(self) -> None:
         domain_deps, domain_models, _domain_tree = _runtime_modules()
         graph = self._graph()
