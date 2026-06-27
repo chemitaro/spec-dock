@@ -5,12 +5,40 @@ import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 import sys
 import tempfile
 
 import pytest
 
 _REQUIRED_NODE_DOCS = ("requirement.md", "design.md", "plan.md", "report.md")
+
+
+def _write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def _write_json(path: Path, payload: object) -> None:
+    _write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+
+
+def _materialize_node(node_dir: Path, meta: dict[str, object]) -> None:
+    node_dir.mkdir(parents=True, exist_ok=True)
+    _write_json(node_dir / ".meta.json", meta)
+    for doc_name in _REQUIRED_NODE_DOCS:
+        _write_text(node_dir / doc_name, f"# {doc_name}\n")
+
+
+def _run_runtime_capture(target: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
+    script = target / "spec-dock" / "scripts" / "spec-dock"
+    assert script.is_file(), f"runtime script missing: {script}"
+    return subprocess.run(
+        [sys.executable, str(script), *args],
+        cwd=str(target),
+        capture_output=True,
+        text=True,
+    )
 
 
 def _runtime_modules():
@@ -281,6 +309,95 @@ class _StubGitGateway:
 
 
 class TestRuntimeDepsS04:
+    def test_cli_deps_check_json_blocks_empty_high_level_source_direct_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            from spec_dock.cli import main
+
+            assert main(["init", str(repo_root)]) == 0
+            marker = {"managed": True, "do_not_edit": True, "edit_via": "spec-dock"}
+            timestamp = "2026-06-27T00:00:00+09:00"
+            initiatives_dir = repo_root / "spec-dock" / "initiatives"
+            _materialize_node(
+                initiatives_dir / "init-local-00001-source-initiative",
+                {
+                    "schema_version": 1,
+                    "type": "initiative",
+                    "id": "init-local-00001",
+                    "title": "Source initiative",
+                    "slug": "source-initiative",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "parent_id": None,
+                    "initiative_id": None,
+                    "epic_id": None,
+                    "depends_on": ["epic-local-00001"],
+                    "_spec_dock": marker,
+                },
+            )
+            _materialize_node(
+                initiatives_dir / "init-local-00002-target-initiative",
+                {
+                    "schema_version": 1,
+                    "type": "initiative",
+                    "id": "init-local-00002",
+                    "title": "Target initiative",
+                    "slug": "target-initiative",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "parent_id": None,
+                    "initiative_id": None,
+                    "epic_id": None,
+                    "depends_on": [],
+                    "_spec_dock": marker,
+                },
+            )
+            _materialize_node(
+                initiatives_dir / "init-local-00002-target-initiative" / "epics" / "epic-local-00001-target-epic",
+                {
+                    "schema_version": 1,
+                    "type": "epic",
+                    "id": "epic-local-00001",
+                    "title": "Target epic",
+                    "slug": "target-epic",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "parent_id": "init-local-00002",
+                    "initiative_id": "init-local-00002",
+                    "epic_id": None,
+                    "depends_on": [],
+                    "_spec_dock": marker,
+                },
+            )
+
+            result = _run_runtime_capture(
+                repo_root,
+                ["deps", "check", "--id", "init-local-00001", "--no-github", "--json"],
+            )
+
+        assert result.returncode == 3, result.stdout + result.stderr
+        assert result.stderr == ""
+        payload = json.loads(result.stdout)
+        assert payload["target"] == "init-local-00001"
+        assert payload["ready"] is False
+        assert payload["effective_depends_on"] == []
+        assert payload["blockers"] == ["epic-local-00001"]
+        assert payload["dependency_contexts"] == []
+        assert payload["direct_node_dependencies"] == [
+            {
+                "source_node_id": "init-local-00001",
+                "source_node_kind": "initiative",
+                "target_node_id": "epic-local-00001",
+                "target_node_kind": "epic",
+                "target_issue_ids": [],
+                "expansion": "empty",
+                "lifecycle_state": "open",
+                "lifecycle_source": "local",
+                "dependency_disposition": "blocking",
+                "disposition_basis": "empty_open_container",
+            }
+        ]
+
     def test_collect_sync_state_reads_shared_topology_map(self) -> None:
         (
             _runtime_app,
