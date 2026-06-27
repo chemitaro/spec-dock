@@ -53,6 +53,7 @@ Disposition ごとの必須証跡:
 | D-002 | resolved | compatibility | user | 既存の `workflow next` / dynamic guidance field 互換を残すか。 | compatibility shim; hard cutover | hard cutover を採用し、不要な interface / field は削除対象にする。 | ユーザーが「hard cutoverを採用します。不要なインターフェースやフィールドは削除」と明示した。 | applied | `discussions/20260627t132404z-interview-default-guidance-dynamic-fields-cutover.md`; `requirement.md` AC-001/AC-002; `design.md` S01/S03 | なし |
 | D-003 | resolved | test-strategy | orchestrator | Issue Planning の実運用テストで、substantive draft requirement が `reason_code=requirement-scaffold` と表示され、`assurance classify` の `standard` と guidance の `strict` も不一致だった。 | この issue の外へ延期; この issue の planning/validation 要件へ織り込む | 本 issue の AC-009/AC-010 と S05 に取り込み、guidance semantics、authorized profile source consistency、provider/dogfood parity を検証対象にする。 | `assurance classify` は requirement を valid/standard と判定する一方、guidance は scaffold/strict を表示したため、agent-facing guidance の状態表現と profile source を検証する必要がある。 | applied | `discussions/20260627t143104z-research-issue-planning-guidance-manual-test-findings.md`; `plan.md` S05/tc-009/tc-010 | なし |
 | D-004 | resolved | test-strategy | ChatGPT Pro advisory review / orchestrator | GPT-5.5 Pro review が、`may_execute_approved_plan`、旧 structured step selector 不要テスト、invalid assurance fail-closed、projection refresh negative test の明示を推奨した。 | 既存 plan のまま; すべて採用; source-grounded な不足分だけ採用 | source-grounded な不足分だけ採用し、`tc-011` - `tc-014` と output / preflight contract へ反映した。 | 外部 review には active issue 本体が確認できないという誤認があったため、助言をそのまま権威化せず、ローカル文書と照合できた指摘だけ採用する。 | applied | `discussions/20260627t150729z-research-chatgpt-pro-plan-review-adoption.md`; `requirement.md`; `design.md`; `plan.md` | なし |
+| D-005 | resolved | operation | dogfooding manual test | `uvx --from . spec-dock update .` 後も dogfooding runtime が古い `guidance issue-execution` 判定を返した。 | update root cause をこの issue で深掘り; dogfooding parity のため provider 正本から同期して本 issue を進める; issue を停止する | 本 issue では provider 正本と dogfooding runtime の parity を確保して検証を続行し、update root cause の深掘りは scope expansion として扱う。 | 主目的は guidance hard cutover であり、provider 正本の実装と dogfooding command の実挙動確認が closure に必要。update behavior の根本原因は別関心事。 | applied | `discussions/20260627t154455z-research-dogfooding-runtime-update-drift-finding.md`; dogfooding `guidance issue-execution` / `guidance issue-planning`; `spec-dock validate` | 必要なら update path 調査を follow-up |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -71,6 +72,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-003 | adopted | user decision | requirement / design / plan | hard cutover と不要 field 削除を互換性方針として採用した。 | `discussions/20260627t132404z-interview-default-guidance-dynamic-fields-cutover.md` | なし |
 | EAL-004 | adopted | command / research | design / plan / report | Issue Planning guidance の manual test 結果を採用し、guidance semantics drift と profile source inconsistency を検証対象へ加えた。 | `discussions/20260627t143104z-research-issue-planning-guidance-manual-test-findings.md`; `./spec-dock/scripts/spec-dock guidance issue-planning`; `./spec-dock/scripts/spec-dock assurance classify --stage requirement --dry-run --format json` | 実装時に S05 で再検証 |
 | EAL-005 | partially_adopted | external advisory review | requirement / design / plan / report | GPT-5.5 Pro review のうち、ローカル文書と照合できた不足分を採用した。active issue 本体未確認という指摘は Oracle 側の可視性制約として参考止まりにした。 | `discussions/20260627t150729z-research-chatgpt-pro-plan-review-adoption.md`; Oracle session `iss-00244-plan-centric-guidance` | なし |
+| EAL-006 | adopted | command / research | report | Dogfooding runtime update drift finding を採用し、provider/dogfood parity と実コマンド出力の両方を最終検証対象にした。 | `discussions/20260627t154455z-research-dogfooding-runtime-update-drift-finding.md`; `./spec-dock/scripts/spec-dock guidance issue-execution`; `./spec-dock/scripts/spec-dock validate` | PR 前に provider/dogfood diff と guidance output を再確認 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -133,7 +135,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- 実装は未開始。本フェーズでは `iss-00244` の要件定義書、設計書、実装計画書を具体化し、Issue Planning guidance の manual test findings を discussion artifact として記録した。
+- `guidance issue-execution` を plan-centric preflight validator へ hard cutover し、旧 dynamic fields（`selected_step` / `step_assurance` / `context_packets` など）を default output / projection / skill handoff から除去した。
+- 実行順序・worker/reviewer/verification obligation は `plan.md` 正本へ集約し、runtime guidance は `state` / `next_action` / `reason_code` / `authority` / `may_execute_approved_plan` / `contract_source` / `evidence_ledger` を返す軽量な実行可否確認に縮退した。
+- provider source と dogfooding workspace の実コマンドで `guidance issue-execution` / `guidance issue-planning` / `validate` を確認し、dogfooding runtime update drift は discussion artifact として記録した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -258,45 +262,169 @@ npx -y @steipete/oracle --engine browser --model gpt-5.5-pro --browser-thinking-
 #### メモ
 - 実装開始前に fresh spec-reviewer の pass が必要。
 
+### セッションログ（2026-06-28 実装・検証）
+
+#### 対象
+- Step: S01 / S02 / S03 / S04 / S05 / S90
+- AC/EC: AC-001..AC-010, EC-001..EC-006
+- closure ids: tc-001..tc-014
+
+#### 実施内容
+- `Runbook` domain model、workflow application、Markdown/JSON renderer、projection store から旧 dynamic execution handoff fields を削除した。
+- ready issue の runtime guidance は `execute-approved-plan` と `may_execute_approved_plan=true` を返し、実行契約 source と evidence ledger を明示する形へ変更した。
+- invalid/stale assurance は `unavailable` authority として fail-closed し、`strict` fallback を current authority として表示しないようにした。
+- shipped issue planning / execution skills を更新し、runtime guidance から current step / worker / reviewer / verification / context packet を導出しないようにした。
+- assurance compose の plan fragment を `Step Obligation Contract` へ更新し、worker/reviewer obligations は `plan.md` に書く契約へ寄せた。
+- `uvx --from . spec-dock update .` 後に dogfooding runtime drift を検出したため、provider 正本と dogfooding runtime の parity を確保してから manual test を再実行した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py tests/cli_runtime/test_assurance_compose.py
+# result: 28 passed
+
+uv run pytest tests/cli_runtime
+# result: 671 passed, 76 skipped
+
+uv run pytest tests/unit
+# result: 832 passed
+
+uv run ruff check .
+# result: All checks passed
+
+uv run mypy src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/runbook.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/workflow_state.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/runbook_store.py src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/workflow.py
+# result: Success: no issues found in 6 source files
+
+./spec-dock/scripts/spec-dock guidance issue-execution
+# result: state=ready, next_action=execute-approved-plan, reason_code=assurance-valid, may_execute_approved_plan=true, authorized_profile=standard
+
+./spec-dock/scripts/spec-dock guidance issue-planning
+# result: state=ready, next_action=planning-ready, may_execute_approved_plan=false, authorized_profile=standard
+
+rg -n "selected step|selected_step|Step Assurance|Context Packets|context_packets|workflow-plan-unselectable|Context Packet" \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime \
+  spec-dock/scripts/spec_dock_runtime \
+  src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md \
+  src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md \
+  .agents/skills/spec-dock-issue-execution/SKILL.md \
+  .agents/skills/spec-dock-issue-planning/SKILL.md \
+  spec-dock/active/current-runbook.md \
+  spec-dock/active/current-runbook.json
+# result: no matches
+
+./spec-dock/scripts/spec-dock validate
+# result: spec-dock: ok (validate) nodes=153
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S01 | Green | ready guidance output contract | `execute-approved-plan`, `may_execute_approved_plan=true`, `contract_source`, `evidence_ledger` observed | pytest / manual command | pass | tc-001, tc-002, tc-011 |
+| S02 | Green | non-executable / invalid assurance blocks execution | invalid/stale assurance fixtures use unavailable authority and `may_execute_approved_plan=false` | pytest | pass | tc-004, tc-013 |
+| S03 | Green | old dynamic fields no longer control execution | old dynamic fields absent in CLI/runtime/projection/skills; report rows no longer select steps | pytest / rg | pass | tc-002, tc-003, tc-012, tc-014 |
+| S04 | Green | skill/template handoff points to plan-centric obligation | provider/generated skill assertions and template assertions pass | pytest / inspection | pass | tc-005, tc-006, tc-007 |
+| S05 | Green | regression and dogfooding parity | CLI runtime/unit suites pass; dogfooding guidance returns ready/standard | pytest / command | pass-with-finding | update drift recorded separately |
+| S90 | Green | docs impact and projection refresh | `current-runbook.*` refreshed without dynamic sections; guidance commands align with active issue | command / rg | pass | tc-010, tc-014 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S05 | `spec-dock update .` 成功後も dogfooding runtime が古い判定を返す場合がある。 | dogfooding manual test | provider 正本から dogfooding runtime parity を確保し、finding を discussion artifact に記録。 | tc-010 / tc-014 | no | `discussions/20260627t154455z-research-dogfooding-runtime-update-drift-finding.md` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S01 | tc-001, tc-002, tc-011 | Runbook output contract hard cutover | focused tests and manual guidance output | pass | ready guidance uses approved plan contract |
+| S02 | tc-004, tc-006, tc-013 | plan readiness preflight validation | workflow tests and invalid/stale assurance fixtures | pass | fail-closed unavailable authority |
+| S03 | tc-002, tc-003, tc-008, tc-012 | dynamic context routing removal | replaced CLI tests, removed obsolete context routing / packet modules, and no old dynamic field grep matches | pass | old context packet control plane removed |
+| S04 | tc-005, tc-007 | planning docs, skill kernels, compose scaffold | provider/generated skill assertions and template assertion | pass | runtime-selected step registration removed |
+| S05 | tc-008, tc-009, tc-010, tc-014 | regression tests and dogfooding parity | `tests/cli_runtime`, `tests/unit`, dogfooding commands, `validate` | pass-with-finding | update drift finding recorded |
+| S90 | tc-010, tc-014 | docs impact resolution | projection refresh and structural grep | pass | no dynamic projection sections |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-001 | S01 | yes | command | old guidance lacked plan-centric execution permission | `uv run pytest tests/cli_runtime/test_workflow.py` | pass | plan/report sources asserted |
+| tc-002 | S01/S03 | yes | command | old dynamic fields existed in contract/tests | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py`; `rg ...` | pass | no old field matches in target surfaces |
+| tc-003 | S03 | yes | command | report rows could influence guidance step selection | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | report no longer control plane |
+| tc-004 | S02 | yes | command | scaffold/non-executable plan needed block | `uv run pytest tests/cli_runtime/test_workflow.py` | pass | `may_execute_approved_plan=false` |
+| tc-005 | S04 | yes | structural assertion | plan scaffold needed obligation fields | `uv run pytest tests/cli_runtime/test_assurance_compose.py tests/unit/infra/test_init_update.py` | pass | `Step Obligation Contract` asserted |
+| tc-006 | S02/S04 | yes | structural assertion | planning taxonomy needed review obligations | `uv run pytest tests/unit/infra/test_init_update.py` | pass | skill/template contracts assert no runtime-derived reviewer |
+| tc-007 | S04 | yes | structural assertion | skill text still registered selected step | `uv run pytest tests/unit/infra/test_init_update.py`; `rg ...` | pass | selected step phrase absent |
+| tc-008 | S05 | yes | command | old tests locked dynamic behavior | `uv run pytest tests/cli_runtime` | pass | replacement suite passed |
+| tc-009 | S05 | yes | inspect-only | planning manual test finding needed record | discussion/report inspection | pass | finding recorded |
+| tc-010 | S05/S90 | yes | command | provider/dogfood parity could drift | dogfooding guidance commands; `./spec-dock/scripts/spec-dock validate` | pass-with-finding | update drift finding recorded |
+| tc-011 | S01/S02 | yes | command | execution permission implicit | `uv run pytest tests/cli_runtime/test_workflow.py` | pass | `may_execute_approved_plan` asserted |
+| tc-012 | S03/S05 | yes | command | hidden structured step selector could remain | `uv run pytest tests/cli_runtime/test_workflow_context_routing.py` | pass | no `workflow-plan-unselectable` |
+| tc-013 | S02/S05 | yes | command | invalid assurance could show false strict authority | `uv run pytest tests/cli_runtime/test_workflow.py` | pass | unavailable authority asserted |
+| tc-014 | S05/S90 | yes | manual + structural | projection could reintroduce old model | `guidance issue-execution`; `rg ... current-runbook.*` | pass | projection has no old dynamic sections |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-001..tc-014 | S01/S02/S03/S04/S05/S90 | focused tests, full CLI runtime, unit suite, ruff, mypy, dogfooding guidance, validate | pass-with-finding | dogfooding update drift is non-blocking finding recorded in D-005/EAL-006 |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| discovered | tc-010 / tc-014 | dogfooding-runtime-update-drift | tc-010 / tc-014 | update success alone is not sufficient dogfooding evidence. | no | final PR reviewで確認 |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01-S90 | approved-local-execution | current host policy did not allow write-capable subagent mutation without explicit subagent request in this turn | N/A | provider runtime/assets/tests and dogfooding validation surfaces | active issue docs / provider source | planned implementation paths | unrelated PR delivery / GitHub review policy / destructive actions | pytest / ruff / mypy / dogfooding commands | failing gates / scope expansion | changed files, tests, risks, report evidence | pass-with-finding |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S01-S90 | parent direct implementation under current tool policy; subagents not used for mutation | user requested implementation completion and PR creation in this worktree | planned provider/runtime/assets/tests/dogfood files | implementation, tests, dogfood validation, report update | git diff and tests before commit/PR | focused tests, CLI runtime, unit, ruff, mypy, validate | PR Codex review / final observation pending | recorded as parent implementation exception |
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
 | docs / templates / README / workflow / skill / migration notes | yes | doc-writer | `plan.md` S90 に docs impact resolution を明記 | pending |
+| runtime guidance / shipped issue skills / assurance compose fragment / dogfooding projection | yes | orchestrator | `guidance issue-execution`; `guidance issue-planning`; `rg ... current-runbook.*`; `uv run pytest tests/unit/infra/test_init_update.py` | local pass; PR review pending |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
 | qa-reviewer | whole issue obligation coverage | added | `plan.md` tc-001..tc-010; S05 / S99 | pending |
+| local verification | whole issue obligation coverage | executed | `uv run pytest tests/cli_runtime`; `uv run pytest tests/unit`; `./spec-dock/scripts/spec-dock validate` | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
 | code-reviewer | issue-wide integrated diff | implementation not started | 0 | pending |
+| PR Codex review | issue-wide integrated diff | PR creation and review trigger pending | 0 | pending |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
 | spec-reviewer | requirement / design / plan / report alignment | pending fresh review | 0 | pending |
+| local spec traceability | requirement / design / plan / report alignment | closure ids tc-001..tc-014 recorded and verified | 0 | local pass; external review pending |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
 | report.md planning ledger | requirement/design/plan/report/discussions | final response | pending |
+| report.md implementation ledger | provider runtime/assets/tests plus dogfooding workspace parity | PR body / final response | pending commit / PR |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: Issue Planning guidance が、substantive draft requirement を `reason_code=requirement-scaffold` と表示した。
   - 解決: `assurance classify` と provider/runtime inspection で原因を切り分け、manual test finding として discussion artifact に記録し、S05/tc-009/tc-010 に検証対象として組み込んだ。
+- 問題: `uvx --from . spec-dock update .` 成功後も dogfooding runtime が古い guidance 判定を返した。
+  - 解決: provider 正本と dogfooding runtime の差分を確認し、dogfooding parity を確保してから guidance / validate を再実行した。根本原因は scope expansion として discussion artifact に残した。
 
 ## 学んだこと (任意)
 - guidance のユーザー向け reason code は safety gate としては機能していても、agent が次の作業を判断する signal としては draft/scaffold/review-needed を分ける必要がある。
 
 ## 今後の推奨事項 (任意)
-- 実装時は provider source と dogfooding runtime の両方で guidance output を比較し、`assurance classify` と矛盾しない状態表現に揃える。
+- provider source と dogfooding runtime の両方で guidance output を比較し、`assurance classify` と矛盾しない状態表現に揃える。
+- `spec-dock update .` が dogfooding runtime を更新しないケースは、別途 update path の follow-up として調査候補にする。
 
 ## 省略/例外メモ (必須)
-- 実装・コードレビュー・QA は未実施。本フェーズは issue planning authoring と manual test findings の記録に限定する。
+- ローカル実装・自動テスト・dogfooding manual test は実施済み。PR 作成、PR 上の Codex review trigger、外部観測は未実施であり、PR 作成後に追記する。
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
