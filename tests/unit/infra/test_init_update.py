@@ -12024,6 +12024,27 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     assert os.access(provider_path, os.X_OK), f"provider script not executable: {rel_path}"
                     assert os.access(mirror_path, os.X_OK), f"mirror script not executable: {rel_path}"
 
+        skill_text = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md"
+        ).read_text(encoding="utf-8")
+        for fragment in (
+            "POST repos/{owner}/{repo}/issues/{pr}/comments",
+            "runtime-composed deterministic body",
+            "starts with `@codex review`",
+            "trusted policy source, policy hash, and reviewed head SHA",
+            "Base policy `missing`, `invalid`, `oversized`, `unreadable`, or\n  `base_sha_missing`",
+            "No comment is posted",
+            "caller-provided trigger body",
+        ):
+            assert fragment in skill_text
+        for stale_fragment in (
+            "with the fixed body `@codex review`",
+            "posts exactly one fixed `@codex review` issue comment",
+            "one fixed `@codex review` comment",
+        ):
+            assert stale_fragment not in skill_text
+
     def test_issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         mirrored_paths = (

@@ -1,22 +1,25 @@
 ---
 name: github-pr-observation
-description: Trigger a fixed Codex PR review request and observe GitHub Actions CI, reviews, comments, and review threads through bounded scripts. Use when a PR needs deterministic wait or snapshot evidence after creation or push.
+description: Trigger a fixed-endpoint Codex PR review request and observe GitHub Actions CI, reviews, comments, and review threads through bounded scripts. Use when a PR needs deterministic wait or snapshot evidence after creation or push.
 ---
 
 # GitHub PR Observation
 
 ## Overview
 
-Use this skill to request one fixed Codex PR review and collect PR observation
-evidence through bounded scripts. The public entrypoints are:
+Use this skill to request one deterministic Codex PR review and collect PR
+observation evidence through bounded scripts. The public entrypoints are:
 
 - `scripts/wait_pr_observation.sh`
 - `scripts/fetch_pr_observation_snapshot.sh`
 
 `wait_pr_observation.sh` is the normal orchestration entrypoint. By default it
-posts exactly one fixed `@codex review` issue comment, then observes CI and
-Codex review completion for that trigger boundary. `fetch_pr_observation_snapshot.sh`
-is read-only and collects one snapshot. `stdout` is machine-readable JSON only.
+validates the PR head and trusted base review policy, then posts exactly one
+runtime-composed deterministic issue comment whose body starts with
+`@codex review` and includes the trusted policy source, policy hash, and
+reviewed head SHA. If the trusted base policy cannot be validated, the helper
+returns `human_gate` and posts no comment. `fetch_pr_observation_snapshot.sh` is
+read-only and collects one snapshot. `stdout` is machine-readable JSON only.
 Progress and diagnostics belong on `stderr` and are non-authoritative.
 
 This skill has a collection-only boundary. It performs evidence collection and
@@ -30,7 +33,14 @@ Triage and judgment over collected evidence belong to
 - `wait_pr_observation.sh` may perform one fixed GitHub write through the
   internal `trigger_codex_review.sh` helper in default `post-once` mode.
 - The only allowed write is `POST repos/{owner}/{repo}/issues/{pr}/comments`
-  with the fixed body `@codex review`.
+  with a runtime-composed deterministic body derived from the trusted base
+  policy and PR metadata. The body starts with `@codex review` and includes the
+  trusted policy source, policy hash, and reviewed head SHA when the base policy
+  is valid.
+- Base policy `missing`, `invalid`, `oversized`, `unreadable`, or
+  `base_sha_missing` is a fail-closed human gate. No comment is posted in those
+  cases, and the final JSON reports `normalized_status="human_gate"` and
+  `overall_status="human_gate"` with a blocking limitation.
 - `fetch_pr_observation_snapshot.sh` and the collector libraries remain
   read-only and call only fixed GitHub read APIs internally.
 - Operators still invoke the public `.sh` scripts directly. The adjacent
@@ -61,7 +71,9 @@ Triage and judgment over collected evidence belong to
 - The scripts do not accept arbitrary GitHub endpoints, methods, GraphQL
   queries, request bodies, headers, `jq` expressions, or raw `gh` arguments.
 - Callers must not ask an agent to post `@codex review` manually for the normal
-  wait flow. The script owns that deterministic trigger action.
+  wait flow. Manual bare trigger comments are outside the normal workflow; the
+  script owns the deterministic trigger action and never accepts a
+  caller-provided trigger body.
 - GitHub auth, rate-limit, schema, or collection failures that can still be
   represented as JSON are returned as non-success observation payloads with
   machine-readable `limitations`.
@@ -93,7 +105,7 @@ Triage and judgment over collected evidence belong to
   and review thread read surfaces. Do not add Checks/status permission wording
   to doctor or capability guidance for this skill; mention Actions read and PR
   review/comment read instead.
-- The fixed `@codex review` trigger comment write failure is separate from read
+- The deterministic trigger comment write failure is separate from read
   collection failures. It returns `normalized_status="human_gate"`,
   `overall_status="human_gate"`, and a
   `limitations[].capability="trigger_comment_write"` permission limitation.
@@ -135,8 +147,11 @@ Triage and judgment over collected evidence belong to
 
 - Default mode is `post-once`.
 - In `post-once`, `wait_pr_observation.sh` validates the current PR head, posts
-  one fixed `@codex review` comment, captures the helper JSON internally, and
-  uses the returned `comment_id` / `created_at` as the observation boundary.
+  one runtime-composed deterministic `@codex review` comment when the trusted
+  base policy is valid, captures the helper JSON internally, and uses the
+  returned `comment_id` / `created_at` as the observation boundary. If the base
+  policy is missing, invalid, oversized, unreadable, or the base SHA is missing,
+  `post-once` returns `human_gate` without posting a comment.
 - `post-once` rejects caller-supplied `--trigger-comment-id` and
   `--trigger-created-at`; those values must come from the helper result.
 - `resume` never posts a new comment. It requires explicit
