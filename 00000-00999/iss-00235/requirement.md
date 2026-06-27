@@ -27,7 +27,7 @@ ID: "iss-00235"
 - 必須:
   - High-level source node (`initiative` / `epic`) 自体の direct `depends_on` を `deps check --id <initiative|epic> --json` で機械可読に確認できる。
   - High-level source node の direct dependency が未解決の場合、`deps check` は `ready: false` または同等の machine-readable non-ready status を返す。
-  - `sync` 後の `.agent/index-all.json` で、保存済み raw direct dependency を source / target node kind とともに機械可読に監査できる。
+  - `sync` 後の `.agent/index-all.json` で、保存済み raw direct dependency を `nodes[<source>].depends_on` と `nodes[<target>].type` の join により機械可読に監査できる。
   - Empty high-level source と non-empty high-level source の両方で、source node 自体の raw direct dependency が失われない。
   - Satisfied / done / closed dependency であっても、complete raw audit から保存済み raw edge が消えない。
   - Existing issue source -> high-level target readiness behavior を維持する。
@@ -85,8 +85,8 @@ ID: "iss-00235"
   - アクター: Agent / downstream tooling
   - 前提: AC-001 と同じ graph。
   - 操作: `./spec-dock/scripts/spec-dock sync --no-github`
-  - 期待結果: `.agent/index-all.json` が `init-00001 -> epic-00002` の raw direct edge を source / target node kind とともに含む。
-  - 不合格条件: `.agent/index-all.json` に raw edge がなく、別 artifact だけで確認できる状態。
+  - 期待結果: `.agent/index-all.json` が `nodes["init-00001"].depends_on=["epic-00002"]` を含み、target kind は `nodes["epic-00002"].type` から取得できる。
+  - 不合格条件: `.agent/index-all.json` の source node payload に `depends_on` がなく、別 artifact だけで確認できる状態。
   - 観測点: generated `.agent/index-all.json`。
 - AC-004: Existing issue readiness behavior remains intact
   - アクター: SpecDock CLI user / agent

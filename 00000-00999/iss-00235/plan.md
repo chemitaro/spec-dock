@@ -54,9 +54,9 @@ ID: "iss-00235"
 - S01 Direct Node Dependency Status Contract:
   - `check_deps` が checked target 自体の direct node dependency を application result として返し、未解決なら non-ready にできる。
 - S02 `deps check --json` Additive JSON Contract:
-  - `direct_node_dependencies` を JSON 出力し、`ready=false` / `blockers` からも non-ready 理由を観測できる。
-- S03 `.agent/index-all.json` Raw Direct Edge Audit:
-  - `.agent/index-all.json` の `deps.raw_direct_edges` に complete raw direct edge audit を追加する。
+  - `dependency_contexts` / `node_blockers` / `satisfied_dependencies` と補助 `direct_node_dependencies` を JSON 出力し、`ready=false` / `blockers` からも non-ready 理由を観測できる。
+- S03 `.agent/index-all.json` Node Depends-On Raw Audit:
+  - `.agent/index-all.json` の `nodes[<source>].depends_on` に complete raw direct dependency ids を追加する。
 - S04 CLI `deps check --json` Reduced Reproduction:
   - `--no-github` の reduced repo で #235 相当の `deps check` false-ready 修正を public CLI surface から固定する。
 - S05 CLI `sync --no-github` Raw Audit Reproduction:
@@ -85,13 +85,13 @@ ID: "iss-00235"
 
 | 識別子（ID） | ステップ | スライス | 種別 | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル | クロージャ証跡 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| cl-ac001-direct-check | S01/S02/S04 | deps-check-direct-source | acceptance | AC-001 | `direct_node_dependencies` が source/target ids/kinds を返す | Empty high-level source が `.meta.json.depends_on=["epic-..."]` を持つ | raw edge が issue projection で消える | yes | red-required | report Step/Test Closure |
+| cl-ac001-direct-check | S01/S02/S04 | deps-check-direct-source | acceptance | AC-001 | `dependency_contexts` と補助 `direct_node_dependencies` が source/target ids/kinds を返す | Empty high-level source が `.meta.json.depends_on=["epic-..."]` を持つ | raw edge が issue projection で消える | yes | red-required | report Step/Test Closure |
 | cl-ac002-non-ready | S01/S02/S04 | deps-check-readiness | acceptance | AC-002 | unresolved direct node dependency で `ready=false`、`blockers` に target node id | target epic が unresolved open/unknown | false-ready | yes | red-required | report Step/Test Closure |
-| cl-ac003-index-all-raw | S03/S05 | index-all-raw-audit | acceptance | AC-003 | `.agent/index-all.json` が `deps.raw_direct_edges` を source/target kind 付きで返す | sync state に raw high-level edge がある | full-history audit 欠落 | yes | red-required | report Step/Test Closure |
+| cl-ac003-index-all-raw | S03/S05 | index-all-raw-audit | acceptance | AC-003 | `.agent/index-all.json` が `nodes[source].depends_on` と `nodes[target].type` で raw dependency を返す | sync state に raw high-level edge がある | full-history audit 欠落 | yes | red-required | report Step/Test Closure |
 | cl-ac004-issue-regression | S06 | issue-source-regression | regression | AC-004/EC-004 | issue-source high-level target blockers / satisfied deps / `effective_depends_on` が維持される | 既存 issue-source high-level target scenarios | iss-00207 regression | yes | covered-existing | report Closure Coverage |
 | cl-ec001-empty-source | S04 | empty-source-runtime | acceptance | EC-001 | empty source でも dependency-free ready output にならない | source initiative/epic に descendant issue がない | empty source compile loss | yes | red-required | report Step/Test Closure |
 | cl-ec002-non-empty-source | S01/S06 | non-empty-source-separation | characterization | EC-002 | direct node status と descendant issue readiness projection が混同されない | source に descendant issues と parent direct dependency がある | double-count / semantic mixing | yes | red-required | report Step/Test Closure |
-| cl-ec003-satisfied-raw-audit | S03/S05 | satisfied-raw-audit | acceptance | EC-003 | satisfied/done/closed dependency も `raw_direct_edges` に残る | target が closed/done/satisfied | raw audit が readiness filter で消える | yes | red-required | report Step/Test Closure |
+| cl-ec003-satisfied-raw-audit | S03/S05 | satisfied-raw-audit | acceptance | EC-003 | satisfied/done/closed dependency も node-level `depends_on` に残る | target が closed/done/satisfied | raw audit が readiness filter で消える | yes | red-required | report Step/Test Closure |
 | cl-boundary-artifacts | S07/S99 | non-goal-artifacts | regression | design constraints | `deps-issues.json` と `deps-raw.puml` を complete raw audit に昇格しない | sync/presentation artifacts | artifact scope creep | yes | inspect-only + covered-existing | report Closure Coverage |
 | cl-boundary-storage-source | S07/S99 | non-goal-source-storage | regression | requirement constraints | fake issue、storage format change、dogfooding generated runtime source edit を行わない | issue-wide diff | storage/source-of-truth regression | yes | inspect-only | report Closure Coverage |
 | cl-boundary-external | S07/S99 | non-goal-external | regression | requirement constraints | live GitHub mutation / external product repo mutation なし、tests are hermetic | command/test evidence and diff | external-state dependency | yes | inspect-only | report Closure Coverage |
@@ -167,7 +167,7 @@ ID: "iss-00235"
 - 禁止変更:
   - 既存 JSON field の削除 / rename。
   - presentation layer で readiness を再計算すること。
-  - `dependency_contexts` への source-node-only dependency 混入。
+  - source-node direct dependency を既存 readiness contexts に載せず `direct_node_dependencies` だけで説明すること。
 - 計画済み契約:
   - closure ids: `cl-ac001-direct-check`, `cl-ac002-non-ready`
   - Red: renderer が direct node dependency payload を出せないことを固定する。
@@ -188,9 +188,9 @@ ID: "iss-00235"
 - amendment trigger:
   - `blockers` に high-level ids を含めることが documented contract と衝突する場合。
 
-## 実装ステップ S03 — `.agent/index-all.json` Raw Direct Edge Audit
+## 実装ステップ S03 — `.agent/index-all.json` Node Depends-On Raw Audit
 - 振る舞いの目標:
-  - Full-history sync artifact が `deps.raw_direct_edges` を complete に返す。
+  - Full-history sync artifact が `nodes[<source>].depends_on` を complete に返す。
 - 依存:
   - S01 committed。
 - unblock:
@@ -204,12 +204,12 @@ ID: "iss-00235"
 - 禁止変更:
   - `deps-issues.json` を complete raw graph dump にすること。
   - `deps-raw.puml` を complete audit artifact にすること。
-  - readiness/satisfied state で `raw_direct_edges` を filter すること。
-  - `.agent/index.json` へ raw audit を追加すること。
+  - readiness/satisfied state で node-level `depends_on` を filter すること。
+  - `.agent/index.json` / tree artifacts へ raw audit `depends_on` を追加すること。
 - 計画済み契約:
   - closure ids: `cl-ac003-index-all-raw`, `cl-ec003-satisfied-raw-audit`
-  - Red: `.agent/index-all.json` に high-level raw direct edge が出ないことを固定する。
-  - Green: deterministic `deps.raw_direct_edges` が source/target kind と `relation: raw_direct` を持つ。
+  - Red: `.agent/index-all.json` の source node payload に high-level raw direct dependency が出ないことを固定する。
+  - Green: deterministic `nodes[source].depends_on` が target ids を持ち、kind は `nodes[target].type` で取得できる。
   - Verification: `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py`
 - 委任契約:
   - delegated role: `dev-coder`
@@ -219,12 +219,12 @@ ID: "iss-00235"
   - output required: changed files、`index-all` payload sample、verification result、material decision の Ledger Note または `No material implementation decisions beyond the approved plan.`
   - report evidence destination: `report.md` S03 session log、TDD evidence、Step/Test Closure、Delegated Worker Evidence、Reviewer Gate Status、Step Commit Gate。
 - 具体テストケース:
-  - `tc-s03-001`: `index-all` includes `init -> epic` raw direct edge.
+  - `tc-s03-001`: `index-all` includes `nodes[init].depends_on=["epic-..."]` and `index.json` omits raw node-level `depends_on`.
   - `tc-s03-002`: satisfied/done/closed raw dependency remains in audit.
 - reviewer focus:
   - complete raw audit semantics、deterministic sorting、node kind correctness、non-goal artifacts 非変更。
 - amendment trigger:
-  - `.agent/index-all.json` additive field が compatibility 上許容できない場合。
+  - node-level `depends_on` が compatibility 上許容できない場合。
 
 ## 実装ステップ S04 — CLI `deps check --json` Reduced Reproduction
 - 振る舞いの目標:
@@ -243,7 +243,7 @@ ID: "iss-00235"
 - 計画済み契約:
   - closure ids: `cl-ac001-direct-check`, `cl-ac002-non-ready`, `cl-ec001-empty-source`
   - Red: current behavior が dependency-free `ready=true` になることを CLI runtime test で固定する。
-  - Green: `deps check --id init --no-github --json` は `ready=false`、`blockers` と `direct_node_dependencies` を返す。
+  - Green: `deps check --id init --no-github --json` は `ready=false`、`blockers`、`dependency_contexts`、必要なら `node_blockers`、補助 `direct_node_dependencies` を返す。
   - Verification: `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` plus `uv run pytest tests/cli_runtime/test_deps.py` if touched。
 - 委任契約:
   - delegated role: `dev-coder`
@@ -275,8 +275,8 @@ ID: "iss-00235"
   - `deps-issues.json` / `deps-raw.puml` contract expansion。
 - 計画済み契約:
   - closure ids: `cl-ac003-index-all-raw`, `cl-ec003-satisfied-raw-audit`
-  - Red: current `sync --no-github` output lacks `deps.raw_direct_edges` in `.agent/index-all.json`。
-  - Green: `sync --no-github` writes `deps.raw_direct_edges` with source/target kinds.
+  - Red: current `sync --no-github` output lacks node-level `depends_on` in `.agent/index-all.json`。
+  - Green: `sync --no-github` writes `nodes[source].depends_on` and preserves target kind in `nodes[target].type`.
   - Verification: `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` plus `uv run pytest tests/cli_runtime/test_sync.py` if touched。
 - 委任契約:
   - delegated role: `dev-coder`
@@ -286,7 +286,7 @@ ID: "iss-00235"
   - output required: changed files、artifact payload sample、verification result、material decision の Ledger Note または `No material implementation decisions beyond the approved plan.`
   - report evidence destination: `report.md` S05 session log、TDD evidence、Step/Test Closure、Delegated Worker Evidence、Reviewer Gate Status、Step Commit Gate。
 - 具体テストケース:
-  - `tc-s05-001`: CLI/runtime `sync --no-github` writes `deps.raw_direct_edges` to `.agent/index-all.json`.
+  - `tc-s05-001`: CLI/runtime `sync --no-github` writes node-level `depends_on` to `.agent/index-all.json` only.
 - reviewer focus:
   - public artifact observation、deterministic payload、hermetic temp repo。
 - amendment trigger:
