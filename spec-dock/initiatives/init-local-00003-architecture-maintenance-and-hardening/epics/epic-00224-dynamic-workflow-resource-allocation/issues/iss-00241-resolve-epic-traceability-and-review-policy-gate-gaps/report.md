@@ -36,7 +36,7 @@ ID: "iss-00241"
 
 | 対象 | 主要目的の証跡 | 副次要件の証跡 | 逆転リスク | レビュアー判定 |
 |---|---|---|---|---|
-| OAL-001 | Epic 00224 の取りこぼした品質ゲート問題を単一 corrective Issue で解決する | PR review policy、skill wording、guidance docs、template lifecycle、Epic report reconciliation | low: scope は audit / spec-reviewer findings と user-approved absorption に限定 | pending |
+| OAL-001 | Epic 00224 の取りこぼした品質ゲート問題を単一 corrective Issue で解決する | PR review policy、skill wording、guidance docs、template lifecycle、Epic report reconciliation | low: scope は audit / spec-reviewer findings と user-approved absorption に限定 | passed: fresh comprehensive `spec-reviewer` coverage review returned no findings, confidence=0.91 |
 
 ## 仕様 authoring ゲート
 
@@ -83,6 +83,7 @@ ID: "iss-00241"
 - Fresh `spec-reviewer` post-amendment re-review 2 は `review_status=fail`。authoring gate 表に pre-amendment pass を現行 readiness と誤読できる記録が残っていたため、current review pending として修正した。
 - Fresh `spec-reviewer` post-amendment re-review 3 は `review_status=fail`。メモ欄に pre-amendment pass に基づく stale implementation-ready claim が残っていたため、post-amendment pass まで blocked として修正した。
 - Fresh `spec-reviewer` post-amendment final re-review は findings なし、`review_status=pass`、confidence 0.92。
+- 手戻り防止のため、別の fresh `spec-reviewer` に Epic audit / Epic spec-reviewer report と現行 `iss-00241` requirement / design / plan / report の網羅対応を独立レビューさせた。findings なし、`review_status=pass`、confidence 0.91。
 
 #### 実行コマンド / 結果
 ```bash
@@ -120,4 +121,4 @@ ID: "iss-00241"
 ### 最終 spec review ゲート
 | reviewer | 範囲 | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / Epic docs alignment | attempt 1: delegation contract / seeds / evidence path findings; attempt 2: EAL path finding; attempt 3: EC-004 marker-preserved direct-edit coverage finding; pre-amendment final: no findings; post-amendment attempt 1: missing-metrics gate wording and reviewer-pass ledger findings; post-amendment attempt 2: current-readiness ledger finding; post-amendment attempt 3: stale implementation-ready memo finding; post-amendment final: no findings | 6 | pass |
+| spec-reviewer | requirement / design / plan / report / Epic docs alignment | attempt 1: delegation contract / seeds / evidence path findings; attempt 2: EAL path finding; attempt 3: EC-004 marker-preserved direct-edit coverage finding; pre-amendment final: no findings; post-amendment attempt 1: missing-metrics gate wording and reviewer-pass ledger findings; post-amendment attempt 2: current-readiness ledger finding; post-amendment attempt 3: stale implementation-ready memo finding; post-amendment final: no findings; fresh comprehensive Epic coverage review: no findings | 7 | pass |
