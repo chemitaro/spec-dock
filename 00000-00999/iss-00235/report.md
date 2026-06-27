@@ -439,6 +439,103 @@ pass
 
 ---
 
+### セッションログ（2026-06-27 S04）
+
+#### 対象
+- Step: S04 CLI `deps check --json` Reduced Reproduction
+- AC/EC: AC-001, AC-002, EC-001
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S04 — CLI deps check --json Reduced Reproduction`
+  - closure ids: `cl-ac001-direct-check`, `cl-ac002-non-ready`, `cl-ec001-empty-source`
+
+#### 実施内容
+- hermetic temp repo を `spec-dock init` で作成し、empty high-level source initiative が high-level epic に raw `depends_on` を持つ reduced fixture を追加した。
+- public runtime script 経由で `deps check --id init-local-00001 --no-github --json` を実行し、`ready=false`、`blockers=["epic-local-00001"]`、`direct_node_dependencies` を assert した。
+- S04 は test-only reproduction として完了し、runtime/source implementation は変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/cli_runtime/test_runtime_deps_s04.py
+
+29 passed in 0.44s
+```
+
+```bash
+git diff --check
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | 赤フェーズ | red-required / characterization allowed after S01-S02 | dev-coder reported the reduced scenario was already fixed by S01/S02 and currently returns returncode 3, `ready=false`, blocker `epic-local-00001`, and `direct_node_dependencies[0].expansion="empty"`. | delegated worker record | pass | No fabricated Red; S04 records public CLI characterization after earlier fix. |
+| S04 | 緑フェーズ | public CLI reduced reproduction passes | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` -> 29 passed in 0.44s | command | pass | Parent-run verification on current worktree. |
+| S04 | リファクタリング | guardrail satisfied | Diff stayed within `tests/cli_runtime/test_runtime_deps_s04.py`; no runtime/source implementation files changed. | diff inspection | pass | `git diff --check` passed. |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | none | implementation | no new closure delta | N/A | no | worker reported no material implementation decisions beyond the approved plan |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | cl-ac001-direct-check | public CLI JSON exposes direct node dependency payload. | Test asserts `direct_node_dependencies` with source/target ids/kinds, empty expansion, and blocking disposition. | pass | Runtime implementation unchanged. |
+| S04 | cl-ac002-non-ready | unresolved direct node dependency makes CLI JSON non-ready. | Test asserts returncode 3, `ready=false`, and blocker `epic-local-00001`. | pass | Public command surface. |
+| S04 | cl-ec001-empty-source | empty high-level source does not collapse to dependency-free ready output. | Test asserts `effective_depends_on=[]` and `dependency_contexts=[]` while direct blocker remains. | pass | Separates raw direct blocker from issue readiness projection. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-ac001-direct-check | S04 | yes | characterization | delegated characterization: fixed by S01/S02 | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` | pass, 29 passed in 0.44s | Public CLI JSON payload. |
+| cl-ac002-non-ready | S04 | yes | characterization | delegated characterization: fixed by S01/S02 | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` | pass, 29 passed in 0.44s | Public CLI non-ready behavior. |
+| cl-ec001-empty-source | S04 | yes | characterization | delegated characterization: empty source remains blocked | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` | pass, 29 passed in 0.44s | Reduced reproduction for #235. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-ac001-direct-check | S04 | CLI runtime test | pass | Direct payload visible publicly. |
+| cl-ac002-non-ready | S04 | CLI runtime test | pass | Exit code and JSON ready state verified. |
+| cl-ec001-empty-source | S04 | CLI runtime test | pass | No issue-projection false-ready. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | S04 | N/A | N/A | Planned closure ids were used as-is. | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | CLI runtime reproduction test | dev-coder | S04 CLI `deps check --json` Reduced Reproduction | `plan.md` S04 | `tests/cli_runtime/test_runtime_deps_s04.py`; optional `tests/cli_runtime/test_deps.py` was not needed | runtime/source implementation, live GitHub, external repo mutation, broad fixture rewrite | `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` | implementation file change required or fixture rewrite broadens scope | changed files, characterization evidence, verification, no-decision statement | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | Added hermetic public CLI reduced reproduction for empty high-level source direct dependency; no implementation files changed. | `tests/cli_runtime/test_runtime_deps_s04.py` | delegated: `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` -> 29 passed; parent: same command -> 29 passed | fresh review passed | S05 sync artifact reproduction remains pending | accepted for commit gate |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | fresh | passed | no | proceed to commit gate | Fresh code-reviewer pass, confidence 0.90. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | committed | S04 test/report files | S04 test commit, amended with this final commit-gate evidence | `git status --short --branch` -> clean after S04 commit before final evidence amendment; clean check must be rerun after amend | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/cli_runtime/test_runtime_deps_s04.py` - public CLI reduced reproduction.
+- `spec-dock/active/issue/report.md` - S04 observed evidence ledger.
+
+#### コミット
+- S04 test commit amended with final commit-gate evidence.
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
