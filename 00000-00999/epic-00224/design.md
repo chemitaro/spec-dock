@@ -58,12 +58,12 @@ ID: "epic-00224"
 | Assurance Engine | risk facts から proposed / authorized Profile、Complexity、obligations を計算 | deterministic domain policy |
 | Assurance Store | Issue-local `assurance.json` の read/write/hash binding | canonical tracked artifact |
 | Workflow State Resolver | Active、artifact readiness、step、PR state から current state を導出 | runtime domain |
-| Runbook Compiler | current state に必要な一つの Runbook を生成 | compiled projection |
+| Guidance Compiler | current state に必要な一つの stdout guidance を生成し、human/debug projection を任意で書く | stdout authority + compiled projection |
 | Artifact Composer | design / plan / report fragment を単調合成 | policy + canonical inputs |
 | Step Assurance Compiler | worker、reasoning、context、verification、reviewers を導出 | issue + step obligations |
 | Context Policy Resolver | role / task / step facts から `recent_fork` / `bounded_packet` / `clean_room` / `minimal_packet` と freshness checks を決定 | deterministic domain policy |
 | Context Packet Compiler | selected context contract を source hash へ bind し、agent invocation packet と reviewer evidence packet を生成 | ignored generated state |
-| Active Projection Writer | current Runbook / context pack を atomic 生成 | ignored generated state |
+| Active Projection Writer | current guidance projection / context pack を atomic 生成 | ignored generated state |
 | Review Policy Compiler | base SHA policy から deterministic `@codex review` body を生成 | trusted policy source |
 | PR Blocker Engine | finding validity、priority、protected domain、machine evidence、re-review を決定 | deterministic review policy |
 | Legacy Adapter | `assurance.json` なし Issue を strict-legacy で実行 | compatibility policy |
@@ -129,7 +129,7 @@ component "Fixed Planning / Execution\nSkill Kernel" as Skill
 component "Workflow State Resolver" as State
 component "Assurance Engine" as Assurance
 database "Issue assurance.json\ntracked canonical" as Contract
-component "Runbook Compiler" as Compiler
+component "Guidance Compiler" as Compiler
 database ".agent/runbooks + active/current-runbook\nignored projection" as Runbook
 component "Artifact Composer" as Composer
 component "Step Assurance Compiler" as Step
@@ -142,13 +142,14 @@ component "PR Blocker Engine" as Blocker
 database "CI / tests / review evidence" as Evidence
 
 User --> Skill : invokes selected skill
-Skill --> State : calls workflow next
+Skill --> State : calls guidance <target>
 State --> Contract : reads canonical contract
 State --> Assurance : asks policy decision
 Assurance --> Contract : classify / approve / escalate
-State --> Compiler : requests current runbook
+State --> Compiler : requests current guidance
 Compiler --> Runbook : writes ignored projection
-Skill --> Runbook : follows current action only
+Compiler --> Skill : returns stdout guidance
+Skill --> Skill : follows stdout action only
 Composer --> Contract : uses authorized profile
 Step --> Contract : derives effective obligations
 Step --> ContextResolver : resolves role context contract
@@ -212,7 +213,8 @@ I --> D : serializes domain contracts
   - `Complexity Tier`: reasoning / routing の複雑度。`routine / normal / complex / deep`。
   - `lite_candidate`: shadow measurement 用の Lite 候補。obligation reduction authority は持たない。
   - `lite_authorized`: evidence-gated / opt-in で obligation reduction に使える Lite profile。
-  - `Runbook`: current state のために runtime が生成する bounded instruction projection。
+  - `Guidance`: current state のために runtime が stdout へ返す bounded agent handoff。
+  - `Runbook projection`: guidance と同等内容を `.agent/runbooks/current-runbook.*` / `active/current-runbook.*` へ書く human/debug-only non-canonical projection。agent handoff authority ではない。
   - `Verified blocker`: P0 / P1 または machine evidence で昇格した blocker。
   - `Automation stalled`: 修正回数上限ではなく、自動 repair が進捗しない状態。
   - `Context Routing Policy`: Role / task / step facts から context mode、include / exclude、freshness、return contract を決める tracked policy。
@@ -257,7 +259,7 @@ I --> D : serializes domain contracts
   - Worker continuation は goal、source binding、scope、risk、allowed paths が一致する場合だけ許可する。
   - Context packet source hash mismatch は execution / review 不可。
   - Child agent return payload は bounded return contract に従い、raw logs / private reasoning を main context へ自動転記しない。
-  - Generated Runbook は canonical authority ではない。
+  - Generated Runbook projection は canonical authority ではなく、agent handoff authority でもない。
   - Runbook compiler は `authorized_profile` だけを execution authority として使う。
   - External review priority だけで machine-validated risk を破棄しない。
   - Repair attempt limit は merge 許可ではない。
@@ -380,8 +382,8 @@ FinishReady --> NoActive : issue finish
 
 ```text
 spec-dock workflow status [--format text|json]
-spec-dock workflow next issue-planning [--format markdown|json]
-spec-dock workflow next issue-execution [--format markdown|json]
+spec-dock guidance issue-planning
+spec-dock guidance issue-execution
 
 spec-dock assurance show [--format text|json]
 spec-dock assurance classify --stage requirement
@@ -396,7 +398,7 @@ Exit semantics:
 
 | Exit | 意味 |
 |---|---|
-| 0 | Runbook / contract が正常に返った |
+| 0 | stdout guidance / contract が正常に返った |
 | 2 | user input / target 不足 |
 | 3 | blocked / stale / human gate |
 | 4 | invalid schema / policy / generated state |
@@ -435,7 +437,7 @@ Exit semantics:
 }
 ```
 
-### Runbook JSON
+### Guidance / Runbook JSON
 
 ```json
 {
@@ -459,7 +461,8 @@ Exit semantics:
 }
 ```
 
-- Markdown は Runbook JSON の human-readable projection とする。
+- Markdown stdout は current agent handoff authority とする。
+- `.agent/runbooks/current-runbook.*` / `active/current-runbook.*` は human/debug-only projection とし、agent は projection file を handoff authority として読まない。
 - `lite_candidate` は events / reports に投影できるが、Runbook obligation の減少に使わない。
 
 ### Agent Context Routing Architecture
@@ -807,11 +810,11 @@ src/spec_dock/assets/spec_dock/templates/assurance/
 
 ### Flow A: No active issue
 
-1. Skill が `workflow next` を実行する。
+1. Skill が `./spec-dock/scripts/spec-dock guidance <target>` を実行する。
 2. State Resolver が NoActive を返す。
-3. Runbook は `issue start <target>` または target 入力要求だけを返す。
+3. Stdout guidance は `issue start <target>` または target 入力要求だけを返す。
 4. Model は authoring / implementation を行わない。
-5. Issue start 後、Runbook を再取得する。
+5. Issue start 後、guidance を再取得する。
 
 ### Flow B: Requirement から approved assurance
 
@@ -825,7 +828,7 @@ src/spec_dock/assets/spec_dock/templates/assurance/
 
 ### Flow C: Step execution
 
-1. `workflow next issue-execution` が current step を解決する。
+1. `guidance issue-execution` が current step を解決する。
 2. Step Assurance が worker、reasoning、context、verification、reviewer を返す。
 3. Context Policy Resolver が worker 用 context contract を選択し、`recent_fork` または `bounded_packet` を source binding へ bind する。
 4. Worker は bounded execution を行い、raw logs ではなく return contract に沿った structured outcome を返す。
@@ -894,7 +897,7 @@ P2 + non-protected
 | Source hash mismatch | stale | reclassify / reapprove |
 | Unknown hard risk | fail-closed | clarification / Strict |
 | `lite_candidate` without authorization | Standard obligations | record telemetry only |
-| Runbook write failure | blocked | temp cleanup / doctor |
+| Projection write failure | non-canonical projection failure / warning | stdout guidance が返っていれば agent handoff は継続し、human/debug projection repair を別途行う |
 | Context policy missing | blocked | policy restore / doctor |
 | Invalid context policy schema | blocked | validation error |
 | Unknown role in context policy | fail-closed | explicit routing required |
@@ -1111,7 +1114,7 @@ The Issue-local draft requirement / draft design artifacts are discussion eviden
   - `discussions/20260623t074444z-adr-trusted-base-sha-github-review-policy.md`
   - `discussions/20260623t074447z-adr-blocker-centric-pr-risk-closure-rereview.md`
 - Accepted ADR summary:
-  - Fixed Skill Kernel / Compiled Runbook: Skill は固定 kernel、current workflow obligation は runtime compiled Runbook が返す。
+- Fixed Skill Kernel / Compiled Runbook: Skill は固定 kernel、current workflow obligation は runtime `guidance <target>` stdout が返す。ADR 内の `workflow next` / generated Runbook authority wording は historical/superseded command wording として扱う。
   - Adaptive Assurance / Lite Authorization: `lite_candidate` は telemetry、`lite_authorized` だけが obligation を減らす。初期 automatic Lite default は無効。
   - Step Assurance / Context Routing: Profile、Complexity、Context Policy を分離し、worker efficiency と reviewer / consultant clean-room を両立する。
   - Trusted Base-SHA Review: review policy は PR base SHA の fixed path から読み、runtime が deterministic trigger body を作る。

@@ -26,8 +26,9 @@ ID: "epic-00224"
   - その後、`iss-00226 / #226` は decision-only Issue として誤った routing だったため close し、Epic-scope accepted ADR 5 件へ authority を移した。
   - `iss-00227 -> iss-00226` dependency を削除し、実装対象 Issue を `iss-00227`〜`iss-00233` に再整理した。
   - 各 implementation Issue の draft requirement / draft design discussion と統合レビュー用 discussion を、G0 Epic Decision Baseline 前提へ更新した。
+  - Corrective Issues `iss-00237` / `iss-00238` / `iss-00239` / `iss-00241` を Epic close-readiness ledger に取り込み、current operational contract を `guidance <target>` stdout authority / projection human-debug-only / trusted base policy fail-closed へ更新した。
 - 次のマイルストーン:
-  - Fresh `spec-reviewer` で ADR authority correction 後の Issue decomposition / draft handoff package をレビューする。
+  - Fresh `spec-reviewer` / final quality gates で S90 docs reconciliation、corrective issue inclusion、QG-006〜QG-008 の traceability ledger を確認する。
 - ブロッカー:
   - 現時点でユーザー確認が必要な blocking question はなし。
 
@@ -68,6 +69,9 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-023 | `adopted` | iss-00231 spec-reviewer finding | `plan.md`, `report.md`, `issues/iss-00231-*/{design.md,plan.md,report.md}` | I05 の `Policy schema / validator / max size` は Markdown policy の fixed path + base SHA + UTF-8 + 32 KiB runtime validation として回収し、dedicated `doctor` capability は I07 rollout / operationalization へ defer する。 | iss-00231 spec review P1: parent I05 scope contract contradicted Issue closure contract | fresh iss-00231 spec re-review |
 | EAL-024 | `adopted` | iss-00232 implementation + spec-reviewer finding | `plan.md`, `report.md`, `issues/iss-00232-*/{design.md,plan.md,report.md}` | I06 の blocker-centric repair は priority disposition / promoted P2 / blocker fingerprint evidence をこの Issue で閉じ、E-AC-013 と dedicated automation-stalled operator surfacing は I07 rollout / telemetry へ defer する。 | iss-00232 blocker policy payload and focused tests; spec review P1: E-AC-013 closure contradicted I07 defer | fresh iss-00232 spec re-review |
 | EAL-025 | `adopted` | iss-00233 implementation | `requirement.md`, `design.md`, `plan.md`, `issues/iss-00233-*/{requirement.md,design.md,plan.md,report.md}` | I07 は automatic Lite default を有効化せず、auto-lite readiness、strict-legacy workflow compatibility、automation-stalled operator surface、required metrics / missing metrics summary、efficiency baseline を rollout evidence として閉じる。 | iss-00233 focused tests、automation-stalled behavior test、workflow strict-legacy tests、provider/mirror parity | fresh iss-00233 reviews |
+| EAL-026 | `adopted` | iss-00238 / iss-00241 S90 reconciliation | `requirement.md`, `design.md`, `plan.md`, `report.md` | Current operational handoff は `./spec-dock/scripts/spec-dock guidance <target>` stdout authority であり、`workflow next` / generated Runbook authority wording は historical/superseded として扱う。Projection files are human/debug-only non-canonical output. | `issues/iss-00238-*/report.md`, `issues/iss-00241-*/report.md`, S90 docs inspection | pending final spec-reviewer |
+| EAL-027 | `adopted` | iss-00241 S01/S02 evidence | `requirement.md`, `design.md`, `plan.md`, `report.md` | Trusted base policy valid path は deterministic multiline `@codex review`; missing / invalid / oversized / unreadable / base_sha_missing は no PR comment, human gate / fail-closed, no head fallback, no bare trigger fallback として反映した。 | `issues/iss-00241-*/report.md` S01/S02 closure evidence | pending final spec-reviewer |
+| EAL-028 | `adopted` | iss-00237 / iss-00238 / iss-00239 / iss-00241 corrective reports | `report.md` | Epic final close-readiness は initial implementation Issues だけでなく corrective Issues も含む必要があるため、formal supersede / pass / pending-final-review を一つの inclusion ledger に記録する。 | corrective issue reports and S90 reconciliation | pending final spec-reviewer |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -168,6 +172,31 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - E-AC-015: pass（証拠: iss-00233 Auto-Lite readiness assertions; `automatic_lite_default_enabled=false`、future adoption gates は accepted ADR / policy version bump / rollout Issue / telemetry gate）
 - E-AC-016: pass（証拠: iss-00233 `auto_lite_readiness_report` efficiency baseline assertions; Lite / Standard / Strict の invocation / review generation / workflow cost proxy 差分を固定し、live telemetry 不足は missing metrics summary として明示）
 - E-AC-017〜021: pass（証拠: iss-00230 report; step assurance, context routing, reviewer clean-room, bounded return contract, stale context invalidation tests）
+
+## Current Operational Contract Ledger
+
+| Contract | Current authority | Projection / fallback boundary | Status | Evidence |
+|---|---|---|---|---|
+| Issue planning / execution handoff | `./spec-dock/scripts/spec-dock guidance issue-planning` / `issue-execution` stdout | `.agent/runbooks/current-runbook.*` / `active/current-runbook.*` are human/debug-only non-canonical projection files and are not agent handoff authority | pending-final-review | `iss-00238` report; `iss-00241` S90 reconciliation |
+| Historical command wording | `workflow next` is superseded command wording when it appears in historical ADR / prior issue evidence | It must not be described as the current entrypoint | pending-final-review | S90 docs inspection |
+| Trusted base policy review trigger | Valid base policy -> deterministic multiline `@codex review` with policy base SHA / policy hash / reviewed head SHA | missing / invalid / oversized / unreadable / non-UTF-8 / base_sha_missing -> no PR comment, human gate / fail-closed, no head fallback, no bare `@codex review` fallback | pending-final-review | `iss-00241` S01/S02 closure evidence |
+
+## Corrective Issues Inclusion Ledger
+
+| Issue | Scope | Disposition | Epic close-readiness status | Evidence |
+|---|---|---|---|---|
+| `iss-00237` / `#237` | Manual test routing failure analysis and routing classifier repair | included corrective issue | pass | report records Red/Green closure, reviewer gate, and commit gate evidence |
+| `iss-00238` / `#238` | Stdout guidance handoff instead of generated workflow files | included corrective issue | pass | report records `guidance <target>` handoff, projection human-only boundary, reviewer gates, and S90 evidence |
+| `iss-00239` / `#239` | Compose issue planning templates after assurance classification | formally superseded by `iss-00241` | formal supersede | report records `./spec-dock/scripts/spec-dock close iss-00239` exit 0 with `state=CLOSED already_closed=true`; GitHub `#239` closed at `2026-06-27T05:17:44Z` |
+| `iss-00241` / `#241` | Resolve Epic traceability and review policy gate gaps | included corrective integration issue | pending-final-review | S01〜S04 closure evidence recorded; S90 docs reconciliation recorded here; S99 final review / commit gate remains pending |
+
+## Epic Traceability Quality Gate Ledger
+
+| Gate | Required audit | Status | Evidence / limitation | Next action |
+|---|---|---|---|---|
+| QG-006 | Step closure / reviewer gate / commit gate cross-issue audit | pending-final-review | Initial implementation issue reports and corrective issue reports are included; `iss-00239` is formal supersede; `iss-00241` S90/S99 reviewer and commit gates remain pending, so this is not a final pass. | Fresh spec-reviewer / S99 final gate must confirm no false pass remains. |
+| QG-007 | Context packet / clean-room / bounded return evidence audit | pending-final-review | E-AC-017〜021 point to `iss-00230` report; current ledger requires final reviewer confirmation that context packet, clean-room reviewer / consultant, and bounded return evidence are sufficient or explicitly gated. | Fresh spec-reviewer / QA review must confirm or record explicit human gate. |
+| QG-008 | Auto-Lite readiness / automatic Lite default disabled / efficiency evidence audit | pending-final-review | E-AC-015〜016 point to `iss-00233` Auto-Lite readiness and efficiency baseline; automatic Lite default remains disabled. Live telemetry gaps are documented, but final reviewer must confirm missing metrics handling is sufficient. | Fresh spec-reviewer / QA review must confirm or record explicit human gate. |
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:

@@ -88,11 +88,12 @@ ID: "epic-00224"
 - provisional slug:
   - `compile-state-aware-workflow-runbooks-and-fixed-skill-kernels`
 - 目的:
-  - `workflow status / next` を導入し、no-active / requirement-capture / classification-required の current Runbook を生成し、Planning / Execution Skill を fixed kernel にする。
+  - `guidance <target>` を current agent handoff entrypoint とし、no-active / requirement-capture / classification-required の stdout guidance を生成し、Planning / Execution Skill を fixed kernel にする。
+  - Historical implementation notes may refer to `workflow status / next`; current operational contract supersedes `workflow next` with `guidance <target>`.
 - 成果物:
   - Workflow State Resolver。
   - Runbook schema / compiler / atomic store。
-  - `active/current-runbook` と context pack projection。
+  - `active/current-runbook` と context pack projection。ただし projection は human/debug-only non-canonical output であり、agent handoff authority ではない。
   - no-active 時の `issue start` guidance。
   - fixed Planning / Execution Skill kernel。
   - generated state で tracked diff が出ない tests。
@@ -354,7 +355,7 @@ T6 I07 Rollout / telemetry / default switch
   - I02 / I05 が依存できる public application contract を確認する。
 - G2 Workflow entrypoint:
   - I02 後、no-active から requirement capture までを manual first-read smoke する。
-  - Skill 本文だけで `workflow next` 起動と stop condition が分かること。
+  - Skill 本文だけで `./spec-dock/scripts/spec-dock guidance <target>` 起動と stop condition が分かること。
   - Git status が clean であること。
 - G3 Planning compiler:
   - I03 後、Lite / Standard / Strict / Critical fixture を golden 比較する。
@@ -465,10 +466,10 @@ T6 I07 Rollout / telemetry / default switch
 - Required ADR が Epic-scope accepted ADR として作成 / 反映され、implementation Issue より先に reviewer-gated baseline になっている。
 - New Issue / substantive Issue の strict-legacy compatibility path が dogfooding で成功している。
 - Existing Issue の strict-legacy path が壊れていない。
-- No-active / planning / execution / PR / finish state が current Runbook として動作する。
+- No-active / planning / execution / PR / finish state が `guidance <target>` stdout authority として動作し、generated projection files は human/debug-only non-canonical output として扱われる。
 - Profile / Complexity / Step Assurance が machine-readable。
 - Generated state が Git 差分を生まない。
-- Trusted base-SHA policy で review trigger が動作する。
+- Valid trusted base-SHA policy で deterministic multiline `@codex review` trigger が動作し、missing / invalid / oversized / unreadable / base_sha_missing は no PR comment の human gate / fail-closed になる。
 - Auto-Lite readiness report が future automatic Lite default の adoption / rollback 条件を示し、初期 rollout では automatic Lite default が無効のままである。
 - Context routing policy、context packet、clean-room reviewer packet、bounded return contract が evidence 付きで動作する。
 - P2-only review で repair / re-review loop が開始されない。

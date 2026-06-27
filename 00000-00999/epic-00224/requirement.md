@@ -47,7 +47,8 @@ ID: "epic-00224"
   - Templates は scaffold であり compliance authority ではない。
 - 本 Epic で更新する責務:
   - Skill は完全な profile workflow を保持せず、runtime Runbook を取得・実行する固定 kernel となる。
-  - 現在の operational workflow authority は、tracked Assurance Contract と policy から compiler が生成する current Runbook に置く。
+  - 現在の agent-facing operational handoff authority は `./spec-dock/scripts/spec-dock guidance <target>` の stdout に置く。
+  - `.agent/runbooks/current-runbook.*` / `active/current-runbook.*` などの projection files は human/debug-only non-canonical projection であり、agent handoff authority ではない。
 
 ## ユースケース
 
@@ -72,13 +73,14 @@ ID: "epic-00224"
 - Profile downgrade は自動実行せず、根拠と明示的 risk acceptance を要求する。
 - Existing Issue に `assurance.json` がない場合、legacy Strict compatibility path で継続できる。
 - Review policy を PR base SHA から取得できない場合、外部 review 必須の workflow では human gate とする。
+- Base SHA policy が missing / invalid / oversized / unreadable / non-UTF-8、または base SHA 自体が missing の場合、review trigger は PR comment を投稿せず human gate / fail-closed とし、PR head fallback や bare `@codex review` fallback を行わない。
 - P2 finding が protected domain に関係し、failing regression test 等で再現された場合、validated blocker へ昇格する。
 - 自動修正が停滞した場合、回数を理由に risk を受容せず `automation-stalled` / human gate へ移行する。
 
 ## エピック要件（Epic requirements）
 
 - E-RQ-001: State-derived workflow entrypoint
-  - Planning / Execution skill は現在状態を推測せず、runtime の `workflow next` が返す一つの Runbook を実行する。
+  - Planning / Execution skill は現在状態を推測せず、runtime の `guidance <target>` が stdout に返す一つの guidance を実行する。
   - no-active、requirement capture、classification required、planning、execution、delivery、blocked を明確に区別する。
 
 - E-RQ-002: Assurance Contract
@@ -96,12 +98,12 @@ ID: "epic-00224"
 
 - E-RQ-004: Fixed Skill kernel
   - Issue 状態ごとに `.agents/skills/**` を差し替えない。
-  - Skill は `workflow next` の実行、stdout Runbook の遵守、blocked 時の停止だけを直接記述する。
+  - Skill は `./spec-dock/scripts/spec-dock guidance <target>` の実行、stdout guidance の遵守、blocked 時の停止だけを直接記述する。
   - mandatory path は別 Skill や複数 workflow docs の参照成功に依存しない。
 
 - E-RQ-005: Compiled Runbook
-  - runtime は current state / phase / profile / step に対応する完全な Runbook を Markdown / JSON で生成する。
-  - Runbook は `.agent/` と `active/` の generated state へ atomic に保存し、Git 差分を発生させない。
+  - runtime は current state / phase / profile / step に対応する完全な guidance を stdout に返し、必要に応じて同内容を Markdown / JSON projection として生成する。
+  - Projection は `.agent/` と `active/` の generated state へ atomic に保存し、Git 差分を発生させない。
   - 未選択 Profile の手順を current Runbook へ混入させない。
   - Runbook compiler は `authorized_profile` だけを実行 authority として扱い、shadow の `lite_candidate` によって obligation を減らさない。
 
@@ -199,7 +201,7 @@ ID: "epic-00224"
 
 - E-AC-001: No-active Runbook
   - 前提: Active Issue がない。
-  - 操作: Issue Planning または Execution で `workflow next` を実行する。
+  - 操作: Issue Planning または Execution で `./spec-dock/scripts/spec-dock guidance issue-planning` または `issue-execution` を実行する。
   - 期待結果: `issue start <target>` または target 入力要求だけが next action として返り、authoring / implementation を開始しない。
   - 観測点: CLI JSON / Markdown、state-machine tests。
 
@@ -385,7 +387,7 @@ ID: "epic-00224"
 ## 非機能要件
 
 - 性能:
-  - Normal `workflow status / next` は network access を必要としない。
+  - Normal `guidance <target>` は network access を必要としない。
   - Representative test repository で local classification / Runbook compile が 2 秒以内に完了することを目標とする。
   - Current Runbook は未選択 Profile の本文を含まず、bounded な context surface である。
 - 信頼性 / 一貫性:
