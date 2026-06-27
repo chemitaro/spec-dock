@@ -37,6 +37,77 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
                 assert payload["artifacts"][artifact]["changed"] is True
                 assert payload["artifacts"][artifact]["added_section_ids"]
 
+    def test_assurance_compose_materializes_placeholder_design_and_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_classified_fixture(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "all", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ok"] is True
+            assert payload["status"] == "applied"
+            for artifact in ("design", "plan"):
+                text = (issue_dir / f"{artifact}.md").read_text(encoding="utf-8")
+                assert "artifact_state: awaiting-assurance-compose" not in text
+                assert "このファイルはまだ合成されていません" not in text
+                assert "この状態のまま" not in text
+                assert "spec-dock:managed-section begin" in text
+                assert payload["artifacts"][artifact]["changed"] is True
+
+    def test_assurance_compose_does_not_overwrite_substantive_non_placeholder_content(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_classified_fixture(target)
+            design_path = issue_dir / "design.md"
+            design_path.write_text("# Direct Design\n\nSubstantive design content.\n", encoding="utf-8")
+            before = self._artifact_texts(issue_dir)
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "all", "--format", "json"],
+            )
+
+            assert result.returncode == 1
+            payload = json.loads(result.stdout)
+            assert payload["ok"] is False
+            assert payload["status"] == "invalid"
+            assert payload["reason"] == "substantive_content_conflict"
+            assert payload["artifacts"]["design"]["errors"]
+            assert self._artifact_texts(issue_dir) == before
+
+    def test_assurance_compose_marker_plus_direct_edit_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_classified_fixture(target)
+            design_path = issue_dir / "design.md"
+            design_path.write_text(
+                design_path.read_text(encoding="utf-8")
+                + "\n## Direct Edit\n\nSubstantive design content added before compose.\n",
+                encoding="utf-8",
+            )
+            before = self._artifact_texts(issue_dir)
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "all", "--format", "json"],
+            )
+
+            assert result.returncode == 1
+            payload = json.loads(result.stdout)
+            assert payload["ok"] is False
+            assert payload["status"] == "invalid"
+            assert payload["reason"] == "substantive_content_conflict"
+            assert payload["artifacts"]["design"]["errors"]
+            assert self._artifact_texts(issue_dir) == before
+
     def test_assurance_compose_single_artifact_only_changes_selected_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -158,13 +229,12 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert payload["artifacts"]["design"]["errors"]
             assert self._artifact_texts(issue_dir) == before
 
-    @pytest.mark.parametrize("filename", ["requirement.md", "design.md", "plan.md"])
-    def test_assurance_compose_stale_source_binding_fails_closed(self, filename: str) -> None:
+    def test_assurance_compose_stale_requirement_source_binding_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             issue_dir = self._create_classified_fixture(target)
-            (issue_dir / filename).write_text(f"# Changed {filename}\n", encoding="utf-8")
+            (issue_dir / "requirement.md").write_text("# Changed requirement.md\n", encoding="utf-8")
             before = self._artifact_texts(issue_dir)
 
             result = self._run_runtime_capture(
@@ -177,7 +247,7 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert payload["ok"] is False
             assert payload["status"] == "invalid"
             assert payload["reason"] == "stale_source_binding"
-            assert filename.removesuffix(".md") in " ".join(payload["details"])
+            assert "requirement" in " ".join(payload["details"])
             assert self._artifact_texts(issue_dir) == before
 
     def test_assurance_compose_rejects_symlinked_artifact_without_touching_target(self) -> None:
