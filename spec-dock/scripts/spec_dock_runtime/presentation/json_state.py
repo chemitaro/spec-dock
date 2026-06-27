@@ -58,23 +58,6 @@ def _deps_dependency_context_payload(context: object) -> dict[str, object]:
     }
 
 
-def _deps_direct_node_dependency_payload(dependency: object) -> dict[str, object]:
-    raw_target_issue_ids = _object_value(dependency, "target_issue_ids", ())
-    target_issue_ids = raw_target_issue_ids if isinstance(raw_target_issue_ids, (list, tuple)) else ()
-    return {
-        "source_node_id": _object_value(dependency, "source_node_id", ""),
-        "source_node_kind": _object_value(dependency, "source_node_kind", ""),
-        "target_node_id": _object_value(dependency, "target_node_id", ""),
-        "target_node_kind": _object_value(dependency, "target_node_kind", ""),
-        "target_issue_ids": list(target_issue_ids),
-        "expansion": _object_value(dependency, "expansion", ""),
-        "lifecycle_state": _object_value(dependency, "lifecycle_state", None),
-        "lifecycle_source": _object_value(dependency, "lifecycle_source", None),
-        "dependency_disposition": _object_value(dependency, "dependency_disposition", None),
-        "disposition_basis": _object_value(dependency, "disposition_basis", None),
-    }
-
-
 def render_deps_check_json(result: DepsCheckResult) -> str:
     inspection = result.inspection
     target_id = inspection.target_id.value
@@ -102,9 +85,6 @@ def render_deps_check_json(result: DepsCheckResult) -> str:
         ],
         "dependency_contexts": [
             _deps_dependency_context_payload(context) for context in inspection.evaluation.dependency_contexts
-        ],
-        "direct_node_dependencies": [
-            _deps_direct_node_dependency_payload(dependency) for dependency in result.direct_node_dependencies
         ],
         "nodes": {
             node_id: {
@@ -220,36 +200,6 @@ def _build_issue_edges_from_deps_state(
             fallback_edges.append({"from": issue_id, "to": dep_id, "kind": "depends_on"})
     fallback_edges.sort(key=lambda item: (_sort_key(item["from"]), _sort_key(item["to"])))
     return fallback_edges
-
-
-def _build_raw_direct_edges(result: SyncStateResult) -> list[dict[str, str]]:
-    graph_nodes = result.graph.nodes_by_id
-    edges: list[dict[str, str]] = []
-    seen_edges: set[tuple[str, str]] = set()
-    for source_id in _sort_ids(list(result.raw_node_depends_on_map.keys())):
-        source_node = graph_nodes.get(source_id)
-        if source_node is None:
-            continue
-        target_ids = _sort_ids([
-            target_id for target_id in result.raw_node_depends_on_map.get(source_id, []) if isinstance(target_id, str)
-        ])
-        for target_id in target_ids:
-            target_node = graph_nodes.get(target_id)
-            if target_node is None:
-                continue
-            edge_key = (source_id, target_id)
-            if edge_key in seen_edges:
-                continue
-            seen_edges.add(edge_key)
-            edges.append({
-                "from": source_id,
-                "from_kind": source_node.kind,
-                "to": target_id,
-                "to_kind": target_node.kind,
-                "relation": "raw_direct",
-            })
-    edges.sort(key=lambda item: (_sort_key(item["from"]), _sort_key(item["to"])))
-    return edges
 
 
 def _issue_raw_state(result: SyncStateResult, issue_id: str) -> str:
@@ -628,10 +578,6 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
         "issue_edges": list(deps_issue_edges_all),
         "edge_direction": "depends_on (dependent -> prerequisite)",
     }
-    deps_top_index_all = {
-        **deps_top_all,
-        "raw_direct_edges": _build_raw_direct_edges(result),
-    }
     deps_issue_edges_todo = [
         edge for edge in deps_issue_edges_all if edge.get("from") in todo_issue_set and edge.get("to") in todo_issue_set
     ]
@@ -652,7 +598,7 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
     payload_all = {
         **common,
         "projection": FULL_HISTORY_PROJECTION,
-        "deps": deps_top_index_all,
+        "deps": deps_top_all,
         "nodes": nodes_all,
     }
     payload_todo = {

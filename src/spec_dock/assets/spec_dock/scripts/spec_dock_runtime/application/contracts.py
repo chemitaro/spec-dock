@@ -13,7 +13,6 @@ if TYPE_CHECKING:
         ActiveSelection,
         BranchDecision,
         DepsDependencyContext,
-        DepsDirectNodeDependency,
         DepsEvaluation,
         DepsHighLevelStatus,
         DepsState,
@@ -386,10 +385,6 @@ class DepsCheckResult:
     target: TargetRef
     inspection: TargetDepsInspection
     warnings: list[str]
-
-    @property
-    def direct_node_dependencies(self) -> list[DepsDirectNodeDependency]:
-        return self.inspection.direct_node_dependencies
 
 
 MutateDepsAction = Literal["add", "remove"]
