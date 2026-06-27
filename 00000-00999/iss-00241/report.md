@@ -101,6 +101,47 @@ ID: "iss-00241"
 - Requirement / design / plan / report は QG-006〜QG-008 明示化後の post-amendment `spec-reviewer` pass を受け、planning package として implementation handoff ready。
 - 実装着手時は `spec-dock-issue-execution` workflow に従い、plan の S01 から順に step review / commit gate を通す。
 
+## 実装ステップ証跡
+
+### Implementation Delegation Gate
+
+| step | decision | required reason | delegated role | scope | allowed changes | forbidden changes | required verification | stop conditions | result |
+|---|---|---|---|---|---|---|---|---|---|
+| S01 | delegated | runtime / tests / shipped asset behavior を含むため | dev-coder | Trusted review trigger failure path only | provider/dogfooding `trigger_codex_review.sh`, focused trigger tests | head policy fallback, caller-provided body, broad PR observation refactor, S02+ docs/templates | focused pytest, provider/dogfooding script parity, code-reviewer pass | fake gh POST なし判定不能、JSON consumer impact不明 | passed: worker returned bounded S01 diff, no material decisions beyond approved plan |
+
+### Step Contract Closure
+
+| step | closure id | close condition | evidence | result |
+|---|---|---|---|---|
+| S01 | tc-001 | base SHA missing / policy missing / invalid / non-UTF-8 / oversized / unreadable は POST なし human gate | focused pytest `trigger_helper and (policy or base_sha or trusted_base)`、broader `trigger_helper`、code-reviewer pass | pass |
+| S01 | tc-002 | valid base policy は deterministic multiline body を投稿 | focused pytest `trigger_helper and (policy or base_sha or trusted_base)`、broader `trigger_helper`、code-reviewer pass | pass |
+
+### Test Contract Closure
+
+| closure id | step | evidence level | pre-implementation evidence | verification command | result |
+|---|---|---|---|---|---|
+| tc-001 | S01 | red-required | dev-coder 実装前 characterization: `5 failed, 1 passed, 509 deselected`; old behavior posted bare `@codex review` for failure paths | `uv run pytest tests/unit/infra/test_init_update.py -k "trigger_helper and (policy or base_sha or trusted_base)"` | pass: `6 passed, 509 deselected` |
+| tc-002 | S01 | covered-existing | valid trusted policy path existed and was preserved while failure paths changed | `uv run pytest tests/unit/infra/test_init_update.py -k "trigger_helper"` | pass: `21 passed, 494 deselected` |
+
+### Closure Coverage
+
+| closure id | requirement / expectation | evidence | status |
+|---|---|---|---|
+| tc-001 | AC-001 / EC-001〜EC-003: trusted base policy failure is POSTなし human gate | tests assert no POST, `success=false`, `overall_status=human_gate`, `normalized_status=human_gate`, `recommended_next_action=human_gate`, `trigger.action=blocked`, blocking limitations | pass |
+| tc-002 | AC-002: valid base policy posts deterministic multiline body | tests assert source, policy hash, reviewed head SHA, and posted body match expected multiline trigger | pass |
+
+### Reviewer Gate Status
+
+| gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision |
+|---|---|---|---|---|---|
+| S01 code review | code-reviewer | fresh uncommitted S01 diff after focused tests | passed | none | S01 eligible for Step Commit Gate |
+
+### Step Commit Gate
+
+| step | review scope | step reviewer verdict | commit scope | closure state | commit evidence | post-commit clean check |
+|---|---|---|---|---|---|---|
+| S01 | trigger helper scripts and focused trigger tests | code-reviewer pass, no findings, confidence 0.89 | S01 runtime/test/report evidence only | committed | S01 scope commit created; exact hash is external git evidence | pass: post-commit `git status --short` clean |
+
 ## 最終品質ゲート
 
 ### ドキュメント影響の解消ステップ S90
