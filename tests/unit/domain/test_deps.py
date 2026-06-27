@@ -231,6 +231,36 @@ class TestDepsDomain:
         assert inspection.direct_node_dependencies[0].dependency_disposition == "satisfied"
         assert inspection.direct_node_dependencies[0].disposition_basis == "all_descendant_issues_done"
 
+    def test_inspect_target_deps_fails_closed_for_unknown_direct_node_lifecycle_with_done_descendants(self) -> None:
+        domain_deps, domain_models, _domain_tree = _runtime_modules()
+        graph = self._direct_high_level_graph()
+
+        inspection = domain_deps.inspect_target_deps(
+            graph,
+            issue_depends_on_map={},
+            target_id=domain_models.NodeId("init-00010"),
+            issue_statuses={"iss-00021": _issue_status(domain_models, "iss-00021", "done")},
+            active_issue_id=None,
+            raw_node_depends_on_map={"init-00010": ["epic-00020"]},
+            high_level_statuses_by_node_id={
+                "epic-00020": domain_models.DepsHighLevelStatus(
+                    node_id="epic-00020",
+                    state="unknown",
+                    source="none",
+                )
+            },
+        )
+
+        assert not inspection.evaluation.ready
+        assert inspection.evaluation.guard_reason == "unknown"
+        assert inspection.evaluation.blockers == ["epic-00020"]
+        assert inspection.effective_depends_on == []
+        assert [(dep.target_issue_ids, dep.expansion) for dep in inspection.direct_node_dependencies] == [
+            (("iss-00021",), "expanded")
+        ]
+        assert inspection.direct_node_dependencies[0].dependency_disposition == "indeterminate"
+        assert inspection.direct_node_dependencies[0].disposition_basis == "descendant_issue_unknown"
+
     def test_inspect_target_deps_classifies_ready_blocked_done_and_unknown_without_cli(self) -> None:
         domain_deps, domain_models, _domain_tree = _runtime_modules()
         graph = self._graph()

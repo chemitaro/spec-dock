@@ -8,8 +8,8 @@ from spec_dock_runtime.domain.models import (
     ActiveSelection,
     DepsDependencyContext,
     DepsDependencyDisposition,
-    DepsDispositionBasis,
     DepsDirectNodeDependency,
+    DepsDispositionBasis,
     DepsEvaluation,
     DepsHighLevelStatus,
     DepsNodeBlocker,
@@ -396,6 +396,10 @@ def _high_level_lifecycle_for_direct_dependency(
             else "local_done"
         )
         return "done", lifecycle_source, "satisfied", basis
+    if state == "unknown":
+        if expansion == "empty":
+            return "unknown", lifecycle_source, "indeterminate", "empty_unknown_container"
+        return "unknown", lifecycle_source, "indeterminate", "descendant_issue_unknown"
     if _all_target_issues_satisfied(target_issue_ids, issue_statuses):
         return state, lifecycle_source, "satisfied", "all_descendant_issues_done"
     if target_issue_ids and _any_target_issue_unknown(target_issue_ids, issue_statuses):
