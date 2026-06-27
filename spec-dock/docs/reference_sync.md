@@ -67,7 +67,7 @@ uninstall との関係:
 - `issue_edges: [{from,to,kind?}]`
 - `edge_direction: "depends_on (dependent -> prerequisite)"`
 
-issueノードには `deps`（`ready`, `depends_on`, `blockers_top`）を統合します。
+`.agent/index-all.json` の各 node には top-level `depends_on` として `.meta.json.depends_on` から解決した canonical raw direct dependency target ids を保持します。`index.json` / `tree.json` の todo projection と tree artifacts にはこの raw audit field を出しません。issueノードにはこれとは別に readiness projection の `deps`（`ready`, `depends_on`, `blockers_top`）を統合します。
 
 `spec-dock/.agent/deps-issues.json` は `index.json` の todo issue-only graph を再パースした派生物ではありません。`sync_state` の readiness evaluation から生成する schema v2 artifact です。GitHub `open` / `closed` は lifecycle fact であり、dependency readiness の `blocking` / `satisfied` / `indeterminate` は `dependency_disposition` と `disposition_basis` で表します。
 
@@ -135,7 +135,7 @@ raw node-level cycle などで deps preflight が失敗した場合、この pla
 
 `deps-issues.*` は readiness / blocker 判定に使う authority です。schema v2 の `deps-issues` は typed issue blockers、typed node blockers、satisfied dependencies を含み、todo-only `index.json` から消える context も `dependency_contexts` に保持します。
 `deps-issues.puml` は active readiness / blocker view です。done / closed / satisfied-only node/edge は `.agent/deps-issues.json` に context を残し、図では表示ノイズとして省きます。blocking edge は `blocks` として表示します。
-`deps-raw.puml` は initiative / epic / issue を含む active raw direct dependency の visual/debug artifact です。high-level participant の state / source を表示できますが、readiness authority ではありません。done / closed / satisfied-only raw context は active raw view から省かれることがあります。complete raw metadata audit は `.meta.json.depends_on` と `.agent/index-all.json` を確認してください。
+`deps-raw.puml` は initiative / epic / issue を含む active raw direct dependency の visual/debug artifact です。high-level participant の state / source を表示できますが、readiness authority ではありません。done / closed / satisfied-only raw context は active raw view から省かれることがあります。complete raw metadata audit は `.meta.json.depends_on` と `.agent/index-all.json` の `nodes[*].depends_on` を確認してください。
 同じ依存を、機械向けと可視化向けで向きを分けて表現しています。
 
 ## 8. 処理フロー（PlantUML）

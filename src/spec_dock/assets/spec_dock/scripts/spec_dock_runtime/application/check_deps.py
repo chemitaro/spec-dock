@@ -319,6 +319,7 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
     topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
     warnings: list[str] = list(topology.warnings)
     issue_depends_on_map = dict(topology.issue_depends_on_map)
+    raw_node_depends_on_map = dict(topology.raw_node_depends_on_map)
     validate_deps_cycles(issue_depends_on_map)
 
     issue_snapshots: list[IssueSnapshot] | None = None
@@ -399,6 +400,7 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
             issue_statuses=status_context.issue_statuses,
             cached_high_level_github_state_by_id=cached_high_level_github_state_by_id,
         ),
+        raw_node_depends_on_map=raw_node_depends_on_map,
         active_issue_id=active_issue_id,
     )
     return DepsCheckResult(target=req.target, inspection=inspection, warnings=warnings)
