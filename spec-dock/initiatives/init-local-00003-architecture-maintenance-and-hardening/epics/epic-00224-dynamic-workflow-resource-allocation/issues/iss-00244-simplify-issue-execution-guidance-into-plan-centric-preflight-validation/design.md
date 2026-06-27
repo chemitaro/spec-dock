@@ -230,6 +230,7 @@ Must include:
 - `reason_code`
 - `active_issue`
 - `authority`
+- `may_execute_approved_plan`
 - `Commands`
 - `Notes`
 - `Stop Conditions`
@@ -264,6 +265,7 @@ Must include:
 - `active_issue_id`
 - `contract_source`
 - `evidence_ledger`
+- `may_execute_approved_plan`
 
 Must not include:
 
@@ -276,6 +278,9 @@ Minimum checks:
 
 - `plan.md` is non-placeholder and has no unresolved scaffold marker.
 - It contains implementation steps or explicit approved-no-op / decision-only closure.
+- Valid assurance contract is used as profile authority when present.
+- Invalid / stale assurance fails closed and must not be hidden by a `strict` fallback authority.
+- Runtime does not require an old structured implementation heading and does not emit `workflow-plan-unselectable` on the default issue-execution path.
 - Each implementation step has:
   - behavior goal
   - obligation pattern
@@ -354,9 +359,12 @@ stop
   - Plan readiness helper detects placeholder / missing required fields / missing S90-S99.
 - CLI runtime:
   - ready `guidance issue-execution` has no dynamic fields.
+  - ready `guidance issue-execution` exposes `may_execute_approved_plan=true` and contract/evidence source paths.
   - report completion rows do not affect guidance output.
   - context policy missing/invalid no longer blocks default ready guidance.
   - non-executable plan blocks execution.
+  - invalid / stale assurance fails closed without presenting `strict` fallback as current authority.
+  - plans without old structured step headings do not produce `workflow-plan-unselectable`.
   - stale source binding still blocks as before.
 - Asset / scaffold:
   - skill text no longer mentions registering selected step.
@@ -368,6 +376,7 @@ stop
   - `./spec-dock/scripts/spec-dock assurance compose --artifact all`
   - `./spec-dock/scripts/spec-dock validate`
   - `guidance` が表示する `authorized_profile` と `assurance classify` の current source binding が矛盾しないことを確認する。
+  - refreshed `current-runbook.*` projection に旧 dynamic sections が残らないことを確認する。
 
 ## 互換性 / 移行 / ロールバック
 
