@@ -663,11 +663,38 @@ class TestRuntimeDepsS04:
                 ["sync", "--no-github", "--no-update-active"],
             )
             closed_index_all = json.loads((agent_dir / "index-all.json").read_text(encoding="utf-8"))
+            closed_index_todo = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            closed_deps_issues = json.loads((agent_dir / "deps-issues.json").read_text(encoding="utf-8"))
+            closed_deps_raw_puml = (repo_root / "spec-dock" / "deps-raw.puml").read_text(encoding="utf-8")
+            source_meta = json.loads(
+                (
+                    initiatives_dir
+                    / "init-local-00001-source-initiative"
+                    / ".meta.json"
+                ).read_text(encoding="utf-8")
+            )
+            target_meta = json.loads(
+                (
+                    initiatives_dir
+                    / "init-local-00002-target-initiative"
+                    / "epics"
+                    / "epic-local-00001-target-epic"
+                    / ".meta.json"
+                ).read_text(encoding="utf-8")
+            )
 
             assert closed_result.returncode == 0, closed_result.stdout + closed_result.stderr
             assert closed_result.stderr == ""
             assert closed_index_all["nodes"]["epic-local-00001"]["github"]["state"] == "CLOSED"
             assert closed_index_all["deps"]["raw_direct_edges"] == expected_raw_edges
+            assert "raw_direct_edges" not in closed_index_todo
+            assert "raw_direct_edges" not in closed_index_todo["deps"]
+            assert "raw_direct_edges" not in closed_deps_issues
+            assert "raw_direct_edges" not in closed_deps_issues["deps"]
+            assert "Nepic_local_00001 --> Ninit_local_00001 : raw_direct" not in closed_deps_raw_puml
+            assert 'note "No raw direct dependencies to render" as Empty' in closed_deps_raw_puml
+            assert source_meta["depends_on"] == ["epic-local-00001"]
+            assert target_meta["depends_on"] == []
 
     def test_collect_sync_state_reads_shared_topology_map(self) -> None:
         (
