@@ -116,31 +116,6 @@ def has_waitable_required_actions_context_limitation(payload: dict) -> bool:
 
 def required_check_rollup_status(repo: str, pr: str, timeout_seconds: float) -> str | None:
     try:
-        required_proc = subprocess.run(
-            ["gh", "pr", "checks", pr, "--repo", repo, "--required", "--json", "state,bucket,conclusion"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=max(0.1, timeout_seconds),
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        required_proc = None
-    if required_proc is not None and required_proc.returncode == 0:
-        try:
-            required_payload = json.loads(required_proc.stdout)
-        except json.JSONDecodeError:
-            required_payload = None
-        if isinstance(required_payload, list) and required_payload:
-            for item in required_payload:
-                if not isinstance(item, dict):
-                    continue
-                state = str(item.get("state") or item.get("bucket") or item.get("conclusion") or "").upper()
-                if state in {"FAIL", "FAILURE", "FAILED", "ERROR", "TIMED_OUT", "CANCELLED"}:
-                    return "failed"
-                if state and state not in {"PASS", "SUCCESS", "COMPLETED", "SKIPPING", "SKIPPED"}:
-                    return "pending"
-            return None
-    try:
         proc = subprocess.run(
             ["gh", "pr", "view", pr, "--repo", repo, "--json", "mergeStateStatus,statusCheckRollup"],
             capture_output=True,
