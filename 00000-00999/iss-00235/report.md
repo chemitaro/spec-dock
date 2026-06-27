@@ -342,6 +342,103 @@ uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime
 
 ---
 
+### セッションログ（2026-06-27 S03）
+
+#### 対象
+- Step: S03 `.agent/index-all.json` Raw Direct Edge Audit
+- AC/EC: AC-003, EC-003
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S03 — .agent/index-all.json Raw Direct Edge Audit`
+  - closure ids: `cl-ac003-index-all-raw`, `cl-ec003-satisfied-raw-audit`
+
+#### 実施内容
+- `.agent/index-all.json` の `deps.raw_direct_edges` に保存済み `depends_on` の direct node edge を追加した。
+- Edge は `from`, `from_kind`, `to`, `to_kind`, `relation: raw_direct` を持つ監査用 payload とした。
+- `.agent/index.json` には `raw_direct_edges` を出力しない契約をテストで固定した。
+- Satisfied / closed な direct dependency も raw audit では除外しない契約をテストで固定した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py
+
+89 passed in 0.53s
+```
+
+```bash
+git diff --check
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | 赤フェーズ | red-required | dev-coder reported focused test `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k 'raw_direct_edges'` initially failed with `KeyError: 'raw_direct_edges'`. | delegated worker record | pass | Parent re-ran required Green command after implementation. |
+| S03 | 緑フェーズ | sync full-history artifact contract passes required tests | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` -> 89 passed in 0.53s | command | pass | Parent-run verification after reviewer finding fix. |
+| S03 | リファクタリング | guardrail satisfied | Diff stayed within S03 allowed paths; `.agent/index.json`, `.agent/tree-all.json`, `deps-issues.json`, and `deps-raw.puml` contracts were not expanded. | diff inspection | pass | `git diff --check` passed; test asserts tree artifacts do not include `raw_direct_edges`. |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | none | implementation | no new closure delta | N/A | no | worker reported no material implementation decisions beyond the approved plan |
+| S03 | `raw_direct_edges` leaking into `.agent/tree-all.json` through shared full-history deps payload | code-reviewer | split index-all deps payload from shared tree deps payload; added assertion that tree artifacts do not include `raw_direct_edges` | cl-ac003-index-all-raw | no | reviewer P1 finding, fixed in S03 allowed files |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | cl-ac003-index-all-raw | `.agent/index-all.json` exposes complete raw direct high-level edge audit. | `render_index_artifact()` all-json payload includes `deps.raw_direct_edges` with source/target kinds and deterministic ordering. | pass | Todo index remains filtered and does not include `raw_direct_edges`. |
+| S03 | cl-ec003-satisfied-raw-audit | Raw audit retains satisfied / closed direct dependencies. | Focused test asserts closed high-level target still appears in `index-all` raw direct edges. | pass | Readiness projection remains separate from raw audit. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-ac003-index-all-raw | S03 | yes | red-required | delegated Red: `KeyError: 'raw_direct_edges'` | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` | pass, 89 passed in 0.53s | Full-history index audit contract; tree artifacts remain outside raw audit contract. |
+| cl-ec003-satisfied-raw-audit | S03 | yes | red-required | delegated Red: raw direct edge missing | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` | pass, 89 passed in 0.53s | Satisfied/closed dependencies are retained in raw audit. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-ac003-index-all-raw | S03 | presentation sync tests | pass | Public CLI reduced reproduction remains S04. |
+| cl-ec003-satisfied-raw-audit | S03 | presentation sync tests | pass | Raw audit is separate from readiness projection. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | S03 | N/A | N/A | Planned closure ids were used as-is. | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | presentation/test implementation | dev-coder | S03 `.agent/index-all.json` Raw Direct Edge Audit | `plan.md` S03 | `presentation/json_state.py`, `tests/unit/presentation/test_runtime_sync_s07.py` | `.agent/index.json` expansion, `deps-issues.json`, `deps-raw.puml`, storage mutation, readiness recomputation | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` | raw audit cannot be built from existing sync result or allowed paths are insufficient | changed files, Red/Green evidence, risks, no-decision statement | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Added full-history `deps.raw_direct_edges` audit payload for saved direct node dependencies; kept todo index and other graph artifacts unchanged. | `presentation/json_state.py`, `tests/unit/presentation/test_runtime_sync_s07.py` | delegated Red: `KeyError`; parent Green: `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` -> 89 passed | fresh re-review passed | CLI reduced reproduction remains S04 | accepted for commit gate |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh | passed | no | proceed to commit gate | First review found P1 leak of raw audit into `.agent/tree-all.json`; implementation/test/report were updated and fresh re-review passed, confidence 0.91. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | committed | S03 presentation/test/report files | S03 implementation commit, amended with this final commit-gate evidence | `git status --short --branch` -> clean after S03 commit before final evidence amendment; clean check must be rerun after amend | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - `.agent/index-all.json` `deps.raw_direct_edges` payload.
+- `tests/unit/presentation/test_runtime_sync_s07.py` - index-all raw direct edge coverage.
+- `spec-dock/active/issue/report.md` - S03 observed evidence ledger.
+
+#### コミット
+- S03 implementation commit amended with final commit-gate evidence.
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
