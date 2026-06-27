@@ -23,6 +23,7 @@ ID: "iss-00241"
 | D-005 | resolved | implementation-boundary | S99 dev-coder / orchestrator | issue design/plan template が awaiting-compose placeholder になったことで draft discussion docs が marker を継承した | A: draft docs も placeholder 化する; B: draft discussion docs は post-render で marker を除去し draft contract に正規化する | B を採用 | discussion draft は canonical planning artifact ではなく、assurance compose の実行対象でもないため marker を持つと誤誘導になる | applied_to_s99 | `tests/cli_runtime/test_new.py` draft artifact regression, manual temp repo flow | none |
 | D-006 | resolved | implementation-boundary | S99 dev-coder / spec-reviewer | trigger permission-denied path が human gate に正規化される際、permission repair action が `human_gate` に潰れていた | A: top-level action は常に `human_gate`; B: permission signal がある場合は `fix_github_token_permissions` を保持する | B を採用 | human gate のままでも operator が直すべき capability が明確になる。trusted base policy fail-closed/no-comment contract は維持される | applied_to_s99 | `test_issue_180_s02_wait_maps_trigger_comment_permission_denied_to_human_gate`, final code review | none |
 | D-007 | resolved | dogfooding-parity | S99 dev-coder / orchestrator | provider runtime/template/agent-tooling を変更したが dogfooding mirror が stale だと focused suite と実運用検証が red になる | A: provider のみ更新; B: provider source of truth に合わせて checked-in dogfooding mirror も同期する | B を採用 | repo の dogfooding rules は provider-side authority と local consumer workspace の parity inspection を要求する | applied_to_s99 | provider/mirror parity diff checks, full focused suite `578 passed, 5 skipped` | none |
+| D-008 | resolved | follow-up-boundary | user / orchestrator / oracle | `guidance issue-execution` の dynamic step selection は複雑で、plan-centric model へ簡素化するべきだが、`iss-00241` に本体実装を混ぜると scope が肥大化する | A: `iss-00241` で全面実装; B: `iss-00241` は方針記録と最小安定化に留め、follow-up Issue へ移管 | B を採用 | 本件は issue planning / issue execution / runtime guidance / tests を横断する workflow architecture 変更であり、現在の corrective PR の mergeability を守るには別 Issue が適切 | transferred_to_follow_up | `discussions/20260627t121356z-disc-plan-centric-execution-model-analysis.md`, `discussions/20260627t122855z-disc-plan-pattern-taxonomy-and-guidance-simplification.md` | `iss-00244` |
 
 ## 証跡採用台帳
 
@@ -35,6 +36,7 @@ ID: "iss-00241"
 | EAL-005 | adopted | research | `requirement.md`, `design.md`, `plan.md` | `iss-00239` の placeholder scaffold 推奨案を、吸収 scope として AC-006 / AC-007 / S03 へ採用した | `../iss-00239-compose-issue-planning-templates-after-assurance-classification/discussions/20260624t113051z-research-assurance-compose-scaffold-analysis.md` | S03 |
 | EAL-006 | adopted | interview | `requirement.md`, `design.md`, `plan.md`, Epic report | `iss-00239` を `iss-00241` に吸収するユーザー判断を採用した | `discussions/20260627t031736z-interview-corrective-issue-scope-confirmation.md` | S04 |
 | EAL-007 | adopted | user cross-check / audit refinement | `requirement.md`, `design.md`, `plan.md` | QG-006〜QG-008 は AC-010 に包括されるだけでなく、S90/S99 の必須 traceability ledger 項目として明示する必要がある | current planning chat cross-check, Epic audit QG-006〜QG-008 | S90/S99 |
+| EAL-008 | transferred | oracle / discussion | `iss-00244` research handoff | plan-centric execution model、planning-time review pattern taxonomy、`guidance issue-execution` simplification は `iss-00241` の要件・設計・計画へ追加せず、follow-up Issue の調査材料として移管する | `discussions/20260627t112517z-research-guidance-step-selection-regression-analysis.md`, `discussions/20260627t114637z-disc-guidance-execution-model-stability-analysis.md`, `discussions/20260627t121356z-disc-plan-centric-execution-model-analysis.md`, `discussions/20260627t122855z-disc-plan-pattern-taxonomy-and-guidance-simplification.md` | `iss-00244` |
 
 ## 目的整合台帳
 
@@ -64,6 +66,7 @@ ID: "iss-00241"
 - S01〜S04 は実装 / 証跡記録済み。
 - S90 は Epic requirement/design/plan/report と本 report の docs-only reconciliation として実施済み。
 - S90 reviewer gate と commit gate はまだ pending。
+- `guidance issue-execution` を plan-centric preflight validator へ簡素化する本体実装は `iss-00241` では行わず、follow-up `iss-00244` へ移管した。
 
 ## 実装記録
 
