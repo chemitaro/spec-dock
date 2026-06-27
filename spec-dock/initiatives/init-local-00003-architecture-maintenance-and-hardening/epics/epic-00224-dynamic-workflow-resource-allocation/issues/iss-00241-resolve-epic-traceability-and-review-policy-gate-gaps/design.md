@@ -275,6 +275,19 @@ Compose -> Placeholder : replace marker with profile-aware scaffold
 - EC-004 -> Placeholder validation / compose conflict tests.
 - EC-005 -> Guidance projection non-authority wording / tests.
 
+## Epic Traceability Gate Detail
+- S90 / S99 の Epic final traceability quality gate は、E-RQ / E-AC / accepted ADR / live discussion decisions の単純な対応表だけでなく、Epic audit の QG-006〜QG-008 を明示行として持つ。
+- QG-006 step closure audit:
+  - 全 implementation Issue report を横断し、Step Contract Closure / Reviewer Gate Status / Step Commit Gate が pass / explicit human gate / formal supersede のいずれかで閉じていることを記録する。
+  - 対象には初期 implementation Issues と corrective Issues (`iss-00237`, `iss-00238`, `iss-00239`, `iss-00241`) を含める。
+- QG-007 context routing audit:
+  - context packet、clean-room reviewer / consultant、bounded return evidence が、該当 step の委任契約または report evidence として確認できることを記録する。
+  - 証跡が historical limitation または未実施の場合は、false pass にせず explicit human gate / formal supersede として扱う。
+- QG-008 Auto-Lite readiness audit:
+  - Auto-Lite readiness evidence、`automatic_lite_default_enabled=false`、Lite 自動化を有効化しない安全側初期状態、efficiency evidence または missing metrics の扱いを記録する。
+  - resource allocation の効果測定が不足する場合は、Epic close report に missing-metrics human gate または formal supersede として明示する。通常の follow-up だけでは Epic close gate を通過できない。
+- この gate は既存 issue の歴史を書き換えない。S90 で Epic report / traceability ledger に現在確認できる evidence、missing evidence、formal supersede を記録し、S99 で spec-reviewer / qa-reviewer の確認対象にする。
+
 ## テスト戦略
 - 単体:
   - `tests/unit/infra/test_init_update.py`
