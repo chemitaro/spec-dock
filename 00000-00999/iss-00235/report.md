@@ -252,14 +252,93 @@ uv run pytest tests/unit/domain/test_deps.py tests/unit/application/test_check_d
 
 ---
 
-### セッションログ（2026-06-24 HH:MM - HH:MM）
+### セッションログ（2026-06-27 S02）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02 `deps check --json` Additive JSON Contract
+- AC/EC: AC-001, AC-002
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S02 — deps check --json Additive JSON Contract`
+  - closure ids: `cl-ac001-direct-check`, `cl-ac002-non-ready`
 
 #### 実施内容
-- ...
+- `render_deps_check_json()` に additive field `direct_node_dependencies` を追加した。
+- S01 の `result.direct_node_dependencies` を presentation で再計算せず、そのまま payload 化する。
+- Existing top-level keys、`node_blockers`、`dependency_contexts` は維持した。
+- Direct dependency が空の場合は `direct_node_dependencies: []` を安定出力する。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py
+
+87 passed in 0.42s
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | 赤フェーズ | red-required | dev-coder reported focused test `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py -k direct_node_dependencies` failed with `KeyError: 'direct_node_dependencies'`. | delegated worker record | pass | Parent re-ran required Green command after implementation. |
+| S02 | 緑フェーズ | renderer JSON contract passes required tests | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` -> 87 passed in 0.42s | command | pass | Parent-run verification on current worktree. |
+| S02 | リファクタリング | guardrail satisfied | Diff stayed within S02 allowed paths and did not touch domain/application/sync artifacts/schema_version. | diff inspection | pass | `tests/cli_runtime/test_runtime_deps_s04.py` did not require changes. |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | none | implementation | no new closure delta | N/A | no | worker reported no closure delta |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | cl-ac001-direct-check | `deps check --json` exposes direct node dependency payload. | `render_deps_check_json()` payload includes `direct_node_dependencies` with source/target ids/kinds, expansion, lifecycle, disposition, and basis. | pass | CLI reduced reproduction remains S04. |
+| S02 | cl-ac002-non-ready | JSON output preserves non-ready observation from application result. | Existing `ready` / `blockers` keys remain and no presentation recomputation was added. | pass | Public CLI behavior remains S04. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-ac001-direct-check | S02 | yes | red-required | delegated Red: `KeyError: 'direct_node_dependencies'` | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` | pass, 87 passed in 0.42s | Renderer contract. |
+| cl-ac002-non-ready | S02 | yes | red-required | delegated Red: direct payload missing | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` | pass, 87 passed in 0.42s | Non-ready status comes from S01 result. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-ac001-direct-check | S02 | presentation/CLI runtime tests | pass | CLI reduced reproduction remains S04. |
+| cl-ac002-non-ready | S02 | presentation/CLI runtime tests | pass | CLI reduced reproduction remains S04. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | S02 | N/A | N/A | Planned closure ids were used as-is. | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | presentation/test implementation | dev-coder | S02 `deps check --json` Additive JSON Contract | `plan.md` S02 | `presentation/json_state.py`, `tests/unit/presentation/test_runtime_sync_s07.py`; optional CLI test was not needed | domain/application implementation, schema_version change, sync artifact behavior | `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` | renderer must infer unavailable status or files outside allowed paths are needed | changed files, Red/Green evidence, risks, no-decision statement | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Added additive `direct_node_dependencies` to `deps check --json` rendering without readiness recomputation. | `presentation/json_state.py`, `tests/unit/presentation/test_runtime_sync_s07.py` | delegated Red: `KeyError`; parent Green: `uv run pytest tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` -> 87 passed | pending | JSON uses S01 result model; sync/index-all remains S03 | accepted pending fresh code-reviewer pass |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | no | proceed to commit gate | Fresh code-reviewer pass, confidence 0.91. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | committed | S02 presentation/test/report files | S02 implementation commit, amended with this final commit-gate evidence | `git status --short --branch` -> clean after S02 commit before final evidence amendment; clean check must be rerun after amend | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py` - additive `direct_node_dependencies` payload.
+- `tests/unit/presentation/test_runtime_sync_s07.py` - renderer S02 coverage.
+- `spec-dock/active/issue/report.md` - S02 observed evidence ledger.
+
+#### コミット
+- S02 implementation commit amended with final commit-gate evidence.
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
 
 ---
 
