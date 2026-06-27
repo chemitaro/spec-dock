@@ -83,9 +83,10 @@ ID: "iss-00244"
 
 - 常に行う:
   - `plan.md` を execution contract、`report.md` を observed evidence ledger として扱う。
-  - `guidance issue-execution` は execution readiness と consistency を確認し、実行順や step obligations は `plan.md` を参照するよう促す。
+  - `guidance issue-execution` は execution readiness と consistency を確認し、`may_execute_approved_plan` で実行可否を明示する。実行順や step obligations は `plan.md` を参照するよう促す。
   - `assurance.json` の `authorized_profile` を obligation authority とし、`lite_candidate` は telemetry として扱う。
   - non-executable / scaffold / stale / unresolved な `requirement.md`、`design.md`、`plan.md` は execution-ready にしない。
+  - invalid / stale assurance contract は fail-closed とし、`strict` fallback を current authority として偽装しない。
   - hard cutover のため、不要 interface / field は削除対象にする。
 - 判断が必要:
   - `context_routing.py` / `context_packets.py` / related store の削除範囲は、残存利用を調査したうえで design で確定する。
@@ -174,7 +175,7 @@ ID: "iss-00244"
   - アクター: maintainer
   - 前提: provider assets / runtime / tests を変更した。
   - 操作: relevant tests と `./spec-dock/scripts/spec-dock validate` を実行する。
-  - 期待結果: provider source と dogfooding workspace の意図した差分が説明でき、validation が pass する。`guidance` が表示する `authorized_profile` / authority は current `assurance classify` source binding と矛盾しない。
+  - 期待結果: provider source と dogfooding workspace の意図した差分が説明でき、validation が pass する。`guidance` が表示する `authorized_profile` / authority は current `assurance classify` source binding と矛盾しない。`workflow-plan-unselectable` のような旧 step selector 由来の block reason は issue-execution default path に残らない。
   - 観測点: test output、report evidence、git diff。
 
 ## 例外・エッジケース
@@ -206,7 +207,7 @@ ID: "iss-00244"
 
 - EC-006: Generated projection stale
   - 条件: `.agent/runbooks/current-runbook.*` や `active/current-runbook.*` が古い。
-  - 期待: agent は projection を authority として読まず、fresh stdout guidance と canonical docs を使う。
+  - 期待: agent は projection を authority として読まず、fresh stdout guidance と canonical docs を使う。projection refresh 後に `Step Assurance` / `Context Packets` / `selected_step` が残らない。
   - 観測点: skill text / tests。
 
 ## 用語

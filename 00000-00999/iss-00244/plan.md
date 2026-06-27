@@ -108,6 +108,10 @@ title iss-00244 Step Dependency Graph
 | tc-008 | AC-008 | old dynamic context routing tests are removed/replaced | CLI test suite | old behavior remains locked | yes | command | S05 |
 | tc-009 | AC-009 | planning manual test findings recorded | report/discussion artifacts | dogfooding evidence missing | yes | inspect-only | S05 |
 | tc-010 | AC-010 | provider and dogfood validation pass, including guidance `authorized_profile` source consistency | validate/test commands | shipped/runtime drift or stale profile authority | yes | command | S05 |
+| tc-011 | AC-001 / AC-004 | ready guidance exposes `may_execute_approved_plan=true`; blocked guidance exposes `false` | ready and blocked active issue fixtures | execution permission remains implicit or ambiguous | yes | red-required | S01 / S02 |
+| tc-012 | AC-003 / AC-010 | issue-execution no longer emits `workflow-plan-unselectable` when old structured step heading is absent | executable plan without old `_STEP_HEADING_RE` shape | hidden dynamic step selector remains control plane | yes | red-required | S03 / S05 |
+| tc-013 | AC-004 / AC-010 | invalid or stale assurance fails closed without `strict` fallback being reported as current authority | invalid/stale assurance fixture | profile authority drift or false safety signal | yes | red-required | S02 / S05 |
+| tc-014 | EC-006 / AC-002 | refreshed runbook projections contain no dynamic sections or fields | current-runbook projection refresh | stale projection reintroduces old mental model | yes | manual-required + structural assertion | S05 / S90 |
 
 ## 実装ステップ
 
@@ -170,10 +174,10 @@ Default `guidance issue-execution` output no longer exposes dynamic execution fi
 - `tc-s01-001` acceptance: ready guidance points to plan/report contract
   - 前提: temp repo に active issue、substantive requirement、valid assurance、executable plan がある。
   - 操作: `guidance issue-execution` と JSON/projection 確認を実行する。
-  - 期待結果: output に `contract_source=spec-dock/active/issue/plan.md` と `evidence_ledger=spec-dock/active/issue/report.md` がある。
+  - 期待結果: output に `contract_source=spec-dock/active/issue/plan.md`、`evidence_ledger=spec-dock/active/issue/report.md`、`may_execute_approved_plan=true` がある。
   - 失敗検出: 実行者が next step source を runtime selected output へ探しに行く回帰を検出する。
   - 検証方法: `tests/cli_runtime/test_workflow.py` に assertion を追加する。
-  - 関連 closure id: `tc-001`
+  - 関連 closure id: `tc-001`, `tc-011`
 
 - `tc-s01-002` hard-cutover: dynamic fields are absent
   - 前提: ready active issue がある。
@@ -210,10 +214,13 @@ Default `guidance issue-execution` output no longer exposes dynamic execution fi
 - Test obligation:
   - placeholder / non-executable / missing required fields blocks.
   - valid plan returns execute-approved-plan.
+  - invalid / stale assurance blocks without presenting `strict` fallback as current authority.
 - Red / alternative evidence:
   - red-required for invalid plan fixtures.
+  - red-required for invalid / stale assurance authority fixture.
 - Green verification:
   - focused CLI runtime tests.
+  - focused assurance authority consistency test.
 - Refactor guardrail:
   - Keep lint coarse and deterministic; do not build a full Markdown parser beyond required fields.
 - Amendment trigger:
@@ -259,6 +266,14 @@ Default `guidance issue-execution` output no longer exposes dynamic execution fi
   - 失敗検出: docs / skill change が no-review で通る回帰を検出する。
   - 検証方法: plan lint fixture test。
   - 関連 closure id: `tc-006`
+
+- `tc-s02-003` negative: invalid assurance fails closed without false authority
+  - 前提: assurance contract が invalid / stale の active issue fixture。
+  - 操作: `guidance issue-execution --format json` を実行する。
+  - 期待結果: `may_execute_approved_plan=false`、blocking reason は assurance invalid / stale を示し、`authorized_profile=strict` を current authority として表示しない。
+  - 失敗検出: stale profile authority / strict fallback が current authority として見える回帰を検出する。
+  - 検証方法: `tests/cli_runtime/test_workflow.py` または assurance preflight test。
+  - 関連 closure id: `tc-013`
 
 #### step closure contract
 
@@ -340,6 +355,14 @@ Default issue-execution no longer depends on context packet generation, context 
   - 失敗検出: old behavior が tests で固定され続ける回帰を検出する。
   - 検証方法: `rg "selected_step|step_assurance|context_packets" tests/cli_runtime` と pytest。
   - 関連 closure id: `tc-008`
+
+- `tc-s03-003` hard-cutover: old structured heading is not required
+  - 前提: approved executable `plan.md` があるが、旧 `_STEP_HEADING_RE` に一致する heading はない。
+  - 操作: `guidance issue-execution --format json` を実行する。
+  - 期待結果: `workflow-plan-unselectable` を返さず、plan-centric preflight result を返す。
+  - 失敗検出: hidden dynamic step selector が残る回帰を検出する。
+  - 検証方法: CLI runtime fixture test。
+  - 関連 closure id: `tc-012`
 
 #### step closure contract
 
@@ -450,6 +473,7 @@ The new guidance contract is locked by tests and validated in the dogfooding wor
   - `validate` passes.
   - manual planning findings are recorded.
   - `guidance` profile authority matches the current `assurance classify` source binding.
+  - refreshed `current-runbook.*` projections do not contain dynamic sections.
 - Red / alternative evidence:
   - existing failing old dynamic tests before replacement.
 - Green verification:
@@ -472,7 +496,7 @@ The new guidance contract is locked by tests and validated in the dogfooding wor
 - forbidden changes:
   - unrelated test cleanup
 - acceptance criteria:
-  - tc-008, tc-009, tc-010
+  - tc-008, tc-009, tc-010, tc-012, tc-013, tc-014
 - required tests or docs-only verification:
   - focused pytest and validate.
 - reviewer focus:
@@ -499,6 +523,14 @@ The new guidance contract is locked by tests and validated in the dogfooding wor
   - 失敗検出: dogfooding findings are lost from the issue evidence.
   - 検証方法: docs inspection.
   - 関連 closure id: `tc-009`
+
+- `tc-s05-003` dogfood: projection refresh does not reintroduce dynamic guidance
+  - 前提: guidance command が projection を更新する。
+  - 操作: `current-runbook.md` / `current-runbook.json` を確認する。
+  - 期待結果: `Step Assurance`、`Context Packets`、`selected_step`、`step_assurance`、`context_packets` が存在しない。
+  - 失敗検出: human/debug projection が旧 mental model を再導入する回帰を検出する。
+  - 検証方法: structural assertion または manual grep。
+  - 関連 closure id: `tc-014`
 
 #### step closure contract
 
@@ -635,7 +667,7 @@ The whole issue satisfies requirement/design/plan/report alignment, tests, docs,
 
 - `requirement.md` / `design.md` / `plan.md` が substantive で reviewer-pass 済み。
 - `assurance.json` が current source binding と整合する。
-- All closure ids `tc-001` - `tc-010` が report で pass / approved-no-op として閉じている。
+- All closure ids `tc-001` - `tc-014` が report で pass / approved-no-op として閉じている。
 - Focused pytest lane と `./spec-dock/scripts/spec-dock validate` が pass。
 - S90 docs impact resolved。
 - S99 final QA / code / spec review が pass。

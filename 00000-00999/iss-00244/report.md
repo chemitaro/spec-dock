@@ -52,6 +52,7 @@ Disposition ごとの必須証跡:
 | D-001 | resolved | scope | user / orchestrator | `guidance issue-execution` を step-by-step dynamic selector として維持するか、plan-centric preflight validator へ縮退するか。 | dynamic selector 維持; plan-centric preflight; hybrid fallback | plan-centric preflight を採用し、実行順序・レビュー・品質ゲートは `plan.md` に集約する。 | ユーザーは複雑な動的状態管理より、実装計画書一本に作業契約を集約する方向を支持した。 | applied | `discussions/20260627t131746z-research-plan-centric-guidance-requirement-preparation.md`; `discussions/20260627t132248z-disc-plan-centric-guidance-requirement-scope-synthesis.md`; `requirement.md`; `design.md`; `plan.md` | なし |
 | D-002 | resolved | compatibility | user | 既存の `workflow next` / dynamic guidance field 互換を残すか。 | compatibility shim; hard cutover | hard cutover を採用し、不要な interface / field は削除対象にする。 | ユーザーが「hard cutoverを採用します。不要なインターフェースやフィールドは削除」と明示した。 | applied | `discussions/20260627t132404z-interview-default-guidance-dynamic-fields-cutover.md`; `requirement.md` AC-001/AC-002; `design.md` S01/S03 | なし |
 | D-003 | resolved | test-strategy | orchestrator | Issue Planning の実運用テストで、substantive draft requirement が `reason_code=requirement-scaffold` と表示され、`assurance classify` の `standard` と guidance の `strict` も不一致だった。 | この issue の外へ延期; この issue の planning/validation 要件へ織り込む | 本 issue の AC-009/AC-010 と S05 に取り込み、guidance semantics、authorized profile source consistency、provider/dogfood parity を検証対象にする。 | `assurance classify` は requirement を valid/standard と判定する一方、guidance は scaffold/strict を表示したため、agent-facing guidance の状態表現と profile source を検証する必要がある。 | applied | `discussions/20260627t143104z-research-issue-planning-guidance-manual-test-findings.md`; `plan.md` S05/tc-009/tc-010 | なし |
+| D-004 | resolved | test-strategy | ChatGPT Pro advisory review / orchestrator | GPT-5.5 Pro review が、`may_execute_approved_plan`、旧 structured step selector 不要テスト、invalid assurance fail-closed、projection refresh negative test の明示を推奨した。 | 既存 plan のまま; すべて採用; source-grounded な不足分だけ採用 | source-grounded な不足分だけ採用し、`tc-011` - `tc-014` と output / preflight contract へ反映した。 | 外部 review には active issue 本体が確認できないという誤認があったため、助言をそのまま権威化せず、ローカル文書と照合できた指摘だけ採用する。 | applied | `discussions/20260627t150729z-research-chatgpt-pro-plan-review-adoption.md`; `requirement.md`; `design.md`; `plan.md` | なし |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -69,6 +70,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-002 | adopted | discussion | requirement / design / plan | dynamic selector を削り、preflight validator と plan lint に責務を分ける構成を採用した。 | `discussions/20260627t132248z-disc-plan-centric-guidance-requirement-scope-synthesis.md` | なし |
 | EAL-003 | adopted | user decision | requirement / design / plan | hard cutover と不要 field 削除を互換性方針として採用した。 | `discussions/20260627t132404z-interview-default-guidance-dynamic-fields-cutover.md` | なし |
 | EAL-004 | adopted | command / research | design / plan / report | Issue Planning guidance の manual test 結果を採用し、guidance semantics drift と profile source inconsistency を検証対象へ加えた。 | `discussions/20260627t143104z-research-issue-planning-guidance-manual-test-findings.md`; `./spec-dock/scripts/spec-dock guidance issue-planning`; `./spec-dock/scripts/spec-dock assurance classify --stage requirement --dry-run --format json` | 実装時に S05 で再検証 |
+| EAL-005 | partially_adopted | external advisory review | requirement / design / plan / report | GPT-5.5 Pro review のうち、ローカル文書と照合できた不足分を採用した。active issue 本体未確認という指摘は Oracle 側の可視性制約として参考止まりにした。 | `discussions/20260627t150729z-research-chatgpt-pro-plan-review-adoption.md`; Oracle session `iss-00244-plan-centric-guidance` | なし |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -172,6 +174,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ./spec-dock/scripts/spec-dock guidance issue-planning
 # result: state=requirement-capture, reason_code=requirement-scaffold, authority=authorized_profile=strict
+
+npx -y @steipete/oracle --engine browser --model gpt-5.5-pro --browser-thinking-time extended ...
+# result: GPT-5.5 Pro advisory review completed; accepted additions recorded in discussions/20260627t150729z-research-chatgpt-pro-plan-review-adoption.md
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
