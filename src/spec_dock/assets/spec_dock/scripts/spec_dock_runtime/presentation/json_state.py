@@ -58,6 +58,23 @@ def _deps_dependency_context_payload(context: object) -> dict[str, object]:
     }
 
 
+def _deps_direct_node_dependency_payload(dependency: object) -> dict[str, object]:
+    raw_target_issue_ids = _object_value(dependency, "target_issue_ids", ())
+    target_issue_ids = raw_target_issue_ids if isinstance(raw_target_issue_ids, (list, tuple)) else ()
+    return {
+        "source_node_id": _object_value(dependency, "source_node_id", ""),
+        "source_node_kind": _object_value(dependency, "source_node_kind", ""),
+        "target_node_id": _object_value(dependency, "target_node_id", ""),
+        "target_node_kind": _object_value(dependency, "target_node_kind", ""),
+        "target_issue_ids": list(target_issue_ids),
+        "expansion": _object_value(dependency, "expansion", ""),
+        "lifecycle_state": _object_value(dependency, "lifecycle_state", None),
+        "lifecycle_source": _object_value(dependency, "lifecycle_source", None),
+        "dependency_disposition": _object_value(dependency, "dependency_disposition", None),
+        "disposition_basis": _object_value(dependency, "disposition_basis", None),
+    }
+
+
 def render_deps_check_json(result: DepsCheckResult) -> str:
     inspection = result.inspection
     target_id = inspection.target_id.value
@@ -85,6 +102,9 @@ def render_deps_check_json(result: DepsCheckResult) -> str:
         ],
         "dependency_contexts": [
             _deps_dependency_context_payload(context) for context in inspection.evaluation.dependency_contexts
+        ],
+        "direct_node_dependencies": [
+            _deps_direct_node_dependency_payload(dependency) for dependency in result.direct_node_dependencies
         ],
         "nodes": {
             node_id: {
