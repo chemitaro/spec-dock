@@ -3337,6 +3337,139 @@ class TestRuntimeSyncS07:
         assert "raw_direct" not in puml
         assert "satisfied edge" not in puml
 
+    def test_index_all_includes_raw_direct_edges_with_node_kinds(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            _app_ports,
+            _app_sync_state,
+            domain_models,
+            _infra_artifact_writer,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        presentation_json_state = _presentation_json_state_module()
+
+        def _node(kind: str, node_id: str, title: str, *, parent_id: str | None = None):
+            path = Path(f"/repo/spec-dock/{node_id}")
+            return domain_models.SpecNode(
+                kind=kind,
+                id=node_id,
+                title=title,
+                slug=node_id,
+                path=path,
+                meta_path=path / ".meta.json",
+                parent_id=parent_id,
+                initiative_id="init-00001" if kind == "epic" else None,
+                epic_id=None,
+                github_issue_number=None,
+            )
+
+        state = app_contracts.SyncStateResult(
+            graph=domain_models.SpecGraph(
+                nodes_by_id={
+                    "init-00001": _node("initiative", "init-00001", "Init"),
+                    "epic-00002": _node("epic", "epic-00002", "Platform", parent_id="init-00001"),
+                }
+            ),
+            active=None,
+            issue_statuses={},
+            progress=domain_models.ProgressMap(by_node_id={}, counts={}),
+            deps_state=domain_models.DepsState(nodes=[], warnings=[]),
+            deps_eval_by_id={},
+            generated_at="2026-03-12T00:00:00Z",
+            warnings=[],
+            deps_preflight_error=None,
+            raw_node_depends_on_map={"init-00001": ["epic-00002"]},
+        )
+
+        artifact = presentation_json_state.render_index_artifact(state)
+        index_all = json.loads(artifact.all_json_text)
+        index_todo = json.loads(artifact.todo_json_text)
+
+        assert index_all["deps"]["raw_direct_edges"] == [
+            {
+                "from": "init-00001",
+                "from_kind": "initiative",
+                "to": "epic-00002",
+                "to_kind": "epic",
+                "relation": "raw_direct",
+            }
+        ]
+        assert "raw_direct_edges" not in index_todo["deps"]
+
+        tree_artifact = presentation_json_state.render_tree_artifact(state)
+        tree_all = json.loads(tree_artifact.all_json_text)
+        tree_todo = json.loads(tree_artifact.todo_json_text)
+        assert "raw_direct_edges" not in tree_all["deps"]
+        assert "raw_direct_edges" not in tree_todo["deps"]
+
+    def test_index_all_raw_direct_edges_keep_satisfied_closed_dependencies(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            _app_ports,
+            _app_sync_state,
+            domain_models,
+            _infra_artifact_writer,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        presentation_json_state = _presentation_json_state_module()
+
+        def _node(kind: str, node_id: str, title: str, *, parent_id: str | None = None):
+            path = Path(f"/repo/spec-dock/{node_id}")
+            return domain_models.SpecNode(
+                kind=kind,
+                id=node_id,
+                title=title,
+                slug=node_id,
+                path=path,
+                meta_path=path / ".meta.json",
+                parent_id=parent_id,
+                initiative_id="init-00001" if kind == "epic" else None,
+                epic_id=None,
+                github_issue_number=None,
+            )
+
+        state = app_contracts.SyncStateResult(
+            graph=domain_models.SpecGraph(
+                nodes_by_id={
+                    "init-00001": _node("initiative", "init-00001", "Init"),
+                    "epic-00002": _node("epic", "epic-00002", "Closed target", parent_id="init-00001"),
+                }
+            ),
+            active=None,
+            issue_statuses={},
+            progress=domain_models.ProgressMap(by_node_id={}, counts={}),
+            deps_state=domain_models.DepsState(nodes=[], warnings=[]),
+            deps_eval_by_id={},
+            generated_at="2026-03-12T00:00:00Z",
+            warnings=[],
+            deps_preflight_error=None,
+            raw_node_depends_on_map={"init-00001": ["epic-00002"]},
+            high_level_statuses_by_node_id={
+                "epic-00002": domain_models.DepsHighLevelStatus(
+                    node_id="epic-00002",
+                    state="closed",
+                    source="cache",
+                )
+            },
+        )
+
+        artifact = presentation_json_state.render_index_artifact(state)
+        index_all = json.loads(artifact.all_json_text)
+
+        assert index_all["deps"]["raw_direct_edges"] == [
+            {
+                "from": "init-00001",
+                "from_kind": "initiative",
+                "to": "epic-00002",
+                "to_kind": "epic",
+                "relation": "raw_direct",
+            }
+        ]
+
     def test_deps_check_json_includes_lifecycle_and_disposition_context(self) -> None:
         (
             _runtime_app,
