@@ -69,9 +69,9 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-023 | `adopted` | iss-00231 spec-reviewer finding | `plan.md`, `report.md`, `issues/iss-00231-*/{design.md,plan.md,report.md}` | I05 の `Policy schema / validator / max size` は Markdown policy の fixed path + base SHA + UTF-8 + 32 KiB runtime validation として回収し、dedicated `doctor` capability は I07 rollout / operationalization へ defer する。 | iss-00231 spec review P1: parent I05 scope contract contradicted Issue closure contract | fresh iss-00231 spec re-review |
 | EAL-024 | `adopted` | iss-00232 implementation + spec-reviewer finding | `plan.md`, `report.md`, `issues/iss-00232-*/{design.md,plan.md,report.md}` | I06 の blocker-centric repair は priority disposition / promoted P2 / blocker fingerprint evidence をこの Issue で閉じ、E-AC-013 と dedicated automation-stalled operator surfacing は I07 rollout / telemetry へ defer する。 | iss-00232 blocker policy payload and focused tests; spec review P1: E-AC-013 closure contradicted I07 defer | fresh iss-00232 spec re-review |
 | EAL-025 | `adopted` | iss-00233 implementation | `requirement.md`, `design.md`, `plan.md`, `issues/iss-00233-*/{requirement.md,design.md,plan.md,report.md}` | I07 は automatic Lite default を有効化せず、auto-lite readiness、strict-legacy workflow compatibility、automation-stalled operator surface、required metrics / missing metrics summary、efficiency baseline を rollout evidence として閉じる。 | iss-00233 focused tests、automation-stalled behavior test、workflow strict-legacy tests、provider/mirror parity | fresh iss-00233 reviews |
-| EAL-026 | `adopted` | iss-00238 / iss-00241 S90 reconciliation | `requirement.md`, `design.md`, `plan.md`, `report.md` | Current operational handoff は `./spec-dock/scripts/spec-dock guidance <target>` stdout authority であり、`workflow next` / generated Runbook authority wording は historical/superseded として扱う。Projection files are human/debug-only non-canonical output. | `issues/iss-00238-*/report.md`, `issues/iss-00241-*/report.md`, S90 docs inspection | pending final spec-reviewer |
-| EAL-027 | `adopted` | iss-00241 S01/S02 evidence | `requirement.md`, `design.md`, `plan.md`, `report.md` | Trusted base policy valid path は deterministic multiline `@codex review`; missing / invalid / oversized / unreadable / base_sha_missing は no PR comment, human gate / fail-closed, no head fallback, no bare trigger fallback として反映した。 | `issues/iss-00241-*/report.md` S01/S02 closure evidence | pending final spec-reviewer |
-| EAL-028 | `adopted` | iss-00237 / iss-00238 / iss-00239 / iss-00241 corrective reports | `report.md` | Epic final close-readiness は initial implementation Issues だけでなく corrective Issues も含む必要があるため、formal supersede / pass / pending-final-review を一つの inclusion ledger に記録する。 | corrective issue reports and S90 reconciliation | pending final spec-reviewer |
+| EAL-026 | `adopted` | iss-00238 / iss-00241 S90 reconciliation | `requirement.md`, `design.md`, `plan.md`, `report.md` | Current operational handoff は `./spec-dock/scripts/spec-dock guidance <target>` stdout authority であり、`workflow next` / generated Runbook authority wording は historical/superseded として扱う。Projection files are human/debug-only non-canonical output. | `issues/iss-00238-*/report.md`, `issues/iss-00241-*/report.md`, S90 docs inspection | final spec-reviewer pass |
+| EAL-027 | `adopted` | iss-00241 S01/S02 evidence | `requirement.md`, `design.md`, `plan.md`, `report.md` | Trusted base policy valid path は deterministic multiline `@codex review`; missing / invalid / oversized / unreadable / base_sha_missing は no PR comment, human gate / fail-closed, no head fallback, no bare trigger fallback として反映した。 | `issues/iss-00241-*/report.md` S01/S02 closure evidence | final spec-reviewer pass |
+| EAL-028 | `adopted` | iss-00237 / iss-00238 / iss-00239 / iss-00241 corrective reports | `report.md` | Epic final close-readiness は initial implementation Issues だけでなく corrective Issues も含む必要があるため、formal supersede / pass / final reviewer pass を一つの inclusion ledger に記録する。 | corrective issue reports and S90/S99 reconciliation | final spec-reviewer pass |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -149,7 +149,14 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
   - `iss-00226 / #226` は decision-only Issue として作成されたが closed / superseded。ADR authority は Epic-scope accepted ADR へ移動済み。
 
 ## 完了した Issue / PR / Release (必須)
-- なし。Issue は作成済みだが未完了。
+- Initial implementation Issues `iss-00227`〜`iss-00233` は各 issue report の implementation / reviewer / commit evidence に基づき完了済み。
+- Corrective Issues:
+  - `iss-00237` / `#237`: pass
+  - `iss-00238` / `#238`: pass
+  - `iss-00239` / `#239`: formal supersede by `iss-00241`
+  - `iss-00241` / `#241`: pass after S99 focused suite, sync/validate, manual flow, and qa/code/spec reviewer gates
+- PR / Release:
+  - pending: this Epic will create one PR after `iss-00241` S99 commit.
 
 ## 作成済み Issue / Draft Handoff
 - superseded historical evidence:
@@ -177,9 +184,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | Contract | Current authority | Projection / fallback boundary | Status | Evidence |
 |---|---|---|---|---|
-| Issue planning / execution handoff | `./spec-dock/scripts/spec-dock guidance issue-planning` / `issue-execution` stdout | `.agent/runbooks/current-runbook.*` / `active/current-runbook.*` are human/debug-only non-canonical projection files and are not agent handoff authority | pending-final-review | `iss-00238` report; `iss-00241` S90 reconciliation |
-| Historical command wording | `workflow next` is superseded command wording when it appears in historical ADR / prior issue evidence | It must not be described as the current entrypoint | pending-final-review | S90 docs inspection |
-| Trusted base policy review trigger | Valid base policy -> deterministic multiline `@codex review` with policy base SHA / policy hash / reviewed head SHA | missing / invalid / oversized / unreadable / non-UTF-8 / base_sha_missing -> no PR comment, human gate / fail-closed, no head fallback, no bare `@codex review` fallback | pending-final-review | `iss-00241` S01/S02 closure evidence |
+| Issue planning / execution handoff | `./spec-dock/scripts/spec-dock guidance issue-planning` / `issue-execution` stdout | `.agent/runbooks/current-runbook.*` / `active/current-runbook.*` are human/debug-only non-canonical projection files and are not agent handoff authority | pass | `iss-00238` report; `iss-00241` S90/S99 reconciliation; manual temp repo guidance flow |
+| Historical command wording | `workflow next` is superseded command wording when it appears in historical ADR / prior issue evidence | It must not be described as the current entrypoint | pass | S90 docs inspection; final stale wording inspection |
+| Trusted base policy review trigger | Valid base policy -> deterministic multiline `@codex review` with policy base SHA / policy hash / reviewed head SHA | missing / invalid / oversized / unreadable / non-UTF-8 / base_sha_missing -> no PR comment, human gate / fail-closed, no head fallback, no bare `@codex review` fallback | pass | `iss-00241` S01/S02/S99 closure evidence; final spec re-review |
 
 ## Corrective Issues Inclusion Ledger
 
@@ -188,15 +195,15 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | `iss-00237` / `#237` | Manual test routing failure analysis and routing classifier repair | included corrective issue | pass | report records Red/Green closure, reviewer gate, and commit gate evidence |
 | `iss-00238` / `#238` | Stdout guidance handoff instead of generated workflow files | included corrective issue | pass | report records `guidance <target>` handoff, projection human-only boundary, reviewer gates, and S90 evidence |
 | `iss-00239` / `#239` | Compose issue planning templates after assurance classification | formally superseded by `iss-00241` | formal supersede | report records `./spec-dock/scripts/spec-dock close iss-00239` exit 0 with `state=CLOSED already_closed=true`; GitHub `#239` closed at `2026-06-27T05:17:44Z` |
-| `iss-00241` / `#241` | Resolve Epic traceability and review policy gate gaps | included corrective integration issue | pending-final-review | S01〜S04 closure evidence recorded; S90 docs reconciliation recorded here; S99 final review / commit gate remains pending |
+| `iss-00241` / `#241` | Resolve Epic traceability and review policy gate gaps | included corrective integration issue | pass | S01〜S04, S90, and S99 closure evidence recorded; focused suite, sync/validate, manual flow, and final qa/code/spec reviewer gates passed |
 
 ## Epic Traceability Quality Gate Ledger
 
 | Gate | Required audit | Status | Evidence / limitation | Next action |
 |---|---|---|---|---|
-| QG-006 | Step closure / reviewer gate / commit gate cross-issue audit | pending-final-review | Initial implementation issue reports and corrective issue reports are included; `iss-00239` is formal supersede; `iss-00241` S90/S99 reviewer and commit gates remain pending, so this is not a final pass. | Fresh spec-reviewer / S99 final gate must confirm no false pass remains. |
-| QG-007 | Context packet / clean-room / bounded return evidence audit | pending-final-review | E-AC-017〜021 point to `iss-00230` report; current ledger requires final reviewer confirmation that context packet, clean-room reviewer / consultant, and bounded return evidence are sufficient or explicitly gated. | Fresh spec-reviewer / QA review must confirm or record explicit human gate. |
-| QG-008 | Auto-Lite readiness / automatic Lite default disabled / efficiency evidence audit | pending-final-review | E-AC-015〜016 point to `iss-00233` Auto-Lite readiness and efficiency baseline; automatic Lite default remains disabled. Live telemetry gaps are documented, but final reviewer must confirm missing metrics handling is sufficient. | Fresh spec-reviewer / QA review must confirm or record explicit human gate. |
+| QG-006 | Step closure / reviewer gate / commit gate cross-issue audit | pass | Initial implementation issue reports and corrective issue reports are included; `iss-00239` is formal supersede; `iss-00241` S01〜S04/S90/S99 reviewer gates passed. S99 commit evidence is recorded in the issue report commit gate. | none |
+| QG-007 | Context packet / clean-room / bounded return evidence audit | pass | E-AC-017〜021 point to `iss-00230` report; S99 final QA/spec reviews accepted the existing context packet, clean-room reviewer / consultant, and bounded return evidence coverage without requiring a human gate. | none |
+| QG-008 | Auto-Lite readiness / automatic Lite default disabled / efficiency evidence audit | pass | E-AC-015〜016 point to `iss-00233` Auto-Lite readiness and efficiency baseline; automatic Lite default remains disabled; final QA/spec reviews accepted missing-metrics handling without requiring a human gate. | none |
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:

@@ -20,6 +20,9 @@ ID: "iss-00241"
 | D-002 | resolved | interpretation | spec-reviewer / audit | trusted base policy failure が fallback success として実装・テスト固定されている | A: fallback 維持; B: head policy fallback; C: POST なし human gate | POST なし human gate | Accepted ADR と Epic requirement が fail-closed を要求する | promoted_to_requirement / promoted_to_design / promoted_to_plan | Epic audit / spec reviewer report | S01 で実装 |
 | D-003 | resolved | interpretation | issue 238 / audit | `workflow next` と generated projection authority の stale wording が Epic 正本に残る | A: `workflow next` alias 追加; B: docs を `guidance <target>` に更新 | `guidance <target>` stdoutを agent handoff authority とし、projection は human/debug-only | Current runtime / skills / tests は guidance model へ移行済み | promoted_to_requirement / promoted_to_design / promoted_to_plan | `iss-00238` evidence, Epic audit | S90 で反映 |
 | D-004 | resolved | implementation-boundary | dev-coder / orchestrator / code-reviewer | assurance compose の既存 stale source binding gate が design / plan direct edit を composer の no-overwrite conflict として観測する前に止めていた | A: 既存どおり stale_source_binding のみ; B: design / plan direct edit は composer conflict を優先し、conflict がなければ stale_source_binding を維持 | B を採用 | S03 は destructive overwrite 防止を compose 境界で観測可能にする必要がある。requirement stale protection は維持され、code-reviewer が S03 slice 内で必要かつ安全と判定した | applied_to_s03 | S03 code-reviewer pass, `tests/cli_runtime/test_assurance_compose.py` | issue-local decision; no broader contract change |
+| D-005 | resolved | implementation-boundary | S99 dev-coder / orchestrator | issue design/plan template が awaiting-compose placeholder になったことで draft discussion docs が marker を継承した | A: draft docs も placeholder 化する; B: draft discussion docs は post-render で marker を除去し draft contract に正規化する | B を採用 | discussion draft は canonical planning artifact ではなく、assurance compose の実行対象でもないため marker を持つと誤誘導になる | applied_to_s99 | `tests/cli_runtime/test_new.py` draft artifact regression, manual temp repo flow | none |
+| D-006 | resolved | implementation-boundary | S99 dev-coder / spec-reviewer | trigger permission-denied path が human gate に正規化される際、permission repair action が `human_gate` に潰れていた | A: top-level action は常に `human_gate`; B: permission signal がある場合は `fix_github_token_permissions` を保持する | B を採用 | human gate のままでも operator が直すべき capability が明確になる。trusted base policy fail-closed/no-comment contract は維持される | applied_to_s99 | `test_issue_180_s02_wait_maps_trigger_comment_permission_denied_to_human_gate`, final code review | none |
+| D-007 | resolved | dogfooding-parity | S99 dev-coder / orchestrator | provider runtime/template/agent-tooling を変更したが dogfooding mirror が stale だと focused suite と実運用検証が red になる | A: provider のみ更新; B: provider source of truth に合わせて checked-in dogfooding mirror も同期する | B を採用 | repo の dogfooding rules は provider-side authority と local consumer workspace の parity inspection を要求する | applied_to_s99 | provider/mirror parity diff checks, full focused suite `578 passed, 5 skipped` | none |
 
 ## 証跡採用台帳
 
@@ -114,6 +117,7 @@ ID: "iss-00241"
 | S03 | delegated | runtime / scaffold behavior / tests を含むため | dev-coder | Issue design/plan awaiting-compose placeholder and compose materialization | issue design/plan templates, artifact composer, assurance compose orchestration needed to expose no-overwrite conflicts, focused CLI runtime tests | removing design/plan files, broad validator/active/sync rewrite, S04/S90 docs | focused and broader CLI runtime tests, code-reviewer pass | placeholder cannot satisfy active/sync/validate without broader migration | passed: worker returned bounded S03 diff; D-004 adopted as issue-local implementation-boundary decision |
 | S04 | delegated | docs / lifecycle evidence only, no code changes | doc-writer / SpecDock operator | `iss-00239` supersession evidence for Epic 00224 close-readiness | `iss-00239` report and `iss-00241` report body ledger entries | requirement/design/plan edits, source code changes, metadata front matter edits, deleting `iss-00239` scaffold history | lifecycle command evidence, GitHub issue state inspection, report inspection, spec-reviewer pass before step completion | close command mutates wrong issue, GitHub state contradicts report, reviewer gate not run | passed: S04 evidence recorded; spec-reviewer re-review returned no findings |
 | S90 | delegated | Epic canonical docs / report-only reconciliation, no code changes | doc-writer | Epic current operational contract, corrective issue inclusion ledger, QG-006〜QG-008 traceability, S90 issue report evidence | Epic requirement/design/plan/report and this issue report | source code, tests, templates, skills, historical ADR rewrite, false pass on pending gates | `rg "workflow next" spec-dock/active/epic/{requirement.md,design.md,plan.md,report.md}`, docs diff inspection, traceability ledger inspection | stale current-entrypoint wording remains, trusted base policy contradicts S01/S02, corrective issues or QG ledger omit required pending/formal statuses | passed: S90 docs reconciliation recorded; spec-reviewer returned no findings |
+| S99 | delegated | runtime / tests / dogfooding parity / manual validation を含む final gate のため | dev-coder / orchestrator | S99 focused regression fix, full focused suite, sync/validate, manual guidance/compose validation, final reviewer gates | provider runtime, dogfooding mirrors, focused tests, final report evidence | unrelated refactor, weakening S01 fail-closed policy, reverting S03 placeholder contract, false pass on reviewer gates | focused pytest, sync, validate, stale wording inspection, manual temp repo flow, qa/code/spec reviewer pass | full focused suite red, provider/mirror parity diverges, manual flow cannot materialize placeholder, PR observation permission signal regresses | passed: S99 fixes, validation, and final reviewer gates recorded; ready for Step Commit Gate |
 
 ### Step Contract Closure
 
@@ -127,10 +131,12 @@ ID: "iss-00241"
 | S03 | tc-009 | marker が残った direct edit は conflict / fail-closed になり上書きされない | marker-plus-direct-edit compose test, code-reviewer pass | pass |
 | S04 | tc-006 | `iss-00239` は `iss-00241` に supersede され、unresolved corrective scaffold として Epic 00224 close-readiness を block しない | `iss-00239` report supersession ledger; `./spec-dock/scripts/spec-dock close iss-00239` -> exit 0 with `state=CLOSED already_closed=true`; `gh issue view 239 --json number,state,title,url,closedAt` -> `state=CLOSED`, `closedAt=2026-06-27T05:17:44Z`, `url=https://github.com/chemitaro/spec-dock/issues/239`; spec-reviewer re-review pass | pass |
 | S90 | tc-007 | Epic 正本は `guidance <target>` stdout authority / projection human-debug-only を示し、`workflow next` を current entrypoint として残さない | Epic requirement/design/plan updated; report current operational contract ledger added; `rg "workflow next" ...` returned only historical/superseded hits; spec-reviewer pass | pass |
-| S90 | tc-008 | Epic report は corrective issues と gate status を矛盾なく示す | Epic report includes `iss-00237`, `iss-00238`, `iss-00239`, `iss-00241`; `iss-00239` formal supersede; `iss-00241` pending-final-review; spec-reviewer pass | pass |
-| S90 | tc-010 | Step closure / reviewer gate / commit gate cross-issue audit を false pass なしで記録する | Epic traceability quality gate ledger QG-006 uses `pending-final-review` because S90/S99 reviewer and commit gates remain pending; spec-reviewer pass | pass |
-| S90 | tc-011 | context packet / clean-room / bounded return evidence audit を false pass なしで記録する | Epic traceability quality gate ledger QG-007 uses `pending-final-review` pending final reviewer confirmation; spec-reviewer pass | pass |
-| S90 | tc-012 | Auto-Lite readiness / automatic Lite default disabled / efficiency evidence audit を false pass なしで記録する | Epic traceability quality gate ledger QG-008 uses `pending-final-review` pending final reviewer confirmation; spec-reviewer pass | pass |
+| S90 | tc-008 | Epic report は corrective issues と gate status を矛盾なく示す | Epic report includes `iss-00237`, `iss-00238`, `iss-00239`, `iss-00241`; `iss-00239` formal supersede; `iss-00241` final reviewer pass; spec-reviewer pass | pass |
+| S90 | tc-010 | Step closure / reviewer gate / commit gate cross-issue audit を false pass なしで記録する | Epic traceability quality gate ledger QG-006 now records final pass after S99 reviewer gates; spec-reviewer pass | pass |
+| S90 | tc-011 | context packet / clean-room / bounded return evidence audit を false pass なしで記録する | Epic traceability quality gate ledger QG-007 now records final pass after S99 reviewer gates; spec-reviewer pass | pass |
+| S90 | tc-012 | Auto-Lite readiness / automatic Lite default disabled / efficiency evidence audit を false pass なしで記録する | Epic traceability quality gate ledger QG-008 now records final pass after S99 reviewer gates; spec-reviewer pass | pass |
+| S99 | tc-004 / tc-005 / tc-009 | S03 placeholder / compose / no-overwrite behavior remains valid after S99 regressions | targeted pytest and full focused pytest; manual temp repo new issue -> classify -> compose flow | pass |
+| S99 | tc-007 / tc-008 / tc-010 / tc-011 / tc-012 | final validation confirms guidance contract, corrective issue ledger, and traceability gates are not contradicted by implementation state | `sync`, `validate`, stale wording inspections, qa/code/spec reviewer pass | pass |
 
 ### Test Contract Closure
 
@@ -144,10 +150,14 @@ ID: "iss-00241"
 | tc-009 | S03 | red-required | marker plus direct edit lacked explicit S03 conflict coverage before new test | `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_assurance_compose.py -k "placeholder or substantive or stale_requirement"` | pass: `4 passed, 53 deselected` |
 | tc-006 | S04 | inspect-only | `iss-00239` scaffold history existed, but its unresolved corrective scope had already been absorbed into `iss-00241` | `./spec-dock/scripts/spec-dock close iss-00239`; `gh issue view 239 --json number,state,title,url,closedAt`; report inspection; spec-reviewer re-review | pass: lifecycle command exit 0 and GitHub `#239` closed; no local diff from lifecycle command because GitHub issue was already closed |
 | tc-007 | S90 | inspect-only | Epic docs had stale current-entrypoint wording for `workflow next` / generated projection authority | Epic docs inspection; `rg "workflow next" spec-dock/active/epic/{requirement.md,design.md,plan.md,report.md}`; spec-reviewer | pass: current-entrypoint wording updated; remaining `workflow next` hits are historical/superseded only |
-| tc-008 | S90 | inspect-only | Epic report needed corrective issue inclusion and current close-readiness state | Epic report inspection; spec-reviewer | pass: corrective issue ledger added with pass / formal supersede / pending-final-review statuses |
-| tc-010 | S90 | inspect-only | QG-006 was required as explicit cross-issue audit, not implicit AC-010 coverage | Epic traceability ledger inspection; spec-reviewer | pass: QG-006 recorded as pending-final-review to avoid false pass |
-| tc-011 | S90 | inspect-only | QG-007 was required as explicit context routing evidence audit, not implicit AC-010 coverage | Epic traceability ledger inspection; spec-reviewer | pass: QG-007 recorded as pending-final-review to avoid false pass |
-| tc-012 | S90 | inspect-only | QG-008 was required as explicit Auto-Lite readiness audit, not implicit AC-010 coverage | Epic traceability ledger inspection; spec-reviewer | pass: QG-008 recorded as pending-final-review to avoid false pass |
+| tc-008 | S90 | inspect-only | Epic report needed corrective issue inclusion and current close-readiness state | Epic report inspection; spec-reviewer | pass: corrective issue ledger added with pass / formal supersede / final reviewer statuses |
+| tc-010 | S90 | inspect-only | QG-006 was required as explicit cross-issue audit, not implicit AC-010 coverage | Epic traceability ledger inspection; spec-reviewer | pass: QG-006 recorded as pass after final reviewer confirmation |
+| tc-011 | S90 | inspect-only | QG-007 was required as explicit context routing evidence audit, not implicit AC-010 coverage | Epic traceability ledger inspection; spec-reviewer | pass: QG-007 recorded as pass after final reviewer confirmation |
+| tc-012 | S90 | inspect-only | QG-008 was required as explicit Auto-Lite readiness audit, not implicit AC-010 coverage | Epic traceability ledger inspection; spec-reviewer | pass: QG-008 recorded as pass after final reviewer confirmation |
+| S99-focused | S99 | red-required | first full focused suite exposed 9 failures: stale full scaffold expectations, draft-doc placeholder leakage, dogfooding mirror drift, permission-denied next-action regression | targeted pytest subsets, provider/mirror parity inspections | pass: `2 passed, 43 deselected`; `7 passed, 508 deselected`; parity diffs clean |
+| S99-full | S99 | required | after S99 fixes, full focused suite had one dogfooding `.meta.json` snapshot failure, then snapshot was updated | `uv run pytest tests/unit/infra/test_init_update.py tests/cli_runtime/test_new.py tests/cli_runtime/test_assurance_compose.py tests/cli_runtime/test_workflow.py` | pass: `578 passed, 5 skipped` |
+| S99-sync-validate | S99 | required | final repo projections and validation must be current | `./spec-dock/scripts/spec-dock sync`; `./spec-dock/scripts/spec-dock validate` | pass: sync wrote derived artifacts; validate `nodes=152` |
+| S99-manual | S99 | manual-required | real command flow must preserve Issue execution/guidance behavior | temp git repo with fake `gh`; init, new initiative/epic/issue, requirement edit, active set, classify, compose, guidance issue-execution | pass: design/plan placeholders initially `1`; after compose markers `0`, managed sections `1`; guidance authority/projection counts `1` |
 
 ### Closure Coverage
 
@@ -161,10 +171,13 @@ ID: "iss-00241"
 | tc-009 | EC-004: marker plus direct edit is not overwritten | compose test asserts `substantive_content_conflict` and unchanged artifact text | pass |
 | tc-006 | AC-008: `iss-00239` is superseded by `iss-00241` | `iss-00239` report now records formal supersession without deleting scaffold history; lifecycle close command returned `state=CLOSED already_closed=true`; GitHub `#239` is `CLOSED` with `closedAt=2026-06-27T05:17:44Z`; no local diff was produced by the lifecycle command because the GitHub issue was already closed; spec-reviewer re-review returned no findings | pass |
 | tc-007 | AC-004 / AC-005 / EC-005: guidance stdout authority and projection human/debug-only boundary | Epic requirement/design/plan/report now describe `guidance <target>` stdout as current handoff and projection files as non-canonical human/debug output; spec-reviewer pass | pass |
-| tc-008 | AC-009 / AC-010: Epic report current close-readiness | Epic report records current operational contract, trusted base policy fail-closed behavior, corrective issue inclusion, and remaining final-review gates | ready_for_review |
-| tc-010 | AC-010: step closure / reviewer gate / commit gate cross-issue audit | QG-006 ledger added with pending-final-review, avoiding false pass while S90/S99 gates remain pending; spec-reviewer pass | pass |
-| tc-011 | AC-010: context packet / clean-room / bounded return evidence audit | QG-007 ledger added with pending-final-review and required final reviewer confirmation; spec-reviewer pass | pass |
-| tc-012 | AC-010: Auto-Lite readiness / automatic Lite default disabled / efficiency evidence audit | QG-008 ledger added with pending-final-review; automatic Lite default remains disabled and missing metrics require final gate confirmation; spec-reviewer pass | pass |
+| tc-008 | AC-009 / AC-010: Epic report current close-readiness | Epic report records current operational contract, trusted base policy fail-closed behavior, corrective issue inclusion, and final reviewer pass | pass |
+| tc-010 | AC-010: step closure / reviewer gate / commit gate cross-issue audit | QG-006 ledger added and final reviewer gates passed; spec-reviewer pass | pass |
+| tc-011 | AC-010: context packet / clean-room / bounded return evidence audit | QG-007 ledger added and final reviewer gates passed; spec-reviewer pass | pass |
+| tc-012 | AC-010: Auto-Lite readiness / automatic Lite default disabled / efficiency evidence audit | QG-008 ledger added; automatic Lite default remains disabled; final reviewer gates passed | pass |
+| S99-focused | AC-006 / AC-007 / EC-004: placeholder and compose behavior remains usable in real workflows | new issue placeholder test, compose tests, draft-doc normalization, manual temp repo classify/compose flow | pass |
+| S99-review-policy | AC-001〜AC-003: trusted base review and observation behavior remains aligned | focused suite, permission-denied regression fix, stale fixed-bare-body inspection | pass |
+| S99-final-validation | AC-009 / AC-010: final quality gate evidence | focused suite, sync, validate, stale wording inspections, manual guidance flow, qa/code/spec reviewer pass | pass |
 
 ### Closure Delta
 
@@ -181,7 +194,9 @@ ID: "iss-00241"
 | S03 code review | code-reviewer | fresh uncommitted S03 diff after P1 fix and focused/broader tests | passed | none | S03 eligible for Step Commit Gate |
 | S04 spec review | spec-reviewer | fresh uncommitted S04 report-only diff after final gate pending correction | passed | none | S04 eligible for Step Commit Gate |
 | S90 spec review | spec-reviewer | fresh uncommitted S90 docs/report diff after `workflow next` inspection and `git diff --check` | passed | none | S90 eligible for Step Commit Gate |
-| S90 spec review | spec-reviewer | pending after S90 docs/report reconciliation | ready_for_review | none yet | S90 reviewer gate pending |
+| S99 final QA review | qa-reviewer | fresh uncommitted S99 diff after focused suite, sync/validate, manual flow, and report update | passed | none | S99 eligible for Step Commit Gate |
+| S99 final code review | code-reviewer | fresh uncommitted S99 runtime/test/mirror/report diff after P2 report ledger fix | passed | none | S99 eligible for Step Commit Gate |
+| S99 final spec review | spec-reviewer | fresh uncommitted S99 diff after P1 trigger usage fix and P2 Epic completion reconciliation | passed | none | S99 eligible for Step Commit Gate |
 
 ### Step Commit Gate
 
@@ -191,28 +206,27 @@ ID: "iss-00241"
 | S02 | PR observation skill text and focused text assertion | spec-reviewer pass, no findings, confidence 0.88 | S02 skill-doc/test/report evidence only | committed | S02 scope commit created; exact hash is external git evidence | pass: post-commit `git status --short` clean |
 | S03 | issue design/plan placeholders, compose materialization/no-overwrite behavior, focused CLI runtime tests | code-reviewer pass after one P1 fix, no findings, confidence 0.88 | S03 runtime/template/test/report evidence only | committed | S03 scope commit created; exact hash is external git evidence | pass: post-commit `git status --short` clean except this report amendment |
 | S04 | report-only supersession evidence for `iss-00239` / `iss-00241` | spec-reviewer pass after one P1 fix, no findings, confidence 0.88 | S04 report evidence only | committed | S04 scope commit created; exact hash is external git evidence | pass: post-commit `git status --short` clean |
-| S90 | Epic docs/report reconciliation and `iss-00241` S90 evidence | spec-reviewer pass, no findings, confidence 0.90 | S90 docs/report evidence only | ready_to_commit | pending | pending: commit after S90 reviewer gate |
-| S90 | Epic docs/report reconciliation and S90 issue report evidence | pending spec-reviewer | S90 docs/report only | ready_to_commit | pending | pending: commit after S90 reviewer gate |
+| S90 | Epic docs/report reconciliation and `iss-00241` S90 evidence | spec-reviewer pass, no findings, confidence 0.90 | S90 docs/report evidence only | committed | S90 scope commit created; exact hash is external git evidence | pass: post-commit `git status --short` clean |
+| S99 | final validation fixes, focused suite, sync/validate, manual flow, final report evidence | qa-reviewer pass confidence 0.89; code-reviewer pass confidence 0.86; spec-reviewer pass confidence 0.91 | S99 runtime/test/mirror/report evidence only | committed | S99 scope commit created; exact hash is external git evidence | pass: post-commit `git status --short` clean |
 
 ## 最終品質ゲート
 
 ### ドキュメント影響の解消ステップ S90
 | 対象 | 更新要否 | 担当 | 証跡 | 仕様レビュアー結果 |
 |---|---|---|---|---|
-| Epic requirement/design/plan/report, skill docs, issue reports | yes | doc-writer | planned in S02/S04/S90 | pending |
-| Epic requirement/design/plan/report, issue report | yes | doc-writer | S90 current operational contract / corrective issue / QG ledger reconciliation recorded | ready_for_review |
+| Epic requirement/design/plan/report, skill docs, issue reports | yes | doc-writer / orchestrator | S02/S04/S90/S99 evidence recorded | pass: qa/code/spec reviewer gates passed |
 
 ### 最終 QA ゲート
 | reviewer | 範囲 | integration test decision | evidence | result |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | pending | pending | pending |
+| qa-reviewer | whole issue obligation coverage | focused suite, sync/validate, manual flow, skipped-test assessment | pass: no findings, confidence 0.89 |
 
 ### 最終コードレビューゲート
 | reviewer | 範囲 | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| code-reviewer | runtime / tests / scaffold behavior | pending | 0 | pending |
+| code-reviewer | runtime / tests / scaffold behavior | initial P2 report ledger finding fixed; final re-review findings none | 1 | pass |
 
 ### 最終 spec review ゲート
 | reviewer | 範囲 | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / Epic docs alignment | planning-stage reviews passed before S04/S90/S99 execution; current final gate remains pending until S04 supersession evidence and S90/S99 Epic traceability updates are reviewed | 7 | pending |
+| spec-reviewer | requirement / design / plan / report / Epic docs alignment | final review P1 stale trigger usage and P2 Epic completion reconciliation fixed; final re-review findings none | 9 | pass |
