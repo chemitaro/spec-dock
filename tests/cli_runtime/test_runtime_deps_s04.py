@@ -398,6 +398,114 @@ class TestRuntimeDepsS04:
             }
         ]
 
+    def test_cli_sync_no_github_writes_index_all_raw_direct_edges_for_high_level_source(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            from spec_dock.cli import main
+
+            assert main(["init", str(repo_root)]) == 0
+            marker = {"managed": True, "do_not_edit": True, "edit_via": "spec-dock"}
+            timestamp = "2026-06-27T00:00:00+09:00"
+            initiatives_dir = repo_root / "spec-dock" / "initiatives"
+            _materialize_node(
+                initiatives_dir / "init-local-00001-source-initiative",
+                {
+                    "schema_version": 1,
+                    "type": "initiative",
+                    "id": "init-local-00001",
+                    "title": "Source initiative",
+                    "slug": "source-initiative",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "parent_id": None,
+                    "initiative_id": None,
+                    "epic_id": None,
+                    "depends_on": ["epic-local-00001"],
+                    "_spec_dock": marker,
+                },
+            )
+            _materialize_node(
+                initiatives_dir / "init-local-00002-target-initiative",
+                {
+                    "schema_version": 1,
+                    "type": "initiative",
+                    "id": "init-local-00002",
+                    "title": "Target initiative",
+                    "slug": "target-initiative",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "parent_id": None,
+                    "initiative_id": None,
+                    "epic_id": None,
+                    "depends_on": [],
+                    "_spec_dock": marker,
+                },
+            )
+            _materialize_node(
+                initiatives_dir / "init-local-00002-target-initiative" / "epics" / "epic-local-00001-target-epic",
+                {
+                    "schema_version": 1,
+                    "type": "epic",
+                    "id": "epic-local-00001",
+                    "title": "Target epic",
+                    "slug": "target-epic",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "parent_id": "init-local-00002",
+                    "initiative_id": "init-local-00002",
+                    "epic_id": None,
+                    "github": {"issue_number": 201},
+                    "depends_on": [],
+                    "_spec_dock": marker,
+                },
+            )
+
+            result = _run_runtime_capture(
+                repo_root,
+                ["sync", "--no-github", "--no-update-active"],
+            )
+
+            agent_dir = repo_root / "spec-dock" / ".agent"
+            index_all = json.loads((agent_dir / "index-all.json").read_text(encoding="utf-8"))
+            index_todo = json.loads((agent_dir / "index.json").read_text(encoding="utf-8"))
+            deps_issues = json.loads((agent_dir / "deps-issues.json").read_text(encoding="utf-8"))
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert result.stderr == ""
+            expected_raw_edges = [
+                {
+                    "from": "init-local-00001",
+                    "from_kind": "initiative",
+                    "to": "epic-local-00001",
+                    "to_kind": "epic",
+                    "relation": "raw_direct",
+                }
+            ]
+            assert index_all["deps"]["raw_direct_edges"] == expected_raw_edges
+            assert "raw_direct_edges" not in index_todo
+            assert "raw_direct_edges" not in index_todo["deps"]
+            assert "raw_direct_edges" not in deps_issues
+            assert "raw_direct_edges" not in deps_issues["deps"]
+
+            index_all["nodes"]["epic-local-00001"]["github"] = {
+                "number": None,
+                "state": "closed",
+                "updated_at": "2026-06-27T00:00:00+09:00",
+                "url": None,
+            }
+            _write_json(agent_dir / "index-all.json", index_all)
+
+            closed_result = _run_runtime_capture(
+                repo_root,
+                ["sync", "--no-github", "--no-update-active"],
+            )
+            closed_index_all = json.loads((agent_dir / "index-all.json").read_text(encoding="utf-8"))
+
+            assert closed_result.returncode == 0, closed_result.stdout + closed_result.stderr
+            assert closed_result.stderr == ""
+            assert closed_index_all["nodes"]["epic-local-00001"]["github"]["state"] == "CLOSED"
+            assert closed_index_all["deps"]["raw_direct_edges"] == expected_raw_edges
+
     def test_collect_sync_state_reads_shared_topology_map(self) -> None:
         (
             _runtime_app,
