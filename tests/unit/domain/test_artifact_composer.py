@@ -198,12 +198,12 @@ def test_marker_conflict_stops_without_output_text() -> None:
     duplicate_text = """# Plan
 
 <!-- spec-dock:managed-section begin id="plan.step-contract" -->
-## Step Assurance Contract
+## Step Obligation Contract
 one
 <!-- spec-dock:managed-section end id="plan.step-contract" -->
 
 <!-- spec-dock:managed-section begin id="plan.step-contract" -->
-## Step Assurance Contract
+## Step Obligation Contract
 two
 <!-- spec-dock:managed-section end id="plan.step-contract" -->
 """

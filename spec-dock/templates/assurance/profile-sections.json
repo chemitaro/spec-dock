@@ -24,8 +24,8 @@
     },
     "plan.step-contract": {
       "artifact": "plan",
-      "heading": "## Step Assurance Contract",
-      "body": "- List step closure ids, required evidence level, and the expected verification command.\n- Keep execution one approved step at a time."
+      "heading": "## Step Obligation Contract",
+      "body": "- List each implementation step, pattern, closure ids, required evidence level, and expected verification command.\n- State worker/reviewer obligations in the plan; do not rely on runtime guidance to infer them.\n- Keep execution one approved step at a time."
     },
     "plan.strict-review": {
       "artifact": "plan",

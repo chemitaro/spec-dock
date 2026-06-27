@@ -16,6 +16,7 @@ _MARKER_PATTERN = re.compile(
     r"<!--\s*spec-dock:managed-section\s+"
     r"(?P<edge>begin|end)\s+id=\"(?P<section_id>[a-z0-9._-]+)\"\s*-->"
 )
+_AWAITING_ASSURANCE_COMPOSE_MARKER = "artifact_state: awaiting-assurance-compose"
 
 
 @dataclass(frozen=True)
@@ -142,6 +143,29 @@ def compose_artifact(
             errors=scan.errors,
         )
 
+    placeholder_state = _placeholder_state(text, artifact)
+    if placeholder_state == "conflict":
+        return ComposeArtifactResult(
+            artifact=artifact,
+            authorized_profile=profile_name,
+            lite_candidate=lite_candidate,
+            output_text=None,
+            changed=False,
+            added_section_ids=(),
+            preserved_section_ids=(),
+            warnings=(),
+            errors=(
+                MarkerConflict(
+                    kind="substantive_content_conflict",
+                    section_id="awaiting-assurance-compose",
+                    message=(
+                        f"{artifact}.md contains substantive content outside managed sections; "
+                        "assurance compose will not overwrite it automatically."
+                    ),
+                ),
+            ),
+        )
+
     required_sections = manifest.sections_for(profile_name, artifact)
     added_blocks: list[str] = []
     added_section_ids: list[str] = []
@@ -166,7 +190,11 @@ def compose_artifact(
             errors=(),
         )
 
-    output_text = _append_blocks(text, added_blocks)
+    output_text = (
+        _append_blocks(_strip_placeholder_marker(text), added_blocks)
+        if placeholder_state == "placeholder"
+        else _append_blocks(text, added_blocks)
+    )
     return ComposeArtifactResult(
         artifact=artifact,
         authorized_profile=profile_name,
@@ -311,6 +339,69 @@ def _render_section(section: ManagedSection) -> str:
         f"{body}\n"
         f'<!-- spec-dock:managed-section end id="{section.section_id}" -->'
     )
+
+
+def _placeholder_state(text: str, artifact: ArtifactKind) -> Literal["none", "placeholder", "conflict"]:
+    if artifact == "report":
+        return "none"
+    has_marker = _AWAITING_ASSURANCE_COMPOSE_MARKER in text
+    has_managed_sections = _MARKER_PATTERN.search(text) is not None
+    if has_marker:
+        return "placeholder" if _is_unedited_placeholder(text, artifact) else "conflict"
+    if has_managed_sections or not _has_substantive_body(text):
+        return "none"
+    return "conflict"
+
+
+def _is_unedited_placeholder(text: str, artifact: ArtifactKind) -> bool:
+    frontmatter, body = _split_frontmatter(text)
+    if _AWAITING_ASSURANCE_COMPOSE_MARKER not in frontmatter:
+        return False
+    title = "設計" if artifact == "design" else "実装計画"
+    noun = "設計書" if artifact == "design" else "実装計画"
+    normalized_lines = [line.rstrip() for line in body.strip().splitlines()]
+    if len(normalized_lines) != 8:
+        return False
+    return (
+        normalized_lines[0].startswith("# ")
+        and normalized_lines[0].endswith(f" — {title} placeholder")
+        and normalized_lines[1] == ""
+        and normalized_lines[2] == "このファイルはまだ合成されていません。"
+        and normalized_lines[3] == ""
+        and normalized_lines[4]
+        == "先に `requirement.md` を具体化し、`assurance classify --stage requirement` を実行してください。"
+        and normalized_lines[5]
+        == f"その後、`assurance compose --artifact all` を実行して、この Issue の分類に応じた{noun}テンプレートを合成してください。"
+        and normalized_lines[6] == ""
+        and normalized_lines[7] == f"この状態のまま{title}本文を書き始めないでください。"
+    )
+
+
+def _strip_placeholder_marker(text: str) -> str:
+    frontmatter, _body = _split_frontmatter(text)
+    if not frontmatter:
+        return text
+    frontmatter_lines = [
+        line for line in frontmatter.splitlines() if line.strip() != _AWAITING_ASSURANCE_COMPOSE_MARKER
+    ]
+    return "\n".join(frontmatter_lines).rstrip() + "\n"
+
+
+def _has_substantive_body(text: str) -> bool:
+    _frontmatter, body = _split_frontmatter(text)
+    body = _MARKER_PATTERN.sub("", body)
+    return bool(body.strip())
+
+
+def _split_frontmatter(text: str) -> tuple[str, str]:
+    if not text.startswith("---\n"):
+        return "", text
+    end = text.find("\n---\n", len("---\n"))
+    if end == -1:
+        return "", text
+    frontmatter = text[: end + len("\n---")]
+    body = text[end + len("\n---\n") :]
+    return frontmatter, body
 
 
 def _append_blocks(text: str, blocks: list[str]) -> str:

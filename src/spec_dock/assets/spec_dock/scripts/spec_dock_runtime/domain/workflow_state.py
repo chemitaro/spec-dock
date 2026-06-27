@@ -5,8 +5,8 @@ from typing import Literal
 
 WorkflowStateKind = Literal["no-active", "requirement-capture", "classification-required", "ready", "blocked"]
 WorkflowArtifactReadiness = Literal["missing", "scaffold", "substantive"]
-WorkflowProfile = Literal["lite", "standard", "strict", "critical"]
-WorkflowObligationSource = Literal["authorized_profile"]
+WorkflowProfile = Literal["lite", "standard", "strict", "critical", "unavailable"]
+WorkflowObligationSource = Literal["authorized_profile", "unavailable"]
 
 
 @dataclass(frozen=True)
@@ -30,6 +30,12 @@ STRICT_LEGACY_AUTHORITY = RunbookAuthority(
     authorized_profile="strict",
     lite_candidate=False,
     obligation_source="authorized_profile",
+)
+
+UNAVAILABLE_AUTHORITY = RunbookAuthority(
+    authorized_profile="unavailable",
+    lite_candidate=False,
+    obligation_source="unavailable",
 )
 
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from spec_dock_runtime.domain.workflow_state import RunbookAuthority, WorkflowState
@@ -23,17 +23,12 @@ class Runbook:
     stop_conditions: tuple[str, ...]
     details: tuple[str, ...]
     active_issue_id: str | None
-    step_assurance: dict[str, Any] | None = None
-    context_packets: dict[str, Any] | None = None
+    may_execute_approved_plan: bool = False
+    contract_source: str | None = None
+    evidence_ledger: str | None = None
 
 
-def compile_runbook(
-    target: WorkflowTarget,
-    state: WorkflowState,
-    *,
-    step_assurance: dict[str, Any] | None = None,
-    context_packets: dict[str, Any] | None = None,
-) -> Runbook:
+def compile_runbook(target: WorkflowTarget, state: WorkflowState) -> Runbook:
     if state.kind == "no-active":
         return _runbook(
             target,
@@ -70,21 +65,7 @@ def compile_runbook(
             stop_conditions=("Do not start implementation until assurance verification succeeds.",),
         )
     if state.kind == "blocked":
-        if state.reason_code == "context-packet-write-failure":
-            return _runbook(
-                target,
-                state,
-                next_action="context-packet-repair-required",
-                commands=(
-                    "./spec-dock/scripts/spec-dock active show",
-                    "Inspect and repair spec-dock/.agent/context-packets before rerunning guidance.",
-                ),
-                notes=("Context packet write failed; repair the agent handoff packet storage before continuing.",),
-                stop_conditions=("Do not continue issue execution until context packets can be written.",),
-                step_assurance=step_assurance,
-                context_packets=context_packets,
-            )
-        if state.reason_code == "workflow-plan-unselectable":
+        if state.reason_code in {"plan-missing", "plan-not-executable"}:
             return _runbook(
                 target,
                 state,
@@ -93,36 +74,54 @@ def compile_runbook(
                     "./spec-dock/scripts/spec-dock active show",
                     "Edit spec-dock/active/issue/plan.md",
                 ),
-                notes=("The active issue plan has no selectable implementation step.",),
-                stop_conditions=("Do not continue issue execution until the plan contains structured steps.",),
-                step_assurance=step_assurance,
-                context_packets=context_packets,
+                notes=("The active issue plan is not an executable workflow contract.",),
+                stop_conditions=(
+                    "Do not continue issue execution until plan.md contains executable step obligations.",
+                ),
             )
         return _runbook(
             target,
             state,
-            next_action="runbook-projection-repair-required",
+            next_action="issue-planning-required",
             commands=(
-                "./spec-dock/scripts/spec-dock doctor",
-                "Remove stale spec-dock/.agent/runbooks/*.tmp files if present.",
+                "./spec-dock/scripts/spec-dock active show",
+                "Inspect spec-dock/active/issue/requirement.md spec-dock/active/issue/design.md spec-dock/active/issue/plan.md",
             ),
-            notes=("Runbook projection write failed; repair generated output storage before continuing.",),
-            stop_conditions=("Do not continue from a Runbook whose projection could not be written.",),
-            step_assurance=step_assurance,
-            context_packets=context_packets,
+            notes=("The active issue is blocked by a workflow preflight condition.",),
+            stop_conditions=("Do not continue issue execution until the blocking condition is resolved.",),
+        )
+    if target == "issue-execution":
+        return _runbook(
+            target,
+            state,
+            next_action="execute-approved-plan",
+            commands=(
+                "./spec-dock/scripts/spec-dock active show",
+                "./spec-dock/scripts/spec-dock assurance verify",
+            ),
+            notes=(
+                f"Use authorized_profile={state.authority.authorized_profile} as the obligation authority.",
+                "Execute the approved plan.md in order; record observed evidence in report.md.",
+                "lite_candidate is telemetry only unless authorized_profile is lite.",
+            ),
+            stop_conditions=(
+                "Do not reduce obligations based only on lite_candidate.",
+                "Do not infer the next step, worker, reviewer, verification, or context packet from runtime guidance.",
+            ),
+            may_execute_approved_plan=True,
+            contract_source="spec-dock/active/issue/plan.md",
+            evidence_ledger="spec-dock/active/issue/report.md",
         )
     return _runbook(
         target,
         state,
-        next_action="execution-ready" if target == "issue-execution" else "planning-ready",
+        next_action="planning-ready",
         commands=("./spec-dock/scripts/spec-dock active show",),
         notes=(
             f"Use authorized_profile={state.authority.authorized_profile} as the obligation authority.",
             "lite_candidate is telemetry only unless authorized_profile is lite.",
         ),
         stop_conditions=("Do not reduce obligations based only on lite_candidate.",),
-        step_assurance=step_assurance,
-        context_packets=context_packets,
     )
 
 
@@ -134,8 +133,9 @@ def _runbook(
     commands: tuple[str, ...],
     notes: tuple[str, ...],
     stop_conditions: tuple[str, ...],
-    step_assurance: dict[str, Any] | None = None,
-    context_packets: dict[str, Any] | None = None,
+    may_execute_approved_plan: bool = False,
+    contract_source: str | None = None,
+    evidence_ledger: str | None = None,
 ) -> Runbook:
     return Runbook(
         schema_version=WORKFLOW_RUNBOOK_SCHEMA_VERSION,
@@ -149,6 +149,7 @@ def _runbook(
         stop_conditions=stop_conditions,
         details=state.details,
         active_issue_id=state.active_issue_id,
-        step_assurance=step_assurance,
-        context_packets=context_packets,
+        may_execute_approved_plan=may_execute_approved_plan,
+        contract_source=contract_source,
+        evidence_ledger=evidence_ledger,
     )

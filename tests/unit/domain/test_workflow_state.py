@@ -31,7 +31,10 @@ def test_lite_candidate_with_standard_authority_does_not_reduce_obligations() ->
     assert runbook.authority.obligation_source == "authorized_profile"
     assert runbook.authority.authorized_profile == "standard"
     assert runbook.authority.lite_candidate is True
-    assert runbook.next_action == "execution-ready"
+    assert runbook.next_action == "execute-approved-plan"
+    assert runbook.may_execute_approved_plan is True
+    assert runbook.contract_source == "spec-dock/active/issue/plan.md"
+    assert runbook.evidence_ledger == "spec-dock/active/issue/report.md"
     joined = "\n".join([*runbook.commands, *runbook.notes, *runbook.stop_conditions]).lower()
     assert "lite procedure" not in joined
     assert "lite-only" not in joined

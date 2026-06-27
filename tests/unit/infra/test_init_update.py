@@ -1208,6 +1208,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00238-stdout-runbook-handoff-instead-of-generated-workflow-files/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00239-compose-issue-planning-templates-after-assurance-classification/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00241-resolve-epic-traceability-and-review-policy-gate-gaps/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1456,6 +1457,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00238-stdout-runbook-handoff-instead-of-generated-workflow-files/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00239-compose-issue-planning-templates-after-assurance-classification/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00241-resolve-epic-traceability-and-review-policy-gate-gaps/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -2013,7 +2015,8 @@ class TestInitUpdate(CliRuntimeHarness):
             "state-specific generated Runbook text",
             "It is not canonical authority",
             "must not be edited as source of truth",
-            "Register the returned `state`, `next_action`, commands, stop conditions, selected step when present, and verification / reviewer gate when present in your task checklist",
+            "Register the returned `state`, `next_action`, `reason_code`, `authority`",
+            "Do not expect or derive",
             "canonical docs",
             "current-runbook.*",
             "Do not read, edit, or manage them as handoff authority",
@@ -2039,6 +2042,8 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "spec-dock/docs/workflow_clarification.md" in execution_text
         assert "spec-dock/docs/phase_plan_issue.md" in execution_text
         assert "spec-dock/docs/authoring/issue-plan.md" in execution_text
+        assert "`may_execute_approved_plan`" in execution_text
+        assert "implementation step" in execution_text
         assert "`authorized_profile` as the obligation authority" in execution_text
         assert "`lite_candidate` is not authority and must not reduce obligations by itself" in execution_text
         assert "lite_candidate can reduce" not in execution_text.lower()

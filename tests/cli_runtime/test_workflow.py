@@ -71,7 +71,8 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert "state: ready" in result.stdout
             assert "reason_code: strict-legacy-missing-assurance" in result.stdout
             assert "authorized_profile=strict" in result.stdout
-            assert "execution-ready" in result.stdout
+            assert "execute-approved-plan" in result.stdout
+            assert "may_execute_approved_plan: true" in result.stdout
 
     def test_guidance_malformed_assurance_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -90,8 +91,9 @@ class TestCliWorkflow(CliRuntimeHarness):
             payload = self._read_projected_runbook(target)
             assert payload["state"] == "classification-required"
             assert payload["reason_code"] == "authority-invalid"
-            assert payload["authority"]["obligation_source"] == "authorized_profile"
-            assert payload["authority"]["authorized_profile"] == "strict"
+            assert payload["may_execute_approved_plan"] is False
+            assert payload["authority"]["obligation_source"] == "unavailable"
+            assert payload["authority"]["authorized_profile"] == "unavailable"
             assert payload["details"]
 
             markdown = self._run_runtime_capture(
@@ -130,6 +132,7 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Ready issue")
             self._write_substantive_requirement(issue_dir)
+            self._write_executable_plan(issue_dir)
             classify = self._run_runtime_capture(
                 target,
                 ["assurance", "classify", "--stage", "requirement", "--format", "json"],
@@ -142,8 +145,8 @@ class TestCliWorkflow(CliRuntimeHarness):
             payload = json.loads(result.stdout)
             assert payload["state"] == "ready"
             assert payload["reason_code"] == "assurance-valid"
-        assert payload["authority"]["authorized_profile"] == "standard"
-        assert payload["authority"]["obligation_source"] == "authorized_profile"
+            assert payload["authority"]["authorized_profile"] == "standard"
+            assert payload["authority"]["obligation_source"] == "authorized_profile"
 
     @pytest.mark.parametrize("filename", ["requirement.md", "design.md", "plan.md"])
     def test_guidance_blocks_stale_source_binding(self, filename: str) -> None:
@@ -152,6 +155,7 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Stale issue")
             self._write_substantive_requirement(issue_dir)
+            self._write_executable_plan(issue_dir)
             classify = self._run_runtime_capture(
                 target,
                 ["assurance", "classify", "--stage", "requirement", "--format", "json"],
@@ -186,6 +190,7 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["state"] == "classification-required"
             assert payload["reason_code"] == "authority-invalid"
             assert payload["next_action"] == "assurance-classification-required"
+            assert payload["may_execute_approved_plan"] is False
             assert filename.removesuffix(".md") in " ".join(payload["details"])
 
     def test_guidance_writes_ignored_runbook_projection_without_tracked_diff(self) -> None:
@@ -267,6 +272,7 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["active_issue_id"] == "iss-00301"
             assert payload["state"] == "ready"
             assert payload["next_action"] == "planning-ready"
+            assert payload["may_execute_approved_plan"] is False
 
     def _read_projected_runbook(self, target: Path) -> dict:
         return json.loads((target / "spec-dock/.agent/runbooks/current-runbook.json").read_text(encoding="utf-8"))

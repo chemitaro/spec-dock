@@ -138,6 +138,9 @@ def _runbook_payload(runbook: Runbook) -> dict[str, Any]:
         "next_action": runbook.next_action,
         "reason_code": runbook.reason_code,
         "active_issue_id": runbook.active_issue_id,
+        "may_execute_approved_plan": runbook.may_execute_approved_plan,
+        "contract_source": runbook.contract_source,
+        "evidence_ledger": runbook.evidence_ledger,
         "authority": {
             "authorized_profile": runbook.authority.authorized_profile,
             "lite_candidate": runbook.authority.lite_candidate,
@@ -148,10 +151,6 @@ def _runbook_payload(runbook: Runbook) -> dict[str, Any]:
         "stop_conditions": list(runbook.stop_conditions),
         "details": list(runbook.details),
     }
-    if runbook.step_assurance is not None:
-        payload["step_assurance"] = runbook.step_assurance
-    if runbook.context_packets is not None:
-        payload["context_packets"] = runbook.context_packets
     return payload
 
 
@@ -166,6 +165,7 @@ def _runbook_markdown(runbook: Runbook) -> str:
         f"- next_action: {runbook.next_action}",
         f"- reason_code: {runbook.reason_code}",
         f"- active_issue: {runbook.active_issue_id or '(none)'}",
+        f"- may_execute_approved_plan: {'true' if runbook.may_execute_approved_plan else 'false'}",
         "- authority: "
         f"authorized_profile={runbook.authority.authorized_profile}, "
         f"lite_candidate={'true' if runbook.authority.lite_candidate else 'false'}, "
@@ -176,31 +176,15 @@ def _runbook_markdown(runbook: Runbook) -> str:
     lines.extend(f"- `{command}`" for command in runbook.commands)
     lines.extend(["", "## Notes"])
     lines.extend(f"- {note}" for note in runbook.notes)
+    if runbook.contract_source is not None or runbook.evidence_ledger is not None:
+        lines.extend(["", "## Contract"])
+        if runbook.contract_source is not None:
+            lines.append(f"- contract_source: {runbook.contract_source}")
+        if runbook.evidence_ledger is not None:
+            lines.append(f"- evidence_ledger: {runbook.evidence_ledger}")
     if runbook.details:
         lines.extend(["", "## Details"])
         lines.extend(f"- {detail}" for detail in runbook.details)
-    if runbook.step_assurance is not None:
-        selected = runbook.step_assurance.get("selected_step", {})
-        lines.extend([
-            "",
-            "## Step Assurance",
-            f"- selected_step: {selected.get('id', '(unknown)')}",
-            f"- worker: {runbook.step_assurance.get('worker')}",
-            f"- reasoning_effort: {runbook.step_assurance.get('reasoning_effort')}",
-            f"- context_mode: {runbook.step_assurance.get('context_mode')}",
-            f"- verification: {', '.join(runbook.step_assurance.get('verification', []))}",
-            f"- reviewers: {', '.join(runbook.step_assurance.get('reviewers', []))}",
-        ])
-    if runbook.context_packets is not None:
-        lines.extend(["", "## Context Packets"])
-        lines.append(f"- written: {'true' if runbook.context_packets.get('written') else 'false'}")
-        for ref in runbook.context_packets.get("refs", []):
-            path = ref.get("path") or "(missing)"
-            missing_reason = ref.get("missing_reason")
-            if missing_reason:
-                lines.append(f"- `{path}` missing_reason={missing_reason}")
-            else:
-                lines.append(f"- `{path}` sha256={ref.get('sha256')}")
     lines.extend(["", "## Stop Conditions"])
     lines.extend(f"- {condition}" for condition in runbook.stop_conditions)
     lines.extend([
