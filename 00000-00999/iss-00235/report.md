@@ -638,6 +638,102 @@ pass
 
 ---
 
+### セッションログ（2026-06-27 S06）
+
+#### 対象
+- Step: S06 Issue-Source High-Level Target Regression
+- AC/EC: AC-004, EC-002
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `実装ステップ S06 — Issue-Source High-Level Target Regression`
+  - closure ids: `cl-ac004-issue-regression`, `cl-ec002-non-empty-source`
+
+#### 実施内容
+- 既存 issue-source -> high-level target の blocker / satisfied semantics に `direct_node_dependencies` が混入しないことを domain/application tests に追加した。
+- non-empty high-level source の direct status と descendant issue readiness projection が別 field で観測できることを public CLI runtime test に追加した。
+- S06 は test-only regression coverage として完了し、runtime/source implementation は変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/domain/test_deps.py tests/unit/application/test_check_deps.py tests/cli_runtime/test_runtime_deps_s04.py
+
+72 passed in 1.33s
+```
+
+```bash
+git diff --check
+
+pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S06 | 赤フェーズ | covered-existing / regression characterization | dev-coder reported pre-change characterization command passed with 71 tests; S06 adds regression coverage without known failing behavior. | delegated worker record | pass | No fabricated Red; regression hardening step. |
+| S06 | 緑フェーズ | regression matrix passes required tests | `uv run pytest tests/unit/domain/test_deps.py tests/unit/application/test_check_deps.py tests/cli_runtime/test_runtime_deps_s04.py` -> 72 passed in 1.33s | command | pass | Parent-run verification on current worktree. |
+| S06 | リファクタリング | guardrail satisfied | Diff stayed within allowed test files; no implementation files, `effective_depends_on` semantic expansion, or snapshot churn. | diff inspection | pass | `git diff --check` passed. |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S06 | CLI non-empty high-level source regression for separate `dependency_contexts` and `direct_node_dependencies`. | implementation | added public CLI runtime test | cl-ec002-non-empty-source | no | `tests/cli_runtime/test_runtime_deps_s04.py` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S06 | cl-ac004-issue-regression | issue-source high-level target blocker/satisfied semantics remain covered. | Domain/application tests assert issue-source contexts keep `direct_node_dependencies == []` and existing readiness outcomes. | pass | Protects existing issue-source axis. |
+| S06 | cl-ec002-non-empty-source | non-empty source direct status remains separate from descendant issue readiness. | CLI test asserts `effective_depends_on` / `dependency_contexts` and `direct_node_dependencies` are separate payload fields. | pass | Direct source edge remains visible without changing `effective_depends_on` meaning. |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| cl-ac004-issue-regression | S06 | yes | characterization | delegated pre-change command passed with 71 tests | `uv run pytest tests/unit/domain/test_deps.py tests/unit/application/test_check_deps.py tests/cli_runtime/test_runtime_deps_s04.py` | pass, 72 passed in 1.33s | Regression hardening. |
+| cl-ec002-non-empty-source | S06 | yes | characterization | delegated pre-change command passed with 71 tests | `uv run pytest tests/unit/domain/test_deps.py tests/unit/application/test_check_deps.py tests/cli_runtime/test_runtime_deps_s04.py` | pass, 72 passed in 1.33s | Public CLI non-empty source regression. |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| cl-ac004-issue-regression | S06 | domain/application tests | pass | Existing issue-source behavior protected. |
+| cl-ec002-non-empty-source | S06 | CLI runtime test | pass | Separation of direct node dependency status from issue readiness projection. |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | S06 | N/A | N/A | Planned closure ids were used as-is. | no | no |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S06 | delegated | regression coverage | dev-coder | S06 Issue-Source High-Level Target Regression | `plan.md` S06 | domain/application/CLI runtime test files | broad snapshot churn, `effective_depends_on` semantic expansion, unrelated implementation refactor | `uv run pytest tests/unit/domain/test_deps.py tests/unit/application/test_check_deps.py tests/cli_runtime/test_runtime_deps_s04.py` | semantics conflict or implementation defect requiring broader scope | changed files, regression matrix, verification, no-decision statement | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S06 | dev-coder | Added regression assertions for issue-source high-level target semantics and CLI non-empty source separation. | `tests/unit/domain/test_deps.py`, `tests/unit/application/test_check_deps.py`, `tests/cli_runtime/test_runtime_deps_s04.py` | delegated: required command -> 72 passed; parent: required command -> 72 passed | fresh review passed | S07 non-goal boundary hardening remains pending | accepted for commit gate |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S06 | step reviewer | code-reviewer | fresh | passed | no | proceed to commit gate | Fresh code-reviewer pass, confidence 0.88. |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S06 | committed | S06 test/report files | S06 test commit, amended with this final commit-gate evidence | `git status --short --branch` -> clean after S06 commit before final evidence amendment; clean check must be rerun after amend | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `tests/unit/domain/test_deps.py` - issue-source regression assertion.
+- `tests/unit/application/test_check_deps.py` - issue-source regression assertions.
+- `tests/cli_runtime/test_runtime_deps_s04.py` - non-empty source CLI regression.
+- `spec-dock/active/issue/report.md` - S06 observed evidence ledger.
+
+#### コミット
+- S06 test commit amended with final commit-gate evidence.
+
+#### メモ
+- No material implementation decisions beyond the approved plan.
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
