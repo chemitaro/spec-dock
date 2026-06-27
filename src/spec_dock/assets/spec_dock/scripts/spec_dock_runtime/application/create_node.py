@@ -1242,11 +1242,7 @@ def _normalize_draft_discussion_text(rendered_text: str, *, doc_type: str) -> st
     heading_prefix = current_heading.split(" — ", 1)[0] if current_heading.startswith("# ") else "# <SCOPE_ID>"
     if doc_type == "draft-design":
         body = (
-            f"{heading_prefix} — 設計（どう実現するか）\n\n"
-            "## 目的・制約\n"
-            "- ...\n\n"
-            "## 採用方針 / トレードオフ\n"
-            "- ...\n"
+            f"{heading_prefix} — 設計（どう実現するか）\n\n## 目的・制約\n- ...\n\n## 採用方針 / トレードオフ\n- ...\n"
         )
     elif doc_type == "draft-plan":
         body = (
