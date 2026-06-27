@@ -222,6 +222,38 @@ def _build_issue_edges_from_deps_state(
     return fallback_edges
 
 
+def _build_raw_direct_edges(result: SyncStateResult) -> list[dict[str, str]]:
+    graph_nodes = result.graph.nodes_by_id
+    edges: list[dict[str, str]] = []
+    seen_edges: set[tuple[str, str]] = set()
+    for source_id in _sort_ids(list(result.raw_node_depends_on_map.keys())):
+        source_node = graph_nodes.get(source_id)
+        if source_node is None:
+            continue
+        target_ids = _sort_ids([
+            target_id
+            for target_id in result.raw_node_depends_on_map.get(source_id, [])
+            if isinstance(target_id, str)
+        ])
+        for target_id in target_ids:
+            target_node = graph_nodes.get(target_id)
+            if target_node is None:
+                continue
+            edge_key = (source_id, target_id)
+            if edge_key in seen_edges:
+                continue
+            seen_edges.add(edge_key)
+            edges.append({
+                "from": source_id,
+                "from_kind": source_node.kind,
+                "to": target_id,
+                "to_kind": target_node.kind,
+                "relation": "raw_direct",
+            })
+    edges.sort(key=lambda item: (_sort_key(item["from"]), _sort_key(item["to"])))
+    return edges
+
+
 def _issue_raw_state(result: SyncStateResult, issue_id: str) -> str:
     status_snapshot = result.issue_statuses.get(issue_id)
     status = status_snapshot.effective_status.lower() if status_snapshot is not None else "unknown"
@@ -598,6 +630,10 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
         "issue_edges": list(deps_issue_edges_all),
         "edge_direction": "depends_on (dependent -> prerequisite)",
     }
+    deps_top_index_all = {
+        **deps_top_all,
+        "raw_direct_edges": _build_raw_direct_edges(result),
+    }
     deps_issue_edges_todo = [
         edge for edge in deps_issue_edges_all if edge.get("from") in todo_issue_set and edge.get("to") in todo_issue_set
     ]
@@ -618,7 +654,7 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
     payload_all = {
         **common,
         "projection": FULL_HISTORY_PROJECTION,
-        "deps": deps_top_all,
+        "deps": deps_top_index_all,
         "nodes": nodes_all,
     }
     payload_todo = {
