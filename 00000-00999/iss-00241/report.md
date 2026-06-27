@@ -111,6 +111,7 @@ ID: "iss-00241"
 | S01 | delegated | runtime / tests / shipped asset behavior を含むため | dev-coder | Trusted review trigger failure path only | provider/dogfooding `trigger_codex_review.sh`, focused trigger tests | head policy fallback, caller-provided body, broad PR observation refactor, S02+ docs/templates | focused pytest, provider/dogfooding script parity, code-reviewer pass | fake gh POST なし判定不能、JSON consumer impact不明 | passed: worker returned bounded S01 diff, no material decisions beyond approved plan |
 | S02 | delegated | shipped skill text / public contract と text assertion を含むため | doc-writer | PR observation skill contract wording only | provider/dogfooding `github-pr-observation/SKILL.md`, focused text assertion | runtime script changes, PR trigger behavior changes, S03+ templates/docs | focused pytest, stale wording inspection, provider/dogfooding skill parity, spec-reviewer pass | S01 behavior と skill wording が一致しない | passed: worker returned bounded S02 diff, no material decisions beyond approved plan |
 | S03 | delegated | runtime / scaffold behavior / tests を含むため | dev-coder | Issue design/plan awaiting-compose placeholder and compose materialization | issue design/plan templates, artifact composer, assurance compose orchestration needed to expose no-overwrite conflicts, focused CLI runtime tests | removing design/plan files, broad validator/active/sync rewrite, S04/S90 docs | focused and broader CLI runtime tests, code-reviewer pass | placeholder cannot satisfy active/sync/validate without broader migration | passed: worker returned bounded S03 diff; D-004 adopted as issue-local implementation-boundary decision |
+| S04 | delegated | docs / lifecycle evidence only, no code changes | doc-writer / SpecDock operator | `iss-00239` supersession evidence for Epic 00224 close-readiness | `iss-00239` report and `iss-00241` report body ledger entries | requirement/design/plan edits, source code changes, metadata front matter edits, deleting `iss-00239` scaffold history | lifecycle command evidence, GitHub issue state inspection, report inspection, spec-reviewer pass before step completion | close command mutates wrong issue, GitHub state contradicts report, reviewer gate not run | passed: S04 evidence recorded; spec-reviewer re-review returned no findings |
 
 ### Step Contract Closure
 
@@ -122,6 +123,7 @@ ID: "iss-00241"
 | S03 | tc-004 | new issue の design / plan は awaiting-assurance-compose placeholder | new issue CLI test, broader S03 runtime test, code-reviewer pass | pass |
 | S03 | tc-005 | compose は placeholder を materialize し、substantive content を上書きしない | compose placeholder/no-overwrite tests, broader S03 runtime test, code-reviewer pass | pass |
 | S03 | tc-009 | marker が残った direct edit は conflict / fail-closed になり上書きされない | marker-plus-direct-edit compose test, code-reviewer pass | pass |
+| S04 | tc-006 | `iss-00239` は `iss-00241` に supersede され、unresolved corrective scaffold として Epic 00224 close-readiness を block しない | `iss-00239` report supersession ledger; `./spec-dock/scripts/spec-dock close iss-00239` -> exit 0 with `state=CLOSED already_closed=true`; `gh issue view 239 --json number,state,title,url,closedAt` -> `state=CLOSED`, `closedAt=2026-06-27T05:17:44Z`, `url=https://github.com/chemitaro/spec-dock/issues/239`; spec-reviewer re-review pass | pass |
 
 ### Test Contract Closure
 
@@ -133,6 +135,7 @@ ID: "iss-00241"
 | tc-004 | S03 | red-required | dev-coder characterization: new issue still produced normal scaffold, not placeholder | `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_assurance_compose.py -k "placeholder or substantive or stale_requirement"` | pass: `4 passed, 53 deselected` |
 | tc-005 | S03 | red-required | dev-coder characterization: substantive non-placeholder content was not exposed as the planned compose no-overwrite conflict; reviewer follow-up found placeholder body remained after compose (`1 failed, 3 passed`) | `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_assurance_compose.py tests/cli_runtime/test_workflow.py -k "issue or compose or guidance"` | pass: `32 passed, 2 skipped, 34 deselected` |
 | tc-009 | S03 | red-required | marker plus direct edit lacked explicit S03 conflict coverage before new test | `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_assurance_compose.py -k "placeholder or substantive or stale_requirement"` | pass: `4 passed, 53 deselected` |
+| tc-006 | S04 | inspect-only | `iss-00239` scaffold history existed, but its unresolved corrective scope had already been absorbed into `iss-00241` | `./spec-dock/scripts/spec-dock close iss-00239`; `gh issue view 239 --json number,state,title,url,closedAt`; report inspection; spec-reviewer re-review | pass: lifecycle command exit 0 and GitHub `#239` closed; no local diff from lifecycle command because GitHub issue was already closed |
 
 ### Closure Coverage
 
@@ -144,6 +147,7 @@ ID: "iss-00241"
 | tc-004 | AC-006: new issue design/plan are assurance compose placeholders | new issue test asserts `artifact_state: awaiting-assurance-compose`, `assurance classify --stage requirement`, `assurance compose --artifact all`, and no managed sections yet | pass |
 | tc-005 | AC-007: compose safely materializes placeholder / does not overwrite substantive content | compose tests assert marker and placeholder body are removed, managed sections are added, substantive non-placeholder content remains unchanged on conflict | pass |
 | tc-009 | EC-004: marker plus direct edit is not overwritten | compose test asserts `substantive_content_conflict` and unchanged artifact text | pass |
+| tc-006 | AC-008: `iss-00239` is superseded by `iss-00241` | `iss-00239` report now records formal supersession without deleting scaffold history; lifecycle close command returned `state=CLOSED already_closed=true`; GitHub `#239` is `CLOSED` with `closedAt=2026-06-27T05:17:44Z`; no local diff was produced by the lifecycle command because the GitHub issue was already closed; spec-reviewer re-review returned no findings | pass |
 
 ### Closure Delta
 
@@ -158,14 +162,16 @@ ID: "iss-00241"
 | S01 code review | code-reviewer | fresh uncommitted S01 diff after focused tests | passed | none | S01 eligible for Step Commit Gate |
 | S02 spec review | spec-reviewer | fresh uncommitted S02 diff after focused tests and inspections | passed | none | S02 eligible for Step Commit Gate |
 | S03 code review | code-reviewer | fresh uncommitted S03 diff after P1 fix and focused/broader tests | passed | none | S03 eligible for Step Commit Gate |
+| S04 spec review | spec-reviewer | fresh uncommitted S04 report-only diff after final gate pending correction | passed | none | S04 eligible for Step Commit Gate |
 
 ### Step Commit Gate
 
 | step | review scope | step reviewer verdict | commit scope | closure state | commit evidence | post-commit clean check |
 |---|---|---|---|---|---|---|
 | S01 | trigger helper scripts and focused trigger tests | code-reviewer pass, no findings, confidence 0.89 | S01 runtime/test/report evidence only | committed | S01 scope commit created; exact hash is external git evidence | pass: post-commit `git status --short` clean |
-| S02 | PR observation skill text and focused text assertion | spec-reviewer pass, no findings, confidence 0.88 | pending | ready_to_commit | pending | pending |
+| S02 | PR observation skill text and focused text assertion | spec-reviewer pass, no findings, confidence 0.88 | S02 skill-doc/test/report evidence only | committed | S02 scope commit created; exact hash is external git evidence | pass: post-commit `git status --short` clean |
 | S03 | issue design/plan placeholders, compose materialization/no-overwrite behavior, focused CLI runtime tests | code-reviewer pass after one P1 fix, no findings, confidence 0.88 | S03 runtime/template/test/report evidence only | committed | S03 scope commit created; exact hash is external git evidence | pass: post-commit `git status --short` clean except this report amendment |
+| S04 | report-only supersession evidence for `iss-00239` / `iss-00241` | spec-reviewer pass after one P1 fix, no findings, confidence 0.88 | S04 report evidence only | ready_to_commit | pending | pending: commit after S04 reviewer gate |
 
 ## 最終品質ゲート
 
@@ -187,4 +193,4 @@ ID: "iss-00241"
 ### 最終 spec review ゲート
 | reviewer | 範囲 | findings / fixes | re-review count | result |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / Epic docs alignment | attempt 1: delegation contract / seeds / evidence path findings; attempt 2: EAL path finding; attempt 3: EC-004 marker-preserved direct-edit coverage finding; pre-amendment final: no findings; post-amendment attempt 1: missing-metrics gate wording and reviewer-pass ledger findings; post-amendment attempt 2: current-readiness ledger finding; post-amendment attempt 3: stale implementation-ready memo finding; post-amendment final: no findings; fresh comprehensive Epic coverage review: no findings | 7 | pass |
+| spec-reviewer | requirement / design / plan / report / Epic docs alignment | planning-stage reviews passed before S04/S90/S99 execution; current final gate remains pending until S04 supersession evidence and S90/S99 Epic traceability updates are reviewed | 7 | pending |
