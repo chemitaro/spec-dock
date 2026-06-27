@@ -58,6 +58,23 @@ def _deps_dependency_context_payload(context: object) -> dict[str, object]:
     }
 
 
+def _deps_direct_node_dependency_payload(dependency: object) -> dict[str, object]:
+    raw_target_issue_ids = _object_value(dependency, "target_issue_ids", ())
+    target_issue_ids = raw_target_issue_ids if isinstance(raw_target_issue_ids, (list, tuple)) else ()
+    return {
+        "source_node_id": _object_value(dependency, "source_node_id", ""),
+        "source_node_kind": _object_value(dependency, "source_node_kind", ""),
+        "target_node_id": _object_value(dependency, "target_node_id", ""),
+        "target_node_kind": _object_value(dependency, "target_node_kind", ""),
+        "target_issue_ids": list(target_issue_ids),
+        "expansion": _object_value(dependency, "expansion", ""),
+        "lifecycle_state": _object_value(dependency, "lifecycle_state", None),
+        "lifecycle_source": _object_value(dependency, "lifecycle_source", None),
+        "dependency_disposition": _object_value(dependency, "dependency_disposition", None),
+        "disposition_basis": _object_value(dependency, "disposition_basis", None),
+    }
+
+
 def render_deps_check_json(result: DepsCheckResult) -> str:
     inspection = result.inspection
     target_id = inspection.target_id.value
@@ -85,6 +102,9 @@ def render_deps_check_json(result: DepsCheckResult) -> str:
         ],
         "dependency_contexts": [
             _deps_dependency_context_payload(context) for context in inspection.evaluation.dependency_contexts
+        ],
+        "direct_node_dependencies": [
+            _deps_direct_node_dependency_payload(dependency) for dependency in inspection.direct_node_dependencies
         ],
         "nodes": {
             node_id: {
@@ -406,7 +426,7 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
         else []
     )
 
-    nodes_all: dict[str, object] = {}
+    nodes_all: dict[str, dict[str, object]] = {}
     for node_id in _sort_ids(list(graph_nodes.keys())):
         node = graph_nodes[node_id]
         item: dict[str, object] = {
@@ -537,7 +557,7 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
     todo_initiative_set = set(todo_initiative_ids)
     todo_node_ids = todo_issue_set | todo_epic_set | todo_initiative_set
 
-    nodes_todo: dict[str, object] = {}
+    nodes_todo: dict[str, dict[str, object]] = {}
     for node_id in _sort_ids(list(todo_node_ids)):
         base = nodes_all.get(node_id)
         if not isinstance(base, dict):
@@ -599,7 +619,13 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
         **common,
         "projection": FULL_HISTORY_PROJECTION,
         "deps": deps_top_all,
-        "nodes": nodes_all,
+        "nodes": {
+            node_id: {
+                **item,
+                "depends_on": list(result.raw_node_depends_on_map.get(node_id, [])),
+            }
+            for node_id, item in nodes_all.items()
+        },
     }
     payload_todo = {
         **common,

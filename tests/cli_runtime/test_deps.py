@@ -1162,6 +1162,7 @@ class TestCliDeps(CliRuntimeHarness):
                 "node_blockers",
                 "satisfied_dependencies",
                 "dependency_contexts",
+                "direct_node_dependencies",
                 "nodes",
                 "warnings",
             ]
@@ -1187,6 +1188,7 @@ class TestCliDeps(CliRuntimeHarness):
                     "disposition_basis": "descendant_issue_open",
                 }
             ]
+            assert data["direct_node_dependencies"] == []
             assert data["warnings"] == []
 
     def test_deps_check_json_reports_empty_open_epic_as_node_blocker(self) -> None:
@@ -1339,6 +1341,185 @@ class TestCliDeps(CliRuntimeHarness):
                     "disposition_basis": "lifecycle_closed",
                 }
             ]
+
+    def test_deps_check_json_blocks_empty_high_level_source_direct_dependency_without_github(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._init_origin_repo(target)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Source init"])
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "Target init"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Target epic"],
+            )
+            source_init_dir = target / "spec-dock" / "initiatives" / "init-00101-source-init"
+            self._set_meta_depends_on(source_init_dir, ["epic-00202"])
+
+            p = self._run_runtime_capture(target, ["deps", "check", "init-00101", "--no-github", "--json"])
+            assert p.returncode == 3, p.stdout + p.stderr
+            data = json.loads(p.stdout)
+            assert data["schema_version"] == 2
+            assert data["target"] == "init-00101"
+            assert not data["ready"]
+            assert data["effective_depends_on"] == []
+            assert data["blockers"] == ["epic-00202"]
+            assert data["issue_blockers"] == []
+            assert data["node_blockers"] == [
+                {
+                    "node_id": "epic-00202",
+                    "reason": "empty_open",
+                    "state": "open",
+                    "state_source": "cache",
+                    "source_issue_id": "init-00101",
+                    "lifecycle_state": "open",
+                    "lifecycle_source": "cache",
+                    "dependency_disposition": "blocking",
+                    "disposition_basis": "empty_open_container",
+                }
+            ]
+            assert data["dependency_contexts"] == [
+                {
+                    "source_node_id": "init-00101",
+                    "source_issue_id": "init-00101",
+                    "target_node_id": "epic-00202",
+                    "target_node_kind": "epic",
+                    "target_issue_ids": [],
+                    "expansion": "empty",
+                    "lifecycle_state": "open",
+                    "lifecycle_source": "cache",
+                    "dependency_disposition": "blocking",
+                    "disposition_basis": "empty_open_container",
+                }
+            ]
+            assert data["direct_node_dependencies"] == [
+                {
+                    "source_node_id": "init-00101",
+                    "source_node_kind": "initiative",
+                    "target_node_id": "epic-00202",
+                    "target_node_kind": "epic",
+                    "target_issue_ids": [],
+                    "expansion": "empty",
+                    "lifecycle_state": "open",
+                    "lifecycle_source": "cache",
+                    "dependency_disposition": "blocking",
+                    "disposition_basis": "empty_open_container",
+                }
+            ]
+
+    def test_deps_check_json_blocks_epic_source_direct_dependency_without_github(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._init_origin_repo(target)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Source init"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "101", "--github-issue", "201", "--title", "Source epic"],
+            )
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "Target init"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Target epic"],
+            )
+            source_epic_dir = (
+                target / "spec-dock" / "initiatives" / "init-00101-source-init" / "epics" / "epic-00201-source-epic"
+            )
+            self._set_meta_depends_on(source_epic_dir, ["epic-00202"])
+
+            p = self._run_runtime_capture(target, ["deps", "check", "epic-00201", "--no-github", "--json"])
+            assert p.returncode == 3, p.stdout + p.stderr
+            data = json.loads(p.stdout)
+            assert data["target"] == "epic-00201"
+            assert not data["ready"]
+            assert data["effective_depends_on"] == []
+            assert data["blockers"] == ["epic-00202"]
+            assert data["dependency_contexts"][0]["source_node_id"] == "epic-00201"
+            assert data["dependency_contexts"][0]["target_node_id"] == "epic-00202"
+            assert data["direct_node_dependencies"] == [
+                {
+                    "source_node_id": "epic-00201",
+                    "source_node_kind": "epic",
+                    "target_node_id": "epic-00202",
+                    "target_node_kind": "epic",
+                    "target_issue_ids": [],
+                    "expansion": "empty",
+                    "lifecycle_state": "open",
+                    "lifecycle_source": "cache",
+                    "dependency_disposition": "blocking",
+                    "disposition_basis": "empty_open_container",
+                }
+            ]
+
+    def test_sync_index_all_preserves_high_level_node_depends_on_without_github(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._init_origin_repo(target)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Source init"])
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "Target init"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Target epic"],
+            )
+            source_init_dir = target / "spec-dock" / "initiatives" / "init-00101-source-init"
+            self._set_meta_depends_on(source_init_dir, ["epic-00202"])
+
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
+            assert p.returncode == 0, p.stdout + p.stderr
+
+            index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            index_todo = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            assert index_all["nodes"]["init-00101"]["depends_on"] == ["epic-00202"]
+            assert index_all["nodes"]["epic-00202"]["depends_on"] == []
+            assert all("depends_on" not in node for node in index_todo["nodes"].values())
+            assert "raw_direct_edges" not in index_all["deps"]
+            assert "raw_direct_edges" not in index_todo["deps"]
+
+    def test_sync_index_all_preserves_satisfied_high_level_node_depends_on_without_github(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._init_origin_repo(target)
+
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "101", "--title", "Source init"])
+            self._run_runtime(target, ["new", "initiative", "--github-issue", "102", "--title", "Target init"])
+            self._run_runtime(
+                target,
+                ["new", "epic", "--initiative", "102", "--github-issue", "202", "--title", "Target epic"],
+            )
+            self._run_runtime(
+                target,
+                ["new", "issue", "--epic", "202", "--github-issue", "302", "--title", "Done child"],
+            )
+            source_init_dir = target / "spec-dock" / "initiatives" / "init-00101-source-init"
+            done_issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00102-target-init"
+                / "epics"
+                / "epic-00202-target-epic"
+                / "issues"
+                / "iss-00302-done-child"
+            )
+            self._set_meta_depends_on(source_init_dir, ["epic-00202"])
+
+            meta = json.loads((done_issue_dir / ".meta.json").read_text(encoding="utf-8"))
+            meta["status"] = "done"
+            self._write_json_force(done_issue_dir / ".meta.json", meta)
+
+            p = self._run_runtime_capture(target, ["sync", "--no-github", "--no-update-active"])
+            assert p.returncode == 0, p.stdout + p.stderr
+
+            index_all = json.loads((target / "spec-dock" / ".agent" / "index-all.json").read_text(encoding="utf-8"))
+            index_todo = json.loads((target / "spec-dock" / ".agent" / "index.json").read_text(encoding="utf-8"))
+            assert index_all["nodes"]["init-00101"]["depends_on"] == ["epic-00202"]
+            assert index_all["nodes"]["epic-00202"]["type"] == "epic"
+            assert all("depends_on" not in node for node in index_todo["nodes"].values())
 
     @pytest.mark.skip(
         reason="S04: covered by TestCheckDepsApplication.test_no_github_uses_cached_status_and_last_sync_without_fetching_github"

@@ -15,7 +15,7 @@ ID: "iss-00235"
 ## 設計目的
 - `.meta.json.depends_on` に保存された high-level source node (`initiative` / `epic`) 自体の direct dependency を、issue readiness projection で失わない。
 - `deps check --id <initiative|epic>` は、target node 自体の direct dependency を machine-readable に返し、未解決なら non-ready と判定する。
-- `.agent/index-all.json` は full-history raw audit surface として、保存済み raw direct edge を complete に返す。
+- `.agent/index-all.json` は full-history raw audit surface として、各 node payload の top-level `depends_on` に保存済み raw direct dependency target ids を返す。
 - `effective_depends_on`、`deps-issues.json`、`deps-raw.puml` の既存責務は拡大しない。
 
 ## 既存実装の理解
@@ -29,15 +29,16 @@ ID: "iss-00235"
 ## 採用方針
 - Raw direct dependency audit と issue readiness projection を分離する。
 - `effective_depends_on` は issue-level effective blocker / closure として維持し、high-level source direct dependency を混ぜない。
-- `deps check` は additive field で target node 自体の direct dependency status を返す。
-- `index-all` は additive field で complete raw direct edge audit を返す。
+- `deps check` は target node 自体の direct dependency status を既存 readiness surface (`dependency_contexts`, `node_blockers`, `satisfied_dependencies`, `blockers`) に合流し、補助 field として `direct_node_dependencies` も返す。
+- `index-all` は full-history node payload の top-level `depends_on` を raw direct dependency audit として返す。todo projection の `index.json` / tree artifacts には raw audit field を出さず、`deps.raw_direct_edges` も追加しない。
 - `deps-issues.json` は issue readiness artifact のままとし、complete raw node graph dump にしない。
 - `deps-raw.puml` はこの issue では complete audit contract に昇格しない。
 
 ## インターフェース契約
 
 ### `deps check --json`
-- 新しい additive field として `direct_node_dependencies` を返す。
+- `dependency_contexts` / `node_blockers` / `satisfied_dependencies` に target node 自体の direct dependency status を返す。
+- 補助的な additive field として `direct_node_dependencies` も返す。
 - Entry は次の情報を持つ。
   - `source_node_id`
   - `source_node_kind`
@@ -85,18 +86,24 @@ Example:
 ```
 
 ### `.agent/index-all.json`
-- `deps.raw_direct_edges` を追加する。
-- `raw_direct_edges` は `.meta.json.depends_on` から解決できた direct node-to-node edge を complete に返す。
-- Satisfied / done / closed dependency も raw audit からは消さない。
+- 各 node payload の top-level `depends_on` に `.meta.json.depends_on` から解決できた canonical target node ids を返す。
+- Source / target kind は `nodes[source].type` と `nodes[target].type` を join して取得する。
+- Satisfied / done / closed dependency も top-level `depends_on` からは消さない。
+- `deps.issue_edges` は issue-level readiness projection のままとし、`deps.raw_direct_edges` は追加しない。raw audit の `depends_on` は `.agent/index-all.json` の node payload に限定する。
 - Entry shape:
 
 ```json
 {
-  "from": "init-00001",
-  "from_kind": "initiative",
-  "to": "epic-00002",
-  "to_kind": "epic",
-  "relation": "raw_direct"
+  "nodes": {
+    "init-00001": {
+      "type": "initiative",
+      "depends_on": ["epic-00002"]
+    },
+    "epic-00002": {
+      "type": "epic",
+      "depends_on": []
+    }
+  }
 }
 ```
 
@@ -127,8 +134,8 @@ rectangle "application.sync_state" as Sync
 rectangle "presentation.json_state" as Json
 
 Reader --> Domain : raw_node_depends_on_map
-Domain --> Check : direct_node_dependencies
-Domain --> Sync : raw_direct_edges semantics
+Domain --> Check : readiness contexts + direct_node_dependencies mirror
+Reader --> Json : raw_node_depends_on_map as nodes[*].depends_on
 Check --> Json : deps check result
 Sync --> Json : SyncStateResult
 
@@ -153,7 +160,7 @@ src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
 |   |-- check_deps.py   # target node direct dependency status を inspection へ統合
 |   `-- sync_state.py   # complete raw direct edges を sync state へ運ぶ
 `-- presentation/
-    `-- json_state.py   # deps check JSON と index-all JSON に additive fields を出力
+    `-- json_state.py   # deps check JSON と index-all node depends_on を出力
 
 tests/
 |-- unit/application/test_check_deps.py
@@ -168,7 +175,7 @@ tests/
 - AC-002:
   - Direct node dependency status に unresolved `blocking` / `indeterminate` がある場合、top-level `ready` を `false` にする。
 - AC-003:
-  - `.agent/index-all.json` の `deps.raw_direct_edges` に complete raw direct edge audit を追加する。
+  - `.agent/index-all.json` の `nodes[<source>].depends_on` に complete raw direct dependency ids を追加する。
 - AC-004:
   - Existing issue readiness path と `effective_depends_on` の意味は維持する。
 - EC-001:
@@ -176,7 +183,7 @@ tests/
 - EC-002:
   - Non-empty source は direct node status と descendant issue readiness projection を別 field として表示する。
 - EC-003:
-  - `.agent/index-all.json` の raw audit は readiness disposition によって edge を落とさない。
+  - `.agent/index-all.json` の node-level `depends_on` は readiness disposition によって edge を落とさない。
 - EC-004:
   - Issue source -> high-level target は既存 `dependency_contexts_by_issue_id` と node blocker semantics を使い続ける。
 
@@ -186,8 +193,8 @@ tests/
   - Non-empty high-level source は direct node status と issue readiness projection を混同しない。
   - Satisfied / done / closed target は readiness blocker から外れても direct status と raw audit には残る。
 - Presentation:
-  - `render_deps_check_json()` が `direct_node_dependencies` を additive に出力する。
-  - `render_index_artifact()` が `.agent/index-all.json` に `deps.raw_direct_edges` を出力する。
+  - `render_deps_check_json()` が existing readiness contexts と補助 `direct_node_dependencies` を出力する。
+  - `render_index_artifact()` が `.agent/index-all.json` の各 node に top-level `depends_on` を出力する。
 - CLI runtime:
   - `--no-github` で GitHub live state に依存せず #235 相当の reduced reproduction を固定する。
   - Existing issue source -> high-level target tests を regression させない。
