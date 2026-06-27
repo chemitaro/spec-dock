@@ -212,6 +212,8 @@ def base_payload():
         "head_matches_expected": False,
         "success": False,
         "overall_status": "unknown",
+        "normalized_status": "unknown",
+        "recommended_next_action": "unknown",
         "review_policy": {
             "source": "fixed_default",
             "path": policy_path,
@@ -241,6 +243,16 @@ def base_payload():
 
 
 payload = base_payload()
+
+
+def block_review_policy_gate():
+    payload["success"] = False
+    payload["overall_status"] = "human_gate"
+    payload["normalized_status"] = "human_gate"
+    payload["recommended_next_action"] = "human_gate"
+    payload["trigger"]["action"] = "blocked"
+    emit(payload)
+    raise SystemExit(0)
 
 metadata_exit, metadata_stdout, metadata_stderr = run_gh(
     ["pr", "view", pr, "--repo", repo, "--json", "headRefOid,baseRefOid,url,state,isDraft,number"]
@@ -307,12 +319,12 @@ if pr_state and pr_state != "OPEN":
     raise SystemExit(0)
 
 if not base_sha:
-    payload["review_policy"].update({"source": "fixed_default", "status": "base_sha_missing"})
+    payload["review_policy"].update({"source": "base_sha", "status": "base_sha_missing"})
     payload["limitations"].append(
         limitation(
             "review_policy_base_sha_missing",
-            "PR metadata did not include baseRefOid; fixed default trigger body will be used",
-            severity="warning",
+            "PR metadata did not include baseRefOid; trusted base review policy cannot be loaded",
+            severity="blocking",
         )
     )
 elif base_sha:
@@ -362,10 +374,10 @@ elif base_sha:
             payload["limitations"].append(
                 limitation(
                     "review_policy_too_large",
-                    "trusted base review policy exceeds the maximum accepted size; fixed default trigger body will be used",
+                    "trusted base review policy exceeds the maximum accepted size",
                     api=policy_endpoint,
                     max_bytes=policy_max_bytes,
-                    severity="warning",
+                    severity="blocking",
                 )
             )
         else:
@@ -375,6 +387,7 @@ elif base_sha:
                     "review_policy_invalid",
                     "trusted base review policy could not be decoded as non-empty UTF-8 text",
                     api=policy_endpoint,
+                    severity="blocking",
                 )
             )
     else:
@@ -382,13 +395,16 @@ elif base_sha:
         payload["limitations"].append(
             limitation(
                 "review_policy_missing",
-                "trusted base review policy could not be loaded; fixed default trigger body will be used",
+                "trusted base review policy could not be loaded",
                 api=policy_endpoint,
                 gh_exit=policy_exit,
                 gh_stderr=policy_stderr.strip(),
-                severity="warning",
+                severity="blocking",
             )
         )
+
+if payload["review_policy"]["status"] != "loaded":
+    block_review_policy_gate()
 
 before_exit, before_stdout, before_stderr = run_gh(["api", endpoint, "--paginate"])
 before_comments_raw = load_json(before_stdout, None) if before_exit == 0 else None
