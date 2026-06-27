@@ -3,9 +3,9 @@
 ID: "iss-00235"
 タイトル: "Repair high level dependency source projection"
 関連GitHub: ["#235"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-24"
+最終更新: "2026-06-27"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00059", "init-local-00003"]
 ---
@@ -50,6 +50,7 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | interpretation | orchestrator + deep-consultant | GitHub issue #235 は `iss-00207` と重複するか、別 edge case か。 | 重複として閉じる; `iss-00207` に吸収する; high-level source direct dependency の別 issue として扱う。 | #235 は high-level source 自体の direct dependency が issue-keyed projection で落ちる問題であり、issue source -> high-level target を扱う `iss-00207` とは別 scope。 | 手動再現で `.meta.json.depends_on` は保存されたが、`deps check --id init-00001` / `index-all` / `deps-issues` から消えた。既存 tests は source issue axis が中心。 | applied | `discussions/20260623t162536z-research-high-level-source-dependency-projection-root-cause.md` | future requirement/design/plan に source-axis test matrix を反映する。 |
+| D-002 | resolved | test-strategy | spec-reviewer | Initial plan S04/S05 bundled multiple observable surfaces in one step. | Keep bundled steps; split by observable surface and commit/review scope. | S04/S05 を `deps check` CLI、`sync` artifact、issue-source regression、non-goal boundary の separate step に分割する。 | `spec-dock-issue-execution` と `phase_plan_issue.md` は 1 implementation step = 1 observable behavior = 1 review scope = 1 commit を要求する。 | applied | `plan.md` S04-S07; plan reviewer finding 2026-06-27 | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -65,6 +66,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 |---|---|---|---|---|---|---|
 | EAL-001 | `adopted` | research + manual command | issue analysis | GitHub #235 の保存済み raw dependency が readiness/index projection から失われることを reduced reproduction で確認したため。 | `discussions/20260623t162536z-research-high-level-source-dependency-projection-root-cause.md`; `/private/tmp/iss-00235-repro`; `deps check --id init-00001 --no-github --json` -> `ready: true`, empty dependency fields | future requirement/design/plan に受け入れ条件と test matrix を反映する。 |
 | EAL-002 | `adopted` | sub-agent | issue analysis | runtime/domain、artifact/contract、issue-scope comparison の3観点が、raw storage ではなく issue-keyed projection loss を根本原因とする点で一致したため。 | `discussions/20260623t162536z-research-high-level-source-dependency-projection-root-cause.md` deep-consultant synthesis | design で raw node dependency result と issue readiness result を分離する。 |
+| EAL-003 | `adopted` | `system-architect` discussion draft | `design.md` | Draft の raw audit / issue readiness separation、`direct_node_dependencies`、`deps.raw_direct_edges` 方針が approved requirement と existing runtime structure に合っていたため。 | `discussions/20260626t054055z-disc-design-high-level-source-direct-deps.md`; diff guard pass: delegated write は discussion draft のみ | integrated into `design.md`; fresh spec-reviewer pass recorded in Spec Authoring Gate |
+| EAL-004 | `adopted` | `implementation-planner` discussion draft | `plan.md` | Draft の closure index と S01-S05/S90/S99 は有用だったが、reviewer 指摘により S04/S05 を S04-S07 へ分割し non-goal closure と step-local delegation contracts を追加した。 | `discussions/20260626t055323z-disc-plan-high-level-source-direct-deps.md`; diff guard pass: delegated write は discussion draft のみ | integrated into `plan.md`; fresh spec-reviewer pass recorded in Spec Authoring Gate |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -73,6 +76,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
 | OAL-001 | GitHub #235 の再現確認と根本原因を research に記録した。 | issue scaffold 作成、issue start、deep-consultant 3系統の統合。 | low | provisional |
+| OAL-002 | Approved requirement/design/plan は #235 の high-level source direct dependency false-ready と raw audit 欠落を primary objective として扱う。 | workflow 上の delegated draft / reviewer gates / per-step commit gate を plan に反映した。 | low | requirement/design/plan passed |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -81,6 +85,10 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
 | research | `discussions/20260623t162536z-research-high-level-source-dependency-projection-root-cause.md`; manual reproduction; code inspection; deep-consultant synthesis | `deps-raw.puml` の complete audit contract は design decision が必要。 | adopted | provisional | no | requirement/design/plan authoring |
+| requirement | `requirement.md`; research discussion; GitHub #235 reproduction | AC-002 が `ready=false` を要求すること、AC-003 が `.agent/index-all.json` を required audit surface とすることを fixed。 | adopted | first review failed; second fresh `spec-reviewer` pass, confidence 0.91 | no | promoted to design |
+| design | `design.md`; `discussions/20260626t054055z-disc-design-high-level-source-direct-deps.md`; runtime source inspection | `direct_node_dependencies` value schema は existing domain vocabulary に合わせる。 | adopted | first review pass with P2; schema vocabulary updated; second fresh `spec-reviewer` pass, confidence 0.90 | no | promoted to plan |
+| plan | `plan.md`; `discussions/20260626t055323z-disc-plan-high-level-source-direct-deps.md`; phase_plan_issue / authoring docs | Delegated draft adoption evidence, single-surface step split, proposal-only draft metadata, and step-local delegation contracts were required. | adopted with revision | first two fresh `spec-reviewer` reviews failed; third fresh `spec-reviewer` pass, confidence 0.91 | no | execution handoff ready |
+| execution-handoff | `requirement.md`; `design.md`; `plan.md`; `report.md`; active issue context | No unresolved requirement/design/plan gaps after reviewer pass. | approved | planning artifacts fresh-pass complete | no | start S01 under `spec-dock-issue-execution` |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -108,7 +116,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00235 | `discussions/20260626t054055z-disc-design-high-level-source-direct-deps.md` | `requirement.md`; root-cause research; runtime source/tests | `design.md`, `plan.md`, `report.md` | adopted | `design.md` | pass | `direct_node_dependencies` / `deps.raw_direct_edges` / non-goal artifact boundary を canonical design に統合 | implementation step ordering details は plan phase へ送った | none | design spec-reviewer pass after schema clarification | promoted to design |
+| implementation-planner | iss-00235 | `discussions/20260626t055323z-disc-plan-high-level-source-direct-deps.md` | `requirement.md`; `design.md`; design discussion; phase_plan_issue; authoring docs | `plan.md`, `report.md` | adopted with revision | `plan.md` | pass | closure index と step sequence を canonical plan に統合し、reviewer finding に基づき S04/S05 を S04-S07 へ分割し step-local delegation contracts を追加 | original bundled S04/S05 step shape | none | first/second plan spec-reviewer failed; third pass | promoted to plan / execution handoff ready |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
