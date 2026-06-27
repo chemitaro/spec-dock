@@ -41,6 +41,21 @@ def _manifest():
     return artifact_composer.load_profile_section_manifest(manifest_path.read_text(encoding="utf-8"))
 
 
+def _plan_placeholder() -> str:
+    return """---
+artifact_state: awaiting-assurance-compose
+---
+# iss-test — 実装計画 placeholder
+
+このファイルはまだ合成されていません。
+
+先に `requirement.md` を具体化し、`assurance classify --stage requirement` を実行してください。
+その後、`assurance compose --artifact all` を実行して、この Issue の分類に応じた実装計画テンプレートを合成してください。
+
+この状態のまま実装計画本文を書き始めないでください。
+"""
+
+
 def test_profile_selection_uses_authorized_profile_for_all_profiles() -> None:
     artifact_composer = _artifact_composer_module()
     assurance = _assurance_module()
@@ -59,7 +74,7 @@ def test_profile_selection_uses_authorized_profile_for_all_profiles() -> None:
 
     for profile, expected_section_ids in expected_plan_sections.items():
         result = artifact_composer.compose_artifact(
-            "# Plan\n",
+            _plan_placeholder(),
             manifest,
             "plan",
             profile,
@@ -78,14 +93,14 @@ def test_lite_candidate_does_not_select_lite_without_authorized_lite() -> None:
     manifest = _manifest()
 
     standard_candidate = artifact_composer.compose_artifact(
-        "# Plan\n",
+        _plan_placeholder(),
         manifest,
         "plan",
         assurance.AssuranceProfile.STANDARD,
         lite_candidate=True,
     )
     explicit_lite = artifact_composer.compose_artifact(
-        "# Plan\n",
+        _plan_placeholder(),
         manifest,
         "plan",
         assurance.AssuranceProfile.LITE,
@@ -241,12 +256,12 @@ def test_marker_token_in_plain_prose_is_not_a_conflict() -> None:
     manifest = _manifest()
 
     result = artifact_composer.compose_artifact(
-        "# Plan\n\nThe token spec-dock:managed-section may be documented in prose.\n",
+        "# Report\n\nThe token spec-dock:managed-section may be documented in prose.\n",
         manifest,
-        "plan",
+        "report",
         assurance.AssuranceProfile.STANDARD,
     )
 
     assert result.ok
     assert result.output_text is not None
-    assert 'id="plan.step-contract"' in result.output_text
+    assert 'id="report.step-evidence"' in result.output_text
