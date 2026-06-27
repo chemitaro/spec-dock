@@ -108,6 +108,7 @@ ID: "iss-00241"
 | step | decision | required reason | delegated role | scope | allowed changes | forbidden changes | required verification | stop conditions | result |
 |---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | runtime / tests / shipped asset behavior を含むため | dev-coder | Trusted review trigger failure path only | provider/dogfooding `trigger_codex_review.sh`, focused trigger tests | head policy fallback, caller-provided body, broad PR observation refactor, S02+ docs/templates | focused pytest, provider/dogfooding script parity, code-reviewer pass | fake gh POST なし判定不能、JSON consumer impact不明 | passed: worker returned bounded S01 diff, no material decisions beyond approved plan |
+| S02 | delegated | shipped skill text / public contract と text assertion を含むため | doc-writer | PR observation skill contract wording only | provider/dogfooding `github-pr-observation/SKILL.md`, focused text assertion | runtime script changes, PR trigger behavior changes, S03+ templates/docs | focused pytest, stale wording inspection, provider/dogfooding skill parity, spec-reviewer pass | S01 behavior と skill wording が一致しない | passed: worker returned bounded S02 diff, no material decisions beyond approved plan |
 
 ### Step Contract Closure
 
@@ -115,6 +116,7 @@ ID: "iss-00241"
 |---|---|---|---|---|
 | S01 | tc-001 | base SHA missing / policy missing / invalid / non-UTF-8 / oversized / unreadable は POST なし human gate | focused pytest `trigger_helper and (policy or base_sha or trusted_base)`、broader `trigger_helper`、code-reviewer pass | pass |
 | S01 | tc-002 | valid base policy は deterministic multiline body を投稿 | focused pytest `trigger_helper and (policy or base_sha or trusted_base)`、broader `trigger_helper`、code-reviewer pass | pass |
+| S02 | tc-003 | skill text は deterministic body / human gate を説明し、fixed bare body を唯一の write として説明しない | text assertion、stale wording `rg` inspection、provider/dogfooding skill parity、spec-reviewer pass | pass |
 
 ### Test Contract Closure
 
@@ -122,6 +124,7 @@ ID: "iss-00241"
 |---|---|---|---|---|---|
 | tc-001 | S01 | red-required | dev-coder 実装前 characterization: `5 failed, 1 passed, 509 deselected`; old behavior posted bare `@codex review` for failure paths | `uv run pytest tests/unit/infra/test_init_update.py -k "trigger_helper and (policy or base_sha or trusted_base)"` | pass: `6 passed, 509 deselected` |
 | tc-002 | S01 | covered-existing | valid trusted policy path existed and was preserved while failure paths changed | `uv run pytest tests/unit/infra/test_init_update.py -k "trigger_helper"` | pass: `21 passed, 494 deselected` |
+| tc-003 | S02 | inspect-only | stale skill wording existed: fixed bare body was described as the only write contract | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_231_trigger_helper or issue_176_s01_trigger_helper_blocks_when_base_sha_missing'` | pass: `7 passed, 508 deselected` |
 
 ### Closure Coverage
 
@@ -129,18 +132,21 @@ ID: "iss-00241"
 |---|---|---|---|
 | tc-001 | AC-001 / EC-001〜EC-003: trusted base policy failure is POSTなし human gate | tests assert no POST, `success=false`, `overall_status=human_gate`, `normalized_status=human_gate`, `recommended_next_action=human_gate`, `trigger.action=blocked`, blocking limitations | pass |
 | tc-002 | AC-002: valid base policy posts deterministic multiline body | tests assert source, policy hash, reviewed head SHA, and posted body match expected multiline trigger | pass |
+| tc-003 | AC-003: skill public contract matches runtime behavior | text assertion requires runtime-composed deterministic body, trusted policy evidence, no comment on base policy failure, caller-provided body prohibition; stale fixed-bare-body phrases absent by `rg` | pass |
 
 ### Reviewer Gate Status
 
 | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision |
 |---|---|---|---|---|---|
 | S01 code review | code-reviewer | fresh uncommitted S01 diff after focused tests | passed | none | S01 eligible for Step Commit Gate |
+| S02 spec review | spec-reviewer | fresh uncommitted S02 diff after focused tests and inspections | passed | none | S02 eligible for Step Commit Gate |
 
 ### Step Commit Gate
 
 | step | review scope | step reviewer verdict | commit scope | closure state | commit evidence | post-commit clean check |
 |---|---|---|---|---|---|---|
 | S01 | trigger helper scripts and focused trigger tests | code-reviewer pass, no findings, confidence 0.89 | S01 runtime/test/report evidence only | committed | S01 scope commit created; exact hash is external git evidence | pass: post-commit `git status --short` clean |
+| S02 | PR observation skill text and focused text assertion | spec-reviewer pass, no findings, confidence 0.88 | pending | ready_to_commit | pending | pending |
 
 ## 最終品質ゲート
 
