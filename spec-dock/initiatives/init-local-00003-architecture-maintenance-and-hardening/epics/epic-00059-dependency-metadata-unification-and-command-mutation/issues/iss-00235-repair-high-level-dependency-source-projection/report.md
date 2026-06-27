@@ -135,7 +135,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装サマリー (任意)
 - S01 では `check_deps` / domain inspection の application result contract に、checked target node 自体の direct node dependency status を追加した。
-- JSON rendering と sync artifact はまだ未実装であり、S02/S03 以降で計画通り扱う。
+- S02-S07 では `deps check --json` / `.agent/index-all.json` の additive public contract、CLI reduced reproduction、sync artifact boundary、non-goal storage boundary を実装・検証した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -863,26 +863,38 @@ pass
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | required command sufficient after recording final ledger; no broader external/CLI lane required | initial final QA review failed because this final ledger omitted the integrated validation evidence. Fresh QA re-review passed and raised non-blocking P2 to cover epic source reduced behavior. Parent added `test_cli_deps_check_json_blocks_epic_source_direct_node_dependency`; `uv run pytest tests/cli_runtime/test_runtime_deps_s04.py` -> 32 passed; final required command `uv run pytest tests/unit/domain/test_deps.py tests/unit/application/test_check_deps.py tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` -> 135 passed in 1.56s. | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | initial final code review found that direct high-level raw dependencies with lifecycle `unknown` and all descendant issues done could be classified as satisfied before fail-closed unknown handling. Fixed `_high_level_lifecycle_for_direct_dependency` to return indeterminate for `unknown` before descendant aggregate satisfaction and added `test_inspect_target_deps_fails_closed_for_unknown_direct_node_lifecycle_with_done_descendants`. Fresh code re-review passed with no findings. | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | initial final spec review found missing S99 evidence and a stale implementation summary that still said JSON/sync were unimplemented. Updated this final ledger and replaced the stale summary with the S02-S07 completed state. Second final spec review found QA/code/spec rows still pending; updated QA/code pass evidence and latest final command result. Fresh final spec re-review passed with no findings. | 2 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| QA/code/spec final reviewer gates passed; final commit amended with this commit-gate evidence; post-commit clean check `git status --short --branch` -> clean before PR push | final code/test/report fix for unknown direct high-level lifecycle, epic-source CLI regression, and S99 ledger closure | final response / PR #242 | ready |
+
+### PR CI repair（2026-06-27）
+| 対象 | 失敗内容 | 修正 | 検証 | 結果 |
+|---|---|---|---|---|
+| PR #242 `provider-tests` | `make lint` failed on ruff import order and format check for `deps.py`, `json_state.py`, and `tests/cli_runtime/test_runtime_deps_s04.py`. | `uv run ruff check --fix src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py`; `uv run ruff format src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py tests/cli_runtime/test_runtime_deps_s04.py` | `make lint` -> pass; `uv run pytest tests/unit/domain/test_deps.py tests/unit/application/test_check_deps.py tests/unit/presentation/test_runtime_sync_s07.py tests/cli_runtime/test_runtime_deps_s04.py` -> 135 passed in 1.64s | ready for PR branch update |
+| PR #242 `provider-tests` | After formatting repair, `uv run pytest` failed on an older CLI JSON key expectation and checked-in dogfooding snapshot/mirror parity. | Updated `tests/cli_runtime/test_deps.py` to include additive `direct_node_dependencies` and direct node blocker behavior; synced provider runtime assets to dogfooding mirror; updated checked-in dogfooding `.meta.json` snapshot for iss-00235. | focused failing tests -> pass; `make lint` -> pass; `uv run pytest` -> 1419 passed, 76 skipped in 798.07s | ready for PR branch update |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: final review で、direct node dependency 側の高水準 target lifecycle が `unknown` の場合に、descendant issues が全て done だと `all_descendant_issues_done` として satisfied になり得る判定順序が見つかった。
+  - 解決: `unknown` lifecycle を descendant aggregate satisfaction より先に indeterminate として扱い、focused regression test を追加した。
+- 問題: final QA で、initiative source の reduced coverage はあるが epic source 自体の `.meta.json.depends_on` を public CLI で検証する reduced test が不足していると指摘された。
+  - 解決: `deps check --id <epic> --json` で epic source direct node dependency が `direct_node_dependencies` に出ることを検証する CLI regression test を追加した。
+- 問題: PR #242 の `provider-tests` で static analysis が失敗した。
+  - 解決: ruff の import order / format 差分を修正し、`make lint` と final pytest lane を再実行した。
+- 問題: PR #242 の `provider-tests` で full pytest が失敗した。
+  - 解決: additive JSON contract の既存 CLI test expectation、dogfooding runtime mirror、checked-in dogfooding `.meta.json` snapshot を更新し、`uv run pytest` full suite を再実行した。
 
 ## 学んだこと (任意)
 - ...

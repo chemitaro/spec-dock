@@ -291,15 +291,21 @@ def resolve_high_level_status_context(
     return statuses
 
 
-def _validate_raw_node_dependency_preflight(ports: Ports, specdock_dir: Path, graph: SpecGraph) -> None:
+def _load_raw_node_depends_on_map(ports: Ports, specdock_dir: Path, graph: SpecGraph) -> dict[str, list[str]]:
     load_node_resolutions = getattr(ports.deps_topology_reader, "load_node_dependency_resolutions", None)
     if not callable(load_node_resolutions):
-        return
+        return {}
 
-    raw_node_depends_on_map = {
+    return {
         src_id: [resolution.resolved_node_id for resolution in resolutions]
         for src_id, resolutions in load_node_resolutions(specdock_dir, graph).items()
     }
+
+
+def _validate_raw_node_dependency_preflight(
+    graph: SpecGraph,
+    raw_node_depends_on_map: dict[str, list[str]],
+) -> None:
     validate_raw_node_dependency_graph(graph, raw_node_depends_on_map)
 
 
@@ -314,7 +320,8 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
     current_repo_slug = resolve_current_repo_slug(ports)
     specdock_dir = _resolve_specdock_dir(ports)
 
-    _validate_raw_node_dependency_preflight(ports, specdock_dir, graph)
+    raw_node_depends_on_map = _load_raw_node_depends_on_map(ports, specdock_dir, graph)
+    _validate_raw_node_dependency_preflight(graph, raw_node_depends_on_map)
 
     topology = ports.deps_topology_reader.load_issue_depends_on_map(specdock_dir, graph)
     warnings: list[str] = list(topology.warnings)
@@ -399,6 +406,7 @@ def check_deps(req: CheckDepsRequest, ports: Ports) -> DepsCheckResult:
             issue_statuses=status_context.issue_statuses,
             cached_high_level_github_state_by_id=cached_high_level_github_state_by_id,
         ),
+        raw_node_depends_on_map=raw_node_depends_on_map,
         active_issue_id=active_issue_id,
     )
     return DepsCheckResult(target=req.target, inspection=inspection, warnings=warnings)

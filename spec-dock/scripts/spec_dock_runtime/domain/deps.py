@@ -8,6 +8,7 @@ from spec_dock_runtime.domain.models import (
     ActiveSelection,
     DepsDependencyContext,
     DepsDependencyDisposition,
+    DepsDirectNodeDependency,
     DepsDispositionBasis,
     DepsEvaluation,
     DepsHighLevelStatus,
@@ -344,6 +345,151 @@ def _dependency_context_from_input(context: DependencyContextInput) -> DepsDepen
         target_node_kind=_context_value(context, "target_node_kind", "issue"),  # type: ignore[arg-type]
         target_issue_ids=target_issue_ids,
         expansion=_context_value(context, "expansion", "issue"),  # type: ignore[arg-type]
+    )
+
+
+def _target_issue_ids_and_expansion(
+    graph: SpecGraph,
+    target_node_id: str,
+) -> tuple[tuple[str, ...], str]:
+    target_node = graph.nodes_by_id[target_node_id]
+    if target_node.kind == "issue":
+        return ((target_node.id,), "issue")
+    target_issue_ids = tuple(_issue_ids_for_target(graph, NodeId(target_node_id)))
+    return (target_issue_ids, "expanded" if target_issue_ids else "empty")
+
+
+def _issue_lifecycle_for_direct_dependency(
+    *,
+    issue_id: str,
+    issue_statuses: dict[str, IssueStatusSnapshot],
+) -> tuple[str, str, DepsDependencyDisposition, DepsDispositionBasis]:
+    snapshot = issue_statuses.get(issue_id)
+    state = _issue_status(issue_id, issue_statuses)
+    lifecycle_source = snapshot.source if snapshot is not None else "unknown"
+    if state in {"closed", "done"}:
+        return state, lifecycle_source, "satisfied", "local_done"
+    if state == "open":
+        return "open", lifecycle_source, "blocking", "descendant_issue_open"
+    return "unknown", lifecycle_source, "indeterminate", "descendant_issue_unknown"
+
+
+def _high_level_lifecycle_for_direct_dependency(
+    *,
+    target_node_id: str,
+    target_issue_ids: tuple[str, ...],
+    expansion: str,
+    issue_statuses: dict[str, IssueStatusSnapshot],
+    high_level_statuses_by_node_id: dict[str, DepsHighLevelStatus] | None,
+) -> tuple[str, str, DepsDependencyDisposition, DepsDispositionBasis]:
+    high_level_statuses = high_level_statuses_by_node_id or {}
+    status = high_level_statuses.get(target_node_id)
+    state = _normalize_high_level_state(status.state if status is not None else None)
+    lifecycle_source = status.source if status is not None else "none"
+
+    if state == "closed":
+        return "closed", lifecycle_source, "satisfied", "lifecycle_closed"
+    if state == "done":
+        basis: DepsDispositionBasis = (
+            "all_descendant_issues_done"
+            if target_issue_ids and lifecycle_source == "descendant_aggregate"
+            else "local_done"
+        )
+        return "done", lifecycle_source, "satisfied", basis
+    if state == "unknown":
+        if expansion == "empty":
+            return "unknown", lifecycle_source, "indeterminate", "empty_unknown_container"
+        return "unknown", lifecycle_source, "indeterminate", "descendant_issue_unknown"
+    if _all_target_issues_satisfied(target_issue_ids, issue_statuses):
+        return state, lifecycle_source, "satisfied", "all_descendant_issues_done"
+    if target_issue_ids and _any_target_issue_unknown(target_issue_ids, issue_statuses):
+        return state, lifecycle_source, "indeterminate", "descendant_issue_unknown"
+    if target_issue_ids and _any_target_issue_open(target_issue_ids, issue_statuses):
+        return state, lifecycle_source, "blocking", "descendant_issue_open"
+    if expansion == "empty" and state == "open":
+        return "open", lifecycle_source, "blocking", "empty_open_container"
+    if expansion == "empty":
+        return "unknown", lifecycle_source, "indeterminate", "empty_unknown_container"
+    return state, lifecycle_source, "indeterminate", "descendant_issue_unknown"
+
+
+def evaluate_direct_node_dependencies(
+    graph: SpecGraph,
+    *,
+    source_node_id: str,
+    raw_node_depends_on_map: dict[str, list[str]] | None,
+    issue_statuses: dict[str, IssueStatusSnapshot],
+    high_level_statuses_by_node_id: dict[str, DepsHighLevelStatus] | None = None,
+) -> list[DepsDirectNodeDependency]:
+    source_node = graph.nodes_by_id.get(source_node_id)
+    if source_node is None:
+        raise RuntimeError(f"Node not found: {source_node_id}")
+
+    direct_target_ids = raw_node_depends_on_map.get(source_node_id, []) if raw_node_depends_on_map else []
+    direct_dependencies: list[DepsDirectNodeDependency] = []
+    for target_node_id in _safe_sorted_node_ids(list(direct_target_ids)):
+        target_node = graph.nodes_by_id.get(target_node_id)
+        if target_node is None:
+            raise RuntimeError(f"Node not found: {target_node_id}")
+        target_issue_ids, expansion = _target_issue_ids_and_expansion(graph, target_node_id)
+        if target_node.kind == "issue":
+            lifecycle_state, lifecycle_source, disposition, basis = _issue_lifecycle_for_direct_dependency(
+                issue_id=target_node.id,
+                issue_statuses=issue_statuses,
+            )
+        else:
+            lifecycle_state, lifecycle_source, disposition, basis = _high_level_lifecycle_for_direct_dependency(
+                target_node_id=target_node.id,
+                target_issue_ids=target_issue_ids,
+                expansion=expansion,
+                issue_statuses=issue_statuses,
+                high_level_statuses_by_node_id=high_level_statuses_by_node_id,
+            )
+
+        direct_dependencies.append(
+            DepsDirectNodeDependency(
+                source_node_id=source_node.id,
+                source_node_kind=source_node.kind,
+                target_node_id=target_node.id,
+                target_node_kind=target_node.kind,
+                target_issue_ids=target_issue_ids,
+                expansion=expansion,  # type: ignore[arg-type]
+                lifecycle_state=lifecycle_state,  # type: ignore[arg-type]
+                lifecycle_source=lifecycle_source,
+                dependency_disposition=disposition,
+                disposition_basis=basis,
+            )
+        )
+    return direct_dependencies
+
+
+def _with_direct_node_dependencies(
+    evaluation: DepsEvaluation,
+    direct_node_dependencies: list[DepsDirectNodeDependency],
+) -> DepsEvaluation:
+    unresolved = [
+        dependency
+        for dependency in direct_node_dependencies
+        if dependency.dependency_disposition in {"blocking", "indeterminate"}
+    ]
+    if not unresolved:
+        return evaluation
+
+    direct_blockers = {dependency.target_node_id for dependency in unresolved}
+    blockers = _safe_sorted_node_ids(set(evaluation.blockers) | direct_blockers)
+    guard_reason = (
+        "unknown"
+        if evaluation.guard_reason == "unknown"
+        or any(dependency.dependency_disposition == "indeterminate" for dependency in unresolved)
+        else "blocked"
+    )
+    return replace(
+        evaluation,
+        ready=False,
+        guard_reason=guard_reason,
+        blockers=blockers,
+        blockers_top=blockers[:_BLOCKERS_TOP_LIMIT],
+        closure=list(blockers),
     )
 
 
@@ -745,6 +891,7 @@ def inspect_target_deps(
     active_issue_id: str | None,
     dependency_contexts_by_issue_id: dict[str, list[DependencyContextInput]] | None = None,
     high_level_statuses_by_node_id: dict[str, DepsHighLevelStatus] | None = None,
+    raw_node_depends_on_map: dict[str, list[str]] | None = None,
 ) -> TargetDepsInspection:
     effective_deps_map = build_effective_deps_map(graph, issue_depends_on_map)
     target_issue_ids = _issue_ids_for_target(graph, target_id)
@@ -760,6 +907,14 @@ def inspect_target_deps(
         dependency_contexts_by_issue_id=dependency_contexts_by_issue_id,
         high_level_statuses_by_node_id=high_level_statuses_by_node_id,
     )
+    direct_node_dependencies = evaluate_direct_node_dependencies(
+        graph,
+        source_node_id=target_id.value,
+        raw_node_depends_on_map=raw_node_depends_on_map,
+        issue_statuses=issue_statuses,
+        high_level_statuses_by_node_id=high_level_statuses_by_node_id,
+    )
+    evaluation = _with_direct_node_dependencies(evaluation, direct_node_dependencies)
 
     node_states: dict[str, DepsNodeState] = {}
     inspect_issue_ids = _safe_sorted_node_ids(set(target_issue_ids) | set(reachable_issue_ids))
@@ -819,6 +974,7 @@ def inspect_target_deps(
             for issue_id in _safe_sorted_node_ids(inspected_status_ids)
             if issue_id in issue_statuses
         },
+        direct_node_dependencies=direct_node_dependencies,
     )
 
 

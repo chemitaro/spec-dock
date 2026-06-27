@@ -231,9 +231,7 @@ def _build_raw_direct_edges(result: SyncStateResult) -> list[dict[str, str]]:
         if source_node is None:
             continue
         target_ids = _sort_ids([
-            target_id
-            for target_id in result.raw_node_depends_on_map.get(source_id, [])
-            if isinstance(target_id, str)
+            target_id for target_id in result.raw_node_depends_on_map.get(source_id, []) if isinstance(target_id, str)
         ])
         for target_id in target_ids:
             target_node = graph_nodes.get(target_id)
