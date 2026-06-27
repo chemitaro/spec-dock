@@ -50,6 +50,7 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-S04-001 | superseded | scope / operation | parent orchestrator | `iss-00239` was still scaffold-shaped and would keep blocking Epic 00224 close-readiness if treated as an independent corrective issue | A: keep `iss-00239` independent; B: delete scaffold history; C: formally supersede by `iss-00241` while preserving history | `iss-00239` is formally superseded by `iss-00241` for Epic 00224 close-readiness purposes | `iss-00241` requirement/design/plan/report already absorb the unresolved assurance-compose planning-template scope; preserving this report keeps the historical scaffold evidence without leaving an unresolved corrective issue | superseded | `./spec-dock/scripts/spec-dock close iss-00239` -> exit 0, `state=CLOSED already_closed=true`; `gh issue view 239 --json number,state,title,url,closedAt` -> `state=CLOSED`, `closedAt=2026-06-27T05:17:44Z`, `url=https://github.com/chemitaro/spec-dock/issues/239`; lifecycle command produced no local diff because GitHub issue `#239` was already closed | Replacement: `iss-00241`; no further implementation under `iss-00239` for Epic 00224 close-readiness |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -124,7 +125,16 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- `iss-00239` の scaffold history は削除せず、Epic 00224 close-readiness 上の未解決 corrective issue としては `iss-00241` に formally superseded と記録する。
+- GitHub issue `#239` は既に closed であり、SpecDock close lifecycle command は no-op close として成功した。
+
+## S04 Supersession Evidence
+
+| 対象 | 観測証跡 | 結果 | メモ |
+|---|---|---|---|
+| `iss-00239` lifecycle close | `./spec-dock/scripts/spec-dock close iss-00239` -> exit 0; output included `spec-dock: ok (close) target=iss-00239 node=iss-00239 kind=issue github=#239 state=CLOSED already_closed=true` and `spec-dock: ok (close auto-sync)` | closed / superseded by `iss-00241` | Command produced no local diff because GitHub issue `#239` was already closed. |
+| GitHub issue `#239` | `gh issue view 239 --json number,state,title,url,closedAt` -> `state=CLOSED`, `closedAt=2026-06-27T05:17:44Z`, `url=https://github.com/chemitaro/spec-dock/issues/239` | closed | This confirms the lifecycle close evidence is observational and does not delete or rewrite this scaffold history. |
+| Epic 00224 close-readiness disposition | `iss-00241` requirement/design/plan/report absorb the unresolved assurance-compose planning-template scope | formal supersede | `iss-00239` must not remain in Epic 00224 final gate as an unresolved scaffold; replacement issue is `iss-00241`. |
 
 ## 実装記録（セッションログ） (必須)
 
