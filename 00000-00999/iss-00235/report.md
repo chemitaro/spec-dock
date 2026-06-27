@@ -837,7 +837,28 @@ pass
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| `src/spec_dock/assets/spec_dock/docs/reference_deps.md` / `reference_sync.md` and dogfooding mirror `spec-dock/docs/reference_deps.md` / `reference_sync.md` | yes | doc-writer | Documented `deps check --json` top-level `direct_node_dependencies`, `.agent/index-all.json` `deps.raw_direct_edges`, non-goal artifact boundaries, and unchanged `.meta.json.depends_on` storage. Provider/dogfooding copies match by `diff -u`; `git diff --check` passed. | pass |
+
+#### S90 セッションログ（2026-06-27）
+
+##### 実施内容
+- Provider-side docs source of truth under `src/spec_dock/assets/spec_dock/docs/` に今回の public JSON / sync artifact contract を追記した。
+- Dogfooding `spec-dock/docs/` copy は secondary generated/consumer copy として同文に更新した。
+- CLI help / generated context guidance は現行の `index-all` full-history guidance と矛盾しないため変更しない判断とした。
+
+##### 実行コマンド / 結果
+```bash
+diff -u src/spec_dock/assets/spec_dock/docs/reference_deps.md spec-dock/docs/reference_deps.md
+diff -u src/spec_dock/assets/spec_dock/docs/reference_sync.md spec-dock/docs/reference_sync.md
+git diff --check
+
+pass
+```
+
+##### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S90 | doc-writer | Updated dependency/sync references for `direct_node_dependencies`, `deps.raw_direct_edges`, and non-goal artifact boundaries. | `src/spec_dock/assets/spec_dock/docs/reference_deps.md`, `src/spec_dock/assets/spec_dock/docs/reference_sync.md`, `spec-dock/docs/reference_deps.md`, `spec-dock/docs/reference_sync.md` | `diff -u` provider/dogfooding docs matched; `git diff --check` passed; pytest not run for docs-only change | fresh spec-reviewer passed | CLI help text not changed because current guidance is not contradictory | accepted for commit gate |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
