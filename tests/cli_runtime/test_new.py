@@ -807,9 +807,11 @@ class TestCliNew(CliRuntimeHarness):
                 content = created[0].read_text(encoding="utf-8")
                 frontmatter = content.split("---", 2)[1]
                 assert '状態: "draft | approved"' in frontmatter
+                assert "artifact_state: awaiting-assurance-compose" not in frontmatter
                 assert "adoption_status" not in frontmatter
                 assert "template_source" not in frontmatter
                 assert "created_by_role" not in frontmatter
+                assert "placeholder" not in content
                 assert "Canonical `" not in content
                 assert "remains main-orchestrator-only" not in content
                 canonical_source = target / "spec-dock" / template_source
