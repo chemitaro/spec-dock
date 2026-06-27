@@ -5,8 +5,10 @@ usage() {
   cat >&2 <<'USAGE'
 usage: trigger_codex_review.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA
 
-Posts exactly one fixed PR issue comment body, "@codex review", after
-verifying that the PR head still matches --head-sha. The script does not accept
+Posts at most one deterministic PR issue comment whose body starts with
+"@codex review" and includes trusted base-branch review policy evidence after
+verifying that the PR head still matches --head-sha. Base policy failures are
+reported as human gate without posting a comment. The script does not accept
 caller-provided bodies, endpoints, methods, GraphQL queries, headers, jq
 expressions, or raw gh arguments.
 USAGE

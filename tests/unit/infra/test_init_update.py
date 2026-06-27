@@ -1207,6 +1207,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00237-analyze-manual-test-routing-failures/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00238-stdout-runbook-handoff-instead-of-generated-workflow-files/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00239-compose-issue-planning-templates-after-assurance-classification/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00241-resolve-epic-traceability-and-review-policy-gate-gaps/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1454,6 +1455,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00237-analyze-manual-test-routing-failures/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00238-stdout-runbook-handoff-instead-of-generated-workflow-files/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00239-compose-issue-planning-templates-after-assurance-classification/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00241-resolve-epic-traceability-and-review-policy-gate-gaps/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -3264,48 +3266,18 @@ class TestInitUpdate(CliRuntimeHarness):
             assert list(issue_templates_dir.rglob("README.md")) == []
 
             design_text = (issue_templates_dir / "design.md").read_text(encoding="utf-8")
-            # UML is embedded as small subsections (not a single block at the end).
-            assert "```plantuml" in design_text
-            assert "### 図表（UML /" in design_text
+            assert "artifact_state: awaiting-assurance-compose" in design_text
+            assert "assurance classify --stage requirement" in design_text
+            assert "assurance compose --artifact all" in design_text
+            assert "```plantuml" not in design_text
 
             plan_text = (issue_templates_dir / "plan.md").read_text(encoding="utf-8")
             assert "update_plan" not in plan_text
-            assert "このテンプレートは executable scaffold" in plan_text
-            assert "## 実行ルール（全ステップ共通）" in plan_text
-            assert "workflow_issue.md" in plan_text
-            assert "phase_plan_issue.md" in plan_text
-            assert "### ドキュメント影響の解消ステップ S90（docs impact resolution / docs refresh）" in plan_text
-            assert "### 最終品質ゲートステップ S99（final quality gate）" in plan_text
-            assert "step reviewer gate" in plan_text
-            assert "commit gate" in plan_text
-            assert "planned contract" in plan_text
-            assert "command queue" in plan_text
-            assert "observed evidence ledger" in plan_text
-            assert "report 証跡の記録先" in plan_text
-            assert "amendment trigger" in plan_text
-            assert "read-only evidence" in plan_text
-            assert "qa-reviewer" in plan_text
-            assert "final QA gate" in plan_text
-            assert "final code review ゲート" in plan_text
-            assert "final spec review ゲート" in plan_text
-            assert "対象ファイル:" in plan_text
-            assert "#### 委任契約（delegation contract）" in plan_text
-            for fragment in (
-                "委任ロール（delegated role）:",
-                "入力 docs:",
-                "許可 paths:",
-                "禁止 changes:",
-                "受け入れ条件:",
-                "必須 tests または docs-only verification:",
-                "reviewer focus:",
-                "必須出力（output required）:",
-                "verification result:",
-                "停止条件（stop conditions）:",
-                "#### 具体テストケース一覧",
-                "#### ステップ完了契約（step closure contract）",
-                "#### ステップゲート（step gate）",
-            ):
-                assert fragment in plan_text
+            assert "artifact_state: awaiting-assurance-compose" in plan_text
+            assert "assurance classify --stage requirement" in plan_text
+            assert "assurance compose --artifact all" in plan_text
+            assert "このテンプレートは executable scaffold" not in plan_text
+            assert "planned contract" not in plan_text
 
             report_text = (issue_templates_dir / "report.md").read_text(encoding="utf-8")
             assert "## 遭遇した問題と解決" in report_text
@@ -4320,134 +4292,19 @@ class TestInitUpdate(CliRuntimeHarness):
                 "更新条件:",
             ):
                 assert metadata_field in section
-        assert "このテンプレートは最小 scaffold" in issue_design
-        assert "項目は追加・削除・統合・並べ替えてよい" in issue_design
-        assert "## 親図（Diagram）参照" in issue_design
-        assert "module 依存:" in issue_design
-        assert "class 依存（必要時）:" in issue_design
-        assert "function 依存（必要時）:" in issue_design
-        assert "file 依存:" in issue_design
-        assert "## モジュール依存図（Module Dependency Diagram）" in issue_design
-        assert "- タイトル:" in issue_design
-        assert "### 図表（UML / 原則: モジュール依存 / パッケージ依存差分）" in issue_design
-        module_dependency_section = issue_design.split("## モジュール依存図（Module Dependency Diagram）", 1)[1].split(
-            "## ローカル図の差分（Local Diagram Delta / 必要時）", 1
-        )[0]
-        assert "```plantuml" in module_dependency_section
-        assert "N/A: 理由" not in module_dependency_section
-        assert "## ローカル図の差分（Local Diagram Delta / 必要時）" in issue_design
-        assert "## シーケンス差分（Sequence Delta / 必要時）" in issue_design
-        assert "## ドメインモデル差分（Domain Model Delta / 必要時）" in issue_design
-        for optional_issue_section in (
-            issue_design.split("## シーケンス差分（Sequence Delta / 必要時）", 1)[1].split(
-                "## ドメインモデル差分（Domain Model Delta / 必要時）", 1
-            )[0],
-            issue_design.split("## ドメインモデル差分（Domain Model Delta / 必要時）", 1)[1].split(
-                "## クラス / インターフェース詳細設計（必要時）", 1
-            )[0],
-            issue_design.split("## クラス / インターフェース詳細設計（必要時）", 1)[1].split(
-                "## ディレクトリ / ファイル変更計画", 1
-            )[0],
-        ):
-            assert "N/A: 理由" in optional_issue_section
-            assert "```plantuml" not in optional_issue_section
-        assert issue_design.count("```plantuml") == 1, (
-            "issue design scaffold should only ship the standard module dependency UML placeholder"
-        )
-        assert "必要な場合だけ追加する" not in issue_design
-        assert "## ディレクトリ / ファイル変更計画" in issue_design
-        assert re.search(r"```text\n\.\n\|-- src/\n\|   \|-- package/", issue_design)
-        for operation in ("追加", "変更", "移動/rename", "読取のみ", "削除"):
-            assert re.search(rf"# .*{re.escape(operation)}", issue_design)
-        assert "依存:" in issue_design
-        assert "\n- Add:\n" not in issue_design
-        assert "\n- Modify:\n" not in issue_design
-        assert "\n- Delete:\n" not in issue_design
-        assert "\n- Move/Rename:\n" not in issue_design
-        assert "\n- Read only:\n" not in issue_design
-        assert "unknown path handling" not in issue_design
-        assert "user confirmation points" not in issue_design
-        assert "## 要件 → 設計マッピング" in issue_design
-        assert "## 要件 / 例外 -> 検証マッピング" in issue_design
-        assert "このテンプレートは executable scaffold" in issue_plan
-        assert "workflow_issue.md" in issue_plan
-        assert "phase_plan_issue.md" in issue_plan
-        assert "## 依存関係から導く実装順序" in issue_plan
-        assert "planned contract" in issue_plan
-        assert "command queue" in issue_plan
-        assert "observed evidence ledger" in issue_plan
-        assert "依存:" in issue_plan
-        assert "unblock:" in issue_plan
-        assert "対象ファイル:" in issue_plan
-        assert "## 仕様固定クロージャ索引（Spec-Locked Closure Index）" in issue_plan
-        assert "coverage ledger" in issue_plan
-        assert "実際の step-local obligation" in issue_plan
-        assert (
-            "| 識別子（ID） | ステップ（step） | スライス（slice） | 種別（type） | 仕様リンク | 固定する期待値 | 観測可能な入力 / 状態 | 防ぐ bug class | 必須 | 証跡レベル（evidence level） | クロージャ証跡（closure evidence） |"
-            in issue_plan
-        )
-        assert "証跡レベル（evidence level）:" in issue_plan
-        assert "red-required:" in issue_plan
-        assert "covered-existing:" in issue_plan
-        assert "inspect-only:" in issue_plan
-        assert "manual-required:" in issue_plan
-        assert (
-            "件数ではなく、AC、changed contract、failure mode、regression risk、invariant、manual / integration risk"
-            in issue_plan
-        )
-        assert "private method、実装アルゴリズム、mock 構造、assert 細部は原則固定しない" in issue_plan
-        assert "テスト義務（test obligation）:" in issue_plan
-        assert "closure id:" in issue_plan
-        assert "coverage rationale:" in issue_plan
-        assert "Red / 代替証跡の要件:" in issue_plan
-        assert "代替 evidence path:" in issue_plan
-        assert "Green 検証:" in issue_plan
-        assert "Refactor / cleanup ガードレール:" in issue_plan
-        assert "report 証跡の記録先:" in issue_plan
-        assert "amendment trigger（plan amendment が必要になる契機）:" in issue_plan
-        assert "#### 具体テストケース一覧" in issue_plan
-        assert "- `tc-s01-001` acceptance: <短い説明>" in issue_plan
-        assert "- `tc-s01-002` inspect-only / manual-required: <短い説明>" in issue_plan
-        assert "step-local obligation と concrete red / characterization / inspect / manual seeds" in issue_plan
-        self._assert_concrete_test_cases_nested_list_contract(
-            issue_plan,
-            source="templates/issue/plan.md",
-        )
-        for fragment in ("前提:", "操作:", "期待結果:", "失敗検出:", "検証方法:"):
-            assert fragment in issue_plan
-        assert "テスト不要理由:" in issue_plan
-        assert "代替検証方法:" in issue_plan
-        assert "記録先:" in issue_plan
-        assert "S01 の subsections を複製して記入する" in issue_plan
-        assert "implementation-ready ではない" in issue_plan
-        assert "#### 委任契約（delegation contract）" in issue_plan
-        for fragment in (
-            "委任ロール（delegated role）:",
-            "入力 docs:",
-            "許可 paths:",
-            "禁止 changes:",
-            "受け入れ条件:",
-            "必須 tests または docs-only verification:",
-            "reviewer focus:",
-            "必須出力（output required）:",
-            "verification result:",
-            "停止条件（stop conditions）:",
-        ):
-            assert fragment in issue_plan
-        assert "#### ステップ完了契約（step closure contract）" in issue_plan
-        assert "closure id:" in issue_plan
-        assert "close 条件:" in issue_plan
-        assert "検証 evidence:" in issue_plan
-        assert "Step Contract Closure:" in issue_plan
-        assert "Test Contract Closure:" in issue_plan
-        assert "Closure Coverage:" in issue_plan
-        assert "TDD iterations" not in issue_plan
+        assert "artifact_state: awaiting-assurance-compose" in issue_design
+        assert "assurance classify --stage requirement" in issue_design
+        assert "assurance compose --artifact all" in issue_design
+        assert "設計 placeholder" in issue_design
+        assert "```plantuml" not in issue_design
+        assert "このテンプレートは最小 scaffold" not in issue_design
+        assert "artifact_state: awaiting-assurance-compose" in issue_plan
+        assert "assurance classify --stage requirement" in issue_plan
+        assert "assurance compose --artifact all" in issue_plan
+        assert "実装計画 placeholder" in issue_plan
+        assert "このテンプレートは executable scaffold" not in issue_plan
+        assert "planned contract" not in issue_plan
         assert "update_plan" not in issue_plan
-        assert "commit gate" in issue_plan
-        assert "step reviewer gate" in issue_plan
-        assert "no-op gate" in issue_plan
-        assert "#### ステップゲート（step gate）" in issue_plan
-        assert "## 要件 ↔ ステップ対応" in issue_plan
 
         assert "#### ワークフロー委任同意の証跡（Workflow Delegation Consent）" in issue_report
         assert _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER in issue_report
@@ -9905,30 +9762,55 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         plan_text = texts["issue plan template"]
         for fragment in (
+            "artifact_state: awaiting-assurance-compose",
+            "assurance classify --stage requirement",
+            "assurance compose --artifact all",
+            "実装計画 placeholder",
+        ):
+            with _case(asset="issue plan template", fragment=fragment):
+                assert fragment in plan_text
+        for fragment in (
             "planned contract",
             "command queue",
             "observed evidence ledger",
-            "report 証跡の記録先",
+        ):
+            with _case(asset="issue plan template", stale_fragment=fragment):
+                assert fragment not in plan_text
+        plan_contract_text = "\n".join(
+            texts[label]
+            for label in (
+                "workflow issue docs",
+                "phase issue plan docs",
+                "issue plan authoring docs",
+                "execute issue prompt",
+                "issue execution skill",
+            )
+        )
+        for fragment in (
+            "planned contract",
+            "command queue",
+            "observed evidence ledger",
+            "report evidence destination",
             "amendment trigger",
             "#### 具体テストケース一覧",
             "step-local obligation",
             "concrete red / characterization / inspect / manual seeds",
-            "#### ステップ完了契約（step closure contract）",
-            "#### ステップゲート（step gate）",
-            "Red / 代替証跡の要件",
-            "Green 検証",
-            "Refactor / cleanup ガードレール",
-            "1 behavior slice / 1 review scope / 1 commit boundary",
+            "step closure contract",
+            "step gate",
+            "Red または代替 evidence",
+            "Green verification",
+            "Refactor / cleanup guardrail",
+            "1 implementation step = 1 review scope = 1 commit",
             "plan amendment",
-            "fresh re-review",
-            "final review / final commit",
-            "per-step review / commit",
-            "N/A は read-only / approved-no-op step",
+            "re-review",
+            "final commit",
+            "per-step reviewer gate",
+            "approved-no-op",
             "Parent Implementation Exception",
-            "file mutation を伴う通常の implementation success path として使わない",
+            "file mutation",
         ):
-            with _case(asset="issue plan template", fragment=fragment):
-                assert fragment in plan_text
+            with _case(asset="issue planning contract docs", fragment=fragment):
+                assert fragment in plan_contract_text
 
         report_text = texts["issue report template"]
         for fragment in (
@@ -12002,6 +11884,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         scaffold_paths = (
             ".agents/skills/github-pr-observation/SKILL.md",
+            ".agents/skills/github-pr-observation/scripts/trigger_codex_review.sh",
             ".agents/skills/github-pr-observation/scripts/wait_pr_observation.sh",
             ".agents/skills/github-pr-observation/scripts/fetch_pr_observation_snapshot.sh",
             ".agents/skills/github-pr-observation/scripts/lib/fetch_pr_checks_snapshot.sh",
@@ -12028,6 +11911,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             repo_root
             / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md"
         ).read_text(encoding="utf-8")
+        trigger_text = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh"
+        ).read_text(encoding="utf-8")
         for fragment in (
             "POST repos/{owner}/{repo}/issues/{pr}/comments",
             "runtime-composed deterministic body",
@@ -12042,8 +11929,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "with the fixed body `@codex review`",
             "posts exactly one fixed `@codex review` issue comment",
             "one fixed `@codex review` comment",
+            'fixed PR issue comment body, "@codex review"',
         ):
             assert stale_fragment not in skill_text
+            assert stale_fragment not in trigger_text
 
     def test_issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -13354,13 +13243,16 @@ exit 44
 case "$*" in
   "pr view 13 --repo owner/repo --json headRefOid,url,state,isDraft,number"|"pr view 13 --repo owner/repo --json headRefOid,baseRefOid,url,state,isDraft,number")
     cat <<'JSON'
-{{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}}
+{{"headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseRefOid":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","baseRefName":"main","headRefName":"feature", "url":"https://github.com/owner/repo/pull/13","state":"OPEN","isDraft":false,"number":13,"mergeable":"MERGEABLE"}}
 JSON
+    ;;
+  "api repos/owner/repo/contents/.github/codex/review-policy.md?ref=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+    printf '%s\\n' '{{"content":"IyBSZXZpZXcgcG9saWN5Cg==","encoding":"base64"}}'
     ;;
   "api repos/owner/repo/issues/13/comments --paginate")
     printf '[]\\n'
     ;;
-  "api repos/owner/repo/issues/13/comments --method POST --raw-field body=@codex review")
+  "api repos/owner/repo/issues/13/comments --method POST --raw-field body="*)
     printf 'GraphQL: Resource not accessible by personal access token {token_marker}\\n' >&2
     exit 1
     ;;

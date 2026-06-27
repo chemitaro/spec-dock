@@ -105,6 +105,13 @@ def has_permission_limitation(payload: dict) -> bool:
     )
 
 
+def has_permission_signal(payload: dict) -> bool:
+    return any(
+        isinstance(item, dict) and item.get("code") == "github_token_permission_denied"
+        for item in payload.get("limitations", [])
+    )
+
+
 def has_waitable_required_actions_context_limitation(payload: dict) -> bool:
     return any(
         isinstance(item, dict)
@@ -115,31 +122,6 @@ def has_waitable_required_actions_context_limitation(payload: dict) -> bool:
 
 
 def required_check_rollup_status(repo: str, pr: str, timeout_seconds: float) -> str | None:
-    try:
-        required_proc = subprocess.run(
-            ["gh", "pr", "checks", pr, "--repo", repo, "--required", "--json", "state,bucket,conclusion"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=max(0.1, timeout_seconds),
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        required_proc = None
-    if required_proc is not None and required_proc.returncode == 0:
-        try:
-            required_payload = json.loads(required_proc.stdout)
-        except json.JSONDecodeError:
-            required_payload = None
-        if isinstance(required_payload, list) and required_payload:
-            for item in required_payload:
-                if not isinstance(item, dict):
-                    continue
-                state = str(item.get("state") or item.get("bucket") or item.get("conclusion") or "").upper()
-                if state in {"FAIL", "FAILURE", "FAILED", "ERROR", "TIMED_OUT", "CANCELLED"}:
-                    return "failed"
-                if state and state not in {"PASS", "SUCCESS", "COMPLETED", "SKIPPING", "SKIPPED"}:
-                    return "pending"
-            return None
     try:
         proc = subprocess.run(
             ["gh", "pr", "view", pr, "--repo", repo, "--json", "mergeStateStatus,statusCheckRollup"],
@@ -959,7 +941,7 @@ def trigger_failure_result(trigger_payload: dict, trigger_stdout: str, trigger_s
     normalized_status = trigger_payload.get("overall_status") or trigger_payload.get("status") or "unknown"
     if normalized_status == "trigger_posted":
         normalized_status = "unknown"
-    if has_permission_limitation(trigger_payload):
+    if has_permission_signal(trigger_payload):
         normalized_status = "human_gate"
         next_action = "fix_github_token_permissions"
     elif normalized_status == "stale_head":
@@ -1837,6 +1819,8 @@ while True:
         terminal_now = True
     elif normalized_status == "human_gate" and blocker_fingerprints(payload) and same_count < same_fingerprint_count:
         terminal_now = False
+    if normalized_status == "human_gate" and has_permission_signal(payload):
+        next_action = "fix_github_token_permissions"
 
     payload["script"] = "wait_pr_observation.sh"
     payload["status"] = normalized_status
