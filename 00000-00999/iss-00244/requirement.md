@@ -3,7 +3,7 @@
 ID: "iss-00244"
 タイトル: "Simplify Issue Execution Guidance Into Plan Centric Preflight Validation"
 関連GitHub: ["#244"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-29"
 親: ["epic-00224", "init-local-00003"]
