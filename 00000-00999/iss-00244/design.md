@@ -121,7 +121,10 @@ ID: "iss-00244"
   - `stop_conditions`: non-executable / stale / unresolved / reviewer missing / assurance invalid など。
 - `guidance issue-planning` も同じ Runbook schema を使うため、agent を誤誘導する `selected step` 登録文面を skill から削除する。
 - `design.md` / `plan.md` の preflight scaffold 判定では、`状態: "draft"`、`draft | proposed`、`template`、`placeholder` などの status / scaffold marker は frontmatter または明示的な managed scaffold 文言に限定して扱う。本文の調査メモ、過去事例、path 名、`non-placeholder` のような否定表現に含まれる語で実行可能な artifact を block してはならない。
-- strict-legacy path でも `design.md` / `plan.md` が symlink の場合は execution-ready にしてはならない。`.assurance.json` が missing の fallback path でも、planning artifact は issue-local regular file として扱う。
+- strict-legacy path でも `requirement.md` / `design.md` / `plan.md` が symlink の場合は execution-ready にしてはならない。`.assurance.json` が missing の fallback path でも、planning artifact は issue-local regular file として扱う。
+- `plan.md` の実行可能性判定では、`implementation steps` のような一般語だけを positive marker として扱わない。`There are no implementation steps yet` のような否定文は scaffold / non-executable として fail-closed にする。
+- `active/current-runbook.json`、`active/current-runbook.md`、`active/context-pack.md` は generated file projection であり、同名 directory が存在する場合は cleanup で再帰削除しない。Directory は異常状態として明示的に拒否し、利用者が確認できるようにする。
+- `new doc draft-*` が discussion artifact を生成する場合、frontmatter closing delimiter と Markdown body は必ず改行で分離する。Draft artifact が `---# Heading` のような malformed Markdown になってはならない。
 
 ### 方針 C: Step-level Obligation Pattern は planning-time contract に移す
 
@@ -173,6 +176,8 @@ ID: "iss-00244"
   - diagnostics には rename 先 `.assurance.json` を示す。
 - `.assurance.json` が directory など regular file ではない場合は、top-level exception ではなく structured invalid result を返す。
 - `assurance compose` は複数 artifact を変更する前に、contract path と全 changed artifact path の書き込み可能性を preflight する。後続 artifact が書けない場合に前段 artifact だけを書き換えて source binding と canonical docs を不整合にしてはならない。
+- `assurance compose` は stale source binding を検出した時点で structured invalid result を返し、source-bound artifact の read に進まない。Artifact が削除済みの場合でも FileNotFoundError を top-level に漏らしてはならない。
+- `obligations.notes` は現行 domain model の round-trip 対象外であるため、non-empty value は unsupported metadata として fail-closed にする。空配列のみ互換 metadata として許可し、非空 notes を読み捨ててはならない。
 - Existing dogfooding Issue-local `assurance.json` artifacts は `.assurance.json` に rename する。
 - CLI help / current docs / test fixtures は `.assurance.json` に揃える。
 - Historical discussions / completed Issue docs は、必要最小限以外の bulk rewrite をしない。

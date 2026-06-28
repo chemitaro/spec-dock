@@ -52,6 +52,7 @@ ID: "iss-00244"
 - AC-021: Missing review completion times out retryably
 - AC-022: Hydration only follows explicit completion
 - AC-023: PR #245 delayed review regression is covered
+- AC-024: Pull request review body is blocker policy input
 
 ## 依存関係から導く実装順序
 
@@ -218,6 +219,12 @@ PR observation completion wait の要件対応:
 | tc-039 | AC-004 / AC-010 | strict-legacy guidance blocks symlinked `design.md` / `plan.md` | `.assurance.json` missing and planning artifact symlink points outside issue | fallback path follows symlink and returns execution-ready | yes | red-required | S02 / S399 |
 | tc-040 | AC-016 / AC-017 | hidden assurance contract path must be regular file and unreadable/non-file paths return structured invalid result | `.assurance.json` is a directory | public validation/guidance exits through unstructured exception | yes | red-required | S200 / S399 |
 | tc-041 | AC-016 / AC-019 | compose preflights all changed artifact writes before mutating any artifact | multi-artifact compose where later changed artifact is unwritable | compose partially mutates earlier artifact then fails before source binding update | yes | red-required | S210 / S399 |
+| tc-042 | AC-004 / AC-010 | strict-legacy guidance blocks symlinked `requirement.md` | `.assurance.json` missing and requirement symlink points outside issue | fallback path follows symlink and returns execution-ready | yes | red-required | S02 / S399 |
+| tc-043 | AC-010 | active pointer refresh refuses generated projection directories | `spec-dock/active/current-runbook.json` is a directory | stale projection cleanup deletes arbitrary directory contents | yes | red-required | S05 / S399 |
+| tc-044 | AC-004 / AC-010 | negated plan prose is not accepted as executable step evidence | approved plan says there are no implementation steps yet | positive marker matching accepts negated free text | yes | red-required | S02 / S399 |
+| tc-045 | AC-009 / AC-010 | draft discussion frontmatter remains delimited from Markdown body | `new doc draft-*` generated discussion artifact | frontmatter closing delimiter is concatenated with body heading | yes | red-required | S05 / S399 |
+| tc-046 | AC-016 / AC-017 | compose returns structured stale binding before reading missing artifacts | source-bound artifact was deleted after classify | missing artifact raises unstructured exception before JSON result | yes | red-required | S210 / S399 |
+| tc-047 | AC-016 / AC-017 | non-empty obligation notes are rejected instead of silently discarded | `.assurance.json` has `obligations.notes` with strings | unsupported metadata is accepted and lost on round trip | yes | red-required | S200 / S399 |
 
 ## 実装ステップ
 

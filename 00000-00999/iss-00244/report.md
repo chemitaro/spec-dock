@@ -673,6 +673,17 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 | Codex P1: `Read review policy from the trusted base` | 採用しない。current issue / Epic ADR は trusted base policy を script-local instruction source へ変更済みであり、GitHub base/head `.github/codex/review-policy.md` を読まないことが AC-012 / AC-015 の期待結果である。 | `requirement.md` AC-012/AC-015; `design.md` 方針 D; `plan.md` tc-016/tc-019/tc-021; trigger script comment added for current contract clarity | rejected |
 | Post-review local verification | P1 4件の修正と trusted-base 誤指摘の明文化後、assurance / workflow / trigger / full init-update / lint / validate を再実行した。 | `40 passed` assurance/application/compose lane; `23 passed` workflow lane; `17 passed` trigger focused lane; `524 passed` full `test_init_update.py`; `make lint`; `validate`; `assurance verify`; `git diff --check` | pass |
 
+#### PR #245 Review Finding Follow-up（2026-06-29 round 2）
+| Review / finding | 対応 | 検証 | 結果 |
+|---|---|---|---|
+| Codex P1: `Reject symlinked requirements before marking execution ready` | strict-legacy path の `requirement.md` reader が symlink を辿らないようにし、symlinked requirement は missing として requirement-capture に戻す。 | `test_guidance_blocks_strict_legacy_symlinked_requirement`; workflow lane 25 passed | fixed |
+| Codex P1: `Refuse directories when clearing stale runbook projections` | `active/current-runbook.json` / `current-runbook.md` / `context-pack.md` が directory の場合、active pointer refresh は削除せず RuntimeError で停止する。 | `test_apply_active_pointers_refuses_generated_projection_directories`; active/assurance unit lane 23 passed | fixed |
+| Codex P1: `Reject negated plan text before enabling execution` | `implementation step(s)` / `planned contract` のような汎用語を positive marker から外し、`no implementation steps` / `no executable steps` を scaffold marker として扱う。 | `test_guidance_blocks_negated_plan_text_without_executable_steps`; workflow lane 25 passed | fixed |
+| Codex P1: `Keep draft discussion frontmatter delimited` | draft discussion normalization が frontmatter closing delimiter と body を改行で分離するよう修正した。 | `test_new_doc_creates_draft_artifacts_from_scope_specific_templates`; compose/new lane 53 passed, 5 skipped | fixed |
+| Codex P1: `Return stale compose as JSON before reading missing artifacts` | `assurance compose` は stale source binding を検出した時点で structured invalid result を返し、missing artifact read へ進まないようにした。 | `test_assurance_compose_returns_stale_binding_before_reading_missing_artifact`; compose/new lane 53 passed, 5 skipped | fixed |
+| Codex P1: `Preserve or reject non-empty obligation notes` | 現行 domain model が preserve しない `obligations.notes` non-empty は `unsupported_obligations_notes` として invalid schema にする。 | `test_invalid_json_and_invalid_schema_have_distinct_machine_reasons`; active/assurance unit lane 23 passed | fixed |
+| Current spec alignment | 上記 6 件を `requirement.md` / `design.md` / `plan.md` に明文化し、`tc-042`〜`tc-047` を追加した。ADR は既存 accepted ADR（explicit review completion / review body blocker ingestion）と旧 ADR の変更済み注記で整合している。 | docs inspection; focused tests pass | pass |
+
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
@@ -689,16 +700,22 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 | tc-040 | S200/S399 | yes | command | non-file `.assurance.json` raised unstructured OSError path | `test_read_contract_rejects_non_file_hidden_assurance_contract` | pass | returns structured invalid result |
 | tc-041 | S210/S399 | yes | command | compose could partially write earlier artifacts before later artifact failure | `test_compose_preflights_all_changed_artifacts_before_writing` | pass | all changed artifact writes are preflighted before mutation |
 | tc-034 | S300 | yes | structural assertion | skill text described terminal-like unknown human gate | grep inspection | pass | active terminal unknown wording removed from provider/dogfood skills |
+| tc-042 | S02/S399 | yes | command | strict-legacy path followed symlinked requirement.md | `test_guidance_blocks_strict_legacy_symlinked_requirement` | pass | symlinked requirement returns `requirement-capture / requirement-missing` |
+| tc-043 | S05/S399 | yes | command | active projection cleanup could recursively delete directory content | `test_apply_active_pointers_refuses_generated_projection_directories` | pass | generated file paths refuse directories |
+| tc-044 | S02/S399 | yes | command | negated plan prose could match positive implementation-step marker | `test_guidance_blocks_negated_plan_text_without_executable_steps` | pass | no implementation steps remains blocked |
+| tc-045 | S05/S399 | yes | command | draft discussion frontmatter closing delimiter could concatenate with body heading | `test_new_doc_creates_draft_artifacts_from_scope_specific_templates` | pass | delimiter/body separation is asserted |
+| tc-046 | S210/S399 | yes | command | compose could read missing source-bound artifact before returning stale JSON | `test_assurance_compose_returns_stale_binding_before_reading_missing_artifact` | pass | stale source binding returns structured invalid JSON |
+| tc-047 | S200/S399 | yes | command | non-empty obligation notes were accepted and lost on round trip | `test_invalid_json_and_invalid_schema_have_distinct_machine_reasons` | pass | `unsupported_obligations_notes` rejects non-empty notes |
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-028..tc-041 | S300/S310/S320/S399 | focused pytest 13 passed, PR observation lane 119 passed, CLI runtime lane 23 passed, assurance/application/compose lane 40 passed, trigger focused lane 17 passed, full `test_init_update.py` 524 passed, `make lint`, `assurance verify`, `validate`, `git diff --check` | pass-review-pending | latest PR re-observation required after commit/push |
+| tc-028..tc-047 | S300/S310/S320/S399 | focused pytest 13 passed, PR observation lane 119 passed, CLI runtime lane 25 passed, active/assurance unit lane 23 passed, assurance/application/compose/new lanes 32 passed + 53 passed / 5 skipped, full `test_init_update.py` 524 passed, `make lint`, `assurance verify`, `validate`, `git diff --check`, provider/dogfood parity diffs | local-pass-pr-review-pending | latest PR re-observation required after commit/push |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S300/S310/S320 | pending-review | PR observation wait script/skill/tests/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S300/S310/S320 + round 2 PR review follow-up | local-pass-pr-review-pending | PR observation wait script/skill/tests/report evidence plus round 2 safety fixes | pending commit | pending post-commit clean check | N/A | N/A | N/A | N/A |
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
@@ -706,14 +723,14 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
 | docs / templates / README / workflow / skill / migration notes | yes | doc-writer | `plan.md` S90 に docs impact resolution を明記 | pending |
-| runtime guidance / shipped issue skills / assurance compose fragment / dogfooding projection | yes | orchestrator | `guidance issue-execution`; `guidance issue-planning`; `rg ... current-runbook.*`; `uv run pytest tests/unit/infra/test_init_update.py` | local pass; PR review pending |
+| runtime guidance / shipped issue skills / assurance compose fragment / dogfooding projection | yes | orchestrator | `guidance issue-execution`; focused workflow/compose/new/assurance tests; full `uv run pytest tests/unit/infra/test_init_update.py`; provider/dogfood parity diffs | local pass; PR review pending |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
 | qa-reviewer | S100/S110/S200/S210/S299 obligation coverage | added | QA re-review pass; `test_init_update.py` 515 passed; assurance/workflow lane 53 passed; hidden/file-list inspections | pass |
-| local verification | whole issue obligation coverage | executed | `uv run pytest tests/unit/infra/test_init_update.py` 524 passed; `uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` 19 passed; focused PR observation lane 119 passed; `./spec-dock/scripts/spec-dock validate`; `assurance verify`; `git diff --check`; `make lint` | pass |
-| PR observation | PR #245 current head | executed / additional wait repair pending | trigger comment `4825350981` posted with script-local instruction metadata; Provider CI initially failed on static analysis and local fix was applied; S300-S320 wait repair implemented locally | re-push / re-observation pending |
+| local verification | whole issue obligation coverage | executed | `uv run pytest tests/unit/infra/test_init_update.py` 524 passed; `uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` 25 passed; `uv run pytest tests/unit/infra/test_active_store.py tests/unit/infra/test_assurance_store.py tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance.py` 32 passed; `uv run pytest tests/cli_runtime/test_assurance_compose.py tests/cli_runtime/test_new.py` 53 passed / 5 skipped; focused PR observation lane 119 passed; `./spec-dock/scripts/spec-dock validate`; `assurance verify`; `git diff --check`; `make lint` | pass |
+| PR observation | PR #245 current head | executed / additional wait repair pending | trigger comment `4825350981` posted with script-local instruction metadata; Provider CI initially failed on static analysis and local fix was applied; S300-S320 and round 2 review follow-up implemented locally | re-push / re-observation pending |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
@@ -725,7 +742,8 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
 | spec-reviewer | requirement / design / plan / report alignment including AC-020..AC-024 / S300..S399 | fresh spec-reviewer pass; P2 traceability gap fixed by adding new ADR to S320/S399 inputs and `tc-036` to S320 closure criteria | 4 | pass |
-| local spec traceability | requirement / design / plan / report alignment | closure ids tc-001..tc-036 have local implementation evidence; latest PR re-observation remains pending after commit/push | 0 | local pass |
+| spec-reviewer round 2 | requirement / design / plan / report alignment including tc-042..tc-047 and ADR supersession | fresh spec-reviewer pass with P2 findings; AC-024 top-level plan index and stale final-gate rows updated | 1 | pass |
+| local spec traceability | requirement / design / plan / report alignment | closure ids tc-001..tc-047 have local implementation evidence; latest PR re-observation remains pending after commit/push | 0 | local pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
