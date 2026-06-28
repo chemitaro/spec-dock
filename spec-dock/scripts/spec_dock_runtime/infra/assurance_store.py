@@ -94,9 +94,12 @@ class AssuranceStore:
 
     def read_requirement_text(self, target: ResolvedIssueTarget) -> str | None:
         requirement_path = target.issue_dir / "requirement.md"
-        if not requirement_path.exists() or not requirement_path.is_file():
+        if requirement_path.is_symlink() or not requirement_path.exists() or not requirement_path.is_file():
             return None
-        return requirement_path.read_text(encoding="utf-8")
+        try:
+            return requirement_path.read_text(encoding="utf-8")
+        except OSError:
+            return None
 
     def read_contract(self, target: ResolvedIssueTarget) -> AssuranceStoreResult:
         path = target.issue_dir / ASSURANCE_CONTRACT_FILENAME
@@ -599,6 +602,8 @@ def _obligations_errors(payload: Any, classification: AssuranceClassification | 
         return ("invalid_obligations_profile_preset",)
     if not isinstance(notes, list) or not all(isinstance(note, str) for note in notes):
         return ("invalid_obligations_notes",)
+    if notes:
+        return ("unsupported_obligations_notes",)
     if classification is not None and profile_preset != classification.authorized_profile.value:
         return ("obligations_profile_mismatch",)
     return ()

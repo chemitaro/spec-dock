@@ -196,7 +196,7 @@ ID: "iss-00244"
   - アクター: issue execution agent
   - 前提: active issue の `plan.md` が scaffold、placeholder、構造化不足、未解決 marker、必須 gate 欠落のいずれかを含む。
   - 操作: `guidance issue-execution` を実行する。
-  - 期待結果: execution-ready にならず、planning-required / blocked として `plan.md` 修正を促す。
+  - 期待結果: execution-ready にならず、planning-required / blocked として `plan.md` 修正を促す。`There are no implementation steps yet` のような否定文や、strict-legacy path の symlinked `requirement.md` / `design.md` / `plan.md` を execution-ready として扱わない。
   - 観測点: CLI tests、reason_code、stop conditions。
 
 - AC-005: Plan contract captures execution obligations
@@ -231,14 +231,14 @@ ID: "iss-00244"
   - アクター: issue planner
   - 前提: この Issue の requirement / design / plan authoring を行う。
   - 操作: authoring 中に `guidance issue-planning`、`assurance classify`、`assurance compose`、`validate` を実行し、観測結果を記録する。
-  - 期待結果: guidance が期待通りなら `report.md` に pass evidence を残し、不具合があれば `discussions/` に bug / research artifact を残す。
+  - 期待結果: guidance が期待通りなら `report.md` に pass evidence を残し、不具合があれば `discussions/` に bug / research artifact を残す。Draft discussion artifact は frontmatter と本文が正しく区切られ、`---# Heading` のような malformed artifact を生成しない。
   - 観測点: `report.md` Spec Authoring Gate / Evidence Adoption Ledger、必要時の discussion artifact。
 
 - AC-010: Provider and dogfooding surfaces stay consistent
   - アクター: maintainer
   - 前提: provider assets / runtime / tests を変更した。
   - 操作: relevant tests と `./spec-dock/scripts/spec-dock validate` を実行する。
-  - 期待結果: provider source と dogfooding workspace の意図した差分が説明でき、validation が pass する。`guidance` が表示する `authorized_profile` / authority は current `assurance classify` source binding と矛盾しない。`workflow-plan-unselectable` のような旧 step selector 由来の block reason は issue-execution default path に残らない。
+  - 期待結果: provider source と dogfooding workspace の意図した差分が説明でき、validation が pass する。`guidance` が表示する `authorized_profile` / authority は current `assurance classify` source binding と矛盾しない。`workflow-plan-unselectable` のような旧 step selector 由来の block reason は issue-execution default path に残らない。Generated projection path が directory の場合、refresh cleanup は再帰削除せず fail-closed する。
   - 観測点: test output、report evidence、git diff。
 
 - AC-011: Review trigger uses script-local instruction
@@ -280,14 +280,14 @@ ID: "iss-00244"
   - アクター: runtime / maintainer
   - 前提: active issue または明示 issue path がある。
   - 操作: `assurance classify --stage requirement`、`assurance show`、`assurance verify` を実行する。
-  - 期待結果: runtime は `.assurance.json` を read/write/verify の canonical path とし、`assurance.json` を新規作成しない。
+  - 期待結果: runtime は `.assurance.json` を read/write/verify の canonical path とし、`assurance.json` を新規作成しない。`.assurance.json` 内の unsupported non-empty metadata（例: `obligations.notes`）を silently discard しない。
   - 観測点: unit tests、CLI runtime tests、file list inspection。
 
 - AC-017: Legacy assurance.json is migration-required, not silent authority
   - アクター: runtime / maintainer
   - 前提: `.assurance.json` がなく、旧 `assurance.json` だけが存在する issue がある。
   - 操作: `assurance show` または `assurance verify` を実行する。
-  - 期待結果: 旧 path は silently current authority にならず、rename / migration が必要であることを示す diagnostics が返る。
+  - 期待結果: 旧 path は silently current authority にならず、rename / migration が必要であることを示す diagnostics が返る。Stale source binding を検出した `assurance compose` は source-bound artifact read より前に structured invalid result を返し、missing artifact を unstructured exception として漏らさない。
   - 観測点: unit tests、CLI runtime tests。
 
 - AC-018: Dogfooding assurance artifacts are renamed
@@ -385,6 +385,21 @@ ID: "iss-00244"
   - 条件: `.assurance.json` がなく `assurance.json` だけがある。
   - 期待: runtime は current authority として silently accept せず、migration-required diagnostics を返す。
   - 観測点: assurance store / CLI runtime tests。
+
+- EC-010: Generated projection path is a directory
+  - 条件: `spec-dock/active/current-runbook.json`、`current-runbook.md`、または `context-pack.md` の位置に directory が存在する。
+  - 期待: active pointer refresh は directory を削除せず、異常状態として停止する。
+  - 観測点: active store unit test。
+
+- EC-011: Unsupported obligation notes
+  - 条件: `.assurance.json` の `obligations.notes` が non-empty である。
+  - 期待: 現行 domain model が preserve しない metadata は invalid schema として拒否し、読み捨てない。
+  - 観測点: assurance store unit test。
+
+- EC-012: Deleted source-bound artifact after classify
+  - 条件: `.assurance.json` の source binding 後に `design.md` / `plan.md` / `report.md` が削除された。
+  - 期待: `assurance compose` は stale source binding の structured JSON を返し、FileNotFoundError を top-level に漏らさない。
+  - 観測点: CLI runtime compose test。
 
 ## 用語
 

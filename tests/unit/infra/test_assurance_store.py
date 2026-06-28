@@ -375,6 +375,7 @@ def test_invalid_json_and_invalid_schema_have_distinct_machine_reasons(tmp_path:
     schema_dir = _make_issue(tmp_path, issue_id="iss-00228", github_issue_number=228)
     semantic_dir = _make_issue(tmp_path, issue_id="iss-00229", github_issue_number=229)
     obligations_dir = _make_issue(tmp_path, issue_id="iss-00230", github_issue_number=230)
+    obligations_notes_dir = _make_issue(tmp_path, issue_id="iss-00233", github_issue_number=233)
     malformed_fact_source_dir = _make_issue(tmp_path, issue_id="iss-00231", github_issue_number=231)
     malformed_fact_reason_dir = _make_issue(tmp_path, issue_id="iss-00232", github_issue_number=232)
     store = AssuranceStore(tmp_path)
@@ -396,6 +397,13 @@ def test_invalid_json_and_invalid_schema_have_distinct_machine_reasons(tmp_path:
     ).to_dict()
     obligations_payload["obligations"] = {"profile_preset": "lite", "notes": []}
     _write_json(obligations_dir / ".assurance.json", obligations_payload)
+    obligations_notes_payload = assurance.build_assurance_contract(
+        issue_id="iss-00233",
+        stage=assurance.ClassificationStage.REQUIREMENT,
+        source_binding=store.build_requirement_source_binding(store.resolve_issue_target("iss-00233")),
+    ).to_dict()
+    obligations_notes_payload["obligations"]["notes"] = ["must not be silently dropped"]
+    _write_json(obligations_notes_dir / ".assurance.json", obligations_notes_payload)
     malformed_fact_source_payload = assurance.build_assurance_contract(
         issue_id="iss-00231",
         stage=assurance.ClassificationStage.REQUIREMENT,
@@ -415,6 +423,7 @@ def test_invalid_json_and_invalid_schema_have_distinct_machine_reasons(tmp_path:
     schema_invalid = store.verify_contract(store.resolve_issue_target("228"))
     semantic_invalid = store.verify_contract(store.resolve_issue_target("229"))
     obligations_invalid = store.verify_contract(store.resolve_issue_target("230"))
+    obligations_notes_invalid = store.verify_contract(store.resolve_issue_target("233"))
     malformed_fact_source_invalid = store.verify_contract(store.resolve_issue_target("231"))
     malformed_fact_reason_invalid = store.verify_contract(store.resolve_issue_target("232"))
 
@@ -430,6 +439,9 @@ def test_invalid_json_and_invalid_schema_have_distinct_machine_reasons(tmp_path:
     assert obligations_invalid.status == "invalid"
     assert obligations_invalid.reason == "invalid_schema"
     assert "obligations_profile_mismatch" in obligations_invalid.details
+    assert obligations_notes_invalid.status == "invalid"
+    assert obligations_notes_invalid.reason == "invalid_schema"
+    assert "unsupported_obligations_notes" in obligations_notes_invalid.details
     assert malformed_fact_source_invalid.status == "invalid"
     assert malformed_fact_source_invalid.reason == "invalid_schema"
     assert "invalid_risk_facts" in malformed_fact_source_invalid.details

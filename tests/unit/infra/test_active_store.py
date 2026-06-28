@@ -97,6 +97,31 @@ class TestActiveStoreInfra:
             assert not (active_dir / "current-runbook.json").exists()
             assert not (active_dir / "current-runbook.md").exists()
 
+    def test_apply_active_pointers_refuses_generated_projection_directories(self) -> None:
+        active_store, infra_contracts = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._make_placeholder_dirs(specdock_dir)
+            active_dir = specdock_dir / "active"
+            stale_projection = active_dir / "current-runbook.json"
+            stale_projection.mkdir(parents=True)
+            (stale_projection / "keep.txt").write_text("do not delete\n", encoding="utf-8")
+
+            try:
+                active_store.apply_active_pointers(
+                    specdock_dir,
+                    infra_contracts.ActiveManifest(initiative=None, epic=None, issue=None),
+                    "# context\n",
+                )
+            except RuntimeError as exc:
+                assert "Refusing to remove directory" in str(exc)
+            else:
+                raise AssertionError("expected generated projection directory refusal")
+
+            assert stale_projection.is_dir()
+            assert (stale_projection / "keep.txt").read_text(encoding="utf-8") == "do not delete\n"
+
     def test_patch_agent_state_updates_cached_active_fields_without_rebuilding_indexes(self) -> None:
         active_store, infra_contracts = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:

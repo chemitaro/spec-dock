@@ -103,6 +103,9 @@ def compose_assurance(
         return _compose_invalid_result(store_result)
 
     contract = store_result.contract
+    if stale_store_result is not None:
+        return _compose_invalid_result(stale_store_result)
+
     manifest = artifact_store.load_profile_section_manifest()
     artifacts = [
         artifact_store.read_artifact(target, artifact) for artifact in artifact_store.artifact_kinds(request.artifact)
@@ -142,9 +145,6 @@ def compose_assurance(
             artifacts=views,
             errors=tuple(error for view in views for error in view.errors),
         )
-
-    if stale_store_result is not None:
-        return _compose_invalid_result(stale_store_result)
 
     changed = [(artifact, result) for artifact, result in composed if result.changed]
     if not request.dry_run:

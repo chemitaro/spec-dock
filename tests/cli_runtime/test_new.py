@@ -807,6 +807,8 @@ class TestCliNew(CliRuntimeHarness):
                 content = created[0].read_text(encoding="utf-8")
                 frontmatter = content.split("---", 2)[1]
                 assert '状態: "draft | approved"' in frontmatter
+                assert "---#" not in content
+                assert content.split("---", 2)[2].lstrip().startswith("#")
                 assert "artifact_state: awaiting-assurance-compose" not in frontmatter
                 assert "adoption_status" not in frontmatter
                 assert "template_source" not in frontmatter

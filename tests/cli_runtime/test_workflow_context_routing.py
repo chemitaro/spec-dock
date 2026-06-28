@@ -48,7 +48,7 @@ class TestWorkflowContextRoutingHardCutover(CliRuntimeHarness):
             self._write_substantive_design(issue_dir)
             (issue_dir / "plan.md").write_text(
                 "# Plan\n\n"
-                "## Planned contract\n"
+                "## Step Closure Contract\n"
                 "- Execute the approved implementation plan in order.\n"
                 "- Verification obligations are recorded here.\n",
                 encoding="utf-8",

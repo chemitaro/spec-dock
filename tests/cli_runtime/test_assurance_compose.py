@@ -76,8 +76,8 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             payload = json.loads(result.stdout)
             assert payload["ok"] is False
             assert payload["status"] == "invalid"
-            assert payload["reason"] == "substantive_content_conflict"
-            assert payload["artifacts"]["design"]["errors"]
+            assert payload["reason"] == "stale_source_binding"
+            assert "design" in " ".join(payload["details"])
             assert self._artifact_texts(issue_dir) == before
 
     def test_assurance_compose_marker_plus_direct_edit_fails_closed(self) -> None:
@@ -102,8 +102,8 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             payload = json.loads(result.stdout)
             assert payload["ok"] is False
             assert payload["status"] == "invalid"
-            assert payload["reason"] == "substantive_content_conflict"
-            assert payload["artifacts"]["design"]["errors"]
+            assert payload["reason"] == "stale_source_binding"
+            assert "design" in " ".join(payload["details"])
             assert self._artifact_texts(issue_dir) == before
 
     def test_assurance_compose_single_artifact_only_changes_selected_artifact(self) -> None:
@@ -247,6 +247,27 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert payload["reason"] == "stale_source_binding"
             assert "requirement" in " ".join(payload["details"])
             assert self._artifact_texts(issue_dir) == before
+
+    def test_assurance_compose_returns_stale_binding_before_reading_missing_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_classified_fixture(target)
+            design_path = issue_dir / "design.md"
+            design_path.unlink()
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "all", "--format", "json"],
+            )
+
+            assert result.returncode == 1
+            payload = json.loads(result.stdout)
+            assert payload["ok"] is False
+            assert payload["status"] == "invalid"
+            assert payload["reason"] == "stale_source_binding"
+            assert "design" in " ".join(payload["details"])
+            assert result.stderr == ""
 
     def test_assurance_compose_rejects_symlinked_artifact_without_touching_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

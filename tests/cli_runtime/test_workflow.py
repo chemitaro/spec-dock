@@ -331,6 +331,60 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["may_execute_approved_plan"] is False
             assert payload["authority"]["authorized_profile"] == "strict"
 
+    def test_guidance_blocks_strict_legacy_symlinked_requirement(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Legacy symlink requirement")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            self._write_executable_plan(issue_dir)
+            external = target / "external-requirement.md"
+            external.write_text("# External Requirement\n\noutside\n", encoding="utf-8")
+            requirement_path = issue_dir / "requirement.md"
+            requirement_path.unlink()
+            requirement_path.symlink_to(external)
+
+            result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = self._read_projected_runbook(target)
+            assert payload["state"] == "requirement-capture"
+            assert payload["reason_code"] == "requirement-missing"
+            assert payload["may_execute_approved_plan"] is False
+            assert payload["authority"]["authorized_profile"] == "strict"
+
+    def test_guidance_blocks_negated_plan_text_without_executable_steps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Negated plan")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            (issue_dir / "plan.md").write_text(
+                "---\n"
+                "種別: 実装計画書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "approved"\n'
+                "---\n\n"
+                "# Plan\n\n"
+                "There are no implementation steps yet; planning is incomplete.\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = self._read_projected_runbook(target)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == "plan-not-executable"
+            assert payload["may_execute_approved_plan"] is False
+
     @pytest.mark.parametrize("filename", ["requirement.md", "design.md", "plan.md"])
     def test_guidance_blocks_stale_source_binding(self, filename: str) -> None:
         with tempfile.TemporaryDirectory() as tmp:
