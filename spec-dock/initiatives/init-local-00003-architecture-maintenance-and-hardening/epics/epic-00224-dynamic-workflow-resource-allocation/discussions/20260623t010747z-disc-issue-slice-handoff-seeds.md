@@ -2,6 +2,13 @@
 
 この文書は Epic planning から各 Issue planning へ渡す seed であり、各 Issue の canonical requirement / design / plan ではない。Issue作成後、runtime-owned `draft-requirement` / `draft-design` discussionへ必要部分を移し、個別 Issue workflowで正式化する。
 
+## Historical status update
+
+- この文書の I02 / I04 / I05 / I06 seed には、後続 ADR / Issue で変更された古い方針が含まれる。
+- 変更済み: `workflow next` / generated Runbook を execution authority として扱う seed は、`iss-00244` により `guidance issue-execution` の plan-centric preflight validation へ置換済み。
+- 変更済み: base SHA 上の review policy を Codex review に渡す seed は、`20260623t074444z-adr Script-local Codex Review Instruction` により script-local instruction source へ置換済み。
+- 変更済み: same fingerprint / quiet window / selected comments 0 による review completion 推定は、`20260628t154553z-adr PR Observation Explicit Review Completion` により廃止済み。Review completion は explicit Codex artifact でのみ判断する。
+
 ---
 
 ## I01 Introduce Assurance Contract And Classification Runtime

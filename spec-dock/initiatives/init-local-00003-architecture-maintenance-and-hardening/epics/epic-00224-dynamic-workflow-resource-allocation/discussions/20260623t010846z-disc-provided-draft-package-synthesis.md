@@ -22,6 +22,13 @@ reflected_to: []
 
 # 20260623t010846z-disc Provided Draft Package Synthesis
 
+## Historical status update
+
+- この文書は提供 draft package の初期理解を保存した artifact であり、現在の canonical Epic requirement / design / plan ではない。
+- 変更済み: `spec-dock workflow next ...` / runtime generated Runbook を agent handoff authority とする理解は、`iss-00244` により `guidance issue-execution` の plan-centric preflight validation へ置換済み。
+- 変更済み: PR base SHA に固定された `.github/codex/review-policy.md` から review trigger を生成する理解は、`20260623t074444z-adr Script-local Codex Review Instruction` により script-local instruction source へ置換済み。
+- 変更済み: review trigger 後の observation completion semantics は、`20260628t154553z-adr PR Observation Explicit Review Completion` が authority を持つ。
+
 ## 保存した入力資料
 
 - `20260623t010733z-draft-requirement-adaptive-assurance-draft-requirement.md`
