@@ -556,6 +556,14 @@ rg --files --hidden spec-dock | rg '(^|/)assurance\\.json$|(^|/)\\.assurance\\.j
 | local static analysis | `make lint` | pass | ruff check pass; ruff format check pass; mypy pass |
 | focused trigger tests | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_244_trigger_helper or issue_176_s05b_codex_review_trigger_helper_is_installed_by_init_and_update'` | pass | `7 passed, 508 deselected in 3.93s` |
 
+#### Review instruction 文面調整（S120 user feedback follow-up）
+| 項目 | 観測 / 決定 | 証跡 | 状態 |
+|---|---|---|---|
+| Epic-level intent | Codex review instruction の目的は、P0/P1 と machine-validated blocker に review / repair loop を集中させ、P2/P3 や style/format/lint 相当の低価値指摘による review-push-review 反復を抑制すること。 | `epic/requirement.md` E-RQ-010/E-RQ-011, E-AC-011; `20260623t074447z-adr-blocker-centric-pr-risk-closure-rereview.md` | confirmed |
+| gap | 既存 `codex-review-instructions.md` は correctness/security/user-visible regressions を優先するだけで、P2/P3 non-blocking、lint/formatter 責務、comment zero ではなく blocker zero という意図を十分に明文化していなかった。 | PR #245 posted comment `4825350981` body inspection | fixed |
+| instruction update | provider authority と dogfooding copy の script-local instruction を、merge-blocking risk / P0-P1 / protected-domain P2 with machine evidence / no low-value comments へ最適化した。 | `.agents/.../codex-review-instructions.md`; `src/spec_dock/assets/install_root/.../codex-review-instructions.md` | implemented |
+| regression guard | install/update 後の instruction asset に P0/P1 blocker、P2/P3 non-blocking、lint/formatter-enforceable issue suppression の文言が含まれる assertion を追加した。 | `tests/unit/infra/test_init_update.py` | implemented |
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
