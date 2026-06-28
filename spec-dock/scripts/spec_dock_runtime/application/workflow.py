@@ -181,7 +181,21 @@ def _classify_plan_text(plan_text: str | None) -> str:
     if not stripped:
         return "scaffold"
     lower = stripped.lower()
-    if "no structured implementation steps" in lower:
+    scaffold_markers = (
+        '状態: "draft',
+        "状態: draft",
+        "draft | proposed",
+        "no structured implementation steps",
+        "record red, green, and refactor evidence",
+        "link each closure id to its observed verification result",
+        "todo",
+        "tbd",
+        "template",
+        "placeholder",
+        "未記入",
+        "記載してください",
+    )
+    if any(marker in lower for marker in scaffold_markers):
         return "scaffold"
     markers = (
         "実装ステップ",
@@ -194,14 +208,4 @@ def _classify_plan_text(plan_text: str | None) -> str:
     )
     if any(marker in lower for marker in markers):
         return "executable"
-    placeholders = (
-        "todo",
-        "tbd",
-        "template",
-        "placeholder",
-        "未記入",
-        "記載してください",
-    )
-    if any(marker in lower for marker in placeholders):
-        return "scaffold"
     return "scaffold"

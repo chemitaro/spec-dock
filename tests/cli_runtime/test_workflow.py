@@ -148,6 +148,40 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["authority"]["authorized_profile"] == "standard"
             assert payload["authority"]["obligation_source"] == "authorized_profile"
 
+    def test_guidance_blocks_draft_placeholder_plan_even_with_executable_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Placeholder plan")
+            self._write_substantive_requirement(issue_dir)
+            (issue_dir / "plan.md").write_text(
+                "---\n"
+                "種別: 実装計画書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "draft | proposed | approved"\n'
+                "---\n\n"
+                "# Plan\n\n"
+                "## 実装ステップ\n\n"
+                '<!-- spec-dock:managed-section begin id="plan.steps" -->\n'
+                "- Record Red, Green, and refactor evidence for each executed step.\n"
+                "- Link each closure id to its observed verification result.\n"
+                '<!-- spec-dock:managed-section end id="plan.steps" -->\n',
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = self._read_projected_runbook(target)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == "plan-not-executable"
+            assert payload["may_execute_approved_plan"] is False
+
     @pytest.mark.parametrize("filename", ["requirement.md", "design.md", "plan.md"])
     def test_guidance_blocks_stale_source_binding(self, filename: str) -> None:
         with tempfile.TemporaryDirectory() as tmp:

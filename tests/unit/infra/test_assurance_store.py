@@ -112,6 +112,30 @@ def test_source_binding_persists_resolved_issue_local_path_and_active_display_pa
     assert verified.contract.to_dict() == contract.to_dict()
 
 
+def test_contract_with_unknown_root_field_is_invalid(tmp_path: Path) -> None:
+    assurance, AssuranceStore, _ = _runtime_modules()
+    issue_dir = _make_issue(tmp_path, body="# Requirement\n\nStable source.\n")
+    _write_active(tmp_path, issue_dir)
+    store = AssuranceStore(tmp_path)
+    target = store.resolve_issue_target(None)
+    binding = store.build_requirement_source_binding(target)
+    contract = assurance.build_assurance_contract(
+        issue_id=target.issue_id,
+        stage=assurance.ClassificationStage.REQUIREMENT,
+        source_binding=binding,
+    )
+    store.write_contract(target, contract)
+    payload = json.loads((issue_dir / ".assurance.json").read_text(encoding="utf-8"))
+    payload["extra_metadata"] = {"note": "must not be silently dropped"}
+    _write_json(issue_dir / ".assurance.json", payload)
+
+    result = store.read_contract(target)
+
+    assert result.status == "invalid"
+    assert result.reason == "invalid_schema"
+    assert "unknown_root_field:extra_metadata" in result.details
+
+
 def test_source_binding_rejects_symlinked_planning_artifacts(tmp_path: Path) -> None:
     _, AssuranceStore, AssuranceStoreError = _runtime_modules()
     issue_dir = _make_issue(tmp_path)
