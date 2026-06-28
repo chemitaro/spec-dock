@@ -11,6 +11,12 @@ ID: "epic-00224"
 
 # epic-00224 Dynamic Workflow Resource Allocation — 要件定義（何を、なぜ行うか）
 
+## 変更履歴（Supersession / Amendment）
+
+- 2026-06-29: 旧 `Trusted GitHub Codex review policy` 方針は変更済み。Review trigger instruction source は PR base SHA 上の `.github/codex/review-policy.md` ではなく、`20260623t074444z-adr Script-local Codex Review Instruction` により `github-pr-observation` script-local Markdown asset へ置換する。
+- 2026-06-29: 旧 `review_completion_unknown` / quiet-window / elapsed-time による PR observation 終了方針は変更済み。Review completion は `20260628t154553z-adr PR Observation Explicit Review Completion` により current trigger boundary と expected head SHA に bind された Codex-authored completion artifact で判断する。
+- 2026-06-29: 旧 `comment zero` / inline review thread zero を blocker zero とみなす暗黙前提は変更済み。`20260628t185812z-adr PR Review Body Blocker Ingestion` により selected pull request review body も blocker policy input として扱う。
+
 ## 目的（Initiative との紐づき）
 
 - Initiative 目標 / 指標:
@@ -19,7 +25,7 @@ ID: "epic-00224"
 - この Epic が提供する能力:
   - Active Issue、authoring phase、Assurance Profile、current step、PR review state に応じた「現在必要な一つの Runbook」を runtime が機械生成する。
   - Issue / Step の risk と complexity に応じ、必要な agent、reasoning effort、context policy、verification、reviewer を選択する。
-  - GitHub Codex review へ trusted base branch 上の review policy を注入し、P0 / P1 を中心とする高価値 review を要求する。
+  - GitHub Codex review へ script-local review instruction を注入し、P0 / P1 を中心とする高価値 review を要求する。
   - P0 / P1 と機械的に検証された blocker だけを自動修正ループへ入れ、P2 / P3 による価値の低い review-push-review 反復を抑制する。
   - 既存 Issue を壊さず、新規 Issue から段階的に adaptive workflow へ移行できる。
 
@@ -60,7 +66,7 @@ ID: "epic-00224"
 - Provisional classification に従って必要な design sections、architect、reasoning effort を選択する。
 - Design 完了後、Assurance Contract を approved とし、plan / step obligations を compile する。
 - Execution では current step に必要な worker、context inheritance、verification、reviewer だけを返す。
-- Final delivery では PR base SHA 上の review policy を読み、review target head SHA と policy hash を含む `@codex review` comment を投稿する。
+- Final delivery では `github-pr-observation` script-local Markdown instruction を読み、review target head SHA と instruction hash を含む deterministic `@codex review` comment を投稿する。
 - Codex finding が P0 / P1 なら repair、verification、push、fresh review を行う。
 - P2 / P3 だけなら原則 no-action / follow-up とし、そのためだけの修正・再 review を行わない。
 - 全 blocker が閉じ、required CI と review coverage が成立したら merge-prepared とする。
@@ -72,8 +78,8 @@ ID: "epic-00224"
 - Lite 適格条件に unknown が含まれる場合は Lite を authorize しない。
 - Profile downgrade は自動実行せず、根拠と明示的 risk acceptance を要求する。
 - Existing Issue に `assurance.json` がない場合、legacy Strict compatibility path で継続できる。
-- Review policy を PR base SHA から取得できない場合、外部 review 必須の workflow では human gate とする。
-- Base SHA policy が missing / invalid / oversized / unreadable / non-UTF-8、または base SHA 自体が missing の場合、review trigger は PR comment を投稿せず human gate / fail-closed とし、PR head fallback や bare `@codex review` fallback を行わない。
+- Script-local review instruction が missing の場合、review trigger は instruction なしの deterministic `@codex review` comment を投稿し、metadata に fallback status を記録する。
+- Script-local review instruction が present だが invalid / oversized / unreadable / non-UTF-8 の場合、review trigger は PR comment を投稿せず human gate / fail-closed とする。
 - P2 finding が protected domain に関係し、failing regression test 等で再現された場合、validated blocker へ昇格する。
 - 自動修正が停滞した場合、回数を理由に risk を受容せず `automation-stalled` / human gate へ移行する。
 
@@ -123,11 +129,11 @@ ID: "epic-00224"
   - reviewer / consultant は clean-room evidence packet を利用し、author narrative や previous verdict へ不必要に anchor されない。
   - 子 agent の raw log を main へ転記せず、outcome、evidence ref、material decision、risk だけを返す。
 
-- E-RQ-009: Trusted GitHub Codex review policy
-  - `.github/codex/review-policy.md` を project-owned bootstrap asset として Git 管理する。
-  - Review policy は PR head ではなく PR base SHA の固定 path から取得する。
-  - trigger script は caller-provided arbitrary body を受け付けず、runtime が policy と metadata から deterministic comment を合成する。
-  - Review comment は policy base SHA、policy hash、reviewed head SHA を記録する。
+- E-RQ-009: Script-local GitHub Codex review instruction
+  - `.github/codex/review-policy.md` bootstrap asset は現行 authority として使用しない。
+  - Review instruction は GitHub base branch / PR head ではなく `github-pr-observation` script-local Markdown から取得する。
+  - trigger script は caller-provided arbitrary body を受け付けず、runtime が instruction と metadata から deterministic comment を合成する。
+  - Review comment は instruction path、instruction hash、reviewed head SHA を記録する。
 
 - E-RQ-010: Blocker-centric review closure
   - Valid P0 / P1 は blocker として修正または独立証拠による反証を要求する。
@@ -247,17 +253,17 @@ ID: "epic-00224"
   - 期待結果: stale source binding として block され、再 classification / approval が next action になる。
   - 観測点: hash invalidation tests。
 
-- E-AC-009: Trusted review trigger
-  - 前提: Open PR、expected head SHA、base SHA 上の valid review policy がある。
+- E-AC-009: Script-local review trigger
+  - 前提: Open PR、expected head SHA、valid script-local review instruction がある。
   - 操作: review trigger を実行する。
-  - 期待結果: base SHA policy を使用した multiline `@codex review` comment が 1 件投稿され、policy/hash/head evidence が返る。
+  - 期待結果: script-local instruction を使用した multiline `@codex review` comment が 1 件投稿され、instruction/hash/head evidence が返る。
   - 観測点: fake GitHub contract tests、trigger JSON。
 
-- E-AC-010: Untrusted policy rejection
-  - 前提: head branch で policy を弱める変更がある。
+- E-AC-010: Remote policy independence
+  - 前提: GitHub base branch / PR head に `.github/codex/review-policy.md` が存在する、または存在しない。
   - 操作: review trigger を実行する。
-  - 期待結果: head 側 policy は使用されず、base SHA policy が使用される。
-  - 観測点: base/head fixture tests。
+  - 期待結果: GitHub contents API で remote policy を読まず、script-local instruction または plain fallback trigger を使用する。
+  - 観測点: fake GitHub call log、trigger JSON。
 
 - E-AC-011: P2 noise suppression
   - 前提: P2 / P3 finding だけが返る。
@@ -397,7 +403,7 @@ ID: "epic-00224"
   - Compiler は substantive content を上書きしない。
   - Lite eligibility は `true / false / unknown` の three-valued policy result として扱う。
 - セキュリティ:
-  - Review policy は trusted base SHA から取得する。
+  - 変更済み: Review policy を trusted base SHA から取得する旧方針は廃止し、script-local review instruction を使用する。
   - Reviewed PR content を untrusted input として扱う。
   - Secret、token、private reasoning、生 credential を event / report へ保存しない。
   - GitHub write は fixed review comment endpoint と deterministic body に限定する。
@@ -431,13 +437,14 @@ ID: "epic-00224"
 - 互換性:
   - Policy compiler が利用不可でも、legacy strict workflow を明示的に選択できる。
   - Existing PR observation JSON contract は versioned migration を行う。
-  - Policy 変更 PR では当該 PR の head policy を使用せず、merge 後から有効にする。
+  - 変更済み: Policy 変更 PR は merge 後から有効にするという旧方針は廃止し、現在の checkout にある script-local instruction 変更を同一 PR で dogfooding できるようにする。
 
 ## 未確定事項
 
 - Blocking question:
   - なし。
-  - Default 案として、new Epic、Strict / Deep、複数 Issue slice、Standard default、Lite opt-in / evidence-gated、candidate / authorized separation、trusted base-SHA review policy を採用する。
+  - Default 案として、new Epic、Strict / Deep、複数 Issue slice、Standard default、Lite opt-in / evidence-gated、candidate / authorized separation を採用する。
+  - 変更済み: 旧 default 案に含まれていた trusted base-SHA review policy は、script-local review instruction と explicit Codex artifact completion へ置換済み。
 - Non-blocking design questions:
   - Review policy maximum size の初期値。
   - Metrics retention の初期値。
