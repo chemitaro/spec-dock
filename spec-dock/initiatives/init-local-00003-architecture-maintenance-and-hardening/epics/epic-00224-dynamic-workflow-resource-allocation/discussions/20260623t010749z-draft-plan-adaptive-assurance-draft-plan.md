@@ -14,9 +14,9 @@ ID: "<EPIC_ID>"
 
 ## Supersession note
 - この draft は初期 planning evidence であり、`T0 Epic authoring / ADR` を Issue-like prerequisite として扱う古い構成を含む。
-- 現在の canonical plan は `G0 Epic Decision Baseline` を採用し、ADR authority は Epic-scope accepted ADR 5 件へ移動済みである。
+- 現在の canonical plan は `G0 Epic Decision Baseline` を採用し、ADR authority は当初 Epic-scope accepted ADR 5 件へ移動済みである。その後の dogfooding corrective work により、review completion semantics は `20260628t154553z-adr-pr-observation-explicit-review-completion.md` で追加変更済みである。
 - `iss-00226 / #226` は closed / superseded historical evidence であり、implementation readiness dependency ではない。
-- Current handoff authority は `../plan.md`、`../design.md`、`../report.md`、および `20260623t074441z-*`〜`20260623t074447z-*` の accepted ADR を参照する。
+- Current handoff authority は `../plan.md`、`../design.md`、`../report.md`、`20260623t074441z-*`〜`20260623t074447z-*` の accepted ADR、および `20260628t154553z-adr-pr-observation-explicit-review-completion.md` を参照する。
 
 ## この計画で閉じる E-RQ / E-AC
 
@@ -24,12 +24,12 @@ ID: "<EPIC_ID>"
 |---|---|---|
 | E-RQ-001〜005 | Assurance core、workflow state、fixed Skill kernel、Runbook compiler | CLI contract tests、golden Runbook、clean Git evidence |
 | E-RQ-006〜008, E-RQ-015〜021 | Planning composer、Step Assurance、agent context routing | artifact golden tests、step matrix、clean-room review evidence、context packet golden tests、return contract tests |
-| E-RQ-009 | trusted base-SHA review policy compiler | trigger JSON、base/head tests、doctor |
+| E-RQ-009 | historical: trusted base-SHA review policy compiler（現在は script-local review instruction と explicit review completion ADR に変更済み） | trigger JSON、base/head tests、doctor |
 | E-RQ-010〜011 | blocker-centric repair / re-review / stagnation | finding matrix、repair loop tests、merge predicate |
 | E-RQ-012〜014 | legacy rollout、metrics、provider/mirror、Auto-Lite readiness | migration fixtures、benchmark、auto-lite-readiness report、validate / sync |
 | E-AC-001〜004 | Issue 1〜2 | state / classification / clean Git tests |
 | E-AC-005〜007 | Issue 3〜4 | composer / routing / stale invalidation tests |
-| E-AC-008〜009 | Issue 5 | trusted trigger integration tests |
+| E-AC-008〜009 | Issue 5 | historical trusted trigger integration tests（現在は script-local review instruction と explicit completion artifact contract に変更済み） |
 | E-AC-010〜012 | Issue 6 | PR blocker policy tests |
 | E-AC-013〜016 | Issue 7 | legacy / rollout / auto-lite-readiness / efficiency report |
 

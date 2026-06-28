@@ -3,9 +3,9 @@
 ID: "iss-00244"
 タイトル: "Simplify Issue Execution Guidance Into Plan Centric Preflight Validation"
 関連GitHub: ["#244"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-28"
+最終更新: "2026-06-29"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00224", "init-local-00003"]
 ---
@@ -48,6 +48,10 @@ ID: "iss-00244"
 - AC-017: Legacy assurance.json is migration-required, not silent authority
 - AC-018: Dogfooding assurance artifacts are renamed
 - AC-019: Current docs and CLI help use .assurance.json
+- AC-020: Review completion is explicit artifact based
+- AC-021: Missing review completion times out retryably
+- AC-022: Hydration only follows explicit completion
+- AC-023: PR #245 delayed review regression is covered
 
 ## 依存関係から導く実装順序
 
@@ -59,6 +63,7 @@ ID: "iss-00244"
 6. Dogfooding validation と manual test findings は最後に report / discussions へ反映する。
 7. PR #245 dogfooding で発見した review trigger failure は、既存 S01-S99 の実施済み plan-centric work を残したまま、追加作業 S100-S199 として末尾で修正する。
 8. `assurance.json` の `.assurance.json` rename は review trigger repair と独立しているが、同じ Issue の追加 hard cutover として S200-S299 で末尾に追加する。
+9. PR #245 dogfooding で発見した review observation early-stop failure は、review trigger instruction source や assurance path repair とは別の PR observation wait contract defect として、既存 S01-S299 の実施済み work を残したまま追加作業 S300-S399 として末尾で修正する。
 
 ```plantuml
 @startuml
@@ -82,6 +87,11 @@ title iss-00244 Step Dependency Graph
 [S199 Additional Final Gate] --> [S200 Hidden Assurance Contract Path]
 [S200 Hidden Assurance Contract Path] --> [S210 Assurance Path Tests and Migration]
 [S210 Assurance Path Tests and Migration] --> [S299 Final Additional Gate]
+[S299 Final Additional Gate] --> [S300 PR Observation Completion Wait Contract]
+[S300 PR Observation Completion Wait Contract] --> [S310 PR Observation Wait Regression Tests]
+[S310 PR Observation Wait Regression Tests] --> [S320 Hydration and Head Binding Hardening]
+[S320 Hydration and Head Binding Hardening] --> [S330 PR #245 Wait Dogfooding Verification]
+[S330 PR #245 Wait Dogfooding Verification] --> [S399 Final PR Observation Completion Gate]
 @enduml
 ```
 
@@ -103,6 +113,11 @@ title iss-00244 Step Dependency Graph
 | S200 Hidden assurance contract path hard cutover | StrictGate | dev-coder | code-reviewer + spec-reviewer | AC-016, AC-017, AC-018, AC-019 |
 | S210 Assurance path regression tests and dogfooding rename | CodePlusSpec | dev-coder | code-reviewer + qa-reviewer | AC-016, AC-017, AC-018, AC-019 |
 | S299 Final additional quality gate | StrictGate | orchestrator | qa-reviewer + code-reviewer + spec-reviewer | AC-016, AC-017, AC-018, AC-019 |
+| S300 PR observation completion wait contract update | CodePlusSpec | dev-coder | code-reviewer + spec-reviewer | AC-020, AC-021, AC-022 |
+| S310 PR observation wait regression tests | CodeReview | dev-coder | code-reviewer + qa-reviewer | AC-020, AC-021, AC-023 |
+| S320 Hydration and head-binding hardening | StrictGate | dev-coder | code-reviewer + qa-reviewer | AC-020, AC-022, AC-023 |
+| S330 PR #245 wait dogfooding verification | StrictGate | orchestrator | qa-reviewer | AC-021, AC-023 |
+| S399 Final PR observation completion gate | StrictGate | orchestrator | qa-reviewer + code-reviewer + spec-reviewer | AC-020, AC-021, AC-022, AC-023 |
 
 ## 要件 ↔ ステップ対応
 
@@ -149,6 +164,15 @@ Assurance contract rename の要件対応:
 
 AC-018 is owned by S210 because dogfooding artifact rename evidence is distinct from S200 runtime path hard cutover.
 
+PR observation completion wait の要件対応:
+
+| Requirement | S300 | S310 | S320 | S330 | S399 |
+|---|---:|---:|---:|---:|---:|
+| AC-020 | yes | yes | yes | no | yes |
+| AC-021 | yes | yes | no | yes | yes |
+| AC-022 | yes | yes | yes | no | yes |
+| AC-023 | no | yes | yes | yes | yes |
+
 ## 仕様固定クロージャ索引（Spec-Locked Closure Index）
 
 | ID | Spec link | Locked expectation | Observable input/state | Bug class guarded | Required | Evidence level | Owner step |
@@ -156,7 +180,7 @@ AC-018 is owned by S210 because dogfooding artifact rename evidence is distinct 
 | tc-001 | AC-001 | Ready guidance points to `plan.md` and `report.md` as contract/evidence sources | ready active issue | agent lacks clear execution source | yes | red-required | S01 |
 | tc-002 | AC-002 | No `selected_step`, `step_assurance`, `context_packets` in default Markdown/JSON/projection | ready active issue | stale dynamic output remains authority | yes | red-required | S01 |
 | tc-003 | AC-003 | `report.md` rows do not change guidance output | misleading report completion rows | report parser remains control plane | yes | red-required | S03 |
-| tc-004 | AC-004 | scaffold / non-executable plan blocks execution | placeholder or missing required fields | execution starts from invalid plan | yes | red-required | S02 |
+| tc-004 | AC-004 | scaffold / non-executable plan blocks execution | scaffold stub or missing required fields | execution starts from invalid plan | yes | red-required | S02 |
 | tc-005 | AC-005 | plan authoring scaffold contains step obligation fields | assurance compose / docs | plan lacks worker/reviewer/verification contract | yes | inspect-only + structural assertion | S04 |
 | tc-006 | AC-006 | mixed / risky steps require correct obligation pattern | plan lint fixture | under-review or no-review misuse | yes | red-required | S02 |
 | tc-007 | AC-007 | skill text no longer says to register selected step | provider skill assets | agent follows runtime-selected step | yes | structural assertion | S04 |
@@ -180,6 +204,14 @@ AC-018 is owned by S210 because dogfooding artifact rename evidence is distinct 
 | tc-025 | AC-018 | dogfooding Issue-local assurance artifacts are renamed to `.assurance.json` | epic dogfooding workspace | stale `assurance.json` remains in current workspace | yes | structural assertion | S210 |
 | tc-026 | AC-019 | CLI help and current docs refer to `.assurance.json` | provider/dogfood docs and parser/help text | agent/user follows obsolete file name | yes | structural assertion + spec-review | S200 / S299 |
 | tc-027 | AC-016 / AC-017 | symlink/outside-issue guard applies to `.assurance.json` | symlink hidden contract fixture | hidden path weakens path safety | yes | red-required | S200 / S210 |
+| tc-028 | AC-020 / AC-021 | stable no-completion evidence never becomes active `review_completion_unknown` | CI passed, completion none, selected comments 0, stable fingerprint | delayed Codex review is missed | yes | red-required | S300 / S310 |
+| tc-029 | AC-021 | no completion by overall deadline returns `timeout` / `wait_or_resume` / `observation_complete=false` | current trigger/head with no Codex completion artifact | timeout is misreported as human review completion | yes | red-required | S300 / S310 |
+| tc-030 | AC-023 | delayed submitted PR review after stable no-completion is selected before terminal result | PR #245-style fake snapshot sequence | wait exits before delayed P1 findings | yes | red-required | S310 |
+| tc-031 | AC-020 / AC-022 | quiet/same fingerprint can complete only after explicit Codex completion artifact visibility | submitted review or no-findings artifact hydration sequence | stability is used as completion substitute | yes | red-required | S300 / S320 |
+| tc-032 | AC-020 | strict no-findings comment promotes only with current trigger/head binding and integrated gates | no-findings fixtures with matching/wrong head and blockers | wrong no-findings pass / stale pass | yes | red-required | S320 |
+| tc-033 | AC-020 / AC-023 | wrong trigger/head or old artifact is not selected as current completion | old trigger, wrong head, body prefix mismatch | stale artifact closes current wait | yes | red-required | S320 |
+| tc-034 | AC-020 / AC-021 | skill text no longer presents `review_completion_unknown` as active terminal human gate | provider and dogfooding skill assets | agent follows obsolete post-unknown audit workflow | yes | structural assertion + spec-review | S300 / S399 |
+| tc-035 | AC-021 / AC-023 | PR #245 resume/manual validation returns submitted-review human gate or documented limitation, not active unknown | live PR #245 or saved/fake equivalent | dogfooding gap remains unverified | yes | manual-required | S330 / S399 |
 
 ## 実装ステップ
 
@@ -280,7 +312,7 @@ Default `guidance issue-execution` output no longer exposes dynamic execution fi
   - `presentation/workflow.py`
   - tests
 - Test obligation:
-  - placeholder / non-executable / missing required fields blocks.
+  - scaffold stub / non-executable / missing required fields blocks.
   - valid plan returns execute-approved-plan.
   - invalid / stale assurance blocks without presenting `strict` fallback as current authority.
 - Red / alternative evidence:
@@ -319,11 +351,11 @@ Default `guidance issue-execution` output no longer exposes dynamic execution fi
 
 #### 具体テストケース一覧
 
-- `tc-s02-001` negative: placeholder plan blocks execution
-  - 前提: substantive requirement と assurance はあるが `plan.md` は placeholder。
+- `tc-s02-001` negative: scaffold stub plan blocks execution
+  - 前提: substantive requirement と assurance はあるが `plan.md` は scaffold stub。
   - 操作: `guidance issue-execution` を実行する。
   - 期待結果: `planning-required` / blocked reason になり、execution-ready にならない。
-  - 失敗検出: placeholder plan でも実装へ進む回帰を検出する。
+  - 失敗検出: scaffold stub plan でも実装へ進む回帰を検出する。
   - 検証方法: CLI runtime test。
   - 関連 closure id: `tc-004`
 
@@ -456,7 +488,7 @@ Issue planning authoring surface teaches agents to put obligation decisions into
   - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`
   - `src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md`
   - `src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md`
-  - `src/spec_dock/assets/spec_dock/templates/assurance/profile-sections.json`
+  - assurance profile section scaffold asset.
   - dogfooding mirror if generated / validation requires.
 - Test obligation:
   - skill text has no `selected step when present`.
@@ -477,11 +509,11 @@ Issue planning authoring surface teaches agents to put obligation decisions into
   - requirement/design/plan
   - existing docs
 - allowed paths:
-  - provider docs/templates/skills listed above.
+  - provider docs/scaffold assets/skills listed above.
 - forbidden changes:
   - implementation code
   - GitHub PR observation skill
-  - unrelated templates.
+  - unrelated scaffold assets.
 - acceptance criteria:
   - tc-005, tc-007
 - required tests or docs-only verification:
@@ -514,7 +546,7 @@ Issue planning authoring surface teaches agents to put obligation decisions into
 
 #### step closure contract
 
-- close condition: skills/docs/templates align with plan-centric authority and spec-reviewer passes.
+- close condition: skills/docs/scaffold assets align with plan-centric authority and spec-reviewer passes.
 - report evidence destination:
   - Docs Impact Resolution
   - Reviewer Gate Status
@@ -615,12 +647,12 @@ The new guidance contract is locked by tests and validated in the dogfooding wor
 
 #### Behavior goal
 
-All docs/templates/skills affected by the hard cutover are consistent and no obsolete dynamic guidance remains.
+All docs/scaffold assets/skills affected by the hard cutover are consistent and no obsolete dynamic guidance remains.
 
 #### Planned contract
 
 - Scope:
-  - provider docs/templates/skills
+  - provider docs/scaffold assets/skills
   - dogfooding docs if applicable
   - Epic requirement/design/report reflection if needed
 - Test obligation:
@@ -629,7 +661,7 @@ All docs/templates/skills affected by the hard cutover are consistent and no obs
 - Red / alternative evidence:
   - inspect-only.
 - Green verification:
-  - `rg "selected step when present|selected_step|step_assurance|context_packets" src/spec_dock/assets/install_root/.agents/skills src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock/templates`
+  - `rg "selected step when present|selected_step|step_assurance|context_packets" src/spec_dock/assets/install_root/.agents/skills src/spec_dock/assets/spec_dock/docs src/spec_dock/assets/spec_dock`
 - Refactor guardrail:
   - Do not remove historical discussion evidence.
 - Amendment trigger:
@@ -639,7 +671,7 @@ All docs/templates/skills affected by the hard cutover are consistent and no obs
 
 - delegated role: `doc-writer`
 - input docs: requirement/design/plan and changed files.
-- allowed paths: docs/templates/skills/Epic reflection if needed.
+- allowed paths: docs/scaffold assets/skills/Epic reflection if needed.
 - forbidden changes: runtime code/tests.
 - acceptance criteria: AC-005, AC-007, AC-010.
 - required tests or docs-only verification: grep and spec-review.
@@ -651,7 +683,7 @@ All docs/templates/skills affected by the hard cutover are consistent and no obs
 
 - `tc-s90-001` docs alignment: obsolete dynamic guidance removed
   - 前提: implementation and docs changes complete.
-  - 操作: provider docs/templates/skills を inspection する。
+  - 操作: provider docs/scaffold assets/skills を inspection する。
   - 期待結果: default authority として dynamic selected step を促す記述がない。
   - 失敗検出: agent-facing docs が旧 behavior を復活させる回帰を検出する。
   - 検証方法: grep + spec-reviewer。
@@ -888,6 +920,24 @@ Script-local review instruction behavior is locked by tests and provider/dogfood
 - output required:
   - test results, grep results, parity summary.
 
+#### 具体テストケース一覧
+
+- `tc-s110-001` asset parity locks script-local instruction source
+  - 前提: provider installed assets and dogfooding installed assets exist.
+  - 操作: asset file list and focused installer/unit tests を実行する。
+  - 期待結果: `codex-review-instructions.md` is installed on both surfaces, and `.github/codex/review-policy.md` is not shipped as current authority.
+  - 失敗検出: provider/dogfooding drift or old GitHub policy asset reintroduction を検出する。
+  - 検証方法: `uv run pytest tests/unit/infra/test_init_update.py` and `rg --hidden` inspection.
+  - 関連 closure id: `tc-015`, `tc-016`, `tc-019`
+
+- `tc-s110-002` skill and tests reject old base policy terminology
+  - 前提: trigger helper tests and skill docs are updated.
+  - 操作: focused tests and grep inspection を実行する。
+  - 期待結果: base-SHA policy fetch is absent from active trigger behavior and skill instructions.
+  - 失敗検出: old trusted-base policy contract remains agent-facing or test-locked.
+  - 検証方法: `tests/unit/infra/test_init_update.py` and grep inspection.
+  - 関連 closure id: `tc-016`, `tc-021`
+
 #### step closure contract
 
 - close condition: focused test lane and parity inspection pass.
@@ -941,6 +991,16 @@ The current PR can receive a Codex review trigger comment through the normal obs
   - PR head changed during observation; rerun with current head SHA.
 - output required:
   - command, result JSON summary, posted comment evidence or limitation.
+
+#### 具体テストケース一覧
+
+- `tc-s120-001` live PR trigger uses script-local instruction source
+  - 前提: PR #245 current head SHA is known, and S100/S110 have passed.
+  - 操作: `wait_pr_observation.sh --trigger-mode post-once` を current head SHA bound で実行する。
+  - 期待結果: deterministic Codex review trigger comment is posted or observed for the current head without GitHub base policy fetch.
+  - 失敗検出: no trigger comment, bare policy-missing dead-end, or base-policy-dependent behavior を検出する。
+  - 検証方法: live observation result JSON or documented external limitation plus unit-test fallback.
+  - 関連 closure id: `tc-020`
 
 #### step closure contract
 
@@ -1001,6 +1061,16 @@ The added review trigger repair scope is aligned with requirement, design, plan,
 - output required:
   - review_status, prioritized findings, residual risk.
 
+#### 具体テストケース一覧
+
+- `tc-s199-001` added review trigger repair final gate
+  - 前提: S100-S120 evidence and updated issue docs are available.
+  - 操作: qa-reviewer, code-reviewer, and spec-reviewer final review を実行する。
+  - 期待結果: AC-011 - AC-015 coverage, tests, ADR/docs alignment, and PR dogfooding evidence are accepted.
+  - 失敗検出: old base-SHA policy authority, missing trigger evidence, or reviewer fail を検出する。
+  - 検証方法: reviewer reports and final grep / focused pytest evidence recorded in `report.md`.
+  - 関連 closure id: `tc-015`, `tc-016`, `tc-017`, `tc-018`, `tc-019`, `tc-020`, `tc-021`
+
 #### step closure contract
 
 - close condition: added scope final QA/code/spec reviews pass, final report ledger is updated.
@@ -1029,7 +1099,7 @@ Assurance runtime and current docs use Issue-local `.assurance.json` as the cano
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/assurance.py`
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py`
   - dogfooding installed mirrors under `spec-dock/scripts/spec_dock_runtime/`
-  - current docs / templates that describe the active assurance contract path.
+  - current docs / scaffold assets that describe the active assurance contract path.
 - Test obligation:
   - classify writes `.assurance.json`.
   - classify does not create `assurance.json`.
@@ -1059,7 +1129,7 @@ Assurance runtime and current docs use Issue-local `.assurance.json` as the cano
 - allowed paths:
   - runtime assurance store / assurance command / parser paths listed above.
   - focused assurance tests.
-  - current docs/templates that describe active assurance contract path.
+  - current docs/scaffold assets that describe active assurance contract path.
 - forbidden changes:
   - unrelated issue lifecycle behavior.
   - broad historical discussion rewrites.
@@ -1172,6 +1242,24 @@ All current tests and dogfooding artifacts use `.assurance.json`, while historic
 - output required:
   - test results, renamed files, legacy references intentionally left untouched.
 
+#### 具体テストケース一覧
+
+- `tc-s210-001` focused assurance lanes use hidden path
+  - 前提: S200 runtime path behavior is implemented.
+  - 操作: focused assurance unit and CLI runtime tests を実行する。
+  - 期待結果: classify/show/verify/workflow tests all use `.assurance.json` as current authority.
+  - 失敗検出: tests or runtime still expect `assurance.json` as current path.
+  - 検証方法: `uv run pytest tests/unit/infra/test_assurance_store.py tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance.py tests/cli_runtime/test_assurance_compose.py tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py`.
+  - 関連 closure id: `tc-022`, `tc-023`, `tc-024`, `tc-027`
+
+- `tc-s210-002` dogfooding current assurance artifacts are renamed
+  - 前提: dogfooding workspace has Issue-local assurance contract artifacts.
+  - 操作: hidden/visible assurance file list を inspect する。
+  - 期待結果: current artifacts are `.assurance.json`; no current Issue-local `assurance.json` remains.
+  - 失敗検出: stale visible assurance contract remains in active dogfooding workspace.
+  - 検証方法: `rg --files --hidden spec-dock | rg '(^|/)assurance\\.json$|(^|/)\\.assurance\\.json$'`.
+  - 関連 closure id: `tc-025`, `tc-026`
+
 #### step closure contract
 
 - close condition: focused tests and dogfooding rename inspection pass.
@@ -1232,6 +1320,16 @@ The `.assurance.json` rename scope is aligned with requirement, design, plan, ru
 - output required:
   - review_status, prioritized findings, residual risk.
 
+#### 具体テストケース一覧
+
+- `tc-s299-001` hidden assurance final gate
+  - 前提: S200-S210 evidence and updated docs are available.
+  - 操作: qa-reviewer, code-reviewer, and spec-reviewer final review を実行する。
+  - 期待結果: `.assurance.json` hard cutover has no dual authority, docs match current runtime, and dogfooding rename evidence is sufficient.
+  - 失敗検出: visible `assurance.json` remains current authority or reviewer finds path safety/doc mismatch.
+  - 検証方法: reviewer reports, focused pytest output, and file-list inspection recorded in `report.md`.
+  - 関連 closure id: `tc-022`, `tc-023`, `tc-024`, `tc-025`, `tc-026`, `tc-027`
+
 #### step closure contract
 
 - close condition: added hidden assurance scope final QA/code/spec reviews pass, final report ledger is updated.
@@ -1243,6 +1341,420 @@ The `.assurance.json` rename scope is aligned with requirement, design, plan, ru
   - final reviewers pass
   - final commit
 
+## 追加作業: PR observation completion wait repair
+
+PR #245 の dogfooding で、`wait_pr_observation.sh` が `review_completion_unknown` を terminal-like result として返した後に、同じ head へ Codex submitted PR review と 5 件の P1 findings が遅れて投稿された。これは time / quiet / same fingerprint / selected comments 0 を review completion の代替証拠として扱っている設計欠陥である。
+
+既存 S01-S299 は残し、この repair は追加作業 S300-S399 として扱う。採用案は `discussions/20260628t150332z-disc-pr-observation-completion-wait-repair-draft.md` の Option C とし、`../../discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md` で ADR に昇格済みである。全面 state-machine refactor ではなく、active `review_completion_unknown` 廃止、explicit completion artifact model、retryable timeout / resume semantics、必要最小限の hydration/head-binding hardening を行う。
+
+### S300 PR observation completion wait contract update
+
+#### Behavior goal
+
+`wait_pr_observation.sh` no longer treats stable no-completion evidence as terminal-like review completion. Missing Codex completion remains pending until explicit completion artifact or retryable timeout.
+
+#### Planned contract
+
+- Scope:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md`
+  - `.agents/skills/github-pr-observation/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+- Test obligation:
+  - `completion_signal=none` / `missing_current_completion_signal` never sets active `review_completion_unknown`.
+  - `classify()` returns pending/wait-or-resume with `can_complete_when_stable=false` for missing completion.
+  - `mark_decision_review_completion_unknown()` is removed, unused, or unreachable for new active output.
+  - `post_unknown_fresh_audit_required` is not emitted for new active output.
+  - skill text describes explicit completion artifact or retryable timeout/resume, not terminal unknown.
+- Red / alternative evidence:
+  - current tests expecting `review_completion_unknown` fail before the update.
+  - PR #245 old result remains documented as bad legacy artifact.
+- Green verification:
+  - focused wait tests under `tests/unit/infra/test_init_update.py`.
+  - grep inspection for active `review_completion_unknown` wording in provider and dogfooding skill text.
+- Refactor guardrail:
+  - Do not add GitHub Checks API / status rollup / `gh pr checks`.
+  - Do not change trigger comment write surface.
+  - Do not turn timeout into no-review-work proof.
+- Amendment trigger:
+  - If an existing consumer requires active `review_completion_unknown`, record it as legacy compatibility evidence and stop for design amendment.
+
+#### delegation contract
+
+- delegated role: `dev-coder`
+- input docs:
+  - `requirement.md`
+  - `design.md`
+  - this `plan.md`
+  - `../../discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`
+  - `discussions/20260628t143306z-research-pr-observation-review-completion-signals.md`
+  - `discussions/20260628t150332z-disc-pr-observation-completion-wait-repair-draft.md`
+- allowed paths:
+  - provider and dogfooding `github-pr-observation/SKILL.md`
+  - provider and dogfooding `scripts/lib/pr_observation_wait.py`
+  - focused tests under `tests/unit/infra/test_init_update.py`
+- forbidden changes:
+  - PR trigger instruction source behavior unrelated to wait completion.
+  - CI authority surface changes.
+  - broad rewrite of `pr_review_snapshot.py` unless S320 requires it.
+- acceptance criteria:
+  - tc-028, tc-029, tc-031, tc-034.
+- required tests or docs-only verification:
+  - focused pytest for wait unknown/timeout tests.
+  - grep inspection for active `review_completion_unknown` contract.
+- reviewer focus:
+  - `code-reviewer`: wait termination logic and stdout JSON contract.
+  - `spec-reviewer`: skill and docs no longer authorize terminal unknown.
+- stop conditions:
+  - `completion_signal=none` can still produce `observation_complete=true`.
+  - active `decision.status_reason=review_completion_unknown` remains reachable.
+- output required:
+  - changed files, before/after behavior summary, test results, legacy terminology rationale.
+
+#### 具体テストケース一覧
+
+- `tc-s300-001` stable no-completion stays waiting or timeout
+  - 前提: CI passed、head matched、current trigger boundary exists、`completion_signal=none`、selected comments / threads 0、same fingerprint stable。
+  - 操作: wait fake snapshots を実行する。
+  - 期待結果: deadline 前は pending/wait-or-resume、deadline では timeout/wait-or-resume。`review_completion_unknown` は出ない。
+  - 失敗検出: PR #245 型の早期終了を検出する。
+  - 検証方法: `tests/unit/infra/test_init_update.py`。
+  - 関連 closure id: `tc-028`, `tc-029`
+
+- `tc-s300-002` skill text removes terminal unknown contract
+  - 前提: provider and dogfooding skill assets are updated.
+  - 操作: skill text を inspect する。
+  - 期待結果: `review_completion_unknown` を active terminal human gate として説明しない。timeout/resume と explicit completion artifact model を説明する。
+  - 失敗検出: agent が obsolete post-unknown fresh audit workflow に従う回帰を検出する。
+  - 検証方法: structural assertion or grep inspection。
+  - 関連 closure id: `tc-034`
+
+#### step closure contract
+
+- close condition: active unknown terminal path is removed from wait behavior and skill contract, focused tests pass.
+- report evidence destination:
+  - PR Observation Completion Wait Repair
+  - TDD / Red / Green / Refactor Evidence
+  - Reviewer Gate Status
+- step gate:
+  - code-reviewer + spec-reviewer pass
+  - Step Commit Gate committed
+
+### S310 PR observation wait regression tests
+
+#### Behavior goal
+
+The PR #245 delayed review failure mode is locked as a regression test, and existing tests that expected active `review_completion_unknown` are rewritten to the new timeout/resume contract.
+
+#### Planned contract
+
+- Scope:
+  - `tests/unit/infra/test_init_update.py`
+- Test obligation:
+  - Existing unknown-after-latency tests are changed to timeout/resume or pending expectations.
+  - A PR #245-style delayed review fake snapshot sequence is added.
+  - No-completion timeout preserves resume metadata.
+  - Submitted review with unresolved threads returns `human_gate` / `address_review_feedback`.
+  - CI failed / stale head / permission limitation terminal behavior remains unchanged.
+- Red / alternative evidence:
+  - red-required: old behavior that terminalizes stable `completion_signal=none` as `review_completion_unknown` must fail the updated tests.
+  - red-required: PR #245-style delayed review sequence must fail if the wait loop exits before submitted review appears.
+  - covered-existing: CI failed / stale head / permission limitation terminal behavior stays covered by existing focused tests.
+- Green verification:
+  - focused pytest for PR observation wait tests.
+- Refactor guardrail:
+  - Keep fake `gh` tests hermetic.
+  - Do not loosen assertions to only inspect top-level status if decision contract is relevant.
+- Amendment trigger:
+  - If existing wait budget tests conflict with retryable timeout semantics, update the explicit public contract before changing tests.
+
+#### delegation contract
+
+- delegated role: `dev-coder`
+- input docs:
+  - S300 output
+  - PR #245 old and fresh snapshot evidence
+- allowed paths:
+  - `tests/unit/infra/test_init_update.py`
+- forbidden changes:
+  - production code except minimal test helper compatibility requested by S300.
+  - live GitHub calls in unit tests.
+- acceptance criteria:
+  - tc-028, tc-029, tc-030.
+- required tests or docs-only verification:
+  - focused pytest on updated tests.
+- reviewer focus:
+  - `code-reviewer`: regression correctly fails on old behavior.
+  - `qa-reviewer`: PR #245 delayed review sequence is faithfully represented.
+- stop conditions:
+  - regression test would pass on old `review_completion_unknown` behavior.
+  - tests depend on real GitHub timing.
+- output required:
+  - tests changed/added, old behavior guarded, focused pytest output.
+
+#### 具体テストケース一覧
+
+- `tc-s310-001` delayed review is not missed
+  - 前提: fake snapshots contain stable no-completion polls followed by submitted Codex PR review and unresolved review threads for same head.
+  - 操作: wait fake snapshot harness を実行する。
+  - 期待結果: wait does not terminate during no-completion stable phase; final result is `human_gate` / `address_review_feedback` with `submitted_pull_request_review`.
+  - 失敗検出: delayed P1 finding を拾えない回帰を検出する。
+  - 検証方法: `tests/unit/infra/test_init_update.py` focused fake `gh` sequence.
+  - 関連 closure id: `tc-030`
+
+- `tc-s310-002` missing completion timeout carries resume metadata
+  - 前提: fake snapshots never contain trusted Codex completion artifact.
+  - 操作: wait until deadline.
+  - 期待結果: `timeout` / `wait_or_resume` / `observation_complete=false` and same-boundary resume metadata.
+  - 失敗検出: timeout が human gate や no-review-work proof に変換される回帰を検出する。
+  - 検証方法: `tests/unit/infra/test_init_update.py` timeout fixture.
+  - 関連 closure id: `tc-029`
+
+#### step closure contract
+
+- close condition: delayed review and timeout/resume regression tests pass.
+- report evidence destination:
+  - Test Contract Closure
+  - PR #245 Regression Evidence
+- step gate:
+  - code-reviewer + qa-reviewer pass
+  - Step Commit Gate committed
+
+### S320 Hydration and head-binding hardening
+
+#### Behavior goal
+
+Quiet window and same fingerprint are used only to hydrate explicit completion artifacts, and current completion selection is bound to the expected head and trigger boundary.
+
+#### Planned contract
+
+- Scope:
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py`
+  - `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `tests/unit/infra/test_init_update.py`
+- Test obligation:
+  - quiet/same fingerprint cannot complete no-completion state.
+  - submitted PR review completion uses current trigger boundary and expected head binding.
+  - strict no-findings comment requires current trigger/head binding and no blockers.
+  - wrong trigger / wrong head / old artifact is not selected as current completion.
+  - partial visibility does not promote to `passed`.
+- Red / alternative evidence:
+  - red-required: stability-only no-completion fixture must fail if quiet/same fingerprint can complete without explicit artifact.
+  - red-required: wrong-head / old-trigger / blocker no-findings fixtures must fail if selected as current completion.
+  - covered-existing: submitted-review actionable feedback path remains covered by S310 delayed review fixture.
+- Green verification:
+  - focused snapshot/wait tests.
+  - grep inspection for forbidden CI authority surfaces if code touched nearby GitHub collection logic.
+- Refactor guardrail:
+  - Do not full-rewrite `pr_review_snapshot.py` state taxonomy unless focused tests require it.
+  - Body `Reviewed commit` prefix is fallback evidence, not stronger than API full SHA.
+  - Review comments should prefer `original_commit_id` for stale/current selection where available.
+- Amendment trigger:
+  - If Codex no-findings output shape is not representable by existing strict matcher, record limitation and route to follow-up rather than loosening to generic pass.
+
+#### delegation contract
+
+- delegated role: `dev-coder`
+- input docs:
+  - S300/S310 output
+  - `20260628t143306z-research-pr-observation-review-completion-signals.md`
+- allowed paths:
+  - PR observation snapshot/wait scripts and focused tests listed above.
+- forbidden changes:
+  - arbitrary GitHub API surfaces.
+  - weakening current trigger/head binding.
+  - accepting reaction-only as completion.
+- acceptance criteria:
+  - tc-031, tc-032, tc-033.
+- required tests or docs-only verification:
+  - focused pytest for hydration/head-binding cases.
+- reviewer focus:
+  - `code-reviewer`: binding correctness and no false pass.
+  - `qa-reviewer`: partial visibility coverage.
+- stop conditions:
+  - no-findings can pass with wrong head or generic wording.
+  - partial visibility can become merge-prepared.
+- output required:
+  - changed files, tests, any remaining product-behavior assumptions.
+
+#### 具体テストケース一覧
+
+- `tc-s320-001` hydration follows explicit artifact only
+  - 前提: explicit submitted review or strict no-findings artifact appears, but related comments/thread state/body is partially visible.
+  - 操作: wait fake snapshots across hydration polls.
+  - 期待結果: quiet/same fingerprint is evaluated only after explicit artifact visibility; no-completion state is never completed by stability alone.
+  - 失敗検出: stability alone completes an observation with `completion_signal=none`.
+  - 検証方法: focused wait/snapshot tests in `tests/unit/infra/test_init_update.py`.
+  - 関連 closure id: `tc-031`
+
+- `tc-s320-002` no-findings requires current head and integrated gates
+  - 前提: no-findings issue comments with matching head, wrong head, old trigger, and blockers.
+  - 操作: snapshot/wait tests run.
+  - 期待結果: only matching current trigger/head with no blockers can promote; wrong/stale cases do not pass.
+  - 失敗検出: stale or wrong-head no-findings comment promotes the current wait.
+  - 検証方法: focused snapshot/wait tests in `tests/unit/infra/test_init_update.py`.
+  - 関連 closure id: `tc-032`, `tc-033`
+
+#### step closure contract
+
+- close condition: hydration and head-binding tests pass; no broad state-machine rewrite was introduced without plan amendment.
+- report evidence destination:
+  - Hydration and Head Binding Evidence
+  - Reviewer Gate Status
+- step gate:
+  - code-reviewer + qa-reviewer pass
+  - Step Commit Gate committed
+
+### S330 PR #245 wait dogfooding verification
+
+#### Behavior goal
+
+The repaired wait behavior is validated against PR #245 live state or a documented saved/fake equivalent when live state is no longer suitable.
+
+#### Planned contract
+
+- Scope:
+  - manual validation evidence and `report.md`.
+- Test obligation:
+  - Old bad result is recorded as legacy failure evidence.
+  - Fresh PR #245 snapshot or equivalent fake sequence proves submitted review findings are selected.
+  - If live PR head changed or PR state prevents replay, saved/fake artifact fallback is documented.
+- Red / alternative evidence:
+  - manual-required: old PR #245 `review_completion_unknown` result is recorded as failing legacy evidence before accepting repaired behavior.
+  - manual-required or covered-existing: live resume is preferred; if unsafe/unavailable, S310 fake delayed-review regression and saved snapshots provide the approved alternative evidence.
+- Green verification:
+  - `wait_pr_observation.sh --trigger-mode resume` against same boundary when feasible.
+  - Or focused fake snapshot regression from S310 if live replay is unsafe/unavailable.
+- Refactor guardrail:
+  - Do not post duplicate review triggers unless explicitly required by workflow and safe for current PR state.
+  - Do not merge PR during this verification.
+- Amendment trigger:
+  - If live Codex behavior differs from strict assumptions, document product-behavior limitation and update S320 tests accordingly.
+
+#### delegation contract
+
+- delegated role: `orchestrator`
+- input docs:
+  - PR #245 URL and head SHA
+  - old result `/private/tmp/spec-dock-iss-00244-pr245-observation-6fc80e8a/result.json`
+  - fresh result `/private/tmp/spec-dock-pr245-fresh-snapshot-6fc80e8a/result.json`
+  - S300-S320 evidence
+- allowed paths:
+  - report evidence updates.
+  - manual test artifacts under repository-approved locations.
+- forbidden changes:
+  - code changes during manual verification, except bounded fix followed by S300-S320 re-test.
+- acceptance criteria:
+  - tc-035.
+- required tests or docs-only verification:
+  - live resume/manual observation or documented saved/fake fallback.
+- reviewer focus:
+  - `qa-reviewer`.
+- stop conditions:
+  - PR head changed and resume boundary is no longer current; rerun with current head or use saved/fake evidence.
+- output required:
+  - command or artifact source, result JSON summary, limitation if live validation skipped.
+
+#### 具体テストケース一覧
+
+- `tc-s330-001` PR #245 delayed-review evidence is replayed or documented
+  - 前提: old bad result and fresh PR #245 snapshot or equivalent fake sequence are available.
+  - 操作: live resume/manual observation or saved/fake fallback を実行する。
+  - 期待結果: result selects submitted review findings as human gate, or records an explicit limitation and points to S310 regression evidence.
+  - 失敗検出: repaired workflow still returns active `review_completion_unknown` for the PR #245 pattern.
+  - 検証方法: live result JSON, saved snapshot result, or focused fake regression evidence.
+  - 関連 closure id: `tc-035`
+
+#### step closure contract
+
+- close condition: PR #245 wait dogfooding evidence or approved saved/fake fallback is recorded.
+- report evidence destination:
+  - PR Observation Wait Dogfooding Evidence
+  - Manual Dogfooding Evidence
+- step gate:
+  - qa-reviewer pass
+  - Step Commit Gate committed or approved-no-op
+
+### S399 Final PR observation completion gate
+
+#### Behavior goal
+
+The PR observation completion wait repair is aligned with requirement, design, plan, skill text, runtime behavior, tests, and dogfooding evidence.
+
+#### Planned contract
+
+- Scope:
+  - S300-S330 diff and evidence.
+  - all issue docs.
+  - provider and dogfooding PR observation assets.
+- Test obligation:
+  - focused PR observation wait/snapshot tests pass.
+  - spec-reviewer confirms `review_completion_unknown` is no longer active terminal contract.
+  - code-reviewer confirms wait logic cannot complete no-completion by time/quiet/fingerprint.
+  - qa-reviewer confirms delayed review regression and PR #245 dogfooding evidence.
+- Red / alternative evidence:
+  - inspect-only + reviewer-required: final gate does not add new implementation behavior; it verifies S300-S330 Red/Green/manual evidence and fails on any unresolved reviewer finding.
+  - manual-required: PR #245 dogfooding evidence or approved saved/fake fallback must be present before this gate can pass.
+- Green verification:
+  - focused pytest lane.
+  - final grep inspection.
+  - final spec/code/QA review.
+  - `./spec-dock/scripts/spec-dock validate`.
+- Refactor guardrail:
+  - Do not re-open S01-S299 unless completion wait repair reveals a direct contradiction.
+  - Do not change PR trigger instruction source semantics while closing wait repair.
+- Amendment trigger:
+  - Any reviewer fail requires bounded fix and re-review.
+
+#### delegation contract
+
+- delegated role: `qa-reviewer`, `code-reviewer`, `spec-reviewer`
+- input docs:
+  - all issue docs
+  - `../../discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`
+  - `20260628t143306z-research-pr-observation-review-completion-signals.md`
+  - `20260628t150332z-disc-pr-observation-completion-wait-repair-draft.md`
+  - S300-S330 evidence
+- allowed paths:
+  - read-only review; no mutations.
+- forbidden changes:
+  - any file edits by reviewers.
+- acceptance criteria:
+  - AC-020 - AC-023.
+- required tests or docs-only verification:
+  - final gate review.
+- reviewer focus:
+  - qa-reviewer: delayed review and timeout/resume coverage.
+  - code-reviewer: wait/snapshot logic and no forbidden CI surfaces.
+  - spec-reviewer: requirement/design/plan consistency.
+- stop conditions:
+  - any reviewer `fail`.
+- output required:
+  - review_status, prioritized findings, residual risk.
+
+#### 具体テストケース一覧
+
+- `tc-s399-001` PR observation completion final gate
+  - 前提: S300-S330 evidence, focused tests, and updated skill/docs are available.
+  - 操作: qa-reviewer, code-reviewer, and spec-reviewer final review を実行し、`spec-dock validate` を確認する。
+  - 期待結果: AC-020 - AC-023 coverage is accepted, no active terminal `review_completion_unknown` remains, and delayed review/timeout behavior is verified.
+  - 失敗検出: reviewer fail, stale unknown contract, no-completion completion by time/quiet/fingerprint, or missing dogfooding evidence.
+  - 検証方法: reviewer reports, focused pytest output, grep inspection, and `./spec-dock/scripts/spec-dock validate`.
+  - 関連 closure id: `tc-028`, `tc-029`, `tc-030`, `tc-031`, `tc-032`, `tc-033`, `tc-034`, `tc-035`
+
+#### step closure contract
+
+- close condition: PR observation completion scope final QA/code/spec reviews pass, final report ledger is updated.
+- report evidence destination:
+  - PR Observation Completion Final QA Gate
+  - PR Observation Completion Final Code Review Gate
+  - PR Observation Completion Final Spec Review Gate
+- step gate:
+  - final reviewers pass
+  - final commit
+
 ## Final Exit Contract
 
 この Issue を execution-ready / complete とみなす条件:
@@ -1250,14 +1762,18 @@ The `.assurance.json` rename scope is aligned with requirement, design, plan, ru
 - `requirement.md` / `design.md` / `plan.md` が substantive で reviewer-pass 済み。
 - `.assurance.json` が current source binding と整合する。
 - All closure ids `tc-001` - `tc-027` が report で pass / approved-no-op として閉じている。
+- All closure ids `tc-028` - `tc-035` が report で pass / approved-no-op として閉じている。
 - Focused pytest lane と `./spec-dock/scripts/spec-dock validate` が pass。
 - Review trigger focused pytest lane が pass。
 - Assurance path focused pytest lane が pass。
+- PR observation completion wait focused pytest lane が pass。
 - PR #245 dogfooding review trigger evidence が pass、または external limitation と unit-test fallback が明示されている。
+- PR #245 dogfooding wait completion evidence が pass、または external limitation と unit-test fallback が明示されている。
 - Dogfooding Issue-local assurance artifacts are renamed to `.assurance.json`.
 - S90 docs impact resolved。
 - S99 final QA / code / spec review が pass。
 - S199 additional final QA / code / spec review が pass。
 - S299 final QA / code / spec review が pass。
+- S399 final QA / code / spec review が pass。
 - Step Commit Gate が各 implementation step で committed または正当な approved-no-op。
 - No open Spec Interpretation / Decision Ledger entries remain.
