@@ -33,7 +33,7 @@ class _StoreFake:
 
     def write_contract(self, target, contract):
         self.writes.append((target, contract))
-        return target.issue_dir / "assurance.json"
+        return target.issue_dir / ".assurance.json"
 
     def read_contract(self, target):
         self.read_target = target
@@ -89,7 +89,7 @@ def test_classify_writes_contract_and_dry_run_returns_same_contract_without_writ
     assert write_result.ok
     assert write_result.operation == "classify"
     assert write_result.status == "valid"
-    assert write_result.written_path == store.target.issue_dir / "assurance.json"
+    assert write_result.written_path == store.target.issue_dir / ".assurance.json"
     assert len(store.writes) == 1
     assert store.writes[0] == (store.target, write_result.contract)
     assert dry_run_result.ok

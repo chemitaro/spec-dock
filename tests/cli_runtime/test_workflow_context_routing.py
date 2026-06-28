@@ -94,7 +94,7 @@ class TestWorkflowContextRoutingHardCutover(CliRuntimeHarness):
             issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Invalid assurance")
             self._write_substantive_requirement(issue_dir)
             self._write_executable_plan(issue_dir)
-            (issue_dir / "assurance.json").write_text("{not-json\n", encoding="utf-8")
+            (issue_dir / ".assurance.json").write_text("{not-json\n", encoding="utf-8")
 
             result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
 

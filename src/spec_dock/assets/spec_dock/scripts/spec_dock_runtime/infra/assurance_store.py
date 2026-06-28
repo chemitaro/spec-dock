@@ -24,6 +24,8 @@ from spec_dock_runtime.infra.active_store import load_active_manifest
 from spec_dock_runtime.infra.json_store import load_json
 
 ReadStatus = Literal["valid", "missing", "invalid"]
+ASSURANCE_CONTRACT_FILENAME = ".assurance.json"
+LEGACY_ASSURANCE_CONTRACT_FILENAME = "assurance.json"
 _PLANNING_SOURCE_ARTIFACTS: tuple[tuple[str, str], ...] = (
     ("requirement", "requirement.md"),
     ("design", "design.md"),
@@ -97,7 +99,30 @@ class AssuranceStore:
         return requirement_path.read_text(encoding="utf-8")
 
     def read_contract(self, target: ResolvedIssueTarget) -> AssuranceStoreResult:
-        path = target.issue_dir / "assurance.json"
+        path = target.issue_dir / ASSURANCE_CONTRACT_FILENAME
+        legacy_path = target.issue_dir / LEGACY_ASSURANCE_CONTRACT_FILENAME
+        if path.is_symlink():
+            return AssuranceStoreResult(
+                status="invalid",
+                target=target,
+                contract=None,
+                mode="invalid",
+                reason="contract_path_symlink",
+                details=(f"path={path.relative_to(self.repo_root).as_posix()}",),
+            )
+        if legacy_path.exists() or legacy_path.is_symlink():
+            return AssuranceStoreResult(
+                status="invalid",
+                target=target,
+                contract=None,
+                mode="invalid",
+                reason="legacy_assurance_contract_path",
+                details=(
+                    f"legacy_path={legacy_path.relative_to(self.repo_root).as_posix()}",
+                    f"canonical_path={path.relative_to(self.repo_root).as_posix()}",
+                    "Rename assurance.json to .assurance.json.",
+                ),
+            )
         if not path.exists():
             return AssuranceStoreResult(
                 status="missing",
@@ -196,7 +221,13 @@ class AssuranceStore:
         return path
 
     def _contract_write_path(self, target: ResolvedIssueTarget) -> Path:
-        path = target.issue_dir / "assurance.json"
+        path = target.issue_dir / ASSURANCE_CONTRACT_FILENAME
+        legacy_path = target.issue_dir / LEGACY_ASSURANCE_CONTRACT_FILENAME
+        if legacy_path.exists() or legacy_path.is_symlink():
+            raise AssuranceStoreError(
+                "legacy_assurance_contract_path",
+                f"Refusing to write assurance contract while legacy path exists: {legacy_path.relative_to(self.repo_root)}",
+            )
         if path.is_symlink():
             raise AssuranceStoreError(
                 "contract_path_symlink",

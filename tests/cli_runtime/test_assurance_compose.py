@@ -181,7 +181,7 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             )
             self._run_runtime(target, ["active", "set", "--id", "iss-00302"])
             invalid_issue_dir = self._find_issue_dir_by_id(target, "iss-00302")
-            (invalid_issue_dir / "assurance.json").write_text("{not-json\n", encoding="utf-8")
+            (invalid_issue_dir / ".assurance.json").write_text("{not-json\n", encoding="utf-8")
             before_invalid = self._artifact_texts(invalid_issue_dir)
 
             invalid = self._run_runtime_capture(
@@ -278,7 +278,7 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             issue_dir = self._create_classified_fixture(target)
             external = target / "external-assurance.json"
-            contract_path = issue_dir / "assurance.json"
+            contract_path = issue_dir / ".assurance.json"
             contract_text = contract_path.read_text(encoding="utf-8")
             external.write_text(contract_text, encoding="utf-8")
             contract_path.unlink()
@@ -291,7 +291,10 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             )
 
             assert result.returncode == 1
-            assert "Refusing to write symlinked assurance contract" in result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ok"] is False
+            assert payload["status"] == "invalid"
+            assert payload["reason"] == "contract_path_symlink"
             assert self._artifact_texts(issue_dir) == before
             assert external.read_text(encoding="utf-8") == contract_text
             contract_path.unlink()

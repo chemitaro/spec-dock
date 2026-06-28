@@ -80,7 +80,7 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Invalid assurance")
             self._write_substantive_requirement(issue_dir)
-            (issue_dir / "assurance.json").write_text("{not-json\n", encoding="utf-8")
+            (issue_dir / ".assurance.json").write_text("{not-json\n", encoding="utf-8")
 
             result = self._run_runtime_capture(
                 target,
