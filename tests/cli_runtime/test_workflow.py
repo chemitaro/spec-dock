@@ -214,6 +214,43 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["reason_code"] == "design-not-substantive"
             assert payload["may_execute_approved_plan"] is False
 
+    def test_guidance_allows_substantive_design_that_mentions_draft_status_in_body(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Substantive design")
+            self._write_substantive_requirement(issue_dir)
+            self._write_executable_plan(issue_dir)
+            (issue_dir / "design.md").write_text(
+                "---\n"
+                "種別: 設計書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "approved"\n'
+                "---\n\n"
+                "# Design\n\n"
+                "## 全体像\n"
+                "- The workflow guidance reads requirement, design, and plan readiness before execution.\n\n"
+                "## 調査メモ\n"
+                '- Historical examples may mention `状態: "draft"` in body text without making this artifact a scaffold.\n\n'
+                "## 対象\n"
+                "- The design may describe shipped docs/templates assets.\n"
+                "- The plan must be non-placeholder before execution.\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = self._read_projected_runbook(target)
+            assert payload["state"] == "ready"
+            assert payload["reason_code"] == "assurance-valid"
+            assert payload["may_execute_approved_plan"] is True
+
     def test_guidance_blocks_strict_legacy_placeholder_plan(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

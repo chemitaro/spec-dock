@@ -213,6 +213,7 @@ PR observation completion wait の要件対応:
 | tc-034 | AC-020 / AC-021 | skill text no longer presents `review_completion_unknown` as active terminal human gate | provider and dogfooding skill assets | agent follows obsolete post-unknown audit workflow | yes | structural assertion + spec-review | S300 / S399 |
 | tc-035 | AC-021 / AC-023 | PR #245 resume/manual validation returns submitted-review human gate or documented limitation, not active unknown | live PR #245 or saved/fake equivalent | dogfooding gap remains unverified | yes | manual-required | S330 / S399 |
 | tc-036 | AC-024 | pull request review body P1 blocks even when inline comments and threads are empty | selected submitted Codex review body with `[P1]` and no selected comments/threads | review body finding is ignored and PR is marked pass/merge-prepared | yes | red-required | S320 / S399 |
+| tc-037 | AC-004 / AC-010 | substantive approved design may mention historical draft status, templates, or non-placeholder in body without being blocked | approved `design.md` with body text containing `状態: "draft"`, `docs/templates`, and `non-placeholder` | preflight scaffold marker scans body prose and blocks execution-ready issue | yes | red-required | S02 / S399 |
 
 ## 実装ステップ
 
