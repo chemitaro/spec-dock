@@ -14,7 +14,7 @@ ID: "iss-00226"
 
 ## 結果
 - `iss-00226 / #226` は decision-only Issue routing として誤りだったため closed / superseded。
-- ADR authority は Epic-scope accepted ADR 5 件へ移動した。
+- ADR authority は当初 Epic-scope accepted ADR 5 件へ移動した。その後、dogfooding corrective work により review instruction source と review completion semantics は `../../discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md` を含む後続ADRで追加変更済みである。
 
 ## 証跡
 - `spec-dock close iss-00226`: `state=CLOSED`, `already_closed=false` の後、再実行で `already_closed=true`。

@@ -40,7 +40,7 @@ ID: "iss-00227"
 - AC-004: `assurance.json` を持たない既存 Issue は strict-legacy candidate として検出される。
 
 ## 依存
-- Upstream: G0 Epic Decision Baseline（Epic-scope accepted ADR 5 件）と `epic-00158` の context-surface 境界。
+- Upstream: G0 Epic Decision Baseline（当初 Epic-scope accepted ADR 5 件）と `epic-00158` の context-surface 境界。後続の dogfooding corrective work により、review instruction source と review completion semantics は `../../../discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md` を含む後続ADRで追加変更済み。
 - Downstream: iss-00228, iss-00229, iss-00231。
 
 ## 静的解析前提
