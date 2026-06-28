@@ -1491,16 +1491,34 @@ while True:
         )
         + NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS
     )
+    snapshot_timeout_preserved_latest_state = False
     if snapshot_poll_timed_out and latest_payload is not None:
         payload = latest_payload
-        append_snapshot_poll_timeout_limitation(
+        quiet_elapsed_at_timeout = int(max(0, time.monotonic() - latest_change_monotonic))
+        (
+            _,
+            _,
+            _,
+            can_complete_when_stable_at_timeout,
+            terminal_at_timeout,
+        ) = classify(
             payload,
-            snapshot_timeout,
-            snapshot_stdout,
-            snapshot_stderr,
-            severity="blocking",
+            poll,
+            zero_check_grace_polls,
         )
-        mark_latest_timeout(payload, latest_change_monotonic, same_count)
+        stable_at_timeout = same_count >= same_fingerprint_count and quiet_elapsed_at_timeout >= quiet_seconds
+        snapshot_timeout_preserved_latest_state = bool(
+            terminal_at_timeout or (can_complete_when_stable_at_timeout and stable_at_timeout)
+        )
+        if not snapshot_timeout_preserved_latest_state:
+            append_snapshot_poll_timeout_limitation(
+                payload,
+                snapshot_timeout,
+                snapshot_stdout,
+                snapshot_stderr,
+                severity="blocking",
+            )
+            mark_latest_timeout(payload, latest_change_monotonic, same_count)
         snapshot_text = latest_snapshot_text
     elif snapshot_poll_timed_out:
         payload = timeout_snapshot(snapshot_timeout, snapshot_stdout, snapshot_stderr)
@@ -1569,7 +1587,7 @@ while True:
     remain = int(max(0, deadline - time.monotonic()))
     if observation_complete:
         final_phase = "terminal"
-    elif snapshot_poll_timed_out:
+    elif snapshot_poll_timed_out and not snapshot_timeout_preserved_latest_state:
         final_phase = "timeout"
         normalized_status = "timeout"
         overall_status = "timeout"

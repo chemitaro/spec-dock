@@ -26089,6 +26089,93 @@ esac
                 for item in payload.get("limitations", [])
             )
 
+    def test_issue_187_s430_final_snapshot_timeout_preserves_zero_check_terminal_state(self) -> None:
+        zero_check_limitation = {
+            "code": "zero_checks_s03_non_success",
+            "severity": "blocking",
+            "status": "none",
+        }
+        first_payload = {
+            "ci": "none",
+            "review": "none",
+            "status": "none",
+            "overall_status": "none",
+            "normalized_status": "none",
+            "recommended_next_action": "wait",
+            "limitations": [zero_check_limitation],
+            "sleep_seconds": 0.2,
+        }
+        second_payload = {**first_payload, "sleep_seconds": 2.0}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [first_payload, second_payload],
+                timeout_seconds=2,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                zero_check_grace_polls=2,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["polls"] == 2
+            assert payload["normalized_status"] == "unknown"
+            assert payload["overall_status"] == "unknown"
+            assert payload["recommended_next_action"] == "human_gate"
+            assert not any(
+                item.get("source") == "fetch_pr_observation_snapshot.sh" and item.get("code") == "snapshot_poll_timeout"
+                for item in payload.get("limitations", [])
+            )
+
+    def test_issue_187_s430_final_snapshot_timeout_preserves_stable_completion_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "passed",
+                        "overall_status": "passed",
+                        "normalized_status": "passed",
+                        "recommended_next_action": "merge_prepared",
+                        "sleep_seconds": 0.2,
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    },
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "passed",
+                        "overall_status": "passed",
+                        "normalized_status": "passed",
+                        "recommended_next_action": "merge_prepared",
+                        "sleep_seconds": 2.0,
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 0, "unresolved": 0, "items": []},
+                    },
+                ],
+                timeout_seconds=2,
+                poll_interval_seconds=1,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["wait"]["polls"] == 2
+            assert payload["normalized_status"] == "passed"
+            assert payload["overall_status"] == "passed"
+            assert payload["recommended_next_action"] == "merge_prepared"
+            assert payload["observation_complete"] is True
+            assert not any(
+                item.get("source") == "fetch_pr_observation_snapshot.sh" and item.get("code") == "snapshot_poll_timeout"
+                for item in payload.get("limitations", [])
+            )
+
     def test_issue_187_s430_slow_snapshot_budget_is_not_capped_by_poll_interval(self) -> None:
         decision = self._issue_187_s430_no_completion_decision("no-completion-s430-slow")
         with tempfile.TemporaryDirectory() as tmp_dir:

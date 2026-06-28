@@ -645,6 +645,13 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 | `./spec-dock/scripts/spec-dock validate` | pass: `spec-dock: ok (validate) nodes=153` | ADR / historical note 追加後の SpecDock tree validation |
 | `git diff --check` | pass | Markdown 差分の whitespace error なし |
 
+#### PR #245 Review Finding Follow-up（2026-06-29）
+| Review / finding | 対応 | 検証 | 結果 |
+|---|---|---|---|
+| Codex P1: `Preserve terminal PR observation result on final timeout` | final snapshot poll が timeout した場合でも、直前 payload が zero-check grace terminal または stable review completion として既に成立していれば、その terminal / completion state を保持するよう `pr_observation_wait.py` を修正 | added `test_issue_187_s430_final_snapshot_timeout_preserves_zero_check_terminal_state` and `test_issue_187_s430_final_snapshot_timeout_preserves_stable_completion_state` | fixed |
+| PR observation lane | provider / dogfooding mirror の wait script を同期し、既存 issue_75 regression と新規 final snapshot timeout regression を含めて確認 | focused: 4 passed; broad: 109 passed, 414 deselected; full `test_init_update.py`: 523 passed in 304.49s | pass |
+| Static analysis / SpecDock validation | wait script parity、lint、assurance、validate を確認 | `make lint` pass; provider/dogfood `diff -u` no diff; `assurance verify` ok; `validate` ok nodes=153 | pass |
+
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
