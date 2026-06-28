@@ -32,6 +32,7 @@ reflected_to:
 - 2026-06-28: 旧 trusted base-SHA review policy 方針は、この ADR により script-local Codex review instruction 方針へ変更済み。
 - 2026-06-29: `20260628t154553z-adr PR Observation Explicit Review Completion` により、review trigger 後の observation completion semantics は explicit Codex artifact model へ補完・変更済み。
 - 2026-06-29: Epic `requirement.md` / `report.md` 上に残っていた base-SHA policy / merge-after-policy-change wording は historical wording として扱い、現行要件は script-local instruction source と同一 PR dogfooding へ変更済み。
+- 2026-06-29: PR #245 dogfooding 再観測で、script-local instruction 付き trigger comment 投稿後、Codex no-findings issue comment を completion artifact として待機し、旧 carryover threads 解決後に `passed / merge_prepared` へ進む運用を確認した。この completion 判定は本 ADR ではなく `20260628t154553z-adr` が authority を持つ。
 - この ADR は「`@codex review` comment に添える instruction source」を決める。Review completion の終了条件、`review_completion_unknown` の扱い、timeout/resume semantics は `20260628t154553z-adr` を authority とする。
 - この ADR は、Codex review が完了したか、findings がないか、または merge-prepared かを判断する authority ではない。completion artifact がない状態を no-review-work proof として扱う旧運用は変更済みである。
 
