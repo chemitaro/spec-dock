@@ -1,5 +1,4 @@
 import ast
-import base64
 from contextlib import contextmanager, redirect_stderr, redirect_stdout, suppress
 from datetime import datetime, timedelta, timezone
 import hashlib
@@ -12706,19 +12705,17 @@ else:
         instruction_text = "Prioritize P0/P1 correctness findings.\n"
         instruction_hash = hashlib.sha256(instruction_text.encode("utf-8")).hexdigest()
         head_sha = "a" * 40
-        body = "\n".join(
-            (
-                "@codex review",
-                "",
-                "Script-local review instruction:",
-                "- source: .agents/skills/github-pr-observation/scripts/codex-review-instructions.md",
-                f"- instruction_sha256: {instruction_hash}",
-                "- instruction_status: loaded",
-                f"- reviewed_head_sha: {head_sha}",
-                "",
-                instruction_text.rstrip(),
-            )
-        )
+        body = "\n".join((
+            "@codex review",
+            "",
+            "Script-local review instruction:",
+            "- source: .agents/skills/github-pr-observation/scripts/codex-review-instructions.md",
+            f"- instruction_sha256: {instruction_hash}",
+            "- instruction_status: loaded",
+            f"- reviewed_head_sha: {head_sha}",
+            "",
+            instruction_text.rstrip(),
+        ))
         return {}, body
 
     def test_issue_244_trigger_helper_posts_plain_review_when_instruction_missing(self) -> None:
@@ -12736,16 +12733,14 @@ else:
             call for call in calls if call[:2] == ["api", "repos/owner/repo/issues/13/comments"] and "--method" in call
         )
         posted_body = post_call[-1][len("body=") :]
-        assert posted_body == "\n".join(
-            (
-                "@codex review",
-                "",
-                "Script-local review instruction:",
-                "- source: .agents/skills/github-pr-observation/scripts/codex-review-instructions.md",
-                "- instruction_status: missing_plain_fallback",
-                f"- reviewed_head_sha: {'a' * 40}",
-            )
-        )
+        assert posted_body == "\n".join((
+            "@codex review",
+            "",
+            "Script-local review instruction:",
+            "- source: .agents/skills/github-pr-observation/scripts/codex-review-instructions.md",
+            "- instruction_status: missing_plain_fallback",
+            f"- reviewed_head_sha: {'a' * 40}",
+        ))
         assert payload["success"] is True
         assert payload["overall_status"] == "trigger_posted"
         assert payload["trigger"]["endpoint"] == "repos/owner/repo/issues/13/comments"
