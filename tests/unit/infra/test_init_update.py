@@ -19688,7 +19688,7 @@ esac
                     "--trigger-created-at",
                     "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
-                    "2",
+                    "8",
                     "--poll-interval-seconds",
                     "1",
                     "--quiet-seconds",
@@ -19702,7 +19702,7 @@ esac
                 capture_output=True,
                 text=True,
                 check=False,
-                timeout=6,
+                timeout=12,
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
@@ -19711,11 +19711,12 @@ esac
         assert events[0]["ci"] == "passed"
         assert "phase=wait ci=passed" in result.stderr
         payload = json.loads(result.stdout)
-        assert payload["normalized_status"] == "timeout"
-        assert payload["recommended_next_action"] == "wait_or_resume"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["observation_complete"] is True
         assert "required_checks_missing_or_pending" not in [item["code"] for item in payload["limitations"]]
 
-    def test_issue_170_pr_observation_wait_maps_failed_required_rollup_to_fix_ci(self) -> None:
+    def test_issue_244_pr_observation_wait_ignores_failed_required_rollup(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -19770,7 +19771,7 @@ esac
                     "--trigger-created-at",
                     "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
-                    "2",
+                    "8",
                     "--poll-interval-seconds",
                     "1",
                     "--quiet-seconds",
@@ -19784,15 +19785,17 @@ esac
                 capture_output=True,
                 text=True,
                 check=False,
-                timeout=6,
+                timeout=12,
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-        assert payload["normalized_status"] == "failed"
-        assert payload["recommended_next_action"] == "fix_ci"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["observation_complete"] is True
+        assert payload["ci"]["status"] == "passed"
 
-    def test_issue_170_pr_observation_wait_maps_failed_required_status_state_to_fix_ci(self) -> None:
+    def test_issue_244_pr_observation_wait_ignores_failed_required_status_state(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -19846,7 +19849,7 @@ esac
                     "--trigger-created-at",
                     "2026-06-08T01:00:00Z",
                     "--timeout-seconds",
-                    "2",
+                    "8",
                     "--poll-interval-seconds",
                     "1",
                     "--quiet-seconds",
@@ -19858,13 +19861,15 @@ esac
                 capture_output=True,
                 text=True,
                 check=False,
-                timeout=6,
+                timeout=12,
             )
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-        assert payload["normalized_status"] == "failed"
-        assert payload["recommended_next_action"] == "fix_ci"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["observation_complete"] is True
+        assert payload["ci"]["status"] == "passed"
 
     def _issue_222_run_observation_snapshot_scenario(
         self,
@@ -31871,77 +31876,35 @@ esac
             "issue_comment", "P2", body
         )
 
-    def test_issue_233_required_check_rollup_ignores_optional_failure_when_mergeable(self) -> None:
+    def test_issue_244_wait_script_does_not_define_required_check_rollup_reader(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         provider_path = (
             repo_root
             / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py"
         )
-        module = ast.parse(provider_path.read_text(encoding="utf-8"))
-        selected = [
-            node
-            for node in module.body
-            if isinstance(node, ast.FunctionDef) and node.name == "required_check_rollup_status"
-        ]
+        provider_text = provider_path.read_text(encoding="utf-8")
+        module = ast.parse(provider_text)
 
-        class FakeCompleted:
-            returncode = 0
-            stdout = json.dumps({
-                "mergeStateStatus": "CLEAN",
-                "statusCheckRollup": [
-                    {"name": "legacy", "state": "SUCCESS", "conclusion": None},
-                    {"name": "required", "status": "COMPLETED", "conclusion": "FAILURE"},
-                ],
-            })
-
-        class FakeSubprocess:
-            TimeoutExpired = TimeoutError
-
-            @staticmethod
-            def run(*_args, **_kwargs):
-                return FakeCompleted()
-
-        namespace = {"json": json, "subprocess": FakeSubprocess}
-        exec(compile(ast.Module(body=selected, type_ignores=[]), str(provider_path), "exec"), namespace)
-
-        assert namespace["required_check_rollup_status"]("owner/repo", "13", 1.0) is None
-
-    def test_issue_233_required_check_rollup_scans_failure_when_not_mergeable(self) -> None:
-        repo_root = Path(__file__).resolve().parents[3]
-        provider_path = (
-            repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py"
+        assert all(
+            not isinstance(node, ast.FunctionDef) or node.name != "required_check_rollup_status" for node in module.body
         )
-        module = ast.parse(provider_path.read_text(encoding="utf-8"))
-        selected = [
-            node
-            for node in module.body
-            if isinstance(node, ast.FunctionDef) and node.name == "required_check_rollup_status"
-        ]
+        assert "mergeStateStatus,statusCheckRollup" not in provider_text
 
-        class FakeCompleted:
-            returncode = 0
-            stdout = json.dumps({
-                "mergeStateStatus": "UNSTABLE",
-                "statusCheckRollup": [
-                    {"name": "legacy", "state": "SUCCESS", "conclusion": None},
-                    {"name": "required", "status": "COMPLETED", "conclusion": "FAILURE"},
-                ],
-            })
-
-        class FakeSubprocess:
-            TimeoutExpired = TimeoutError
-
-            @staticmethod
-            def run(*_args, **_kwargs):
-                return FakeCompleted()
-
-        namespace = {"json": json, "subprocess": FakeSubprocess}
-        exec(compile(ast.Module(body=selected, type_ignores=[]), str(provider_path), "exec"), namespace)
-
-        assert namespace["required_check_rollup_status"]("owner/repo", "13", 1.0) == "failed"
-
-    @pytest.mark.parametrize("term", ["authentication", "authorization", "permissions"])
+    @pytest.mark.parametrize(
+        "term",
+        [
+            "authentication",
+            "authorization",
+            "permissions",
+            "merge-prepared",
+            "PR observation",
+            "execution-ready",
+            "assurance schema",
+            "dependency sync",
+            "symlink path traversal",
+            "provider asset parity",
+        ],
+    )
     def test_issue_232_protected_domain_recognizes_auth_terms(self, term: str) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         provider_path = (

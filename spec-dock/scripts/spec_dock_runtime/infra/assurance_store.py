@@ -427,20 +427,25 @@ class _IssueRecord:
 def _contract_from_payload(payload: Any) -> tuple[AssuranceContract | None, tuple[str, ...]]:
     if not isinstance(payload, dict):
         return None, ("contract_not_object",)
+    required_keys = (
+        "schema_version",
+        "policy_version",
+        "issue_id",
+        "stage",
+        "status",
+        "mode",
+        "source_binding",
+        "classification",
+        "risk_facts",
+        "obligations",
+    )
+    allowed_keys = set(required_keys)
+    unknown_keys = sorted(str(key) for key in payload if key not in allowed_keys)
+    if unknown_keys:
+        return None, tuple(f"unknown_root_field:{key}" for key in unknown_keys)
     errors = _missing_keys(
         payload,
-        (
-            "schema_version",
-            "policy_version",
-            "issue_id",
-            "stage",
-            "status",
-            "mode",
-            "source_binding",
-            "classification",
-            "risk_facts",
-            "obligations",
-        ),
+        required_keys,
     )
     if errors:
         return None, errors

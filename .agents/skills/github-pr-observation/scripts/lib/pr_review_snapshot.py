@@ -1014,6 +1014,32 @@ def has_protected_domain(raw_body):
         r"\bfinancial\b",
         r"\btoken\b",
         r"\bsecret\b",
+        r"\bpr\s+observation\b",
+        r"\bmerge-prepared\b",
+        r"\bmerge\s+prepared\b",
+        r"\bci\b",
+        r"\breview\s+coverage\b",
+        r"\breview\s+gate\b",
+        r"\bguidance\b",
+        r"\bexecution-ready\b",
+        r"\bassurance\b",
+        r"\bschema\b",
+        r"\bdependency\b",
+        r"\bdependencies\b",
+        r"\bsync\b",
+        r"\bactive\s+set\b",
+        r"\bdelete\b",
+        r"\buninstall\b",
+        r"\bworktree\s+remove\b",
+        r"\bcleanup\b",
+        r"\bsymlink\b",
+        r"\bpath\s+traversal\b",
+        r"\binstall\b",
+        r"\bupdate\b",
+        r"\bshipped\s+asset\b",
+        r"\bprovider\s+asset\b",
+        r"\bdogfooding\s+mirror\b",
+        r"\bparity\b",
     )
     return any(re.search(pattern, normalized) for pattern in protected_patterns)
 
@@ -1263,6 +1289,7 @@ selected_blocker_present = bool(selected_unresolved_thread_ids or selected_chang
 explicit_completion_present = completion_signal in {
     "submitted_pull_request_review",
     "codex_no_findings_issue_comment",
+    "blocker_policy_no_action",
 }
 fallback_issue_comment_present = completion_signal == "fallback_issue_comment"
 if selected_blocker_present:
