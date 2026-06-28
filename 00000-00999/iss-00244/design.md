@@ -5,7 +5,7 @@ ID: "iss-00244"
 関連GitHub: ["#244"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-28"
+最終更新: "2026-06-29"
 依存: ["requirement.md"]
 親: ["epic-00224", "init-local-00003"]
 ---
@@ -23,6 +23,8 @@ ID: "iss-00244"
   - PR #245 dogfooding failure を受け、旧 trusted base-SHA review policy ADR は script-local Codex review instruction 方針へ差し替え済み。
   - この Issue の追加作業として、GitHub PR observation の review trigger instruction source を base branch policy から script-local Markdown へ切り替える。
   - Issue-local `assurance.json` は runtime-managed metadata contract として `.assurance.json` へ改名し、agent-facing primary docs と区別する。
+  - PR #245 dogfooding failure を受け、`review_completion_unknown` を active terminal-like wait state として扱う方針を廃止する。Review completion は current trigger boundary と expected head SHA に bind された Codex-authored artifact のみで判断する。
+  - この review completion 判断は `../../discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md` として ADR に昇格済み。
 
 ## 既存実装 / 規約の理解
 
@@ -77,6 +79,26 @@ ID: "iss-00244"
   - assurance store / application / CLI runtime tests が `assurance.json` fixture を使う。
 - Dogfooding artifacts:
   - `epic-00224` 配下の複数 Issue に Issue-local `assurance.json` が存在する。
+
+### 現行 PR observation wait completion
+
+- `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/SKILL.md` と `.agents/skills/github-pr-observation/SKILL.md`
+  - `review_completion_unknown` を non-pass terminal-like review state として説明している。
+  - CI passed、head matched、current blocker なし、trusted Codex review completion signal なし、latency guard 充足後に top-level `human_gate` とする contract を持つ。
+  - `post_unknown_fresh_audit_required` により downstream orchestration が fresh audit する前提になっている。
+- `pr_observation_wait.py`
+  - `REVIEW_COMPLETION_UNKNOWN_MIN_TRIGGER_AGE_SECONDS = 300`
+  - `REVIEW_COMPLETION_UNKNOWN_MIN_CI_PASSED_AGE_SECONDS = 300`
+  - `is_review_completion_unknown_candidate()` が `no_completion_evidence` を terminal candidate に変換する。
+  - `classify()` は `missing_current_completion_signal` かつ unknown candidate の場合、stable completion 可能な tuple を返す。
+  - wait loop は quiet window / same fingerprint / latency guard を組み合わせ、completion signal がなくても `observation_complete=true` とし、`mark_decision_review_completion_unknown()` によって `human_gate` / `review_completion_unknown` へ昇格する。
+- `pr_review_snapshot.py`
+  - `submitted_pull_request_review`、`codex_no_findings_issue_comment`、`blocker_policy_no_action`、`fallback_issue_comment`、`none` の completion taxonomy を持つ。
+  - `completion_signal == "none"` の場合、`missing_current_completion_signal` / `wait_or_resume` / `no_completion_evidence` を返せる。
+  - 危険な早期終了は主に wait layer 側で起きている。
+- PR #245 observed incident:
+  - old wait result は CI passed、selected comments 0、completion none、`review_completion_unknown` で終了した。
+  - 約 14 分後、same head に Codex submitted PR review と 5 件の P1 unresolved review threads が投稿された。
 
 ## 採用方針
 
@@ -150,6 +172,101 @@ ID: "iss-00244"
 - Existing dogfooding Issue-local `assurance.json` artifacts は `.assurance.json` に rename する。
 - CLI help / current docs / test fixtures は `.assurance.json` に揃える。
 - Historical discussions / completed Issue docs は、必要最小限以外の bulk rewrite をしない。
+
+### 方針 F: Review completion wait は explicit artifact model に切り替える
+
+ADR authority: `../../discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`
+
+- 採用案は `Option C: hybrid` とする。
+  - `review_completion_unknown` の active terminal path は廃止する。
+  - `no_completion_evidence` は diagnostics として残す。
+  - `completion_signal=none` / `missing_current_completion_signal` は explicit completion artifact が見えるまで pending / wait として扱う。
+  - Overall deadline まで trusted completion artifact がない場合は `timeout` / `wait_or_resume` / `observation_complete=false` を返す。
+  - quiet window / same fingerprint は explicit completion artifact が見えた後の hydration stability にのみ使う。
+- Trusted completion signal:
+  - `submitted_pull_request_review`: Codex-authored submitted PR review object。current trigger 後で、expected head SHA に bind されていること。
+  - `codex_no_findings_issue_comment`: Codex-authored strict no-findings issue comment。current trigger 後で、`Reviewed commit` が expected head に bind され、pending review / blockers / carryover / CI / PR metadata gates を統合後にのみ pass できること。
+  - `blocker_policy_no_action`: 既存 taxonomy を維持するが、no-findings と混同しない。
+- Completion として扱わない signal:
+  - `fallback_issue_comment`
+  - `none`
+  - current trigger 前 artifact
+  - wrong head artifact
+  - generic Codex issue comment
+  - reaction only
+  - selected comments 0
+  - CI passed
+- `review_completion_unknown`:
+  - 新規 wait result の active status / active decision reason としては出さない。
+  - 過去 artifact を読む場合の legacy vocabulary としてのみ扱う。
+  - downstream は legacy `review_completion_unknown` を no-review-work proof / merge-prepared proof にしてはならない。
+
+## Review Completion State Machine
+
+```plantuml
+@startuml
+title PR Observation Review Completion Wait State Machine
+' Question answered: When can wait_pr_observation.sh stop waiting for Codex review?
+' Scope: github-pr-observation wait logic for current trigger boundary.
+' Excluded details: GitHub write trigger body construction and CI collection internals.
+' Update trigger: review completion semantics or timeout/resume contract changes.
+
+start
+:Trigger boundary ready;
+:Poll CI and PR review surfaces;
+
+if (PR head matches expected?) then (no)
+  :stale_head / rerun_for_current_head;
+  stop
+else (yes)
+endif
+
+if (Actions CI failed?) then (yes)
+  :failed / fix_ci;
+  stop
+else (no)
+endif
+
+if (Trusted Codex submitted PR review?) then (yes)
+  :Hydrate review comments, threads, body;
+  if (current or carryover actionable feedback?) then (yes)
+    :human_gate / address_review_feedback;
+    stop
+  else (no)
+    :passed / merge_prepared;
+    stop
+  endif
+elseif (Strict Codex no-findings issue comment?) then (yes)
+  :Hydrate and integrate CI, PR metadata, blockers, carryover;
+  if (all gates pass?) then (yes)
+    :passed / merge_prepared;
+    stop
+  else (no)
+    :human_gate or timeout depending blocker visibility;
+    stop
+  endif
+elseif (Ambiguous Codex output?) then (yes)
+  :human_gate / manual_review_required_non_retryable;
+  stop
+else (no completion artifact)
+endif
+
+if (overall deadline reached?) then (yes)
+  :timeout / wait_or_resume;
+  :observation_complete=false;
+  stop
+else (no)
+  :Continue polling;
+endif
+@enduml
+```
+
+設計判断:
+
+- `completion_signal=none` は state machine の terminal branch ではない。
+- `quiet_seconds` と `same_fingerprint_count` は no-completion branch では terminal 化に使わない。
+- `timeout` は no-review-work proof ではなく、same-boundary resume のための retryable outcome である。
+- Visible actionable review comments がある場合は merge-ready にしてはならない。ただし selected review / thread hydration が不完全な場合は、可能な限り hydration して machine-readable inventory を揃える。
 
 ## Module Dependency Diagram
 
@@ -320,6 +437,35 @@ src/spec_dock/assets/
     `-- review-policy.md                             # Delete
 ```
 
+追加された PR observation completion wait repair の変更計画:
+
+```text
+src/spec_dock/assets/
+`-- install_root/
+    `-- .agents/
+        `-- skills/
+            `-- github-pr-observation/
+                |-- SKILL.md                         # Modify: remove active review_completion_unknown contract
+                `-- scripts/
+                    `-- lib/
+                        |-- pr_observation_wait.py   # Modify: no-completion stays wait/timeout
+                        `-- pr_review_snapshot.py    # Modify if head-binding/hydration hardening is needed
+
+.agents/
+`-- skills/
+    `-- github-pr-observation/
+        |-- SKILL.md                                 # Modify: dogfooding installed copy
+        `-- scripts/
+            `-- lib/
+                |-- pr_observation_wait.py           # Modify: dogfooding installed copy
+                `-- pr_review_snapshot.py            # Modify if mirrored provider change is made
+
+tests/
+`-- unit/
+    `-- infra/
+        `-- test_init_update.py                      # Modify/Add: wait completion regressions
+```
+
 ## インターフェース契約
 
 ### `guidance issue-execution` Markdown
@@ -372,6 +518,39 @@ Must not include:
 
 - `step_assurance`
 - `context_packets`
+
+### `wait_pr_observation.sh` review completion output
+
+Must include on missing completion timeout:
+
+- `normalized_status: "timeout"`
+- `overall_status: "timeout"`
+- `recommended_next_action: "wait_or_resume"`
+- `observation_complete: false`
+- `decision.status: "timeout"`
+- `decision.status_reason: "wait_timeout"` or an equivalent timeout reason
+- `decision.completion_signal: "none"`
+- same-boundary `resume` metadata
+
+Must include on submitted review with unresolved findings:
+
+- `normalized_status: "human_gate"`
+- `recommended_next_action: "address_review_feedback"`
+- `decision.completion_signal: "submitted_pull_request_review"`
+- selected review ids / selected review comment ids / selected review thread ids
+- selected review bodies and selected review comment bodies in final stdout JSON
+
+Must not include for new active results:
+
+- active `normalized_status: "review_completion_unknown"`
+- active `decision.status_reason: "review_completion_unknown"`
+- `post_unknown_fresh_audit_required`
+- `review_completion_unknown_latency_satisfied` as a terminal gate
+
+May include:
+
+- `no_completion_evidence` diagnostics
+- legacy compatibility notes in docs, not as new active status
 
 ### Plan contract lint / readiness
 
@@ -461,6 +640,10 @@ stop
 | AC-017 | 旧 `assurance.json` だけがある場合は migration-required diagnostics を返し、silently current authority にしない |
 | AC-018 | dogfooding Issue-local assurance artifacts を `.assurance.json` へ rename する |
 | AC-019 | current docs / CLI help / tests は `.assurance.json` を canonical path として説明・検証する |
+| AC-020 | `completion_signal=none` を completion proof にせず、trusted Codex artifact のみを review completion とする |
+| AC-021 | missing completion by deadline を retryable `timeout` / `wait_or_resume` とし、active `review_completion_unknown` を返さない |
+| AC-022 | quiet / same fingerprint を explicit completion artifact 後の hydration stability に限定する |
+| AC-023 | PR #245 型 delayed review sequence を regression test と manual/dogfooding evidence で固定する |
 
 ## テスト戦略
 
@@ -493,6 +676,12 @@ stop
   - missing script-local instruction posts deterministic plain fallback comment.
   - invalid / oversized / unreadable script-local instruction blocks with `human_gate` and no comment.
   - fake `gh` command logs do not include contents API reads for `.github/codex/review-policy.md`.
+  - CI passed + `completion_signal=none` + stable fingerprint does not produce active `review_completion_unknown`.
+  - no completion by deadline returns `timeout` / `wait_or_resume` / `observation_complete=false`.
+  - delayed submitted PR review after stable no-completion is selected and returns `human_gate` / `address_review_feedback`.
+  - quiet / same fingerprint is used only after explicit completion artifact visibility for hydration.
+  - strict no-findings issue comment promotes to `passed` only after current trigger/head binding and integrated gates.
+  - wrong trigger / wrong head / old artifact is not selected as current completion.
 - Dogfooding:
   - `./spec-dock/scripts/spec-dock guidance issue-planning`
   - `./spec-dock/scripts/spec-dock assurance classify --stage requirement`
@@ -542,6 +731,9 @@ stop
   - Missing instruction は review continuation のため plain fallback。Invalid instruction は設定不備として human gate。
 - Assurance contract path:
   - design 方針: `.assurance.json` を canonical path とする hard cutover。旧 `assurance.json` は migration-required diagnostics の対象であり、current authority として silently accept しない。
+- PR observation review completion:
+  - design 方針: Option C を採用する。`review_completion_unknown` の active terminal path を廃止し、explicit completion artifact model と retryable timeout / resume semantics を実装する。
+  - unresolved: Codex no-findings wording の将来バリエーションは本 Issue では全面調査しない。現行 strict wording と head binding を保守的に扱い、未知の場合は false timeout / human gate 側へ倒す。
 
 ## Assurance Profile
 

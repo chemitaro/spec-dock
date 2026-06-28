@@ -56,6 +56,7 @@ Disposition ごとの必須証跡:
 | D-005 | resolved | operation | dogfooding manual test | `uvx --from . spec-dock update .` 後も dogfooding runtime が古い `guidance issue-execution` 判定を返した。 | update root cause をこの issue で深掘り; dogfooding parity のため provider 正本から同期して本 issue を進める; issue を停止する | 本 issue では provider 正本と dogfooding runtime の parity を確保して検証を続行し、update root cause の深掘りは scope expansion として扱う。 | 主目的は guidance hard cutover であり、provider 正本の実装と dogfooding command の実挙動確認が closure に必要。update behavior の根本原因は別関心事。 | applied | `discussions/20260627t154455z-research-dogfooding-runtime-update-drift-finding.md`; dogfooding `guidance issue-execution` / `guidance issue-planning`; `spec-dock validate` | 必要なら update path 調査を follow-up |
 | D-006 | resolved | compatibility | dev-coder / orchestrator | `.assurance.json` がなく旧 `assurance.json` だけがある場合の public status / reason をどう扱うか。 | `missing / missing_assurance_contract`; `invalid / legacy_assurance_contract_path` | `invalid / legacy_assurance_contract_path` を採用する。 | 旧 visible path は「存在しない契約」ではなく、current authority ではない stale artifact である。missing strict-legacy と区別し、show / verify を fail-closed にする必要がある。 | applied | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/assurance_store.py`; `tests/unit/infra/test_assurance_store.py`; `tests/cli_runtime/test_assurance.py`; focused pytest `53 passed` | なし |
 | D-007 | resolved | implementation | dev-coder / orchestrator | Script-local Codex review instruction body の metadata labels と instruction size limit をどう固定するか。 | max size を変更する; 既存 32768 bytes を維持する | 既存上限 32768 bytes を維持し、body metadata は `source`, `instruction_sha256`, `instruction_status`, `reviewed_head_sha` とする。 | ADR / plan は script-local path/hash/status/head metadata を要求しており、既存 size limit の変更理由はない。GitHub base/head policy fetch を廃止しつつ、最小差分で deterministic body を保てる。 | applied | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh`; `.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh`; `tests/unit/infra/test_init_update.py` | なし |
+| D-008 | resolved | operation | user / ChatGPT Pro advisory / orchestrator | PR #245 で `wait_pr_observation.sh` が `review_completion_unknown` で終了した約 14 分後に Codex submitted PR review と 5 件の P1 finding が投稿され、time / quiet / same fingerprint / selected comments 0 を completion proof とする設計欠陥が露出した。 | active `review_completion_unknown` 維持; timeout だけ延長; explicit artifact model へ切替; full state-machine rewrite | Option C hybrid を採用し、active `review_completion_unknown` terminal path を廃止する。Review completion は current trigger boundary と expected head SHA に bind された Codex-authored submitted PR review または strict no-findings comment に限定し、completion artifact がない場合は retryable `timeout` / `wait_or_resume` とする。 | GPT-5.5 Pro advisory と追加分析は、時間経過・静穏・fingerprint 安定は非同期 review worker の完了証拠ではないと結論づけた。full rewrite は scope 過大であり、現 defect は wait layer の terminalization と hydration/head binding を絞って直せる。 | promoted_to_adr / promoted_to_design / promoted_to_plan | `../../discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`; `discussions/20260628t143306z-research-pr-observation-review-completion-signals.md`; `discussions/20260628t150332z-disc-pr-observation-completion-wait-repair-draft.md`; `requirement.md` AC-020..AC-023; `design.md` 方針 F; `plan.md` S300..S399 | なし |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -77,6 +78,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-006 | adopted | command / research | report | Dogfooding runtime update drift finding を採用し、provider/dogfood parity と実コマンド出力の両方を最終検証対象にした。 | `discussions/20260627t154455z-research-dogfooding-runtime-update-drift-finding.md`; `./spec-dock/scripts/spec-dock guidance issue-execution`; `./spec-dock/scripts/spec-dock validate` | PR 前に provider/dogfood diff と guidance output を再確認 |
 | EAL-007 | adopted | delegated worker / command | report / implementation | S200/S210 実装結果と legacy visible path status semantics を採用した。 | `dev-coder` result; focused pytest `51 passed`; hidden file inspection; `assurance verify`; `guidance issue-execution`; `validate` | final review gates and commit |
 | EAL-008 | adopted | delegated worker / command | report / implementation | S100/S110 review trigger repair と QA P2 test tightening を採用した。 | `dev-coder` result; `test_init_update.py` 515 passed; focused assurance lane 53 passed; grep/file-list inspections | final review gates and commit |
+| EAL-009 | adopted | research / discussion / advisory analysis / ADR | requirement / design / plan / report | PR observation completion wait repair の Option C hybrid を採用し、AC-020..AC-023、方針 F、S300..S399、tc-028..tc-035 へ反映したうえで、`20260628t154553z-adr` へ昇格した。 | `../../discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`; `discussions/20260628t143306z-research-pr-observation-review-completion-signals.md`; `discussions/20260628t150332z-disc-pr-observation-completion-wait-repair-draft.md`; `requirement.md`; `design.md`; `plan.md`; `./spec-dock/scripts/spec-dock guidance issue-planning`; `./spec-dock/scripts/spec-dock assurance verify`; fresh spec-reviewer pass | implementation ready |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -84,7 +86,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | `guidance issue-execution` を plan-centric preflight validator に単純化する要件・設計・計画が作成済み。 | Issue Planning guidance の manual test 結果を `discussions/` と plan の検証対象へ反映済み。 | low | provisional: fresh spec-reviewer pending |
+| OAL-001 | `guidance issue-execution` を plan-centric preflight validator に単純化する要件・設計・計画が作成済み。 | Issue Planning guidance の manual test 結果を `discussions/` と plan の検証対象へ反映済み。 | low | pass: fresh spec-reviewer |
+| OAL-002 | PR observation wait の早期終了を防ぐ AC-020..AC-023 / S300..S399 を追加し、レビュー完了判定を explicit artifact model へ寄せた。 | 既存 S01-S299 は残し、PR trigger repair / hidden assurance rename と分離した追加 repair scope として扱う。 | medium | pass: fresh spec-reviewer |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -92,9 +95,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | active epic/issue docs, runtime code, discussions, user hard-cutover decision | Q-001 resolved; Q-002/Q-003 design-routed | adopted | provisional: reviewer pending | no | promote to design, then request final spec-review |
-| design | `application/workflow.py`, `context_packets.py`, `context_routing.py`, `runbook.py`, `presentation/workflow.py`, shipped skills, templates, tests | no blocking open question; deletion depth captured as S03 | adopted | provisional: reviewer pending | no | promote to plan, then request final spec-review |
-| plan | requirement/design AC and module dependency analysis | no blocking open question | adopted | provisional: reviewer pending | no | ready for spec-review; implementation starts only after passed review |
+| requirement | active epic/issue docs, runtime code, discussions, user hard-cutover decision, PR #245 wait failure analysis | Q-001 resolved; Q-002/Q-003 design-routed; PR observation completion wait scope resolved by Option C hybrid | adopted | pass: fresh spec-reviewer | no | implementation-ready |
+| design | `application/workflow.py`, `context_packets.py`, `context_routing.py`, `runbook.py`, `presentation/workflow.py`, PR observation wait/snapshot scripts, shipped skills, docs/scaffold assets, tests | no blocking open question; deletion depth captured as S03; completion wait repair captured as 方針 F | adopted | pass: fresh spec-reviewer | no | implementation-ready |
+| plan | requirement/design AC and module dependency analysis, PR observation wait repair dependency analysis | no blocking open question; AC-020..AC-023 mapped to S300..S399 and tc-028..tc-035 | adopted | pass: fresh spec-reviewer | no | implementation-ready |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -588,8 +591,8 @@ rg --files --hidden spec-dock | rg '(^|/)assurance\\.json$|(^|/)\\.assurance\\.j
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report alignment | prior P1 and stale final gate wording resolved; S120 remains pending and not overclaimed | 2 | pass |
-| local spec traceability | requirement / design / plan / report alignment | closure ids tc-001..tc-027 recorded and verified except live S120/PR evidence pending | 0 | local pass |
+| spec-reviewer | requirement / design / plan / report alignment including AC-020..AC-023 / S300..S399 | prior P1 findings resolved; discussion reflection P2 resolved; no new P0/P1/P2 findings | 3 | pass |
+| local spec traceability | requirement / design / plan / report alignment | closure ids tc-001..tc-035 recorded; implementation evidence for S300..S399 remains future execution scope | 0 | local pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |

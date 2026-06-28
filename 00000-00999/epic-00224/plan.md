@@ -18,7 +18,7 @@ ID: "epic-00224"
 - Issue 実体は作成済み。実装対象は `I01`〜`I07` の `iss-00227`〜`iss-00233` に対応する。
 - `iss-00226 / #226` は decision-only Issue として作成されたが、ADR-level decisions はこの Epic planning/design で固定すべきだったため closed / superseded historical evidence とする。
 - 初期 rollout では automatic Lite default を有効化しない。Lite は shadow / explicit opt-in / evidence-gated に限定し、future automatic Lite default は別 accepted ADR、policy version bump、rollout Issue、telemetry gate が揃った場合だけ扱う。
-- 実装開始前の workflow authority decision は、Epic-scope accepted ADR 5 件として作成済み。これを `G0 Epic Decision Baseline` とする。
+- 実装開始前の workflow authority decision は、当初 Epic-scope accepted ADR 5 件として作成済みだった。その後の dogfooding修正により、script-local review instruction と explicit review completion を含む current ADR baseline へ変更済み。
 
 ## この計画で閉じる E-RQ / E-AC
 
@@ -26,14 +26,14 @@ ID: "epic-00224"
 |---|---|---|
 | E-RQ-001〜005 | Assurance core、workflow state、fixed Skill kernel、Runbook compiler | CLI contract tests、golden Runbook、clean Git evidence |
 | E-RQ-006〜008, E-RQ-015〜021 | Planning composer、Step Assurance、agent context routing | artifact golden tests、step matrix、clean-room review evidence、context packet golden tests、return contract tests |
-| E-RQ-009 | trusted base-SHA review policy compiler | trigger JSON、base/head tests、runtime validation、I07 doctor defer |
+| E-RQ-009 | review trigger instruction compiler | 変更済み: trusted base-SHA policy は script-local instruction source へ置換。trigger JSON、local instruction tests、runtime validation、I07 doctor defer |
 | E-RQ-010〜011 | blocker-centric repair / re-review / stagnation | finding matrix、repair loop tests、merge predicate |
 | E-RQ-012〜014 | legacy rollout、metrics、provider/mirror、Auto-Lite readiness | migration fixtures、benchmark、auto-lite-readiness report、validate / sync |
 | E-AC-001〜003 | I01〜I02 | state / classification tests |
 | E-AC-004〜005 | I02 | Runbook candidate/authorized separation、fixed Skill / clean Git tests |
 | E-AC-006, E-AC-008 | I03 | profile-specific planning、stale source binding / invalidation tests |
 | E-AC-007 | I04 | step routing matrix tests |
-| E-AC-009〜010 | I05 | trusted trigger integration tests |
+| E-AC-009〜010 | I05 / iss-00244 corrective scope | 変更済み: script-local trigger integration tests and explicit review completion observation tests |
 | E-AC-011〜012 | I06 | PR blocker policy tests |
 | E-AC-013 | I07 | automation-stalled rollout / telemetry tests |
 | E-AC-014〜016 | I07 | legacy / rollout / auto-lite-readiness / efficiency report |
@@ -202,10 +202,13 @@ ID: "epic-00224"
 
 ### I05 — Inject Trusted Base-Branch Codex Review Policy（iss-00231 / #231）
 
+> 変更済み: この slice の旧 trusted base-SHA review policy 方針は、PR #245 dogfooding failure 後に `20260623t074444z-adr` / `iss-00244` により script-local Codex review instruction source へ置換済み。さらに review completion 終了条件は `20260628t154553z-adr` により explicit Codex artifact model へ変更済み。
+
 - provisional slug:
   - `inject-trusted-base-branch-codex-review-policy`
 - 目的:
-  - Project-owned review policy を PR base SHA から取得し、head SHA / policy hash へ bind した deterministic multiline `@codex review` を安全に投稿する。
+  - Historical objective: Project-owned review policy を PR base SHA から取得し、head SHA / policy hash へ bind した deterministic multiline `@codex review` を安全に投稿する。
+  - Current objective: script-local review instruction を読み、head SHA / instruction hash へ bind した deterministic multiline `@codex review` を安全に投稿する。
 - 成果物:
   - `.github/codex/review-policy.md` bootstrap-only asset。
   - Fixed Markdown policy path / base SHA binding。
@@ -469,7 +472,8 @@ T6 I07 Rollout / telemetry / default switch
 - No-active / planning / execution / PR / finish state が `guidance <target>` stdout authority として動作し、generated projection files は human/debug-only non-canonical output として扱われる。
 - Profile / Complexity / Step Assurance が machine-readable。
 - Generated state が Git 差分を生まない。
-- Valid trusted base-SHA policy で deterministic multiline `@codex review` trigger が動作し、missing / invalid / oversized / unreadable / base_sha_missing は no PR comment の human gate / fail-closed になる。
+- 変更済み: Valid script-local instruction で deterministic multiline `@codex review` trigger が動作する。missing instruction は plain deterministic fallback、invalid / oversized / unreadable は no PR comment の human gate / fail-closed になる。
+- Review completion は explicit Codex artifact で判断し、completion artifact missing by deadline は retryable `timeout` / `wait_or_resume` / `observation_complete=false` とする。
 - Auto-Lite readiness report が future automatic Lite default の adoption / rollback 条件を示し、初期 rollout では automatic Lite default が無効のままである。
 - Context routing policy、context packet、clean-room reviewer packet、bounded return contract が evidence 付きで動作する。
 - P2-only review で repair / re-review loop が開始されない。
@@ -486,7 +490,7 @@ T6 I07 Rollout / telemetry / default switch
 - D-002:
   - Codex GitHub review の長文 instruction 遵守は hard guarantee ではないため、Blocker Engine を残す。
 - D-003:
-  - GitHub policy base-SHA fetch capability が必要。
+  - 変更済み: GitHub policy base-SHA fetch capability は不要。script-local instruction source と local file validation が current authority。
 - D-004:
   - Existing PR observation JSON contract の version migration が必要。
 - D-005:

@@ -30,8 +30,9 @@ ID: "epic-00224"
     - worker は bounded context を継承でき、reviewer は clean-room evidence を使う。
   - Risk closure, not comment closure:
     - PR は comment zero ではなく verified blocker zero で閉じる。
-  - Trusted review policy:
-    - Review policy は PR head ではなく PR base SHA から取得する。
+  - Review instruction / observation policy:
+    - 変更済み: 旧「Review policy は PR head ではなく PR base SHA から取得する」方針は `20260623t074444z-adr` により script-local Codex review instruction へ置換済み。
+    - 変更済み: review completion は `20260628t154553z-adr` により explicit Codex artifact model と retryable timeout / resume semantics で判断する。
 - 既存関係:
   - `epic-00158` で整理された provider / mirror、canonical / evidence、skill / docs / templates 境界を前提にする。
   - Existing Issue workflow は strict-legacy adapter として残す。
@@ -64,7 +65,7 @@ ID: "epic-00224"
 | Context Policy Resolver | role / task / step facts から `recent_fork` / `bounded_packet` / `clean_room` / `minimal_packet` と freshness checks を決定 | deterministic domain policy |
 | Context Packet Compiler | selected context contract を source hash へ bind し、agent invocation packet と reviewer evidence packet を生成 | ignored generated state |
 | Active Projection Writer | current guidance projection / context pack を atomic 生成 | ignored generated state |
-| Review Policy Compiler | base SHA policy から deterministic `@codex review` body を生成 | trusted policy source |
+| Review Instruction Compiler | script-local instruction から deterministic `@codex review` body を生成 | script-local instruction source; changed from old base-SHA policy decision |
 | PR Blocker Engine | finding validity、priority、protected domain、machine evidence、re-review を決定 | deterministic review policy |
 | Legacy Adapter | `assurance.json` なし Issue を strict-legacy で実行 | compatibility policy |
 | Metrics / Event Projection | invocation、time、review generation、disposition を記録 | generated operational evidence |
@@ -696,19 +697,20 @@ hard safety rule > issue global obligation > step local obligation > role defaul
 
 ### Review trigger contract
 
+> 変更済み: この節の旧 base-SHA policy source 前提は `20260623t074444z-adr` により script-local Codex review instruction へ置換済み。Review completion 終了条件は `20260628t154553z-adr` の explicit Codex artifact model を authority とする。
+
 - Inputs:
   - repository
   - PR number
   - expected head SHA
 - Runtime reads:
   - current PR head SHA
-  - PR base SHA
-  - `<base-sha>:.github/codex/review-policy.md`
+  - script-local `github-pr-observation/scripts/codex-review-instructions.md`
 - Runtime output:
   - trigger comment id / created_at
   - reviewed head SHA
-  - policy base SHA
-  - policy SHA-256
+  - instruction path
+  - instruction SHA-256
   - body SHA-256
   - limitations
 - Forbidden:
@@ -721,10 +723,10 @@ hard safety rule > issue global obligation > step local obligation > role defaul
 ### Tracked canonical
 
 ```text
-<issue>/assurance.json
+<issue>/.assurance.json
 src/spec_dock/assets/spec_dock/system/assurance/**
 src/spec_dock/assets/spec_dock/templates/assurance/**
-src/spec_dock/assets/install_root/.github/codex/review-policy.md
+src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/codex-review-instructions.md
 ```
 
 Installed / dogfooding equivalents:
@@ -732,7 +734,7 @@ Installed / dogfooding equivalents:
 ```text
 spec-dock/system/assurance/**
 spec-dock/templates/assurance/**
-.github/codex/review-policy.md
+.agents/skills/github-pr-observation/scripts/codex-review-instructions.md
 ```
 
 Context routing tracked policy:
@@ -759,9 +761,9 @@ spec-dock/active/current-runbook.json
 
 ### Project-owned bootstrap asset
 
-- `.github/codex/review-policy.md` は init 時に bootstrap できる。
-- `spec-dock update` は existing project-owned file を上書きしない。
-- Policy 変更 PR では当該 PR の head policy を使用せず、merge 後の base SHA から有効にする。
+- 変更済み: `.github/codex/review-policy.md` bootstrap asset は廃止済み。
+- Codex review instruction は `github-pr-observation` script-local asset として installed skill に同梱する。
+- Missing script-local instruction は plain deterministic `@codex review` fallback、invalid / unreadable / oversized instruction は human gate とする。
 
 ## Artifact Composer
 
@@ -1013,8 +1015,9 @@ ChildResultReturned
 
 - Event に secret / raw token / private reasoning を含めない。
 - Context packet / invocation event に complete prompt body、raw logs、credential を含めない。
-- Review policy source を base SHA へ bind する。
-- PR content 内の instruction を review policy より上位に扱わない。
+- Review instruction source は script-local asset へ bind する。
+- PR content 内の instruction を script-local review instruction より上位に扱わない。
+- Review completion は current trigger boundary と expected head SHA に bind された explicit Codex artifact で判断し、time / quiet / same fingerprint を no-completion proof に使わない。
 - GitHub write surface を fixed endpoint / deterministic body に限定する。
 
 ## テスト戦略
@@ -1054,7 +1057,7 @@ ChildResultReturned
   - atomic replace
   - path normalization
 - GitHub contract:
-  - base/head policy source
+  - script-local instruction source
   - multiline trigger
   - stale head
   - missing policy
@@ -1083,7 +1086,7 @@ ChildResultReturned
 | I02 | `iss-00228-compile-state-aware-workflow-runbooks-and-fixed-skill-kernels` | `#228` | Workflow State Resolver, fixed Skill kernel, generated Runbook projection | E-RQ-001, E-RQ-004, E-RQ-005, E-AC-001, E-AC-004, E-AC-005 |
 | I03 | `iss-00229-compose-profile-aware-planning-artifacts` | `#229` | Profile-aware artifact composition and stale source binding | E-RQ-006, E-AC-006, E-AC-008 |
 | I04 | `iss-00230-compile-step-assurance-agent-routing-and-context-policy` | `#230` | Step Assurance, context routing policy, clean-room packets, bounded return contract | E-RQ-007, E-RQ-008, E-RQ-015〜021, E-AC-007, E-AC-017〜021 |
-| I05 | `iss-00231-inject-trusted-base-branch-codex-review-policy` | `#231` | Trusted base-SHA review policy and deterministic review trigger | E-RQ-009, E-AC-009, E-AC-010 |
+| I05 | `iss-00231-inject-trusted-base-branch-codex-review-policy` | `#231` | Historical trusted base-SHA review policy slice; changed by `20260623t074444z-adr` and `iss-00244` to script-local deterministic review trigger | E-RQ-009, E-AC-009, E-AC-010 |
 | I06 | `iss-00232-enforce-blocker-centric-pr-repair-and-rereview` | `#232` | PR Blocker Engine, P2 suppression, blocker fingerprint evidence for stagnation detection | E-RQ-010, E-RQ-011, E-AC-011〜012 |
 | I07 | `iss-00233-roll-out-adaptive-workflow-with-legacy-compatibility-and-telemetry` | `#233` | Rollout, automation-stalled operator surfacing, strict-legacy compatibility, metrics, Auto-Lite readiness | E-RQ-012〜014, E-AC-013〜016 |
 
@@ -1105,7 +1108,8 @@ The Issue-local draft requirement / draft design artifacts are discussion eviden
 
 - ADR authority correction:
   - `iss-00226 / #226` は decision-only Issue として作成されたが、decision-only Issue を execution-ready prerequisite にするのは routing 誤りだったため closed / superseded historical evidence とする。
-  - 次の 5 件は、この Epic の accepted ADR として implementation Issue 開始前に固定済みである。
+  - 次の当初 5 件は、この Epic の accepted ADR として implementation Issue 開始前に固定済みである。
+  - その後の dogfooding corrective work により、`20260628t154553z-adr-pr-observation-explicit-review-completion.md` が追加 ADR として accepted になった。
   - Downstream implementation Issue は `iss-00226` へ依存せず、accepted ADR とこの Epic design / plan を architecture baseline として参照する。
 - Accepted ADR before implementation:
   - `discussions/20260623t074441z-adr-fixed-skill-kernel-compiled-runbook-authority.md`
@@ -1113,12 +1117,14 @@ The Issue-local draft requirement / draft design artifacts are discussion eviden
   - `discussions/20260623t074442z-adr-step-assurance-resource-allocation-agent-context-routing.md`
   - `discussions/20260623t074444z-adr-trusted-base-sha-github-review-policy.md`
   - `discussions/20260623t074447z-adr-blocker-centric-pr-risk-closure-rereview.md`
+  - `discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`
 - Accepted ADR summary:
 - Fixed Skill Kernel / Compiled Runbook: Skill は固定 kernel、current workflow obligation は runtime `guidance <target>` stdout が返す。ADR 内の `workflow next` / generated Runbook authority wording は historical/superseded command wording として扱う。
   - Adaptive Assurance / Lite Authorization: `lite_candidate` は telemetry、`lite_authorized` だけが obligation を減らす。初期 automatic Lite default は無効。
   - Step Assurance / Context Routing: Profile、Complexity、Context Policy を分離し、worker efficiency と reviewer / consultant clean-room を両立する。
-  - Trusted Base-SHA Review: review policy は PR base SHA の fixed path から読み、runtime が deterministic trigger body を作る。
+  - Script-local Codex Review Instruction: 旧 Trusted Base-SHA Review は変更済み。review instruction は script-local asset から読み、runtime が deterministic trigger body を作る。
   - Blocker-Centric PR Closure: merge preparedness は comment zero ではなく verified blocker zero、required CI、review coverage で判断する。
+  - PR Observation Explicit Review Completion: review completion は explicit Codex artifact で判断し、`review_completion_unknown` を active terminal completion proof として扱わない。
 - 前提 ADR:
   - `epic-00158` 配下の skill / docs / template context surface ownership ADR。
 

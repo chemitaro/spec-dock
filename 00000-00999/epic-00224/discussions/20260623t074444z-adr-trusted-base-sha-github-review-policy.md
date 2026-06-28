@@ -9,6 +9,8 @@ ID: "20260623t074444z-adr"
 authority: "accepted"
 supersedes:
   - "Trusted Base SHA GitHub Review Policy"
+amended_by:
+  - "20260628t154553z-adr"
 derived_from:
   - "20260623t074452z-disc-adr-decision-synthesis-after-issue-226-closure.md"
   - "iss-00244 PR #245 dogfooding review trigger failure"
@@ -20,9 +22,16 @@ reflected_to:
   - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/requirement.md"
   - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/design.md"
   - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/plan.md"
+  - "20260628t154553z-adr-pr-observation-explicit-review-completion.md"
 ---
 
 # 20260623t074444z-adr Script-local Codex Review Instruction
+
+## 変更履歴（Supersession / Amendment）
+
+- 2026-06-28: 旧 trusted base-SHA review policy 方針は、この ADR により script-local Codex review instruction 方針へ変更済み。
+- 2026-06-29: `20260628t154553z-adr PR Observation Explicit Review Completion` により、review trigger 後の observation completion semantics は explicit Codex artifact model へ補完・変更済み。
+- この ADR は「`@codex review` comment に添える instruction source」を決める。Review completion の終了条件、`review_completion_unknown` の扱い、timeout/resume semantics は `20260628t154553z-adr` を authority とする。
 
 ## ADR 化基準
 
