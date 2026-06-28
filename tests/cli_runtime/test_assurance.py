@@ -19,8 +19,9 @@ class TestCliAssurance(CliRuntimeHarness):
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            contract_path = issue_dir / "assurance.json"
+            contract_path = issue_dir / ".assurance.json"
             assert contract_path.is_file()
+            assert not (issue_dir / "assurance.json").exists()
             persisted = json.loads(contract_path.read_text(encoding="utf-8"))
             assert payload["operation"] == "classify"
             assert payload["ok"] is True
@@ -43,6 +44,24 @@ class TestCliAssurance(CliRuntimeHarness):
             assert persisted["stage"] == "requirement"
             assert persisted["mode"] == "adaptive"
 
+            for command in ("show", "verify"):
+                read_result = self._run_runtime_capture(
+                    target,
+                    ["assurance", command, "--format", "json"],
+                )
+
+                assert read_result.returncode == 0, read_result.stdout + read_result.stderr
+                read_payload = json.loads(read_result.stdout)
+                assert read_payload["operation"] == command
+                assert read_payload["ok"] is True
+                assert read_payload["status"] == "valid"
+                assert read_payload["has_contract"] is True
+                assert read_payload["contract"] == persisted
+                assert read_payload["classification"]["authorized_profile"] == "standard"
+                assert read_payload["classification"]["complexity_tier"] == "normal"
+                assert read_payload["classification"]["lite_candidate"] is False
+                assert read_payload["classification"]["lite_authorized"] is False
+
     def test_assurance_classify_dry_run_does_not_write_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -61,6 +80,7 @@ class TestCliAssurance(CliRuntimeHarness):
             assert payload["dry_run"] is True
             assert payload["has_contract"] is True
             assert payload["classification"]["authorized_profile"] == "standard"
+            assert not (issue_dir / ".assurance.json").exists()
             assert not (issue_dir / "assurance.json").exists()
 
     def test_assurance_show_and_verify_strict_legacy_missing(self) -> None:
@@ -84,12 +104,35 @@ class TestCliAssurance(CliRuntimeHarness):
                 assert payload["auto_lite_readiness"]["adoption_blockers"][0] == "assurance_contract_missing"
                 assert payload["auto_lite_readiness"]["rollback_mode"] == "strict-legacy"
 
+    def test_assurance_show_and_verify_legacy_visible_contract_requires_migration(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_assurance_fixture(target, issue_number=301, title="Legacy visible issue")
+            (issue_dir / "assurance.json").write_text("{}\n", encoding="utf-8")
+
+            for command in ("show", "verify"):
+                result = self._run_runtime_capture(target, ["assurance", command, "--format", "json"])
+
+                assert result.returncode == 1
+                payload = json.loads(result.stdout)
+                assert payload["operation"] == command
+                assert payload["ok"] is False
+                assert payload["status"] == "invalid"
+                assert payload["mode"] == "invalid"
+                assert payload["has_contract"] is False
+                assert payload["reason"] == "legacy_assurance_contract_path"
+                details = " ".join(payload["details"])
+                assert "legacy_path=" in details
+                assert "canonical_path=" in details
+                assert ".assurance.json" in details
+
     def test_assurance_verify_invalid_contract_exits_one_with_reason(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             issue_dir = self._create_assurance_fixture(target, issue_number=301, title="Invalid issue")
-            (issue_dir / "assurance.json").write_text("{not-json\n", encoding="utf-8")
+            (issue_dir / ".assurance.json").write_text("{not-json\n", encoding="utf-8")
 
             result = self._run_runtime_capture(target, ["assurance", "verify", "--format", "json"])
 
@@ -136,8 +179,10 @@ class TestCliAssurance(CliRuntimeHarness):
             assert by_id.returncode == 0, by_id.stdout + by_id.stderr
             assert by_number.returncode == 0, by_number.stdout + by_number.stderr
             assert by_path.returncode == 0, by_path.stdout + by_path.stderr
+            assert not (active_issue_dir / ".assurance.json").exists()
             assert not (active_issue_dir / "assurance.json").exists()
-            assert (explicit_issue_dir / "assurance.json").is_file()
+            assert (explicit_issue_dir / ".assurance.json").is_file()
+            assert not (explicit_issue_dir / "assurance.json").exists()
             assert json.loads(by_id.stdout)["issue_id"] == "iss-00302"
             assert json.loads(by_number.stdout)["issue_id"] == "iss-00302"
             assert json.loads(by_path.stdout)["issue_id"] == "iss-00302"

@@ -14,12 +14,15 @@ observation evidence through bounded scripts. The public entrypoints are:
 - `scripts/fetch_pr_observation_snapshot.sh`
 
 `wait_pr_observation.sh` is the normal orchestration entrypoint. By default it
-validates the PR head and trusted base review policy, then posts exactly one
-runtime-composed deterministic issue comment whose body starts with
-`@codex review` and includes the trusted policy source, policy hash, and
-reviewed head SHA. If the trusted base policy cannot be validated, the helper
-returns `human_gate` and posts no comment. `fetch_pr_observation_snapshot.sh` is
-read-only and collects one snapshot. `stdout` is machine-readable JSON only.
+validates the PR head, then posts exactly one runtime-composed deterministic
+issue comment whose body starts with `@codex review`. When the script-local
+`scripts/codex-review-instructions.md` file is valid, the comment includes the
+instruction source path, instruction hash, reviewed head SHA, and instruction
+text. If the instruction file is missing, the helper posts a plain deterministic
+review request with `instruction_status: missing_plain_fallback`. If the
+instruction file is present but invalid, unreadable, or oversized, the helper
+returns `human_gate` and posts no comment. `fetch_pr_observation_snapshot.sh`
+is read-only and collects one snapshot. `stdout` is machine-readable JSON only.
 Progress and diagnostics belong on `stderr` and are non-authoritative.
 
 This skill has a collection-only boundary. It performs evidence collection and
@@ -33,13 +36,16 @@ Triage and judgment over collected evidence belong to
 - `wait_pr_observation.sh` may perform one fixed GitHub write through the
   internal `trigger_codex_review.sh` helper in default `post-once` mode.
 - The only allowed write is `POST repos/{owner}/{repo}/issues/{pr}/comments`
-  with a runtime-composed deterministic body derived from the trusted base
-  policy and PR metadata. The body starts with `@codex review` and includes the
-  trusted policy source, policy hash, and reviewed head SHA when the base policy
-  is valid.
-- Base policy `missing`, `invalid`, `oversized`, `unreadable`, or
-  `base_sha_missing` is a fail-closed human gate. No comment is posted in those
-  cases, and the final JSON reports `normalized_status="human_gate"` and
+  with a runtime-composed deterministic body derived from script-local
+  instruction metadata and PR metadata. The body starts with `@codex review`.
+  With a valid instruction file, it includes the instruction source path,
+  instruction hash, reviewed head SHA, and instruction text.
+- Missing script-local instruction is not a human gate. The helper posts a
+  deterministic plain review request with
+  `instruction_status: missing_plain_fallback`.
+- Script-local instruction `invalid`, `oversized`, or `unreadable` is a
+  fail-closed human gate. No comment is posted in those cases, and the final
+  JSON reports `normalized_status="human_gate"` and
   `overall_status="human_gate"` with a blocking limitation.
 - `fetch_pr_observation_snapshot.sh` and the collector libraries remain
   read-only and call only fixed GitHub read APIs internally.
@@ -147,11 +153,13 @@ Triage and judgment over collected evidence belong to
 
 - Default mode is `post-once`.
 - In `post-once`, `wait_pr_observation.sh` validates the current PR head, posts
-  one runtime-composed deterministic `@codex review` comment when the trusted
-  base policy is valid, captures the helper JSON internally, and uses the
-  returned `comment_id` / `created_at` as the observation boundary. If the base
-  policy is missing, invalid, oversized, unreadable, or the base SHA is missing,
-  `post-once` returns `human_gate` without posting a comment.
+  one runtime-composed deterministic `@codex review` comment. With a valid
+  script-local instruction file, the comment includes instruction metadata and
+  text. With a missing instruction file, it posts a plain deterministic review
+  request. If the instruction file is invalid, oversized, or unreadable,
+  `post-once` returns `human_gate` without posting a comment. It captures the
+  helper JSON internally and uses the returned `comment_id` / `created_at` as
+  the observation boundary.
 - `post-once` rejects caller-supplied `--trigger-comment-id` and
   `--trigger-created-at`; those values must come from the helper result.
 - `resume` never posts a new comment. It requires explicit

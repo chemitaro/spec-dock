@@ -87,7 +87,7 @@ def _add_show_arguments(parser: argparse.ArgumentParser) -> None:
 def _add_classify_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--stage", choices=("requirement",), required=True, help="Classification stage")
     _add_common_arguments(parser)
-    parser.add_argument("--dry-run", action="store_true", help="Return classification without writing assurance.json")
+    parser.add_argument("--dry-run", action="store_true", help="Return classification without writing .assurance.json")
 
 
 def _add_verify_arguments(parser: argparse.ArgumentParser) -> None:

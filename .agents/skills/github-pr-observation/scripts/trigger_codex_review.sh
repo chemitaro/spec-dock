@@ -6,9 +6,11 @@ usage() {
 usage: trigger_codex_review.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA
 
 Posts at most one deterministic PR issue comment whose body starts with
-"@codex review" and includes trusted base-branch review policy evidence after
-verifying that the PR head still matches --head-sha. Base policy failures are
-reported as human gate without posting a comment. The script does not accept
+"@codex review" after verifying that the PR head still matches --head-sha.
+When script-local review instructions are valid, the comment includes
+instruction metadata and text. Missing instructions fall back to a plain
+deterministic review request. Invalid instructions are reported as human gate
+without posting a comment. The script does not accept
 caller-provided bodies, endpoints, methods, GraphQL queries, headers, jq
 expressions, or raw gh arguments.
 USAGE
@@ -62,19 +64,21 @@ fi
 
 owner="${repo%%/*}"
 name="${repo#*/}"
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 TRIGGER_REPO="$repo" \
 TRIGGER_OWNER="$owner" \
 TRIGGER_NAME="$name" \
 TRIGGER_PR="$pr" \
 TRIGGER_HEAD_SHA="$head_sha" \
+TRIGGER_SCRIPT_DIR="$script_dir" \
 python3 - <<'PY'
 import json
-import base64
 import hashlib
 import os
 import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 
 repo = os.environ["TRIGGER_REPO"]
 owner = os.environ["TRIGGER_OWNER"]
@@ -83,8 +87,9 @@ pr = os.environ["TRIGGER_PR"]
 expected_head_sha = os.environ["TRIGGER_HEAD_SHA"]
 endpoint = f"repos/{owner}/{name}/issues/{pr}/comments"
 fixed_body = "@codex review"
-policy_path = ".github/codex/review-policy.md"
-policy_max_bytes = 32768
+instruction_path = Path(os.environ["TRIGGER_SCRIPT_DIR"]) / "codex-review-instructions.md"
+instruction_display_path = ".agents/skills/github-pr-observation/scripts/codex-review-instructions.md"
+instruction_max_bytes = 32768
 
 
 def now_iso():
@@ -210,16 +215,14 @@ def base_payload():
         "expected_head_sha": expected_head_sha,
         "current_head_sha": None,
         "final_head_sha": None,
-        "base_sha": None,
         "head_matches_expected": False,
         "success": False,
         "overall_status": "unknown",
         "normalized_status": "unknown",
         "recommended_next_action": "unknown",
-        "review_policy": {
-            "source": "fixed_default",
-            "path": policy_path,
-            "base_sha": None,
+        "review_instruction": {
+            "source": "script_local",
+            "path": instruction_display_path,
             "hash": None,
             "bytes": 0,
             "status": "not_requested",
@@ -247,7 +250,7 @@ def base_payload():
 payload = base_payload()
 
 
-def block_review_policy_gate():
+def block_review_instruction_gate():
     payload["success"] = False
     payload["overall_status"] = "human_gate"
     payload["normalized_status"] = "human_gate"
@@ -257,13 +260,11 @@ def block_review_policy_gate():
     raise SystemExit(0)
 
 metadata_exit, metadata_stdout, metadata_stderr = run_gh(
-    ["pr", "view", pr, "--repo", repo, "--json", "headRefOid,baseRefOid,url,state,isDraft,number"]
+    ["pr", "view", pr, "--repo", repo, "--json", "headRefOid,url,state,isDraft,number"]
 )
 metadata = load_json(metadata_stdout, {}) if metadata_exit == 0 else {}
 current_head_sha = metadata.get("headRefOid") or ""
-base_sha = metadata.get("baseRefOid") or ""
 payload["current_head_sha"] = current_head_sha or None
-payload["base_sha"] = base_sha or None
 payload["head_matches_expected"] = head_matches(current_head_sha, expected_head_sha)
 
 if metadata_exit != 0 or not current_head_sha:
@@ -320,93 +321,88 @@ if pr_state and pr_state != "OPEN":
     emit(payload)
     raise SystemExit(0)
 
-if not base_sha:
-    payload["review_policy"].update({"source": "base_sha", "status": "base_sha_missing"})
+try:
+    instruction_bytes = instruction_path.read_bytes()
+except FileNotFoundError:
+    instruction_bytes = None
+    payload["review_instruction"].update({"status": "missing_plain_fallback"})
+    fixed_body = "\n".join(
+        (
+            "@codex review",
+            "",
+            "Script-local review instruction:",
+            f"- source: {instruction_display_path}",
+            "- instruction_status: missing_plain_fallback",
+            f"- reviewed_head_sha: {expected_head_sha}",
+        )
+    )
+    payload["trigger"]["body"] = fixed_body
+except OSError as exc:
+    instruction_bytes = None
+    payload["review_instruction"].update({"status": "unreadable"})
     payload["limitations"].append(
         limitation(
-            "review_policy_base_sha_missing",
-            "PR metadata did not include baseRefOid; trusted base review policy cannot be loaded",
+            "review_instruction_unreadable",
+            "script-local review instruction could not be read",
+            path=instruction_display_path,
+            error_type=type(exc).__name__,
             severity="blocking",
         )
     )
-elif base_sha:
-    policy_endpoint = f"repos/{owner}/{name}/contents/{policy_path}?ref={base_sha}"
-    policy_exit, policy_stdout, policy_stderr = run_gh(["api", policy_endpoint])
-    policy_payload = load_json(policy_stdout, {}) if policy_exit == 0 else {}
-    encoded_content = policy_payload.get("content") if isinstance(policy_payload, dict) else None
-    if policy_exit == 0 and isinstance(encoded_content, str):
+
+if instruction_bytes is not None:
+    payload["review_instruction"]["bytes"] = len(instruction_bytes)
+    if len(instruction_bytes) > instruction_max_bytes:
+        payload["review_instruction"].update({"status": "too_large"})
+        payload["limitations"].append(
+            limitation(
+                "review_instruction_too_large",
+                "script-local review instruction exceeds the maximum accepted size",
+                path=instruction_display_path,
+                max_bytes=instruction_max_bytes,
+                severity="blocking",
+            )
+        )
+    else:
         try:
-            policy_text = base64.b64decode("".join(encoded_content.split()), validate=False).decode("utf-8")
-        except Exception:
-            policy_text = ""
-        policy_bytes = policy_text.encode("utf-8") if policy_text else b""
-        if policy_bytes and len(policy_bytes) <= policy_max_bytes:
-            policy_hash = hashlib.sha256(policy_bytes).hexdigest()
+            instruction_text = instruction_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            instruction_text = ""
+        if instruction_text.strip():
+            instruction_hash = hashlib.sha256(instruction_bytes).hexdigest()
             fixed_body = "\n".join(
                 (
                     "@codex review",
                     "",
-                    "Trusted review policy:",
-                    f"- source: {repo}@{base_sha}:{policy_path}",
-                    f"- policy_sha256: {policy_hash}",
+                    "Script-local review instruction:",
+                    f"- source: {instruction_display_path}",
+                    f"- instruction_sha256: {instruction_hash}",
+                    "- instruction_status: loaded",
                     f"- reviewed_head_sha: {expected_head_sha}",
                     "",
-                    policy_text.rstrip(),
+                    instruction_text.rstrip(),
                 )
             )
-            payload["review_policy"].update(
+            payload["review_instruction"].update(
                 {
-                    "source": "base_sha",
-                    "base_sha": base_sha,
-                    "hash": policy_hash,
-                    "bytes": len(policy_bytes),
+                    "hash": instruction_hash,
                     "status": "loaded",
                 }
             )
             payload["trigger"]["body"] = fixed_body
-        elif policy_bytes:
-            payload["review_policy"].update(
-                {
-                    "source": "base_sha",
-                    "base_sha": base_sha,
-                    "bytes": len(policy_bytes),
-                    "status": "too_large",
-                }
-            )
-            payload["limitations"].append(
-                limitation(
-                    "review_policy_too_large",
-                    "trusted base review policy exceeds the maximum accepted size",
-                    api=policy_endpoint,
-                    max_bytes=policy_max_bytes,
-                    severity="blocking",
-                )
-            )
         else:
-            payload["review_policy"].update({"source": "base_sha", "base_sha": base_sha, "status": "invalid"})
+            payload["review_instruction"].update({"status": "invalid"})
             payload["limitations"].append(
                 limitation(
-                    "review_policy_invalid",
-                    "trusted base review policy could not be decoded as non-empty UTF-8 text",
-                    api=policy_endpoint,
+                    "review_instruction_invalid",
+                    "script-local review instruction must be non-empty UTF-8 text",
+                    path=instruction_display_path,
                     severity="blocking",
                 )
             )
-    else:
-        payload["review_policy"].update({"source": "base_sha", "base_sha": base_sha, "status": "missing"})
-        payload["limitations"].append(
-            limitation(
-                "review_policy_missing",
-                "trusted base review policy could not be loaded",
-                api=policy_endpoint,
-                gh_exit=policy_exit,
-                gh_stderr=policy_stderr.strip(),
-                severity="blocking",
-            )
-        )
 
-if payload["review_policy"]["status"] != "loaded":
-    block_review_policy_gate()
+if payload["review_instruction"]["status"] in {"invalid", "too_large", "unreadable"}:
+    block_review_instruction_gate()
 
 before_exit, before_stdout, before_stderr = run_gh(["api", endpoint, "--paginate"])
 before_comments_raw = load_json(before_stdout, None) if before_exit == 0 else None
@@ -516,7 +512,7 @@ else:
         )
 
 final_exit, final_stdout, final_stderr = run_gh(
-    ["pr", "view", pr, "--repo", repo, "--json", "headRefOid,baseRefOid,url,state,isDraft,number"]
+    ["pr", "view", pr, "--repo", repo, "--json", "headRefOid,url,state,isDraft,number"]
 )
 final_metadata = load_json(final_stdout, {}) if final_exit == 0 else {}
 final_head_sha = final_metadata.get("headRefOid") or ""

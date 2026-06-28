@@ -54,6 +54,8 @@ Disposition ごとの必須証跡:
 | D-003 | resolved | test-strategy | orchestrator | Issue Planning の実運用テストで、substantive draft requirement が `reason_code=requirement-scaffold` と表示され、`assurance classify` の `standard` と guidance の `strict` も不一致だった。 | この issue の外へ延期; この issue の planning/validation 要件へ織り込む | 本 issue の AC-009/AC-010 と S05 に取り込み、guidance semantics、authorized profile source consistency、provider/dogfood parity を検証対象にする。 | `assurance classify` は requirement を valid/standard と判定する一方、guidance は scaffold/strict を表示したため、agent-facing guidance の状態表現と profile source を検証する必要がある。 | applied | `discussions/20260627t143104z-research-issue-planning-guidance-manual-test-findings.md`; `plan.md` S05/tc-009/tc-010 | なし |
 | D-004 | resolved | test-strategy | ChatGPT Pro advisory review / orchestrator | GPT-5.5 Pro review が、`may_execute_approved_plan`、旧 structured step selector 不要テスト、invalid assurance fail-closed、projection refresh negative test の明示を推奨した。 | 既存 plan のまま; すべて採用; source-grounded な不足分だけ採用 | source-grounded な不足分だけ採用し、`tc-011` - `tc-014` と output / preflight contract へ反映した。 | 外部 review には active issue 本体が確認できないという誤認があったため、助言をそのまま権威化せず、ローカル文書と照合できた指摘だけ採用する。 | applied | `discussions/20260627t150729z-research-chatgpt-pro-plan-review-adoption.md`; `requirement.md`; `design.md`; `plan.md` | なし |
 | D-005 | resolved | operation | dogfooding manual test | `uvx --from . spec-dock update .` 後も dogfooding runtime が古い `guidance issue-execution` 判定を返した。 | update root cause をこの issue で深掘り; dogfooding parity のため provider 正本から同期して本 issue を進める; issue を停止する | 本 issue では provider 正本と dogfooding runtime の parity を確保して検証を続行し、update root cause の深掘りは scope expansion として扱う。 | 主目的は guidance hard cutover であり、provider 正本の実装と dogfooding command の実挙動確認が closure に必要。update behavior の根本原因は別関心事。 | applied | `discussions/20260627t154455z-research-dogfooding-runtime-update-drift-finding.md`; dogfooding `guidance issue-execution` / `guidance issue-planning`; `spec-dock validate` | 必要なら update path 調査を follow-up |
+| D-006 | resolved | compatibility | dev-coder / orchestrator | `.assurance.json` がなく旧 `assurance.json` だけがある場合の public status / reason をどう扱うか。 | `missing / missing_assurance_contract`; `invalid / legacy_assurance_contract_path` | `invalid / legacy_assurance_contract_path` を採用する。 | 旧 visible path は「存在しない契約」ではなく、current authority ではない stale artifact である。missing strict-legacy と区別し、show / verify を fail-closed にする必要がある。 | applied | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/assurance_store.py`; `tests/unit/infra/test_assurance_store.py`; `tests/cli_runtime/test_assurance.py`; focused pytest `53 passed` | なし |
+| D-007 | resolved | implementation | dev-coder / orchestrator | Script-local Codex review instruction body の metadata labels と instruction size limit をどう固定するか。 | max size を変更する; 既存 32768 bytes を維持する | 既存上限 32768 bytes を維持し、body metadata は `source`, `instruction_sha256`, `instruction_status`, `reviewed_head_sha` とする。 | ADR / plan は script-local path/hash/status/head metadata を要求しており、既存 size limit の変更理由はない。GitHub base/head policy fetch を廃止しつつ、最小差分で deterministic body を保てる。 | applied | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh`; `.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh`; `tests/unit/infra/test_init_update.py` | なし |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -73,6 +75,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-004 | adopted | command / research | design / plan / report | Issue Planning guidance の manual test 結果を採用し、guidance semantics drift と profile source inconsistency を検証対象へ加えた。 | `discussions/20260627t143104z-research-issue-planning-guidance-manual-test-findings.md`; `./spec-dock/scripts/spec-dock guidance issue-planning`; `./spec-dock/scripts/spec-dock assurance classify --stage requirement --dry-run --format json` | 実装時に S05 で再検証 |
 | EAL-005 | partially_adopted | external advisory review | requirement / design / plan / report | GPT-5.5 Pro review のうち、ローカル文書と照合できた不足分を採用した。active issue 本体未確認という指摘は Oracle 側の可視性制約として参考止まりにした。 | `discussions/20260627t150729z-research-chatgpt-pro-plan-review-adoption.md`; Oracle session `iss-00244-plan-centric-guidance` | なし |
 | EAL-006 | adopted | command / research | report | Dogfooding runtime update drift finding を採用し、provider/dogfood parity と実コマンド出力の両方を最終検証対象にした。 | `discussions/20260627t154455z-research-dogfooding-runtime-update-drift-finding.md`; `./spec-dock/scripts/spec-dock guidance issue-execution`; `./spec-dock/scripts/spec-dock validate` | PR 前に provider/dogfood diff と guidance output を再確認 |
+| EAL-007 | adopted | delegated worker / command | report / implementation | S200/S210 実装結果と legacy visible path status semantics を採用した。 | `dev-coder` result; focused pytest `51 passed`; hidden file inspection; `assurance verify`; `guidance issue-execution`; `validate` | final review gates and commit |
+| EAL-008 | adopted | delegated worker / command | report / implementation | S100/S110 review trigger repair と QA P2 test tightening を採用した。 | `dev-coder` result; `test_init_update.py` 515 passed; focused assurance lane 53 passed; grep/file-list inspections | final review gates and commit |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -378,6 +382,170 @@ rg -n "selected step|selected_step|Step Assurance|Context Packets|context_packet
 |---|---|---|---|---|---|---|---|---|
 | S01-S90 | parent direct implementation under current tool policy; subagents not used for mutation | user requested implementation completion and PR creation in this worktree | planned provider/runtime/assets/tests/dogfood files | implementation, tests, dogfood validation, report update | git diff and tests before commit/PR | focused tests, CLI runtime, unit, ruff, mypy, validate | PR Codex review / final observation pending | recorded as parent implementation exception |
 
+### セッションログ（2026-06-28 追加実装: Hidden assurance contract path）
+
+#### 対象
+- Step: S200 / S210
+- AC/EC: AC-016..AC-019, EC-009
+- closure ids: tc-022..tc-027
+
+#### 実施内容
+- Issue-local Assurance Contract の canonical path を `assurance.json` から `.assurance.json` に hard cutover した。
+- provider runtime と dogfooding runtime の `AssuranceStore` が `.assurance.json` を read/write/verify authority として扱うようにした。
+- `assurance classify` は `.assurance.json` を作成し、`assurance.json` を新規作成しないようにした。
+- `.assurance.json` がなく旧 `assurance.json` だけがある場合は、`invalid / legacy_assurance_contract_path` として fail-closed し、`legacy_path` と `canonical_path` を diagnostics に含めるようにした。
+- `.assurance.json` が symlink の場合は `invalid / contract_path_symlink` として fail-closed することを確認した。
+- current dogfooding Issue-local `assurance.json` 7 件を `.assurance.json` に rename した。
+- CLI help と focused tests を `.assurance.json` contract に更新した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_assurance_store.py tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance.py tests/cli_runtime/test_assurance_compose.py tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py
+# result: 51 passed in 49.20s
+
+rg --files --hidden spec-dock/initiatives | rg '(^|/)assurance\.json$|(^|/)\.assurance\.json$'
+# result: 7 hidden .assurance.json paths; 0 current Issue-local assurance.json paths
+
+./spec-dock/scripts/spec-dock assurance verify --format json
+# result: ok=true, status=valid, issue_id=iss-00244, reason=ok
+
+./spec-dock/scripts/spec-dock guidance issue-execution
+# result: state=ready, reason_code=assurance-valid, may_execute_approved_plan=true
+
+./spec-dock/scripts/spec-dock assurance classify --help
+# result: --dry-run help says "Return classification without writing .assurance.json"
+
+./spec-dock/scripts/spec-dock validate
+# result: spec-dock: ok (validate) nodes=153
+
+git diff --check
+# result: pass
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S200 | Red / 代替証跡 | existing tests expecting `assurance.json` fail before update | grep で runtime/tests が old path を read/write/help/fixture として参照していることを確認 | `rg -n "assurance\\.json|\\.assurance\\.json" ...` | observed | provider/dogfood `AssuranceStore` が旧 path を直接参照していた |
+| S200 | Green | classify writes hidden path; show/verify read hidden path; legacy path requires migration; hidden symlink guard fail-closes | focused pytest `51 passed`; help/guidance/verify commands pass | pytest / CLI commands | pass | tc-022, tc-023, tc-024, tc-026, tc-027 |
+| S210 | Green | current dogfooding artifacts are renamed and tests use `.assurance.json` | hidden file inspection shows 7 `.assurance.json` and 0 current `assurance.json` artifacts | `rg --files --hidden spec-dock/initiatives ...` | pass | tc-025 |
+| S210 | Refactor | no broad historical rewrite and no dual authority | historical text references left where they are diagnostics/tests or history; runtime uses single canonical filename constant plus legacy diagnostic filename | diff inspection | pass | no compatibility dual-write |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S200 | legacy visible path の public status / reason が計画上は diagnostics とだけ定義されていた。 | dev-coder Ledger Note | `invalid / legacy_assurance_contract_path` を D-006 として採用し、missing strict-legacy と区別した。 | tc-024 | no | `tests/unit/infra/test_assurance_store.py`; `tests/cli_runtime/test_assurance.py` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S200 | tc-022, tc-023, tc-024, tc-026, tc-027 | focused evidence pass; code-reviewer + spec-reviewer pass; Step Commit Gate committed | focused tests and CLI commands pass; reviewer/commit pending | implementation-pass-review-pending | legacy visible path is fail-closed |
+| S210 | tc-022..tc-027 | focused tests and dogfooding rename inspection pass; code-reviewer + qa-reviewer pass; Step Commit Gate committed | focused tests and hidden inspection pass; reviewer/commit pending | implementation-pass-review-pending | old current Issue-local `assurance.json` paths are absent |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-022 | S200/S210 | yes | command | runtime wrote old visible path | focused pytest; `test_assurance_classify_writes_contract` | pass | classify writes `.assurance.json` and does not create `assurance.json` |
+| tc-023 | S200/S210 | yes | command | show/verify read old path | focused pytest; `./spec-dock/scripts/spec-dock assurance verify --format json` | pass | active issue valid through hidden contract |
+| tc-024 | S200/S210 | yes | command | old path could be silently authoritative | focused pytest; legacy-only fixtures | pass | returns `invalid / legacy_assurance_contract_path` |
+| tc-025 | S210 | yes | structural assertion | 7 current dogfooding `assurance.json` artifacts existed | `rg --files --hidden spec-dock/initiatives ...` | pass | 7 hidden paths, 0 old current artifact matches |
+| tc-026 | S200/S299 | yes | structural assertion | help text mentioned `assurance.json` | `./spec-dock/scripts/spec-dock assurance classify --help`; grep inspection | pass | help text mentions `.assurance.json` |
+| tc-027 | S200/S210 | yes | command | hidden path safety not covered | focused pytest symlink fixtures | pass | `.assurance.json` symlink returns `contract_path_symlink` |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-022..tc-027 | S200/S210 | focused pytest, hidden file inspection, active verify/guidance, help inspection, validate, diff check | pass-review-pending | S299 final reviewer gates pending |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| clarified | tc-024 | legacy-visible-path-migration-diagnostics | tc-024 | legacy-only path status/reason was implemented as `invalid / legacy_assurance_contract_path` rather than generic missing. | no | yes, S299 review |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S200/S210 | approved-delegated-execution | normal file mutation is delegated by issue-execution skill | dev-coder | hidden assurance contract path hard cutover and dogfooding rename | active issue docs / plan S200/S210 | provider runtime, dogfood mirror, focused tests, current dogfooding contract files | unrelated lifecycle behavior, historical discussion rewrites, dual authority | focused pytest, hidden inspection, active verify/guidance, validate | runtime writes old path / old path silently accepted / stale old artifacts remain | changed files, tests, status semantics, Ledger Note | pass; parent accepted D-006 |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S200/S210 | dev-coder | `.assurance.json` hard cutover、legacy visible path migration diagnostics、dogfooding artifact rename を実装。 | provider/dogfood assurance runtime, parser/help, focused tests, 7 dogfooding contract renames | worker: focused pytest 51 passed, hidden inspection, verify/guidance/help/validate; parent rerun: same focused pytest 51 passed, hidden inspection, verify/guidance/help/validate, diff-check pass | S299 pending | exact legacy status semantics was material decision | accepted; D-006 recorded |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S200/S210 | pending-review | hidden assurance runtime/tests/dogfood rename/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+### セッションログ（2026-06-28 S100/S110 + QA P2 follow-up）
+
+#### 対象
+- Step: S100 / S110, QA P2 follow-up for S200/S210
+- AC/EC: AC-011..AC-019
+- closure ids: tc-015..tc-019, tc-021, tc-023, tc-027
+
+#### 実施内容
+- `trigger_codex_review.sh` の instruction source を GitHub base/head の `.github/codex/review-policy.md` fetch から script-local `codex-review-instructions.md` へ切り替えた。
+- provider asset と dogfooding mirror の `github-pr-observation` skill / trigger helper を同期し、script-local instruction asset を追加した。
+- provider / dogfooding の `.github/codex/review-policy.md` asset を削除した。
+- missing instruction は deterministic plain `@codex review` fallback を投稿し、invalid / non-UTF-8 / oversized / unreadable は human gate で fail-closed するようにした。
+- QA P2 follow-up として、hidden `.assurance.json` を `assurance show` / `assurance verify` が `status=valid`, `has_contract=true`, `contract`, `classification` 付きで読める CLI assertion を追加した。
+- `.assurance.json` contract の source binding が別 Issue を指す場合に `source_binding_path_not_issue_local` で invalid になる unit coverage を追加した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py
+# result: 515 passed in 312.02s
+
+uv run pytest tests/unit/infra/test_assurance_store.py tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance.py tests/cli_runtime/test_assurance_compose.py tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py
+# result: 53 passed in 50.62s
+
+rg -n "trusted base|base-SHA|review-policy.md|\\.github/codex/review-policy|review_policy|Trusted review policy|base policy" .agents/skills/github-pr-observation src/spec_dock/assets/install_root/.agents/skills/github-pr-observation tests/unit/infra/test_init_update.py
+# result: no matches
+
+rg --files --hidden .agents src/spec_dock/assets/install_root .github | rg '(^|/)review-policy\\.md$|(^|/)codex-review-instructions\\.md$'
+# result: only provider and dogfooding codex-review-instructions.md
+
+rg --files --hidden spec-dock | rg '(^|/)assurance\\.json$|(^|/)\\.assurance\\.json$'
+# result: 7 hidden .assurance.json paths, 0 current assurance.json paths
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S100 | Red / 代替証跡 | existing base-SHA policy tests fail before update; fake gh log would show contents API call | pre-implementation grep showed trigger helpers using `baseRefOid` and `.github/codex/review-policy.md` contents API | `rg -n "trigger_codex_review|review-policy|baseRefOid|review_policy" ...` | observed | old trusted-base behavior present before patch |
+| S100/S110 | Green | valid instruction included; missing instruction posts fallback; invalid / unreadable / oversized blocks; no GitHub policy fetch | focused pytest `515 passed`; grep no obsolete trusted-base/review-policy matches | pytest / grep | pass | tc-015..tc-019, tc-021 |
+| S100/S110 | Refactor | provider and dogfooding assets stay synchronized | file-list shows two `codex-review-instructions.md` assets and no `review-policy.md` asset | `rg --files --hidden ...` | pass | script and skill copied from provider to dogfood mirror |
+| S200/S210 | QA P2 Green | hidden `show` / `verify` expose valid status, contract, classification; dual-path and outside-issue guards are explicit | focused assurance lane `53 passed` | pytest | pass | tc-023, tc-027 strengthened |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S100/S110 | tc-015, tc-016, tc-017, tc-018, tc-019, tc-021 | focused tests and grep inspection pass | `test_init_update.py` 515 passed; obsolete grep no matches; asset list has only script-local instruction assets | implementation-pass-review-pending | PR #245 live dogfooding S120 remains orchestrator-owned |
+| QA P2 for S200/S210 | tc-023, tc-027 | focused hidden assurance read and guard tests pass | assurance/workflow lane 53 passed | implementation-pass-review-pending | show/verify assertion now checks status/contract/classification; dual-path state fails closed |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-015 | S100/S110 | yes | red-required | old script fetched remote policy | `test_issue_244_trigger_helper_uses_script_local_review_instruction` | pass | body includes source, instruction hash, status, reviewed head SHA, instruction text |
+| tc-016 | S100/S110 | yes | red-required | old fake gh fixture included contents API | fake gh log assertion and final grep | pass | no `/contents/` GitHub API read in trigger tests |
+| tc-017 | S100/S110 | yes | red-required | missing base policy blocked | `test_issue_244_trigger_helper_posts_plain_review_when_instruction_missing` | pass | posts fallback with `missing_plain_fallback` |
+| tc-018 | S100/S110 | yes | red-required | invalid policy gate was remote-policy based | empty, non-UTF-8, oversized instruction tests | pass | human gate with no comment |
+| tc-019 | S100/S110 | yes | structural assertion | provider/dogfood `review-policy.md` existed | file-list inspection | pass | only script-local instruction assets remain |
+| tc-023 | S200/S210 | yes | command | QA P2 found weak assertion | `tests/cli_runtime/test_assurance.py` | pass | show/verify assert `status=valid`, `has_contract=true`, `contract`, `classification` |
+| tc-027 | S200/S210 | yes | command | outside-issue guard needed explicit coverage | `test_hidden_contract_rejects_source_binding_from_another_issue` | pass | `.assurance.json` source binding outside target issue is invalid |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S100/S110 + QA P2 | dev-coder | script-local review instruction behavior、asset removal/parity、hidden assurance QA assertions を実装。 | provider/dogfood github-pr-observation assets, focused tests, report evidence | `test_init_update.py` 515 passed; assurance/workflow lane 53 passed; grep/file-list inspections pass | S199/S299 pending | exact trigger body metadata semantics and retained 32768-byte max are implementation-time choices from ADR bounds | pending orchestrator review |
+
+#### レビュー指摘フォローアップ（S199/S299）
+| レビュー元（reviewer） | 優先度 | 指摘 | 対応 | 証跡 | 状態 |
+|---|---|---|---|---|---|
+| code-reviewer | P1 | hidden `.assurance.json` と旧 `assurance.json` が coexist すると valid hidden contract が受理され、no-dual-authority を破る。 | `read_contract` と `_contract_write_path` で旧 visible path が存在する限り `legacy_assurance_contract_path` として fail-closed にし、dual-path unit test を追加。 | `tests/unit/infra/test_assurance_store.py`; code-reviewer re-review pass | fixed |
+| qa-reviewer / code-reviewer | P2 | script-local instruction unreadable branch が未テスト。 | `codex-review-instructions.md` の位置に directory を置く regression test を追加し、`review_instruction_unreadable` / no POST を検証。 | `tests/unit/infra/test_init_update.py`; qa-reviewer/code-reviewer re-review pass | fixed |
+| spec-reviewer | P2 | Final Code Review Gate が stale に `implementation not started` と記録していた。 | gate row を実装済み diff に対する code review pending 表現へ更新。 | `report.md`; spec-reviewer re-review pass | fixed |
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
@@ -389,20 +557,20 @@ rg -n "selected step|selected_step|Step Assurance|Context Packets|context_packet
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added | `plan.md` tc-001..tc-010; S05 / S99 | pending |
-| local verification | whole issue obligation coverage | executed | `uv run pytest tests/cli_runtime`; `uv run pytest tests/unit`; `./spec-dock/scripts/spec-dock validate` | pass |
+| qa-reviewer | S100/S110/S200/S210/S299 obligation coverage | added | QA re-review pass; `test_init_update.py` 515 passed; assurance/workflow lane 53 passed; hidden/file-list inspections | pass |
+| local verification | whole issue obligation coverage | executed | `uv run pytest tests/unit/infra/test_init_update.py`; focused assurance/workflow lane; `./spec-dock/scripts/spec-dock validate`; `assurance verify`; `guidance issue-execution`; `git diff --check` | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | implementation not started | 0 | pending |
+| code-reviewer | S100/S110/S200/S210 integrated diff | P1 dual-path fix and P2 unreadable instruction test verified | 2 | pass |
 | PR Codex review | issue-wide integrated diff | PR creation and review trigger pending | 0 | pending |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report alignment | pending fresh review | 0 | pending |
-| local spec traceability | requirement / design / plan / report alignment | closure ids tc-001..tc-014 recorded and verified | 0 | local pass; external review pending |
+| spec-reviewer | requirement / design / plan / report alignment | prior P1 and stale final gate wording resolved; S120 remains pending and not overclaimed | 2 | pass |
+| local spec traceability | requirement / design / plan / report alignment | closure ids tc-001..tc-027 recorded and verified except live S120/PR evidence pending | 0 | local pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
