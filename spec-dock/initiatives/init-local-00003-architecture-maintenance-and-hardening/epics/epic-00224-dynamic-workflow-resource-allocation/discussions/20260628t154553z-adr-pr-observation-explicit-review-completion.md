@@ -20,6 +20,7 @@ derived_from:
   - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/report.md"
   - "PR #245 dogfooding wait failure"
   - "PR #245 delayed review observation and reviewer feedback on premature under-budget timeout"
+  - "PR #245 dogfooding wait on a1ee5ac3: explicit no-findings issue comment and resolved carryover threads"
 reflected_to:
   - "../design.md"
   - "../plan.md"
@@ -32,6 +33,13 @@ reflected_to:
 ---
 
 # 20260628t154553z-adr PR Observation Explicit Review Completion
+
+## 変更履歴（Supersession / Amendment）
+
+- 2026-06-29: PR #245 latest head `a1ee5ac3cfe9e7a603de396b0d686d2fdb350e25` の dogfooding wait で、旧実装なら終了し得た `quiet_seconds > 90` / `trigger_age > 300` の状態でも completion artifact が出るまで待機することを確認した。
+- 2026-06-29: 同 wait で Codex-authored strict no-findings issue comment が current trigger boundary と expected head SHA に bind された completion artifact として観測され、CI / blocker / carryover gates 統合後に `passed / merge_prepared` へ進むことを確認した。
+- 2026-06-29: 旧 review threads の carryover unresolved は current no-findings completion artifact を無効化し得る blocker evidence として扱う。ただし、旧 threads が GitHub 上で resolve された後は `carryover_unresolved_count=0` として再観測し、同一 trigger boundary の resume で `passed / merge_prepared` へ進める。
+- 2026-06-29: 旧 `review_completion_unknown` / time-based no-completion terminal behavior は変更済みであり、current completion proof、no-review-work proof、merge-prepared proof のいずれにも使わない。
 
 ## ADR 化基準
 
@@ -49,6 +57,7 @@ reflected_to:
 - Trusted completion artifact は、current trigger boundary 後かつ expected head SHA に bind された次のいずれかに限定する。
   - Codex-authored submitted pull request review。
   - Codex-authored strict no-findings issue comment。`Reviewed commit` または同等の head binding と、CI / PR metadata / blocker / carryover gate の統合確認を必須とする。
+- Strict no-findings issue comment は、current trigger boundary 後に投稿され、expected head SHA に bind され、同一 boundary の submitted review / blocker evidence がなく、CI / PR metadata / blocker / carryover gates がすべて pass する場合に限り、`passed / merge_prepared` の completion proof になり得る。
 - Codex-authored submitted pull request review は completion artifact であると同時に、その review body が blocker evidence source になり得る。
 - Selected review comments / selected review threads が 0 件であっても、selected pull request review body の blocker scan を通すまでは blocker zero / no-finding proof として扱わない。
 - `completion_signal=none`、selected review comments 0、selected review threads 0、CI passed、quiet window、same fingerprint、trigger からの経過時間、CI pass からの経過時間は review completion proof ではない。
@@ -80,6 +89,7 @@ reflected_to:
 - `20260623t074447z-adr` は blocker-centric PR closure を固定する ADR であり、この ADR はその前段である「review completion が観測済みかどうか」の判定を明確にする。
 - 後続の PR #245 dogfooding では、completion artifact を待つ方向へ修正した後、under-budget の zero-check grace / hydration stability 待機まで `timeout` にしてしまう可能性が reviewer から指摘された。この ADR は、no-completion を完了扱いしないこと、budget 内の正当な追加待機を潰さないこと、かつ stability 未成立の completion artifact を merge-prepared proof へ broad に昇格しないことを同時に固定する。
 - 2026-06-29 の追加検証では、`Allow late stable review completion before timing out` という review finding の broad 修正案は既存の quiet / same fingerprint contract tests を壊すことが確認された。そのため、この finding は現行契約上の採用対象ではなく、ADR 上は narrow final-timeout preservation と hydration stability gate の維持を正本とする。
+- 2026-06-29 の PR #245 dogfooding 再観測では、head `a1ee5ac3cfe9e7a603de396b0d686d2fdb350e25` に対して `wait_pr_observation.sh --trigger-mode post-once` を実行した。script は `quiet_seconds > 90`、`trigger_age > 300`、`completion_signal=none` の状態では終了せず、Codex no-findings issue comment が出るまで待機した。その後 CI passed と gates 統合を待ったうえで、旧 carryover unresolved threads が残っている間は `human_gate / address_review_feedback`、threads 解決後の同一 trigger boundary resume では `passed / merge_prepared` になった。
 
 ## 選択肢（Options considered）
 
@@ -124,6 +134,7 @@ reflected_to:
 - quiet window と same fingerprint は、観測済み artifact の hydration が安定したかを見る補助には使えるが、artifact 未出現を completion へ変換する根拠にはならない。
 - timeout は operational boundary であり、semantic completion ではない。したがって retry / resume の outcome にすべきであり、human gate や no-review-work proof にしてはならない。
 - Blocker-centric PR closure は、review completion artifact が観測された後に finding / no-finding / blocker disposition を評価して初めて成立する。
+- No-findings comment は単体で merge proof ではない。current trigger/head binding、CI pass、PR metadata、current blocker zero、carryover blocker zero、hydration stability を統合した後にだけ merge-prepared proof になる。
 - completion artifact が見えた直後の GitHub response は、review body、review comments、review threads の hydration が遅れる場合がある。そのため、explicit artifact model は「artifact が見えた瞬間に即終了」ではなく、head/trigger binding と hydration stability を確認したうえで blocker-centric closure へ渡す。
 - 一方で、completion artifact がない状態の quiet / fingerprint stability は no-finding の証拠ではない。この二つの stability 用途を混同すると、delayed review 見逃し、または reviewer 指摘のような premature timeout のどちらかを再発させる。
 - ただし、hydration stability が成立していない completion artifact を under-budget timeout 直前に pass として固定することも同じく危険である。PR observation は、completion artifact の存在、head/trigger binding、blocker scan、hydration stability をそれぞれ別 gate として扱う。
@@ -167,7 +178,7 @@ reflected_to:
 - `20260623t074444z-adr Script-local Codex Review Instruction`:
   - 変更済み: review trigger instruction source は script-local asset のまま維持する。
   - 補完: 同 ADR は trigger comment の instruction source を決めるものであり、review completion の終了条件は本 ADR が authority を持つ。
-  - 矛盾回避: base-SHA review policy / missing policy human gate 前提は、script-local instruction ADR により既に変更済みであり、本 ADR では扱わない。
+  - 変更済み: base-SHA review policy / missing policy human gate 前提は、script-local instruction ADR により既に廃止済みである。本 ADR はその後段として、trigger comment 投稿後の completion / timeout / merge-prepared semantics を固定する。
 - `20260623t074447z-adr Blocker Centric PR Risk Closure And Re Review`:
   - 補完: blocker-centric closure は review completion artifact が観測済みであることを前提に適用する。
   - 変更済み: `review_completion_unknown` は blocker disposition や merge-prepared evidence の前提にならない。
