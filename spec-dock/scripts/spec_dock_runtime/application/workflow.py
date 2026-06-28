@@ -220,17 +220,19 @@ def _classify_plan_text(plan_text: str | None) -> str:
     if not stripped:
         return "scaffold"
     lower = stripped.lower()
-    scaffold_markers = (
+    frontmatter_scaffold_markers = (
         '状態: "draft',
         "状態: draft",
         "draft | proposed",
+    )
+    if _frontmatter_has_any(lower, frontmatter_scaffold_markers):
+        return "scaffold"
+    scaffold_markers = (
         "no structured implementation steps",
         "record red, green, and refactor evidence",
         "link each closure id to its observed verification result",
         "todo",
         "tbd",
-        "template",
-        "placeholder",
         "未記入",
         "記載してください",
     )
@@ -257,15 +259,19 @@ def _classify_design_text(design_text: str | None) -> str:
     if not stripped:
         return "scaffold"
     lower = stripped.lower()
-    scaffold_markers = (
+    frontmatter_scaffold_markers = (
         '状態: "draft',
         "状態: draft",
         "draft | proposed",
         "artifact_state: awaiting-assurance-compose",
-        "todo",
-        "tbd",
         "template",
         "placeholder",
+    )
+    if _frontmatter_has_any(lower, frontmatter_scaffold_markers):
+        return "scaffold"
+    scaffold_markers = (
+        "todo",
+        "tbd",
         "未記入",
         "記載してください",
     )
@@ -286,3 +292,17 @@ def _classify_design_text(design_text: str | None) -> str:
     if any(marker in lower for marker in markers):
         return "substantive"
     return "scaffold"
+
+
+def _frontmatter_has_any(text: str, markers: tuple[str, ...]) -> bool:
+    frontmatter = _frontmatter_text(text)
+    return any(marker in frontmatter for marker in markers)
+
+
+def _frontmatter_text(text: str) -> str:
+    if not text.startswith("---"):
+        return ""
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return ""
+    return parts[1]

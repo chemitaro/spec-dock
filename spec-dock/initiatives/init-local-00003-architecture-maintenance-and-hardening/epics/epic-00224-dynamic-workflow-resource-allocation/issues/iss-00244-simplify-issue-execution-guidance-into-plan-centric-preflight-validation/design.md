@@ -3,7 +3,7 @@
 ID: "iss-00244"
 タイトル: "Simplify Issue Execution Guidance Into Plan Centric Preflight Validation"
 関連GitHub: ["#244"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-29"
 依存: ["requirement.md"]
@@ -120,6 +120,7 @@ ID: "iss-00244"
   - `notes`: `plan.md` を上から実行し、step obligations は plan に従う。
   - `stop_conditions`: non-executable / stale / unresolved / reviewer missing / assurance invalid など。
 - `guidance issue-planning` も同じ Runbook schema を使うため、agent を誤誘導する `selected step` 登録文面を skill から削除する。
+- `design.md` / `plan.md` の preflight scaffold 判定では、`状態: "draft"`、`draft | proposed`、`template`、`placeholder` などの status / scaffold marker は frontmatter または明示的な managed scaffold 文言に限定して扱う。本文の調査メモ、過去事例、path 名、`non-placeholder` のような否定表現に含まれる語で実行可能な artifact を block してはならない。
 
 ### 方針 C: Step-level Obligation Pattern は planning-time contract に移す
 
