@@ -11,6 +11,13 @@ ID: "<EPIC_ID>"
 
 # <EPIC_ID> Adaptive Assurance And Compiled Agent Workflow — 要件定義（何を、なぜ行うか）
 
+## Historical status update
+
+- この文書は user-provided draft package の保存 artifact であり、現在の canonical Epic requirement ではない。
+- 変更済み: 旧「trusted base branch / base SHA 上の review policy を Codex review に注入する」方針は、`20260623t074444z-adr Script-local Codex Review Instruction` により script-local review instruction source へ置換済み。
+- 変更済み: review trigger 後の終了条件は、`20260628t154553z-adr PR Observation Explicit Review Completion` により explicit Codex completion artifact model へ置換済み。time / quiet window / same fingerprint / selected comments 0 は review completion proof ではない。
+- 変更済み: runtime が execution step / worker / reviewer / verification を動的に選ぶ Runbook authority 方針は、`iss-00244` により plan-centric preflight validation へ hard cutover する。
+
 ## 目的（Initiative との紐づき）
 
 - Initiative 目標 / 指標:

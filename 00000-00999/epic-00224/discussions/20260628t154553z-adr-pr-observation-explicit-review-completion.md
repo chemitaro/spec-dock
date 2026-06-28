@@ -17,6 +17,7 @@ derived_from:
   - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/discussions/20260628t150332z-disc-pr-observation-completion-wait-repair-draft.md"
   - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/report.md"
   - "PR #245 dogfooding wait failure"
+  - "PR #245 delayed review observation and reviewer feedback on premature under-budget timeout"
 reflected_to:
   - "../design.md"
   - "../plan.md"
@@ -51,6 +52,9 @@ reflected_to:
   - 既存 artifact を読むための legacy vocabulary としてのみ扱う。
   - downstream は legacy `review_completion_unknown` を no-review-work proof、merge-prepared proof、または review completion proof として扱ってはならない。
 - quiet window / same fingerprint は、trusted completion artifact が見えた後の hydration stability にのみ使う。
+- Overall deadline 未到達の wait loop では、zero-check grace、pending review hydration、late review artifact による fingerprint reset、または configured stability confirmation が残っている場合、早期に `timeout` へ昇格しない。
+  - `timeout` は semantic completion ではなく、観測 budget の到達を示す operational boundary である。
+  - budget 内で必要な追加 poll が残る場合は、`pending` / `wait_or_resume` 相当の非完了状態を維持する。
 - ambiguous Codex output、wrong head、old trigger、reaction-only、generic Codex issue comment は current completion として扱わない。必要に応じて wait / timeout / human gate 側へ倒す。
 
 ## 背景（Context）
@@ -66,6 +70,7 @@ reflected_to:
 - しかし、これらは GitHub surface の観測値が静かだったことを示すだけで、非同期 Codex review worker が完了した証拠ではない。
 - `20260623t074444z-adr` は review trigger instruction の source を script-local asset に変更する ADR であり、review completion の終了条件そのものはこの ADR で補完・変更する。
 - `20260623t074447z-adr` は blocker-centric PR closure を固定する ADR であり、この ADR はその前段である「review completion が観測済みかどうか」の判定を明確にする。
+- 後続の PR #245 dogfooding では、completion artifact を待つ方向へ修正した後、under-budget の zero-check grace / hydration stability 待機まで `timeout` にしてしまう回帰が reviewer から指摘された。この ADR は、no-completion を完了扱いしないことと、budget 内の正当な追加待機を潰さないことを同時に固定する。
 
 ## 選択肢（Options considered）
 
@@ -110,6 +115,8 @@ reflected_to:
 - quiet window と same fingerprint は、観測済み artifact の hydration が安定したかを見る補助には使えるが、artifact 未出現を completion へ変換する根拠にはならない。
 - timeout は operational boundary であり、semantic completion ではない。したがって retry / resume の outcome にすべきであり、human gate や no-review-work proof にしてはならない。
 - Blocker-centric PR closure は、review completion artifact が観測された後に finding / no-finding / blocker disposition を評価して初めて成立する。
+- completion artifact が見えた直後の GitHub response は、review body、review comments、review threads の hydration が遅れる場合がある。そのため、explicit artifact model は「artifact が見えた瞬間に即終了」ではなく、head/trigger binding と hydration stability を確認したうえで blocker-centric closure へ渡す。
+- 一方で、completion artifact がない状態の quiet / fingerprint stability は no-finding の証拠ではない。この二つの stability 用途を混同すると、delayed review 見逃し、または reviewer 指摘のような premature timeout のどちらかを再発させる。
 
 ## 影響（Consequences）
 
@@ -121,6 +128,7 @@ reflected_to:
 - Negative / Debt:
   - Codex の no-findings comment 形式が変わる場合、strict matcher を更新する必要がある。
   - 完了 artifact が出ない外部障害では timeout / resume が増え、運用上の待ち時間が長くなる可能性がある。
+  - completion artifact 後の hydration stability と、completion artifact 前の no-completion wait は別物として実装・テストする必要がある。
   - Legacy artifact の `review_completion_unknown` は読み取り時にだけ互換 vocabulary として扱う必要がある。
 - 影響範囲:
   - `.agents/skills/github-pr-observation/SKILL.md`

@@ -629,6 +629,22 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 | S310 | tc-028, tc-029, tc-030 | delayed review and timeout/resume regression tests pass | focused pytest 107 passed; delayed submitted review test selects `current_selected_unresolved_thread` with `submitted_pull_request_review` | implementation-pass-review-pending | PR #245 live/manual S330 pending |
 | S320 | tc-031, tc-032, tc-033 | hydration/head-binding tests pass; no broad state-machine rewrite | no-completion cannot complete via stability; existing no-findings/blocker tests included in PR observation lane | implementation-pass-review-pending | no GitHub Checks/status-rollup surface added |
 
+#### ADR 昇格 / 旧決定変更済み注記（ADR Promotion and Supersession Evidence）
+| 対象 | 処理 | 証跡 | 結果 |
+|---|---|---|---|
+| PR observation completion wait decision | `20260628t154553z-adr PR Observation Explicit Review Completion` を accepted ADR authority として更新 | `derived_from` に PR #245 delayed review / premature under-budget timeout reviewer feedback を追加し、Decision / Context / Rationale / Consequences に zero-check grace と hydration stability の境界を追記 | pass |
+| Script-local review instruction ADR | 古い trusted base-SHA / missing policy 方針との境界を明確化 | `20260623t074444z-adr` に、review completion / no-review-work / merge-prepared 判断は同 ADR の authority ではなく `20260628t154553z-adr` が authority であると追記 | pass |
+| Blocker-centric PR closure ADR | blocker disposition と review completion 判定の責務を分離 | `20260623t074447z-adr` に、completion artifact 未観測時は blocker-centric closure 評価へ入らず、timeout / wait_or_resume は review 不要の human gate ではないと追記 | pass |
+| Historical draft package artifacts | 古い draft / seed の矛盾を変更済みとして注記 | draft requirement / draft design / issue slice seeds / provided draft package synthesis に historical status update を追加 | pass |
+
+#### ADR 整合検証（ADR Alignment Verification）
+| コマンド / 確認 | 結果 | メモ |
+|---|---|---|
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_75_pr_observation_wait_applies_zero_check_grace_before_human_gate or issue_75_pr_observation_wait_late_review_change_resets_stability" -vv` | pass: 2 passed, 519 deselected | reviewer が指摘した zero-check grace / late review stability regression は現行手元で再現せず通過 |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation or s04_wait or s101 or s204 or s420_wait or s430 or s01_wait_carryover or s03_wait_fallback or issue_75_pr_observation_wait"` | pass: 107 passed, 414 deselected | PR observation lane で completion / timeout / hydration 周辺を再確認 |
+| `./spec-dock/scripts/spec-dock validate` | pass: `spec-dock: ok (validate) nodes=153` | ADR / historical note 追加後の SpecDock tree validation |
+| `git diff --check` | pass | Markdown 差分の whitespace error なし |
+
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
