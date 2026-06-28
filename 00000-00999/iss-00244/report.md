@@ -5,7 +5,7 @@ ID: "iss-00244"
 関連GitHub: ["#244"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-27"
+最終更新: "2026-06-29"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00224", "init-local-00003"]
 ---
@@ -567,6 +567,89 @@ rg --files --hidden spec-dock | rg '(^|/)assurance\\.json$|(^|/)\\.assurance\\.j
 | instruction update | provider authority と dogfooding copy の script-local instruction を、merge-blocking risk / P0-P1 / protected-domain P2 with machine evidence / no low-value comments へ最適化した。 | `.agents/.../codex-review-instructions.md`; `src/spec_dock/assets/install_root/.../codex-review-instructions.md` | implemented |
 | regression guard | install/update 後の instruction asset に P0/P1 blocker、P2/P3 non-blocking、lint/formatter-enforceable issue suppression の文言が含まれる assertion を追加した。 | `tests/unit/infra/test_init_update.py` | implemented |
 
+### セッションログ（2026-06-29 S300/S310/S320 PR observation completion wait repair）
+
+#### 対象
+- Step: S300 / S310 / S320
+- AC/EC: AC-020..AC-023
+- closure ids: tc-028, tc-029, tc-030, tc-031, tc-032, tc-033, tc-034
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 判断（decision） | 例外理由（reason） | 直接変更した範囲（direct mutation scope） | 代替策（alternatives） | リスク低減（risk mitigation） | 状態（status） |
+|---|---|---|---|---|---|---|
+| S300/S310/S320 | parent-direct-implementation | 今回の修正対象は `github-pr-observation` skill 自体とその wait script であり、PR作成後の手動dogfooding監視まで同一文脈で連続検証する必要がある。 | provider/dogfooding `github-pr-observation/SKILL.md`; provider/dogfooding `pr_observation_wait.py`; focused tests | delegated dev-coder | 変更範囲を wait completion contract と focused tests に限定し、focused PR observation lane 107件、ruff、assurance、validate を実行した。 | approved |
+
+#### 実施内容
+- `pr_observation_wait.py` から active `review_completion_unknown` terminal path を削除した。
+- `missing_current_completion_signal` は stable / quiet / latency で完了扱いにせず、明示的な Codex completion artifact、blocker、CI/permission terminal、または timeout まで wait/resume する契約にした。
+- deadline 到達、under-budget final poll skip、snapshot poll timeout は `timeout / wait_or_resume / observation_complete=false` として扱い、`post_unknown_fresh_audit_required` を新規出力しないようにした。
+- provider と dogfooding の `github-pr-observation/SKILL.md` から terminal-like `review_completion_unknown` contract を削除し、legacy vocabulary と retryable timeout/resume contract を明記した。
+- 旧unknown期待の unit tests を timeout/resume期待へ反転し、遅延submitted reviewを見逃さない回帰テスト名・期待を明確化した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -k "s101_wait_times_out_stable_no_completion or s204_wait or s01_wait_carryover or s420_wait_pending_review_beats_unknown or s430_ci_passed_age_below_300 or s430_post_unknown or s430_short_timeout_does_not_force_no_completion_confirmation_poll"
+# result: 13 passed, 508 deselected in 33.12s
+
+uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation or s04_wait or s101 or s204 or s420_wait or s430 or s01_wait_carryover or s03_wait_fallback"
+# result: 107 passed, 414 deselected in 153.91s; after formatting rerun 107 passed, 414 deselected in 142.60s
+
+uv run pytest tests/unit/infra/test_init_update.py
+# result: 521 passed in 320.06s
+
+uv run ruff check src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py .agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py tests/unit/infra/test_init_update.py
+# result: All checks passed
+
+make lint
+# result: ruff check pass; ruff format check pass; mypy pass
+
+./spec-dock/scripts/spec-dock assurance verify
+# result: ok, issue=iss-00244, authorized_profile=standard, reason=ok
+
+./spec-dock/scripts/spec-dock validate
+# result: spec-dock: ok (validate) nodes=153
+
+rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_unknown_fresh_audit_required|mark_decision_review_completion_unknown|is_review_completion_unknown_candidate|REVIEW_COMPLETION_UNKNOWN|review_completion_unknown_latency_satisfied" src/spec_dock/assets/install_root/.agents/skills/github-pr-observation .agents/skills/github-pr-observation tests/unit/infra/test_init_update.py
+# result: only negative assertions in tests remain
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S300 | Red / 代替証跡 | existing tests expected active `review_completion_unknown` | focused pytest initially failed 9 tests where stable no-completion promoted to human_gate unknown or emitted latency metadata | initial focused pytest failure output | observed | old behavior was still encoded in tests before expectation update |
+| S300 | Green | no-completion does not complete by stability/time/quiet; timeout remains retryable | focused wait tests now return `timeout / wait_or_resume / observation_complete=false`; old unknown functions removed | focused pytest; grep inspection | pass | tc-028, tc-029, tc-034 |
+| S310 | Green | delayed submitted review is not missed | `test_issue_187_s204_wait_delayed_submitted_review_is_not_missed` waits through no-completion and selects submitted review blocker | focused pytest 107 passed | pass | tc-030 |
+| S320 | Green | quiet/same fingerprint only stabilizes explicit completion; no-completion stability cannot pass | no-completion classify returns `can_complete_when_stable=false`; under-budget / deadline path becomes timeout; strict no-findings and blocker paths remain covered in PR observation lane | diff inspection; focused pytest 107 passed | pass | tc-031..tc-033 |
+| S300/S320 | Refactor | remove obsolete unknown metadata and keep provider/dogfood parity | provider/dogfood wait script and skill are byte-identical; grep finds no active unknown contract in skill/scripts | `diff -u ...`; `rg ...` | pass | only legacy vocabulary note and negative tests remain |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S300 | tc-028, tc-029, tc-031, tc-034 | active unknown terminal path removed from wait behavior and skill contract; focused tests pass | provider/dogfood `pr_observation_wait.py` removes unknown promotion helpers and latency guards; skill contract updated; focused pytest/grep pass | implementation-pass-review-pending | reviewer gates pending |
+| S310 | tc-028, tc-029, tc-030 | delayed review and timeout/resume regression tests pass | focused pytest 107 passed; delayed submitted review test selects `current_selected_unresolved_thread` with `submitted_pull_request_review` | implementation-pass-review-pending | PR #245 live/manual S330 pending |
+| S320 | tc-031, tc-032, tc-033 | hydration/head-binding tests pass; no broad state-machine rewrite | no-completion cannot complete via stability; existing no-findings/blocker tests included in PR observation lane | implementation-pass-review-pending | no GitHub Checks/status-rollup surface added |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-028 | S300/S310 | yes | command | stable no-completion promoted to human_gate unknown | focused pytest 13 passed / 107 passed | pass | stable no-completion returns timeout/resume, not unknown |
+| tc-029 | S300/S310 | yes | command | timeout/latency metadata mixed with unknown promotion | focused pytest 13 passed / 107 passed | pass | resume action remains `wait_or_resume`; `observation_complete=false` |
+| tc-030 | S310 | yes | command | PR #245 style delayed review could be missed after no-completion stability | `test_issue_187_s204_wait_delayed_submitted_review_is_not_missed` | pass | final result is `human_gate / address_review_feedback` |
+| tc-031 | S320 | yes | command / inspection | quiet/same fingerprint could complete no-completion candidate | classify/diff inspection plus focused pytest | pass | no-completion `can_complete_when_stable=false` |
+| tc-032 | S320 | yes | command | wrong/no explicit completion must not pass | focused PR observation lane | pass | existing strict no-findings/blocker tests remain green |
+| tc-033 | S320 | yes | command | partial/no completion visibility could be over-promoted | focused PR observation lane | pass | no completion becomes timeout/resume, not pass |
+| tc-034 | S300 | yes | structural assertion | skill text described terminal-like unknown human gate | grep inspection | pass | active terminal unknown wording removed from provider/dogfood skills |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| tc-028..tc-034 | S300/S310/S320 | focused pytest 13 passed, broad PR observation lane 107 passed, ruff check, grep inspection, assurance verify, validate | pass-review-pending | S330 live/manual dogfooding and S399 final reviewers pending |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S300/S310/S320 | pending-review | PR observation wait script/skill/tests/report evidence | pending | pending | N/A | N/A | N/A | N/A |
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
@@ -579,8 +662,8 @@ rg --files --hidden spec-dock | rg '(^|/)assurance\\.json$|(^|/)\\.assurance\\.j
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
 | qa-reviewer | S100/S110/S200/S210/S299 obligation coverage | added | QA re-review pass; `test_init_update.py` 515 passed; assurance/workflow lane 53 passed; hidden/file-list inspections | pass |
-| local verification | whole issue obligation coverage | executed | `uv run pytest tests/unit/infra/test_init_update.py`; focused assurance/workflow lane; `./spec-dock/scripts/spec-dock validate`; `assurance verify`; `guidance issue-execution`; `git diff --check`; `make lint`; focused trigger tests | pass |
-| PR observation | PR #245 current head | executed | trigger comment `4825350981` posted with script-local instruction metadata; Provider CI initially failed on static analysis and local fix was applied | re-observation pending |
+| local verification | whole issue obligation coverage | executed | `uv run pytest tests/unit/infra/test_init_update.py`; focused assurance/workflow lane; focused PR observation lane 107 passed; `./spec-dock/scripts/spec-dock validate`; `assurance verify`; `guidance issue-execution`; `git diff --check`; `make lint`; focused trigger tests; ruff check for wait/test files | pass |
+| PR observation | PR #245 current head | executed / additional wait repair pending | trigger comment `4825350981` posted with script-local instruction metadata; Provider CI initially failed on static analysis and local fix was applied; S300-S320 wait repair implemented locally | re-push / re-observation pending |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
@@ -591,14 +674,14 @@ rg --files --hidden spec-dock | rg '(^|/)assurance\\.json$|(^|/)\\.assurance\\.j
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report alignment including AC-020..AC-023 / S300..S399 | prior P1 findings resolved; discussion reflection P2 resolved; no new P0/P1/P2 findings | 3 | pass |
-| local spec traceability | requirement / design / plan / report alignment | closure ids tc-001..tc-035 recorded; implementation evidence for S300..S399 remains future execution scope | 0 | local pass |
+| spec-reviewer | requirement / design / plan / report alignment including AC-020..AC-023 / S300..S399 | prior P1 findings resolved; discussion reflection P2 resolved; no new P0/P1/P2 findings | 3 | pass; final S399 re-review pending after S330 |
+| local spec traceability | requirement / design / plan / report alignment | closure ids tc-001..tc-034 have local implementation evidence; tc-035 / S330 live/manual dogfooding remains pending | 0 | local pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
 | report.md planning ledger | requirement/design/plan/report/discussions | final response | implementation commit `4d7cf1a4`; follow-up lint/report commit pending |
-| report.md implementation ledger | provider runtime/assets/tests plus dogfooding workspace parity | PR body / final response | PR #245 trigger posted; CI re-push pending |
+| report.md implementation ledger | provider runtime/assets/tests plus dogfooding workspace parity | PR body / final response | S300-S320 local implementation verified; PR #245 re-push / re-observation pending |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: Issue Planning guidance が、substantive draft requirement を `reason_code=requirement-scaffold` と表示した。
@@ -614,7 +697,7 @@ rg --files --hidden spec-dock | rg '(^|/)assurance\\.json$|(^|/)\\.assurance\\.j
 - `spec-dock update .` が dogfooding runtime を更新しないケースは、別途 update path の follow-up として調査候補にする。
 
 ## 省略/例外メモ (必須)
-- ローカル実装・自動テスト・dogfooding manual test は実施済み。PR #245 の Codex review trigger は実施済みで、script-local instruction metadata 付きコメント投稿は成功した。初回 PR 観測は Provider CI の静的解析 failure で止まったため、lint 修正後に再 push / 再観測する。
+- ローカル実装・自動テスト・dogfooding manual test は一部実施済み。PR #245 の Codex review trigger は実施済みで、script-local instruction metadata 付きコメント投稿は成功した。初回 PR 観測は Provider CI の静的解析 failure で止まり、その後 S300-S320 wait repair を追加実装したため、再 push / 修正版 wait script による再観測を実施する。
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
