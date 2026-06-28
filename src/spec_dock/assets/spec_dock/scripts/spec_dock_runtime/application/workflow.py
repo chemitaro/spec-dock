@@ -231,6 +231,8 @@ def _classify_plan_text(plan_text: str | None) -> str:
         return "scaffold"
     scaffold_markers = (
         "no structured implementation steps",
+        "no implementation steps",
+        "no executable steps",
         "record red, green, and refactor evidence",
         "link each closure id to its observed verification result",
         "未記入",
@@ -240,8 +242,6 @@ def _classify_plan_text(plan_text: str | None) -> str:
         return "scaffold"
     markers = (
         "実装ステップ",
-        "implementation step",
-        "planned contract",
         "具体テストケース",
         "step closure contract",
         "approved-no-op",

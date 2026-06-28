@@ -1254,7 +1254,7 @@ def _normalize_draft_discussion_text(rendered_text: str, *, doc_type: str) -> st
         )
     else:
         return text
-    return f"---{frontmatter}---{body}"
+    return f"---{frontmatter}---\n{body.lstrip()}"
 
 
 def plan_discussion_doc(

@@ -129,11 +129,13 @@ def _active_placeholder_dir(specdock_dir: Path, layer: str) -> Path:
     return path
 
 
-def _unlink_any(path: Path) -> None:
+def _unlink_any(path: Path, *, allow_directory: bool = True) -> None:
     if path.is_symlink() or path.is_file():
         path.unlink(missing_ok=True)
         return
     if path.is_dir():
+        if not allow_directory:
+            raise RuntimeError(f"Refusing to remove directory at generated file path: {path}")
         shutil.rmtree(path)
 
 
@@ -334,6 +336,7 @@ def apply_active_pointers(specdock_dir: Path, manifest: ActiveManifest | None, r
     active_dir = specdock_dir / _ACTIVE_DIRNAME
     active_dir.mkdir(parents=True, exist_ok=True)
 
+    generated_file_names = {"context-pack.md", "current-runbook.json", "current-runbook.md"}
     for name in (
         "initiative",
         "epic",
@@ -345,7 +348,7 @@ def apply_active_pointers(specdock_dir: Path, manifest: ActiveManifest | None, r
         "epic.path",
         "issue.path",
     ):
-        _unlink_any(active_dir / name)
+        _unlink_any(active_dir / name, allow_directory=name not in generated_file_names)
 
     def _target_dir(layer: str) -> Path:
         if manifest is None:
