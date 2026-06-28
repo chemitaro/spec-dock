@@ -283,6 +283,41 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["reason_code"] == "assurance-valid"
             assert payload["may_execute_approved_plan"] is True
 
+    def test_guidance_allows_executable_plan_that_mentions_negated_marker_as_test_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Executable plan")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            (issue_dir / "plan.md").write_text(
+                "---\n"
+                "種別: 実装計画書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "approved"\n'
+                "---\n\n"
+                "# Plan\n\n"
+                "## 実装ステップ\n"
+                "### S01 Implement deterministic workflow guidance\n"
+                "#### 具体テストケース一覧\n"
+                "- `tc-001` regression: plan readiness handles negated fixture prose\n"
+                "  - 失敗検出: approved plan says there are no implementation steps yet.\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = self._read_projected_runbook(target)
+            assert payload["state"] == "ready"
+            assert payload["reason_code"] == "assurance-valid"
+            assert payload["may_execute_approved_plan"] is True
+
     def test_guidance_blocks_strict_legacy_placeholder_plan(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

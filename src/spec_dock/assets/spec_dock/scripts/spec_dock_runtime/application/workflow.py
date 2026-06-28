@@ -229,6 +229,14 @@ def _classify_plan_text(plan_text: str | None) -> str:
     )
     if _frontmatter_has_any(lower, frontmatter_scaffold_markers):
         return "scaffold"
+    markers = (
+        "実装ステップ",
+        "具体テストケース",
+        "step closure contract",
+        "approved-no-op",
+        "decision-only closure",
+    )
+    has_executable_marker = any(marker in lower for marker in markers)
     scaffold_markers = (
         "no structured implementation steps",
         "no implementation steps",
@@ -238,16 +246,9 @@ def _classify_plan_text(plan_text: str | None) -> str:
         "未記入",
         "記載してください",
     )
-    if any(marker in lower for marker in scaffold_markers):
+    if not has_executable_marker and any(marker in lower for marker in scaffold_markers):
         return "scaffold"
-    markers = (
-        "実装ステップ",
-        "具体テストケース",
-        "step closure contract",
-        "approved-no-op",
-        "decision-only closure",
-    )
-    if any(marker in lower for marker in markers):
+    if has_executable_marker:
         return "executable"
     return "scaffold"
 
