@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 import sys
 
@@ -42,6 +43,49 @@ class _StoreFake:
     def verify_contract(self, target):
         self.verify_target = target
         return self.read_result
+
+    def ensure_contract_writable(self, target):
+        self.ensure_contract_writable_target = target
+
+
+@dataclass(frozen=True)
+class _ArtifactFake:
+    artifact: str
+    path: Path
+    repo_relative_path: str
+    text: str
+
+
+class _ArtifactStoreFake:
+    def __init__(self, manifest, artifacts) -> None:
+        self.manifest = manifest
+        self.artifacts = tuple(artifacts)
+        self.unwritable: set[str] = set()
+        self.preflighted: list[str] = []
+        self.writes: list[tuple[str, str]] = []
+
+    def artifact_kinds(self, selection):
+        if selection == "all":
+            return tuple(artifact.artifact for artifact in self.artifacts)
+        return (selection,)
+
+    def read_artifact(self, target, artifact):
+        del target
+        for item in self.artifacts:
+            if item.artifact == artifact:
+                return item
+        raise AssertionError(f"unknown artifact: {artifact}")
+
+    def ensure_artifact_writable(self, artifact):
+        self.preflighted.append(artifact.artifact)
+        if artifact.artifact in self.unwritable:
+            raise RuntimeError(f"unwritable artifact: {artifact.artifact}")
+
+    def write_artifact(self, artifact, text):
+        self.writes.append((artifact.artifact, text))
+
+    def load_profile_section_manifest(self):
+        return self.manifest
 
 
 def _contract(domain_assurance, *, issue_id: str = "iss-00227"):
@@ -99,6 +143,89 @@ def test_classify_writes_contract_and_dry_run_returns_same_contract_without_writ
     assert domain_assurance.canonical_json_bytes(dry_run_result.contract) == domain_assurance.canonical_json_bytes(
         write_result.contract
     )
+
+
+def test_compose_preflights_all_changed_artifacts_before_writing() -> None:
+    app_assurance, app_contracts, domain_assurance, AssuranceStoreResult, ResolvedIssueTarget = _runtime_modules()
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.domain.artifact_composer import load_profile_section_manifest
+    finally:
+        sys.path.pop(0)
+    manifest_text = (
+        Path(__file__).resolve().parents[3]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "templates"
+        / "assurance"
+        / "profile-sections.json"
+    ).read_text(encoding="utf-8")
+    manifest = load_profile_section_manifest(manifest_text)
+    store = _store_with_target(domain_assurance, ResolvedIssueTarget)
+    valid_contract = _contract(domain_assurance)
+    store.read_result = AssuranceStoreResult(
+        status="valid",
+        target=store.target,
+        contract=valid_contract,
+        mode="adaptive",
+        reason="ok",
+    )
+    artifact_store = _ArtifactStoreFake(
+        manifest,
+        (
+            _ArtifactFake(
+                "design",
+                store.target.issue_dir / "design.md",
+                "design.md",
+                "---\n"
+                "artifact_state: awaiting-assurance-compose\n"
+                "---\n"
+                "# iss-00227 — 設計 placeholder\n"
+                "\n"
+                "このファイルはまだ合成されていません。\n"
+                "\n"
+                "先に `requirement.md` を具体化し、`assurance classify --stage requirement` を実行してください。\n"
+                "その後、`assurance compose --artifact all` を実行して、この Issue の分類に応じた設計書テンプレートを合成してください。\n"
+                "\n"
+                "この状態のまま設計本文を書き始めないでください。\n",
+            ),
+            _ArtifactFake(
+                "plan",
+                store.target.issue_dir / "plan.md",
+                "plan.md",
+                "---\n"
+                "artifact_state: awaiting-assurance-compose\n"
+                "---\n"
+                "# iss-00227 — 実装計画 placeholder\n"
+                "\n"
+                "このファイルはまだ合成されていません。\n"
+                "\n"
+                "先に `requirement.md` を具体化し、`assurance classify --stage requirement` を実行してください。\n"
+                "その後、`assurance compose --artifact all` を実行して、この Issue の分類に応じた実装計画テンプレートを合成してください。\n"
+                "\n"
+                "この状態のまま実装計画本文を書き始めないでください。\n",
+            ),
+        ),
+    )
+    artifact_store.unwritable.add("plan")
+
+    try:
+        app_assurance.compose_assurance(
+            app_contracts.ComposeAssuranceRequest(artifact="all", dry_run=False),
+            store=store,
+            artifact_store=artifact_store,
+        )
+    except RuntimeError as exc:
+        assert "unwritable artifact: plan" in str(exc)
+    else:
+        raise AssertionError("compose should fail during writable preflight")
+
+    assert artifact_store.preflighted == ["design", "plan"]
+    assert artifact_store.writes == []
+    assert len(store.writes) == 0
 
 
 def test_show_and_verify_map_valid_missing_and_invalid_store_outcomes() -> None:

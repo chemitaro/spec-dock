@@ -206,7 +206,7 @@ def _resolve_state(store: WorkflowAssuranceStoreLike) -> WorkflowState:
 
 def _read_optional_text(path: Path) -> str | None:
     try:
-        if not path.exists() or not path.is_file():
+        if path.is_symlink() or not path.exists() or not path.is_file():
             return None
         return path.read_text(encoding="utf-8")
     except OSError:
@@ -224,6 +224,8 @@ def _classify_plan_text(plan_text: str | None) -> str:
         '状態: "draft',
         "状態: draft",
         "draft | proposed",
+        "todo",
+        "tbd",
     )
     if _frontmatter_has_any(lower, frontmatter_scaffold_markers):
         return "scaffold"
@@ -231,8 +233,6 @@ def _classify_plan_text(plan_text: str | None) -> str:
         "no structured implementation steps",
         "record red, green, and refactor evidence",
         "link each closure id to its observed verification result",
-        "todo",
-        "tbd",
         "未記入",
         "記載してください",
     )
@@ -266,12 +266,12 @@ def _classify_design_text(design_text: str | None) -> str:
         "artifact_state: awaiting-assurance-compose",
         "template",
         "placeholder",
+        "todo",
+        "tbd",
     )
     if _frontmatter_has_any(lower, frontmatter_scaffold_markers):
         return "scaffold"
     scaffold_markers = (
-        "todo",
-        "tbd",
         "未記入",
         "記載してください",
     )

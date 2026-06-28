@@ -131,6 +131,15 @@ class AssuranceStore:
                 mode=AssuranceMode.STRICT_LEGACY.value,
                 reason="missing_assurance_contract",
             )
+        if not path.is_file():
+            return AssuranceStoreResult(
+                status="invalid",
+                target=target,
+                contract=None,
+                mode="invalid",
+                reason="contract_path_not_file",
+                details=(f"path={path.relative_to(self.repo_root).as_posix()}",),
+            )
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
@@ -149,6 +158,15 @@ class AssuranceStore:
                 contract=None,
                 mode="invalid",
                 reason="invalid_json",
+                details=(exc.__class__.__name__,),
+            )
+        except OSError as exc:
+            return AssuranceStoreResult(
+                status="invalid",
+                target=target,
+                contract=None,
+                mode="invalid",
+                reason="contract_unreadable",
                 details=(exc.__class__.__name__,),
             )
 

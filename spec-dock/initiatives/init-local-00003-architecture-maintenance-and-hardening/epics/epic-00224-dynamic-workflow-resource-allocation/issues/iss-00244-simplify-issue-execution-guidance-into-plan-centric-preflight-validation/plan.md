@@ -214,6 +214,10 @@ PR observation completion wait の要件対応:
 | tc-035 | AC-021 / AC-023 | PR #245 resume/manual validation returns submitted-review human gate or documented limitation, not active unknown | live PR #245 or saved/fake equivalent | dogfooding gap remains unverified | yes | manual-required | S330 / S399 |
 | tc-036 | AC-024 | pull request review body P1 blocks even when inline comments and threads are empty | selected submitted Codex review body with `[P1]` and no selected comments/threads | review body finding is ignored and PR is marked pass/merge-prepared | yes | red-required | S320 / S399 |
 | tc-037 | AC-004 / AC-010 | substantive approved design may mention historical draft status, templates, or non-placeholder in body without being blocked | approved `design.md` with body text containing `状態: "draft"`, `docs/templates`, and `non-placeholder` | preflight scaffold marker scans body prose and blocks execution-ready issue | yes | red-required | S02 / S399 |
+| tc-038 | AC-004 / AC-010 | executable approved plan may mention TODO/TBD in body without being blocked | approved executable `plan.md` whose step text contains TODO/TBD as user data | preflight scaffold marker scans body prose and blocks executable plan | yes | red-required | S02 / S399 |
+| tc-039 | AC-004 / AC-010 | strict-legacy guidance blocks symlinked `design.md` / `plan.md` | `.assurance.json` missing and planning artifact symlink points outside issue | fallback path follows symlink and returns execution-ready | yes | red-required | S02 / S399 |
+| tc-040 | AC-016 / AC-017 | hidden assurance contract path must be regular file and unreadable/non-file paths return structured invalid result | `.assurance.json` is a directory | public validation/guidance exits through unstructured exception | yes | red-required | S200 / S399 |
+| tc-041 | AC-016 / AC-019 | compose preflights all changed artifact writes before mutating any artifact | multi-artifact compose where later changed artifact is unwritable | compose partially mutates earlier artifact then fails before source binding update | yes | red-required | S210 / S399 |
 
 ## 実装ステップ
 

@@ -226,6 +226,21 @@ def test_read_contract_rejects_symlinked_hidden_assurance_contract(tmp_path: Pat
     assert result.contract is None
 
 
+def test_read_contract_rejects_non_file_hidden_assurance_contract(tmp_path: Path) -> None:
+    _, AssuranceStore, _ = _runtime_modules()
+    issue_dir = _make_issue(tmp_path)
+    (issue_dir / ".assurance.json").mkdir()
+    store = AssuranceStore(tmp_path)
+    target = store.resolve_issue_target("iss-00227")
+
+    result = store.verify_contract(target)
+
+    assert result.status == "invalid"
+    assert result.mode == "invalid"
+    assert result.reason == "contract_path_not_file"
+    assert result.contract is None
+
+
 def test_write_contract_rejects_symlinked_assurance_contract_without_touching_target(tmp_path: Path) -> None:
     assurance, AssuranceStore, AssuranceStoreError = _runtime_modules()
     issue_dir = _make_issue(tmp_path)

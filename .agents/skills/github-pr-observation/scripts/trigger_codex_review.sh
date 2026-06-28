@@ -87,6 +87,8 @@ pr = os.environ["TRIGGER_PR"]
 expected_head_sha = os.environ["TRIGGER_HEAD_SHA"]
 endpoint = f"repos/{owner}/{name}/issues/{pr}/comments"
 fixed_body = "@codex review"
+# Current iss-00244 contract: use the shipped script-local instruction asset,
+# not a GitHub base/head .github/codex/review-policy.md file.
 instruction_path = Path(os.environ["TRIGGER_SCRIPT_DIR"]) / "codex-review-instructions.md"
 instruction_display_path = ".agents/skills/github-pr-observation/scripts/codex-review-instructions.md"
 instruction_max_bytes = 32768
