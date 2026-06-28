@@ -251,6 +251,38 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["reason_code"] == "assurance-valid"
             assert payload["may_execute_approved_plan"] is True
 
+    def test_guidance_allows_executable_plan_that_mentions_todo_in_body(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Executable plan")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            (issue_dir / "plan.md").write_text(
+                "---\n"
+                "種別: 実装計画書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "approved"\n'
+                "---\n\n"
+                "# Plan\n\n"
+                "## 実装ステップ\n"
+                "- Step S01 handles TODO/TBD strings as user data, not scaffold markers.\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = self._read_projected_runbook(target)
+            assert payload["state"] == "ready"
+            assert payload["reason_code"] == "assurance-valid"
+            assert payload["may_execute_approved_plan"] is True
+
     def test_guidance_blocks_strict_legacy_placeholder_plan(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -265,6 +297,37 @@ class TestCliWorkflow(CliRuntimeHarness):
             payload = self._read_projected_runbook(target)
             assert payload["state"] == "blocked"
             assert payload["reason_code"] == "plan-not-executable"
+            assert payload["may_execute_approved_plan"] is False
+            assert payload["authority"]["authorized_profile"] == "strict"
+
+    @pytest.mark.parametrize(
+        ("filename", "reason_code"),
+        [("design.md", "design-missing"), ("plan.md", "plan-missing")],
+    )
+    def test_guidance_blocks_strict_legacy_symlinked_planning_artifact(
+        self,
+        filename: str,
+        reason_code: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Legacy symlink")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            self._write_executable_plan(issue_dir)
+            external = target / f"external-{filename}"
+            external.write_text("# External\n\n## 実装ステップ\n- outside\n", encoding="utf-8")
+            artifact_path = issue_dir / filename
+            artifact_path.unlink()
+            artifact_path.symlink_to(external)
+
+            result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = self._read_projected_runbook(target)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == reason_code
             assert payload["may_execute_approved_plan"] is False
             assert payload["authority"]["authorized_profile"] == "strict"
 

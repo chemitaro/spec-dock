@@ -46,6 +46,8 @@ class ArtifactStoreLike(Protocol):
 
     def read_artifact(self, target: Any, artifact: Any) -> Any: ...
 
+    def ensure_artifact_writable(self, artifact: Any) -> None: ...
+
     def write_artifact(self, artifact: Any, text: str) -> None: ...
 
     def load_profile_section_manifest(self) -> Any: ...
@@ -148,6 +150,8 @@ def compose_assurance(
     if not request.dry_run:
         if changed:
             store.ensure_contract_writable(target)
+            for artifact, _ in changed:
+                artifact_store.ensure_artifact_writable(artifact)
         for artifact, result in changed:
             if result.output_text is not None:
                 artifact_store.write_artifact(artifact, result.output_text)

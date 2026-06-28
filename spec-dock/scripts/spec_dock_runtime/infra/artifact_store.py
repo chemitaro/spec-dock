@@ -51,12 +51,17 @@ class ArtifactStore:
         )
 
     def write_artifact(self, artifact: IssueArtifact, text: str) -> None:
+        self.ensure_artifact_writable(artifact)
+        artifact.path.write_text(text, encoding="utf-8")
+
+    def ensure_artifact_writable(self, artifact: IssueArtifact) -> None:
         if artifact.path.is_symlink():
             raise RuntimeError(f"Refusing to write symlinked planning artifact: {artifact.repo_relative_path}")
+        if artifact.path.exists() and not artifact.path.is_file():
+            raise RuntimeError(f"Refusing to write non-file planning artifact: {artifact.repo_relative_path}")
         resolved = artifact.path.resolve()
         if not _is_relative_to(resolved, self.repo_root):
             raise RuntimeError(f"Refusing to write artifact outside repository: {artifact.repo_relative_path}")
-        artifact.path.write_text(text, encoding="utf-8")
 
     def load_profile_section_manifest(self) -> ProfileSectionManifest:
         path = self.specdock_dir / "templates" / "assurance" / "profile-sections.json"
