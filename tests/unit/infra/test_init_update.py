@@ -21650,7 +21650,7 @@ exit 44
             assert payload["observation_complete"] is False
             assert payload["decision"]["recommended_next_action"] == ("manual_review_required_non_retryable")
 
-    def test_issue_187_s101_wait_promotes_stable_no_completion_to_human_gate_unknown(self) -> None:
+    def test_issue_187_s101_wait_times_out_stable_no_completion_with_resume(self) -> None:
         evidence = {
             "present": True,
             "category": "missing_current_completion_signal",
@@ -21715,18 +21715,17 @@ exit 44
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["normalized_status"] == "human_gate"
-            assert payload["overall_status"] == "human_gate"
-            assert payload["recommended_next_action"] == "human_gate"
-            assert payload["observation_complete"] is True
-            assert payload["decision"]["status"] == "unknown"
-            assert payload["decision"]["status_reason"] == "review_completion_unknown"
-            assert payload["decision"]["recommended_next_action"] == "human_gate"
-            assert payload["decision"]["observation_complete"] is True
+            assert payload["normalized_status"] == "timeout"
+            assert payload["overall_status"] == "timeout"
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["observation_complete"] is False
+            assert payload["decision"]["status"] == "timeout"
+            assert payload["decision"]["status_reason"] == "wait_timeout"
+            assert payload["decision"]["recommended_next_action"] == "wait_or_resume"
+            assert payload["decision"]["observation_complete"] is False
             assert payload["decision"]["no_completion_evidence"] == evidence
             assert payload["decision"]["recommended_next_action"] != "merge_prepared"
-            assert payload["wait"]["same_fingerprint_observed"] >= 2
-            assert payload["wait"]["quiet_seconds_observed"] >= 1
+            assert "post_unknown_fresh_audit_required" not in payload["wait"]
 
     def test_issue_187_s204_wait_does_not_promote_unknown_before_trigger_age(self) -> None:
         evidence = {
@@ -21804,8 +21803,8 @@ exit 44
                 assert payload["decision"]["status_reason"] != "review_completion_unknown"
                 assert payload["recommended_next_action"] == "wait_or_resume"
                 assert payload["observation_complete"] is False
-                assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
                 assert payload["wait"]["review_trigger_age_seconds"] < 300
+                assert "review_completion_unknown_latency_satisfied" not in payload["wait"]
                 assert "phase=wait ci=passed review=pending_signal" in result.stderr
 
     def test_issue_187_s204_wait_does_not_promote_unknown_before_ci_passed_age(self) -> None:
@@ -21875,8 +21874,8 @@ exit 44
             assert payload["decision"]["status_reason"] != "review_completion_unknown"
             assert payload["recommended_next_action"] == "wait_or_resume"
             assert payload["observation_complete"] is False
-            assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
             assert payload["wait"]["ci_passed_age_seconds"] < 90
+            assert "review_completion_unknown_latency_satisfied" not in payload["wait"]
 
     def test_issue_187_s204_wait_resume_preserves_prior_ci_passed_age(self) -> None:
         evidence = {
@@ -21969,13 +21968,13 @@ exit 44
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["normalized_status"] == "human_gate"
-            assert payload["decision"]["status_reason"] == "review_completion_unknown"
-            assert payload["wait"]["review_completion_unknown_latency_satisfied"] is True
+            assert payload["normalized_status"] == "timeout"
+            assert payload["recommended_next_action"] == "wait_or_resume"
+            assert payload["decision"]["status_reason"] == "wait_timeout"
             assert payload["wait"]["ci_passed_age_seconds"] >= 90
             assert payload["wait"]["ci_passed_since"]
 
-    def test_issue_187_s204_wait_promotes_unknown_after_trigger_and_ci_ages(self) -> None:
+    def test_issue_187_s204_wait_times_out_after_trigger_and_ci_ages(self) -> None:
         evidence = {
             "present": True,
             "category": "missing_current_completion_signal",
@@ -22038,14 +22037,13 @@ exit 44
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["normalized_status"] == "human_gate"
-            assert payload["decision"]["status_reason"] == "review_completion_unknown"
-            assert payload["decision"]["recommended_next_action"] == "human_gate"
-            assert payload["wait"]["review_completion_unknown_latency_satisfied"] is True
+            assert payload["normalized_status"] == "timeout"
+            assert payload["decision"]["status_reason"] == "wait_timeout"
+            assert payload["decision"]["recommended_next_action"] == "wait_or_resume"
             assert payload["wait"]["review_trigger_age_seconds"] >= 300
             assert payload["wait"]["ci_passed_age_seconds"] >= 90
 
-    def test_issue_187_s204_wait_late_unresolved_review_overrides_unknown_candidate(self) -> None:
+    def test_issue_187_s204_wait_delayed_submitted_review_is_not_missed(self) -> None:
         evidence = {
             "present": True,
             "category": "missing_current_completion_signal",
@@ -22130,6 +22128,7 @@ exit 44
             assert payload["recommended_next_action"] == "address_review_feedback"
             assert payload["decision"]["status_reason"] == "current_selected_unresolved_thread"
             assert payload["decision"]["status_reason"] != "review_completion_unknown"
+            assert payload["decision"]["completion_signal"] == "submitted_pull_request_review"
             assert payload["decision"]["selected_unresolved_thread_ids"] == ["RT_current"]
 
     def test_issue_187_s101_wait_pending_review_no_completion_evidence_still_times_out(self) -> None:
@@ -25319,7 +25318,7 @@ esac
         assert payload["decision"]["carryover_unresolved_thread_ids"] == ["RT_carryover"]
         assert payload["decision"]["status_reason"] != "review_completion_unknown"
 
-    def test_issue_219_s01_wait_guard_under_carryover_only_missing_completion_does_not_timeout(self) -> None:
+    def test_issue_219_s01_wait_guard_under_carryover_only_missing_completion_times_out(self) -> None:
         evidence = {
             "present": True,
             "category": "missing_current_completion_signal",
@@ -25389,11 +25388,11 @@ esac
 
         assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
-        assert payload["normalized_status"] == "pending"
+        assert payload["normalized_status"] == "timeout"
         assert payload["recommended_next_action"] == "wait_or_resume"
         assert payload["observation_complete"] is False
-        assert payload["decision"]["status_reason"] == "missing_current_completion_signal"
-        assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
+        assert payload["decision"]["status_reason"] == "wait_timeout"
+        assert "review_completion_unknown_latency_satisfied" not in payload["wait"]
 
     def test_issue_219_s01_wait_carryover_snapshot_poll_timeout_keeps_limitation(self) -> None:
         evidence = {
@@ -25464,16 +25463,17 @@ esac
 
         assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
-        assert payload["normalized_status"] == "pending"
+        assert payload["normalized_status"] == "timeout"
         assert payload["recommended_next_action"] == "wait_or_resume"
         assert payload["observation_complete"] is False
+        assert payload["decision"]["status_reason"] == "wait_timeout"
         poll_timeout_limitations = [
             item
             for item in payload.get("limitations", [])
             if item.get("source") == "fetch_pr_observation_snapshot.sh" and item.get("code") == "snapshot_poll_timeout"
         ]
         assert poll_timeout_limitations
-        assert poll_timeout_limitations[0]["severity"] == "warning"
+        assert poll_timeout_limitations[0]["severity"] == "blocking"
 
     def test_issue_219_s01_wait_carryover_snapshot_poll_timeout_blocks_after_latency(self) -> None:
         evidence = {
@@ -25556,7 +25556,7 @@ esac
         assert poll_timeout_limitations[0]["severity"] == "blocking"
         assert payload["decision"]["status_reason"] == "wait_timeout"
 
-    def test_issue_219_s01_wait_carryover_only_missing_completion_reaches_unknown_after_latency(self) -> None:
+    def test_issue_219_s01_wait_carryover_only_missing_completion_times_out_after_latency(self) -> None:
         evidence = {
             "present": True,
             "category": "missing_current_completion_signal",
@@ -25620,11 +25620,11 @@ esac
 
         assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
-        assert payload["normalized_status"] == "human_gate"
-        assert payload["recommended_next_action"] == "human_gate"
-        assert payload["observation_complete"] is True
-        assert payload["decision"]["status_reason"] == "review_completion_unknown"
-        assert payload["wait"]["review_completion_unknown_latency_satisfied"] is True
+        assert payload["normalized_status"] == "timeout"
+        assert payload["recommended_next_action"] == "wait_or_resume"
+        assert payload["observation_complete"] is False
+        assert payload["decision"]["status_reason"] == "wait_timeout"
+        assert "review_completion_unknown_latency_satisfied" not in payload["wait"]
 
     def test_issue_187_s420_snapshot_current_selected_reason_wins_over_carryover(self) -> None:
         payload = self._issue_187_s420_run_observation_snapshot(
@@ -25803,9 +25803,9 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["normalized_status"] == "human_gate"
-            assert payload["decision"]["status_reason"] == "review_completion_unknown"
-            assert payload["decision"]["recommended_next_action"] == "human_gate"
+            assert payload["normalized_status"] == "timeout"
+            assert payload["decision"]["status_reason"] == "wait_timeout"
+            assert payload["decision"]["recommended_next_action"] == "wait_or_resume"
             assert payload["decision"]["recommended_next_action"] != "merge_prepared"
 
     def _issue_187_s430_no_completion_decision(self, fingerprint: str) -> dict:
@@ -25882,7 +25882,7 @@ esac
             assert payload["wait"]["next_poll_min_budget_seconds"] >= 0.6
             assert payload["wait"]["final_poll_skipped_reason"] == "insufficient_next_snapshot_budget"
 
-    def test_issue_187_s430_short_timeout_still_attempts_confirmation_poll(self) -> None:
+    def test_issue_187_s430_short_timeout_does_not_force_no_completion_confirmation_poll(self) -> None:
         decision = self._issue_187_s430_no_completion_decision("no-completion-s430-confirm")
         first_payload = {
             "ci": "passed",
@@ -25920,10 +25920,10 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["wait"]["polls"] >= 2
-            assert payload["normalized_status"] == "human_gate"
-            assert payload["decision"]["status_reason"] == "review_completion_unknown"
-            assert payload["wait"].get("final_poll_skipped_reason") is None
+            assert payload["wait"]["polls"] == 1
+            assert payload["normalized_status"] == "timeout"
+            assert payload["decision"]["status_reason"] == "wait_timeout"
+            assert payload["wait"]["final_poll_skipped_reason"] == "insufficient_next_snapshot_budget"
 
     def test_issue_187_s430_under_budget_still_attempts_zero_check_grace_poll(self) -> None:
         zero_check_limitation = {
@@ -26172,7 +26172,7 @@ esac
             assert payload["recommended_next_action"] == "fix_ci"
             assert payload["wait"].get("final_poll_skipped_reason") is None
 
-    def test_issue_187_s430_ci_passed_age_below_300_does_not_promote_unknown(self) -> None:
+    def test_issue_187_s430_ci_passed_age_below_300_still_times_out_without_completion(self) -> None:
         decision = self._issue_187_s430_no_completion_decision("no-completion-s430-young-ci")
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
@@ -26237,12 +26237,12 @@ esac
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
             assert payload["wait"]["ci_passed_age_seconds"] < 300
-            assert payload["wait"]["review_completion_unknown_min_ci_passed_age_seconds"] == 300
-            assert payload["wait"]["review_completion_unknown_latency_satisfied"] is False
-            assert payload["decision"]["status_reason"] != "review_completion_unknown"
+            assert "review_completion_unknown_min_ci_passed_age_seconds" not in payload["wait"]
+            assert "review_completion_unknown_latency_satisfied" not in payload["wait"]
+            assert payload["decision"]["status_reason"] == "wait_timeout"
             assert payload["recommended_next_action"] == "wait_or_resume"
 
-    def test_issue_187_s430_post_unknown_fresh_audit_metadata_is_emitted(self) -> None:
+    def test_issue_187_s430_post_unknown_fresh_audit_metadata_is_not_emitted(self) -> None:
         decision = self._issue_187_s430_no_completion_decision("no-completion-s430-post-audit")
         with tempfile.TemporaryDirectory() as tmp_dir:
             result, _out_dir = self._issue_174_run_wait_fake_snapshots(
@@ -26279,8 +26279,8 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["decision"]["status_reason"] == "review_completion_unknown"
-            assert payload["wait"]["post_unknown_fresh_audit_required"] is True
+            assert payload["decision"]["status_reason"] == "wait_timeout"
+            assert "post_unknown_fresh_audit_required" not in payload["wait"]
             assert payload["decision"]["actionable_unresolved_count"] == 0
             assert payload["decision"]["current_selected_unresolved_thread_ids"] == []
             assert payload["decision"]["carryover_unresolved_thread_ids"] == []

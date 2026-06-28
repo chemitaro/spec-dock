@@ -214,8 +214,7 @@ status collection are implemented by the public scripts.
 - `stderr` progress is bounded and non-authoritative.
 - `--out` artifacts are optional debug/audit copies.
 - Observation statuses include `passed`, `failed`, `pending`, `running`,
-  `none`, `timeout`, `stale_head`, `unknown`, `review_completion_unknown`,
-  and `human_gate`.
+  `none`, `timeout`, `stale_head`, `unknown`, and `human_gate`.
 - CI terminal state and Codex review lifecycle are observed independently and
   merged only in the final wait result.
 - GitHub Actions workflow runs/jobs are the only CI source used by PR
@@ -239,30 +238,25 @@ status collection are implemented by the public scripts.
   head freshness, unresolved threads, changes-requested reviews, draft/non-open
   PR state, stale head, and blocking limitations have been integrated. Those
   blockers override `codex_no_findings_issue_comment`.
-- `review_completion_unknown` is a non-pass terminal-like review state. It means
-  CI passed, the observed head matched, no current trigger-boundary review
-  blocker was selected, and no trusted Codex review completion signal was found
-  after the trigger-age and CI-passed-age guards are satisfied. Carryover
-  unresolved inventory may still be present and must be reported separately from
-  current selected blockers.
-- Stable no-completion evidence for the current boundary must not be collapsed
-  into a generic timeout. The top-level result is `human_gate`, with the decision
-  reason indicating `review_completion_unknown`, so a human can review the
-  no-completion condition explicitly.
-- `review_completion_unknown` remains a human gate, not `passed` or
-  merge-ready, and it is not proof that no review work exists. Below the latency
-  guards, stable no-completion evidence stays in the wait/resume path instead of
-  being promoted early.
-- When `review_completion_unknown` is emitted, wait metadata marks that a fresh
-  post-unknown audit is required before any merge-prepared or no-review-work
-  reporting. Downstream orchestration must perform that fresh audit instead of
-  reusing the unknown result as absence proof.
+- Review completion is never inferred from elapsed time, quiet windows, repeated
+  fingerprints, zero selected comments, or CI success. If no explicit
+  Codex-authored completion artifact is visible for the current trigger boundary
+  and expected head, the observation remains retryable until the configured wait
+  deadline is reached.
+- At the wait deadline, missing current Codex completion becomes `timeout` with
+  `recommended_next_action=wait_or_resume` and `observation_complete=false`.
+  Timeout is not proof that no review work exists and must not be reported as
+  merge-ready or no-review-work evidence.
+- Legacy artifacts may contain `review_completion_unknown`. Treat that wording
+  only as historical vocabulary, not as a current wait result, review completion
+  proof, blocker disposition, or merge-prepared evidence.
 - The wait loop may skip a final under-budget snapshot and preserve the latest
   useful payload with `final_poll_skipped_reason="insufficient_next_snapshot_budget"`.
   Treat that as budget-preservation metadata, not as a stronger review result.
 - A missing current completion signal or pending review remains retryable and
-  stays in the wait/resume path, such as `wait_or_resume`, until the configured
-  latency guards or terminal conditions are reached.
+  stays in the wait/resume path, such as `wait_or_resume`, until an explicit
+  completion artifact, blocker, CI/permission terminal condition, or timeout is
+  observed.
 - Generic `fallback_issue_comment` remains low-confidence evidence. It keeps the
   final status in the human gate path with
   `manual_review_required_non_retryable` and does not promote a run to
@@ -287,9 +281,8 @@ status collection are implemented by the public scripts.
 - When a timeout or limit occurs before CI and review complete, the final JSON
   includes resume metadata and a resume command hint for continuing the same
   boundary without posting another trigger.
-- Same-boundary resume preserves CI-passed age through additive wait metadata so
-  delayed `review_completion_unknown` evaluation can continue without posting a
-  new trigger.
+- Same-boundary resume preserves trigger metadata so observation can continue
+  without posting a new trigger.
 
 ## Safe Usage
 
