@@ -9362,8 +9362,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 f"missing Codex review instruction asset after init: {instruction_path}"
             )
             installed_instruction_text = installed_instruction.read_text(encoding="utf-8")
-            assert "P0 or P1 blockers" in installed_instruction_text
-            assert "Treat P2/P3 findings as non-blocking by default" in installed_instruction_text
+            assert "merge-blocking reviewer" in installed_instruction_text
+            assert "Do not report non-blocking P2/P3 findings" in installed_instruction_text
             assert "lint/formatter-enforceable issues" in installed_instruction_text
 
             installed_helper.unlink()
@@ -9381,8 +9381,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 f"missing Codex review instruction asset after update: {instruction_path}"
             )
             installed_instruction_text = installed_instruction.read_text(encoding="utf-8")
-            assert "P0 or P1 blockers" in installed_instruction_text
-            assert "Treat P2/P3 findings as non-blocking by default" in installed_instruction_text
+            assert "merge-blocking reviewer" in installed_instruction_text
+            assert "Do not report non-blocking P2/P3 findings" in installed_instruction_text
             assert "lint/formatter-enforceable issues" in installed_instruction_text
 
     def test_issue_187_s201_actions_checks_python_asset_installed_by_init_and_update(self) -> None:
