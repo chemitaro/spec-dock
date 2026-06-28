@@ -121,6 +121,7 @@ ID: "iss-00244"
   - `stop_conditions`: non-executable / stale / unresolved / reviewer missing / assurance invalid など。
 - `guidance issue-planning` も同じ Runbook schema を使うため、agent を誤誘導する `selected step` 登録文面を skill から削除する。
 - `design.md` / `plan.md` の preflight scaffold 判定では、`状態: "draft"`、`draft | proposed`、`template`、`placeholder` などの status / scaffold marker は frontmatter または明示的な managed scaffold 文言に限定して扱う。本文の調査メモ、過去事例、path 名、`non-placeholder` のような否定表現に含まれる語で実行可能な artifact を block してはならない。
+- strict-legacy path でも `design.md` / `plan.md` が symlink の場合は execution-ready にしてはならない。`.assurance.json` が missing の fallback path でも、planning artifact は issue-local regular file として扱う。
 
 ### 方針 C: Step-level Obligation Pattern は planning-time contract に移す
 
@@ -170,6 +171,8 @@ ID: "iss-00244"
   - current authority として silently accept しない。
   - `legacy_assurance_contract_path` / migration-required diagnostics を返す。
   - diagnostics には rename 先 `.assurance.json` を示す。
+- `.assurance.json` が directory など regular file ではない場合は、top-level exception ではなく structured invalid result を返す。
+- `assurance compose` は複数 artifact を変更する前に、contract path と全 changed artifact path の書き込み可能性を preflight する。後続 artifact が書けない場合に前段 artifact だけを書き換えて source binding と canonical docs を不整合にしてはならない。
 - Existing dogfooding Issue-local `assurance.json` artifacts は `.assurance.json` に rename する。
 - CLI help / current docs / test fixtures は `.assurance.json` に揃える。
 - Historical discussions / completed Issue docs は、必要最小限以外の bulk rewrite をしない。
