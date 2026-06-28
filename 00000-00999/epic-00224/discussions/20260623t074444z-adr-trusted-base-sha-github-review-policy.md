@@ -1,87 +1,125 @@
 ---
 種別: ADR（Architecture Decision Record）
 ID: "20260623t074444z-adr"
-タイトル: "Trusted Base SHA GitHub Review Policy"
+タイトル: "Script-local Codex Review Instruction"
 状態: "accepted"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-23"
+最終更新: "2026-06-28"
 親: ["epic-00224"]
 authority: "accepted"
+supersedes:
+  - "Trusted Base SHA GitHub Review Policy"
 derived_from:
   - "20260623t074452z-disc-adr-decision-synthesis-after-issue-226-closure.md"
+  - "iss-00244 PR #245 dogfooding review trigger failure"
+  - "20260628t043053z-research-script-local-codex-review-instruction-source.md"
 reflected_to:
   - "../design.md"
   - "../plan.md"
   - "../report.md"
+  - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/requirement.md"
+  - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/design.md"
+  - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/plan.md"
 ---
 
-# 20260623t074444z-adr Trusted Base SHA GitHub Review Policy
+# 20260623t074444z-adr Script-local Codex Review Instruction
 
 ## ADR 化基準
+
 - hard to reverse: yes
 - surprising without context: yes
 - real tradeoff: yes
 - ADR として残す理由:
-  - PR head の変更に review policy を委ねない判断は security / governance boundary であり、PR review と blocker closure の複数 Issue が依存する。
+  - Codex PR review trigger がどの instruction を使うかは、PR review の品質、dogfooding 速度、外部 automation の再現性に影響する。
+  - 旧決定である trusted base-SHA policy は、個人開発 / dogfooding repo では運用の即時性を阻害し、PR #245 で review trigger 自体が起動できない問題を起こした。
 
 ## 結論（Decision）
-- Codex PR review policy は PR base SHA の `.github/codex/review-policy.md` からのみ読む。
-- Runtime は review trigger body を deterministic に合成する。caller-provided body、任意 endpoint、任意 path、raw `gh` args、PR head 側 policy は受け付けない。
-- Trigger evidence には base SHA、head SHA、policy path、policy hash、generated body hash、review target を記録する。
-- External review が required で、base policy が missing / invalid / oversized / unreadable の場合は human gate とし、head policy への fallback はしない。
-- Findings already deterministically enforced by required lint, formatting, type checking, schema validation, or CI should be handled by those gates, not by Codex P2 repair loops.
+
+- 旧方針「PR base SHA の `.github/codex/review-policy.md` からのみ policy を読む」は廃止する。
+- Codex review trigger は、GitHub 上の base branch / PR head の `.github/codex/review-policy.md` を読みに行かない。
+- Review instruction は `github-pr-observation` skill の comment posting script 近傍に置く script-local Markdown を使用する。
+  - 採用予定 path:
+    - provider authority: `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/codex-review-instructions.md`
+    - dogfooding installed copy: `.agents/skills/github-pr-observation/scripts/codex-review-instructions.md`
+- Trigger runtime は local filesystem の script-local Markdown を読み、valid な場合だけ `@codex review` comment に instruction と metadata を含める。
+- Script-local Markdown が missing の場合、review trigger は止めない。Instruction なしの deterministic `@codex review` comment を投稿し、metadata に `instruction_status: missing_plain_fallback` を記録する。
+- Script-local Markdown が present だが invalid / oversized / unreadable の場合は、設定不備として human gate とし、comment を投稿しない。
+- Runtime は caller-provided body、任意 endpoint、任意 path、raw `gh` args を受け付けない。Write surface は引き続き fixed `POST repos/{owner}/{repo}/issues/{pr}/comments` に限定する。
+- Trigger evidence には head SHA、instruction path、instruction hash、instruction status、generated body hash、review target を記録する。
 
 ## 背景（Context）
-- PR head は攻撃者や誤った実装が変更できるため、そこに review policy を置くと review gate を弱められる。
-- 任意 body injection を許すと、reviewer prompt / policy / scope が caller によって変わる。
-- SpecDock の review gate は deterministic evidence を残し、後続の PR blocker closure と接続する必要がある。
+
+- この repository は個人開発 / dogfooding repo であり、PR author と policy author を adversarial に分離する必要がない。
+- Review instruction は、モデル変更や review 運用の調整に合わせてしばらく頻繁に変わる可能性が高い。
+- 旧方針では、review instruction の変更を main に merge しないと当該 PR の review trigger で検証できない。
+- PR #245 では head 側に `.github/codex/review-policy.md` がある一方、base SHA に同 file がないため、`wait_pr_observation.sh --trigger-mode post-once` が `human_gate` になり、Codex review trigger comment が投稿されなかった。
+- `.github/codex/review-policy.md` という置き場所は GitHub/Codex の repository policy に見えるが、実際の用途は「comment posting script が `@codex review` に添える instruction」である。したがって script-local asset として管理する方が責務に合う。
 
 ## 選択肢（Options considered）
-- Option A: PR head の policy を読む。
-  - Pros: PR 内で policy 変更を同時に試せる。
-  - Cons: review 対象自身が review policy を弱められる。
-  - 棄却理由: trusted review gate として成立しない。
-- Option B: caller が自由に review body / args を指定する。
-  - Pros: 柔軟。
-  - Cons: injection surface が大きく、再現性が落ちる。
-  - 棄却理由: deterministic review evidence と相性が悪い。
-- Option C: base SHA の fixed path から policy を読み、runtime が body を合成する。
-  - Pros: trusted source と再現性を確保できる。
-  - Cons: policy change 自体の rollout には base branch integration が必要。
-  - 採用理由: security と reproducibility の balance が最もよい。
+
+- Option A: PR base SHA の `.github/codex/review-policy.md` を読む。
+  - Pros: team / adversarial repo では PR head から policy を弱めにくい。
+  - Cons: policy の同一 PR dogfooding ができない。main merge 前に運用変更を検証できない。個人 repo では安全性の利益が小さい。
+  - 判断: 廃止する。
+- Option B: PR head SHA の `.github/codex/review-policy.md` を読む。
+  - Pros: branch 上の変更を同一 PR で検証できる。
+  - Cons: GitHub repository policy に見える file を review 対象差分に置くため、責務が曖昧になる。GitHub API fetch が増え、local dogfooding の現在情報より remote state に寄る。
+  - 判断: 今回は採用しない。
+- Option C: local checkout の `.github/codex/review-policy.md` を読む。
+  - Pros: 現在の作業状態を直接使える。
+  - Cons: `.github/codex` を汚染し、GitHub 側の policy と comment trigger 用 instruction の境界が曖昧になる。
+  - 判断: 採用しない。
+- Option D: `github-pr-observation` script-local Markdown を読む。
+  - Pros: comment posting runtime の責務に近く、local checkout の最新 instruction を即時に使える。GitHub base branch に依存しない。`.github/codex` を汚染しない。
+  - Cons: installed skill asset と provider asset の同期を tests で守る必要がある。
+  - 判断: 採用する。
 
 ## 判断理由（Rationale）
-- Review policy は review される差分から独立した trusted source にあるべきである。
-- Deterministic body / hash evidence は、再 review、PR repair、blocker closure の入力として使いやすい。
-- Static analysis で機械的に検出できる事項を reviewer P2 loop に流すと waste が増えるため、lint / type / schema / CI と review obligation を分離する。
+
+- この repo の現在の最適化対象は、adversarial policy governance ではなく、個人開発における review instruction の迅速な調整と dogfooding の再現性である。
+- GitHub base branch から policy を読む設計は、過去に必要だと考えた security boundary を優先しすぎており、現在の運用目的と合っていない。
+- Local script-local instruction は、「今この branch / checkout で review trigger がどう投稿されるか」を最も直接的に表す。
+- Missing instruction で review 自体を止めるのは過剰である。Instruction がない場合でも Codex review を実行し、review の有無を確保する方が価値が高い。
+- Present だが invalid な instruction は、意図した運用が壊れている状態なので human gate とする。
+- Arbitrary body / path / endpoint を許さない fixed write boundary は、今回の方針変更後も必要である。
 
 ## 影響（Consequences）
+
 - Positive:
-  - PR head から review policy を弱められない。
-  - Review trigger が監査可能になる。
-  - Static analysis と human/AI review の責務が分離される。
+  - PR #245 のように base branch に policy がない状態でも、script-local instruction または plain fallback で Codex review trigger を投稿できる。
+  - Review instruction の変更を main merge 前に当該 branch 上で検証できる。
+  - `.github/codex/review-policy.md` を bootstrap asset / project policy として管理する必要がなくなる。
+  - Review trigger script の責務と instruction の置き場所が一致する。
 - Negative / Debt:
-  - Base branch に policy bootstrap がない repo では human gate になる。
-  - Policy rollout は base integration を伴う。
+  - Team / adversarial repo 向けの base-strict governance はこの ADR の default では扱わない。
+  - Installed skill asset と provider asset の parity を regression tests で確認する必要がある。
+  - Existing tests / docs / skill text の trusted base-SHA terminology を置換する必要がある。
 - 影響範囲:
-  - GitHub review trigger runtime
-  - installed `.github/codex/review-policy.md`
-  - PR observation / blocker closure evidence
+  - GitHub PR observation skill
+  - `trigger_codex_review.sh`
+  - `wait_pr_observation.sh` の trigger behavior
+  - provider-side installed assets
+  - unit tests for installer / shipped skill scripts
+  - Epic / Issue docs that mention trusted base-SHA review policy
 - 移行/ロールバック:
-  - Missing base policy は fail-closed human gate。
-  - Policy change は通常 PR で base に取り込んでから有効化する。
-- Follow-ups:
-  - `iss-00231` が trusted base-SHA review policy trigger を実装する。
+  - `.github/codex/review-policy.md` は廃止対象とする。
+  - Script-local Markdown が存在しない checkout では plain fallback trigger により review を継続できる。
+  - 旧 base-SHA fail-closed behavior へ戻す場合は、新 ADR が必要である。
 
 ## 非目標（Non-goals）
+
 - `openai/codex-action` 本番移行をこの ADR で決めない。
-- PR head policy を fallback として使わない。
-- caller-provided raw `gh` args を review trigger に通さない。
+- 任意の review body / arbitrary prompt injection を許可しない。
+- GitHub Checks API / status rollup を CI evidence として採用しない。
+- Team / adversarial repository 向けの strict governance mode をこの Issue の default として実装しない。
 
 ## 未確定事項（Open Questions）
-- 初期 max size、additive focus allow-list の細部は `iss-00231` で確定する。ただし base SHA fixed path / deterministic body / no head fallback は固定済み。
+
+- Script-local Markdown の max size は旧実装の 32768 bytes を暫定維持するか、より小さい上限にするかを実装時に確定する。
+- Plain fallback comment に含める metadata の最小項目は実装時に確定する。ただし `instruction_status: missing_plain_fallback`、`reviewed_head_sha`、`instruction_path` は必須とする。
 
 ## 参考（References）
-- `design.md`
-- `plan.md`
-- `20260623t074452z-disc-adr-decision-synthesis-after-issue-226-closure.md`
+
+- `20260628t043053z-research-script-local-codex-review-instruction-source.md`
+- `../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/report.md`
+- `../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/requirement.md`
