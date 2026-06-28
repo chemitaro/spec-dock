@@ -546,6 +546,16 @@ rg --files --hidden spec-dock | rg '(^|/)assurance\\.json$|(^|/)\\.assurance\\.j
 | qa-reviewer / code-reviewer | P2 | script-local instruction unreadable branch が未テスト。 | `codex-review-instructions.md` の位置に directory を置く regression test を追加し、`review_instruction_unreadable` / no POST を検証。 | `tests/unit/infra/test_init_update.py`; qa-reviewer/code-reviewer re-review pass | fixed |
 | spec-reviewer | P2 | Final Code Review Gate が stale に `implementation not started` と記録していた。 | gate row を実装済み diff に対する code review pending 表現へ更新。 | `report.md`; spec-reviewer re-review pass | fixed |
 
+#### PR #245 dogfooding 観測（S120 / S199 follow-up）
+| 項目 | 証跡 | 結果 | メモ |
+|---|---|---|---|
+| branch push | `git push origin iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation` | pass | PR head updated to `4d7cf1a4751d0a89562c99af6b7b6f63497f9227` |
+| review trigger | `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 245 --head-sha 4d7cf1a4751d0a89562c99af6b7b6f63497f9227 --trigger-mode post-once ...` | pass | trigger comment `4825350981`; `body_matches_expected=true`; `instruction_status=loaded`; source `.agents/skills/github-pr-observation/scripts/codex-review-instructions.md` |
+| PR observation | same command | failed | `Provider CI` failed in `Run provider static analysis`; recommended action `fix_ci` |
+| CI failure fix | `gh run view 28316189965 --log-failed` | diagnosed | unused `base64` import and ruff format drift in `tests/unit/infra/test_init_update.py` |
+| local static analysis | `make lint` | pass | ruff check pass; ruff format check pass; mypy pass |
+| focused trigger tests | `uv run pytest tests/unit/infra/test_init_update.py -k 'issue_244_trigger_helper or issue_176_s05b_codex_review_trigger_helper_is_installed_by_init_and_update'` | pass | `7 passed, 508 deselected in 3.93s` |
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
@@ -558,13 +568,14 @@ rg --files --hidden spec-dock | rg '(^|/)assurance\\.json$|(^|/)\\.assurance\\.j
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
 | qa-reviewer | S100/S110/S200/S210/S299 obligation coverage | added | QA re-review pass; `test_init_update.py` 515 passed; assurance/workflow lane 53 passed; hidden/file-list inspections | pass |
-| local verification | whole issue obligation coverage | executed | `uv run pytest tests/unit/infra/test_init_update.py`; focused assurance/workflow lane; `./spec-dock/scripts/spec-dock validate`; `assurance verify`; `guidance issue-execution`; `git diff --check` | pass |
+| local verification | whole issue obligation coverage | executed | `uv run pytest tests/unit/infra/test_init_update.py`; focused assurance/workflow lane; `./spec-dock/scripts/spec-dock validate`; `assurance verify`; `guidance issue-execution`; `git diff --check`; `make lint`; focused trigger tests | pass |
+| PR observation | PR #245 current head | executed | trigger comment `4825350981` posted with script-local instruction metadata; Provider CI initially failed on static analysis and local fix was applied | re-observation pending |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
 | code-reviewer | S100/S110/S200/S210 integrated diff | P1 dual-path fix and P2 unreadable instruction test verified | 2 | pass |
-| PR Codex review | issue-wide integrated diff | PR creation and review trigger pending | 0 | pending |
+| PR Codex review | issue-wide integrated diff | trigger comment posted successfully; Codex completion pending because CI failed first | 0 | pending after CI re-push |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
@@ -575,8 +586,8 @@ rg --files --hidden spec-dock | rg '(^|/)assurance\\.json$|(^|/)\\.assurance\\.j
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| report.md planning ledger | requirement/design/plan/report/discussions | final response | pending |
-| report.md implementation ledger | provider runtime/assets/tests plus dogfooding workspace parity | PR body / final response | pending commit / PR |
+| report.md planning ledger | requirement/design/plan/report/discussions | final response | implementation commit `4d7cf1a4`; follow-up lint/report commit pending |
+| report.md implementation ledger | provider runtime/assets/tests plus dogfooding workspace parity | PR body / final response | PR #245 trigger posted; CI re-push pending |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: Issue Planning guidance が、substantive draft requirement を `reason_code=requirement-scaffold` と表示した。
@@ -592,7 +603,7 @@ rg --files --hidden spec-dock | rg '(^|/)assurance\\.json$|(^|/)\\.assurance\\.j
 - `spec-dock update .` が dogfooding runtime を更新しないケースは、別途 update path の follow-up として調査候補にする。
 
 ## 省略/例外メモ (必須)
-- ローカル実装・自動テスト・dogfooding manual test は実施済み。PR 作成、PR 上の Codex review trigger、外部観測は未実施であり、PR 作成後に追記する。
+- ローカル実装・自動テスト・dogfooding manual test は実施済み。PR #245 の Codex review trigger は実施済みで、script-local instruction metadata 付きコメント投稿は成功した。初回 PR 観測は Provider CI の静的解析 failure で止まったため、lint 修正後に再 push / 再観測する。
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
