@@ -4,7 +4,7 @@ ID: "20260623t074447z-adr"
 タイトル: "Blocker Centric PR Risk Closure And Re Review"
 状態: "accepted"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-23"
+最終更新: "2026-06-29"
 親: ["epic-00224"]
 authority: "accepted"
 amended_by:
@@ -25,6 +25,7 @@ reflected_to:
 - 2026-06-29: `20260628t154553z-adr PR Observation Explicit Review Completion` により、blocker-centric closure の前提となる review completion 判定が明確化された。
 - この ADR は「観測済み review finding をどう blocker / non-blocking として扱うか」を決める。Review worker が完了したかどうか、`completion_signal=none`、`review_completion_unknown`、timeout/resume semantics は `20260628t154553z-adr` を authority とする。
 - `review_completion_unknown` は blocker disposition や merge-prepared evidence の前提として扱わないよう変更済み。
+- completion artifact が current trigger boundary と expected head SHA に bind されていない場合、blocker-centric closure はまだ評価対象に入らない。timeout / wait_or_resume は review 不要の human gate ではなく、観測 budget 到達または再開待ちの状態として扱うよう変更済み。
 
 ## ADR 化基準
 - hard to reverse: yes
