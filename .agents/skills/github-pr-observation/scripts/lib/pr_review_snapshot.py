@@ -1145,7 +1145,7 @@ if pending_codex_review_signals:
     current_pending_codex_review_present = True
 
 blocker_policy_findings = []
-for item in current_codex_issue_comments:
+for item in [*current_codex_issue_comments, *selected_review_signals]:
     raw_body = item.get("_fallback_pass_raw_body") or item.get("body") or item.get("_raw_body_artifact") or ""
     priorities = finding_priorities(raw_body)
     if not priorities:

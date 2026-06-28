@@ -31845,6 +31845,91 @@ esac
             assert blocker_policy["findings"][0]["priority"] == "P1"
             assert blocker_policy["findings"][0]["disposition"] == "blocker"
 
+    def test_issue_232_review_collector_treats_p1_pull_review_body_as_blocker(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"[P1] merge-prepared decision can pass with a blocker. Failing test proves the review body is ignored."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "blocker_policy_validated_blocker"
+            assert payload["decision"]["recommended_next_action"] == "address_review_feedback"
+            blocker_policy = payload["decision"]["blocker_policy"]
+            assert blocker_policy["status"] == "blocker_present"
+            assert blocker_policy["blocker_count"] == 1
+            assert blocker_policy["findings"][0]["kind"] == "pull_review"
+            assert blocker_policy["findings"][0]["id"] == 201
+            assert blocker_policy["findings"][0]["priority"] == "P1"
+            assert blocker_policy["findings"][0]["disposition"] == "blocker"
+
     def test_issue_232_review_collector_promotes_protected_p2_with_machine_evidence(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (

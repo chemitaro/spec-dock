@@ -540,6 +540,14 @@ Must include on submitted review with unresolved findings:
 - selected review ids / selected review comment ids / selected review thread ids
 - selected review bodies and selected review comment bodies in final stdout JSON
 
+Must treat as blocker evidence:
+
+- current Codex issue comments
+- selected review comments
+- selected review threads
+- selected pull request review bodies
+- P0 / P1 finding in selected pull request review body, even when selected review comments / threads are empty
+
 Must not include for new active results:
 
 - active `normalized_status: "review_completion_unknown"`
@@ -644,6 +652,7 @@ stop
 | AC-021 | missing completion by deadline を retryable `timeout` / `wait_or_resume` とし、active `review_completion_unknown` を返さない |
 | AC-022 | quiet / same fingerprint を explicit completion artifact 後の hydration stability に限定する |
 | AC-023 | PR #245 型 delayed review sequence を regression test と manual/dogfooding evidence で固定する |
+| AC-024 | selected pull request review body を blocker policy input として扱い、body P0 / P1 を見逃さない |
 
 ## テスト戦略
 
