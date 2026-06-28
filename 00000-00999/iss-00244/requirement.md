@@ -332,6 +332,13 @@ ID: "iss-00244"
   - 期待結果: wait loop は no-completion stable phase で早期 terminal にならず、後続 submitted PR review を拾って `human_gate` / `address_review_feedback` を返す。
   - 観測点: regression unit test、PR #245 manual/dogfooding evidence。
 
+- AC-024: Pull request review body is blocker policy input
+  - アクター: PR observation agent / test suite
+  - 前提: current trigger boundary と expected head SHA に bind された Codex-authored submitted PR review があり、inline review comment / review thread は 0 件だが review body に P0 / P1 finding が含まれる。
+  - 操作: `fetch_pr_observation_snapshot.sh` または `wait_pr_observation.sh` が blocker policy を評価する。
+  - 期待結果: selected pull request review body を blocker evidence source として扱い、`human_gate` / `address_review_feedback` を返す。Selected review comments / threads 0 を blocker zero / no-finding proof にしない。
+  - 観測点: snapshot unit test、stdout JSON の selected review signal、ADR `20260628t185812z-adr`。
+
 ## 例外・エッジケース
 
 - EC-001: Legacy issue without `.assurance.json`

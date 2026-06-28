@@ -212,6 +212,7 @@ PR observation completion wait の要件対応:
 | tc-033 | AC-020 / AC-023 | wrong trigger/head or old artifact is not selected as current completion | old trigger, wrong head, body prefix mismatch | stale artifact closes current wait | yes | red-required | S320 |
 | tc-034 | AC-020 / AC-021 | skill text no longer presents `review_completion_unknown` as active terminal human gate | provider and dogfooding skill assets | agent follows obsolete post-unknown audit workflow | yes | structural assertion + spec-review | S300 / S399 |
 | tc-035 | AC-021 / AC-023 | PR #245 resume/manual validation returns submitted-review human gate or documented limitation, not active unknown | live PR #245 or saved/fake equivalent | dogfooding gap remains unverified | yes | manual-required | S330 / S399 |
+| tc-036 | AC-024 | pull request review body P1 blocks even when inline comments and threads are empty | selected submitted Codex review body with `[P1]` and no selected comments/threads | review body finding is ignored and PR is marked pass/merge-prepared | yes | red-required | S320 / S399 |
 
 ## 実装ステップ
 
@@ -1537,12 +1538,14 @@ Quiet window and same fingerprint are used only to hydrate explicit completion a
 - Test obligation:
   - quiet/same fingerprint cannot complete no-completion state.
   - submitted PR review completion uses current trigger boundary and expected head binding.
+  - selected pull request review body participates in blocker policy input.
   - strict no-findings comment requires current trigger/head binding and no blockers.
   - wrong trigger / wrong head / old artifact is not selected as current completion.
   - partial visibility does not promote to `passed`.
 - Red / alternative evidence:
   - red-required: stability-only no-completion fixture must fail if quiet/same fingerprint can complete without explicit artifact.
   - red-required: wrong-head / old-trigger / blocker no-findings fixtures must fail if selected as current completion.
+  - red-required: PR review body P1 fixture must fail if blocker policy scans only issue comments or inline review comments/threads.
   - covered-existing: submitted-review actionable feedback path remains covered by S310 delayed review fixture.
 - Green verification:
   - focused snapshot/wait tests.
@@ -1560,6 +1563,7 @@ Quiet window and same fingerprint are used only to hydrate explicit completion a
 - input docs:
   - S300/S310 output
   - `20260628t143306z-research-pr-observation-review-completion-signals.md`
+  - `../../discussions/20260628t185812z-adr-pr-review-body-blocker-ingestion.md`
 - allowed paths:
   - PR observation snapshot/wait scripts and focused tests listed above.
 - forbidden changes:
@@ -1567,7 +1571,7 @@ Quiet window and same fingerprint are used only to hydrate explicit completion a
   - weakening current trigger/head binding.
   - accepting reaction-only as completion.
 - acceptance criteria:
-  - tc-031, tc-032, tc-033.
+  - tc-031, tc-032, tc-033, tc-036.
 - required tests or docs-only verification:
   - focused pytest for hydration/head-binding cases.
 - reviewer focus:
@@ -1714,6 +1718,7 @@ The PR observation completion wait repair is aligned with requirement, design, p
 - input docs:
   - all issue docs
   - `../../discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`
+  - `../../discussions/20260628t185812z-adr-pr-review-body-blocker-ingestion.md`
   - `20260628t143306z-research-pr-observation-review-completion-signals.md`
   - `20260628t150332z-disc-pr-observation-completion-wait-repair-draft.md`
   - S300-S330 evidence
@@ -1722,7 +1727,7 @@ The PR observation completion wait repair is aligned with requirement, design, p
 - forbidden changes:
   - any file edits by reviewers.
 - acceptance criteria:
-  - AC-020 - AC-023.
+  - AC-020 - AC-024.
 - required tests or docs-only verification:
   - final gate review.
 - reviewer focus:
@@ -1739,10 +1744,10 @@ The PR observation completion wait repair is aligned with requirement, design, p
 - `tc-s399-001` PR observation completion final gate
   - 前提: S300-S330 evidence, focused tests, and updated skill/docs are available.
   - 操作: qa-reviewer, code-reviewer, and spec-reviewer final review を実行し、`spec-dock validate` を確認する。
-  - 期待結果: AC-020 - AC-023 coverage is accepted, no active terminal `review_completion_unknown` remains, and delayed review/timeout behavior is verified.
-  - 失敗検出: reviewer fail, stale unknown contract, no-completion completion by time/quiet/fingerprint, or missing dogfooding evidence.
+  - 期待結果: AC-020 - AC-024 coverage is accepted, no active terminal `review_completion_unknown` remains, delayed review/timeout behavior is verified, and selected pull request review body P0/P1 is blocker input.
+  - 失敗検出: reviewer fail, stale unknown contract, no-completion completion by time/quiet/fingerprint, ignored PR review body P1, or missing dogfooding evidence.
   - 検証方法: reviewer reports, focused pytest output, grep inspection, and `./spec-dock/scripts/spec-dock validate`.
-  - 関連 closure id: `tc-028`, `tc-029`, `tc-030`, `tc-031`, `tc-032`, `tc-033`, `tc-034`, `tc-035`
+  - 関連 closure id: `tc-028`, `tc-029`, `tc-030`, `tc-031`, `tc-032`, `tc-033`, `tc-034`, `tc-035`, `tc-036`
 
 #### step closure contract
 
@@ -1763,6 +1768,7 @@ The PR observation completion wait repair is aligned with requirement, design, p
 - `.assurance.json` が current source binding と整合する。
 - All closure ids `tc-001` - `tc-027` が report で pass / approved-no-op として閉じている。
 - All closure ids `tc-028` - `tc-035` が report で pass / approved-no-op として閉じている。
+- All closure ids `tc-028` - `tc-036` が report で pass / approved-no-op として閉じている。
 - Focused pytest lane と `./spec-dock/scripts/spec-dock validate` が pass。
 - Review trigger focused pytest lane が pass。
 - Assurance path focused pytest lane が pass。

@@ -158,7 +158,7 @@ ContextResolver --> ContextPackets : writes bounded packet / clean-room evidence
 Compiler --> Router : includes worker/reviewer routing
 Compiler --> ContextPackets : references packet hash
 Router --> Evidence : produces bounded evidence
-ReviewCompiler --> Codex : posts base-policy + head binding
+ReviewCompiler --> Codex : posts script-local instruction + head binding
 Codex --> Blocker : returns findings
 Evidence --> Blocker : supplies machine evidence
 Blocker --> State : repaired / merge-prepared / human-gate
@@ -842,11 +842,11 @@ src/spec_dock/assets/spec_dock/templates/assurance/
 
 1. Local assurance gate 後、PR head を freeze する。
 2. Trigger compiler が PR metadata を読み head 一致を確認する。
-3. Base SHA から fixed policy path を取得する。
-4. Policy を UTF-8 / schema / size 検証し hash を計算する。
-5. Deterministic multiline `@codex review` comment を投稿する。
-6. Observation が CI / review / thread evidence を収集する。
-7. Blocker Engine が P0 / P1 / promoted P2 を repair queue へ入れる。
+3. `github-pr-observation` script-local instruction を UTF-8 / size 検証し hash を計算する。
+4. Script-local instruction が valid なら deterministic multiline `@codex review` comment を投稿する。Missing の場合は instruction なしの deterministic plain fallback review comment を投稿する。
+5. Observation が CI / PR review / review body / review comments / review threads / issue comments evidence を収集する。
+6. Review completion は current trigger boundary と expected head SHA に bind された explicit Codex artifact で判断し、time / quiet / fingerprint / selected comments 0 を completion proof にしない。
+7. Blocker Engine が current Codex issue comments、selected review comments、selected review threads、selected pull request review body から P0 / P1 / promoted P2 を repair queue へ入れる。
 8. P2 / P3 only なら no-action / follow-up で閉じる。
 9. Blocker fix 後は new head へ fresh review。
 10. Stagnation 時は automation-stalled。
@@ -1118,6 +1118,7 @@ The Issue-local draft requirement / draft design artifacts are discussion eviden
   - `discussions/20260623t074444z-adr-trusted-base-sha-github-review-policy.md`
   - `discussions/20260623t074447z-adr-blocker-centric-pr-risk-closure-rereview.md`
   - `discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`
+  - `discussions/20260628t185812z-adr-pr-review-body-blocker-ingestion.md`
 - Accepted ADR summary:
 - Fixed Skill Kernel / Compiled Runbook: Skill は固定 kernel、current workflow obligation は runtime `guidance <target>` stdout が返す。ADR 内の `workflow next` / generated Runbook authority wording は historical/superseded command wording として扱う。
   - Adaptive Assurance / Lite Authorization: `lite_candidate` は telemetry、`lite_authorized` だけが obligation を減らす。初期 automatic Lite default は無効。
@@ -1125,6 +1126,7 @@ The Issue-local draft requirement / draft design artifacts are discussion eviden
   - Script-local Codex Review Instruction: 旧 Trusted Base-SHA Review は変更済み。review instruction は script-local asset から読み、runtime が deterministic trigger body を作る。
   - Blocker-Centric PR Closure: merge preparedness は comment zero ではなく verified blocker zero、required CI、review coverage で判断する。
   - PR Observation Explicit Review Completion: review completion は explicit Codex artifact で判断し、`review_completion_unknown` を active terminal completion proof として扱わない。
+  - PR Review Body Blocker Ingestion: selected pull request review body も blocker policy input として扱い、inline comment / thread が 0 件でも body P0 / P1 を blocker として扱う。
 - 前提 ADR:
   - `epic-00158` 配下の skill / docs / template context surface ownership ADR。
 

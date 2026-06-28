@@ -12,6 +12,8 @@ supersedes:
 amends:
   - "20260623t074444z-adr"
   - "20260623t074447z-adr"
+amended_by:
+  - "20260628t185812z-adr"
 derived_from:
   - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/discussions/20260628t143306z-research-pr-observation-review-completion-signals.md"
   - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/discussions/20260628t150332z-disc-pr-observation-completion-wait-repair-draft.md"
@@ -26,6 +28,7 @@ reflected_to:
   - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/design.md"
   - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/plan.md"
   - "../issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/report.md"
+  - "20260628t185812z-adr-pr-review-body-blocker-ingestion.md"
 ---
 
 # 20260628t154553z-adr PR Observation Explicit Review Completion
@@ -46,6 +49,8 @@ reflected_to:
 - Trusted completion artifact は、current trigger boundary 後かつ expected head SHA に bind された次のいずれかに限定する。
   - Codex-authored submitted pull request review。
   - Codex-authored strict no-findings issue comment。`Reviewed commit` または同等の head binding と、CI / PR metadata / blocker / carryover gate の統合確認を必須とする。
+- Codex-authored submitted pull request review は completion artifact であると同時に、その review body が blocker evidence source になり得る。
+- Selected review comments / selected review threads が 0 件であっても、selected pull request review body の blocker scan を通すまでは blocker zero / no-finding proof として扱わない。
 - `completion_signal=none`、selected review comments 0、selected review threads 0、CI passed、quiet window、same fingerprint、trigger からの経過時間、CI pass からの経過時間は review completion proof ではない。
 - Trusted completion artifact がないまま overall deadline に到達した場合は、`timeout` / `wait_or_resume` / `observation_complete=false` として返す。
 - `review_completion_unknown` は新規 active wait result の terminal status / terminal `decision.status_reason` として返さない。
@@ -160,6 +165,9 @@ reflected_to:
 - `20260623t074447z-adr Blocker Centric PR Risk Closure And Re Review`:
   - 補完: blocker-centric closure は review completion artifact が観測済みであることを前提に適用する。
   - 変更済み: `review_completion_unknown` は blocker disposition や merge-prepared evidence の前提にならない。
+- `20260628t185812z-adr PR Review Body Blocker Ingestion`:
+  - 補完: submitted pull request review が completion artifact として選択された場合、その body も current blocker policy input として扱う。
+  - 変更済み: selected review comments / threads 0 を no-finding proof とする旧実装上の暗黙前提は廃止済みである。
 - Epic `design.md` / `plan.md` の trusted base-SHA review policy 記述:
   - 変更済み: `20260623t074444z-adr` により script-local Codex review instruction へ置換済み。
   - 本 ADR はさらに、review trigger 後の observation completion semantics を explicit artifact model へ置換する。

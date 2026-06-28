@@ -9,6 +9,7 @@ ID: "20260623t074447z-adr"
 authority: "accepted"
 amended_by:
   - "20260628t154553z-adr"
+  - "20260628t185812z-adr"
 derived_from:
   - "20260623t074452z-disc-adr-decision-synthesis-after-issue-226-closure.md"
 reflected_to:
@@ -16,6 +17,7 @@ reflected_to:
   - "../plan.md"
   - "../report.md"
   - "20260628t154553z-adr-pr-observation-explicit-review-completion.md"
+  - "20260628t185812z-adr-pr-review-body-blocker-ingestion.md"
 ---
 
 # 20260623t074447z-adr Blocker Centric PR Risk Closure And Re Review
@@ -23,9 +25,11 @@ reflected_to:
 ## 変更履歴（Supersession / Amendment）
 
 - 2026-06-29: `20260628t154553z-adr PR Observation Explicit Review Completion` により、blocker-centric closure の前提となる review completion 判定が明確化された。
+- 2026-06-29: `20260628t185812z-adr PR Review Body Blocker Ingestion` により、selected pull request review body も blocker policy input に含めるよう補完・変更済み。
 - この ADR は「観測済み review finding をどう blocker / non-blocking として扱うか」を決める。Review worker が完了したかどうか、`completion_signal=none`、`review_completion_unknown`、timeout/resume semantics は `20260628t154553z-adr` を authority とする。
 - `review_completion_unknown` は blocker disposition や merge-prepared evidence の前提として扱わないよう変更済み。
 - completion artifact が current trigger boundary と expected head SHA に bind されていない場合、blocker-centric closure はまだ評価対象に入らない。timeout / wait_or_resume は review 不要の human gate ではなく、観測 budget 到達または再開待ちの状態として扱うよう変更済み。
+- inline review comment / review thread が 0 件であれば blocker zero とみなせるという旧実装上の暗黙前提は変更済みである。Selected pull request review body に P0 / P1 finding がある場合は blocker として扱う。
 
 ## ADR 化基準
 - hard to reverse: yes
@@ -37,6 +41,8 @@ reflected_to:
 ## 結論（Decision）
 - Merge preparedness は `verified blocker zero + required CI + review coverage` で判断し、comment zero では判断しない。
 - Valid P0 / P1 finding は blocker である。
+- Verified blocker の入力には、current Codex issue comments、selected review comments、selected review threads、selected pull request review body を含める。
+- Selected pull request review body に P0 / P1 finding が含まれる場合、inline comment / thread が 0 件でも blocker zero とは扱わない。
 - P2 / P3 finding は default non-blocking とし、no-action、follow-up、docs note、future issue のいずれかで disposition できる。
 - P2 は protected domain に触れ、かつ deterministic machine evidence がある場合だけ validated blocker に promotion できる。Reviewer assertion alone is not machine evidence.
 - Review-exempt local delta は、reviewed production behavior または trusted policy semantics に影響しないこと、deterministic local verification があること、diff evidence が記録されることを満たす場合に限る。
