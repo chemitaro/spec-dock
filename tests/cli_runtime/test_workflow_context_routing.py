@@ -45,6 +45,7 @@ class TestWorkflowContextRoutingHardCutover(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             issue_dir = self._create_workflow_fixture(target, issue_number=301, title="No old heading")
             self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
             (issue_dir / "plan.md").write_text(
                 "# Plan\n\n"
                 "## Planned contract\n"
@@ -71,6 +72,7 @@ class TestWorkflowContextRoutingHardCutover(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Placeholder plan")
             self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
             (issue_dir / "plan.md").write_text("# Plan\n\nNo structured implementation steps.\n", encoding="utf-8")
             (issue_dir / "report.md").write_text("# Report\n", encoding="utf-8")
             self._classify(target)
@@ -173,7 +175,23 @@ class TestWorkflowContextRoutingHardCutover(CliRuntimeHarness):
             encoding="utf-8",
         )
 
+    def _write_substantive_design(self, issue_dir: Path) -> None:
+        (issue_dir / "design.md").write_text(
+            "---\n"
+            "種別: 設計書（Issue）\n"
+            'ID: "iss-00301"\n'
+            '状態: "approved"\n'
+            "---\n\n"
+            "# Design\n\n"
+            "## 全体像\n"
+            "- Guidance execution checks planning artifacts before execution.\n\n"
+            "## 責務\n"
+            "- The runtime validates readiness and the plan remains the execution contract.\n",
+            encoding="utf-8",
+        )
+
     def _write_executable_plan(self, issue_dir: Path) -> None:
+        self._write_substantive_design(issue_dir)
         (issue_dir / "plan.md").write_text(
             "# Plan\n\n"
             "## 実装ステップ\n\n"

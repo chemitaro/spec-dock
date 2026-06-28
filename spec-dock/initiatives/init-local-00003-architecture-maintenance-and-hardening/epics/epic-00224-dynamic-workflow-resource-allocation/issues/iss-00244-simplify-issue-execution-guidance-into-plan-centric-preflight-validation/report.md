@@ -57,6 +57,7 @@ Disposition ごとの必須証跡:
 | D-006 | resolved | compatibility | dev-coder / orchestrator | `.assurance.json` がなく旧 `assurance.json` だけがある場合の public status / reason をどう扱うか。 | `missing / missing_assurance_contract`; `invalid / legacy_assurance_contract_path` | `invalid / legacy_assurance_contract_path` を採用する。 | 旧 visible path は「存在しない契約」ではなく、current authority ではない stale artifact である。missing strict-legacy と区別し、show / verify を fail-closed にする必要がある。 | applied | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/assurance_store.py`; `tests/unit/infra/test_assurance_store.py`; `tests/cli_runtime/test_assurance.py`; focused pytest `53 passed` | なし |
 | D-007 | resolved | implementation | dev-coder / orchestrator | Script-local Codex review instruction body の metadata labels と instruction size limit をどう固定するか。 | max size を変更する; 既存 32768 bytes を維持する | 既存上限 32768 bytes を維持し、body metadata は `source`, `instruction_sha256`, `instruction_status`, `reviewed_head_sha` とする。 | ADR / plan は script-local path/hash/status/head metadata を要求しており、既存 size limit の変更理由はない。GitHub base/head policy fetch を廃止しつつ、最小差分で deterministic body を保てる。 | applied | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh`; `.agents/skills/github-pr-observation/scripts/trigger_codex_review.sh`; `tests/unit/infra/test_init_update.py` | なし |
 | D-008 | resolved | operation | user / ChatGPT Pro advisory / orchestrator | PR #245 で `wait_pr_observation.sh` が `review_completion_unknown` で終了した約 14 分後に Codex submitted PR review と 5 件の P1 finding が投稿され、time / quiet / same fingerprint / selected comments 0 を completion proof とする設計欠陥が露出した。 | active `review_completion_unknown` 維持; timeout だけ延長; explicit artifact model へ切替; full state-machine rewrite | Option C hybrid を採用し、active `review_completion_unknown` terminal path を廃止する。Review completion は current trigger boundary と expected head SHA に bind された Codex-authored submitted PR review または strict no-findings comment に限定し、completion artifact がない場合は retryable `timeout` / `wait_or_resume` とする。 | GPT-5.5 Pro advisory と追加分析は、時間経過・静穏・fingerprint 安定は非同期 review worker の完了証拠ではないと結論づけた。full rewrite は scope 過大であり、現 defect は wait layer の terminalization と hydration/head binding を絞って直せる。 | promoted_to_adr / promoted_to_design / promoted_to_plan | `../../discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`; `discussions/20260628t143306z-research-pr-observation-review-completion-signals.md`; `discussions/20260628t150332z-disc-pr-observation-completion-wait-repair-draft.md`; `requirement.md` AC-020..AC-023; `design.md` 方針 F; `plan.md` S300..S399 | なし |
+| D-009 | resolved | operation | PR #245 Codex review / orchestrator | Codex submitted pull request review body に P1 が含まれる場合、inline review comment / review thread が 0 件でも blocker として扱うか。 | inline comments/threads のみ scan; selected pull request review body も scan; review body は human-only gate | selected pull request review body も blocker policy input に含め、body P0 / P1 は `human_gate` / `address_review_feedback` として扱う。 | submitted review は completion artifact であり、その body を blocker input から外すと completion は認識するが finding は捨てる矛盾が起きる。Epic の目的は P2/P3 noise 削減であり、P0/P1 blocker の見逃しではない。 | promoted_to_adr / promoted_to_design / promoted_to_plan | `../../discussions/20260628t185812z-adr-pr-review-body-blocker-ingestion.md`; `requirement.md` AC-024; `design.md` wait output contract; `plan.md` tc-036; `tests/unit/infra/test_init_update.py` | なし |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -79,6 +80,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-007 | adopted | delegated worker / command | report / implementation | S200/S210 実装結果と legacy visible path status semantics を採用した。 | `dev-coder` result; focused pytest `51 passed`; hidden file inspection; `assurance verify`; `guidance issue-execution`; `validate` | final review gates and commit |
 | EAL-008 | adopted | delegated worker / command | report / implementation | S100/S110 review trigger repair と QA P2 test tightening を採用した。 | `dev-coder` result; `test_init_update.py` 515 passed; focused assurance lane 53 passed; grep/file-list inspections | final review gates and commit |
 | EAL-009 | adopted | research / discussion / advisory analysis / ADR | requirement / design / plan / report | PR observation completion wait repair の Option C hybrid を採用し、AC-020..AC-023、方針 F、S300..S399、tc-028..tc-035 へ反映したうえで、`20260628t154553z-adr` へ昇格した。 | `../../discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`; `discussions/20260628t143306z-research-pr-observation-review-completion-signals.md`; `discussions/20260628t150332z-disc-pr-observation-completion-wait-repair-draft.md`; `requirement.md`; `design.md`; `plan.md`; `./spec-dock/scripts/spec-dock guidance issue-planning`; `./spec-dock/scripts/spec-dock assurance verify`; fresh spec-reviewer pass | implementation ready |
+| EAL-010 | adopted | PR #245 Codex review finding / ADR | requirement / design / plan / report / implementation | Pull request review body blocker ingestion を採用し、AC-024、tc-036、ADR `20260628t185812z-adr`、snapshot blocker regression へ反映した。 | `../../discussions/20260628t185812z-adr-pr-review-body-blocker-ingestion.md`; `requirement.md`; `design.md`; `plan.md`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py`; `tests/unit/infra/test_init_update.py` | focused tests and PR re-observation |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -87,7 +89,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
 | OAL-001 | `guidance issue-execution` を plan-centric preflight validator に単純化する要件・設計・計画が作成済み。 | Issue Planning guidance の manual test 結果を `discussions/` と plan の検証対象へ反映済み。 | low | pass: fresh spec-reviewer |
-| OAL-002 | PR observation wait の早期終了を防ぐ AC-020..AC-023 / S300..S399 を追加し、レビュー完了判定を explicit artifact model へ寄せた。 | 既存 S01-S299 は残し、PR trigger repair / hidden assurance rename と分離した追加 repair scope として扱う。 | medium | pass: fresh spec-reviewer |
+| OAL-002 | PR observation wait の早期終了を防ぐ AC-020..AC-024 / S300..S399 を追加し、レビュー完了判定を explicit artifact model へ寄せ、review body blocker ingestion を追加した。 | 既存 S01-S299 は残し、PR trigger repair / hidden assurance rename と分離した追加 repair scope として扱う。 | medium | pass: fresh spec-reviewer; AC-024 re-review pending |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -97,7 +99,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 |---|---|---|---|---|---|---|
 | requirement | active epic/issue docs, runtime code, discussions, user hard-cutover decision, PR #245 wait failure analysis | Q-001 resolved; Q-002/Q-003 design-routed; PR observation completion wait scope resolved by Option C hybrid | adopted | pass: fresh spec-reviewer | no | implementation-ready |
 | design | `application/workflow.py`, `context_packets.py`, `context_routing.py`, `runbook.py`, `presentation/workflow.py`, PR observation wait/snapshot scripts, shipped skills, docs/scaffold assets, tests | no blocking open question; deletion depth captured as S03; completion wait repair captured as 方針 F | adopted | pass: fresh spec-reviewer | no | implementation-ready |
-| plan | requirement/design AC and module dependency analysis, PR observation wait repair dependency analysis | no blocking open question; AC-020..AC-023 mapped to S300..S399 and tc-028..tc-035 | adopted | pass: fresh spec-reviewer | no | implementation-ready |
+| plan | requirement/design AC and module dependency analysis, PR observation wait repair dependency analysis | no blocking open question; AC-020..AC-024 mapped to S300..S399 and tc-028..tc-036 | adopted | pass: fresh spec-reviewer; AC-024 re-review pending | no | implementation-ready |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -635,14 +637,19 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 | PR observation completion wait decision | `20260628t154553z-adr PR Observation Explicit Review Completion` を accepted ADR authority として更新 | `derived_from` に PR #245 delayed review / premature under-budget timeout reviewer feedback を追加し、Decision / Context / Rationale / Consequences に zero-check grace と hydration stability の境界を追記 | pass |
 | Script-local review instruction ADR | 古い trusted base-SHA / missing policy 方針との境界を明確化 | `20260623t074444z-adr` に、review completion / no-review-work / merge-prepared 判断は同 ADR の authority ではなく `20260628t154553z-adr` が authority であると追記 | pass |
 | Blocker-centric PR closure ADR | blocker disposition と review completion 判定の責務を分離 | `20260623t074447z-adr` に、completion artifact 未観測時は blocker-centric closure 評価へ入らず、timeout / wait_or_resume は review 不要の human gate ではないと追記 | pass |
+| PR review body blocker ingestion ADR | selected pull request review body も blocker input とする意思決定をADRへ昇格 | `20260628t185812z-adr-pr-review-body-blocker-ingestion.md` を追加し、`20260623t074447z-adr` / `20260628t154553z-adr` に変更済み注記を追記 | pass |
 | Historical draft package artifacts | 古い draft / seed の矛盾を変更済みとして注記 | draft requirement / draft design / issue slice seeds / provided draft package synthesis に historical status update を追加 | pass |
 
 #### ADR 整合検証（ADR Alignment Verification）
 | コマンド / 確認 | 結果 | メモ |
 |---|---|---|
 | `uv run pytest tests/unit/infra/test_init_update.py -k "issue_75_pr_observation_wait_applies_zero_check_grace_before_human_gate or issue_75_pr_observation_wait_late_review_change_resets_stability" -vv` | pass: 2 passed, 519 deselected | reviewer が指摘した zero-check grace / late review stability regression は現行手元で再現せず通過 |
-| `uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation or s04_wait or s101 or s204 or s420_wait or s430 or s01_wait_carryover or s03_wait_fallback or issue_75_pr_observation_wait"` | pass: 107 passed, 414 deselected | PR observation lane で completion / timeout / hydration 周辺を再確認 |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "pr_observation or s04_wait or s101 or s204 or s420_wait or s430 or s01_wait_carryover or s03_wait_fallback or issue_75_pr_observation_wait or issue_232_review_collector"` | pass: 119 passed, 405 deselected | PR observation lane で completion / timeout / hydration / review body blocker 周辺を再確認 |
+| `uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` | pass: 19 passed | design / plan readiness と hard cutover guidance fixture を確認 |
+| `uv run pytest tests/unit/infra/test_init_update.py` | pass: 524 passed in 315.43s | shipped asset / PR observation / installer regression 全体を確認 |
+| `make lint` | pass: ruff check, ruff format check, mypy | static analysis 全体を確認 |
 | `./spec-dock/scripts/spec-dock validate` | pass: `spec-dock: ok (validate) nodes=153` | ADR / historical note 追加後の SpecDock tree validation |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass: issue=iss-00244, authorized_profile=standard | requirement/design/plan source binding 更新後の assurance contract を確認 |
 | `git diff --check` | pass | Markdown 差分の whitespace error なし |
 
 #### PR #245 Review Finding Follow-up（2026-06-29）
@@ -651,6 +658,9 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 | Codex P1: `Preserve terminal PR observation result on final timeout` | final snapshot poll が timeout した場合でも、直前 payload が zero-check grace terminal または stable review completion として既に成立していれば、その terminal / completion state を保持するよう `pr_observation_wait.py` を修正 | added `test_issue_187_s430_final_snapshot_timeout_preserves_zero_check_terminal_state` and `test_issue_187_s430_final_snapshot_timeout_preserves_stable_completion_state` | fixed |
 | PR observation lane | provider / dogfooding mirror の wait script を同期し、既存 issue_75 regression と新規 final snapshot timeout regression を含めて確認 | focused: 4 passed; broad: 109 passed, 414 deselected; full `test_init_update.py`: 523 passed in 304.49s | pass |
 | Static analysis / SpecDock validation | wait script parity、lint、assurance、validate を確認 | `make lint` pass; provider/dogfood `diff -u` no diff; `assurance verify` ok; `validate` ok nodes=153 | pass |
+| Codex P1: `Block scaffold plans in strict-legacy guidance` | `.assurance.json` がない strict legacy path でも `plan.md` scaffold / missing を execution-ready にしないよう `workflow.py` を修正 | added `test_guidance_blocks_strict_legacy_placeholder_plan`; focused pytest 7 passed; CLI runtime lane 19 passed | fixed |
+| Codex P1: `Require non-placeholder design before ready guidance` | valid assurance path / strict legacy path の両方で `design.md` が missing / scaffold の場合は execution-ready にしないよう `workflow.py` を修正 | added `test_guidance_blocks_placeholder_design_even_with_valid_assurance_and_executable_plan`; focused pytest 7 passed; CLI runtime lane 19 passed | fixed |
+| Codex P1: `Include pull review bodies in blocker policy` | selected pull request review body を blocker policy input に含め、body P1 を comments/threads 0 でも blocker として扱うよう `pr_review_snapshot.py` を修正し、ADRへ昇格 | added `test_issue_232_review_collector_treats_p1_pull_review_body_as_blocker`; focused pytest 7 passed; PR observation lane 119 passed; ADR `20260628t185812z-adr` | fixed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -661,12 +671,13 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 | tc-031 | S320 | yes | command / inspection | quiet/same fingerprint could complete no-completion candidate | classify/diff inspection plus focused pytest | pass | no-completion `can_complete_when_stable=false` |
 | tc-032 | S320 | yes | command | wrong/no explicit completion must not pass | focused PR observation lane | pass | existing strict no-findings/blocker tests remain green |
 | tc-033 | S320 | yes | command | partial/no completion visibility could be over-promoted | focused PR observation lane | pass | no completion becomes timeout/resume, not pass |
+| tc-036 | S320/S399 | yes | command | PR review body P1 could be ignored if only issue comments / inline comments / threads are scanned | `test_issue_232_review_collector_treats_p1_pull_review_body_as_blocker`; focused pytest 7 passed; PR observation lane 119 passed | pass | selected pull request review body is blocker input |
 | tc-034 | S300 | yes | structural assertion | skill text described terminal-like unknown human gate | grep inspection | pass | active terminal unknown wording removed from provider/dogfood skills |
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-028..tc-034 | S300/S310/S320 | focused pytest 13 passed, broad PR observation lane 107 passed, ruff check, grep inspection, assurance verify, validate | pass-review-pending | S330 live/manual dogfooding and S399 final reviewers pending |
+| tc-028..tc-036 | S300/S310/S320/S399 | focused pytest 13 passed, PR observation lane 119 passed, CLI runtime lane 19 passed, full `test_init_update.py` 524 passed, `make lint`, `assurance verify`, `validate` | pass-review-pending | latest PR re-observation still pending after commit/push |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -685,7 +696,7 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
 | qa-reviewer | S100/S110/S200/S210/S299 obligation coverage | added | QA re-review pass; `test_init_update.py` 515 passed; assurance/workflow lane 53 passed; hidden/file-list inspections | pass |
-| local verification | whole issue obligation coverage | executed | `uv run pytest tests/unit/infra/test_init_update.py`; focused assurance/workflow lane; focused PR observation lane 107 passed; `./spec-dock/scripts/spec-dock validate`; `assurance verify`; `guidance issue-execution`; `git diff --check`; `make lint`; focused trigger tests; ruff check for wait/test files | pass |
+| local verification | whole issue obligation coverage | executed | `uv run pytest tests/unit/infra/test_init_update.py` 524 passed; `uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` 19 passed; focused PR observation lane 119 passed; `./spec-dock/scripts/spec-dock validate`; `assurance verify`; `git diff --check`; `make lint` | pass |
 | PR observation | PR #245 current head | executed / additional wait repair pending | trigger comment `4825350981` posted with script-local instruction metadata; Provider CI initially failed on static analysis and local fix was applied; S300-S320 wait repair implemented locally | re-push / re-observation pending |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
@@ -697,8 +708,8 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report alignment including AC-020..AC-023 / S300..S399 | prior P1 findings resolved; discussion reflection P2 resolved; no new P0/P1/P2 findings | 3 | pass; final S399 re-review pending after S330 |
-| local spec traceability | requirement / design / plan / report alignment | closure ids tc-001..tc-034 have local implementation evidence; tc-035 / S330 live/manual dogfooding remains pending | 0 | local pass |
+| spec-reviewer | requirement / design / plan / report alignment including AC-020..AC-024 / S300..S399 | fresh spec-reviewer pass; P2 traceability gap fixed by adding new ADR to S320/S399 inputs and `tc-036` to S320 closure criteria | 4 | pass |
+| local spec traceability | requirement / design / plan / report alignment | closure ids tc-001..tc-036 have local implementation evidence; latest PR re-observation remains pending after commit/push | 0 | local pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |

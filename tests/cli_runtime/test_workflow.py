@@ -154,6 +154,7 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Placeholder plan")
             self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
             (issue_dir / "plan.md").write_text(
                 "---\n"
                 "種別: 実装計画書（Issue）\n"
@@ -181,6 +182,54 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["state"] == "blocked"
             assert payload["reason_code"] == "plan-not-executable"
             assert payload["may_execute_approved_plan"] is False
+
+    def test_guidance_blocks_placeholder_design_even_with_valid_assurance_and_executable_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Placeholder design")
+            self._write_substantive_requirement(issue_dir)
+            self._write_executable_plan(issue_dir)
+            (issue_dir / "design.md").write_text(
+                "---\n"
+                "種別: 設計書（Issue）\n"
+                'ID: "iss-00301"\n'
+                "artifact_state: awaiting-assurance-compose\n"
+                "---\n\n"
+                "# Design\n\n"
+                "TODO\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = self._read_projected_runbook(target)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == "design-not-substantive"
+            assert payload["may_execute_approved_plan"] is False
+
+    def test_guidance_blocks_strict_legacy_placeholder_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Legacy placeholder plan")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+
+            result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = self._read_projected_runbook(target)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == "plan-not-executable"
+            assert payload["may_execute_approved_plan"] is False
+            assert payload["authority"]["authorized_profile"] == "strict"
 
     @pytest.mark.parametrize("filename", ["requirement.md", "design.md", "plan.md"])
     def test_guidance_blocks_stale_source_binding(self, filename: str) -> None:
@@ -278,6 +327,7 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Current issue")
             self._write_substantive_requirement(issue_dir)
+            self._write_executable_plan(issue_dir)
             stale_payload = {
                 "schema_version": "workflow-runbook-v1",
                 "workflow_target": "issue-planning",
@@ -345,7 +395,23 @@ class TestCliWorkflow(CliRuntimeHarness):
             encoding="utf-8",
         )
 
+    def _write_substantive_design(self, issue_dir: Path) -> None:
+        (issue_dir / "design.md").write_text(
+            "---\n"
+            "種別: 設計書（Issue）\n"
+            'ID: "iss-00301"\n'
+            '状態: "approved"\n'
+            "---\n\n"
+            "# Design\n\n"
+            "## 全体像\n"
+            "- The workflow guidance reads requirement, design, and plan readiness before execution.\n\n"
+            "## 責務\n"
+            "- Runtime reports readiness and does not infer implementation steps.\n",
+            encoding="utf-8",
+        )
+
     def _write_executable_plan(self, issue_dir: Path) -> None:
+        self._write_substantive_design(issue_dir)
         (issue_dir / "plan.md").write_text(
             "# Plan\n\n"
             "### 実装ステップ S01 — Implement deterministic workflow guidance\n"

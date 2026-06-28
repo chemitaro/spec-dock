@@ -127,6 +127,19 @@ def _resolve_state(store: WorkflowAssuranceStoreLike) -> WorkflowState:
         )
 
     if assurance.status == "valid" and assurance.contract is not None:
+        design_readiness = _classify_design_text(_read_optional_text(Path(target.issue_dir) / "design.md"))
+        if design_readiness != "substantive":
+            return WorkflowState(
+                kind="blocked",
+                active_issue_id=target.issue_id,
+                reason_code="design-missing" if design_readiness == "missing" else "design-not-substantive",
+                artifact_readiness="substantive",
+                authority=authority,
+                details=(
+                    "design.md must be a substantive design artifact before issue execution.",
+                    "Complete the design artifact before relying on the approved implementation plan.",
+                ),
+            )
         plan_readiness = _classify_plan_text(_read_optional_text(Path(target.issue_dir) / "plan.md"))
         if plan_readiness != "executable":
             return WorkflowState(
@@ -155,6 +168,32 @@ def _resolve_state(store: WorkflowAssuranceStoreLike) -> WorkflowState:
             artifact_readiness="substantive",
             authority=UNAVAILABLE_AUTHORITY,
             details=tuple(assurance.details),
+        )
+    design_readiness = _classify_design_text(_read_optional_text(Path(target.issue_dir) / "design.md"))
+    if design_readiness != "substantive":
+        return WorkflowState(
+            kind="blocked",
+            active_issue_id=target.issue_id,
+            reason_code="design-missing" if design_readiness == "missing" else "design-not-substantive",
+            artifact_readiness="substantive",
+            authority=STRICT_LEGACY_AUTHORITY,
+            details=(
+                "design.md must be a substantive design artifact before strict-legacy issue execution.",
+                "Complete the design artifact or create a valid assurance contract before execution.",
+            ),
+        )
+    plan_readiness = _classify_plan_text(_read_optional_text(Path(target.issue_dir) / "plan.md"))
+    if plan_readiness != "executable":
+        return WorkflowState(
+            kind="blocked",
+            active_issue_id=target.issue_id,
+            reason_code="plan-missing" if plan_readiness == "missing" else "plan-not-executable",
+            artifact_readiness="substantive",
+            authority=STRICT_LEGACY_AUTHORITY,
+            details=(
+                "plan.md must be an executable workflow contract before strict-legacy issue execution.",
+                "Add implementation steps, verification obligations, reviewer/no-review rationale, and report evidence destinations.",
+            ),
         )
     return WorkflowState(
         kind="ready",
@@ -208,4 +247,42 @@ def _classify_plan_text(plan_text: str | None) -> str:
     )
     if any(marker in lower for marker in markers):
         return "executable"
+    return "scaffold"
+
+
+def _classify_design_text(design_text: str | None) -> str:
+    if design_text is None:
+        return "missing"
+    stripped = design_text.strip()
+    if not stripped:
+        return "scaffold"
+    lower = stripped.lower()
+    scaffold_markers = (
+        '状態: "draft',
+        "状態: draft",
+        "draft | proposed",
+        "artifact_state: awaiting-assurance-compose",
+        "todo",
+        "tbd",
+        "template",
+        "placeholder",
+        "未記入",
+        "記載してください",
+    )
+    if any(marker in lower for marker in scaffold_markers):
+        return "scaffold"
+    markers = (
+        "設計",
+        "全体像",
+        "コンポーネント",
+        "データモデル",
+        "責務",
+        "design",
+        "architecture",
+        "component",
+        "interface",
+        "contract",
+    )
+    if any(marker in lower for marker in markers):
+        return "substantive"
     return "scaffold"
