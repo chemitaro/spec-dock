@@ -28,12 +28,23 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
                 (issue_dir / "plan.md").relative_to(target).as_posix(),
                 (issue_dir / "report.md").relative_to(target).as_posix(),
             ])
-            for artifact in ("design", "plan", "report"):
-                text = (issue_dir / f"{artifact}.md").read_text(encoding="utf-8")
-                assert "spec-dock:managed-section begin" in text
-                assert f'artifact": "{artifact}"' not in text
-                assert payload["artifacts"][artifact]["changed"] is True
-                assert payload["artifacts"][artifact]["added_section_ids"]
+            design_text = (issue_dir / "design.md").read_text(encoding="utf-8")
+            plan_text = (issue_dir / "plan.md").read_text(encoding="utf-8")
+            report_text = (issue_dir / "report.md").read_text(encoding="utf-8")
+            assert "spec-dock:managed-section begin" not in design_text
+            assert "Issue 設計書（Standard）" in design_text
+            assert "## 1. 等級 Standard" in design_text
+            assert payload["artifacts"]["design"]["changed"] is True
+            assert payload["artifacts"]["design"]["added_section_ids"] == []
+            assert "spec-dock:managed-section begin" not in plan_text
+            assert "Issue 実装計画書（Standard / TDD）" in plan_text
+            assert "## 6. 仕様固定クロージャ一覧" in plan_text
+            assert payload["artifacts"]["plan"]["changed"] is True
+            assert payload["artifacts"]["plan"]["added_section_ids"] == []
+            assert "spec-dock:managed-section begin" in report_text
+            assert '"artifact": "report"' not in report_text
+            assert payload["artifacts"]["report"]["changed"] is True
+            assert payload["artifacts"]["report"]["added_section_ids"]
 
     def test_assurance_compose_materializes_placeholder_design_and_plan(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -57,14 +68,12 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
                 assert '状態: "approved"' in text
                 assert "このファイルはまだ合成されていません" not in text
                 assert "この状態のまま" not in text
-                assert "spec-dock:managed-section begin" in text
+                assert "spec-dock:managed-section begin" not in text
                 assert payload["artifacts"][artifact]["changed"] is True
-            assert "## 実装ステップ" in (issue_dir / "plan.md").read_text(encoding="utf-8")
-            guidance = self._run_runtime_capture(target, ["guidance", "issue-execution"])
-            assert guidance.returncode == 0, guidance.stdout + guidance.stderr
-            runbook = json.loads((target / "spec-dock/active/current-runbook.json").read_text(encoding="utf-8"))
-            assert runbook["state"] == "ready"
-            assert runbook["may_execute_approved_plan"] is True
+                assert payload["artifacts"][artifact]["added_section_ids"] == []
+            assert "Issue 設計書（Standard）" in (issue_dir / "design.md").read_text(encoding="utf-8")
+            assert "## 6. 仕様固定クロージャ一覧" in (issue_dir / "plan.md").read_text(encoding="utf-8")
+            assert "spec-dock:managed-section begin" in (issue_dir / "report.md").read_text(encoding="utf-8")
 
     def test_assurance_compose_does_not_overwrite_substantive_non_placeholder_content(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

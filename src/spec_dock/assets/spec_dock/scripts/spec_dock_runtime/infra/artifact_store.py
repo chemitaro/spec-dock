@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Literal
 
 from spec_dock_runtime.domain.artifact_composer import (
     ArtifactKind,
+    ProfileArtifactTemplate,
+    ProfileName,
     ProfileSectionManifest,
     load_profile_section_manifest,
 )
@@ -67,6 +69,32 @@ class ArtifactStore:
         path = self.specdock_dir / "templates" / "assurance" / "profile-sections.json"
         return load_profile_section_manifest(path.read_text(encoding="utf-8"))
 
+    def load_profile_artifact_template(
+        self,
+        artifact: Literal["design", "plan"],
+        profile: ProfileName,
+    ) -> ProfileArtifactTemplate:
+        if artifact not in ("design", "plan"):
+            raise ValueError(f"Unsupported profile template artifact: {artifact}")
+        if profile not in ("lite", "standard", "strict", "critical"):
+            raise ValueError(f"Unsupported profile template profile: {profile}")
+        path = self.specdock_dir / "templates" / "issue-profiles" / profile / f"{artifact}.md"
+        resolved = path.resolve()
+        if not _is_relative_to(resolved, self.specdock_dir.resolve()):
+            raise RuntimeError(f"Profile template is outside spec-dock workspace: {path}")
+        if not path.is_file():
+            raise FileNotFoundError(f"Profile template not found: {path.relative_to(self.repo_root)}")
+        text = path.read_text(encoding="utf-8")
+        _frontmatter, body = _split_frontmatter(text)
+        if not body.strip():
+            raise ValueError(f"Profile template body is empty: {path.relative_to(self.repo_root)}")
+        return ProfileArtifactTemplate(
+            profile=profile,
+            artifact=artifact,
+            repo_relative_path=path.relative_to(self.repo_root).as_posix(),
+            body=body,
+        )
+
     def _validate_artifact_path(self, target: ResolvedIssueTarget, path: Path) -> None:
         if path.is_symlink():
             raise RuntimeError(f"Refusing to use symlinked planning artifact: {path.relative_to(self.repo_root)}")
@@ -83,3 +111,14 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _split_frontmatter(text: str) -> tuple[str, str]:
+    if not text.startswith("---\n"):
+        return "", text
+    end = text.find("\n---\n", len("---\n"))
+    if end == -1:
+        return "", text
+    frontmatter = text[: end + len("\n---")]
+    body = text[end + len("\n---\n") :]
+    return frontmatter, body
