@@ -227,6 +227,30 @@ def test_profile_markdown_template_does_not_overwrite_substantive_content() -> N
     assert result.errors[0].kind == "substantive_content_conflict"
 
 
+def test_profile_markdown_template_invalid_marker_fails_closed() -> None:
+    artifact_composer = _artifact_composer_module()
+    assurance = _assurance_module()
+    manifest = _manifest()
+
+    result = artifact_composer.compose_artifact(
+        _design_placeholder(),
+        manifest,
+        "design",
+        assurance.AssuranceProfile.STANDARD,
+        profile_template=_profile_template(
+            "design",
+            "standard",
+            "# Standard Design Template\n\n"
+            '<!-- spec-dock:managed-section begin id="design.invalid" -->\n',
+        ),
+    )
+
+    assert not result.ok
+    assert result.output_text is None
+    assert result.changed is False
+    assert result.errors[0].kind == "unclosed_marker"
+
+
 def test_authorized_standard_lite_candidate_uses_standard_markdown_template_not_lite() -> None:
     artifact_composer = _artifact_composer_module()
     assurance = _assurance_module()

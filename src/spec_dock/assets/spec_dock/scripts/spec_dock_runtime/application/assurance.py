@@ -13,7 +13,7 @@ from spec_dock_runtime.application.contracts import (
     ShowAssuranceRequest,
     VerifyAssuranceRequest,
 )
-from spec_dock_runtime.domain.artifact_composer import ComposeArtifactResult, compose_artifact
+from spec_dock_runtime.domain.artifact_composer import ComposeArtifactResult, MarkerConflict, compose_artifact
 from spec_dock_runtime.domain.assurance import (
     AssuranceContract,
     ClassificationStage,
@@ -112,32 +112,40 @@ def compose_assurance(
     artifacts = [
         artifact_store.read_artifact(target, artifact) for artifact in artifact_store.artifact_kinds(request.artifact)
     ]
-    composed = [
-        (
-            artifact,
-            compose_artifact(
-                artifact.text,
-                manifest,
-                artifact.artifact,
-                contract.classification.authorized_profile,
-                lite_candidate=contract.classification.lite_candidate,
-                profile_template=(
-                    artifact_store.load_profile_artifact_template(
-                        artifact.artifact,
-                        contract.classification.authorized_profile.value,
-                    )
-                    if artifact.artifact in ("design", "plan")
-                    else None
+    composed = []
+    for artifact in artifacts:
+        try:
+            profile_template = (
+                artifact_store.load_profile_artifact_template(
+                    artifact.artifact,
+                    contract.classification.authorized_profile.value,
+                )
+                if artifact.artifact in ("design", "plan")
+                else None
+            )
+        except (FileNotFoundError, NotADirectoryError, OSError, RuntimeError, ValueError) as exc:
+            composed.append((artifact, _template_validation_error(artifact.artifact, contract, str(exc))))
+            continue
+        composed.append(
+            (
+                artifact,
+                compose_artifact(
+                    artifact.text,
+                    manifest,
+                    artifact.artifact,
+                    contract.classification.authorized_profile,
+                    lite_candidate=contract.classification.lite_candidate,
+                    profile_template=profile_template,
                 ),
-            ),
+            )
         )
-        for artifact in artifacts
-    ]
 
     if any(not result.ok for _, result in composed):
         views = tuple(_compose_artifact_view(artifact, result) for artifact, result in composed)
         reason = (
-            "substantive_content_conflict"
+            "template_validation_failed"
+            if any(error.kind == "template_validation_failed" for _, result in composed for error in result.errors)
+            else "substantive_content_conflict"
             if any(error.kind == "substantive_content_conflict" for _, result in composed for error in result.errors)
             else "marker_conflict"
         )
@@ -213,6 +221,26 @@ def _compose_invalid_result(store_result: Any) -> AssuranceResult:
         reason=store_result.reason,
         details=details,
         contract=store_result.contract,
+    )
+
+
+def _template_validation_error(artifact: Any, contract: AssuranceContract, message: str) -> ComposeArtifactResult:
+    return ComposeArtifactResult(
+        artifact=artifact,
+        authorized_profile=contract.classification.authorized_profile.value,
+        lite_candidate=contract.classification.lite_candidate,
+        output_text=None,
+        changed=False,
+        added_section_ids=(),
+        preserved_section_ids=(),
+        warnings=(),
+        errors=(
+            MarkerConflict(
+                kind="template_validation_failed",
+                section_id=str(artifact),
+                message=message,
+            ),
+        ),
     )
 
 

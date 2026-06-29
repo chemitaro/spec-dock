@@ -213,6 +213,103 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert invalid_payload["reason"] == "invalid_json"
             assert self._artifact_texts(invalid_issue_dir) == before_invalid
 
+    def test_assurance_compose_missing_profile_template_fails_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_classified_fixture(target)
+            contract_path = issue_dir / ".assurance.json"
+            before = self._artifact_texts(issue_dir)
+            contract_before = contract_path.read_text(encoding="utf-8")
+            (target / "spec-dock" / "templates" / "issue-profiles" / "standard" / "plan.md").unlink()
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "all", "--format", "json"],
+            )
+
+            assert result.returncode == 1
+            payload = json.loads(result.stdout)
+            assert payload["ok"] is False
+            assert payload["status"] == "invalid"
+            assert payload["reason"] == "template_validation_failed"
+            assert "Profile template not found" in " ".join(payload["details"])
+            assert self._artifact_texts(issue_dir) == before
+            assert contract_path.read_text(encoding="utf-8") == contract_before
+
+    def test_assurance_compose_non_file_and_empty_profile_templates_fail_before_writes(self) -> None:
+        cases = (
+            ("directory", "Profile template is not a file"),
+            ("empty-body", "Profile template body is empty"),
+        )
+        for template_state, expected_detail in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                issue_dir = self._create_classified_fixture(target)
+                contract_path = issue_dir / ".assurance.json"
+                before = self._artifact_texts(issue_dir)
+                contract_before = contract_path.read_text(encoding="utf-8")
+                plan_template = target / "spec-dock" / "templates" / "issue-profiles" / "standard" / "plan.md"
+                plan_template.unlink()
+                if template_state == "directory":
+                    plan_template.mkdir()
+                else:
+                    plan_template.write_text(
+                        "---\n"
+                        'profile: "standard"\n'
+                        'artifact: "plan"\n'
+                        "---\n",
+                        encoding="utf-8",
+                    )
+
+                result = self._run_runtime_capture(
+                    target,
+                    ["assurance", "compose", "--artifact", "all", "--format", "json"],
+                )
+
+                assert result.returncode == 1
+                payload = json.loads(result.stdout)
+                assert payload["ok"] is False
+                assert payload["status"] == "invalid"
+                assert payload["reason"] == "template_validation_failed"
+                assert expected_detail in " ".join(payload["details"])
+                assert self._artifact_texts(issue_dir) == before
+                assert contract_path.read_text(encoding="utf-8") == contract_before
+
+    def test_assurance_compose_invalid_profile_template_marker_fails_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_classified_fixture(target)
+            contract_path = issue_dir / ".assurance.json"
+            before = self._artifact_texts(issue_dir)
+            contract_before = contract_path.read_text(encoding="utf-8")
+            plan_template = target / "spec-dock" / "templates" / "issue-profiles" / "standard" / "plan.md"
+            plan_template.write_text(
+                "---\n"
+                'profile: "standard"\n'
+                'artifact: "plan"\n'
+                "---\n"
+                "# Invalid Plan Template\n"
+                '<!-- spec-dock:managed-section begin id="template.invalid" -->\n',
+                encoding="utf-8",
+            )
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "all", "--format", "json"],
+            )
+
+            assert result.returncode == 1
+            payload = json.loads(result.stdout)
+            assert payload["ok"] is False
+            assert payload["status"] == "invalid"
+            assert payload["reason"] == "marker_conflict"
+            assert "Managed section template.invalid has no end marker." in payload["artifacts"]["plan"]["errors"]
+            assert self._artifact_texts(issue_dir) == before
+            assert contract_path.read_text(encoding="utf-8") == contract_before
+
     def test_assurance_compose_marker_conflict_keeps_artifact_unchanged(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
