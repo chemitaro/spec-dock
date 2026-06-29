@@ -493,6 +493,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/scripts/spec_dock_runtime/application/contracts.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py"
         ),
+        "spec-dock/scripts/spec_dock_runtime/application/assurance.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/assurance.py"
+        ),
         "spec-dock/scripts/spec_dock_runtime/application/create_node.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py"
         ),
@@ -510,6 +513,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
         "spec-dock/scripts/spec_dock_runtime/application/worktree.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/application/workflow.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py"
         ),
         "spec-dock/scripts/spec_dock_runtime/application/import_node.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py"
@@ -535,6 +541,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/scripts/spec_dock_runtime/domain/discussion_docs.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/discussion_docs.py"
         ),
+        "spec-dock/scripts/spec_dock_runtime/domain/artifact_composer.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/artifact_composer.py"
+        ),
         "spec-dock/scripts/spec_dock_runtime/commands/import_cmd.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py"
         ),
@@ -546,6 +555,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
         "spec-dock/scripts/spec_dock_runtime/infra/git_cli.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/infra/artifact_store.py": (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/artifact_store.py"
         ),
         "spec-dock/scripts/spec_dock_runtime/infra/make_cli.py": (
             "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/make_cli.py"

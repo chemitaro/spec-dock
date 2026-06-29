@@ -183,6 +183,40 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["reason_code"] == "plan-not-executable"
             assert payload["may_execute_approved_plan"] is False
 
+    def test_guidance_blocks_composed_standard_profile_plan_placeholders(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Composed placeholder plan")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+            compose = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "plan", "--format", "json"],
+            )
+            assert compose.returncode == 0, compose.stdout + compose.stderr
+            plan_text = (issue_dir / "plan.md").read_text(encoding="utf-8")
+            assert "Issue 実装計画書（Standard / TDD）" in plan_text
+            assert "| M1 | ... | `B-...` | ... | planned |" in plan_text
+
+            status = self._run_runtime_capture(target, ["workflow", "status", "--format", "json"])
+            result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+
+            assert status.returncode == 0, status.stdout + status.stderr
+            status_payload = json.loads(status.stdout)
+            assert status_payload["state"] == "blocked"
+            assert status_payload["reason_code"] == "plan-not-executable"
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = self._read_projected_runbook(target)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == "plan-not-executable"
+            assert payload["may_execute_approved_plan"] is False
+
     def test_guidance_blocks_placeholder_design_even_with_valid_assurance_and_executable_plan(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
