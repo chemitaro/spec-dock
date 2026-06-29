@@ -3,7 +3,7 @@
 ID: "iss-00247"
 タイトル: "Move Assurance Compose Scaffold Sources To Profile Markdown Templates"
 関連GitHub: ["#247"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-29"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -49,7 +49,12 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | orchestrator + ChatGPT advisory | `report.md` を `design.md` / `plan.md` と同時に Markdown template 化するかが未確定だった | A: design/plan のみ移行; B: design/plan/report を同時移行; C: JSON section manifest 継続 | この Issue は `design.md` / `plan.md` の profile-specific scaffold prose を Markdown template source へ移し、`report.md` は現行 append-oriented managed-section behavior を維持する | `report.md` は placeholder materialization 対象外で evidence ledger lifecycle が別である。既存 research と ChatGPT advisory は report migration defer で一致した | applied | `discussions/20260629t022552z-research-profile-markdown-template-management.md`; `discussions/20260629t043419z-research-source-grounding-profile-markdown-templates.md`; `discussions/20260629t043420z-disc-template-source-scope-decision-synthesis.md`; `requirement.md` scope / AC-003 | `report.md` Markdown template 化は future follow-up 条件として残すが、この requirement phase の blocker ではない |
+| D-002 | resolved | scope | user + GPT-5.5 Pro template pack | 前回 requirement は design/plan の JSON prose migration に焦点があり、実際の planning artifact template が薄すぎて手作業 authoring になっていた | A: 前回 requirement のまま design/plan だけ手動補強; B: ZIP template pack を採用して requirement/design/plan を再構成; C: compose を捨てて手動 copy にする | ZIP template pack を採用し、common requirement template と grade-specific design/plan templates を provider assets とする。Issue 自体は scaffold/template contract 変更なので `strict` として扱う | ZIP は common `issue/requirement.md` と `issue-profiles/{lite,standard,strict,critical}/{design,plan}.md` を含み、README / matrix も existing `report.md` 維持を推奨している。ユーザーも先に template を決める方針を明示した | applied | `discussions/20260629t111542z-research-template-pack-adoption.md`; `requirement.md` AC-001〜AC-013; `design.md` DES-001〜DES-010; `plan.md` CLOS-001〜CLOS-009 | 前回 requirement spec-review pass は substantive change により stale。fresh `spec-reviewer` が必要 |
+| D-003 | resolved | operation | orchestrator | 再 classify 後、runtime は `authorized_profile=standard` を返したが、Issue docs は `strict` として計画している | A: runtime standard に合わせて計画も standard に落とす; B: `.assurance.json` を手動編集する; C: runtime selection authority は standard のまま、issue-local gate だけ strict に引き上げる | C を採用する。runtime selection authority は `.assurance.json` の `authorized_profile` に限定し、manual strict grade は reviewer / execution obligation の引き上げとして扱う | 現行 classifier は requirement risk facts を defaults/unknown として扱う。scaffold/template contract 変更は strict 相当だが、selection authority を手動変更すると AC-003 / DES-003 に反する | applied | `assurance classify --stage requirement --format json` -> `authorized_profile=standard`; `assurance verify --format json` -> valid; `requirement.md` Assurance runtime note; `design.md` Assurance authority note | classifier の risk fact 抽出改善はこの Issue の実装対象外。必要なら follow-up |
+| D-004 | resolved | operation | orchestrator | `guidance issue-planning` が reviewer pass / approved 後も `design-not-substantive` を返した | A: title を変えて preflight を通す; B: workflow preflight false positive として記録する; C: source docs を再度書き直す | B を採用する。現行 preflight は design frontmatter に `template` という語があると scaffold 扱いするため、Issue title `Move Assurance Compose Scaffold Sources To Profile Markdown Templates` に反応している。artifact 内容は fresh `spec-reviewer` pass 済み | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py` の `_classify_design_text` は frontmatter scaffold markers に `template` を含む。Issue title は GitHub issue title と一致させるべきで、判定器を回避するために改名しない | no_action | `guidance issue-planning` -> `reason_code=design-not-substantive`; `spec-reviewer` `019f1321-8efe-7cb0-9ffd-a9b7549cace6` -> pass | この false positive 自体は iss-00247 実装時に workflow preflight 改善候補として扱える |
+| D-005 | resolved | scope | user | template の英語 title / heading が後続本文を英語化させる傾向がある | A: 英語見出しを許容する; B: 見出し・title・本文を日本語優先にする; C: 英語 template と日本語 template を別管理する | B を採用する。template は日本語を主言語にし、日本語だけで正確性が落ちる語だけ括弧で英語名を併記する | user-facing / agent-facing template の言語は、後続 authoring の出力言語を誘導する。日本語ユーザー向けの SpecDock 運用では日本語 title / heading が望ましい | applied | `requirement.md` BH-007 / AC-013 / CON-008; `design.md` DES-010; `plan.md` CLOS-009 / S01 / S90 | 実装時に template pack 採用と同時に日本語優先補正を行う |
+| D-006 | resolved | operation | orchestrator | `guidance issue-execution` も `design-not-substantive` / `may_execute_approved_plan=false` を返した | A: guidance に従って停止する; B: canonical docs と fresh reviewer pass を根拠に manual fallback で進める; C: issue title を改名して guidance を通す | B を採用する。guidance 出力は観測事実として discussion に記録し、実行 authority は `workflow_issue.md` と承認済み issue docs に戻す | D-004 と同じ false-positive 系統であり、`requirement.md` / `design.md` / `plan.md` は具体化済み、fresh `spec-reviewer` pass もある。ユーザーは実行スクリプトが不安定な場合は手動実施し、問題を discussion に記録するよう指示している | applied | `guidance issue-execution` -> `state=blocked`, `reason_code=design-not-substantive`; `discussions/20260629t123000z-disc-issue-execution-guidance-false-positive-manual-fallback.md` | workflow classifier 改善候補として扱う。実装中に同種の command inconsistency があれば追加記録する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +68,10 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | research | `requirement.md` | 既存 research は JSON section body から Markdown-template-first hybrid へ移す理由、scope、minimum acceptance を整理しており、現行コードと矛盾しない | `discussions/20260629t022552z-research-profile-markdown-template-management.md` | requirement に目的、背景、scope、AC として反映済み |
+| EAL-002 | adopted | research | `requirement.md` | source-grounding research は親 Epic、現行 runtime、tests から safety contract と edge cases を確認した | `discussions/20260629t043419z-research-source-grounding-profile-markdown-templates.md` | requirement の MUST / MUST NOT / AC / EC に反映済み |
+| EAL-003 | adopted | discussion + ChatGPT advisory | `requirement.md` | synthesis は design/plan-only migration、report defer、prose-less manifest/index の扱いを整理し、ChatGPT advisory と local facts を照合した | `discussions/20260629t043420z-disc-template-source-scope-decision-synthesis.md`; Oracle session `iss-247-template-scope` | requirement scope / non-scope / unresolved design questions に反映済み |
+| EAL-004 | adopted | user-provided GPT-5.5 Pro template pack | `requirement.md`, `design.md`, `plan.md` | ZIP は common requirement template と grade-specific design/plan templates を提供し、今回の「手動 authoring 化している重大問題」を直接解消する source material である | `discussions/20260629t111542z-research-template-pack-adoption.md`; attachment `spec-dock-issue-grade-templates.zip` | requirement を template-pack adoption scope へ拡張し、design/plan を strict template contract / execution plan として再作成済み。fresh reviewer pending |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +79,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `requirement.md` 目的 / AC-001 / AC-002 は design/plan scaffold prose を Markdown template source へ移すことを主目的として固定した | AC-003 は `report.md` compatibility、AC-004〜AC-011 は safety / verification obligations を固定した | superseded by OAL-002 after template pack adoption | previous pass by `spec-reviewer` `019f11b4-279b-7d41-bda7-5954ddc1fbc9` is stale |
+| OAL-002 | `requirement.md` 目的 / AC-001 / AC-002 / AC-004 は template pack adoption、profile Markdown template source、common requirement template refresh を主目的として固定した | AC-005〜AC-013 は report compatibility、fail-closed safety、idempotence、dry-run、source binding、installed parity、日本語優先 template language policy を固定した | low | passed by fresh `spec-reviewer` `019f133b-ee00-73f0-8303-e2791a5d7638`; non-blocking P2 evidence freshness note resolved in report |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +88,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | `guidance issue-planning` -> `state=requirement-capture`, `reason_code=requirement-scaffold`; parent Epic docs; active issue placeholder; composer / assurance / artifact store code; unit / CLI tests; issue discussions | Blocking user question: none. Design-phase questions remain in `requirement.md` Q-001〜Q-003 | EAL-001〜EAL-003 adopted into `requirement.md` | passed by fresh `spec-reviewer` `019f11b4-279b-7d41-bda7-5954ddc1fbc9`; findings=[]; confidence=0.89 | no | promote requirement phase; next action: design authoring |
+| requirement/design/plan refresh | user-provided ZIP inspected; `README.md`, `docs/template-matrix.md`, `docs/final-review.md`, common `issue/requirement.md`, and profile `issue-profiles/*/{design,plan}.md` confirmed; current generated design/plan were minimal managed sections only | Blocking user question: none. Fact: ZIP contains common requirement template, not four requirement templates; design/plan are grade-specific. Q-001〜Q-004 resolved in `requirement.md` section 11 after P2 reviewer note | EAL-004 adopted into `requirement.md`, `design.md`, `plan.md`; D-002 / D-003 applied | passed by fresh `spec-reviewer` `019f1321-8efe-7cb0-9ffd-a9b7549cace6`; one non-blocking P2 traceability note resolved | no | promote planning artifacts; rerun `assurance classify`, `assurance verify`, and `guidance issue-planning` |
+| Japanese-first template policy update | user clarified that English template title / heading tends to induce English prose; issue docs updated with BH-007 / AC-013 / CON-008, DES-010, CLOS-009 / S01 / S90 / S99 | Blocking user question: none. The policy applies to template title, heading, subheading, and explanatory prose; code identifiers / commands / paths may remain English where needed | D-005 applied into `requirement.md`, `design.md`, `plan.md`; OAL-002 updated | passed by fresh `spec-reviewer` `019f133b-ee00-73f0-8303-e2791a5d7638`; review_status=pass; one non-blocking P2 evidence freshness note resolved here | no | proceed to implementation planning handoff; keep CLOS-009 in execution closure coverage |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -124,11 +135,85 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- 実装はまだ開始していない。
+- この時点の更新は、ユーザー提供の GPT-5.5 Pro template pack を採用するための requirement / design / plan refresh と authoring evidence の記録である。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-06-29 HH:MM - HH:MM）
+### セッションログ（2026-06-29 20:11 - 20:45）
+
+#### 対象
+- Step: planning refresh before implementation
+- AC/EC: AC-001〜AC-013
+- 計画上の出典（Planned source）:
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
+  - `discussions/20260629t111542z-research-template-pack-adoption.md`
+
+#### 実施内容
+- ユーザー提供 ZIP `spec-dock-issue-grade-templates.zip` を `/private/tmp/spec-dock-issue-grade-templates/` に展開し、common `requirement.md` と `issue-profiles/{lite,standard,strict,critical}/{design,plan}.md` を確認した。
+- ZIP 採用により、前回の requirement-only pass は stale と判断した。
+- `requirement.md` を template pack adoption / common requirement refresh / grade-specific design-plan templates 導入の scope に更新した。
+- `design.md` を strict grade の設計契約として作成した。
+- `plan.md` を strict / Spec-Locked TDD の implementation plan として作成した。
+- `assurance classify --stage requirement` を再実行し、`.assurance.json` source binding を現行 artifact hash へ更新した。
+- `assurance classify` は `authorized_profile=standard` を返したため、runtime selection authority と issue-local strict execution gate を分離する判断を D-003 として記録した。
+
+#### 実行コマンド / 結果
+```bash
+unzip -l /Users/iwasawayuuta/.codex/attachments/ed533576-0494-4554-8480-1ea2c23320e0/spec-dock-issue-grade-templates.zip
+
+result: pass; common requirement template and lite/standard/strict/critical design/plan templates were present.
+```
+
+```bash
+./spec-dock/scripts/spec-dock assurance classify --stage requirement --format json
+
+result: pass; .assurance.json written; authorized_profile=standard, lite_candidate=false.
+```
+
+```bash
+git diff --check
+
+result: pass.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| planning refresh | docs inspection | ZIP template pack presence and adoption rationale | common requirement and profile design/plan files present | `unzip -l`; `sed`; `rg`; discussion artifact | pass | implementation not started |
+| planning refresh | assurance binding | updated source binding after substantive artifact edits | `.assurance.json` regenerated | `assurance classify --stage requirement --format json` | pass | runtime `authorized_profile=standard`; manual strict gate recorded |
+| planning refresh | formatting | Markdown diff has no trailing whitespace errors | no diff-check errors | `git diff --check` | pass | no code tests run because no implementation yet |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| planning refresh | runtime classifier reports standard while issue docs use strict grade | `assurance classify` output | recorded as D-003; separated runtime selection authority from issue-local strict gate | CLOS-002 / CLOS-008 | no | `requirement.md`, `design.md`, `plan.md`, D-003 |
+| planning refresh | current report template contains future implementation slots | spark-worker quick check | clarified implementation not started and filled planning refresh evidence | CLOS-008 | no | this session log |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| planning refresh | CLOS-008 / CLOS-009 partial | docs / skill impact resolved or explicitly deferred; template language policy traceable | issue-local docs updated; spec-reviewer `019f133b-ee00-73f0-8303-e2791a5d7638` passed | pass | implementation not started |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| CLOS-001〜CLOS-009 | planning refresh | yes | planning-only | requirement/design/plan now define verification obligations | spec-reviewer `019f133b-ee00-73f0-8303-e2791a5d7638` | pass | actual implementation tests deferred to execution |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CLOS-001〜CLOS-009 | planned execution | `plan.md` closure index | planned | implementation not started |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | CLOS-001〜CLOS-009 | none | CLOS-001〜CLOS-009 | template pack adoption and Japanese-first template policy expanded the planning contract | yes | yes |
+
+#### 実装未開始スロット
+The remaining execution evidence sections below are intentionally left as future slots until implementation starts. They must be filled by the executor as each approved step runs.
 
 #### 対象
 - Step: S01, S02, ...
@@ -277,3 +362,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 省略/例外メモ (必須)
 - 該当なし
+
+<!-- spec-dock:managed-section begin id="report.step-evidence" -->
+## Step Evidence
+- Record Red, Green, and refactor evidence for each executed step.
+- Link each closure id to its observed verification result.
+<!-- spec-dock:managed-section end id="report.step-evidence" -->
