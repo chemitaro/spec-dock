@@ -4141,6 +4141,9 @@ class TestInitUpdate(CliRuntimeHarness):
             installed_root = target / "spec-dock" / "templates"
             for rel_path in required_paths:
                 assert (installed_root / rel_path).is_file(), f"missing installed issue template asset: {rel_path}"
+                assert (installed_root / rel_path).read_text(encoding="utf-8") == (
+                    asset_root / rel_path
+                ).read_text(encoding="utf-8"), f"installed issue template diverged from provider asset: {rel_path}"
 
     def test_checked_in_dogfooding_active_none_reports_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
