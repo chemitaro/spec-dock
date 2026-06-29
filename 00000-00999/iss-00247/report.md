@@ -594,7 +594,7 @@ result: pass.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S02 | pending commit | runtime/domain/infra/application manifest/tests/report S02 evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S02 | committed | runtime/domain/infra/application manifest/tests/report S02 evidence | `e8c5e067` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/artifact_composer.py` - profile Markdown template compose path を追加。
@@ -607,7 +607,7 @@ result: pass.
 - `spec-dock/active/issue/report.md` - S02 evidence を記録。
 
 #### コミット
-- pending
+- `e8c5e067` feat(assurance): profile別Markdownテンプレートで計画文書を合成
 
 #### メモ
 - S03 deferred: missing / invalid template の structured error reporting、invalid template marker handling、`--artifact all` の full atomicity hardening は S03 で扱う。
