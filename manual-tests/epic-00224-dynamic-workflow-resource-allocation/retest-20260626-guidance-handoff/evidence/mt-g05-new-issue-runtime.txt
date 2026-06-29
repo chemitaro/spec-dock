@@ -1,2 +1,0 @@
-spec-dock: ok (new issue) id=iss-09004 epic=epic-09002 initiative=init-09001 path=spec-dock/manual-tests/epic-00224-dynamic-workflow-resource-allocation/retest-20260626-guidance-handoff/workspaces/trial-local-repo/spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task github=#9004
-spec-dock: ok (new issue auto-sync)

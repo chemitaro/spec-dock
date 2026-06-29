@@ -1,1 +1,0 @@
-spec-dock: ok (init) -> /Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/dbca/spec-dock/manual-tests/epic-00224-dynamic-workflow-resource-allocation/retest-20260626-guidance-handoff/workspaces/trial-local-repo
