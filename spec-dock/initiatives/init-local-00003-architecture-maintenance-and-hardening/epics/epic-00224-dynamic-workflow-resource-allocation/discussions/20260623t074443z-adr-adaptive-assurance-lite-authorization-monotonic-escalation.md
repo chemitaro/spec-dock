@@ -7,6 +7,8 @@ ID: "20260623t074443z-adr"
 最終更新: "2026-06-23"
 親: ["epic-00224"]
 authority: "accepted"
+amended_by:
+  - "20260629t003132z-adr"
 derived_from:
   - "20260623t074452z-disc-adr-decision-synthesis-after-issue-226-closure.md"
   - "20260623t012043z-research-deep-consultant-lite-rollout-report.md"
@@ -18,6 +20,12 @@ reflected_to:
 ---
 
 # 20260623t074443z-adr Adaptive Assurance Contract Lite Authorization And Monotonic Escalation
+
+## 変更履歴（Supersession / Amendment）
+
+- 2026-06-29: `20260629t003132z-adr Hidden Assurance Contract Path` により、Issue-local Assurance Contract の canonical path は `assurance.json` から `.assurance.json` へ変更済み。
+- 維持: `authorized_profile` だけが workflow obligation を減らせる authority であり、`lite_candidate` は telemetry / recommendation である。
+- 変更済み: 旧 `assurance.json` だけが存在する状態は current authority ではなく、migration-required diagnostics として扱う。
 
 ## ADR 化基準
 - hard to reverse: yes

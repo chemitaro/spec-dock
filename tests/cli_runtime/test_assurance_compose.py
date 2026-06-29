@@ -39,7 +39,7 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
-            issue_dir = self._create_classified_fixture(target)
+            issue_dir = self._create_substantive_classified_fixture(target)
 
             result = self._run_runtime_capture(
                 target,
@@ -53,10 +53,18 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             for artifact in ("design", "plan"):
                 text = (issue_dir / f"{artifact}.md").read_text(encoding="utf-8")
                 assert "artifact_state: awaiting-assurance-compose" not in text
+                assert '状態: "draft"' not in text
+                assert '状態: "approved"' in text
                 assert "このファイルはまだ合成されていません" not in text
                 assert "この状態のまま" not in text
                 assert "spec-dock:managed-section begin" in text
                 assert payload["artifacts"][artifact]["changed"] is True
+            assert "## 実装ステップ" in (issue_dir / "plan.md").read_text(encoding="utf-8")
+            guidance = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+            assert guidance.returncode == 0, guidance.stdout + guidance.stderr
+            runbook = json.loads((target / "spec-dock/active/current-runbook.json").read_text(encoding="utf-8"))
+            assert runbook["state"] == "ready"
+            assert runbook["may_execute_approved_plan"] is True
 
     def test_assurance_compose_does_not_overwrite_substantive_non_placeholder_content(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -355,6 +363,24 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
 
     def _create_classified_fixture(self, target: Path) -> Path:
         issue_dir = self._create_assurance_fixture(target, issue_number=301, title="Compose assurance")
+        self._run_runtime(target, ["assurance", "classify", "--stage", "requirement", "--format", "json"])
+        return issue_dir
+
+    def _create_substantive_classified_fixture(self, target: Path) -> Path:
+        issue_dir = self._create_assurance_fixture(target, issue_number=301, title="Compose assurance")
+        (issue_dir / "requirement.md").write_text(
+            "---\n"
+            "種別: 要件定義書（Issue）\n"
+            'ID: "iss-00301"\n'
+            '状態: "approved"\n'
+            "---\n\n"
+            "# Requirement\n\n"
+            "## 目的\n"
+            "- Implement concrete runtime behavior with observable CLI output.\n\n"
+            "## 受け入れ条件\n"
+            "- The command returns deterministic state and guidance.\n",
+            encoding="utf-8",
+        )
         self._run_runtime(target, ["assurance", "classify", "--stage", "requirement", "--format", "json"])
         return issue_dir
 

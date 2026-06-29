@@ -24,8 +24,8 @@
     },
     "plan.step-contract": {
       "artifact": "plan",
-      "heading": "## Step Obligation Contract",
-      "body": "- List each implementation step, pattern, closure ids, required evidence level, and expected verification command.\n- State worker/reviewer obligations in the plan; do not rely on runtime guidance to infer them.\n- Keep execution one approved step at a time."
+      "heading": "## 実装ステップ",
+      "body": "- List each implementation step, pattern, closure ids, required evidence level, and expected verification command.\n- State worker/reviewer obligations in the plan; do not rely on runtime guidance to infer them.\n- Keep execution one approved step at a time.\n- Treat this managed section as the initial step closure contract and replace the bullets with concrete steps before execution when more detail is needed."
     },
     "plan.strict-review": {
       "artifact": "plan",
