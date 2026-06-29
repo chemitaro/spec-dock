@@ -4,6 +4,12 @@ from dataclasses import dataclass
 import os
 from typing import TYPE_CHECKING
 
+from spec_dock_runtime.application.assurance import (
+    classify_assurance as application_classify_assurance,
+    compose_assurance as application_compose_assurance,
+    show_assurance as application_show_assurance,
+    verify_assurance as application_verify_assurance,
+)
 from spec_dock_runtime.application.check_deps import check_deps as application_check_deps
 from spec_dock_runtime.application.close_node import close_node as application_close_node
 from spec_dock_runtime.application.contracts import UseCases
@@ -33,6 +39,10 @@ from spec_dock_runtime.application.set_active import (
 )
 from spec_dock_runtime.application.sync_state import sync as application_sync
 from spec_dock_runtime.application.validate_tree import validate_tree as application_validate_tree
+from spec_dock_runtime.application.workflow import (
+    workflow_next as application_workflow_next,
+    workflow_status as application_workflow_status,
+)
 from spec_dock_runtime.application.worktree import (
     worktree_create as application_worktree_create,
     worktree_list as application_worktree_list,
@@ -41,7 +51,9 @@ from spec_dock_runtime.application.worktree import (
 )
 from spec_dock_runtime.infra import (
     active_store as infra_active_store,
+    artifact_store as infra_artifact_store,
     artifact_writer as infra_artifact_writer,
+    assurance_store as infra_assurance_store,
     clock as infra_clock,
     deps_reader as infra_deps_reader,
     derived_state_reader as infra_derived_state_reader,
@@ -52,6 +64,7 @@ from spec_dock_runtime.infra import (
     github_cli as infra_github_cli,
     json_store as infra_json_store,
     make_cli as infra_make_cli,
+    runbook_store as infra_runbook_store,
     template_scaffolder as infra_template_scaffolder,
 )
 
@@ -295,9 +308,10 @@ class _ArtifactWriter:
 
 
 def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> BootstrapContext:
+    resolved_repo_root = repo_root if repo_root is not None else specdock_dir.parent
     ports = Ports(
         node_reader=_NodeReader(specdock_dir=specdock_dir),
-        repo_root=repo_root if repo_root is not None else specdock_dir.parent,
+        repo_root=resolved_repo_root,
         specdock_dir=specdock_dir,
         node_repo=_NodeRepository(),
         template_scaffolder=_TemplateScaffolder(),
@@ -314,6 +328,9 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         clock=_Clock(),
         artifact_writer=_ArtifactWriter(),
     )
+    assurance_store = infra_assurance_store.AssuranceStore(resolved_repo_root)
+    artifact_store = infra_artifact_store.ArtifactStore(resolved_repo_root)
+    runbook_store = infra_runbook_store.RunbookStore(resolved_repo_root)
     use_cases = UseCases(
         create_initiative=lambda req: application_create_initiative(req, ports),
         create_epic=lambda req: application_create_epic(req, ports),
@@ -333,6 +350,20 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         issue_start=lambda req: application_issue_start(req, ports),
         issue_finish=lambda req: application_issue_finish(req, ports),
         validate_tree=lambda req: application_validate_tree(req, ports),
+        show_assurance=lambda req: application_show_assurance(req, store=assurance_store),
+        classify_assurance=lambda req: application_classify_assurance(req, store=assurance_store),
+        verify_assurance=lambda req: application_verify_assurance(req, store=assurance_store),
+        compose_assurance=lambda req: application_compose_assurance(
+            req,
+            store=assurance_store,
+            artifact_store=artifact_store,
+        ),
+        workflow_status=lambda req: application_workflow_status(req, store=assurance_store),
+        workflow_next=lambda req: application_workflow_next(
+            req,
+            store=assurance_store,
+            runbook_store=runbook_store,
+        ),
         doctor=lambda req: application_doctor(req, ports),
         worktree_create=lambda req: application_worktree_create(req, ports),
         worktree_list=lambda req: application_worktree_list(req, ports),

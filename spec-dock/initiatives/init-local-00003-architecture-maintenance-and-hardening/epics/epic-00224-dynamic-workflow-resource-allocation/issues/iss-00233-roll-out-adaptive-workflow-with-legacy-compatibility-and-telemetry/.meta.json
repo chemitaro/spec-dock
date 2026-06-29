@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00233",
+  "title": "Roll Out Adaptive Workflow With Legacy Compatibility And Telemetry",
+  "slug": "roll-out-adaptive-workflow-with-legacy-compatibility-and-telemetry",
+  "created_at": "2026-06-23T12:33:48+09:00",
+  "updated_at": "2026-06-23T12:35:05+09:00",
+  "parent_id": "epic-00224",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00224",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 233,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "depends_on": [
+    "iss-00228",
+    "iss-00229",
+    "iss-00230",
+    "iss-00231",
+    "iss-00232"
+  ]
+}

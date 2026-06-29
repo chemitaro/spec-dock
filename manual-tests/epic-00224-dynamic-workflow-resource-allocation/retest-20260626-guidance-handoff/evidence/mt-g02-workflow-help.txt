@@ -1,0 +1,8 @@
+usage: spec-dock/scripts/spec-dock workflow [-h] {status} ...
+
+positional arguments:
+  {status}
+    status    Show resolved workflow state
+
+options:
+  -h, --help  show this help message and exit

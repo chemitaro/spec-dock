@@ -1226,6 +1226,37 @@ def _draft_canonical_template_path(*, specdock_dir: Path, scope_kind: SpecNodeKi
     return specdock_dir / "templates" / scope_kind / f"{target}.md"
 
 
+def _normalize_draft_discussion_text(rendered_text: str, *, doc_type: str) -> str:
+    if doc_type not in _DRAFT_DISCUSSION_DOC_TYPES:
+        return rendered_text
+    if "artifact_state: awaiting-assurance-compose" not in rendered_text:
+        return rendered_text
+
+    text = rendered_text.replace('状態: "draft"\n', '状態: "draft | approved"\n', 1)
+    text = text.replace("artifact_state: awaiting-assurance-compose\n", "", 1)
+    parts = text.split("---", 2)
+    if len(parts) != 3:
+        return text
+    _prefix, frontmatter, body = parts
+    current_heading, _body_separator, _rest = body.partition("\n\n")
+    heading_prefix = current_heading.split(" — ", 1)[0] if current_heading.startswith("# ") else "# <SCOPE_ID>"
+    if doc_type == "draft-design":
+        body = (
+            f"{heading_prefix} — 設計（どう実現するか）\n\n## 目的・制約\n- ...\n\n## 採用方針 / トレードオフ\n- ...\n"
+        )
+    elif doc_type == "draft-plan":
+        body = (
+            f"{heading_prefix} — 実装計画（実行契約 / Execution Contract）\n\n"
+            "## 計画（Issue と実施順序）\n"
+            "- ...\n\n"
+            "## 検証\n"
+            "- ...\n"
+        )
+    else:
+        return text
+    return f"---{frontmatter}---\n{body.lstrip()}"
+
+
 def plan_discussion_doc(
     req: CreateDiscussionDocRequest,
     graph: SpecGraph,
@@ -1328,10 +1359,11 @@ def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> Crea
 
         template_text = template_scaffolder.load_template_text(template_path)
         rendered_text = template_scaffolder.render_text(template_text, replacements)
+        doc_type, _title, _slug = _normalize_discussion_doc_inputs(req)
+        rendered_text = _normalize_draft_discussion_text(rendered_text, doc_type=doc_type)
         template_scaffolder.write_text(dest_path, rendered_text)
         doc_id = _doc_id_from_path(dest_path)
         _post_write_discussion_duplicate_guard(dest_path.parent, doc_id=doc_id)
-        doc_type, _title, _slug = _normalize_discussion_doc_inputs(req)
         result = CreateDiscussionDocResult(
             doc_id=doc_id,
             doc_type=doc_type,

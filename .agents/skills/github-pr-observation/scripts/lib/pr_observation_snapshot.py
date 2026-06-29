@@ -483,7 +483,10 @@ def classify_snapshot(
             return "unknown", "human_gate", False, "blocking_limitation"
         return str(ci_status), "wait", False, "ci_pending"
     if ci_status == "unknown" and has_waitable_required_actions_context_limitation(limitations):
-        if has_blocking_limitation(limitations, ignored_codes={"required_checks_missing_or_pending"}):
+        if has_blocking_limitation(
+            limitations,
+            ignored_codes={"required_actions_context_pending", "required_checks_missing_or_pending"},
+        ):
             if has_permission_limitation(limitations):
                 return "unknown", "fix_github_token_permissions", False, "blocking_limitation"
             return "unknown", "human_gate", False, "blocking_limitation"

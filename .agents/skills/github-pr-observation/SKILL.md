@@ -1,21 +1,27 @@
 ---
 name: github-pr-observation
-description: Trigger a fixed Codex PR review request and observe GitHub Actions CI, reviews, comments, and review threads through bounded scripts. Use when a PR needs deterministic wait or snapshot evidence after creation or push.
+description: Trigger a fixed-endpoint Codex PR review request and observe GitHub Actions CI, reviews, comments, and review threads through bounded scripts. Use when a PR needs deterministic wait or snapshot evidence after creation or push.
 ---
 
 # GitHub PR Observation
 
 ## Overview
 
-Use this skill to request one fixed Codex PR review and collect PR observation
-evidence through bounded scripts. The public entrypoints are:
+Use this skill to request one deterministic Codex PR review and collect PR
+observation evidence through bounded scripts. The public entrypoints are:
 
 - `scripts/wait_pr_observation.sh`
 - `scripts/fetch_pr_observation_snapshot.sh`
 
 `wait_pr_observation.sh` is the normal orchestration entrypoint. By default it
-posts exactly one fixed `@codex review` issue comment, then observes CI and
-Codex review completion for that trigger boundary. `fetch_pr_observation_snapshot.sh`
+validates the PR head, then posts exactly one runtime-composed deterministic
+issue comment whose body starts with `@codex review`. When the script-local
+`scripts/codex-review-instructions.md` file is valid, the comment includes the
+instruction source path, instruction hash, reviewed head SHA, and instruction
+text. If the instruction file is missing, the helper posts a plain deterministic
+review request with `instruction_status: missing_plain_fallback`. If the
+instruction file is present but invalid, unreadable, or oversized, the helper
+returns `human_gate` and posts no comment. `fetch_pr_observation_snapshot.sh`
 is read-only and collects one snapshot. `stdout` is machine-readable JSON only.
 Progress and diagnostics belong on `stderr` and are non-authoritative.
 
@@ -30,7 +36,17 @@ Triage and judgment over collected evidence belong to
 - `wait_pr_observation.sh` may perform one fixed GitHub write through the
   internal `trigger_codex_review.sh` helper in default `post-once` mode.
 - The only allowed write is `POST repos/{owner}/{repo}/issues/{pr}/comments`
-  with the fixed body `@codex review`.
+  with a runtime-composed deterministic body derived from script-local
+  instruction metadata and PR metadata. The body starts with `@codex review`.
+  With a valid instruction file, it includes the instruction source path,
+  instruction hash, reviewed head SHA, and instruction text.
+- Missing script-local instruction is not a human gate. The helper posts a
+  deterministic plain review request with
+  `instruction_status: missing_plain_fallback`.
+- Script-local instruction `invalid`, `oversized`, or `unreadable` is a
+  fail-closed human gate. No comment is posted in those cases, and the final
+  JSON reports `normalized_status="human_gate"` and
+  `overall_status="human_gate"` with a blocking limitation.
 - `fetch_pr_observation_snapshot.sh` and the collector libraries remain
   read-only and call only fixed GitHub read APIs internally.
 - Operators still invoke the public `.sh` scripts directly. The adjacent
@@ -61,7 +77,9 @@ Triage and judgment over collected evidence belong to
 - The scripts do not accept arbitrary GitHub endpoints, methods, GraphQL
   queries, request bodies, headers, `jq` expressions, or raw `gh` arguments.
 - Callers must not ask an agent to post `@codex review` manually for the normal
-  wait flow. The script owns that deterministic trigger action.
+  wait flow. Manual bare trigger comments are outside the normal workflow; the
+  script owns the deterministic trigger action and never accepts a
+  caller-provided trigger body.
 - GitHub auth, rate-limit, schema, or collection failures that can still be
   represented as JSON are returned as non-success observation payloads with
   machine-readable `limitations`.
@@ -93,7 +111,7 @@ Triage and judgment over collected evidence belong to
   and review thread read surfaces. Do not add Checks/status permission wording
   to doctor or capability guidance for this skill; mention Actions read and PR
   review/comment read instead.
-- The fixed `@codex review` trigger comment write failure is separate from read
+- The deterministic trigger comment write failure is separate from read
   collection failures. It returns `normalized_status="human_gate"`,
   `overall_status="human_gate"`, and a
   `limitations[].capability="trigger_comment_write"` permission limitation.
@@ -135,8 +153,13 @@ Triage and judgment over collected evidence belong to
 
 - Default mode is `post-once`.
 - In `post-once`, `wait_pr_observation.sh` validates the current PR head, posts
-  one fixed `@codex review` comment, captures the helper JSON internally, and
-  uses the returned `comment_id` / `created_at` as the observation boundary.
+  one runtime-composed deterministic `@codex review` comment. With a valid
+  script-local instruction file, the comment includes instruction metadata and
+  text. With a missing instruction file, it posts a plain deterministic review
+  request. If the instruction file is invalid, oversized, or unreadable,
+  `post-once` returns `human_gate` without posting a comment. It captures the
+  helper JSON internally and uses the returned `comment_id` / `created_at` as
+  the observation boundary.
 - `post-once` rejects caller-supplied `--trigger-comment-id` and
   `--trigger-created-at`; those values must come from the helper result.
 - `resume` never posts a new comment. It requires explicit
@@ -191,8 +214,7 @@ status collection are implemented by the public scripts.
 - `stderr` progress is bounded and non-authoritative.
 - `--out` artifacts are optional debug/audit copies.
 - Observation statuses include `passed`, `failed`, `pending`, `running`,
-  `none`, `timeout`, `stale_head`, `unknown`, `review_completion_unknown`,
-  and `human_gate`.
+  `none`, `timeout`, `stale_head`, `unknown`, and `human_gate`.
 - CI terminal state and Codex review lifecycle are observed independently and
   merged only in the final wait result.
 - GitHub Actions workflow runs/jobs are the only CI source used by PR
@@ -216,30 +238,25 @@ status collection are implemented by the public scripts.
   head freshness, unresolved threads, changes-requested reviews, draft/non-open
   PR state, stale head, and blocking limitations have been integrated. Those
   blockers override `codex_no_findings_issue_comment`.
-- `review_completion_unknown` is a non-pass terminal-like review state. It means
-  CI passed, the observed head matched, no current trigger-boundary review
-  blocker was selected, and no trusted Codex review completion signal was found
-  after the trigger-age and CI-passed-age guards are satisfied. Carryover
-  unresolved inventory may still be present and must be reported separately from
-  current selected blockers.
-- Stable no-completion evidence for the current boundary must not be collapsed
-  into a generic timeout. The top-level result is `human_gate`, with the decision
-  reason indicating `review_completion_unknown`, so a human can review the
-  no-completion condition explicitly.
-- `review_completion_unknown` remains a human gate, not `passed` or
-  merge-ready, and it is not proof that no review work exists. Below the latency
-  guards, stable no-completion evidence stays in the wait/resume path instead of
-  being promoted early.
-- When `review_completion_unknown` is emitted, wait metadata marks that a fresh
-  post-unknown audit is required before any merge-prepared or no-review-work
-  reporting. Downstream orchestration must perform that fresh audit instead of
-  reusing the unknown result as absence proof.
+- Review completion is never inferred from elapsed time, quiet windows, repeated
+  fingerprints, zero selected comments, or CI success. If no explicit
+  Codex-authored completion artifact is visible for the current trigger boundary
+  and expected head, the observation remains retryable until the configured wait
+  deadline is reached.
+- At the wait deadline, missing current Codex completion becomes `timeout` with
+  `recommended_next_action=wait_or_resume` and `observation_complete=false`.
+  Timeout is not proof that no review work exists and must not be reported as
+  merge-ready or no-review-work evidence.
+- Legacy artifacts may contain `review_completion_unknown`. Treat that wording
+  only as historical vocabulary, not as a current wait result, review completion
+  proof, blocker disposition, or merge-prepared evidence.
 - The wait loop may skip a final under-budget snapshot and preserve the latest
   useful payload with `final_poll_skipped_reason="insufficient_next_snapshot_budget"`.
   Treat that as budget-preservation metadata, not as a stronger review result.
 - A missing current completion signal or pending review remains retryable and
-  stays in the wait/resume path, such as `wait_or_resume`, until the configured
-  latency guards or terminal conditions are reached.
+  stays in the wait/resume path, such as `wait_or_resume`, until an explicit
+  completion artifact, blocker, CI/permission terminal condition, or timeout is
+  observed.
 - Generic `fallback_issue_comment` remains low-confidence evidence. It keeps the
   final status in the human gate path with
   `manual_review_required_non_retryable` and does not promote a run to
@@ -264,9 +281,8 @@ status collection are implemented by the public scripts.
 - When a timeout or limit occurs before CI and review complete, the final JSON
   includes resume metadata and a resume command hint for continuing the same
   boundary without posting another trigger.
-- Same-boundary resume preserves CI-passed age through additive wait metadata so
-  delayed `review_completion_unknown` evaluation can continue without posting a
-  new trigger.
+- Same-boundary resume preserves trigger metadata so observation can continue
+  without posting a new trigger.
 
 ## Safe Usage
 

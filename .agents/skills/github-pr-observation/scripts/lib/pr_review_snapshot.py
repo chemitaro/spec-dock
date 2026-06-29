@@ -979,6 +979,92 @@ def normalized_body_text(value):
     return " ".join(str(value or "").strip().split()).casefold()
 
 
+def finding_priorities(raw_body):
+    priorities = []
+    declared_pattern = re.compile(
+        r"(?:!\[P([0-3])\s+Badge\]|\[\s*P([0-3])\s*\]|^\*{0,2}\s*P([0-3])(?=\b|:|-))",
+        flags=re.IGNORECASE,
+    )
+    for line in str(raw_body or "").splitlines():
+        match = declared_pattern.search(line.strip())
+        if match:
+            priority = next(group for group in match.groups() if group is not None)
+            priorities.append(f"P{priority}")
+    return priorities
+
+
+def finding_priority(raw_body):
+    priorities = finding_priorities(raw_body)
+    return priorities[0] if priorities else None
+
+
+def has_protected_domain(raw_body):
+    normalized = normalized_body_text(raw_body)
+    protected_patterns = (
+        r"\bsecurity\b",
+        r"\bprivacy\b",
+        r"\bdata\s+loss\b",
+        r"\bpermission\b",
+        r"\bpermissions\b",
+        r"\bauth\b",
+        r"\bauthentication\b",
+        r"\bauthorization\b",
+        r"\bmigration\b",
+        r"\bbilling\b",
+        r"\bfinancial\b",
+        r"\btoken\b",
+        r"\bsecret\b",
+        r"\bpr\s+observation\b",
+        r"\bmerge-prepared\b",
+        r"\bmerge\s+prepared\b",
+        r"\bci\b",
+        r"\breview\s+coverage\b",
+        r"\breview\s+gate\b",
+        r"\bguidance\b",
+        r"\bexecution-ready\b",
+        r"\bassurance\b",
+        r"\bschema\b",
+        r"\bdependency\b",
+        r"\bdependencies\b",
+        r"\bsync\b",
+        r"\bactive\s+set\b",
+        r"\bdelete\b",
+        r"\buninstall\b",
+        r"\bworktree\s+remove\b",
+        r"\bcleanup\b",
+        r"\bsymlink\b",
+        r"\bpath\s+traversal\b",
+        r"\binstall\b",
+        r"\bupdate\b",
+        r"\bshipped\s+asset\b",
+        r"\bprovider\s+asset\b",
+        r"\bdogfooding\s+mirror\b",
+        r"\bparity\b",
+    )
+    return any(re.search(pattern, normalized) for pattern in protected_patterns)
+
+
+def has_machine_evidence(raw_body):
+    normalized = normalized_body_text(raw_body)
+    evidence_terms = (
+        "test:",
+        "repro:",
+        "trace:",
+        "stack:",
+        "error:",
+        "assertion:",
+        "command:",
+        "failing test",
+        "deterministic",
+    )
+    return any(term in normalized for term in evidence_terms)
+
+
+def blocker_fingerprint(kind, priority, raw_body):
+    digest = body_hash(normalized_body_text(raw_body))
+    return f"{kind}:{priority}:{digest}"
+
+
 def reviewed_commit_from_no_findings_body(raw_body):
     for line in str(raw_body or "").splitlines():
         match = re.search(r"\*\*Reviewed commit:\*\*\s*`([0-9A-Fa-f]{7,64})`", line)
@@ -1057,11 +1143,72 @@ current_pending_codex_review_present = any(
 ) or any(item.get("codex_authored") for item in review_request_signals)
 if pending_codex_review_signals:
     current_pending_codex_review_present = True
+
+blocker_policy_findings = []
+for item in [*current_codex_issue_comments, *selected_review_signals]:
+    raw_body = item.get("_fallback_pass_raw_body") or item.get("body") or item.get("_raw_body_artifact") or ""
+    priorities = finding_priorities(raw_body)
+    if not priorities:
+        continue
+    protected_domain = has_protected_domain(raw_body)
+    machine_evidence = has_machine_evidence(raw_body)
+    for priority in priorities:
+        if priority in {"P0", "P1"}:
+            disposition = "blocker"
+            reason = "p0_p1_priority"
+        elif priority == "P2" and protected_domain and machine_evidence:
+            disposition = "promoted_blocker"
+            reason = "p2_protected_domain_with_machine_evidence"
+        elif priority in {"P2", "P3"}:
+            disposition = "non_blocking_followup"
+            reason = "p2_p3_default_non_blocking"
+        else:
+            disposition = "unknown"
+            reason = "unknown_priority"
+        blocker_policy_findings.append({
+            "kind": item.get("kind"),
+            "id": item.get("id"),
+            "priority": priority,
+            "disposition": disposition,
+            "reason": reason,
+            "protected_domain": protected_domain,
+            "machine_evidence": machine_evidence,
+            "fingerprint": blocker_fingerprint(item.get("kind"), priority, raw_body),
+        })
+blocker_policy_blockers = [
+    item for item in blocker_policy_findings if item.get("disposition") in {"blocker", "promoted_blocker"}
+]
+blocker_policy_non_blocking = [
+    item for item in blocker_policy_findings if item.get("disposition") == "non_blocking_followup"
+]
+blocker_policy_status = (
+    "blocker_present" if blocker_policy_blockers else "non_blocking_only" if blocker_policy_non_blocking else "none"
+)
+blocker_policy_payload = {
+    "status": blocker_policy_status,
+    "blocker_count": len(blocker_policy_blockers),
+    "non_blocking_count": len(blocker_policy_non_blocking),
+    "findings": blocker_policy_findings,
+    "blocker_fingerprints": [item.get("fingerprint") for item in blocker_policy_blockers],
+}
 no_findings_completion_promotes = bool(
     expected_head_sha
     and current_pr_head_sha
     and sha_prefix_matches(current_pr_head_sha, expected_head_sha)
     and no_findings_source_ids
+    and not stale_codex_head_context_present
+    and not actionable_unresolved_thread_ids
+    and not review_decision_changes_requested
+    and not review_decision_requires_review
+    and not active_changes_requested_review_present
+    and not current_pending_codex_review_present
+    and not blocking_collection_failure
+)
+blocker_policy_no_action_promotes = bool(
+    blocker_policy_status == "non_blocking_only"
+    and expected_head_sha
+    and current_pr_head_sha
+    and sha_prefix_matches(current_pr_head_sha, expected_head_sha)
     and not stale_codex_head_context_present
     and not actionable_unresolved_thread_ids
     and not review_decision_changes_requested
@@ -1077,6 +1224,10 @@ if selected_review_signals:
 elif no_findings_completion_promotes:
     lifecycle_status = "completed"
     completion_signal = "codex_no_findings_issue_comment"
+    lifecycle_confidence = "medium"
+elif blocker_policy_no_action_promotes:
+    lifecycle_status = "completed"
+    completion_signal = "blocker_policy_no_action"
     lifecycle_confidence = "medium"
 elif current_pending_codex_review_present:
     lifecycle_status = "pending"
@@ -1138,6 +1289,7 @@ selected_blocker_present = bool(selected_unresolved_thread_ids or selected_chang
 explicit_completion_present = completion_signal in {
     "submitted_pull_request_review",
     "codex_no_findings_issue_comment",
+    "blocker_policy_no_action",
 }
 fallback_issue_comment_present = completion_signal == "fallback_issue_comment"
 if selected_blocker_present:
@@ -1285,7 +1437,11 @@ no_findings_completion_candidate = {
     "reason": ("current_boundary_codex_no_findings_comment" if no_findings_completion_promotes else None),
     "promotes_top_level_status": bool(no_findings_completion_promotes),
 }
-if selected_unresolved_thread_ids:
+if blocker_policy_blockers:
+    decision_status_reason = "blocker_policy_validated_blocker"
+    decision_status = "human_gate"
+    decision_action = "address_review_feedback"
+elif selected_unresolved_thread_ids:
     decision_status_reason = "current_selected_unresolved_thread"
     decision_status = "human_gate"
     decision_action = "address_review_feedback"
@@ -1307,7 +1463,11 @@ elif completion_signal == "none":
     decision_action = "wait_or_resume"
 else:
     decision_status_reason = (
-        "codex_no_findings_issue_comment" if completion_signal == "codex_no_findings_issue_comment" else "passed"
+        "codex_no_findings_issue_comment"
+        if completion_signal == "codex_no_findings_issue_comment"
+        else "blocker_policy_no_action"
+        if completion_signal == "blocker_policy_no_action"
+        else "passed"
     )
     decision_status = "passed"
     decision_action = (
@@ -1351,6 +1511,7 @@ decision_source = {
     "confidence": lifecycle_confidence,
     "fallback_pass_candidate": fallback_pass_candidate,
     "no_findings_completion_candidate": no_findings_completion_candidate,
+    "blocker_policy": blocker_policy_payload,
     "no_completion_evidence": no_completion_evidence,
     "blocking_limitations": [item.get("code") for item in limitations if item.get("severity") == "blocking"],
 }
@@ -1375,6 +1536,7 @@ audit_fingerprint_source = {
         "body_chars_omitted": body_state["body_chars_omitted"],
     },
     "codex_review": codex_review_payload,
+    "blocker_policy": blocker_policy_payload,
     "limitations": limitations,
 }
 audit_fingerprint = hashlib.sha256(
@@ -1399,6 +1561,7 @@ review_current_payload = {
     "actionable_unresolved_thread_ids": actionable_unresolved_thread_ids,
     "actionable_unresolved_count": len(actionable_unresolved_thread_ids),
     "selected_changes_requested_evidence": selected_changes_requested_evidence,
+    "blocker_policy": blocker_policy_payload,
 }
 review_audit_payload = {
     "scope": "all_fetched",

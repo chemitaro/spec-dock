@@ -50,6 +50,33 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     _bind_leaf(active_sub.add_parser("show", help="Show current active pointers"), registry, "active_show")
     _bind_leaf(active_sub.add_parser("clear", help="Clear active pointers"), registry, "active_clear")
 
+    p_assurance = sub.add_parser("assurance", help="Show, classify, and verify issue assurance contracts")
+    assurance_sub = p_assurance.add_subparsers(dest="assurance_cmd", required=True)
+    _bind_leaf(
+        assurance_sub.add_parser("show", help="Show the target issue assurance contract"), registry, "assurance_show"
+    )
+    _bind_leaf(
+        assurance_sub.add_parser("classify", help="Classify the target issue and write .assurance.json"),
+        registry,
+        "assurance_classify",
+    )
+    _bind_leaf(
+        assurance_sub.add_parser("verify", help="Verify the target issue assurance contract"),
+        registry,
+        "assurance_verify",
+    )
+    _bind_leaf(
+        assurance_sub.add_parser("compose", help="Compose profile-aware planning artifact sections"),
+        registry,
+        "assurance_compose",
+    )
+
+    _bind_leaf(sub.add_parser("guidance", help="Render state-aware issue guidance"), registry, "guidance")
+
+    p_workflow = sub.add_parser("workflow", help="Show state-aware workflow status")
+    workflow_sub = p_workflow.add_subparsers(dest="workflow_cmd", required=True)
+    _bind_leaf(workflow_sub.add_parser("status", help="Show resolved workflow state"), registry, "workflow_status")
+
     _bind_leaf(sub.add_parser("delete", help="Delete local spec nodes with safeguards"), registry, "delete")
     _bind_leaf(sub.add_parser("close", help="Close the linked GitHub issue for a node target"), registry, "close")
     _bind_leaf(
