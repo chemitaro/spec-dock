@@ -834,6 +834,104 @@ result: pass.
 
 ---
 
+### セッションログ（2026-06-29 23:40 - 23:55）
+
+#### 対象
+- Step: S05 provider / dogfooding / installed parity
+- AC/EC: AC-012 / CLOS-007
+- 計画上の出典（Planned source）:
+  - `plan.md` S05
+  - `design.md` DES-009
+
+#### 実施内容
+- dev-coder `019f13b4-ce2d-72a1-9b3b-63b2a7788773` に S05 の parity 検証を委任した。
+- provider asset presence、installed target presence、dogfooding mirror parity、controlled compose materialization の既存 coverage を整理した。
+- `test_issue_profile_templates_are_provider_and_installed_assets` を精密化し、installed target の required issue templates が provider asset と内容一致することを確認する assertion を追加した。
+- production code、provider templates、dogfooding templates、active dogfooding issue artifacts は変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_profile_templates_are_provider_and_installed_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_templates_match_provider_assets tests/cli_runtime/test_assurance_compose.py::TestCliAssuranceCompose::test_assurance_compose_all_materializes_planning_sections
+
+result: 3 passed.
+```
+
+```bash
+diff -qr src/spec_dock/assets/spec_dock/templates spec-dock/templates
+
+result: pass; no output.
+```
+
+```bash
+git diff --check
+
+result: pass.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S05 | Red / alternative | installed target に profile templates が含まれること | S01 時点で generic copying は成立済み; S05 は content parity assertion を追加 | focused pytest before/after | pass | inspect-only / coverage-tightening path |
+| S05 | Green | provider / dogfooding / installed / controlled compose parity | focused 3 tests passed; provider/dogfooding template diff clean | pytest + `diff -qr` | pass | CLOS-007 |
+| S05 | Refactor | active dogfooding issue artifacts を rewrite しない | production/templates/dogfooding data no-op | diff inspection; `git diff --check` | pass | S90 docs impact は次工程 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S05 | installed issue templates の content parity が presence-only だった | dev-coder inspection | provider asset と installed file の text equality assertion を追加 | CLOS-007 | no | `tests/unit/infra/test_init_update.py` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S05 | CLOS-007 | provider / dogfooding / installed target repos が同じ template structure と compose behavior を公開する | provider presence + installed content parity + dogfooding mirror parity + controlled compose materialization tests | pass | production no-op |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| CLOS-007 | S05 | yes | focused-test + inspection | existing generic copying green; content equality not explicit | focused installer/mirror/CLI compose pytest | 3 passed | `diff -qr` provider/dogfooding templates no output |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CLOS-007 | S05 | `test_issue_profile_templates_are_provider_and_installed_assets`; `test_checked_in_dogfooding_mirror_templates_match_provider_assets`; `test_assurance_compose_all_materializes_planning_sections` | pass | compose behavior verified in temp initialized target |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S05 | delegated | installer / dogfooding parity test verification | dev-coder | provider/dogfooding/installed parity coverage | `plan.md` S05; DES-009 | focused tests only if coverage gap found | source runtime, templates, dogfooding issue artifacts, report | focused pytest and `git diff --check` | dogfooding rewrite risk or template wording change | summary, coverage mapping, verification, no-op rationale | pass; one test assertion tightened |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S05 | dev-coder | tightened installed target template parity by asserting provider/installed content equality; mapped provider/dogfooding/installed/controlled compose coverage | `tests/unit/infra/test_init_update.py` | focused 3 tests -> 3 passed; `git diff --check` -> pass | pass: code-reviewer `019f13b7-ce93-7cb1-978d-5918d7eff42a` found no findings | S90 still owns docs / skill impact resolution | accepted for commit |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S05 | N/A; implementation was delegated to dev-coder | N/A | N/A | N/A | revert S05 commit if needed after review | focused pytest and `git diff --check` | code-reviewer required | no waiver / no degraded mode |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S05 | step reviewer | code-reviewer | fresh | pass | N/A | commit S05 | code-reviewer `019f13b7-ce93-7cb1-978d-5918d7eff42a` passed with no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S05 | pending commit | test/report S05 evidence | pending | pending | production/templates/dogfooding data no-op | CLOS-007 focused tests | `git diff --check` | `diff -qr src/spec_dock/assets/spec_dock/templates spec-dock/templates` |
+
+#### 変更したファイル
+- `tests/unit/infra/test_init_update.py` - installed target の required issue templates が provider asset と内容一致することを検証。
+- `spec-dock/active/issue/report.md` - S05 evidence を記録。
+
+#### コミット
+- pending
+
+#### メモ
+- S90 deferred: docs / skill impact resolution を次ステップで扱う。
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
