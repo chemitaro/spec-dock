@@ -819,7 +819,7 @@ result: pass.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S04 | pending commit | tests/report S04 evidence | pending | pending | production code no-op; tests changed | CLOS-006 application / CLI tests | `git diff --check` | diff inspection |
+| S04 | committed | tests/report S04 evidence | `8f9ce689` | clean before ledger update; post-ledger clean pending | production code no-op; tests changed | CLOS-006 application / CLI tests | `git diff --check` | diff inspection |
 
 #### 変更したファイル
 - `tests/unit/application/test_assurance.py` - dry-run no-write と real-write-only source binding update の application tests を追加。
@@ -827,7 +827,7 @@ result: pass.
 - `spec-dock/active/issue/report.md` - S04 evidence を記録。
 
 #### コミット
-- pending
+- `8f9ce689` `test(assurance): compose結果契約とsource bindingを固定`
 
 #### メモ
 - S05 deferred: provider / dogfooding / installed parity を次ステップで扱う。
