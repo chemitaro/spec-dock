@@ -232,6 +232,11 @@ def _classify_plan_text(plan_text: str | None) -> str:
     markers = (
         "実装ステップ",
         "具体テストケース",
+        "振る舞いバックログ",
+        "実行中の振る舞い",
+        "tdd サイクル",
+        "validation gate",
+        "報告証跡",
         "step closure contract",
         "approved-no-op",
         "decision-only closure",
@@ -299,6 +304,8 @@ def _classify_design_text(design_text: str | None) -> str:
     )
     if any(marker in lower for marker in scaffold_markers):
         return "scaffold"
+    if _has_placeholder_entries(stripped):
+        return "scaffold"
     markers = (
         "設計",
         "全体像",
@@ -314,6 +321,14 @@ def _classify_design_text(design_text: str | None) -> str:
     if any(marker in lower for marker in markers):
         return "substantive"
     return "scaffold"
+
+
+def _has_placeholder_entries(text: str) -> bool:
+    return _has_placeholder_list_items(text) or _has_placeholder_table_rows(text)
+
+
+def _has_placeholder_list_items(text: str) -> bool:
+    return any(line.strip() in {"- ...", "1. ...", "2. ..."} for line in text.splitlines())
 
 
 def _frontmatter_has_any(text: str, markers: tuple[str, ...]) -> bool:
