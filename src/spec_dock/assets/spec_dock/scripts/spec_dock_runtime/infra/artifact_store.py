@@ -82,6 +82,8 @@ class ArtifactStore:
         resolved = path.resolve()
         if not _is_relative_to(resolved, self.specdock_dir.resolve()):
             raise RuntimeError(f"Profile template is outside spec-dock workspace: {path}")
+        if path.exists() and not path.is_file():
+            raise RuntimeError(f"Profile template is not a file: {path.relative_to(self.repo_root)}")
         if not path.is_file():
             raise FileNotFoundError(f"Profile template not found: {path.relative_to(self.repo_root)}")
         text = path.read_text(encoding="utf-8")
