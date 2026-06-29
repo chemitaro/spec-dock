@@ -1005,7 +1005,13 @@ result: pass.
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer `019f13c6-6816-7a83-a17d-8a7d1857c7b3` / re-review `019f13d0-7f97-7070-8969-cdffb362d30e` | issue-wide integrated diff | initial fail P1: profile Markdown template body left `<ISS_ID>` / `<ISS_TITLE>` tokens unresolved in composed design/plan. Fix delegated to dev-coder `019f13cb-a0a9-7b23-af5a-6767165c12d1`: render profile template body from target artifact front matter before compose and add CLI token regression. QA P2 root-escape coverage was fixed in same follow-up with symlink fail-closed CLI test. Re-review found no findings. | 1 | pass |
+
+#### S99 Follow-up Fix Evidence（2026-06-30 00:30 - 00:45）
+| finding | 対応 | 変更ファイル | 検証 | 状態 |
+|---|---|---|---|---|
+| Code-review P1: unresolved `<ISS_ID>` / `<ISS_TITLE>` tokens | profile template body を target artifact front matter から render してから marker scan / body match / append する | `artifact_composer.py`; `tests/cli_runtime/test_assurance_compose.py` | `uv run pytest tests/unit/domain/test_artifact_composer.py tests/cli_runtime/test_assurance_compose.py` -> 33 passed | pass: re-review `019f13d0-7f97-7070-8969-cdffb362d30e` |
+| QA P2: root-escape template guard coverage gap | workspace 外 symlink template が `template_validation_failed` で fail-closed し、artifacts / `.assurance.json` unchanged である CLI test を追加 | `tests/cli_runtime/test_assurance_compose.py` | final focused lane -> 43 passed; `git diff --check` -> pass | pass: re-review `019f13d0-7f97-7070-8969-cdffb362d30e` |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
