@@ -248,9 +248,30 @@ def _classify_plan_text(plan_text: str | None) -> str:
     )
     if not has_executable_marker and any(marker in lower for marker in scaffold_markers):
         return "scaffold"
+    if has_executable_marker and _has_placeholder_table_rows(stripped):
+        return "scaffold"
     if has_executable_marker:
         return "executable"
     return "scaffold"
+
+
+def _has_placeholder_table_rows(text: str) -> bool:
+    placeholder_cells = {
+        "...",
+        "ac-...",
+        "b-...",
+        "clos-...",
+        "des-...",
+        "evd-...",
+    }
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|") or stripped.count("|") < 3:
+            continue
+        cells = [cell.strip().strip("`").lower() for cell in stripped.strip("|").split("|")]
+        if sum(1 for cell in cells if cell in placeholder_cells) >= 2:
+            return True
+    return False
 
 
 def _classify_design_text(design_text: str | None) -> str:

@@ -1055,6 +1055,37 @@ uv run pytest
 result: 1554 passed, 76 skipped. (delegated verification)
 ```
 
+### PR #248 Codex Review P1 修正ゲート（Post-PR Review Repair Gate）
+| review thread | 指摘 | 対応 | 再検証 | 結果 |
+|---|---|---|---|---|
+| `PRRT_kwDOQ99OK86NBISi` | checked-in dogfooding runtime が旧 manifest-only composer のままで、`spec-dock/scripts/spec-dock assurance compose` が profile Markdown templates を materialize できない | provider runtime の `application/assurance.py`、`application/workflow.py`、`domain/artifact_composer.py`、`infra/artifact_store.py` を dogfooding mirror に同期し、mirror parity test の対象に追加 | `diff -q` provider/mirror target files -> pass; `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_mirror_match_provider_assets` -> pass | pass |
+| `PRRT_kwDOQ99OK86NBISr` | 未記入の Standard profile plan template が `実装ステップ` / `具体テストケース` marker により executable 扱いになりうる | plan readiness classifier に placeholder table row 判定を追加し、composed Standard plan が `plan-not-executable` で止まる CLI regression test を追加 | `uv run pytest tests/cli_runtime/test_workflow.py` -> 22 passed | pass |
+
+#### PR #248 P1 修正コマンド / 結果
+```bash
+make lint
+
+result: pass; ruff check pass, ruff format check pass, mypy pass.
+```
+
+```bash
+uv run pytest tests/cli_runtime/test_workflow.py tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_mirror_match_provider_assets
+
+result: 23 passed.
+```
+
+```bash
+uv run pytest tests/cli_runtime/test_assurance_compose.py tests/unit/domain/test_artifact_composer.py tests/unit/application/test_assurance.py
+
+result: 40 passed.
+```
+
+```bash
+uv run pytest
+
+result: 1555 passed, 76 skipped. (delegated verification)
+```
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...
