@@ -1,6 +1,0 @@
-sync-github: exit=0
-deps-check-ready-iss-01940-github: exit=0
-deps-check-blocked-iss-01933-github: exit=3
-deps-check-blocked-iss-01933-no-github: exit=3
-deps-check-unknown-iss-01942-github: exit=3
-verifier: exit=0
