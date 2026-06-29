@@ -1,1 +1,0 @@
-# Empty closed prerequisite epic
