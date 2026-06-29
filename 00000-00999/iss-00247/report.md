@@ -737,6 +737,103 @@ result: pass.
 
 ---
 
+### セッションログ（2026-06-29 23:18 - 23:35）
+
+#### 対象
+- Step: S04 application result contract と source binding
+- AC/EC: AC-010、AC-011 / CLOS-006
+- 計画上の出典（Planned source）:
+  - `plan.md` S04
+  - `design.md` DES-008
+
+#### 実施内容
+- dev-coder `019f13ac-61aa-7761-b392-848f27487f20` に S04 の result contract / source binding 監査を委任した。
+- production code は変更せず、既存実装が満たしている契約を application / CLI runtime tests で精密化した。
+- dry-run が具体的な `changed_paths` を返しつつ、artifact と `.assurance.json` を変更しないことを確認した。
+- real write 後にのみ `build_planning_source_binding()` が呼ばれ、`.assurance.json` の `source_binding` が planning artifacts の hash に更新されることを確認した。
+- second run unchanged では `changed_paths=[]` かつ `.assurance.json` が不要更新されないことを確認した。
+- template failure JSON の `details` / `errors` / `changed_paths=[]` は S03 追加済み CLI tests を covered-existing evidence として扱った。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance_compose.py
+
+result: 24 passed.
+```
+
+```bash
+git diff --check
+
+result: pass.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S04 | Red / alternative | dry-run / changed_paths / source binding regression を捕捉できること | 既存実装が契約を満たしていたため、characterization tests を追加 | application / CLI tests | pass | covered-existing path |
+| S04 | Green | CLOS-006 を application + CLI tests で監査可能化 | focused suite 24 passed | `uv run pytest tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance_compose.py` | pass | production diff なし |
+| S04 | Refactor | public output shape を維持する | production code unchanged; tests only | diff inspection; `git diff --check` | pass | S05 parity は未実施 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S04 | dry-run changed_paths が抽象 assertion だけだった | dev-coder inspection | concrete path assertion と `.assurance.json` unchanged assertion を追加 | CLOS-006 | no | `tests/cli_runtime/test_assurance_compose.py` |
+| S04 | real write 後の source_binding hash update が明示されていなかった | dev-coder inspection | design compose 後の `source_binding` hash を実ファイル hash と比較 | CLOS-006 | no | CLI runtime test |
+| S04 | second run unchanged の contract no-op が未固定だった | dev-coder inspection | `.assurance.json` unchanged assertion を追加 | CLOS-006 | no | CLI runtime test |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S04 | CLOS-006 | dry-run、changed_paths、source binding update を維持する | application + CLI tests で dry-run no-write、changed_paths、real-write-only binding update、unchanged no-op を確認 | pass | tests-only change |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| CLOS-006 | S04 | yes | characterization + focused-test | existing implementation already satisfied contract | `uv run pytest tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance_compose.py` | 24 passed | production code unchanged |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CLOS-006 | S04 | dry-run no-write, concrete changed_paths, real-write source_binding update, unchanged contract no-op | pass | error reporting coverage is inherited from S03 fail-closed tests |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S04 | delegated | runtime behavior contract tests | dev-coder | result contract / source binding tests | `plan.md` S04; DES-008 | application / CLI tests only unless implementation gap found | issue docs/report, S05 parity, template wording | focused pytest and `git diff --check` | output shape change or design mismatch | summary, changed files, verification, existing coverage | pass; production change not required |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S04 | dev-coder | added tests for dry-run no-write, concrete changed_paths, real-write planning source binding update, second-run contract no-op | `tests/unit/application/test_assurance.py`; `tests/cli_runtime/test_assurance_compose.py` | `uv run pytest tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance_compose.py` -> 24 passed; `git diff --check` -> pass | pass: code-reviewer `019f13b1-6219-7c53-9b6f-f31346e95353` found no findings | S05 still owns provider / dogfooding / installed parity | accepted for commit |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | N/A; implementation was delegated to dev-coder | N/A | N/A | N/A | revert S04 commit if needed after review | focused pytest and `git diff --check` | code-reviewer required | no waiver / no degraded mode |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | code-reviewer | fresh | pass | N/A | commit S04 | code-reviewer `019f13b1-6219-7c53-9b6f-f31346e95353` passed with no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S04 | pending commit | tests/report S04 evidence | pending | pending | production code no-op; tests changed | CLOS-006 application / CLI tests | `git diff --check` | diff inspection |
+
+#### 変更したファイル
+- `tests/unit/application/test_assurance.py` - dry-run no-write と real-write-only source binding update の application tests を追加。
+- `tests/cli_runtime/test_assurance_compose.py` - dry-run / unchanged / real-write source binding の CLI runtime assertions を精密化。
+- `spec-dock/active/issue/report.md` - S04 evidence を記録。
+
+#### コミット
+- pending
+
+#### メモ
+- S05 deferred: provider / dogfooding / installed parity を次ステップで扱う。
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
