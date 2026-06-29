@@ -213,7 +213,107 @@ result: pass.
 | added | CLOS-001〜CLOS-009 | none | CLOS-001〜CLOS-009 | template pack adoption and Japanese-first template policy expanded the planning contract | yes | yes |
 
 #### 実装未開始スロット
-The remaining execution evidence sections below are intentionally left as future slots until implementation starts. They must be filled by the executor as each approved step runs.
+The remaining execution evidence sections below are intentionally left as future slots until each approved step runs.
+
+---
+
+### セッションログ（2026-06-29 21:30 - 21:46）
+
+#### 対象
+- Step: S00 baseline characterization
+- AC/EC: CLOS-003、CLOS-005、CLOS-006 の baseline evidence
+- 計画上の出典（Planned source）:
+  - `plan.md` S00
+  - `design.md` DES-004〜DES-008
+  - `workflow_issue.md`
+
+#### 実施内容
+- `spec-dock-issue-execution` skill を読み、first-read として `guidance issue-execution` を実行した。
+- `guidance issue-execution` は `state=blocked` / `reason_code=design-not-substantive` / `may_execute_approved_plan=false` を返したため、D-006 と discussion artifact に false positive / manual fallback を記録した。
+- `workflow_issue.md` と `plan.md` を確認し、approved issue docs と fresh reviewer pass を execution authority として S00 を手動開始した。
+- repo-analyst `019f135d-85e1-7743-8150-13a60edf0768` に read-only baseline mapping を委任した。
+- `profile-sections.json` を点検し、現行では `design` / `plan` / `report` すべての `heading` と `body` prose authority を保持していることを確認した。
+- 既存 focused tests を実行し、baseline は green であることを確認した。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock guidance issue-execution
+
+result: blocked projection; state=blocked, reason_code=design-not-substantive, may_execute_approved_plan=false. Recorded as D-006 and manual fallback discussion.
+```
+
+```bash
+uv run pytest tests/unit/domain/test_artifact_composer.py
+
+result: pass; 7 passed.
+```
+
+```bash
+uv run pytest tests/unit/application/test_assurance.py
+
+result: pass; 3 passed.
+```
+
+```bash
+sed -n '1,240p' src/spec_dock/assets/spec_dock/templates/assurance/profile-sections.json
+
+result: inspected; current manifest contains design / plan / report prose bodies.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S00 | Red 代替 / baseline | characterization-only; existing tests pass なら baseline coverage として記録 | domain composer tests 7 passed | `uv run pytest tests/unit/domain/test_artifact_composer.py` | pass | 実装変更前の baseline |
+| S00 | Red 代替 / baseline | characterization-only; source binding / preflight baseline | application assurance tests 3 passed | `uv run pytest tests/unit/application/test_assurance.py` | pass | 実装変更前の baseline |
+| S00 | inspection | current JSON prose authority を確認 | `profile-sections.json` は design / plan / report body を保持 | manifest inspection | pass | S02 の移行対象を確認 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S00 | `guidance issue-execution` が approved docs でも `design-not-substantive` を返す | runtime guidance | D-006 と discussion artifact に記録し、manual fallback | CLOS-008 | no | `discussions/20260629t123000z-disc-issue-execution-guidance-false-positive-manual-fallback.md` |
+| S00 | `profile-sections.json` は現行で design / plan prose authority を持つ | manifest inspection + repo-analyst | S02 の移行対象として記録 | CLOS-002 / CLOS-003 | no | manifest inspection; repo-analyst `019f135d-85e1-7743-8150-13a60edf0768` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S00 | CLOS-003 / CLOS-005 / CLOS-006 baseline | compose、report legacy sections、placeholder guards、source binding、installer asset copying の現在挙動を確定する | focused tests pass; repo-analyst mapping; manifest inspection | pass | S00 自体では closure を閉じず、baseline evidence として記録 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| CLOS-003 baseline | S00 | yes | covered-existing | report compatibility / idempotence / downgrade baseline | `uv run pytest tests/unit/domain/test_artifact_composer.py` | pass | 7 passed |
+| CLOS-005 baseline | S00 | yes | covered-existing | placeholder guard / marker conflict / no-overwrite baseline | `uv run pytest tests/unit/domain/test_artifact_composer.py` | pass | 7 passed |
+| CLOS-006 baseline | S00 | yes | covered-existing | application preflight / source binding baseline | `uv run pytest tests/unit/application/test_assurance.py` | pass | 3 passed |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CLOS-003 | S00 baseline | existing domain tests and manifest inspection | baseline-pass | final closure remains S02/S04/S05 dependent |
+| CLOS-005 | S00 baseline | existing domain tests | baseline-pass | final closure remains S03 dependent |
+| CLOS-006 | S00 baseline | existing application tests | baseline-pass | final closure remains S04 dependent |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S00 | delegated read-only | baseline mapping and risk analysis | repo-analyst | composer / store / assurance / manifest / relevant tests | `plan.md` S00; `design.md` DES-004〜DES-008 | none | file edits | mapping, tests-to-closures, risks, Ledger Note | material spec gap or contradiction | summary, evidence, risks, Ledger Note | pass |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S00 | repo-analyst | current manifest is design/plan/report prose authority; existing domain/application tests cover baseline; installer asset copy likely generic | none | read-only inspection; reported `PYTHONDONTWRITEBYTECODE=1 uv run pytest -p no:cacheprovider tests/unit/domain/test_artifact_composer.py tests/unit/application/test_assurance.py` -> 10 passed | N/A | S02 must remove design/plan JSON prose without breaking report legacy | accepted |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S00 | pending commit | report S00 evidence only | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `spec-dock/active/issue/report.md` - S00 baseline evidence と manual fallback 記録を追加。
+
+#### コミット
+- pending
+
+---
 
 #### 対象
 - Step: S01, S02, ...
