@@ -16,6 +16,8 @@ ID: "epic-00224"
 - 2026-06-29: 旧 `Trusted GitHub Codex review policy` 方針は変更済み。Review trigger instruction source は PR base SHA 上の `.github/codex/review-policy.md` ではなく、`20260623t074444z-adr Script-local Codex Review Instruction` により `github-pr-observation` script-local Markdown asset へ置換する。
 - 2026-06-29: 旧 `review_completion_unknown` / quiet-window / elapsed-time による PR observation 終了方針は変更済み。Review completion は `20260628t154553z-adr PR Observation Explicit Review Completion` により current trigger boundary と expected head SHA に bind された Codex-authored completion artifact で判断する。
 - 2026-06-29: 旧 `comment zero` / inline review thread zero を blocker zero とみなす暗黙前提は変更済み。`20260628t185812z-adr PR Review Body Blocker Ingestion` により selected pull request review body も blocker policy input として扱う。
+- 2026-06-29: 旧 runtime-selected issue execution step / Step Assurance / Context Packet authority は変更済み。Issue execution は `20260629t003131z-adr Plan Centric Issue Execution Preflight` により `plan.md` を execution contract、`guidance issue-execution` を preflight validator とする。
+- 2026-06-29: 旧 Issue-local `assurance.json` path は変更済み。Assurance Contract は `20260629t003132z-adr Hidden Assurance Contract Path` により `.assurance.json` を canonical metadata contract とする。
 
 ## 目的（Initiative との紐づき）
 

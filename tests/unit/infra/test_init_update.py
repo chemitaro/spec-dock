@@ -29053,6 +29053,25 @@ esac
                 assert reason == "ci_pending"
                 assert action != "merge_prepared"
 
+    def test_issue_244_pr_observation_snapshot_required_actions_context_pending_is_waitable(self) -> None:
+        status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
+            ci_status="unknown",
+            limitations=[
+                {
+                    "code": "required_actions_context_pending",
+                    "recommended_next_action": "wait",
+                    "severity": "blocking",
+                    "source": "fetch_pr_observation_snapshot.sh",
+                }
+            ],
+        )
+
+        assert status == "pending"
+        assert action == "wait"
+        assert complete is False
+        assert reason == "ci_pending"
+        assert action != "merge_prepared"
+
     def test_issue_218_s02_snapshot_no_findings_pr_lifecycle_blockers_do_not_promote(self) -> None:
         cases = [
             ({"state": "OPEN", "isDraft": True}, "human_gate", "mark_pr_ready_for_review", "draft_pr"),

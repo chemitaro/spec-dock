@@ -381,9 +381,15 @@ def _strip_placeholder_marker(text: str) -> str:
     frontmatter, _body = _split_frontmatter(text)
     if not frontmatter:
         return text
-    frontmatter_lines = [
-        line for line in frontmatter.splitlines() if line.strip() != _AWAITING_ASSURANCE_COMPOSE_MARKER
-    ]
+    frontmatter_lines = []
+    for line in frontmatter.splitlines():
+        stripped = line.strip()
+        if stripped == _AWAITING_ASSURANCE_COMPOSE_MARKER:
+            continue
+        if stripped in {'状態: "draft"', "状態: draft"}:
+            frontmatter_lines.append('状態: "approved"')
+            continue
+        frontmatter_lines.append(line)
     return "\n".join(frontmatter_lines).rstrip() + "\n"
 
 

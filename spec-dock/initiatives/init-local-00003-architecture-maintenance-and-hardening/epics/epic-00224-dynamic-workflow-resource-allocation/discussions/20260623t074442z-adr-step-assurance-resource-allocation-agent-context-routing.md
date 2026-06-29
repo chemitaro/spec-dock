@@ -7,6 +7,8 @@ ID: "20260623t074442z-adr"
 最終更新: "2026-06-23"
 親: ["epic-00224"]
 authority: "accepted"
+amended_by:
+  - "20260629t003131z-adr"
 derived_from:
   - "20260623t074452z-disc-adr-decision-synthesis-after-issue-226-closure.md"
   - "20260623t024533z-research-agent-context-routing-supplemental-draft.md"
@@ -18,6 +20,12 @@ reflected_to:
 ---
 
 # 20260623t074442z-adr Step Assurance Resource Allocation And Agent Context Routing
+
+## 変更履歴（Supersession / Amendment）
+
+- 2026-06-29: `20260629t003131z-adr Plan Centric Issue Execution Preflight` により、default issue execution path で runtime が step assurance / context packet / worker / reviewer / verification を選ぶ方針は変更済み。
+- 維持: reviewer / consultant independence、clean-room boundary、bounded return contract は current policy として有効である。
+- 変更済み: step-level worker / reviewer / verification / context obligations は runtime inference ではなく、`plan.md` の explicit step contract として planning 時に固定する。
 
 ## ADR 化基準
 - hard to reverse: yes
