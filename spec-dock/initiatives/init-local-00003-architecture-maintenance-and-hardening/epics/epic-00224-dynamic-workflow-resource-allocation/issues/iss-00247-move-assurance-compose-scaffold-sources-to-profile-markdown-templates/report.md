@@ -305,110 +305,156 @@ result: inspected; current manifest contains design / plan / report prose bodies
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S00 | pending commit | report S00 evidence only | pending | pending | N/A | N/A | N/A | N/A |
+| S00 | committed | report S00 evidence only | `362e7f79` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `spec-dock/active/issue/report.md` - S00 baseline evidence と manual fallback 記録を追加。
 
 #### コミット
-- pending
+- `362e7f79` docs(issue): S00 ベースライン証跡を記録
 
 ---
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01 provider template assets の追加
+- AC/EC: AC-001、AC-004、AC-012、AC-013 / CLOS-001、CLOS-009
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` S01
+  - `requirement.md` AC-001 / AC-004 / AC-013
+  - `design.md` DES-001 / DES-010
+  - closure ids: CLOS-001、CLOS-009
 
 #### 実施内容
-- ...
+- dev-coder `019f137d-f668-71d0-aa80-451c7afc466b` に S01 の provider template assets と focused asset presence tests を委任した。
+- provider `templates/issue/requirement.md` を template pack 採用後の厚い common requirement template に更新した。
+- provider `templates/issue-profiles/{lite,standard,strict,critical}/{design,plan}.md` を追加した。
+- 追加・更新 templates の title、見出し、小見出し、説明本文を日本語優先へ補正した。
+- `tests/unit/infra/test_init_update.py` に profile templates の provider / installed asset presence assertion を追加した。
+- 既存 `test_checked_in_dogfooding_mirror_templates_match_provider_assets` が provider と checked-in dogfooding mirror の完全一致を要求するため、`spec-dock/templates/issue/requirement.md` と `spec-dock/templates/issue-profiles/**` を最小同期した。
+- code-reviewer `019f1382-fc1a-7471-a211-e21b0c4f7e32` は S01 diff 自体を S01 scope 内と確認したが、report の S01 証跡が placeholder-only であるため `review_status=fail` とした。この節の更新はその P1 finding への対応である。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+git ls-tree -r --name-only HEAD -- src/spec_dock/assets/spec_dock/templates/issue-profiles spec-dock/templates/issue-profiles
 
-<result>
+result: red-alternative; S01 実装前の HEAD には issue-profiles templates が存在しない。
+```
+
+```bash
+rg --files src/spec_dock/assets/spec_dock/templates/issue-profiles spec-dock/templates/issue-profiles
+
+result: pass; provider と dogfooding mirror に 4 profiles x design/plan の 16 paths が存在する。
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_profile_templates_are_provider_and_installed_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_templates_match_provider_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_spec_document_templates_keep_policy_out_of_scaffold
+
+result: pass; 3 passed.
+```
+
+```bash
+diff -qr src/spec_dock/assets/spec_dock/templates/issue spec-dock/templates/issue
+diff -qr src/spec_dock/assets/spec_dock/templates/issue-profiles spec-dock/templates/issue-profiles
+
+result: pass; no differences.
+```
+
+```bash
+git diff --check
+
+result: pass.
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | Red 代替 | asset presence assertion は issue-profiles 追加前なら fail する | HEAD に `templates/issue-profiles/**` が存在しないことを確認 | `git ls-tree -r --name-only HEAD -- ...` | pass | focused test は files 追加前なら missing provider asset で fail する |
+| S01 | Green | provider / installed / dogfooding mirror に required profile templates が存在する | 3 focused tests passed; provider/mirror diff clean | `uv run pytest ...test_issue_profile_templates_are_provider_and_installed_assets ...test_checked_in_dogfooding_mirror_templates_match_provider_assets ...test_spec_document_templates_keep_policy_out_of_scaffold`; `diff -qr` | pass | installer / mirror parity を確認 |
+| S01 | inspection | template title / heading / prose が日本語優先である | headings は日本語を主にし、英語は profile ID、frontmatter keys、artifact IDs、括弧併記に限定 | `rg -n '^#{1,6} ' src/spec_dock/assets/spec_dock/templates/issue/requirement.md src/spec_dock/assets/spec_dock/templates/issue-profiles/*/*.md` | pass | 一部 technical term は括弧併記 |
+| S01 | Refactor | runtime compose logic を変更しない | runtime files / `profile-sections.json` は未変更 | `git diff --name-only`; diff inspection | pass | S01 scope 内 |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | checked-in dogfooding mirror must match provider templates | existing `test_checked_in_dogfooding_mirror_templates_match_provider_assets` | provider asset additionに合わせて `spec-dock/templates/**` を最小同期 | CLOS-007 / CLOS-009 | no | dev-coder Ledger Note; mirror test pass |
+| S01 | S01 evidence ledger was placeholder-only | code-reviewer `019f1382-fc1a-7471-a211-e21b0c4f7e32` | この S01 evidence block を実測値で更新 | CLOS-001 / CLOS-009 | no | review_status=fail finding P1 |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | CLOS-001 | provider template pack files が期待 layout に存在する | provider `issue/requirement.md` と `issue-profiles/{lite,standard,strict,critical}/{design,plan}.md` が存在し、focused installer test が pass | pass | installed target への asset presence も test で確認 |
+| S01 | CLOS-009 | 追加・更新 template の title / heading / prose が日本語優先である | headings inspection; dev-coder inspection; code-reviewer S01 scope review | pass | final step review は report 更新後に再実行する |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| CLOS-001 | S01 | yes | red-alternative + focused-test | HEAD lacked `issue-profiles`; added test would fail before assets exist | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_profile_templates_are_provider_and_installed_assets` | pass | provider and installed asset presence |
+| CLOS-001 / CLOS-007 | S01 | yes | covered-existing | mirror parity required provider/dogfooding sync | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_templates_match_provider_assets` | pass | dogfooding mirror parity |
+| CLOS-009 | S01 | yes | inspection + focused-test | template pack had English-heavy headings before adaptation | heading inspection; `test_spec_document_templates_keep_policy_out_of_scaffold` | pass | Japanese-first template policy checked by inspection |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| CLOS-001 | S01 | asset files, focused installer test, mirror diff | pass | provider / installed / mirror presence confirmed |
+| CLOS-009 | S01 | Japanese-first heading/prose inspection and focused scaffold policy test | pass | code-reviewer re-run passed |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| alias-mapped | `test_issue_profile_templates_are_provider_and_installed_assets` | CLOS-001 | CLOS-001 | provider/install asset presence を具体 test に対応付けた | no | yes |
+| alias-mapped | `test_checked_in_dogfooding_mirror_templates_match_provider_assets` | CLOS-001 / CLOS-007 | CLOS-001 / CLOS-007 | checked-in mirror parity を既存 test に対応付けた | no | no |
+| alias-mapped | heading inspection | CLOS-009 | CLOS-009 | 日本語優先 template policy は機械的 test と人間 inspection を組み合わせる | no | yes |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00247 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/cdfe/spec-dock` | iss-00247 | current session | repo-analyst, dev-coder, code-reviewer, spec-reviewer, qa-reviewer | same repo, active issue, session, named role; no destructive action / credentialed access / scope expansion beyond issue; PR publishing handled later by explicit PR workflow | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed with bounded delegation and required reviewer gates |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | shipped scaffold assets and installer tests | dev-coder | provider issue templates, issue-profiles, focused installer tests, required mirror sync | `plan.md` S01; AC-001 / AC-004 / AC-013; DES-001 / DES-010 | provider templates, profile templates, focused tests, mirror sync only if existing test requires | runtime compose logic, `profile-sections.json`, active issue docs/report/discussions | asset listing, focused pytest, Japanese-first inspection, diff check | semantic rewrite beyond adaptation; broad unrelated installer refactor | summary, changed files, verification, Ledger Note | pass with Ledger Note accepted |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | provider issue requirement template updated; profile templates added; focused asset presence test added; dogfooding mirror synced because existing mirror parity test required it | `src/spec_dock/assets/spec_dock/templates/issue/requirement.md`; `src/spec_dock/assets/spec_dock/templates/issue-profiles/**`; `tests/unit/infra/test_init_update.py`; `spec-dock/templates/issue/requirement.md`; `spec-dock/templates/issue-profiles/**` | focused pytest -> 3 passed; `rg --files` -> expected templates; `git diff --check` -> pass | first code-reviewer failed on report evidence only | no product risk; dogfooding mirror sync accepted as existing parity-test requirement | accepted; report evidence updated and re-review required |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01 | N/A; implementation was delegated to dev-coder | N/A | N/A | N/A | revert S01 commit if needed after review | focused pytest and `git diff --check` | code-reviewer required; first pass failed on report evidence and is being rerun | no waiver / no degraded mode |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S01 | step reviewer | code-reviewer | fresh | failed | N/A | follow-up required | `019f1382-fc1a-7471-a211-e21b0c4f7e32`; P1 report evidence placeholder finding; product diff otherwise in scope |
+| S01 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to Step Commit Gate | `019f1387-5d0e-7363-9732-6d6d2c7f3b6a`; findings=[]; previous P1 resolved |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | pending commit | provider/dogfooding templates, focused installer test, report S01 evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/templates/issue/requirement.md` - common Issue requirement template を更新。
+- `src/spec_dock/assets/spec_dock/templates/issue-profiles/**` - profile 別 design / plan templates を追加。
+- `tests/unit/infra/test_init_update.py` - provider / installed issue profile template asset presence test を追加。
+- `spec-dock/templates/issue/requirement.md` - dogfooding mirror を provider と同期。
+- `spec-dock/templates/issue-profiles/**` - dogfooding mirror を provider と同期。
+- `spec-dock/active/issue/report.md` - S01 evidence と reviewer finding 対応を記録。
 
 #### コミット
-- <hash> <message>
+- pending
 
 #### メモ
-- ...
+- dev-coder Ledger Note は、dogfooding mirror sync を既存 parity test による S01 verification-required exception として提案した。orchestrator は、`test_checked_in_dogfooding_mirror_templates_match_provider_assets` が provider と checked-in mirror の完全一致を要求しているため、S01 scope 内の最小同期として採用する。
 
 ---
 

@@ -35,6 +35,12 @@ from tests.cli_runtime.harness import (
 
 _EXPECTED_MANAGED_SKILL_NAMES = _HARNESS_EXPECTED_MANAGED_SKILL_NAMES
 
+_REQUIRED_ISSUE_PROFILE_TEMPLATE_PATHS = tuple(
+    f"issue-profiles/{profile}/{artifact}.md"
+    for profile in ("lite", "standard", "strict", "critical")
+    for artifact in ("design", "plan")
+)
+
 
 @contextmanager
 def _case(**labels: object):
@@ -4119,6 +4125,22 @@ class TestInitUpdate(CliRuntimeHarness):
     def test_checked_in_dogfooding_mirror_templates_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         self._assert_installed_templates_match_provider_assets(repo_root, repo_root=repo_root)
+
+    def test_issue_profile_templates_are_provider_and_installed_assets(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        asset_root = repo_root / "src/spec_dock/assets/spec_dock/templates"
+
+        required_paths = ("issue/requirement.md", *_REQUIRED_ISSUE_PROFILE_TEMPLATE_PATHS)
+        for rel_path in required_paths:
+            assert (asset_root / rel_path).is_file(), f"missing provider issue template asset: {rel_path}"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target"
+            target.mkdir()
+            assert main(["init", str(target)]) == 0
+            installed_root = target / "spec-dock" / "templates"
+            for rel_path in required_paths:
+                assert (installed_root / rel_path).is_file(), f"missing installed issue template asset: {rel_path}"
 
     def test_checked_in_dogfooding_active_none_reports_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
