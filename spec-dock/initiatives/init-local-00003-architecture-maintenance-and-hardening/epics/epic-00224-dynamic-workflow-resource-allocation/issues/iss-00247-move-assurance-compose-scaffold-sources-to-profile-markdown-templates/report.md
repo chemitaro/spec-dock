@@ -939,6 +939,64 @@ result: pass.
 |---|---|---|---|---|
 | docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
 
+#### S90 セッションログ（2026-06-29 23:58 - 2026-06-30 00:15）
+
+##### 対象
+- Step: S90 docs / skill impact resolution
+- AC/EC: AC-013 / CLOS-008、CLOS-009
+- 計画上の出典（Planned source）:
+  - `plan.md` S90
+  - `design.md` DES-010
+
+##### 実施内容
+- `phase_design.md`、`authoring/issue-plan.md`、`workflow_issue.md` と issue planning / execution skills の参照関係を点検した。
+- stale guidance として、Issue design / plan template を旧 `templates/issue/{design,plan}.md` の実体テンプレートとして読ませる案内を特定した。
+- doc-writer `019f13bb-32f3-7ee1-9479-a6d8e342338b` に shipped docs の最小修正を委任した。
+- `templates/issue/design.md` / `templates/issue/plan.md` は compose 前 placeholder であり、手動 authoring の開始点ではないことを docs に明記した。
+- 実体の `design.md` / `plan.md` 本文は `.assurance.json` の `authorized_profile` に従い、`templates/issue-profiles/{lite,standard,strict,critical}/{design,plan}.md` から `assurance compose` が合成することを docs に明記した。
+- title 行、見出し、小見出しは日本語優先とし、日本語だけで正確性が落ちる場合のみ日本語表現 + 括弧内英語名称を併記する方針を docs に明記した。
+- provider docs と checked-in dogfooding docs の対応ファイルを同期した。
+
+##### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_docs_match_provider_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_templates_match_provider_assets
+
+result: 2 passed.
+```
+
+```bash
+diff -qr src/spec_dock/assets/spec_dock/docs spec-dock/docs
+
+result: pass; no output.
+```
+
+```bash
+git diff --check
+
+result: pass.
+```
+
+##### S90 Closure Coverage
+| クロージャID（closure id） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|
+| CLOS-008 | `phase_design.md` / `authoring/issue-plan.md` / `workflow_issue.md` inspection and docs update | pass | future agents が placeholder から手動 design / plan authoring に戻る stale guidance を解消 |
+| CLOS-009 | docs wording for Japanese-first title / headings policy | pass | 日本語だけで正確性が落ちる場合のみ括弧内英語名称を併記 |
+
+##### S90 Delegated Worker Evidence
+| 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 検証（verification） | レビュアー判定（reviewer verdict） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|
+| doc-writer | clarified placeholder/profile template relationship and Japanese-first heading guidance in shipped docs; follow-up wording now covers common `requirement.md` plus profile-specific `design.md` / `plan.md` | `src/spec_dock/assets/spec_dock/docs/phase_design.md`; `src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md`; `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`; mirrored `spec-dock/docs/**` files | docs parity pytest -> 2 passed; `diff -qr` provider/dogfooding docs -> no output; `git diff --check` -> pass | pass: spec-reviewer `019f13be-1505-71f1-a71b-3a16ed00c003` P2 fixed and re-review pass | accepted for commit |
+
+##### S90 Reviewer Gate Status
+| ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|
+| docs/spec alignment | spec-reviewer | fresh | pass | commit S90 | spec-reviewer `019f13be-1505-71f1-a71b-3a16ed00c003` found one P2, fixed wording to cover common `requirement.md` and profile-specific `design.md` / `plan.md`, re-review passed |
+
+##### S90 Commit Gate
+| クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | メモ（notes） |
+|---|---|---|---|---|
+| pending commit | shipped docs / dogfooding docs / report S90 evidence | pending | pending | docs-only change |
+
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
