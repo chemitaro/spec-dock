@@ -995,7 +995,7 @@ result: pass.
 ##### S90 Commit Gate
 | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | メモ（notes） |
 |---|---|---|---|---|
-| pending commit | shipped docs / dogfooding docs / report S90 evidence | pending | pending | docs-only change |
+| committed | shipped docs / dogfooding docs / report S90 evidence | `48552d50` | clean before ledger update; post-ledger clean pending | docs-only change |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
