@@ -918,14 +918,14 @@ result: pass.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S05 | pending commit | test/report S05 evidence | pending | pending | production/templates/dogfooding data no-op | CLOS-007 focused tests | `git diff --check` | `diff -qr src/spec_dock/assets/spec_dock/templates spec-dock/templates` |
+| S05 | committed | test/report S05 evidence | `8ff85d79` | clean before ledger update; post-ledger clean pending | production/templates/dogfooding data no-op | CLOS-007 focused tests | `git diff --check` | `diff -qr src/spec_dock/assets/spec_dock/templates spec-dock/templates` |
 
 #### 変更したファイル
 - `tests/unit/infra/test_init_update.py` - installed target の required issue templates が provider asset と内容一致することを検証。
 - `spec-dock/active/issue/report.md` - S05 evidence を記録。
 
 #### コミット
-- pending
+- `8ff85d79` `test(templates): installed issue templateのparityを固定`
 
 #### メモ
 - S90 deferred: docs / skill impact resolution を次ステップで扱う。
