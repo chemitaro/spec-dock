@@ -615,6 +615,128 @@ result: pass.
 
 ---
 
+### セッションログ（2026-06-29 22:55 - 23:10）
+
+#### 対象
+- Step: S03 fail-closed validation と atomic compose
+- AC/EC: AC-006、AC-007、AC-008、AC-009 / CLOS-004、CLOS-005
+- 計画上の出典（Planned source）:
+  - `plan.md` S03
+  - `design.md` DES-005 / DES-006 / DES-007
+
+#### 実施内容
+- dev-coder `019f139e-2d84-7142-a4d4-fa4847638a12` に S03 の fail-closed validation と atomic preflight を委任した。
+- `compose_assurance()` は全 target artifacts と selected profile templates を読み、全 artifact の compose candidate を作ってから write preflight / write に進む形になった。
+- profile template load / validation failure は uncaught exception ではなく `template_validation_failed` の visible `AssuranceResult` に変換されるようになった。
+- non-file template、empty template body、invalid managed marker template、target marker conflict、substantive content conflict が write 前に fail-closed することを tests で確認した。
+- `--artifact all` で 1 artifact が invalid な場合、artifacts と `.assurance.json` が unchanged であることを application / CLI tests で確認した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/domain/test_artifact_composer.py
+
+red result before implementation: failing focused tests for missing ProfileArtifactTemplate / invalid marker expectations.
+green result after implementation: 14 passed.
+```
+
+```bash
+uv run pytest tests/unit/application/test_assurance.py
+
+green result: 5 passed.
+```
+
+```bash
+uv run pytest tests/cli_runtime/test_assurance_compose.py
+
+green result: 16 passed.
+```
+
+```bash
+uv run pytest tests/unit/domain/test_artifact_composer.py tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance_compose.py
+
+parent verification result: 35 passed.
+```
+
+```bash
+git diff --check
+
+result: pass.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S03 | Red | missing template fails before writes | missing profile template は実装前に `FileNotFoundError` / no JSON failure | application / CLI focused tests | pass | dev-coder captured red |
+| S03 | Red | invalid marker template fails before writes | invalid marker template の artifact-level error assertion を追加 | CLI focused test | pass | dev-coder captured red |
+| S03 | Red | `--artifact all` partial failure writes nothing | invalid artifact failure 時の artifact / contract unchanged assertion を追加 | application / CLI tests | pass | partial write を固定 |
+| S03 | Green | all selected templates / artifacts preflight before writes | domain 14 passed、application 5 passed、CLI 16 passed、parent aggregate 35 passed | `uv run pytest ...` | pass | CLOS-004 / CLOS-005 |
+| S03 | Refactor | broad transaction machinery を入れず preflight ordering で保証する | all candidates are composed before write preflight/write | diff inspection; `git diff --check` | pass | S04 source-binding expansion は未実施 |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S03 | non-file template / empty template body should be visible fail-closed | dev-coder implementation | CLI fail-closed coverage を追加 | CLOS-004 | no | `tests/cli_runtime/test_assurance_compose.py` |
+| S03 | dry-run / changed_paths / source binding expansion remains S04 scope | dev-coder deferred risk | S04 の予定範囲として記録 | CLOS-006 | no | dev-coder summary |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S03 | CLOS-004 | missing / invalid template が write 前に fail-closed する | missing / non-file / empty / invalid marker template fail with visible errors before writes | pass | template_validation_failed / marker_conflict paths |
+| S03 | CLOS-005 | placeholder safety、no-overwrite、idempotence、downgrade safety が維持される | existing and new domain/application/CLI tests pass; invalid all leaves artifacts and contract unchanged | pass | old-model managed artifact no-append regression preserved |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| CLOS-004 | S03 | yes | red-required + focused-test | missing template / invalid marker expectations failed before implementation | `uv run pytest tests/unit/application/test_assurance.py`; `uv run pytest tests/cli_runtime/test_assurance_compose.py` | pass | application 5 passed; CLI 16 passed |
+| CLOS-005 | S03 | yes | focused-test | partial failure atomicity needed explicit tests | `uv run pytest tests/unit/domain/test_artifact_composer.py tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance_compose.py` | pass | 35 passed parent aggregate |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CLOS-004 | S03 | missing / non-file / empty / invalid-marker template fail-closed tests | pass | full coverage within S03 |
+| CLOS-005 | S03 | all-candidate preflight and unchanged artifact/contract assertions | pass | no-overwrite / idempotence safety preserved |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S03 | delegated | runtime application / infra validation and atomicity behavior | dev-coder | fail-closed template validation, all-candidate preflight, focused tests | `plan.md` S03; DES-005 / DES-006 / DES-007 | application / infra / composer and focused tests | classify logic, report redesign, active issue docs/report | Red/Green tests, atomicity evidence, diff check | scope change requiring design update | summary, changed files, verification, deferred risks, Ledger Note | pass; no material implementation decisions |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | compose preflights all artifacts/templates before writes; template load/validation failures return visible result; non-file/empty/invalid-marker template fail closed | `application/assurance.py`; `artifact_store.py`; domain/application/CLI tests | domain -> 14 passed; application -> 5 passed; CLI -> 16 passed; parent aggregate -> 35 passed; `git diff --check` -> pass | pass: code-reviewer `019f13a6-e672-78b1-a59c-4a086cf81a30` and `019f13a8-9078-7841-894f-34f9b0c7c9bb` found no findings | S04 still owns dry-run / changed_paths / source binding expansion | accepted for commit |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | N/A; implementation was delegated to dev-coder | N/A | N/A | N/A | revert S03 commit if needed after review | focused pytest and `git diff --check` | code-reviewer required | no waiver / no degraded mode |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh | pass | N/A | commit S03 | code-reviewer `019f13a6-e672-78b1-a59c-4a086cf81a30` and `019f13a8-9078-7841-894f-34f9b0c7c9bb` both passed with no findings |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S03 | pending commit | application/infra/tests/report S03 evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/assurance.py` - template load/validation failure を visible result に変換し、全 candidate compose 後に write する。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/artifact_store.py` - non-file profile template を explicit error にする。
+- `tests/unit/domain/test_artifact_composer.py` - invalid marker / no-overwrite regression を追加。
+- `tests/unit/application/test_assurance.py` - missing template / atomicity tests を追加。
+- `tests/cli_runtime/test_assurance_compose.py` - missing / non-file / empty / invalid marker template fail-closed coverage を追加。
+- `spec-dock/active/issue/report.md` - S03 evidence を記録。
+
+#### コミット
+- pending
+
+#### メモ
+- S04 deferred: dry-run、changed_paths、source binding behavior の追加監査は S04 で扱う。
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
