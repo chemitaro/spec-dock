@@ -52,6 +52,8 @@ class ArtifactStoreLike(Protocol):
 
     def load_profile_section_manifest(self) -> Any: ...
 
+    def load_profile_artifact_template(self, artifact: Any, profile: Any) -> Any: ...
+
 
 def show_assurance(request: ShowAssuranceRequest, *, store: AssuranceStoreLike) -> AssuranceResult:
     target = store.resolve_issue_target(request.issue)
@@ -119,6 +121,14 @@ def compose_assurance(
                 artifact.artifact,
                 contract.classification.authorized_profile,
                 lite_candidate=contract.classification.lite_candidate,
+                profile_template=(
+                    artifact_store.load_profile_artifact_template(
+                        artifact.artifact,
+                        contract.classification.authorized_profile.value,
+                    )
+                    if artifact.artifact in ("design", "plan")
+                    else None
+                ),
             ),
         )
         for artifact in artifacts

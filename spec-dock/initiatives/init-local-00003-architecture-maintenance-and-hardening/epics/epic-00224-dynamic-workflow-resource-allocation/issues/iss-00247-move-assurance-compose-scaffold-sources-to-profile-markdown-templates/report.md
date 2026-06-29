@@ -458,14 +458,160 @@ result: pass.
 
 ---
 
-### セッションログ（2026-06-29 HH:MM - HH:MM）
+### セッションログ（2026-06-29 22:24 - 22:40）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S02 profile 別 Markdown template source の domain / infra 導入
+- AC/EC: AC-002、AC-003、AC-005、AC-007、AC-008、AC-009 / CLOS-002、CLOS-003
+- 計画上の出典（Planned source）:
+  - `plan.md` S02
+  - `design.md` DES-002 / DES-003 / DES-004 / DES-006 / DES-007
 
 #### 実施内容
-- ...
+- dev-coder `019f138a-f2ea-73b1-a398-dbfb5169e692` に S02 の domain / infra / application 接続を委任した。
+- `design` / `plan` compose は `authorized_profile` から `spec-dock/templates/issue-profiles/<profile>/<artifact>.md` を読み、Markdown template body を placeholder artifact に materialize するようになった。
+- `lite_candidate=true` は template selection に使わず、`authorized_profile` のみを selection authority として維持した。
+- `report` compose は従来どおり `profile-sections.json` の managed-section compose behavior を維持した。
+- `profile-sections.json` から `design` / `plan` prose sections を除去し、report sections は保持した。
+- provider と checked-in dogfooding mirror の `profile-sections.json` を同期した。
+- S03 scope の structured fail-closed error reporting / full `--artifact all` atomicity hardening は未実装として deferred risk に残した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/domain/test_artifact_composer.py
+
+red result before implementation: 4 failed, 7 passed.
+green result after implementation: 12 passed.
+```
+
+```bash
+uv run pytest tests/unit/application/test_assurance.py
+
+result: pass; 3 passed.
+```
+
+```bash
+uv run python - <<'PY'
+from pathlib import Path
+import sys
+sys.path.insert(0, 'src/spec_dock/assets/spec_dock/scripts')
+from spec_dock_runtime.infra.artifact_store import ArtifactStore
+store = ArtifactStore(Path('.'))
+for profile in ('lite','standard','strict','critical'):
+    for artifact in ('design','plan'):
+        template = store.load_profile_artifact_template(artifact, profile)
+        print(f'{profile}/{artifact}: {template.repo_relative_path} {len(template.body)}')
+PY
+
+result: pass; all 8 real profile templates loaded through ArtifactStore.
+```
+
+```bash
+rg -n '"artifact": "(design|plan)"|design\.assurance|plan\.' src/spec_dock/assets/spec_dock/templates/assurance/profile-sections.json spec-dock/templates/assurance/profile-sections.json
+
+result: pass; no matches.
+```
+
+```bash
+rg -n '"artifact": "report"|"report"' src/spec_dock/assets/spec_dock/templates/assurance/profile-sections.json spec-dock/templates/assurance/profile-sections.json
+
+result: pass; report sections remain present.
+```
+
+```bash
+git diff --check
+
+result: pass.
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S02 | Red | profile Markdown body content が composed design / plan に入ることを期待する domain test | implementation 前に `ProfileArtifactTemplate` missing と manifest authority assertions で fail | `uv run pytest tests/unit/domain/test_artifact_composer.py` | pass | red result: 4 failed, 7 passed |
+| S02 | Green | design / plan は Markdown template body、report は managed-section compose | domain tests 12 passed; application tests 3 passed | `uv run pytest tests/unit/domain/test_artifact_composer.py`; `uv run pytest tests/unit/application/test_assurance.py` | pass | `authorized_profile=standard` + `lite_candidate=true` も Standard template |
+| S02 | inspection | `profile-sections.json` は design / plan prose authority を持たず、report sections を維持する | design / plan matches none; report matches present | `rg` inspections | pass | provider と dogfooding mirror を確認 |
+| S02 | Refactor | layer boundary を維持する | domain model + infra loader + application handoff に限定 | diff inspection; `git diff --check` | pass | S03 fail-closed hardening は deferred |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | real profile templates should load through `ArtifactStore` | implementation smoke | all 8 profile template files を store 経由で読み込み確認 | CLOS-002 | no | `uv run python` smoke |
+| S02 | missing / invalid template reporting and full `--artifact all` atomicity remain S03 scope | dev-coder deferred risk | S03 の予定範囲として記録し、S02 では追加しない | CLOS-004 / CLOS-005 | no | dev-coder summary |
+| S02 | existing managed-section design/plan artifacts would receive full template append on rerun | code-reviewer `019f1391-db9e-7c52-b6df-f84dd307b78f` | blocking P1として bounded follow-up を委任 | CLOS-005 | no | review_status=fail finding P1 |
+| S02 | CLI runtime tests still expect managed-section markers in design/plan after compose | parent smoke test | S02の新挙動に合わせて focused CLI expectations を更新する | CLOS-002 / CLOS-003 | no | `uv run pytest tests/cli_runtime/test_assurance_compose.py` -> 2 failed, 11 passed |
+| S02 | old-model managed-section design/plan no-append regression needs a focused test | dev-coder follow-up | domain regression test を追加し、full template append を no-op に修正 | CLOS-005 | no | `uv run pytest tests/unit/domain/test_artifact_composer.py -k old_managed_section` red -> 1 failed before fix; full suite green after fix |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | CLOS-002 | compose が `authorized_profile` で profile Markdown template を選択する | domain tests and application fake prove Markdown template materialization; store smoke reads real templates | pass | `lite_candidate` does not reduce obligations |
+| S02 | CLOS-003 | `report.md` compose behavior が互換維持される | report sections remain in manifest; application tests pass | pass | report legacy path retained |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| CLOS-002 | S02 | yes | red-required + focused-test | domain test failed before implementation | `uv run pytest tests/unit/domain/test_artifact_composer.py` | pass | 12 passed |
+| CLOS-003 | S02 | yes | focused-test + inspection | report sections were mixed with design/plan before implementation | `uv run pytest tests/unit/application/test_assurance.py`; report manifest `rg` inspection | pass | 3 passed; report sections present |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CLOS-002 | S02 | domain tests, application tests, real template store smoke | pass | final CLI behavior still S04/S05 dependent |
+| CLOS-003 | S02 | report manifest inspection and application tests | pass | S04/S05 will continue mixed-mode verification |
+| CLOS-005 | S02 follow-up | old-model managed-section design/plan no-append regression test | pass | supports no-overwrite / idempotence safety after migration |
+| CLOS-006 | S02 follow-up | CLI compose mixed-mode expectations | pass | broader dry-run/source-binding remains S04 |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| alias-mapped | `test_design_and_plan_compose_materializes_profile_markdown_template_body` | CLOS-002 | CLOS-002 | profile Markdown body materialization を具体 test に対応付けた | no | yes |
+| alias-mapped | `test_authorized_standard_lite_candidate_uses_standard_markdown_template_not_lite` | CLOS-002 | CLOS-002 | selection authority を concrete test に対応付けた | no | yes |
+| alias-mapped | manifest report-only inspection | CLOS-003 | CLOS-003 | report legacy compatibility と design/plan prose authority removal を inspection に対応付けた | no | yes |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S02 | delegated | runtime domain / infra / application behavior | dev-coder | profile Markdown template loading, design/plan compose, report legacy path, focused tests | `plan.md` S02; DES-002〜DES-004 / DES-006 / DES-007 | domain / infra / narrowly necessary application / manifest / focused tests | classify logic, report redesign, active issue docs/report/discussions | Red/Green tests, manifest inspection, real template smoke, diff check | semantic scope change; S03 atomicity expansion | summary, changed files, verification, deferred risks, Ledger Note | pass; no material implementation decisions |
+
+#### 委任 worker 証跡（Delegated Worker Evidence）
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | design/plan now load profile Markdown templates by authorized_profile; report remains profile-sections managed-section path; design/plan prose removed from manifest | `artifact_composer.py`; `artifact_store.py`; `application/assurance.py`; provider/dogfooding `profile-sections.json`; domain/application tests | domain tests -> 12 passed; application tests -> 3 passed; store smoke -> pass; `git diff --check` -> pass | pending code-reviewer | S03 still owns structured fail-closed missing/invalid template reporting and full atomicity hardening | accepted for review |
+
+#### 親実装例外（Parent Implementation Exception）
+| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | N/A; implementation was delegated to dev-coder | N/A | N/A | N/A | revert S02 commit if needed after review | focused pytest, manifest inspection, store smoke, `git diff --check` | code-reviewer required | no waiver / no degraded mode |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | pending | provisional | N/A | review required | not yet run |
+| S02 | step reviewer | code-reviewer | fresh | failed | N/A | follow-up required | `019f1391-db9e-7c52-b6df-f84dd307b78f`; P1 existing managed artifact auto-append risk |
+| S02 | follow-up verification | N/A | fresh | passed | N/A | re-review required | `uv run pytest tests/unit/domain/test_artifact_composer.py tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance_compose.py` -> 29 passed |
+| S02 | step reviewer | code-reviewer | fresh | passed | N/A | proceed to Step Commit Gate | `019f1399-ab1a-71c2-9926-c5d314694c69`; findings=[]; previous P1 resolved |
+
+#### ステップ commit ゲート（Step Commit Gate）
+| ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S02 | pending commit | runtime/domain/infra/application manifest/tests/report S02 evidence | pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/artifact_composer.py` - profile Markdown template compose path を追加。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/artifact_store.py` - profile artifact template loader を追加。
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/assurance.py` - design/plan compose に profile template を渡す。
+- `src/spec_dock/assets/spec_dock/templates/assurance/profile-sections.json` - design/plan prose sections を除去し report sections を維持。
+- `spec-dock/templates/assurance/profile-sections.json` - dogfooding mirror を provider と同期。
+- `tests/unit/domain/test_artifact_composer.py` - Markdown template materialization / idempotence / no-overwrite / selection authority / manifest demotion tests を追加。
+- `tests/unit/application/test_assurance.py` - artifact store fake に profile template loader を追加。
+- `spec-dock/active/issue/report.md` - S02 evidence を記録。
+
+#### コミット
+- pending
+
+#### メモ
+- S03 deferred: missing / invalid template の structured error reporting、invalid template marker handling、`--artifact all` の full atomicity hardening は S03 で扱う。
+- S02 follow-up: code-reviewer P1 は old-model managed-section design/plan artifacts を no-op にする domain regression で修正した。CLI runtime tests は design/plan full Markdown materialization と report managed-section preservation の mixed-mode expectation に更新した。
 
 ---
 

@@ -87,6 +87,16 @@ class _ArtifactStoreFake:
     def load_profile_section_manifest(self):
         return self.manifest
 
+    def load_profile_artifact_template(self, artifact, profile):
+        from spec_dock_runtime.domain.artifact_composer import ProfileArtifactTemplate
+
+        return ProfileArtifactTemplate(
+            profile=profile,
+            artifact=artifact,
+            repo_relative_path=f"spec-dock/templates/issue-profiles/{profile}/{artifact}.md",
+            body=f"# {profile} {artifact} template\n\n{profile.upper()}_{artifact.upper()}_TEMPLATE_BODY\n",
+        )
+
 
 def _contract(domain_assurance, *, issue_id: str = "iss-00227"):
     binding = domain_assurance.SourceBinding(
