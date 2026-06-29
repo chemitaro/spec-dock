@@ -440,7 +440,7 @@ result: pass.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | pending commit | provider/dogfooding templates, focused installer test, report S01 evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S01 | committed | provider/dogfooding templates, focused installer test, report S01 evidence | `0fcf64ac` | `git status --short` -> clean | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/templates/issue/requirement.md` - common Issue requirement template を更新。
@@ -451,7 +451,7 @@ result: pass.
 - `spec-dock/active/issue/report.md` - S01 evidence と reviewer finding 対応を記録。
 
 #### コミット
-- pending
+- `0fcf64ac` feat(templates): Issue grade別テンプレートを追加
 
 #### メモ
 - dev-coder Ledger Note は、dogfooding mirror sync を既存 parity test による S01 verification-required exception として提案した。orchestrator は、`test_checked_in_dogfooding_mirror_templates_match_provider_assets` が provider と checked-in mirror の完全一致を要求しているため、S01 scope 内の最小同期として採用する。
