@@ -126,19 +126,17 @@ def compose_assurance(
         except (FileNotFoundError, NotADirectoryError, OSError, RuntimeError, ValueError) as exc:
             composed.append((artifact, _template_validation_error(artifact.artifact, contract, str(exc))))
             continue
-        composed.append(
-            (
-                artifact,
-                compose_artifact(
-                    artifact.text,
-                    manifest,
-                    artifact.artifact,
-                    contract.classification.authorized_profile,
-                    lite_candidate=contract.classification.lite_candidate,
-                    profile_template=profile_template,
-                ),
-            )
-        )
+        composed.append((
+            artifact,
+            compose_artifact(
+                artifact.text,
+                manifest,
+                artifact.artifact,
+                contract.classification.authorized_profile,
+                lite_candidate=contract.classification.lite_candidate,
+                profile_template=profile_template,
+            ),
+        ))
 
     if any(not result.ok for _, result in composed):
         views = tuple(_compose_artifact_view(artifact, result) for artifact, result in composed)

@@ -100,8 +100,8 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
                 assert "iss-00301 Compose assurance" in text
                 assert 'ID: "iss-00301"' in text
                 assert 'タイトル: "Compose assurance"' in text
-                assert '<ISS_ID>' not in text
-                assert '<ISS_TITLE>' not in text
+                assert "<ISS_ID>" not in text
+                assert "<ISS_TITLE>" not in text
 
     def test_assurance_compose_does_not_overwrite_substantive_non_placeholder_content(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -317,10 +317,7 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
                     plan_template.mkdir()
                 else:
                     plan_template.write_text(
-                        "---\n"
-                        'profile: "standard"\n'
-                        'artifact: "plan"\n'
-                        "---\n",
+                        '---\nprofile: "standard"\nartifact: "plan"\n---\n',
                         encoding="utf-8",
                     )
 
@@ -515,9 +512,10 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert payload["ok"] is True
             assert payload["status"] == "dry-run"
             assert payload["dry_run"] is True
-            assert sorted(payload["changed_paths"]) == sorted(
-                [(issue_dir / f"{artifact}.md").relative_to(target).as_posix() for artifact in ("design", "plan", "report")]
-            )
+            assert sorted(payload["changed_paths"]) == sorted([
+                (issue_dir / f"{artifact}.md").relative_to(target).as_posix()
+                for artifact in ("design", "plan", "report")
+            ])
             assert self._artifact_texts(issue_dir) == before
             assert contract_path.read_text(encoding="utf-8") == contract_before
 
@@ -596,10 +594,7 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
         }
 
     def _source_binding_by_role(self, contract: dict) -> dict[str, dict]:
-        return {
-            artifact["role"]: artifact
-            for artifact in contract["source_binding"]["artifacts"]
-        }
+        return {artifact["role"]: artifact for artifact in contract["source_binding"]["artifacts"]}
 
     def _sha256(self, path: Path) -> str:
         import hashlib
