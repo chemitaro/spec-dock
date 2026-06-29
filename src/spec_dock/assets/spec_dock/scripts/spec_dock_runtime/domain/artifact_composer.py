@@ -245,8 +245,9 @@ def _compose_from_profile_template(
             f"Profile template mismatch: expected {authorized_profile}, got {profile_template.profile}"
         )
 
+    template_body = _render_profile_template_body(profile_template.body, text)
     target_scan = _scan_managed_sections(text)
-    template_scan = _scan_managed_sections(profile_template.body)
+    template_scan = _scan_managed_sections(template_body)
     errors = (*target_scan.errors, *template_scan.errors)
     if errors:
         return ComposeArtifactResult(
@@ -263,7 +264,7 @@ def _compose_from_profile_template(
 
     placeholder_state = _placeholder_state(text, artifact)
     if placeholder_state == "conflict":
-        if _body_matches_template(text, profile_template.body):
+        if _body_matches_template(text, template_body):
             return ComposeArtifactResult(
                 artifact=artifact,
                 authorized_profile=authorized_profile,
@@ -297,11 +298,11 @@ def _compose_from_profile_template(
         )
 
     if placeholder_state == "placeholder":
-        output_text = _append_template_body(_strip_placeholder_marker(text), profile_template.body)
+        output_text = _append_template_body(_strip_placeholder_marker(text), template_body)
     elif target_scan.section_ids:
         output_text = text
     else:
-        output_text = _append_blocks(text, [profile_template.body.rstrip()])
+        output_text = _append_blocks(text, [template_body.rstrip()])
     return ComposeArtifactResult(
         artifact=artifact,
         authorized_profile=authorized_profile,
@@ -533,6 +534,71 @@ def _append_template_body(text: str, template_body: str) -> str:
 def _body_matches_template(text: str, template_body: str) -> bool:
     _frontmatter, body = _split_frontmatter(text)
     return body.strip() == template_body.strip()
+
+
+def _render_profile_template_body(template_body: str, target_text: str) -> str:
+    replacements = _profile_template_replacements(target_text)
+    rendered = template_body
+    for token, value in replacements.items():
+        rendered = rendered.replace(token, value)
+    return rendered
+
+
+def _profile_template_replacements(target_text: str) -> dict[str, str]:
+    frontmatter, _body = _split_frontmatter(target_text)
+    if not frontmatter:
+        return {}
+
+    scalar_fields = _frontmatter_scalar_fields(frontmatter)
+    parent_ids = _frontmatter_list_values(frontmatter, "親")
+    github_refs = _frontmatter_list_values(frontmatter, "関連GitHub")
+    issue_id = scalar_fields.get("ID")
+    issue_title = scalar_fields.get("タイトル")
+    replacements: dict[str, str] = {}
+    if issue_id:
+        replacements["<ISS_ID>"] = issue_id
+        replacements["<FEATURE_ID>"] = issue_id
+    if issue_title:
+        replacements["<ISS_TITLE>"] = issue_title
+        replacements["<FEATURE_NAME>"] = issue_title
+    for parent_id in parent_ids:
+        if parent_id.startswith("epic-") and "<EPIC_ID>" not in replacements:
+            replacements["<EPIC_ID>"] = parent_id
+        elif parent_id.startswith("init-") and "<INIT_ID>" not in replacements:
+            replacements["<INIT_ID>"] = parent_id
+    if github_refs:
+        replacements["<GITHUB_ISSUE_NUMBER_OR_URL>"] = github_refs[0]
+        replacements["<ISSUE_NUMBER_OR_URL>"] = github_refs[0]
+    if scalar_fields.get("作成者"):
+        replacements["<YOUR_NAME>"] = scalar_fields["作成者"]
+    if scalar_fields.get("最終更新"):
+        replacements["YYYY-MM-DD"] = scalar_fields["最終更新"]
+    return replacements
+
+
+def _frontmatter_scalar_fields(frontmatter: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for line in frontmatter.splitlines():
+        if line.strip() == "---" or ":" not in line:
+            continue
+        key, raw_value = line.split(":", 1)
+        value = raw_value.strip()
+        if not value or value.startswith("["):
+            continue
+        fields[key.strip()] = value.strip('"')
+    return fields
+
+
+def _frontmatter_list_values(frontmatter: str, key: str) -> tuple[str, ...]:
+    pattern = re.compile(rf"(?m)^{re.escape(key)}:\s*\[(?P<values>[^\]]*)\]\s*$")
+    match = pattern.search(frontmatter)
+    if match is None:
+        return ()
+    return tuple(
+        value.strip().strip('"')
+        for value in match.group("values").split(",")
+        if value.strip()
+    )
 
 
 def _profile_name(profile: AssuranceProfile | str) -> ProfileName:

@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 import tempfile
 
+import pytest
+
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
@@ -33,12 +35,18 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             report_text = (issue_dir / "report.md").read_text(encoding="utf-8")
             assert "spec-dock:managed-section begin" not in design_text
             assert "Issue 設計書（Standard）" in design_text
+            assert "iss-00301 Compose assurance" in design_text
             assert "## 1. 等級 Standard" in design_text
+            assert "<ISS_ID>" not in design_text
+            assert "<ISS_TITLE>" not in design_text
             assert payload["artifacts"]["design"]["changed"] is True
             assert payload["artifacts"]["design"]["added_section_ids"] == []
             assert "spec-dock:managed-section begin" not in plan_text
             assert "Issue 実装計画書（Standard / TDD）" in plan_text
+            assert "iss-00301 Compose assurance" in plan_text
             assert "## 6. 仕様固定クロージャ一覧" in plan_text
+            assert "<ISS_ID>" not in plan_text
+            assert "<ISS_TITLE>" not in plan_text
             assert payload["artifacts"]["plan"]["changed"] is True
             assert payload["artifacts"]["plan"]["added_section_ids"] == []
             assert "spec-dock:managed-section begin" in report_text
@@ -74,6 +82,26 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert "Issue 設計書（Standard）" in (issue_dir / "design.md").read_text(encoding="utf-8")
             assert "## 6. 仕様固定クロージャ一覧" in (issue_dir / "plan.md").read_text(encoding="utf-8")
             assert "spec-dock:managed-section begin" in (issue_dir / "report.md").read_text(encoding="utf-8")
+
+    def test_assurance_compose_renders_profile_template_tokens_from_issue_frontmatter(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_substantive_classified_fixture(target)
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "all", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            for artifact in ("design", "plan"):
+                text = (issue_dir / f"{artifact}.md").read_text(encoding="utf-8")
+                assert "iss-00301 Compose assurance" in text
+                assert 'ID: "iss-00301"' in text
+                assert 'タイトル: "Compose assurance"' in text
+                assert '<ISS_ID>' not in text
+                assert '<ISS_TITLE>' not in text
 
     def test_assurance_compose_does_not_overwrite_substantive_non_placeholder_content(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -237,6 +265,36 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert payload["status"] == "invalid"
             assert payload["reason"] == "template_validation_failed"
             assert "Profile template not found" in " ".join(payload["details"])
+            assert self._artifact_texts(issue_dir) == before
+            assert contract_path.read_text(encoding="utf-8") == contract_before
+
+    def test_assurance_compose_profile_template_symlink_escape_fails_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink creation is not available")
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_classified_fixture(target)
+            contract_path = issue_dir / ".assurance.json"
+            before = self._artifact_texts(issue_dir)
+            contract_before = contract_path.read_text(encoding="utf-8")
+            external = target / "outside-plan.md"
+            external.write_text("# Outside Plan\n", encoding="utf-8")
+            plan_template = target / "spec-dock" / "templates" / "issue-profiles" / "standard" / "plan.md"
+            plan_template.unlink()
+            plan_template.symlink_to(external)
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "all", "--format", "json"],
+            )
+
+            assert result.returncode == 1
+            payload = json.loads(result.stdout)
+            assert payload["ok"] is False
+            assert payload["status"] == "invalid"
+            assert payload["reason"] == "template_validation_failed"
+            assert "Profile template is outside spec-dock workspace" in " ".join(payload["details"])
             assert self._artifact_texts(issue_dir) == before
             assert contract_path.read_text(encoding="utf-8") == contract_before
 
