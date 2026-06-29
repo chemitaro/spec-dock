@@ -87,6 +87,8 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 - discussion docs は思考、知識、未確定情報を外部化する作業面であり、それ自体を正本へ昇格させない。`scratch` / `interview` / `research` / `disc` の文脈をもとに、必要な `adr` を新規作成し、`requirement.md` / `design.md` / `plan.md` へ織り込む。
 - `note` は新規作成 catalog から retired。既存 `note` artifact は grandfathered として壊さない。
 - templates は完成形ではなく、書き始めるための最小 scaffold に留める。仕様書作成の説明や判断基準は docs / skills を参照する
+- Issue の `templates/issue/design.md` と `templates/issue/plan.md` は compose 前 placeholder であり、手動 authoring の開始点ではない。実体の `design.md` / `plan.md` 本文は、`.assurance.json` の `authorized_profile` に従って `templates/issue-profiles/{lite,standard,strict,critical}/{design,plan}.md` から `assurance compose` が合成する
+- Issue templates（共通 `requirement.md` と profile 別 `design.md` / `plan.md`）の title 行、見出し、小見出しは日本語を優先する。日本語だけで正確性が落ちる場合だけ、日本語表現の後に括弧内英語名称を併記する
 - agent は、プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目を追加・削除・統合・並べ替えてよい
 - 不要な placeholder や該当しない節は削ってよいが、正確性、検証可能性、人間の理解、エージェントの実行に必要な情報は削らない
 - テンプレートにない図表や節も、[phase_design.md](phase_design.md) の `optional diagram catalog` から必要なものを選んで追加してよい。カタログ外でも、構造・境界・責務・流れ・状態・依存を人間が理解しやすくする情報なら追加してよい

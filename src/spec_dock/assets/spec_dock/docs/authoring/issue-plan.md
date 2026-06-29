@@ -12,7 +12,11 @@ Issue の `plan.md` を作成・更新するときに、`spec-dock-issue-plannin
 2. `phase_plan.md`
 3. `phase_plan_issue.md`
 4. `workflow_issue.md`
-5. `templates/issue/plan.md`
+5. `templates/issue/plan.md` は compose 前 placeholder として確認し、実体の plan template は `templates/issue-profiles/<profile>/plan.md` を `.assurance.json` の `authorized_profile` に従って compose する
+
+`templates/issue/plan.md` の placeholder のまま実装計画本文を書き始めない。先に `requirement.md` を具体化し、`assurance classify --stage requirement` と `assurance compose --artifact plan|all` で profile 別 plan template を materialize してから編集する。
+
+Issue templates（共通 `requirement.md` と profile 別 `design.md` / `plan.md`）の title 行、見出し、小見出しは日本語を優先する。日本語だけで正確性が落ちる場合だけ、日本語表現の後に括弧内英語名称を併記する。
 
 ## この artifact の責務
 
