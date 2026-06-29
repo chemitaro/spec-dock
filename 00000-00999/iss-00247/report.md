@@ -1000,7 +1000,7 @@ result: pass.
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer `019f13c6-2a17-7412-a848-79fdfb12fb34` | whole issue obligation coverage | added: root-escape symlink coverage after P2; final focused lane rerun | final lane `uv run pytest tests/unit/domain/test_artifact_composer.py tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance_compose.py tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_profile_templates_are_provider_and_installed_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_templates_match_provider_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_docs_match_provider_assets` -> 43 passed; `git diff --check` -> pass | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
@@ -1016,12 +1016,12 @@ result: pass.
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer `019f13c6-9a9c-7703-be38-ba77ab79d60f` / re-review `019f13d4-122c-7a53-9564-ec8575f25fd3` | requirement / design / plan / report / implementation / tests / docs alignment | initial fail P1: S99 final gate rows were placeholders. This report now records QA/code/spec/final commit evidence, final lane 43 passed, and final code re-review pass after P1 fix. Re-review found no findings and confirmed CLOS-001〜CLOS-009 traceability. | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| pending final report ledger commit | `report.md` final gate evidence only | final response / PR | pending |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
