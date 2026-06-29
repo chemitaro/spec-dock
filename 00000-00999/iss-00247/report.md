@@ -719,7 +719,7 @@ result: pass.
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S03 | pending commit | application/infra/tests/report S03 evidence | pending | pending | N/A | N/A | N/A | N/A |
+| S03 | committed | application/infra/tests/report S03 evidence | `8a644c77` | clean before ledger update; post-ledger clean pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/assurance.py` - template load/validation failure を visible result に変換し、全 candidate compose 後に write する。
@@ -730,7 +730,7 @@ result: pass.
 - `spec-dock/active/issue/report.md` - S03 evidence を記録。
 
 #### コミット
-- pending
+- `8a644c77` `fix(assurance): profile template composeをfail-closedにする`
 
 #### メモ
 - S04 deferred: dry-run、changed_paths、source binding behavior の追加監査は S04 で扱う。
