@@ -237,13 +237,9 @@ def _compose_from_profile_template(
     if artifact not in ("design", "plan"):
         raise ValueError(f"Profile Markdown templates are not supported for artifact kind: {artifact}")
     if profile_template.artifact != artifact:
-        raise ValueError(
-            f"Profile template artifact mismatch: expected {artifact}, got {profile_template.artifact}"
-        )
+        raise ValueError(f"Profile template artifact mismatch: expected {artifact}, got {profile_template.artifact}")
     if profile_template.profile != authorized_profile:
-        raise ValueError(
-            f"Profile template mismatch: expected {authorized_profile}, got {profile_template.profile}"
-        )
+        raise ValueError(f"Profile template mismatch: expected {authorized_profile}, got {profile_template.profile}")
 
     template_body = _render_profile_template_body(profile_template.body, text)
     target_scan = _scan_managed_sections(text)
@@ -594,11 +590,7 @@ def _frontmatter_list_values(frontmatter: str, key: str) -> tuple[str, ...]:
     match = pattern.search(frontmatter)
     if match is None:
         return ()
-    return tuple(
-        value.strip().strip('"')
-        for value in match.group("values").split(",")
-        if value.strip()
-    )
+    return tuple(value.strip().strip('"') for value in match.group("values").split(",") if value.strip())
 
 
 def _profile_name(profile: AssuranceProfile | str) -> ProfileName:

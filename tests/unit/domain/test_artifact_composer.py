@@ -211,7 +211,7 @@ def test_profile_markdown_template_does_not_overwrite_substantive_content() -> N
     manifest = _manifest()
 
     result = artifact_composer.compose_artifact(
-        "---\nID: \"iss-test\"\n---\n# Human Design\n\nHuman-authored design body.\n",
+        '---\nID: "iss-test"\n---\n# Human Design\n\nHuman-authored design body.\n',
         manifest,
         "design",
         assurance.AssuranceProfile.STANDARD,
@@ -240,8 +240,7 @@ def test_profile_markdown_template_invalid_marker_fails_closed() -> None:
         profile_template=_profile_template(
             "design",
             "standard",
-            "# Standard Design Template\n\n"
-            '<!-- spec-dock:managed-section begin id="design.invalid" -->\n',
+            '# Standard Design Template\n\n<!-- spec-dock:managed-section begin id="design.invalid" -->\n',
         ),
     )
 
@@ -276,7 +275,6 @@ def test_authorized_standard_lite_candidate_uses_standard_markdown_template_not_
 
 
 def test_profile_sections_manifest_keeps_only_report_prose_sections() -> None:
-    artifact_composer = _artifact_composer_module()
     manifest = _manifest()
 
     assert manifest.sections

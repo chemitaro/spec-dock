@@ -1021,7 +1021,39 @@ result: pass.
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| pending final report ledger commit | `report.md` final gate evidence only | final response / PR | pending |
+| `9b5bb1a7` | `report.md` final gate evidence only | PR #248 / final response | pass |
+
+### PR #248 CI 修正ゲート（Post-PR CI Repair Gate）
+| 観測対象 | 初回結果 | 原因 | 対応 | 再検証 | 結果 |
+|---|---|---|---|---|---|
+| GitHub Actions `Provider CI` / `provider-tests` | failed at `Run provider static analysis` | `ruff check` unused variable in `tests/unit/domain/test_artifact_composer.py`; `ruff format --check` reported 6 unformatted files | unused assignment removal and Ruff formatting only; updated `test_init_update.py` expectations for new requirement heading and checked-in dogfooding `.meta.json` snapshot so full provider pytest remains aligned with this issue's committed dogfooding state | delegated full lane `make lint` -> pass; delegated `uv run pytest` -> `1554 passed, 76 skipped`; parent `make lint` -> pass; parent targeted failure rerun -> `2 passed` | pass |
+
+#### PR #248 CI 修正変更ファイル
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/assurance.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/artifact_composer.py`
+- `tests/cli_runtime/test_assurance_compose.py`
+- `tests/unit/application/test_assurance.py`
+- `tests/unit/domain/test_artifact_composer.py`
+- `tests/unit/infra/test_init_update.py`
+
+#### PR #248 CI 修正コマンド / 結果
+```bash
+make lint
+
+result: pass; ruff check pass, ruff format check pass, mypy pass.
+```
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_init_creates_expected_structure tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json
+
+result: 2 passed.
+```
+
+```bash
+uv run pytest
+
+result: 1554 passed, 76 skipped. (delegated verification)
+```
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...

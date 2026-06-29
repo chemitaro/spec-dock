@@ -1216,6 +1216,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00239-compose-issue-planning-templates-after-assurance-classification/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00241-resolve-epic-traceability-and-review-policy-gate-gaps/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00247-move-assurance-compose-scaffold-sources-to-profile-markdown-templates/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1465,6 +1466,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00239-compose-issue-planning-templates-after-assurance-classification/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00241-resolve-epic-traceability-and-review-policy-gate-gaps/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00247-move-assurance-compose-scaffold-sources-to-profile-markdown-templates/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -3237,8 +3239,8 @@ class TestInitUpdate(CliRuntimeHarness):
             issue_templates_dir = templates_dir / "issue"
 
             req_text = (issue_templates_dir / "requirement.md").read_text(encoding="utf-8")
-            assert "## 対象ユーザー / 利用シナリオ" in req_text
-            assert "## 用語（ドメイン語彙）" in req_text
+            assert "## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）" in req_text
+            assert "## 17. 用語" in req_text
             for scope_templates in (
                 initiative_templates_dir,
                 epic_templates_dir,
@@ -4141,9 +4143,9 @@ class TestInitUpdate(CliRuntimeHarness):
             installed_root = target / "spec-dock" / "templates"
             for rel_path in required_paths:
                 assert (installed_root / rel_path).is_file(), f"missing installed issue template asset: {rel_path}"
-                assert (installed_root / rel_path).read_text(encoding="utf-8") == (
-                    asset_root / rel_path
-                ).read_text(encoding="utf-8"), f"installed issue template diverged from provider asset: {rel_path}"
+                assert (installed_root / rel_path).read_text(encoding="utf-8") == (asset_root / rel_path).read_text(
+                    encoding="utf-8"
+                ), f"installed issue template diverged from provider asset: {rel_path}"
 
     def test_checked_in_dogfooding_active_none_reports_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

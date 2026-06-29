@@ -281,9 +281,7 @@ def test_compose_dry_run_reports_intended_changes_without_contract_or_artifact_w
     )
     artifact_store = _ArtifactStoreFake(
         manifest,
-        (
-            _ArtifactFake("design", store.target.issue_dir / "design.md", "design.md", _artifact_placeholder("design")),
-        ),
+        (_ArtifactFake("design", store.target.issue_dir / "design.md", "design.md", _artifact_placeholder("design")),),
     )
 
     result = app_assurance.compose_assurance(
@@ -341,9 +339,7 @@ def test_compose_real_write_updates_source_binding_after_artifact_write_only() -
     )
     artifact_store = _ArtifactStoreFake(
         manifest,
-        (
-            _ArtifactFake("design", store.target.issue_dir / "design.md", "design.md", _artifact_placeholder("design")),
-        ),
+        (_ArtifactFake("design", store.target.issue_dir / "design.md", "design.md", _artifact_placeholder("design")),),
     )
 
     result = app_assurance.compose_assurance(
