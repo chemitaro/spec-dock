@@ -699,6 +699,17 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 | carryover resolution | GitHub GraphQL `resolveReviewThread` for 17 old threads | pass | 旧 review threads は対応済み/誤指摘として GitHub 上で resolved にした |
 | resume after resolve | `/private/tmp/spec-dock-pr245-observation-a1ee5ac3-resume-after-resolve/result.json` | pass: `passed / merge_prepared` | `decision.status_reason=codex_no_findings_issue_comment`; `completion_signal=codex_no_findings_issue_comment`; `carryover_unresolved_count=0`; `current_selected_unresolved_count=0`; CI/head matched |
 
+#### PR #245 Review Finding Follow-up（2026-06-29 round 3）
+| Review / finding | 対応 | 検証 | 結果 |
+|---|---|---|---|
+| Codex P1: `Promote composed artifacts out of draft` | `assurance compose` が awaiting-assurance-compose placeholder を materialize する際、frontmatter の `artifact_state` を削除し、`状態: "draft"` / `状態: draft` を `状態: "approved"` へ昇格するよう修正した。 | `test_assurance_compose_materializes_placeholder_design_and_plan`; compose/workflow lane 39 passed | fixed |
+| Codex P1: `Emit a plan marker accepted by workflow readiness` | standard profile の composed plan section heading を `## 実装ステップ` に変更し、初期 step closure contract として扱う説明を追加した。 | `test_assurance_compose_materializes_placeholder_design_and_plan` で compose 後の `guidance issue-execution` が `ready / may_execute_approved_plan=true` になることを確認 | fixed |
+| Codex P1 body: `Allow the last stabilizing review poll` | 現行 ADR は completion artifact 後の hydration stability を必須とし、under-budget final timeout で incomplete hydration を broad に pass へ保存しない。ローカルでは reviewer が示した exact regression test が pass したため、現時点では no-code / stale finding として扱う。 | `PYTHONPATH=src uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_75_pr_observation_wait_late_review_change_resets_stability -q` => pass | rejected-no-code |
+| Codex P1 body: `Ignore the waitable Actions-context limitation` | `required_actions_context_pending` は waitable limitation であるため、`ci.status=unknown` のとき blocking limitation として human_gate に昇格しないよう classifier の ignored codes に追加した。 | `test_issue_244_pr_observation_snapshot_required_actions_context_pending_is_waitable`; focused PR observation lane 81 passed | fixed |
+| ADR promotion: plan-centric execution hard cutover | Issue execution authority を `plan.md` に一本化し、runtime-selected `selected_step` / `step_assurance` / `context_packets` を廃止する意思決定を Epic ADR `20260629t003131z-adr Plan Centric Issue Execution Preflight` へ昇格した。 | ADR inspection; old ADR `20260623t074441z` / `20260623t074442z` に変更済み注記を追加 | pass |
+| ADR promotion: hidden assurance contract path | Issue-local Assurance Contract を `assurance.json` から `.assurance.json` へ hard cutover する意思決定を Epic ADR `20260629t003132z-adr Hidden Assurance Contract Path` へ昇格した。 | ADR inspection; old ADR `20260623t074443z` に変更済み注記を追加 | pass |
+| Current focused verification | round 3 の実装差分と ADR/report 更新後に focused / broader regression を実行した。 | compose readiness test 1 passed; required-actions context test 1 passed; late review stability test 1 passed; compose/workflow/context lane 39 passed; PR observation focused lane 81 passed; full `test_init_update.py` 525 passed; `make lint`; `validate`; `assurance verify`; `git diff --check` | pass-current-head-pr-reobservation-pending |
+
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
@@ -725,7 +736,7 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-028..tc-047 | S300/S310/S320/S399 | focused pytest 13 passed, PR observation lane 119 passed, CLI runtime lane 25 passed, active/assurance unit lane 23 passed, assurance/application/compose/new lanes 32 passed + 53 passed / 5 skipped, full `test_init_update.py` 524 passed, `make lint`, `assurance verify`, `validate`, `git diff --check`, provider/dogfood parity diffs, PR #245 `a1ee5ac3` observation/resume | pass-current-head-docs-update-pending | docs-only ADR/report update will require final PR re-observation after commit/push |
+| tc-028..tc-047 | S300/S310/S320/S399 | focused pytest 13 passed, PR observation lane 119 passed, CLI runtime lane 25 passed, active/assurance unit lane 23 passed, assurance/application/compose/new lanes 32 passed + 53 passed / 5 skipped, full `test_init_update.py` 525 passed, `make lint`, `assurance verify`, `validate`, `git diff --check`, provider/dogfood parity diffs, PR #245 `a1ee5ac3` observation/resume | pass-current-head-docs-update-pending | docs-only ADR/report update will require final PR re-observation after commit/push |
 
 #### ステップ commit ゲート（Step Commit Gate）
 | ステップ（step） | クロージャ状態（closure state） | コミット範囲（commit scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -744,7 +755,7 @@ rg -n "review_completion_unknown is a non-pass|terminal-like review state|post_u
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
 | qa-reviewer | S100/S110/S200/S210/S299 obligation coverage | added | QA re-review pass; `test_init_update.py` 515 passed; assurance/workflow lane 53 passed; hidden/file-list inspections | pass |
-| local verification | whole issue obligation coverage | executed | `uv run pytest tests/unit/infra/test_init_update.py` 524 passed; `uv run pytest tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` 25 passed; `uv run pytest tests/unit/infra/test_active_store.py tests/unit/infra/test_assurance_store.py tests/unit/application/test_assurance.py tests/cli_runtime/test_assurance.py` 32 passed; `uv run pytest tests/cli_runtime/test_assurance_compose.py tests/cli_runtime/test_new.py` 53 passed / 5 skipped; focused PR observation lane 119 passed; `./spec-dock/scripts/spec-dock validate`; `assurance verify`; `git diff --check`; `make lint` | pass |
+| local verification | whole issue obligation coverage | executed | `uv run pytest tests/unit/infra/test_init_update.py` 525 passed; `uv run pytest tests/cli_runtime/test_assurance_compose.py tests/cli_runtime/test_workflow.py tests/cli_runtime/test_workflow_context_routing.py` 39 passed; focused PR observation lane 81 passed; `./spec-dock/scripts/spec-dock validate`; `assurance verify`; `git diff --check`; `make lint` | pass |
 | PR observation | PR #245 current head `a1ee5ac3` | executed / passed for current head before this docs update | `wait_pr_observation.sh --trigger-mode post-once` waited for completion artifact; old carryover threads produced human_gate; after resolving 17 carryover threads, `--trigger-mode resume` returned `passed / merge_prepared` with `codex_no_findings_issue_comment` | pass-current-head-docs-update-pending |
 
 ### 最終コードレビューゲート（Final Code Review Gate）

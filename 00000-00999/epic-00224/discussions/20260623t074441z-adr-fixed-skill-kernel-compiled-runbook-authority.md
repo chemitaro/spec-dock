@@ -7,6 +7,8 @@ ID: "20260623t074441z-adr"
 最終更新: "2026-06-23"
 親: ["epic-00224"]
 authority: "accepted"
+amended_by:
+  - "20260629t003131z-adr"
 derived_from:
   - "20260623t074452z-disc-adr-decision-synthesis-after-issue-226-closure.md"
 reflected_to:
@@ -16,6 +18,12 @@ reflected_to:
 ---
 
 # 20260623t074441z-adr Fixed Skill Kernel And Compiled Runbook Authority
+
+## 変更履歴（Supersession / Amendment）
+
+- 2026-06-29: `20260629t003131z-adr Plan Centric Issue Execution Preflight` により、issue execution の current step / detailed workflow body を runtime-compiled Runbook が agent handoff authority として選ぶ方針は変更済み。
+- 変更済み: Skill を固定 kernel とする方針、および generated Runbook を tracked source of truth にしない方針は維持する。
+- 変更済み: `workflow next` / compiled Runbook を execution authority とする wording は historical wording として扱う。Current command surface は `guidance <target>` であり、issue execution の execution contract は `plan.md` である。
 
 ## ADR 化基準
 - hard to reverse: yes

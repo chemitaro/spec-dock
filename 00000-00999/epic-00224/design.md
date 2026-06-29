@@ -23,7 +23,7 @@ ID: "epic-00224"
   - Facts before profile:
     - Model は risk facts を抽出し、policy engine が Profile を決める。
   - Tracked contract, ignored projection:
-    - `assurance.json` は tracked canonical artifact、Runbook / active projection / event は ignored generated state とする。
+    - 変更済み: `.assurance.json` は tracked canonical metadata contract、Runbook / active projection / event は ignored generated state とする。
   - Candidate is not authority:
     - `lite_candidate` は shadow measurement 用であり、Runbook obligation を減らす authority は `lite_authorized` だけが持つ。
   - Execution context affinity, evaluation independence:
@@ -33,6 +33,9 @@ ID: "epic-00224"
   - Review instruction / observation policy:
     - 変更済み: 旧「Review policy は PR head ではなく PR base SHA から取得する」方針は `20260623t074444z-adr` により script-local Codex review instruction へ置換済み。
     - 変更済み: review completion は `20260628t154553z-adr` により explicit Codex artifact model と retryable timeout / resume semantics で判断する。
+  - Issue execution authority:
+    - 変更済み: 旧 runtime-selected step / Step Assurance / Context Packet authority は `20260629t003131z-adr` により plan-centric preflight validation へ置換済み。
+    - 変更済み: 旧 `assurance.json` path は `20260629t003132z-adr` により `.assurance.json` へ置換済み。
 - 既存関係:
   - `epic-00158` で整理された provider / mirror、canonical / evidence、skill / docs / templates 境界を前提にする。
   - Existing Issue workflow は strict-legacy adapter として残す。
@@ -57,7 +60,7 @@ ID: "epic-00224"
 | Assurance Policy Source | Profile preset、hard trigger、schema、fragment manifest | tracked provider source |
 | Context Routing Policy Source | Agent role / step kind / profile ごとの context mode、include / exclude category、return contract を定義 | tracked provider source |
 | Assurance Engine | risk facts から proposed / authorized Profile、Complexity、obligations を計算 | deterministic domain policy |
-| Assurance Store | Issue-local `assurance.json` の read/write/hash binding | canonical tracked artifact |
+| Assurance Store | Issue-local `.assurance.json` の read/write/hash binding | canonical tracked metadata contract |
 | Workflow State Resolver | Active、artifact readiness、step、PR state から current state を導出 | runtime domain |
 | Guidance Compiler | current state に必要な一つの stdout guidance を生成し、human/debug projection を任意で書く | stdout authority + compiled projection |
 | Artifact Composer | design / plan / report fragment を単調合成 | policy + canonical inputs |

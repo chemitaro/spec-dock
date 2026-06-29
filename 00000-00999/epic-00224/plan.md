@@ -19,12 +19,13 @@ ID: "epic-00224"
 - `iss-00226 / #226` は decision-only Issue として作成されたが、ADR-level decisions はこの Epic planning/design で固定すべきだったため closed / superseded historical evidence とする。
 - 初期 rollout では automatic Lite default を有効化しない。Lite は shadow / explicit opt-in / evidence-gated に限定し、future automatic Lite default は別 accepted ADR、policy version bump、rollout Issue、telemetry gate が揃った場合だけ扱う。
 - 実装開始前の workflow authority decision は、当初 Epic-scope accepted ADR 5 件として作成済みだった。その後の dogfooding修正により、script-local review instruction と explicit review completion を含む current ADR baseline へ変更済み。
+- dogfooding修正により、issue execution authority は `20260629t003131z-adr` の plan-centric preflight、Assurance Contract path は `20260629t003132z-adr` の `.assurance.json` へ変更済み。
 
 ## この計画で閉じる E-RQ / E-AC
 
 | Requirement / AC | 閉じ方 | 主な完了証跡 |
 |---|---|---|
-| E-RQ-001〜005 | Assurance core、workflow state、fixed Skill kernel、Runbook compiler | CLI contract tests、golden Runbook、clean Git evidence |
+| E-RQ-001〜005 | Assurance core、workflow state、fixed Skill kernel、plan-centric preflight guidance | CLI contract tests、guidance/runbook projection evidence、clean Git evidence |
 | E-RQ-006〜008, E-RQ-015〜021 | Planning composer、Step Assurance、agent context routing | artifact golden tests、step matrix、clean-room review evidence、context packet golden tests、return contract tests |
 | E-RQ-009 | review trigger instruction compiler | 変更済み: trusted base-SHA policy は script-local instruction source へ置換。trigger JSON、local instruction tests、runtime validation、I07 doctor defer |
 | E-RQ-010〜011 | blocker-centric repair / re-review / stagnation | finding matrix、repair loop tests、merge predicate |
