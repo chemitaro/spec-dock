@@ -5,8 +5,12 @@ usage() {
   cat >&2 <<'USAGE'
 usage: trigger_codex_review.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA
 
-Posts exactly one fixed PR issue comment body, "@codex review", after
-verifying that the PR head still matches --head-sha. The script does not accept
+Posts at most one deterministic PR issue comment whose body starts with
+"@codex review" after verifying that the PR head still matches --head-sha.
+When script-local review instructions are valid, the comment includes
+instruction metadata and text. Missing instructions fall back to a plain
+deterministic review request. Invalid instructions are reported as human gate
+without posting a comment. The script does not accept
 caller-provided bodies, endpoints, methods, GraphQL queries, headers, jq
 expressions, or raw gh arguments.
 USAGE
@@ -60,18 +64,21 @@ fi
 
 owner="${repo%%/*}"
 name="${repo#*/}"
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 TRIGGER_REPO="$repo" \
 TRIGGER_OWNER="$owner" \
 TRIGGER_NAME="$name" \
 TRIGGER_PR="$pr" \
 TRIGGER_HEAD_SHA="$head_sha" \
+TRIGGER_SCRIPT_DIR="$script_dir" \
 python3 - <<'PY'
 import json
 import hashlib
 import os
 import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 
 repo = os.environ["TRIGGER_REPO"]
 owner = os.environ["TRIGGER_OWNER"]
@@ -80,6 +87,11 @@ pr = os.environ["TRIGGER_PR"]
 expected_head_sha = os.environ["TRIGGER_HEAD_SHA"]
 endpoint = f"repos/{owner}/{name}/issues/{pr}/comments"
 fixed_body = "@codex review"
+# Current iss-00244 contract: use the shipped script-local instruction asset,
+# not a GitHub base/head .github/codex/review-policy.md file.
+instruction_path = Path(os.environ["TRIGGER_SCRIPT_DIR"]) / "codex-review-instructions.md"
+instruction_display_path = ".agents/skills/github-pr-observation/scripts/codex-review-instructions.md"
+instruction_max_bytes = 32768
 
 
 def now_iso():
@@ -208,6 +220,15 @@ def base_payload():
         "head_matches_expected": False,
         "success": False,
         "overall_status": "unknown",
+        "normalized_status": "unknown",
+        "recommended_next_action": "unknown",
+        "review_instruction": {
+            "source": "script_local",
+            "path": instruction_display_path,
+            "hash": None,
+            "bytes": 0,
+            "status": "not_requested",
+        },
         "trigger": {
             "action": "none",
             "body": fixed_body,
@@ -229,6 +250,16 @@ def base_payload():
 
 
 payload = base_payload()
+
+
+def block_review_instruction_gate():
+    payload["success"] = False
+    payload["overall_status"] = "human_gate"
+    payload["normalized_status"] = "human_gate"
+    payload["recommended_next_action"] = "human_gate"
+    payload["trigger"]["action"] = "blocked"
+    emit(payload)
+    raise SystemExit(0)
 
 metadata_exit, metadata_stdout, metadata_stderr = run_gh(
     ["pr", "view", pr, "--repo", repo, "--json", "headRefOid,url,state,isDraft,number"]
@@ -291,6 +322,89 @@ if pr_state and pr_state != "OPEN":
     )
     emit(payload)
     raise SystemExit(0)
+
+try:
+    instruction_bytes = instruction_path.read_bytes()
+except FileNotFoundError:
+    instruction_bytes = None
+    payload["review_instruction"].update({"status": "missing_plain_fallback"})
+    fixed_body = "\n".join(
+        (
+            "@codex review",
+            "",
+            "Script-local review instruction:",
+            f"- source: {instruction_display_path}",
+            "- instruction_status: missing_plain_fallback",
+            f"- reviewed_head_sha: {expected_head_sha}",
+        )
+    )
+    payload["trigger"]["body"] = fixed_body
+except OSError as exc:
+    instruction_bytes = None
+    payload["review_instruction"].update({"status": "unreadable"})
+    payload["limitations"].append(
+        limitation(
+            "review_instruction_unreadable",
+            "script-local review instruction could not be read",
+            path=instruction_display_path,
+            error_type=type(exc).__name__,
+            severity="blocking",
+        )
+    )
+
+if instruction_bytes is not None:
+    payload["review_instruction"]["bytes"] = len(instruction_bytes)
+    if len(instruction_bytes) > instruction_max_bytes:
+        payload["review_instruction"].update({"status": "too_large"})
+        payload["limitations"].append(
+            limitation(
+                "review_instruction_too_large",
+                "script-local review instruction exceeds the maximum accepted size",
+                path=instruction_display_path,
+                max_bytes=instruction_max_bytes,
+                severity="blocking",
+            )
+        )
+    else:
+        try:
+            instruction_text = instruction_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            instruction_text = ""
+        if instruction_text.strip():
+            instruction_hash = hashlib.sha256(instruction_bytes).hexdigest()
+            fixed_body = "\n".join(
+                (
+                    "@codex review",
+                    "",
+                    "Script-local review instruction:",
+                    f"- source: {instruction_display_path}",
+                    f"- instruction_sha256: {instruction_hash}",
+                    "- instruction_status: loaded",
+                    f"- reviewed_head_sha: {expected_head_sha}",
+                    "",
+                    instruction_text.rstrip(),
+                )
+            )
+            payload["review_instruction"].update(
+                {
+                    "hash": instruction_hash,
+                    "status": "loaded",
+                }
+            )
+            payload["trigger"]["body"] = fixed_body
+        else:
+            payload["review_instruction"].update({"status": "invalid"})
+            payload["limitations"].append(
+                limitation(
+                    "review_instruction_invalid",
+                    "script-local review instruction must be non-empty UTF-8 text",
+                    path=instruction_display_path,
+                    severity="blocking",
+                )
+            )
+
+if payload["review_instruction"]["status"] in {"invalid", "too_large", "unreadable"}:
+    block_review_instruction_gate()
 
 before_exit, before_stdout, before_stderr = run_gh(["api", endpoint, "--paginate"])
 before_comments_raw = load_json(before_stdout, None) if before_exit == 0 else None

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00237",
+  "title": "Analyze Manual Test Routing Failures",
+  "slug": "analyze-manual-test-routing-failures",
+  "created_at": "2026-06-24T15:21:52+09:00",
+  "updated_at": "2026-06-24T15:21:52+09:00",
+  "parent_id": "epic-00224",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00224",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 237,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}

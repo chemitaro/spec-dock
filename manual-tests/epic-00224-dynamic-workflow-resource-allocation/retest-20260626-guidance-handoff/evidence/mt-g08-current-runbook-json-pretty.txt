@@ -1,0 +1,319 @@
+{
+    "schema_version": "workflow-runbook-v1",
+    "workflow_target": "issue-execution",
+    "state": "ready",
+    "next_action": "execution-ready",
+    "reason_code": "assurance-valid",
+    "active_issue_id": "iss-09004",
+    "authority": {
+        "authorized_profile": "standard",
+        "lite_candidate": false,
+        "obligation_source": "authorized_profile"
+    },
+    "commands": [
+        "./spec-dock/scripts/spec-dock active show"
+    ],
+    "notes": [
+        "Use authorized_profile=standard as the obligation authority.",
+        "lite_candidate is telemetry only unless authorized_profile is lite."
+    ],
+    "stop_conditions": [
+        "Do not reduce obligations based only on lite_candidate."
+    ],
+    "details": [],
+    "step_assurance": {
+        "selected_step": {
+            "id": "S01",
+            "title": "Guidance command stdout path \u3092\u78ba\u8a8d\u3059\u308b",
+            "task_kind": "runtime",
+            "risk_tags": [
+                "runtime"
+            ],
+            "selection_method": "plan_first_uncompleted_heading"
+        },
+        "policy": {
+            "status": "valid",
+            "reason": "ok",
+            "version": "context-routing-policy-v1"
+        },
+        "worker": "dev-coder",
+        "reasoning_effort": "medium",
+        "context_mode": "bounded_packet",
+        "verification": [
+            "unit_tests"
+        ],
+        "reviewers": [
+            "code-reviewer"
+        ],
+        "return_contract": {
+            "allowed_fields": [
+                "summary",
+                "changed_files",
+                "verification_result",
+                "evidence_refs",
+                "unresolved_risks",
+                "ledger_note"
+            ],
+            "forbidden_fields": [
+                "raw_shell_transcript",
+                "private_reasoning",
+                "full_test_log",
+                "implementation_transcript"
+            ]
+        },
+        "continuation": {
+            "eligible": false,
+            "context_mode": "bounded_packet",
+            "reason_codes": [
+                "worktree_not_clean"
+            ]
+        },
+        "continuation_state": {
+            "source_binding_hash": "db2eca10bb03d266c0e02e32f9437387b6d81cd9cb8ca346634b38186e475c54",
+            "source_revision": "03a707f13d83f3664143dfba7c7047e6664d26af",
+            "goal_hash": "0270481b9f972e70e03770b3e97c06cc5074fb58e05f5ccaa1e3f522c9dc48e3",
+            "scope_hash": "0270481b9f972e70e03770b3e97c06cc5074fb58e05f5ccaa1e3f522c9dc48e3",
+            "allowed_paths_hash": "41efd5c25889de5a09e22e9b1d8e9bb760107b55aa27abd72b1ee072530550bc",
+            "risk_fingerprint": "1f5824f34b2e4e29b7901e85c4f8ac0638483959de0e5013df5560447a8c9651"
+        },
+        "source_refs": [
+            {
+                "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/requirement.md",
+                "sha256": "e291209f45c17c925ce0a87e72a06d01c5256358617785814286b79414464393",
+                "missing_reason": null
+            },
+            {
+                "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/design.md",
+                "sha256": "a2e6ff4061b2da915f91c90ae491fecbe90101d9f0a6743e5254fbc1630e966b",
+                "missing_reason": null
+            },
+            {
+                "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/plan.md",
+                "sha256": "29394a9e48f73fde2a9f6a3c49b8ef981ced6f1a518dd5c9029ef4997f47cffa",
+                "missing_reason": null
+            },
+            {
+                "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/report.md",
+                "sha256": "cca00ba77882d31364426724adcbba65273ba6f1be0a7bd33522c92266b9a77e",
+                "missing_reason": null
+            },
+            {
+                "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/assurance.json",
+                "sha256": "6718cc1905df72beac84fdf7104466d92b292c6c1f7a916e94e0ebee7ea96aff",
+                "missing_reason": null
+            },
+            {
+                "path": "spec-dock/system/assurance/context-routing-policy.json",
+                "sha256": "d32f284e8c848ba6390d8cd8fc6c0b2b7b69274475f444846596991614566767",
+                "missing_reason": null
+            }
+        ]
+    },
+    "context_packets": {
+        "written": true,
+        "refs": [
+            {
+                "path": "spec-dock/.agent/context-packets/current-context-packets.json",
+                "sha256": "04de35af747d5463f66efe9e2715e3afb5f9ac5679b4ec002d40a154d718b689",
+                "missing_reason": null
+            },
+            {
+                "path": "spec-dock/.agent/context-packets/dev-coder-packet.json",
+                "sha256": "e7a23e33ee279976a356fbe079930e0be59f64ff6812461fab3c9f62e22f85bb",
+                "missing_reason": null
+            },
+            {
+                "path": "spec-dock/.agent/context-packets/code-reviewer-packet.json",
+                "sha256": "533a2e500d8bfdf671f4ce928c9cee4f11335790ba331db47f8e743df55b4a7e",
+                "missing_reason": null
+            }
+        ],
+        "invocation_events": [
+            {
+                "role": "dev-coder",
+                "reasoning_effort": "medium",
+                "context_mode": "bounded_packet",
+                "policy_version": "context-routing-policy-v1",
+                "packet_hash": "e1661ee54054e0b2e5211b804252ae927eb5bdcd7a6697bcfb5ff596b38a911a",
+                "source_hashes": [
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/requirement.md",
+                        "sha256": "e291209f45c17c925ce0a87e72a06d01c5256358617785814286b79414464393",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/design.md",
+                        "sha256": "a2e6ff4061b2da915f91c90ae491fecbe90101d9f0a6743e5254fbc1630e966b",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/plan.md",
+                        "sha256": "29394a9e48f73fde2a9f6a3c49b8ef981ced6f1a518dd5c9029ef4997f47cffa",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/report.md",
+                        "sha256": "cca00ba77882d31364426724adcbba65273ba6f1be0a7bd33522c92266b9a77e",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/assurance.json",
+                        "sha256": "6718cc1905df72beac84fdf7104466d92b292c6c1f7a916e94e0ebee7ea96aff",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/system/assurance/context-routing-policy.json",
+                        "sha256": "d32f284e8c848ba6390d8cd8fc6c0b2b7b69274475f444846596991614566767",
+                        "missing_reason": null
+                    }
+                ],
+                "fork_turn_count": 0,
+                "include_categories": [
+                    "requirements",
+                    "design",
+                    "plan",
+                    "allowed_paths",
+                    "evidence_refs"
+                ],
+                "exclude_categories": [
+                    "private_reasoning",
+                    "raw_full_logs"
+                ],
+                "returned_evidence_refs": [
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/requirement.md",
+                        "sha256": "e291209f45c17c925ce0a87e72a06d01c5256358617785814286b79414464393",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/design.md",
+                        "sha256": "a2e6ff4061b2da915f91c90ae491fecbe90101d9f0a6743e5254fbc1630e966b",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/plan.md",
+                        "sha256": "29394a9e48f73fde2a9f6a3c49b8ef981ced6f1a518dd5c9029ef4997f47cffa",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/report.md",
+                        "sha256": "cca00ba77882d31364426724adcbba65273ba6f1be0a7bd33522c92266b9a77e",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/assurance.json",
+                        "sha256": "6718cc1905df72beac84fdf7104466d92b292c6c1f7a916e94e0ebee7ea96aff",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/system/assurance/context-routing-policy.json",
+                        "sha256": "d32f284e8c848ba6390d8cd8fc6c0b2b7b69274475f444846596991614566767",
+                        "missing_reason": null
+                    }
+                ],
+                "missing_reason": null
+            },
+            {
+                "role": "code-reviewer",
+                "reasoning_effort": "medium",
+                "context_mode": "clean_room",
+                "policy_version": "context-routing-policy-v1",
+                "packet_hash": "e495124f6a140135ab25eb9255d8898cdb2449de91910a759c1535e902f98b46",
+                "source_hashes": [
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/requirement.md",
+                        "sha256": "e291209f45c17c925ce0a87e72a06d01c5256358617785814286b79414464393",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/design.md",
+                        "sha256": "a2e6ff4061b2da915f91c90ae491fecbe90101d9f0a6743e5254fbc1630e966b",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/plan.md",
+                        "sha256": "29394a9e48f73fde2a9f6a3c49b8ef981ced6f1a518dd5c9029ef4997f47cffa",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/report.md",
+                        "sha256": "cca00ba77882d31364426724adcbba65273ba6f1be0a7bd33522c92266b9a77e",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/assurance.json",
+                        "sha256": "6718cc1905df72beac84fdf7104466d92b292c6c1f7a916e94e0ebee7ea96aff",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/system/assurance/context-routing-policy.json",
+                        "sha256": "d32f284e8c848ba6390d8cd8fc6c0b2b7b69274475f444846596991614566767",
+                        "missing_reason": null
+                    }
+                ],
+                "fork_turn_count": 0,
+                "include_categories": [
+                    "requirements",
+                    "design",
+                    "plan",
+                    "diff_summary",
+                    "evidence_refs"
+                ],
+                "exclude_categories": [
+                    "author_self_assessment",
+                    "implementation_transcript",
+                    "previous_reviewer_verdict",
+                    "private_reasoning",
+                    "raw_full_logs"
+                ],
+                "returned_evidence_refs": [
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/requirement.md",
+                        "sha256": "e291209f45c17c925ce0a87e72a06d01c5256358617785814286b79414464393",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/design.md",
+                        "sha256": "a2e6ff4061b2da915f91c90ae491fecbe90101d9f0a6743e5254fbc1630e966b",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/plan.md",
+                        "sha256": "29394a9e48f73fde2a9f6a3c49b8ef981ced6f1a518dd5c9029ef4997f47cffa",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/report.md",
+                        "sha256": "cca00ba77882d31364426724adcbba65273ba6f1be0a7bd33522c92266b9a77e",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/initiatives/init-09001-manual-workflow-trial/epics/epic-09002-adaptive-guidance-manual-trial/issues/iss-09004-runtime-guidance-manual-task/assurance.json",
+                        "sha256": "6718cc1905df72beac84fdf7104466d92b292c6c1f7a916e94e0ebee7ea96aff",
+                        "missing_reason": null
+                    },
+                    {
+                        "path": "spec-dock/system/assurance/context-routing-policy.json",
+                        "sha256": "d32f284e8c848ba6390d8cd8fc6c0b2b7b69274475f444846596991614566767",
+                        "missing_reason": null
+                    }
+                ],
+                "missing_reason": null
+            }
+        ],
+        "errors": []
+    },
+    "projection": {
+        "written": true,
+        "paths": [
+            "spec-dock/.agent/runbooks/current-runbook.json",
+            "spec-dock/.agent/runbooks/current-runbook.md",
+            "spec-dock/active/current-runbook.json",
+            "spec-dock/active/current-runbook.md"
+        ],
+        "errors": [],
+        "audience": "human",
+        "authority": "non-canonical",
+        "refresh_command": "./spec-dock/scripts/spec-dock guidance issue-execution"
+    }
+}

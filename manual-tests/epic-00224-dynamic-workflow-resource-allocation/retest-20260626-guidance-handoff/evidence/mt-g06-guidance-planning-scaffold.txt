@@ -1,0 +1,28 @@
+# Guidance: issue-planning
+
+- state: requirement-capture
+- next_action: requirement-capture-required
+- reason_code: requirement-scaffold
+- active_issue: iss-09004
+- authority: authorized_profile=strict, lite_candidate=false, obligation_source=authorized_profile
+
+## Commands
+- `./spec-dock/scripts/spec-dock active show`
+- `Edit spec-dock/active/issue/requirement.md`
+
+## Notes
+- Capture substantive issue requirements and get the required review gate before continuing.
+
+## Stop Conditions
+- Do not classify assurance or start execution from a scaffold requirement.
+
+## Projection
+- audience: human
+- authority: non-canonical
+- note: Human-facing projection; not agent handoff authority.
+- refresh_command: `./spec-dock/scripts/spec-dock guidance issue-planning`
+- written: true
+- `spec-dock/.agent/runbooks/current-runbook.json`
+- `spec-dock/.agent/runbooks/current-runbook.md`
+- `spec-dock/active/current-runbook.json`
+- `spec-dock/active/current-runbook.md`

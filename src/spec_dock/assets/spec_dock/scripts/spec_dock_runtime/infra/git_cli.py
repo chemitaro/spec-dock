@@ -55,6 +55,35 @@ def current_branch_or_none(repo_root: Path) -> str | None:
     return branch
 
 
+def current_head_or_none(repo_root: Path) -> str | None:
+    _ensure_git_available()
+    p = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if p.returncode != 0:
+        return None
+    head = (p.stdout or "").strip()
+    return head or None
+
+
+def status_short_or_none(repo_root: Path) -> str | None:
+    _ensure_git_available()
+    p = subprocess.run(
+        ["git", "status", "--short"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if p.returncode != 0:
+        return None
+    return (p.stdout or "").strip()
+
+
 def local_branch_exists(repo_root: Path, branch: str) -> bool:
     _ensure_git_available()
     p = subprocess.run(

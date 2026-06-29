@@ -31,6 +31,30 @@ class TestCliNew(CliRuntimeHarness):
             ["new", "issue", "--epic", "2", "--title", "Add refresh token", "--github-issue", "3"],
         )
 
+    def test_new_issue_creates_assurance_compose_placeholders_for_design_and_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+
+            for filename in ("design.md", "plan.md"):
+                text = (issue_dir / filename).read_text(encoding="utf-8")
+                assert "artifact_state: awaiting-assurance-compose" in text
+                assert "assurance classify --stage requirement" in text
+                assert "assurance compose --artifact all" in text
+                assert "spec-dock:managed-section begin" not in text
+
     def _write_runtime_clock(self, target: Path, *, now_iso: str, today: str) -> None:
         runtime_clock = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "clock.py"
         runtime_clock.write_text(
@@ -783,9 +807,13 @@ class TestCliNew(CliRuntimeHarness):
                 content = created[0].read_text(encoding="utf-8")
                 frontmatter = content.split("---", 2)[1]
                 assert '状態: "draft | approved"' in frontmatter
+                assert "---#" not in content
+                assert content.split("---", 2)[2].lstrip().startswith("#")
+                assert "artifact_state: awaiting-assurance-compose" not in frontmatter
                 assert "adoption_status" not in frontmatter
                 assert "template_source" not in frontmatter
                 assert "created_by_role" not in frontmatter
+                assert "placeholder" not in content
                 assert "Canonical `" not in content
                 assert "remains main-orchestrator-only" not in content
                 canonical_source = target / "spec-dock" / template_source
