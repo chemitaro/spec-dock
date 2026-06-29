@@ -21,6 +21,8 @@ class _StoreFake:
     def __init__(self, read_result=None) -> None:
         self.target = None
         self.binding = None
+        self.planning_binding = None
+        self.planning_binding_targets: list[object] = []
         self.read_result = read_result
         self.writes: list[tuple[object, object]] = []
 
@@ -31,6 +33,10 @@ class _StoreFake:
     def build_requirement_source_binding(self, target):
         self.binding_target = target
         return self.binding
+
+    def build_planning_source_binding(self, target):
+        self.planning_binding_targets.append(target)
+        return self.planning_binding if self.planning_binding is not None else self.binding
 
     def write_contract(self, target, contract):
         self.writes.append((target, contract))
@@ -243,6 +249,119 @@ def test_compose_preflights_all_changed_artifacts_before_writing() -> None:
     assert artifact_store.preflighted == ["design", "plan"]
     assert artifact_store.writes == []
     assert len(store.writes) == 0
+
+
+def test_compose_dry_run_reports_intended_changes_without_contract_or_artifact_writes() -> None:
+    app_assurance, app_contracts, domain_assurance, AssuranceStoreResult, ResolvedIssueTarget = _runtime_modules()
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.domain.artifact_composer import load_profile_section_manifest
+    finally:
+        sys.path.pop(0)
+    manifest_text = (
+        Path(__file__).resolve().parents[3]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "templates"
+        / "assurance"
+        / "profile-sections.json"
+    ).read_text(encoding="utf-8")
+    manifest = load_profile_section_manifest(manifest_text)
+    store = _store_with_target(domain_assurance, ResolvedIssueTarget)
+    valid_contract = _contract(domain_assurance)
+    store.read_result = AssuranceStoreResult(
+        status="valid",
+        target=store.target,
+        contract=valid_contract,
+        mode="adaptive",
+        reason="ok",
+    )
+    artifact_store = _ArtifactStoreFake(
+        manifest,
+        (
+            _ArtifactFake("design", store.target.issue_dir / "design.md", "design.md", _artifact_placeholder("design")),
+        ),
+    )
+
+    result = app_assurance.compose_assurance(
+        app_contracts.ComposeAssuranceRequest(artifact="design", dry_run=True),
+        store=store,
+        artifact_store=artifact_store,
+    )
+
+    assert result.ok is True
+    assert result.status == "dry-run"
+    assert result.dry_run is True
+    assert result.changed_paths == ("design.md",)
+    assert result.contract == valid_contract
+    assert result.artifacts[0].changed is True
+    assert artifact_store.preflighted == []
+    assert artifact_store.writes == []
+    assert store.writes == []
+    assert store.planning_binding_targets == []
+
+
+def test_compose_real_write_updates_source_binding_after_artifact_write_only() -> None:
+    app_assurance, app_contracts, domain_assurance, AssuranceStoreResult, ResolvedIssueTarget = _runtime_modules()
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.domain.artifact_composer import load_profile_section_manifest
+    finally:
+        sys.path.pop(0)
+    manifest_text = (
+        Path(__file__).resolve().parents[3]
+        / "src"
+        / "spec_dock"
+        / "assets"
+        / "spec_dock"
+        / "templates"
+        / "assurance"
+        / "profile-sections.json"
+    ).read_text(encoding="utf-8")
+    manifest = load_profile_section_manifest(manifest_text)
+    store = _store_with_target(domain_assurance, ResolvedIssueTarget)
+    valid_contract = _contract(domain_assurance)
+    planning_binding = domain_assurance.SourceBinding(
+        artifacts=(
+            domain_assurance.SourceArtifact(path="design.md", role="design", sha256="1" * 64),
+            domain_assurance.SourceArtifact(path="plan.md", role="plan", sha256="2" * 64),
+        )
+    )
+    store.planning_binding = planning_binding
+    store.read_result = AssuranceStoreResult(
+        status="valid",
+        target=store.target,
+        contract=valid_contract,
+        mode="adaptive",
+        reason="ok",
+    )
+    artifact_store = _ArtifactStoreFake(
+        manifest,
+        (
+            _ArtifactFake("design", store.target.issue_dir / "design.md", "design.md", _artifact_placeholder("design")),
+        ),
+    )
+
+    result = app_assurance.compose_assurance(
+        app_contracts.ComposeAssuranceRequest(artifact="design", dry_run=False),
+        store=store,
+        artifact_store=artifact_store,
+    )
+
+    assert result.ok is True
+    assert result.status == "applied"
+    assert result.changed_paths == ("design.md",)
+    assert artifact_store.preflighted == ["design"]
+    assert [artifact for artifact, _text in artifact_store.writes] == ["design"]
+    assert store.planning_binding_targets == [store.target]
+    assert len(store.writes) == 1
+    assert store.writes[0] == (store.target, result.contract)
+    assert result.contract is not None
+    assert result.contract.source_binding == planning_binding
 
 
 def test_compose_missing_profile_template_fails_before_writes() -> None:

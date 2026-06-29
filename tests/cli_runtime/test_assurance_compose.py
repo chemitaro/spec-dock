@@ -149,9 +149,11 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
-            self._create_classified_fixture(target)
+            issue_dir = self._create_classified_fixture(target)
+            contract_path = issue_dir / ".assurance.json"
 
             first = self._run_runtime_capture(target, ["assurance", "compose", "--artifact", "all", "--format", "json"])
+            contract_after_first = contract_path.read_text(encoding="utf-8")
             second = self._run_runtime_capture(
                 target, ["assurance", "compose", "--artifact", "all", "--format", "json"]
             )
@@ -162,6 +164,7 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert payload["ok"] is True
             assert payload["status"] == "unchanged"
             assert payload["changed_paths"] == []
+            assert contract_path.read_text(encoding="utf-8") == contract_after_first
 
     def test_assurance_compose_missing_and_invalid_assurance_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -440,7 +443,9 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             issue_dir = self._create_classified_fixture(target)
+            contract_path = issue_dir / ".assurance.json"
             before = self._artifact_texts(issue_dir)
+            contract_before = contract_path.read_text(encoding="utf-8")
 
             result = self._run_runtime_capture(
                 target,
@@ -452,8 +457,37 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert payload["ok"] is True
             assert payload["status"] == "dry-run"
             assert payload["dry_run"] is True
-            assert payload["changed_paths"]
+            assert sorted(payload["changed_paths"]) == sorted(
+                [(issue_dir / f"{artifact}.md").relative_to(target).as_posix() for artifact in ("design", "plan", "report")]
+            )
             assert self._artifact_texts(issue_dir) == before
+            assert contract_path.read_text(encoding="utf-8") == contract_before
+
+    def test_assurance_compose_real_write_updates_planning_source_binding_only_after_change(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_classified_fixture(target)
+            contract_path = issue_dir / ".assurance.json"
+            contract_before = json.loads(contract_path.read_text(encoding="utf-8"))
+
+            result = self._run_runtime_capture(
+                target,
+                ["assurance", "compose", "--artifact", "design", "--format", "json"],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["ok"] is True
+            assert payload["status"] == "applied"
+            assert payload["changed_paths"] == [(issue_dir / "design.md").relative_to(target).as_posix()]
+            contract_after = json.loads(contract_path.read_text(encoding="utf-8"))
+            before_binding = self._source_binding_by_role(contract_before)
+            after_binding = self._source_binding_by_role(contract_after)
+            assert sorted(after_binding) == ["design", "plan", "requirement"]
+            assert after_binding["design"]["sha256"] != before_binding["design"]["sha256"]
+            assert after_binding["design"]["sha256"] == self._sha256(issue_dir / "design.md")
+            assert after_binding["plan"]["sha256"] == before_binding["plan"]["sha256"]
 
     def _create_assurance_fixture(self, target: Path, *, issue_number: int, title: str) -> Path:
         self._create_same_repo_linked_hierarchy(
@@ -502,3 +536,14 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             artifact: (issue_dir / f"{artifact}.md").read_text(encoding="utf-8")
             for artifact in ("design", "plan", "report")
         }
+
+    def _source_binding_by_role(self, contract: dict) -> dict[str, dict]:
+        return {
+            artifact["role"]: artifact
+            for artifact in contract["source_binding"]["artifacts"]
+        }
+
+    def _sha256(self, path: Path) -> str:
+        import hashlib
+
+        return hashlib.sha256(path.read_bytes()).hexdigest()
