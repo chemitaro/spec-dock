@@ -1086,6 +1086,37 @@ uv run pytest
 result: 1555 passed, 76 skipped. (delegated verification)
 ```
 
+### PR #248 Codex 再レビュー P1 追加修正ゲート（Second Review Repair Gate）
+| review thread | 指摘 | 対応 | 再検証 | 結果 |
+|---|---|---|---|---|
+| `PRRT_kwDOQ99OK86NB7il` | profile plan templates の placeholder を埋めた後も、新しい見出しが executable marker として認識されず `plan-not-executable` になる | `_classify_plan_text` に `振る舞いバックログ`、`実行中の振る舞い`、`TDD サイクル`、`Validation Gate`、`報告証跡` を executable marker として追加。placeholder table rows が残る場合は従来どおり scaffold | `uv run pytest tests/cli_runtime/test_workflow.py` -> 24 passed（親側 focused bundleでは 25 passed） | pass |
+| `PRRT_kwDOQ99OK86NB7io` | composed Standard design template の `...` placeholder が残っても substantive と判定され、実行可能 plan と組み合わさると ready になりうる | `_classify_design_text` に placeholder list/table 検出を追加し、`- ...` / numbered placeholder / placeholder table rows が残る design を scaffold 判定 | `test_guidance_blocks_composed_standard_profile_design_placeholders` -> pass | pass |
+
+#### PR #248 再レビュー P1 追加修正コマンド / 結果
+```bash
+make lint
+
+result: pass; ruff check pass, ruff format check pass, mypy pass.
+```
+
+```bash
+uv run pytest tests/cli_runtime/test_workflow.py tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_mirror_match_provider_assets
+
+result: 25 passed.
+```
+
+```bash
+uv run pytest tests/cli_runtime/test_assurance_compose.py tests/unit/domain/test_artifact_composer.py tests/unit/application/test_assurance.py
+
+result: 40 passed.
+```
+
+```bash
+uv run pytest
+
+result: 1557 passed, 76 skipped. (delegated verification)
+```
+
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
   - 解決: ...
