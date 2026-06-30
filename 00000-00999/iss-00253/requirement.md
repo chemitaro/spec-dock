@@ -4,7 +4,7 @@ ID: "iss-00253"
 タイトル: "Connect Delegated Specialist Routing And Draft Artifact Sources"
 関連GitHub: ["#253"]
 Issue Grade: "strict"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-01"
 親: ["epic-00224", "init-local-00003"]
@@ -34,6 +34,7 @@ classified Issue の `draft-design` / `draft-plan` が `.assurance.json` の `au
 対象:
 
 - `application/create_node.py`
+- `cli/bootstrap.py`
 - `infra/assurance_store.py`
 - `infra/artifact_store.py`
 - `tests/cli_runtime/test_new.py`
