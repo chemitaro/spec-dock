@@ -95,7 +95,8 @@ def evaluate_report_evidence_gate(report_text: str | None, profile: WorkflowProf
             reason_code="report-evidence-missing",
             details=("report.md is empty.",),
         )
-    if _report_has_scaffold_markers(stripped):
+    rows = _markdown_table_rows(stripped)
+    if _report_has_scaffold_markers(stripped, rows):
         return ReportEvidenceGateResult(
             status="blocked",
             reason_code="report-evidence-scaffold",
@@ -108,7 +109,6 @@ def evaluate_report_evidence_gate(report_text: str | None, profile: WorkflowProf
             reason_code="report-evidence-incomplete",
             details=tuple(f"missing report section: {section}" for section in missing_sections),
         )
-    rows = _markdown_table_rows(stripped)
     if not _has_valid_spec_authoring_gate(rows):
         return ReportEvidenceGateResult(
             status="blocked",
@@ -166,8 +166,8 @@ _REQUIRED_REPORT_SECTIONS = (
 )
 
 
-def _report_has_scaffold_markers(text: str) -> bool:
-    markers = (
+def _report_has_scaffold_markers(text: str, rows: tuple[_TableRow, ...]) -> bool:
+    global_markers = (
         "<ISS_ID>",
         "<ISS_TITLE>",
         "<GITHUB_ISSUE_NUMBER_OR_URL>",
@@ -175,10 +175,25 @@ def _report_has_scaffold_markers(text: str) -> bool:
         "YYYY-MM-DD",
         "AC-___",
         "EC-___",
+    )
+    if any(marker in text for marker in global_markers):
+        return True
+    row_markers = (
         "pass / fail / blocked",
         "未解決 / 解決済み / 置換済み",
     )
-    return any(marker in text for marker in markers)
+    readiness_sections = (
+        "spec authoring gate",
+        "delegated draft evidence",
+        "grade specialist evidence gate",
+        "reviewer gate status",
+    )
+    for row in rows:
+        if not any(section in row.section for section in readiness_sections):
+            continue
+        if any(marker in cell for marker in row_markers for cell in row.cells):
+            return True
+    return False
 
 
 def _markdown_table_rows(text: str) -> tuple[_TableRow, ...]:
@@ -228,14 +243,27 @@ def _has_valid_spec_authoring_gate(rows: tuple[_TableRow, ...]) -> bool:
         if "spec authoring gate" not in row.section:
             continue
         cells = row.cells
-        if not cells or cells[0] not in required_steps:
+        if not cells:
+            continue
+        phase = _phase_value(cells[0], required_steps)
+        if phase is None:
             continue
         reviewer_verdict = cells[4] if len(cells) > 4 else ""
         blocking = cells[5] if len(cells) > 5 else ""
         promotion_decision = cells[6] if len(cells) > 6 else ""
-        if _has_review_pass(reviewer_verdict) and blocking == "no" and _has_promotion_decision(promotion_decision):
-            valid_steps.add(cells[0])
+        if _has_review_pass(reviewer_verdict) and _is_no(blocking) and _has_promotion_decision(promotion_decision):
+            valid_steps.add(phase)
     return valid_steps == required_steps
+
+
+def _phase_value(value: str, allowed_values: set[str]) -> str | None:
+    stripped = value.strip().strip("`")
+    if stripped in allowed_values:
+        return stripped
+    for allowed_value in allowed_values:
+        if f"({allowed_value})" in stripped or f"（{allowed_value}）" in stripped:
+            return allowed_value
+    return None
 
 
 def _has_delegated_draft_evidence(rows: tuple[_TableRow, ...]) -> bool:
@@ -318,7 +346,29 @@ def _row_has_delegated_draft_evidence(cells: tuple[str, ...], eal_tokens: tuple[
 def _has_review_pass(value: str) -> bool:
     if any(marker in value for marker in ("not pass", "not passed", "did not pass", "fail", "blocked", "unavailable")):
         return False
-    return value in {"pass", "passed"}
+    return _has_contract_value(value, {"pass", "passed", "合格"})
+
+
+def _is_no(value: str) -> bool:
+    return _has_contract_value(value, {"no", "いいえ"})
+
+
+def _is_ready(value: str) -> bool:
+    return _has_contract_value(value, {"ready"})
+
+
+def _has_contract_value(value: str, allowed_values: set[str]) -> bool:
+    stripped = value.strip().strip("`")
+    if not stripped:
+        return False
+    if "/" in stripped:
+        return False
+    if stripped in allowed_values:
+        return True
+    for allowed_value in allowed_values:
+        if f"({allowed_value})" in stripped or f"（{allowed_value}）" in stripped:
+            return True
+    return False
 
 
 def _has_promotion_decision(value: str) -> bool:
@@ -368,7 +418,7 @@ def _has_lite_grade_evidence(rows: tuple[_TableRow, ...]) -> bool:
         if (
             ("not applicable" in joined_evidence or "skip reason" in evidence or "未使用理由" in evidence)
             and _has_review_pass(reviewer_verdict)
-            and readiness == "ready"
+            and _is_ready(readiness)
         ):
             return True
     return False
@@ -381,6 +431,7 @@ def _row_has_grade_specialist_evidence(cells: tuple[str, ...], profile: Workflow
     evidence = cells[3] if len(cells) > 3 else ""
     reviewer_verdict = cells[4] if len(cells) > 4 else ""
     readiness = cells[5] if len(cells) > 5 else ""
+    fallback_and_evidence = f"{required_or_fallback} {evidence}".strip()
     usage_and_evidence = f"{usage} {evidence}".strip() or joined_row
     has_specialist = (
         ("system-architect" in required_or_fallback or "implementation-planner" in required_or_fallback)
@@ -389,18 +440,19 @@ def _row_has_grade_specialist_evidence(cells: tuple[str, ...], profile: Workflow
     )
     has_skip_reason = "skip reason:" in usage_and_evidence or "未使用理由" in usage_and_evidence
     has_fallback = (
-        "manual authoring fallback" in usage_and_evidence
-        or "manual-authored canonical docs" in usage_and_evidence
-        or "manual fallback" in usage_and_evidence
+        "manual authoring fallback" in fallback_and_evidence
+        or "manual-authored canonical docs" in fallback_and_evidence
+        or "manual fallback" in fallback_and_evidence
+        or ("manual fallback" in required_or_fallback and "manual evidence" in evidence)
     )
     if profile == "critical" and has_fallback:
-        has_fallback = _has_critical_fallback_approval(usage_and_evidence)
+        has_fallback = _has_critical_fallback_approval(fallback_and_evidence)
     if profile in {"strict", "critical"}:
         has_skip_reason = False
     if not (has_specialist or has_skip_reason or has_fallback):
         return False
     has_fresh_review = _has_review_pass(reviewer_verdict)
-    has_readiness = readiness == "ready" or "execute approved plan" in readiness
+    has_readiness = _is_ready(readiness) or "execute approved plan" in readiness
     return has_fresh_review and has_readiness
 
 
