@@ -4,7 +4,7 @@ ID: "iss-00251"
 タイトル: "Enforce Fail Closed Issue Artifact Readiness Preflight"
 関連GitHub: ["#251"]
 Issue Grade: "strict"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-01"
 親: ["epic-00224", "init-local-00003"]
@@ -26,7 +26,7 @@ Issue Grade: "strict"
 - `Validation Gate`、`M99`、static analysis / lint / tests / report / commit などの品質ゲート見出しだけを持つ plan は ready にならない。
 - `artifact_state: awaiting-assurance-compose` や明示 scaffold marker を持つ design / plan は ready にならない。
 - title に普通語として `template` または `placeholder` を含む substantive design は、それだけでは block されない。
-- stale reviewer evidence または missing Evidence Adoption Ledger が必要な状態では issue readiness が block される。
+- 既存 contract が reviewer / Evidence Adoption Ledger 証跡を必須としている状態では、証跡欠落を issue readiness の block reason として扱える。
 
 ## 4. スコープ
 
@@ -61,7 +61,7 @@ Issue Grade: "strict"
 - AC-003: plan の table/list/code span に複合 placeholder が含まれる場合、workflow readiness は block される。
 - AC-004: design の title に `template` / `placeholder` が含まれていても、本文が substantive なら ready 判定を妨げない。
 - AC-005: `artifact_state: awaiting-assurance-compose`、draft-only state、明示 scaffold marker は ready 判定を block する。
-- AC-006: delegated adoption / fresh reviewer / report evidence が必要な状態で欠落している場合、workflow guidance は repair action または human gate を返す。
+- AC-006: 既存 contract が delegated adoption / fresh reviewer / report evidence を必須としている状態で証跡が欠落している場合、R0 は新しい grade-aware evidence policy を定義せず、generic fail-closed readiness predicate / block reason として扱える。
 - AC-007: 既存 strict-legacy path と stale source binding block は退行しない。
 
 ## 7. 制約
@@ -69,4 +69,4 @@ Issue Grade: "strict"
 - false positive より false negative を優先する。判定不能な artifact は ready にしない。
 - 裸の `...` のような一般的な省略記号だけで全体を block しない。ID sentinel、table/list placeholder、明示 scaffold marker を文脈付きで判定する。
 - design の ordinary word `template` / `placeholder` は scaffold marker として扱わない。
-- R0 は readiness contract の修正に集中し、grade-aware authoring rules の再設計を行わない。
+- R0 は readiness contract の修正に集中し、grade-aware authoring rules、delegated specialist evidence policy、fresh reviewer gate、Evidence Adoption Ledger policy の再設計を行わない。それらの grade-aware policy 定義と guidance/template 接続は G1 / G3 の責務である。

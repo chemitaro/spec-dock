@@ -3,7 +3,7 @@
 ID: "iss-00251"
 タイトル: "Enforce Fail Closed Issue Artifact Readiness Preflight"
 Issue Grade: "strict"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-01"
 関連Requirement: ["requirement.md"]
@@ -24,7 +24,7 @@ workflow readiness は Issue execution の開始可否を決める shared runtim
 - `[N]` placeholder detection は requirement / artifact cell / artifact text の文脈を分ける。
 - `[N]` plan readiness は executable work marker と quality marker を分離する。
 - `[N]` design readiness は explicit scaffold marker に限定し、ordinary word `template` / `placeholder` だけで block しない。
-- `[N]` stale reviewer evidence / missing adoption evidence は issue readiness を block する。
+- `[N]` 既存 contract が必須化している reviewer / adoption evidence の欠落を、generic fail-closed block reason として扱えるようにする。Grade-aware evidence policy の定義は G3 に残す。
 
 ## 3. コンポーネント
 
@@ -34,7 +34,7 @@ workflow readiness は Issue execution の開始可否を決める shared runtim
 | Plan Executable Predicate | milestone / behavior / verification / actionable step を executable marker として判定する | `domain/workflow_state.py` |
 | Quality Marker Filter | `Validation Gate`、`M99`、static analysis / lint / tests / report / commit を supporting marker として扱う | `domain/workflow_state.py` |
 | Design Scaffold Predicate | `artifact_state: awaiting-assurance-compose` と明示 scaffold marker だけを block に使う | `domain/workflow_state.py` |
-| Evidence Readiness Predicate | fresh reviewer / adoption ledger / report evidence の欠落を block reason に変換する | `domain/workflow_state.py` |
+| Evidence Readiness Predicate | 既存 contract が必須化している fresh reviewer / adoption ledger / report evidence の欠落を generic block reason に変換する。必須条件そのものは定義しない | `domain/workflow_state.py` |
 
 ## 4. 判定ルール
 
@@ -43,7 +43,7 @@ workflow readiness は Issue execution の開始可否を決める shared runtim
 | requirement | `REQ-XXX`、`CON-...`、未置換 placeholder row、旧 scaffold sentence | 正当な説明文中の省略表現 |
 | design | `artifact_state: awaiting-assurance-compose`、draft-only state、明示 scaffold marker | title や本文中の ordinary word `template` / `placeholder` |
 | plan | 実行可能 milestone / behavior なし、quality marker だけ、placeholder cell | executable step と supporting quality gate の共存 |
-| report evidence | stale reviewer、missing adoption ledger、required command result missing | 実行不能理由が明記された no-op evidence |
+| report evidence | 既存 contract 上の stale reviewer、missing adoption ledger、required command result missing | 実行不能理由が明記された no-op evidence、新規 grade-aware evidence policy 定義 |
 
 ## 5. 失敗設計
 
