@@ -39,7 +39,7 @@ Issue Grade: "strict"
 |---|---|---|---|
 | C-001 | AC-001 | Issue `draft-design` が `authorized_profile` の design profile template を使う | CLI success test |
 | C-002 | AC-002 | Issue `draft-plan` が `authorized_profile` の plan profile template を使う | CLI success test |
-| C-003 | AC-003 | missing / invalid / stale contract が discussion allocation 前に no-write fail-closed する | CLI fail/no-write tests |
+| C-003 | AC-003 | missing / invalid / stale contract、unsupported profile、missing / non-file / symlink escape / empty profile template が discussion allocation 前に no-write fail-closed する | CLI fail/no-write tests |
 | C-004 | AC-004 | `draft-requirement` と Initiative / Epic draft behavior が退行しない | preservation tests |
 | C-005 | AC-005 | profile-sourced draft に legacy thin normalization が適用されない | content assertions |
 | C-006 | AC-006 | generated draft が authority / reviewer pass / phase completion / implementation readiness を自己主張しない | content assertions |
