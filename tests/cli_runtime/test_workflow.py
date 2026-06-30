@@ -317,6 +317,72 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["state"] == "blocked"
             assert payload["reason_code"] == "plan-not-executable"
 
+    def test_guidance_blocks_composite_plan_placeholder_code_spans(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Composite placeholder")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            (issue_dir / "plan.md").write_text(
+                "---\n"
+                "種別: 実装計画書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "approved"\n'
+                "---\n\n"
+                "# Plan\n\n"
+                "## 実装ステップ\n"
+                "- S01 handles the behavior.\n\n"
+                "| Closure | Evidence |\n"
+                "|---|---|\n"
+                "| `AC-...` / `BH-...` / `CON-...` | focused pytest |\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["workflow", "status", "--format", "json"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == "plan-not-executable"
+
+    def test_guidance_blocks_standalone_plan_placeholder_code_span(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Standalone placeholder")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            (issue_dir / "plan.md").write_text(
+                "---\n"
+                "種別: 実装計画書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "approved"\n'
+                "---\n\n"
+                "# Plan\n\n"
+                "## 実装ステップ\n"
+                "- S01 handles the behavior.\n\n"
+                "The evidence mapping still references `AC-...` and must not be executable.\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["workflow", "status", "--format", "json"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == "plan-not-executable"
+
     def test_guidance_blocks_generated_milestone_placeholder_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -336,6 +402,38 @@ class TestCliWorkflow(CliRuntimeHarness):
                 "| マイルストーン | 行動 |\n"
                 "|---|---|\n"
                 "| `M...` | Implement focused behavior |\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["workflow", "status", "--format", "json"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == "plan-not-executable"
+
+    def test_guidance_blocks_awaiting_assurance_compose_plan_frontmatter(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Awaiting compose plan")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            (issue_dir / "plan.md").write_text(
+                "---\n"
+                "種別: 実装計画書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "approved"\n'
+                "artifact_state: awaiting-assurance-compose\n"
+                "---\n\n"
+                "# Plan\n\n"
+                "## 実装ステップ\n"
+                "- S01 handles the behavior.\n",
                 encoding="utf-8",
             )
             classify = self._run_runtime_capture(
@@ -531,6 +629,40 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["reason_code"] == "assurance-valid"
             assert payload["may_execute_approved_plan"] is True
 
+    def test_guidance_blocks_quality_gate_only_plan_without_implementation_steps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Quality Only Plan")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            (issue_dir / "plan.md").write_text(
+                "---\n"
+                "種別: 実装計画書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "approved"\n'
+                "---\n\n"
+                "# Plan\n\n"
+                "## Validation Gate\n"
+                "- static analysis / lint\n"
+                "- tests\n"
+                "- report\n"
+                "- commit\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["workflow", "status", "--format", "json"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == "plan-not-executable"
+
     def test_guidance_allows_executable_plan_that_mentions_negated_marker_as_test_fixture(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -550,6 +682,140 @@ class TestCliWorkflow(CliRuntimeHarness):
                 "#### 具体テストケース一覧\n"
                 "- `tc-001` regression: plan readiness handles negated fixture prose\n"
                 "  - 失敗検出: approved plan says there are no implementation steps yet.\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = self._read_projected_runbook(target)
+            assert payload["state"] == "ready"
+            assert payload["reason_code"] == "assurance-valid"
+            assert payload["may_execute_approved_plan"] is True
+
+    def test_guidance_allows_executable_plan_with_ordinary_ellipsis_prose(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Executable ellipsis")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            (issue_dir / "plan.md").write_text(
+                "---\n"
+                "種別: 実装計画書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "approved"\n'
+                "---\n\n"
+                "# Plan\n\n"
+                "## 実装ステップ\n"
+                "- S01 handles a user-facing sentence that may naturally trail off... without being a placeholder.\n\n"
+                "| Check | Evidence |\n"
+                "|---|---|\n"
+                "| Runtime prose may include ellipsis... as ordinary text | focused pytest |\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["workflow", "status", "--format", "json"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["state"] == "ready"
+            assert payload["reason_code"] == "assurance-valid"
+
+    def test_guidance_allows_executable_plan_with_bare_ellipsis_code_span(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Executable ellipsis code")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            (issue_dir / "plan.md").write_text(
+                "---\n"
+                "種別: 実装計画書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "approved"\n'
+                "---\n\n"
+                "# Plan\n\n"
+                "## 実装ステップ\n"
+                "- S01 handles literal code examples that include `...` as ordinary notation.\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["workflow", "status", "--format", "json"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["state"] == "ready"
+            assert payload["reason_code"] == "assurance-valid"
+
+    def test_guidance_allows_substantive_design_that_mentions_template_placeholder_in_body(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Substantive design wording")
+            self._write_substantive_requirement(issue_dir)
+            self._write_executable_plan(issue_dir)
+            (issue_dir / "design.md").write_text(
+                "---\n"
+                "種別: 設計書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "approved"\n'
+                "---\n\n"
+                "# Design\n\n"
+                "## 全体像\n"
+                "- The workflow design documents how template and placeholder words appear in user-facing explanations.\n\n"
+                "## 責務\n"
+                "- Runtime blocks explicit scaffold markers while allowing ordinary domain vocabulary.\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = self._read_projected_runbook(target)
+            assert payload["state"] == "ready"
+            assert payload["reason_code"] == "assurance-valid"
+            assert payload["may_execute_approved_plan"] is True
+
+    def test_guidance_allows_substantive_design_with_template_placeholder_title(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Substantive design title")
+            self._write_substantive_requirement(issue_dir)
+            self._write_executable_plan(issue_dir)
+            (issue_dir / "design.md").write_text(
+                "---\n"
+                "種別: 設計書（Issue）\n"
+                'ID: "iss-00301"\n'
+                'タイトル: "Template Placeholder Migration Design"\n'
+                '状態: "approved"\n'
+                "---\n\n"
+                "# Template Placeholder Migration Design\n\n"
+                "## 全体像\n"
+                "- The workflow design is substantive and includes an implementation contract.\n\n"
+                "## 責務\n"
+                "- Runtime blocks explicit scaffold markers without treating title vocabulary as scaffold.\n",
                 encoding="utf-8",
             )
             classify = self._run_runtime_capture(

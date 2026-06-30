@@ -225,24 +225,23 @@ def _classify_plan_text(plan_text: str | None) -> str:
         '状態: "draft',
         "状態: draft",
         "draft | proposed",
+        "artifact_state: awaiting-assurance-compose",
         "todo",
         "tbd",
     )
     if _frontmatter_has_any(lower, frontmatter_scaffold_markers):
         return "scaffold"
-    markers = (
+    executable_markers = (
         "実装ステップ",
         "具体テストケース",
         "振る舞いバックログ",
         "実行中の振る舞い",
         "tdd サイクル",
-        "validation gate",
-        "報告証跡",
         "step closure contract",
         "approved-no-op",
         "decision-only closure",
     )
-    has_executable_marker = any(marker in lower for marker in markers)
+    has_executable_marker = any(marker in lower for marker in executable_markers)
     scaffold_markers = (
         "no structured implementation steps",
         "no implementation steps",
@@ -267,7 +266,7 @@ def _has_placeholder_table_rows(text: str) -> bool:
         if not stripped.startswith("|") or stripped.count("|") < 3:
             continue
         cells = [cell.strip().strip("`").lower() for cell in stripped.strip("|").split("|")]
-        if any(_is_generated_placeholder_token(cell) for cell in cells):
+        if any(_has_generated_placeholder_token(cell) for cell in cells):
             return True
     return False
 
@@ -284,8 +283,6 @@ def _classify_design_text(design_text: str | None) -> str:
         "状態: draft",
         "draft | proposed",
         "artifact_state: awaiting-assurance-compose",
-        "template",
-        "placeholder",
         "todo",
         "tbd",
     )
@@ -317,7 +314,11 @@ def _classify_design_text(design_text: str | None) -> str:
 
 
 def _has_placeholder_entries(text: str) -> bool:
-    return _has_placeholder_list_items(text) or _has_placeholder_table_rows(text)
+    return _has_placeholder_list_items(text) or _has_placeholder_table_rows(text) or _has_placeholder_code_spans(text)
+
+
+def _has_placeholder_code_spans(text: str) -> bool:
+    return any(_has_generated_placeholder_id_token(token) for token in re.findall(r"`([^`]+)`", text))
 
 
 def _has_placeholder_list_items(text: str) -> bool:
@@ -326,9 +327,23 @@ def _has_placeholder_list_items(text: str) -> bool:
         if item_match is None:
             continue
         item_text = item_match.group(1).strip().strip("`").lower()
-        if _is_generated_placeholder_token(item_text) or item_text.endswith(": ...") or item_text.endswith("： ..."):
+        if _has_generated_placeholder_token(item_text) or item_text.endswith(": ...") or item_text.endswith("： ..."):
             return True
     return False
+
+
+def _has_generated_placeholder_token(text: str) -> bool:
+    normalized = text.strip().strip("`").lower()
+    if _is_generated_placeholder_token(normalized):
+        return True
+    tokens = re.findall(r"[a-z][a-z0-9_-]*-(?:\.\.\.|xxx)|#\.\.\.", normalized)
+    return any(_is_generated_placeholder_token(token) for token in tokens)
+
+
+def _has_generated_placeholder_id_token(text: str) -> bool:
+    normalized = text.strip().strip("`").lower()
+    tokens = re.findall(r"[a-z][a-z0-9_-]*-(?:\.\.\.|xxx)|#\.\.\.", normalized)
+    return any(_is_generated_placeholder_token(token) for token in tokens)
 
 
 def _is_generated_placeholder_token(text: str) -> bool:
