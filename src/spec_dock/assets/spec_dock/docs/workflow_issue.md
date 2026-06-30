@@ -131,7 +131,7 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 - `report.md` の仕様解釈 / 判断台帳（`Spec Interpretation / Decision Ledger`）は実行中判断の audit trail であり、planned contract の正本ではない。report に durable decision が残った場合は、completion 前に canonical artifact への promotion、follow-up 化、または issue-local disposition の evidence を残す
 - `Parent Agent Invariant`: normal execution における親 Codex は inspect / plan / delegate / verify / integrate / report を担当する orchestration owner であり、code / runtime / tests / scaffold behavior / templates / shipped docs / skills / workflow text の直接実装者ではない
 - 親 Codex が直接作成・更新してよいのは、`report.md`、handoff note、phase evidence など run-local orchestration metadata に限定する。shipped docs / templates / skills / workflow text、runtime-facing scaffold、コード、テスト、runtime behavior は delegated worker work として扱う
-- 各 implementation step は `step closure contract`（step クロージャ契約）→ implementation delegation decision → bounded implementation batch → verification → refactor/tidy → report draft update → step reviewer gate → fix → re-review → commit → clean確認 の順で進める
+- 各 implementation step は `step closure contract`（step クロージャ契約）→ implementation delegation decision → bounded implementation batch → verification → refactor/tidy → report draft update → step reviewer gate → fix → re-review → step / milestone result approval → clean確認 の順で進める。commit は `lite` では必須の途中ゲートにせず、`standard` / `strict` / `critical` ではマイルストーン完了ゲートの `commit候補` として扱う
 - 完成版 `plan.md` には仕様固定クロージャ索引（`Spec-Locked Closure Index`）を置き、各 behavior slice の仕様ロックと closure owner step を実装前に固定する
 - 仕様固定クロージャ索引（`Spec-Locked Closure Index`）は Issue 全体のテストケース一覧や詳細なテスト実装指示ではなく、観測可能な入力・状態・locked expectation・防ぐ欠陥クラス・required/evidence level を固定する coverage ledger である
 - step クロージャ契約（`step closure contract`）は closure index の `id` を参照し、どの検証契約をその step で満たせば close してよいかを追えるようにする
@@ -159,7 +159,7 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 - テンプレート内の `001` / `002` などの連番例示は上限ではない。仕様目的に応じて必要な数だけ項目、行、振る舞い、ゲートを追加・削除し、`XXX` placeholder がある場合は実IDへ置換するか削除する
 - `standard` / `strict` / `critical` では、マイルストーン完了ゲートの `commit候補` を使って、issue 全体を巨大な 1 commit にまとめずレビュー可能な履歴を残す。review scope と commit scope は一致してもよいが、常に完全一致するとは定義しない
 - commit 後は `git status --short` などで、次のマイルストーンへ持ち越す意図しない staged / unstaged 変更がないことを確認する
-- step の close state は `committed` または `approved-no-op` のどちらかにする。`approved-no-op` は差分が本当にない場合だけ許可し、小さい変更、あとでまとめる、report だけ、時間不足を理由にしてはならない
+- step または milestone closure unit の close state は `committed` または `approved-no-op` のどちらかにする。`approved-no-op` は差分が本当にない場合だけ許可し、小さい変更、あとでまとめる、report だけ、時間不足を理由にしてはならない
 - `approved-no-op` には対象 step、変更不要の理由、確認した契約やファイル、差分なし確認コマンド、review 不要または read-only 確認の根拠を `report.md` に残す
 - `1 step = 1 つの観測可能な振る舞い` を原則にし、各 step に観測用の 1 本のコマンドを置く
 - `plan.md` では agent-native TDD cycle を step / block / behavior slice に埋め込み、配置ルールは `phase_plan_issue.md` に従う
@@ -173,9 +173,9 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 - 三者すべての final gate が `pass` した後、final report ledger に各 step の closure、三者 final review、final commit scope、post-commit external evidence の記録先を更新し、final commit を作成する。final commit の hash と clean check は final commit 後にしか確定できないため、committed `report.md` 内の必須記録ではなく、最終応答、PR、issue comment などの external delivery evidence として残す
 - final commit は final report ledger と delivery evidence boundary を閉じるための commit であり、過去の implementation step / milestone で未 commit の実装差分をまとめる catch-up implementation commit ではない。未 commit の差分が残っている場合は、該当 milestone の commit候補または approved-no-op が未完了であり、final commit で救済してはならない。
 - route だけ、または manual `active set` だけでは Issue work は完了しない。通常の開始/終了は `issue start` / `issue finish` を使う
-- `complete` と報告してよいのは、`issue finish` 前に active issue が set されその対象 issue を確認できる状態で、`spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` / `report.md` の 4 点が issue 固有の内容になっており、`spec-dock/active/issue/report.md` に required `sync` / `validate` の成功または pass 結果、required review の approval または pass 結果を示すコマンド証跡、各 implementation step の `Implementation Delegation Gate` が `delegated` / `approved-local-execution` / degraded mode のいずれかで閉じている証跡、required closure id が step 契約クロージャ（`Step Contract Closure`）/ テスト契約クロージャ（`Test Contract Closure`）/ クロージャ coverage（`Closure Coverage`）で pass または approved-no-op として閉じている証跡、全 implementation step が `committed` または正当な `approved-no-op` で閉じている証跡、final docs impact resolved、final `qa-reviewer` pass、issue-wide `code-reviewer` pass、final `spec-reviewer` pass、PR 送達ゲート（PR Delivery Gate）とマージ準備ゲート（Merge Preparation Gate）の pass evidence、final report ledger が記録済みであり、final commit 済みと意図しない staged / unstaged 変更なしの post-commit external delivery evidence を確認している場合のみである。ここで degraded mode は implementation delegation availability の証跡に限られ、required reviewer gate pass ではない
+- `complete` と報告してよいのは、`issue finish` 前に active issue が set されその対象 issue を確認できる状態で、`spec-dock/active/issue/requirement.md` / `design.md` / `plan.md` / `report.md` の 4 点が issue 固有の内容になっており、`spec-dock/active/issue/report.md` に required `sync` / `validate` の成功または pass 結果、required review の approval または pass 結果を示すコマンド証跡、各 implementation step の `Implementation Delegation Gate` が `delegated` / `approved-local-execution` / degraded mode のいずれかで閉じている証跡、required closure id が step 契約クロージャ（`Step Contract Closure`）/ テスト契約クロージャ（`Test Contract Closure`）/ クロージャ coverage（`Closure Coverage`）で pass または approved-no-op として閉じている証跡、全 implementation step / milestone closure unit が `committed` または正当な `approved-no-op` で閉じている証跡、final docs impact resolved、final `qa-reviewer` pass、issue-wide `code-reviewer` pass、final `spec-reviewer` pass、PR 送達ゲート（PR Delivery Gate）とマージ準備ゲート（Merge Preparation Gate）の pass evidence、final report ledger が記録済みであり、final commit 済みと意図しない staged / unstaged 変更なしの post-commit external delivery evidence を確認している場合のみである。ここで degraded mode は implementation delegation availability の証跡に限られ、required reviewer gate pass ではない
 - 4 点の issue docs のいずれかが untouched、template、placeholder、または実質未記入の状態で残る場合は `未完了` であり、成功報告をしてはならない
-- required step（`sync` / `validate` / `required review` / implementation delegation decision / per-step reviewer gate / step commit / final QA review / issue-wide code review / final spec review / final commit）のいずれかを未実施のままにした場合、または実行しても成功、pass、approval、`delegated`、`approved-local-execution`、`committed`、または正当な `approved-no-op` に到達しなかった場合、理由の記録は必須だが `complete` にはならない。`blocked` または `未完了` に分類し、`report.md` に reason と next action を残す
+- required step（`sync` / `validate` / `required review` / implementation delegation decision / per-step reviewer gate / step / milestone result approval / final QA review / issue-wide code review / final spec review / final commit）のいずれかを未実施のままにした場合、または実行しても成功、pass、approval、`delegated`、`approved-local-execution`、`committed`、または正当な `approved-no-op` に到達しなかった場合、理由の記録は必須だが `complete` にはならない。`blocked` または `未完了` に分類し、`report.md` に reason と next action を残す
 - `blocked` は、外部依存、権限不足、サービス停止、その他の環境条件によって次の required action を進められない状態を指す
 - `blocked` の場合は `report.md` に reason と next action を残す。blocker type と impact は該当する場合に併記する
 - `未完了` は、product work、docs 更新、または証跡が不足している状態を指す。product gap は環境 blocker がない限り `blocked` ではなく `未完了` として扱う
@@ -207,7 +207,7 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 - `issue finish` 後は active issue が clear されていてよく、`complete` 判定は active state の残存ではなく `issue finish` 前に記録・確認した report evidence で行う
 - `complete` 判定に必要な required closure id は、report の step 契約クロージャ（`Step Contract Closure`）/ テスト契約クロージャ（`Test Contract Closure`）/ クロージャ coverage（`Closure Coverage`）で pass または approved-no-op として閉じている必要がある
 - `complete` 判定に必要な各 implementation step は、report の `Implementation Delegation Gate` で `delegated`、`approved-local-execution`、または degraded mode として閉じている必要がある。delegation evidence が不足している場合は `未完了` として扱う
-- required step（`sync` / `validate` / `required review` / implementation delegation decision / per-step reviewer gate / step commit / final QA review / issue-wide code review / final spec review / final commit）を未実施にした場合、または実行しても成功、pass、approval、`delegated`、`approved-local-execution`、`committed`、または正当な `approved-no-op` に到達しなかった場合は reason と next action を残し、`blocked` / `未完了` に分類する
+- required step（`sync` / `validate` / `required review` / implementation delegation decision / per-step reviewer gate / step / milestone result approval / final QA review / issue-wide code review / final spec review / final commit）を未実施にした場合、または実行しても成功、pass、approval、`delegated`、`approved-local-execution`、`committed`、または正当な `approved-no-op` に到達しなかった場合は reason と next action を残し、`blocked` / `未完了` に分類する
 - `blocked` / `未完了` の場合は reason と next action を残し、環境 blocker と product gap を混在させない
 - `blocked` では blocker type と impact を該当する範囲で残す
 - stage gate ごとの reviewer verdict / test結果 / 修正内容 / no-op 理由もここに残す
@@ -237,12 +237,12 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
   - docs 影響 / docs 更新 step（docs impact / docs refresh）が必要なら入っている
   - 最終品質ゲート（final quality gate）が独立し、`qa-reviewer`、issue-wide `code-reviewer`、`spec-reviewer` の三者 review を含んでいる
   - 各 implementation step に Implementation Delegation Gate があり、条件付き必須 trigger に該当する step では適切なサブエージェント利用または degraded mode evidence がある
-  - 各 implementation step に step reviewer gate、commit gate、no-op gate がある
+  - 各 implementation step に step reviewer gate があり、`standard` / `strict` / `critical` の主要マイルストーンには commit候補 gate、差分なしの場合には no-op gate がある
 - report:
   - `complete` を報告する場合に必要な required `sync` / `validate` の成功または pass 結果と required review の approval または pass 結果を示すコマンド証跡が、`issue finish` 前に active issue を確認できる状態の report に残っている
   - required closure id が step 契約クロージャ（`Step Contract Closure`）/ テスト契約クロージャ（`Test Contract Closure`）/ クロージャ coverage（`Closure Coverage`）で閉じている
   - required row の削除、locked expectation 変更、required 変更、spec link 意味変更がある場合は re-review 証跡が残っている
-  - 全 implementation step の `delegated` / `approved-local-execution` / degraded mode evidence と、`committed` または正当な `approved-no-op` evidence が残っている
+  - 全 implementation step の `delegated` / `approved-local-execution` / degraded mode evidence と、step / milestone closure unit の `committed` または正当な `approved-no-op` evidence が残っている
   - final docs impact resolved、`qa-reviewer` pass、issue-wide `code-reviewer` pass、`spec-reviewer` pass、final report ledger、final commit scope、post-commit external evidence の記録先が残っている
   - required step を未実施にした場合、または実行しても成功、pass、approval、`committed`、または正当な `approved-no-op` に到達しなかった場合は `blocked` / `未完了` の reason と next action が残っている
   - `blocked` の blocker type / impact が必要な場合に残っている

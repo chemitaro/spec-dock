@@ -20,7 +20,7 @@ Issue templates（共通 `requirement.md` と profile 別 `design.md` / `plan.md
 
 ## この artifact の責務
 
-- reviewer-pass 済みの `requirement.md` と `design.md` を、実装可能な step、検証、review gate、commit gate、最終品質ゲート（final quality gate）へ変換する。
+- reviewer-pass 済みの `requirement.md` と `design.md` を、実装可能な step、検証、review gate、commit候補 gate、最終品質ゲート（final quality gate）へ変換する。
 - `plan.md` を planned contract として扱い、実装者が step を上から順に実行できる command queue にする。
 - `report.md` を observed evidence ledger として扱い、実際の Red / Green / Refactor 結果、discovered tests、closure delta、reviewer verdict、commit/no-op evidence の記録先にする。
 - 仕様固定クロージャ索引（`Spec-Locked Closure Index`）で仕様 coverage を固定し、各 implementation step の `具体テストケース一覧` で step-local obligation と concrete red / characterization / inspect / manual seeds を固定する。
@@ -49,7 +49,7 @@ Issue templates（共通 `requirement.md` と profile 別 `design.md` / `plan.md
   - closure delta and amendment history
   - delegated worker evidence
   - reviewer gate status
-  - step commit / approved-no-op evidence
+  - step / milestone result approval / approved-no-op evidence
 - `report.md` は仕様解釈 / 判断台帳（`Spec Interpretation / Decision Ledger`）も持つ。実行中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up は report 側に記録し、`plan.md` を実行中判断の追記先にしない。
 - `plan.md` は decision result を所有しない。将来も効く durable decision が実行中に見つかった場合は、report に evidence と disposition を残したうえで、必要に応じて `design.md`、ADR、plan amendment、follow-up issue へ昇格する。
 - 実行中に見つかった新しい bug class、外部 contract risk、仕様差分が既存 plan obligation の範囲外なら、report に発見を残すだけで閉じず、plan amendment と re-review を先に行う。

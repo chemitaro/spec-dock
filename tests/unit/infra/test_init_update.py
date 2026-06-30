@@ -4487,7 +4487,10 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "failing test は iteration ごとに 1 本ずつ進める" not in phase_plan_issue
         assert "completion policy の正本は `workflow_issue.md`" in phase_plan_issue
         assert "step 固有の worker handoff contract" in phase_plan_issue
-        assert "report-before-commit、step reviewer gate pass、step commit、approved-no-op" in phase_plan_issue
+        assert (
+            "report-before-commit、step reviewer gate pass、step / milestone result approval、approved-no-op"
+            in phase_plan_issue
+        )
         assert "マイルストーン完了ゲートに `commit候補`" in phase_plan_issue
         assert "review scope と commit scope は一致してもよいが、常に完全一致するとは定義しない" in phase_plan_issue
         assert "reviewer gate、`commit候補` または no-op 判定" in phase_plan_issue
@@ -4599,7 +4602,7 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "bounded delegated follow-up" in workflow_issue
         assert "test sensitivity evidence" in workflow_issue
         assert "Red → Green → Refactor → review" not in workflow_issue
-        assert "step reviewer gate → fix → re-review → commit → clean確認" in workflow_issue
+        assert "step reviewer gate → fix → re-review → step / milestone result approval → clean確認" in workflow_issue
         assert "マイルストーン完了ゲートの `commit候補`" in workflow_issue
         assert "常に完全一致するとは定義しない" in workflow_issue
         assert "`committed` または `approved-no-op`" in workflow_issue

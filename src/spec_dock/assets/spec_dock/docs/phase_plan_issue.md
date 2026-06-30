@@ -126,7 +126,7 @@ Operational entrypoint / first-read spine は `spec-dock-issue-planning` skill �
 - `standard` 以上では主要マイルストーンが `commit候補` または no-op 判定を持ち、`lite` では途中 commit を前提にしない軽量完了条件になっている
 - step 順が design の依存関係分析、Module Dependency Diagram、directory / file change plan と矛盾しない
 - 各 step の `depends on` / `unblocks` / `target files` が、実装順と変更対象の確認に使える
-- report update が stage gate に置かれている。report-before-commit、step reviewer gate pass、step commit、approved-no-op の実行順は `workflow_issue.md` の実行 contract で確認する
+- report update が stage gate に置かれている。report-before-commit、step reviewer gate pass、step / milestone result approval、approved-no-op の実行順は `workflow_issue.md` の実行 contract で確認する
 - AC / EC と step の対応が取れている
 - docs impact と最終品質ゲート（final quality gate）が計画に埋め込まれ、`doc-writer` による必要 docs 更新、`qa-reviewer`、issue-wide `code-reviewer`、`spec-reviewer` の三者 review が追跡できる
 - delegated plan draft を使う場合、lightweight provenance、fresh requirement/design reviewer pass、approved artifacts への traceability、stale / superseded handling、scope discipline、phase gate preservation が確認できる
