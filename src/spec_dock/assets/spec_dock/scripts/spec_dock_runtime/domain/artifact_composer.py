@@ -35,6 +35,14 @@ class ProfileArtifactPreset:
 
 
 @dataclass(frozen=True)
+class ProfileArtifactTemplate:
+    profile: ProfileName
+    artifact: Literal["design", "plan"]
+    repo_relative_path: str
+    body: str
+
+
+@dataclass(frozen=True)
 class ProfileSectionManifest:
     schema_version: int
     sections: dict[str, ManagedSection]
@@ -127,8 +135,18 @@ def compose_artifact(
     authorized_profile: AssuranceProfile | str,
     *,
     lite_candidate: bool = False,
+    profile_template: ProfileArtifactTemplate | None = None,
 ) -> ComposeArtifactResult:
     profile_name = _profile_name(authorized_profile)
+    if profile_template is not None:
+        return _compose_from_profile_template(
+            text,
+            artifact,
+            profile_name,
+            lite_candidate=lite_candidate,
+            profile_template=profile_template,
+        )
+
     scan = _scan_managed_sections(text)
     if scan.errors:
         return ComposeArtifactResult(
@@ -203,6 +221,92 @@ def compose_artifact(
         changed=output_text != text,
         added_section_ids=tuple(added_section_ids),
         preserved_section_ids=tuple(preserved_section_ids),
+        warnings=(),
+        errors=(),
+    )
+
+
+def _compose_from_profile_template(
+    text: str,
+    artifact: ArtifactKind,
+    authorized_profile: ProfileName,
+    *,
+    lite_candidate: bool,
+    profile_template: ProfileArtifactTemplate,
+) -> ComposeArtifactResult:
+    if artifact not in ("design", "plan"):
+        raise ValueError(f"Profile Markdown templates are not supported for artifact kind: {artifact}")
+    if profile_template.artifact != artifact:
+        raise ValueError(f"Profile template artifact mismatch: expected {artifact}, got {profile_template.artifact}")
+    if profile_template.profile != authorized_profile:
+        raise ValueError(f"Profile template mismatch: expected {authorized_profile}, got {profile_template.profile}")
+
+    template_body = _render_profile_template_body(profile_template.body, text)
+    target_scan = _scan_managed_sections(text)
+    template_scan = _scan_managed_sections(template_body)
+    errors = (*target_scan.errors, *template_scan.errors)
+    if errors:
+        return ComposeArtifactResult(
+            artifact=artifact,
+            authorized_profile=authorized_profile,
+            lite_candidate=lite_candidate,
+            output_text=None,
+            changed=False,
+            added_section_ids=(),
+            preserved_section_ids=(),
+            warnings=(),
+            errors=errors,
+        )
+
+    placeholder_state = _placeholder_state(text, artifact)
+    if placeholder_state == "conflict":
+        if _body_matches_template(text, template_body):
+            return ComposeArtifactResult(
+                artifact=artifact,
+                authorized_profile=authorized_profile,
+                lite_candidate=lite_candidate,
+                output_text=text,
+                changed=False,
+                added_section_ids=(),
+                preserved_section_ids=tuple(sorted(target_scan.section_ids)),
+                warnings=(),
+                errors=(),
+            )
+        return ComposeArtifactResult(
+            artifact=artifact,
+            authorized_profile=authorized_profile,
+            lite_candidate=lite_candidate,
+            output_text=None,
+            changed=False,
+            added_section_ids=(),
+            preserved_section_ids=(),
+            warnings=(),
+            errors=(
+                MarkerConflict(
+                    kind="substantive_content_conflict",
+                    section_id="awaiting-assurance-compose",
+                    message=(
+                        f"{artifact}.md contains substantive content outside managed sections; "
+                        "assurance compose will not overwrite it automatically."
+                    ),
+                ),
+            ),
+        )
+
+    if placeholder_state == "placeholder":
+        output_text = _append_template_body(_strip_placeholder_marker(text), template_body)
+    elif target_scan.section_ids:
+        output_text = text
+    else:
+        output_text = _append_blocks(text, [template_body.rstrip()])
+    return ComposeArtifactResult(
+        artifact=artifact,
+        authorized_profile=authorized_profile,
+        lite_candidate=lite_candidate,
+        output_text=output_text,
+        changed=output_text != text,
+        added_section_ids=tuple(sorted(template_scan.section_ids - target_scan.section_ids)),
+        preserved_section_ids=tuple(sorted(template_scan.section_ids & target_scan.section_ids)),
         warnings=(),
         errors=(),
     )
@@ -390,6 +494,8 @@ def _strip_placeholder_marker(text: str) -> str:
             frontmatter_lines.append('状態: "approved"')
             continue
         frontmatter_lines.append(line)
+    if frontmatter_lines == ["---", "---"]:
+        return ""
     return "\n".join(frontmatter_lines).rstrip() + "\n"
 
 
@@ -415,6 +521,76 @@ def _append_blocks(text: str, blocks: list[str]) -> str:
     if not base:
         return "\n\n".join(blocks) + "\n"
     return base + "\n\n" + "\n\n".join(blocks) + "\n"
+
+
+def _append_template_body(text: str, template_body: str) -> str:
+    return _append_blocks(text, [template_body.rstrip()])
+
+
+def _body_matches_template(text: str, template_body: str) -> bool:
+    _frontmatter, body = _split_frontmatter(text)
+    return body.strip() == template_body.strip()
+
+
+def _render_profile_template_body(template_body: str, target_text: str) -> str:
+    replacements = _profile_template_replacements(target_text)
+    rendered = template_body
+    for token, value in replacements.items():
+        rendered = rendered.replace(token, value)
+    return rendered
+
+
+def _profile_template_replacements(target_text: str) -> dict[str, str]:
+    frontmatter, _body = _split_frontmatter(target_text)
+    if not frontmatter:
+        return {}
+
+    scalar_fields = _frontmatter_scalar_fields(frontmatter)
+    parent_ids = _frontmatter_list_values(frontmatter, "親")
+    github_refs = _frontmatter_list_values(frontmatter, "関連GitHub")
+    issue_id = scalar_fields.get("ID")
+    issue_title = scalar_fields.get("タイトル")
+    replacements: dict[str, str] = {}
+    if issue_id:
+        replacements["<ISS_ID>"] = issue_id
+        replacements["<FEATURE_ID>"] = issue_id
+    if issue_title:
+        replacements["<ISS_TITLE>"] = issue_title
+        replacements["<FEATURE_NAME>"] = issue_title
+    for parent_id in parent_ids:
+        if parent_id.startswith("epic-") and "<EPIC_ID>" not in replacements:
+            replacements["<EPIC_ID>"] = parent_id
+        elif parent_id.startswith("init-") and "<INIT_ID>" not in replacements:
+            replacements["<INIT_ID>"] = parent_id
+    if github_refs:
+        replacements["<GITHUB_ISSUE_NUMBER_OR_URL>"] = github_refs[0]
+        replacements["<ISSUE_NUMBER_OR_URL>"] = github_refs[0]
+    if scalar_fields.get("作成者"):
+        replacements["<YOUR_NAME>"] = scalar_fields["作成者"]
+    if scalar_fields.get("最終更新"):
+        replacements["YYYY-MM-DD"] = scalar_fields["最終更新"]
+    return replacements
+
+
+def _frontmatter_scalar_fields(frontmatter: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for line in frontmatter.splitlines():
+        if line.strip() == "---" or ":" not in line:
+            continue
+        key, raw_value = line.split(":", 1)
+        value = raw_value.strip()
+        if not value or value.startswith("["):
+            continue
+        fields[key.strip()] = value.strip('"')
+    return fields
+
+
+def _frontmatter_list_values(frontmatter: str, key: str) -> tuple[str, ...]:
+    pattern = re.compile(rf"(?m)^{re.escape(key)}:\s*\[(?P<values>[^\]]*)\]\s*$")
+    match = pattern.search(frontmatter)
+    if match is None:
+        return ()
+    return tuple(value.strip().strip('"') for value in match.group("values").split(",") if value.strip())
 
 
 def _profile_name(profile: AssuranceProfile | str) -> ProfileName:
