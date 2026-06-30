@@ -147,8 +147,9 @@ unknown は fail-closed です。unknown high-level target や unknown descendan
 - `deps-issues` には typed issue blockers、typed node blockers、satisfied dependencies が含まれます。todo-only `index.json` の再パース結果ではありません。
 - `.agent/deps-issues.json` の `nodes` / `edges` は active readiness graph です。done / closed / satisfied-only context は active graph から省かれることがあります。
 - `.agent/deps-issues.json` の `dependency_contexts` は evaluated high-level dependency context を保持します。GitHub-open all-descendant-done high-level dependency など、図に出ない satisfied context の確認先です。
+- `.agent/index-all.json` は各 node payload の top-level `depends_on` に canonical raw direct dependency target ids を保持します。source / target kind は `nodes[source].type` と `nodes[target].type` を join して取得します。
 - `sync` が生成する `deps-issues.puml` は active readiness / blocker view です。blocking edge は user-facing label `blocks` で表示し、done / closed / satisfied-only edge は表示ノイズとして省きます。
-- `sync` が生成する `deps-raw.puml` は `.meta.json.depends_on` の active raw direct dependency を可視化する確認用 artifact です。high-level node の state / source を表示できますが、readiness / blocker 判定の authority は `deps-issues.*` 側にあります。complete raw metadata audit は `.meta.json.depends_on` と `.agent/index-all.json` を確認します。
+- `sync` が生成する `deps-raw.puml` は `.meta.json.depends_on` の active raw direct dependency を可視化する確認用 artifact です。high-level node の state / source を表示できますが、readiness / blocker 判定の authority は `deps-issues.*` 側にあります。complete raw metadata audit は `.meta.json.depends_on` と `.agent/index-all.json` の `nodes[*].depends_on` を確認します。
 - raw node-level cycle などの deps preflight failure や disabled path は fail-closed です。`sync --force` では stale graph を残さない placeholder が出力され、partial readiness authority として読んではいけません。
 - 運用では `deps add/remove` の後に `./spec-dock/scripts/spec-dock deps check <target>`、`./spec-dock/scripts/spec-dock validate`、`./spec-dock/scripts/spec-dock sync` を順に実行して、標準の GitHub live state で整合を確認します。GitHub を呼ばない cache/local 確認が必要な場合だけ `--no-github` を指定します。
 - この文書は `.meta.json` schema / reader / `deps check` / `deps add/remove` の command contract を固定するもので、downstream parity や hard cutover 完了を意味しません。

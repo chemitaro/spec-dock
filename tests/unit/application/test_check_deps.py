@@ -47,6 +47,7 @@ class _StubDepsTopologyReader:
         return infra_contracts.DepsTopologyLoadResult(
             issue_depends_on_map=dict(self.issue_depends_on_map),
             warnings=list(self.warnings),
+            raw_node_depends_on_map=dict(self.node_depends_on_map),
             dependency_contexts_by_issue_id=dict(self.dependency_contexts),
         )
 
@@ -266,6 +267,7 @@ class TestCheckDepsApplication:
         derived_state_reader=None,
         issue_gateway=None,
         deps=None,
+        node_depends_on_map=None,
         records=None,
         dependency_contexts=None,
         specdock_dir=Path("/repo/spec-dock"),
@@ -280,6 +282,7 @@ class TestCheckDepsApplication:
             issue_gateway=issue_gateway,
             deps_topology_reader=_StubDepsTopologyReader(
                 deps or {"iss-00302": ["iss-00301"]},
+                node_depends_on_map=node_depends_on_map,
                 dependency_contexts=dependency_contexts,
             ),
         )
@@ -392,6 +395,136 @@ class TestCheckDepsApplication:
                 self._request(app_contracts, use_github=False, node_id="epic-00203"),
                 ports,
             )
+
+    def test_deps_check_blocks_empty_initiative_direct_node_dependency(self) -> None:
+        app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        records = [
+            *self._empty_epic_records(infra_contracts),
+            infra_contracts.StoredMetaRecord(
+                kind="initiative",
+                id="init-00104",
+                title="External initiative",
+                slug="external-initiative",
+                path="/repo/spec-dock/initiatives/init-00104-external-initiative",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=104,
+                meta_path="/repo/spec-dock/initiatives/init-00104-external-initiative/.meta.json",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="epic",
+                id="epic-local-00205",
+                title="External empty epic",
+                slug="external-empty-epic",
+                path="/repo/spec-dock/initiatives/init-00104-external-initiative/epics/epic-local-00205-external-empty-epic",
+                parent_id="init-00104",
+                initiative_id="init-00104",
+                epic_id=None,
+                github_issue_number=None,
+                meta_path="/repo/spec-dock/initiatives/init-00104-external-initiative/epics/epic-local-00205-external-empty-epic/.meta.json",
+            ),
+        ]
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            records=records,
+            deps={},
+            node_depends_on_map={"init-00103": ["epic-local-00205"]},
+            derived_state_reader=_StubDerivedStateReader(),
+        )
+
+        result = app_check_deps.check_deps(
+            self._request(app_contracts, use_github=False, node_id="init-00103"),
+            ports,
+        )
+
+        assert not result.inspection.evaluation.ready
+        assert result.inspection.evaluation.guard_reason == "blocked"
+        assert result.inspection.evaluation.blockers == ["epic-local-00205"]
+        assert result.inspection.effective_depends_on == []
+        assert [
+            (context.source_node_id, context.target_node_id, context.dependency_disposition)
+            for context in result.inspection.evaluation.dependency_contexts
+        ] == [("init-00103", "epic-local-00205", "blocking")]
+        assert [
+            (blocker.node_id, blocker.reason, blocker.source_issue_id)
+            for blocker in result.inspection.evaluation.node_blockers
+        ] == [("epic-local-00205", "empty_open", "init-00103")]
+        assert [(dep.source_node_id, dep.target_node_id) for dep in result.inspection.direct_node_dependencies] == [
+            ("init-00103", "epic-local-00205")
+        ]
+
+    def test_deps_check_keeps_direct_node_status_separate_from_issue_readiness(self) -> None:
+        app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
+        records = [
+            *self._empty_epic_records(infra_contracts),
+            infra_contracts.StoredMetaRecord(
+                kind="initiative",
+                id="init-00104",
+                title="External initiative",
+                slug="external-initiative",
+                path="/repo/spec-dock/initiatives/init-00104-external-initiative",
+                parent_id=None,
+                initiative_id=None,
+                epic_id=None,
+                github_issue_number=104,
+                meta_path="/repo/spec-dock/initiatives/init-00104-external-initiative/.meta.json",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="epic",
+                id="epic-00205",
+                title="External non-empty epic",
+                slug="external-non-empty-epic",
+                path="/repo/spec-dock/initiatives/init-00104-external-initiative/epics/epic-00205-external-non-empty-epic",
+                parent_id="init-00104",
+                initiative_id="init-00104",
+                epic_id=None,
+                github_issue_number=205,
+                meta_path="/repo/spec-dock/initiatives/init-00104-external-initiative/epics/epic-00205-external-non-empty-epic/.meta.json",
+            ),
+            infra_contracts.StoredMetaRecord(
+                kind="issue",
+                id="iss-00405",
+                title="External done issue",
+                slug="external-done-issue",
+                path="/repo/spec-dock/initiatives/init-00104-external-initiative/epics/epic-00205-external-non-empty-epic/issues/iss-00405-external-done-issue",
+                parent_id="epic-00205",
+                initiative_id="init-00104",
+                epic_id="epic-00205",
+                github_issue_number=405,
+                meta_path="/repo/spec-dock/initiatives/init-00104-external-initiative/epics/epic-00205-external-non-empty-epic/issues/iss-00405-external-done-issue/.meta.json",
+            ),
+        ]
+        ports = self._ports(
+            app_ports,
+            infra_contracts,
+            records=records,
+            deps={},
+            node_depends_on_map={"init-00103": ["epic-00205"]},
+            derived_state_reader=_StubDerivedStateReader(statuses={"iss-00405": "done"}),
+        )
+
+        result = app_check_deps.check_deps(
+            self._request(app_contracts, use_github=False, node_id="init-00103"),
+            ports,
+        )
+
+        assert result.inspection.evaluation.ready
+        assert result.inspection.evaluation.blockers == []
+        assert result.inspection.effective_depends_on == []
+        assert [
+            (context.source_node_id, context.target_node_id, context.dependency_disposition)
+            for context in result.inspection.evaluation.dependency_contexts
+        ] == [("init-00103", "epic-00205", "satisfied")]
+        assert [
+            (context.source_node_id, context.target_node_id)
+            for context in result.inspection.evaluation.satisfied_dependencies
+        ] == [("init-00103", "epic-00205")]
+        assert [(dep.target_issue_ids, dep.expansion) for dep in result.inspection.direct_node_dependencies] == [
+            (("iss-00405",), "expanded")
+        ]
+        assert result.inspection.direct_node_dependencies[0].dependency_disposition == "satisfied"
 
     def test_no_github_missing_cache_defaults_to_unknown_and_blocks(self) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
