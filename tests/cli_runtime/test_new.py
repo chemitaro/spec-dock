@@ -45,10 +45,41 @@ class TestCliNew(CliRuntimeHarness):
         *,
         complexity_tier: str = "complex",
     ) -> None:
+        from spec_dock.assets.spec_dock.scripts.spec_dock_runtime.domain.assurance import (
+            FactValue,
+            RiskFact,
+            classify_risk_facts,
+        )
+
         contract_path = issue_dir / ".assurance.json"
         payload = json.loads(contract_path.read_text(encoding="utf-8"))
-        if profile in ("strict", "critical"):
-            values = {
+        risk_values: dict[str, FactValue] | None = None
+        if profile == "lite":
+            risk_values = {
+                "docs_only_change": "true",
+                "explicit_lite_opt_in": "true",
+                "lite_evidence_gate_passed": "true",
+                "migration_or_persistence_change": "false",
+                "public_contract_change": "false",
+                "rollback_difficulty_high": "false",
+                "runtime_behavior_change": "false",
+                "security_or_privacy_sensitive": "false",
+            }
+            complexity_tier = "normal"
+        elif profile == "standard":
+            risk_values = {
+                "docs_only_change": "unknown",
+                "explicit_lite_opt_in": "false",
+                "lite_evidence_gate_passed": "false",
+                "migration_or_persistence_change": "unknown",
+                "public_contract_change": "unknown",
+                "rollback_difficulty_high": "unknown",
+                "runtime_behavior_change": "unknown",
+                "security_or_privacy_sensitive": "unknown",
+            }
+            complexity_tier = "normal"
+        elif profile in ("strict", "critical"):
+            risk_values = {
                 "docs_only_change": "unknown",
                 "explicit_lite_opt_in": "false",
                 "lite_evidence_gate_passed": "false",
@@ -58,53 +89,23 @@ class TestCliNew(CliRuntimeHarness):
                 "runtime_behavior_change": "unknown",
                 "security_or_privacy_sensitive": "true" if profile == "critical" else "unknown",
             }
-            payload["risk_facts"] = [
-                {
-                    "key": key,
-                    "value": value,
-                    "source": "requirement",
-                    "reason_code": f"fact_default_{key}",
-                }
-                for key, value in sorted(values.items())
-            ]
-            reason_codes = {f"fact_default_{key}" for key in values} | {
-                "hard_trigger_migration_unknown",
-                "hard_trigger_rollback_unknown",
-                "lite_evidence_gate_missing_or_unknown",
-                "lite_opt_in_missing_or_unknown",
-                "lite_predicate_docs_only_unknown",
-                "lite_predicate_runtime_behavior_unknown",
-                "standard_default",
-            }
-            if profile == "strict":
-                reason_codes |= {
-                    "hard_trigger_public_contract_change",
-                    "hard_trigger_security_unknown",
-                }
-                hard_triggers = ["public_contract_change"]
-                unknown_facts = [
-                    "migration_or_persistence_change",
-                    "rollback_difficulty_high",
-                    "security_or_privacy_sensitive",
-                ]
-            else:
-                reason_codes |= {
-                    "hard_trigger_public_contract_unknown",
-                    "hard_trigger_security_or_privacy_sensitive",
-                }
-                hard_triggers = ["security_or_privacy_sensitive"]
-                unknown_facts = [
-                    "migration_or_persistence_change",
-                    "public_contract_change",
-                    "rollback_difficulty_high",
-                ]
-            payload["classification"]["hard_triggers"] = hard_triggers
-            payload["classification"]["unknown_facts"] = unknown_facts
-            payload["classification"]["reason_codes"] = sorted(reason_codes)
+        if risk_values is not None:
+            risk_facts = tuple(
+                RiskFact(
+                    key=key,
+                    value=value,
+                    source="requirement",
+                    reason_code=f"fact_default_{key}",
+                )
+                for key, value in sorted(risk_values.items())
+            )
+            payload["risk_facts"] = [fact.to_dict() for fact in risk_facts]
+            payload["classification"] = classify_risk_facts(risk_facts).to_dict()
         payload["classification"]["authorized_profile"] = profile
         payload["classification"]["complexity_tier"] = complexity_tier
-        payload["classification"]["lite_candidate"] = False
-        payload["classification"]["lite_authorized"] = False
+        if profile != "lite":
+            payload["classification"]["lite_candidate"] = False
+            payload["classification"]["lite_authorized"] = False
         payload["obligations"]["profile_preset"] = profile
         contract_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -926,6 +927,7 @@ class TestCliNew(CliRuntimeHarness):
 
             issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
             profile_cases = (
+                ("lite", "normal", "Issue 設計書（Lite）", "Issue 実装計画書（Lite"),
                 ("standard", "normal", "Issue 設計書（Standard）", "Issue 実装計画書（Standard"),
                 ("strict", "complex", "Issue 設計書（Strict）", "Issue 実装計画書（Strict"),
                 ("critical", "deep", "Issue 設計書（Critical）", "Issue 実装計画書（Critical"),
@@ -964,6 +966,16 @@ class TestCliNew(CliRuntimeHarness):
                     assert "adoption_status: adopted" not in content
                     canonical_source = target / "spec-dock" / template_source
                     assert canonical_source.is_file(), f"missing source template: {canonical_source}"
+                    if doc_type == "draft-plan" and profile == "lite":
+                        assert "commit候補:" not in content
+                        assert "static analysis / lint:" not in content
+                        assert "PR 作成後の GitHub Actions" not in content
+                    elif doc_type == "draft-plan":
+                        assert "最終品質ゲート" in content or "最終安全ゲート" in content
+                        assert "static analysis / lint:" in content
+                        assert "tests:" in content
+                        assert "report:" in content
+                        assert "commit候補:" in content
 
     def test_new_doc_issue_profile_drafts_fail_closed_without_valid_assurance_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -972,40 +984,48 @@ class TestCliNew(CliRuntimeHarness):
             self._create_same_repo_linked_hierarchy(target)
             issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
 
-            self._assert_profile_draft_no_write_failure(
-                target,
-                issue_dir,
-                ["new", "doc", "draft-plan", "--issue", "iss-00003", "--title", "Plan Draft"],
-                "missing_assurance_contract",
+            commands = (
+                ("draft-design", "Design Draft"),
+                ("draft-plan", "Plan Draft"),
             )
+            for doc_type, title in commands:
+                self._assert_profile_draft_no_write_failure(
+                    target,
+                    issue_dir,
+                    ["new", "doc", doc_type, "--issue", "iss-00003", "--title", title],
+                    "missing_assurance_contract",
+                )
 
             (issue_dir / ".assurance.json").write_text("{not-json\n", encoding="utf-8")
-            self._assert_profile_draft_no_write_failure(
-                target,
-                issue_dir,
-                ["new", "doc", "draft-design", "--issue", "iss-00003", "--title", "Design Draft"],
-                "invalid_json",
-            )
+            for doc_type, title in commands:
+                self._assert_profile_draft_no_write_failure(
+                    target,
+                    issue_dir,
+                    ["new", "doc", doc_type, "--issue", "iss-00003", "--title", f"Invalid {title}"],
+                    "invalid_json",
+                )
 
             self._run_runtime(target, ["active", "set", "--id", "iss-00003"])
             self._run_runtime(target, ["assurance", "classify", "--stage", "requirement", "--format", "json"])
             (issue_dir / "requirement.md").write_text("# Changed requirement.md\n", encoding="utf-8")
-            self._assert_profile_draft_no_write_failure(
-                target,
-                issue_dir,
-                ["new", "doc", "draft-plan", "--issue", "iss-00003", "--title", "Stale Plan"],
-                "stale_source_binding",
-            )
+            for doc_type, title in commands:
+                self._assert_profile_draft_no_write_failure(
+                    target,
+                    issue_dir,
+                    ["new", "doc", doc_type, "--issue", "iss-00003", "--title", f"Stale {title}"],
+                    "stale_source_binding",
+                )
 
             self._run_runtime(target, ["active", "set", "--id", "iss-00003"])
             self._run_runtime(target, ["assurance", "classify", "--stage", "requirement", "--format", "json"])
             self._set_assurance_contract_profile(issue_dir, "enterprise")
-            self._assert_profile_draft_no_write_failure(
-                target,
-                issue_dir,
-                ["new", "doc", "draft-design", "--issue", "iss-00003", "--title", "Unsupported Profile"],
-                "invalid_classification",
-            )
+            for doc_type, title in commands:
+                self._assert_profile_draft_no_write_failure(
+                    target,
+                    issue_dir,
+                    ["new", "doc", doc_type, "--issue", "iss-00003", "--title", f"Unsupported {title}"],
+                    "invalid_classification",
+                )
 
     def test_new_doc_issue_profile_drafts_fail_closed_for_invalid_profile_templates(self) -> None:
         cases = (

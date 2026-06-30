@@ -10230,6 +10230,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "docs/phase_plan_issue.md",
             "docs/authoring/issue-plan.md",
             "templates/issue-profiles/lite/design.md",
+            "templates/issue-profiles/lite/plan.md",
             "templates/issue-profiles/standard/design.md",
             "templates/issue-profiles/strict/design.md",
             "templates/issue-profiles/critical/design.md",
