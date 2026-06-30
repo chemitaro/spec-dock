@@ -4,7 +4,7 @@ ID: "iss-00255"
 タイトル: "Add Grade Aware Issue Authoring Smoke Tests"
 関連GitHub: ["#255"]
 Issue Grade: "strict"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-01"
 親: ["epic-00224", "init-local-00003"]
