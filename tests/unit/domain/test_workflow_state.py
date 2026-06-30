@@ -493,6 +493,32 @@ def test_report_evidence_gate_rejects_whole_file_fresh_pass_shortcut() -> None:
     assert result.reason_code == "report-spec-review-missing"
 
 
+def test_report_evidence_gate_rejects_failed_fresh_spec_reviewer_even_with_later_pass() -> None:
+    _runbook_module, workflow_state = _workflow_modules()
+
+    result = workflow_state.evaluate_report_evidence_gate(
+        "## 証跡採用台帳（Evidence Adoption Ledger / 必須）\n"
+        "| EAL-001 | adopted | source | target | rationale | evidence | none |\n\n"
+        "## 仕様 authoring ゲート（Spec Authoring Gate / 必須）\n"
+        "| requirement | docs | none | adopted | pass | no | execute approved plan |\n"
+        "| design | docs | none | adopted | pass | no | execute approved plan |\n"
+        "| plan | docs | none | adopted | pass | no | execute approved plan |\n\n"
+        "## 委任ドラフト証跡（Delegated Draft Evidence / 必須）\n"
+        "| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | not used | [] | not_run | manual authoring | 該当なし | none | pass | execute approved plan |\n\n"
+        "#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）\n"
+        "| Grade | required specialist / fallback | usage | evidence | fresh spec-reviewer verdict | execution readiness |\n"
+        "|---|---|---|---|---|---|\n"
+        "| standard | system-architect / implementation-planner | skipped | skip reason: existing pattern sufficient | pass | ready |\n\n"
+        "#### レビューゲート状態（Reviewer Gate Status）\n"
+        "| planning | planning spec-review | spec-reviewer | fresh | fail | no | do not execute approved plan | blocking finding |\n"
+        "| planning | planning spec-review | spec-reviewer | fresh | pass | no | execute approved plan | later pass row |\n",
+        "standard",
+    )
+
+    assert result.status == "blocked"
+    assert result.reason_code == "report-spec-review-missing"
+
+
 def test_report_evidence_gate_requires_fresh_spec_review_in_reviewer_gate_section() -> None:
     _runbook_module, workflow_state = _workflow_modules()
 
@@ -573,6 +599,31 @@ def test_report_evidence_gate_blocks_localized_unresolved_eal_entries() -> None:
     result = workflow_state.evaluate_report_evidence_gate(
         "## 証跡採用台帳（Evidence Adoption Ledger / 必須）\n"
         "| EAL-001 | stale（stale） | source | target | rationale | evidence | re-review |\n\n"
+        "## 仕様 authoring ゲート（Spec Authoring Gate / 必須）\n"
+        "| requirement | docs | none | adopted | pass | no | execute approved plan |\n"
+        "| design | docs | none | adopted | pass | no | execute approved plan |\n"
+        "| plan | docs | none | adopted | pass | no | execute approved plan |\n\n"
+        "## 委任ドラフト証跡（Delegated Draft Evidence / 必須）\n"
+        "| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | not used | [] | not_run | manual authoring | 該当なし | none | pass | execute approved plan |\n\n"
+        "#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）\n"
+        "| Grade | required specialist / fallback | usage | evidence | fresh spec-reviewer verdict | execution readiness |\n"
+        "|---|---|---|---|---|---|\n"
+        "| standard | system-architect / implementation-planner | skipped | skip reason: existing pattern sufficient | pass | ready |\n\n"
+        "#### レビューゲート状態（Reviewer Gate Status）\n"
+        "| planning | planning spec-review | spec-reviewer | fresh | pass | no | execute approved plan | note |\n",
+        "standard",
+    )
+
+    assert result.status == "blocked"
+    assert result.reason_code == "report-eal-unresolved"
+
+
+def test_report_evidence_gate_blocks_unknown_eal_statuses() -> None:
+    _runbook_module, workflow_state = _workflow_modules()
+
+    result = workflow_state.evaluate_report_evidence_gate(
+        "## 証跡採用台帳（Evidence Adoption Ledger / 必須）\n"
+        "| EAL-001 | pending | source | target | rationale | evidence | re-review |\n\n"
         "## 仕様 authoring ゲート（Spec Authoring Gate / 必須）\n"
         "| requirement | docs | none | adopted | pass | no | execute approved plan |\n"
         "| design | docs | none | adopted | pass | no | execute approved plan |\n"
@@ -962,6 +1013,31 @@ def test_report_evidence_gate_rejects_lite_failed_grade_verdict() -> None:
 
     assert result.status == "blocked"
     assert result.reason_code == "report-specialist-evidence-missing"
+
+
+def test_report_evidence_gate_rejects_negated_promotion_decisions() -> None:
+    _runbook_module, workflow_state = _workflow_modules()
+
+    result = workflow_state.evaluate_report_evidence_gate(
+        "## 証跡採用台帳（Evidence Adoption Ledger / 必須）\n"
+        "| EAL-001 | adopted | fixture | requirement/design/plan | source input only | test fixture | none |\n\n"
+        "## 仕様 authoring ゲート（Spec Authoring Gate / 必須）\n"
+        "| requirement | docs | none | manual authoring candidate | pass | no | do not promote |\n"
+        "| design | docs | none | manual authoring candidate | pass | no | execute approved plan |\n"
+        "| plan | docs | none | manual authoring candidate | pass | no | execute approved plan |\n\n"
+        "## 委任ドラフト証跡（Delegated Draft Evidence / 必須）\n"
+        "| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | not used | [] | not_run | manual authoring | 該当なし | none | pass | execute approved plan |\n\n"
+        "#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）\n"
+        "| Grade | required specialist / fallback | usage | evidence | fresh spec-reviewer verdict | execution readiness |\n"
+        "|---|---|---|---|---|---|\n"
+        "| standard | system-architect / implementation-planner | skipped | skip reason: existing pattern sufficient | pass | ready |\n\n"
+        "#### レビューゲート状態（Reviewer Gate Status）\n"
+        "| planning | planning spec-review | spec-reviewer | fresh | pass | no | execute approved plan | note |\n",
+        "standard",
+    )
+
+    assert result.status == "blocked"
+    assert result.reason_code == "report-spec-authoring-gate-invalid"
 
 
 def test_report_evidence_gate_accepts_standard_skip_reason_in_grade_specialist_table() -> None:
