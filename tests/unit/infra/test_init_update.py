@@ -356,14 +356,21 @@ class TestInitUpdate(CliRuntimeHarness):
         copied = sorted(
             path.relative_to(root).as_posix()
             for path in root.rglob("*")
-            if "__pycache__" in path.parts or path.name.endswith(".pyc")
+            if self._is_generated_python_cache_path(path)
         )
         assert copied == []
 
     @staticmethod
     def _is_generated_python_cache_path(path: Path | str) -> bool:
         normalized_path = Path(path)
-        return "__pycache__" in normalized_path.parts or normalized_path.name.endswith(".pyc")
+        return "__pycache__" in normalized_path.parts or normalized_path.suffix in {".pyc", ".pyo"}
+
+    def _runtime_inventory(self, root: Path) -> dict[str, Path]:
+        return {
+            path.relative_to(root).as_posix(): path
+            for path in root.rglob("*")
+            if path.is_file() and not self._is_generated_python_cache_path(path.relative_to(root))
+        }
 
     def _uninstall_json_actions(self, target: Path, *args: str) -> dict[str, dict[str, object]]:
         exit_code, stdout, stderr = self._capture_installer_main(["uninstall", str(target), "--json", *args])
@@ -486,87 +493,6 @@ class TestInitUpdate(CliRuntimeHarness):
             "src/spec_dock/assets/spec_dock/system/active-none/issue/report.md"
         ),
     }
-    _DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
-        "spec-dock/scripts/spec_dock_runtime/app.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/application/contracts.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/application/assurance.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/assurance.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/application/create_node.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/application/doctor.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/application/issue_lifecycle.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_lifecycle.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/application/repo_context.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/application/sync_state.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/application/worktree.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/application/workflow.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/application/import_node.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/cli/parser.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/cli/registry.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/commands/issue.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/issue.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/commands/new.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/domain/delegated_authoring.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/delegated_authoring.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/domain/discussion_docs.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/discussion_docs.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/domain/artifact_composer.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/artifact_composer.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/commands/import_cmd.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/import_cmd.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/commands/worktree.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/worktree.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/domain/validation.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/infra/git_cli.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/infra/artifact_store.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/artifact_store.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/infra/make_cli.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/make_cli.py"
-        ),
-        "spec-dock/scripts/spec_dock_runtime/presentation/cli_text.py": (
-            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py"
-        ),
-    }
-
     _CANONICAL_RULES_EXPECTATIONS: ClassVar[dict[str, object]] = {
         "docs/rules/initiative/discussions.md": {
             "contains": (
@@ -1167,6 +1093,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00178-review-feedback-triage/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00180-github-token-capability-preflight/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00182-limit-pr-observation-final-status-to-current-trigger-boundary/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json",
@@ -1350,6 +1277,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00178-review-feedback-triage/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00180-github-token-capability-preflight/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00182-limit-pr-observation-final-status-to-current-trigger-boundary/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00077-legacy-hidden-workspace-coexistence-and-migration/issues/iss-00078-installer-coexistence-contract-and-migration-flow/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00090-github-default-sync-contract/.meta.json": [],
@@ -2001,13 +1929,25 @@ class TestInitUpdate(CliRuntimeHarness):
             )
 
     def _assert_checked_in_dogfooding_runtime_mirror_match_provider_assets(self, repo_root: Path) -> None:
-        for mirror_rel_path, asset_rel_path in self._DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP.items():
-            mirror_path = repo_root / mirror_rel_path
-            asset_path = repo_root / asset_rel_path
-            assert mirror_path.is_file(), f"missing checked-in dogfooding runtime mirror file: {mirror_path}"
-            assert asset_path.is_file(), f"missing provider runtime asset file: {asset_path}"
-            assert mirror_path.read_text(encoding="utf-8") == asset_path.read_text(encoding="utf-8"), (
-                f"checked-in dogfooding runtime mirror file diverged from provider asset: {mirror_rel_path}"
+        provider_root = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "spec_dock_runtime"
+        mirror_root = repo_root / "spec-dock" / "scripts" / "spec_dock_runtime"
+        assert provider_root.is_dir(), f"missing provider runtime asset directory: {provider_root}"
+        assert mirror_root.is_dir(), f"missing checked-in dogfooding runtime mirror directory: {mirror_root}"
+        provider_inventory = self._runtime_inventory(provider_root)
+        mirror_inventory = self._runtime_inventory(mirror_root)
+
+        provider_paths = set(provider_inventory)
+        mirror_paths = set(mirror_inventory)
+        assert mirror_paths == provider_paths, (
+            "checked-in dogfooding runtime mirror inventory diverged from provider assets: "
+            f"missing={sorted(provider_paths - mirror_paths)} extra={sorted(mirror_paths - provider_paths)}"
+        )
+
+        for rel_path in sorted(provider_paths):
+            mirror_path = mirror_inventory[rel_path]
+            asset_path = provider_inventory[rel_path]
+            assert mirror_path.read_bytes() == asset_path.read_bytes(), (
+                f"checked-in dogfooding runtime mirror file diverged from provider asset: {rel_path}"
             )
 
     def _assert_issue_execution_runtime_command_reminders(self, text: str, *, source: str) -> None:
@@ -3919,6 +3859,73 @@ class TestInitUpdate(CliRuntimeHarness):
                 repo_root=repo_root,
             )
 
+    def test_issue_246_isolated_wheel_update_refreshes_stale_runtime_file(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir(parents=True, exist_ok=True)
+            target_repo = temp_root / "consumer-repo"
+            target_repo.mkdir(parents=True, exist_ok=True)
+            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
+                repo_root=repo_root,
+                temp_root=temp_root,
+            )
+            spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
+            runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
+
+            init_result = self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "init", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+            assert init_result.returncode == 0
+
+            provider_runtime = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "spec_dock"
+                / "scripts"
+                / "spec_dock_runtime"
+                / "application"
+                / "workflow.py"
+            )
+            target_runtime = (
+                target_repo
+                / "spec-dock"
+                / "scripts"
+                / "spec_dock_runtime"
+                / "application"
+                / "workflow.py"
+            )
+            provider_bytes = provider_runtime.read_bytes()
+            assert target_runtime.read_bytes() == provider_bytes
+
+            stale_bytes = b"# stale runtime mirror fixture for iss-00246 S03 package-like smoke\n"
+            assert stale_bytes != provider_bytes
+            target_runtime.write_bytes(stale_bytes)
+
+            update_result = self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "update", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+
+            assert update_result.returncode == 0
+            assert target_runtime.read_bytes() == provider_bytes
+            snapshot = self._issue_69_collect_isolated_installed_runtime_snapshot(
+                venv_python=venv_python,
+                repo_root=repo_root,
+                cwd=isolated_cwd,
+            )
+            self._issue_69_assert_runtime_snapshot_uses_installed_package(
+                snapshot=snapshot,
+                repo_root=repo_root,
+            )
+
     def test_issue_69_windows_helper_prefers_existing_exe_launcher(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             venv_dir = Path(tmp)
@@ -4858,6 +4865,21 @@ assert observed_non_empty == expected_non_empty, json.dumps(
     def test_checked_in_dogfooding_runtime_mirror_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         self._assert_checked_in_dogfooding_runtime_mirror_match_provider_assets(repo_root)
+
+    def test_dogfooding_runtime_inventory_excludes_generated_python_caches(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_root = Path(tmp) / "spec_dock_runtime"
+            runtime_root.mkdir()
+            source_file = runtime_root / "app.py"
+            source_file.write_text("# runtime source\n", encoding="utf-8")
+            cache_dir = runtime_root / "__pycache__"
+            cache_dir.mkdir()
+            (cache_dir / "app.cpython-312.pyc").write_bytes(b"pyc")
+            (runtime_root / "app.pyo").write_bytes(b"pyo")
+
+            inventory = self._runtime_inventory(runtime_root)
+
+            assert inventory == {"app.py": source_file}
 
     def test_checked_in_dogfooding_runtime_keeps_repo_scoped_import_uniqueness_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -34204,6 +34226,61 @@ esac
             assert not legacy_workflow.exists()
             if created_symlink:
                 assert not legacy_symlink.is_symlink()
+
+    def test_update_refreshes_stale_runtime_mirror_and_preserves_user_data(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            repo_root = Path(__file__).resolve().parents[3]
+            provider_runtime = (
+                repo_root
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "spec_dock"
+                / "scripts"
+                / "spec_dock_runtime"
+                / "application"
+                / "workflow.py"
+            )
+            target_runtime = (
+                target
+                / "spec-dock"
+                / "scripts"
+                / "spec_dock_runtime"
+                / "application"
+                / "workflow.py"
+            )
+            provider_bytes = provider_runtime.read_bytes()
+            stale_bytes = b"# stale runtime mirror fixture for iss-00246 S01\n"
+            assert stale_bytes != provider_bytes
+            target_runtime.write_bytes(stale_bytes)
+
+            user_issue_doc = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-99999-user"
+                / "epics"
+                / "epic-local-99999-user"
+                / "issues"
+                / "iss-local-99999-user"
+                / "requirement.md"
+            )
+            user_issue_doc.parent.mkdir(parents=True, exist_ok=True)
+            user_issue_text = "# user-authored issue data\n"
+            user_issue_doc.write_text(user_issue_text, encoding="utf-8")
+
+            unmanaged_marker = target / "user-owned-marker.txt"
+            unmanaged_marker_text = "keep unmanaged marker\n"
+            unmanaged_marker.write_text(unmanaged_marker_text, encoding="utf-8")
+
+            assert main(["update", str(target)]) == 0
+
+            assert target_runtime.read_bytes() == provider_bytes
+            assert user_issue_doc.read_text(encoding="utf-8") == user_issue_text
+            assert unmanaged_marker.read_text(encoding="utf-8") == unmanaged_marker_text
 
     def test_update_does_not_copy_generated_python_caches_from_provider_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
