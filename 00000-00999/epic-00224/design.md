@@ -75,6 +75,7 @@ ID: "epic-00224"
 | Issue Draft Authoring Router | Issue `draft-design` / `draft-plan` の discussion draft source を `.assurance.json` の `authorized_profile` に対応する profile template へ route する | `.assurance.json` + provider template source |
 | Profile Template Store | `templates/issue-profiles/<profile>/{design,plan}.md` の path / text validation と読み込みを提供する | tracked provider source |
 | Spec Authoring Evidence Gate | delegated draft adoption、fresh `spec-reviewer`、Evidence Adoption Ledger、report evidence が phase promotion / issue readiness に揃っているかを確認する | canonical docs + report ledger |
+| Epic PR Integration Gate | R0〜G4 の累積 branch、Issue report evidence、requirements/design trace、tests、spec/code/QA review を統合し、Epic 単位の単一 PR 作成可否を判定する | Epic plan/report + cumulative branch |
 | Step Assurance Compiler | worker、reasoning、context、verification、reviewers を導出 | issue + step obligations |
 | Context Policy Resolver | role / task / step facts から `recent_fork` / `bounded_packet` / `clean_room` / `minimal_packet` と freshness checks を決定 | deterministic domain policy |
 | Context Packet Compiler | selected context contract を source hash へ bind し、agent invocation packet と reviewer evidence packet を生成 | ignored generated state |
@@ -1215,11 +1216,11 @@ ChildResultReturned
 | I05 | `iss-00231-inject-trusted-base-branch-codex-review-policy` | `#231` | Historical trusted base-SHA review policy slice; changed by `20260623t074444z-adr` and `iss-00244` to script-local deterministic review trigger | E-RQ-009, E-AC-009, E-AC-010 |
 | I06 | `iss-00232-enforce-blocker-centric-pr-repair-and-rereview` | `#232` | PR Blocker Engine, P2 suppression, blocker fingerprint evidence for stagnation detection | E-RQ-010, E-RQ-011, E-AC-011〜012 |
 | I07 | `iss-00233-roll-out-adaptive-workflow-with-legacy-compatibility-and-telemetry` | `#233` | Rollout, automation-stalled operator surfacing, strict-legacy compatibility, metrics, Auto-Lite readiness | E-RQ-012〜014, E-AC-013〜016 |
-| R0 | planned corrective Issue; formal ID 未作成 | 未作成 | Artifact Readiness Validator、shared placeholder detector、executable plan predicate、`workflow status` / `guidance issue-execution` fail-closed preflight | E-RQ-006, E-AC-006 |
-| G1 | planned corrective Issue; formal ID 未作成 | 未作成 | Grade-aware Issue planning guidance、grade authoring matrix、Lite non-default / manual escalation / authorized_profile separation | E-RQ-022, E-AC-022 |
-| G2 | planned corrective Issue; formal ID 未作成 | 未作成 | Delegated specialist role routing、Issue `draft-design` / `draft-plan` profile template source、discussion evidence provenance | E-RQ-022, E-AC-022 |
-| G3 | planned corrective Issue; formal ID 未作成 | 未作成 | Fresh spec-reviewer / Evidence Adoption Ledger / report evidence gate を grade-aware authoring workflow に接続 | E-RQ-022, E-AC-022 |
-| G4 | planned corrective Issue; formal ID 未作成 | 未作成 | Grade-aware authoring smoke tests、draft routing regression、readiness regression、provider / dogfooding docs parity | E-AC-006, E-AC-022 |
+| R0 | `iss-00251-enforce-fail-closed-issue-artifact-readiness-preflight` | `#251` | Artifact Readiness Validator、shared placeholder detector、executable plan predicate、`workflow status` / `guidance issue-execution` fail-closed preflight | E-RQ-006, E-AC-006 |
+| G1 | `iss-00252-compile-grade-aware-issue-planning-guidance` | `#252` | Grade-aware Issue planning guidance、grade authoring matrix、Lite non-default / manual escalation / authorized_profile separation | E-RQ-022, E-AC-022 |
+| G2 | `iss-00253-connect-delegated-specialist-routing-and-draft-artifact-sources` | `#253` | Delegated specialist role routing、Issue `draft-design` / `draft-plan` profile template source、discussion evidence provenance | E-RQ-022, E-AC-022 |
+| G3 | `iss-00254-add-grade-aware-spec-review-and-evidence-gates` | `#254` | Fresh spec-reviewer / Evidence Adoption Ledger / report evidence gate を grade-aware authoring workflow に接続 | E-RQ-022, E-AC-022 |
+| G4 | `iss-00255-add-grade-aware-issue-authoring-smoke-tests` | `#255` | Grade-aware authoring smoke tests、draft routing regression、readiness regression、provider / dogfooding docs parity | E-AC-006, E-AC-022 |
 
 Dependency direction:
 
@@ -1231,12 +1232,28 @@ iss-00227
        -> iss-00230
             -> iss-00232
 iss-00233 depends on iss-00228, iss-00229, iss-00230, iss-00231, iss-00232
-iss-00247 -> R0 after formal corrective Issue creation
-R0 -> G1
-G1 -> G2
-G1 -> G3
-R0, G1, G2, G3 -> G4
+iss-00247 -> iss-00251
+iss-00251 -> iss-00252
+iss-00252 -> iss-00253
+iss-00252 -> iss-00254
+iss-00251 -> iss-00254
+iss-00251, iss-00252, iss-00253, iss-00254 -> iss-00255
 ```
+
+## Epic PR Integration / Branch Baton
+
+R0 + G1〜G4 corrective tranche は、個別 Issue ごとに PR を作らず、Epic 単位の 1 PR として提出する。
+
+- Branch baton:
+  - `iss-00251 -> iss-00252 -> iss-00253 -> iss-00254 -> iss-00255` の順に、直前 Issue 完了時点の HEAD を次 Issue branch の starting point にする。
+  - 各 Issue branch は累積 branch として扱い、最終 `iss-00255` branch が Epic PR の head になる。
+  - 個別 Issue の M99 は PR 作成 gate ではなく、次 Issue へ渡せる local closure checkpoint とする。
+- Evidence boundary:
+  - 各 Issue は focused validation、issue `report.md`、reviewable commit を残す。
+  - Epic の最終 PR 作成可否は、Issue 単位の closure ではなく、Epic requirement / design trace、R0〜G4 の統合テスト、Spec review、code review、QA review の合成結果で判断する。
+- Review boundary:
+  - Issue-level review は次 Issue へ安全に渡すための checkpoint であり、GitHub PR review の代替ではない。
+  - Epic-level final review は累積 diff 全体を対象にし、E-RQ-006 / E-AC-006 / E-RQ-022 / E-AC-022 の behavior coverage と regression coverage を確認する。
 
 The Issue-local draft requirement / draft design artifacts are discussion evidence only. Canonical Issue `requirement.md` / `design.md` / `plan.md` remain owned by each downstream Issue planning workflow.
 

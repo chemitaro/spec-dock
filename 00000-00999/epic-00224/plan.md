@@ -22,7 +22,7 @@ ID: "epic-00224"
 - dogfooding修正により、issue execution authority は `20260629t003131z-adr` の plan-centric preflight、Assurance Contract path は `20260629t003132z-adr` の `.assurance.json` へ変更済み。
 - `iss-00247 / #247` で profile Markdown templates は導入済みだが、manual test / follow-up analysis により、問題は `new doc draft-design` / `draft-plan` の source routing だけではなく、artifact readiness preflight、grade-aware Issue authoring guidance、delegated specialist routing、fresh review / report evidence gate、grade-aware smoke tests まで広がると整理した。
 - そのため、以前の `I08` 単独案は採用せず、追加 corrective tranche を `R0 + G1〜G4` として計画する。既存 I01〜I07 と完了済み corrective work はそのまま保持する。
-- `iss-00250` はこの corrective tranche の一部を検討するために一時的に作成したデータ置き場であり、正式な implementation Issue としては採用しない。正式 Issue ID は、Epic plan gate 通過後に executable Issue slice として別途作成し、R0 / G1 / G2 / G3 / G4 に対応付ける。
+- `iss-00250` はこの corrective tranche の一部を検討するために一時的に作成したデータ置き場であり、正式な implementation Issue としては採用しない。正式 Issue は `iss-00251`〜`iss-00255` として作成済みであり、R0 / G1 / G2 / G3 / G4 に対応付ける。
 
 ## この計画で閉じる E-RQ / E-AC
 
@@ -54,7 +54,7 @@ ID: "epic-00224"
   - domain だけ、docs だけ、tests だけの horizontal slice を原則作らない。
   - Provider source、dogfooding mirror、tests、docs を各 Issue 内で閉じる。
   - Issue 間の temporary incompatible state を避け、feature flag / compatibility adapter を用いる。
-  - 一つの Issue / PR は、GitHub Codex review が全 diff と direct callers を現実的に追える大きさに保つ。
+  - 個別 Issue はレビュー可能な commit / checkpoint 単位に保つ。R0 + G1〜G4 corrective tranche は Issue ごとに PR を作らず、最終的に Epic 単位の 1 PR として GitHub Codex review が追える差分・証跡に整える。
   - Canonical artifact migration と runtime enforcement を同じ Issue で無制限に広げない。
 - 例外:
   - Shared JSON schema / domain model は最初の vertical capability に同梱する。
@@ -304,7 +304,7 @@ ID: "epic-00224"
   - Existing Issue 全量 backfill。
   - Automatic Lite default の有効化。
 
-### R0 — Enforce Fail-Closed Issue Artifact Readiness Preflight（planned corrective Issue / formal ID 未作成）
+### R0 — Enforce Fail-Closed Issue Artifact Readiness Preflight（iss-00251 / #251）
 
 - provisional slug:
   - `enforce-fail-closed-issue-artifact-readiness-preflight`
@@ -334,7 +334,7 @@ ID: "epic-00224"
   - delegated specialist role routing。
   - profile template 本文の全面改訂。
 
-### G1 — Compile Grade-Aware Issue Planning Guidance（planned corrective Issue / formal ID 未作成）
+### G1 — Compile Grade-Aware Issue Planning Guidance（iss-00252 / #252）
 
 - provisional slug:
   - `compile-grade-aware-issue-planning-guidance`
@@ -354,13 +354,13 @@ ID: "epic-00224"
   - E-RQ-022 の grade-aware planning guidance subset
   - E-AC-022 の guidance subset
 - 依存:
-  - R0
+  - `iss-00251 / #251`
   - `20260630t111316z-adr`
 - 非対象:
   - `new doc draft-design` / `draft-plan` routing 実装。
   - smoke test matrix の全量。
 
-### G2 — Connect Delegated Specialist Role Routing And Draft Artifact Sources（planned corrective Issue / formal ID 未作成）
+### G2 — Connect Delegated Specialist Role Routing And Draft Artifact Sources（iss-00253 / #253）
 
 - provisional slug:
   - `connect-delegated-specialist-routing-and-draft-artifact-sources`
@@ -380,13 +380,13 @@ ID: "epic-00224"
   - E-RQ-022 の delegated draft / profile-aware draft routing subset
   - E-AC-022 の draft routing subset
 - 依存:
-  - G1
+  - `iss-00252 / #252`
   - profile Markdown templates
 - 非対象:
   - `system-architect` / `implementation-planner` role skill の新規 shipped asset 化。
   - canonical design / plan の直接 rewrite。
 
-### G3 — Add Grade-Aware Spec Review And Evidence Gates（planned corrective Issue / formal ID 未作成）
+### G3 — Add Grade-Aware Spec Review And Evidence Gates（iss-00254 / #254）
 
 - provisional slug:
   - `add-grade-aware-spec-review-and-evidence-gates`
@@ -406,13 +406,13 @@ ID: "epic-00224"
   - E-RQ-022 の review / evidence gate subset
   - E-AC-022 の review / evidence subset
 - 依存:
-  - G1
-  - R0
+  - `iss-00252 / #252`
+  - `iss-00251 / #251`
 - 非対象:
   - code-review / PR observation policy の再設計。
   - automatic Lite default 有効化。
 
-### G4 — Add Grade-Aware Issue Authoring Smoke Tests（planned corrective Issue / formal ID 未作成）
+### G4 — Add Grade-Aware Issue Authoring Smoke Tests（iss-00255 / #255）
 
 - provisional slug:
   - `add-grade-aware-issue-authoring-smoke-tests`
@@ -433,10 +433,10 @@ ID: "epic-00224"
   - E-AC-006 の readiness regression subset
   - E-AC-022 の end-to-end smoke subset
 - 依存:
-  - R0
-  - G1
-  - G2
-  - G3
+  - `iss-00251 / #251`
+  - `iss-00252 / #252`
+  - `iss-00253 / #253`
+  - `iss-00254 / #254`
 - 非対象:
   - live GitHub repository を必要とする external integration。
   - production telemetry backend。
@@ -464,15 +464,15 @@ Post-I07 corrective:
 
 iss-00247 Profile Markdown templates
   |
-  +--> R0 Fail-closed artifact readiness preflight
+  +--> R0 iss-00251 Fail-closed artifact readiness preflight
         |
-        +--> G1 Grade-aware issue planning guidance
+        +--> G1 iss-00252 Grade-aware issue planning guidance
               |
-              +--> G2 Delegated specialist + draft artifact routing
+              +--> G2 iss-00253 Delegated specialist + draft artifact routing
               |
-              +--> G3 Spec review + evidence gates
+              +--> G3 iss-00254 Spec review + evidence gates
                     |
-                    +--> G4 Grade-aware authoring smoke tests
+                    +--> G4 iss-00255 Grade-aware authoring smoke tests
 ```
 
 ## Dependency commands（登録済み）
@@ -505,17 +505,44 @@ iss-00247 Profile Markdown templates
 ./spec-dock/scripts/spec-dock deps add --from iss-00233 --to iss-00231
 ./spec-dock/scripts/spec-dock deps add --from iss-00233 --to iss-00232
 
-# R0 / G1 / G2 / G3 / G4 formal Issue ID は未作成。作成後に次の依存を登録する:
-# ./spec-dock/scripts/spec-dock deps add --from <R0-issue-id> --to iss-00247
-# ./spec-dock/scripts/spec-dock deps add --from <G1-issue-id> --to <R0-issue-id>
-# ./spec-dock/scripts/spec-dock deps add --from <G2-issue-id> --to <G1-issue-id>
-# ./spec-dock/scripts/spec-dock deps add --from <G3-issue-id> --to <G1-issue-id>
-# ./spec-dock/scripts/spec-dock deps add --from <G3-issue-id> --to <R0-issue-id>
-# ./spec-dock/scripts/spec-dock deps add --from <G4-issue-id> --to <R0-issue-id>
-# ./spec-dock/scripts/spec-dock deps add --from <G4-issue-id> --to <G1-issue-id>
-# ./spec-dock/scripts/spec-dock deps add --from <G4-issue-id> --to <G2-issue-id>
-# ./spec-dock/scripts/spec-dock deps add --from <G4-issue-id> --to <G3-issue-id>
+# R0 -> iss-00247
+./spec-dock/scripts/spec-dock deps add --from iss-00251 --to iss-00247
+
+# G1 -> R0
+./spec-dock/scripts/spec-dock deps add --from iss-00252 --to iss-00251
+
+# G2 -> G1
+./spec-dock/scripts/spec-dock deps add --from iss-00253 --to iss-00252
+
+# G3 -> G1, R0
+./spec-dock/scripts/spec-dock deps add --from iss-00254 --to iss-00252
+./spec-dock/scripts/spec-dock deps add --from iss-00254 --to iss-00251
+
+# G4 -> R0, G1, G2, G3
+./spec-dock/scripts/spec-dock deps add --from iss-00255 --to iss-00251
+./spec-dock/scripts/spec-dock deps add --from iss-00255 --to iss-00252
+./spec-dock/scripts/spec-dock deps add --from iss-00255 --to iss-00253
+./spec-dock/scripts/spec-dock deps add --from iss-00255 --to iss-00254
 ```
+
+## Epic PR 実行モデル（R0 + G1〜G4）
+
+- PR 方針:
+  - `iss-00251`〜`iss-00255` は個別 PR を作成しない。
+  - 各 Issue は実装、focused validation、issue-local report evidence、必要な commit までを checkpoint とする。
+  - GitHub PR は G4 完了後の Epic 最終品質ゲートを通過してから、Epic #224 の corrective tranche 全体として 1 本だけ作成する。
+- branch baton:
+  - 基本順序は `iss-00251 -> iss-00252 -> iss-00253 -> iss-00254 -> iss-00255` とする。
+  - 各 Issue 完了時点の HEAD を次 Issue branch の starting point にする。
+  - 次 Issue branch は直前 Issue の commit を含む累積 branch として作成し、差分をバケツリレーで引き継ぐ。
+  - 最終 PR head は `iss-00255` 完了後の累積 branch とし、R0〜G4 の全 commit を含める。
+- Issue handoff gate:
+  - 各 Issue の M99 は「PR 作成」ではなく「次 Issue へ渡せる local closure checkpoint」とする。
+  - checkpoint では focused tests、`./spec-dock/scripts/spec-dock validate`、必要な docs / template parity、issue `report.md` の証跡、未実施理由を記録する。
+  - 次 Issue の実装を始める前に、直前 Issue の未完了差分・失敗テスト・未記録の検証結果を残さない。
+- 最終 PR gate:
+  - G4 完了後、下記の Epic 最終品質ゲートを通過してから PR を作成する。
+  - PR description には `iss-00251`〜`iss-00255`、Epic requirement / design trace、実行した test / review / QA、未実施理由、残リスクをまとめる。
 
 ## 統合チェックポイント
 
@@ -554,6 +581,10 @@ iss-00247 Profile Markdown templates
   - G2 後、classified Issue の `draft-design` / `draft-plan` が `authorized_profile` の profile template を source とし、missing / invalid / stale `.assurance.json` で no-write fail-closed することを確認する。
   - G3 後、fresh `spec-reviewer`、Evidence Adoption Ledger、delegated specialist evidence、report evidence gate が phase promotion / issue readiness と整合することを確認する。
   - G4 後、Lite / Standard / Strict / Critical の representative smoke tests と provider / dogfooding docs parity を確認する。
+- IC99 Epic final PR readiness:
+  - R0〜G4 の issue-local report evidence を横断し、E-RQ-006 / E-AC-006 / E-RQ-022 / E-AC-022 の実装証跡が揃っていることを確認する。
+  - Epic requirement / design で定義した振る舞いが focused tests / smoke tests / docs parity / manual QA で支えられていることを確認する。
+  - Fresh `spec-reviewer`、fresh code review、QA review を通過するまで Epic PR を作成しない。
 
 ## 品質ゲート
 
@@ -598,6 +629,40 @@ iss-00247 Profile Markdown templates
   - `./spec-dock/scripts/spec-dock sync`
   - targeted and full relevant test suites。
 
+## Epic 最終品質ゲート（単一 PR 前）
+
+G4 完了後、Epic #224 corrective tranche の最終 PR を作成する前にこの gate を通す。
+
+- requirement / design trace:
+  - `E-RQ-006` / `E-AC-006` / `E-RQ-022` / `E-AC-022` の各項目について、どの Issue、どの test、どの report evidence が closure を支えるかを確認する。
+  - R0〜G4 の scope / non-scope が崩れ、同じ責務を複数 Issue が重複実装していないことを確認する。
+  - `iss-00250` が temporary / superseded evidence のままで、正式 implementation evidence と誤認されていないことを確認する。
+- tests:
+  - artifact readiness regression: placeholder / heading-only / stale evidence / missing adoption evidence が ready にならないこと。
+  - grade-aware guidance regression: Lite / Standard / Strict / Critical の authoring / specialist / review / report evidence rules が guidance に出ること。
+  - draft routing regression: Issue `draft-design` / `draft-plan` が `authorized_profile` の profile template source を使い、missing / invalid / stale `.assurance.json` で no-write fail-closed すること。
+  - evidence gate regression: fresh `spec-reviewer`、Evidence Adoption Ledger、delegated specialist evidence、report evidence gate が phase promotion / issue readiness と整合すること。
+  - smoke / parity: Lite / Standard / Strict / Critical fixture、provider / dogfooding docs・template parity、installer/update 影響を確認すること。
+- static analysis / lint / format:
+  - repository で設定されている静的解析、lint、format check をローカルで実行する。
+  - 実行できない検証は、未実施理由、代替確認、残リスクを Epic / Issue report に記録する。
+- local test suite:
+  - R0〜G4 の focused tests をすべて実行する。
+  - 影響範囲に必要な unit / CLI runtime / integration / regression tests を実行する。
+  - 現実的に full `uv run pytest` が必要かを判断し、実行した場合は結果、未実施の場合は理由と代替確認を記録する。
+- Spec review:
+  - Fresh `spec-reviewer` が Epic requirement / design / plan / report、R0〜G4 の requirement / design / plan / report、最終 diff、test evidence をレビューする。
+  - `review_status: pass` になるまで Epic PR を作成しない。
+- Code review:
+  - Fresh code review が runtime / docs / tests / template changes をレビューする。
+  - P0 / P1 / promoted blocker が残る場合は repair / re-review を行い、blocker zero まで PR 作成を保留する。
+- QA review:
+  - QA 観点で no-active / planning / execution guidance、draft generation、readiness preflight、report evidence、provider / dogfooding parity の代表フローを確認する。
+  - QA で見つかった Epic requirement / design 不一致は、修正または明示 defer する。
+- PR creation:
+  - 上記 gate を pass した後、累積 branch から Epic #224 corrective tranche の単一 PR を作成する。
+  - PR 作成後の GitHub Actions / Codex review は、ローカル検証後の最終確認として扱う。基礎的な lint / test failure を初めて発見する場所にしない。
+
 ## ロールアウト / ドキュメント影響
 
 - Rollout:
@@ -625,7 +690,7 @@ iss-00247 Profile Markdown templates
   - Codex Action + structured output migration。
   - Cross-provider review ensemble。
   - Automatic Lite activation tuning。
-  - `iss-00250` 一時検討置き場は、この amendment の採用証跡として、R0 / G1 / G2 / G3 / G4 の正式 Issue 証跡へ置換されるまで temporary / superseded evidence として保持する。破棄する場合は、EAL-033 の参照先を正式 Issue evidence に置換してから行う。
+  - `iss-00250` 一時検討置き場は、この amendment の採用証跡として、`iss-00251`〜`iss-00255` の正式 Issue 証跡へ置換されるまで temporary / superseded evidence として保持する。破棄する場合は、EAL-033 の参照先を正式 Issue evidence に置換してから行う。
 
 ## 課題準備完了条件（Issue readiness criteria）
 
