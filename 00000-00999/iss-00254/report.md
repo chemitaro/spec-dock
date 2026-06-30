@@ -187,10 +187,10 @@ green: state=ready, next_action=execute-approved-plan, may_execute_approved_plan
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | planning-readiness | S00 | yes | inspect-only / planning-readiness | initial docs were draft; guidance blocked on design-not-substantive | `./spec-dock/scripts/spec-dock guidance issue-planning`; `./spec-dock/scripts/spec-dock guidance issue-execution` | pass | execution tests not run yet |
-| G3-C-001〜G3-C-005 | S01〜S02 | yes | implementation / runtime tests | N/A | planned focused docs/runtime tests | pending | not closed by S00 |
-| G3-C-006〜G3-C-008 | S03 / S90 | yes | regression / parity | N/A | planned regression and parity checks | pending | not closed by S00 |
-| G3-C-095 | S95 | yes | reviewer gates | N/A | qa-reviewer / code-reviewer / spec-reviewer | pending | not closed by S00 |
-| G3-C-099 | S99 | yes | final local checkpoint | N/A | final commands / commit / issue finish | pending | not closed by S00 |
+| G3-C-001〜G3-C-005 | S01〜S02 | yes | implementation / runtime tests | N/A | focused docs/runtime tests | pass | closed by implementation session |
+| G3-C-006〜G3-C-008 | S03 / S90 | yes | regression / parity | N/A | regression and parity checks | pass | closed by implementation session |
+| G3-C-095 | S95 | yes | reviewer gates | N/A | qa-reviewer / code-reviewer / spec-reviewer | pass | closed by final re-review |
+| G3-C-099 | S99 | yes | final local checkpoint | N/A | final commands / commit / issue finish | pass | committed and issue finish completed |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -198,10 +198,10 @@ green: state=ready, next_action=execute-approved-plan, may_execute_approved_plan
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
 | planning-readiness candidate | S00 | planning docs / guidance | pass | implementation evidence pending execution |
-| G3-C-001〜G3-C-005 | S01〜S02 | docs/runtime implementation and tests | pending | implementation not started |
-| G3-C-006〜G3-C-008 | S03 / S90 | regression and parity evidence | pending | implementation not started |
-| G3-C-095 | S95 | fresh QA / code / spec review | pending | implementation not started |
-| G3-C-099 | S99 | final commands, commit, issue finish | pending | implementation not started |
+| G3-C-001〜G3-C-005 | S01〜S02 | docs/runtime implementation and tests | pass | implementation completed |
+| G3-C-006〜G3-C-008 | S03 / S90 | regression and parity evidence | pass | implementation completed |
+| G3-C-095 | S95 | fresh QA / code / spec review | pass | final re-review completed |
+| G3-C-099 | S99 | final commands, commit, issue finish | pass | committed and issue finish completed |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -221,7 +221,7 @@ green: state=ready, next_action=execute-approved-plan, may_execute_approved_plan
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | planning | delegated | strict issue requires specialist draft evidence | system-architect / implementation-planner | discussion draft evidence only | active issue docs / Epic docs / runtime docs/code/tests | active issue `discussions/` direct child | canonical docs / source / tests | source-grounded draft; no self-claim | forbidden path / self-claim / unresolved design gap | draft artifact path / summary | pass |
-| S01〜S99 | pending | implementation not started | N/A | parent orchestration with possible bounded workers | approved plan | planned paths only | out-of-scope PR policy / G2 routing redesign | focused tests / lint / validate / reviews | reviewer blocker / test failure | report evidence | pending execution |
+| S01〜S99 | completed | implementation completed | N/A | parent orchestration with bounded reviewer gates | approved plan | planned paths only | out-of-scope PR policy / G2 routing redesign | focused tests / lint / validate / reviews | reviewer blocker / test failure | report evidence | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -247,7 +247,7 @@ green: state=ready, next_action=execute-approved-plan, may_execute_approved_plan
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| planning | candidate | requirement/design/plan/report/discussion drafts | pending planning commit | pending | N/A | changed files | N/A | guidance ready; planning spec-review pass |
+| planning | committed | requirement/design/plan/report/discussion drafts | `81bcc066` docs(issue-planning): iss-00254のevidence gate計画を承認状態に更新 | clean after planning checkpoint / later implementation committed | N/A | changed files | N/A | guidance ready; planning spec-review pass |
 
 #### 変更したファイル
 - `requirement.md` - G3 requirements approved candidate
@@ -258,7 +258,8 @@ green: state=ready, next_action=execute-approved-plan, may_execute_approved_plan
 - `discussions/20260630t180152z-disc-g3-implementation-plan-draft.md` - delegated implementation plan draft
 
 #### コミット
-- pending: planning commit after fresh spec-review
+- committed: `81bcc066` docs(issue-planning): iss-00254のevidence gate計画を承認状態に更新
+- committed: `9802cee1` feat(workflow): report evidence gateをissue実行前に追加
 
 #### メモ
 - No per-issue PR. G3 will hand off to G4 after execution checkpoint.
@@ -384,7 +385,7 @@ pass: no output
 | S02 | Green | missing/stale/non-pass evidence blocks readiness; complete evidence allows ready | domain helper と workflow hook を追加し、missing report、fresh review、unresolved EAL、Strict fallback を検証 | domain / CLI tests | pass | runtime は agent を呼ばず report text の stable sections/tokens だけを読む |
 | S03 | Regression | G2 routing and existing EAL lifecycle remain intact | profile draft routing focused tests と authority tests が pass | pytest | pass | PR policy / issue finish lifecycle は変更なし |
 | S90 | Parity | provider / dogfooding docs/templates/runtime are synchronized | relevant provider/dogfooding pairs の `diff -u` が no output | diff inspection | pass | source-of-truth は provider 側 |
-| S99 | Static / focused final verification | lint, validate, diff check, focused suite | `make lint`, `validate`, `git diff --check`, focused pytest pass | commands | pass | final reviewer gates pending |
+| S99 | Static / focused final verification | lint, validate, diff check, focused suite | `make lint`, `validate`, `git diff --check`, focused pytest pass | commands | pass | final reviewer gates passed before checkpoint commit |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
@@ -405,16 +406,16 @@ pass: no output
 | S95 | EAL rejected row が delegated draft adoption の参照証跡になり得る、Reviewer Gate Status が列位置ではなく行全体の `fresh` / `pass` を拾う、Lite grade verdict fail が ready と通る | code-reviewer / QA reviewer | EAL reference token は adopted / partially_adopted / integrated / partially_integrated 行からだけ抽出。Reviewer Gate Status は reviewer role / freshness / state の列を固定。Lite grade evidence も reviewer verdict exact pass と readiness 列 ready を必須化。negative tests を追加 | G3-C-002〜G3-C-005, G3-C-095 | no | `test_workflow_state.py` 44 passed; combined focused suite 121 passed; `make lint` pass |
 | S95 | plan/report の docs scope が旧 plan phase doc のままで、実変更の `phase_requirement.md` / `phase_plan_issue.md` を trace していない | spec-reviewer | requirement / plan / report の変更対象一覧と changed-file ledger を実変更に合わせて更新。S90 Docs Impact row に provider/dogfooding docs/template parity と policy test evidence を記録 | G3-C-004, G3-C-008, G3-C-090, G3-C-095 | no | old phase-doc target no hit in issue docs; `test_spec_document_templates_keep_policy_out_of_scaffold` pass |
 | S95 | Spec Authoring Gate が section 存在だけで通り、fail / blocking=yes の phase promotion row が execution readiness に進み得る | QA reviewer | requirement/design/plan の各 row で reviewer verdict exact pass、blocking=no、promotion decision を必須化。failed / blocking row の negative tests と CLI fixture 更新を追加 | G3-C-002〜G3-C-005, G3-C-095 | no | `test_workflow_state.py` 46 passed; combined focused suite 123 passed; active guidance ready |
-| S99 | `tests/unit/infra/test_init_update.py` full run が checked-in dogfooding snapshot / runtime mirror の既存差分を検出 | broad verification | 今回変更面の policy test は修正済み。残る failure は追加済み Issue 250〜255 の snapshot constant 追随不足と、今回差分外の `create_node.py` provider/dogfooding mirror mismatch。`iss-00254` の commit には混ぜず、Epic final gate / follow-up で deferred として扱う候補に記録 | G3-C-099 | no: deferred to Epic final quality gate candidate | full `test_init_update.py`: 4 failed before policy repair; expected remaining failures are snapshot/mirror scope |
+| S99 | `tests/unit/infra/test_init_update.py` full run が checked-in dogfooding snapshot / runtime mirror の既存差分を検出 | broad verification | 今回変更面の policy test は修正済み。残る failure は追加済み Issue 250〜255 の snapshot constant 追随不足と、今回差分外の `create_node.py` provider/dogfooding mirror mismatch。Epic final gate で snapshot constants と dogfooding runtime mirror を修正し、focused rerun と full `uv run pytest` が pass した。 | G3-C-099 | no: resolved at Epic final quality gate | full `test_init_update.py`: initial 4 failed before Epic repair; final full suite pass recorded in Epic report |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | G3-C-001〜G3-C-004, G3-C-006, G3-C-008 | docs/template contract is visible and non-contradictory | docs/template edits, focused init_update tests, parity diff | pass | spec-reviewer final gate pending |
-| S02 | G3-C-001〜G3-C-005 | CLI/domain tests cover report evidence readiness block / pass | `test_workflow.py`, `test_workflow_state.py` | pass | code-reviewer / QA final gate pending |
+| S01 | G3-C-001〜G3-C-004, G3-C-006, G3-C-008 | docs/template contract is visible and non-contradictory | docs/template edits, focused init_update tests, parity diff | pass | spec-reviewer final gate passed |
+| S02 | G3-C-001〜G3-C-005 | CLI/domain tests cover report evidence readiness block / pass | `test_workflow.py`, `test_workflow_state.py` | pass | code-reviewer / QA final gate passed |
 | S03 | G3-C-006 / G3-C-007 | G2 draft routing and EAL lifecycle remain intact | `test_new.py -k`, `test_authority.py` | pass | no production changes outside G3 scope |
 | S90 | G3-C-008 / G3-C-090 | provider / dogfooding docs/template/runtime parity | `diff -u` no output for touched pairs | pass | no unintended drift observed |
-| S99 | G3-C-099 | focused tests, lint, validate, diff check pass before final review | `test_workflow.py test_workflow_context_routing.py test_workflow_state.py test_authority.py` 123 passed; `make lint` pass; `validate` pass; `git diff --check` pass; active guidance ready | partial | commit / issue finish pending; broad snapshot/mirror test failures recorded separately |
+| S99 | G3-C-099 | focused tests, lint, validate, diff check pass before final review | `test_workflow.py test_workflow_context_routing.py test_workflow_state.py test_authority.py` 123 passed; `make lint` pass; `validate` pass; `git diff --check` pass; active guidance ready | pass | committed in `9802cee1`; issue finish completed; broad snapshot/mirror failures resolved by Epic final gate |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -442,22 +443,22 @@ pass: no output
 | tc-s03-001 | S03 | yes | regression | existing G2 route should remain intact | `test_new.py -k "profile_drafts or authorized_profile"` | pass | no G2 routing change |
 | tc-s03-002 | S03 | yes | regression | existing EAL lifecycle should remain intact | `tests/unit/domain/test_authority.py` | pass | 32 passed |
 | tc-s90-001 | S90 | yes | parity | provider / dogfooding mirror touched pairs | `diff -u` | pass | docs/template/runtime pairs matched |
-| tc-s99-001 | S99 | yes | static / focused final | N/A | `make lint`; `validate`; `git diff --check`; focused pytest | pass | 123 passed; commit / issue finish pending |
-| tc-s99-002 | S99 | no | broad scaffold snapshot awareness | N/A | `uv run pytest tests/unit/infra/test_init_update.py -q` | fail | deferred: remaining failure scope is dogfooding snapshot constants and runtime mirror mismatch outside this issue diff |
+| tc-s99-001 | S99 | yes | static / focused final | N/A | `make lint`; `validate`; `git diff --check`; focused pytest | pass | 123 passed; committed in `9802cee1`; issue finish completed |
+| tc-s99-002 | S99 | no | broad scaffold snapshot awareness | N/A | `uv run pytest tests/unit/infra/test_init_update.py -q`; Epic final focused rerun; full `uv run pytest` | pass after Epic final repair | initial failure was dogfooding snapshot constants and runtime mirror mismatch outside iss-00254 focused diff; resolved in Epic final quality gate |
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| G3-C-001〜G3-C-005 | S01〜S02 | docs/template/runtime helper/CLI tests, reviewer P1 repair tests, Grade Specialist Evidence Gate tests | pass | final re-review pending after latest repair |
-| G3-C-006〜G3-C-008 | S03 / S90 | regression and parity evidence | pass | final reviewer gates pending |
+| G3-C-001〜G3-C-005 | S01〜S02 | docs/template/runtime helper/CLI tests, reviewer P1 repair tests, Grade Specialist Evidence Gate tests | pass | final re-review passed |
+| G3-C-006〜G3-C-008 | S03 / S90 | regression and parity evidence | pass | final reviewer gates passed |
 | G3-C-090 | S90 | parity diff | pass | no drift |
-| G3-C-095 | S95 | fresh QA / code / spec review | pending | latest repairs complete; re-review pending |
-| G3-C-099 | S99 | final commands / lint / validate / diff check | partial | focused gate pass; commit and issue finish pending; broad snapshot/mirror failure deferred to Epic final gate candidate |
+| G3-C-095 | S95 | fresh QA / code / spec review | pass | final re-review passed |
+| G3-C-099 | S99 | final commands / lint / validate / diff check | pass | focused gate pass; committed in `9802cee1`; issue finish completed; broad snapshot/mirror failure resolved by Epic final gate |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| deferred | G3-C-099 | broad `test_init_update.py` snapshot/mirror awareness | Epic final quality gate candidate | remaining broad failures are outside iss-00254 focused diff and require Epic-level snapshot/mirror disposition | no | mention in final handoff |
+| resolved-at-epic-gate | G3-C-099 | broad `test_init_update.py` snapshot/mirror awareness | Epic final quality gate | remaining broad failures were outside iss-00254 focused diff and were repaired during Epic-level snapshot/mirror disposition | no | final full `uv run pytest` pass recorded in Epic report |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` - report evidence gate の runtime readiness contract を追記。
@@ -488,7 +489,7 @@ pass: no output
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / workflow phase docs | yes | main orchestrator | S01 / S90 changed-file ledger; provider/dogfooding docs/template parity; `test_spec_document_templates_keep_policy_out_of_scaffold` pass | pending final spec re-review |
+| docs / templates / workflow phase docs | yes | main orchestrator | S01 / S90 changed-file ledger; provider/dogfooding docs/template parity; `test_spec_document_templates_keep_policy_out_of_scaffold` pass | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |

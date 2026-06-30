@@ -3,7 +3,7 @@
 ID: "iss-00253"
 タイトル: "Connect Delegated Specialist Routing And Draft Artifact Sources"
 関連GitHub: ["#253"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-01"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -267,7 +267,7 @@ pass: validate nodes=160; diff check clean
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S00〜S99 | completed | runtime / tests / docs / report | to be recorded by this implementation commit | post-commit clean check to run after commit | N/A | changed files | N/A | focused tests / lint / validate / reviewer pass |
+| S00〜S99 | committed | runtime / tests / docs / report | `561b7ac8` feat(workflow): issue draft生成をprofile templateに接続 | issue finish completed; Epic baton continued without per-issue PR | N/A | changed files | N/A | focused tests / lint / validate / reviewer pass |
 
 #### 変更したファイル
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - profile-aware issue draft routing
@@ -279,7 +279,8 @@ pass: validate nodes=160; diff check clean
 - `report.md` - implementation evidence
 
 #### コミット
-- this implementation commit records S00〜S99 after final reviewer gates; no per-issue PR is created.
+- committed: `561b7ac8` feat(workflow): issue draft生成をprofile templateに接続
+- Per-issue PR は作成せず、Epic #224 の単一 PR に含める。
 
 #### メモ
 - Per-issue PR は作成しない。Epic #224 の単一 PR に含める。
@@ -311,7 +312,7 @@ pass: validate nodes=160; diff check clean
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| updated through S99 before commit | runtime create-node/profile-template routing, bootstrap injection, artifact store loader, CLI tests, docs/rules/README, report | final response; Epic branch baton to next issue; no per-issue PR | ready |
+| updated through S99 and committed | runtime create-node/profile-template routing, bootstrap injection, artifact store loader, CLI tests, docs/rules/README, report | final response; Epic branch baton to next issue; no per-issue PR | committed: `561b7ac8` |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: 初回 code-review で `plan_discussion_doc` の返り値 arity 互換破壊が見つかった。

@@ -2,9 +2,9 @@
 種別: レポート（Epic）
 ID: "epic-00224"
 タイトル: "Dynamic Workflow Resource Allocation"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-06-23"
+最終更新: "2026-07-01"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["init-local-00003"]
 ---
@@ -32,10 +32,13 @@ ID: "epic-00224"
   - 正式な追加 corrective Issue として `iss-00251 / #251`〜`iss-00255 / #255` を SpecDock の `new issue` で作成し、`iss-00247 -> iss-00251 -> iss-00252`、`iss-00252 -> iss-00253`、`iss-00251 / iss-00252 -> iss-00254`、`iss-00251〜iss-00254 -> iss-00255` の依存を登録した。
   - 追加 Issue ごとに draft `requirement.md` / `design.md` / `plan.md` を作成し、R0〜G4 の責務境界、親 Epic trace、依存、非対象を統合的に整えた。
   - Fresh integrated `spec-reviewer` が、Epic plan / design / report、`iss-00251`〜`iss-00255` の draft requirement / design / plan、各 `.meta.json` dependencies をレビューし、findings なし / `review_status: pass` / confidence 0.88 を返した。
+  - `iss-00251 / #251`〜`iss-00255 / #255` は依存順に実装・checkpoint commit・`issue finish` まで完了し、GitHub Issue はすべて CLOSED。
+  - Epic 単一 PR 前の local quality gate として `make lint`、focused regression、full `uv run pytest`、`git diff --check`、`./spec-dock/scripts/spec-dock validate` を実行した。
+  - Full pytest 初回は dogfooding snapshot / runtime mirror drift 3 件で fail したため、Epic final gate の deferred blocker として provider/dogfooding mirror と checked-in dogfooding snapshot constants を修正した。再実行で `1623 passed, 76 skipped`。
 - 次のマイルストーン:
-  - `iss-00251` から dependency order に沿って個別 Issue 実装へ進む。
+  - Fresh Epic-level spec review を再実行し、Epic #224 corrective tranche の単一 PR を作成する。
 - ブロッカー:
-  - 現時点でユーザー確認が必要な blocking question はなし。
+  - 現時点でユーザー確認が必要な blocking question はなし。Fresh code review / QA review は pass。Fresh spec review は Issue report 証跡補正後に再実行する。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -171,8 +174,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
   - `iss-00238` / `#238`: pass
   - `iss-00239` / `#239`: formal supersede by `iss-00241`
   - `iss-00241` / `#241`: pass after S99 focused suite, sync/validate, manual flow, and qa/code/spec reviewer gates
+  - `iss-00251` / `#251`: pass; fail-closed artifact readiness preflight implemented, reviewed, and closed
+  - `iss-00252` / `#252`: pass; grade-aware Issue planning guidance implemented, reviewed, and closed
+  - `iss-00253` / `#253`: pass; delegated specialist routing and profile draft artifact sources implemented, reviewed, and closed
+  - `iss-00254` / `#254`: pass; grade-aware spec review / evidence gates implemented, reviewed, and closed
+  - `iss-00255` / `#255`: pass; grade-aware authoring smoke tests implemented, reviewed, and closed
 - PR / Release:
-  - pending: `iss-00251`〜`iss-00255` を branch baton で累積実装し、G4 後の Epic 最終品質ゲートを通過してから Epic #224 corrective tranche として単一 PR を作成する。
+  - pending: Epic-level fresh spec review 再実行を通過してから、Epic #224 corrective tranche として単一 PR を作成する。
 
 ## 作成済み Issue / Draft Handoff
 - superseded historical evidence:
@@ -195,7 +203,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ## 受け入れ条件（E-AC）の達成状況 (必須)
 - E-AC-001〜004: pass（証拠: iss-00227 report; assurance classification / schema / Lite safety targeted tests）
 - E-AC-005: pass（証拠: iss-00228 report; workflow runbook / fixed Skill / clean Git tests）
-- E-AC-006: partially passed / amended pending（証拠: iss-00229 report で profile-aware planning は pass。2026-06-30 amendment により fail-closed artifact readiness preflight は R0 で追加対応する）
+- E-AC-006: pass（証拠: iss-00229 report で profile-aware planning は pass。2026-06-30 amendment の fail-closed artifact readiness preflight は `iss-00251` / R0 で実装・review・closed）
 - E-AC-007〜008: pass（証拠: iss-00230 / iss-00229 reports; step routing, stale source binding tests）
 - E-AC-009〜012: pass（証拠: iss-00231 / iss-00232 / iss-00244 reports; trusted base-SHA review policy は script-local instruction source へ変更済み、blocker disposition, promoted P2, rereview payload tests, explicit review completion ADR）
 - E-AC-013: pass（証拠: iss-00233 `test_issue_233_pr_observation_wait_exposes_automation_stalled_operator_surface`; repeated blocker fingerprint は `automation_stalled` / `human_gate` になり `merge_prepared` にならない）
@@ -203,7 +211,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - E-AC-015: pass（証拠: iss-00233 Auto-Lite readiness assertions; `automatic_lite_default_enabled=false`、future adoption gates は accepted ADR / policy version bump / rollout Issue / telemetry gate）
 - E-AC-016: pass（証拠: iss-00233 `auto_lite_readiness_report` efficiency baseline assertions; Lite / Standard / Strict の invocation / review generation / workflow cost proxy 差分を固定し、live telemetry 不足は missing metrics summary として明示）
 - E-AC-017〜021: pass（証拠: iss-00230 report; step assurance, context routing, reviewer clean-room, bounded return contract, stale context invalidation tests）
-- E-AC-022: pending（証拠: `20260630t111316z-adr` と draft routing research は採用済み。R0 + G1〜G4 の implementation / smoke / reviewer evidence 完了後に pass 判定する）
+- E-AC-022: pass（証拠: `20260630t111316z-adr` と draft routing research を採用し、R0 + G1〜G4 の implementation / smoke / reviewer evidence / issue finish が完了）
 
 ## Current Operational Contract Ledger
 
@@ -222,7 +230,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | `iss-00238` / `#238` | Stdout guidance handoff instead of generated workflow files | included corrective issue | pass | report records `guidance <target>` handoff, projection human-only boundary, reviewer gates, and S90 evidence |
 | `iss-00239` / `#239` | Compose issue planning templates after assurance classification | formally superseded by `iss-00241` | formal supersede | report records `./spec-dock/scripts/spec-dock close iss-00239` exit 0 with `state=CLOSED already_closed=true`; GitHub `#239` closed at `2026-06-27T05:17:44Z` |
 | `iss-00241` / `#241` | Resolve Epic traceability and review policy gate gaps | included corrective integration issue | pass | S01〜S04, S90, and S99 closure evidence recorded; focused suite, sync/validate, manual flow, and final qa/code/spec reviewer gates passed |
-| `iss-00251`〜`iss-00255` / `#251`〜`#255` | Grade-aware Issue authoring / readiness corrective tranche | included planned corrective tranche | pending implementation | Formal Issue 作成と dependency registration は完了。draft requirement / design / plan を作成済み。実装・smoke・reviewer evidence 完了後に Epic close-readiness を pass 判定する |
+| `iss-00251`〜`iss-00255` / `#251`〜`#255` | Grade-aware Issue authoring / readiness corrective tranche | included corrective tranche | pass | R0〜G4 implementation / smoke / reviewer evidence / checkpoint commits / `issue finish` 完了。GitHub Issues #251〜#255 は CLOSED。 |
 
 ## Epic Traceability Quality Gate Ledger
 
@@ -231,8 +239,10 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | QG-006 | Step closure / reviewer gate / commit gate cross-issue audit | pass | Initial implementation issue reports and corrective issue reports are included; `iss-00239` is formal supersede; `iss-00241` S01〜S04/S90/S99 reviewer gates passed. S99 commit evidence is recorded in the issue report commit gate. | none |
 | QG-007 | Context packet / clean-room / bounded return evidence audit | pass | E-AC-017〜021 point to `iss-00230` report; S99 final QA/spec reviews accepted the existing context packet, clean-room reviewer / consultant, and bounded return evidence coverage without requiring a human gate. | none |
 | QG-008 | Auto-Lite readiness / automatic Lite default disabled / efficiency evidence audit | pass | E-AC-015〜016 point to `iss-00233` Auto-Lite readiness and efficiency baseline; automatic Lite default remains disabled; final QA/spec reviews accepted missing-metrics handling without requiring a human gate. | none |
-| QG-009 | Grade-aware authoring / artifact readiness amendment audit | pass | E-RQ-006 / E-AC-006 / E-RQ-022 / E-AC-022 were amended to cover R0 + G1〜G4. Fresh `spec-reviewer` returned pass with confidence 0.90; non-blocking P2 stale checkpoint wording was fixed. Formal corrective Issues `iss-00251`〜`iss-00255` were created and dependency edges registered. | fresh integrated review before individual Issue execution |
-| QG-010 | Formal corrective Issue handoff integration review | pass | Fresh integrated `spec-reviewer` reviewed Epic plan / design / report, `iss-00251`〜`iss-00255` draft requirement / design / plan, and `.meta.json` dependencies. Findings none, `review_status: pass`, confidence 0.88. | proceed to `iss-00251` implementation |
+| QG-009 | Grade-aware authoring / artifact readiness amendment audit | pass | E-RQ-006 / E-AC-006 / E-RQ-022 / E-AC-022 were amended to cover R0 + G1〜G4. Formal corrective Issues `iss-00251`〜`iss-00255` were implemented and closed. | none |
+| QG-010 | Formal corrective Issue handoff integration review | pass | Fresh integrated `spec-reviewer` reviewed Epic plan / design / report, `iss-00251`〜`iss-00255` draft requirement / design / plan, and `.meta.json` dependencies. Findings none, `review_status: pass`, confidence 0.88. | completed by R0〜G4 issue execution |
+| QG-011 | Epic final local quality gate | pass | `make lint` pass; full `uv run pytest` first found dogfooding snapshot / runtime mirror drift, repair applied, rerun pass `1623 passed, 76 skipped`; `git diff --check` pass; `./spec-dock/scripts/spec-dock validate` pass. | fresh Epic-level reviewer gates |
+| QG-012 | Epic final reviewer gates | pass | Fresh QA reviewer `019f1a8a-a800-7080-8beb-f7794bdae873` pass; fresh code reviewer `019f1a8a-8625-79b3-8b4f-1a1e27a5c8fa` pass; fresh spec reviewer `019f1a97-d50e-7751-b317-f237752f479b` pass. Earlier stale report evidence findings were reconciled across `iss-00251`〜`iss-00254`; remaining P2 scaffold cleanup in `iss-00252` was applied before PR creation. | create Epic single PR |
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
@@ -249,7 +259,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - dedicated review-instruction doctor surfacing は、この Epic では script-local instruction validation / operator evidence までを対象とし、専用 doctor command は未作成。
 - production telemetry backend と automatic Lite activation tuning は、この Epic の initial rollout 対象外。採用には accepted ADR、policy version bump、rollout Issue、telemetry gate が必要。
 - I06 で defer した automation-stalled operator surface は iss-00233 で resolved。
-- R0 / G1 / G2 / G3 / G4 の formal Issue 作成と dependency registration は完了。次は `iss-00251`〜`iss-00255` を依存順に個別実装する。
+- R0 / G1 / G2 / G3 / G4 の formal Issue 作成、dependency registration、実装、review、`issue finish` は完了。Fresh code review / QA review は pass。次は Epic-level fresh spec re-review と単一 PR 作成を行う。
 
 ## 省略/例外メモ (必須)
 - 該当なし
