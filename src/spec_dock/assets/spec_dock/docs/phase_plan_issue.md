@@ -42,7 +42,8 @@ Operational entrypoint / first-read spine は `spec-dock-issue-planning` skill �
 - 低リスク docs-only / inspect-only step は code test を義務化しないが、inspection、structural assertion、manual evidence、docs diff などの代替 evidence path と rationale を step-local に固定する
 - required row の削除、`locked expectation` の変更、`required` の変更、`spec link` の意味変更は plan amendment と re-review を必須にする
 - typo / link correction は `report.md` のクロージャ差分（`Closure Delta`）に記録してよい。新規 bug による regression 追加は中央索引（central index）と step クロージャ契約（step closure contract）へ追加し、report に記録する
-- 各 implementation step は commit 単位として設計し、`1 implementation step = 1 review scope = 1 commit` を標準にする。step が大きすぎる場合は commit をまとめず step を分割する
+- テンプレート内の連番項目は例示であり、目的に応じて必要な数だけ追加・削除してよい。`XXX` placeholder がある場合は、作成時に実IDへ置換するか削除する
+- `standard` / `strict` / `critical` の plan では、マイルストーン完了ゲートに `commit候補` を置き、レビュー可能な履歴を残す。review scope と commit scope は一致してもよいが、常に完全一致するとは定義しない
 - review / QA / docs / 最終品質ゲート（final quality gate）は behavior slice の外に置き、step gate / milestone gate / `S90` / `S99` に配置する
 - `refactor / tidy` は bounded decision point として残し、事前に詳細な cleanup task を書き込まない
 - cleanup が最初から明確で大きい場合は、`bounded implementation batch` / design / 別 step で扱う
@@ -95,7 +96,7 @@ Operational entrypoint / first-read spine は `spec-dock-issue-planning` skill �
 - 各 implementation step に `具体テストケース一覧` を置く。これは完全な test inventory ではなく、step-local obligation と concrete red / characterization / inspect / manual seeds を実装前に固定する欄である
 - `具体テストケース一覧` の first case は `public interface / observable behavior` を観測するものにし、必要なら `vertical tracer bullet` として最小の end-to-end Green を先に置く。private method 先行や `horizontal batching` だけの plan になっていないか確認する
 - `refactor / tidy` には `目的` と `guardrail` を置き、具体的な refactor 内容は `report.md` へ送る
-- 各 step gate に `step reviewer gate`、`commit gate`、`no-op gate`、`report update` を置き、reviewer は `workflow_issue.md` の mapping に従って選ぶ
+- 各 step / milestone gate に reviewer gate、`commit候補` または no-op 判定、`report update` を置き、reviewer は `workflow_issue.md` の mapping に従って選ぶ
 - `S90 docs 影響解決 / docs 更新（S90 docs impact resolution / docs refresh）` を必須で置く
 - `S99 最終品質ゲート（S99 final quality gate）` を必須で置き、`qa-reviewer` のテスト十分性確認、issue-wide `code-reviewer` の統合 diff review、`spec-reviewer` の要件達成確認を配置する
 - `final exit contract` を置く
@@ -122,7 +123,7 @@ Operational entrypoint / first-read spine は `spec-dock-issue-planning` skill �
 - 各 implementation step が step-local な `具体テストケース一覧` を持つ。完全な issue-wide inventory ではなく、実装前に固定する concrete seeds と alternative evidence path を確認できる
 - concrete test case が横長 table に押し込まれて読みづらい場合、または global test plan だけで step-local case がない場合は fail とする
 - docs-only / approved-no-op step は、テスト不要理由と inspection / manual / docs diff などの代替検証方法を持つ
-- 各 implementation step が commit 単位として設計され、`step reviewer gate`、`commit gate`、`no-op gate` を持っている
+- `standard` 以上では主要マイルストーンが `commit候補` または no-op 判定を持ち、`lite` では途中 commit を前提にしない軽量完了条件になっている
 - step 順が design の依存関係分析、Module Dependency Diagram、directory / file change plan と矛盾しない
 - 各 step の `depends on` / `unblocks` / `target files` が、実装順と変更対象の確認に使える
 - report update が stage gate に置かれている。report-before-commit、step reviewer gate pass、step commit、approved-no-op の実行順は `workflow_issue.md` の実行 contract で確認する

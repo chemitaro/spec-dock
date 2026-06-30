@@ -26,6 +26,8 @@ Issue templates（共通 `requirement.md` と profile 別 `design.md` / `plan.md
 - 仕様固定クロージャ索引（`Spec-Locked Closure Index`）で仕様 coverage を固定し、各 implementation step の `具体テストケース一覧` で step-local obligation と concrete red / characterization / inspect / manual seeds を固定する。
 - step 順、依存、対象ファイル、検証方法、report evidence destination、amendment trigger を実装者が判断せずに実行できる粒度へ落とす。
 - `workflow_issue.md` の delegated-by-default policy を再定義せず、各 implementation step の `delegation contract` として委任先、入力、許可範囲、検証、reviewer focus、停止条件、出力を具体化する。
+- テンプレート内の `001` / `002` などの連番例示は上限ではない。目的に応じて必要な数だけ項目を追加・削除し、`XXX` placeholder は実IDへ置換するか削除する。
+- `standard` / `strict` / `critical` の plan では、マイルストーン完了ゲートの `commit候補` でレビュー可能な履歴を残す。review scope と commit scope は一致してもよいが、常に完全一致するとは定義しない。
 
 ## 計画契約 / 観測 evidence 台帳（planned contract / observed evidence ledger）
 

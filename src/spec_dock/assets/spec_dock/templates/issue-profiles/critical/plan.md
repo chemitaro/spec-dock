@@ -429,6 +429,14 @@ Minimal Safe Change Boundary:
 | Current test 基準（baseline） | `...` | pass / 既知失敗を記録済み | `report.md#...` |
 | GitHub state 基準（baseline） | ... | current state recorded / N/A | `report.md#...` |
 
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+
 ### M1: 事前確認・中止条件評価（Precheck / No-Go Evaluation）
 
 | Precheck 識別子（ID） | 内容 | 結果 | 報告先（Report Destination） |
@@ -439,6 +447,14 @@ Minimal Safe Change Boundary:
 | PRE-004 | セキュリティ・プライバシー（security / privacy）影響 | 通過 / blocked（clear / blocked） | `report.md#...` |
 | PRE-005 | GitHub mutation影響 | 通過 / blocked（clear / blocked） | `report.md#...` |
 
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+
 ### M2: ドライラン・プレビュー（ドライラン（Dry-run） / Preview）
 
 | ドライラン（Dry-run） 識別子（ID） | 対象 | 方法 | 期待結果 | 報告先（Report Destination） |
@@ -446,17 +462,42 @@ Minimal Safe Change Boundary:
 | DRY-001 | ... | ... | no write / expected diff | `report.md#...` |
 | DRY-002 | ... | ... | protected assets untouched | `report.md#...` |
 
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+
 ### M3: 仕様固定 TDD 実装（Spec-Locked TDD Implementation）
 
 | Work 識別子（ID） | 内容 | クロージャ（Closure） | 状態 |
 |---|---|---|---|
 | B-001 | ... | `CLOS-...` | planned |
+| B-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `CLOS-...` | planned |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 ### M4: 契約・互換性検証（Contract / Compatibility 検証（Verification））
 
 | Contract 識別子（ID） | 対象 | 期待状態 | 検証 |
 |---|---|---|---|
 | CTR-001 | ... | ... | ... |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 ### M5: 移行・更新・遷移検証（Migration / Update / Transition 検証（Verification））
 
@@ -466,11 +507,27 @@ Minimal Safe Change Boundary:
 | MIG-STEP-002 | dry-run | はい（yes） | いいえ（no） | `report.md#...` |
 | MIG-STEP-003 | apply | はい / いいえ（yes / no） | はい / いいえ（yes / no） | `report.md#...` |
 
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+
 ### M6: 失敗・部分失敗・復旧検証（Failure / Partial Failure / Recovery 検証（Verification））
 
 | Failure 識別子（ID） | 条件 | 検証方法 | 期待結果 | 報告先（Report Destination） |
 |---|---|---|---|---|
 | FAIL-001 | ... | ... | ... | `report.md#...` |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 ### M7: セキュリティ・プライバシー・認証情報検証（Security / Privacy / Credential 検証（Verification））
 
@@ -478,6 +535,14 @@ Minimal Safe Change Boundary:
 |---|---|---|---|---|
 | SEC-001 | secretsが出力されない | 点検（inspect） / test | pass | `report.md#...` |
 | SEC-002 | private dataがreportに出ない | 点検（inspect） | pass | `report.md#...` |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 ### M8: GitHub 状態変更検証（GitHub State Mutation 検証（Verification））
 
@@ -487,6 +552,14 @@ GitHub state mutationがない場合は `N/A` と記述する。
 |---|---|---|---|---|---|
 | GH-001 | Issue / Label / Comment / PR | ... | required / N/A | required / N/A | `report.md#...` |
 
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+
 ### M90: 文書・テンプレート・スキル整合性（Docs / Template / Skill Consistency）
 
 | 対象 | 必要な対応 | 状態 |
@@ -494,6 +567,14 @@ GitHub state mutationがない場合は `N/A` と記述する。
 | 文書（docs） | ... | planned |
 | テンプレート（templates） | ... | planned |
 | スキル群（skills） | ... | planned |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 ### M95: 手動承認・レビューゲート（Manual Approval / Review Gates）
 
@@ -503,6 +584,14 @@ GitHub state mutationがない場合は `N/A` と記述する。
 | MG-002 | before migration apply | migration preview / rollback plan | ... | 未完了（pending） |
 | MG-003 | before GitHub mutation | mutation preview | ... | 未完了（pending） |
 | MG-004 | before final completion | 最終証跡（final evidence） | ... | 未完了（pending） |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 ---
 
@@ -700,6 +789,14 @@ Delegation requirements:
 | Docs / template / skill checks | `...` | pass / N/A | `report.md#...` |
 | Manual gates | approval records | approved | `report.md#...` |
 | Final review | ... | approved | `report.md#...` |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 最終終了契約（Final Exit Contract）:
 

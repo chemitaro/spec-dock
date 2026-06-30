@@ -197,6 +197,7 @@ Compatibility Outcomes:
 |---|---|---|---|---|---|
 | CLOS-001 | AC-001 | DES-001 | ... | unit・CLI・テンプレート・文書 | `report.md#...` |
 | CLOS-002 | AC-002 | DES-002 | ... | 統合・契約（integration / contract） | `report.md#...` |
+| CLOS-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | DES-... | ... | ... | `report.md#...` |
 
 Contract クロージャ（Closure）:
 
@@ -220,6 +221,7 @@ Compatibility クロージャ（Closure）:
 | B-002 | M1 | ... | `CLOS-...` | B-001 | medium | planned |
 | B-003 | M2 | ... | `CLOS-...` | B-001 | high | planned |
 | B-004 | M3 | contract guarantee ... | CTR-`CLOS-...` | B-002 | high | planned |
+| B-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | `CLOS-...` | ... | ... | planned |
 | B-005 | M4 | compatibility guarantee ... | COMP-`CLOS-...` | B-004 | high | planned |
 
 ---
@@ -354,6 +356,14 @@ Contract / Compatibility Evidence:
 | Template / contract 基準（baseline） | ... | current shape recorded | `report.md#...` |
 | Compatibility 基準（baseline） | ... | current behavior recorded | `report.md#...` |
 
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+
 ### M1: 最小振る舞い経路（Minimal Behavior Path）
 
 | 振る舞い識別子（Behavior ID） | 内容 | クロージャ（Closure） | 状態 |
@@ -367,17 +377,41 @@ Gate:
 | Focused suite | `...` | pass | `report.md#...` |
 | Local regression | `...` | pass | `report.md#...` |
 
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+
 ### M2: 境界・失敗時振る舞い（Edge / Failure Behavior）
 
 | Failure 識別子（ID） | 条件 | 期待される扱い | 報告先（Report Destination） |
 |---|---|---|---|
 | FAIL-001 | ... | ... | `report.md#...` |
 
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+
 ### M3: 契約・テンプレート・メタデータゲート（Contract / Template / Metadata Gate）
 
 | Contract 識別子（ID） | 対象 | 期待状態 | 検証 |
 |---|---|---|---|
 | CTR-001 | ... | ... | ... |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 ### M4: 互換性・移行・更新ゲート（Compatibility / Migration / Update Gate）
 
@@ -387,11 +421,27 @@ Gate:
 | Legacy read compatibility | `...` | pass / N/A | `report.md#...` |
 | Existing workspace simulation | `...` | pass | `report.md#...` |
 
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+
 ### M5: 失敗・復旧ゲート（Failure / Recovery Gate）
 
 | Recovery 識別子（ID） | 対象Failure | 期待されるRecovery | 検証 |
 |---|---|---|---|
 | REC-001 | FAIL-... | ... | ... |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 ### M90: 文書・テンプレート・スキル整合性（Docs / Template / Skill Consistency）
 
@@ -401,6 +451,14 @@ Gate:
 | テンプレート（templates） | ... | planned |
 | スキル群（skills） | ... | planned |
 
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+
 ### M95: レビュー Strictゲート（Strict Review Gate）
 
 | Review対象 | Reviewer | Focus | 報告先（Report Destination） |
@@ -409,6 +467,14 @@ Gate:
 | design contract | ... | 契約・互換性（契約・互換性（contract / compatibility）） | `report.md#...` |
 | plan execution | ... | TDD / gates / stop rules | `report.md#...` |
 | 実装差分（implementation diff） | ... | コード / 文書 / テンプレート（code / docs / templates）（templates） | `report.md#...` |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 ---
 
@@ -532,6 +598,14 @@ Compatibility Gate:
 | Static checks | `...` | pass | `report.md#...` |
 | Docs / template / skill checks | `...` | pass / N/A | `report.md#...` |
 | Strict review | ... | approved | `report.md#...` |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 最終終了契約（Final Exit Contract）:
 

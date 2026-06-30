@@ -196,6 +196,7 @@ Issue Grade: "strict"
 | AC-002 | ... | DES-002 | ... | ... |
 | BH-001 | ... | DES-003 | ... | ... |
 | CON-001 | ... | DES-004 | ... | ... |
+| REQ-XXX | 必要に応じて要件・振る舞い・制約を連番で追加する。`XXX` は実IDへ置換するか削除する。 | DES-... | ... | ... |
 
 ### 要件へ戻すべき事項
 
@@ -285,6 +286,21 @@ Contractual Guarantees:
 ## 10. 視覚的な設計概要（Visual Design Overview）
 
 PlantUML図は必須ではない。ただし、contract surface、metadata flow、migration/update、failure/recoveryがある場合は図示を推奨する。
+
+クラス図で継承・実装関係を表す場合は、親クラス・抽象クラス・インターフェースを上側、子クラス・実装クラスを下側に置く。PlantUMLでは原則 `Child --|> Parent` または `Implementation ..|> Interface` の形で記述し、見た目として矢印が下から上へ向くようにする。
+
+```plantuml
+@startuml
+title 継承・実装方向の例（Inheritance / Implementation Direction）
+abstract class BaseRenderer
+interface OutputPort
+class MarkdownRenderer
+class JsonOutputPort
+
+MarkdownRenderer --|> BaseRenderer
+JsonOutputPort ..|> OutputPort
+@enduml
+```
 
 ### 図表一覧（Diagram Index）
 

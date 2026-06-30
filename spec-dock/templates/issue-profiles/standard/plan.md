@@ -205,6 +205,7 @@ stop
 | CLOS-002 | AC-002 | DES-002 | ... | unit / integration / 手動（manual） | `report.md#...` |
 | CLOS-003 | BH-001 | DES-003 | ... | unit / CLI | `report.md#...` |
 | CLOS-004 | CON-001 | DES-004 | ... | 点検・文書（点検（inspect）ion / docs） | `report.md#...` |
+| CLOS-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | DES-... | ... | ... | `report.md#...` |
 
 ---
 
@@ -218,6 +219,7 @@ Behaviorは、ファイル変更単位ではなく、観測可能な成果また
 | B-002 | M1 | ... | `CLOS-...` | B-001 | medium | planned |
 | B-003 | M2 | ... | `CLOS-...` | B-001 | high | planned |
 | B-004 | M3 | ... | `CLOS-...` | B-002 | medium | planned |
+| B-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | `CLOS-...` | ... | ... | planned |
 
 状態: `planned` / `ready` / `active` / `complete` / `split` / `blocked` / `removed`
 
@@ -397,6 +399,14 @@ Concrete Test Seed:
 | Local regression | `...` | pass | `report.md#...` |
 | Manual review | ... | 承認済み / N/A | `report.md#...` |
 
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+
 ### M2: 実装単位2（Implementation Unit 2）
 #### 成果
 
@@ -414,6 +424,14 @@ Concrete Test Seed:
 | ゲート（Gate） | コマンド（Command） / Evidence | 期待結果 | 報告先（Report Destination） |
 |---|---|---|---|
 | ... | ... | ... | ... |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 ---
 
@@ -502,6 +520,14 @@ Report記録ルール:
 | 提供資産（provider assets） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
 | 検証workspace（dogfooding workspace） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
 
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+
 ---
 
 ## 16. 最終品質ゲート（Final Quality Gate）
@@ -515,6 +541,14 @@ Report記録ルール:
 | Static checks | `...` | pass | `report.md#...` |
 | Docs / template checks | `...` | pass / N/A | `report.md#...` |
 | Manual review | ... | 承認済み / N/A | `report.md#...` |
+
+- commit:
+  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
+  - commit前確認:
+    - [ ] このマイルストーンの差分だけで意味が通る
+    - [ ] 必要な検証が完了している
+    - [ ] `report.md` に証跡がある
+    - [ ] 次のマイルストーンの未完了差分が混ざっていない
 
 最終終了契約（Final Exit Contract）:
 

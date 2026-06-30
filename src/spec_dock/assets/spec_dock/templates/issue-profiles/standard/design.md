@@ -150,6 +150,7 @@ Issue Grade: "standard"
 | AC-002 | ... | DES-002 | ... | ... |
 | BH-001 | ... | DES-003 | ... | ... |
 | CON-001 | ... | DES-004 | ... | ... |
+| REQ-XXX | 必要に応じて要件・振る舞い・制約を連番で追加する。`XXX` は実IDへ置換するか削除する。 | DES-... | ... | ... |
 
 ---
 
@@ -273,10 +274,13 @@ A -[#red,dashed]-> X : must not change
 
 ### 8.3 VIS-002: 静的構造・クラス図（Static Structure / Class Diagram）
 
+継承・実装関係を表す場合は、親クラス・抽象クラス・インターフェースを上側、子クラス・実装クラスを下側に置く。PlantUMLでは原則 `Child --|> Parent` または `Implementation ..|> Interface` の形で記述し、見た目として矢印が下から上へ向くようにする。
+
 ```plantuml
 @startuml
 title VIS-002 Static Structure
 
+abstract class "Base Renderer" as BaseRenderer
 class "Primary Model / Aggregate" as Aggregate <<Aggregate Root>> {
   +operation()
 }
@@ -285,7 +289,9 @@ class "Value Object" as ValueObject <<Value Object>>
 class "Domain Event" as DomainEvent <<Domain Event>>
 interface "Repository Port" as Repository <<Port>>
 class "Application Service" as AppService <<Application Service>>
+class "Markdown Renderer" as MarkdownRenderer
 
+MarkdownRenderer --|> BaseRenderer
 Aggregate *-- Entity : owns
 Aggregate --> ValueObject : uses
 Aggregate ..> DomainEvent : emits
