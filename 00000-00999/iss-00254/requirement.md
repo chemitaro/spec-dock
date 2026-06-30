@@ -39,8 +39,9 @@ Epic #224 の corrective tranche では、R0 が artifact readiness を fail-clo
 - provider-side docs/templates:
   - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_requirement.md`
   - `src/spec_dock/assets/spec_dock/docs/phase_design.md`
-  - `src/spec_dock/assets/spec_dock/docs/phase_plan.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md`
   - `src/spec_dock/assets/spec_dock/templates/issue/report.md`
 - dogfooding mirror の対応箇所:
   - `spec-dock/docs/...`

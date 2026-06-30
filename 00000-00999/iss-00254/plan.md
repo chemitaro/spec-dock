@@ -151,8 +151,9 @@ G3 は、既存の EAL gate / delegated draft authority gate / artifact readines
 - 変更対象:
   - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_requirement.md`
   - `src/spec_dock/assets/spec_dock/docs/phase_design.md`
-  - `src/spec_dock/assets/spec_dock/docs/phase_plan.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md`
   - `src/spec_dock/assets/spec_dock/templates/issue/report.md`
   - 対応する `spec-dock/docs/...` / `spec-dock/templates/issue/report.md`
 - close 条件:
@@ -437,14 +438,16 @@ G3 は、既存の EAL gate / delegated draft authority gate / artifact readines
 - provider docs/templates:
   - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
   - `src/spec_dock/assets/spec_dock/docs/workflow_issue.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_requirement.md`
   - `src/spec_dock/assets/spec_dock/docs/phase_design.md`
-  - `src/spec_dock/assets/spec_dock/docs/phase_plan.md`
+  - `src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md`
   - `src/spec_dock/assets/spec_dock/templates/issue/report.md`
 - dogfooding mirror:
   - `spec-dock/docs/workflow_spec_authoring.md`
   - `spec-dock/docs/workflow_issue.md`
+  - `spec-dock/docs/phase_requirement.md`
   - `spec-dock/docs/phase_design.md`
-  - `spec-dock/docs/phase_plan.md`
+  - `spec-dock/docs/phase_plan_issue.md`
   - `spec-dock/templates/issue/report.md`
 - runtime:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workflow.py`
