@@ -506,4 +506,5 @@ G3 は、既存の EAL gate / delegated draft authority gate / artifact readines
 
 - この Issue では個別 PR を作成しない。
 - G3 完了後、`issue finish` し、同じ累積 branch HEAD から G4 / `iss-00255` を開始する。
+- PR Delivery Gate / Merge Preparation Gate はこの Issue では実行せず、G4 完了後の Epic 最終品質ゲートに集約する。
 - Epic PR は G4 完了後、Epic 最終品質ゲートを通過してから 1 本だけ作成する。

@@ -171,5 +171,6 @@ Issue Grade: "strict"
 
 - この Issue では個別 PR を作成しない。
 - M99 は `iss-00254` に渡せる local closure checkpoint とする。
+- PR Delivery Gate / Merge Preparation Gate はこの Issue では実行せず、G4 完了後の Epic 最終品質ゲートに集約する。
 - M99 通過後、draft routing success / fail-closed path、preservation tests、report evidence を commit し、その HEAD から `iss-00254` の branch を開始する。
 - G3 に evidence gate を渡すため、draft が authority / reviewer pass / phase completion を自己主張しないことを report に明記する。
