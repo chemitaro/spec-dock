@@ -3340,7 +3340,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "#### 委任 worker 証跡（Delegated Worker Evidence）" in report_text
             assert "#### 親実装例外（Parent Implementation Exception）" in report_text
             assert "#### レビューゲート状態（Reviewer Gate Status）" in report_text
-            assert "#### ステップ commit ゲート（Step Commit Gate）" in report_text
+            assert "#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）" in report_text
             assert "## 最終品質ゲート（Final Quality Gate / 必須）" in report_text
             assert "### 最終 QA ゲート（Final QA Gate）" in report_text
             assert "### 最終コードレビューゲート（Final Code Review Gate）" in report_text
@@ -4488,8 +4488,9 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "completion policy の正本は `workflow_issue.md`" in phase_plan_issue
         assert "step 固有の worker handoff contract" in phase_plan_issue
         assert "report-before-commit、step reviewer gate pass、step commit、approved-no-op" in phase_plan_issue
-        assert "`1 implementation step = 1 review scope = 1 commit`" in phase_plan_issue
-        assert "`step reviewer gate`、`commit gate`、`no-op gate`" in phase_plan_issue
+        assert "マイルストーン完了ゲートに `commit候補`" in phase_plan_issue
+        assert "review scope と commit scope は一致してもよいが、常に完全一致するとは定義しない" in phase_plan_issue
+        assert "reviewer gate、`commit候補` または no-op 判定" in phase_plan_issue
         assert "`S99 最終品質ゲート（S99 final quality gate）`" in phase_plan_issue
         assert "`qa-reviewer` / issue-wide `code-reviewer` / `spec-reviewer`" in phase_plan_issue
         assert "三者最終品質ゲート（final quality gate）" in phase_plan_issue
@@ -4579,9 +4580,9 @@ class TestInitUpdate(CliRuntimeHarness):
             "unavailable / denied / host conflict は degraded success でも",
             "fresh reviewer pass、Step Result Approval、normal implementation success の代替ではない",
             "reviewer `failed`、`unavailable`、`denied`、`waived`、`provisional`",
-            "`Step Result Approval` は",
-            "required verification、fresh step reviewer `passed`",
-            "`Step Commit Gate`",
+            "`Step / Milestone Result Approval` は",
+            "required verification、fresh reviewer `passed`",
+            "commit候補または approved-no-op",
             "post-commit clean check",
             "final commit は final report ledger と delivery evidence boundary",
             "catch-up implementation commit ではない",
@@ -4599,7 +4600,8 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "test sensitivity evidence" in workflow_issue
         assert "Red → Green → Refactor → review" not in workflow_issue
         assert "step reviewer gate → fix → re-review → commit → clean確認" in workflow_issue
-        assert "`1 implementation step = 1 review scope = 1 commit`" in workflow_issue
+        assert "マイルストーン完了ゲートの `commit候補`" in workflow_issue
+        assert "常に完全一致するとは定義しない" in workflow_issue
         assert "`committed` または `approved-no-op`" in workflow_issue
         assert (
             "docs impact `none` は、docs / templates / README / workflow / skill / migration notes を確認"
@@ -4619,11 +4621,11 @@ class TestInitUpdate(CliRuntimeHarness):
             "spec-dock/docs/workflow_issue.md as the source of truth",
             "concise reminder for issue execution",
             "parent agent responsible for orchestration",
-            "Execute exactly one current implementation step at a time",
-            "Do not start implementation, review, or commit work for the next step until the current step is closed",
+            "Execute exactly one current implementation step or milestone at a time",
+            "Do not start implementation, review, or commit work for the next step / milestone until the current unit is closed",
             "required verification",
-            "a fresh step reviewer pass",
-            "the Step Commit Gate",
+            "a fresh reviewer pass",
+            "commit候補 or approved-no-op evidence",
             "a post-commit clean check",
             "Route runtime, tests, and scaffold behavior to `dev-coder`",
             "Route shipped docs, templates, skills, and workflow text to `doc-writer`",
@@ -9863,7 +9865,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Red または代替 evidence",
             "Green verification",
             "Refactor / cleanup guardrail",
-            "1 implementation step = 1 review scope = 1 commit",
+            "連番例示は上限ではない",
+            "マイルストーン完了ゲートの `commit候補`",
+            "常に完全一致するとは定義しない",
             "plan amendment",
             "re-review",
             "final commit",
@@ -9883,7 +9887,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "#### 発見されたテスト / リスク（Discovered Tests）",
             "#### クロージャ差分（Closure Delta）",
             "#### レビューゲート状態（Reviewer Gate Status）",
-            "#### ステップ commit ゲート（Step Commit Gate）",
+            "#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）",
             _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER,
             "実際の Red / Green / Refactor evidence",
             "closure delta",
@@ -10089,6 +10093,97 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             for fragment in fragments:
                 with _case(asset=label, fragment=fragment):
                     assert fragment in text
+
+    def test_issue_247_grade_profile_template_followup_contract_assets(self) -> None:
+        import spec_dock.cli as cli
+
+        repo_root = Path(__file__).resolve().parents[3]
+        with cli._assets_dir() as assets_dir:
+            spec_dock_assets = assets_dir / "spec_dock"
+            provider_paths = {
+                "issue requirement template": spec_dock_assets / "templates" / "issue" / "requirement.md",
+                "issue report template": spec_dock_assets / "templates" / "issue" / "report.md",
+                "workflow issue docs": spec_dock_assets / "docs" / "workflow_issue.md",
+                "phase issue plan docs": spec_dock_assets / "docs" / "phase_plan_issue.md",
+                "issue plan authoring docs": spec_dock_assets / "docs" / "authoring" / "issue-plan.md",
+            }
+            for grade in ("lite", "standard", "strict", "critical"):
+                provider_paths[f"{grade} design template"] = (
+                    spec_dock_assets / "templates" / "issue-profiles" / grade / "design.md"
+                )
+                provider_paths[f"{grade} plan template"] = (
+                    spec_dock_assets / "templates" / "issue-profiles" / grade / "plan.md"
+                )
+            provider_texts = {label: path.read_text(encoding="utf-8") for label, path in provider_paths.items()}
+
+        requirement_text = provider_texts["issue requirement template"]
+        for fragment in ("SC-XXX", "BH-XXX", "AC-XXX", "B-CAND-XXX", "TERM-XXX", "実IDへ置換するか削除"):
+            with _case(asset="issue requirement template", fragment=fragment):
+                assert fragment in requirement_text
+
+        for grade in ("standard", "strict", "critical"):
+            plan_text = provider_texts[f"{grade} plan template"]
+            with _case(grade=grade, asset="plan template", commit_candidate=True):
+                assert "commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする" in plan_text
+                assert "commit前確認:" in plan_text
+                assert "次のマイルストーンの未完了差分が混ざっていない" in plan_text
+
+        with _case(grade="lite", asset="plan template", commit_candidate=False):
+            assert "commit候補:" not in provider_texts["lite plan template"]
+            assert "commit前確認:" not in provider_texts["lite plan template"]
+
+        for grade in ("lite", "standard", "strict", "critical"):
+            design_text = provider_texts[f"{grade} design template"]
+            with _case(grade=grade, asset="design template", plantuml_inheritance=True):
+                assert "Child --|> Parent" in design_text
+                assert "Implementation ..|> Interface" in design_text
+
+        for grade in ("standard", "strict", "critical"):
+            design_text = provider_texts[f"{grade} design template"]
+            plan_text = provider_texts[f"{grade} plan template"]
+            with _case(grade=grade, asset="design template", numbered_placeholder=True):
+                assert "REQ-XXX" in design_text
+                assert "実IDへ置換するか削除" in design_text
+            with _case(grade=grade, asset="plan template", numbered_placeholder=True):
+                assert "B-XXX" in plan_text
+                assert "実IDへ置換するか削除" in plan_text
+
+        docs_text = "\n".join(
+            provider_texts[label]
+            for label in (
+                "workflow issue docs",
+                "phase issue plan docs",
+                "issue plan authoring docs",
+            )
+        )
+        with _case(asset="provider docs", stale_one_to_one_commit_rule=True):
+            assert "1 implementation step = 1 review scope = 1 commit" not in docs_text
+            assert "連番例示は上限ではない" in docs_text
+            assert "常に完全一致するとは定義しない" in docs_text
+
+        with _case(asset="issue report template", commit_candidate_gate=True):
+            assert "マイルストーン / commit 候補ゲート" in provider_texts["issue report template"]
+            assert "commit候補 / コミット範囲" in provider_texts["issue report template"]
+
+        parity_paths = (
+            "templates/issue/requirement.md",
+            "templates/issue/report.md",
+            "docs/workflow_issue.md",
+            "docs/phase_plan_issue.md",
+            "docs/authoring/issue-plan.md",
+            "templates/issue-profiles/lite/design.md",
+            "templates/issue-profiles/standard/design.md",
+            "templates/issue-profiles/strict/design.md",
+            "templates/issue-profiles/critical/design.md",
+            "templates/issue-profiles/standard/plan.md",
+            "templates/issue-profiles/strict/plan.md",
+            "templates/issue-profiles/critical/plan.md",
+        )
+        for path in parity_paths:
+            provider_path = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / path
+            dogfooding_path = repo_root / "spec-dock" / path
+            with _case(path=path, provider_dogfooding_parity=True):
+                assert dogfooding_path.read_bytes() == provider_path.read_bytes()
 
     def test_issue_142_matt_pocock_phase_discipline_contract_assets(self) -> None:
         import spec_dock.cli as cli
@@ -11880,7 +11975,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "期待結果",
                 "失敗検出",
                 "検証方法",
-                "1 implementation step = 1 review scope = 1 commit",
+                "commit候補",
             ),
         }
 
