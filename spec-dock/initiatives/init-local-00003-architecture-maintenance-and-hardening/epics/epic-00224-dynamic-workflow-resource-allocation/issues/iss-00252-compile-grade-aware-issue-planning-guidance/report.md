@@ -275,7 +275,7 @@ pass: no output after reviewer fix; provider / dogfooding skill mirror parity co
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S95 | first final QA review | qa-reviewer | fresh | fail | no | blocked until fix | P1: final reviewer gates pending; Evidence Adoption Ledger missing concrete delegated adoption entry |
+| S95 | first final QA review | qa-reviewer | fresh | fail | no | blocked until fix | P1: 初回時点では final reviewer gates の完了証跡が未記録; Evidence Adoption Ledger missing concrete delegated adoption entry |
 | S95 | first final code review | code-reviewer | fresh | fail | no | blocked until fix | P1: `authorized_profile` stop condition too weak; Evidence Adoption Ledger missing concrete delegated adoption entry |
 | S95 | first final spec review | spec-reviewer | fresh | fail | no | blocked until fix | P1: Evidence Adoption Ledger missing concrete delegated adoption entry; P2: final quality gate placeholders pending |
 | S95 | reviewer fix | orchestrator | current | fixed | no | re-review required | Split `authorized_profile` hard stop from grade Standard+ escalation; added EAL-001 adopted entry; reran parity, validate, lint, focused pytest |
@@ -287,9 +287,9 @@ pass: no output after reviewer fix; provider / dogfooding skill mirror parity co
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S00 | completed | baseline evidence only | N/A | N/A | inspect-only | provider/dogfooding docs and skill | N/A | `rg` inspection |
-| S01〜S90 | completed | docs / skill wording and parity | pending until commit | pending until commit | N/A | provider/dogfooding docs and skill | N/A | `rg`; `diff -u`; validate; lint; focused pytest |
+| S01〜S90 | committed | docs / skill wording and parity | `9d172bff` docs(workflow): issue planningにgrade別authoring方針を追加 / `180578ea` docs(issue-planning): iss-00252のレビュー証跡を補足 | `git status --short` clean after checkpoint commit / issue finish completed | N/A | provider/dogfooding docs and skill | N/A | `rg`; `diff -u`; validate; lint; focused pytest |
 | S95 | completed | final reviewer evidence | N/A | N/A | review-only | report reviewer gate records | N/A | QA/code/spec re-review pass |
-| S99 | ready | final commit candidate | pending until commit | pending until commit | N/A | docs / skill / report diff | N/A | final quality gate pass |
+| S99 | committed | final issue checkpoint | `180578ea` docs(issue-planning): iss-00252のレビュー証跡を補足 | issue finish completed; Epic baton continued without per-issue PR | N/A | docs / skill / report diff | N/A | final quality gate pass |
 
 #### 変更したファイル
 - `report.md` - S00 baseline / delegation evidence
@@ -301,23 +301,11 @@ pass: no output after reviewer fix; provider / dogfooding skill mirror parity co
 - dogfooding mirrors under `spec-dock/docs/` and `.agents/skills/spec-dock-issue-planning/SKILL.md`
 
 #### コミット
-- pending: docs / skill / report final commit candidate
+- committed: `9d172bff` docs(workflow): issue planningにgrade別authoring方針を追加
+- committed: `180578ea` docs(issue-planning): iss-00252のレビュー証跡を補足
 
 #### メモ
 - Per-issue PR は作成しない。Epic #224 の最終 PR にバケツリレー方式で引き継ぐ。
-
----
-
-### セッションログ（2026-07-01 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
@@ -345,17 +333,17 @@ pass: no output after reviewer fix; provider / dogfooding skill mirror parity co
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| S00〜S99 closure, EAL, OAL, reviewer pass, validation commands recorded | provider/dogfooding docs and issue-planning skill; issue report | Epic baton / final Epic PR evidence | ready |
+| S00〜S99 closure, EAL, OAL, reviewer pass, validation commands recorded | provider/dogfooding docs and issue-planning skill; issue report | Epic baton / final Epic PR evidence | committed: `180578ea`; no per-issue PR |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: 初回 reviewer gate で Evidence Adoption Ledger と final reviewer evidence の不足が見つかった。
+  - 解決: EAL-001 と S95 reviewer gate / final quality gate 証跡を追加し、final QA / code / spec re-review で pass を得た。
 
 ## 学んだこと (任意)
-- ...
+- docs-only の G1 でも、委任証跡と reviewer gate の完了状態は report 上で明示しないと Epic final gate で監査不能になる。
 
 ## 今後の推奨事項 (任意)
-- ...
+- 後続 issue でも Epic 単一 PR 方針に従い、issue 完了時は checkpoint commit と report 証跡だけを残し、PR 作成は Epic 最終品質ゲートに集約する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
