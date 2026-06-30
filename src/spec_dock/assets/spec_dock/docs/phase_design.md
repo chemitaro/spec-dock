@@ -65,9 +65,11 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 - template:
   - Initiative: `spec-dock/templates/initiative/design.md`
   - Epic: `spec-dock/templates/epic/design.md`
-  - Issue: `spec-dock/templates/issue/design.md`
+  - Issue: `spec-dock/templates/issue/design.md` は compose 前 placeholder。実体の設計本文は `assurance compose` が `.assurance.json` の `authorized_profile` に従い、`spec-dock/templates/issue-profiles/<profile>/design.md` から合成する
 - template flexibility:
   - templates は完成形や準拠規格ではなく、書き始めるための最小 scaffold として扱う
+  - Issue design の placeholder は手動 authoring の開始点にしない。先に `requirement.md` を具体化し、`assurance classify --stage requirement` と `assurance compose --artifact design|all` で profile 別 design template を materialize してから本文を編集する
+  - Issue templates（共通 `requirement.md` と profile 別 `design.md` / `plan.md`）の title 行、見出し、小見出しは日本語を優先する。日本語だけで正確性が落ちる場合だけ、日本語表現の後に括弧内英語名称を併記する
   - agent は、プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目を追加・削除・統合・並べ替えてよい
   - 不要な placeholder や該当しない節は削ってよいが、要件、設計判断、検証可能性、人間の理解に必要な情報は削らない
 

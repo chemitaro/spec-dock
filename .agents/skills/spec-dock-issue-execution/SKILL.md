@@ -15,7 +15,7 @@ This skill is a fixed kernel. It must not carry state-specific generated Runbook
   - `./spec-dock/scripts/spec-dock guidance issue-execution`
 - Treat the command stdout as current guidance only. It is not canonical authority, and must not be edited as source of truth.
 - Register the returned `state`, `next_action`, `reason_code`, `authority`, `may_execute_approved_plan`, commands, and stop conditions in your task checklist before acting.
-- Do not expect or derive the current implementation step, worker, reviewer, verification, or context packet from runtime guidance. Read execution order and step obligations from the approved `plan.md`, and record observed evidence in `report.md`.
+- Do not expect or derive the current implementation step / milestone, worker, reviewer, verification, or context packet from runtime guidance. Read execution order and step / milestone obligations from the approved `plan.md`, and record observed evidence in `report.md`.
 - If runtime guidance cannot be generated, is malformed, or contradicts canonical docs, stop and fall back to `spec-dock/docs/workflow_issue.md` and the active issue docs instead of guessing the next step.
 - Generated projections such as `spec-dock/.agent/runbooks/current-runbook.*` or `spec-dock/active/current-runbook.*` are ignored human/debug output. Do not read, edit, or manage them as handoff authority.
 
@@ -34,7 +34,7 @@ This skill is a fixed kernel. It must not carry state-specific generated Runbook
 - Stop if any artifact is draft, template-only, unresolved, stale, contradictory, or missing reviewer-pass evidence.
 - Stop on any unresolved spec gap; return to `spec-dock/docs/workflow_clarification.md` instead of absorbing the gap inside execution.
 - Stop if active context, allowed paths, acceptance criteria, reviewer requirements, delegated worker boundaries, or closure conditions cannot be verified.
-- Execute exactly one current implementation step at a time. Do not start implementation, review, or commit work for the next step until the current step is closed.
+- Execute exactly one current implementation step or milestone at a time. Do not start implementation, review, or commit work for the next step / milestone until the current unit is closed.
 - Treat `plan.md` as the planned executable workflow contract / command queue. A non-executable `plan.md` is a planning gap, not an execution assumption.
 - Treat a non-executable `plan.md` as an unresolved plan gap.
 - If implementation reveals an unresolved requirement / design / plan gap, return to planning / spec authoring or clarification instead of inventing an execution assumption.
@@ -64,7 +64,7 @@ This skill is a fixed kernel. It must not carry state-specific generated Runbook
 - Mutate dependencies command-first with `deps add`, `deps remove`, and `deps check`: `./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>`, `./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>`, and `./spec-dock/scripts/spec-dock deps check <target>`.
 - Evidence commands include `validate` and `sync`: `./spec-dock/scripts/spec-dock validate` and `./spec-dock/scripts/spec-dock sync`.
 - Use `--no-github` only for explicit cache/local verification without GitHub calls.
-- Step completion still requires required verification, a fresh step reviewer pass, the Step Commit Gate, and a post-commit clean check as defined by `workflow_issue.md`.
+- Step / milestone completion still requires required verification, a fresh reviewer pass, commit候補 or approved-no-op evidence, and a post-commit clean check as defined by `workflow_issue.md`.
 
 ## Kernel Boundary
 
