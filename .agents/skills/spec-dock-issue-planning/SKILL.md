@@ -24,13 +24,26 @@ This skill is a fixed kernel. It must not carry state-specific generated Runbook
 - Primary lifecycle / execution workflow: `spec-dock/docs/workflow_issue.md`.
 - Spec authoring workflow: `spec-dock/docs/workflow_spec_authoring.md`.
 - Clarification workflow for unresolved ambiguity, interview evidence, and source-grounded questions: `spec-dock/docs/workflow_clarification.md`.
+- Requirement phase playbook: `spec-dock/docs/phase_requirement.md`.
+- Design phase playbook: `spec-dock/docs/phase_design.md`.
 - Issue plan phase playbook: `spec-dock/docs/phase_plan_issue.md`.
 - Issue plan field semantics and executable step schema: `spec-dock/docs/authoring/issue-plan.md`.
 - Decision routing examples and detailed placement guidance: `spec-dock/docs/authoring/decision-routing.md`.
 
+## Issue grade 補足
+
+- Issue の `requirement.md`、`design.md`、`plan.md` を作成または更新する前に、`spec-dock/docs/workflow_spec_authoring.md` の Issue grade matrix を読む。
+- `authorized_profile` は runtime template、guidance、obligation authority として扱う。manual escalation は reviewer / specialist / evidence gate を追加で強める判断であり、authority override ではない。
+- Lite は automatic default ではない。低リスク根拠が明示される場合だけ Lite を使う。grade、scope、impact、reviewer obligation が unknown / ambiguous の場合は Standard 以上へ倒す。
+- Standard では specialist 使用を推奨する。使わない場合は、確認した source、skip reason、残リスクを `report.md` に残す。
+- Strict / Critical では specialist 使用を原則必須にする。unavailable、denied、host constraint で使えない場合は、継続前に manual fallback evidence を `report.md` に残す。Critical の fallback は明示承認がない限り通常 blocked のまま扱う。
+- 後続作業の stable term として、G2 `draft routing`、G3 `report evidence gate`、G4 `integrated smoke matrix` を維持する。この skill は用語を固定するだけで、routing、report validation、smoke coverage は実装しない。
+
 ## Stop Conditions And Authority
 
 - Stop if active context, artifact freshness, reviewer pass evidence, or delegated draft adoption evidence is missing, stale, failed, unavailable, denied, waived, provisional, or contradictory.
+- Stop if `authorized_profile` is missing, ambiguous, or inconsistent with the requested obligation.
+- Stop if the Issue grade is missing or ambiguous, unless the plan explicitly escalates to Standard or higher and records the reason.
 - Stop if `requirement.md`, `design.md`, or `plan.md` is template-only, unresolved, or not reviewer-passed for the current phase.
 - Stop if planning reveals unresolved requirement / design / plan gaps; route back to `spec-dock/docs/workflow_clarification.md` or the relevant authoring phase.
 - Keep canonical `requirement.md` / `design.md` / `plan.md` / `report.md` main-orchestrator-owned. This skill does not grant delegated canonical write authority.

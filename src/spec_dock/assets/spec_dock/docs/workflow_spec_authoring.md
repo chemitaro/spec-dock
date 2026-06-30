@@ -25,6 +25,21 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - scope / non-scope に影響する未確認事項が残る場合は `blocked` または `incomplete` として扱い、次 phase へ進めない。
 - authoring 中に Decision-only finding を見つけた場合は、execution handoff 前に [authoring/decision-routing.md](authoring/decision-routing.md) で placement を確認する。Issue-local なら対象 Issue に閉じ、cross-issue なら Epic、cross-epic / investment なら Initiative、long-lived architecture decision なら ADR 候補、判断材料不足なら clarification へ戻す。routing 判断は canonical artifact または `report.md` の evidence に残し、template や skill に長い例を複製しない。
 
+## Issue grade 別 authoring matrix
+
+Issue の `authorized_profile` は runtime template、guidance、authoring obligation の authority です。manual escalation は reviewer / specialist / evidence gate を強める運用判断であり、`authorized_profile` を上書きする authority ではありません。manual escalation を使った場合は、理由、追加した gate、`authorized_profile` との差分、戻し条件を `report.md` の `Spec Authoring Gate` に残します。
+
+Lite は automatic default ではありません。Issue が小さく、低リスクで、既存 contract / scaffold / runtime / user-facing behavior への影響が限定されることを明示できる場合だけ Lite として扱えます。grade が unknown / ambiguous、または影響範囲や reviewer obligation を判断できない場合は Standard 以上に倒し、Lite として進めてはなりません。
+
+| Grade | Requirement | Design | Plan | Review / report evidence |
+|---|---|---|---|---|
+| Lite | 目的、scope / non-scope、AC / EC、低リスク根拠を短く固定する。Lite 採用理由を明示する。 | 既存 pattern の再利用と変更境界を示す。新規 architecture 判断、runtime contract、scaffold API 変更が出たら Standard 以上へ上げる。 | docs-only / inspect-only なら軽量 step でよい。途中 commit 候補や三者 gate を必須化しないが、完了条件と代替 evidence を置く。 | fresh `spec-reviewer` pass と `report.md` の Lite 採用理由、未使用 specialist 理由、検証結果を残す。 |
+| Standard | AC / EC、scope、上位 trace、未確定事項を固定し、曖昧さが残る場合は clarification へ戻す。 | `system-architect` などの specialist 使用を推奨する。使わない場合は、既存 pattern で十分な理由、リスク、skip reason を `report.md` に残す。 | `implementation-planner` などの specialist 使用を推奨する。使わない場合は、manual authoring の根拠と skip reason を `report.md` に残す。 | fresh `spec-reviewer` pass、specialist 使用 / 未使用理由、manual evidence、promotion evidence を残す。 |
+| Strict | requirement は上位 requirement / ADR / workflow contract との trace と non-scope を明確にし、曖昧な判断を plan へ送らない。 | specialist は原則必須。unavailable / denied / host conflict の場合だけ manual fallback を使い、利用不可理由、代替調査、採用判断を `report.md` に残す。 | specialist は原則必須。plan は closure index、step-local evidence、review / QA / docs gate、commit 候補を持つ。fallback 時は manual planning evidence を残す。 | fresh `spec-reviewer` pass に加え、specialist evidence または manual fallback evidence、failure-mode record、promotion evidence を残す。 |
+| Critical | requirement は安全性、不可逆性、外部契約、運用影響、rollback / risk acceptance を明示する。 | specialist 必須。複数観点 review、ADR / escalation、risk acceptance が必要な場合は design で固定する。利用不可時は blocked を基本とし、manual fallback は明示承認と強い evidence がある場合だけ使う。 | specialist 必須。integration / rollback / observability / smoke / manual gate を plan に固定し、実行前に final quality gate を明示する。 | fresh `spec-reviewer` pass、必要な追加 reviewer、manual fallback approval、risk acceptance、report evidence gate を残す。 |
+
+Downstream stable wording として、G2 は `draft routing` を `authorized_profile` に従う runtime-owned discussion draft selection と呼び、G3 は `report evidence gate` を grade / specialist / fallback / promotion evidence の `report.md` 記録確認と呼び、G4 は `integrated smoke matrix` を Lite / Standard / Strict / Critical の各 grade が draft routing、report evidence gate、execution handoff の整合を保つことを確認する matrix と呼びます。G1 の guidance はこれらの用語を提供するだけで、routing enforcement、report validation、smoke 実装は行いません。
+
 ## 権限境界（Authority boundary / Promotion Record）
 
 Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator の single-writer authority です。Sub-agent は canonical docs を直接編集しません。Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `discussions/` 直下に置く flat Markdown draft / analysis / discussion-local report です。

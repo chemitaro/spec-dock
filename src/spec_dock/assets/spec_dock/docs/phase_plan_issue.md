@@ -51,6 +51,16 @@ Operational entrypoint / first-read spine は `spec-dock-issue-planning` skill �
 - templates は最小 scaffold であり、Issue 固有の実行順・依存・検証に不要な placeholder は削除してよい
 - cadence、approval policy、reviewer gate mapping、completion policy の正本は `workflow_issue.md` に残し、この文書では plan 本文への埋め込み方だけを扱う
 
+## Issue grade 補足（issue grade guidance）
+
+Issue plan は [workflow_spec_authoring.md](workflow_spec_authoring.md) の `Issue grade 別 authoring matrix` と `authorized_profile` を入口にします。manual escalation は plan の reviewer / QA / evidence gate を強める補助判断であり、`authorized_profile` を置き換えません。
+
+- Lite は default ではない。Lite plan は低リスク根拠、軽量完了条件、docs-only / inspect-only の代替 evidence を持つ場合だけ使う。
+- unknown / ambiguous な Issue、または実装影響、検証 obligation、reviewer gate が判断できない Issue は Standard 以上として計画する。
+- Standard では `implementation-planner` などの planning specialist 使用を推奨する。使わない場合は、manual authoring の根拠、skip reason、確認した source、残リスクを `report.md` に残す。
+- Strict / Critical では planning specialist を原則必須にする。specialist が unavailable / denied / host conflict の場合は、manual fallback evidence として利用不可理由、代替 planning evidence、step / closure / reviewer gate の妥当性を `report.md` に残す。
+- `draft routing`、`report evidence gate`、`integrated smoke matrix` は後続 G2 / G3 / G4 の stable term として扱い、この文書では plan 上の参照語に留める。runtime routing、report validation、smoke matrix 実装はここで定義しない。
+
 ## スキーマ routing の方針（schema routing）
 
 - `authoring/issue-plan.md` が所有するもの:
