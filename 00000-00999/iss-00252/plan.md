@@ -341,5 +341,6 @@ ADR と Epic design の grade matrix を、agent-facing guidance と docs に落
 
 - この Issue では個別 PR を作成しない。
 - M99 は `iss-00253` に渡せる local closure checkpoint とする。
+- PR Delivery Gate / Merge Preparation Gate はこの Issue では実行せず、G4 完了後の Epic 最終品質ゲートに集約する。
 - M99 通過後、grade-aware guidance、docs / tests、report evidence を commit し、その HEAD から `iss-00253` の branch を開始する。
 - G2 / G3 が並列可能に見える場合でも、この Epic PR では抜け漏れ・重複を避けるため default baton order を `iss-00253 -> iss-00254` とする。

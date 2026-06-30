@@ -1250,10 +1250,12 @@ R0 + G1〜G4 corrective tranche は、個別 Issue ごとに PR を作らず、E
   - 個別 Issue の M99 は PR 作成 gate ではなく、次 Issue へ渡せる local closure checkpoint とする。
 - Evidence boundary:
   - 各 Issue は focused validation、issue `report.md`、reviewable commit を残す。
+  - `issue finish` は GitHub Issue lifecycle / active state closure の証跡であり、PR delivery / merge-preparation の代替として扱わない。
   - Epic の最終 PR 作成可否は、Issue 単位の closure ではなく、Epic requirement / design trace、R0〜G4 の統合テスト、Spec review、code review、QA review の合成結果で判断する。
 - Review boundary:
   - Issue-level review は次 Issue へ安全に渡すための checkpoint であり、GitHub PR review の代替ではない。
   - Epic-level final review は累積 diff 全体を対象にし、E-RQ-006 / E-AC-006 / E-RQ-022 / E-AC-022 の behavior coverage と regression coverage を確認する。
+  - Epic-level final gate が pass するまで、累積 branch を PR として提出しない。
 
 The Issue-local draft requirement / draft design artifacts are discussion evidence only. Canonical Issue `requirement.md` / `design.md` / `plan.md` remain owned by each downstream Issue planning workflow.
 

@@ -538,6 +538,7 @@ iss-00247 Profile Markdown templates
   - 最終 PR head は `iss-00255` 完了後の累積 branch とし、R0〜G4 の全 commit を含める。
 - Issue handoff gate:
   - 各 Issue の M99 は「PR 作成」ではなく「次 Issue へ渡せる local closure checkpoint」とする。
+  - 各 Issue の M99 では PR Delivery Gate / Merge Preparation Gate を実行しない。これらは G4 完了後の Epic 最終品質ゲートに集約する。
   - checkpoint では focused tests、`./spec-dock/scripts/spec-dock validate`、必要な docs / template parity、issue `report.md` の証跡、未実施理由を記録する。
   - 次 Issue の実装を始める前に、直前 Issue の未完了差分・失敗テスト・未記録の検証結果を残さない。
 - 最終 PR gate:
@@ -661,6 +662,7 @@ G4 完了後、Epic #224 corrective tranche の最終 PR を作成する前に�
   - QA で見つかった Epic requirement / design 不一致は、修正または明示 defer する。
 - PR creation:
   - 上記 gate を pass した後、累積 branch から Epic #224 corrective tranche の単一 PR を作成する。
+  - PR 本文には Epic 要件 / 設計 trace、R0〜G4 の Issue closure、spec review、code review、QA review、local tests、未実施理由、残リスクを記録する。
   - PR 作成後の GitHub Actions / Codex review は、ローカル検証後の最終確認として扱う。基礎的な lint / test failure を初めて発見する場所にしない。
 
 ## ロールアウト / ドキュメント影響
@@ -714,6 +716,7 @@ G4 完了後、Epic #224 corrective tranche の最終 PR を作成する前に�
 
 - E-AC-001〜022 に evidence がある。
 - 7 initial implementation Issue と、追加 corrective tranche `R0 + G1〜G4` が完了または明示的に superseded / deferred されている。
+- `iss-00251`〜`iss-00255` の個別 PR は作成せず、Epic 最終品質ゲート通過後に Epic #224 corrective tranche の単一 PR が作成されている。
 - Required ADR が Epic-scope accepted ADR として作成 / 反映され、implementation Issue より先に reviewer-gated baseline になっている。
 - New Issue / substantive Issue の strict-legacy compatibility path が dogfooding で成功している。
 - Existing Issue の strict-legacy path が壊れていない。
