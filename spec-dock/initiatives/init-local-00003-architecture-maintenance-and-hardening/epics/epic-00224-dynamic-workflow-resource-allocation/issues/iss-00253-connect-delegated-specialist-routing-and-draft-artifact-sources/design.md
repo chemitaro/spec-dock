@@ -3,7 +3,7 @@
 ID: "iss-00253"
 タイトル: "Connect Delegated Specialist Routing And Draft Artifact Sources"
 Issue Grade: "strict"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-01"
 関連Requirement: ["requirement.md"]
@@ -20,11 +20,12 @@ Issue Grade: "strict"
 
 ## 2. 設計要約
 
-- `[N]` Issue `draft-design` / `draft-plan` は profile-aware branch を通る。
-- `[N]` Assurance verification は write 前に完了する。
-- `[N]` profile template validation は `assurance compose` と同等の filesystem guard を再利用する。
+- `[N]` Issue `draft-design` / `draft-plan` だけを profile-aware branch に通す。
+- `[N]` `.assurance.json` は `AssuranceStore.verify_contract()` で discussion filename allocation 前に検証する。
+- `[N]` profile template は `ArtifactStore.load_profile_artifact_template()` を使い、`assurance compose` と同じ filesystem guard を再利用する。
 - `[N]` profile-sourced draft は legacy thin normalization を通さない。
-- `[N]` draft artifacts は discussion evidence であり canonical docs ではない。
+- `[N]` `draft-requirement` と Initiative / Epic `draft-design` / `draft-plan` は既存 routing を維持する。
+- `[N]` draft artifacts は discussion evidence であり canonical docs、reviewer pass、phase completion、implementation readiness を自己主張しない。
 
 ## 3. コンポーネント
 
@@ -41,10 +42,19 @@ Issue Grade: "strict"
 ```text
 new doc draft-design/draft-plan --issue <id>
   -> target issue lookup
-  -> assurance contract verify
-  -> authorized_profile resolve
-  -> profile template full markdown load
-  -> provenance / draft frontmatter normalize without authority claim
+  -> if scope.kind == issue and doc_type in {draft-design, draft-plan}
+       -> AssuranceStore.resolve_issue_target(scope.id)
+       -> AssuranceStore.verify_contract(target)
+       -> fail if status != valid
+       -> profile = contract.classification.authorized_profile.value
+       -> artifact = design | plan
+       -> ArtifactStore.load_profile_artifact_template(artifact, profile)
+       -> use profile template body as render source
+     else
+       -> existing scope canonical template route
+  -> discussion filename allocation
+  -> render replacements
+  -> skip legacy thin normalization for profile-sourced drafts
   -> discussion file write
 ```
 
@@ -55,6 +65,9 @@ new doc draft-design/draft-plan --issue <id>
 - stale source binding: fail without write。
 - unsupported profile / missing template / symlink escape / empty template: fail without write。
 - file allocation failure: no canonical docs are modified。
+- fail-closed は discussion filename allocation 前に発生させ、失敗時に new discussion file を残さない。
+- missing / invalid / stale assurance で Standard fallback を作らない。
+- `.assurance.json` を silent repair しない。
 
 ## 6. 要件追跡
 
@@ -67,8 +80,27 @@ new doc draft-design/draft-plan --issue <id>
 | AC-006 | provenance / authority guard |
 | AC-007 | compose regression tests |
 
-## 7. 非対象
+## 7. Runtime Interface Contract
+
+| Input | Expected result |
+|---|---|
+| Issue `new doc draft-design` with valid Standard / Strict / Critical contract | `templates/issue-profiles/<authorized_profile>/design.md` に由来する Issue discussion draft を1件作成する |
+| Issue `new doc draft-plan` with valid Standard / Strict / Critical contract | `templates/issue-profiles/<authorized_profile>/plan.md` に由来する Issue discussion draft を1件作成する |
+| Issue `new doc draft-design` / `draft-plan` without valid contract | non-zero failure; no new discussion file |
+| Issue `draft-requirement` | existing `templates/issue/requirement.md` route |
+| Initiative / Epic `draft-design` / `draft-plan` | existing `templates/<scope>/design.md` / `plan.md` route |
+
+## 8. 実装境界
+
+- command layer は `new doc` の引数 contract を変更しない。
+- application layer は scope / doc_type によって profile-aware route と legacy route を分ける。
+- infra layer は `.assurance.json` と profile template の filesystem validation を担う。
+- domain layer へ filesystem store を持ち込まない。
+- `new doc` で canonical `design.md` / `plan.md` / `.assurance.json` を更新しない。
+
+## 9. 非対象
 
 - G2 は profile template 本文を再設計しない。
 - G2 は specialist role skill を新設しない。
 - G2 は readiness preflight の広範な修正を行わない。
+- G2 は G3 の Evidence Adoption Ledger enforcement や G4 smoke matrix 実装を行わない。

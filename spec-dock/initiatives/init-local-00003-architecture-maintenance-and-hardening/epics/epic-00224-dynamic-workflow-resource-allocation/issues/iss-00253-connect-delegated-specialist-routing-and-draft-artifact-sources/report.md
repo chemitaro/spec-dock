@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | implementation | system-architect / implementation-planner / orchestrator | `new doc` へ `AssuranceStore` / `ArtifactStore` をどう接続するか | Ports へ store を追加する; bootstrap closure から `AssuranceStore` / `ArtifactStore` を渡す; `create_node.py` 内で直接生成する | G2 implementation では bootstrap が生成済みの stores を `create_discussion_doc` へ渡し、application layer で profile-aware branch を分ける方針にする。domain へ filesystem store は持ち込まない。 | 既存 `compose_assurance` は bootstrap で store を注入している。`new doc` command surface は変更しない。 | applied | delegated design draft; delegated plan draft; `create_node.py`; `bootstrap.py`; `artifact_store.py`; `assurance_store.py` inspection | canonical design / plan に反映 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -61,9 +61,10 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 - Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
 - Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
 
-| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
-|---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| ID | adoption_status | source | source_role | claim | target_artifact | target_section | rationale | evidence_strength | evidence_path | adopter | reviewer | blocking | next_action |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| EAL-001 | adopted | sub-agent | system-architect | Issue design/plan draft routing、pre-allocation fail-closed、profile template guard reuse、legacy normalization bypass、preservation boundary | `design.md` / `plan.md` / `report.md` | design sections 2〜9; plan S90 scope; report D-001 / Delegated Draft Evidence | Draft 内容を source inspection と既存 runtime/test surface に照合し、G2 scope 内の設計判断として採用できるため。 | strong: source-grounded draft + orchestrator inspection | `discussions/20260630t171026z-draft-design-g2-draft-artifact-source-routing-design.md`; `create_node.py`; `artifact_store.py`; `assurance_store.py` | orchestrator | pending fresh spec-review | no | fresh spec-review |
+| EAL-002 | adopted | sub-agent | implementation-planner | S00〜S99 step contract、Red/Green tests、fail-closed/no-write確認、preservation tests、local handoff gate | `plan.md` / `report.md` | plan sections 2.1 / 6.1 / 7; report Delegated Draft Evidence | Draft 内容が active requirement AC-001〜AC-007 と Epic branch baton policy に対応し、strict issue execution に必要な step-local evidence destination を持つため。 | strong: source-grounded draft + orchestrator inspection | `discussions/20260630t171038z-disc-implementation-plan-draft-for-profile-aware-routing.md`; `tests/cli_runtime/test_new.py`; `tests/cli_runtime/test_assurance_compose.py` | orchestrator | pending fresh spec-review | no | fresh spec-review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +72,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | G2 の主目的は Issue `draft-design` / `draft-plan` を `authorized_profile` 対応 profile template source に接続し、delegated specialist が canonical と同構造の draft evidence を作れるようにすること。 | fail-closed/no-write、preservation、compose regression、individual PR なしの local handoff を副次要件として plan に固定した。 | low | pending fresh spec-review |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +80,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | active requirement、Epic #224 requirement/design/plan、G1 completion commit `9d172bff` | blocking question なし | requirement を approved に昇格 | pending fresh spec-review | no | design / plan review |
+| design | system-architect draft、`create_node.py`、`artifact_store.py`、`assurance_store.py`、profile templates、existing tests | blocking question なし | delegated draft を採用し、canonical design に反映 | pending fresh spec-review | no | plan review |
+| plan | implementation-planner draft、existing CLI tests、Epic branch baton policy | blocking question なし | step contract / closure index / final local handoff を canonical plan に反映 | pending fresh spec-review | no | fresh spec-review |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +110,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | iss-00253 | `discussions/20260630t171026z-draft-design-g2-draft-artifact-source-routing-design.md` | active issue docs、Epic docs、runtime code、profile templates、tests | `design.md`, `plan.md`, `report.md` | adopted | `design.md`, `plan.md`, `report.md` | passed | design decisions integrated | none | none | pending fresh spec-review | promote after spec-review pass |
+| implementation-planner | iss-00253 | `discussions/20260630t171038z-disc-implementation-plan-draft-for-profile-aware-routing.md` | active issue docs、Epic docs、runtime code、profile templates、tests | `plan.md`, `report.md` | adopted | `plan.md`, `report.md` | passed | step contract integrated | none | none | pending fresh spec-review | promote after spec-review pass |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
