@@ -55,6 +55,11 @@ def classify_requirement_text(text: str) -> WorkflowArtifactReadiness:
         "1. ...",
         "2. ...",
         "draft | approved",
+        "SC-XXX",
+        "BH-XXX",
+        "AC-XXX",
+        "B-CAND-XXX",
+        "TERM-XXX",
     )
     if any(marker in stripped for marker in placeholder_markers):
         return "scaffold"

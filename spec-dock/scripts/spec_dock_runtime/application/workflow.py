@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import TYPE_CHECKING, Any, Protocol
 
 from spec_dock_runtime.application.contracts import (
@@ -253,7 +254,7 @@ def _classify_plan_text(plan_text: str | None) -> str:
     )
     if not has_executable_marker and any(marker in lower for marker in scaffold_markers):
         return "scaffold"
-    if has_executable_marker and _has_placeholder_table_rows(stripped):
+    if has_executable_marker and _has_placeholder_entries(stripped):
         return "scaffold"
     if has_executable_marker:
         return "executable"
@@ -261,20 +262,12 @@ def _classify_plan_text(plan_text: str | None) -> str:
 
 
 def _has_placeholder_table_rows(text: str) -> bool:
-    placeholder_cells = {
-        "...",
-        "ac-...",
-        "b-...",
-        "clos-...",
-        "des-...",
-        "evd-...",
-    }
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped.startswith("|") or stripped.count("|") < 3:
             continue
         cells = [cell.strip().strip("`").lower() for cell in stripped.strip("|").split("|")]
-        if sum(1 for cell in cells if cell in placeholder_cells) >= 2:
+        if any(_is_generated_placeholder_token(cell) for cell in cells):
             return True
     return False
 
@@ -328,7 +321,23 @@ def _has_placeholder_entries(text: str) -> bool:
 
 
 def _has_placeholder_list_items(text: str) -> bool:
-    return any(line.strip() in {"- ...", "1. ...", "2. ..."} for line in text.splitlines())
+    for line in text.splitlines():
+        item_match = re.match(r"^\s*(?:[-*]|\d+[.)])\s+(.+?)\s*$", line)
+        if item_match is None:
+            continue
+        item_text = item_match.group(1).strip().strip("`").lower()
+        if _is_generated_placeholder_token(item_text) or item_text.endswith(": ...") or item_text.endswith("： ..."):
+            return True
+    return False
+
+
+def _is_generated_placeholder_token(text: str) -> bool:
+    return (
+        text == "..."
+        or "#..." in text
+        or re.fullmatch(r"[a-z][a-z0-9_-]*-(?:\.\.\.|xxx)", text) is not None
+        or re.fullmatch(r"[a-z][a-z0-9_]*(?:\.\.\.|xxx)", text) is not None
+    )
 
 
 def _frontmatter_has_any(text: str, markers: tuple[str, ...]) -> bool:
