@@ -20,25 +20,32 @@ ID: "epic-00224"
 - 初期 rollout では automatic Lite default を有効化しない。Lite は shadow / explicit opt-in / evidence-gated に限定し、future automatic Lite default は別 accepted ADR、policy version bump、rollout Issue、telemetry gate が揃った場合だけ扱う。
 - 実装開始前の workflow authority decision は、当初 Epic-scope accepted ADR 5 件として作成済みだった。その後の dogfooding修正により、script-local review instruction と explicit review completion を含む current ADR baseline へ変更済み。
 - dogfooding修正により、issue execution authority は `20260629t003131z-adr` の plan-centric preflight、Assurance Contract path は `20260629t003132z-adr` の `.assurance.json` へ変更済み。
+- `iss-00247 / #247` で profile Markdown templates は導入済みだが、manual test / follow-up analysis により、問題は `new doc draft-design` / `draft-plan` の source routing だけではなく、artifact readiness preflight、grade-aware Issue authoring guidance、delegated specialist routing、fresh review / report evidence gate、grade-aware smoke tests まで広がると整理した。
+- そのため、以前の `I08` 単独案は採用せず、追加 corrective tranche を `R0 + G1〜G4` として計画する。既存 I01〜I07 と完了済み corrective work はそのまま保持する。
+- `iss-00250` はこの corrective tranche の一部を検討するために一時的に作成したデータ置き場であり、正式な implementation Issue としては採用しない。正式 Issue ID は、Epic plan gate 通過後に executable Issue slice として別途作成し、R0 / G1 / G2 / G3 / G4 に対応付ける。
 
 ## この計画で閉じる E-RQ / E-AC
 
 | Requirement / AC | 閉じ方 | 主な完了証跡 |
 |---|---|---|
 | E-RQ-001〜005 | Assurance core、workflow state、fixed Skill kernel、plan-centric preflight guidance | CLI contract tests、guidance/runbook projection evidence、clean Git evidence |
-| E-RQ-006〜008, E-RQ-015〜021 | Planning composer、Step Assurance、agent context routing | artifact golden tests、step matrix、clean-room review evidence、context packet golden tests、return contract tests |
+| E-RQ-006 | I03 の initial planning composer と R0 の fail-closed artifact readiness preflight | profile template golden tests、readiness classifier regression、workflow/guidance fail-closed tests |
+| E-RQ-007〜008, E-RQ-015〜021 | Step Assurance、agent context routing | step matrix、clean-room review evidence、context packet golden tests、return contract tests |
 | E-RQ-009 | review trigger instruction compiler | 変更済み: trusted base-SHA policy は script-local instruction source へ置換。trigger JSON、local instruction tests、runtime validation、I07 doctor defer |
 | E-RQ-010〜011 | blocker-centric repair / re-review / stagnation | finding matrix、repair loop tests、merge predicate |
 | E-RQ-012〜014 | legacy rollout、metrics、provider/mirror、Auto-Lite readiness | migration fixtures、benchmark、auto-lite-readiness report、validate / sync |
+| E-RQ-022 | G1〜G3 の grade-aware authoring guidance、delegated specialist / draft routing、fresh review / evidence gate | guidance tests、`new doc` CLI tests、report evidence tests、provider / dogfooding docs inspection |
 | E-AC-001〜003 | I01〜I02 | state / classification tests |
 | E-AC-004〜005 | I02 | Runbook candidate/authorized separation、fixed Skill / clean Git tests |
-| E-AC-006, E-AC-008 | I03 | profile-specific planning、stale source binding / invalidation tests |
+| E-AC-006 | I03 + R0 | profile-specific planning、fail-closed readiness、placeholder / executable plan classifier tests |
+| E-AC-008 | I03 | stale source binding / invalidation tests |
 | E-AC-007 | I04 | step routing matrix tests |
 | E-AC-009〜010 | I05 / iss-00244 corrective scope | 変更済み: script-local trigger integration tests and explicit review completion observation tests |
 | E-AC-011〜012 | I06 | PR blocker policy tests |
 | E-AC-013 | I07 | automation-stalled rollout / telemetry tests |
 | E-AC-014〜016 | I07 | legacy / rollout / auto-lite-readiness / efficiency report |
 | E-AC-017〜021 | I04 | context routing / reviewer independence / reuse / invalidation / return contract tests |
+| E-AC-022 | G1〜G4 | grade-aware Issue authoring workflow、profile-aware draft routing、delegated specialist evidence、fresh review gate、smoke tests |
 
 ## 課題分割方針（Issue slicing policy）
 
@@ -53,7 +60,8 @@ ID: "epic-00224"
   - Shared JSON schema / domain model は最初の vertical capability に同梱する。
   - Real GitHub review evaluation は network / external latency を含むため、final rollout Issue の acceptance に置く。
   - Codex Action migration は本 Epic 外の follow-up とする。
-  - ADR 作成 / 承認は execution capability ではないため、Issue slice へ切り出さず Epic-scope `G0` gate として扱う。
+  - ADR 作成 / 承認は execution capability ではないため、Issue slice へ切り出さず Epic-scope `IC0` gate として扱う。
+  - Cross-issue authoring source authority の判断は Epic requirement / design / plan に置き、Issue slice は runtime / tests / docs の実装だけを担う。
 
 ## 課題一覧（Issue list / 順序 / tranche 付き）
 
@@ -77,7 +85,7 @@ ID: "epic-00224"
 - contributes:
   - E-RQ-012 strict-legacy detection prerequisite。正式 close は rollout / compatibility owner の I07。
 - 依存:
-  - G0 Epic Decision Baseline。
+  - IC0 Epic Decision Baseline。
   - `epic-00158` の context-surface 境界。
 - 非対象:
   - Skill kernel 切替。
@@ -126,8 +134,11 @@ ID: "epic-00224"
 - Assurance:
   - strict / deep
 - closes:
-  - E-RQ-006
-  - E-AC-006, E-AC-008
+  - E-RQ-006 の initial artifact composition / profile template materialization subset
+  - E-AC-006 の profile-specific planning subset
+  - E-AC-008
+- amended closure:
+  - fail-closed readiness preflight、shared placeholder detector、executable plan predicate、stale reviewer / missing adoption evidence block は R0 で閉じる。
 - 依存:
   - I01
   - I02
@@ -211,17 +222,17 @@ ID: "epic-00224"
   - Historical objective: Project-owned review policy を PR base SHA から取得し、head SHA / policy hash へ bind した deterministic multiline `@codex review` を安全に投稿する。
   - Current objective: script-local review instruction を読み、head SHA / instruction hash へ bind した deterministic multiline `@codex review` を安全に投稿する。
 - 成果物:
-  - `.github/codex/review-policy.md` bootstrap-only asset。
-  - Fixed Markdown policy path / base SHA binding。
-  - Policy runtime validator:
+  - script-local `github-pr-observation` review instruction asset。
+  - instruction path / instruction SHA-256 / reviewed head SHA binding。
+  - instruction runtime validator:
     - non-empty UTF-8。
-    - 32 KiB max size。
-    - machine-readable limitation fallback。
-  - Base SHA fixed-path fetch。
+    - max size。
+    - invalid / unreadable / oversized / non-UTF-8 の no PR comment + human gate / fail-closed。
+    - missing instruction の plain deterministic fallback。
   - Trigger compiler / evidence。
   - Arbitrary body 禁止。
   - Multiline trigger observation compatibility。
-  - Dedicated doctor capability は I07 rollout / operationalization へ defer。
+  - Dedicated script-local instruction doctor capability は I07 rollout / operationalization へ defer。
 - Assurance:
   - strict / complex
 - closes:
@@ -293,6 +304,143 @@ ID: "epic-00224"
   - Existing Issue 全量 backfill。
   - Automatic Lite default の有効化。
 
+### R0 — Enforce Fail-Closed Issue Artifact Readiness Preflight（planned corrective Issue / formal ID 未作成）
+
+- provisional slug:
+  - `enforce-fail-closed-issue-artifact-readiness-preflight`
+- 位置づけ:
+  - `iss-00247 / #247` 後の manual test で確認した F-001〜F-004 を直接閉じる最優先 corrective slice。
+  - `assurance compose` 成功と execution readiness を分離し、未完成 artifact が `ready` になる false positive を止める。
+- 目的:
+  - `workflow status` / `guidance issue-execution` が requirement / design / plan / report evidence を fail-closed に判定し、placeholder / heading-only / stale evidence を execution-ready にしない。
+- 成果物:
+  - shared placeholder detector。
+  - requirement の `REQ-XXX` / `CON-...` / placeholder sentinel 検出。
+  - plan の executable marker と quality marker の分離。
+  - design の scaffold marker 判定 narrow 化。
+  - stale reviewer / missing adoption evidence の readiness block。
+  - `tests/unit/domain/test_workflow_state.py` と `tests/cli_runtime/test_workflow.py` の F-001〜F-004 regression。
+- Assurance:
+  - strict / normal
+  - execution readiness に関わるため、runtime classification が Standard 相当でも manual escalation として strict review gate を使う。
+- closes:
+  - E-RQ-006
+  - E-AC-006
+- 依存:
+  - `iss-00247 / #247`
+  - existing workflow state / guidance contract
+- 非対象:
+  - Issue planning guidance の全文再構成。
+  - delegated specialist role routing。
+  - profile template 本文の全面改訂。
+
+### G1 — Compile Grade-Aware Issue Planning Guidance（planned corrective Issue / formal ID 未作成）
+
+- provisional slug:
+  - `compile-grade-aware-issue-planning-guidance`
+- 位置づけ:
+  - `20260630t111316z-adr` の grade-aware Issue authoring rules を runtime / docs / guidance へ反映する slice。
+- 目的:
+  - Issue planning guidance が `lite / standard / strict / critical` ごとに requirement / design / plan / review / report evidence の作業ルールを示し、agent が旧 step-centric / one-size-fits-all planning に戻らないようにする。
+- 成果物:
+  - `guidance issue-planning` または関連 docs の grade-aware authoring matrix。
+  - `authorized_profile` と manual escalation の分離説明。
+  - Lite automatic default 禁止、unknown / ambiguous は Standard 以上の guidance。
+  - `standard` の specialist 推奨 / 未使用理由、`strict` / `critical` の原則必須 / fallback evidence。
+  - provider docs と dogfooding docs parity。
+- Assurance:
+  - strict / normal
+- closes:
+  - E-RQ-022 の grade-aware planning guidance subset
+  - E-AC-022 の guidance subset
+- 依存:
+  - R0
+  - `20260630t111316z-adr`
+- 非対象:
+  - `new doc draft-design` / `draft-plan` routing 実装。
+  - smoke test matrix の全量。
+
+### G2 — Connect Delegated Specialist Role Routing And Draft Artifact Sources（planned corrective Issue / formal ID 未作成）
+
+- provisional slug:
+  - `connect-delegated-specialist-routing-and-draft-artifact-sources`
+- 位置づけ:
+  - grade-aware authoring guidance を、`system-architect` / `implementation-planner` 相当の delegated specialist routing と discussion draft generation に接続する slice。
+- 目的:
+  - classified Issue の `draft-design` / `draft-plan` が `authorized_profile` に対応する profile template から生成され、delegated specialist draft が canonical docs ではなく evidence として扱われることを runtime / docs / tests で固定する。
+- 成果物:
+  - Issue `new doc draft-design` / `draft-plan` の profile-aware routing。
+  - `.assurance.json` missing / invalid / stale 時の no-write fail-closed。
+  - `draft-requirement` と Initiative / Epic draft の既存挙動維持。
+  - delegated specialist draft provenance / self-claim 禁止 guidance。
+  - `tests/cli_runtime/test_new.py` と profile template validation regression。
+- Assurance:
+  - strict / normal
+- closes:
+  - E-RQ-022 の delegated draft / profile-aware draft routing subset
+  - E-AC-022 の draft routing subset
+- 依存:
+  - G1
+  - profile Markdown templates
+- 非対象:
+  - `system-architect` / `implementation-planner` role skill の新規 shipped asset 化。
+  - canonical design / plan の直接 rewrite。
+
+### G3 — Add Grade-Aware Spec Review And Evidence Gates（planned corrective Issue / formal ID 未作成）
+
+- provisional slug:
+  - `add-grade-aware-spec-review-and-evidence-gates`
+- 位置づけ:
+  - grade-aware authoring guidance を phase promotion / issue readiness の証跡 gate へ接続する slice。
+- 目的:
+  - Fresh `spec-reviewer`、Evidence Adoption Ledger、delegated specialist adoption、report evidence が grade に応じて揃わない限り、canonical phase promotion / issue readiness を主張できないようにする。
+- 成果物:
+  - grade 別 report evidence / Spec Authoring Gate guidance。
+  - `standard` の specialist 未使用理由、`strict` / `critical` の unavailable / manual fallback evidence contract。
+  - delegated draft adoption ledger と stale draft rejection rule。
+  - stale reviewer evidence / missing adoption evidence の readiness block と R0 連携。
+  - relevant docs / tests。
+- Assurance:
+  - strict / normal
+- closes:
+  - E-RQ-022 の review / evidence gate subset
+  - E-AC-022 の review / evidence subset
+- 依存:
+  - G1
+  - R0
+- 非対象:
+  - code-review / PR observation policy の再設計。
+  - automatic Lite default 有効化。
+
+### G4 — Add Grade-Aware Issue Authoring Smoke Tests（planned corrective Issue / formal ID 未作成）
+
+- provisional slug:
+  - `add-grade-aware-issue-authoring-smoke-tests`
+- 位置づけ:
+  - R0 / G1 / G2 / G3 の統合動作を provider-side と dogfooding-side で確認する closure slice。
+- 目的:
+  - grade-aware Issue authoring workflow が、template materialization、readiness preflight、draft routing、delegated evidence、fresh review / report gate まで end-to-end で崩れていないことを固定する。
+- 成果物:
+  - Lite に途中 commit / full static analysis 必須が混入しない smoke。
+  - Standard / Strict / Critical に M99 static analysis / lint / tests / report / commit gate がある smoke。
+  - classified Standard / Strict / Critical Issue の `draft-design` / `draft-plan` profile template routing smoke。
+  - missing / invalid / stale `.assurance.json` の draft no-write smoke。
+  - readiness false-positive regression smoke。
+  - provider / dogfooding docs parity inspection。
+- Assurance:
+  - strict / normal
+- closes:
+  - E-AC-006 の readiness regression subset
+  - E-AC-022 の end-to-end smoke subset
+- 依存:
+  - R0
+  - G1
+  - G2
+  - G3
+- 非対象:
+  - live GitHub repository を必要とする external integration。
+  - production telemetry backend。
+
 ## Tranche / 依存順
 
 ```text
@@ -311,6 +459,20 @@ T4 I04 Step assurance / routing / context policy
 T5 I06 PR blocker closure
          |
 T6 I07 Rollout / telemetry / default switch
+
+Post-I07 corrective:
+
+iss-00247 Profile Markdown templates
+  |
+  +--> R0 Fail-closed artifact readiness preflight
+        |
+        +--> G1 Grade-aware issue planning guidance
+              |
+              +--> G2 Delegated specialist + draft artifact routing
+              |
+              +--> G3 Spec review + evidence gates
+                    |
+                    +--> G4 Grade-aware authoring smoke tests
 ```
 
 ## Dependency commands（登録済み）
@@ -342,11 +504,22 @@ T6 I07 Rollout / telemetry / default switch
 ./spec-dock/scripts/spec-dock deps add --from iss-00233 --to iss-00230
 ./spec-dock/scripts/spec-dock deps add --from iss-00233 --to iss-00231
 ./spec-dock/scripts/spec-dock deps add --from iss-00233 --to iss-00232
+
+# R0 / G1 / G2 / G3 / G4 formal Issue ID は未作成。作成後に次の依存を登録する:
+# ./spec-dock/scripts/spec-dock deps add --from <R0-issue-id> --to iss-00247
+# ./spec-dock/scripts/spec-dock deps add --from <G1-issue-id> --to <R0-issue-id>
+# ./spec-dock/scripts/spec-dock deps add --from <G2-issue-id> --to <G1-issue-id>
+# ./spec-dock/scripts/spec-dock deps add --from <G3-issue-id> --to <G1-issue-id>
+# ./spec-dock/scripts/spec-dock deps add --from <G3-issue-id> --to <R0-issue-id>
+# ./spec-dock/scripts/spec-dock deps add --from <G4-issue-id> --to <R0-issue-id>
+# ./spec-dock/scripts/spec-dock deps add --from <G4-issue-id> --to <G1-issue-id>
+# ./spec-dock/scripts/spec-dock deps add --from <G4-issue-id> --to <G2-issue-id>
+# ./spec-dock/scripts/spec-dock deps add --from <G4-issue-id> --to <G3-issue-id>
 ```
 
 ## 統合チェックポイント
 
-- G0 Epic Decision Baseline:
+- IC0 Epic Decision Baseline:
   - `20260623t074441z-adr-fixed-skill-kernel-compiled-runbook-authority.md` accepted。
   - `20260623t074443z-adr-adaptive-assurance-lite-authorization-monotonic-escalation.md` accepted。
   - `20260623t074442z-adr-step-assurance-resource-allocation-agent-context-routing.md` accepted。
@@ -354,27 +527,33 @@ T6 I07 Rollout / telemetry / default switch
   - `20260623t074447z-adr-blocker-centric-pr-risk-closure-rereview.md` accepted。
   - `iss-00226 / #226` は closed / superseded historical evidence であり、implementation readiness dependency ではない。
   - Fresh spec-reviewer pass 後に implementation Issue を downstream planning-ready にする。
-- G1 Core contract:
+- IC1 Core contract:
   - I01 後、classification truth table、legacy detection、schema/versioning を固定する。
   - I02 / I05 が依存できる public application contract を確認する。
-- G2 Workflow entrypoint:
+- IC2 Workflow entrypoint:
   - I02 後、no-active から requirement capture までを manual first-read smoke する。
   - Skill 本文だけで `./spec-dock/scripts/spec-dock guidance <target>` 起動と stop condition が分かること。
   - Git status が clean であること。
-- G3 Planning compiler:
+- IC3 Planning compiler:
   - I03 後、Lite / Standard / Strict / Critical fixture を golden 比較する。
   - substantive content no-overwrite を確認する。
   - approved `assurance.json` 後の requirement / design / plan substantive change が stale source binding として block されることを確認する。
-- G4 Execution routing:
+- IC4 Execution routing:
   - I04 後、docs-only、runtime、migration、security fixture で routing matrix を確認する。
   - worker context inheritance と reviewer clean-room を区別する。
   - returned evidence refs / missing reason が event に残ることを確認する。
-- G5 Review governance:
-  - I05 後、base/head policy trust boundary、multiline trigger、stale head を実 PR または fake GitHub で確認する。
+- IC5 Review governance:
+  - I05 後、script-local instruction validation、instruction hash / reviewed head SHA binding、missing fallback、invalid fail-closed、multiline trigger、stale head を実 PR または fake GitHub で確認する。
   - I06 後、P0/P1、P2 only、promoted P2、stagnation を確認する。
-- G9 Rollout:
+- IC9 Rollout:
   - I07 後、automatic Lite default が無効のまま、Auto-Lite adoption gates、strict-legacy fallback、required metrics / missing metrics summary、automation-stalled human gate、efficiency baseline を確認する。
   - Epic-wide diff を fresh `deep-consultant`、`spec-reviewer`、code / QA 観点でレビューする。
+- IC10 Grade-aware authoring corrective tranche:
+  - R0 後、manual test で見つかった F-001〜F-004 が runtime readiness classifier regression として閉じていることを確認する。
+  - G1 後、Issue planning guidance が grade-aware authoring rules、Lite non-default、manual escalation / `authorized_profile` separation を返すことを確認する。
+  - G2 後、classified Issue の `draft-design` / `draft-plan` が `authorized_profile` の profile template を source とし、missing / invalid / stale `.assurance.json` で no-write fail-closed することを確認する。
+  - G3 後、fresh `spec-reviewer`、Evidence Adoption Ledger、delegated specialist evidence、report evidence gate が phase promotion / issue readiness と整合することを確認する。
+  - G4 後、Lite / Standard / Strict / Critical の representative smoke tests と provider / dogfooding docs parity を確認する。
 
 ## 品質ゲート
 
@@ -407,7 +586,7 @@ T6 I07 Rollout / telemetry / default switch
   - dogfooding semantic parity。
   - installer init / update。
 - PR:
-  - trusted policy source。
+  - script-local instruction source。
   - head freshness。
   - P2 suppression。
   - blocker repair。
@@ -433,18 +612,20 @@ T6 I07 Rollout / telemetry / default switch
 - Docs:
   - workflow issue / epic。
   - authoring issue plan。
+  - issue discussions / draft authoring source authority。
   - GitHub reference。
   - context routing reference。
   - installer / update ownership。
   - troubleshooting / doctor。
-- Review policy:
-  - `.github/codex/review-policy.md` は project-owned。
-  - `AGENTS.md` から参照しない。
-  - bootstrap-only ownership を document する。
+- Review instruction:
+  - `.github/codex/review-policy.md` は current authority ではなく historical / bootstrap-only evidence として扱う。
+  - `github-pr-observation` script-local instruction asset を current authority とし、`AGENTS.md` から参照しない。
+  - script-local instruction ownership、missing fallback、invalid fail-closed を document する。
 - Follow-up:
   - Codex Action + structured output migration。
   - Cross-provider review ensemble。
   - Automatic Lite activation tuning。
+  - `iss-00250` 一時検討置き場は、この amendment の採用証跡として、R0 / G1 / G2 / G3 / G4 の正式 Issue 証跡へ置換されるまで temporary / superseded evidence として保持する。破棄する場合は、EAL-033 の参照先を正式 Issue evidence に置換してから行う。
 
 ## 課題準備完了条件（Issue readiness criteria）
 
@@ -462,11 +643,12 @@ T6 I07 Rollout / telemetry / default switch
 - PR external review policy。
 - Downstream dependency and unblock output。
 - No unresolved requirement / design gap。
+- Temporary analysis artifacts are not treated as formal Issue IDs unless plan gate and creation command have promoted them.
 
 ## 最終完了条件
 
-- E-AC-001〜021 に evidence がある。
-- 7 implementation Issue が完了または明示的に superseded / deferred されている。
+- E-AC-001〜022 に evidence がある。
+- 7 initial implementation Issue と、追加 corrective tranche `R0 + G1〜G4` が完了または明示的に superseded / deferred されている。
 - Required ADR が Epic-scope accepted ADR として作成 / 反映され、implementation Issue より先に reviewer-gated baseline になっている。
 - New Issue / substantive Issue の strict-legacy compatibility path が dogfooding で成功している。
 - Existing Issue の strict-legacy path が壊れていない。
@@ -477,6 +659,10 @@ T6 I07 Rollout / telemetry / default switch
 - Review completion は explicit Codex artifact で判断し、completion artifact missing by deadline は retryable `timeout` / `wait_or_resume` / `observation_complete=false` とする。
 - Auto-Lite readiness report が future automatic Lite default の adoption / rollback 条件を示し、初期 rollout では automatic Lite default が無効のままである。
 - Context routing policy、context packet、clean-room reviewer packet、bounded return contract が evidence 付きで動作する。
+- Artifact readiness preflight は未解決 placeholder、template-only artifact、heading-only plan、stale reviewer evidence、missing adoption evidence を ready にしない。
+- Grade-aware Issue planning guidance は `lite / standard / strict / critical` ごとの authoring、delegated specialist、review、report evidence rules を返し、Lite automatic default を許可しない。
+- Issue `draft-design` / `draft-plan` は profile template source authority と fail-closed contract に従って動作する。
+- Fresh `spec-reviewer`、Evidence Adoption Ledger、delegated specialist evidence、report evidence gate が grade-aware authoring workflow に整合している。
 - P2-only review で repair / re-review loop が開始されない。
 - P0 / P1 / promoted blocker が閉じるまで merge-prepared にならない。
 - Automation-stalled が risk acceptance にならない。
