@@ -599,13 +599,24 @@ Compatibility Gate:
 | Docs / template / skill checks | `...` | pass / N/A | `report.md#...` |
 | Strict review | ... | approved | `report.md#...` |
 
+- static analysis / lint:
+  - 実行対象: このリポジトリで設定されている静的解析、lint、format check
+  - pass条件: 既知の許容済み例外を除き成功する
+- tests:
+  - 実行対象: 単体テスト、およびこのIssueの影響範囲に必要な統合テスト / CLIテスト / regression test
+  - pass条件: すべて成功する
+  - 追加観点: contract / compatibility / migration dry-run / scaffold / workflow への影響がある場合は必要な検証を含める
+  - 実行できない検証がある場合: 未実施理由と代替確認を `report.md` に記録する
+- report:
+  - [ ] 実行したコマンド、結果、未実施の理由を `report.md` に記録する
+  - [ ] PR 作成後の GitHub Actions を、基礎的な lint / test 失敗の初回検出場所にしていない
 - commit:
   - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
   - commit前確認:
-    - [ ] このマイルストーンの差分だけで意味が通る
-    - [ ] 必要な検証が完了している
+    - [ ] 静的解析 / lint が完了している
+    - [ ] 必要なテストが完了している
     - [ ] `report.md` に証跡がある
-    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+    - [ ] 未完了差分が混ざっていない
 
 最終終了契約（Final Exit Contract）:
 

@@ -10128,9 +10128,44 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 assert "commit前確認:" in plan_text
                 assert "次のマイルストーンの未完了差分が混ざっていない" in plan_text
 
+        for grade in ("standard", "strict", "critical"):
+            plan_text = provider_texts[f"{grade} plan template"]
+            with _case(grade=grade, asset="plan template", final_quality_gate=True):
+                heading = "最終安全ゲート" if grade == "critical" else "最終品質ゲート"
+                final_gate_match = re.search(
+                    rf"^## \d+\. {re.escape(heading)}.*?(?=^## \d+\. |\Z)",
+                    plan_text,
+                    re.MULTILINE | re.DOTALL,
+                )
+                assert final_gate_match is not None
+                final_gate_text = final_gate_match.group(0)
+                assert "static analysis / lint:" in final_gate_text
+                assert "このリポジトリで設定されている静的解析、lint、format check" in final_gate_text
+                assert "tests:" in final_gate_text
+                assert (
+                    "単体テスト、およびこのIssueの影響範囲に必要な統合テスト / CLIテスト / regression test"
+                    in final_gate_text
+                )
+                assert "report:" in final_gate_text
+                assert (
+                    "PR 作成後の GitHub Actions を、基礎的な lint / test 失敗の初回検出場所にしていない"
+                    in final_gate_text
+                )
+                assert "commit:" in final_gate_text
+                assert "[ ] 静的解析 / lint が完了している" in final_gate_text
+                assert "[ ] 必要なテストが完了している" in final_gate_text
+                assert "[ ] 未完了差分が混ざっていない" in final_gate_text
+
         with _case(grade="lite", asset="plan template", commit_candidate=False):
             assert "commit候補:" not in provider_texts["lite plan template"]
             assert "commit前確認:" not in provider_texts["lite plan template"]
+            assert "M99" not in provider_texts["lite plan template"]
+            assert "static analysis / lint:" not in provider_texts["lite plan template"]
+            assert "pass条件: すべて成功する" not in provider_texts["lite plan template"]
+            assert (
+                "PR 作成後の GitHub Actions を、基礎的な lint / test 失敗の初回検出場所にしていない"
+                not in provider_texts["lite plan template"]
+            )
 
         for grade in ("lite", "standard", "strict", "critical"):
             design_text = provider_texts[f"{grade} design template"]
@@ -10163,7 +10198,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         with _case(asset="issue report template", commit_candidate_gate=True):
             assert "マイルストーン / commit 候補ゲート" in provider_texts["issue report template"]
-            assert "commit候補 / コミット範囲" in provider_texts["issue report template"]
+            assert "コミット候補 / コミット範囲" in provider_texts["issue report template"]
 
         parity_paths = (
             "templates/issue/requirement.md",
