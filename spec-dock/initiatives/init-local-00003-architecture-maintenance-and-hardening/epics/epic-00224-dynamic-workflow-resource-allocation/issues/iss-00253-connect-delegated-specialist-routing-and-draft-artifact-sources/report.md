@@ -63,8 +63,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | ID | adoption_status | source | source_role | claim | target_artifact | target_section | rationale | evidence_strength | evidence_path | adopter | reviewer | blocking | next_action |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| EAL-001 | adopted | sub-agent | system-architect | Issue design/plan draft routing、pre-allocation fail-closed、profile template guard reuse、legacy normalization bypass、preservation boundary | `design.md` / `plan.md` / `report.md` | design sections 2〜9; plan S90 scope; report D-001 / Delegated Draft Evidence | Draft 内容を source inspection と既存 runtime/test surface に照合し、G2 scope 内の設計判断として採用できるため。 | strong: source-grounded draft + orchestrator inspection | `discussions/20260630t171026z-draft-design-g2-draft-artifact-source-routing-design.md`; `create_node.py`; `artifact_store.py`; `assurance_store.py` | orchestrator | pending fresh spec-review | no | fresh spec-review |
-| EAL-002 | adopted | sub-agent | implementation-planner | S00〜S99 step contract、Red/Green tests、fail-closed/no-write確認、preservation tests、local handoff gate | `plan.md` / `report.md` | plan sections 2.1 / 6.1 / 7; report Delegated Draft Evidence | Draft 内容が active requirement AC-001〜AC-007 と Epic branch baton policy に対応し、strict issue execution に必要な step-local evidence destination を持つため。 | strong: source-grounded draft + orchestrator inspection | `discussions/20260630t171038z-disc-implementation-plan-draft-for-profile-aware-routing.md`; `tests/cli_runtime/test_new.py`; `tests/cli_runtime/test_assurance_compose.py` | orchestrator | pending fresh spec-review | no | fresh spec-review |
+| EAL-001 | adopted | sub-agent | system-architect | Issue design/plan draft routing、pre-allocation fail-closed、profile template guard reuse、legacy normalization bypass、preservation boundary | `design.md` / `plan.md` / `report.md` | design sections 2〜9; plan S90 scope; report D-001 / Delegated Draft Evidence | Draft 内容を source inspection と既存 runtime/test surface に照合し、G2 scope 内の設計判断として採用できるため。 | strong: source-grounded draft + orchestrator inspection | `discussions/20260630t171026z-draft-design-g2-draft-artifact-source-routing-design.md`; `create_node.py`; `artifact_store.py`; `assurance_store.py` | orchestrator | final spec-review pass | no | adopted |
+| EAL-002 | adopted | sub-agent | implementation-planner | S00〜S99 step contract、Red/Green tests、fail-closed/no-write確認、preservation tests、local handoff gate | `plan.md` / `report.md` | plan sections 2.1 / 6.1 / 7; report Delegated Draft Evidence | Draft 内容が active requirement AC-001〜AC-007 と Epic branch baton policy に対応し、strict issue execution に必要な step-local evidence destination を持つため。 | strong: source-grounded draft + orchestrator inspection | `discussions/20260630t171038z-disc-implementation-plan-draft-for-profile-aware-routing.md`; `tests/cli_runtime/test_new.py`; `tests/cli_runtime/test_assurance_compose.py` | orchestrator | final spec-review pass | no | adopted |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -72,7 +72,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | G2 の主目的は Issue `draft-design` / `draft-plan` を `authorized_profile` 対応 profile template source に接続し、delegated specialist が canonical と同構造の draft evidence を作れるようにすること。 | fail-closed/no-write、preservation、compose regression、individual PR なしの local handoff を副次要件として plan に固定した。 | low | pending fresh spec-review |
+| OAL-001 | G2 の主目的は Issue `draft-design` / `draft-plan` を `authorized_profile` 対応 profile template source に接続し、delegated specialist が canonical と同構造の draft evidence を作れるようにすること。 | fail-closed/no-write、preservation、compose regression、individual PR なしの local handoff を副次要件として plan に固定した。 | low | final spec-review pass |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -80,9 +80,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | active requirement、Epic #224 requirement/design/plan、G1 completion commit `9d172bff` | blocking question なし | requirement を approved に昇格 | pending fresh spec-review | no | design / plan review |
-| design | system-architect draft、`create_node.py`、`artifact_store.py`、`assurance_store.py`、profile templates、existing tests | blocking question なし | delegated draft を採用し、canonical design に反映 | pending fresh spec-review | no | plan review |
-| plan | implementation-planner draft、existing CLI tests、Epic branch baton policy | blocking question なし | step contract / closure index / final local handoff を canonical plan に反映 | pending fresh spec-review | no | fresh spec-review |
+| requirement | active requirement、Epic #224 requirement/design/plan、G1 completion commit `9d172bff` | blocking question なし | requirement を approved に昇格 | final spec-review pass | no | design / plan review |
+| design | system-architect draft、`create_node.py`、`artifact_store.py`、`assurance_store.py`、profile templates、existing tests | blocking question なし | delegated draft を採用し、canonical design に反映 | final spec-review pass | no | plan review |
+| plan | implementation-planner draft、existing CLI tests、Epic branch baton policy | blocking question なし | step contract / closure index / final local handoff を canonical plan に反映 | final spec-review pass | no | final spec-review |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -110,8 +110,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| system-architect | iss-00253 | `discussions/20260630t171026z-draft-design-g2-draft-artifact-source-routing-design.md` | active issue docs、Epic docs、runtime code、profile templates、tests | `design.md`, `plan.md`, `report.md` | adopted | `design.md`, `plan.md`, `report.md` | passed | design decisions integrated | none | none | pending fresh spec-review | promote after spec-review pass |
-| implementation-planner | iss-00253 | `discussions/20260630t171038z-disc-implementation-plan-draft-for-profile-aware-routing.md` | active issue docs、Epic docs、runtime code、profile templates、tests | `plan.md`, `report.md` | adopted | `plan.md`, `report.md` | passed | step contract integrated | none | none | pending fresh spec-review | promote after spec-review pass |
+| system-architect | iss-00253 | `discussions/20260630t171026z-draft-design-g2-draft-artifact-source-routing-design.md` | active issue docs、Epic docs、runtime code、profile templates、tests | `design.md`, `plan.md`, `report.md` | adopted | `design.md`, `plan.md`, `report.md` | passed | design decisions integrated | none | none | final spec-review pass | promoted |
+| implementation-planner | iss-00253 | `discussions/20260630t171038z-disc-implementation-plan-draft-for-profile-aware-routing.md` | active issue docs、Epic docs、runtime code、profile templates、tests | `plan.md`, `report.md` | adopted | `plan.md`, `report.md` | passed | step contract integrated | none | none | final spec-review pass | promoted |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -128,117 +128,161 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- Issue `draft-design` / `draft-plan` を verified `.assurance.json` の `authorized_profile` に対応する issue profile template へ接続した。
+- missing assurance では discussion file を作らず fail-closed し、`draft-requirement` と Initiative / Epic draft は既存挙動を維持した。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-07-01 HH:MM - HH:MM）
+### セッションログ（2026-07-01 G2 実装）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S00, S01, S02, S03, S04, S90
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: `6.1 実装ステップ / 実行ステップ契約`
+  - closure ids: C-001, C-002, C-003, C-004, C-005, C-006, C-007, C-090
 
 #### 実施内容
-- ...
+- S00: `create_node.py`、`artifact_store.py`、`assurance_store.py`、既存 `test_new.py` / `test_assurance_compose.py` を調査した。
+- S01: `create_discussion_doc` に `AssuranceStore` / `ArtifactStore` を bootstrap から注入し、Issue `draft-design` / `draft-plan` だけ profile-aware route に通した。
+- S02: verified contract がない場合は discussion filename allocation 前に `RuntimeError` で停止するようにした。
+- S03: `ArtifactStore.load_profile_artifact_template_text()` を追加し、compose と同じ profile template filesystem guard を再利用した。
+- S04: `draft-requirement` と Initiative / Epic draft route の preservation test を維持した。
+- S90: provider / dogfooding issue discussion rules と templates README を profile-aware routing に更新した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_assurance_compose.py
 
-<result>
+pass: 63 passed, 5 skipped
+```
+
+```bash
+uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_assurance_compose.py tests/cli_runtime/test_runtime_new_doc_s09.py
+
+pass: 92 passed, 5 skipped
+```
+
+```bash
+uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py
+
+pass: 29 passed
+```
+
+```bash
+make lint
+
+pass: ruff check / ruff format check / mypy
+```
+
+```bash
+./spec-dock/scripts/spec-dock validate
+git diff --check
+
+pass: validate nodes=160; diff check clean
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S00 | 代替証跡（inspect-only） | current routing / reusable stores | Issue draft design/plan は common template + thin normalization。profile loader / assurance verifier は再利用可能。 | source inspection | pass | baseline fixed |
+| S01 | 緑フェーズ（Green） | profile template success path | Standard / Strict / Critical の Issue design/plan draft が各 profile template heading を含む | `uv run pytest tests/cli_runtime/test_new.py` | pass | C-001, C-002, C-005, C-006 |
+| S02 | 緑フェーズ（Green） | assurance contract no-write | missing / invalid JSON / stale binding / unsupported profile で non-zero、discussions file set unchanged | `uv run pytest tests/cli_runtime/test_new.py` | pass | C-003 |
+| S03 | 緑フェーズ（Green） | profile template guard reuse | missing / non-file / symlink escape / empty profile template で `new doc` が no-write fail-closed。`test_assurance_compose.py` 既存 validation regression も維持 | `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_assurance_compose.py` | pass | C-003, C-007 |
+| S04 | 緑フェーズ（Green） | preservation behavior | Issue `draft-requirement` と Initiative / Epic draft route が維持。application-level S09 direct caller regression も維持 | `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_runtime_new_doc_s09.py` | pass | C-004 |
+| S90 | docs inspection | docs / rules / README alignment | issue discussion rules と templates README を provider/dogfooding で更新 | `rg` inspection; `git diff --check` | pass | C-090 |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S90 | `templates/README.md` に Issue design/plan も scope canonical source と読める古い説明が残っていた | docs inspection | provider / dogfooding README を更新 | C-090 | no | `rg` inspection |
+| S95 | reviewer 指摘で `plan_discussion_doc` の返り値 arity 互換破壊が判明 | code-reviewer | public return shape を 3 要素に戻し、create 側だけ internal extended planner を使用 | C-004 | no | `uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py` |
+| S95 | reviewer 指摘で Standard のみ / missing contract のみの証跡不足が判明 | qa-reviewer / spec-reviewer | Strict / Critical success と invalid / stale / template guard no-write tests を追加 | C-001, C-002, C-003 | no | `uv run pytest tests/cli_runtime/test_new.py tests/cli_runtime/test_assurance_compose.py` |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S00 | C-001〜C-007 | baseline routing / reusable store evidence | source inspection | pass | no code change |
+| S01 | C-001, C-002, C-005, C-006 | profile design/plan success and no self-claim | CLI content assertions | pass | Standard / Strict / Critical profile fixtures |
+| S02 | C-003 | invalid assurance fail-closed before write | CLI no-write assertions | pass | missing / invalid JSON / stale binding / unsupported profile |
+| S03 | C-003, C-007 | profile template guard and compose validation regression | CLI no-write assertions / compose CLI tests | pass | missing / non-file / symlink escape / empty template |
+| S04 | C-004 | preservation behavior and application caller compatibility | CLI preservation tests / S09 application tests | pass | non-Issue draft routes unchanged; `plan_discussion_doc` 3-tuple contract preserved |
+| S90 | C-090 | docs/rules impact resolved | docs inspection | pass | provider/dogfooding updated |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| C-001 / C-002 | S01 | yes | red-required | old Issue draft source was common issue template | `uv run pytest tests/cli_runtime/test_new.py` | pass | Standard / Strict / Critical profile design/plan source |
+| C-003 | S02 / S03 | yes | red-required | old Issue draft plan succeeded without assurance | `uv run pytest tests/cli_runtime/test_new.py` | pass | missing / invalid JSON / stale binding / unsupported profile / missing template / non-file template / symlink escape / empty template no-write |
+| C-004 | S04 | yes | covered-existing | preservation cases existed | `uv run pytest tests/cli_runtime/test_new.py`; `uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py` | pass | expectation updated for Issue requirement; application-level tuple contract preserved |
+| C-005 / C-006 | S01 | yes | content assertion | old thin normalization generated simplified body | `uv run pytest tests/cli_runtime/test_new.py` | pass | no self-claim assertions |
+| C-007 | S03 | yes | regression | compose tests existed | `uv run pytest tests/cli_runtime/test_assurance_compose.py` | pass | unchanged compose behavior |
+| C-090 | S90 | yes | docs inspection | stale README/rules wording | `rg` / diff inspection | pass | docs updated |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| C-001〜C-007 | S01〜S04 | focused CLI / application tests | pass | combined focused suite: 92 passed, 5 skipped |
+| C-090 | S90 | docs inspection / diff check | pass | provider/dogfooding docs updated |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| reviewer-driven expansion | C-001, C-002, C-003, C-004 | test_new / test_assurance_compose / test_runtime_new_doc_s09 / docs inspection | C-001〜C-090 | final QA/code/spec review の指摘により、Strict/Critical、invalid/stale/template guard、public tuple contract の証跡を追加 | no | re-review required |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00253 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction / workflow issue execution | `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/cdfe/spec-dock` | iss-00253 | current session | system-architect / implementation-planner / spec-reviewer / code-reviewer / qa-reviewer | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| planning | delegated | strict issue planning required specialist evidence | system-architect / implementation-planner | discussion draft evidence only | active issue docs / Epic docs | active issue `discussions/` direct child | canonical docs / implementation / tests | diff guard / validate | forbidden path / self-claim | draft artifact path / summary | pass |
+| S01〜S90 | approved-local-execution | implementation is tightly coupled runtime/test/docs patch | N/A | parent execution | active plan | listed implementation paths | out-of-scope G3/G4 evidence gates | focused tests / lint / validate | reviewer blocker | report evidence | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| planning | system-architect | draft routing design evidence produced | discussion draft only | validate pass reported by worker | spec-review pass after fixes | none | accepted in EAL-001 |
+| planning | implementation-planner | step contract and local handoff plan produced | discussion draft only | validate pass reported by worker | spec-review pass after fixes | none | accepted in EAL-002 |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S01〜S90 | implementation changes require integrated parent coordination across runtime, tests, docs, and report | user asked to continue Epic implementation; risk accepted: no special waiver | listed implementation files | local edit / tests / docs update | revert commit or patch rollback | `make lint`; focused pytest; validate | final qa/code/spec reviewers passed after fixes | N/A |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| planning | spec-review | spec-reviewer | fresh | passed | no | proceed | P2 requirement scope clarified before implementation |
+| S95 | final QA / code / spec review | qa-reviewer / code-reviewer / spec-reviewer | fresh first pass | failed-fixed | no | re-review required | P1 findings: missing Strict/Critical evidence, incomplete C-003 no-write matrix, `plan_discussion_doc` return arity regression. Fixes applied and tests passed. |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S00〜S99 | completed | runtime / tests / docs / report | to be recorded by this implementation commit | post-commit clean check to run after commit | N/A | changed files | N/A | focused tests / lint / validate / reviewer pass |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py` - profile-aware issue draft routing
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` - store injection
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/artifact_store.py` - full profile template text loader
+- `tests/cli_runtime/test_new.py` - profile source / no-write / preservation tests
+- `src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md` and dogfooding mirror - issue draft source rules
+- `src/spec_dock/assets/spec_dock/templates/README.md` and dogfooding mirror - template source explanation
+- `report.md` - implementation evidence
 
 #### コミット
-- <hash> <message>
+- this implementation commit records S00〜S99 after final reviewer gates; no per-issue PR is created.
 
 #### メモ
-- ...
-
----
-
-### セッションログ（2026-07-01 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
+- Per-issue PR は作成しない。Epic #224 の単一 PR に含める。
 
 ---
 
@@ -247,37 +291,39 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | yes | parent executor | provider / dogfooding issue discussion rules and templates README updated; `git diff --check`; `./spec-dock/scripts/spec-dock validate` | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | added | first pass failed on C-003 matrix and Strict/Critical coverage; tests added; re-review `019f19a6-8a61-7532-a72a-84edeaf086b8` pass | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | first pass failed on `plan_discussion_doc` return arity; public 3-tuple contract restored with internal extended planner | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | first pass failed on C-001/C-002 profile breadth and C-003 matrix evidence; tests/report updated; re-review pass with P2 ledger cleanup applied | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| updated through S99 before commit | runtime create-node/profile-template routing, bootstrap injection, artifact store loader, CLI tests, docs/rules/README, report | final response; Epic branch baton to next issue; no per-issue PR | ready |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: 初回 code-review で `plan_discussion_doc` の返り値 arity 互換破壊が見つかった。
+  - 解決: public function は従来の 3-tuple を維持し、`create_discussion_doc` 内部だけ extended planner を使う構造に変更した。
+- 問題: 初回 QA/spec review で Strict/Critical routing と C-003 fail-closed matrix の証跡不足が見つかった。
+  - 解決: Standard / Strict / Critical success tests と missing / invalid / stale / unsupported profile / invalid profile template no-write tests を追加した。
 
 ## 学んだこと (任意)
-- ...
+- Issue draft の source routing は CLI 成功系だけでなく、discussion filename allocation 前に止まる no-write 系を直接 CLI 経路で検証する必要がある。
 
 ## 今後の推奨事項 (任意)
-- ...
+- 後続 issue でも Epic 単一 PR 方針に従い、issue 完了時は commit checkpoint と report 証跡だけを残し、PR 作成は Epic 最終品質ゲートに集約する。
 
 ## 省略/例外メモ (必須)
 - 該当なし

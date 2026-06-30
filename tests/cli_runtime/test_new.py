@@ -31,6 +31,100 @@ class TestCliNew(CliRuntimeHarness):
             ["new", "issue", "--epic", "2", "--title", "Add refresh token", "--github-issue", "3"],
         )
 
+    def _find_issue_dir_by_id(self, target: Path, issue_id: str) -> Path:
+        for meta_path in sorted((target / "spec-dock" / "initiatives").glob("**/.meta.json")):
+            payload = json.loads(meta_path.read_text(encoding="utf-8"))
+            if payload.get("type") == "issue" and payload.get("id") == issue_id:
+                return meta_path.parent
+        raise AssertionError(f"issue not found: {issue_id}")
+
+    def _set_assurance_contract_profile(
+        self,
+        issue_dir: Path,
+        profile: str,
+        *,
+        complexity_tier: str = "complex",
+    ) -> None:
+        contract_path = issue_dir / ".assurance.json"
+        payload = json.loads(contract_path.read_text(encoding="utf-8"))
+        if profile in ("strict", "critical"):
+            values = {
+                "docs_only_change": "unknown",
+                "explicit_lite_opt_in": "false",
+                "lite_evidence_gate_passed": "false",
+                "migration_or_persistence_change": "unknown",
+                "public_contract_change": "true" if profile == "strict" else "unknown",
+                "rollback_difficulty_high": "unknown",
+                "runtime_behavior_change": "unknown",
+                "security_or_privacy_sensitive": "true" if profile == "critical" else "unknown",
+            }
+            payload["risk_facts"] = [
+                {
+                    "key": key,
+                    "value": value,
+                    "source": "requirement",
+                    "reason_code": f"fact_default_{key}",
+                }
+                for key, value in sorted(values.items())
+            ]
+            reason_codes = {f"fact_default_{key}" for key in values} | {
+                "hard_trigger_migration_unknown",
+                "hard_trigger_rollback_unknown",
+                "lite_evidence_gate_missing_or_unknown",
+                "lite_opt_in_missing_or_unknown",
+                "lite_predicate_docs_only_unknown",
+                "lite_predicate_runtime_behavior_unknown",
+                "standard_default",
+            }
+            if profile == "strict":
+                reason_codes |= {
+                    "hard_trigger_public_contract_change",
+                    "hard_trigger_security_unknown",
+                }
+                hard_triggers = ["public_contract_change"]
+                unknown_facts = [
+                    "migration_or_persistence_change",
+                    "rollback_difficulty_high",
+                    "security_or_privacy_sensitive",
+                ]
+            else:
+                reason_codes |= {
+                    "hard_trigger_public_contract_unknown",
+                    "hard_trigger_security_or_privacy_sensitive",
+                }
+                hard_triggers = ["security_or_privacy_sensitive"]
+                unknown_facts = [
+                    "migration_or_persistence_change",
+                    "public_contract_change",
+                    "rollback_difficulty_high",
+                ]
+            payload["classification"]["hard_triggers"] = hard_triggers
+            payload["classification"]["unknown_facts"] = unknown_facts
+            payload["classification"]["reason_codes"] = sorted(reason_codes)
+        payload["classification"]["authorized_profile"] = profile
+        payload["classification"]["complexity_tier"] = complexity_tier
+        payload["classification"]["lite_candidate"] = False
+        payload["classification"]["lite_authorized"] = False
+        payload["obligations"]["profile_preset"] = profile
+        contract_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    def _discussion_file_names(self, issue_dir: Path) -> tuple[str, ...]:
+        return tuple(sorted(path.name for path in (issue_dir / "discussions").glob("*.md")))
+
+    def _assert_profile_draft_no_write_failure(
+        self,
+        target: Path,
+        issue_dir: Path,
+        command: list[str],
+        expected_stderr: str,
+    ) -> None:
+        before = self._discussion_file_names(issue_dir)
+        p = self._run_runtime_capture(target, command)
+        assert p.returncode != 0, p.stdout + p.stderr
+        assert expected_stderr in p.stderr
+        after = self._discussion_file_names(issue_dir)
+        assert after == before
+
     def test_new_issue_creates_assurance_compose_placeholders_for_design_and_plan(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -764,7 +858,7 @@ class TestCliNew(CliRuntimeHarness):
                     "要件定義（何を、なぜ行うか）",
                 ),
                 (
-                    ["new", "doc", "draft-design", "--issue", "iss-00003", "--title", "Design Draft"],
+                    ["new", "doc", "draft-requirement", "--issue", "iss-00003", "--title", "Issue Requirement"],
                     target
                     / "spec-dock"
                     / "initiatives"
@@ -774,10 +868,10 @@ class TestCliNew(CliRuntimeHarness):
                     / "issues"
                     / "iss-00003-add-refresh-token"
                     / "discussions",
-                    "draft-design",
-                    "templates/issue/design.md",
-                    "design.md",
-                    "設計（どう実現するか）",
+                    "draft-requirement",
+                    "templates/issue/requirement.md",
+                    "requirement.md",
+                    "Issue 要件定義",
                 ),
                 (
                     ["new", "doc", "draft-plan", "--epic", "epic-00002", "--title", "Plan Draft"],
@@ -821,6 +915,151 @@ class TestCliNew(CliRuntimeHarness):
                 canonical_text = canonical_source.read_text(encoding="utf-8")
                 assert canonical_text.splitlines()[1] in content
                 assert body_heading in content
+
+    def test_new_doc_issue_design_and_plan_use_authorized_profile_templates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            self._run_runtime(target, ["active", "set", "--id", "iss-00003"])
+            self._run_runtime(target, ["assurance", "classify", "--stage", "requirement", "--format", "json"])
+
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
+            profile_cases = (
+                ("standard", "normal", "Issue 設計書（Standard）", "Issue 実装計画書（Standard"),
+                ("strict", "complex", "Issue 設計書（Strict）", "Issue 実装計画書（Strict"),
+                ("critical", "deep", "Issue 設計書（Critical）", "Issue 実装計画書（Critical"),
+            )
+
+            for profile, complexity_tier, design_heading, plan_heading in profile_cases:
+                self._set_assurance_contract_profile(issue_dir, profile, complexity_tier=complexity_tier)
+                cases = (
+                    (
+                        ["new", "doc", "draft-design", "--issue", "iss-00003", "--title", f"{profile} Design"],
+                        "draft-design",
+                        design_heading,
+                        f"templates/issue-profiles/{profile}/design.md",
+                    ),
+                    (
+                        ["new", "doc", "draft-plan", "--issue", "iss-00003", "--title", f"{profile} Plan"],
+                        "draft-plan",
+                        plan_heading,
+                        f"templates/issue-profiles/{profile}/plan.md",
+                    ),
+                )
+                for command, doc_type, profile_heading, template_source in cases:
+                    before = set((issue_dir / "discussions").glob(f"*-{doc_type}-*.md"))
+                    p = self._run_runtime_capture(target, command)
+                    assert p.returncode == 0, p.stdout + p.stderr
+                    assert f"type={doc_type}" in p.stdout
+                    after = set((issue_dir / "discussions").glob(f"*-{doc_type}-*.md"))
+                    created = sorted(after - before)
+                    assert len(created) == 1
+                    content = created[0].read_text(encoding="utf-8")
+                    assert profile_heading in content
+                    assert "artifact_state: awaiting-assurance-compose" not in content
+                    assert "設計（どう実現するか）" not in content
+                    assert "実装計画（実行契約 / Execution Contract）" not in content
+                    assert "authority: accepted" not in content
+                    assert "adoption_status: adopted" not in content
+                    canonical_source = target / "spec-dock" / template_source
+                    assert canonical_source.is_file(), f"missing source template: {canonical_source}"
+
+    def test_new_doc_issue_profile_drafts_fail_closed_without_valid_assurance_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
+
+            self._assert_profile_draft_no_write_failure(
+                target,
+                issue_dir,
+                ["new", "doc", "draft-plan", "--issue", "iss-00003", "--title", "Plan Draft"],
+                "missing_assurance_contract",
+            )
+
+            (issue_dir / ".assurance.json").write_text("{not-json\n", encoding="utf-8")
+            self._assert_profile_draft_no_write_failure(
+                target,
+                issue_dir,
+                ["new", "doc", "draft-design", "--issue", "iss-00003", "--title", "Design Draft"],
+                "invalid_json",
+            )
+
+            self._run_runtime(target, ["active", "set", "--id", "iss-00003"])
+            self._run_runtime(target, ["assurance", "classify", "--stage", "requirement", "--format", "json"])
+            (issue_dir / "requirement.md").write_text("# Changed requirement.md\n", encoding="utf-8")
+            self._assert_profile_draft_no_write_failure(
+                target,
+                issue_dir,
+                ["new", "doc", "draft-plan", "--issue", "iss-00003", "--title", "Stale Plan"],
+                "stale_source_binding",
+            )
+
+            self._run_runtime(target, ["active", "set", "--id", "iss-00003"])
+            self._run_runtime(target, ["assurance", "classify", "--stage", "requirement", "--format", "json"])
+            self._set_assurance_contract_profile(issue_dir, "enterprise")
+            self._assert_profile_draft_no_write_failure(
+                target,
+                issue_dir,
+                ["new", "doc", "draft-design", "--issue", "iss-00003", "--title", "Unsupported Profile"],
+                "invalid_classification",
+            )
+
+    def test_new_doc_issue_profile_drafts_fail_closed_for_invalid_profile_templates(self) -> None:
+        cases = (
+            ("missing", "Profile template not found"),
+            ("directory", "Profile template is not a file"),
+            ("empty-body", "Profile template body is empty"),
+        )
+        for template_state, expected_stderr in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                self._create_same_repo_linked_hierarchy(target)
+                self._run_runtime(target, ["active", "set", "--id", "iss-00003"])
+                self._run_runtime(target, ["assurance", "classify", "--stage", "requirement", "--format", "json"])
+                issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
+                plan_template = target / "spec-dock" / "templates" / "issue-profiles" / "standard" / "plan.md"
+                plan_template.unlink()
+                if template_state == "directory":
+                    plan_template.mkdir()
+                elif template_state == "empty-body":
+                    plan_template.write_text(
+                        '---\nprofile: "standard"\nartifact: "plan"\n---\n',
+                        encoding="utf-8",
+                    )
+
+                self._assert_profile_draft_no_write_failure(
+                    target,
+                    issue_dir,
+                    ["new", "doc", "draft-plan", "--issue", "iss-00003", "--title", f"{template_state} Plan"],
+                    expected_stderr,
+                )
+
+    def test_new_doc_issue_profile_drafts_fail_closed_for_symlinked_profile_template(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            if not self._can_create_symlink(target):
+                pytest.skip("symlink creation is not available")
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            self._run_runtime(target, ["active", "set", "--id", "iss-00003"])
+            self._run_runtime(target, ["assurance", "classify", "--stage", "requirement", "--format", "json"])
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
+            external = target / "outside-plan.md"
+            external.write_text("# Outside Plan\n", encoding="utf-8")
+            plan_template = target / "spec-dock" / "templates" / "issue-profiles" / "standard" / "plan.md"
+            plan_template.unlink()
+            plan_template.symlink_to(external)
+
+            self._assert_profile_draft_no_write_failure(
+                target,
+                issue_dir,
+                ["new", "doc", "draft-plan", "--issue", "iss-00003", "--title", "Symlink Plan"],
+                "Profile template is outside spec-dock workspace",
+            )
 
     def test_new_doc_note_is_retired_with_scratch_guidance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

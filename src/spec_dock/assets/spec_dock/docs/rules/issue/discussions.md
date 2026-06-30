@@ -6,7 +6,7 @@
 - Naming rules: `spec-dock/docs/reference_naming.md`
 - 作成される docs はこの directory に timestamp-prefixed original として保存されます（標準: `<ts>-<kind>-<slug>.md` / same-second collision: `<ts>-<nn>-<kind>-<slug>.md`）。legacy sequential files は grandfathered で、自動 rename しません。
 - Delegated authoring の draft / analysis / discussion-local report も、この directory の直下に同じ命名規則で flat Markdown として保存します。per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/` は新規出力先にしません。
-- Sub-agent-created draft は canonical docs への直接書き込みではなく、scope-local `discussions/` 直下の flat Markdown として保存します。`draft-requirement` / `draft-design` / `draft-plan` は draft 専用 template を持たず、scope kind に応じた canonical template を直接 source として render します。canonical docs remain main-orchestrator-only. `authority: accepted`、`adoption_status: adopted`、non-empty `reflected_to` は自己主張しません。
+- Sub-agent-created draft は canonical docs への直接書き込みではなく、scope-local `discussions/` 直下の flat Markdown として保存します。Issue `draft-requirement` は issue canonical requirement template を source として render します。Issue `draft-design` / `draft-plan` は verified `.assurance.json` の `authorized_profile` に対応する `templates/issue-profiles/<profile>/design.md` / `plan.md` を source として render し、missing / invalid / stale contract では no-write fail-closed します。canonical docs remain main-orchestrator-only. `authority: accepted`、`adoption_status: adopted`、non-empty `reflected_to` は自己主張しません。
 - Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator single-writer authority です。discussion draft は evidence であり、採用は canonical `report.md` の Evidence Adoption Ledger と canonical docs への再記述で成立します。
 - `report.md` は canonical observed evidence ledger です。`new doc report` として作成する discussion catalog には含めません。
 - Historical delegated-authoring manifest/Profile/probe/session artifacts は grandfathered evidence です。current delegated drafts が flat model を使うことだけを理由に削除、rename、validation failure 化しません。
@@ -19,8 +19,8 @@
   - `adr`: 意思決定記録。後から戻しにくく、将来の読者に意外性があり、実質的な tradeoff がある長期判断を固定する。
   - `pr-repair-batch`: PR repair workflow の observation、concern inventory、repair queue、merge-prepared gate を記録する。repair unit は `pr-repair-unit` type を作らず、必要な場合は ordinary `disc` を使う。
   - `draft-requirement`: scope kind に応じた canonical requirement template を直接 source として render する discussion-local draft。
-  - `draft-design`: scope kind に応じた canonical design template を直接 source として render する discussion-local draft。
-  - `draft-plan`: scope kind に応じた canonical plan template を直接 source として render する discussion-local draft。
+  - `draft-design`: verified `authorized_profile` に対応する issue profile design template を source として render する discussion-local draft。
+  - `draft-plan`: verified `authorized_profile` に対応する issue profile plan template を source として render する discussion-local draft。
 - `note` は retired。既存 artifact は grandfathered だが、新規 raw capture は `scratch` を使う。
 - `disc` が大きくなりすぎたら、質問回答は `interview`、事実調査は `research`、生ログは `scratch`、長期判断は `adr` へ分割してください。`report.md` へ synthesis 本文を抱え込ませず、採用済み evidence と canonical 反映結果だけを残します。
 - Create commands:
