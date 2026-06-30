@@ -3,7 +3,7 @@
 ID: "iss-00252"
 タイトル: "Compile Grade Aware Issue Planning Guidance"
 Issue Grade: "strict"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-01"
 関連Requirement: ["requirement.md"]
@@ -62,3 +62,16 @@ Issue planning guidance は agent の authoring behavior を変える workflow c
 - G2 の `new doc` routing implementation。
 - G3 の report evidence enforcement。
 - G4 の smoke test full matrix。
+
+## 7. 設計判断
+
+- `workflow_spec_authoring.md` を grade-aware authoring rule の durable policy surface とする。
+- `phase_requirement.md` / `phase_design.md` / `phase_plan_issue.md` は phase-specific な読み替えと reviewer / specialist evidence の入口だけを持つ。
+- `spec-dock-issue-planning` skill は詳細 policy を重複定義せず、first-read path と stop condition を強化する。
+- runtime guidance は current state projection に留め、authoring matrix の authority は docs / skill に置く。これにより G2 の draft routing 実装や G3 の evidence enforcement と責務を分離する。
+
+## 8. 検証設計
+
+- Docs inspection: provider 側 `src/spec_dock/assets/spec_dock/docs/` と dogfooding 側 `spec-dock/docs/` の grade-aware wording parity を確認する。
+- Skill inspection: provider 側 `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` と dogfooding 側 `.agents/skills/spec-dock-issue-planning/SKILL.md` の first-read / stop condition parity を確認する。
+- Regression: 既存 workflow tests が guidance/runbook の authority split を壊していないことを focused test で確認する。

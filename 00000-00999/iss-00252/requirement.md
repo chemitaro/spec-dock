@@ -4,7 +4,7 @@ ID: "iss-00252"
 タイトル: "Compile Grade Aware Issue Planning Guidance"
 関連GitHub: ["#252"]
 Issue Grade: "strict"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-01"
 親: ["epic-00224", "init-local-00003"]
