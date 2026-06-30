@@ -65,9 +65,9 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - Epic: `spec-dock/templates/epic/requirement.md`
   - Issue: `spec-dock/templates/issue/requirement.md`
 
-## Issue grade 補足（issue grade guidance）
+## グレード補足（issue grade guidance）
 
-Issue requirement は [workflow_spec_authoring.md](workflow_spec_authoring.md) の `Issue grade 別 authoring matrix` を入口にします。
+Issue requirement は [workflow_spec_authoring.md](workflow_spec_authoring.md) の `グレード別authoring matrix（Issue grade authoring matrix）` を入口にします。
 
 - Lite は default ではなく、低リスク根拠、scope の狭さ、既存 contract への影響が限定される理由を requirement に残す。
 - grade が unknown / ambiguous、または影響範囲、受け入れ条件、reviewer obligation が判断できない場合は Standard 以上へ倒し、clarification または上位 design / ADR 確認へ戻す。

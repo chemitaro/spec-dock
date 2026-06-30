@@ -3339,6 +3339,25 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "#### 実装委任ゲート（Implementation Delegation Gate）" in report_text
             assert "#### 委任 worker 証跡（Delegated Worker Evidence）" in report_text
             assert "#### 親実装例外（Parent Implementation Exception）" in report_text
+            assert "#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）" in report_text
+            for fragment in (
+                "required specialist / fallback",
+                "usage",
+                "evidence",
+                "fresh spec-reviewer",
+                "execution readiness",
+                "standard",
+                "strict",
+                "critical",
+                "system-architect",
+                "implementation-planner",
+                "manual fallback",
+                "not applicable",
+                "skip reason",
+                "pass",
+                "ready",
+            ):
+                assert fragment in report_text
             assert "#### レビューゲート状態（Reviewer Gate Status）" in report_text
             assert "#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）" in report_text
             assert "## 最終品質ゲート（Final Quality Gate / 必須）" in report_text
@@ -9889,6 +9908,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）",
             "#### 発見されたテスト / リスク（Discovered Tests）",
             "#### クロージャ差分（Closure Delta）",
+            "#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）",
             "#### レビューゲート状態（Reviewer Gate Status）",
             "#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）",
             _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER,
