@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import shlex
 import time
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal, Protocol, cast
 import uuid
 
 from spec_dock_runtime.application.contracts import (
@@ -47,6 +47,21 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from spec_dock_runtime.application.ports import Ports
+
+
+class _AssuranceStoreLike(Protocol):
+    def resolve_issue_target(self, issue: str | None = None): ...
+
+    def verify_contract(self, target): ...
+
+
+class _ArtifactStoreLike(Protocol):
+    def load_profile_artifact_template_text(
+        self,
+        artifact: Literal["design", "plan"],
+        profile: Literal["lite", "standard", "strict", "critical"],
+    ) -> str: ...
+
 
 _META_FILENAME = ".meta.json"
 _DRAFT_TARGET_BY_DOC_TYPE = {
@@ -1257,29 +1272,87 @@ def _normalize_draft_discussion_text(rendered_text: str, *, doc_type: str) -> st
     return f"---{frontmatter}---\n{body.lstrip()}"
 
 
-def plan_discussion_doc(
+def _draft_profile_artifact(doc_type: str) -> Literal["design", "plan"] | None:
+    if doc_type == "draft-design":
+        return "design"
+    if doc_type == "draft-plan":
+        return "plan"
+    return None
+
+
+def _resolve_issue_profile_draft_template_text(
+    *,
+    scope: SpecNode,
+    doc_type: str,
+    assurance_store: _AssuranceStoreLike | None,
+    artifact_store: _ArtifactStoreLike | None,
+) -> str | None:
+    artifact = _draft_profile_artifact(doc_type)
+    if scope.kind != "issue" or artifact is None:
+        return None
+    if assurance_store is None and artifact_store is None:
+        return None
+    if assurance_store is None:
+        raise RuntimeError(f"assurance_store is required for issue {doc_type}")
+    if artifact_store is None:
+        raise RuntimeError(f"artifact_store is required for issue {doc_type}")
+    target = assurance_store.resolve_issue_target(scope.id)
+    store_result = assurance_store.verify_contract(target)
+    if store_result.status != "valid" or store_result.contract is None:
+        details = "; ".join(getattr(store_result, "details", ()) or ())
+        suffix = f" details={details}" if details else ""
+        raise RuntimeError(
+            f"Valid assurance contract is required before creating issue {doc_type}: "
+            f"reason={store_result.reason}{suffix}"
+        )
+    profile = store_result.contract.classification.authorized_profile.value
+    return artifact_store.load_profile_artifact_template_text(artifact, profile)
+
+
+def _plan_discussion_doc_extended(
     req: CreateDiscussionDocRequest,
     graph: SpecGraph,
     *,
+    assurance_store: _AssuranceStoreLike | None = None,
+    artifact_store: _ArtifactStoreLike | None = None,
     today: str | None = None,
     timestamp: str | None = None,
     now_iso_provider: Callable[[], str | None] | None = None,
     sleep_fn: Callable[[float], None] | None = None,
-) -> tuple[Path, Path, dict[str, str]]:
+) -> tuple[Path, Path, dict[str, str], str | None, bool]:
     del today
 
     scope = _resolve_scope_node(req, graph)
     doc_type, title, slug = _normalize_discussion_doc_inputs(req)
 
     specdock_dir = _resolve_specdock_root(scope.path)
+    template_text_override = _resolve_issue_profile_draft_template_text(
+        scope=scope,
+        doc_type=doc_type,
+        assurance_store=assurance_store,
+        artifact_store=artifact_store,
+    )
+    profile_sourced = template_text_override is not None
     if doc_type in _DRAFT_DISCUSSION_DOC_TYPES:
-        template_path = _draft_canonical_template_path(
-            specdock_dir=specdock_dir,
-            scope_kind=scope.kind,
-            doc_type=doc_type,
-        )
-        if template_path is None or not template_path.is_file():
-            raise RuntimeError(f"Missing canonical template source for {scope.kind} {doc_type}: {template_path}")
+        if profile_sourced:
+            template_path = (
+                specdock_dir
+                / "templates"
+                / "issue-profiles"
+                / "<authorized_profile>"
+                / (f"{_draft_profile_artifact(doc_type)}.md")
+            )
+        else:
+            canonical_template_path = _draft_canonical_template_path(
+                specdock_dir=specdock_dir,
+                scope_kind=scope.kind,
+                doc_type=doc_type,
+            )
+            if canonical_template_path is None or not canonical_template_path.is_file():
+                raise RuntimeError(
+                    f"Missing canonical template source for {scope.kind} {doc_type}: {canonical_template_path}"
+                )
+            template_path = canonical_template_path
     else:
         template_path = specdock_dir / "templates" / "discussions" / f"{doc_type}.md"
     discussions_dir = scope.path / "discussions"
@@ -1327,10 +1400,40 @@ def plan_discussion_doc(
             "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
             "YYYY-MM-DD": rendered_date,
         }
+    return template_path, dest_path, replacements, template_text_override, profile_sourced
+
+
+def plan_discussion_doc(
+    req: CreateDiscussionDocRequest,
+    graph: SpecGraph,
+    *,
+    assurance_store: _AssuranceStoreLike | None = None,
+    artifact_store: _ArtifactStoreLike | None = None,
+    today: str | None = None,
+    timestamp: str | None = None,
+    now_iso_provider: Callable[[], str | None] | None = None,
+    sleep_fn: Callable[[float], None] | None = None,
+) -> tuple[Path, Path, dict[str, str]]:
+    template_path, dest_path, replacements, _template_text_override, _profile_sourced = _plan_discussion_doc_extended(
+        req,
+        graph,
+        assurance_store=assurance_store,
+        artifact_store=artifact_store,
+        today=today,
+        timestamp=timestamp,
+        now_iso_provider=now_iso_provider,
+        sleep_fn=sleep_fn,
+    )
     return template_path, dest_path, replacements
 
 
-def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> CreateDiscussionDocResult:
+def create_discussion_doc(
+    req: CreateDiscussionDocRequest,
+    ports: Ports,
+    *,
+    assurance_store: _AssuranceStoreLike | None = None,
+    artifact_store: _ArtifactStoreLike | None = None,
+) -> CreateDiscussionDocResult:
     template_scaffolder = _resolve_template_scaffolder(ports)
     specdock_dir = _resolve_specdock_dir(ports)
     _preflight_discussion_duplicate_guard(req, ports, specdock_dir=specdock_dir)
@@ -1346,9 +1449,11 @@ def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> Crea
         now_iso = _now_iso()
         today = _format_discussion_date(now_iso)
         timestamp = _format_discussion_timestamp(now_iso)
-        template_path, dest_path, replacements = plan_discussion_doc(
+        template_path, dest_path, replacements, template_text_override, profile_sourced = _plan_discussion_doc_extended(
             req,
             graph,
+            assurance_store=assurance_store,
+            artifact_store=artifact_store,
             today=today,
             timestamp=timestamp,
             now_iso_provider=_now_iso,
@@ -1357,10 +1462,15 @@ def create_discussion_doc(req: CreateDiscussionDocRequest, ports: Ports) -> Crea
         if duplicate_error is not None:
             raise RuntimeError(duplicate_error)
 
-        template_text = template_scaffolder.load_template_text(template_path)
+        template_text = (
+            template_text_override
+            if template_text_override is not None
+            else template_scaffolder.load_template_text(template_path)
+        )
         rendered_text = template_scaffolder.render_text(template_text, replacements)
         doc_type, _title, _slug = _normalize_discussion_doc_inputs(req)
-        rendered_text = _normalize_draft_discussion_text(rendered_text, doc_type=doc_type)
+        if not profile_sourced:
+            rendered_text = _normalize_draft_discussion_text(rendered_text, doc_type=doc_type)
         template_scaffolder.write_text(dest_path, rendered_text)
         doc_id = _doc_id_from_path(dest_path)
         _post_write_discussion_duplicate_guard(dest_path.parent, doc_id=doc_id)
