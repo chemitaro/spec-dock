@@ -231,9 +231,23 @@ def _has_unresolved_eal_row(rows: tuple[_TableRow, ...]) -> bool:
         if not cells or not cells[0].startswith("eal-") or len(cells) < 2:
             continue
         status = cells[1]
-        if "stale" in status or "blocked" in status:
+        if _is_unresolved_eal_status(status):
             return True
     return False
+
+
+def _is_unresolved_eal_status(status: str) -> bool:
+    if "stale" in status or "blocked" in status:
+        return True
+    allowed_statuses = {
+        "adopted",
+        "partially_adopted",
+        "rejected",
+        "deferred",
+        "integrated",
+        "partially_integrated",
+    }
+    return not _has_contract_value(status, allowed_statuses)
 
 
 def _has_valid_spec_authoring_gate(rows: tuple[_TableRow, ...]) -> bool:
@@ -372,10 +386,29 @@ def _has_contract_value(value: str, allowed_values: set[str]) -> bool:
 
 
 def _has_promotion_decision(value: str) -> bool:
-    return "execute" in value or "promote" in value or "manual-authored" in value
+    negated_markers = (
+        "do not promote",
+        "do not execute",
+        "not promote",
+        "not execute",
+        "no promote",
+        "no execute",
+        "failed",
+        "blocked",
+        "pending",
+    )
+    if any(marker in value for marker in negated_markers):
+        return False
+    return (
+        _has_contract_value(value, {"promote", "昇格"})
+        or "execute approved plan" in value
+        or "execute manual-authored canonical docs" in value
+        or "manual-authored" in value
+    )
 
 
 def _has_fresh_spec_review_pass(rows: tuple[_TableRow, ...]) -> bool:
+    found_fresh_pass = False
     for row in rows:
         if "reviewer gate status" not in row.section:
             continue
@@ -385,9 +418,12 @@ def _has_fresh_spec_review_pass(rows: tuple[_TableRow, ...]) -> bool:
         state = cells[4] if len(cells) > 4 else ""
         if reviewer_role != "spec-reviewer":
             continue
-        if freshness == "fresh" and _has_review_pass(state):
-            return True
-    return False
+        if freshness != "fresh":
+            continue
+        if not _has_review_pass(state):
+            return False
+        found_fresh_pass = True
+    return found_fresh_pass
 
 
 def _has_specialist_or_manual_fallback_evidence(rows: tuple[_TableRow, ...], profile: WorkflowProfile) -> bool:
