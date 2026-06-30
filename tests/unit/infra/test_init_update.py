@@ -354,9 +354,7 @@ class TestInitUpdate(CliRuntimeHarness):
 
     def _assert_no_generated_python_caches(self, root: Path) -> None:
         copied = sorted(
-            path.relative_to(root).as_posix()
-            for path in root.rglob("*")
-            if self._is_generated_python_cache_path(path)
+            path.relative_to(root).as_posix() for path in root.rglob("*") if self._is_generated_python_cache_path(path)
         )
         assert copied == []
 
@@ -3893,14 +3891,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 / "application"
                 / "workflow.py"
             )
-            target_runtime = (
-                target_repo
-                / "spec-dock"
-                / "scripts"
-                / "spec_dock_runtime"
-                / "application"
-                / "workflow.py"
-            )
+            target_runtime = target_repo / "spec-dock" / "scripts" / "spec_dock_runtime" / "application" / "workflow.py"
             provider_bytes = provider_runtime.read_bytes()
             assert target_runtime.read_bytes() == provider_bytes
 
@@ -34244,14 +34235,7 @@ esac
                 / "application"
                 / "workflow.py"
             )
-            target_runtime = (
-                target
-                / "spec-dock"
-                / "scripts"
-                / "spec_dock_runtime"
-                / "application"
-                / "workflow.py"
-            )
+            target_runtime = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "application" / "workflow.py"
             provider_bytes = provider_runtime.read_bytes()
             stale_bytes = b"# stale runtime mirror fixture for iss-00246 S01\n"
             assert stale_bytes != provider_bytes
