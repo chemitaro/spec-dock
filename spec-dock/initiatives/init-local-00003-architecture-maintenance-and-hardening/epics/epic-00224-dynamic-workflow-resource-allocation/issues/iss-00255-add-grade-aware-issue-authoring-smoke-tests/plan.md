@@ -69,4 +69,5 @@ R0〜G3 の成果を前提に、representative fixture と focused smoke tests �
 - この Issue では個別 PR を作成しない。
 - M99 は Epic 最終品質ゲートへ渡す local closure checkpoint とする。
 - M99 通過後、grade-aware smoke tests、provider / dogfooding parity evidence、report evidence を commit し、その HEAD を Epic #224 corrective tranche の PR candidate head とする。
+- PR Delivery Gate / Merge Preparation Gate は Issue-local M99 では実行せず、Epic `plan.md` の最終品質ゲートで実行する。
 - PR 作成前に、Epic `plan.md` の「Epic 最終品質ゲート（単一 PR 前）」を実行し、fresh spec review、code review、QA review、required tests の結果を Epic / Issue reports に記録する。
