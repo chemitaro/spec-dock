@@ -3,277 +3,476 @@
 ID: "iss-00246"
 タイトル: "Dogfooding Update Runtime Mirror Sync"
 関連GitHub: ["#246"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-30"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00067", "init-local-00003"]
 ---
 
-# iss-00246 Dogfooding Update Runtime Mirror Sync — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
+# iss-00246 Dogfooding Update Runtime Mirror Sync — 実装報告
 
-> `report.md` は観測証跡台帳（observed evidence ledger）の scaffold です。planned requirements、evidence destination、closure 条件は `plan.md` が持ち、この文書は実際の Red / Green / Refactor evidence、発見された tests、closure delta、reviewer status、commit/no-op evidence を記録する evidence slot です。workflow / compliance authority は skills、docs、accepted ADRs、reviewer gates に置きます。
+この report は、Issue #246 の planning phase と execution phase で確認した証跡を記録する。実装は test hardening が中心であり、production code と package metadata は no-op とした。spec authoring review はユーザー指示により fresh spec-reviewer で実施済みである。
 
-## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger / 必須）
+## 1. 仕様解釈・判断台帳
 
-`report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
+| ID | 状態 | 種別 | 起票元 | 判断 / 解釈 | 根拠 | 処置 | フォローアップ |
+|---|---|---|---|---|---|---|---|
+| D-001 | resolved | scope | orchestrator | Issue #246 は manual sync 手順化ではなく、`spec-dock update` と dogfooding parity が runtime mirror drift を検出または解消する契約として扱う | GitHub #246 の観測、Issue #244 research、`requirement.md` RQ-001/RQ-002 | promoted_to_requirement | none |
+| D-002 | resolved | test-strategy | orchestrator | 現行 code が既に stale runtime を更新できる場合でも、subset parity の穴を閉じる test hardening を成果に含める | `design.md` DES-002、`plan.md` S02 | promoted_to_design | none |
+| D-003 | resolved | operation | orchestrator | 現時点でユーザー interview は不要。残る不確実性は実装時の root-cause technical split である | `requirement.md` 8、`plan.md` 8 | no_action | none |
+| D-004 | resolved | test-strategy | spec-reviewer | 初回 spec-review は plan の step-local delegation、closure index、具体テストケース schema 不足を P1 blocker とした | fresh spec-reviewer review_status=fail | promoted_to_plan | `plan.md` 5-7 を拡張し再レビュー |
+| D-005 | resolved | implementation | orchestrator | S01/S03 で installer/package update は stale runtime file を provider bytes へ戻せることが確認されたため、production code と `pyproject.toml` は no-op とする | S01 focused pytest 2 passed; S03 isolated wheel smoke 1 passed | applied | none |
+| D-006 | resolved | test-strategy | orchestrator | Issue #246 の再発防止上の主 defect は、checked-in dogfooding runtime parity が手書き subset で provider runtime 95 files 中 26 files しか比較していなかった coverage gap と判断する | S02 worker inspection and inventory-driven parity test | applied | none |
+| D-007 | resolved | operation | spec-reviewer | S99 final gate requires dirty-tree scope evidence. `.assurance.json` is an intended PR artifact because `assurance classify/verify` binds the approved requirement/design/plan to the active issue authority. | final spec-reviewer P1 finding; `git status --short --branch` | applied | none |
+| D-008 | resolved | test-strategy | code-reviewer | Runtime inventory parity should fail if both provider and mirror roots disappear. Add explicit root directory assertions before comparing inventories. | issue-wide code-reviewer P2 finding; focused parity pytest 1 passed after fix | applied | none |
 
-Material な判断がない場合もこの section は残し、次を明示する。
+## 2. 証跡採用台帳
 
-- No material interpretation changes.
-- No decision entries.
-
-Ledger entry は次の契約値を使う。
-
-- `Status`: `open` / `resolved` / `superseded`
-- `Type`: `interpretation` / `scope` / `implementation` / `compatibility` / `test-strategy` / `operation` / `deviation` / `follow-up`
-- `Disposition`: `applied` / `rejected` / `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` / `converted_to_followup` / `deferred` / `no_action` / `superseded`
-
-完了時の意味論（completion semantics）:
-- issue completion 前に `Status=open` の entry を残してはならない。
-- `Status=resolved` は `Disposition`、evidence、必要な follow-up を持つ。
-- `Status=superseded` または `Disposition=superseded` は置換先 entry ID を持つ。
-- `Disposition=promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` は昇格先 artifact と evidence を持つ。
-- `Disposition=converted_to_followup` は follow-up issue / discussion / ADR candidate の参照を持つ。
-- `Disposition=deferred` は scope 外である理由、blocking でない根拠、revisit 条件を持つ。
-- `Disposition=no_action` は issue-local な判断で追加対応不要である理由を持つ。将来も効く durable decision を `report.md` だけに閉じ込めてはならない。
-
-Disposition ごとの必須証跡:
-- `applied`: 変更した artifact / 実装証跡と、issue-local 適用で十分な理由。
-- `rejected`: 却下した選択肢、理由、blocking impact が残らない根拠。
-- `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan`: 昇格先 artifact 参照と証跡。
-- `converted_to_followup`: follow-up issue / discussion / ADR candidate 参照と blocking / non-blocking の分類。
-- `deferred`: scope-out 理由、non-blocking の根拠、revisit 条件。
-- `no_action`: 判断が issue-local で durable ではない理由。
-- `superseded`: 置換先 entry ID と置換理由。
-
-| 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
-|---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
-
-## 証跡採用台帳（Evidence Adoption Ledger / 必須）
-
-Delegated draft、worker note、research、reviewer finding、discussion、command output を canonical artifact や実装判断へ取り込む場合、この台帳に採用判断を記録する。raw transcript ではなく、orchestrator が検証した採否・理由・証跡・次アクションだけを記録する。
-
-- `adoption_status`: `adopted` / `partially_adopted` / `rejected` / `deferred` / `stale` / `blocked`
-- `blocked` または `stale` の unresolved entry は promotion / implementation start / issue ready / issue finish / phase completion を止める。
-- `deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せる。
-- Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
-- Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
-
-| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
+| ID | 採用状態 | 出所 | 対象 | 判断理由 | 証跡 | 次アクション |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | GitHub issue | `requirement.md` / `design.md` / `plan.md` | Issue #246 の観測が runtime mirror drift 契約の中心根拠であるため | GitHub Issue #246 imported metadata in `.meta.json` | implementation |
+| EAL-002 | adopted | research | `requirement.md` / `design.md` | Issue #244 検証で provider/dogfooding `workflow.py` drift と manual sync recovery が記録されているため | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/discussions/20260627t154455z-research-dogfooding-runtime-update-drift-finding.md` | implementation |
+| EAL-003 | adopted | command | `design.md` / `plan.md` | 現在の local tree では provider/dogfood runtime 通常 file 差分がなく、実装時は regression hardening と package/local smoke が主眼になりうるため | `diff -qr src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime spec-dock/scripts/spec_dock_runtime` showed only `__pycache__` differences | implementation |
+| EAL-004 | adopted | command | `plan.md` | 現在の active Issue と dependency readiness を確認済み | `spec-dock active show`; `spec-dock deps check --id iss-00246 --github --json` ready=true | implementation |
+| EAL-005 | adopted | reviewer | `plan.md` | Fresh spec-reviewer findings identify mandatory issue-plan workflow gaps; all findings were plan-contract fixes, not requirement/design changes | spec-reviewer review_status=fail with P1 findings on step-local delegation, closure index fields, concrete test schema | re-review |
+| EAL-006 | adopted | command | `report.md` | S01/S03 verification demonstrates update runtime refresh works in checkout and installed wheel paths; production fix is not required | S01 focused pytest 2 passed; S03 focused pytest 1 passed | S04 closure |
+| EAL-007 | adopted | command | `report.md` | S02 verification demonstrates full dogfooding runtime inventory parity and cache exclusion; old subset map coverage gap is closed | S02 focused pytest 3 passed; provider/mirror inventory 95/95 | S04 closure |
+| EAL-008 | adopted | reviewer | `tests/unit/infra/test_init_update.py` | Issue-wide code review found a non-blocking parity guard weakness; adding root directory assertions improves sensitivity without changing production behavior | code-reviewer P2; `test_checked_in_dogfooding_runtime_mirror_match_provider_assets -q` -> 1 passed | final review |
+| EAL-009 | adopted | command | `report.md` | Final dirty-tree scope is now explicit and contains only intended issue docs, assurance authority artifact, and test changes | `git status --short --branch` output recorded in S99 final verification | final review |
 
-## 目的整合台帳（Objective Alignment Ledger / 必須）
+## 3. 目的整合台帳
 
-主要目的と副次要件の主従が逆転していないことを記録する。特に clarification / authoring / handoff の変更では、primary objective evidence、secondary requirement evidence、inversion risk、reviewer verdict を残す。
-
-| 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
+| 対象 | 主要目的の証跡 | 副次要件の証跡 | 逆転リスク | レビュアー判定 |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `requirement.md` RQ-001/RQ-002 と `design.md` DES-001/DES-002 が runtime mirror update/parity を中心に置く | preservation/cache/package smoke は AC-003 から AC-005 に限定 | low | pass |
 
-## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
+## 4. 仕様 authoring ゲート
 
-Requirement / design / plan の phase promotion ごとに、調査、未確定事項、回答、採用判断、reviewer verdict、blocking / non-blocking、次アクションを記録する。
-
-| フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
+| フェーズ | 調査証跡 | 未確定事項 / 回答 | 採用判断 | レビュアー判定 | ブロック有無 | 昇格 / 次アクション |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | GitHub #246、Issue #244 research、active context、existing code/test surface | ユーザー確認が必要な open question なし | adopted | pass | no | fresh spec-reviewer pass recorded |
+| design | `src/spec_dock/cli.py` update structure、`pyproject.toml` package data、`tests/unit/infra/test_init_update.py` existing parity/update tests | root cause は S01-S04 で切り分け | adopted | pass | no | fresh spec-reviewer pass recorded |
+| plan | `phase_plan_issue.md` / `authoring/issue-plan.md` の closure/test/delegation 契約を反映 | 初回 fail 指摘は `plan.md` に反映し、P2 report traceability nit も修正済み | adopted | pass | no | final fresh spec-reviewer pass; findings none |
 
-## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
-- 委任 authoring の使用:
-  - used / not used
-- 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
-- lifecycle state（契約値）:
-  - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
-- 昇格不可 state:
-  - `stale`, `rejected`, `superseded`, `blocked`
-- 標準出力先:
-  - 対象 scope の `discussions/` direct child にある flat Markdown
-  - filename: `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md`
-- 軽量 provenance:
-  - `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
-  - 互換 label: source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
-- 禁止 self-claim:
-  - `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
-- 禁止 wildcard token:
-  - `*`, `grants.*`, `all`
-- 標準必須にしない field:
-  - task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
-- historical note:
-  - 既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
+## 5. 委任ドラフト証跡
 
-| ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| ロール | 範囲 | ドラフトパス | 参照元 | 採用状態 | ブロッカー | レビュー結果 | 昇格判断 |
+|---|---|---|---|---|---|---|---|
+| N/A | N/A | N/A | N/A | not_used | none | not_run | manual issue-doc authoring only |
 
-### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
-| 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
-|---|---|---|---|---|
-| 同意なし（missing consent） | blocked / incomplete | 範囲付き同意を取得する、または手動 authoring に戻す | この section | ineligible |
-| 前段 reviewer pass 不足 / stale（missing/stale previous reviewer pass） | blocked / incomplete | レビューゲートを再実行する（rerun reviewer gate） | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
-| 設計中の要件 gap（requirement gap during design） | blocked / incomplete | requirement phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| 計画中の設計 gap（design gap during plan） | blocked / incomplete | design phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| ロール利用不可（role unavailable） | blocked / manual path | 利用不可を記録し、妥当なら手動で続行する | この section | ineligible |
-| 禁止行為の試行（forbidden action attempt） | rejected | ドラフトを破棄し incident を記録する | この section / decision ledger | ineligible |
-| 古いドラフト（stale draft） | stale | 再生成または差分調整する | この section | ineligible |
-| 置換済みドラフト（superseded draft） | superseded | 置換先ドラフトを参照する | この section | ineligible |
-| 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
-| reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
+## 6. ワークフロー委任同意の証跡
 
-## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+| 同意元 | repo/worktree | active issue | 指名ロール | 境界 | 拒否 / 利用不可理由 | 次アクション |
+|---|---|---|---|---|---|---|
+| user instruction | `/Users/iwasawayuuta/.codex/worktrees/55b2/spec-dock` | iss-00246 | spec-reviewer | read-only fresh review of requirement/design/plan; findings must be fixed and re-reviewed until pass | none | record pass/fail in this report before implementation |
 
-## 実装記録（セッションログ） (必須)
+## 6.1 Spec Review Gate Evidence
 
-### セッションログ（2026-06-30 HH:MM - HH:MM）
+| Review pass | 対象 | reviewer status | findings | 修正内容 | residual risks | evidence |
+|---|---|---|---|---|---|---|
+| initial | `requirement.md`, `design.md`, `plan.md`, `report.md` | fail | P1: step-local delegation contracts missing; P1: closure index fields incomplete; P1: concrete test case schema incomplete | `plan.md` の closure index、S01/S02/S03/S04/S90/S99 contracts、具体テストケース、step gates を拡張 | N/A | spec-reviewer output |
+| second | `requirement.md`, `design.md`, `plan.md`, `report.md` | pass | P2: report closure references used old `TC-*` labels | `report.md` Closure Coverage を `tc-s01-001` 等の現行 test IDs へ更新 | implementation-phase only | spec-reviewer output |
+| final | `requirement.md`, `design.md`, `plan.md`, `report.md` | pass | none | no further changes required | S03 may need justified package-like smoke alternative; final QA/code/spec gates still need post-implementation evidence | spec-reviewer output; assurance/guidance/validate/diff-check commands pass |
+
+## 7. 実装記録
+
+### セッションログ（2026-06-30 planning）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+
+- Step: Planning only
+- AC/EC: AC-001 から AC-006 の契約化
 
 #### 実施内容
-- ...
+
+- `issue start iss-00246` 済みの active issue context を確認した。
+- `spec-dock-issue-planning` workflow と planning/authoring docs に従い、placeholder requirement/design/plan を issue-specific docs へ更新した。
+- `assurance classify --stage requirement --issue iss-00246` を実行し、`authorized_profile=standard` を確認した。
+- `assurance compose --artifact all --issue iss-00246` を実行し、standard skeleton を生成した。
+- 生成 skeleton を Issue #246 固有の requirement/design/plan/report へ統合した。
 
 #### 実行コマンド / 結果
-```bash
-<command>
 
-<result>
+```bash
+./spec-dock/scripts/spec-dock assurance classify --stage requirement --issue iss-00246
+# assurance classify: ok
+# authorized_profile: standard
+
+./spec-dock/scripts/spec-dock assurance compose --artifact all --issue iss-00246
+# assurance compose: ok
+# changed_paths: design.md, plan.md, report.md
 ```
 
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+#### TDD / 実装証跡
 
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+実装はまだ開始していない。Red/Green/Refactor evidence は S01 以降で記録する。
 
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
-
-| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
-|---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00246 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
-
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
-#### レビューゲート状態（Reviewer Gate Status）
-| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
-
-#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
-| マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
-
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
-
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
-
-### セッションログ（2026-06-30 HH:MM - HH:MM）
+### セッションログ（2026-06-30 S01）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+
+- Step: S01 stale runtime mirror refresh characterization
+- AC/EC: AC-001, AC-003
+- Closure: CLOS-001, CLOS-003
 
 #### 実施内容
-- ...
 
----
+- `dev-coder` に S01 の bounded task を委任し、`tests/unit/infra/test_init_update.py` に focused regression test を追加した。
+- temp target の `spec-dock/scripts/spec_dock_runtime/application/workflow.py` を stale bytes にして `update` を実行し、provider bytes へ戻ることを確認する。
+- 同じ test で `spec-dock/initiatives/**` の user-authored issue data と root unmanaged marker が保持されることを確認する。
+- Red が production defect を示さなかったため、production code は no-op とした。
 
-## 最終品質ゲート（Final Quality Gate / 必須）
+#### 実行コマンド / 結果
 
-### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
-| 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
-|---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_refreshes_stale_runtime_mirror_and_preserves_user_data tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_keeps_initiatives_by_default
+# 2 passed
+```
 
-### 最終 QA ゲート（Final QA Gate）
-| レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
-|---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+#### TDD / Red / Green / Refactor Evidence
 
-### 最終コードレビューゲート（Final Code Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| step | phase | planned evidence requirement | observed evidence | method | result | notes |
+|---|---|---|---|---|---|---|
+| S01 | Red alternative / characterization | red-required; existing Green acceptable with stale fixture sensitivity | new test asserts `stale_bytes != provider_bytes` and fails if stale bytes remain after update | focused pytest | pass | production defect not reproduced |
+| S01 | Green | stale runtime file refreshed to provider bytes; user-authored data preserved | `test_update_refreshes_stale_runtime_mirror_and_preserves_user_data` | focused pytest | pass | CLOS-001/CLOS-003 closed |
+| S01 | Refactor | no unrelated refactor | no production code change; test-only diff | diff inspection | pass | no helper refactor |
 
-### 最終 spec review ゲート（Final Spec Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+#### Step Contract Closure
 
-### 最終 commit（Final Commit）
-| 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S01 | CLOS-001, CLOS-003 | `tc-s01-001` and `tc-s01-002` pass; production code change/no-op recorded | focused pytest 2 passed; production no-op | pass | code-reviewer pass |
+
+#### Test Contract Closure
+
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| CLOS-001 / `tc-s01-001` | S01 | yes | focused pytest / CLI-like unit | stale fixture sensitivity | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_refreshes_stale_runtime_mirror_and_preserves_user_data` | pass | target runtime bytes match provider bytes |
+| CLOS-003 / `tc-s01-002` | S01 | yes | focused pytest plus existing preservation regression | user-authored issue data and unmanaged marker fixture | same focused pytest plus `test_update_keeps_initiatives_by_default` | pass | preservation guard retained |
+
+#### Delegated Worker Evidence
+
+| step | delegated role | delegated worker summary | changed files | tests run | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S01 | dev-coder | Added stale runtime refresh + preservation focused test. Production code no-op. No material implementation decisions beyond the approved plan. | `tests/unit/infra/test_init_update.py` | focused pytest 1 passed; combined focused pytest 2 passed; `git diff --check -- tests/unit/infra/test_init_update.py` pass | code-reviewer pass | S02/S03 remain open by plan | accepted |
+
+#### Reviewer Gate Status
+
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S01 | step reviewer | code-reviewer | fresh | passed | N/A | proceed | no findings; reviewer relied on parent pytest evidence |
+
+#### 変更したファイル
+
+- `tests/unit/infra/test_init_update.py` - stale runtime mirror refresh and preservation regression test
+
+### セッションログ（2026-06-30 S02）
+
+#### 対象
+
+- Step: S02 checked-in dogfooding runtime parity inventory
+- AC/EC: AC-002, AC-004
+- Closure: CLOS-002, CLOS-004
+
+#### 実施内容
+
+- `dev-coder` に S02 の bounded task を委任し、手書き subset map を provider/dogfooding runtime inventory 由来の比較へ置換した。
+- `_runtime_inventory` を追加し、`__pycache__`、`.pyc`、`.pyo` を generated cache として除外する。
+- provider runtime inventory と checked-in dogfooding mirror inventory の relative path set equality と byte equality を検証する。
+- 現在の checked-in dogfooding mirror は provider と一致していたため、runtime mirror file は変更しなかった。
+
+#### 実行コマンド / 結果
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_mirror_match_provider_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_dogfooding_runtime_inventory_excludes_generated_python_caches tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_does_not_copy_generated_python_caches_from_provider_assets
+# 3 passed
+```
+
+#### TDD / Red / Green / Refactor Evidence
+
+| step | phase | planned evidence requirement | observed evidence | method | result | notes |
+|---|---|---|---|---|---|---|
+| S02 | Characterization | old subset map leak should be made visible | old handwritten map covered 26 of 95 provider runtime files; old parity test still passed | worker inspection | pass | 69 files were not covered by old map |
+| S02 | Green | provider/dogfood runtime path set and bytes match with cache exclusion | inventory-driven parity test and cache helper test | focused pytest | pass | provider inventory 95, mirror inventory 95, no drift |
+| S02 | Refactor | avoid stale handwritten map | `_DOGFOODING_RUNTIME_MIRROR_PROVIDER_ASSET_MAP` removed; `_runtime_inventory` added | diff inspection | pass | test-only change |
+
+#### Step Contract Closure
+
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S02 | CLOS-002, CLOS-004 | `tc-s02-001` and `tc-s02-002` pass; generated cache exclusion recorded | focused pytest 3 passed; code-reviewer pass | pass | no dogfooding mirror file changes |
+
+#### Test Contract Closure
+
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| CLOS-002 / `tc-s02-001` | S02 | yes | focused pytest / inspection | old map covered 26/95 runtime files | `uv run pytest ...test_checked_in_dogfooding_runtime_mirror_match_provider_assets` | pass | path set and bytes parity from inventory |
+| CLOS-004 / `tc-s02-002` | S02 | yes | focused pytest / structural inspection | generated cache exclusion required by plan | `uv run pytest ...test_dogfooding_runtime_inventory_excludes_generated_python_caches ...test_update_does_not_copy_generated_python_caches_from_provider_assets` | pass | `__pycache__`, `.pyc`, `.pyo` excluded |
+
+#### Delegated Worker Evidence
+
+| step | delegated role | delegated worker summary | changed files | tests run | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S02 | dev-coder | Replaced handwritten runtime subset parity with inventory-driven parity and generated cache exclusion. No material implementation decisions beyond the approved plan. | `tests/unit/infra/test_init_update.py` | focused pytest 2 passed; generated-cache update pytest 1 passed | code-reviewer pass | S03 package/local smoke remains open | accepted |
+
+#### Reviewer Gate Status
+
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S02 | step reviewer | code-reviewer | fresh | passed | N/A | proceed | no findings; reviewer relied on parent pytest evidence |
+
+#### 変更したファイル
+
+- `tests/unit/infra/test_init_update.py` - inventory-driven runtime mirror parity and generated cache exclusion test
+
+### セッションログ（2026-06-30 S03）
+
+#### 対象
+
+- Step: S03 local checkout/package update smoke
+- AC/EC: AC-005
+- Closure: CLOS-005
+
+#### 実施内容
+
+- `dev-coder` に S03 の bounded task を委任し、既存 Issue 69 系の hermetic wheel/install helper を再利用した package-like smoke を追加した。
+- isolated wheel install された `spec-dock` command で target repo を `init` し、target runtime file を stale bytes に変更した。
+- 同じ installed/package-like command の `update` で `workflow.py` が provider bytes に戻ることを byte-level で確認した。
+- installed package snapshot assertion により checkout fallback を使っていないことを確認した。
+- 追加 test が Green だったため、`pyproject.toml` / package metadata は no-op とした。
+
+#### 実行コマンド / 結果
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_246_isolated_wheel_update_refreshes_stale_runtime_file
+# 1 passed
+```
+
+#### TDD / Red / Green / Refactor Evidence
+
+| step | phase | planned evidence requirement | observed evidence | method | result | notes |
+|---|---|---|---|---|---|---|
+| S03 | Characterization | package-like path should prove stale runtime refresh; existing S01/Issue69 tests did not combine both assertions | new test uses local wheel build + isolated installed command + stale runtime file | focused pytest | pass | full package-like smoke chosen; no alternative needed |
+| S03 | Green | installed/package-like update refreshes stale runtime file to provider bytes | `test_issue_246_isolated_wheel_update_refreshes_stale_runtime_file` | focused pytest | pass | checkout fallback excluded by snapshot assertion |
+| S03 | Refactor | no package metadata change unless defect observed | `pyproject.toml` unchanged | diff inspection | pass | package data defect not observed |
+
+#### Step Contract Closure
+
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S03 | CLOS-005 | `tc-s03-001` or approved equivalent pass; selected evidence path recorded | focused package-like isolated wheel smoke 1 passed | pass | full package-like smoke, no alternative path |
+
+#### Test Contract Closure
+
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| CLOS-005 / `tc-s03-001` | S03 | yes | package-like smoke | existing S01 covered checkout update and Issue69 covered isolated init/update, but stale runtime byte refresh in package-like path was missing | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_246_isolated_wheel_update_refreshes_stale_runtime_file` | pass | installed wheel update restores stale `workflow.py` to provider bytes |
+
+#### Delegated Worker Evidence
+
+| step | delegated role | delegated worker summary | changed files | tests run | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S03 | dev-coder | Added isolated wheel/package-like stale runtime refresh test. `pyproject.toml` no-op. No material implementation decisions beyond the approved plan. | `tests/unit/infra/test_init_update.py` | focused S03 pytest 1 passed; supporting 3-test selection 3 passed | code-reviewer pass after report evidence update | test path uses one representative runtime file by design | accepted |
+
+#### Reviewer Gate Status
+
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S03 | step reviewer | code-reviewer | fresh | passed | N/A | proceed | initial fail was report-evidence-only; re-review passed after CLOS-005 evidence update |
+
+#### 変更したファイル
+
+- `tests/unit/infra/test_init_update.py` - isolated wheel/package-like stale runtime refresh smoke
+
+### セッションログ（2026-06-30 S04）
+
+#### 対象
+
+- Step: S04 production defect / no-op root-cause closure
+- AC/EC: AC-006
+- Closure: CLOS-006 implementation-decision portion
+
+#### 実施内容
+
+- S01/S03 の結果により、direct checkout update と installed wheel/package-like update の両方で stale runtime file が provider bytes へ戻ることを確認した。
+- `src/spec_dock/cli.py` と `pyproject.toml` の production/package metadata defect は観測されなかったため no-op とした。
+- S02 の結果により、checked-in dogfooding runtime parity の旧手書き map が provider runtime 95 files 中 26 files のみを比較していたことを確認し、inventory-driven parity へ置換した。
+- root cause classification を `test coverage gap / parity subset gap` として記録した。
+
+#### 実行コマンド / 結果
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_refreshes_stale_runtime_mirror_and_preserves_user_data tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_mirror_match_provider_assets tests/unit/infra/test_init_update.py::TestInitUpdate::test_dogfooding_runtime_inventory_excludes_generated_python_caches tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_246_isolated_wheel_update_refreshes_stale_runtime_file
+# 4 passed
+```
+
+#### Step Contract Closure
+
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S04 | CLOS-006 | root cause classification and code/no-op decision recorded | production/package metadata no-op; parity subset gap fixed in tests | pass | no plan amendment required |
+
+#### Test Contract Closure
+
+| closure id / test id | step | required | evidence level | pre-implementation evidence | verification command or alternative path | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| CLOS-006 / `tc-s04-001` | S04 | yes | docs inspection / focused pytest evidence | S01-S03 pass evidence | report decision ledger inspection | pass | root cause and no-op rationale recorded |
+
+#### Reviewer Gate Status
+
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S04 | step reviewer | spec-reviewer | pending | not_run | N/A | run at S99 | S04 changes are report/closure evidence; final spec-reviewer checks issue-wide closure |
+
+### セッションログ（2026-06-30 S90）
+
+#### 対象
+
+- Step: S90 docs / workflow impact resolution
+- AC/EC: AC-006
+- Closure: CLOS-006 docs impact portion
+
+#### 実施内容
+
+- S01-S03 の実装差分を確認し、public CLI command / argument / workspace layout / operator-visible diagnostic は変更していないことを確認した。
+- production code と `pyproject.toml` は no-op で、変更は `tests/unit/infra/test_init_update.py` と issue docs/report の証跡更新に閉じている。
+- したがって persistent docs/templates/skills/workflow text の更新は不要と判断した。
+
+#### 代替検証 / 結果
+
+| step | phase | planned evidence requirement | observed evidence | method | result | notes |
+|---|---|---|---|---|---|---|
+| S90 | inspect-only | docs impact resolved by no-op rationale or docs diff | no public CLI/docs contract change; no operator-visible diagnostic added | diff inspection | pass | doc-writer delegation not required |
+
+#### Step Contract Closure
+
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S90 | CLOS-006 | docs no-op or docs update evidence recorded | docs no-op rationale recorded | pass | final spec-reviewer to check at S99 |
+
+#### Reviewer Gate Status
+
+| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
+|---|---|---|---|---|---|---|---|
+| S90 | docs/spec alignment | spec-reviewer | pending | not_run | N/A | run at S99 | no persistent docs update required |
+
+### セッションログ（2026-06-30 S99 discovered repair）
+
+#### 対象
+
+- Step: S99 final gate discovered test repair
+- Test: `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json`
+- Closure: CLOS-006 final evidence hygiene
+
+#### 発見事項
+
+`uv run pytest tests/unit/infra/test_init_update.py -q` の初回実行で `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` が失敗した。原因は、Issue #246 import により checked-in dogfooding initiatives tree に `iss-00246` の `.meta.json` が追加された一方、test snapshot `_CHECKED_IN_DOGFOODING_META_JSON_PATHS` と `_CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH` が未更新だったことである。
+
+#### 実施内容
+
+- `dev-coder` に discovered repair を委任した。
+- `tests/unit/infra/test_init_update.py` の checked-in dogfooding `.meta.json` snapshot に `iss-00246` の `.meta.json` path を追加した。
+- 同じ path を `depends_on=[]` として depends-on baseline に追加した。
+- runtime/source behavior は変更していない。
+
+#### 実行コマンド / 結果
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -q
+# 1 passed
+```
+
+#### Delegated Worker Evidence
+
+| step | delegated role | delegated worker summary | changed files | tests run | reviewer verdict | unresolved risks | parent integration decision |
+|---|---|---|---|---|---|---|---|
+| S99 repair | dev-coder | Updated checked-in dogfooding meta snapshot and depends_on baseline for imported iss-00246. | `tests/unit/infra/test_init_update.py` | focused failing test 1 passed | pending final review | snapshot could mask unintended import; mitigated by confirming actual iss-00246 `.meta.json` | accepted |
+
+### セッションログ（2026-06-30 S99 final verification）
+
+#### 対象
+
+- Step: S99 final quality gate
+- Closure: CLOS-001 through CLOS-006
+
+#### 実行コマンド / 結果
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -q
+# 530 passed in 322.38s
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=156
+
+./spec-dock/scripts/spec-dock sync
+# spec-dock: ok (sync)
+
+./spec-dock/scripts/spec-dock assurance verify --issue iss-00246
+# assurance verify: ok
+
+git diff --check
+# pass
+
+git status --short --branch
+# ## iss-00246-dogfooding-update-runtime-mirror-sync
+#  M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/design.md
+#  M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/plan.md
+#  M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/report.md
+#  M spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/requirement.md
+#  M tests/unit/infra/test_init_update.py
+# ?? spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00067-installed-layout-aligned-asset-source-structure-for-agent-tooling/issues/iss-00246-dogfooding-update-runtime-mirror-sync/.assurance.json
+```
+
+#### Dirty-tree scope decision
+
+| path | scope decision | rationale |
+|---|---|---|
+| `spec-dock/active/issue/requirement.md` | intended | Issue #246 requirement authored and reviewed |
+| `spec-dock/active/issue/design.md` | intended | Issue #246 design authored and reviewed |
+| `spec-dock/active/issue/plan.md` | intended | Issue #246 execution plan authored, reviewed, and amended for reviewer findings |
+| `spec-dock/active/issue/report.md` | intended | Observed evidence ledger for S01-S99 |
+| `spec-dock/active/issue/.assurance.json` | intended | Generated assurance authority binding for approved issue artifacts; required by `assurance verify` / guidance |
+| `tests/unit/infra/test_init_update.py` | intended | Regression tests and checked-in dogfooding snapshot updates for Issue #246 |
+
+#### Reviewer follow-up fixes
+
+| reviewer | finding | fix | verification |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| code-reviewer | P2: runtime parity could pass if both roots disappeared | added explicit `provider_root.is_dir()` and `mirror_root.is_dir()` assertions | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_mirror_match_provider_assets -q` -> 1 passed |
+| spec-reviewer | P1: final gate lacked `git status --short` evidence and `.assurance.json` scope decision | recorded dirty-tree status and marked `.assurance.json` as intended assurance artifact | pending re-review |
+| spec-reviewer | final re-review | no further changes required | pass |
 
-## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+#### Step Contract Closure
 
-## 学んだこと (任意)
-- ...
+| step | closure ids | close condition from plan | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S99 | CLOS-001, CLOS-002, CLOS-003, CLOS-004, CLOS-005, CLOS-006 | required commands pass; report has closure coverage and final quality evidence | `test_init_update.py` full file 530 passed; validate/sync/assurance/diff-check pass | pass | reviewer gates pending |
 
-## 今後の推奨事項 (任意)
-- ...
+## 8. Closure Coverage
 
-## 省略/例外メモ (必須)
-- 該当なし
+| Closure ID | 状態 | 現在の証跡 | 次アクション |
+|---|---|---|---|
+| CLOS-001 | closed | S01 focused pytest / `tc-s01-001` | update stale runtime refresh covered |
+| CLOS-002 | closed | S02 focused pytest / `tc-s02-001` | inventory-driven runtime parity covered |
+| CLOS-003 | closed | S01 focused pytest / `tc-s01-002` | user-authored data and unmanaged marker preservation covered |
+| CLOS-004 | closed | S02 focused pytest / `tc-s02-002` | generated cache exclusion covered |
+| CLOS-005 | closed | S03 focused pytest / `tc-s03-001` | package-like isolated wheel update smoke covered |
+| CLOS-006 | closed | S04 decision ledger / `tc-s04-001`; S90 docs no-op; S99 commands and reviewer gates pass | root cause/no-op, docs impact, final command evidence, and final reviewer evidence recorded |
+
+## 9. Final Quality Gate
+
+| Gate | 状態 | 証跡 | 次アクション |
+|---|---|---|---|
+| spec authoring | pass | `requirement.md`, `design.md`, `plan.md`, `report.md`; final spec-reviewer findings none | implementation phase may start subject to issue execution workflow gates |
+| QA | pass | `uv run pytest tests/unit/infra/test_init_update.py -q` -> 530 passed in 322.38s; qa-reviewer findings none | residual risk limited to implementation-phase smoke representativeness |
+| code review | pass | issue-wide code-reviewer findings none after P2 root assertion fix | no remaining code-review findings |
+| spec review | pass | final spec-reviewer findings none after dirty-tree scope evidence fix | no unresolved spec gaps |
+| validation | pass | `spec-dock validate`, `spec-dock sync`, `assurance verify`, `git diff --check` passed | none |
+
+## 10. 変更したファイル
+
+- `spec-dock/active/issue/requirement.md` - Issue #246 の要件・受け入れ条件を定義
+- `spec-dock/active/issue/design.md` - runtime mirror update/parity の設計差分を定義
+- `spec-dock/active/issue/plan.md` - TDD/closure/test/delegation plan を定義
+- `spec-dock/active/issue/report.md` - planning phase の evidence ledger を定義
