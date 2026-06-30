@@ -125,9 +125,202 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- workflow readiness の fail-closed 判定を補強し、requirement の `REQ-XXX` / `CON-...` sentinel と、実装ステップを持たない品質ゲートのみの plan を execution ready にしないようにした。
+- plan readiness では executable marker と quality/supporting marker を分離し、design readiness では本文中の ordinary word `template` / `placeholder` を block しない regression を追加した。
 
 ## 実装記録（セッションログ） (必須)
+
+### セッションログ（2026-07-01 R0 実装）
+
+#### 対象
+- Step: S00, S01, S02, S03, S04, S90, S99
+- AC/EC: AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007
+- 計画上の出典（Planned source）:
+  - `plan.md` section: `7. 実装ステップ / 実行ステップ契約（Executable Step Contract）`
+  - closure ids: C-001, C-002, C-003, C-004, C-090, C-099
+
+#### 実施内容
+- S00: `workflow.py` / `workflow_state.py` / 既存 workflow tests を確認し、readiness 判定が `_classify_plan_text`、`_classify_design_text`、`classify_requirement_text` に分散していることを確認した。
+- S01: `classify_requirement_text` の placeholder markers に `REQ-XXX` と `CON-...` を追加した。
+- S02: `_classify_plan_text` の executable marker から `validation gate` / `報告証跡` を外し、品質ゲート見出しだけの plan を executable と扱わないようにした。
+- S02: fresh spec review の P1 指摘を受け、plan frontmatter の `artifact_state: awaiting-assurance-compose` と composite code-span placeholder を block する regression を追加した。
+- S02: fresh re-review の P1 指摘を受け、table/list 内だけでなく standalone code span の `AC-...` も block する regression を追加した。
+- S02: fresh re-review 2 の P1 指摘を受け、bare `...` code span は普通の記法として許容し、code span block は ID placeholder token に限定した。
+- S03: design 本文・title 中の ordinary word `template` / `placeholder` が ready を妨げない regression test を追加した。既存の `artifact_state: awaiting-assurance-compose` block test は維持した。
+- S04: R0 では grade-aware evidence policy を追加せず、既存 contract の readiness classifier に閉じる判断を維持した。
+- S90: provider / dogfooding docs と active issue docs を `rg` で点検し、今回の R0 は runtime classifier と tests の更新で足りると判断した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py
+
+3 failed, 31 passed in 33.98s
+```
+
+```bash
+uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py
+
+34 passed in 34.45s
+```
+
+```bash
+uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py
+
+34 passed in 34.65s
+```
+
+```bash
+uv run pytest tests/cli_runtime/test_workflow.py
+
+3 failed, 30 passed in 38.24s
+```
+
+```bash
+uv run pytest tests/cli_runtime/test_workflow.py
+
+33 passed in 38.16s
+```
+
+```bash
+uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py
+
+37 passed in 38.47s
+```
+
+```bash
+uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py
+
+38 passed in 39.87s
+```
+
+```bash
+uv run pytest tests/cli_runtime/test_workflow.py::TestCliWorkflow::test_guidance_blocks_standalone_plan_placeholder_code_span
+
+1 failed in 1.26s
+```
+
+```bash
+uv run pytest tests/cli_runtime/test_workflow.py::TestCliWorkflow::test_guidance_blocks_standalone_plan_placeholder_code_span
+
+1 passed in 1.21s
+```
+
+```bash
+uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py
+
+39 passed in 41.07s
+```
+
+```bash
+uv run pytest tests/cli_runtime/test_workflow.py::TestCliWorkflow::test_guidance_allows_executable_plan_with_bare_ellipsis_code_span tests/cli_runtime/test_workflow.py::TestCliWorkflow::test_guidance_blocks_standalone_plan_placeholder_code_span
+
+2 passed in 2.72s
+```
+
+```bash
+uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py
+
+40 passed in 41.91s
+```
+
+```bash
+make lint
+
+ruff check: pass
+ruff format check: pass
+mypy: pass
+```
+
+```bash
+git diff --check
+
+pass
+```
+
+```bash
+./spec-dock/scripts/spec-dock validate
+
+spec-dock: ok (validate) nodes=160
+```
+
+```bash
+rg -n "REQ-XXX|CON-\\.\\.\\.|quality gate|Validation Gate|plan-not-executable|artifact_state: awaiting-assurance-compose|template|placeholder|readiness" src/spec_dock/assets/spec_dock/docs spec-dock/docs src/spec_dock/assets/spec_dock/templates spec-dock/templates spec-dock/active/issue
+
+pass: active issue docs と provider/dogfooding docs/templates の関連記述を確認。追加 docs 更新は不要。
+```
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| S00 | 代替証跡（inspect-only） | 現行 readiness 判定の配置確認 | `_classify_plan_text`、`_classify_design_text`、`classify_requirement_text` を確認 | inspection | pass | 実装変更なし |
+| S01 | 赤フェーズ（Red） | requirement sentinel block test | `REQ-XXX` / `CON-...` tests が `substantive` で失敗 | `uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py` | pass | 2 件の想定 Red を確認 |
+| S01 | 緑フェーズ（Green） | requirement sentinel block test | `REQ-XXX` / `CON-...` が `scaffold` になる | `uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py` | pass | `workflow_state.py` markers 追加 |
+| S02 | 赤フェーズ（Red） | quality-marker-only plan block test | test fixture title 制約修正後、旧実装では quality marker が executable marker に混在していた | test / inspection | pass | `validation gate` は supporting marker 扱いに変更 |
+| S02 | 緑フェーズ（Green） | quality-marker-only plan block test | `plan-not-executable` で block | `uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py` | pass | 実装ステップなし plan を ready にしない |
+| S02 | 赤フェーズ（Red） | composite placeholder code-span block test / plan `artifact_state` block test | 追加 regression が `ready` で失敗 | `uv run pytest tests/cli_runtime/test_workflow.py` | pass | fresh spec review P1-2 / P1-3 の再現 |
+| S02 | 緑フェーズ（Green） | composite placeholder code-span block test / plan `artifact_state` block test | 追加 regression が `plan-not-executable` で pass | `uv run pytest tests/cli_runtime/test_workflow.py` | pass | code-span token scan と plan frontmatter marker を追加 |
+| S02 | 赤フェーズ（Red） | standalone code-span placeholder block test | `AC-...` を含む narrative code span が `ready` で失敗 | targeted pytest | pass | fresh re-review P1 の再現 |
+| S02 | 緑フェーズ（Green） | standalone code-span placeholder block test | `AC-...` code span が `plan-not-executable` で pass | targeted pytest | pass | `_has_placeholder_code_spans` を追加 |
+| S02 | 緑フェーズ（Green） | bare ellipsis code-span non-block regression | literal `...` code span と `AC-...` code span の境界を確認 | targeted pytest | pass | ID placeholder token のみに限定 |
+| S03 | 赤フェーズ（Red） | title ordinary word non-block regression | substantive design title の `template` / `placeholder` が `design-not-substantive` で失敗 | `uv run pytest tests/cli_runtime/test_workflow.py` | pass | fresh spec review P1-1 の再現 |
+| S03 | 緑フェーズ（Green） | ordinary word non-block regression | substantive design body/title の `template` / `placeholder` が ready を妨げない | `uv run pytest tests/cli_runtime/test_workflow.py` | pass | frontmatter の ordinary words を scaffold marker から除外 |
+| S04 | 代替証跡（inspect-only） | G3 policy を R0 に持ち込まない | grade-aware evidence policy の新規定義なし | diff inspection | approved-no-op | runtime readiness predicate の範囲に閉じた |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
+|---|---|---|---|---|---|---|
+| S02 | `--title` は hyphen を許可しないため、test fixture title を `Quality Only Plan` に修正する必要があった | implementation | test data correction | C-002 | no | Red run failure output |
+| S95 | design title / plan artifact_state / composite code-span placeholder の 3 点に P1 指摘 | spec-reviewer | tests と runtime classifier を追加修正 | C-002 / C-003 | no | Avicenna review fail output |
+| S95 | standalone code-span placeholder に P1 指摘 | spec-reviewer | targeted regression と `_has_placeholder_code_spans` を追加 | C-002 | no | Hilbert re-review fail output |
+| S95 | bare ellipsis code span の過剰 block に P1 指摘 | spec-reviewer | code span detector を ID placeholder token のみに限定 | C-002 | no | Herschel re-review fail output |
+| S04 | evidence policy の深掘りは G3 範囲に広がる | spec boundary | R0 では no-op として記録 | C-004 | no | `git diff` inspection |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S00 | C-001〜C-004 | 現行判定の配置と既存 coverage を確認 | source / tests inspection | pass | 実装変更前調査完了 |
+| S01 | C-001 | requirement placeholder sentinel block test | focused pytest 34 passed | pass | `REQ-XXX` / `CON-...` を追加 |
+| S02 | C-002 | plan quality-marker-only and placeholder-cell block tests | focused pytest 40 passed | pass | composite / standalone code-span と plan `artifact_state` block、bare `...` non-block |
+| S03 | C-003 | design explicit scaffold block and ordinary-word non-block regression | focused pytest 37 passed | pass | title/body ordinary words と `artifact_state` block を確認 |
+| S04 | C-004 | G3 policy out-of-scope no-op rationale | diff inspection | approved-no-op | 新規 grade-aware evidence policy なし |
+| S90 | C-090 | docs parity inspection and validate | `rg` inspection | pass | runtime/test 変更のみで docs 追加不要 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| C-001 | S01 | yes | red-required | 2 failing unit tests | `uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py` | pass | Red: `REQ-XXX` / `CON-...` が substantive |
+| C-002 | S02 | yes | red-required | quality marker が executable marker に含まれていた | `uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py` | pass | `plan-not-executable` を確認 |
+| C-003 | S03 | yes | regression | existing explicit scaffold block tests plus reviewer Red | `uv run pytest tests/unit/domain/test_workflow_state.py tests/cli_runtime/test_workflow.py` | pass | ordinary word non-block / plan `artifact_state` block tests 追加 |
+| C-004 | S04 | yes | inspect-only | G3 境界の spec review 指摘 | diff inspection | approved-no-op | R0 は policy を追加しない |
+| C-090 | S90 | yes | inspect-only | docs / templates related wording | `rg` inspection | pass | docs 更新不要 |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| C-001 | S01 | focused pytest | pass | requirement sentinel |
+| C-002 | S02 | focused pytest | pass | quality-only plan block / placeholder code-span block |
+| C-003 | S03 | focused pytest | pass | design false-positive prevention / plan `artifact_state` block |
+| C-004 | S04 | diff inspection | approved-no-op | G3 policy out of scope |
+| C-090 | S90 | `rg` inspection | pass | docs parity |
+| C-099 | S99 | `make lint`; focused pytest; `git diff --check`; `./spec-dock/scripts/spec-dock validate` | pass | final handoff gate |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| none | C-001〜C-090 | pytest / inspection | C-001〜C-090 | 計画された closure で充足 | no | S95 で fresh spec review を実行 |
+
+#### レビューゲート状態（Reviewer Gate Status）
+| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| S95 | final spec review | spec-reviewer | fresh | failed | no | rework completed; re-review required | reviewer: Avicenna / `019f1942-9b18-7882-9ff6-b4446d2eacf9`; P1 x3 |
+| S95 | final spec re-review | spec-reviewer | fresh | failed | no | rework completed; re-review required | reviewer: Hilbert / `019f1949-51d1-7f30-95c7-0ab310c394d0`; P1 x1 |
+| S95 | final spec re-review 2 | spec-reviewer | fresh | failed | no | rework completed; re-review required | reviewer: Herschel / `019f194e-0c9d-7531-af0b-4207efa67558`; P1 x1 |
+| S95 | final spec re-review 3 | spec-reviewer | fresh | passed | no | proceed | reviewer: Kant / `019f1952-41b5-7001-9542-8971defe0330`; findings none |
+
+#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
+| マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| S99 | ready-for-commit | readiness classifier、regression tests、report evidence | pending | pending | N/A | N/A | N/A | N/A |
 
 ### セッションログ（2026-07-01 HH:MM - HH:MM）
 

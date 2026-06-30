@@ -56,3 +56,40 @@ def test_requirement_sentinels_keep_requirement_scaffold_until_replaced() -> Non
     )
 
     assert workflow_state.classify_requirement_text(text) == "scaffold"
+
+
+def test_requirement_req_placeholder_keeps_requirement_scaffold_until_replaced() -> None:
+    _runbook_module, workflow_state = _workflow_modules()
+
+    text = (
+        "---\n"
+        "種別: 要件定義書（Issue）\n"
+        '状態: "approved"\n'
+        "---\n\n"
+        "# Requirement\n\n"
+        "## 目的\n"
+        "- Concrete objective.\n\n"
+        "| ID | 内容 | 根拠 |\n"
+        "|---|---|---|\n"
+        "| REQ-XXX | 必要な数だけ連番で追加する | issue discussion |\n"
+    )
+
+    assert workflow_state.classify_requirement_text(text) == "scaffold"
+
+
+def test_requirement_contract_placeholder_keeps_requirement_scaffold_until_replaced() -> None:
+    _runbook_module, workflow_state = _workflow_modules()
+
+    text = (
+        "---\n"
+        "種別: 要件定義書（Issue）\n"
+        '状態: "approved"\n'
+        "---\n\n"
+        "# Requirement\n\n"
+        "## 目的\n"
+        "- Concrete objective.\n\n"
+        "## 制約\n"
+        "- CON-...: concrete contract still needs to be filled before execution.\n"
+    )
+
+    assert workflow_state.classify_requirement_text(text) == "scaffold"
