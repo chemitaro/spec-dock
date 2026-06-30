@@ -73,9 +73,9 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - agent は、プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目を追加・削除・統合・並べ替えてよい
   - 不要な placeholder や該当しない節は削ってよいが、要件、設計判断、検証可能性、人間の理解に必要な情報は削らない
 
-## Issue grade 補足（issue grade guidance）
+## グレード補足（issue grade guidance）
 
-Issue design は [workflow_spec_authoring.md](workflow_spec_authoring.md) の `Issue grade 別 authoring matrix` と `authorized_profile` を入口にします。manual escalation は design obligation を強める補助判断であり、`authorized_profile` を置き換えません。
+Issue design は [workflow_spec_authoring.md](workflow_spec_authoring.md) の `グレード別authoring matrix（Issue grade authoring matrix）` と `authorized_profile` を入口にします。manual escalation は design obligation を強める補助判断であり、`authorized_profile` を置き換えません。
 
 - Standard では `system-architect` などの design specialist 使用を推奨する。使わない場合は、既存 pattern で十分な理由、確認した source、skip reason、残リスクを `report.md` に残す。
 - Strict / Critical では design specialist を原則必須にする。specialist が unavailable / denied / host conflict の場合は、manual fallback として利用不可理由、代替調査、採否判断、fresh `spec-reviewer` への提示 evidence を `report.md` に残す。

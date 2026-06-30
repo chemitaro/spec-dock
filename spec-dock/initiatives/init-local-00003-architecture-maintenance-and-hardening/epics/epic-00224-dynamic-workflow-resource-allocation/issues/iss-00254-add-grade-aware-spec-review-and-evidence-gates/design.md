@@ -32,7 +32,7 @@ G3 は phase promotion と issue execution readiness の workflow contract に�
 | コンポーネント | 責務 | 配置 |
 |---|---|---|
 | Report Evidence Template | EAL、Delegated Draft Evidence、Spec Authoring Gate、Reviewer Gate Status、Grade Specialist Evidence、Final Spec Review Gate の記録先を提供する | `src/spec_dock/assets/spec_dock/templates/issue/report.md` |
-| Authoring Docs | fresh reviewer、delegated adoption、grade evidence、fallback evidence、no self-claim の authoring contract を説明する | `workflow_spec_authoring.md`, `phase_design.md`, `phase_plan.md`, `workflow_issue.md` |
+| Authoring Docs | fresh reviewer、delegated adoption、grade evidence、fallback evidence、no self-claim の authoring contract を説明する | `workflow_spec_authoring.md`, `phase_requirement.md`, `phase_design.md`, `phase_plan_issue.md`, `workflow_issue.md` |
 | Report Evidence Parser | report text の stable sections / rows / tokens を読み、readiness に必要な evidence を判定する | domain helper |
 | Workflow Readiness Hook | requirement/design/plan readiness と assurance authority の後、ready を返す前に report evidence gate を評価する | `application/workflow.py` |
 | Presentation | block reason と details を JSON / Markdown guidance に露出する | existing `WorkflowState.details` |
@@ -60,13 +60,13 @@ G3 は phase promotion と issue execution readiness の workflow contract に�
 |---|---|---|
 | Evidence Adoption Ledger | unresolved `stale` / `blocked` がない | `adoption-evidence-stale-or-blocked` |
 | Delegated Draft Evidence | delegated use が claimed の場合、draft path、lifecycle state、integration result、diff guard、promotion decision がある | `delegated-draft-evidence-missing` |
-| Spec Authoring Gate | requirement/design/plan promotion で latest canonical artifacts に対する reviewer verdict が `passed` | `spec-reviewer-evidence-missing` / `spec-reviewer-evidence-stale` |
+| Spec Authoring Gate | requirement/design/plan promotion で latest canonical artifacts に対する reviewer verdict が exact `pass` または `passed` | `report-spec-authoring-gate-invalid` |
 | Grade Specialist Evidence | Standard では used または skipped-with-reason、Strict/Critical では used または unavailable/manual fallback evidence がある | `grade-specialist-evidence-missing` |
 | Reviewer Gate Status | final execution handoff では `spec-reviewer` が fresh/passed。code/QA は final quality gate に置く | `spec-reviewer-evidence-missing` |
 
 ### 4.3 pass / fail の扱い
 
-- `passed` だけを pass とする。
+- exact `pass` または `passed` だけを pass とする。
 - `failed`, `unavailable`, `denied`, `waived`, `provisional`, `stale`, 空欄は pass ではない。
 - `not used` は、Standard の specialist skip reason として十分な根拠がある場合だけ non-blocking。
 - Strict / Critical の `unavailable` / `manual fallback` は、利用不可理由、代替調査、採否判断、fresh spec-reviewer への提示 evidence が揃う場合だけ non-blocking。Reviewer pass の代替にはならない。
@@ -140,7 +140,7 @@ report_evidence_status(report_text, profile, purpose)
 - phase promotion と issue readiness は fresh `spec-reviewer` + report evidence gate を必要とする。
 - delegated draft は EAL 採用前に authority を持たない。
 
-`phase_design.md` / `phase_plan.md`:
+`phase_requirement.md` / `phase_design.md` / `phase_plan_issue.md`:
 
 - Standard skip reason と Strict/Critical fallback evidence の report destination を明確にする。
 

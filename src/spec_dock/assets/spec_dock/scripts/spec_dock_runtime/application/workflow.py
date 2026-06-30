@@ -17,6 +17,7 @@ from spec_dock_runtime.domain.workflow_state import (
     RunbookAuthority,
     WorkflowState,
     classify_requirement_text,
+    evaluate_report_evidence_gate,
 )
 
 if TYPE_CHECKING:
@@ -154,6 +155,19 @@ def _resolve_state(store: WorkflowAssuranceStoreLike) -> WorkflowState:
                     "Add implementation steps, verification obligations, reviewer/no-review rationale, and report evidence destinations.",
                 ),
             )
+        report_gate = evaluate_report_evidence_gate(
+            _read_optional_text(Path(target.issue_dir) / "report.md"),
+            authority.authorized_profile,
+        )
+        if report_gate.status != "pass":
+            return WorkflowState(
+                kind="blocked",
+                active_issue_id=target.issue_id,
+                reason_code=report_gate.reason_code,
+                artifact_readiness="substantive",
+                authority=authority,
+                details=report_gate.details,
+            )
         return WorkflowState(
             kind="ready",
             active_issue_id=target.issue_id,
@@ -195,6 +209,19 @@ def _resolve_state(store: WorkflowAssuranceStoreLike) -> WorkflowState:
                 "plan.md must be an executable workflow contract before strict-legacy issue execution.",
                 "Add implementation steps, verification obligations, reviewer/no-review rationale, and report evidence destinations.",
             ),
+        )
+    report_gate = evaluate_report_evidence_gate(
+        _read_optional_text(Path(target.issue_dir) / "report.md"),
+        STRICT_LEGACY_AUTHORITY.authorized_profile,
+    )
+    if report_gate.status != "pass":
+        return WorkflowState(
+            kind="blocked",
+            active_issue_id=target.issue_id,
+            reason_code=report_gate.reason_code,
+            artifact_readiness="substantive",
+            authority=STRICT_LEGACY_AUTHORITY,
+            details=report_gate.details,
         )
     return WorkflowState(
         kind="ready",
