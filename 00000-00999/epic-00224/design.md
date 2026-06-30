@@ -36,6 +36,10 @@ ID: "epic-00224"
   - Issue execution authority:
     - 変更済み: 旧 runtime-selected step / Step Assurance / Context Packet authority は `20260629t003131z-adr` により plan-centric preflight validation へ置換済み。
     - 変更済み: 旧 `assurance.json` path は `20260629t003132z-adr` により `.assurance.json` へ置換済み。
+  - Profile template authority:
+    - 追加済み: Issue design / plan の profile Markdown template authority は `assurance compose` だけでなく、Issue planning guidance、delegated specialist draft、Issue scope の `new doc draft-design` / `new doc draft-plan`、fresh review / report evidence gate にも適用する。
+    - `authorized_profile` は runtime template / guidance / obligation selection authority、manual escalation は authoring / review / evidence gate を強める判断として分離する。
+    - `iss-00250` はこの判断の一時検討置き場であり、正式な実装 Issue slice ではない。正式な設計 authority はこの Epic design / plan と `20260630t111316z-adr` に置く。
 - 既存関係:
   - `epic-00158` で整理された provider / mirror、canonical / evidence、skill / docs / templates 境界を前提にする。
   - Existing Issue workflow は strict-legacy adapter として残す。
@@ -64,6 +68,13 @@ ID: "epic-00224"
 | Workflow State Resolver | Active、artifact readiness、step、PR state から current state を導出 | runtime domain |
 | Guidance Compiler | current state に必要な一つの stdout guidance を生成し、human/debug projection を任意で書く | stdout authority + compiled projection |
 | Artifact Composer | design / plan / report fragment を単調合成 | policy + canonical inputs |
+| Profile Template Resolver | `.assurance.json` の `classification.authorized_profile` から Issue design / plan template source を決定し、manual escalation や `lite_candidate` による silent override を拒否する | `.assurance.json` + provider template source |
+| Template Materializer | `templates/issue-profiles/<profile>/{design,plan}.md` を canonical artifact または discussion draft の source として deterministic に materialize する | tracked provider source + canonical/evidence target |
+| Artifact Readiness Validator | requirement / design / plan / report evidence が execution-ready かを fail-closed に判定し、placeholder / heading-only / stale evidence を block する | runtime domain |
+| Grade-Aware Authoring Router | Issue grade に応じて requirement / design / plan / review / report evidence の authoring rule、delegated specialist requirement、manual fallback を guidance へ展開する | accepted ADR + workflow policy |
+| Issue Draft Authoring Router | Issue `draft-design` / `draft-plan` の discussion draft source を `.assurance.json` の `authorized_profile` に対応する profile template へ route する | `.assurance.json` + provider template source |
+| Profile Template Store | `templates/issue-profiles/<profile>/{design,plan}.md` の path / text validation と読み込みを提供する | tracked provider source |
+| Spec Authoring Evidence Gate | delegated draft adoption、fresh `spec-reviewer`、Evidence Adoption Ledger、report evidence が phase promotion / issue readiness に揃っているかを確認する | canonical docs + report ledger |
 | Step Assurance Compiler | worker、reasoning、context、verification、reviewers を導出 | issue + step obligations |
 | Context Policy Resolver | role / task / step facts から `recent_fork` / `bounded_packet` / `clean_room` / `minimal_packet` と freshness checks を決定 | deterministic domain policy |
 | Context Packet Compiler | selected context contract を source hash へ bind し、agent invocation packet と reviewer evidence packet を生成 | ignored generated state |
@@ -136,6 +147,14 @@ database "Issue assurance.json\ntracked canonical" as Contract
 component "Guidance Compiler" as Compiler
 database ".agent/runbooks + active/current-runbook\nignored projection" as Runbook
 component "Artifact Composer" as Composer
+component "Profile Template Resolver" as TemplateResolver
+component "Template Materializer" as Materializer
+component "Artifact Readiness Validator" as Readiness
+component "Grade-Aware Authoring Router" as AuthoringRouter
+component "Issue Draft Authoring Router" as DraftRouter
+database "Issue profile templates\ntracked provider source" as ProfileTemplates
+database "Issue discussions\nnon-canonical evidence" as Discussions
+component "Spec Authoring Evidence Gate" as EvidenceGate
 component "Step Assurance Compiler" as Step
 component "Context Policy Resolver" as ContextResolver
 database "context packets\nignored projection" as ContextPackets
@@ -154,7 +173,18 @@ State --> Compiler : requests current guidance
 Compiler --> Runbook : writes ignored projection
 Compiler --> Skill : returns stdout guidance
 Skill --> Skill : follows stdout action only
-Composer --> Contract : uses authorized profile
+Composer --> TemplateResolver : requests profile template source
+TemplateResolver --> Contract : reads authorized profile
+TemplateResolver --> ProfileTemplates : resolves issue-profiles template
+Materializer --> ProfileTemplates : reads selected template
+Composer --> Materializer : materializes canonical artifact
+Readiness --> State : blocks incomplete artifacts
+AuthoringRouter --> TemplateResolver : applies grade-aware source routing
+AuthoringRouter --> EvidenceGate : requires adoption/review/report evidence
+DraftRouter --> AuthoringRouter : asks issue draft policy
+DraftRouter --> Materializer : materializes draft text
+DraftRouter --> Discussions : writes draft only
+EvidenceGate --> Evidence : records adoption/reviewer evidence
 Step --> Contract : derives effective obligations
 Step --> ContextResolver : resolves role context contract
 ContextResolver --> ContextPackets : writes bounded packet / clean-room evidence
@@ -795,6 +825,34 @@ src/spec_dock/assets/spec_dock/templates/assurance/
     `-- metrics-summary.md
 ```
 
+Issue design / plan の profile Markdown template source:
+
+```text
+src/spec_dock/assets/spec_dock/templates/issue/
+`-- requirement.md
+
+src/spec_dock/assets/spec_dock/templates/issue-profiles/
+|-- lite/
+|   |-- design.md
+|   `-- plan.md
+|-- standard/
+|   |-- design.md
+|   `-- plan.md
+|-- strict/
+|   |-- design.md
+|   `-- plan.md
+`-- critical/
+    |-- design.md
+    `-- plan.md
+```
+
+Installed / dogfooding equivalents:
+
+```text
+spec-dock/templates/issue/requirement.md
+spec-dock/templates/issue-profiles/{lite,standard,strict,critical}/{design,plan}.md
+```
+
 ### Composition rules
 
 - Fragment ID と policy version を固定する。
@@ -810,6 +868,71 @@ src/spec_dock/assets/spec_dock/templates/assurance/
 - Same input は byte-identical output。
 - Escalation は section 追加と downstream invalidation。
 - Automatic downgrade で section 削除しない。
+
+## Grade-aware Issue authoring and readiness contract
+
+Issue grade 別の作業ルールは、個別 Issue の planning 中に再設計しない。`20260630t111316z-adr` を Epic-level authority とし、runtime / guidance / tests はその判断を実装する。
+
+### Authority split
+
+| 判断軸 | Authority | 使ってよいこと | 禁止すること |
+|---|---|---|---|
+| Runtime template / guidance / obligation selection | `.assurance.json` の `classification.authorized_profile` | Issue design / plan template selection、workflow obligation selection | frontmatter、`lite_candidate`、command title、manual escalation による silent override |
+| Issue authoring grade / manual escalation | main orchestrator の documented decision | specialist routing、reviewer追加、manual gate、report evidence density の強化 | `authorized_profile` の暗黙変更、template source の差し替え |
+| Delegated specialist draft | scope-local `discussions/` evidence | canonical design / plan authoring の入力 | canonical docs への直接 authority、phase completion / reviewer pass の自己主張 |
+| Fresh spec review | clean-room `spec-reviewer` pass | phase promotion / issue readiness の reviewer evidence | grade を理由にした省略または stale reviewer の再利用 |
+
+### Grade authoring matrix
+
+| Grade | Requirement | Design | Plan | Review / evidence |
+|---|---|---|---|---|
+| `lite` | main orchestrator。Lite 前提と非影響を明示する。 | specialist 原則なし。必要になった時点で `standard` 以上へ上げる。 | 軽量 checklist と focused verification。途中 commit gate は必須にしない。 | fresh `spec-reviewer`。Lite 前提を破っていないことを確認し、report に grade source を残す。 |
+| `standard` | AC / behavior / constraint / grade signal を確認する。 | 設計差分、runtime behavior、TDD behavior、責務境界がある場合は `system-architect` 推奨。未使用なら理由を report に残す。 | TDD / milestone / validation ladder がある場合は `implementation-planner` 推奨。未使用なら理由を report に残す。 | fresh `spec-reviewer`。traceability、TDD 実行可能性、report evidence を確認する。 |
+| `strict` | contract / compatibility / migration / workflow risk を確認する。 | `system-architect` 原則必須。利用不可なら manual fallback evidence を report に残す。 | `implementation-planner` 原則必須。compatibility / migration / review gate を具体化する。 | fresh `spec-reviewer` + 必要時追加 reviewer。delegated evidence adoption と fallback 証跡を必須にする。 |
+| `critical` | protected / destructive / security / recovery signal を確認する。 | `system-architect` 必須。必要時に security / recovery consultant を追加する。 | `implementation-planner` 必須。manual approval、dry-run、rollback、recovery gate を扱う。 | fresh `spec-reviewer` + safety / security / recovery review。manual approval と no-go 条件を report に残す。 |
+
+### Artifact readiness validation
+
+`workflow status` / `guidance issue-execution` は、artifact が存在することや `assurance compose` が成功したことだけで ready と判定しない。Readiness Validator は次を fail-closed に扱う。
+
+| Artifact | Block condition | Positive signal |
+|---|---|---|
+| Requirement | `REQ-XXX`、`CON-...`、旧 scaffold sentence、placeholder table/list entry、ID sentinel が未解決 | Issue objective、constraints、acceptance criteria、scope / non-scope が具体化されている |
+| Design | `artifact_state: awaiting-assurance-compose`、draft state、explicit scaffold marker、substantive section 欠落 | concrete component / data / flow / failure design があり、ordinary word `template` / `placeholder` だけでは block しない |
+| Plan | 実行可能 step なし、`Validation Gate` / `M99` / static analysis / lint / tests / report / commit heading だけ、placeholder cell、approved-no-op 根拠なし | milestone / step / behavior / verification / gate のいずれかが実装対象として具体化されている |
+| Report evidence | delegated adoption ledger 不足、fresh reviewer evidence 不足、stale reviewer、missing command result / no-op reason | Evidence Adoption Ledger、Spec Authoring Gate、検証結果、未実施理由、commit または no-op 結果が追える |
+
+Readiness Validator は false positive を最小化する。判定不能な場合は `ready` にせず、repair guidance または human gate を返す。
+
+## Issue discussion draft routing
+
+Issue scope の `new doc draft-design` / `new doc draft-plan` は、canonical artifact を compose しない。しかし、agent が system-architect / implementation-planner として作成する discussion draft は、その後の canonical design / plan authoring の入力になる。そのため、draft source authority は canonical compose と一致させる。
+
+### Routing rules
+
+| Doc type | Issue scope source | Assurance contract requirement | 備考 |
+|---|---|---|---|
+| `draft-requirement` | `templates/issue/requirement.md` | 不要 | requirement は profile 判定前に作成できる。 |
+| `draft-design` | `templates/issue-profiles/<authorized_profile>/design.md` | 必須 | `.assurance.json` を verify してから discussion file を作る。 |
+| `draft-plan` | `templates/issue-profiles/<authorized_profile>/plan.md` | 必須 | `.assurance.json` を verify してから discussion file を作る。 |
+| Initiative / Epic `draft-design` / `draft-plan` | `templates/{initiative,epic}/{design,plan}.md` | 不要 | Issue profile routing を適用しない。 |
+
+### Authority and failure design
+
+- Profile selection は `.assurance.json` の `classification.authorized_profile` だけを使う。
+- `lite_candidate`、frontmatter の `Issue Grade`、command title、implicit default は template selection authority にしない。
+- Missing / invalid / stale `.assurance.json`、unsupported profile、missing template、empty template、non-file template、symlink escape は discussion filename allocation と write の前に fail-closed とする。
+- Fail-closed 時に Standard template へ fallback しない。
+- Generated discussion draft は対象 Issue の `discussions/` 直下に 1 件だけ作成する。Canonical `design.md` / `plan.md` は変更しない。
+- Generated discussion draft は evidence / authoring input であり、`authority: accepted`、`adoption_status: adopted`、reviewer pass、phase completion、implementation readiness を自己主張しない。
+
+### Implementation placement
+
+- `application/create_node.py` は Issue `draft-design` / `draft-plan` の orchestration を担当する。
+- `infra/assurance_store.py` は `.assurance.json` の read / schema / source binding / stale 判定 authority として使う。
+- `infra/artifact_store.py` は profile template validation と full text read を提供する。`assurance compose` と `new doc` で filesystem guard を分岐させない。
+- `tests/cli_runtime/test_new.py` は success / fail-closed / legacy behavior preservation を固定する。
+- `tests/cli_runtime/test_assurance_compose.py` は profile template validation guard の既存 contract を守る。
 
 ## 主要フロー
 
@@ -914,7 +1037,7 @@ P2 + non-protected
 | Worker continuation binding mismatch | reset | new worker invocation |
 | Reviewer packet includes author narrative | blocked | clean-room packet rebuild |
 | Existing content overwrite risk | blocked | manual merge |
-| Review policy missing / invalid | human gate if required | restore base policy |
+| Script-local review instruction missing / invalid | missing は deterministic fallback、invalid は human gate if required | restore script-local instruction asset |
 | Head SHA mismatch | stale | refetch / retrigger |
 | P0 / P1 parsing unknown | human gate | manual analysis |
 | Protected P2 unverifiable | human gate | reproduce / human |
@@ -1087,11 +1210,16 @@ ChildResultReturned
 |---|---|---:|---|---|
 | I01 | `iss-00227-introduce-assurance-contract-and-classification-runtime` | `#227` | Assurance Contract, deterministic classification, strict-legacy detection prerequisite | E-RQ-002, E-RQ-003, E-AC-002, E-AC-003 |
 | I02 | `iss-00228-compile-state-aware-workflow-runbooks-and-fixed-skill-kernels` | `#228` | Workflow State Resolver, fixed Skill kernel, generated Runbook projection | E-RQ-001, E-RQ-004, E-RQ-005, E-AC-001, E-AC-004, E-AC-005 |
-| I03 | `iss-00229-compose-profile-aware-planning-artifacts` | `#229` | Profile-aware artifact composition and stale source binding | E-RQ-006, E-AC-006, E-AC-008 |
+| I03 | `iss-00229-compose-profile-aware-planning-artifacts` | `#229` | Profile-aware artifact composition and stale source binding; amended readiness contract is completed by R0 | E-RQ-006 initial composition subset, E-AC-006 initial planning subset, E-AC-008 |
 | I04 | `iss-00230-compile-step-assurance-agent-routing-and-context-policy` | `#230` | Step Assurance, context routing policy, clean-room packets, bounded return contract | E-RQ-007, E-RQ-008, E-RQ-015〜021, E-AC-007, E-AC-017〜021 |
 | I05 | `iss-00231-inject-trusted-base-branch-codex-review-policy` | `#231` | Historical trusted base-SHA review policy slice; changed by `20260623t074444z-adr` and `iss-00244` to script-local deterministic review trigger | E-RQ-009, E-AC-009, E-AC-010 |
 | I06 | `iss-00232-enforce-blocker-centric-pr-repair-and-rereview` | `#232` | PR Blocker Engine, P2 suppression, blocker fingerprint evidence for stagnation detection | E-RQ-010, E-RQ-011, E-AC-011〜012 |
 | I07 | `iss-00233-roll-out-adaptive-workflow-with-legacy-compatibility-and-telemetry` | `#233` | Rollout, automation-stalled operator surfacing, strict-legacy compatibility, metrics, Auto-Lite readiness | E-RQ-012〜014, E-AC-013〜016 |
+| R0 | planned corrective Issue; formal ID 未作成 | 未作成 | Artifact Readiness Validator、shared placeholder detector、executable plan predicate、`workflow status` / `guidance issue-execution` fail-closed preflight | E-RQ-006, E-AC-006 |
+| G1 | planned corrective Issue; formal ID 未作成 | 未作成 | Grade-aware Issue planning guidance、grade authoring matrix、Lite non-default / manual escalation / authorized_profile separation | E-RQ-022, E-AC-022 |
+| G2 | planned corrective Issue; formal ID 未作成 | 未作成 | Delegated specialist role routing、Issue `draft-design` / `draft-plan` profile template source、discussion evidence provenance | E-RQ-022, E-AC-022 |
+| G3 | planned corrective Issue; formal ID 未作成 | 未作成 | Fresh spec-reviewer / Evidence Adoption Ledger / report evidence gate を grade-aware authoring workflow に接続 | E-RQ-022, E-AC-022 |
+| G4 | planned corrective Issue; formal ID 未作成 | 未作成 | Grade-aware authoring smoke tests、draft routing regression、readiness regression、provider / dogfooding docs parity | E-AC-006, E-AC-022 |
 
 Dependency direction:
 
@@ -1103,6 +1231,11 @@ iss-00227
        -> iss-00230
             -> iss-00232
 iss-00233 depends on iss-00228, iss-00229, iss-00230, iss-00231, iss-00232
+iss-00247 -> R0 after formal corrective Issue creation
+R0 -> G1
+G1 -> G2
+G1 -> G3
+R0, G1, G2, G3 -> G4
 ```
 
 The Issue-local draft requirement / draft design artifacts are discussion evidence only. Canonical Issue `requirement.md` / `design.md` / `plan.md` remain owned by each downstream Issue planning workflow.
@@ -1122,6 +1255,7 @@ The Issue-local draft requirement / draft design artifacts are discussion eviden
   - `discussions/20260623t074447z-adr-blocker-centric-pr-risk-closure-rereview.md`
   - `discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`
   - `discussions/20260628t185812z-adr-pr-review-body-blocker-ingestion.md`
+  - `discussions/20260630t111316z-adr-grade-aware-issue-authoring-rules.md`
 - Accepted ADR summary:
 - Fixed Skill Kernel / Compiled Runbook: Skill は固定 kernel、current workflow obligation は runtime `guidance <target>` stdout が返す。ADR 内の `workflow next` / generated Runbook authority wording は historical/superseded command wording として扱う。
   - Adaptive Assurance / Lite Authorization: `lite_candidate` は telemetry、`lite_authorized` だけが obligation を減らす。初期 automatic Lite default は無効。
@@ -1130,6 +1264,7 @@ The Issue-local draft requirement / draft design artifacts are discussion eviden
   - Blocker-Centric PR Closure: merge preparedness は comment zero ではなく verified blocker zero、required CI、review coverage で判断する。
   - PR Observation Explicit Review Completion: review completion は explicit Codex artifact で判断し、`review_completion_unknown` を active terminal completion proof として扱わない。
   - PR Review Body Blocker Ingestion: selected pull request review body も blocker policy input として扱い、inline comment / thread が 0 件でも body P0 / P1 を blocker として扱う。
+  - Grade-Aware Issue Authoring Rules: `authorized_profile` と manual escalation を分離し、grade 別 authoring / specialist / review / evidence rules を Epic-level authority として固定する。
 - 前提 ADR:
   - `epic-00158` 配下の skill / docs / template context surface ownership ADR。
 

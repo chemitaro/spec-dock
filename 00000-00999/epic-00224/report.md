@@ -2,7 +2,7 @@
 種別: レポート（Epic）
 ID: "epic-00224"
 タイトル: "Dynamic Workflow Resource Allocation"
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-06-23"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -25,10 +25,12 @@ ID: "epic-00224"
   - T0 + I01〜I07 の Issue 実体を作成し、依存関係を登録した。
   - その後、`iss-00226 / #226` は decision-only Issue として誤った routing だったため close し、当初 5 件の Epic-scope accepted ADR へ authority を移した。後続 dogfooding corrective work で explicit review completion ADR を追加した。
   - `iss-00227 -> iss-00226` dependency を削除し、実装対象 Issue を `iss-00227`〜`iss-00233` に再整理した。
-  - 各 implementation Issue の draft requirement / draft design discussion と統合レビュー用 discussion を、G0 Epic Decision Baseline 前提へ更新した。
+  - 各 implementation Issue の draft requirement / draft design discussion と統合レビュー用 discussion を、IC0 Epic Decision Baseline 前提へ更新した。
   - Corrective Issues `iss-00237` / `iss-00238` / `iss-00239` / `iss-00241` を Epic close-readiness ledger に取り込んだ。その後、`iss-00244` で current operational contract を `guidance <target>` stdout authority / projection human-debug-only / script-local review instruction / explicit review completion artifact model へ変更した。
+  - `iss-00247 / #247` 後の manual test / follow-up analysis により、Issue `draft-design` / `draft-plan` が profile template source に route されていない gap だけでなく、artifact readiness preflight、grade-aware Issue authoring guidance、delegated specialist routing、fresh review / report evidence gate、grade-aware smoke tests まで Epic #224 の追加修正として扱う必要があると確認した。
+  - `I08` 単独案は狭すぎるため superseded とし、正式な追加 corrective tranche を `R0 + G1〜G4` として Epic requirement / design / plan へ反映した。`iss-00250` は一時検討置き場として扱い、正式な Issue slice では採用しない。
 - 次のマイルストーン:
-  - Fresh `spec-reviewer` / final quality gates で S90 docs reconciliation、corrective issue inclusion、QG-006〜QG-008 の traceability ledger を確認する。
+  - Fresh `spec-reviewer` で今回の Epic amendment（E-RQ-006 改訂 / E-RQ-022 / E-AC-006 改訂 / E-AC-022 / R0 + G1〜G4）を確認し、pass 後に正式な corrective Issue 作成へ進む。
 - ブロッカー:
   - 現時点でユーザー確認が必要な blocking question はなし。
 
@@ -73,6 +75,10 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-027 | `superseded` | iss-00241 S01/S02 evidence | `requirement.md`, `design.md`, `plan.md`, `report.md` | 旧 Trusted base policy valid path は deterministic multiline `@codex review`; missing / invalid / oversized / unreadable / base_sha_missing は no PR comment, human gate / fail-closed, no head fallback, no bare trigger fallback として反映していた。この decision は `20260623t074444z-adr` / `iss-00244` により script-local review instruction source へ変更済み。 | `issues/iss-00241-*/report.md` S01/S02 closure evidence; `discussions/20260623t074444z-adr-trusted-base-sha-github-review-policy.md` | superseded by EAL-029 |
 | EAL-028 | `adopted` | iss-00237 / iss-00238 / iss-00239 / iss-00241 corrective reports | `report.md` | Epic final close-readiness は initial implementation Issues だけでなく corrective Issues も含む必要があるため、formal supersede / pass / final reviewer pass を一つの inclusion ledger に記録する。 | corrective issue reports and S90/S99 reconciliation | final spec-reviewer pass |
 | EAL-029 | `adopted` | iss-00244 dogfooding repair + ADR | `requirement.md`, `design.md`, `plan.md`, `report.md` | PR #245 dogfooding で trusted base-SHA policy と `review_completion_unknown` terminal wait の問題が露出したため、review trigger instruction source は script-local asset、review completion は explicit Codex artifact model へ変更した。旧 base-SHA policy / active `review_completion_unknown` は historical/superseded decision として扱う。 | `discussions/20260623t074444z-adr-trusted-base-sha-github-review-policy.md`; `discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`; `issues/iss-00244-*/report.md` | implementation in iss-00244 S300-S399 |
+| EAL-030 | `adopted` | manual test / focused root cause analysis | `requirement.md`, `design.md`, `plan.md` | Manual test の F-001〜F-004 は template pack 本体ではなく artifact readiness classifier の drift と判断し、E-RQ-006 / E-AC-006 を fail-closed readiness contract へ拡張した。 | `discussions/20260630t080402z-disc-manual-test-readiness-failure-root-cause-analysis.md`; `discussions/20260630t055323z-disc-issue-247-manual-test-followup-analysis.md` | fresh spec-reviewer pass; proceed to corrective Issue creation |
+| EAL-031 | `adopted` | ADR / grade-aware rules definition | `requirement.md`, `design.md`, `plan.md` | Grade-aware authoring rules は follow-up Issue で再設計せず、Epic-level authority として固定する判断を採用した。`W1` Issue 案は不採用とし、R0 + G1〜G4 の実装 tranche へ展開した。 | `discussions/20260630t111316z-adr-grade-aware-issue-authoring-rules.md`; `discussions/20260630t084325z-disc-grade-aware-authoring-rules-definition.md` | fresh spec-reviewer pass; proceed to corrective Issue creation |
+| EAL-032 | `adopted` | draft routing research | `requirement.md`, `design.md`, `plan.md` | Issue `draft-design` / `draft-plan` が旧 Issue template を source とする gap は、G2 の delegated specialist / draft artifact routing scope として採用した。 | `discussions/20260630t112403z-research-issue-draft-artifact-profile-template-routing-analysis.md` | fresh spec-reviewer pass; proceed to corrective Issue creation |
+| EAL-033 | `partially_adopted` | temporary issue artifacts | `requirement.md`, `design.md`, `plan.md` | `iss-00250` の requirement / design / plan は draft routing subcase の材料として採用するが、正式な implementation Issue ID としては採用しない。R0 / G1 / G2 / G3 / G4 の正式 Issue 証跡へ置換されるまで temporary / superseded evidence として保持し、破棄する場合はこの ledger の参照先を先に置換する。 | `issues/iss-00250-route-issue-draft-design-and-plan-through-profile-templates/{requirement.md,design.md,plan.md,report.md}` | corrective Issue creation after reviewer pass |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -93,8 +99,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | requirement | `workflow_epic.md`, `workflow_spec_authoring.md`, `phase_requirement.md`, `epic-00158` docs, active Epic scaffold, draft package discussions, source search, deep-consultant Lite rollout report | blocking question なし。Lite rollout は UX preference ではなく system-design best practice として deep-consultant に reroute 済み。 | draft requirement / decision / synthesis / deep-consultant report を canonical `requirement.md` へ採用。 | passed: fresh `spec-reviewer` returned no findings and `review_status: pass` with confidence 0.88. | no | promote to design phase. |
 | design | reviewer-pass 済み `requirement.md`, `workflow_epic.md`, `workflow_spec_authoring.md`, `phase_design.md`, draft design, draft package synthesis, issue slice draft, deep-consultant Lite rollout report, provider / dogfooding runtime layout | blocking design question なし。Implementation parameter（review policy size, metrics retention, repo-specific hard trigger extension, future Auto-Lite adoption surface）は plan / later Issue で扱う non-blocking item とした。初回 design review で ADR 必須判断の曖昧さが P1 指摘となったため、当初 4 件、Agent Context Routing 追加後は 5 件の ADR を implementation 前 required として設計に明記した。後続 corrective work で script-local review instruction と explicit review completion ADR を追加した。 | adaptive assurance contract、compiled Runbook、candidate / authorized separation、script-local review instruction、explicit review completion、blocker-centric PR closure、tracked canonical vs ignored projection、migration / rollback / observability、required ADR before implementation を canonical `design.md` へ採用。 | passed: fresh re-review returned no findings and `review_status: pass` with confidence 0.91. | no | promote to plan phase. |
 | requirement/design update | supplemental Agent Context Routing draft, existing passed requirement/design, draft issue slice I04, draft plan I04 | blocking question なし。既存 E-RQ-008 の短い context policy 要件だけでは tracked policy / packet / reviewer independence / return boundary / observability が不足していた。Fresh review の P2 指摘により returned evidence refs observability、Auto-Lite trace、pending gate 記録を補正した。 | E-RQ-015〜021、E-AC-017〜021、Agent Context Routing Architecture、Context Policy Resolver / Packet Compiler、I04 seed update、required ADR update、Auto-Lite trace update を採用。 | passed: fresh `spec-reviewer` returned `review_status: pass` with confidence 0.88; 3 P2 findings fixed. | no | promote updated requirement/design inputs to plan authoring. |
-| plan | reviewer-pass 済み `requirement.md`, reviewer-pass 済み `design.md`, `workflow_epic.md`, `workflow_spec_authoring.md`, `phase_plan.md`, `phase_plan_epic.md`, updated draft plan, updated issue slice seed | blocking question なし。ユーザー指示により Issue 実体作成 / dependency mutation はこの phase では行わない。初回 plan review で E-AC-008 trace mismatch が P1、ADR 件数の古い記録が P2 として指摘され、修正済み。再レビューで E-AC-005〜007 owner mismatch が P1 として指摘され、修正済み。Fresh re-review pass 後の P2 として E-RQ-012 owner clarification があり、formal close を I07 に一本化した。その後、T0 ADR prerequisite Issue は routing correction により superseded となり、G0 Epic Decision Baseline へ置換済み。 | G0 Epic Decision Baseline、I01〜I07 implementation slices、E-RQ / E-AC closure matrix、dependency order、integration checkpoints、quality gates、rollout/docs impact、Issue readiness criteria、final exit contract を canonical `plan.md` へ採用。 | passed: fresh plan re-review returned `review_status: pass` with confidence 0.86; remaining P2 fixed. ADR authority correction 後の handoff は fresh re-review 待ち。 | no | promote to Issue decomposition / creation in a later turn; no Issue creation performed in this turn. |
-| issue decomposition | reviewer-pass 済み Epic requirement/design/plan, created Issues `iss-00226`〜`iss-00233`, dependency metadata, issue-local draft requirement/design, integration review discussion | blocking question なし。ユーザー補足として、別 worktree の MyPy / Ruff 適用計画を implementation baseline への外部前提として扱い、draft に静的解析前提を反映した。初回 decomposition review は pass したが、ユーザー指摘により `iss-00226` decision-only Issue routing を訂正した。 | `iss-00226 / #226` を closed / superseded とし、当初 5 件の Epic-scope accepted ADR、G0 Epic Decision Baseline、`iss-00227`〜`iss-00233` implementation handoff へ更新した。後続 corrective work で review instruction / completion ADR を更新・追加した。 | passed: fresh re-review returned no findings and `review_status: pass` with confidence 0.91. | no | Issue decomposition / ADR authority correction handoff complete; downstream Issue planning can proceed from `iss-00227`. |
+| plan | reviewer-pass 済み `requirement.md`, reviewer-pass 済み `design.md`, `workflow_epic.md`, `workflow_spec_authoring.md`, `phase_plan.md`, `phase_plan_epic.md`, updated draft plan, updated issue slice seed | blocking question なし。ユーザー指示により Issue 実体作成 / dependency mutation はこの phase では行わない。初回 plan review で E-AC-008 trace mismatch が P1、ADR 件数の古い記録が P2 として指摘され、修正済み。再レビューで E-AC-005〜007 owner mismatch が P1 として指摘され、修正済み。Fresh re-review pass 後の P2 として E-RQ-012 owner clarification があり、formal close を I07 に一本化した。その後、T0 ADR prerequisite Issue は routing correction により superseded となり、IC0 Epic Decision Baseline へ置換済み。 | IC0 Epic Decision Baseline、I01〜I07 implementation slices、E-RQ / E-AC closure matrix、dependency order、integration checkpoints、quality gates、rollout/docs impact、Issue readiness criteria、final exit contract を canonical `plan.md` へ採用。 | passed: fresh plan re-review returned `review_status: pass` with confidence 0.86; remaining P2 fixed. ADR authority correction 後の handoff は fresh re-review 待ち。 | no | promote to Issue decomposition / creation in a later turn; no Issue creation performed in this turn. |
+| issue decomposition | reviewer-pass 済み Epic requirement/design/plan, created Issues `iss-00226`〜`iss-00233`, dependency metadata, issue-local draft requirement/design, integration review discussion | blocking question なし。ユーザー補足として、別 worktree の MyPy / Ruff 適用計画を implementation baseline への外部前提として扱い、draft に静的解析前提を反映した。初回 decomposition review は pass したが、ユーザー指摘により `iss-00226` decision-only Issue routing を訂正した。 | `iss-00226 / #226` を closed / superseded とし、当初 5 件の Epic-scope accepted ADR、IC0 Epic Decision Baseline、`iss-00227`〜`iss-00233` implementation handoff へ更新した。後続 corrective work で review instruction / completion ADR を更新・追加した。 | passed: fresh re-review returned no findings and `review_status: pass` with confidence 0.91. | no | Issue decomposition / ADR authority correction handoff complete; downstream Issue planning can proceed from `iss-00227`. |
+| requirement/design/plan amendment | `workflow_epic.md`, `workflow_spec_authoring.md`, `phase_requirement.md`, `phase_design.md`, `phase_plan.md`, `phase_plan_epic.md`, decision routing guide, issue #247 manual test/follow-up analysis, root-cause analysis, grade-aware ADR, draft routing research, temporary `iss-00250` artifacts | blocking question なし。Issue `draft-design` / `draft-plan` source authority だけでなく、readiness preflight、grade-aware authoring rules、delegated specialist routing、fresh review / report evidence gate、smoke tests は複数 Issue の authoring backbone に関わるため、`iss-00250` ではなく Epic amendment として扱う。 | `E-RQ-006` / `E-AC-006` / `E-RQ-022` / `E-AC-022` / design components / R0 + G1〜G4 planned corrective tranche を canonical Epic artifacts へ採用。 | passed: fresh `spec-reviewer` returned `review_status: pass` with confidence 0.90; non-blocking P2 stale checkpoint wording was fixed. | no | formal corrective Issue creationへ進む。 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -148,6 +155,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
   - `discussions/20260623t074447z-adr-blocker-centric-pr-risk-closure-rereview.md`
 - Added by corrective dogfooding work:
   - `discussions/20260628t154553z-adr-pr-observation-explicit-review-completion.md`
+  - `discussions/20260630t111316z-adr-grade-aware-issue-authoring-rules.md`
 - Superseded routing:
   - `iss-00226 / #226` は decision-only Issue として作成されたが closed / superseded。ADR authority は Epic-scope accepted ADR へ移動済み。
 
@@ -172,16 +180,25 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - iss-00231 / #231: Inject Trusted Base Branch Codex Review Policy
 - iss-00232 / #232: Enforce Blocker Centric PR Repair And Rereview
 - iss-00233 / #233: Roll Out Adaptive Workflow With Legacy Compatibility And Telemetry
+- planned corrective handoff:
+  - R0: Enforce Fail-Closed Issue Artifact Readiness Preflight（formal Issue ID 未作成）
+  - G1: Compile Grade-Aware Issue Planning Guidance（formal Issue ID 未作成）
+  - G2: Connect Delegated Specialist Role Routing And Draft Artifact Sources（formal Issue ID 未作成）
+  - G3: Add Grade-Aware Spec Review And Evidence Gates（formal Issue ID 未作成）
+  - G4: Add Grade-Aware Issue Authoring Smoke Tests（formal Issue ID 未作成）
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
 - E-AC-001〜004: pass（証拠: iss-00227 report; assurance classification / schema / Lite safety targeted tests）
-- E-AC-005〜008: pass（証拠: iss-00228 / iss-00229 reports; workflow runbook, profile-aware planning, stale source binding tests）
+- E-AC-005: pass（証拠: iss-00228 report; workflow runbook / fixed Skill / clean Git tests）
+- E-AC-006: partially passed / amended pending（証拠: iss-00229 report で profile-aware planning は pass。2026-06-30 amendment により fail-closed artifact readiness preflight は R0 で追加対応する）
+- E-AC-007〜008: pass（証拠: iss-00230 / iss-00229 reports; step routing, stale source binding tests）
 - E-AC-009〜012: pass（証拠: iss-00231 / iss-00232 / iss-00244 reports; trusted base-SHA review policy は script-local instruction source へ変更済み、blocker disposition, promoted P2, rereview payload tests, explicit review completion ADR）
 - E-AC-013: pass（証拠: iss-00233 `test_issue_233_pr_observation_wait_exposes_automation_stalled_operator_surface`; repeated blocker fingerprint は `automation_stalled` / `human_gate` になり `merge_prepared` にならない）
 - E-AC-014: pass（証拠: iss-00233 `test_workflow_next_missing_assurance_uses_strict_legacy_execution_authority`, `test_assurance_show_and_verify_strict_legacy_missing`; missing assurance は strict-legacy ready、invalid / stale assurance は fail-closed）
 - E-AC-015: pass（証拠: iss-00233 Auto-Lite readiness assertions; `automatic_lite_default_enabled=false`、future adoption gates は accepted ADR / policy version bump / rollout Issue / telemetry gate）
 - E-AC-016: pass（証拠: iss-00233 `auto_lite_readiness_report` efficiency baseline assertions; Lite / Standard / Strict の invocation / review generation / workflow cost proxy 差分を固定し、live telemetry 不足は missing metrics summary として明示）
 - E-AC-017〜021: pass（証拠: iss-00230 report; step assurance, context routing, reviewer clean-room, bounded return contract, stale context invalidation tests）
+- E-AC-022: pending（証拠: `20260630t111316z-adr` と draft routing research は採用済み。R0 + G1〜G4 の implementation / smoke / reviewer evidence 完了後に pass 判定する）
 
 ## Current Operational Contract Ledger
 
@@ -200,6 +217,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | `iss-00238` / `#238` | Stdout guidance handoff instead of generated workflow files | included corrective issue | pass | report records `guidance <target>` handoff, projection human-only boundary, reviewer gates, and S90 evidence |
 | `iss-00239` / `#239` | Compose issue planning templates after assurance classification | formally superseded by `iss-00241` | formal supersede | report records `./spec-dock/scripts/spec-dock close iss-00239` exit 0 with `state=CLOSED already_closed=true`; GitHub `#239` closed at `2026-06-27T05:17:44Z` |
 | `iss-00241` / `#241` | Resolve Epic traceability and review policy gate gaps | included corrective integration issue | pass | S01〜S04, S90, and S99 closure evidence recorded; focused suite, sync/validate, manual flow, and final qa/code/spec reviewer gates passed |
+| `R0 + G1〜G4` | Grade-aware Issue authoring / readiness corrective tranche | planned corrective tranche | pending | Formal Issue ID 未作成。Epic amendment reviewer pass 後に executable Issue slice として作成する |
 
 ## Epic Traceability Quality Gate Ledger
 
@@ -208,6 +226,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | QG-006 | Step closure / reviewer gate / commit gate cross-issue audit | pass | Initial implementation issue reports and corrective issue reports are included; `iss-00239` is formal supersede; `iss-00241` S01〜S04/S90/S99 reviewer gates passed. S99 commit evidence is recorded in the issue report commit gate. | none |
 | QG-007 | Context packet / clean-room / bounded return evidence audit | pass | E-AC-017〜021 point to `iss-00230` report; S99 final QA/spec reviews accepted the existing context packet, clean-room reviewer / consultant, and bounded return evidence coverage without requiring a human gate. | none |
 | QG-008 | Auto-Lite readiness / automatic Lite default disabled / efficiency evidence audit | pass | E-AC-015〜016 point to `iss-00233` Auto-Lite readiness and efficiency baseline; automatic Lite default remains disabled; final QA/spec reviews accepted missing-metrics handling without requiring a human gate. | none |
+| QG-009 | Grade-aware authoring / artifact readiness amendment audit | pass | E-RQ-006 / E-AC-006 / E-RQ-022 / E-AC-022 were amended to cover R0 + G1〜G4. Fresh `spec-reviewer` returned pass with confidence 0.90; non-blocking P2 stale checkpoint wording was fixed. | create formal corrective Issues |
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
@@ -221,9 +240,10 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
   - 該当なし。
 
 ## フォローアップ（別Issue化） (必須)
-- dedicated review-policy doctor surfacing は、この Epic では base-SHA policy validation / operator evidence までを対象とし、専用 doctor command は未作成。
+- dedicated review-instruction doctor surfacing は、この Epic では script-local instruction validation / operator evidence までを対象とし、専用 doctor command は未作成。
 - production telemetry backend と automatic Lite activation tuning は、この Epic の initial rollout 対象外。採用には accepted ADR、policy version bump、rollout Issue、telemetry gate が必要。
 - I06 で defer した automation-stalled operator surface は iss-00233 で resolved。
+- R0 / G1 / G2 / G3 / G4 の formal Issue 作成と dependency registration は、この Epic amendment の fresh `spec-reviewer` pass 後に行う。
 
 ## 省略/例外メモ (必須)
 - 該当なし
