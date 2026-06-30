@@ -3,7 +3,7 @@
 ID: "iss-00252"
 タイトル: "Compile Grade Aware Issue Planning Guidance"
 関連GitHub: ["#252"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-01"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -79,7 +79,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement/design/plan | Epic #224 requirement/design/plan、ADR `20260630t111316z`、`iss-00251` completion result、`./spec-dock/scripts/spec-dock guidance issue-planning`、fresh spec-reviewer fail/pass findings | blocking question なし。G1 は grade-aware authoring rules を docs / skill guidance に落とし、G2 / G3 / G4 の runtime routing / evidence enforcement / smoke は対象外にする。 | requirement/design/plan を approved に昇格。review fail findings を受け、plan に step-local source/paths/verification/reviewer/report destination、Spec-Locked Closure Index、三者 final quality gate、Parent Implementation Exception 境界、P0/P1 vs P2/P3 review semantics を追加した。 | passed: fresh `spec-reviewer` returned findings none / `review_status: pass` / confidence 0.90. | no | promote to issue execution |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
