@@ -74,6 +74,28 @@ class ArtifactStore:
         artifact: Literal["design", "plan"],
         profile: ProfileName,
     ) -> ProfileArtifactTemplate:
+        path, text = self._load_profile_artifact_template_text(artifact, profile)
+        _frontmatter, body = _split_frontmatter(text)
+        return ProfileArtifactTemplate(
+            profile=profile,
+            artifact=artifact,
+            repo_relative_path=path.relative_to(self.repo_root).as_posix(),
+            body=body,
+        )
+
+    def load_profile_artifact_template_text(
+        self,
+        artifact: Literal["design", "plan"],
+        profile: ProfileName,
+    ) -> str:
+        _path, text = self._load_profile_artifact_template_text(artifact, profile)
+        return text
+
+    def _load_profile_artifact_template_text(
+        self,
+        artifact: Literal["design", "plan"],
+        profile: ProfileName,
+    ) -> tuple[Path, str]:
         if artifact not in ("design", "plan"):
             raise ValueError(f"Unsupported profile template artifact: {artifact}")
         if profile not in ("lite", "standard", "strict", "critical"):
@@ -90,12 +112,7 @@ class ArtifactStore:
         _frontmatter, body = _split_frontmatter(text)
         if not body.strip():
             raise ValueError(f"Profile template body is empty: {path.relative_to(self.repo_root)}")
-        return ProfileArtifactTemplate(
-            profile=profile,
-            artifact=artifact,
-            repo_relative_path=path.relative_to(self.repo_root).as_posix(),
-            body=body,
-        )
+        return path, text
 
     def _validate_artifact_path(self, target: ResolvedIssueTarget, path: Path) -> None:
         if path.is_symlink():

@@ -18,6 +18,7 @@ ID: "epic-00224"
 - 2026-06-29: 旧 `comment zero` / inline review thread zero を blocker zero とみなす暗黙前提は変更済み。`20260628t185812z-adr PR Review Body Blocker Ingestion` により selected pull request review body も blocker policy input として扱う。
 - 2026-06-29: 旧 runtime-selected issue execution step / Step Assurance / Context Packet authority は変更済み。Issue execution は `20260629t003131z-adr Plan Centric Issue Execution Preflight` により `plan.md` を execution contract、`guidance issue-execution` を preflight validator とする。
 - 2026-06-29: 旧 Issue-local `assurance.json` path は変更済み。Assurance Contract は `20260629t003132z-adr Hidden Assurance Contract Path` により `.assurance.json` を canonical metadata contract とする。
+- 2026-06-30: `iss-00247 / #247` により Issue design / plan の canonical source が profile Markdown template pack へ移った。その後の manual test、GPT-5.5 Pro 分析、`20260630t111316z-adr` により、単なる draft routing だけでなく、grade-aware Issue authoring rules、fail-closed artifact readiness preflight、delegated specialist routing、fresh review / evidence gate、grade-aware smoke tests を Epic #224 全体の追加修正として扱う。`iss-00250` はこの論点の一時検討置き場であり、正式な Epic Issue slice としては採用しない。
 
 ## 目的（Initiative との紐づき）
 
@@ -115,8 +116,13 @@ ID: "epic-00224"
   - 未選択 Profile の手順を current Runbook へ混入させない。
   - Runbook compiler は `authorized_profile` だけを実行 authority として扱い、shadow の `lite_candidate` によって obligation を減らさない。
 
-- E-RQ-006: Adaptive artifact composition
-  - design / plan / report の必要 sections を policy fragment から合成する。
+- E-RQ-006: Grade template materialization and artifact readiness contract
+  - Issue requirement は共通 `templates/issue/requirement.md` を使う。
+  - Issue design / plan は `.assurance.json` の `classification.authorized_profile` だけを runtime template selection authority とし、`templates/issue-profiles/<authorized_profile>/{design,plan}.md` を materialize source とする。
+  - `authorized_profile` は runtime template / guidance / obligation selection authority であり、frontmatter、`lite_candidate`、command title、暗黙 default、manual escalation は template selection authority ではない。
+  - Manual escalation は planning、delegated specialist、review、report evidence、manual gate を強める判断であり、`authorized_profile` を silent override しない。
+  - `assurance compose` は deterministic materialization / diagnostic helper であり、compose 成功だけでは execution readiness を意味しない。
+  - `workflow status` / `guidance issue-execution` は fail-closed artifact readiness preflight として、未解決 placeholder、template-only artifact、heading-only plan、non-executable plan、stale reviewer evidence、missing adoption evidence を ready にしない。
   - substantive user content を自動上書きしない。
   - escalation は必要 section の単調追加と downstream invalidation を行う。
   - downgrade による section 削除を自動実行しない。
@@ -205,6 +211,21 @@ ID: "epic-00224"
   - 各 agent invocation について、role、reasoning effort、context mode、context policy version、context packet hash、source artifact hashes、fork turn count、included category、excluded category、returned evidence references を machine-readable evidence として記録する。
   - Private reasoning、secret、credential、raw token を記録してはならない。
 
+- E-RQ-022: Grade-aware Issue authoring, draft, review, and evidence workflow
+  - Grade 別 Issue authoring rules は follow-up Issue 内で再設計せず、Epic #224 の上流設計判断として扱う。
+  - `lite` は automatic default にしない。unknown / ambiguous な Issue は `standard` 以上として扱い、Lite は明示根拠がある場合だけ使用する。
+  - Issue authoring grade は通常 `authorized_profile` と一致するが、manual escalation により specialist routing、review、report evidence、manual gate を強められる。ただし runtime template selection authority は `authorized_profile` のままとする。
+  - Requirement authoring は main orchestrator が保持し、grade signal、scope、AC、risk facts を確定する。Requirement phase で `system-architect` / `implementation-planner` を常用しない。
+  - Design authoring では、`lite` は specialist 原則なし、`standard` は設計差分 / runtime behavior / TDD behavior / 責務境界がある場合に `system-architect` 推奨、`strict` 以上は原則必須、`critical` は safety / security / recovery consultant を必要に応じて追加する。
+  - Plan authoring では、`lite` は軽量 checklist、`standard` は TDD / milestone / validation ladder がある場合に `implementation-planner` 推奨、`strict` 以上は原則必須、`critical` は manual approval / dry-run / rollback / recovery gate を扱う。
+  - Delegated specialist draft は scope-local discussions evidence であり、canonical `requirement.md` / `design.md` / `plan.md` の authority ではない。main orchestrator が採否を判断し、Evidence Adoption Ledger と canonical docs へ統合する。
+  - Fresh `spec-reviewer` gate は grade によって省略・弱体化しない。grade により review focus、追加 reviewer、manual gate、evidence density を変える。
+  - Issue scope の `new doc draft-design` / `new doc draft-plan` は、classified Issue の `.assurance.json` にある `classification.authorized_profile` に対応する `templates/issue-profiles/<authorized_profile>/{design,plan}.md` を source とする。
+  - Issue scope の `draft-requirement` は共通 `templates/issue/requirement.md` を source とし、`.assurance.json` を要求しない。
+  - Initiative / Epic scope の `draft-design` / `draft-plan` は従来通り `templates/{initiative,epic}/{design,plan}.md` を source とする。
+  - `.assurance.json` が missing / invalid / stale の Issue で `draft-design` / `draft-plan` を作る場合は、薄い fallback draft を作らず fail-closed とする。
+  - Generated discussion draft は canonical artifact ではなく evidence / authoring input であり、`authority: accepted`、`adoption_status: adopted`、reviewer pass、phase completion、implementation readiness を自己主張してはならない。
+
 ## エピック受け入れ条件（Epic acceptance criteria）
 
 - E-AC-001: No-active Runbook
@@ -237,11 +258,13 @@ ID: "epic-00224"
   - 期待結果: `.agents/skills/**`、managed policy/template source に Issue 切替由来の差分がなく、generated Runbook は ignored path に存在する。
   - 観測点: Git integration tests、provider/mirror inspection。
 
-- E-AC-006: Profile-specific planning
-  - 前提: Provisional Profile が異なる複数 fixture がある。
-  - 操作: design / plan を compile する。
-  - 期待結果: 必要 section だけが生成され、不要 Profile の workflow は含まれず、既存 substantive content は保持される。
-  - 観測点: golden files、idempotence tests、no-overwrite tests。
+- E-AC-006: Grade template materialization and fail-closed readiness
+  - 前提: `lite / standard / strict / critical` の profile fixture と、未完成 artifact / placeholder / heading-only plan / stale evidence fixture がある。
+  - 操作: design / plan を materialize し、`workflow status` / `guidance issue-execution` の artifact readiness preflight を実行する。
+  - 期待結果: `authorized_profile` に対応する template だけが deterministic に materialize され、不要 Profile の workflow は含まれず、既存 substantive content は保持される。
+  - 期待結果: compose 成功だけでは ready と判定されず、未解決 placeholder、`REQ-XXX` / `CON-...`、template-only artifact、quality-gate heading だけの plan、missing adoption evidence、stale reviewer evidence は fail-closed で block される。
+  - 期待結果: `template` / `placeholder` という普通語を含む substantive design title は、それだけで block されない。
+  - 観測点: golden files、idempotence tests、no-overwrite tests、readiness classifier unit tests、CLI runtime negative / positive tests。
 
 - E-AC-007: Step routing
   - 前提: docs-only、runtime behavior、migration、security-sensitive の各 Step がある。
@@ -333,12 +356,26 @@ ID: "epic-00224"
   - 期待結果: main へ返るのは outcome、evidence refs、material decisions、remaining risks に限定され、raw logs と private reasoning は含まれない。
   - 観測点: return contract tests、generated event artifacts。
 
+- E-AC-022: Grade-aware Issue authoring workflow
+  - 前提: `lite / standard / strict / critical` の Issue authoring fixture と、classified Issue、delegated draft、spec-reviewer evidence、report evidence fixture がある。
+  - 操作: Issue planning guidance、discussion draft generation、delegated specialist routing、canonical adoption、fresh spec review、report evidence recording を実行する。
+  - 期待結果: Issue planning guidance は grade ごとに requirement / design / plan / review / report evidence の作業ルールを示し、Lite automatic default を許可しない。
+  - 期待結果: `standard` では specialist 使用 / 未使用理由を report に残せ、`strict` / `critical` では specialist unavailable / manual fallback を記録しない限り authoring gate を通過しない。
+  - 期待結果: 作成される Issue `draft-design` / `draft-plan` は `authorized_profile` に対応する `issue-profiles` template の主要見出しを含み、旧 `templates/issue/design.md` / `templates/issue/plan.md` の薄い fallback 本文を使わない。
+  - 例外期待: `.assurance.json` が missing / invalid / stale の場合は non-zero で失敗し、discussion file は増えない。
+  - 維持期待: Issue `draft-requirement` と Initiative / Epic `draft-design` / `draft-plan` の既存挙動は変わらない。
+  - 期待結果: Fresh `spec-reviewer` gate と Evidence Adoption Ledger なしに canonical phase promotion / implementation readiness を主張できない。
+  - 観測点: `guidance issue-planning` tests、`new doc` CLI tests、no-write fail-closed tests、spec-review / report evidence tests、grade-aware smoke tests、provider / dogfooding docs inspection。
+
 ## スコープ
 
 - 必須:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/` の domain / application / infra / command / presentation 拡張。
   - `src/spec_dock/assets/spec_dock/system/` の policy / schema / preset。
   - `src/spec_dock/assets/spec_dock/templates/` の assurance / workflow fragment。
+  - `src/spec_dock/assets/spec_dock/templates/issue-profiles/{lite,standard,strict,critical}/{design,plan}.md` を source とする Issue design / plan discussion draft routing。
+  - Artifact readiness preflight の placeholder / executable plan / stale evidence 判定。
+  - Grade-aware Issue planning guidance、delegated specialist routing、fresh spec-reviewer / report evidence gate。
   - Issue `assurance.json` contract。
   - `.agents/skills/spec-dock-issue-planning` / `spec-dock-issue-execution` の fixed kernel 化。
   - Provider-side source と dogfooding mirror。
@@ -391,6 +428,10 @@ ID: "epic-00224"
   - Generated Runbook を Git 管理しない。
   - Static Skill へ全 Profile workflow を複製しない。
   - Escalation を初期分類の安全性の代替として扱わない。
+  - Issue `draft-design` / `draft-plan` で `.assurance.json` missing / invalid / stale 時に Standard へ自動 fallback しない。
+  - Issue discussion draft を canonical `design.md` / `plan.md` の代替 authority として扱わない。
+  - `assurance compose` 成功だけを execution readiness とみなすこと。
+  - Grade-aware authoring rules を後続 Issue 内で再設計すること。
 
 ## 非機能要件
 
@@ -426,11 +467,13 @@ ID: "epic-00224"
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/`
   - `src/spec_dock/assets/spec_dock/system/`
   - `src/spec_dock/assets/spec_dock/templates/`
+  - `src/spec_dock/assets/spec_dock/templates/issue-profiles/`
   - `src/spec_dock/assets/install_root/.agents/skills/`
   - `.agents/skills/`
   - `spec-dock/scripts/spec_dock_runtime/`
   - `spec-dock/system/`
   - `spec-dock/templates/`
+  - `spec-dock/templates/issue-profiles/`
   - `.github/codex/`
   - tests / docs / installer ownership metadata
 - 外部依存:

@@ -205,6 +205,16 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 |---|---|---|---|---|---|---|---|---|
 | S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
 
+#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
+Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
+
+| グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
+|---|---|---|---|---|---|
+| `lite` | `not applicable` | `not applicable` | ライト該当なし理由（lite not applicable reason） | `pass / fail / blocked` | `ready / blocked` |
+| `standard` | `system-architect / implementation-planner / manual fallback` | `used / skipped / unavailable / denied` | `discussions/...` / manual evidence / skip reason: ... | `pass / fail / blocked` | `ready / blocked` |
+| `strict` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `discussions/...` / manual fallback evidence | `pass / fail / blocked` | `ready / blocked` |
+| `critical` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `discussions/...` / explicit approval and risk acceptance | `pass / fail / blocked` | `ready / blocked` |
+
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
