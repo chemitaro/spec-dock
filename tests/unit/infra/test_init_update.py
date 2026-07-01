@@ -1163,6 +1163,14 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00254-add-grade-aware-spec-review-and-evidence-gates/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00255-add-grade-aware-issue-authoring-smoke-tests/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00257-severity-aware-pr-review-policy/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00262-artifact-templates-and-rules/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00263-new-artifact-command-and-new-doc-removal/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00264-future-node-scaffold-artifacts-default/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00265-validation-sync-adr-mirror-and-agent-projection/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00266-delegated-authoring-artifacts-boundary/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00267-workflow-docs-skills-and-readme-alignment/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00268-dogfood-artifacts-without-migrating-discussions/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1436,6 +1444,35 @@ class TestInitUpdate(CliRuntimeHarness):
             "iss-00254",
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00257-severity-aware-pr-review-policy/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00262-artifact-templates-and-rules/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00263-new-artifact-command-and-new-doc-removal/.meta.json": [
+            "iss-00262"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00264-future-node-scaffold-artifacts-default/.meta.json": [
+            "iss-00262",
+            "iss-00263",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00265-validation-sync-adr-mirror-and-agent-projection/.meta.json": [
+            "iss-00263",
+            "iss-00264",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00266-delegated-authoring-artifacts-boundary/.meta.json": [
+            "iss-00263",
+            "iss-00265",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00267-workflow-docs-skills-and-readme-alignment/.meta.json": [
+            "iss-00263",
+            "iss-00266",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00268-dogfood-artifacts-without-migrating-discussions/.meta.json": [
+            "iss-00262",
+            "iss-00263",
+            "iss-00264",
+            "iss-00265",
+            "iss-00266",
+            "iss-00267",
+        ],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -1473,6 +1510,12 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00253": ["iss-00252"],
         "iss-00254": ["iss-00251", "iss-00252"],
         "iss-00255": ["iss-00251", "iss-00252", "iss-00253", "iss-00254"],
+        "iss-00263": ["iss-00262"],
+        "iss-00264": ["iss-00262", "iss-00263"],
+        "iss-00265": ["iss-00263", "iss-00264"],
+        "iss-00266": ["iss-00263", "iss-00265"],
+        "iss-00267": ["iss-00263", "iss-00266"],
+        "iss-00268": ["iss-00262", "iss-00263", "iss-00264", "iss-00265", "iss-00266", "iss-00267"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -32802,6 +32845,177 @@ esac
                     "fingerprint": blocker_policy["findings"][0]["fingerprint"],
                 }
             ]
+
+    def test_issue_232_review_collector_preserves_review_decision_gate_for_p2_inline_thread(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"Inline follow-up review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"[P2] consider a clearer helper name."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":"CHANGES_REQUESTED","reviewThreads":{"nodes":[{"id":"RT_selected","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:06:00Z","body":"[P2] consider a clearer helper name."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "review_decision_changes_requested"
+            assert payload["decision"]["recommended_next_action"] == "manual_review_required_non_retryable"
+            assert payload["review"]["review_decision"] == "CHANGES_REQUESTED"
+            assert payload["decision"]["current_selected_unresolved_thread_ids"] == ["RT_selected"]
+            assert payload["decision"]["actionable_unresolved_thread_ids"] == []
+            assert payload["decision"]["blocker_policy"]["status"] == "non_blocking_only"
+
+    def test_issue_232_review_collector_keeps_mixed_priority_thread_actionable(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"Inline mixed review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"[P2] consider a clearer helper name."},{"id":302,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:07:00Z","path":"app.py","line":14,"body":"Please inspect this behavior before merging."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_selected","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:06:00Z","body":"[P2] consider a clearer helper name."},{"id":"RTC_302","databaseId":302,"author":{"login":"codex"},"createdAt":"2026-06-08T01:07:00Z","body":"Please inspect this behavior before merging."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "current_selected_unresolved_thread"
+            assert payload["decision"]["recommended_next_action"] == "address_review_feedback"
+            assert payload["decision"]["current_selected_unresolved_thread_ids"] == ["RT_selected"]
+            assert payload["decision"]["actionable_unresolved_thread_ids"] == ["RT_selected"]
+            blocker_policy = payload["decision"]["blocker_policy"]
+            assert blocker_policy["status"] == "non_blocking_only"
+            assert blocker_policy["blocker_count"] == 0
+            assert blocker_policy["findings"][0]["id"] == 301
+            assert blocker_policy["findings"][0]["disposition"] == "non_blocking_followup"
 
     def test_issue_232_review_collector_treats_p1_inline_thread_as_blocker(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

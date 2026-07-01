@@ -1190,22 +1190,32 @@ blocker_policy_blockers = [item for item in blocker_policy_findings if item.get(
 blocker_policy_non_blocking = [
     item for item in blocker_policy_findings if item.get("disposition") == "non_blocking_followup"
 ]
-non_blocking_selected_unresolved_thread_ids = []
-for item in blocker_policy_non_blocking:
+selected_unresolved_comments_by_thread = {}
+for item in selected_comment_signals:
     thread_id = item.get("thread_id")
-    if (
-        item.get("kind") == "pull_review_comment"
-        and item.get("thread_state") == "unresolved"
-        and thread_id is not None
-        and str(thread_id) in selected_unresolved_thread_id_set
-        and thread_id not in non_blocking_selected_unresolved_thread_ids
-    ):
+    if thread_id is None or str(thread_id) not in selected_unresolved_thread_id_set:
+        continue
+    selected_unresolved_comments_by_thread.setdefault(str(thread_id), []).append(item)
+non_blocking_finding_comment_id_set = {
+    str(item.get("id"))
+    for item in blocker_policy_non_blocking
+    if item.get("kind") == "pull_review_comment" and item.get("id") is not None
+}
+non_blocking_selected_unresolved_thread_ids = []
+for thread_id in selected_unresolved_thread_ids:
+    selected_comments = selected_unresolved_comments_by_thread.get(str(thread_id), [])
+    if not selected_comments:
+        continue
+    if all(str(item.get("id")) in non_blocking_finding_comment_id_set for item in selected_comments):
         non_blocking_selected_unresolved_thread_ids.append(thread_id)
 selected_actionable_unresolved_thread_ids = [
     thread_id
     for thread_id in selected_unresolved_thread_ids
     if thread_id not in non_blocking_selected_unresolved_thread_ids
 ]
+review_decision_selected_unresolved_gate_present = bool(
+    selected_unresolved_thread_ids or non_blocking_selected_unresolved_thread_ids
+)
 stale_codex_carryover_thread_ids = [
     item.get("id")
     for item in carryover_non_outdated_unresolved_threads
@@ -1515,6 +1525,16 @@ elif completion_signal == "none":
     decision_status_reason = "missing_current_completion_signal"
     decision_status = "pending" if current_pending_codex_review_present else "unknown"
     decision_action = "wait_or_resume"
+elif (
+    review_decision_changes_requested and review_decision_selected_unresolved_gate_present
+) or active_changes_requested_review_present:
+    decision_status_reason = "review_decision_changes_requested"
+    decision_status = "human_gate"
+    decision_action = "manual_review_required_non_retryable"
+elif review_decision_requires_review and review_decision_selected_unresolved_gate_present:
+    decision_status_reason = "review_decision_requires_review"
+    decision_status = "human_gate"
+    decision_action = "manual_review_required_non_retryable"
 else:
     decision_status_reason = (
         "codex_no_findings_issue_comment"
