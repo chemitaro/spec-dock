@@ -18,7 +18,7 @@ Issue Grade: "standard"
 ## 上位 trace
 - Epic requirements: E-RQ-007 and cross-E-RQ evidence.
 - Epic acceptance criteria: E-AC-010 and final cross-E-AC evidence.
-- Depends on: `iss-00261` through `iss-00267`.
+- Depends on: `iss-00262` through `iss-00267`, plus accepted Epic ADR `artifacts/20260701t072851z-adr-artifact-domain-filename-template-contract.md`.
 
 ## スコープ
 - 必須:
@@ -51,4 +51,5 @@ Issue Grade: "standard"
 - Final Epic pre-PR review evidence。
 
 ## 依存
-- `iss-00261`, `iss-00262`, `iss-00263`, `iss-00264`, `iss-00265`, `iss-00266`, `iss-00267`。
+- `iss-00262`, `iss-00263`, `iss-00264`, `iss-00265`, `iss-00266`, `iss-00267`。
+- Epic-level artifact domain / filename / draft template ADR。

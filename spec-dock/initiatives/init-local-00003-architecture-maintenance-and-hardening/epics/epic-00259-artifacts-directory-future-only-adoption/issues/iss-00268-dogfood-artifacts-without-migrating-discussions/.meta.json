@@ -5,7 +5,7 @@
   "title": "Dogfood artifacts without migrating discussions",
   "slug": "dogfood-artifacts-without-migrating-discussions",
   "created_at": "2026-07-01T16:00:06+09:00",
-  "updated_at": "2026-07-01T16:00:59+09:00",
+  "updated_at": "2026-07-01T16:28:29+09:00",
   "parent_id": "epic-00259",
   "initiative_id": "init-local-00003",
   "epic_id": "epic-00259",
@@ -20,7 +20,6 @@
     "repo_name": "spec-dock"
   },
   "depends_on": [
-    "iss-00261",
     "iss-00262",
     "iss-00263",
     "iss-00264",
