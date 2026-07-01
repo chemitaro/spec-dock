@@ -3521,7 +3521,7 @@ class TestRuntimeSyncS07:
                 create_initiative=lambda req: None,  # type: ignore[return-value]
                 create_epic=lambda req: None,  # type: ignore[return-value]
                 create_issue=lambda req: None,  # type: ignore[return-value]
-                create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+                create_artifact_doc=lambda req: None,  # type: ignore[return-value]
                 import_initiative=lambda req: None,  # type: ignore[return-value]
                 import_epic=lambda req: None,  # type: ignore[return-value]
                 import_issue=lambda req: None,  # type: ignore[return-value]

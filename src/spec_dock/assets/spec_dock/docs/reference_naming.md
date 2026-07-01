@@ -1,6 +1,6 @@
-# 命名参照（reference: naming / `--title` / `--slug` / branch / discussions）
+# 命名参照（reference: naming / `--title` / `--slug` / branch / artifacts）
 
-このドキュメントは、spec-dock が扱う **命名**（title/slug、discussion docs のファイル名、checkout 後のブランチ名）をまとめた参照です。
+このドキュメントは、spec-dock が扱う **命名**（title/slug、artifact docs のファイル名、checkout 後のブランチ名）をまとめた参照です。
 
 関連:
 - 入口: [README.md](README.md)
@@ -14,11 +14,11 @@
 
 - `new {initiative,epic,issue}`
 - `import {initiative,epic,issue}`
-- `new doc <type>`（current catalog: `adr` / `disc` / `research` / `interview` / `scratch` / `pr-repair-batch` / `draft-requirement` / `draft-design` / `draft-plan`）
+- `new artifact <type>`（current catalog: `blank` / `adr` / `disc` / `research` / `interview` / `decision-candidate` / `pr-repair-batch` / issue-only `draft-requirement` / `draft-design` / `draft-plan`）
 
 補足:
-- `new doc <type>` は explicit basename / `doc_id` override（`--id` / `--seq` など）を提供しません。
-- 新規 discussion doc の filename / `doc_id` / path は runtime が生成します。caller / agent は `new doc <type>` の stdout で返る `path=...` を正本として本文更新に使います。
+- `new artifact <type>` は explicit basename / `artifact_id` override（`--id` / `--seq` など）を提供しません。
+- 新規 artifact doc の filename / `artifact_id` / path は runtime が生成します。caller / agent は `new artifact <type>` の stdout で返る `path=...` を正本として本文更新に使います。
 
 ### 1.2 ブランチ命名（checkout 後の正規化）
 
@@ -54,13 +54,13 @@
 - title から slug を決定的に生成できるようにし、パス/ブランチ名を安全に保つためです。
 
 補足:
-- `new doc <type>` の `--title` は、discussion markdown 本文に埋め込むためのタイトルです（node title 制約とは別系統）。
+- `new artifact <type>` の `--title` は、artifact markdown 本文に埋め込むためのタイトルです（node title 制約とは別系統）。
 
 ---
 
 ## 3. `--slug`（kebab-case 制約）
 
-`new/import {initiative,epic,issue}` と `new doc <type>` の `--slug` は、**trim 後**に次を満たす必要があります。
+`new/import {initiative,epic,issue}` と `new artifact <type>` の `--slug` は、**trim 後**に次を満たす必要があります。
 
 - 正規表現: `^[a-z0-9]+(?:-[a-z0-9]+)*$`
 - 意味: 「小文字英数字トークンを `-` で区切った列（kebab-case）」
@@ -80,78 +80,87 @@
 `--slug` を省略した場合、slug は title から自動生成されます。
 
 - ルール（node系）: `slug = lower(title).replace(" ", "-")`
-- ルール（discussion docs）: `_slugify(title)` で候補を作り、最終的に kebab-case 制約で検証
+- ルール（artifact docs）: `_slugify(title)` で候補を作り、最終的に kebab-case 制約で検証
 
 ---
 
-## 4. 議論文書の命名と識別子（discussion docs / `new doc <type>`）
+## 4. Artifact 文書の命名と識別子（artifact docs / `new artifact <type>`）
 
 ### 4.1 文書種別と保存先（doc family）
 
-- new creation の discussion doc family は `adr` / `disc` / `research` / `interview` / `scratch` / `pr-repair-batch` / `draft-requirement` / `draft-design` / `draft-plan` です。
-- `note` は retired です。既存 `note` artifact は grandfathered として validation 対象に残りますが、新規作成 catalog ではありません。
-- original/source file は、対象 Initiative / Epic / Issue ノード配下の `discussions/` に作成されます。
-- ADR も original は常に `discussions/` 配下です。generated ADR mirror / sync 対象は `adr` のみで、`pr-repair-batch` や他の discussion type へ広げません。
-- この節の basename 形式は validation / allocation contract の参照です。新規作成時に手で `<ts>-...` filename を組み立てず、`new doc <type>` が返す generated path を使います。
+- new creation の artifact doc family は `blank` / `adr` / `disc` / `research` / `interview` / `decision-candidate` / `pr-repair-batch` / issue-only `draft-requirement` / `draft-design` / `draft-plan` です。
+- `scratch` / `note` は retired です。既存 `scratch` / `note` artifact は grandfathered として validation 対象に残りますが、新規作成 catalog ではありません。
+- original/source file は、対象 Initiative / Epic / Issue ノード配下の `artifacts/` に作成されます。
+- ADR original は future `artifacts/` または legacy `discussions/` 配下にありえます。generated ADR mirror / sync 対象は `adr` のみで、`pr-repair-batch` や他の artifact type へ広げません。
+- `draft-requirement` / `draft-design` / `draft-plan` は issue-only routing type です。Initiative / Epic scope では unsupported です。
+- この節の basename 形式は validation / allocation contract の参照です。新規作成時に手で `<ts>-...` filename を組み立てず、`new artifact <type>` が返す generated path を使います。
 
 ### 4.2 ベース名契約（basename contract）
 
 標準形:
-- `<ts>-<kind>-<slug>.md`
+- typed artifact: `<ts>-<type>-<slug>.md`
+- blank artifact: `<ts>-<slug>.md`
 
 same-second collision 形:
-- `<ts>-<nn>-<kind>-<slug>.md`
+- typed artifact: `<ts>-<nn>-<type>-<slug>.md`
+- blank artifact: `<ts>-<nn>-<slug>.md`
 
 各要素:
 - `ts = yyyymmddthhmmssz`
   - UTC 固定
   - `t` / `z` は lowercase 固定
 - `nn = 01..99`
-  - 同一 `discussions/` directory 内で同じ秒を共有した discussion doc family collision の safety fallback suffix です
+  - 同一 `artifacts/` directory 内で同じ秒を共有した artifact doc family collision の safety fallback suffix です
   - runtime は同じ timestamp slot が使われている場合、短い wait / retry で次の timestamp slot を優先し、bounded wait で解消できないときだけ suffix を使います
-- `kind = adr|disc|research|interview|scratch|pr-repair-batch|draft-requirement|draft-design|draft-plan`
-- grandfathered existing `note` filenames may also appear in validation.
+- `type = adr|disc|research|interview|decision-candidate|pr-repair-batch|draft-requirement|draft-design|draft-plan`
+- `blank` は filename token を使わず、front matter の `template: "blank"` で template identity を示します。
+- grandfathered existing `scratch` / `note` filenames may also appear in validation.
 - `slug` は kebab-case です
 
 例:
+- `20260329t123455z-kickoff-memo.md`
 - `20260329t123456z-adr-token-rotation.md`
 - `20260329t123456z-disc-api-options.md`
+- `20260329t123456z-decision-candidate-token-options.md`
 - `20260329t123456z-pr-repair-batch-review-fixes.md`
 - `20260329t123456z-01-research-benchmark-summary.md`
 - `20260329t123456z-02-interview-rollout-policy.md`
-- `20260329t123456z-scratch-kickoff-memo.md`
 - `20260329t123457z-draft-plan-step-slicing.md`
 
-### 4.3 `doc_id` と filename stem の境界
+### 4.3 `artifact_id` と filename stem の境界
 
-`doc_id` は slugless identity です。
+`artifact_id` は slugless identity です。
 
-標準形の `doc_id`:
-- `<ts>-<kind>`
+標準形の `artifact_id`:
+- typed artifact: `<ts>-<type>`
+- blank artifact: `<ts>`
 
-collision 形の `doc_id`:
-- `<ts>-<nn>-<kind>`
+collision 形の `artifact_id`:
+- typed artifact: `<ts>-<nn>-<type>`
+- blank artifact: `<ts>-<nn>`
 
 関係:
-- filename stem = `<doc_id>-<slug>`
+- filename stem = `<artifact_id>-<slug>`
 - つまり slug は filename の一部ですが、identity そのものではありません
-- CLI / runtime が discussion doc の識別子を表示するときは、この slugless `doc_id` を使います
+- CLI / runtime が artifact doc の識別子を表示するときは、この slugless `artifact_id` を使います
 
 例:
 - filename: `20260329t123456z-adr-token-rotation.md`
-  - `doc_id`: `20260329t123456z-adr`
+  - `artifact_id`: `20260329t123456z-adr`
 - filename: `20260329t123456z-01-disc-api-options.md`
-  - `doc_id`: `20260329t123456z-01-disc`
+  - `artifact_id`: `20260329t123456z-01-disc`
 - filename: `20260329t123456z-pr-repair-batch-review-fixes.md`
-  - `doc_id`: `20260329t123456z-pr-repair-batch`
+  - `artifact_id`: `20260329t123456z-pr-repair-batch`
+- filename: `20260329t123455z-kickoff-memo.md`
+  - `artifact_id`: `20260329t123455z`
 
 ### 4.4 旧形式ファイルと検証境界（legacy files / validation boundary）
 
 legacy sequential docs は grandfathered only です。
 
 - 例: `001-adr-token-rotation.md`, `002-disc-api-options.md`
-- 既存 `001-note-kickoff-memo.md` や timestamp `*-note-*.md` も grandfathered artifact として扱います。
-- 強制的 backward compatibility を維持するために legacy naming へ戻したり、新規 doc で legacy sequence basename を優先したりはしません
+- 既存 `001-note-kickoff-memo.md`、timestamp `*-note-*.md`、timestamp `*-scratch-*.md` も grandfathered artifact として扱います。
+- 強制的 backward compatibility を維持するために legacy naming へ戻したり、新規 artifact で legacy sequence basename を優先したりはしません
 - 既存 legacy file は自動 rename しません
 - 新 contract で新規作成するときに legacy sequential basename を再利用しません
 - malformed / mismatch basename を validation が自動 repair することもありません
@@ -163,7 +172,7 @@ validation / allocation の扱い:
   - 例: `20260329T123456Z-adr-token-rotation.md`（`T` / `Z` が uppercase）
   - 例: `20260329t123456-adr-token-rotation.md`（末尾 `z` 欠落）
   - 例: `20260329t123456z_adr-token-rotation.md`（separator 不正）
-  - 例: `001_adr-token-rotation.md`, `adr_token_rotation.md`（discussion-doc intent の malformed legacy-like basename）
+  - 例: `001_adr-token-rotation.md`, `adr_token_rotation.md`（artifact intent の malformed legacy-like basename）
 
 原則:
 - unrelated file は ignore します

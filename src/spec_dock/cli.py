@@ -667,9 +667,10 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
             continue
         p.unlink(missing_ok=True)
 
-    # Legacy node templates used per-scope `adrs/` and `artifacts/`; prune them.
-    for legacy_dir in ("adrs", "artifacts"):
-        for d in sorted(templates_dir.rglob(legacy_dir), key=lambda x: len(str(x)), reverse=True):
+    # Legacy node templates used per-scope `adrs/` and `artifacts/`; prune only those nested scopes.
+    for scope in ("initiative", "epic", "issue"):
+        for legacy_dir in ("adrs", "artifacts"):
+            d = templates_dir / scope / legacy_dir
             if d.is_dir():
                 shutil.rmtree(d, ignore_errors=True)
 

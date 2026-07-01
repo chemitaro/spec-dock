@@ -3717,7 +3717,7 @@ class TestRuntimeNewS08:
             create_initiative=_fake_create,
             create_epic=_unexpected,
             create_issue=_unexpected,
-            create_discussion_doc=_unexpected,
+            create_artifact_doc=_unexpected,
             import_initiative=_unexpected,
             import_epic=_unexpected,
             import_issue=_unexpected,
