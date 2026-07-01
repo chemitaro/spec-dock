@@ -292,6 +292,28 @@ class TestDelegatedAuthoringRuntimeDomain:
             assert not result.ok
             assert "reason=new_artifact_claims_non_editable_state" in "\n".join(result.details)
 
+    def test_diff_guard_rejects_new_artifact_with_inline_commented_non_editable_state(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
+            text = _draft_text("# draft").replace(
+                "adoption_status: unreviewed",
+                "status: accepted # final\nadoption_status: unreviewed",
+            )
+            discussion.write_text(text, encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            assert not result.ok
+            assert "reason=new_artifact_claims_non_editable_state" in "\n".join(result.details)
+
     def test_diff_guard_rejects_new_artifact_with_quoted_accepted_authority(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
