@@ -72,7 +72,7 @@ endif
 |---|---|---|
 | `.agents/skills/github-pr-observation/scripts/codex-review-instructions.md` | Codex review request instruction | P0/P1 blocking、P2/P3 reportable non-blocking、P2/P3 promotion 禁止を明示 |
 | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/codex-review-instructions.md` | Installed provider mirror | dogfooding asset と同じ内容にする |
-| `.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | Review comments / reviews から blocker policy snapshot を生成 | P2 + protected_domain + machine_evidence を `promoted_blocker` にしない |
+| `.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | Review comments / reviews から blocker policy snapshot を生成 | P2 + protected_domain + machine_evidence を `promoted_blocker` にしない。current no-findings fallback/pass context では trigger boundary 外の Codex-only carryover thread を actionable gate から外し、carryover inventory には残す |
 | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | Installed provider mirror | runtime mirror parity を維持する |
 | `.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py` | Snapshot-level PR observation classifier | explicit `actionable_unresolved_*` fields を尊重し、P2/P3-only raw selected unresolved を再ブロックしない |
 | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py` | Installed provider mirror | downstream classifier mirror parity を維持する |
@@ -95,7 +95,7 @@ endif
 |---|---|---|---|---|
 | DES-001 | AC-001, AC-006 | Review instruction は P2/P3 を報告しない merge-blocking reviewer 風 | P0/P1 blocking、P2/P3 reportable non-blocking、P2/P3 promotion 禁止を明示 | `[N]` |
 | DES-002 | AC-002, AC-003 | P2 protected-domain + machine-evidence が `promoted_blocker` | P0/P1 のみ `blocker`; P2/P3 は metadata 付き `non_blocking_followup` | `[N]` |
-| DES-003 | AC-004, AC-005 | P2-only no-action path はあるが protected+machine P2 は blocker 化 | P2/P3-only は他 gate clean なら `blocker_policy_no_action` / merge-prepared に進める | `[N]` |
+| DES-003 | AC-004, AC-005 | P2-only no-action path はあるが protected+machine P2 は blocker 化。古い Codex thread が current no-findings evidence を上書きし得る | P2/P3-only は他 gate clean なら `blocker_policy_no_action` / merge-prepared に進める。current no-findings fallback/pass context では trigger boundary 外の Codex-only carryover thread を non-actionable inventory として扱う | `[N]` |
 | DES-004 | AC-006 | Merge-preparer / batch template の terminal P2/P3-only 境界が弱い | P0/P1 repair と P2/P3 terminal report を分離し、persistent batch を blocking work に限定 | `[N]` |
 | DES-005 | AC-007 | Provider/dogfooding mirror は現状一致 | 更新後も mirror parity を維持 | `[N]` |
 | DES-006 | AC-008 | 親 Epic には旧 promotion 方針が残る可能性 | 親 docs は非編集。issue-local override を requirement/report に固定 | `[N]` |
@@ -120,6 +120,16 @@ Design constraints:
 - `protected_domain` and `machine_evidence` remain useful metadata in finding summaries.
 - `blocker_policy.blocker_fingerprints` is derived only from P0/P1 blockers.
 - Existing platform / human gates remain independent from severity blocker policy.
+
+### 6.1 Carryover Thread Gate Contract
+
+Unresolved review thread handling is separate from severity parsing:
+
+- current selected unresolved threads remain actionable unless the selected inline finding is classified as P2/P3 non-blocking under the explicit actionable-field contract.
+- human-authored or human-participated carryover threads remain actionable unresolved gates.
+- trigger boundary 外の Codex-only carryover thread は、current head に対する clean Codex no-findings fallback/pass context がある場合に限り、`actionable_unresolved_thread_ids` から除外してよい。
+- The same Codex-only carryover thread must remain visible in `carryover_unresolved_thread_ids` / audit inventory, so the workflow does not erase historical evidence.
+- A thread is not Codex-only if any thread comment author is outside the trusted SpecDock/Codex reviewer identity set.
 
 ## 7. File Change Plan
 
@@ -146,6 +156,8 @@ Expected local delta:
 - Remove P2 protected-domain + machine-evidence `promoted_blocker` branch.
 - Ensure blockers are selected only from `disposition == "blocker"`.
 - Keep P2/P3 metadata in finding records.
+- In clean no-findings fallback/pass context, exclude only trigger-boundary-old Codex-only carryover threads from actionable unresolved output while keeping them in carryover inventory.
+- Preserve human-authored or human-participated carryover threads as actionable unresolved gates.
 - Avoid adding `root_cause_family` parser / field.
 
 ### 7.3 Tests

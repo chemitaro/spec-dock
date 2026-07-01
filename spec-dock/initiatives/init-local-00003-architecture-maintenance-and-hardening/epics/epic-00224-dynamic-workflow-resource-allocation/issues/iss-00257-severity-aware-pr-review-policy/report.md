@@ -25,6 +25,7 @@ ID: "iss-00257"
 | D-005 | resolved | test-strategy | spec-reviewer | Plan の CLOS-004 が terminal P2/P3-only no-mutation 境界を具体的に閉じていなかった | そのまま / CLOS と step を追加 | `CLOS-004A` と `S40` を追加し、batch persistence / commit-push / re-review / repair loop の証跡を要求 | Plan phase review P1 finding | applied | plan review `019f1baf-8f38-7833-bca6-21c4a48fe275`, `plan.md` | none |
 | D-006 | resolved | test-strategy | spec-reviewer | Parent Epic 非編集 evidence が symlink path だけだと弱い | symlink path / real parent docs path | 実体 parent Epic docs path を plan の検証コマンドと report evidence requirement に明示 | Plan re-review P2 finding | applied | plan re-review `019f1bb1-e3c3-7b70-a79a-94be1be82475`, `plan.md` | none |
 | D-007 | resolved | operation | user | SpecDock workflow が必要とする named sub-agent / reviewer を追加許可待ちで省略する判断が発生した | 現状維持 / runtime consent schema / instruction hardening | SpecDock workflow invocation を workflow-scoped named role authorization として instruction / docs / skill に明文化する | SpecDock は workflow-defined named roles を orchestrator が自律的に使い分ける前提であり、複雑な runtime consent schema は不要 | applied | supplemental user instruction, `requirement.md`, `design.md`, `plan.md` | none |
+| D-008 | resolved | implementation | dev-coder | PR #260 で current head の Codex no-findings issue comment があるのに、trigger boundary 外の古い Codex inline thread が carryover actionable として `human_gate` に昇格した | all carryover を除外 / Codex carryover を常に除外 / clean no-findings fallback context の古い Codex-only carryover だけ除外 | clean no-findings fallback/pass context では、trigger boundary 外かつ thread 全コメント author が trusted Codex identity の Codex-only carryover thread だけを actionable から除外し、carryover inventory には残す | human-authored / human-participated carryover と current selected unresolved は引き続き gate しつつ、現在の Codex no-findings evidence を古い Codex-only thread で無効化しない | applied | PR observation artifact `/private/tmp/spec-dock-pr-260-observation-3/result.json`, design Carryover Thread Gate Contract, plan `CLOS-005A`, dev-coder `019f1c8c-ed0c-7661-a112-e5176b92719f`, dev-coder `019f1c9d-a46b-70a1-aa62-3fc9e620e385`, focused tests | none |
 
 ## Evidence Adoption Ledger
 
@@ -279,6 +280,41 @@ ID: "iss-00257"
 | `git diff --check` | pass | No whitespace errors in the final diff. |
 | `git diff -- spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/requirement.md spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/design.md spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/plan.md spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/report.md` | pass | Exact parent Epic doc path diff produced no output. |
 | qa-reviewer `019f1c71-fc03-7893-a8d8-f5cc69cf09ae` | pass | Final QA review found only P2 mixed selected inline/human thread coverage recommendation; no P0/P1 QA gaps. Recommendation recorded as follow-up risk, not blocking. |
+| `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 260 --head-sha 7a9915af...` | failed | CI and current Codex no-findings issue comment were green, but old trigger-boundary-excluded Codex thread `PRRT_kwDOQ99OK86NevIt` remained in `carryover_unresolved_thread_ids` and was also emitted as `actionable_unresolved_thread_ids`, producing `human_gate` / `address_review_feedback`. No GitHub conversation resolution was performed. |
+| dev-coder `019f1c8c-ed0c-7661-a112-e5176b92719f` | complete | Added stale Codex carryover actionable exclusion to provider/dogfooding `pr_review_snapshot.py` mirror pair and added PR #260-shaped regression coverage. Carryover inventory remains; human carryover and current selected unresolved remain blocking. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187_s410 or issue_218_s01_review_collector_no_findings or issue_219_s01_review_collector_no_findings_with_carryover or issue_222_s03" -q --tb=short` | pass | 30 passed / 508 deselected. Covers stale Codex carryover non-actionable, human carryover still actionable, explicit actionable unresolved still blocking, and downstream fallback pass. |
+| `cmp -s .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | pass | Runtime mirror parity passed after stale Codex carryover repair. |
+| `git diff --check` | pass | No whitespace errors after stale Codex carryover repair. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 538 passed in 332.03s after stale Codex carryover repair. |
+| `make lint` | pass | Re-run after stale Codex carryover repair: ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after stale Codex carryover repair: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after stale Codex carryover repair: issue `iss-00257`, authorized profile `standard`. |
+| code-reviewer `019f1c99-3d10-7c53-b483-ff47c7152f72` | fail | P1: stale Codex carryover exclusion used only `first_comment_author`, so a Codex-opened thread with a human reply could be treated as non-actionable. |
+| spec-reviewer `019f1c99-9983-7bc2-9105-ed7a26789549` | fail | P1: stale Codex carryover policy was recorded only in report D-008 and had to be promoted into design/plan closure contract. |
+| qa-reviewer `019f1c99-98a6-7873-a805-0a45bc222537` | pass | Fresh QA found no P0/P1 test adequacy gaps before the P1 code/spec fixes; post-push live observation remains pending by design. |
+| dev-coder `019f1c9d-a46b-70a1-aa62-3fc9e620e385` | complete | Repaired P1 by adding `comment_authors` to normalized review thread data and treating a stale carryover thread as Codex-only only when all thread comment authors are trusted Codex identities. Human-participated carryover remains actionable. |
+| design/plan promotion | complete | Promoted stale Codex-only carryover policy from report-only D-008 into `design.md` carryover thread gate contract, `plan.md` CLOS-005A, S20/S40 verification, behavior backlog, and handoff summary. |
+| Red before P1 fix | fail evidence | Worker-reported `human_participated_codex_carryover` failed before implementation with `assert [] == ['RT_codex_human_carryover']`, proving the P1 bypass. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "human_participated_codex_carryover or issue_219_s01_review_collector_no_findings_with_carryover or issue_222_s03 or issue_187_s410" -q --tb=short` | pass | 18 passed / 521 deselected after the all-comment-authors Codex-only fix. |
+| `cmp -s .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | pass | Runtime mirror parity passed after human-participated carryover fix. |
+| `git diff --check` | pass | No whitespace errors after human-participated carryover fix and design/plan/report updates. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 539 passed in 335.36s after human-participated carryover fix and spec contract promotion. |
+| `make lint` | pass | Re-run after P1 fix: ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after P1 fix: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | fail then pass | First failed with stale source binding for updated design/plan. `assurance classify --stage requirement` refreshed the binding; `assurance compose --artifact all` failed closed with `substantive_content_conflict` rather than overwriting authored docs; final `assurance verify` passed. |
+| code-reviewer `019f1ca7-7b4c-77a2-9aad-788677d202cb` | pass | P2: missing/null thread comment author should prevent Codex-only proof and remain actionable. |
+| spec-reviewer `019f1ca7-7d70-7a73-b33e-f9c158b3a1bd` | pass | P2: D-008 wording needed `Codex-only` / all-comment-authors alignment; D-008 was updated. |
+| qa-reviewer `019f1ca7-7c4a-7f03-bfd3-d81d99257f34` | pass | Fresh QA found no P0/P1 gaps after P1 fixes. |
+| dev-coder `019f1caa-2d19-7d53-950c-f5c54554a631` | complete | Addressed P2 unknown-author edge case by preserving a `None` author entry for missing/null GraphQL comment authors; `is_codex_only_thread` therefore rejects unknown-author threads. |
+| Red before unknown-author fix | fail evidence | Worker-reported `unknown_author` regression failed before implementation with empty `actionable_unresolved_thread_ids`. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "unknown_author or human_participated_codex_carryover or stale_codex_carryover or issue_219_s01_review_collector_no_findings_with_carryover or issue_222_s03" -q --tb=short` | pass | 15 passed / 525 deselected. Covers Codex-only stale carryover, human-participated carryover, unknown-author carryover, and downstream fallback/actionable behavior. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 540 passed in 334.13s after unknown-author fix. |
+| `make lint` | pass | Re-run after unknown-author fix: ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after unknown-author fix: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after unknown-author fix: issue `iss-00257`, authorized profile `standard`. |
+| final code-reviewer `019f1cb2-78f7-7a50-8679-9327ba026dd7` | pass | No P0/P1/P2 findings in final uncommitted diff; mirror parity and gate behavior reviewed. |
+| final qa-reviewer `019f1cb2-79c3-7512-9164-24c388c59043` | pass | No P0/P1/P2/P3 QA findings; pre-commit test adequacy accepted, with live PR observation still pending after push. |
+| final spec-reviewer `019f1cb2-7ac1-72c1-be27-211156cbf9da` | pass | No spec findings; stale Codex-only carryover policy is promoted into design/plan/report and parent Epic docs remain untouched. |
 
 ## Final Quality Gate
 
@@ -307,7 +343,7 @@ ID: "iss-00257"
 
 | Final report ledger | Final commit scope | Post-commit evidence destination | Result |
 |---|---|---|---|
-| this report | S10-S50 implementation/docs/tests, PR observation repairs, and issue report evidence | final response and PR observation artifact | final verification and reviewer gates passed; commit, push, and PR observation re-run pending |
+| this report | S10-S50 implementation/docs/tests, PR observation repairs including stale Codex-only carryover handling, and issue report evidence | final response and PR observation artifact | final verification and fresh reviewer gates passed; commit, push, and PR observation re-run pending |
 
 ## 遭遇した問題と解決
 
@@ -323,6 +359,10 @@ ID: "iss-00257"
 - Fresh code review で positive explicit actionable unresolved fields が raw selected count zero のとき bypass できる P1 が見つかったため、downstream classifier で positive actionable を先に `actionable_unresolved_thread` として扱うようにした。
 - Full regression lane で上記 positive actionable の早期 return が current-selected / carryover / waitable precedence を壊すことが分かったため、positive actionable は trusted submitted-review path で current-selected と carryover の後に評価するよう修正した。
 - QA review は mixed selected inline P2 thread with human reply の追加テストを P2 follow-up risk として推奨した。現行 gate は P0/P1 なしで pass のため、この Issue の blocking closure にはしない。
+- PR #260 再観測で、CI と current Codex no-findings が通っているにもかかわらず、古い Codex-authored carryover thread が actionable として残り `human_gate` になることが分かった。clean no-findings fallback/pass context では trigger boundary 外の Codex carryover を actionable から除外し、carryover inventory には残すよう修正した。
+- Fresh code review で、Codex が開いた古い thread に人間の reply がある場合まで non-actionable になり得る P1 が見つかったため、Codex-only 判定を thread 全コメント author ベースに狭めた。人間参加 carryover は actionable gate として維持する。
+- Fresh spec review で、stale Codex-only carryover policy が report-only decision になっている P1 が見つかったため、design の Carryover Thread Gate Contract と plan の CLOS-005A / S20 / S40 / behavior backlog に昇格した。
+- Fresh code review の P2 として、missing/null author の thread comment は Codex-only と証明できないため actionable に残すべきと指摘された。`comment_authors` に `None` を保持し、unknown author があれば Codex-only 判定に失敗するよう修正した。
 
 ## 省略/例外メモ
 
