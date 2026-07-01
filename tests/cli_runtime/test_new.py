@@ -875,7 +875,7 @@ class TestCliNew(CliRuntimeHarness):
                     (
                         "種別: pr-repair-batch",
                         "PR / Observation Metadata",
-                        "observed GitHub Actions CI failures",
+                        "Required GitHub Actions CI failures",
                     ),
                 ),
                 (
@@ -1110,6 +1110,7 @@ class TestCliNew(CliRuntimeHarness):
             issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
 
             for artifact_type in ("scratch", "note", "unknown"):
+                artifact_files_before = sorted((issue_dir / "artifacts").glob("*.md"))
                 p = self._run_runtime_capture(
                     target,
                     ["new", "artifact", artifact_type, "--issue", "iss-00003", "--title", f"{artifact_type} one"],
@@ -1117,7 +1118,7 @@ class TestCliNew(CliRuntimeHarness):
 
                 assert p.returncode != 0, p.stdout + p.stderr
                 assert artifact_type in p.stderr
-                assert not (issue_dir / "artifacts").exists()
+                assert sorted((issue_dir / "artifacts").glob("*.md")) == artifact_files_before
 
     def test_new_artifact_stdout_uses_slugless_id_and_artifacts_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1207,10 +1208,11 @@ class TestCliNew(CliRuntimeHarness):
                 (["new", "artifact", "draft-requirement", "--initiative", "init-00001", "--title", "Requirement Draft"], init_dir),
                 (["new", "artifact", "draft-plan", "--epic", "epic-00002", "--title", "Plan Draft"], epic_dir),
             ):
+                artifact_files_before = sorted((scope_dir / "artifacts").glob("*.md"))
                 p = self._run_runtime_capture(target, command)
                 assert p.returncode != 0, p.stdout + p.stderr
                 assert "issue scope" in p.stderr
-                assert not (scope_dir / "artifacts").exists()
+                assert sorted((scope_dir / "artifacts").glob("*.md")) == artifact_files_before
 
     def test_new_artifact_malformed_artifact_candidates_block_but_discussions_do_not(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1246,6 +1248,13 @@ class TestCliNew(CliRuntimeHarness):
             self._create_same_repo_linked_hierarchy(target)
             issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
             discussions_dir = issue_dir / "discussions"
+            shutil.rmtree(issue_dir / "artifacts")
+            discussions_dir.mkdir()
+            (discussions_dir / "rules.md").write_text("legacy issue discussion rules\n", encoding="utf-8")
+            (discussions_dir / "20260312t010203z-research-existing.md").write_text(
+                "legacy research\n",
+                encoding="utf-8",
+            )
             discussions_before = sorted(path.name for path in discussions_dir.glob("*.md"))
             assert not (issue_dir / "artifacts").exists()
 
@@ -1285,7 +1294,7 @@ class TestCliNew(CliRuntimeHarness):
             assert p.returncode != 0, p.stdout + p.stderr
             assert "--slug" in p.stderr
             assert "expected regex" in p.stderr
-            assert not (issue_dir / "artifacts").exists()
+            assert sorted(path.name for path in (issue_dir / "artifacts").glob("*.md")) == ["rules.md"]
 
     def test_new_artifact_blank_rejects_ambiguous_supported_type_slug_before_setup(self) -> None:
         cases = (
@@ -1317,7 +1326,7 @@ class TestCliNew(CliRuntimeHarness):
                 assert p.returncode != 0, p.stdout + p.stderr
                 assert "Ambiguous blank artifact slug" in p.stderr
                 assert slug in p.stderr
-                assert not (issue_dir / "artifacts").exists()
+                assert sorted(path.name for path in (issue_dir / "artifacts").glob("*.md")) == ["rules.md"]
 
     def test_new_artifact_rejects_unexpected_sequence_override_option(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

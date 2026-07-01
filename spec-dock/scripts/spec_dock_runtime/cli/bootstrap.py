@@ -13,8 +13,8 @@ from spec_dock_runtime.application.assurance import (
 from spec_dock_runtime.application.check_deps import check_deps as application_check_deps
 from spec_dock_runtime.application.close_node import close_node as application_close_node
 from spec_dock_runtime.application.contracts import UseCases
+from spec_dock_runtime.application.create_artifact_doc import create_artifact_doc as application_create_artifact_doc
 from spec_dock_runtime.application.create_node import (
-    create_discussion_doc as application_create_discussion_doc,
     create_epic as application_create_epic,
     create_initiative as application_create_initiative,
     create_issue as application_create_issue,
@@ -335,7 +335,7 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         create_initiative=lambda req: application_create_initiative(req, ports),
         create_epic=lambda req: application_create_epic(req, ports),
         create_issue=lambda req: application_create_issue(req, ports),
-        create_discussion_doc=lambda req: application_create_discussion_doc(
+        create_artifact_doc=lambda req: application_create_artifact_doc(
             req,
             ports,
             assurance_store=assurance_store,

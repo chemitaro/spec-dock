@@ -1528,6 +1528,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         target = Path(tmp.name)
         assert main(["init", str(target)]) == 0
         self._create_same_repo_linked_hierarchy(target, issue_issue_number=3, issue_title="Delegated authoring")
+        _create_legacy_discussions_fixture(target)
         return target
 
     def _run_runtime_capture_from_cwd(
@@ -1559,6 +1560,15 @@ def _issue_dir(target: Path) -> Path:
         / "issues"
         / "iss-00003-delegated-authoring"
     )
+
+
+def _create_legacy_discussions_fixture(target: Path) -> None:
+    discussions_dir = _issue_dir(target) / "discussions"
+    discussions_dir.mkdir(exist_ok=True)
+    rules_target = target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md"
+    rules_path = discussions_dir / "rules.md"
+    if not rules_path.exists():
+        rules_path.symlink_to(os.path.relpath(rules_target, start=discussions_dir))
 
 
 def _write_delegated_authoring_baseline(testcase: TestDelegatedAuthoringCli, target: Path) -> Path:

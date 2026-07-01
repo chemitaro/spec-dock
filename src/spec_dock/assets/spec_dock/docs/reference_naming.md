@@ -84,7 +84,7 @@
 
 ---
 
-## 4. Artifact 文書の命名と識別子（artifact docs / `new artifact <type>`）
+## 4. 成果物文書の命名と識別子（artifact docs / `new artifact <type>`）
 
 ### 4.1 文書種別と保存先（doc family）
 

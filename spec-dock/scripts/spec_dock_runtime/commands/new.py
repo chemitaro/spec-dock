@@ -4,25 +4,26 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from spec_dock_runtime.application.contracts import (
-    CreateDiscussionDocRequest,
+    CreateArtifactDocRequest,
     CreateNodeRequest,
     CreateNodeResult,
     UseCases,
 )
 from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
-from spec_dock_runtime.presentation.cli_text import render_new_doc_text, render_new_node_text
+from spec_dock_runtime.presentation.cli_text import render_new_artifact_text, render_new_node_text
 from spec_dock_runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
     import argparse
 
-_discussion_doc_types = (
-    "adr",
-    "disc",
+_artifact_types = (
+    "blank",
     "research",
     "interview",
-    "scratch",
+    "disc",
+    "decision-candidate",
     "pr-repair-batch",
+    "adr",
     "draft-requirement",
     "draft-design",
     "draft-plan",
@@ -56,8 +57,8 @@ class NewIssueArgs(CommandArgs):
 
 
 @dataclass(frozen=True)
-class NewDocArgs(CommandArgs):
-    doc_type: str
+class NewArtifactArgs(CommandArgs):
+    artifact_type: str
     scope_node_id: str
     scope_kind: Literal["initiative", "epic", "issue"]
     title: str
@@ -81,10 +82,10 @@ def command_specs() -> dict[str, CommandSpec]:
             args_factory=_new_issue_args,
             run=_run_new_issue,
         ),
-        "new_doc": CommandSpec(
-            add_arguments=_add_new_doc_arguments,
-            args_factory=_new_doc_args,
-            run=_run_new_doc,
+        "new_artifact": CommandSpec(
+            add_arguments=_add_new_artifact_arguments,
+            args_factory=_new_artifact_args,
+            run=_run_new_artifact,
         ),
     }
 
@@ -147,14 +148,13 @@ def _add_new_issue_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _add_new_doc_arguments(parser: argparse.ArgumentParser) -> None:
+def _add_new_artifact_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
-        "doc_type",
-        metavar="doc_type",
+        "artifact_type",
+        metavar="type",
         help=(
-            "Discussion doc type: "
-            f"{', '.join(_discussion_doc_types)}. "
-            "'note' is retired; use 'scratch' for new raw capture docs."
+            "Artifact type: "
+            f"{', '.join(_artifact_types)}."
         ),
     )
     scope_group = parser.add_mutually_exclusive_group(required=True)
@@ -194,7 +194,7 @@ def _new_issue_args(ns: argparse.Namespace) -> CommandArgs:
     )
 
 
-def _new_doc_args(ns: argparse.Namespace) -> CommandArgs:
+def _new_artifact_args(ns: argparse.Namespace) -> CommandArgs:
     initiative = getattr(ns, "initiative", None)
     epic = getattr(ns, "epic", None)
     issue = getattr(ns, "issue", None)
@@ -209,8 +209,8 @@ def _new_doc_args(ns: argparse.Namespace) -> CommandArgs:
         scope_node_id = issue
     else:
         raise RuntimeError("scope is required")
-    return NewDocArgs(
-        doc_type=str(ns.doc_type),
+    return NewArtifactArgs(
+        artifact_type=str(ns.artifact_type),
         scope_node_id=str(scope_node_id),
         scope_kind=scope_kind,
         title=str(ns.title),
@@ -281,18 +281,18 @@ def _run_new_issue(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     return CommandOutcome(exit_code=_post_sync_exit_code(result), text=text)
 
 
-def _run_new_doc(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
-    typed = _expect_new_doc_args(args)
-    result = use_cases.create_discussion_doc(
-        CreateDiscussionDocRequest(
-            doc_type=typed.doc_type,  # type: ignore[arg-type]
+def _run_new_artifact(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    typed = _expect_new_artifact_args(args)
+    result = use_cases.create_artifact_doc(
+        CreateArtifactDocRequest(
+            artifact_type=typed.artifact_type,  # type: ignore[arg-type]
             scope_node_id=typed.scope_node_id,
             scope_kind=typed.scope_kind,
             title=typed.title,
             slug=typed.slug,
         )
     )
-    return CommandOutcome(exit_code=0, text=render_new_doc_text(result))
+    return CommandOutcome(exit_code=0, text=render_new_artifact_text(result))
 
 
 def _prepend_stderr(text: CliText, line: str) -> CliText:
@@ -325,7 +325,7 @@ def _expect_new_issue_args(args: CommandArgs) -> NewIssueArgs:
     return args
 
 
-def _expect_new_doc_args(args: CommandArgs) -> NewDocArgs:
-    if not isinstance(args, NewDocArgs):
-        raise RuntimeError("Invalid command args for new doc")
+def _expect_new_artifact_args(args: CommandArgs) -> NewArtifactArgs:
+    if not isinstance(args, NewArtifactArgs):
+        raise RuntimeError("Invalid command args for new artifact")
     return args

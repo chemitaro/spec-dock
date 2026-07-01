@@ -11,7 +11,7 @@ if TYPE_CHECKING:
         ActiveSetResult,
         ActiveViewResult,
         CloseNodeResult,
-        CreateDiscussionDocResult,
+        CreateArtifactDocResult,
         CreateNodeResult,
         DeleteNodeResult,
         DepsCheckResult,
@@ -169,9 +169,12 @@ def render_new_node_text(result: CreateNodeResult) -> CliText:
     )
 
 
-def render_new_doc_text(result: CreateDiscussionDocResult) -> CliText:
+def render_new_artifact_text(result: CreateArtifactDocResult) -> CliText:
     rel = _rel_path_for_output(result.path.as_posix())
-    line = f"spec-dock: ok (new doc) type={result.doc_type} id={result.doc_id} scope={result.scope_node_id} path={rel}"
+    line = (
+        "spec-dock: ok (new artifact) "
+        f"type={result.artifact_type} id={result.artifact_id} scope={result.scope_node_id} path={rel}"
+    )
     return CliText(stdout_lines=[line], stderr_lines=[], warnings=list(result.warnings))
 
 

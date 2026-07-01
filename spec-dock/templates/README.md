@@ -7,17 +7,25 @@
 - `epic/` → `.../epics/epic-xxxx-<slug>/`
 - `issue/` → `.../issues/iss-xxxx-<slug>/`
 - `discussions/{scratch,interview,research,disc,adr,pr-repair-batch}.md` → `<scope>/discussions/<ts>-<kind>-<slug>.md`
-- `draft-requirement` は scope kind に応じた canonical `templates/{initiative,epic,issue}/requirement.md` を source として render します。Initiative / Epic の `draft-design` / `draft-plan` も scope kind に応じた canonical design / plan template を source とします。Issue の `draft-design` / `draft-plan` は verified `.assurance.json` の `authorized_profile` に対応する `templates/issue-profiles/<profile>/design.md` / `plan.md` を source として render します。
+- `draft-requirement` / `draft-design` / `draft-plan` は safety-sensitive draft work です。Future `new artifact draft-*` は Issue scope only で、Initiative / Epic scope は unsupported のため write 前に no-write fail-closed します。Issue の `draft-design` / `draft-plan` は verified `.assurance.json` の `authorized_profile` に対応する `templates/issue-profiles/<profile>/design.md` / `plan.md` を source として render します。
 - same-second collision 時は `<scope>/discussions/<ts>-<nn>-<kind>-<slug>.md`
+- future `artifacts/{blank,research,interview,disc,decision-candidate,pr-repair-batch,adr}.md` → `<scope>/artifacts/<ts>-<type>-<slug>.md`
+- future `blank` artifact は `<scope>/artifacts/<ts>-<slug>.md` を使い、filename に `blank` token を要求しません。template identity は front matter の `template: "blank"` で示します。
+- future `new artifact draft-requirement` / `draft-design` / `draft-plan` は専用 `templates/artifacts/draft-*.md` を持ちません。Issue scope だけで `draft-requirement` は既存 issue requirement template contract を、`draft-design` / `draft-plan` は verified `.assurance.json` の `authorized_profile` に対応する `templates/issue-profiles/<profile>/design.md` / `plan.md` を source とします。Initiative / Epic scope の future `new artifact draft-*` は unsupported / no-write fail-closed です。
 
 注意:
 - discussion docs の公開 CLI は `new doc <type>` のみです。
 - current catalog は `scratch` / `interview` / `research` / `disc` / `adr` / `pr-repair-batch` / `draft-requirement` / `draft-design` / `draft-plan` です。
+- future `new artifact` catalog は `blank` / `research` / `interview` / `disc` / `decision-candidate` / `pr-repair-batch` / `adr` / `draft-requirement` / `draft-design` / `draft-plan` です。
+- `scratch` は legacy-only であり、future artifact catalog には追加しません。raw / untyped capture は future `blank` artifact を使います。
 - `interview` は docs-aware clarification workflow の正式質問シートです。重要判断は一問一答で扱い、回答前に unanswered artifact を作成し、回答後に同じ artifact へ回答、採用判断、反映先を追記します。既存の複数質問 interview artifact は grandfathered で、自動分割や rename はしません。
 - `research` は source-grounded read、事実、推測、未検証事項、判断への含意を分離します。`disc` は複数質問や research の synthesis、reflection proposal、ADR candidate triage を扱います。採否の最終証跡は canonical docs / ADR / `report.md` へ昇格して記録します。
 - `report.md` は initiative / epic / issue の canonical observed evidence ledger であり、`new doc report` として作成する discussion catalog には含めません。
-- `draft-requirement` / `draft-design` / `draft-plan` は `discussions/` 配置と draft filename で draft artifact として扱います。canonical docs remain main-orchestrator-only; canonical docs direct-write success path はありません。
-- `note` は retired です。既存 `note` artifact は grandfathered として壊さず、新規 raw capture は `scratch` を使います。
+- Issue scope の `draft-requirement` / `draft-design` / `draft-plan` は current / legacy `discussions/` 配置と draft filename で draft artifact として扱います。canonical docs remain main-orchestrator-only; canonical docs direct-write success path はありません。
+- Future `new artifact` では Issue scope の `draft-requirement` / `draft-design` / `draft-plan` も `artifacts/` 配置になりますが、content source は上記の existing issue requirement / issue-profile design / issue-profile plan template reuse です。
+- Future `artifacts/` は working evidence surface です。既存 `discussions/` docs は preservation / legacy surface として削除、移動、rename しません。
+- Future ADR originals may live under `artifacts/` or legacy `discussions/`; accepted ADR mirror collection must collect both without moving originals.
+- `note` は retired です。既存 `note` artifact は grandfathered として壊さず、current / legacy `new doc` surface の新規 raw capture は `scratch` を使います。future `new artifact` surface の raw / untyped capture は `blank` を使います。
 - discussion docs の filename contract は timestamp-prefix です（標準: `<ts>-<kind>-<slug>.md` / same-second collision: `<ts>-<nn>-<kind>-<slug>.md`）。
 - `ts = yyyymmddthhmmssz`（UTC, lowercase `t` / `z`）、`nn = 01..99` です。
 - `doc_id` は slugless identity（`<ts>-<kind>` / `<ts>-<nn>-<kind>`）で、filename stem は `<doc_id>-<slug>` です。

@@ -279,12 +279,17 @@ _JAPANESE_PRIMARY_TABLE_ROLE_TOKENS = {
 
 class TestInitUpdate(CliRuntimeHarness):
     _CANONICAL_RULES_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
+        "spec-dock/docs/rules/initiative/artifacts.md": (
+            "src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md"
+        ),
         "spec-dock/docs/rules/initiative/discussions.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md"
         ),
         "spec-dock/docs/rules/initiative/epics.md": ("src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md"),
+        "spec-dock/docs/rules/epic/artifacts.md": ("src/spec_dock/assets/spec_dock/docs/rules/epic/artifacts.md"),
         "spec-dock/docs/rules/epic/discussions.md": ("src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md"),
         "spec-dock/docs/rules/epic/issues.md": ("src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md"),
+        "spec-dock/docs/rules/issue/artifacts.md": ("src/spec_dock/assets/spec_dock/docs/rules/issue/artifacts.md"),
         "spec-dock/docs/rules/issue/discussions.md": ("src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"),
     }
 
@@ -493,6 +498,15 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
     }
     _CANONICAL_RULES_EXPECTATIONS: ClassVar[dict[str, object]] = {
+        "docs/rules/initiative/artifacts.md": {
+            "contains": (
+                "# 成果物ルール（artifacts/rules.md）",
+                "このディレクトリには initiative に紐づく future working artifacts を置きます。",
+                "Legacy `discussions/` は preservation surface です。",
+                "`blank`: 型を先に決めない working evidence。",
+            ),
+            "absent": ("new doc note",),
+        },
         "docs/rules/initiative/discussions.md": {
             "contains": (
                 "# 議論ルール（discussions/rules.md）",
@@ -525,6 +539,15 @@ class TestInitUpdate(CliRuntimeHarness):
                 "new doc adr",
             ),
         },
+        "docs/rules/epic/artifacts.md": {
+            "contains": (
+                "# 成果物ルール（artifacts/rules.md）",
+                "このディレクトリには epic に紐づく future working artifacts を置きます。",
+                "Legacy `discussions/` は preservation surface です。",
+                "`blank`: 型を先に決めない working evidence。",
+            ),
+            "absent": ("new doc note",),
+        },
         "docs/rules/epic/discussions.md": {
             "contains": (
                 "# 議論ルール（discussions/rules.md）",
@@ -556,6 +579,15 @@ class TestInitUpdate(CliRuntimeHarness):
                 "--initiative <id>",
                 "new doc adr",
             ),
+        },
+        "docs/rules/issue/artifacts.md": {
+            "contains": (
+                "# 成果物ルール（artifacts/rules.md）",
+                "このディレクトリには issue に紐づく future working artifacts を置きます。",
+                "Legacy `discussions/` は preservation surface です。",
+                "`blank`: 型を先に決めない working evidence。",
+            ),
+            "absent": ("new doc note",),
         },
         "docs/rules/issue/discussions.md": {
             "contains": (
@@ -3286,10 +3318,13 @@ class TestInitUpdate(CliRuntimeHarness):
             assert not (issue_templates_dir / "discussions" / "rules.md").exists()
 
             rules_dir = target / "spec-dock" / "docs" / "rules"
+            assert (rules_dir / "initiative" / "artifacts.md").is_file()
             assert (rules_dir / "initiative" / "discussions.md").is_file()
             assert (rules_dir / "initiative" / "epics.md").is_file()
+            assert (rules_dir / "epic" / "artifacts.md").is_file()
             assert (rules_dir / "epic" / "discussions.md").is_file()
             assert (rules_dir / "epic" / "issues.md").is_file()
+            assert (rules_dir / "issue" / "artifacts.md").is_file()
             assert (rules_dir / "issue" / "discussions.md").is_file()
 
             discussions_templates_dir = templates_dir / "discussions"
@@ -3585,10 +3620,13 @@ class TestInitUpdate(CliRuntimeHarness):
 
             guidance_paths = [
                 "spec-dock/templates/README.md",
+                "spec-dock/docs/rules/initiative/artifacts.md",
                 "spec-dock/docs/rules/initiative/discussions.md",
                 "spec-dock/docs/rules/initiative/epics.md",
+                "spec-dock/docs/rules/epic/artifacts.md",
                 "spec-dock/docs/rules/epic/discussions.md",
                 "spec-dock/docs/rules/epic/issues.md",
+                "spec-dock/docs/rules/issue/artifacts.md",
                 "spec-dock/docs/rules/issue/discussions.md",
                 "spec-dock/docs/reference_naming.md",
                 "spec-dock/docs/workflow_adr.md",
@@ -3679,10 +3717,13 @@ class TestInitUpdate(CliRuntimeHarness):
 
             guidance_paths = [
                 "spec-dock/templates/README.md",
+                "spec-dock/docs/rules/initiative/artifacts.md",
                 "spec-dock/docs/rules/initiative/discussions.md",
                 "spec-dock/docs/rules/initiative/epics.md",
+                "spec-dock/docs/rules/epic/artifacts.md",
                 "spec-dock/docs/rules/epic/discussions.md",
                 "spec-dock/docs/rules/epic/issues.md",
+                "spec-dock/docs/rules/issue/artifacts.md",
                 "spec-dock/docs/rules/issue/discussions.md",
                 "spec-dock/docs/reference_naming.md",
                 "spec-dock/docs/workflow_adr.md",
@@ -3760,10 +3801,13 @@ class TestInitUpdate(CliRuntimeHarness):
         repo_root = Path(__file__).resolve().parents[3]
         guidance_paths = [
             "src/spec_dock/assets/spec_dock/templates/README.md",
+            "src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md",
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md",
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md",
+            "src/spec_dock/assets/spec_dock/docs/rules/epic/artifacts.md",
             "src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md",
             "src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md",
+            "src/spec_dock/assets/spec_dock/docs/rules/issue/artifacts.md",
             "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md",
             "src/spec_dock/assets/spec_dock/docs/reference_naming.md",
             "src/spec_dock/assets/spec_dock/docs/workflow_adr.md",
@@ -5126,6 +5170,7 @@ with tempfile.TemporaryDirectory() as td:
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
     rules_dir = specdock_dir / "docs" / "rules" / "issue"
     rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "artifacts.md").write_text("# issue artifacts\\n", encoding="utf-8")
     (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
@@ -5405,6 +5450,7 @@ with tempfile.TemporaryDirectory() as td:
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
     rules_dir = specdock_dir / "docs" / "rules" / "issue"
     rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "artifacts.md").write_text("# issue artifacts\\n", encoding="utf-8")
     (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
@@ -5650,6 +5696,7 @@ with tempfile.TemporaryDirectory() as td:
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
     rules_dir = specdock_dir / "docs" / "rules" / "issue"
     rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "artifacts.md").write_text("# issue artifacts\\n", encoding="utf-8")
     (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
@@ -5908,6 +5955,7 @@ with tempfile.TemporaryDirectory() as td:
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
     rules_dir = specdock_dir / "docs" / "rules" / "issue"
     rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "artifacts.md").write_text("# issue artifacts\\n", encoding="utf-8")
     (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
@@ -6156,6 +6204,7 @@ with tempfile.TemporaryDirectory() as td:
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
     rules_dir = specdock_dir / "docs" / "rules" / "issue"
     rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "artifacts.md").write_text("# issue artifacts\\n", encoding="utf-8")
     (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
@@ -6902,10 +6951,13 @@ def _prepare_templates(specdock_dir):
         (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
     rules_root = specdock_dir / "docs" / "rules"
     for scope, filename in (
+        ("initiative", "artifacts.md"),
         ("initiative", "epics.md"),
         ("initiative", "discussions.md"),
+        ("epic", "artifacts.md"),
         ("epic", "issues.md"),
         ("epic", "discussions.md"),
+        ("issue", "artifacts.md"),
         ("issue", "discussions.md"),
     ):
         rules_path = rules_root / scope / filename
@@ -7790,10 +7842,13 @@ def _prepare_templates(specdock_dir):
         (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
     rules_root = specdock_dir / "docs" / "rules"
     for scope, filename in (
+        ("initiative", "artifacts.md"),
         ("initiative", "epics.md"),
         ("initiative", "discussions.md"),
+        ("epic", "artifacts.md"),
         ("epic", "issues.md"),
         ("epic", "discussions.md"),
+        ("issue", "artifacts.md"),
         ("issue", "discussions.md"),
     ):
         rules_path = rules_root / scope / filename
@@ -8016,10 +8071,13 @@ def _prepare_templates(specdock_dir):
         (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
     rules_root = specdock_dir / "docs" / "rules"
     for scope, filename in (
+        ("initiative", "artifacts.md"),
         ("initiative", "epics.md"),
         ("initiative", "discussions.md"),
+        ("epic", "artifacts.md"),
         ("epic", "issues.md"),
         ("epic", "discussions.md"),
+        ("issue", "artifacts.md"),
         ("issue", "discussions.md"),
     ):
         rules_path = rules_root / scope / filename
@@ -10584,8 +10642,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "`scratch` / `interview` / `research` / `disc` / `adr` / `pr-repair-batch`",
             ),
             "scripts readme": (
-                "`scratch` / `interview` / `research` / `disc` / `adr` / `pr-repair-batch`",
-                './spec-dock/scripts/spec-dock new doc pr-repair-batch --issue iss-00123 --title "PR Repair Batch"',
+                "current catalog: `blank` / `interview` / `research` / `disc` / `decision-candidate` / `adr` / `pr-repair-batch`",
+                './spec-dock/scripts/spec-dock new artifact pr-repair-batch --issue iss-00123 --title "PR Repair Batch"',
+                "typed artifact のファイル名 contract は `<ts>-<type>-<slug>.md`",
             ),
         }
 

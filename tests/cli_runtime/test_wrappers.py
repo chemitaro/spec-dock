@@ -19,22 +19,22 @@ class TestCliRulesContract(CliRuntimeHarness):
             issue_dir = epic_dir / "issues" / "iss-00003-add-refresh-token"
             expected_rules_links = {
                 init_dir / "epics" / "rules.md": target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md",
-                init_dir / "discussions" / "rules.md": (
-                    target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
+                init_dir / "artifacts" / "rules.md": (
+                    target / "spec-dock" / "docs" / "rules" / "initiative" / "artifacts.md"
                 ),
                 epic_dir / "issues" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md",
-                epic_dir / "discussions" / "rules.md": target
+                epic_dir / "artifacts" / "rules.md": target
                 / "spec-dock"
                 / "docs"
                 / "rules"
                 / "epic"
-                / "discussions.md",
-                issue_dir / "discussions" / "rules.md": target
+                / "artifacts.md",
+                issue_dir / "artifacts" / "rules.md": target
                 / "spec-dock"
                 / "docs"
                 / "rules"
                 / "issue"
-                / "discussions.md",
+                / "artifacts.md",
             }
             for link_path, target_path in expected_rules_links.items():
                 assert link_path.is_symlink(), f"missing rules symlink: {link_path}"
@@ -45,6 +45,9 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert not (epic_dir / "issues" / "new-issue").exists()
             assert list((init_dir / "epics").glob("new-*")) == []
             assert list((epic_dir / "issues").glob("new-*")) == []
+            assert not (init_dir / "discussions").exists()
+            assert not (epic_dir / "discussions").exists()
+            assert not (issue_dir / "discussions").exists()
 
     def test_scaffold_docs_point_to_runtime_commands_and_rules_docs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
