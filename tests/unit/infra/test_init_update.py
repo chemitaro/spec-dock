@@ -32930,6 +32930,94 @@ esac
             assert payload["decision"]["actionable_unresolved_thread_ids"] == []
             assert payload["decision"]["blocker_policy"]["status"] == "non_blocking_only"
 
+    def test_issue_232_review_collector_keeps_p2_inline_with_priorityless_comment_on_fallback_path(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:07:00Z","body":"please inspect this behavior before merging"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"Inline follow-up review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"[P2] consider a clearer helper name."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_selected","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:06:00Z","body":"[P2] consider a clearer helper name."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "fallback_issue_comment_low_confidence"
+            assert payload["decision"]["recommended_next_action"] == "manual_review_required_non_retryable"
+            assert payload["decision"]["current_selected_unresolved_thread_ids"] == ["RT_selected"]
+            assert payload["decision"]["actionable_unresolved_thread_ids"] == []
+            blocker_policy = payload["decision"]["blocker_policy"]
+            assert blocker_policy["status"] == "non_blocking_only"
+            assert blocker_policy["blocker_count"] == 0
+            assert blocker_policy["findings"][0]["kind"] == "pull_review_comment"
+            assert blocker_policy["findings"][0]["id"] == 301
+            assert blocker_policy["findings"][0]["disposition"] == "non_blocking_followup"
+
     def test_issue_232_review_collector_keeps_mixed_priority_thread_actionable(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
@@ -33523,6 +33611,88 @@ esac
                 "findings": [],
                 "blocker_fingerprints": [],
             }
+
+    def test_issue_232_review_collector_keeps_p2_with_priorityless_comment_on_fallback_path(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:05:00Z","body":"P2: consider renaming this helper later."},{"id":101,"user":{"login":"codex"},"created_at":"2026-06-08T01:06:00Z","body":"please inspect this behavior before merging"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "fallback_issue_comment_low_confidence"
+            assert payload["decision"]["recommended_next_action"] == "manual_review_required_non_retryable"
+            blocker_policy = payload["decision"]["blocker_policy"]
+            assert blocker_policy["status"] == "non_blocking_only"
+            assert blocker_policy["blocker_count"] == 0
+            assert blocker_policy["non_blocking_count"] == 1
+            assert blocker_policy["findings"][0]["id"] == 100
+            assert blocker_policy["findings"][0]["disposition"] == "non_blocking_followup"
 
     def test_issue_233_pr_observation_wait_exposes_automation_stalled_operator_surface(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
