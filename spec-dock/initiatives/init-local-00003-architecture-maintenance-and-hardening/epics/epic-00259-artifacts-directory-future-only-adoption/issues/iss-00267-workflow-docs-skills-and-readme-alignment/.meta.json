@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00267",
+  "title": "Workflow docs skills and README alignment",
+  "slug": "workflow-docs-skills-and-readme-alignment",
+  "created_at": "2026-07-01T15:59:59+09:00",
+  "updated_at": "2026-07-01T16:00:46+09:00",
+  "parent_id": "epic-00259",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00259",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 267,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "depends_on": [
+    "iss-00263",
+    "iss-00266"
+  ]
+}

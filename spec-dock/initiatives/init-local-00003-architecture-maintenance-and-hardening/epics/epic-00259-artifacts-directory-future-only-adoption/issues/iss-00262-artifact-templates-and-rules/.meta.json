@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00262",
+  "title": "Artifact templates and rules",
+  "slug": "artifact-templates-and-rules",
+  "created_at": "2026-07-01T15:59:19+09:00",
+  "updated_at": "2026-07-01T16:00:27+09:00",
+  "parent_id": "epic-00259",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00259",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 262,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "depends_on": [
+    "iss-00261"
+  ]
+}
