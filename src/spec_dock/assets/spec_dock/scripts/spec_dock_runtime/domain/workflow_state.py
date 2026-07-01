@@ -172,15 +172,15 @@ def _report_has_scaffold_markers(text: str, rows: tuple[_TableRow, ...]) -> bool
         "<ISS_TITLE>",
         "<GITHUB_ISSUE_NUMBER_OR_URL>",
         "<YOUR_NAME>",
-        "YYYY-MM-DD",
-        "AC-___",
-        "EC-___",
     )
     if any(marker in text for marker in global_markers):
         return True
     row_markers = (
         "pass / fail / blocked",
         "未解決 / 解決済み / 置換済み",
+        "YYYY-MM-DD",
+        "AC-___",
+        "EC-___",
     )
     readiness_sections = (
         "spec authoring gate",
@@ -336,9 +336,9 @@ def _row_has_delegated_draft_evidence(cells: tuple[str, ...], eal_tokens: tuple[
     integration_result = cells[8] if len(cells) > 8 else ""
     reviewer_result = cells[11] if len(cells) > 11 else ""
     promotion_decision = cells[12] if len(cells) > 12 else ""
-    if "not used" in adoption_status or (cells[0] == "該当なし" and "manual authoring" in integration_result):
+    if "not used" in adoption_status or (cells[0] == "該当なし" and _has_manual_authoring(integration_result)):
         return (
-            "manual authoring" in integration_result
+            _has_manual_authoring(integration_result)
             and _has_review_pass(reviewer_result)
             and _has_promotion_decision(promotion_decision)
         )
@@ -361,6 +361,16 @@ def _has_review_pass(value: str) -> bool:
     if any(marker in value for marker in ("not pass", "not passed", "did not pass", "fail", "blocked", "unavailable")):
         return False
     return _has_contract_value(value, {"pass", "passed", "合格"})
+
+
+def _has_manual_authoring(value: str) -> bool:
+    return (
+        "manual authoring" in value
+        or "manual-authored" in value
+        or "手動 authoring" in value
+        or "手動authoring" in value
+        or "手動オーサリング" in value
+    )
 
 
 def _is_no(value: str) -> bool:
@@ -416,11 +426,13 @@ def _has_fresh_spec_review_pass(rows: tuple[_TableRow, ...]) -> bool:
         reviewer_role = cells[2] if len(cells) > 2 else ""
         freshness = cells[3] if len(cells) > 3 else ""
         state = cells[4] if len(cells) > 4 else ""
+        risk_acceptance = cells[5] if len(cells) > 5 else ""
+        promotion_decision = cells[6] if len(cells) > 6 else ""
         if reviewer_role != "spec-reviewer":
             continue
         if freshness != "fresh":
             continue
-        if not _has_review_pass(state):
+        if not (_has_review_pass(state) and _is_no(risk_acceptance) and _has_promotion_decision(promotion_decision)):
             return False
         found_fresh_pass = True
     return found_fresh_pass
@@ -494,6 +506,8 @@ def _row_has_grade_specialist_evidence(cells: tuple[str, ...], profile: Workflow
 
 def _has_substantive_evidence(value: str) -> bool:
     if value in {"", "none", "該当なし", "n/a", "[]"}:
+        return False
+    if "not applicable" in value:
         return False
     return not value.startswith("skip reason:")
 
