@@ -1172,9 +1172,7 @@ for item in [*current_codex_issue_comments, *selected_review_signals]:
             "machine_evidence": machine_evidence,
             "fingerprint": blocker_fingerprint(item.get("kind"), priority, raw_body),
         })
-blocker_policy_blockers = [
-    item for item in blocker_policy_findings if item.get("disposition") == "blocker"
-]
+blocker_policy_blockers = [item for item in blocker_policy_findings if item.get("disposition") == "blocker"]
 blocker_policy_non_blocking = [
     item for item in blocker_policy_findings if item.get("disposition") == "non_blocking_followup"
 ]
