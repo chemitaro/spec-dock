@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Protocol
 
 from spec_dock_runtime.application.contracts import CreateArtifactDocRequest, CreateArtifactDocResult
@@ -26,10 +25,12 @@ from spec_dock_runtime.domain.artifacts import (
     scan_artifact_duplicate_state,
 )
 from spec_dock_runtime.domain.ids import resolve_id_input, slugify, validate_input_slug_kebab
-from spec_dock_runtime.domain.models import SpecGraph, SpecNode
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from spec_dock_runtime.application.ports import Ports
+    from spec_dock_runtime.domain.models import SpecGraph, SpecNode
 
 
 class _AssuranceStoreLike(Protocol):
@@ -114,7 +115,9 @@ def create_artifact_doc(
         if duplicate_error is not None:
             raise RuntimeError(f"post-write duplicate guard failed: {duplicate_error}")
         if written_artifact_id not in artifact_ids:
-            raise RuntimeError(f"post-write duplicate guard failed: created artifact id not found: {written_artifact_id}")
+            raise RuntimeError(
+                f"post-write duplicate guard failed: created artifact id not found: {written_artifact_id}"
+            )
         result = CreateArtifactDocResult(
             artifact_id=written_artifact_id,
             artifact_type=artifact_type,
@@ -250,9 +253,8 @@ def _load_required_template_text(path: Path, *, label: str) -> str:
 
 
 def _preflight_artifacts_dir(artifacts_dir: Path) -> None:
-    if os.path.lexists(artifacts_dir):
-        if artifacts_dir.is_symlink() or not artifacts_dir.is_dir():
-            raise RuntimeError(f"Destination already exists: {artifacts_dir}")
+    if os.path.lexists(artifacts_dir) and (artifacts_dir.is_symlink() or not artifacts_dir.is_dir()):
+        raise RuntimeError(f"Destination already exists: {artifacts_dir}")
     parent = artifacts_dir.parent
     if parent.is_symlink() or not parent.is_dir():
         raise RuntimeError(f"Destination already exists: {parent}")
@@ -306,27 +308,25 @@ def _artifact_replacements(
         github_issue_number=scope.github_issue_number,
         today=today,
     )
-    replacements.update(
-        {
-            "<ARTIFACT_ID>": artifact_id,
-            "<ARTIFACT_TITLE>": title,
-            "<ADR_ID>": artifact_id,
-            "<ADR_TITLE>": title,
-            "<DISC_ID>": artifact_id,
-            "<DISC_TITLE>": title,
-            "<RESEARCH_ID>": artifact_id,
-            "<RESEARCH_TITLE>": title,
-            "<INTERVIEW_ID>": artifact_id,
-            "<INTERVIEW_TITLE>": title,
-            "<DECISION_CANDIDATE_ID>": artifact_id,
-            "<DECISION_CANDIDATE_TITLE>": title,
-            "<PR_REPAIR_BATCH_ID>": artifact_id,
-            "<PR_REPAIR_BATCH_TITLE>": title,
-            "<SCOPE_ID>": scope.id,
-            "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
-            "YYYY-MM-DD": today,
-        }
-    )
+    replacements.update({
+        "<ARTIFACT_ID>": artifact_id,
+        "<ARTIFACT_TITLE>": title,
+        "<ADR_ID>": artifact_id,
+        "<ADR_TITLE>": title,
+        "<DISC_ID>": artifact_id,
+        "<DISC_TITLE>": title,
+        "<RESEARCH_ID>": artifact_id,
+        "<RESEARCH_TITLE>": title,
+        "<INTERVIEW_ID>": artifact_id,
+        "<INTERVIEW_TITLE>": title,
+        "<DECISION_CANDIDATE_ID>": artifact_id,
+        "<DECISION_CANDIDATE_TITLE>": title,
+        "<PR_REPAIR_BATCH_ID>": artifact_id,
+        "<PR_REPAIR_BATCH_TITLE>": title,
+        "<SCOPE_ID>": scope.id,
+        "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
+        "YYYY-MM-DD": today,
+    })
     if artifact_type.startswith("draft-"):
         replacements["<SCOPE_ID>"] = scope.id
     return replacements

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 import re
 from typing import TYPE_CHECKING
 
@@ -21,7 +22,9 @@ SUPPORTED_ARTIFACT_TYPES = (*DIRECT_ARTIFACT_TYPES, *ROUTING_ONLY_ARTIFACT_TYPES
 UNSUPPORTED_ARTIFACT_TYPES = ("scratch", "note")
 
 _ARTIFACT_TIMESTAMP_INTENT_RE = re.compile(r"^[0-9]{8}[tT][0-9].*$")
-_ARTIFACT_DOC_TYPE_PATTERN = "|".join(re.escape(doc_type) for doc_type in sorted(SUPPORTED_ARTIFACT_TYPES, key=len, reverse=True))
+_ARTIFACT_DOC_TYPE_PATTERN = "|".join(
+    re.escape(doc_type) for doc_type in sorted(SUPPORTED_ARTIFACT_TYPES, key=len, reverse=True)
+)
 _TYPED_ARTIFACT_FILENAME_RE = re.compile(
     r"^(?P<ts>[0-9]{8}t[0-9]{6}z)(?:-(?P<nn>0[1-9]|[1-9][0-9]))?"
     rf"-(?P<artifact_type>{_ARTIFACT_DOC_TYPE_PATTERN})-"
@@ -31,6 +34,7 @@ _BLANK_ARTIFACT_FILENAME_RE = re.compile(
     r"^(?P<ts>[0-9]{8}t[0-9]{6}z)(?:-(?P<nn>0[1-9]|[1-9][0-9]))?"
     r"-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
 )
+_GRANDFATHERED_LEGACY_ARTIFACT_FILENAME_RE = re.compile(r"^[0-9]{3}-(?:adr|disc|note)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
 
 
 @dataclass(frozen=True)
@@ -55,7 +59,13 @@ def is_routing_only_artifact_type(artifact_type: str) -> bool:
 
 
 def is_ambiguous_blank_artifact_slug(slug: str) -> bool:
-    return any(slug == artifact_type or slug.startswith(f"{artifact_type}-") for artifact_type in SUPPORTED_ARTIFACT_TYPES)
+    return any(
+        slug == artifact_type or slug.startswith(f"{artifact_type}-") for artifact_type in SUPPORTED_ARTIFACT_TYPES
+    )
+
+
+def is_grandfathered_legacy_artifact_filename(name: str) -> bool:
+    return _GRANDFATHERED_LEGACY_ARTIFACT_FILENAME_RE.fullmatch(name) is not None
 
 
 def parse_artifact_filename(name: str) -> ArtifactFilename | None:
@@ -113,6 +123,8 @@ def is_malformed_artifact_candidate(path: Path) -> bool:
         return False
     if path.suffix != ".md":
         return False
+    if is_grandfathered_legacy_artifact_filename(path.name):
+        return False
     if parse_artifact_filename(path.name) is not None:
         return False
     stem = path.stem
@@ -121,7 +133,11 @@ def is_malformed_artifact_candidate(path: Path) -> bool:
     if _ARTIFACT_TIMESTAMP_INTENT_RE.fullmatch(stem) is not None:
         return True
     for artifact_type in (*SUPPORTED_ARTIFACT_TYPES, *UNSUPPORTED_ARTIFACT_TYPES):
-        if lowered == artifact_type or lowered.startswith(f"{artifact_type}-") or lowered.startswith(f"{artifact_type}_"):
+        if (
+            lowered == artifact_type
+            or lowered.startswith(f"{artifact_type}-")
+            or lowered.startswith(f"{artifact_type}_")
+        ):
             return True
         for start in (1, 2):
             if len(parts) <= start:
@@ -134,6 +150,10 @@ def is_malformed_artifact_candidate(path: Path) -> bool:
 
 def scan_artifact_duplicate_state(artifacts_dir: Path) -> tuple[str | None, set[str]]:
     refs: list[ArtifactFilename] = []
+    if artifacts_dir.is_symlink():
+        return f"Unsafe artifact directory under {artifacts_dir}: artifacts directory must not be a symlink", set()
+    if os.path.lexists(artifacts_dir) and not artifacts_dir.is_dir():
+        return f"Unsafe artifact directory under {artifacts_dir}: artifacts path is not a directory", set()
     if artifacts_dir.exists():
         for path in sorted(artifacts_dir.glob("*.md"), key=lambda p: p.as_posix()):
             if path.name == "rules.md":
@@ -159,7 +179,10 @@ def scan_artifact_duplicate_state(artifacts_dir: Path) -> tuple[str | None, set[
             return f"Duplicate artifact timestamp slot detected under {artifacts_dir}: slot={timestamp}", artifact_ids
     for (timestamp, suffix), ids in sorted(by_suffix_slot.items()):
         if len(ids) > 1:
-            return f"Duplicate artifact timestamp suffix detected under {artifacts_dir}: slot={timestamp}-{suffix:02d}", artifact_ids
+            return (
+                f"Duplicate artifact timestamp suffix detected under {artifacts_dir}: slot={timestamp}-{suffix:02d}",
+                artifact_ids,
+            )
     return None, artifact_ids
 
 
@@ -178,7 +201,9 @@ def allocate_artifact_filename_for_timestamp(
                 refs.append(parsed)
     matching = [parsed for parsed in refs if parsed.timestamp == timestamp]
     if not matching:
-        return _format_artifact_identity(artifacts_dir, timestamp=timestamp, suffix=None, artifact_type=artifact_type, slug=slug)
+        return _format_artifact_identity(
+            artifacts_dir, timestamp=timestamp, suffix=None, artifact_type=artifact_type, slug=slug
+        )
     used_suffixes = {parsed.suffix for parsed in matching if parsed.suffix is not None}
     for suffix in range(1, 100):
         if suffix not in used_suffixes:

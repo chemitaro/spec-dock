@@ -278,9 +278,7 @@ def _validate_new_artifact_create(path: Path, *, scope_id: str, authorized_role:
     return None
 
 
-def _validate_required_artifact_frontmatter(
-    metadata: str, *, scope_id: str, authorized_role: str | None
-) -> str | None:
+def _validate_required_artifact_frontmatter(metadata: str, *, scope_id: str, authorized_role: str | None) -> str | None:
     duplicated_key = _duplicate_artifact_frontmatter_provenance_key(metadata)
     if duplicated_key is not None:
         return f"new_artifact_duplicate_provenance:{duplicated_key}"

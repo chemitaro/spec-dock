@@ -655,6 +655,47 @@ class TestRuntimeSyncS07:
             assert "failed (sync)" in rendered.stderr_lines[0]
             assert "ADR mirror basename collision" in rendered.stderr_lines[0]
 
+    def test_sync_rejects_symlinked_artifacts_dir_before_adr_collection(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            issue_api_dir = Path(records[2].path)
+            external_artifacts = repo_root / "external-artifacts"
+            external_artifacts.mkdir()
+            artifacts_dir = issue_api_dir / "artifacts"
+            artifacts_dir.symlink_to(external_artifacts)
+            spy_writer = _SpyArtifactWriter()
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=spy_writer,
+                clock=_StubClock(),
+            )
+
+            with pytest.raises(RuntimeError, match=r"Unsafe artifact directory: .* is a symlink"):
+                app_sync_state.sync(self._request(app_contracts, force=True), ports)
+            assert not spy_writer.called
+
     def test_sync_builds_flat_adr_mirror_symlinks_on_success(self) -> None:
         (
             _runtime_app,

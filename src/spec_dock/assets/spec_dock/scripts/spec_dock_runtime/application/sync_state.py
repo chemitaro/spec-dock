@@ -282,6 +282,16 @@ def _artifact_adr_doc_id_from_basename(basename: str) -> str | None:
     return parsed.artifact_id
 
 
+def _ensure_collectable_artifacts_dir(artifacts_dir: Path) -> bool:
+    if artifacts_dir.is_symlink():
+        raise RuntimeError(f"Unsafe artifact directory: {artifacts_dir.as_posix()} is a symlink")
+    if not artifacts_dir.exists():
+        return False
+    if not artifacts_dir.is_dir():
+        raise RuntimeError(f"Unsafe artifact directory: {artifacts_dir.as_posix()} is not a directory")
+    return True
+
+
 def _collect_adr_mirror_sources(graph: SpecGraph) -> list[_AdrMirrorSource]:
     sources: list[_AdrMirrorSource] = []
     scope_nodes = sorted(
@@ -312,7 +322,7 @@ def _collect_adr_mirror_sources(graph: SpecGraph) -> list[_AdrMirrorSource]:
                     )
                 )
         artifacts_dir = scope.path / "artifacts"
-        if not artifacts_dir.exists():
+        if not _ensure_collectable_artifacts_dir(artifacts_dir):
             continue
         for path in sorted(artifacts_dir.glob("*.md"), key=lambda p: p.as_posix()):
             basename = path.name
