@@ -3,277 +3,396 @@
 ID: "iss-00257"
 タイトル: "Severity Aware Codex PR Review Policy And Non Blocking Repair Loop Hardening"
 関連GitHub: ["#257"]
-状態: "draft | approved"
+状態: "reviewed"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-01"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00224", "init-local-00003"]
 ---
 
-# iss-00257 Severity Aware Codex PR Review Policy And Non Blocking Repair Loop Hardening — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
+# iss-00257 Severity Aware Codex PR Review Policy And Non Blocking Repair Loop Hardening — 実装報告
 
-> `report.md` は観測証跡台帳（observed evidence ledger）の scaffold です。planned requirements、evidence destination、closure 条件は `plan.md` が持ち、この文書は実際の Red / Green / Refactor evidence、発見された tests、closure delta、reviewer status、commit/no-op evidence を記録する evidence slot です。workflow / compliance authority は skills、docs、accepted ADRs、reviewer gates に置きます。
+この report は、Issue Planning / clarification / implementation / verification / review の観測証跡台帳である。要件定義書、設計書、実装計画書の段階的 authoring、S10-S90 の実装・検証、fresh reviewer gate、commit / PR 前の残状態を記録する。
 
-## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger / 必須）
+## Spec Interpretation / Decision Ledger
 
-`report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
-
-Material な判断がない場合もこの section は残し、次を明示する。
-
-- No material interpretation changes.
-- No decision entries.
-
-Ledger entry は次の契約値を使う。
-
-- `Status`: `open` / `resolved` / `superseded`
-- `Type`: `interpretation` / `scope` / `implementation` / `compatibility` / `test-strategy` / `operation` / `deviation` / `follow-up`
-- `Disposition`: `applied` / `rejected` / `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` / `converted_to_followup` / `deferred` / `no_action` / `superseded`
-
-完了時の意味論（completion semantics）:
-- issue completion 前に `Status=open` の entry を残してはならない。
-- `Status=resolved` は `Disposition`、evidence、必要な follow-up を持つ。
-- `Status=superseded` または `Disposition=superseded` は置換先 entry ID を持つ。
-- `Disposition=promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` は昇格先 artifact と evidence を持つ。
-- `Disposition=converted_to_followup` は follow-up issue / discussion / ADR candidate の参照を持つ。
-- `Disposition=deferred` は scope 外である理由、blocking でない根拠、revisit 条件を持つ。
-- `Disposition=no_action` は issue-local な判断で追加対応不要である理由を持つ。将来も効く durable decision を `report.md` だけに閉じ込めてはならない。
-
-Disposition ごとの必須証跡:
-- `applied`: 変更した artifact / 実装証跡と、issue-local 適用で十分な理由。
-- `rejected`: 却下した選択肢、理由、blocking impact が残らない根拠。
-- `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan`: 昇格先 artifact 参照と証跡。
-- `converted_to_followup`: follow-up issue / discussion / ADR candidate 参照と blocking / non-blocking の分類。
-- `deferred`: scope-out 理由、non-blocking の根拠、revisit 条件。
-- `no_action`: 判断が issue-local で durable ではない理由。
-- `superseded`: 置換先 entry ID と置換理由。
-
-| 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
+| ID | Status | Type | Raised By | Gap | Options | Decision | Rationale | Disposition | Evidence | Follow-up |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | user | 親 Epic には旧 P2 promotion 方針があるが、この Issue では新方針を採用する必要がある | 親 docs も更新 / Issue 内限定 override | Issue 内限定で `P2 + protected_domain + machine_evidence` promotion を廃止し、親 Epic docs は編集しない | 親 Epic は別 worktree で作業中というユーザー制約がある | applied | `discussions/20260701t022257z-interview-parent-epic-p2-promotion-policy.md`, `requirement.md` | none |
+| D-002 | resolved | implementation | user | bundle は `root_cause_family` を強く示すが現行 runtime は `blocker_fingerprint` contract | runtime first-class / docs-only / optional metadata | Option B: docs / LLM judgement / operational triage vocabulary に限定する | runtime parser と stalled semantics を広げず、主目的の P2/P3 non-blocking 化に集中する | applied | `discussions/20260701t023858z-interview-root-cause-family-runtime-scope.md`, `design.md` | none |
+| D-003 | resolved | operation | orchestrator | Issue Planning 導入初回運用で、workflow の違和感を残す必要がある | product requirement に混ぜる / discussion と report に分離 | Dogfooding note を discussion artifact に分離し、採用分だけ report に反映する | 本筋の PR review policy 要件と workflow 改善観察を混ぜない | applied | `discussions/20260701t025116z-research-issue-planning-dogfooding-notes.md` | Possible future workflow polish, non-blocking |
+| D-004 | resolved | operation | orchestrator | 誤って no-op spec-reviewer を起動した | 採用 / 不採用 | no-op reviewer は workflow evidence として不採用 | 対象 artifact をレビューしていないため | rejected | subagent `019f1ba9-9921-7212-83a5-e26b782610c3` | none |
+| D-005 | resolved | test-strategy | spec-reviewer | Plan の CLOS-004 が terminal P2/P3-only no-mutation 境界を具体的に閉じていなかった | そのまま / CLOS と step を追加 | `CLOS-004A` と `S40` を追加し、batch persistence / commit-push / re-review / repair loop の証跡を要求 | Plan phase review P1 finding | applied | plan review `019f1baf-8f38-7833-bca6-21c4a48fe275`, `plan.md` | none |
+| D-006 | resolved | test-strategy | spec-reviewer | Parent Epic 非編集 evidence が symlink path だけだと弱い | symlink path / real parent docs path | 実体 parent Epic docs path を plan の検証コマンドと report evidence requirement に明示 | Plan re-review P2 finding | applied | plan re-review `019f1bb1-e3c3-7b70-a79a-94be1be82475`, `plan.md` | none |
+| D-007 | resolved | operation | user | SpecDock workflow が必要とする named sub-agent / reviewer を追加許可待ちで省略する判断が発生した | 現状維持 / runtime consent schema / instruction hardening | SpecDock workflow invocation を workflow-scoped named role authorization として instruction / docs / skill に明文化する | SpecDock は workflow-defined named roles を orchestrator が自律的に使い分ける前提であり、複雑な runtime consent schema は不要 | applied | supplemental user instruction, `requirement.md`, `design.md`, `plan.md` | none |
+| D-008 | resolved | implementation | dev-coder | PR #260 で current head の Codex no-findings issue comment があるのに、trigger boundary 外の古い Codex inline thread が carryover actionable として `human_gate` に昇格した | all carryover を除外 / Codex carryover を常に除外 / clean no-findings fallback context の古い Codex-only carryover だけ除外 | clean no-findings fallback/pass context では、trigger boundary 外かつ thread 全コメント author が trusted Codex identity の Codex-only carryover thread だけを actionable から除外し、carryover inventory には残す | human-authored / human-participated carryover と current selected unresolved は引き続き gate しつつ、現在の Codex no-findings evidence を古い Codex-only thread で無効化しない | applied | PR observation artifact `/private/tmp/spec-dock-pr-260-observation-3/result.json`, design Carryover Thread Gate Contract, plan `CLOS-005A`, dev-coder `019f1c8c-ed0c-7661-a112-e5176b92719f`, dev-coder `019f1c9d-a46b-70a1-aa62-3fc9e620e385`, focused tests | none |
+| D-009 | resolved | implementation | Codex review / code-reviewer | PR #260 の fresh Codex review が、P2 selected inline thread と platform `reviewDecision` gate の両立、および同一 thread 内の P2 selected comment と priorityless selected comment の混在を P1 として指摘した | `reviewDecision` を常に gate / `reviewDecision` を無視 / selected unresolved suppression 文脈に限定して platform gate を保持し、mixed-priority thread は actionable のまま保持 | selected unresolved thread suppression は、その thread の selected current comments がすべて non-blocking finding に分類された場合だけ適用し、platform `reviewDecision` は selected unresolved / suppression 文脈で human gate として保持する | P2/P3-only selected thread の non-blocking terminal path を保ちつつ、platform review gate と priorityless / unclassified selected comment を取り落とさない | applied | PR observation artifact `/private/tmp/spec-dock-pr-260-observation-4/result.json`, dev-coder follow-ups `019f1cc9-4dbe-75f2-ba66-70c5e079d486` and `019f1cd4-bd64-7550-a9ad-38508f10baca`, focused tests `issue_232 or issue_182_s01`, code-reviewer `019f1cdf-5f3b-7f91-b962-977263eda4b5` | none |
+| D-010 | resolved | implementation | Codex review / dev-coder | PR #260 の fresh Codex review が、P2/P3 finding と priority marker のない current Codex issue comment が同じ trigger 内にあると `blocker_policy_no_action` で pass し得る P1 を指摘した | priorityless current Codex issue comment を全て block / strict no-findings 以外の unclassified current Codex issue comment だけ fallback gate / 何もしない | strict no-findings ではなく priority marker もない current Codex issue comment がある場合は、P2/P3-only promotion よりも `fallback_issue_comment_low_confidence` を優先する | clean P2/P3-only terminal path と strict no-findings pass を保ちながら、低信頼 current Codex comment の黙殺を防ぐ | applied | PR observation artifact `/private/tmp/spec-dock-pr-260-observation-5/result.json`, dev-coder `019f1cf8-fb4e-7662-b447-a745fdc631a8`, focused tests `issue_232 or issue_182_s01 or issue_218_s01` | none |
 
-## 証跡採用台帳（Evidence Adoption Ledger / 必須）
+## Evidence Adoption Ledger
 
-Delegated draft、worker note、research、reviewer finding、discussion、command output を canonical artifact や実装判断へ取り込む場合、この台帳に採用判断を記録する。raw transcript ではなく、orchestrator が検証した採否・理由・証跡・次アクションだけを記録する。
-
-- `adoption_status`: `adopted` / `partially_adopted` / `rejected` / `deferred` / `stale` / `blocked`
-- `blocked` または `stale` の unresolved entry は promotion / implementation start / issue ready / issue finish / phase completion を止める。
-- `deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せる。
-- Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
-- Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
-
-| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
+| ID | adoption_status | source | target | rationale | evidence | next_action |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | research | `requirement.md`, `design.md`, `plan.md` | 添付 bundle と現行 repo 差分、tests、edge cases を突き合わせ済み | `discussions/20260701t023648z-research-pr-review-policy-clarification-research.md` | none |
+| EAL-002 | adopted | discussion / user answer | `requirement.md`, `design.md`, `plan.md` | Issue-local P2 promotion 廃止と親 Epic docs 非編集が明確化された | `discussions/20260701t022257z-interview-parent-epic-p2-promotion-policy.md` | none |
+| EAL-003 | adopted | discussion / user answer | `requirement.md`, `design.md`, `plan.md` | `root_cause_family` を runtime contract にしない範囲が確定した | `discussions/20260701t023858z-interview-root-cause-family-runtime-scope.md` | none |
+| EAL-004 | adopted | command evidence | design.md and plan.md and report.md | assurance classify and compose produced standard profile planning artifacts | command evidence recorded in Implementation Session Log | none |
+| EAL-005 | adopted | research / dogfooding | this report | Issue Planning workflow の初回運用観察を正本 report に反映した | `discussions/20260701t025116z-research-issue-planning-dogfooding-notes.md` | Track future polish outside this Issue if needed |
+| EAL-006 | adopted | reviewer | `requirement.md` | Requirement phase pass により design phase へ進める | spec-reviewer `019f1ba9-6a28-7890-8dcc-6e17cca335b2` | none |
+| EAL-007 | adopted | reviewer | `design.md` | Design phase pass により plan phase へ進める | spec-reviewer `019f1bac-2f1c-7720-bf8b-4e95f443562b` | none |
+| EAL-008 | partially_adopted | reviewer | `plan.md` | Initial plan review failed with one P1 finding; finding was fixed and re-reviewed | spec-reviewer `019f1baf-8f38-7833-bca6-21c4a48fe275` | none |
+| EAL-009 | adopted | reviewer | `plan.md` | Re-review passed; P2 evidence-path correction was incorporated | spec-reviewer `019f1bb1-e3c3-7b70-a79a-94be1be82475` | none |
+| EAL-010 | rejected | reviewer | none | Accidental no-op reviewer reviewed no artifacts and is not valid workflow evidence | spec-reviewer `019f1ba9-9921-7212-83a5-e26b782610c3` | none |
+| EAL-011 | adopted | user instruction | requirement.md and design.md and plan.md | SpecDock workflow invocation authorization hardening was added to planning scope | supplemental user instruction in current session | fresh spec-reviewer after scope update |
+| EAL-012 | adopted | reviewer | requirement.md and design.md and plan.md and report.md | Supplemental authorization scope re-review passed after P1/P2 fixes | spec-reviewer `019f1bc3-0837-73c2-841d-6c935120e3a7` | none |
 
-## 目的整合台帳（Objective Alignment Ledger / 必須）
+## Objective Alignment Ledger
 
-主要目的と副次要件の主従が逆転していないことを記録する。特に clarification / authoring / handoff の変更では、primary objective evidence、secondary requirement evidence、inversion risk、reviewer verdict を残す。
-
-| 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
+| Target | Primary objective evidence | Secondary requirement evidence | Inversion risk | Reviewer verdict |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| Severity-aware PR review policy | `requirement.md` defines P0/P1 blocking, P2/P3 reportable non-blocking, and no P2 promotion | Dogfooding notes and `root_cause_family` docs-only vocabulary are captured but scoped | low | pass |
 
-## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
+## Spec Authoring Gate
 
-Requirement / design / plan の phase promotion ごとに、調査、未確定事項、回答、採用判断、reviewer verdict、blocking / non-blocking、次アクションを記録する。
-
-| フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
+| Phase | Investigated facts | Open questions / answers | Adoption decision | Reviewer verdict | Blocking | Promotion / next_action |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | ZIP bundle, current code/tests/assets, parent Epic constraint, discussions, supplemental authorization scope | Parent docs do not edit; root_cause_family Option B docs-only; workflow-scoped named role authorization | adopted into requirement artifact | passed | no | promote |
+| design | Requirement pass, current runtime and asset structure, mirror parity tests, authorization docs surfaces | none | adopted into design artifact | passed | no | promote |
+| plan | Design pass, closure IDs, target files, focused tests, forbidden changes, authorization hardening step | Initial no-mutation verification gap fixed via CLOS-004A and S40; CLOS-010 added | adopted into plan artifact | passed | no | promote |
 
-## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
-- 委任 authoring の使用:
-  - used / not used
-- 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
-- lifecycle state（契約値）:
-  - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
-- 昇格不可 state:
-  - `stale`, `rejected`, `superseded`, `blocked`
-- 標準出力先:
-  - 対象 scope の `discussions/` direct child にある flat Markdown
-  - filename: `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md`
-- 軽量 provenance:
-  - `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
-  - 互換 label: source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
-- 禁止 self-claim:
-  - `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
-- 禁止 wildcard token:
-  - `*`, `grants.*`, `all`
-- 標準必須にしない field:
-  - task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
-- historical note:
-  - 既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
+## Delegated Draft Evidence
 
-| ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
+| Role | Scope | Draft path | Source paths | Intended targets | Adoption status | Reflected to | Diff guard result | Integration result | Rejected portions | Blockers | Reviewer result | Promotion decision |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| N/A | iss-00257 | N/A | N/A | N/A | not used | [] | not_run | manual authoring by main orchestrator | N/A | none | passed | promote |
 
-### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
-| 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
-|---|---|---|---|---|
-| 同意なし（missing consent） | blocked / incomplete | 範囲付き同意を取得する、または手動 authoring に戻す | この section | ineligible |
-| 前段 reviewer pass 不足 / stale（missing/stale previous reviewer pass） | blocked / incomplete | レビューゲートを再実行する（rerun reviewer gate） | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
-| 設計中の要件 gap（requirement gap during design） | blocked / incomplete | requirement phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| 計画中の設計 gap（design gap during plan） | blocked / incomplete | design phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| ロール利用不可（role unavailable） | blocked / manual path | 利用不可を記録し、妥当なら手動で続行する | この section | ineligible |
-| 禁止行為の試行（forbidden action attempt） | rejected | ドラフトを破棄し incident を記録する | この section / decision ledger | ineligible |
-| 古いドラフト（stale draft） | stale | 再生成または差分調整する | この section | ineligible |
-| 置換済みドラフト（superseded draft） | superseded | 置換先ドラフトを参照する | この section | ineligible |
-| 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
-| reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
+## Grade Specialist Evidence Gate
 
-## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+| Profile | Required or fallback | Usage | Evidence | Reviewer verdict | Readiness |
+|---|---|---|---|---|---|
+| standard | manual authoring fallback | not used | manual-authored canonical docs reviewed by fresh spec-reviewer passes | passed | ready |
 
-## 実装記録（セッションログ） (必須)
+## Reviewer Gate Status
 
-### セッションログ（2026-07-01 HH:MM - HH:MM）
+| Step | Gate | Reviewer role | Freshness | State | Risk acceptance | Completion decision | Notes |
+|---|---|---|---|---|---|---|---|
+| requirement | requirement authoring review | spec-reviewer | fresh | passed | no | promote | `019f1ba9-6a28-7890-8dcc-6e17cca335b2` |
+| design | design authoring review | spec-reviewer | fresh | passed | no | promote | `019f1bac-2f1c-7720-bf8b-4e95f443562b` |
+| plan | plan authoring review | spec-reviewer | fresh | passed | no | promote | P1 fixed via `CLOS-004A` and `S40`; pass from `019f1bb1-e3c3-7b70-a79a-94be1be82475` |
+| ignored | accidental no-op review | spec-reviewer | stale | rejected | no | no_action | `019f1ba9-9921-7212-83a5-e26b782610c3`; no artifacts reviewed |
+
+## Implementation Session Log
+
+### セッションログ（2026-07-01）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+
+- Phase: issue planning authoring redo
+- Closures: CLOS-009 authoring evidence
 
 #### 実施内容
-- ...
+
+- User instruction に従い、先行して一括具体化した canonical docs を template 状態へ戻した。
+- Requirement のみを具体化し、spec-reviewer pass を取得した。
+- `assurance classify --stage requirement` と `assurance compose --artifact all` を実行した。
+- Design のみを具体化し、spec-reviewer pass を取得した。
+- Plan を具体化し、spec-reviewer review を実施した。
+- Plan review P1 finding に従い、terminal P2/P3-only no-mutation 境界を `CLOS-004A` / `S40` として追加した。
+- Plan re-review pass 後、P2 finding に従い parent Epic docs 実体 path の diff evidence を plan に明記した。
+- User supplemental instruction に従い、SpecDock workflow-scoped named role authorization hardening を requirement/design/plan scope に追加した。
 
 #### 実行コマンド / 結果
-```bash
-<command>
 
-<result>
+```bash
+./spec-dock/scripts/spec-dock guidance issue-planning
+# requirement-capture / requirement-scaffold を確認
+
+./spec-dock/scripts/spec-dock assurance classify --stage requirement
+# assurance classify: ok
+# authorized_profile: standard
+
+./spec-dock/scripts/spec-dock assurance compose --artifact all
+# assurance compose: ok
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate)
 ```
 
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+#### Test / Review Evidence
 
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### ワークフロー委任同意の証跡（Workflow Delegation Consent）
-`workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
-
-| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
-|---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00257 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
-
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
-#### レビューゲート状態（Reviewer Gate Status）
-| ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
-
-#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
-| マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| Step | Evidence | Result | Notes |
+|---|---|---|---|
+| requirement authoring | spec-reviewer `019f1ba9-6a28-7890-8dcc-6e17cca335b2` | pass | no findings |
+| design authoring | spec-reviewer `019f1bac-2f1c-7720-bf8b-4e95f443562b` | pass | no findings |
+| plan authoring | spec-reviewer `019f1baf-8f38-7833-bca6-21c4a48fe275` | fail | P1 no-mutation verification gap |
+| plan re-review | spec-reviewer `019f1bb1-e3c3-7b70-a79a-94be1be82475` | pass | P1 fixed; P2 evidence path incorporated |
+| final scope update review | spec-reviewer `019f1bc3-0837-73c2-841d-6c935120e3a7` | pass | supplemental authorization scope re-review passed |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
 
-#### コミット
-- <hash> <message>
+- `spec-dock/active/issue/requirement.md` - Requirement concrete draft, reviewer-passed.
+- `spec-dock/active/issue/design.md` - Design concrete draft, reviewer-passed.
+- `spec-dock/active/issue/plan.md` - Plan concrete draft, reviewer-passed after one fix.
+- `spec-dock/active/issue/report.md` - Authoring and reviewer evidence ledger.
+- `spec-dock/active/issue/discussions/20260701t023858z-interview-root-cause-family-runtime-scope.md` - User answer captured.
+- `spec-dock/active/issue/discussions/20260701t025116z-research-issue-planning-dogfooding-notes.md` - Dogfooding observations.
 
-#### メモ
-- ...
+### セッションログ（2026-07-01 / issue execution）
 
----
+#### S10 Markdown policy assets
 
-### セッションログ（2026-07-01 HH:MM - HH:MM）
+| Evidence | Result | Notes |
+|---|---|---|
+| doc-writer `019f1bda-2d9b-76a2-8f75-57983b1412c7` | complete | Updated provider and dogfooding PR review / merge-preparer / repair-batch policy text for P0/P1 blocking and P2/P3 reportable-but-non-blocking handling. |
+| `cmp -s` provider/dogfooding mirror pairs | pass | `codex-review-instructions.md`, `github-pr-merge-preparer/SKILL.md`, and `pr-repair-batch.md` mirror pairs matched. |
+| `rg -n "P0/P1|P2/P3|reportable but non-blocking|non-blocking|protected domain|machine evidence|root_cause_family|re-review|push|repair batch|persistent" ...` | pass | Expected severity and no-mutation boundary language was present in the edited policy assets. |
+| `git diff --check -- <S10 files>` | pass | No whitespace errors. |
+| `git diff -- spec-dock/initiatives/.../epic-00224-*/{requirement.md,design.md,plan.md,report.md}` | pass | Parent Epic docs remained unchanged. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s05b or issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing" -q --tb=short` | fail | Expected Red before S30: `test_issue_176_s05b...` still asserted legacy phrase `merge-blocking reviewer` in the installed instruction text. The S30 test-update step owns this stale expectation. |
 
-#### 対象
-- Step: ...
-- AC/EC: ...
+#### S20 Runtime blocker policy
 
-#### 実施内容
-- ...
+| Evidence | Result | Notes |
+|---|---|---|
+| dev-coder `019f1bdf-fa93-7f43-ac4f-7000c9e68bfa` | complete | Removed the `P2 + protected_domain + machine_evidence -> promoted_blocker` branch from provider and dogfooding `pr_review_snapshot.py`. |
+| `git diff -- .agents/.../pr_review_snapshot.py src/spec_dock/assets/install_root/.../pr_review_snapshot.py` | pass | Diff was limited to deleting the promotion branch and changing `blocker_policy_blockers` to `disposition == "blocker"`. |
+| `python -m py_compile .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | pass | Worker-reported syntax check passed for both mirror files. |
+| `cmp -s .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | pass | Worker-reported mirror parity passed. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_232" -q --tb=short` | fail | Expected Red before S30: 1 failed / 20 passed. The remaining failure was the old `promoted_blocker` expectation in `test_issue_232_review_collector_promotes_protected_p2_with_machine_evidence`. |
 
----
+#### S30 Test updates and focused verification
 
-## 最終品質ゲート（Final Quality Gate / 必須）
+| Evidence | Result | Notes |
+|---|---|---|
+| dev-coder `019f1be2-041b-7790-8eb7-5844f4aec83f` | complete | Updated `tests/unit/infra/test_init_update.py` for severity-classifying review instructions, P0/P1 blocker fingerprints, and P2 protected-domain machine-evidence non-blocking behavior. |
+| `git diff -- tests/unit/infra/test_init_update.py` | pass | Diff was limited to test phrase expectations and blocker-policy assertions. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s05b or issue_232 or issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing or issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint" -q --tb=short` | pass | Worker-reported 25 passed / 505 deselected. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_105_pr_merge_preparer_content_regression_contract or issue_176_s05b or issue_232 or issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing or issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint" -q --tb=short` | pass | Worker-reported 26 passed / 504 deselected. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | fail | Worker-reported 529 passed / 1 failed. Remaining failure was `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` due the active issue `.meta.json` dogfooding snapshot, not S30 test expectation behavior. |
 
-### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
-| 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
+#### S40 Terminal no-mutation boundary verification
+
+| Evidence | Result | Notes |
+|---|---|---|
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_232" -q --tb=short` | pass | 21 passed / 509 deselected. Covered `blocker_policy_no_action`, P2/P3 `non_blocking_only`, metadata preservation, and blocker fingerprint exclusion. |
+| `rg -n "P2/P3|non-blocking|re-review|push|persistent|repair batch|blocker_policy_no_action" .agents/skills/github-pr-merge-preparer/SKILL.md spec-dock/templates/discussions/pr-repair-batch.md` | pass | Confirmed terminal P2/P3-only policy forbids repo-persistent repair batch creation/update, push, and re-review solely for non-blocking findings. |
+| `rg -n "blocker_policy_no_action|non_blocking_only|merge_prepared|protected_domain|machine_evidence|blocker_fingerprints" tests/unit/infra/test_init_update.py .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | pass | Confirmed runtime/test evidence for non-blocking completion and metadata retention. |
+| CLOS-004A `batch_persistence` | pass | Text inspection of merge-preparer / repair-batch assets confirmed no repo-persistent repair-batch creation or update is required solely for terminal P2/P3-only findings. |
+| CLOS-004A `commit_push` | pass | Text inspection confirmed no commit or push is requested solely for terminal P2/P3-only findings; runtime tests show the clean P2/P3-only terminal path ends at `blocker_policy_no_action` / `merge_prepared` without repair mutation. |
+| CLOS-004A `re_review` | pass | Text inspection confirmed no re-review request is required solely for terminal P2/P3-only findings. |
+| CLOS-004A `repair_loop` | pass | Runtime/test evidence for `blocker_policy_no_action` plus merge-preparer policy inspection confirmed terminal P2/P3-only findings do not start another autonomous repair loop. |
+
+#### S50 SpecDock workflow named role authorization instruction hardening
+
+| Evidence | Result | Notes |
+|---|---|---|
+| doc-writer `019f1bf2-1777-7ff1-86f1-6f70d13d148b` | complete | Added bounded workflow-scoped authorization wording to provider and dogfooding Codex config, SpecDock skills, and workflow docs. |
+| `rg -n "workflow-scoped authorization|SpecDock-defined named sub-agents|active repo/worktree|active SpecDock scope|documented role responsibility|ユーザーが SpecDock workflow の利用を依頼" <S50 files>` | pass | Confirmed central English and Japanese wording across changed surfaces. |
+| `rg -n "workflow-scoped delegation consent|委任同意|issue-scoped workflow delegation consent|per-phase confirmation" <S50 files>` | pass | No stale consent wording remained in the changed S50 files. |
+| CLOS-010 audit detail | pass | `authorization_scope`: active repo/worktree, active SpecDock scope, current session, SpecDock-defined named roles, documented role responsibility. `additional_confirmation_required`: scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, roles outside SpecDock workflow. `single_writer_authority`: canonical docs remain main orchestrator-owned; sub-agent / reviewer output is evidence and adoption is performed by the main orchestrator. |
+| `cmp -s` across all 9 provider/dogfooding mirror pairs | pass | Main-orchestrator recheck reported `all mirror pairs match`. |
+| `git diff --check -- <S50 files>` | pass | Worker-reported whitespace check passed. |
+| doc-writer `019f1bfe-9282-73a0-a664-ee1126f333b5` | complete | Adjusted the 4 user-facing workflow docs to keep Japanese-primary prose while retaining the required English phrases as inline anchors. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "test_spec_document_templates_keep_policy_out_of_scaffold" -q --tb=short` | pass | Worker-reported 1 passed / 529 deselected after Japanese-primary rewrite. |
+
+#### Dogfooding snapshot drift closure
+
+| Evidence | Result | Notes |
+|---|---|---|
+| dev-coder `019f1bf6-f9b6-76c2-a787-6d9e62cfd2ea` | complete | Added tracked `iss-00257.../.meta.json` to the checked-in dogfooding meta path and depends-on snapshots with empty dependency list. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json" -q --tb=short` | pass | Worker-reported 1 passed / 529 deselected after the snapshot update. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | fail then pending recheck | Worker-reported first remaining failure was `test_spec_document_templates_keep_policy_out_of_scaffold`; doc-writer `019f1bfe-...` fixed the S50 docs-language violation. |
+
+#### Code review P1 closure: workflow authorization contract vocabulary
+
+| Evidence | Result | Notes |
+|---|---|---|
+| code-reviewer `019f1c06-30ac-7a61-98d8-0475aa8fdb0d` | fail | P1: stale `Workflow Delegation Consent` / `consent source` report contracts remained after workflow-scoped authorization hardening. |
+| doc-writer `019f1c0a-14a4-7660-a27b-4f2dad5c4a20` | complete | Replaced old consent vocabulary in `workflow_issue.md`, `workflow_spec_authoring.md`, `authoring/issue-plan.md`, and `templates/issue/report.md` with `Workflow-Scoped Authorization` / `authorization source` vocabulary. |
+| `rg -n "Workflow Delegation Consent|delegation consent|consent source|consent_source|委任同意|missing consent" <P1 docs/templates>` | pass | No stale consent vocabulary remained in the updated docs/templates. |
+| `cmp -s` across the 4 P1 provider/dogfooding doc/template mirror pairs | pass | Main-orchestrator check reported all P1 doc mirror pairs match. |
+| dev-coder `019f1c10-69ab-7693-8254-74f5b0aae467` | complete | Updated `tests/unit/infra/test_init_update.py` assertions from old consent vocabulary to workflow-scoped authorization vocabulary. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "test_spec_document_templates_keep_policy_out_of_scaffold" -q --tb=short` | pass | Worker-reported 1 passed / 529 deselected after test expectation update. |
+| `rg -n "Workflow Delegation Consent|consent source|missing consent|ワークフロー委任同意" tests/unit/infra/test_init_update.py` | pass | Worker-reported no matches. |
+| focused issue lane | pass | Worker-reported 28 passed / 502 deselected after P1 closure. |
+| doc-writer `019f1c18-6643-7c00-969f-404dce88074f` | complete | Added the new `missing workflow-scoped authorization evidence` failure-mode row to initiative/epic report templates. |
+| doc-writer `019f1c1b-3095-7e63-a559-098bb6e9c5bf` and dev-coder `019f1c1b-67d8-78f3-9d0e-1530e552b929` | complete | Removed temporary bare `consent` delegated-evidence field compatibility and updated the schema helper to expect `authorization source`. |
+| doc-writer `019f1c1d-c7cd-76c0-a322-b1d972cf4198` | complete | Aligned `system/active-none/{initiative,epic,issue}/report.md` provider/dogfooding assets with the same `authorization source` / `missing workflow-scoped authorization evidence` schema. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "test_init_creates_expected_structure" -q --tb=short` | pass | Worker-reported 1 passed / 529 deselected after active-none alignment. |
+
+#### S90 / pre-review verification
+
+| Evidence | Result | Notes |
+|---|---|---|
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s05b or issue_232 or issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing or issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint or issue_105_pr_merge_preparer_content_regression_contract or checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json or test_spec_document_templates_keep_policy_out_of_scaffold" -q --tb=short` | pass | 28 passed / 502 deselected. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 530 passed in 324.94s. |
+| `./spec-dock/scripts/spec-dock validate` | pass | `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | `assurance verify: ok`; issue `iss-00257`, authorized profile `standard`. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s05b or issue_232 or issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing or issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint or issue_105_pr_merge_preparer_content_regression_contract or checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json or test_spec_document_templates_keep_policy_out_of_scaffold or test_init_creates_expected_structure" -q --tb=short` | pass | 29 passed / 501 deselected after P1 workflow authorization contract closure. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 530 passed in 324.44s after P1 workflow authorization contract closure. |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after P1 closure: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after P1 closure: `assurance verify: ok`; issue `iss-00257`, authorized profile `standard`. |
+
+#### PR observation / CI repair
+
+| Evidence | Result | Notes |
+|---|---|---|
+| PR creation | pass | PR #260 created against `main` from `iss-00257-severity-aware-pr-review-policy`, head `7515ecd6ef416a2c103cdc3102d3acccd89e324d`. |
+| `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 260 --head-sha 7515ecd6...` | failed | Observation triggered Codex review comment and found Provider CI failed in `make lint`; recommended action `fix_ci`. |
+| `gh run view 28495918351 --job 84462042332 --log` | fail evidence | `ruff format check` reported `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` would be reformatted at `blocker_policy_blockers`. |
+| dev-coder `019f1c2b-a184-7212-b453-4733b308127c` | complete | Applied formatter-equivalent one-line change to provider and dogfooding `pr_review_snapshot.py` mirror files only. |
+| `uv run ruff format --check .agents/.../pr_review_snapshot.py src/spec_dock/assets/install_root/.../pr_review_snapshot.py` | pass | Worker-reported `2 files already formatted`. |
+| `cmp -s .agents/.../pr_review_snapshot.py src/spec_dock/assets/install_root/.../pr_review_snapshot.py` | pass | Worker-reported mirror parity passed. |
+| `make lint` | pass | Worker-reported ruff check pass, ruff format check pass, mypy pass. |
+| `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 260 --head-sha 56bf7660...` | failed | Observation triggered Codex review comment and returned `human_gate` / `address_review_feedback`; selected unresolved inline Codex review thread `PRRT_kwDOQ99OK86NevIt` was blocking because inline review comments were not included in `blocker_policy_findings`. |
+| `gh run view 28496070249 --job 84462500420 --log` | fail evidence | Provider CI static analysis passed; pytest failed only at `tests/cli_runtime/test_new.py::TestCliNew::test_new_doc_creates_pr_repair_batch_with_generated_identity_and_template` because the test still expected old phrase `observed GitHub Actions CI failures`. |
+| dev-coder `019f1c42-0ecd-7681-a4d1-0a7d8bda1aeb` | complete | Included `selected_comment_signals` in blocker policy classification, added inline comment thread metadata, excluded P2/P3 selected unresolved inline threads from actionable gate, preserved P0/P1 blockers and platform gates, and updated the stale `pr-repair-batch` assertion. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_232" -q --tb=short` | pass | 23 passed / 509 deselected. Covers inline `[P2]` selected unresolved thread as `non_blocking_followup` with `kind=pull_review_comment`, thread metadata, empty `actionable_unresolved_thread_ids`, and `blocker_policy_no_action`; also covers inline `[P1]` selected unresolved thread as `blocker_policy_validated_blocker`. |
+| `uv run pytest tests/cli_runtime/test_new.py -k "pr_repair_batch" -q --tb=short` | pass | 1 passed / 48 deselected after aligning the test to current blocking repair wording. |
+| `uv run ruff format --check .agents/.../pr_review_snapshot.py src/spec_dock/assets/install_root/.../pr_review_snapshot.py tests/unit/infra/test_init_update.py tests/cli_runtime/test_new.py` | pass | 4 files already formatted. |
+| `cmp -s .agents/.../pr_review_snapshot.py src/spec_dock/assets/install_root/.../pr_review_snapshot.py` | pass | Runtime mirror parity passed after inline severity repair. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 532 passed in 323.09s after inline severity repair tests were added. |
+| `make lint` | pass | ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after PR observation repair: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after PR observation repair: `assurance verify: ok`; issue `iss-00257`, authorized profile `standard`. |
+| `git diff -- <parent epic requirement/design/plan/report>` | pass | Parent Epic docs remained unchanged after PR observation repair. |
+| code-reviewer `019f1c4c-1907-7212-b698-14b5b0386b90` | fail | P1: collector emitted empty `actionable_unresolved_thread_ids` for P2/P3 inline threads, but downstream `pr_observation_snapshot.py` / `pr_observation_wait.py` still treated raw selected unresolved counts as `current_selected_unresolved_thread`. |
+| plan amendment | complete | Added `pr_observation_snapshot.py` and `pr_observation_wait.py` mirror pairs to the Observation runtime allowed surface and S20/S40 downstream classifier verification text. |
+| dev-coder `019f1c4e-fd8d-7050-aa6f-7934dc28565c` | complete | Updated downstream snapshot/wait classifiers to prefer explicit actionable unresolved fields; raw selected counts remain legacy fallback only when explicit actionable fields are absent. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s03 or issue_232" -q --tb=short` | pass | 31 passed / 503 deselected. Covers explicit empty actionable unresolved fields overriding raw selected counts in snapshot/wait classifiers and preserves explicit actionable unresolved blocking. |
+| `uv run ruff format --check .agents/.../pr_observation_snapshot.py src/spec_dock/assets/install_root/.../pr_observation_snapshot.py .agents/.../pr_observation_wait.py src/spec_dock/assets/install_root/.../pr_observation_wait.py tests/unit/infra/test_init_update.py` | pass | 5 files already formatted. |
+| `cmp -s` for `pr_observation_snapshot.py` and `pr_observation_wait.py` mirror pairs | pass | Both downstream classifier mirror pairs matched after P1 fix. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 534 passed in 332.26s after downstream classifier tests were added. |
+| `make lint` | pass | Re-run after downstream classifier fix: ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after plan/report update: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after `assurance classify --stage requirement` refreshed source binding; issue `iss-00257`, authorized profile `standard`. |
+| `./spec-dock/scripts/spec-dock assurance compose --artifact all` | expected fail-closed | `substantive_content_conflict` because concrete `design.md` / `plan.md` contain authored content outside managed sections; compose did not overwrite them automatically. `assurance verify` is the final binding check and passed. |
+| code-reviewer `019f1c5b-7638-75a3-ba7d-c8b5100df8f9` | fail | P1: downstream classifiers honored explicit empty actionable fields but did not treat positive explicit actionable unresolved fields as blocking when raw selected counts were zero. |
+| dev-coder `019f1c5e-4b6e-7f72-be40-37187c3c0ff3` | complete | Updated snapshot/wait classifiers so positive explicit actionable unresolved fields return `actionable_unresolved_thread` before empty-actionable raw-count suppression; empty explicit fields still suppress raw selected P2/P3-only counts; legacy payload fallback remains. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s03 or issue_232" -q --tb=short` | pass | 33 passed / 503 deselected after adding wait and snapshot tests for explicit positive actionable unresolved with raw selected count zero. |
+| `uv run ruff format --check .agents/.../pr_observation_snapshot.py src/spec_dock/assets/install_root/.../pr_observation_snapshot.py .agents/.../pr_observation_wait.py src/spec_dock/assets/install_root/.../pr_observation_wait.py tests/unit/infra/test_init_update.py` | pass | 5 files already formatted after positive explicit actionable fix. |
+| `cmp -s` for `pr_observation_snapshot.py` and `pr_observation_wait.py` mirror pairs | pass | Both downstream classifier mirror pairs matched after positive explicit actionable fix. |
+| spec-reviewer `019f1c5b-bbf9-7b32-a2a7-9622f58eba6c` | pass | P2 docs consistency notes recorded; plan handoff summary updated to mention downstream snapshot/wait classifier mirror pairs. |
+| qa-reviewer `019f1c5b-9e3a-7091-beee-81ef48fcc1ec` | pass | P2 mixed-thread coverage recommendation recorded as non-blocking follow-up risk; no P0/P1 QA gaps. |
+| dev-coder `019f1c67-5e55-7071-b22a-0538a6cca602` | complete | Repaired the positive explicit actionable follow-up without breaking existing reason precedence: current-selected still wins, carryover remains waitable where required, and positive actionable is considered in the trusted submitted-review path after carryover. |
+| focused Red before precedence fix | fail evidence | Worker-reported 3 failed / 41 passed / 492 deselected for `issue_187_s420 or issue_218_s02 or issue_222_s03 or issue_232`, showing the early positive-actionable return broke current-selected/carryover reason precedence. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187_s420 or issue_218_s02 or issue_222_s03 or issue_232" -q --tb=short` | pass | 44 passed / 492 deselected after precedence-aware positive actionable fix. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | Worker-reported 536 passed in 331.87s after precedence-aware positive actionable fix. |
+| `uv run ruff format --check ... pr_observation_snapshot.py ... pr_observation_wait.py tests/unit/infra/test_init_update.py` | pass | Worker-reported 5 files already formatted; main-orchestrator recheck with `tests/cli_runtime/test_new.py` included reported 6 files already formatted. |
+| `cmp -s` for `pr_observation_snapshot.py` and `pr_observation_wait.py` mirror pairs | pass | Worker-reported and main-orchestrator rechecked mirror parity. |
+| `make lint` | pass | Re-run after precedence-aware positive actionable fix: ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after precedence-aware positive actionable fix: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after precedence-aware positive actionable fix: issue `iss-00257`, authorized profile `standard`. |
+| `git diff --check` | pass | No whitespace errors in the final diff. |
+| `git diff -- spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/requirement.md spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/design.md spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/plan.md spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/report.md` | pass | Exact parent Epic doc path diff produced no output. |
+| qa-reviewer `019f1c71-fc03-7893-a8d8-f5cc69cf09ae` | pass | Final QA review found only P2 mixed selected inline/human thread coverage recommendation; no P0/P1 QA gaps. Recommendation recorded as follow-up risk, not blocking. |
+| `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 260 --head-sha 7a9915af...` | failed | CI and current Codex no-findings issue comment were green, but old trigger-boundary-excluded Codex thread `PRRT_kwDOQ99OK86NevIt` remained in `carryover_unresolved_thread_ids` and was also emitted as `actionable_unresolved_thread_ids`, producing `human_gate` / `address_review_feedback`. No GitHub conversation resolution was performed. |
+| dev-coder `019f1c8c-ed0c-7661-a112-e5176b92719f` | complete | Added stale Codex carryover actionable exclusion to provider/dogfooding `pr_review_snapshot.py` mirror pair and added PR #260-shaped regression coverage. Carryover inventory remains; human carryover and current selected unresolved remain blocking. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187_s410 or issue_218_s01_review_collector_no_findings or issue_219_s01_review_collector_no_findings_with_carryover or issue_222_s03" -q --tb=short` | pass | 30 passed / 508 deselected. Covers stale Codex carryover non-actionable, human carryover still actionable, explicit actionable unresolved still blocking, and downstream fallback pass. |
+| `cmp -s .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | pass | Runtime mirror parity passed after stale Codex carryover repair. |
+| `git diff --check` | pass | No whitespace errors after stale Codex carryover repair. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 538 passed in 332.03s after stale Codex carryover repair. |
+| `make lint` | pass | Re-run after stale Codex carryover repair: ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after stale Codex carryover repair: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after stale Codex carryover repair: issue `iss-00257`, authorized profile `standard`. |
+| code-reviewer `019f1c99-3d10-7c53-b483-ff47c7152f72` | fail | P1: stale Codex carryover exclusion used only `first_comment_author`, so a Codex-opened thread with a human reply could be treated as non-actionable. |
+| spec-reviewer `019f1c99-9983-7bc2-9105-ed7a26789549` | fail | P1: stale Codex carryover policy was recorded only in report D-008 and had to be promoted into design/plan closure contract. |
+| qa-reviewer `019f1c99-98a6-7873-a805-0a45bc222537` | pass | Fresh QA found no P0/P1 test adequacy gaps before the P1 code/spec fixes; post-push live observation remains pending by design. |
+| dev-coder `019f1c9d-a46b-70a1-aa62-3fc9e620e385` | complete | Repaired P1 by adding `comment_authors` to normalized review thread data and treating a stale carryover thread as Codex-only only when all thread comment authors are trusted Codex identities. Human-participated carryover remains actionable. |
+| design/plan promotion | complete | Promoted stale Codex-only carryover policy from report-only D-008 into `design.md` carryover thread gate contract, `plan.md` CLOS-005A, S20/S40 verification, behavior backlog, and handoff summary. |
+| Red before P1 fix | fail evidence | Worker-reported `human_participated_codex_carryover` failed before implementation with `assert [] == ['RT_codex_human_carryover']`, proving the P1 bypass. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "human_participated_codex_carryover or issue_219_s01_review_collector_no_findings_with_carryover or issue_222_s03 or issue_187_s410" -q --tb=short` | pass | 18 passed / 521 deselected after the all-comment-authors Codex-only fix. |
+| `cmp -s .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | pass | Runtime mirror parity passed after human-participated carryover fix. |
+| `git diff --check` | pass | No whitespace errors after human-participated carryover fix and design/plan/report updates. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 539 passed in 335.36s after human-participated carryover fix and spec contract promotion. |
+| `make lint` | pass | Re-run after P1 fix: ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after P1 fix: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | fail then pass | First failed with stale source binding for updated design/plan. `assurance classify --stage requirement` refreshed the binding; `assurance compose --artifact all` failed closed with `substantive_content_conflict` rather than overwriting authored docs; final `assurance verify` passed. |
+| code-reviewer `019f1ca7-7b4c-77a2-9aad-788677d202cb` | pass | P2: missing/null thread comment author should prevent Codex-only proof and remain actionable. |
+| spec-reviewer `019f1ca7-7d70-7a73-b33e-f9c158b3a1bd` | pass | P2: D-008 wording needed `Codex-only` / all-comment-authors alignment; D-008 was updated. |
+| qa-reviewer `019f1ca7-7c4a-7f03-bfd3-d81d99257f34` | pass | Fresh QA found no P0/P1 gaps after P1 fixes. |
+| dev-coder `019f1caa-2d19-7d53-950c-f5c54554a631` | complete | Addressed P2 unknown-author edge case by preserving a `None` author entry for missing/null GraphQL comment authors; `is_codex_only_thread` therefore rejects unknown-author threads. |
+| Red before unknown-author fix | fail evidence | Worker-reported `unknown_author` regression failed before implementation with empty `actionable_unresolved_thread_ids`. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "unknown_author or human_participated_codex_carryover or stale_codex_carryover or issue_219_s01_review_collector_no_findings_with_carryover or issue_222_s03" -q --tb=short` | pass | 15 passed / 525 deselected. Covers Codex-only stale carryover, human-participated carryover, unknown-author carryover, and downstream fallback/actionable behavior. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 540 passed in 334.13s after unknown-author fix. |
+| `make lint` | pass | Re-run after unknown-author fix: ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after unknown-author fix: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after unknown-author fix: issue `iss-00257`, authorized profile `standard`. |
+| final code-reviewer `019f1cb2-78f7-7a50-8679-9327ba026dd7` | pass | No P0/P1/P2 findings in final uncommitted diff; mirror parity and gate behavior reviewed. |
+| final qa-reviewer `019f1cb2-79c3-7512-9164-24c388c59043` | pass | No P0/P1/P2/P3 QA findings; pre-commit test adequacy accepted, with live PR observation still pending after push. |
+| final spec-reviewer `019f1cb2-7ac1-72c1-be27-211156cbf9da` | pass | No spec findings; stale Codex-only carryover policy is promoted into design/plan/report and parent Epic docs remain untouched. |
+| main merge | complete | Merged `origin/main` into this branch after PR observation to align with current base. Merge added epic-00259 / iss-00262 through iss-00268 dogfooding records from main; parent epic-00224 docs remained untouched. |
+| `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 260 --head-sha e194be39...` | failed | PR observation returned `human_gate`: Provider CI failed cutover snapshot tests, and current Codex review found two P1 blockers plus one P2 follow-up. P1s were platform `reviewDecision` gate preservation and mixed-priority selected thread actionability. P2 truncated thread author history remains non-blocking follow-up. |
+| dev-coder `019f1cc9-4dbe-75f2-ba66-70c5e079d486` | complete | Fixed P1 blockers by preserving platform `reviewDecision` gates for selected unresolved suppression contexts and only suppressing selected unresolved thread IDs when all selected current comments in the thread are classified P2/P3 non-blocking. Updated main-derived cutover snapshot constants for epic-00259 / iss-00262 through iss-00268. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_232 or issue_219_s01_review_collector_no_findings_with_carryover or unknown_author or human_participated_codex_carryover" -q --tb=short` | pass | 28 passed / 514 deselected after P1 fixes. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json or checked_in_dogfooding_runtime_subprocess_validate_and_sync_on_cutover_snapshot" -q --tb=short` | pass | 2 passed / 540 deselected after cutover snapshot constants were updated. |
+| full test regression after P1 fix | fail evidence | Full `test_init_update.py` initially failed `test_issue_182_s01_review_collector_does_not_promote_global_changes_requested_decision`, showing the platform `reviewDecision` gate was too broad for clean selected approved evidence. |
+| dev-coder `019f1cd4-bd64-7550-a9ad-38508f10baca` | complete | Narrowed platform `reviewDecision` human gate to selected unresolved / non-blocking selected unresolved suppression context, preserving existing `issue_182` global reviewDecision behavior. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_232 or issue_182_s01" -q --tb=short` | pass | 30 passed / 512 deselected after reviewDecision gate narrowing. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 542 passed after reviewDecision gate narrowing and cutover snapshot updates. |
+| `make lint` | pass | Re-run after P1 / CI fixes: ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after main merge and P1 / CI fixes: `spec-dock: ok (validate) nodes=171`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after main merge and P1 / CI fixes: issue `iss-00257`, authorized profile `standard`. |
+| `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 260 --head-sha 0803cd16...` | failed | CI passed, but PR observation returned `human_gate` with one fresh P1 blocker: non-blocking-only promotion did not account for a current priorityless Codex issue comment. One P2 template-path finding was non-blocking and not used as a branch-update reason. |
+| dev-coder `019f1cf8-fb4e-7662-b447-a745fdc631a8` | complete | Added `current_codex_unclassified_fallback_issue_comments` guard so strict no-findings comments remain valid, while priorityless non-no-findings current Codex issue comments force `fallback_issue_comment_low_confidence` before P2/P3-only promotion. |
+| Red regression | fail evidence | Newly added regression first failed with `assert 'passed' == 'human_gate'` for P2/P3 finding plus priorityless current Codex issue comment. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_232 or issue_182_s01 or issue_218_s01" -q --tb=short` | pass | 47 passed / 497 deselected after unclassified fallback guard. |
+| `uv run ruff format --check .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py tests/unit/infra/test_init_update.py` | pass | 3 files already formatted after unclassified fallback guard. |
+| `cmp -s .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | pass | Provider/dogfooding runtime mirror parity remained intact. |
+
+## Final Quality Gate
+
+### Docs Impact Resolution
+
+| Target | Update needed | Owner | Evidence | spec-reviewer result |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| Issue-local requirement/design/plan/report | yes | main orchestrator | this report includes planning, implementation, verification, and review evidence; latest downstream classifier/design amendment re-review is tracked below | pending final re-review |
+| Parent Epic docs | no | N/A | `git diff -- <parent epic requirement/design/plan/report>` produced no output | N/A |
+| Non-issue workflow docs / skill docs / orchestrator instructions | yes | doc-writer | S50 evidence above; provider/dogfooding mirror parity passed | pass |
 
-### 最終 QA ゲート（Final QA Gate）
-| レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
+### Final Spec Review Gate
+
+| Reviewer | Scope | Findings / fixes | Re-review count | Result |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| spec-reviewer | requirement/design/plan/report alignment after supplemental authorization scope during planning | Fresh review found report/docs-impact and skill-scope issues; fixes applied; re-review passed | 2 | pass |
+| spec-reviewer | final implementation/report alignment after S10-S90 | P1 stale final report completion statements; this section updated to reflect implementation completed, commit/PR still pending | 1 | pass |
+| code-reviewer | final integrated diff | P1 stale delegation-consent contract; docs/templates/tests/active-none assets updated to workflow-scoped authorization vocabulary; fresh re-review found no findings | 2 | pass |
+| qa-reviewer | final test adequacy | P2 stale report wording; report opening/final sections updated; focused/full lanes passed | 1 | pass |
+| spec-reviewer | final implementation/docs/tests/report alignment after P1 closure | P2 CLOS-010 audit detail; `authorization_scope`, `additional_confirmation_required`, and `single_writer_authority` recorded above | 2 | pass |
+| code-reviewer | PR observation repair after inline severity and downstream classifier fix | First fresh review found P1 downstream raw selected count re-blocking; second fresh review found P1 positive explicit actionable bypass; both fixes applied; final fresh review passed with no findings | 3 | pass |
+| qa-reviewer | PR observation repair test adequacy | Fresh review found only P2 mixed selected inline thread coverage recommendation; final QA review passed with the P2 recorded as follow-up risk | 2 | pass |
+| spec-reviewer | Plan/report/design alignment after downstream classifier plan amendment | Fresh review passed after design surface and exact parent Epic evidence fixes; remaining P2 final gate row staleness fixed here | 2 | pass |
 
-### 最終コードレビューゲート（Final Code Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+### Final Commit
 
-### 最終 spec review ゲート（Final Spec Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
-
-### 最終 commit（Final Commit）
-| 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
+| Final report ledger | Final commit scope | Post-commit evidence destination | Result |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| this report | S10-S50 implementation/docs/tests, PR observation repairs including stale Codex-only carryover handling, and issue report evidence | final response and PR observation artifact | final verification and fresh reviewer gates passed; commit, push, and PR observation re-run pending |
 
-## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+## 遭遇した問題と解決
 
-## 学んだこと (任意)
-- ...
+- 誤って no-op spec-reviewer を一件起動したが、対象 artifact をレビューしていないため workflow evidence として不採用にした。
+- Plan review で terminal P2/P3-only no-mutation の検証不足が見つかったため、`CLOS-004A` と `S40` を追加して再レビュー pass を得た。
+- Supplemental authorization scope review で stale docs impact gate と epic/initiative skill path ambiguity が見つかったため、`report.md` と `plan.md` を更新した。
+- Final spec review で planning 時点の stale completion statements が残っていることを P1 として指摘されたため、final gate / commit / exception notes を implementation-complete but pre-commit / pre-PR 状態へ更新した。
+- Full `test_init_update.py` lane で dogfooding `.meta.json` snapshot drift と scaffold docs language policy failure が順に見つかったため、snapshot と S50 workflow docs prose を最小修正して 530 passed へ戻した。
+- Final code review で stale delegation-consent contract が P1 として見つかったため、workflow/report/template/test の語彙を `Workflow-Scoped Authorization` / `authorization source` へ更新し、旧 consent vocabulary を除去した。
+- PR observation で inline review comment の P2/P3 が blocker policy に入らず selected unresolved thread として human gate になる P1 が見つかったため、inline comments を severity classification に含め、P2/P3 は actionable unresolved gate から外し、P0/P1 は blocker policy で止める回帰テストを追加した。
+- Provider CI で `pr-repair-batch` template の旧 phrase assertion が残っていることが見つかったため、現行の blocking repair wording にテストを合わせた。
+- Fresh code review で downstream observation classifier が raw selected unresolved count を再ブロックする P1 が見つかったため、explicit actionable unresolved fields がある場合はそれを blocking 判定の正本にし、旧 payload だけ raw selected count fallback を残した。
+- Fresh code review で positive explicit actionable unresolved fields が raw selected count zero のとき bypass できる P1 が見つかったため、downstream classifier で positive actionable を先に `actionable_unresolved_thread` として扱うようにした。
+- Full regression lane で上記 positive actionable の早期 return が current-selected / carryover / waitable precedence を壊すことが分かったため、positive actionable は trusted submitted-review path で current-selected と carryover の後に評価するよう修正した。
+- QA review は mixed selected inline P2 thread with human reply の追加テストを P2 follow-up risk として推奨した。現行 gate は P0/P1 なしで pass のため、この Issue の blocking closure にはしない。
+- PR #260 再観測で、CI と current Codex no-findings が通っているにもかかわらず、古い Codex-authored carryover thread が actionable として残り `human_gate` になることが分かった。clean no-findings fallback/pass context では trigger boundary 外の Codex carryover を actionable から除外し、carryover inventory には残すよう修正した。
+- Fresh code review で、Codex が開いた古い thread に人間の reply がある場合まで non-actionable になり得る P1 が見つかったため、Codex-only 判定を thread 全コメント author ベースに狭めた。人間参加 carryover は actionable gate として維持する。
+- Fresh spec review で、stale Codex-only carryover policy が report-only decision になっている P1 が見つかったため、design の Carryover Thread Gate Contract と plan の CLOS-005A / S20 / S40 / behavior backlog に昇格した。
+- Fresh code review の P2 として、missing/null author の thread comment は Codex-only と証明できないため actionable に残すべきと指摘された。`comment_authors` に `None` を保持し、unknown author があれば Codex-only 判定に失敗するよう修正した。
+- PR observation after push found two fresh P1 blockers: selected P2-only suppression could bypass GitHub `reviewDecision` gates, and mixed selected threads could become non-actionable when any selected comment was P2/P3. The runtime now preserves platform `reviewDecision` gates in selected-unresolved suppression contexts and suppresses a selected unresolved thread only when all selected current comments in that thread are classified non-blocking.
+- After merging `origin/main`, provider CI cutover snapshot tests failed because main added epic-00259 and issues iss-00262 through iss-00268. The checked-in dogfooding meta path and dependency-map snapshot constants were updated to the new base.
+- The initial reviewDecision gate fix over-blocked the existing `issue_182` global reviewDecision scenario. It was narrowed so clean selected approved evidence is not blocked solely by global GraphQL `reviewDecision`.
+- A later PR observation found that current priorityless Codex issue comments could be bypassed when a P2/P3-only blocker policy path also existed. The runtime now treats non-no-findings unclassified current Codex issue comments as low-confidence fallback evidence before allowing P2/P3-only promotion.
 
-## 今後の推奨事項 (任意)
-- ...
+## 省略/例外メモ
 
-## 省略/例外メモ (必須)
-- 該当なし
+- 実装変更と実装テストは完了している。追加 PR observation repair は final verification 後に commit / push し、external PR observation を再実行する。
+- Parent Epic docs は編集していない。
