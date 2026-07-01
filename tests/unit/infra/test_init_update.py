@@ -28170,6 +28170,272 @@ esac
             assert decision["no_findings_completion_candidate"]["present"] is False
             assert decision["carryover_unresolved_thread_ids"] == ["RT_carryover"]
             assert decision["selected_unresolved_thread_ids"] == []
+            assert decision["actionable_unresolved_thread_ids"] == ["RT_carryover"]
+            assert decision["actionable_unresolved_count"] == 1
+
+    def test_issue_219_s01_review_collector_no_findings_with_stale_codex_carryover_is_not_actionable(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"chatgpt-codex-connector[bot]"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Swish!\\n\\n**Reviewed commit:** `aaaaaaaaaa`\\n\\n<details><summary>About Codex</summary></details>"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"chatgpt-codex-connector[bot]"},"state":"COMMENTED","commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","submitted_at":"2026-06-08T00:30:00Z","body":"Old inline review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"chatgpt-codex-connector[bot]"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","original_commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","created_at":"2026-06-08T00:30:00Z","path":"app.py","line":12,"body":"[P1] stale carryover from an older trigger."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_codex_carryover","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"chatgpt-codex-connector"},"createdAt":"2026-06-08T00:30:00Z","body":"[P1] stale carryover from an older trigger."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert decision["completion_signal"] == "fallback_issue_comment"
+            assert decision["fallback_pass_candidate"]["present"] is True
+            assert decision["fallback_pass_candidate"]["promotes_top_level_status"] is True
+            assert decision["carryover_unresolved_thread_ids"] == ["RT_codex_carryover"]
+            assert decision["selected_unresolved_thread_ids"] == []
+            assert decision["current_selected_unresolved_thread_ids"] == []
+            assert decision["actionable_unresolved_thread_ids"] == []
+            assert decision["actionable_unresolved_count"] == 0
+
+    def test_issue_219_s01_review_collector_no_findings_with_unknown_author_codex_carryover_is_actionable(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"chatgpt-codex-connector[bot]"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Swish!\\n\\n**Reviewed commit:** `aaaaaaaaaa`\\n\\n<details><summary>About Codex</summary></details>"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"chatgpt-codex-connector[bot]"},"state":"COMMENTED","commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","submitted_at":"2026-06-08T00:30:00Z","body":"Old inline review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"chatgpt-codex-connector[bot]"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","original_commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","created_at":"2026-06-08T00:30:00Z","path":"app.py","line":12,"body":"[P1] stale carryover from an older trigger."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_codex_unknown_author_carryover","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"chatgpt-codex-connector"},"createdAt":"2026-06-08T00:30:00Z","body":"[P1] stale carryover from an older trigger."},{"id":"RTC_302","databaseId":302,"author":null,"createdAt":"2026-06-08T00:45:00Z","body":"Unknown author reply."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert decision["completion_signal"] == "fallback_issue_comment"
+            assert decision["fallback_pass_candidate"]["present"] is True
+            assert decision["fallback_pass_candidate"]["promotes_top_level_status"] is True
+            assert decision["carryover_unresolved_thread_ids"] == ["RT_codex_unknown_author_carryover"]
+            assert decision["selected_unresolved_thread_ids"] == []
+            assert decision["current_selected_unresolved_thread_ids"] == []
+            assert decision["actionable_unresolved_thread_ids"] == ["RT_codex_unknown_author_carryover"]
+            assert decision["actionable_unresolved_count"] == 1
+
+    def test_issue_219_s01_review_collector_no_findings_with_human_participated_codex_carryover_is_actionable(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"chatgpt-codex-connector[bot]"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Swish!\\n\\n**Reviewed commit:** `aaaaaaaaaa`\\n\\n<details><summary>About Codex</summary></details>"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"chatgpt-codex-connector[bot]"},"state":"COMMENTED","commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","submitted_at":"2026-06-08T00:30:00Z","body":"Old inline review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"chatgpt-codex-connector[bot]"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","original_commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","created_at":"2026-06-08T00:30:00Z","path":"app.py","line":12,"body":"[P1] stale carryover from an older trigger."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_codex_human_carryover","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"chatgpt-codex-connector"},"createdAt":"2026-06-08T00:30:00Z","body":"[P1] stale carryover from an older trigger."},{"id":"RTC_302","databaseId":302,"author":{"login":"maintainer"},"createdAt":"2026-06-08T00:45:00Z","body":"This still looks relevant."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert decision["completion_signal"] == "fallback_issue_comment"
+            assert decision["fallback_pass_candidate"]["present"] is True
+            assert decision["fallback_pass_candidate"]["promotes_top_level_status"] is True
+            assert decision["carryover_unresolved_thread_ids"] == ["RT_codex_human_carryover"]
+            assert decision["selected_unresolved_thread_ids"] == []
+            assert decision["current_selected_unresolved_thread_ids"] == []
+            assert decision["actionable_unresolved_thread_ids"] == ["RT_codex_human_carryover"]
+            assert decision["actionable_unresolved_count"] == 1
 
     def test_issue_218_s01_review_collector_no_findings_with_actionable_unresolved_thread_does_not_promote(
         self,
@@ -29569,10 +29835,10 @@ esac
             "selected_unresolved_count": 0,
             "current_selected_unresolved_count": 0,
             "selected_unresolved_thread_ids": [],
-            "carryover_unresolved_count": 0,
-            "carryover_unresolved_thread_ids": [],
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_codex_human_carryover"],
             "actionable_unresolved_count": 1,
-            "actionable_unresolved_thread_ids": ["RT_actionable"],
+            "actionable_unresolved_thread_ids": ["RT_codex_human_carryover"],
             "fallback_pass_candidate": fallback_pass_candidate,
         }
 
@@ -29602,6 +29868,61 @@ esac
         assert complete is True
         assert reason == "actionable_unresolved_thread"
         assert action != "merge_prepared"
+
+    def test_issue_222_s03_snapshot_fallback_no_findings_with_stale_codex_carryover_passes(
+        self,
+    ) -> None:
+        module = self._issue_218_s02_load_observation_snapshot_module()
+        fallback_pass_candidate = {
+            "present": True,
+            "source": "issue_comment",
+            "source_ids": [100],
+            "reason": "current_boundary_no_major_issues_comment",
+            "promotes_top_level_status": True,
+        }
+        decision = {
+            "status": "human_gate",
+            "status_reason": "fallback_issue_comment_low_confidence",
+            "recommended_next_action": "manual_review_required_non_retryable",
+            "observation_complete": False,
+            "completion_signal": "fallback_issue_comment",
+            "confidence": "low",
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "selected_unresolved_thread_ids": [],
+            "current_selected_unresolved_thread_ids": [],
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_codex_carryover"],
+            "actionable_unresolved_count": 0,
+            "actionable_unresolved_thread_ids": [],
+            "fallback_pass_candidate": fallback_pass_candidate,
+        }
+
+        status, action, complete, reason = module.classify_snapshot(
+            summary={"ci": "passed", "review": "approved", "head": "matched"},
+            ci_payload={"status": "passed"},
+            review_payload={"status": "approved"},
+            review_wrapper_payload={
+                "decision": decision,
+                "codex_review": {
+                    "lifecycle": {
+                        "completion_signal": "fallback_issue_comment",
+                        "fallback_pass_candidate": fallback_pass_candidate,
+                    },
+                },
+            },
+            metadata={"state": "OPEN", "isDraft": False, "mergeable": "MERGEABLE"},
+            limitations=[],
+            head_matches_expected=True,
+            normalized_status="unknown",
+            trigger_comment_id="99",
+            trigger_created_at="2026-06-08T01:00:00Z",
+        )
+
+        assert status == "passed"
+        assert action == "merge_prepared"
+        assert complete is True
+        assert reason == "fallback_issue_comment_no_major_issues"
 
     def test_issue_222_s03_snapshot_explicit_empty_actionable_unresolved_overrides_raw_selected_count(self) -> None:
         status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(

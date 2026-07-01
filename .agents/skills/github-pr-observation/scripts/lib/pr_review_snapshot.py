@@ -282,6 +282,7 @@ def user_login(payload):
 
 
 TRUSTED_CODEX_LOGINS = {
+    "chatgpt-codex-connector",
     "chatgpt-codex-connector[bot]",
     "codex",
 }
@@ -289,6 +290,13 @@ TRUSTED_CODEX_LOGINS = {
 
 def is_codex_authored(login):
     return str(login or "").lower() in TRUSTED_CODEX_LOGINS
+
+
+def is_codex_only_thread(thread):
+    comment_authors = thread.get("comment_authors") if isinstance(thread, dict) else None
+    if isinstance(comment_authors, list):
+        return bool(comment_authors) and all(is_codex_authored(author) for author in comment_authors)
+    return False
 
 
 def is_trigger_command_body(body):
@@ -753,6 +761,7 @@ for thread in thread_nodes:
             "state": state,
         }
     comment_ids = []
+    comment_authors = []
     for comment in comments:
         comment_id = comment.get("databaseId")
         if comment_id is None:
@@ -763,6 +772,7 @@ for thread in thread_nodes:
                 "thread_id": thread_id,
                 "state": state,
             }
+        comment_authors.append(user_login(comment))
     threads.append({
         "id": thread.get("id"),
         "state": state,
@@ -770,6 +780,7 @@ for thread in thread_nodes:
         "is_outdated": outdated,
         "comment_count": len(comments),
         "comment_ids": comment_ids,
+        "comment_authors": comment_authors,
         "first_comment_id": first_comment.get("databaseId") or first_comment.get("id"),
         "first_comment_author": user_login(first_comment),
         "first_comment_created_at": first_comment.get("createdAt"),
@@ -1195,8 +1206,32 @@ selected_actionable_unresolved_thread_ids = [
     for thread_id in selected_unresolved_thread_ids
     if thread_id not in non_blocking_selected_unresolved_thread_ids
 ]
+stale_codex_carryover_thread_ids = [
+    item.get("id")
+    for item in carryover_non_outdated_unresolved_threads
+    if item.get("id") is not None
+    and body_state["trigger_known"]
+    and not thread_after_trigger(item)
+    and is_codex_only_thread(item)
+]
+stale_codex_carryover_thread_id_set = {str(thread_id) for thread_id in stale_codex_carryover_thread_ids}
+no_findings_fallback_pass_context = bool(
+    expected_head_sha
+    and current_pr_head_sha
+    and sha_prefix_matches(current_pr_head_sha, expected_head_sha)
+    and no_findings_source_ids
+    and not stale_codex_head_context_present
+    and not selected_actionable_unresolved_thread_ids
+    and not review_decision_changes_requested
+    and not review_decision_requires_review
+    and not active_changes_requested_review_present
+    and not current_pending_codex_review_present
+    and not blocking_collection_failure
+)
 actionable_unresolved_thread_ids = list(selected_actionable_unresolved_thread_ids)
 for thread_id in carryover_unresolved_thread_ids:
+    if no_findings_fallback_pass_context and str(thread_id) in stale_codex_carryover_thread_id_set:
+        continue
     if thread_id not in actionable_unresolved_thread_ids:
         actionable_unresolved_thread_ids.append(thread_id)
 blocker_policy_status = (
@@ -1215,6 +1250,7 @@ no_findings_completion_promotes = bool(
     and sha_prefix_matches(current_pr_head_sha, expected_head_sha)
     and no_findings_source_ids
     and not stale_codex_head_context_present
+    and not carryover_unresolved_thread_ids
     and not actionable_unresolved_thread_ids
     and not review_decision_changes_requested
     and not review_decision_requires_review
