@@ -18,15 +18,15 @@ Issue Grade: "standard"
 ## 上位 trace
 - Epic requirements: E-RQ-001, E-RQ-004, E-RQ-005, E-RQ-008.
 - Epic acceptance criteria: E-AC-001, E-AC-002, E-AC-004, E-AC-006.
-- Epic design decisions: D-002, D-003, D-004.
-- Depends on: `iss-00261`.
+- Epic design decisions: D-000, D-002, D-003, D-004.
+- Depends on: accepted Epic ADR `artifacts/20260701t072851z-adr-artifact-domain-filename-template-contract.md`.
 
 ## スコープ
 - 必須:
   - `templates/artifacts/` を provider-side assets に追加する。
   - `blank`, `research`, `interview`, `disc`, `decision-candidate`, `pr-repair-batch`, `adr`, `draft-requirement`, `draft-design`, `draft-plan` の template routing を提供する。
   - blank template は frontmatter に `template: "blank"` を記録する。
-  - draft-* template は existing issue assurance/profile routing と衝突しない形で source location を定義する。
+  - draft-* は独自の draft-only content templates を作らず、既存の requirement / design / plan templates と Issue grade/profile-aware template selection を再利用する routing を定義する。
   - `artifacts/rules.md` の source docs を用意する。
   - template README / catalog guidance を更新する。
 - 対象外:
@@ -42,7 +42,7 @@ Issue Grade: "standard"
 - AC-262-003 ADR:
   - ADR template は future original が `artifacts/` に置かれ、accepted ADR authority と mirror eligibility を表現できる。
 - AC-262-004 draft:
-  - draft-requirement/design/plan routing は issue scope profile-aware template selection へ接続できる。
+  - draft-requirement/design/plan routing は既存の requirement/design/plan template contract と issue scope profile-aware template selection へ接続できる。
 - AC-262-005 rules:
   - `artifacts/rules.md` は future working artifact surface と legacy `discussions/` preservation を説明する。
 - AC-262-006 no scratch:
@@ -54,4 +54,4 @@ Issue Grade: "standard"
 - `uv run pytest tests/unit` の scaffold/template lane。
 
 ## 依存
-- `iss-00261` の type naming and filename contract。
+- Epic-level artifact domain / filename / draft template ADR。

@@ -46,11 +46,14 @@ ID: "epic-00259"
   - Future artifact creation は `spec-dock new artifact <type> --{initiative|epic|issue} <id> --title "..." [--slug ...]` に統一する。
   - `new doc` は parser / help / command registry から削除し、alias / shim / hidden compatibility command として残さない。
 - E-RQ-004: Artifact type catalog
+  - Artifact domain / filename / template-routing contract はこの Epic の accepted ADR `artifacts/20260701t072851z-adr-artifact-domain-filename-template-contract.md` を authority とし、child Issue で policy を決めない。
   - `new artifact` は少なくとも `blank`, `research`, `interview`, `disc`, `decision-candidate`, `pr-repair-batch`, `adr`, `draft-requirement`, `draft-design`, `draft-plan` を扱う。
   - `blank` は freeform / raw capture 用であり、filename に `blank` token を含めない。
   - `scratch` は future artifact catalog に含めず、legacy `discussions/` に存在する historical type として扱う。
 - E-RQ-005: Safety-sensitive draft artifacts
   - `draft-requirement`, `draft-design`, `draft-plan` は `new artifact` で作成できるが、既存の `.assurance.json` / authorized profile 検査、profile-specific template selection、missing / stale / invalid 時の no-write fail-closed behavior を維持する。
+  - `draft-requirement`, `draft-design`, `draft-plan` 用に独自の draft-only content templates を作らず、既存の requirement / design / plan template contract を再利用する。
+  - Issue scope の `draft-design` / `draft-plan` は既存の Issue grade / authorized profile template selection を使う。
   - ADR だけ、draft だけ、delegated authoring だけを例外的に旧 surface へ残してはならない。
 - E-RQ-006: Validation / sync / projection parity
   - validate は old-only (`discussions/` only), new-only (`artifacts/` only), mixed (`discussions/` + `artifacts/`) の各 layout を正しく扱う。
@@ -166,7 +169,7 @@ ID: "epic-00259"
 
 ## スコープ
 - 必須:
-  - artifact domain model / filename parser / id generation / collision handling.
+  - Epic-level ADR で確定した artifact domain model / filename parser / id generation / collision handling の実装。
   - `templates/artifacts/` catalog and rules.
   - `new artifact` runtime command.
   - `new doc` command removal from parser / help / command registry.

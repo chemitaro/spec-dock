@@ -16,7 +16,7 @@ Issue Grade: "standard"
 
 ## この計画で満たす要件ID
 - AC-262-001 through AC-262-006.
-- Depends on `iss-00261`.
+- Depends on accepted Epic ADR `artifacts/20260701t072851z-adr-artifact-domain-filename-template-contract.md`.
 
 ## 実装順序
 1. S01 artifact template catalog.
@@ -30,7 +30,7 @@ Issue Grade: "standard"
 |---|---|---|---|---|
 | CLOS-262-001 | AC-262-001 | DES-262-001 | all supported types have template/routing | structural test |
 | CLOS-262-002 | AC-262-002/006 | DES-262-002 | blank has no filename token; no scratch | test/inspection |
-| CLOS-262-003 | AC-262-003/004 | DES-262-003/005 | ADR and draft routing are represented | template inspection |
+| CLOS-262-003 | AC-262-003/004 | DES-262-003/005 | ADR routing and existing requirement/design/plan template reuse for draft-* are represented | template inspection |
 | CLOS-262-004 | AC-262-005 | DES-262-004 | rules explain future artifacts and legacy preservation | docs inspection |
 
 ## 実装ステップ
