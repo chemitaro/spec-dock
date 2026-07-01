@@ -12,7 +12,7 @@ ID: "iss-00257"
 
 # iss-00257 Severity Aware Codex PR Review Policy And Non Blocking Repair Loop Hardening — 実装報告
 
-この report は、Issue Planning / clarification / implementation / verification の観測証跡台帳である。現時点では要件定義書、設計書、実装計画書の段階的 authoring と spec-reviewer gate までを記録する。
+この report は、Issue Planning / clarification / implementation / verification / review の観測証跡台帳である。要件定義書、設計書、実装計画書の段階的 authoring、S10-S90 の実装・検証、fresh reviewer gate、commit / PR 前の残状態を記録する。
 
 ## Spec Interpretation / Decision Ledger
 
@@ -123,7 +123,7 @@ ID: "iss-00257"
 | design authoring | spec-reviewer `019f1bac-2f1c-7720-bf8b-4e95f443562b` | pass | no findings |
 | plan authoring | spec-reviewer `019f1baf-8f38-7833-bca6-21c4a48fe275` | fail | P1 no-mutation verification gap |
 | plan re-review | spec-reviewer `019f1bb1-e3c3-7b70-a79a-94be1be82475` | pass | P1 fixed; P2 evidence path incorporated |
-| final scope update review | pending fresh spec-reviewer | pending | authorization hardening scope added after previous pass |
+| final scope update review | spec-reviewer `019f1bc3-0837-73c2-841d-6c935120e3a7` | pass | supplemental authorization scope re-review passed |
 
 #### 変更したファイル
 
@@ -134,35 +134,134 @@ ID: "iss-00257"
 - `spec-dock/active/issue/discussions/20260701t023858z-interview-root-cause-family-runtime-scope.md` - User answer captured.
 - `spec-dock/active/issue/discussions/20260701t025116z-research-issue-planning-dogfooding-notes.md` - Dogfooding observations.
 
+### セッションログ（2026-07-01 / issue execution）
+
+#### S10 Markdown policy assets
+
+| Evidence | Result | Notes |
+|---|---|---|
+| doc-writer `019f1bda-2d9b-76a2-8f75-57983b1412c7` | complete | Updated provider and dogfooding PR review / merge-preparer / repair-batch policy text for P0/P1 blocking and P2/P3 reportable-but-non-blocking handling. |
+| `cmp -s` provider/dogfooding mirror pairs | pass | `codex-review-instructions.md`, `github-pr-merge-preparer/SKILL.md`, and `pr-repair-batch.md` mirror pairs matched. |
+| `rg -n "P0/P1|P2/P3|reportable but non-blocking|non-blocking|protected domain|machine evidence|root_cause_family|re-review|push|repair batch|persistent" ...` | pass | Expected severity and no-mutation boundary language was present in the edited policy assets. |
+| `git diff --check -- <S10 files>` | pass | No whitespace errors. |
+| `git diff -- spec-dock/initiatives/.../epic-00224-*/{requirement.md,design.md,plan.md,report.md}` | pass | Parent Epic docs remained unchanged. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s05b or issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing" -q --tb=short` | fail | Expected Red before S30: `test_issue_176_s05b...` still asserted legacy phrase `merge-blocking reviewer` in the installed instruction text. The S30 test-update step owns this stale expectation. |
+
+#### S20 Runtime blocker policy
+
+| Evidence | Result | Notes |
+|---|---|---|
+| dev-coder `019f1bdf-fa93-7f43-ac4f-7000c9e68bfa` | complete | Removed the `P2 + protected_domain + machine_evidence -> promoted_blocker` branch from provider and dogfooding `pr_review_snapshot.py`. |
+| `git diff -- .agents/.../pr_review_snapshot.py src/spec_dock/assets/install_root/.../pr_review_snapshot.py` | pass | Diff was limited to deleting the promotion branch and changing `blocker_policy_blockers` to `disposition == "blocker"`. |
+| `python -m py_compile .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | pass | Worker-reported syntax check passed for both mirror files. |
+| `cmp -s .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | pass | Worker-reported mirror parity passed. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_232" -q --tb=short` | fail | Expected Red before S30: 1 failed / 20 passed. The remaining failure was the old `promoted_blocker` expectation in `test_issue_232_review_collector_promotes_protected_p2_with_machine_evidence`. |
+
+#### S30 Test updates and focused verification
+
+| Evidence | Result | Notes |
+|---|---|---|
+| dev-coder `019f1be2-041b-7790-8eb7-5844f4aec83f` | complete | Updated `tests/unit/infra/test_init_update.py` for severity-classifying review instructions, P0/P1 blocker fingerprints, and P2 protected-domain machine-evidence non-blocking behavior. |
+| `git diff -- tests/unit/infra/test_init_update.py` | pass | Diff was limited to test phrase expectations and blocker-policy assertions. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s05b or issue_232 or issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing or issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint" -q --tb=short` | pass | Worker-reported 25 passed / 505 deselected. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_105_pr_merge_preparer_content_regression_contract or issue_176_s05b or issue_232 or issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing or issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint" -q --tb=short` | pass | Worker-reported 26 passed / 504 deselected. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | fail | Worker-reported 529 passed / 1 failed. Remaining failure was `test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json` due the active issue `.meta.json` dogfooding snapshot, not S30 test expectation behavior. |
+
+#### S40 Terminal no-mutation boundary verification
+
+| Evidence | Result | Notes |
+|---|---|---|
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_232" -q --tb=short` | pass | 21 passed / 509 deselected. Covered `blocker_policy_no_action`, P2/P3 `non_blocking_only`, metadata preservation, and blocker fingerprint exclusion. |
+| `rg -n "P2/P3|non-blocking|re-review|push|persistent|repair batch|blocker_policy_no_action" .agents/skills/github-pr-merge-preparer/SKILL.md spec-dock/templates/discussions/pr-repair-batch.md` | pass | Confirmed terminal P2/P3-only policy forbids repo-persistent repair batch creation/update, push, and re-review solely for non-blocking findings. |
+| `rg -n "blocker_policy_no_action|non_blocking_only|merge_prepared|protected_domain|machine_evidence|blocker_fingerprints" tests/unit/infra/test_init_update.py .agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | pass | Confirmed runtime/test evidence for non-blocking completion and metadata retention. |
+
+#### S50 SpecDock workflow named role authorization instruction hardening
+
+| Evidence | Result | Notes |
+|---|---|---|
+| doc-writer `019f1bf2-1777-7ff1-86f1-6f70d13d148b` | complete | Added bounded workflow-scoped authorization wording to provider and dogfooding Codex config, SpecDock skills, and workflow docs. |
+| `rg -n "workflow-scoped authorization|SpecDock-defined named sub-agents|active repo/worktree|active SpecDock scope|documented role responsibility|ユーザーが SpecDock workflow の利用を依頼" <S50 files>` | pass | Confirmed central English and Japanese wording across changed surfaces. |
+| `rg -n "workflow-scoped delegation consent|委任同意|issue-scoped workflow delegation consent|per-phase confirmation" <S50 files>` | pass | No stale consent wording remained in the changed S50 files. |
+| CLOS-010 audit detail | pass | `authorization_scope`: active repo/worktree, active SpecDock scope, current session, SpecDock-defined named roles, documented role responsibility. `additional_confirmation_required`: scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, roles outside SpecDock workflow. `single_writer_authority`: canonical docs remain main orchestrator-owned; sub-agent / reviewer output is evidence and adoption is performed by the main orchestrator. |
+| `cmp -s` across all 9 provider/dogfooding mirror pairs | pass | Main-orchestrator recheck reported `all mirror pairs match`. |
+| `git diff --check -- <S50 files>` | pass | Worker-reported whitespace check passed. |
+| doc-writer `019f1bfe-9282-73a0-a664-ee1126f333b5` | complete | Adjusted the 4 user-facing workflow docs to keep Japanese-primary prose while retaining the required English phrases as inline anchors. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "test_spec_document_templates_keep_policy_out_of_scaffold" -q --tb=short` | pass | Worker-reported 1 passed / 529 deselected after Japanese-primary rewrite. |
+
+#### Dogfooding snapshot drift closure
+
+| Evidence | Result | Notes |
+|---|---|---|
+| dev-coder `019f1bf6-f9b6-76c2-a787-6d9e62cfd2ea` | complete | Added tracked `iss-00257.../.meta.json` to the checked-in dogfooding meta path and depends-on snapshots with empty dependency list. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json" -q --tb=short` | pass | Worker-reported 1 passed / 529 deselected after the snapshot update. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | fail then pending recheck | Worker-reported first remaining failure was `test_spec_document_templates_keep_policy_out_of_scaffold`; doc-writer `019f1bfe-...` fixed the S50 docs-language violation. |
+
+#### Code review P1 closure: workflow authorization contract vocabulary
+
+| Evidence | Result | Notes |
+|---|---|---|
+| code-reviewer `019f1c06-30ac-7a61-98d8-0475aa8fdb0d` | fail | P1: stale `Workflow Delegation Consent` / `consent source` report contracts remained after workflow-scoped authorization hardening. |
+| doc-writer `019f1c0a-14a4-7660-a27b-4f2dad5c4a20` | complete | Replaced old consent vocabulary in `workflow_issue.md`, `workflow_spec_authoring.md`, `authoring/issue-plan.md`, and `templates/issue/report.md` with `Workflow-Scoped Authorization` / `authorization source` vocabulary. |
+| `rg -n "Workflow Delegation Consent|delegation consent|consent source|consent_source|委任同意|missing consent" <P1 docs/templates>` | pass | No stale consent vocabulary remained in the updated docs/templates. |
+| `cmp -s` across the 4 P1 provider/dogfooding doc/template mirror pairs | pass | Main-orchestrator check reported all P1 doc mirror pairs match. |
+| dev-coder `019f1c10-69ab-7693-8254-74f5b0aae467` | complete | Updated `tests/unit/infra/test_init_update.py` assertions from old consent vocabulary to workflow-scoped authorization vocabulary. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "test_spec_document_templates_keep_policy_out_of_scaffold" -q --tb=short` | pass | Worker-reported 1 passed / 529 deselected after test expectation update. |
+| `rg -n "Workflow Delegation Consent|consent source|missing consent|ワークフロー委任同意" tests/unit/infra/test_init_update.py` | pass | Worker-reported no matches. |
+| focused issue lane | pass | Worker-reported 28 passed / 502 deselected after P1 closure. |
+| doc-writer `019f1c18-6643-7c00-969f-404dce88074f` | complete | Added the new `missing workflow-scoped authorization evidence` failure-mode row to initiative/epic report templates. |
+| doc-writer `019f1c1b-3095-7e63-a559-098bb6e9c5bf` and dev-coder `019f1c1b-67d8-78f3-9d0e-1530e552b929` | complete | Removed temporary bare `consent` delegated-evidence field compatibility and updated the schema helper to expect `authorization source`. |
+| doc-writer `019f1c1d-c7cd-76c0-a322-b1d972cf4198` | complete | Aligned `system/active-none/{initiative,epic,issue}/report.md` provider/dogfooding assets with the same `authorization source` / `missing workflow-scoped authorization evidence` schema. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "test_init_creates_expected_structure" -q --tb=short` | pass | Worker-reported 1 passed / 529 deselected after active-none alignment. |
+
+#### S90 / pre-review verification
+
+| Evidence | Result | Notes |
+|---|---|---|
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s05b or issue_232 or issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing or issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint or issue_105_pr_merge_preparer_content_regression_contract or checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json or test_spec_document_templates_keep_policy_out_of_scaffold" -q --tb=short` | pass | 28 passed / 502 deselected. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 530 passed in 324.94s. |
+| `./spec-dock/scripts/spec-dock validate` | pass | `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | `assurance verify: ok`; issue `iss-00257`, authorized profile `standard`. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_176_s05b or issue_232 or issue_75_pr_monitor_assets_retired_and_observation_scaffold_present or issue_75_pr_workflow_guidance_uses_observation_without_pr_monitor_routing or issue_197_pr_review_snapshot_provider_wrapper_invokes_python_entrypoint or issue_105_pr_merge_preparer_content_regression_contract or checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json or test_spec_document_templates_keep_policy_out_of_scaffold or test_init_creates_expected_structure" -q --tb=short` | pass | 29 passed / 501 deselected after P1 workflow authorization contract closure. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 530 passed in 324.44s after P1 workflow authorization contract closure. |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after P1 closure: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after P1 closure: `assurance verify: ok`; issue `iss-00257`, authorized profile `standard`. |
+
 ## Final Quality Gate
 
 ### Docs Impact Resolution
 
 | Target | Update needed | Owner | Evidence | spec-reviewer result |
 |---|---|---|---|---|
-| Issue-local requirement/design/plan/report | yes | main orchestrator | this report | pass |
-| Parent Epic docs | no | N/A | real parent doc path diff required by `plan.md` | N/A |
-| Non-issue workflow docs / skill docs / orchestrator instructions | yes | dev-coder or doc-writer during implementation | CLOS-010 / S50 require provider and dogfooding updates for workflow-scoped named role authorization | pass |
+| Issue-local requirement/design/plan/report | yes | main orchestrator | this report includes planning, implementation, verification, and review evidence | pass |
+| Parent Epic docs | no | N/A | `git diff -- <parent epic requirement/design/plan/report>` produced no output | N/A |
+| Non-issue workflow docs / skill docs / orchestrator instructions | yes | doc-writer | S50 evidence above; provider/dogfooding mirror parity passed | pass |
 
 ### Final Spec Review Gate
 
 | Reviewer | Scope | Findings / fixes | Re-review count | Result |
 |---|---|---|---|---|
-| spec-reviewer | requirement/design/plan/report alignment after supplemental authorization scope | Fresh review found report/docs-impact and skill-scope issues; fixes applied; re-review passed | 2 | pass |
+| spec-reviewer | requirement/design/plan/report alignment after supplemental authorization scope during planning | Fresh review found report/docs-impact and skill-scope issues; fixes applied; re-review passed | 2 | pass |
+| spec-reviewer | final implementation/report alignment after S10-S90 | P1 stale final report completion statements; this section updated to reflect implementation completed, commit/PR still pending | 1 | pending re-review |
+| code-reviewer | final integrated diff | P1 stale delegation-consent contract; docs/templates/tests/active-none assets updated to workflow-scoped authorization vocabulary; fresh re-review found no findings | 2 | pass |
+| qa-reviewer | final test adequacy | P2 stale report wording; report opening/final sections updated; focused/full lanes passed | 1 | pass |
+| spec-reviewer | final implementation/docs/tests/report alignment after P1 closure | P2 CLOS-010 audit detail; `authorization_scope`, `additional_confirmation_required`, and `single_writer_authority` recorded above | 2 | pass |
 
 ### Final Commit
 
 | Final report ledger | Final commit scope | Post-commit evidence destination | Result |
 |---|---|---|---|
-| this report | planning docs only for current turn | final response | ready for implementation workflow |
+| this report | S10-S50 implementation/docs/tests plus issue report evidence | final response and PR body | pending final reviewer gates and commit |
 
 ## 遭遇した問題と解決
 
 - 誤って no-op spec-reviewer を一件起動したが、対象 artifact をレビューしていないため workflow evidence として不採用にした。
 - Plan review で terminal P2/P3-only no-mutation の検証不足が見つかったため、`CLOS-004A` と `S40` を追加して再レビュー pass を得た。
 - Supplemental authorization scope review で stale docs impact gate と epic/initiative skill path ambiguity が見つかったため、`report.md` と `plan.md` を更新した。
+- Final spec review で planning 時点の stale completion statements が残っていることを P1 として指摘されたため、final gate / commit / exception notes を implementation-complete but pre-commit / pre-PR 状態へ更新した。
+- Full `test_init_update.py` lane で dogfooding `.meta.json` snapshot drift と scaffold docs language policy failure が順に見つかったため、snapshot と S50 workflow docs prose を最小修正して 530 passed へ戻した。
+- Final code review で stale delegation-consent contract が P1 として見つかったため、workflow/report/template/test の語彙を `Workflow-Scoped Authorization` / `authorization source` へ更新し、旧 consent vocabulary を除去した。
 
 ## 省略/例外メモ
 
-- 実装変更、実装テスト、commit はまだ行っていない。
+- 実装変更と実装テストは完了している。commit / PR / external PR observation は final reviewer gates pass 後に実施する。
 - Parent Epic docs は編集していない。

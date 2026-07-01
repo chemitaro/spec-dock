@@ -98,7 +98,7 @@ _INTERVIEW_REQUIRED_LABELS = (
 )
 
 _DELEGATED_DRAFT_REQUIRED_FAILURE_MODES = (
-    "missing consent",
+    "missing workflow-scoped authorization evidence",
     "missing/stale previous reviewer pass",
     "requirement gap during design",
     "design gap during plan",
@@ -110,11 +110,12 @@ _DELEGATED_DRAFT_REQUIRED_FAILURE_MODES = (
     "reviewer unavailable/denied/waived/provisional",
 )
 
-_WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER = (
-    "| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | "
+_WORKFLOW_SCOPED_AUTHORIZATION_TABLE_HEADER = (
+    "| 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | "
     "対象課題（active issue） | セッション（session） | 指名ロール（named roles） | "
     "境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | "
-    "拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |"
+    "拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | "
+    "次アクション（next action） |"
 )
 
 _JAPANESE_PRIMARY_HEADING_ALLOWED_PREFIXES = (
@@ -1161,6 +1162,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00253-connect-delegated-specialist-routing-and-draft-artifact-sources/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00254-add-grade-aware-spec-review-and-evidence-gates/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00255-add-grade-aware-issue-authoring-smoke-tests/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00257-severity-aware-pr-review-policy/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1433,6 +1435,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "iss-00253",
             "iss-00254",
         ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00257-severity-aware-pr-review-policy/.meta.json": [],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -1765,7 +1768,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "role",
             "phase",
             "scope",
-            "consent",
+            "authorization source",
             "source artifacts",
             "draft artifact path",
             "status",
@@ -1828,12 +1831,12 @@ class TestInitUpdate(CliRuntimeHarness):
                 f"{source}: missing failure-mode field {field}"
             )
         expected_failure_mode_rows = {
-            "missing consent": (
+            "missing workflow-scoped authorization evidence": (
                 "blocked / incomplete",
                 (
-                    "obtain scoped consent or use manual authoring",
-                    "範囲付き同意を取得する、または手動 authoring に戻す",
-                    "obtain scoped consent or use manual authoring（scope 付き同意を取得する、または手動 authoring を使う）",
+                    "record workflow request authorization source and boundary or use manual authoring",
+                    "ワークフロー利用依頼の authorization source と boundary を記録する、または手動 authoring に戻す",
+                    "ワークフロー利用依頼の authorization source と boundary を記録する、または手動 authoring を使う",
                 ),
             ),
             "missing/stale previous reviewer pass": (
@@ -3298,13 +3301,20 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "#### テスト契約の完了証跡（Test Contract Closure）" in report_text
             assert "#### クロージャ網羅（Closure Coverage）" in report_text
             assert "#### クロージャ差分（Closure Delta）" in report_text
-            assert "#### ワークフロー委任同意の証跡（Workflow Delegation Consent）" in report_text
-            assert _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER in report_text
+            assert "#### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）" in report_text
+            assert _WORKFLOW_SCOPED_AUTHORIZATION_TABLE_HEADER in report_text
             for fragment in (
-                "consent source",
+                "authorization source",
+                "active repo/worktree",
+                "active SpecDock scope",
+                "documented role responsibility",
+                "role ごと・phase ごとの追加承認 gate ではなく",
                 "boundary",
                 "expires / invalidation condition",
-                "denied / unavailable handling",
+                "separate-confirmation exception",
+                "scope expansion",
+                "credentialed external mutation",
+                "SpecDock workflow 外の role 利用",
             ):
                 assert fragment in report_text
             assert "#### 実装委任ゲート（Implementation Delegation Gate）" in report_text
@@ -4401,13 +4411,20 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "planned contract" not in issue_plan
         assert "update_plan" not in issue_plan
 
-        assert "#### ワークフロー委任同意の証跡（Workflow Delegation Consent）" in issue_report
-        assert _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER in issue_report
+        assert "#### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）" in issue_report
+        assert _WORKFLOW_SCOPED_AUTHORIZATION_TABLE_HEADER in issue_report
         for fragment in (
-            "consent source",
+            "authorization source",
+            "active repo/worktree",
+            "active SpecDock scope",
+            "documented role responsibility",
+            "role ごと・phase ごとの追加承認 gate ではなく",
             "boundary",
             "expires / invalidation condition",
-            "denied / unavailable handling",
+            "separate-confirmation exception",
+            "scope expansion",
+            "credentialed external mutation",
+            "SpecDock workflow 外の role 利用",
         ):
             assert fragment in issue_report
         assert "#### 委任 worker 証跡（Delegated Worker Evidence）" in issue_report
@@ -9471,9 +9488,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 f"missing Codex review instruction asset after init: {instruction_path}"
             )
             installed_instruction_text = installed_instruction.read_text(encoding="utf-8")
-            assert "merge-blocking reviewer" in installed_instruction_text
-            assert "Do not report non-blocking P2/P3 findings" in installed_instruction_text
-            assert "lint/formatter-enforceable issues" in installed_instruction_text
+            assert "severity-classifying PR reviewer" in installed_instruction_text
+            assert "Only `P0` and `P1` are merge-blocking" in installed_instruction_text
+            assert "`P2` and `P3` are non-blocking review" in installed_instruction_text
+            assert "Do not upgrade a `P2`/`P3` finding to `P1`" in installed_instruction_text
+            assert "formatter/linter-enforceable issues" in installed_instruction_text
 
             installed_helper.unlink()
             installed_instruction.unlink()
@@ -9490,9 +9509,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 f"missing Codex review instruction asset after update: {instruction_path}"
             )
             installed_instruction_text = installed_instruction.read_text(encoding="utf-8")
-            assert "merge-blocking reviewer" in installed_instruction_text
-            assert "Do not report non-blocking P2/P3 findings" in installed_instruction_text
-            assert "lint/formatter-enforceable issues" in installed_instruction_text
+            assert "severity-classifying PR reviewer" in installed_instruction_text
+            assert "Only `P0` and `P1` are merge-blocking" in installed_instruction_text
+            assert "`P2` and `P3` are non-blocking review" in installed_instruction_text
+            assert "Do not upgrade a `P2`/`P3` finding to `P1`" in installed_instruction_text
+            assert "formatter/linter-enforceable issues" in installed_instruction_text
 
     def test_issue_187_s201_actions_checks_python_asset_installed_by_init_and_update(self) -> None:
         relative_path = Path(".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py")
@@ -9957,7 +9978,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）",
             "#### レビューゲート状態（Reviewer Gate Status）",
             "#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）",
-            _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER,
+            _WORKFLOW_SCOPED_AUTHORIZATION_TABLE_HEADER,
             "実際の Red / Green / Refactor evidence",
             "closure delta",
             "reviewer status",
@@ -11858,16 +11879,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         merge_preparer_phrases = (
             "github-pr-merge-preparer",
             "failure_class",
-            "Default autonomous repair limit is two repair attempts for the same `failure_class`.",
-            "Default total autonomous repair limit is four repair attempts per PR preparation invocation.",
-            "Stop at a human gate when the same `failure_class` appears after a repair",
-            "the blocker is `permission_or_auth`, `external_or_flaky`, `base_branch_conflict`, `unknown`",
-            "a requirement expansion, a breaking change, a migration, a secret or deployment setting change",
+            "Default autonomous repair limit is one repair attempt for `P0` family",
+            "Default autonomous repair limit is two repair attempts for the same `P1`",
+            "Default total autonomous repair limit is four repair attempts per PR",
+            "Stop at a human gate when the same",
+            "appears after a repair",
+            "Stop at a human gate when the blocker is `permission_or_auth`,",
+            "`external_or_flaky`, `base_branch_conflict`, `unknown`, a requirement",
+            "expansion, breaking change, migration, secret/deployment setting change",
             "ambiguous review intent",
             "External/non-Actions checks are not claimed as observed by this skill.",
-            "Any waived or unconfirmed external/non-Actions check risk is reported as residual risk.",
-            "If unresolved review-thread state cannot be determined",
-            "stop at a human gate. Do not hide the limitation.",
+            "Any waived or unconfirmed external/non-Actions check risk is reported as",
+            "Review-thread unresolved state is known, or unresolved-thread limitations are",
+            "stop at the platform human gate",
             "If an existing PR exists, use its base for monitoring.",
             "If no PR exists, prefer an explicit user base.",
             "Otherwise respect `branch.<current>.gh-merge-base` when present.",
@@ -32102,6 +32126,8 @@ esac
             assert blocker_policy["blocker_count"] == 1
             assert blocker_policy["findings"][0]["priority"] == "P1"
             assert blocker_policy["findings"][0]["disposition"] == "blocker"
+            assert len(blocker_policy["blocker_fingerprints"]) == 1
+            assert blocker_policy["findings"][0]["fingerprint"] == blocker_policy["blocker_fingerprints"][0]
 
     def test_issue_232_review_collector_treats_p1_pull_review_body_as_blocker(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -32187,8 +32213,10 @@ esac
             assert blocker_policy["findings"][0]["id"] == 201
             assert blocker_policy["findings"][0]["priority"] == "P1"
             assert blocker_policy["findings"][0]["disposition"] == "blocker"
+            assert len(blocker_policy["blocker_fingerprints"]) == 1
+            assert blocker_policy["findings"][0]["fingerprint"] == blocker_policy["blocker_fingerprints"][0]
 
-    def test_issue_232_review_collector_promotes_protected_p2_with_machine_evidence(self) -> None:
+    def test_issue_232_review_collector_keeps_protected_p2_with_machine_evidence_non_blocking(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -32216,7 +32244,7 @@ JSON
     ;;
   "api repos/owner/repo/pulls/13 --paginate")
     cat <<'JSON'
-{"requested_reviewers":[],"requested_teams":[]}
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
 JSON
     ;;
   api\\ graphql*)
@@ -32260,15 +32288,15 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["decision"]["status"] == "human_gate"
-            assert payload["decision"]["status_reason"] == "blocker_policy_validated_blocker"
-            assert payload["decision"]["recommended_next_action"] == "address_review_feedback"
+            assert payload["decision"]["status"] == "passed"
+            assert payload["decision"]["status_reason"] == "blocker_policy_no_action"
+            assert payload["decision"]["recommended_next_action"] == "merge_prepared"
             blocker_policy = payload["decision"]["blocker_policy"]
-            assert blocker_policy["status"] == "blocker_present"
-            assert blocker_policy["blocker_count"] == 1
-            assert len(blocker_policy["blocker_fingerprints"]) == 1
-            assert blocker_policy["findings"][0]["disposition"] == "promoted_blocker"
-            assert blocker_policy["findings"][0]["fingerprint"] == blocker_policy["blocker_fingerprints"][0]
+            assert blocker_policy["status"] == "non_blocking_only"
+            assert blocker_policy["blocker_count"] == 0
+            assert blocker_policy["blocker_fingerprints"] == []
+            assert blocker_policy["findings"][0]["disposition"] == "non_blocking_followup"
+            assert blocker_policy["findings"][0]["fingerprint"] not in blocker_policy["blocker_fingerprints"]
             assert blocker_policy["findings"][0]["protected_domain"] is True
             assert blocker_policy["findings"][0]["machine_evidence"] is True
 
