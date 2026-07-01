@@ -66,6 +66,7 @@ reflected_to:
 - `guidance issue-planning` は design/plan/report の具体化後、`reason_code: report-spec-authoring-gate-invalid` で停止した。Details は `Spec Authoring Gate must record non-blocking pass evidence for requirement/design/plan.` であり、fresh spec-reviewer pass 未実行を execution readiness blocker として検出している。
 - 要件、設計、計画を各 phase ごとに spec-reviewer review した後、`report.md` の `Spec Authoring Gate`、`Delegated Draft Evidence`、`Reviewer Gate Status`、`Grade Specialist Evidence Gate` は runtime が期待する表の列順と契約値に合わせる必要があった。
 - 最終的に `guidance issue-planning` は `state: ready`、`reason_code: assurance-valid` を返した。
+- 初回 authoring 時、main orchestrator が multi-agent tool の一般制約を優先して、SpecDock workflow が必要とする `spec-reviewer` の起動を追加人間許可待ちにしてしまった。ユーザー補足指示により、SpecDock workflow invocation 自体を workflow-defined named role 利用の明示許可として扱う方針を、この Issue scope に追加した。
 
 ## inference / 推測 (必須)
 - 事実から推測したこと:
@@ -111,8 +112,9 @@ reflected_to:
   - Planning workflow の使い勝手に関する違和感は product requirement に混ぜず、この dogfooding note に分離する。
 
 ## implications / 判断への含意 (必須)
-- `iss-00257` authoring は strict profile として扱い、requirement / design / plan 各 phase で reviewer gate と report evidence を残す必要がある。
-- Specialist を使わず main orchestrator の manual authoring で進める場合、Strict profile の manual fallback evidence と skip reason を `report.md` に残す。
+- Superseded: 初回 guidance の `authorized_profile=strict` を前提にした implication は、requirement 具体化後の `assurance classify --stage requirement` が `authorized_profile: standard` を返したため採用しない。
+- Current adopted implication: `iss-00257` authoring は `authorized_profile: standard` として扱い、requirement / design / plan 各 phase で fresh spec-reviewer gate と report evidence を残す必要がある。
+- Specialist を使わず main orchestrator の manual authoring で進める場合、Standard profile の manual authoring fallback evidence と fresh reviewer pass を `report.md` に残す。
 - Issue Planning workflow 自体の改善候補が出た場合は、この issue の本筋と分けて discussion / follow-up 候補として残す。
 
 ## リスク/制約 (任意)
@@ -123,6 +125,7 @@ reflected_to:
   - 合成直後の `design.md` / `plan.md` が `状態: "approved"` になる一方で fresh reviewer gate は未実行なので、agent がそのまま承認済みと誤読する余地がある。逆に `draft` は scaffold 扱いになるため、未レビューだが具体化済みの状態名が必要だった。
   - planning docs を具体化しただけでも guidance は execution readiness gate まで評価するため、spec-reviewer 未実行が blocker として出る。これは安全側の挙動だが、「planning authoring 完了」と「execution ready」の違いを利用者に明示する UX があると分かりやすい。
   - `report.md` evidence gate は human-readable な自然文よりも、表の列順と契約値 (`passed`, `no`, `promote`, `ready` など) に強く依存する。初回利用時は gate の期待 schema が docs か guidance から直接分かると運用しやすい。
+  - SpecDock workflow の利用依頼が named sub-agent / reviewer 起動の許可を含むことが、skill / workflow docs / orchestrator instruction に明示されていないと、required reviewer gate を不必要に人間許可待ちしてしまう。
   - `guidance issue-planning` は next action と stop condition を簡潔に返すが、reviewer / specialist 実行コマンドまでは返さないため、phase docs 併読が必須。
 
 ## 反映先 (任意)
