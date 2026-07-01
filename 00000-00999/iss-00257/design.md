@@ -74,7 +74,10 @@ endif
 | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/codex-review-instructions.md` | Installed provider mirror | dogfooding asset と同じ内容にする |
 | `.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | Review comments / reviews から blocker policy snapshot を生成 | P2 + protected_domain + machine_evidence を `promoted_blocker` にしない |
 | `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` | Installed provider mirror | runtime mirror parity を維持する |
-| `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py` | Observation loop and stalled detection | `root_cause_family` first-class field は追加しない |
+| `.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py` | Snapshot-level PR observation classifier | explicit `actionable_unresolved_*` fields を尊重し、P2/P3-only raw selected unresolved を再ブロックしない |
+| `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py` | Installed provider mirror | downstream classifier mirror parity を維持する |
+| `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py` | Observation loop and stalled detection | explicit `actionable_unresolved_*` fields を尊重し、current-selected / carryover / waitable reason precedence を維持する。`root_cause_family` first-class field は追加しない |
+| `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py` | Installed provider mirror | downstream classifier mirror parity を維持する |
 | `.agents/skills/github-pr-merge-preparer/SKILL.md` | PR merge preparation workflow | P2/P3 terminal no-mutation policy を明示 |
 | `spec-dock/templates/discussions/pr-repair-batch.md` | Repair batch discussion template | repo-persistent batch が blocking repair 用であることを明示 |
 | `tests/unit/infra/test_init_update.py` | Installer / asset / observation regression tests | 旧 P2 promotion expectation と旧 instruction phrase expectation を更新 |

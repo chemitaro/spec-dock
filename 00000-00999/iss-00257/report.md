@@ -237,6 +237,48 @@ ID: "iss-00257"
 | `uv run ruff format --check .agents/.../pr_review_snapshot.py src/spec_dock/assets/install_root/.../pr_review_snapshot.py` | pass | Worker-reported `2 files already formatted`. |
 | `cmp -s .agents/.../pr_review_snapshot.py src/spec_dock/assets/install_root/.../pr_review_snapshot.py` | pass | Worker-reported mirror parity passed. |
 | `make lint` | pass | Worker-reported ruff check pass, ruff format check pass, mypy pass. |
+| `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 260 --head-sha 56bf7660...` | failed | Observation triggered Codex review comment and returned `human_gate` / `address_review_feedback`; selected unresolved inline Codex review thread `PRRT_kwDOQ99OK86NevIt` was blocking because inline review comments were not included in `blocker_policy_findings`. |
+| `gh run view 28496070249 --job 84462500420 --log` | fail evidence | Provider CI static analysis passed; pytest failed only at `tests/cli_runtime/test_new.py::TestCliNew::test_new_doc_creates_pr_repair_batch_with_generated_identity_and_template` because the test still expected old phrase `observed GitHub Actions CI failures`. |
+| dev-coder `019f1c42-0ecd-7681-a4d1-0a7d8bda1aeb` | complete | Included `selected_comment_signals` in blocker policy classification, added inline comment thread metadata, excluded P2/P3 selected unresolved inline threads from actionable gate, preserved P0/P1 blockers and platform gates, and updated the stale `pr-repair-batch` assertion. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_232" -q --tb=short` | pass | 23 passed / 509 deselected. Covers inline `[P2]` selected unresolved thread as `non_blocking_followup` with `kind=pull_review_comment`, thread metadata, empty `actionable_unresolved_thread_ids`, and `blocker_policy_no_action`; also covers inline `[P1]` selected unresolved thread as `blocker_policy_validated_blocker`. |
+| `uv run pytest tests/cli_runtime/test_new.py -k "pr_repair_batch" -q --tb=short` | pass | 1 passed / 48 deselected after aligning the test to current blocking repair wording. |
+| `uv run ruff format --check .agents/.../pr_review_snapshot.py src/spec_dock/assets/install_root/.../pr_review_snapshot.py tests/unit/infra/test_init_update.py tests/cli_runtime/test_new.py` | pass | 4 files already formatted. |
+| `cmp -s .agents/.../pr_review_snapshot.py src/spec_dock/assets/install_root/.../pr_review_snapshot.py` | pass | Runtime mirror parity passed after inline severity repair. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 532 passed in 323.09s after inline severity repair tests were added. |
+| `make lint` | pass | ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after PR observation repair: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after PR observation repair: `assurance verify: ok`; issue `iss-00257`, authorized profile `standard`. |
+| `git diff -- <parent epic requirement/design/plan/report>` | pass | Parent Epic docs remained unchanged after PR observation repair. |
+| code-reviewer `019f1c4c-1907-7212-b698-14b5b0386b90` | fail | P1: collector emitted empty `actionable_unresolved_thread_ids` for P2/P3 inline threads, but downstream `pr_observation_snapshot.py` / `pr_observation_wait.py` still treated raw selected unresolved counts as `current_selected_unresolved_thread`. |
+| plan amendment | complete | Added `pr_observation_snapshot.py` and `pr_observation_wait.py` mirror pairs to the Observation runtime allowed surface and S20/S40 downstream classifier verification text. |
+| dev-coder `019f1c4e-fd8d-7050-aa6f-7934dc28565c` | complete | Updated downstream snapshot/wait classifiers to prefer explicit actionable unresolved fields; raw selected counts remain legacy fallback only when explicit actionable fields are absent. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s03 or issue_232" -q --tb=short` | pass | 31 passed / 503 deselected. Covers explicit empty actionable unresolved fields overriding raw selected counts in snapshot/wait classifiers and preserves explicit actionable unresolved blocking. |
+| `uv run ruff format --check .agents/.../pr_observation_snapshot.py src/spec_dock/assets/install_root/.../pr_observation_snapshot.py .agents/.../pr_observation_wait.py src/spec_dock/assets/install_root/.../pr_observation_wait.py tests/unit/infra/test_init_update.py` | pass | 5 files already formatted. |
+| `cmp -s` for `pr_observation_snapshot.py` and `pr_observation_wait.py` mirror pairs | pass | Both downstream classifier mirror pairs matched after P1 fix. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | 534 passed in 332.26s after downstream classifier tests were added. |
+| `make lint` | pass | Re-run after downstream classifier fix: ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after plan/report update: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after `assurance classify --stage requirement` refreshed source binding; issue `iss-00257`, authorized profile `standard`. |
+| `./spec-dock/scripts/spec-dock assurance compose --artifact all` | expected fail-closed | `substantive_content_conflict` because concrete `design.md` / `plan.md` contain authored content outside managed sections; compose did not overwrite them automatically. `assurance verify` is the final binding check and passed. |
+| code-reviewer `019f1c5b-7638-75a3-ba7d-c8b5100df8f9` | fail | P1: downstream classifiers honored explicit empty actionable fields but did not treat positive explicit actionable unresolved fields as blocking when raw selected counts were zero. |
+| dev-coder `019f1c5e-4b6e-7f72-be40-37187c3c0ff3` | complete | Updated snapshot/wait classifiers so positive explicit actionable unresolved fields return `actionable_unresolved_thread` before empty-actionable raw-count suppression; empty explicit fields still suppress raw selected P2/P3-only counts; legacy payload fallback remains. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_222_s03 or issue_232" -q --tb=short` | pass | 33 passed / 503 deselected after adding wait and snapshot tests for explicit positive actionable unresolved with raw selected count zero. |
+| `uv run ruff format --check .agents/.../pr_observation_snapshot.py src/spec_dock/assets/install_root/.../pr_observation_snapshot.py .agents/.../pr_observation_wait.py src/spec_dock/assets/install_root/.../pr_observation_wait.py tests/unit/infra/test_init_update.py` | pass | 5 files already formatted after positive explicit actionable fix. |
+| `cmp -s` for `pr_observation_snapshot.py` and `pr_observation_wait.py` mirror pairs | pass | Both downstream classifier mirror pairs matched after positive explicit actionable fix. |
+| spec-reviewer `019f1c5b-bbf9-7b32-a2a7-9622f58eba6c` | pass | P2 docs consistency notes recorded; plan handoff summary updated to mention downstream snapshot/wait classifier mirror pairs. |
+| qa-reviewer `019f1c5b-9e3a-7091-beee-81ef48fcc1ec` | pass | P2 mixed-thread coverage recommendation recorded as non-blocking follow-up risk; no P0/P1 QA gaps. |
+| dev-coder `019f1c67-5e55-7071-b22a-0538a6cca602` | complete | Repaired the positive explicit actionable follow-up without breaking existing reason precedence: current-selected still wins, carryover remains waitable where required, and positive actionable is considered in the trusted submitted-review path after carryover. |
+| focused Red before precedence fix | fail evidence | Worker-reported 3 failed / 41 passed / 492 deselected for `issue_187_s420 or issue_218_s02 or issue_222_s03 or issue_232`, showing the early positive-actionable return broke current-selected/carryover reason precedence. |
+| `uv run pytest tests/unit/infra/test_init_update.py -k "issue_187_s420 or issue_218_s02 or issue_222_s03 or issue_232" -q --tb=short` | pass | 44 passed / 492 deselected after precedence-aware positive actionable fix. |
+| `uv run pytest tests/unit/infra/test_init_update.py -q --tb=short` | pass | Worker-reported 536 passed in 331.87s after precedence-aware positive actionable fix. |
+| `uv run ruff format --check ... pr_observation_snapshot.py ... pr_observation_wait.py tests/unit/infra/test_init_update.py` | pass | Worker-reported 5 files already formatted; main-orchestrator recheck with `tests/cli_runtime/test_new.py` included reported 6 files already formatted. |
+| `cmp -s` for `pr_observation_snapshot.py` and `pr_observation_wait.py` mirror pairs | pass | Worker-reported and main-orchestrator rechecked mirror parity. |
+| `make lint` | pass | Re-run after precedence-aware positive actionable fix: ruff check pass, ruff format check pass (`277 files already formatted`), mypy pass (`167 source files`). |
+| `./spec-dock/scripts/spec-dock validate` | pass | Re-run after precedence-aware positive actionable fix: `spec-dock: ok (validate) nodes=163`. |
+| `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after precedence-aware positive actionable fix: issue `iss-00257`, authorized profile `standard`. |
+| `git diff --check` | pass | No whitespace errors in the final diff. |
+| `git diff -- spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/requirement.md spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/design.md spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/plan.md spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/report.md` | pass | Exact parent Epic doc path diff produced no output. |
+| qa-reviewer `019f1c71-fc03-7893-a8d8-f5cc69cf09ae` | pass | Final QA review found only P2 mixed selected inline/human thread coverage recommendation; no P0/P1 QA gaps. Recommendation recorded as follow-up risk, not blocking. |
 
 ## Final Quality Gate
 
@@ -244,7 +286,7 @@ ID: "iss-00257"
 
 | Target | Update needed | Owner | Evidence | spec-reviewer result |
 |---|---|---|---|---|
-| Issue-local requirement/design/plan/report | yes | main orchestrator | this report includes planning, implementation, verification, and review evidence | pass |
+| Issue-local requirement/design/plan/report | yes | main orchestrator | this report includes planning, implementation, verification, and review evidence; latest downstream classifier/design amendment re-review is tracked below | pending final re-review |
 | Parent Epic docs | no | N/A | `git diff -- <parent epic requirement/design/plan/report>` produced no output | N/A |
 | Non-issue workflow docs / skill docs / orchestrator instructions | yes | doc-writer | S50 evidence above; provider/dogfooding mirror parity passed | pass |
 
@@ -253,16 +295,19 @@ ID: "iss-00257"
 | Reviewer | Scope | Findings / fixes | Re-review count | Result |
 |---|---|---|---|---|
 | spec-reviewer | requirement/design/plan/report alignment after supplemental authorization scope during planning | Fresh review found report/docs-impact and skill-scope issues; fixes applied; re-review passed | 2 | pass |
-| spec-reviewer | final implementation/report alignment after S10-S90 | P1 stale final report completion statements; this section updated to reflect implementation completed, commit/PR still pending | 1 | pending re-review |
+| spec-reviewer | final implementation/report alignment after S10-S90 | P1 stale final report completion statements; this section updated to reflect implementation completed, commit/PR still pending | 1 | pass |
 | code-reviewer | final integrated diff | P1 stale delegation-consent contract; docs/templates/tests/active-none assets updated to workflow-scoped authorization vocabulary; fresh re-review found no findings | 2 | pass |
 | qa-reviewer | final test adequacy | P2 stale report wording; report opening/final sections updated; focused/full lanes passed | 1 | pass |
 | spec-reviewer | final implementation/docs/tests/report alignment after P1 closure | P2 CLOS-010 audit detail; `authorization_scope`, `additional_confirmation_required`, and `single_writer_authority` recorded above | 2 | pass |
+| code-reviewer | PR observation repair after inline severity and downstream classifier fix | First fresh review found P1 downstream raw selected count re-blocking; second fresh review found P1 positive explicit actionable bypass; both fixes applied; final fresh review passed with no findings | 3 | pass |
+| qa-reviewer | PR observation repair test adequacy | Fresh review found only P2 mixed selected inline thread coverage recommendation; final QA review passed with the P2 recorded as follow-up risk | 2 | pass |
+| spec-reviewer | Plan/report/design alignment after downstream classifier plan amendment | Fresh review passed after design surface and exact parent Epic evidence fixes; remaining P2 final gate row staleness fixed here | 2 | pass |
 
 ### Final Commit
 
 | Final report ledger | Final commit scope | Post-commit evidence destination | Result |
 |---|---|---|---|
-| this report | S10-S50 implementation/docs/tests plus issue report evidence | final response and PR body | pending final reviewer gates and commit |
+| this report | S10-S50 implementation/docs/tests, PR observation repairs, and issue report evidence | final response and PR observation artifact | final verification and reviewer gates passed; commit, push, and PR observation re-run pending |
 
 ## 遭遇した問題と解決
 
@@ -272,8 +317,14 @@ ID: "iss-00257"
 - Final spec review で planning 時点の stale completion statements が残っていることを P1 として指摘されたため、final gate / commit / exception notes を implementation-complete but pre-commit / pre-PR 状態へ更新した。
 - Full `test_init_update.py` lane で dogfooding `.meta.json` snapshot drift と scaffold docs language policy failure が順に見つかったため、snapshot と S50 workflow docs prose を最小修正して 530 passed へ戻した。
 - Final code review で stale delegation-consent contract が P1 として見つかったため、workflow/report/template/test の語彙を `Workflow-Scoped Authorization` / `authorization source` へ更新し、旧 consent vocabulary を除去した。
+- PR observation で inline review comment の P2/P3 が blocker policy に入らず selected unresolved thread として human gate になる P1 が見つかったため、inline comments を severity classification に含め、P2/P3 は actionable unresolved gate から外し、P0/P1 は blocker policy で止める回帰テストを追加した。
+- Provider CI で `pr-repair-batch` template の旧 phrase assertion が残っていることが見つかったため、現行の blocking repair wording にテストを合わせた。
+- Fresh code review で downstream observation classifier が raw selected unresolved count を再ブロックする P1 が見つかったため、explicit actionable unresolved fields がある場合はそれを blocking 判定の正本にし、旧 payload だけ raw selected count fallback を残した。
+- Fresh code review で positive explicit actionable unresolved fields が raw selected count zero のとき bypass できる P1 が見つかったため、downstream classifier で positive actionable を先に `actionable_unresolved_thread` として扱うようにした。
+- Full regression lane で上記 positive actionable の早期 return が current-selected / carryover / waitable precedence を壊すことが分かったため、positive actionable は trusted submitted-review path で current-selected と carryover の後に評価するよう修正した。
+- QA review は mixed selected inline P2 thread with human reply の追加テストを P2 follow-up risk として推奨した。現行 gate は P0/P1 なしで pass のため、この Issue の blocking closure にはしない。
 
 ## 省略/例外メモ
 
-- 実装変更と実装テストは完了している。commit / PR / external PR observation は final reviewer gates pass 後に実施する。
+- 実装変更と実装テストは完了している。追加 PR observation repair は final verification 後に commit / push し、external PR observation を再実行する。
 - Parent Epic docs は編集していない。

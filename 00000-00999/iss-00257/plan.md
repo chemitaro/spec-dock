@@ -34,7 +34,7 @@ authorized_profile: "standard"
 | Surface | Paths |
 |---|---|
 | Review instruction assets | `.agents/skills/github-pr-observation/scripts/codex-review-instructions.md`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/codex-review-instructions.md` |
-| Observation runtime | `.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` |
+| Observation runtime | `.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py`; `.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_snapshot.py`; `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py` |
 | Merge-preparer skill assets | `.agents/skills/github-pr-merge-preparer/SKILL.md`; `src/spec_dock/assets/install_root/.agents/skills/github-pr-merge-preparer/SKILL.md` |
 | Repair-batch template | `spec-dock/templates/discussions/pr-repair-batch.md`; `src/spec_dock/assets/spec_dock/templates/discussions/pr-repair-batch.md` |
 | Tests | `tests/unit/infra/test_init_update.py` |
@@ -106,6 +106,7 @@ authorized_profile: "standard"
   - Remove P2 protected-domain + machine-evidence promotion.
   - Ensure blocker filtering is P0/P1-only.
   - Preserve existing platform gate separation and no-action path.
+  - If PR observation shows downstream decision classifiers still promote raw selected unresolved P2/P3-only threads, update `pr_observation_snapshot.py` and `pr_observation_wait.py` mirror pairs so explicit actionable unresolved fields control blocking while legacy payloads without those fields keep fallback behavior.
 - Red:
   - Existing protected-domain + machine-evidence P2 promotion test should fail until expectation and implementation are updated.
 - Verification:
@@ -137,6 +138,7 @@ authorized_profile: "standard"
 - Purpose: Close the specific P2/P3-only no-mutation obligation from AC-004.
 - Actions:
   - Verify that observation runtime treats P2/P3-only findings as `blocker_policy_no_action` / merge-prepared when other gates are clean.
+  - Verify that downstream PR observation snapshot/wait classifiers do not re-promote explicit non-actionable P2/P3-only selected unresolved threads into `human_gate`.
   - Verify that merge-preparer instructions do not direct branch mutation, repo-persistent batch updates, pushes, or re-review requests solely for terminal P2/P3-only findings.
   - Verify that repair-batch template says persistent batches are for blocking repair / blocking triage, not non-blocking P2/P3-only follow-ups.
   - Record in `report.md` whether each no-mutation boundary was covered by unit test, text inspection, or runtime inspection.
@@ -262,7 +264,7 @@ authorized_profile: "standard"
 The implementation should be a small, focused policy update:
 
 1. Update three Markdown asset pairs to express severity-aware review / repair policy.
-2. Update two runtime mirror files so only P0/P1 are semantic blockers.
+2. Update observation runtime mirror files so only P0/P1 are semantic blockers and downstream snapshot/wait classifiers honor explicit actionable unresolved fields.
 3. Update focused unit tests and mirror parity assertions.
 4. Preserve current `blocker_fingerprint` contract and platform gate separation.
 5. Add bounded SpecDock workflow named role authorization wording to provider/dogfooding instructions, skills, and workflow docs without adding runtime consent logic.
