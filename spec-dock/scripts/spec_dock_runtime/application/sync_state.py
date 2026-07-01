@@ -325,6 +325,10 @@ def _collect_adr_mirror_sources(graph: SpecGraph) -> list[_AdrMirrorSource]:
         if not _ensure_collectable_artifacts_dir(artifacts_dir):
             continue
         for path in sorted(artifacts_dir.glob("*.md"), key=lambda p: p.as_posix()):
+            if path.name == "rules.md":
+                continue
+            if path.is_symlink():
+                raise RuntimeError(f"Unsafe artifact file: {path.as_posix()} is a symlink")
             basename = path.name
             doc_id = _artifact_adr_doc_id_from_basename(basename)
             if doc_id is None:

@@ -158,6 +158,8 @@ def scan_artifact_duplicate_state(artifacts_dir: Path) -> tuple[str | None, set[
         for path in sorted(artifacts_dir.glob("*.md"), key=lambda p: p.as_posix()):
             if path.name == "rules.md":
                 continue
+            if path.is_symlink():
+                return f"Unsafe artifact file under {artifacts_dir}: {path.name} is a symlink", set()
             if is_malformed_artifact_candidate(path):
                 return f"Malformed artifact filename under {artifacts_dir}: {path.name}", set()
             parsed = parse_artifact_filename(path.name)
