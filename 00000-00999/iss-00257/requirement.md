@@ -58,12 +58,14 @@ ID: "iss-00257"
 - Provider-side shipped assets と local dogfooding assets の mirror parity を維持する。
 - Existing tests を、新しい severity-aware policy に合わせて更新する。
 - Issue Planning dogfooding 中の違和感や不具合は Issue discussion artifact と `report.md` に記録する。
+- SpecDock workflow invocation が、SpecDock-defined named sub-agents / reviewers の workflow-scoped 利用許可であることを、provider / dogfooding の instruction、workflow docs、skill docs に明示する。
 
 ### 3.2 対象外
 
 - 親 `epic-00224` / initiative 文書の更新。
 - GitHub PR の merge、issue finish、branch deletion、review dismissal、conversation resolution の自動化。
 - `root_cause_family` を runtime JSON output、`blocker_fingerprint`、automation stalled 判定の first-class contract にする変更。
+- 複雑な runtime consent schema、新しい permission persistence、または新しい許可判定ロジックの追加。
 - GitHub platform の `CHANGES_REQUESTED`、unresolved thread、branch protection を semantic code repair blocker と同一視する変更。
 - 全 SpecDock workflow の一般方針変更。今回の変更は `iss-00257` の対象 surface に閉じる。
 
@@ -73,6 +75,8 @@ ID: "iss-00257"
 - GitHub platform / human gate が残っている場合に、それを自律的に解消済みと誤認しないこと。
 - Priority-less または confidence が足りない review comment を silent pass にしないこと。
 - Existing `blocker_fingerprint` contract を `root_cause_family` へ置き換えないこと。
+- Canonical docs の single-writer authority は main orchestrator が保持し、sub-agent authoring outputs は evidence として扱うこと。
+- Scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途ユーザー確認を必要とすること。
 
 ## 4. Actors / Triggers
 
@@ -82,6 +86,8 @@ ID: "iss-00257"
 | github-pr-observation workflow | review / CI / PR 状態を観測する | blocker policy と terminal signal を出す |
 | github-pr-merge-preparer workflow | blocking repair と merge handoff を進める | P2/P3-only terminal state で追加 repair を起こさない |
 | SpecDock maintainer | shipped asset と dogfooding asset を管理する | provider / dogfooding mirror parity を確認する |
+| Main orchestrator | SpecDock workflow を進行し canonical docs を統合する | workflow-defined named role を適切な gate で起動し、canonical 採用判断を行う |
+| SpecDock-defined named sub-agent / reviewer | spec-reviewer / code-reviewer / qa-reviewer / planning roles など | active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲で workflow gate を担う |
 
 Triggers:
 
@@ -126,6 +132,14 @@ Triggers:
 - When: LLM / operator が repair unit を整理する。
 - Then: `root_cause_family` は判断語彙として使える。
 - And: runtime JSON / fingerprint / stalled 判定の必須 field にはしない。
+
+### BH-006: SpecDock workflow invocation は workflow-scoped named role authorization である
+
+- Given: ユーザーが SpecDock workflow、SpecDock skill、Issue Planning、Issue Execution、Epic Planning、Initiative Planning などの利用を依頼する。
+- When: workflow が SpecDock-defined named sub-agent / reviewer を必要とする。
+- Then: その依頼自体を、active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲で該当 named role を利用する明示的な許可として扱う。
+- And: role ごと・phase ごとの追加承認を求めず、fresh `spec-reviewer` / `code-reviewer` / `qa-reviewer` pass など必要な gate を省略しない。
+- And: scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途ユーザー確認を求める。
 
 ## 6. 受け入れ条件
 
@@ -179,6 +193,19 @@ Triggers:
 - Issue Planning workflow の利用中に観測した不具合・違和感・manual test 結果を `discussions/` artifact に残す。
 - 採用した内容は `report.md` の Evidence Adoption Ledger / Spec Authoring Gate に反映する。
 
+### AC-010: SpecDock workflow-scoped named role authorization が明文化される
+
+- Provider 側と dogfooding 側の orchestrator instruction / skill docs / workflow docs に、次の趣旨が明示される。
+  - “A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow.”
+  - “Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility.”
+  - “Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow.”
+- 日本語でも同趣旨を記載する。
+  - 「ユーザーが SpecDock workflow の利用を依頼した場合、その依頼自体を、SpecDock が定義する named sub-agent / reviewer を workflow に従って利用する明示的な許可として扱う。」
+  - 「active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲内では、role ごと・phase ごとの追加承認を求めない。」
+  - 「scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途確認する。」
+- Canonical docs の single-writer authority は main orchestrator に残し、sub-agent outputs は canonical ではなく evidence として扱う。
+- 複雑な runtime consent schema や新しい許可ロジックは追加しない。
+
 ## 7. 例外・エッジケース
 
 ### EC-001: Priority-less Codex comment
@@ -205,6 +232,11 @@ Triggers:
 
 - 条件: 添付 bundle の replacement Markdown と現行 repo asset に差分がある。
 - 期待: そのまま無批判に上書きせず、今回の Issue scope と user-approved decisions に照らして採用する。
+
+### EC-006: SpecDock workflow 外の role または範囲拡大
+
+- 条件: workflow が定義していない role、active repo/worktree 外、active SpecDock scope 外、current session 外、または documented role responsibility 外の作業が必要になる。
+- 期待: workflow-scoped authorization の範囲外として扱い、ユーザー確認を求める。
 
 ## 8. 契約上の注意
 
@@ -263,6 +295,20 @@ Triggers:
 - 根拠: Dogfooding repo policy and existing parity tests。
 - 変更可能性: fixed.
 
+### CON-005: Workflow-scoped named role authorization boundary
+
+- 種別: workflow / operation
+- 内容: SpecDock workflow 利用依頼は、SpecDock-defined named sub-agent / reviewer を workflow に従って使う明示許可として扱う。ただし active repo/worktree、active SpecDock scope、current session、documented role responsibility に限定する。
+- 根拠: ユーザー補足指示。
+- 変更可能性: fixed for this Issue.
+
+### CON-006: Escalation remains required outside workflow-scoped authorization
+
+- 種別: safety / operation
+- 内容: Scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途ユーザー確認を必要とする。
+- 根拠: ユーザー補足指示。
+- 変更可能性: fixed.
+
 ## 11. Trace
 
 | Requirement item | Source |
@@ -272,6 +318,7 @@ Triggers:
 | root_cause_family docs / LLM judgement scope | `20260701t023858z-interview-root-cause-family-runtime-scope.md` |
 | parent Epic docs non-edit | user instruction, `CON-001` |
 | Issue Planning dogfooding record | user instruction, `20260701t025116z-research-issue-planning-dogfooding-notes.md` |
+| SpecDock workflow-scoped named role authorization | user supplemental instruction, `AC-010`, `CON-005`, `CON-006` |
 
 ## 12. 未解決事項
 

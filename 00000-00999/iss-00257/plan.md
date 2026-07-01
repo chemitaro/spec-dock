@@ -39,6 +39,7 @@ authorized_profile: "standard"
 | Repair-batch template | `spec-dock/templates/discussions/pr-repair-batch.md`; `src/spec_dock/assets/spec_dock/templates/discussions/pr-repair-batch.md` |
 | Tests | `tests/unit/infra/test_init_update.py` |
 | Issue-local docs/evidence | `spec-dock/active/issue/{requirement.md,design.md,plan.md,report.md,discussions/*.md}` |
+| SpecDock workflow authorization docs / skills | `src/spec_dock/assets/install_root/.codex/config.toml`; `.codex/config.toml`; `src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md`; `.agents/skills/spec-dock-hub/SKILL.md`; `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`; `.agents/skills/spec-dock-issue-planning/SKILL.md`; `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md`; `.agents/skills/spec-dock-issue-execution/SKILL.md`; `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md`; `.agents/skills/spec-dock-epic-planning/SKILL.md`; `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md`; `.agents/skills/spec-dock-epic-execution/SKILL.md`; `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md`; `.agents/skills/spec-dock-initiative-planning/SKILL.md`; `spec-dock/docs/workflow_spec_authoring.md`; `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`; `spec-dock/docs/workflow_issue.md`; `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` |
 
 ### Forbidden
 
@@ -48,6 +49,7 @@ authorized_profile: "standard"
 | Runtime `root_cause_family` parser / JSON / stalled logic | User selected docs/LLM judgement scope only |
 | GitHub PR merge / branch deletion / conversation resolution | Out of Issue scope |
 | Broad workflow policy docs unrelated to this Issue | Keep scope issue-local |
+| Runtime consent schema / new permission persistence | User requested instruction and documentation hardening only |
 
 ## 3. Spec-Locked Closure Index
 
@@ -63,6 +65,7 @@ authorized_profile: "standard"
 | CLOS-007 | AC-007 | DES-005 | Provider/dogfooding mirrors match after updates | existing parity tests / `cmp` |
 | CLOS-008 | AC-008 | DES-006 | Parent Epic docs are untouched | `git diff -- spec-dock/active/epic` and status inspection |
 | CLOS-009 | AC-009 | DES-007 | Issue Planning dogfooding notes are recorded and adopted into report | report/discussion inspection |
+| CLOS-010 | AC-010 | DES-008 | SpecDock workflow invocation is documented as explicit workflow-scoped authorization to use SpecDock-defined named sub-agents / reviewers, with bounded scope and escalation exceptions | text inspection, mirror parity inspection, targeted tests if existing asset tests cover these files |
 
 ## 4. 実装ステップ
 
@@ -149,6 +152,39 @@ authorized_profile: "standard"
   - `repair_loop`: no autonomous repair loop solely for P2/P3-only terminal findings.
 - Closures: CLOS-004A, CLOS-006.
 
+### S50: SpecDock workflow named role authorization instruction hardening
+
+- Owner: dev-coder or doc-writer, depending on execution delegation.
+- Purpose: Prevent future orchestrators from skipping required SpecDock-defined named sub-agent / reviewer gates due to per-role permission hesitation.
+- Actions:
+  - Add bilingual instruction to provider and dogfooding Codex orchestrator instructions:
+    - “A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow.”
+    - “Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility.”
+    - “Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow.”
+    - Japanese equivalents from `requirement.md#AC-010`.
+  - Update `spec-dock-hub`, `spec-dock-issue-planning`, `spec-dock-issue-execution`, `spec-dock-epic-planning`, `spec-dock-epic-execution`, and `spec-dock-initiative-planning` skill docs in provider and dogfooding mirrors with the same boundary.
+  - Update `workflow_spec_authoring.md` and `workflow_issue.md` plus provider scaffold mirrors.
+  - Preserve main orchestrator single-writer authority for canonical docs; sub-agent outputs remain evidence until adopted.
+- Verification:
+  ```bash
+  rg -n "workflow-scoped authorization|SpecDock-defined named sub-agents|active repo/worktree|active SpecDock scope|documented role responsibility|ユーザーが SpecDock workflow の利用を依頼" \
+    src/spec_dock/assets/install_root/.codex/config.toml .codex/config.toml \
+    src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md .agents/skills/spec-dock-hub/SKILL.md \
+    src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md .agents/skills/spec-dock-issue-planning/SKILL.md \
+    src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md .agents/skills/spec-dock-issue-execution/SKILL.md \
+    src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md .agents/skills/spec-dock-epic-planning/SKILL.md \
+    src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md .agents/skills/spec-dock-epic-execution/SKILL.md \
+    src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md .agents/skills/spec-dock-initiative-planning/SKILL.md \
+    spec-dock/docs/workflow_spec_authoring.md src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md \
+    spec-dock/docs/workflow_issue.md src/spec_dock/assets/spec_dock/docs/workflow_issue.md
+  ```
+  - Use `cmp` or existing installer/asset tests to confirm provider/dogfooding mirror parity for updated files where parity is expected.
+- Required report evidence:
+  - `authorization_scope`: active repo/worktree, active SpecDock scope, current session, documented role responsibility.
+  - `additional_confirmation_required`: scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, roles outside SpecDock workflow.
+  - `single_writer_authority`: main orchestrator owns canonical docs; sub-agent outputs are evidence.
+- Closures: CLOS-010, CLOS-007, CLOS-009.
+
 ### S90: Docs / report impact
 
 - Owner: main orchestrator for issue-local docs, doc-writer only if persistent non-issue docs become necessary.
@@ -196,11 +232,13 @@ authorized_profile: "standard"
 | B-007 | S10-S30 | Provider/dogfooding mirrors remain in sync | CLOS-007 | planned |
 | B-008 | S90 | Parent Epic docs remain untouched | CLOS-008 | planned |
 | B-009 | S00/S90 | Issue Planning dogfooding evidence is recorded | CLOS-009 | planned |
+| B-010 | S50 | SpecDock workflow request authorizes workflow-defined named roles within bounded scope | CLOS-010 | planned |
 
 ## 6. Stop Conditions
 
 - A needed change touches parent `epic-00224` docs.
 - A needed change requires runtime `root_cause_family` first-class contract.
+- A needed change requires runtime consent schema or broader permission persistence.
 - A test failure suggests P0/P1 blockers are no longer blocking.
 - GitHub platform state mutation becomes necessary.
 - Reviewer finds requirement/design/plan gap that changes AC or scope.
@@ -212,6 +250,7 @@ authorized_profile: "standard"
 - Evidence Adoption Ledger entries for research, interviews, dogfooding, classify/compose command outputs, and all spec-reviewer passes.
 - Spec Authoring Gate rows showing requirement, design, and plan review state.
 - Test evidence for each closure ID.
+- Text/mirror evidence for CLOS-010 workflow-scoped named role authorization, including escalation exceptions and single-writer authority.
 - Diff evidence proving parent Epic docs were not edited. Use the real parent Epic doc paths, not only `spec-dock/active/epic` symlinks:
   - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/requirement.md`
   - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/design.md`
@@ -226,4 +265,5 @@ The implementation should be a small, focused policy update:
 2. Update two runtime mirror files so only P0/P1 are semantic blockers.
 3. Update focused unit tests and mirror parity assertions.
 4. Preserve current `blocker_fingerprint` contract and platform gate separation.
-5. Leave parent Epic docs untouched.
+5. Add bounded SpecDock workflow named role authorization wording to provider/dogfooding instructions, skills, and workflow docs without adding runtime consent logic.
+6. Leave parent Epic docs untouched.
