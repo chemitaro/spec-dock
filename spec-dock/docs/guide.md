@@ -48,18 +48,18 @@ Initiative
     └── Issue
 ```
 
-## Artifact 文書カタログ（artifact docs catalog）
+## 成果物文書カタログ（artifact docs catalog）
 
 current catalog は `blank` / `adr` / `disc` / `research` / `interview` / `decision-candidate` / `pr-repair-batch` / issue-only `draft-requirement` / `draft-design` / `draft-plan` です。
 
 | 種別（type） | ライフサイクル（lifecycle） | 既定 authority（authority default） | 使う場面 |
 |---|---|---:|---|
-| `blank` | capture | `raw` | 型を先に決めない working evidence、未整理の発話、観察、思考、会話ログ、下書きを低摩擦に置く |
-| `interview` | elicitation | `raw` | 人間から目的、制約、期待、判断基準、未決事項を引き出す |
-| `research` | research | `synthesized` | 検証可能な事実、仕様、実装、先例、外部制約を確認する |
-| `disc` | framing | `proposed` | 集まった情報から論点、評価軸、選択肢、合意点を整理する |
-| `decision-candidate` | decision candidate | `proposed` | canonical docs / ADR / report ledger へ採用する前の判断候補を整理する |
-| `adr` | decision | `accepted` | 長期的な判断、理由、影響、見直し条件を固定する |
+| `blank` | 記録（capture） | `raw` | 型を先に決めない working evidence、未整理の発話、観察、思考、会話ログ、下書きを低摩擦に置く |
+| `interview` | 聞き取り（elicitation） | `raw` | 人間から目的、制約、期待、判断基準、未決事項を引き出す |
+| `research` | 調査（research） | `synthesized` | 検証可能な事実、仕様、実装、先例、外部制約を確認する |
+| `disc` | 論点整理（framing） | `proposed` | 集まった情報から論点、評価軸、選択肢、合意点を整理する |
+| `decision-candidate` | 判断候補（decision candidate） | `proposed` | 採用前の判断候補を canonical docs / ADR / report ledger へ反映できる形で整理する |
+| `adr` | 判断（decision） | `accepted` | 長期的な判断、理由、影響、見直し条件を固定する |
 | `pr-repair-batch` | 実行証跡（execution evidence） | `proposed` | レビュー修復 workflow の observation、concern inventory、repair queue、merge-prepared gate を記録する |
 
 通常は doc type から authority を推定します。例外時だけ front matter の `authority` で override し、全 artifact で明示必須にはしません。`derived_from` / `reflected_to` は任意 metadata として、元になった discussion docs と反映先を追うために使えます。

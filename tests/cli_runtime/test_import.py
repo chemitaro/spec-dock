@@ -254,16 +254,16 @@ class TestCliImport(CliRuntimeHarness):
 
             expected_rules_links = {
                 init_dir / "epics" / "rules.md": target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md",
-                init_dir / "discussions" / "rules.md": (
-                    target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
+                init_dir / "artifacts" / "rules.md": (
+                    target / "spec-dock" / "docs" / "rules" / "initiative" / "artifacts.md"
                 ),
                 epic_dir / "issues" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md",
-                epic_dir / "discussions" / "rules.md": target
+                epic_dir / "artifacts" / "rules.md": target
                 / "spec-dock"
                 / "docs"
                 / "rules"
                 / "epic"
-                / "discussions.md",
+                / "artifacts.md",
             }
             for link_path, target_path in expected_rules_links.items():
                 assert link_path.is_symlink(), f"missing imported rules symlink: {link_path}"
@@ -272,11 +272,13 @@ class TestCliImport(CliRuntimeHarness):
 
             for scope_dir in (
                 init_dir / "epics",
-                init_dir / "discussions",
+                init_dir / "artifacts",
                 epic_dir / "issues",
-                epic_dir / "discussions",
+                epic_dir / "artifacts",
             ):
                 assert list(scope_dir.glob("new-*")) == [], f"unexpected wrapper(s) in {scope_dir}"
+            assert not (init_dir / "discussions").exists()
+            assert not (epic_dir / "discussions").exists()
 
     def test_import_issue_creates_node_and_runs_sync_without_updating_active(self) -> None:
         if os.name == "nt":

@@ -48,6 +48,7 @@ v2 では、日常運用（initiative/epic/issue/artifact の作成、active 切
 artifact 補足:
 - typed artifact のファイル名 contract は `<ts>-<type>-<slug>.md`、same-second collision 時は `<ts>-<nn>-<type>-<slug>.md` です。
 - `blank` artifact は filename に type token を含めず、`<ts>-<slug>.md` / `<ts>-<nn>-<slug>.md` を使います。
+- legacy discussion docs の timestamp contract は `<ts>-<kind>-<slug>.md` / `<ts>-<nn>-<kind>-<slug>.md` です。
 - `ts = yyyymmddthhmmssz`（UTC, lowercase `t` / `z`）、`nn = 01..99` です。
 - `artifact_id` は slugless identity（typed: `<ts>-<type>` / `<ts>-<nn>-<type>`、blank: `<ts>` / `<ts>-<nn>`）で、filename stem は `<artifact_id>-<slug>` です。
 - allocation 対象は valid timestamp-contract files のみです。
