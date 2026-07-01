@@ -120,6 +120,7 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 
 - 実装前に `requirement.md` / `design.md` / `plan.md` の整合を確認し、特に `design.md` の依存関係分析 / module dependency diagram / directory tree と `plan.md` の step 順が一致していることを確認して、plan upfront approval を得る
 - 実装前に `workflow_spec_authoring.md` の requirement / design / plan gate がすべて pass し、`Spec Authoring Gate` evidence が `report.md` に残っていることを確認する
+- 実装開始前は、`workflow status` / `guidance issue-execution` の `report evidence gate` も pass していることを確認する。fresh `spec-reviewer` pass、Spec Authoring Gate、Evidence Adoption Ledger、Delegated Draft Evidence、Grade Specialist Evidence Gate、Reviewer Gate Status、未解決でない EAL が `report.md` に残っていない場合は、execution-ready として扱わない。Lite は specialist / fallback evidence を必須化しないが、fresh review と not applicable / skip reason の記録は必要とする
 - implementation start 前または実装中に unresolved spec gap を見つけた場合は、`workflow_clarification.md` / authoring phase へ戻し、`report.md` に handoff readiness evidence または blocked reason と next action を残す。Issue planning / execution split や PR / finish lifecycle の再設計で gap を吸収しない。
 - `plan.md` は planned executable workflow contract / command queue である。実行者は step を上から順に読み、各 step の behavior goal、planned obligation、Red または代替 evidence、Green verification、refactor guardrail、closure requirements、report evidence destination、amendment trigger に従って作業する
 - `report.md` は observed evidence ledger である。実際の Red / Green / Refactor 結果、verification result、discovered tests、closure delta、reviewer verdict、commit/no-op evidence は `report.md` に記録し、`plan.md` を実行結果の正本にしない

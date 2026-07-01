@@ -53,7 +53,7 @@ class TestWorkflowContextRoutingHardCutover(CliRuntimeHarness):
                 "- Verification obligations are recorded here.\n",
                 encoding="utf-8",
             )
-            (issue_dir / "report.md").write_text("# Report\n", encoding="utf-8")
+            self._write_report_evidence(issue_dir)
             self._classify(target)
 
             result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
@@ -74,7 +74,7 @@ class TestWorkflowContextRoutingHardCutover(CliRuntimeHarness):
             self._write_substantive_requirement(issue_dir)
             self._write_substantive_design(issue_dir)
             (issue_dir / "plan.md").write_text("# Plan\n\nNo structured implementation steps.\n", encoding="utf-8")
-            (issue_dir / "report.md").write_text("# Report\n", encoding="utf-8")
+            self._write_report_evidence(issue_dir)
             self._classify(target)
 
             result = self._run_runtime_capture(target, ["guidance", "issue-execution"])
@@ -201,7 +201,36 @@ class TestWorkflowContextRoutingHardCutover(CliRuntimeHarness):
             "- Reviewer gate: code-reviewer.\n",
             encoding="utf-8",
         )
-        (issue_dir / "report.md").write_text("# Report\n", encoding="utf-8")
+        self._write_report_evidence(issue_dir)
+
+    def _write_report_evidence(self, issue_dir: Path) -> None:
+        (issue_dir / "report.md").write_text(
+            "# Report\n\n"
+            "## 証跡採用台帳（Evidence Adoption Ledger / 必須）\n"
+            "| ID | adoption_status | source | target | rationale | evidence | next_action |\n"
+            "|---|---|---|---|---|---|---|\n"
+            "| EAL-001 | adopted | fixture | design.md | ready evidence | discussions/draft.md | pass |\n\n"
+            "## 仕様 authoring ゲート（Spec Authoring Gate / 必須）\n"
+            "| phase | investigated facts | open questions / answers | adoption decision | reviewer verdict | blocking | promotion / next_action |\n"
+            "|---|---|---|---|---|---|---|\n"
+            "| requirement | docs | none | adopted | pass | no | execute approved plan |\n"
+            "| design | docs | none | adopted | pass | no | execute approved plan |\n"
+            "| plan | docs | none | adopted | pass | no | execute approved plan |\n\n"
+            "## 委任ドラフト証跡（Delegated Draft Evidence / 必須）\n"
+            "| role | scope | draft path | source paths | intended targets | adoption_status | reflected_to | diff_guard_result | integration result | rejected portions | blockers | reviewer result | promotion decision |\n"
+            "|---|---|---|---|---|---|---|---|---|---|---|---|---|\n"
+            "| system-architect | iss-00301 | discussions/draft.md | active docs | design.md | partially_adopted | design.md | orchestrator inspection pass | source input integrated; not promotion evidence | none | prior reviewer evidence missing; resolved by manual authoring fallback D-003 | pass | execute manual-authored canonical docs |\n\n"
+            "#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）\n"
+            "| Grade | required specialist / fallback | usage | evidence | fresh spec-reviewer verdict | execution readiness |\n"
+            "|---|---|---|---|---|---|\n"
+            "| standard | system-architect / implementation-planner | skipped | skip reason: fixture uses manual plan evidence | pass | ready |\n"
+            "| strict | manual fallback | unavailable | manual authoring fallback with source inspection and residual risk | pass | ready |\n\n"
+            "#### レビューゲート状態（Reviewer Gate Status）\n"
+            "| step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |\n"
+            "|---|---|---|---|---|---|---|---|\n"
+            "| planning | planning spec-review | spec-reviewer | fresh | pass | no | execute approved plan | no findings |\n",
+            encoding="utf-8",
+        )
 
     def _commit_baseline(self, target: Path) -> None:
         subprocess.run(["git", "add", "."], cwd=target, check=True, capture_output=True, text=True)

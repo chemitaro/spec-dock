@@ -1155,6 +1155,12 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00241-resolve-epic-traceability-and-review-policy-gate-gaps/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00247-move-assurance-compose-scaffold-sources-to-profile-markdown-templates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00250-route-issue-draft-design-and-plan-through-profile-templates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00251-enforce-fail-closed-issue-artifact-readiness-preflight/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00252-compile-grade-aware-issue-planning-guidance/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00253-connect-delegated-specialist-routing-and-draft-artifact-sources/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00254-add-grade-aware-spec-review-and-evidence-gates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00255-add-grade-aware-issue-authoring-smoke-tests/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1407,6 +1413,26 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00241-resolve-epic-traceability-and-review-policy-gate-gaps/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00244-simplify-issue-execution-guidance-into-plan-centric-preflight-validation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00247-move-assurance-compose-scaffold-sources-to-profile-markdown-templates/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00250-route-issue-draft-design-and-plan-through-profile-templates/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00251-enforce-fail-closed-issue-artifact-readiness-preflight/.meta.json": [
+            "iss-00247"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00252-compile-grade-aware-issue-planning-guidance/.meta.json": [
+            "iss-00251"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00253-connect-delegated-specialist-routing-and-draft-artifact-sources/.meta.json": [
+            "iss-00252"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00254-add-grade-aware-spec-review-and-evidence-gates/.meta.json": [
+            "iss-00252",
+            "iss-00251",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00255-add-grade-aware-issue-authoring-smoke-tests/.meta.json": [
+            "iss-00251",
+            "iss-00252",
+            "iss-00253",
+            "iss-00254",
+        ],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -1439,6 +1465,11 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00231": ["iss-00227"],
         "iss-00232": ["iss-00230", "iss-00231"],
         "iss-00233": ["iss-00228", "iss-00229", "iss-00230", "iss-00231", "iss-00232"],
+        "iss-00251": ["iss-00247"],
+        "iss-00252": ["iss-00251"],
+        "iss-00253": ["iss-00252"],
+        "iss-00254": ["iss-00251", "iss-00252"],
+        "iss-00255": ["iss-00251", "iss-00252", "iss-00253", "iss-00254"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -3279,6 +3310,25 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "#### 実装委任ゲート（Implementation Delegation Gate）" in report_text
             assert "#### 委任 worker 証跡（Delegated Worker Evidence）" in report_text
             assert "#### 親実装例外（Parent Implementation Exception）" in report_text
+            assert "#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）" in report_text
+            for fragment in (
+                "required specialist / fallback",
+                "usage",
+                "evidence",
+                "fresh spec-reviewer",
+                "execution readiness",
+                "standard",
+                "strict",
+                "critical",
+                "system-architect",
+                "implementation-planner",
+                "manual fallback",
+                "not applicable",
+                "skip reason",
+                "pass",
+                "ready",
+            ):
+                assert fragment in report_text
             assert "#### レビューゲート状態（Reviewer Gate Status）" in report_text
             assert "#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）" in report_text
             assert "## 最終品質ゲート（Final Quality Gate / 必須）" in report_text
@@ -9904,6 +9954,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）",
             "#### 発見されたテスト / リスク（Discovered Tests）",
             "#### クロージャ差分（Closure Delta）",
+            "#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）",
             "#### レビューゲート状態（Reviewer Gate Status）",
             "#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）",
             _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER,
@@ -10225,6 +10276,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "docs/phase_plan_issue.md",
             "docs/authoring/issue-plan.md",
             "templates/issue-profiles/lite/design.md",
+            "templates/issue-profiles/lite/plan.md",
             "templates/issue-profiles/standard/design.md",
             "templates/issue-profiles/strict/design.md",
             "templates/issue-profiles/critical/design.md",
