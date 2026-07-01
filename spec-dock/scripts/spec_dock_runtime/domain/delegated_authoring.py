@@ -306,7 +306,7 @@ def _validate_required_artifact_frontmatter(metadata: str, *, scope_id: str, aut
 
 def _has_non_editable_artifact_state(metadata: str) -> bool:
     return any(
-        _frontmatter_scalar_value(metadata, field) in NON_EDITABLE_ARTIFACT_STATE_VALUES
+        _frontmatter_normalized_scalar_value(metadata, field) in NON_EDITABLE_ARTIFACT_STATE_VALUES
         for field in NON_EDITABLE_ARTIFACT_STATE_FIELDS
     )
 
@@ -375,6 +375,31 @@ def _frontmatter_scalar_value(metadata: str, key: str) -> str | None:
             return value or None
         return raw
     return None
+
+
+def _frontmatter_normalized_scalar_value(metadata: str, key: str) -> str | None:
+    value = _frontmatter_scalar_value(metadata, key)
+    if value is None:
+        return None
+    value = _strip_yaml_inline_comment(value).strip()
+    while len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        value = value[1:-1].strip()
+    return value.lower() or None
+
+
+def _strip_yaml_inline_comment(value: str) -> str:
+    quote: str | None = None
+    for index, char in enumerate(value):
+        if quote is not None:
+            if char == quote:
+                quote = None
+            continue
+        if char in ("'", '"'):
+            quote = char
+            continue
+        if char == "#" and (index == 0 or value[index - 1].isspace()):
+            return value[:index]
+    return value
 
 
 def _frontmatter_metadata(text: str) -> str:
