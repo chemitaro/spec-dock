@@ -13,7 +13,7 @@ Issue Grade: "standard"
 # iss-00263 New artifact command and new doc removal — Issue 要件定義
 
 ## 目的
-`spec-dock new artifact <type>` を runtime command として追加し、`new doc` を parser / help / registry から完全削除する。あわせて draft-requirement/design/plan の issue-scope `.assurance.json` / authorized profile preflight を `new artifact` 経由へ移行する。
+`spec-dock new artifact <type>` を runtime command として追加し、`new doc` を parser / help / registry から完全削除する。あわせて `draft-requirement` は既存 Issue requirement template への routing、`draft-design` / `draft-plan` は issue-scope `.assurance.json` / authorized profile preflight 付き routing として `new artifact` 経由へ移行する。
 
 ## 上位 trace
 - Epic requirements: E-RQ-001, E-RQ-003, E-RQ-004, E-RQ-005.
@@ -30,8 +30,9 @@ Issue Grade: "standard"
   - old node で `artifacts/` がない場合も on-demand に direct child Markdown artifact を作成できる。
   - no-overwrite / collision handling / no-write failure を守る。
   - draft-* は issue scope only とし、initiative/epic scope は preflight no-write で失敗する。
-  - draft-* は独自の draft-only content templates を使わず、既存の requirement/design/plan template contract と Issue grade/profile-aware selection を使う。
-  - missing/stale/invalid authorized profile は no-write fail-closed になる。
+  - draft-* は独自の draft-only content templates を使わず、既存の requirement/design/plan template contract を使う。
+  - `draft-requirement` は issue scope only で既存 Issue requirement template を使い、専用 draft template や profile template routing は使わない。
+  - `draft-design` / `draft-plan` は issue scope only で Issue grade/profile-aware selection を使い、missing/stale/invalid authorized profile は no-write fail-closed になる。
 - 対象外:
   - new node scaffold default 変更。
   - validate/sync/ADR mirror の artifacts-aware 化。
@@ -47,7 +48,8 @@ Issue Grade: "standard"
 - AC-263-004 new doc removal:
   - `new --help` に `doc` が出ず、`new doc ...` は unknown subcommand / argparse error 相当で失敗し、custom migration hint は出ない。
 - AC-263-005 draft safety:
-  - `draft-requirement`, `draft-design`, `draft-plan` は issue scope で既存 requirement/design/plan template と profile-aware selection を使い、invalid profile は no-write fail-closed になる。
+  - `draft-requirement` は issue scope で既存 Issue requirement template を使い、`draft-design` / `draft-plan` は issue scope で profile-aware design/plan template selection を使う。
+  - `draft-design` / `draft-plan` の missing/stale/invalid authorized profile は no-write fail-closed になる。
 - AC-263-006 unsupported draft scope:
   - `new artifact draft-* --initiative/--epic` は書き込み前に失敗する。
 - AC-263-007 old node setup:
