@@ -178,9 +178,9 @@ def _report_has_scaffold_markers(text: str, rows: tuple[_TableRow, ...]) -> bool
     row_markers = (
         "pass / fail / blocked",
         "未解決 / 解決済み / 置換済み",
-        "YYYY-MM-DD",
-        "AC-___",
-        "EC-___",
+        "yyyy-mm-dd",
+        "ac-___",
+        "ec-___",
     )
     readiness_sections = (
         "evidence adoption ledger",
@@ -256,16 +256,7 @@ def _is_unresolved_eal_row(cells: tuple[str, ...]) -> bool:
 
 
 def _has_eal_scaffold_marker(cells: tuple[str, ...]) -> bool:
-    scaffold_markers = (
-        "...",
-        "path / command / reviewer finding",
-        "path / command",
-        "reviewer finding",
-    )
-    return any(
-        cell in scaffold_markers or cell.endswith(": ...") or cell.endswith("： ...") or ("<" in cell and ">" in cell)
-        for cell in cells
-    )
+    return any(_is_scaffold_placeholder(cell) for cell in cells)
 
 
 def _is_unresolved_eal_status(status: str) -> bool:
@@ -294,12 +285,37 @@ def _has_valid_spec_authoring_gate(rows: tuple[_TableRow, ...]) -> bool:
         phase = _phase_value(cells[0], required_steps)
         if phase is None:
             continue
-        reviewer_verdict = cells[4] if len(cells) > 4 else ""
-        blocking = cells[5] if len(cells) > 5 else ""
-        promotion_decision = cells[6] if len(cells) > 6 else ""
-        if _has_review_pass(reviewer_verdict) and _is_no(blocking) and _has_promotion_decision(promotion_decision):
-            valid_steps.add(phase)
+        if not _is_valid_spec_authoring_row(cells):
+            return False
+        valid_steps.add(phase)
     return valid_steps == required_steps
+
+
+def _is_valid_spec_authoring_row(cells: tuple[str, ...]) -> bool:
+    if len(cells) < 7:
+        return False
+    investigated_facts = cells[1]
+    open_questions = cells[2]
+    adoption_decision = cells[3]
+    reviewer_verdict = cells[4]
+    blocking = cells[5]
+    promotion_decision = cells[6]
+    return (
+        _has_substantive_evidence(investigated_facts)
+        and _has_answer_or_explicit_none(open_questions)
+        and _has_substantive_evidence(adoption_decision)
+        and _has_review_pass(reviewer_verdict)
+        and _is_no(blocking)
+        and _has_promotion_decision(promotion_decision)
+    )
+
+
+def _has_answer_or_explicit_none(value: str) -> bool:
+    if _is_scaffold_placeholder(value):
+        return False
+    if value in {"none", "なし", "該当なし", "n/a", "[]"}:
+        return True
+    return _has_substantive_evidence(value)
 
 
 def _phase_value(value: str, allowed_values: set[str]) -> str | None:
@@ -323,7 +339,7 @@ def _has_delegated_draft_evidence(rows: tuple[_TableRow, ...]) -> bool:
         if not cells or "created_by_role" in cells[0]:
             continue
         adoption_status = cells[5] if len(cells) > 5 else ""
-        if adoption_status in {"adopted", "partially_adopted", "integrated", "partially_integrated"}:
+        if _has_contract_value(adoption_status, {"adopted", "partially_adopted", "integrated", "partially_integrated"}):
             has_adopted_row = True
             if not _row_has_delegated_draft_evidence(cells, eal_tokens):
                 return False
@@ -342,7 +358,7 @@ def _eal_reference_tokens(rows: tuple[_TableRow, ...]) -> tuple[str, ...]:
         cells = row.cells
         if not cells or not cells[0].startswith("eal-") or len(cells) < 2:
             continue
-        if cells[1] not in adopted_statuses:
+        if not _has_contract_value(cells[1], adopted_statuses):
             continue
         for cell in cells[2:6]:
             tokens.extend(_evidence_reference_tokens(cell))
@@ -374,7 +390,7 @@ def _row_has_delegated_draft_evidence(cells: tuple[str, ...], eal_tokens: tuple[
             and _has_review_pass(reviewer_result)
             and _has_promotion_decision(promotion_decision)
         )
-    if adoption_status not in {"adopted", "partially_adopted", "integrated", "partially_integrated"}:
+    if not _has_contract_value(adoption_status, {"adopted", "partially_adopted", "integrated", "partially_integrated"}):
         return False
     draft_path = cells[2] if len(cells) > 2 else ""
     source_paths = cells[3] if len(cells) > 3 else ""
@@ -534,7 +550,7 @@ def _row_has_grade_specialist_evidence(cells: tuple[str, ...], profile: Workflow
         and usage == "used"
         and _has_substantive_evidence(evidence)
     )
-    has_skip_reason = "skip reason:" in usage_and_evidence or "未使用理由" in usage_and_evidence
+    has_skip_reason = _has_substantive_skip_reason(usage_and_evidence)
     has_fallback = (
         "manual authoring fallback" in fallback_and_evidence
         or "manual-authored canonical docs" in fallback_and_evidence
@@ -557,7 +573,41 @@ def _has_substantive_evidence(value: str) -> bool:
         return False
     if "not applicable" in value:
         return False
-    return not value.startswith("skip reason:")
+    return not _is_scaffold_placeholder(value)
+
+
+def _has_substantive_skip_reason(value: str) -> bool:
+    for marker in ("skip reason:", "未使用理由"):
+        if marker not in value:
+            continue
+        tail = value.split(marker, 1)[1].strip(" :：-")
+        return _has_substantive_evidence(tail)
+    return False
+
+
+def _is_scaffold_placeholder(value: str) -> bool:
+    placeholder_values = {
+        "...",
+        "xxx",
+        "path / command / reviewer finding",
+        "path / command",
+        "reviewer finding",
+        "yyyy-mm-dd",
+        "ac-___",
+        "ec-___",
+    }
+    if value in placeholder_values:
+        return True
+    if value.endswith(": ...") or value.endswith("： ..."):
+        return True
+    if "yyyy-mm-dd" in value or "ac-___" in value or "ec-___" in value:
+        return True
+    if "<" in value and ">" in value:
+        return True
+    if value.startswith("skip reason:"):
+        tail = value.split("skip reason:", 1)[1].strip(" :：-")
+        return not tail or _is_scaffold_placeholder(tail)
+    return False
 
 
 def _has_critical_fallback_approval(value: str) -> bool:
