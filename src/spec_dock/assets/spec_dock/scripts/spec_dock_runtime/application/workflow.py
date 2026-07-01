@@ -324,6 +324,9 @@ def _classify_design_text(design_text: str | None) -> str:
     scaffold_markers = (
         "未記入",
         "記載してください",
+        "設計 placeholder",
+        "design placeholder",
+        "placeholder design",
     )
     if any(marker in lower for marker in scaffold_markers):
         return "scaffold"

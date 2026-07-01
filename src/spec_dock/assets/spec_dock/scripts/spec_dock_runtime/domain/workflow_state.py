@@ -384,6 +384,7 @@ def _row_has_delegated_draft_evidence(cells: tuple[str, ...], eal_tokens: tuple[
     reflected_to = cells[6] if len(cells) > 6 else ""
     diff_guard = cells[7] if len(cells) > 7 else ""
     integration_result = cells[8] if len(cells) > 8 else ""
+    blockers = cells[10] if len(cells) > 10 else ""
     reviewer_result = cells[11] if len(cells) > 11 else ""
     promotion_decision = cells[12] if len(cells) > 12 else ""
     if "not used" in adoption_status or (cells[0] == "該当なし" and _has_manual_authoring(integration_result)):
@@ -401,9 +402,26 @@ def _row_has_delegated_draft_evidence(cells: tuple[str, ...], eal_tokens: tuple[
         and _delegated_row_has_eal_reference((draft_path,), eal_tokens)
         and _has_substantive_evidence(source_paths)
         and _has_substantive_evidence(reflected_to)
-        and diff_guard not in {"", "not_run", "none", "該当なし"}
+        and _has_passing_diff_guard(diff_guard)
+        and _has_no_unresolved_blocker(blockers)
         and _has_review_pass(reviewer_result)
         and _has_promotion_decision(promotion_decision)
+    )
+
+
+def _has_passing_diff_guard(value: str) -> bool:
+    if value in {"", "not_run", "none", "該当なし"}:
+        return False
+    if any(marker in value for marker in ("fail", "failed", "blocked", "pending", "unresolved")):
+        return False
+    return any(marker in value for marker in ("pass", "passed", "success", "successful", "ok", "clean"))
+
+
+def _has_no_unresolved_blocker(value: str) -> bool:
+    if value in {"none", "なし", "該当なし", "[]", "no", "resolved", "解決済み"}:
+        return True
+    return any(marker in value for marker in ("resolved", "解決済み")) and not any(
+        marker in value for marker in ("unresolved", "未解決", "blocked", "pending")
     )
 
 
@@ -528,9 +546,13 @@ def _has_lite_grade_evidence(rows: tuple[_TableRow, ...]) -> bool:
         evidence = cells[3] if len(cells) > 3 else ""
         reviewer_verdict = cells[4] if len(cells) > 4 else ""
         readiness = cells[5] if len(cells) > 5 else ""
-        joined_evidence = f"{required_or_fallback} {usage} {evidence}".strip()
         if (
-            ("not applicable" in joined_evidence or "skip reason" in evidence or "未使用理由" in evidence)
+            (
+                "not applicable" in required_or_fallback
+                or "not applicable" in usage
+                or _has_substantive_skip_reason(evidence)
+            )
+            and _has_substantive_evidence(evidence)
             and _has_review_pass(reviewer_verdict)
             and _is_ready(readiness)
         ):
@@ -593,7 +615,13 @@ def _is_scaffold_placeholder(value: str) -> bool:
         "xxx",
         "path / command / reviewer finding",
         "path / command",
+        "path",
+        "command",
+        "コマンド",
         "reviewer finding",
+        "レビュアー指摘",
+        "lite not applicable reason",
+        "ライト該当なし理由（lite not applicable reason）",
         "manual evidence",
         "manual fallback evidence",
         "explicit approval and risk acceptance",
