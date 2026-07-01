@@ -349,6 +349,10 @@ def decision_list(decision: dict[str, object], key: str) -> list[object]:
     return value if isinstance(value, list) else []
 
 
+def has_explicit_actionable_unresolved_fields(decision: dict[str, object]) -> bool:
+    return "actionable_unresolved_count" in decision or "actionable_unresolved_thread_ids" in decision
+
+
 def current_selected_actionable_reason(decision: dict[str, object]) -> str | None:
     selected_unresolved_thread_ids = decision_list(decision, "selected_unresolved_thread_ids")
     selected_unresolved_count = decision_int(
@@ -361,6 +365,15 @@ def current_selected_actionable_reason(decision: dict[str, object]) -> str | Non
         "current_selected_unresolved_count",
         selected_unresolved_count,
     )
+    actionable_unresolved_count = decision_int(decision, "actionable_unresolved_count")
+    actionable_unresolved_thread_ids = decision_list(decision, "actionable_unresolved_thread_ids")
+    if (
+        has_explicit_actionable_unresolved_fields(decision)
+        and actionable_unresolved_count == 0
+        and not actionable_unresolved_thread_ids
+    ):
+        selected_unresolved_count = 0
+        current_selected_unresolved_count = 0
     selected_changes_requested_evidence = decision_list(decision, "selected_changes_requested_evidence")
     decision_status_reason = decision.get("status_reason") if isinstance(decision.get("status_reason"), str) else None
     if (
@@ -407,7 +420,10 @@ def trusted_completion_actionable_reason(decision: dict[str, object], completion
     ):
         return explicit_actionable_unresolved_reason(decision)
     if completion_signal == "submitted_pull_request_review":
-        return carryover_inventory_reason(decision)
+        carryover_reason = carryover_inventory_reason(decision)
+        if carryover_reason:
+            return carryover_reason
+        return explicit_actionable_unresolved_reason(decision)
     return None
 
 

@@ -96,15 +96,17 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 - Issue design では [phase_design.md](phase_design.md) に従い、必要な粒度で依存関係分析、`Module Dependency Diagram`、Linux `tree` style の `ディレクトリ / ファイル変更計画` を置く
 - Issue plan では [phase_plan_issue.md](phase_plan_issue.md) に従い、design の依存関係分析、module dependency diagram、directory / file change plan から step 順を導く
 
-## ワークフロー単位の委任同意（workflow-scoped delegation consent）
+## ワークフロー単位の named role 許可（workflow-scoped authorization）
 
-- Issue workflow の開始時、または reviewer / specialist sub-agent を初めて起動する前に、active issue scope の issue-scoped workflow delegation consent を確認し、`report.md` に記録する。
-- consent scope は current repo/worktree、active issue、current session、named reviewer / read-only specialist role に限定する。現在のユーザー指示がこの scope の自律委任を明示している場合は consent として扱える。
-- consent がある場合、orchestrator は同一 issue / repo / session / named role の範囲で、`spec-reviewer`、`code-reviewer`、`qa-reviewer`、および必要な read-only specialist を phase ごとに再確認せず起動してよい。
-- consent は destructive action、external publishing、credentialed access、scope expansion、write-capable delegation、named role 以外の delegation、browser/private external systems の利用を許可しない。これらが必要な場合は別途明示確認する。
-- consent がない、または host policy と衝突する場合は `denied` または `unavailable` として記録し、required reviewer gate を満たしたことにしてはならない。
-- read-only specialist consent と scope-local discussion direct-write consent は分離する。Sub-agent authoring output は proposal-only に限定しないが、canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator single-writer authority である。
-- scope-local discussion direct-write consent は task-local に記録する。最低限、target node、role、source artifacts、allowed discussion path rule、forbidden canonical/implementation paths、post-run diff guard、report ledger destination を含める。
+- ユーザーが SpecDock workflow の利用を依頼した場合、その依頼自体を、SpecDock が定義する named sub-agent / reviewer を workflow に従って利用する明示的な許可として扱う（"A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow."）。
+- active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲内では、SpecDock-defined named role の起動前に role ごと・phase ごとの追加承認を求めない（"Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility."）。
+- 追加確認は scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用に限る（"Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow."）。
+- この許可は「ユーザーがすべてを許可した」ことを意味しない。範囲は current repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility に限る。
+- canonical docs の single-writer authority は main orchestrator に残る。Sub-agent / reviewer output は evidence であり、canonical docs への採用は main orchestrator が行う。
+- fresh `spec-reviewer` / `code-reviewer` / `qa-reviewer` pass は required gate であり、bounded SpecDock workflow scope 内の追加許可待ちを理由に省略してはならない。
+- user request と host policy が衝突し、required named role が利用できない場合は `denied` または `unavailable` として記録し、required reviewer gate を満たしたことにしてはならない。
+- read-only specialist authorization と scope-local discussion direct-write authorization は分離する。Sub-agent authoring output は proposal-only に限定しないが、canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator single-writer authority である。
+- scope-local discussion direct-write authorization は task-local に記録する。最低限、target node、role、source artifacts、allowed discussion path rule、forbidden canonical/implementation paths、post-run diff guard、report ledger destination を含める。
 - unguarded workspace-write、static broad profile edit、Desktop-only fallback は adoption-ready delegated output に数えない。System architect / implementation planner の static adapters は guarded workspace-write で scope-local `discussions/` Markdown draft を作成できるが、workspace-write は hard path allow-list ではなく canonical target write の許可でもない。diff guard pass と report ledger entry まで adoption-ineligible とする。
 
 ## 報告判断台帳ライフサイクル（report decision ledger lifecycle）
@@ -195,7 +197,7 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 - クロージャ差分（`Closure Delta`）に追加・削除・変更・未実装 row と re-review 要否を残す
 - `Implementation Delegation Gate` に step、decision、required reason、delegated role、scope、source of truth、allowed changes、forbidden changes、required verification、stop conditions、output required、result を残す。`delegated` の場合は worker summary、changed files、verification result、unresolved risks、parent integration decision を追跡する
 - `Parent Implementation Exception` に delegation 不可理由、user approval、allowed files、allowed operation、rollback plan、post-change verification、reviewer gate、unavailable / denied / host conflict / waiver の扱い、risk acceptance の有無を残す。exception record がない親 Codex direct implementation は required gate 未完了として扱う
-- `Workflow Delegation Consent` に consent source、repo/worktree、active issue、session、named roles、boundary、expires / invalidation condition、`denied` / `unavailable` の場合の reason と next action を残す
+- `Workflow-Scoped Authorization` に authorization source、repo/worktree、active issue、session、named roles、boundary、expires / invalidation condition、`denied` / `unavailable` / host conflict の場合の reason と next action を残す。authorization source は SpecDock workflow 利用依頼でよく、active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility の範囲内では role ごと・phase ごとの追加承認を求める根拠にしてはならない
 - `Reviewer Gate Status` に gate name、reviewer role、freshness、state（`passed` / `failed` / `unavailable` / `denied` / `waived` / `provisional`）、risk acceptance の有無、promotion / completion decision を残す
 - `Milestone / Commit Candidate Gate` に milestone / step、reviewer verdict、commit候補 / commit scope、closure state、commit evidence または approved-no-op、post-commit clean check を残す。reviewer は reviewer gate mapping に従って `code-reviewer` または `spec-reviewer` を記録する
 - PR 送達ゲート（`PR Delivery Gate`）に PR URL、selected base、base-resolution source、base-resolution conflict / handling、draft / ready decision、head branch、head SHA、issue linkage、existing PR reuse / new PR creation decision を残す

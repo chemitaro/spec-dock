@@ -98,7 +98,7 @@ _INTERVIEW_REQUIRED_LABELS = (
 )
 
 _DELEGATED_DRAFT_REQUIRED_FAILURE_MODES = (
-    "missing consent",
+    "missing workflow-scoped authorization evidence",
     "missing/stale previous reviewer pass",
     "requirement gap during design",
     "design gap during plan",
@@ -110,11 +110,12 @@ _DELEGATED_DRAFT_REQUIRED_FAILURE_MODES = (
     "reviewer unavailable/denied/waived/provisional",
 )
 
-_WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER = (
-    "| 同意元（consent source） | リポジトリ / worktree（repo/worktree） | "
+_WORKFLOW_SCOPED_AUTHORIZATION_TABLE_HEADER = (
+    "| 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | "
     "対象課題（active issue） | セッション（session） | 指名ロール（named roles） | "
     "境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | "
-    "拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |"
+    "拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | "
+    "次アクション（next action） |"
 )
 
 _JAPANESE_PRIMARY_HEADING_ALLOWED_PREFIXES = (
@@ -1161,6 +1162,15 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00253-connect-delegated-specialist-routing-and-draft-artifact-sources/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00254-add-grade-aware-spec-review-and-evidence-gates/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00255-add-grade-aware-issue-authoring-smoke-tests/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00257-severity-aware-pr-review-policy/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00262-artifact-templates-and-rules/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00263-new-artifact-command-and-new-doc-removal/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00264-future-node-scaffold-artifacts-default/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00265-validation-sync-adr-mirror-and-agent-projection/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00266-delegated-authoring-artifacts-boundary/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00267-workflow-docs-skills-and-readme-alignment/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00268-dogfood-artifacts-without-migrating-discussions/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1433,6 +1443,36 @@ class TestInitUpdate(CliRuntimeHarness):
             "iss-00253",
             "iss-00254",
         ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00257-severity-aware-pr-review-policy/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00262-artifact-templates-and-rules/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00263-new-artifact-command-and-new-doc-removal/.meta.json": [
+            "iss-00262"
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00264-future-node-scaffold-artifacts-default/.meta.json": [
+            "iss-00262",
+            "iss-00263",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00265-validation-sync-adr-mirror-and-agent-projection/.meta.json": [
+            "iss-00263",
+            "iss-00264",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00266-delegated-authoring-artifacts-boundary/.meta.json": [
+            "iss-00263",
+            "iss-00265",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00267-workflow-docs-skills-and-readme-alignment/.meta.json": [
+            "iss-00263",
+            "iss-00266",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00268-dogfood-artifacts-without-migrating-discussions/.meta.json": [
+            "iss-00262",
+            "iss-00263",
+            "iss-00264",
+            "iss-00265",
+            "iss-00266",
+            "iss-00267",
+        ],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -1470,6 +1510,12 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00253": ["iss-00252"],
         "iss-00254": ["iss-00251", "iss-00252"],
         "iss-00255": ["iss-00251", "iss-00252", "iss-00253", "iss-00254"],
+        "iss-00263": ["iss-00262"],
+        "iss-00264": ["iss-00262", "iss-00263"],
+        "iss-00265": ["iss-00263", "iss-00264"],
+        "iss-00266": ["iss-00263", "iss-00265"],
+        "iss-00267": ["iss-00263", "iss-00266"],
+        "iss-00268": ["iss-00262", "iss-00263", "iss-00264", "iss-00265", "iss-00266", "iss-00267"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -1765,7 +1811,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "role",
             "phase",
             "scope",
-            "consent",
+            "authorization source",
             "source artifacts",
             "draft artifact path",
             "status",
@@ -1828,12 +1874,12 @@ class TestInitUpdate(CliRuntimeHarness):
                 f"{source}: missing failure-mode field {field}"
             )
         expected_failure_mode_rows = {
-            "missing consent": (
+            "missing workflow-scoped authorization evidence": (
                 "blocked / incomplete",
                 (
-                    "obtain scoped consent or use manual authoring",
-                    "範囲付き同意を取得する、または手動 authoring に戻す",
-                    "obtain scoped consent or use manual authoring（scope 付き同意を取得する、または手動 authoring を使う）",
+                    "record workflow request authorization source and boundary or use manual authoring",
+                    "ワークフロー利用依頼の authorization source と boundary を記録する、または手動 authoring に戻す",
+                    "ワークフロー利用依頼の authorization source と boundary を記録する、または手動 authoring を使う",
                 ),
             ),
             "missing/stale previous reviewer pass": (
@@ -3298,13 +3344,20 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "#### テスト契約の完了証跡（Test Contract Closure）" in report_text
             assert "#### クロージャ網羅（Closure Coverage）" in report_text
             assert "#### クロージャ差分（Closure Delta）" in report_text
-            assert "#### ワークフロー委任同意の証跡（Workflow Delegation Consent）" in report_text
-            assert _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER in report_text
+            assert "#### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）" in report_text
+            assert _WORKFLOW_SCOPED_AUTHORIZATION_TABLE_HEADER in report_text
             for fragment in (
-                "consent source",
+                "authorization source",
+                "active repo/worktree",
+                "active SpecDock scope",
+                "documented role responsibility",
+                "role ごと・phase ごとの追加承認 gate ではなく",
                 "boundary",
                 "expires / invalidation condition",
-                "denied / unavailable handling",
+                "separate-confirmation exception",
+                "scope expansion",
+                "credentialed external mutation",
+                "SpecDock workflow 外の role 利用",
             ):
                 assert fragment in report_text
             assert "#### 実装委任ゲート（Implementation Delegation Gate）" in report_text
@@ -4401,13 +4454,20 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "planned contract" not in issue_plan
         assert "update_plan" not in issue_plan
 
-        assert "#### ワークフロー委任同意の証跡（Workflow Delegation Consent）" in issue_report
-        assert _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER in issue_report
+        assert "#### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）" in issue_report
+        assert _WORKFLOW_SCOPED_AUTHORIZATION_TABLE_HEADER in issue_report
         for fragment in (
-            "consent source",
+            "authorization source",
+            "active repo/worktree",
+            "active SpecDock scope",
+            "documented role responsibility",
+            "role ごと・phase ごとの追加承認 gate ではなく",
             "boundary",
             "expires / invalidation condition",
-            "denied / unavailable handling",
+            "separate-confirmation exception",
+            "scope expansion",
+            "credentialed external mutation",
+            "SpecDock workflow 外の role 利用",
         ):
             assert fragment in issue_report
         assert "#### 委任 worker 証跡（Delegated Worker Evidence）" in issue_report
@@ -9471,9 +9531,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 f"missing Codex review instruction asset after init: {instruction_path}"
             )
             installed_instruction_text = installed_instruction.read_text(encoding="utf-8")
-            assert "merge-blocking reviewer" in installed_instruction_text
-            assert "Do not report non-blocking P2/P3 findings" in installed_instruction_text
-            assert "lint/formatter-enforceable issues" in installed_instruction_text
+            assert "severity-classifying PR reviewer" in installed_instruction_text
+            assert "Only `P0` and `P1` are merge-blocking" in installed_instruction_text
+            assert "`P2` and `P3` are non-blocking review" in installed_instruction_text
+            assert "Do not upgrade a `P2`/`P3` finding to `P1`" in installed_instruction_text
+            assert "formatter/linter-enforceable issues" in installed_instruction_text
 
             installed_helper.unlink()
             installed_instruction.unlink()
@@ -9490,9 +9552,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 f"missing Codex review instruction asset after update: {instruction_path}"
             )
             installed_instruction_text = installed_instruction.read_text(encoding="utf-8")
-            assert "merge-blocking reviewer" in installed_instruction_text
-            assert "Do not report non-blocking P2/P3 findings" in installed_instruction_text
-            assert "lint/formatter-enforceable issues" in installed_instruction_text
+            assert "severity-classifying PR reviewer" in installed_instruction_text
+            assert "Only `P0` and `P1` are merge-blocking" in installed_instruction_text
+            assert "`P2` and `P3` are non-blocking review" in installed_instruction_text
+            assert "Do not upgrade a `P2`/`P3` finding to `P1`" in installed_instruction_text
+            assert "formatter/linter-enforceable issues" in installed_instruction_text
 
     def test_issue_187_s201_actions_checks_python_asset_installed_by_init_and_update(self) -> None:
         relative_path = Path(".agents/skills/github-pr-observation/scripts/lib/pr_observation_checks.py")
@@ -9957,7 +10021,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）",
             "#### レビューゲート状態（Reviewer Gate Status）",
             "#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）",
-            _WORKFLOW_DELEGATION_CONSENT_TABLE_HEADER,
+            _WORKFLOW_SCOPED_AUTHORIZATION_TABLE_HEADER,
             "実際の Red / Green / Refactor evidence",
             "closure delta",
             "reviewer status",
@@ -11858,16 +11922,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         merge_preparer_phrases = (
             "github-pr-merge-preparer",
             "failure_class",
-            "Default autonomous repair limit is two repair attempts for the same `failure_class`.",
-            "Default total autonomous repair limit is four repair attempts per PR preparation invocation.",
-            "Stop at a human gate when the same `failure_class` appears after a repair",
-            "the blocker is `permission_or_auth`, `external_or_flaky`, `base_branch_conflict`, `unknown`",
-            "a requirement expansion, a breaking change, a migration, a secret or deployment setting change",
+            "Default autonomous repair limit is one repair attempt for `P0` family",
+            "Default autonomous repair limit is two repair attempts for the same `P1`",
+            "Default total autonomous repair limit is four repair attempts per PR",
+            "Stop at a human gate when the same",
+            "appears after a repair",
+            "Stop at a human gate when the blocker is `permission_or_auth`,",
+            "`external_or_flaky`, `base_branch_conflict`, `unknown`, a requirement",
+            "expansion, breaking change, migration, secret/deployment setting change",
             "ambiguous review intent",
             "External/non-Actions checks are not claimed as observed by this skill.",
-            "Any waived or unconfirmed external/non-Actions check risk is reported as residual risk.",
-            "If unresolved review-thread state cannot be determined",
-            "stop at a human gate. Do not hide the limitation.",
+            "Any waived or unconfirmed external/non-Actions check risk is reported as",
+            "Review-thread unresolved state is known, or unresolved-thread limitations are",
+            "stop at the platform human gate",
             "If an existing PR exists, use its base for monitoring.",
             "If no PR exists, prefer an explicit user base.",
             "Otherwise respect `branch.<current>.gh-merge-base` when present.",
@@ -21762,6 +21829,124 @@ exit 44
         assert payload["decision"]["status_reason"] == "actionable_unresolved_thread"
         assert payload["decision"]["recommended_next_action"] != "merge_prepared"
 
+    def test_issue_222_s03_wait_explicit_empty_actionable_unresolved_overrides_raw_selected_count(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "passed",
+            "status_reason": "blocker_policy_no_action",
+            "recommended_next_action": "merge_prepared",
+            "observation_complete": True,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [301],
+            "selected_review_thread_ids": ["RT_selected"],
+            "selected_unresolved_thread_ids": ["RT_selected"],
+            "selected_unresolved_count": 1,
+            "current_selected_unresolved_count": 1,
+            "current_selected_unresolved_thread_ids": ["RT_selected"],
+            "carryover_unresolved_count": 0,
+            "carryover_unresolved_thread_ids": [],
+            "actionable_unresolved_count": 0,
+            "actionable_unresolved_thread_ids": [],
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "submitted_pull_request_review",
+            "fingerprint": "explicit-empty-actionable-unresolved-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "passed",
+                        "overall_status": "passed",
+                        "normalized_status": "passed",
+                        "recommended_next_action": "merge_prepared",
+                        "decision": decision,
+                        "decision_fingerprint": "explicit-empty-actionable-unresolved-s03",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "submitted",
+                                "completion_signal": "submitted_pull_request_review",
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_selected"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["overall_status"] == "passed"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["observation_complete"] is True
+        assert payload["decision"]["status_reason"] == "blocker_policy_no_action"
+
+    def test_issue_222_s03_wait_explicit_actionable_unresolved_blocks_with_raw_selected_zero(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "passed",
+            "status_reason": "blocker_policy_no_action",
+            "recommended_next_action": "merge_prepared",
+            "observation_complete": True,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [301],
+            "selected_review_thread_ids": ["RT_actionable"],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "current_selected_unresolved_thread_ids": [],
+            "carryover_unresolved_count": 0,
+            "carryover_unresolved_thread_ids": [],
+            "actionable_unresolved_count": 1,
+            "actionable_unresolved_thread_ids": ["RT_actionable"],
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "submitted_pull_request_review",
+            "fingerprint": "explicit-actionable-unresolved-raw-zero-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "passed",
+                        "overall_status": "passed",
+                        "normalized_status": "passed",
+                        "recommended_next_action": "merge_prepared",
+                        "decision": decision,
+                        "decision_fingerprint": "explicit-actionable-unresolved-raw-zero-s03",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "submitted",
+                                "completion_signal": "submitted_pull_request_review",
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_actionable"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["overall_status"] == "human_gate"
+        assert payload["normalized_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "address_review_feedback"
+        assert payload["observation_complete"] is False
+        assert payload["decision"]["status_reason"] == "actionable_unresolved_thread"
+
     def test_issue_219_s01_wait_fallback_no_findings_with_unresolved_review_blocks_pass(self) -> None:
         decision = {
             "scope": "current_trigger_boundary",
@@ -28028,6 +28213,272 @@ esac
             assert decision["no_findings_completion_candidate"]["present"] is False
             assert decision["carryover_unresolved_thread_ids"] == ["RT_carryover"]
             assert decision["selected_unresolved_thread_ids"] == []
+            assert decision["actionable_unresolved_thread_ids"] == ["RT_carryover"]
+            assert decision["actionable_unresolved_count"] == 1
+
+    def test_issue_219_s01_review_collector_no_findings_with_stale_codex_carryover_is_not_actionable(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"chatgpt-codex-connector[bot]"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Swish!\\n\\n**Reviewed commit:** `aaaaaaaaaa`\\n\\n<details><summary>About Codex</summary></details>"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"chatgpt-codex-connector[bot]"},"state":"COMMENTED","commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","submitted_at":"2026-06-08T00:30:00Z","body":"Old inline review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"chatgpt-codex-connector[bot]"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","original_commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","created_at":"2026-06-08T00:30:00Z","path":"app.py","line":12,"body":"[P1] stale carryover from an older trigger."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_codex_carryover","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"chatgpt-codex-connector"},"createdAt":"2026-06-08T00:30:00Z","body":"[P1] stale carryover from an older trigger."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert decision["completion_signal"] == "fallback_issue_comment"
+            assert decision["fallback_pass_candidate"]["present"] is True
+            assert decision["fallback_pass_candidate"]["promotes_top_level_status"] is True
+            assert decision["carryover_unresolved_thread_ids"] == ["RT_codex_carryover"]
+            assert decision["selected_unresolved_thread_ids"] == []
+            assert decision["current_selected_unresolved_thread_ids"] == []
+            assert decision["actionable_unresolved_thread_ids"] == []
+            assert decision["actionable_unresolved_count"] == 0
+
+    def test_issue_219_s01_review_collector_no_findings_with_unknown_author_codex_carryover_is_actionable(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"chatgpt-codex-connector[bot]"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Swish!\\n\\n**Reviewed commit:** `aaaaaaaaaa`\\n\\n<details><summary>About Codex</summary></details>"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"chatgpt-codex-connector[bot]"},"state":"COMMENTED","commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","submitted_at":"2026-06-08T00:30:00Z","body":"Old inline review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"chatgpt-codex-connector[bot]"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","original_commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","created_at":"2026-06-08T00:30:00Z","path":"app.py","line":12,"body":"[P1] stale carryover from an older trigger."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_codex_unknown_author_carryover","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"chatgpt-codex-connector"},"createdAt":"2026-06-08T00:30:00Z","body":"[P1] stale carryover from an older trigger."},{"id":"RTC_302","databaseId":302,"author":null,"createdAt":"2026-06-08T00:45:00Z","body":"Unknown author reply."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert decision["completion_signal"] == "fallback_issue_comment"
+            assert decision["fallback_pass_candidate"]["present"] is True
+            assert decision["fallback_pass_candidate"]["promotes_top_level_status"] is True
+            assert decision["carryover_unresolved_thread_ids"] == ["RT_codex_unknown_author_carryover"]
+            assert decision["selected_unresolved_thread_ids"] == []
+            assert decision["current_selected_unresolved_thread_ids"] == []
+            assert decision["actionable_unresolved_thread_ids"] == ["RT_codex_unknown_author_carryover"]
+            assert decision["actionable_unresolved_count"] == 1
+
+    def test_issue_219_s01_review_collector_no_findings_with_human_participated_codex_carryover_is_actionable(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"chatgpt-codex-connector[bot]"},"created_at":"2026-06-08T01:03:00Z","body":"Codex Review: Didn't find any major issues. Swish!\\n\\n**Reviewed commit:** `aaaaaaaaaa`\\n\\n<details><summary>About Codex</summary></details>"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"chatgpt-codex-connector[bot]"},"state":"COMMENTED","commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","submitted_at":"2026-06-08T00:30:00Z","body":"Old inline review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"chatgpt-codex-connector[bot]"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","original_commit_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","created_at":"2026-06-08T00:30:00Z","path":"app.py","line":12,"body":"[P1] stale carryover from an older trigger."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_codex_human_carryover","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"chatgpt-codex-connector"},"createdAt":"2026-06-08T00:30:00Z","body":"[P1] stale carryover from an older trigger."},{"id":"RTC_302","databaseId":302,"author":{"login":"maintainer"},"createdAt":"2026-06-08T00:45:00Z","body":"This still looks relevant."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            decision = payload["decision"]
+            assert decision["completion_signal"] == "fallback_issue_comment"
+            assert decision["fallback_pass_candidate"]["present"] is True
+            assert decision["fallback_pass_candidate"]["promotes_top_level_status"] is True
+            assert decision["carryover_unresolved_thread_ids"] == ["RT_codex_human_carryover"]
+            assert decision["selected_unresolved_thread_ids"] == []
+            assert decision["current_selected_unresolved_thread_ids"] == []
+            assert decision["actionable_unresolved_thread_ids"] == ["RT_codex_human_carryover"]
+            assert decision["actionable_unresolved_count"] == 1
 
     def test_issue_218_s01_review_collector_no_findings_with_actionable_unresolved_thread_does_not_promote(
         self,
@@ -29219,6 +29670,7 @@ esac
         normalized_status: str = "unknown",
         decision_overrides: dict[str, object] | None = None,
         review_status: str = "none",
+        lifecycle_completion_signal: str = "codex_no_findings_issue_comment",
     ) -> tuple[str, str, bool, str | None]:
         module = self._issue_218_s02_load_observation_snapshot_module()
         decision: dict[str, object] = {
@@ -29246,7 +29698,7 @@ esac
                 "decision": decision,
                 "codex_review": {
                     "lifecycle": {
-                        "completion_signal": "codex_no_findings_issue_comment",
+                        "completion_signal": lifecycle_completion_signal,
                     },
                 },
             },
@@ -29426,10 +29878,10 @@ esac
             "selected_unresolved_count": 0,
             "current_selected_unresolved_count": 0,
             "selected_unresolved_thread_ids": [],
-            "carryover_unresolved_count": 0,
-            "carryover_unresolved_thread_ids": [],
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_codex_human_carryover"],
             "actionable_unresolved_count": 1,
-            "actionable_unresolved_thread_ids": ["RT_actionable"],
+            "actionable_unresolved_thread_ids": ["RT_codex_human_carryover"],
             "fallback_pass_candidate": fallback_pass_candidate,
         }
 
@@ -29459,6 +29911,107 @@ esac
         assert complete is True
         assert reason == "actionable_unresolved_thread"
         assert action != "merge_prepared"
+
+    def test_issue_222_s03_snapshot_fallback_no_findings_with_stale_codex_carryover_passes(
+        self,
+    ) -> None:
+        module = self._issue_218_s02_load_observation_snapshot_module()
+        fallback_pass_candidate = {
+            "present": True,
+            "source": "issue_comment",
+            "source_ids": [100],
+            "reason": "current_boundary_no_major_issues_comment",
+            "promotes_top_level_status": True,
+        }
+        decision = {
+            "status": "human_gate",
+            "status_reason": "fallback_issue_comment_low_confidence",
+            "recommended_next_action": "manual_review_required_non_retryable",
+            "observation_complete": False,
+            "completion_signal": "fallback_issue_comment",
+            "confidence": "low",
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "selected_unresolved_thread_ids": [],
+            "current_selected_unresolved_thread_ids": [],
+            "carryover_unresolved_count": 1,
+            "carryover_unresolved_thread_ids": ["RT_codex_carryover"],
+            "actionable_unresolved_count": 0,
+            "actionable_unresolved_thread_ids": [],
+            "fallback_pass_candidate": fallback_pass_candidate,
+        }
+
+        status, action, complete, reason = module.classify_snapshot(
+            summary={"ci": "passed", "review": "approved", "head": "matched"},
+            ci_payload={"status": "passed"},
+            review_payload={"status": "approved"},
+            review_wrapper_payload={
+                "decision": decision,
+                "codex_review": {
+                    "lifecycle": {
+                        "completion_signal": "fallback_issue_comment",
+                        "fallback_pass_candidate": fallback_pass_candidate,
+                    },
+                },
+            },
+            metadata={"state": "OPEN", "isDraft": False, "mergeable": "MERGEABLE"},
+            limitations=[],
+            head_matches_expected=True,
+            normalized_status="unknown",
+            trigger_comment_id="99",
+            trigger_created_at="2026-06-08T01:00:00Z",
+        )
+
+        assert status == "passed"
+        assert action == "merge_prepared"
+        assert complete is True
+        assert reason == "fallback_issue_comment_no_major_issues"
+
+    def test_issue_222_s03_snapshot_explicit_empty_actionable_unresolved_overrides_raw_selected_count(self) -> None:
+        status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
+            decision_overrides={
+                "status": "passed",
+                "status_reason": "blocker_policy_no_action",
+                "recommended_next_action": "merge_prepared",
+                "observation_complete": True,
+                "selected_unresolved_count": 1,
+                "current_selected_unresolved_count": 1,
+                "selected_unresolved_thread_ids": ["RT_selected"],
+                "current_selected_unresolved_thread_ids": ["RT_selected"],
+                "actionable_unresolved_count": 0,
+                "actionable_unresolved_thread_ids": [],
+            },
+            review_status="approved",
+        )
+
+        assert status == "passed"
+        assert action == "merge_prepared"
+        assert complete is True
+        assert reason == "passed"
+
+    def test_issue_222_s03_snapshot_explicit_actionable_unresolved_blocks_with_raw_selected_zero(self) -> None:
+        status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
+            decision_overrides={
+                "status": "passed",
+                "status_reason": "blocker_policy_no_action",
+                "recommended_next_action": "merge_prepared",
+                "observation_complete": True,
+                "completion_signal": "submitted_pull_request_review",
+                "selected_unresolved_count": 0,
+                "current_selected_unresolved_count": 0,
+                "selected_unresolved_thread_ids": [],
+                "current_selected_unresolved_thread_ids": [],
+                "actionable_unresolved_count": 1,
+                "actionable_unresolved_thread_ids": ["RT_actionable"],
+            },
+            review_status="approved",
+            lifecycle_completion_signal="submitted_pull_request_review",
+        )
+
+        assert status == "human_gate"
+        assert action == "address_review_feedback"
+        assert complete is True
+        assert reason == "actionable_unresolved_thread"
 
     def test_issue_170_pr_observation_review_collector_keeps_feedback_with_trigger_text(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -32102,6 +32655,8 @@ esac
             assert blocker_policy["blocker_count"] == 1
             assert blocker_policy["findings"][0]["priority"] == "P1"
             assert blocker_policy["findings"][0]["disposition"] == "blocker"
+            assert len(blocker_policy["blocker_fingerprints"]) == 1
+            assert blocker_policy["findings"][0]["fingerprint"] == blocker_policy["blocker_fingerprints"][0]
 
     def test_issue_232_review_collector_treats_p1_pull_review_body_as_blocker(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -32187,8 +32742,464 @@ esac
             assert blocker_policy["findings"][0]["id"] == 201
             assert blocker_policy["findings"][0]["priority"] == "P1"
             assert blocker_policy["findings"][0]["disposition"] == "blocker"
+            assert len(blocker_policy["blocker_fingerprints"]) == 1
+            assert blocker_policy["findings"][0]["fingerprint"] == blocker_policy["blocker_fingerprints"][0]
 
-    def test_issue_232_review_collector_promotes_protected_p2_with_machine_evidence(self) -> None:
+    def test_issue_232_review_collector_treats_p2_inline_thread_as_non_blocking(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"Inline follow-up review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"[P2] consider a clearer helper name."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_selected","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:06:00Z","body":"[P2] consider a clearer helper name."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "passed"
+            assert payload["decision"]["status_reason"] == "blocker_policy_no_action"
+            assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+            assert payload["decision"]["current_selected_unresolved_thread_ids"] == ["RT_selected"]
+            assert payload["decision"]["actionable_unresolved_thread_ids"] == []
+            blocker_policy = payload["decision"]["blocker_policy"]
+            assert blocker_policy["status"] == "non_blocking_only"
+            assert blocker_policy["blocker_count"] == 0
+            assert blocker_policy["blocker_fingerprints"] == []
+            assert blocker_policy["findings"] == [
+                {
+                    "kind": "pull_review_comment",
+                    "id": 301,
+                    "review_id": 201,
+                    "thread_id": "RT_selected",
+                    "thread_state": "unresolved",
+                    "priority": "P2",
+                    "disposition": "non_blocking_followup",
+                    "reason": "p2_p3_default_non_blocking",
+                    "protected_domain": False,
+                    "machine_evidence": False,
+                    "fingerprint": blocker_policy["findings"][0]["fingerprint"],
+                }
+            ]
+
+    def test_issue_232_review_collector_preserves_review_decision_gate_for_p2_inline_thread(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"Inline follow-up review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"[P2] consider a clearer helper name."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":"CHANGES_REQUESTED","reviewThreads":{"nodes":[{"id":"RT_selected","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:06:00Z","body":"[P2] consider a clearer helper name."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "review_decision_changes_requested"
+            assert payload["decision"]["recommended_next_action"] == "manual_review_required_non_retryable"
+            assert payload["review"]["review_decision"] == "CHANGES_REQUESTED"
+            assert payload["decision"]["current_selected_unresolved_thread_ids"] == ["RT_selected"]
+            assert payload["decision"]["actionable_unresolved_thread_ids"] == []
+            assert payload["decision"]["blocker_policy"]["status"] == "non_blocking_only"
+
+    def test_issue_232_review_collector_keeps_p2_inline_with_priorityless_comment_on_fallback_path(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:07:00Z","body":"please inspect this behavior before merging"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"Inline follow-up review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"[P2] consider a clearer helper name."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_selected","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:06:00Z","body":"[P2] consider a clearer helper name."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "fallback_issue_comment_low_confidence"
+            assert payload["decision"]["recommended_next_action"] == "manual_review_required_non_retryable"
+            assert payload["decision"]["current_selected_unresolved_thread_ids"] == ["RT_selected"]
+            assert payload["decision"]["actionable_unresolved_thread_ids"] == []
+            blocker_policy = payload["decision"]["blocker_policy"]
+            assert blocker_policy["status"] == "non_blocking_only"
+            assert blocker_policy["blocker_count"] == 0
+            assert blocker_policy["findings"][0]["kind"] == "pull_review_comment"
+            assert blocker_policy["findings"][0]["id"] == 301
+            assert blocker_policy["findings"][0]["disposition"] == "non_blocking_followup"
+
+    def test_issue_232_review_collector_keeps_mixed_priority_thread_actionable(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"Inline mixed review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"[P2] consider a clearer helper name."},{"id":302,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:07:00Z","path":"app.py","line":14,"body":"Please inspect this behavior before merging."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_selected","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:06:00Z","body":"[P2] consider a clearer helper name."},{"id":"RTC_302","databaseId":302,"author":{"login":"codex"},"createdAt":"2026-06-08T01:07:00Z","body":"Please inspect this behavior before merging."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "current_selected_unresolved_thread"
+            assert payload["decision"]["recommended_next_action"] == "address_review_feedback"
+            assert payload["decision"]["current_selected_unresolved_thread_ids"] == ["RT_selected"]
+            assert payload["decision"]["actionable_unresolved_thread_ids"] == ["RT_selected"]
+            blocker_policy = payload["decision"]["blocker_policy"]
+            assert blocker_policy["status"] == "non_blocking_only"
+            assert blocker_policy["blocker_count"] == 0
+            assert blocker_policy["findings"][0]["id"] == 301
+            assert blocker_policy["findings"][0]["disposition"] == "non_blocking_followup"
+
+    def test_issue_232_review_collector_treats_p1_inline_thread_as_blocker(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"Inline blocker review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"[P1] this lets unresolved selected threads bypass a blocker."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_selected","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:06:00Z","body":"[P1] this lets unresolved selected threads bypass a blocker."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "blocker_policy_validated_blocker"
+            assert payload["decision"]["recommended_next_action"] == "address_review_feedback"
+            assert payload["decision"]["current_selected_unresolved_thread_ids"] == ["RT_selected"]
+            assert payload["decision"]["actionable_unresolved_thread_ids"] == ["RT_selected"]
+            blocker_policy = payload["decision"]["blocker_policy"]
+            assert blocker_policy["status"] == "blocker_present"
+            assert blocker_policy["blocker_count"] == 1
+            assert blocker_policy["findings"][0]["kind"] == "pull_review_comment"
+            assert blocker_policy["findings"][0]["id"] == 301
+            assert blocker_policy["findings"][0]["review_id"] == 201
+            assert blocker_policy["findings"][0]["thread_id"] == "RT_selected"
+            assert blocker_policy["findings"][0]["thread_state"] == "unresolved"
+            assert blocker_policy["findings"][0]["priority"] == "P1"
+            assert blocker_policy["findings"][0]["disposition"] == "blocker"
+            assert len(blocker_policy["blocker_fingerprints"]) == 1
+            assert blocker_policy["findings"][0]["fingerprint"] == blocker_policy["blocker_fingerprints"][0]
+
+    def test_issue_232_review_collector_keeps_protected_p2_with_machine_evidence_non_blocking(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         script_path = (
             repo_root
@@ -32216,7 +33227,7 @@ JSON
     ;;
   "api repos/owner/repo/pulls/13 --paginate")
     cat <<'JSON'
-{"requested_reviewers":[],"requested_teams":[]}
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
 JSON
     ;;
   api\\ graphql*)
@@ -32260,15 +33271,15 @@ esac
 
             assert result.returncode == 0, result.stdout + result.stderr
             payload = json.loads(result.stdout)
-            assert payload["decision"]["status"] == "human_gate"
-            assert payload["decision"]["status_reason"] == "blocker_policy_validated_blocker"
-            assert payload["decision"]["recommended_next_action"] == "address_review_feedback"
+            assert payload["decision"]["status"] == "passed"
+            assert payload["decision"]["status_reason"] == "blocker_policy_no_action"
+            assert payload["decision"]["recommended_next_action"] == "merge_prepared"
             blocker_policy = payload["decision"]["blocker_policy"]
-            assert blocker_policy["status"] == "blocker_present"
-            assert blocker_policy["blocker_count"] == 1
-            assert len(blocker_policy["blocker_fingerprints"]) == 1
-            assert blocker_policy["findings"][0]["disposition"] == "promoted_blocker"
-            assert blocker_policy["findings"][0]["fingerprint"] == blocker_policy["blocker_fingerprints"][0]
+            assert blocker_policy["status"] == "non_blocking_only"
+            assert blocker_policy["blocker_count"] == 0
+            assert blocker_policy["blocker_fingerprints"] == []
+            assert blocker_policy["findings"][0]["disposition"] == "non_blocking_followup"
+            assert blocker_policy["findings"][0]["fingerprint"] not in blocker_policy["blocker_fingerprints"]
             assert blocker_policy["findings"][0]["protected_domain"] is True
             assert blocker_policy["findings"][0]["machine_evidence"] is True
 
@@ -32600,6 +33611,88 @@ esac
                 "findings": [],
                 "blocker_fingerprints": [],
             }
+
+    def test_issue_232_review_collector_keeps_p2_with_priorityless_comment_on_fallback_path(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"},{"id":100,"user":{"login":"codex"},"created_at":"2026-06-08T01:05:00Z","body":"P2: consider renaming this helper later."},{"id":101,"user":{"login":"codex"},"created_at":"2026-06-08T01:06:00Z","body":"please inspect this behavior before merging"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    printf '[]\\n'
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "fallback_issue_comment_low_confidence"
+            assert payload["decision"]["recommended_next_action"] == "manual_review_required_non_retryable"
+            blocker_policy = payload["decision"]["blocker_policy"]
+            assert blocker_policy["status"] == "non_blocking_only"
+            assert blocker_policy["blocker_count"] == 0
+            assert blocker_policy["non_blocking_count"] == 1
+            assert blocker_policy["findings"][0]["id"] == 100
+            assert blocker_policy["findings"][0]["disposition"] == "non_blocking_followup"
 
     def test_issue_233_pr_observation_wait_exposes_automation_stalled_operator_surface(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

@@ -10,7 +10,7 @@
 - 昇格不可 state: `stale`, `rejected`, `superseded`, `blocked`
 - 標準出力先: target scope `discussions/` direct child の flat Markdown。filename は `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md`
 - 軽量 provenance field: `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
-- 互換 label: source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
+- 互換 label: role, phase, scope, authorization source, source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
 - 禁止 self-claim: `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
 - 標準必須にしない field: task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
 - 禁止 wildcard token: `*`, `grants.*`, `all`
@@ -22,7 +22,7 @@
 
 | 失敗モード | 期待される判定 | 許可される次アクション | report 証跡の記録先 | 昇格可否 |
 |---|---|---|---|---|
-| 同意なし（missing consent） | blocked / incomplete | 範囲付き同意を取得する、または手動 authoring に戻す | Delegated Draft Evidence | ineligible |
+| ワークフロー単位の許可証跡不足（missing workflow-scoped authorization evidence） | blocked / incomplete | ワークフロー利用依頼の authorization source と boundary を記録する、または手動 authoring に戻す | ワークフロー単位の named role 許可（Workflow-Scoped Authorization） / この section | ineligible |
 | 前段 reviewer pass 不足 / stale（missing/stale previous reviewer pass） | blocked / incomplete | reviewer gate を再実行する | Spec Authoring Gate / reviewer evidence | ineligible |
 | 設計中の要件 gap（requirement gap during design） | blocked / incomplete | requirement phase へ戻す | decision ledger / gate evidence | ineligible |
 | 計画中の設計 gap（design gap during plan） | blocked / incomplete | design phase へ戻す | decision ledger / gate evidence | ineligible |

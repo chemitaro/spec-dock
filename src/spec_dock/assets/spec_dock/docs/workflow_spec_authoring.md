@@ -62,14 +62,16 @@ Promotion Record は delegated draft や reviewer output を canonical authority
 
 Active manifest と context-pack は同じ authority/grant 状態を示す必要があります。`spec-dock/.agent/active.json` の issue entry が `authority=proposed`、authority metadata 欠落、stale promotion record、または required exact grant 不足の場合、implementation start、issue ready、issue finish、phase completion の lifecycle handoff は blocked / incomplete とします。`spec-dock/active/context-pack.md` は人間向け guidance ですが、authority source は `spec-dock/.agent/active.json` です。
 
-## ワークフロー単位の委任同意（workflow-scoped delegation consent）
+## ワークフロー単位の named role 許可（workflow-scoped authorization）
 
-- Issue scope の spec authoring では、reviewer / read-only specialist sub-agent を使う前に、current repo/worktree、active issue、session、named role に限定した issue-scoped workflow delegation consent を確認し、`report.md` に記録する。
-- 現在のユーザー指示が「この issue workflow 内では reviewer / specialist を自律利用してよい」と明示している場合、その指示を同一 issue / repo / session / named role に限定した consent として扱える。
-- consent がある場合、orchestrator は requirement / design / plan の各 phase ごとに再確認せず、必要な `spec-reviewer` や read-only specialist を起動してよい。
-- consent は destructive action、external publishing、credentialed access、scope expansion、named role 以外の delegation、または canonical docs への直接 write を許可しない。scope が変わる場合は再確認する。
-- read-only specialist consent と scope-local discussion direct-write consent は別物として扱う。Sub-agent authoring output は proposal-only に限定しないが、採用可能な write は対象 scope `discussions/` direct child の flat Markdown draft / analysis / discussion-local report に限る。
-- scope-local discussion direct-write consent は、target node、role、source artifacts、allowed discussion path rule、forbidden canonical/implementation paths、post-run diff guard、report ledger destination を明示した task-local consent として別途記録する。workflow-wide blanket consent、unguarded workspace-write、static broad profile、または Desktop-only fallback は adoption-ready delegated output に数えない。
+- ユーザーが SpecDock workflow の利用を依頼した場合、その依頼自体を、SpecDock が定義する named sub-agent / reviewer を workflow に従って利用する明示的な許可として扱う（"A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow."）。
+- active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲内では、SpecDock-defined named role の起動前に role ごと・phase ごとの追加承認を求めない（"Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility."）。
+- 追加確認は scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用に限る（"Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow."）。
+- この許可は「ユーザーがすべてを許可した」ことを意味しない。範囲は current repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility に限る。
+- canonical docs の single-writer authority は main orchestrator に残る。Sub-agent / reviewer output は evidence であり、canonical docs への採用は main orchestrator が行う。
+- fresh `spec-reviewer` pass など workflow が要求する reviewer pass は gate であり、bounded SpecDock workflow scope 内の追加許可待ちを理由に省略してはならない。
+- read-only specialist authorization と scope-local discussion direct-write authorization は別物として扱う。Sub-agent authoring output は proposal-only に限定しないが、採用可能な write は対象 scope `discussions/` direct child の flat Markdown draft / analysis / discussion-local report に限る。
+- scope-local discussion direct-write authorization は、target node、role、source artifacts、allowed discussion path rule、forbidden canonical/implementation paths、post-run diff guard、report ledger destination を明示した task-local authorization として別途記録する。workflow-wide authorization、unguarded workspace-write、static broad profile、または Desktop-only fallback は adoption-ready delegated output に数えない。
 
 ## 委任 authoring policy foundation（delegated authoring policy foundation）
 
@@ -88,7 +90,7 @@ Active manifest と context-pack は同じ authority/grant 状態を示す必要
 - Delegated draft evidence record は少なくとも `created_by_role`、scope、source artifacts、draft artifact path、intended targets、`adoption_status: unreviewed`、`reflected_to: []`、diff guard result、integration result、rejected portions、blockers、reviewer result、promotion decision を持つ。
 - `source_snapshot` を記録する場合は source revision、reviewer pass reference、generated_at、stale_if を含める。
 - Failure-mode record は expected verdict、allowed next action、report evidence path、promotion eligibility を持つ。
-- Required failure modes は missing consent、missing/stale previous reviewer pass、requirement gap during design、design gap during plan、role unavailable、forbidden action attempt、stale draft、superseded draft、missing draft evidence when delegated use is claimed、reviewer unavailable/denied/waived/provisional を含む。
+- Required failure modes は missing workflow-scoped authorization evidence、missing/stale previous reviewer pass、requirement gap during design、design gap during plan、role unavailable、forbidden action attempt、stale draft、superseded draft、missing draft evidence when delegated use is claimed、reviewer unavailable/denied/waived/provisional を含む。
 - Delegated draft evidence を使った場合、対象 scope の `report.md` は delegated draft evidence table と failure-mode table を持つ。使わなかった場合は manual authoring / not used として、promotion evidence に delegated draft を使っていないことを短く記録する。
 
 ## 証跡採用台帳（Evidence Adoption Ledger）
@@ -137,7 +139,7 @@ Historical `iss-00126` task manifest / Permission Profile / probe / session arti
 
 | 失敗モード | 期待される判定 | 許可される次アクション | report 証跡の記録先 | 昇格可否 |
 |---|---|---|---|---|
-| missing consent（同意欠落） | blocked / incomplete | obtain scoped consent or use manual authoring（scope 付き同意を取得する、または手動 authoring を使う） | Delegated Draft Evidence | ineligible |
+| ワークフロー単位の許可証跡不足（missing workflow-scoped authorization evidence） | blocked / incomplete | ワークフロー利用依頼の authorization source と boundary を記録する、または手動 authoring を使う | ワークフロー単位の named role 許可（Workflow-Scoped Authorization） / Delegated Draft Evidence | ineligible |
 | missing/stale previous reviewer pass（前段 reviewer pass の欠落 / stale） | blocked / incomplete | rerun reviewer gate（reviewer gate を再実行する） | Spec Authoring Gate / reviewer evidence | ineligible |
 | requirement gap during design（design 中の requirement gap） | blocked / incomplete | return to requirement phase（requirement phase に戻す） | decision ledger / gate evidence | ineligible |
 | design gap during plan（plan 中の design gap） | blocked / incomplete | return to design phase（design phase に戻す） | decision ledger / gate evidence | ineligible |
@@ -196,7 +198,7 @@ Historical `iss-00126` task manifest / Permission Profile / probe / session arti
 - investigated facts: 確認した docs / code / ADR / discussions / 外部一次情報
 - open questions: 未確定事項、ユーザー質問、回答
 - clarification evidence: source-grounded read、formal `interview` path、lightweight chat question の扱い、採用 / 非採用判断
-- delegation consent: scope、named roles、source、boundary、expires / invalidation condition
+- workflow-scoped authorization evidence: authorization source、active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility、boundary、expires / invalidation condition。SpecDock workflow 利用依頼を authorization source として扱い、scope 内の role ごと・phase ごとの追加承認 gate にはしない
 - reviewer: fresh `spec-reviewer` の実行単位と review scope
 - verdict: `passed` / `failed` / `unavailable` / `denied` / `waived` / `provisional` と理由。`passed` 以外は reviewer gate pass ではない
 - fixes: 指摘に対する修正要約
