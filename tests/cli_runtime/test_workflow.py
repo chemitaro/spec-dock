@@ -802,6 +802,37 @@ class TestCliWorkflow(CliRuntimeHarness):
             assert payload["state"] == "ready"
             assert payload["reason_code"] == "assurance-valid"
 
+    def test_guidance_blocks_completion_only_plan_without_executable_structure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            issue_dir = self._create_workflow_fixture(target, issue_number=301, title="Completion only plan")
+            self._write_substantive_requirement(issue_dir)
+            self._write_substantive_design(issue_dir)
+            (issue_dir / "plan.md").write_text(
+                "---\n"
+                "種別: 実装計画書（Issue）\n"
+                'ID: "iss-00301"\n'
+                '状態: "approved"\n'
+                "---\n\n"
+                "# Plan\n\n"
+                "## 完了条件\n"
+                "- Done\n",
+                encoding="utf-8",
+            )
+            classify = self._run_runtime_capture(
+                target,
+                ["assurance", "classify", "--stage", "requirement", "--format", "json"],
+            )
+            assert classify.returncode == 0, classify.stdout + classify.stderr
+
+            result = self._run_runtime_capture(target, ["workflow", "status", "--format", "json"])
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["state"] == "blocked"
+            assert payload["reason_code"] == "plan-not-executable"
+
     def test_guidance_allows_executable_plan_that_mentions_negated_marker_as_test_fixture(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

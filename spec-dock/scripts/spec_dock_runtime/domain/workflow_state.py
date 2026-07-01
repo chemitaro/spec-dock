@@ -183,6 +183,7 @@ def _report_has_scaffold_markers(text: str, rows: tuple[_TableRow, ...]) -> bool
         "EC-___",
     )
     readiness_sections = (
+        "evidence adoption ledger",
         "spec authoring gate",
         "delegated draft evidence",
         "grade specialist evidence gate",
@@ -230,10 +231,41 @@ def _has_unresolved_eal_row(rows: tuple[_TableRow, ...]) -> bool:
         cells = row.cells
         if not cells or not cells[0].startswith("eal-") or len(cells) < 2:
             continue
-        status = cells[1]
-        if _is_unresolved_eal_status(status):
+        if _is_unresolved_eal_row(cells):
             return True
     return False
+
+
+def _is_unresolved_eal_row(cells: tuple[str, ...]) -> bool:
+    status = cells[1]
+    if _has_eal_scaffold_marker(cells):
+        return True
+    if _is_unresolved_eal_status(status):
+        return True
+    if _has_contract_value(status, {"deferred"}):
+        rationale = cells[4] if len(cells) > 4 else ""
+        next_action = cells[6] if len(cells) > 6 else ""
+        return not (_has_substantive_evidence(rationale) and _has_substantive_evidence(next_action))
+    if _has_contract_value(status, {"adopted", "partially_adopted", "integrated", "partially_integrated"}):
+        required_fields = cells[2:6]
+        return len(required_fields) < 4 or any(not _has_substantive_evidence(cell) for cell in required_fields)
+    if _has_contract_value(status, {"rejected"}):
+        rationale = cells[4] if len(cells) > 4 else ""
+        return not _has_substantive_evidence(rationale)
+    return True
+
+
+def _has_eal_scaffold_marker(cells: tuple[str, ...]) -> bool:
+    scaffold_markers = (
+        "...",
+        "path / command / reviewer finding",
+        "path / command",
+        "reviewer finding",
+    )
+    return any(
+        cell in scaffold_markers or cell.endswith(": ...") or cell.endswith("： ...") or ("<" in cell and ">" in cell)
+        for cell in cells
+    )
 
 
 def _is_unresolved_eal_status(status: str) -> bool:
@@ -358,7 +390,23 @@ def _row_has_delegated_draft_evidence(cells: tuple[str, ...], eal_tokens: tuple[
 
 
 def _has_review_pass(value: str) -> bool:
-    if any(marker in value for marker in ("not pass", "not passed", "did not pass", "fail", "blocked", "unavailable")):
+    if any(
+        marker in value
+        for marker in (
+            "not pass",
+            "not passed",
+            "did not pass",
+            "fail",
+            "blocked",
+            "unavailable",
+            "waived",
+            "provisional",
+            "denied",
+            "incomplete",
+            "missing",
+            "pending",
+        )
+    ):
         return False
     return _has_contract_value(value, {"pass", "passed", "合格"})
 
