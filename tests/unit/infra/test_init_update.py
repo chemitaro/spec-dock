@@ -1872,9 +1872,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             assert field in text, f"{source}: missing delegated artifact evidence field {field}"
         assert "artifacts/" in text, f"{source}: missing artifacts/ delegated draft output guidance"
-        assert (
-            "legacy `discussions/`" in text or "`discussions/` は legacy / preservation evidence" in text
-        ), f"{source}: missing legacy discussions historical evidence guidance"
+        assert "legacy `discussions/`" in text or "`discussions/` は legacy / preservation evidence" in text, (
+            f"{source}: missing legacy discussions historical evidence guidance"
+        )
         assert "grandfathered evidence" in text, f"{source}: missing grandfathered evidence wording"
         for retired_heavy_field in (
             "manifest_hash",

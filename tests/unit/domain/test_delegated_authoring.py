@@ -158,7 +158,9 @@ class TestDelegatedAuthoringRuntimeDomain:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
             discussion = issue_dir / "artifacts" / "20260525t010203z-pr-repair-batch-pr-repair-batch.md"
-            discussion.write_text(_draft_text("# draft").replace("scope_id: iss-00003", "scope_id: iss-99999"), encoding="utf-8")
+            discussion.write_text(
+                _draft_text("# draft").replace("scope_id: iss-00003", "scope_id: iss-99999"), encoding="utf-8"
+            )
 
             result = domain.evaluate_diff_guard(
                 scope_id="iss-00003",

@@ -258,12 +258,7 @@ class TestCliImport(CliRuntimeHarness):
                     target / "spec-dock" / "docs" / "rules" / "initiative" / "artifacts.md"
                 ),
                 epic_dir / "issues" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md",
-                epic_dir / "artifacts" / "rules.md": target
-                / "spec-dock"
-                / "docs"
-                / "rules"
-                / "epic"
-                / "artifacts.md",
+                epic_dir / "artifacts" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "artifacts.md",
             }
             for link_path, target_path in expected_rules_links.items():
                 assert link_path.is_symlink(), f"missing imported rules symlink: {link_path}"
