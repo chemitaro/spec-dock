@@ -99,7 +99,7 @@ Sxx behavior slice
 - docs-only / template-only / skill-text-only step は code test を無理に作らず、inspection、structural assertion、manual evidence、docs diff、spec-review evidence を planned verification として書く。
 - `report evidence destination` は、実行結果を `report.md` のどの ledger に残すかを明示する。`plan.md` へ observed evidence を戻して正本を二重化しない。
 - scope-local discussion direct-write step は、target scope `discussions/` direct child、filename rule、allowed paths、forbidden paths、post-run diff guard、fallback decision、lightweight provenance、report evidence destination を step-local contract に置く。最低 fields は `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、allowed paths、forbidden paths、fallback decision、report evidence destination。
-- report evidence destination は、candidate evidence path だけでなく scope-local `report.md` の Evidence Adoption Ledger、Delegated Draft Evidence、Workflow Delegation Consent、Step Contract Closure、Test Contract Closure のどこへ採否・diff guard・fallback を記録するかを示す。Evidence Adoption Ledger に採否がない delegated evidence は downstream authority に使えない。
+- report evidence destination は、candidate evidence path だけでなく scope-local `report.md` の Evidence Adoption Ledger、Delegated Draft Evidence、Workflow-Scoped Authorization、Step Contract Closure、Test Contract Closure のどこへ採否・diff guard・fallback を記録するかを示す。Evidence Adoption Ledger に採否がない delegated evidence は downstream authority に使えない。
 - `amendment trigger` は、どの発見が report 記録だけで足りず plan amendment / re-review を必要にするかを示す。
 
 ## 委任 contract（delegation contract）
