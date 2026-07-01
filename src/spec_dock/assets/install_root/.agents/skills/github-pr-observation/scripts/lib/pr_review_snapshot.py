@@ -282,6 +282,7 @@ def user_login(payload):
 
 
 TRUSTED_CODEX_LOGINS = {
+    "chatgpt-codex-connector",
     "chatgpt-codex-connector[bot]",
     "codex",
 }
@@ -289,6 +290,13 @@ TRUSTED_CODEX_LOGINS = {
 
 def is_codex_authored(login):
     return str(login or "").lower() in TRUSTED_CODEX_LOGINS
+
+
+def is_codex_only_thread(thread):
+    comment_authors = thread.get("comment_authors") if isinstance(thread, dict) else None
+    if isinstance(comment_authors, list):
+        return bool(comment_authors) and all(is_codex_authored(author) for author in comment_authors)
+    return False
 
 
 def is_trigger_command_body(body):
@@ -753,6 +761,7 @@ for thread in thread_nodes:
             "state": state,
         }
     comment_ids = []
+    comment_authors = []
     for comment in comments:
         comment_id = comment.get("databaseId")
         if comment_id is None:
@@ -763,6 +772,7 @@ for thread in thread_nodes:
                 "thread_id": thread_id,
                 "state": state,
             }
+        comment_authors.append(user_login(comment))
     threads.append({
         "id": thread.get("id"),
         "state": state,
@@ -770,6 +780,7 @@ for thread in thread_nodes:
         "is_outdated": outdated,
         "comment_count": len(comments),
         "comment_ids": comment_ids,
+        "comment_authors": comment_authors,
         "first_comment_id": first_comment.get("databaseId") or first_comment.get("id"),
         "first_comment_author": user_login(first_comment),
         "first_comment_created_at": first_comment.get("createdAt"),
@@ -1118,6 +1129,14 @@ no_findings_source_ids = (
     if latest_current_codex_issue_comment_is_no_findings and latest_current_codex_issue_comment.get("id") is not None
     else []
 )
+current_codex_unclassified_fallback_issue_comments = [
+    item
+    for item in current_codex_issue_comments
+    if not finding_priorities(
+        item.get("_fallback_pass_raw_body") or item.get("body") or item.get("_raw_body_artifact") or ""
+    )
+    and not is_strict_no_findings_issue_comment(item)
+]
 stale_codex_head_context_present = any(
     item.get("codex_authored")
     and item.get("stale")
@@ -1145,7 +1164,7 @@ if pending_codex_review_signals:
     current_pending_codex_review_present = True
 
 blocker_policy_findings = []
-for item in [*current_codex_issue_comments, *selected_review_signals]:
+for item in [*current_codex_issue_comments, *selected_review_signals, *selected_comment_signals]:
     raw_body = item.get("_fallback_pass_raw_body") or item.get("body") or item.get("_raw_body_artifact") or ""
     priorities = finding_priorities(raw_body)
     if not priorities:
@@ -1156,9 +1175,6 @@ for item in [*current_codex_issue_comments, *selected_review_signals]:
         if priority in {"P0", "P1"}:
             disposition = "blocker"
             reason = "p0_p1_priority"
-        elif priority == "P2" and protected_domain and machine_evidence:
-            disposition = "promoted_blocker"
-            reason = "p2_protected_domain_with_machine_evidence"
         elif priority in {"P2", "P3"}:
             disposition = "non_blocking_followup"
             reason = "p2_p3_default_non_blocking"
@@ -1168,6 +1184,9 @@ for item in [*current_codex_issue_comments, *selected_review_signals]:
         blocker_policy_findings.append({
             "kind": item.get("kind"),
             "id": item.get("id"),
+            "review_id": item.get("review_id"),
+            "thread_id": item.get("thread_id"),
+            "thread_state": item.get("thread_state"),
             "priority": priority,
             "disposition": disposition,
             "reason": reason,
@@ -1175,12 +1194,64 @@ for item in [*current_codex_issue_comments, *selected_review_signals]:
             "machine_evidence": machine_evidence,
             "fingerprint": blocker_fingerprint(item.get("kind"), priority, raw_body),
         })
-blocker_policy_blockers = [
-    item for item in blocker_policy_findings if item.get("disposition") in {"blocker", "promoted_blocker"}
-]
+blocker_policy_blockers = [item for item in blocker_policy_findings if item.get("disposition") == "blocker"]
 blocker_policy_non_blocking = [
     item for item in blocker_policy_findings if item.get("disposition") == "non_blocking_followup"
 ]
+selected_unresolved_comments_by_thread = {}
+for item in selected_comment_signals:
+    thread_id = item.get("thread_id")
+    if thread_id is None or str(thread_id) not in selected_unresolved_thread_id_set:
+        continue
+    selected_unresolved_comments_by_thread.setdefault(str(thread_id), []).append(item)
+non_blocking_finding_comment_id_set = {
+    str(item.get("id"))
+    for item in blocker_policy_non_blocking
+    if item.get("kind") == "pull_review_comment" and item.get("id") is not None
+}
+non_blocking_selected_unresolved_thread_ids = []
+for thread_id in selected_unresolved_thread_ids:
+    selected_comments = selected_unresolved_comments_by_thread.get(str(thread_id), [])
+    if not selected_comments:
+        continue
+    if all(str(item.get("id")) in non_blocking_finding_comment_id_set for item in selected_comments):
+        non_blocking_selected_unresolved_thread_ids.append(thread_id)
+selected_actionable_unresolved_thread_ids = [
+    thread_id
+    for thread_id in selected_unresolved_thread_ids
+    if thread_id not in non_blocking_selected_unresolved_thread_ids
+]
+review_decision_selected_unresolved_gate_present = bool(
+    selected_unresolved_thread_ids or non_blocking_selected_unresolved_thread_ids
+)
+stale_codex_carryover_thread_ids = [
+    item.get("id")
+    for item in carryover_non_outdated_unresolved_threads
+    if item.get("id") is not None
+    and body_state["trigger_known"]
+    and not thread_after_trigger(item)
+    and is_codex_only_thread(item)
+]
+stale_codex_carryover_thread_id_set = {str(thread_id) for thread_id in stale_codex_carryover_thread_ids}
+no_findings_fallback_pass_context = bool(
+    expected_head_sha
+    and current_pr_head_sha
+    and sha_prefix_matches(current_pr_head_sha, expected_head_sha)
+    and no_findings_source_ids
+    and not stale_codex_head_context_present
+    and not selected_actionable_unresolved_thread_ids
+    and not review_decision_changes_requested
+    and not review_decision_requires_review
+    and not active_changes_requested_review_present
+    and not current_pending_codex_review_present
+    and not blocking_collection_failure
+)
+actionable_unresolved_thread_ids = list(selected_actionable_unresolved_thread_ids)
+for thread_id in carryover_unresolved_thread_ids:
+    if no_findings_fallback_pass_context and str(thread_id) in stale_codex_carryover_thread_id_set:
+        continue
+    if thread_id not in actionable_unresolved_thread_ids:
+        actionable_unresolved_thread_ids.append(thread_id)
 blocker_policy_status = (
     "blocker_present" if blocker_policy_blockers else "non_blocking_only" if blocker_policy_non_blocking else "none"
 )
@@ -1197,6 +1268,7 @@ no_findings_completion_promotes = bool(
     and sha_prefix_matches(current_pr_head_sha, expected_head_sha)
     and no_findings_source_ids
     and not stale_codex_head_context_present
+    and not carryover_unresolved_thread_ids
     and not actionable_unresolved_thread_ids
     and not review_decision_changes_requested
     and not review_decision_requires_review
@@ -1215,13 +1287,10 @@ blocker_policy_no_action_promotes = bool(
     and not review_decision_requires_review
     and not active_changes_requested_review_present
     and not current_pending_codex_review_present
+    and not current_codex_unclassified_fallback_issue_comments
     and not blocking_collection_failure
 )
-if selected_review_signals:
-    lifecycle_status = "unresolved" if selected_thread_ids else "completed"
-    completion_signal = "submitted_pull_request_review"
-    lifecycle_confidence = "high"
-elif no_findings_completion_promotes:
+if no_findings_completion_promotes:
     lifecycle_status = "completed"
     completion_signal = "codex_no_findings_issue_comment"
     lifecycle_confidence = "medium"
@@ -1229,6 +1298,14 @@ elif blocker_policy_no_action_promotes:
     lifecycle_status = "completed"
     completion_signal = "blocker_policy_no_action"
     lifecycle_confidence = "medium"
+elif current_codex_unclassified_fallback_issue_comments:
+    lifecycle_status = "fallback"
+    completion_signal = "fallback_issue_comment"
+    lifecycle_confidence = "low"
+elif selected_review_signals:
+    lifecycle_status = "unresolved" if selected_actionable_unresolved_thread_ids else "completed"
+    completion_signal = "submitted_pull_request_review"
+    lifecycle_confidence = "high"
 elif current_pending_codex_review_present:
     lifecycle_status = "pending"
     completion_signal = "none"
@@ -1285,7 +1362,7 @@ selected_changes_requested_evidence.extend(
 )
 pending_review_present = lifecycle_status == "pending" or current_pending_codex_review_present
 blocking_limitation_present = bool(blocking_collection_failure)
-selected_blocker_present = bool(selected_unresolved_thread_ids or selected_changes_requested_evidence)
+selected_blocker_present = bool(selected_actionable_unresolved_thread_ids or selected_changes_requested_evidence)
 explicit_completion_present = completion_signal in {
     "submitted_pull_request_review",
     "codex_no_findings_issue_comment",
@@ -1413,7 +1490,7 @@ fallback_pass_promotes = bool(
     and sha_prefix_matches(current_pr_head_sha, expected_head_sha)
     and fallback_pass_source_ids
     and not stale_codex_head_context_present
-    and not selected_unresolved_thread_ids
+    and not selected_actionable_unresolved_thread_ids
     and not selected_changes_requested_evidence
     and not review_decision_changes_requested
     and not review_decision_requires_review
@@ -1441,7 +1518,7 @@ if blocker_policy_blockers:
     decision_status_reason = "blocker_policy_validated_blocker"
     decision_status = "human_gate"
     decision_action = "address_review_feedback"
-elif selected_unresolved_thread_ids:
+elif selected_actionable_unresolved_thread_ids:
     decision_status_reason = "current_selected_unresolved_thread"
     decision_status = "human_gate"
     decision_action = "address_review_feedback"
@@ -1461,6 +1538,16 @@ elif completion_signal == "none":
     decision_status_reason = "missing_current_completion_signal"
     decision_status = "pending" if current_pending_codex_review_present else "unknown"
     decision_action = "wait_or_resume"
+elif (
+    review_decision_changes_requested and review_decision_selected_unresolved_gate_present
+) or active_changes_requested_review_present:
+    decision_status_reason = "review_decision_changes_requested"
+    decision_status = "human_gate"
+    decision_action = "manual_review_required_non_retryable"
+elif review_decision_requires_review and review_decision_selected_unresolved_gate_present:
+    decision_status_reason = "review_decision_requires_review"
+    decision_status = "human_gate"
+    decision_action = "manual_review_required_non_retryable"
 else:
     decision_status_reason = (
         "codex_no_findings_issue_comment"

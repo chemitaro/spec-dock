@@ -3,7 +3,7 @@
 ID: "iss-00257"
 タイトル: "Severity Aware Codex PR Review Policy And Non Blocking Repair Loop Hardening"
 関連GitHub: ["#257"]
-状態: "draft | approved"
+状態: "review-needed"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-01"
 親: ["epic-00224", "init-local-00003"]
@@ -11,822 +11,315 @@ ID: "iss-00257"
 
 # iss-00257 Severity Aware Codex PR Review Policy And Non Blocking Repair Loop Hardening — Issue 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
+## 0. 位置づけ
 
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
+この Issue は、Codex PR review observation / merge preparation workflow における「報告すべき指摘」と「自律修復・merge blocking の対象」を分離する。
 
----
+親 `epic-00224` は継承する。ただし、`P2 + protected_domain + machine_evidence` を `promoted_blocker` に昇格する旧方針は、この Issue 内では採用しない。親 Epic 文書は別 worktree で作業中のため、この Issue では編集しない。
 
-## 0. 文書の位置づけ
+## 1. 目的
 
-### この文書が定義すること
+- Codex review の severity policy を、`P0/P1` は merge blocking、`P2/P3` は reportable but non-blocking として明確化する。
+- `protected_domain` や deterministic / machine evidence は attention metadata として保持するが、それだけを理由に `P2/P3` を `P1` 相当へ自動昇格しない。
+- P2/P3-only の terminal observation で、repo-persistent repair batch 更新、branch push、re-review request、追加の自律修復ループが発生しないことを保証する。
 
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
+## 2. 背景と現状
 
-### この文書が定義しないこと
+### 2.1 現状
 
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
+- 現行の review instruction は Codex を `merge-blocking reviewer` として扱い、non-blocking `P2/P3` findings を報告しないよう指示している。
+- 現行 runtime は `P2` かつ `protected_domain` かつ `machine_evidence` の finding を `promoted_blocker` として扱う経路を持つ。
+- 現行 tests には P2-only が non-blocking になる経路の保証がある一方で、protected-domain + machine-evidence P2 の旧昇格を期待する test も残っている。
+- `github-pr-merge-preparer` と `pr-repair-batch` template は review-clean と merge-prepared の分離を一部持つが、terminal P2/P3-only の no-mutation 境界と severity-aware repair policy は十分に明文化されていない。
 
----
+### 2.2 根拠
 
-## 1. 概要
+- 添付 bundle `specdock-pr-review-policy-update.zip`
+- `spec-dock/active/issue/discussions/20260701t022257z-interview-parent-epic-p2-promotion-policy.md`
+- `spec-dock/active/issue/discussions/20260701t023648z-research-pr-review-policy-clarification-research.md`
+- `spec-dock/active/issue/discussions/20260701t023858z-interview-root-cause-family-runtime-scope.md`
+- Current implementation and tests:
+  - `.agents/skills/github-pr-observation/scripts/codex-review-instructions.md`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py`
+  - `.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py`
+  - `.agents/skills/github-pr-merge-preparer/SKILL.md`
+  - `spec-dock/templates/discussions/pr-repair-batch.md`
+  - provider mirrors under `src/spec_dock/assets/...`
+  - `tests/unit/infra/test_init_update.py`
 
-### 1.1 目的
+## 3. スコープ
 
-このIssueで達成したい目的を1〜3文で記述する。
+### 3.1 対象範囲
 
-- 目的:
-  - ...
+- Codex review instruction を severity-aware policy へ更新する。
+- `github-pr-merge-preparer` skill を、P0/P1 repair と P2/P3 terminal report の分離が明確になるよう更新する。
+- `pr-repair-batch` template を、repo-persistent repair batch が blocking repair / blocking triage 用であることが分かるよう更新する。
+- Observation runtime の blocker policy を、P0/P1 だけが blocker になり、P2/P3 は protected-domain / machine-evidence metadata を持っていても non-blocking follow-up になるよう更新する。
+- Provider-side shipped assets と local dogfooding assets の mirror parity を維持する。
+- Existing tests を、新しい severity-aware policy に合わせて更新する。
+- Issue Planning dogfooding 中の違和感や不具合は Issue discussion artifact と `report.md` に記録する。
+- SpecDock workflow invocation が、SpecDock-defined named sub-agents / reviewers の workflow-scoped 利用許可であることを、provider / dogfooding の instruction、workflow docs、skill docs に明示する。
 
-### 1.2 観測可能な成果
+### 3.2 対象外
 
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
+- 親 `epic-00224` / initiative 文書の更新。
+- GitHub PR の merge、issue finish、branch deletion、review dismissal、conversation resolution の自動化。
+- `root_cause_family` を runtime JSON output、`blocker_fingerprint`、automation stalled 判定の first-class contract にする変更。
+- 複雑な runtime consent schema、新しい permission persistence、または新しい許可判定ロジックの追加。
+- GitHub platform の `CHANGES_REQUESTED`、unresolved thread、branch protection を semantic code repair blocker と同一視する変更。
+- 全 SpecDock workflow の一般方針変更。今回の変更は `iss-00257` の対象 surface に閉じる。
 
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
+### 3.3 変更してはいけないもの
 
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
+- `P0/P1` findings が merge-blocking repair target であること。
+- GitHub platform / human gate が残っている場合に、それを自律的に解消済みと誤認しないこと。
+- Priority-less または confidence が足りない review comment を silent pass にしないこと。
+- Existing `blocker_fingerprint` contract を `root_cause_family` へ置き換えないこと。
+- Canonical docs の single-writer authority は main orchestrator が保持し、sub-agent authoring outputs は evidence として扱うこと。
+- Scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途ユーザー確認を必要とすること。
 
-### 1.3 このIssueの種類
+## 4. Actors / Triggers
 
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
-
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
-
-### 3.3 このIssueで再定義してはいけないもの
-
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
-
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
-
----
-
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
-
-### 4.1 主な関係者（Actor）
-
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
-
-| 関係者（Actor） | 役割 | このIssueとの関係 |
+| Actor | 役割 | この Issue との関係 |
 |---|---|---|
-| ... | ... | ... |
+| Codex PR reviewer | PR 上の指摘を severity 付きで報告する | P0/P1 と P2/P3 の意味を instruction から受け取る |
+| github-pr-observation workflow | review / CI / PR 状態を観測する | blocker policy と terminal signal を出す |
+| github-pr-merge-preparer workflow | blocking repair と merge handoff を進める | P2/P3-only terminal state で追加 repair を起こさない |
+| SpecDock maintainer | shipped asset と dogfooding asset を管理する | provider / dogfooding mirror parity を確認する |
+| Main orchestrator | SpecDock workflow を進行し canonical docs を統合する | workflow-defined named role を適切な gate で起動し、canonical 採用判断を行う |
+| SpecDock-defined named sub-agent / reviewer | spec-reviewer / code-reviewer / qa-reviewer / planning roles など | active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲で workflow gate を担う |
 
-### 4.2 開始条件（Trigger）
+Triggers:
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
+- Codex review observation script execution
+- Merge-preparer skill execution
+- Installed asset scaffold / update verification
+- Issue Planning workflow execution
 
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
+## 5. 要求される振る舞い
 
-### 4.3 代表シナリオ
+### BH-001: P0/P1 は blocking repair target である
 
-#### シナリオ SC-001:
+- Given: Codex review finding が `P0` または `P1` として判定される。
+- When: observation が blocker policy を集計する。
+- Then: finding は blocker として扱われ、repair loop / human attention の対象になる。
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+### BH-002: P2/P3 は reportable but non-blocking である
 
-#### シナリオ SC-002:
+- Given: Codex review finding が `P2` または `P3` として判定される。
+- When: observation が blocker policy を集計する。
+- Then: finding は non-blocking follow-up として保持されるが、semantic blocker にはならない。
+- And: `protected_domain` や `machine_evidence` が真でも、severity は自動昇格しない。
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+### BH-003: P2/P3-only terminal observation は branch mutation を起こさない
 
-#### シナリオ SC-XXX:
+- Given: 最新 head、required CI、review decision、unresolved thread、collection failure など他の blocking gate が clean である。
+- And: Codex findings が P2/P3-only である。
+- When: observation / merge-preparer が terminal state を判断する。
+- Then: merge-prepared として報告できる。
+- And: repo-persistent repair batch update、commit、push、re-review request、自律修復 loop は行わない。
 
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+### BH-004: GitHub platform / human gates は別扱いで残る
 
----
+- Given: P2/P3-only review comment とは別に `CHANGES_REQUESTED`、unresolved thread、branch protection、collection limitation が残っている。
+- When: observation / merge-preparer が terminal state を判断する。
+- Then: semantic blocker policy は P2/P3 を blocker にしない。
+- And: platform / human gate は別の gate として報告され、自律修復で解消済みとは扱わない。
 
-## 5. スコープ
+### BH-005: root_cause_family は docs / LLM judgement の運用語彙である
 
-### 5.1 対象範囲（In 対象範囲（Scope））
+- Given: review instruction、merge-preparer skill、repair-batch template が finding grouping を説明する。
+- When: LLM / operator が repair unit を整理する。
+- Then: `root_cause_family` は判断語彙として使える。
+- And: runtime JSON / fingerprint / stalled 判定の必須 field にはしない。
 
-このIssueで必ず実現することを列挙する。
+### BH-006: SpecDock workflow invocation は workflow-scoped named role authorization である
 
-- ...
-- ...
+- Given: ユーザーが SpecDock workflow、SpecDock skill、Issue Planning、Issue Execution、Epic Planning、Initiative Planning などの利用を依頼する。
+- When: workflow が SpecDock-defined named sub-agent / reviewer を必要とする。
+- Then: その依頼自体を、active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲で該当 named role を利用する明示的な許可として扱う。
+- And: role ごと・phase ごとの追加承認を求めず、fresh `spec-reviewer` / `code-reviewer` / `qa-reviewer` pass など必要な gate を省略しない。
+- And: scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途ユーザー確認を求める。
 
-### 5.2 対象外（Out of 対象範囲（Scope））
-
-このIssueでは実現しないことを列挙する。
+## 6. 受け入れ条件
 
-- ...
-- ...
+### AC-001: Review instruction が severity-aware policy を明示する
 
-### 5.3 変更しないもの（Unchanged / Must Not Change）
+- `P0/P1` は blocking。
+- `P2/P3` は reportable but non-blocking。
+- `P2/P3` は protected domain または machine evidence だけで P1 に自動昇格しない。
+- Non-blocking findings を黙殺せず、terminal report / follow-up として扱う。
 
-関連はあるが、このIssueで変更してはいけないものを列挙する。
+### AC-002: Observation runtime が P2 protected-domain + machine-evidence を non-blocking にする
 
-- ...
-- ...
+- `P2` finding が `protected_domain: true` かつ `machine_evidence: true` でも `promoted_blocker` にならない。
+- blocker count / blocker fingerprints は P0/P1 のみから作られる。
+- metadata は follow-up / terminal report 用に保持される。
 
-### 5.4 判断が必要な境界
+### AC-003: P0/P1 blocking behavior は維持される
 
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
+- P0/P1 finding は blocker として集計される。
+- P0/P1 blocker が存在する場合、recommended next action は repair / review-feedback handling に進む。
 
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
+### AC-004: P2/P3-only clean terminal state は merge-prepared になれる
 
----
+- 他 gate が clean で、P2/P3-only findings だけが残る場合、`blocker_policy_no_action` 相当の terminal signal に到達できる。
+- この状態だけを理由に repo-persistent batch update、commit、push、re-review request を行わない。
 
-## 6. 要求される振る舞い
+### AC-005: Platform / human gate は誤って消さない
 
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
+- `CHANGES_REQUESTED`、unresolved review thread、branch protection、collection limitation が残る場合、それらは P2/P3 policy とは別 gate として報告される。
+- P2/P3 non-blocking policy は GitHub platform mergeability を保証するものではない。
 
-### 振る舞い BH-001:
+### AC-006: Merge-preparer と repair-batch template が blocking repair 境界を示す
 
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
+- `github-pr-merge-preparer` は P0/P1 repair と P2/P3 terminal report の違いを明示する。
+- `pr-repair-batch` は repo-persistent batch を blocking repair / blocking triage 用として扱う。
+- `root_cause_family` は docs / LLM judgement の grouping vocabulary として記述され、runtime contract 化は要求しない。
 
-### 振る舞い BH-002:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-XXX:
-
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 7. 受け入れ条件
-
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
-
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-002:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-XXX:
-
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
-
-```text
-...
-```
-
-### 例 EX-002: 出力例
-
-```text
-...
-```
-
-### 例 EX-003: エラー例
-
-```text
-...
-```
-
-### 契約上の注意
-
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-
-### 10.2 移行性
-
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-
-### 10.3 可観測性
-
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
-
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
+### AC-007: Provider / dogfooding mirror parity が維持される
 
-### 13.3 リスク事実（Risk Facts）
+- `.agents/...` と `src/spec_dock/assets/install_root/.agents/...` の対応 asset は一致する。
+- `spec-dock/templates/...` と `src/spec_dock/assets/spec_dock/templates/...` の対応 template は一致する。
+- Existing parity tests は更新後の contract を確認する。
 
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
+### AC-008: Issue-local override と非スコープが守られる
 
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
+- 親 `epic-00224` docs はこの Issue で編集しない。
+- Issue docs / report は、旧 P2 promotion policy の issue-local override と、親 docs 非編集の制約を明示する。
 
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
-
-#### `strict` 以上を検討する条件
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
+### AC-009: Issue Planning dogfooding notes が残る
 
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
+- Issue Planning workflow の利用中に観測した不具合・違和感・manual test 結果を `discussions/` artifact に残す。
+- 採用した内容は `report.md` の Evidence Adoption Ledger / Spec Authoring Gate に反映する。
 
-#### `lite` を検討できる条件
+### AC-010: SpecDock workflow-scoped named role authorization が明文化される
 
-すべて満たす場合のみ `lite` を検討できる。
+- Provider 側と dogfooding 側の orchestrator instruction / skill docs / workflow docs に、次の趣旨が明示される。
+  - “A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow.”
+  - “Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility.”
+  - “Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow.”
+- 日本語でも同趣旨を記載する。
+  - 「ユーザーが SpecDock workflow の利用を依頼した場合、その依頼自体を、SpecDock が定義する named sub-agent / reviewer を workflow に従って利用する明示的な許可として扱う。」
+  - 「active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲内では、role ごと・phase ごとの追加承認を求めない。」
+  - 「scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途確認する。」
+- Canonical docs の single-writer authority は main orchestrator に残し、sub-agent outputs は canonical ではなく evidence として扱う。
+- 複雑な runtime consent schema や新しい許可ロジックは追加しない。
 
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
+## 7. 例外・エッジケース
 
----
+### EC-001: Priority-less Codex comment
 
-## 14. 設計への引き渡し
+- 条件: review comment から P0/P1/P2/P3 が信頼できる形で判定できない。
+- 期待: silent pass ではなく fallback / manual review required として扱う。
 
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
+### EC-002: P2-only だが GitHub review decision が CHANGES_REQUESTED
 
-### 14.1 設計で必ず扱うべき論点
+- 条件: semantic finding は P2-only だが GitHub review decision が blocking。
+- 期待: semantic blocker policy は non-blocking、GitHub human gate は blocking として分離する。
 
-- ...
-- ...
+### EC-003: P2/P3-only だが unresolved thread が platform gate
 
-### 14.2 責任所有者が未確定のもの
+- 条件: branch protection または unresolved conversation policy が残る。
+- 期待: 自律修復対象ではなく platform / human gate として報告する。
 
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+### EC-004: Multiple priorities in one body
 
-### 14.3 境界が未確定のもの
+- 条件: review body に複数 priority または incidental priority mention が含まれる。
+- 期待: declared finding priority を根拠に分類し、 incidental mention だけで blocker 化しない。
 
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+### EC-005: Bundle replacement と現行 repo の差分
 
-### 14.4 契約影響が未確定のもの
+- 条件: 添付 bundle の replacement Markdown と現行 repo asset に差分がある。
+- 期待: そのまま無批判に上書きせず、今回の Issue scope と user-approved decisions に照らして採用する。
 
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+### EC-006: SpecDock workflow 外の role または範囲拡大
 
-### 14.5 上位へ昇格すべき可能性がある判断
+- 条件: workflow が定義していない role、active repo/worktree 外、active SpecDock scope 外、current session 外、または documented role responsibility 外の作業が必要になる。
+- 期待: workflow-scoped authorization の範囲外として扱い、ユーザー確認を求める。
 
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
+## 8. 契約上の注意
 
----
+- Public API: 影響なし。
+- CLI contract: observation output の blocker policy semantics に影響あり。ただし new first-class JSON field は追加しない。
+- Template contract: `pr-repair-batch.md` の運用契約に影響あり。
+- Installed asset contract: `.agents` shipped assets に影響あり。
+- Metadata / generated index: 影響なし。
 
-## 15. 実装計画への引き渡し
+## 9. 非機能要求
 
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
+### 9.1 互換性
 
-### 15.1 計画で分解すべき成果
+- Existing `blocker_fingerprint` は維持する。
+- Existing P0/P1 blocker behavior は維持する。
+- P2/P3 non-blocking 化により、旧 `promoted_blocker` 期待は新 policy に置き換える。
 
-- ...
-- ...
+### 9.2 可観測性
 
-### 15.2 検証が必要な観測点
+- Tests で P2 protected-domain + machine-evidence が non-blocking になることを確認できること。
+- Tests または inspection で provider / dogfooding mirror parity を確認できること。
+- `report.md` に Issue Planning dogfooding と spec authoring gate の証跡を残すこと。
 
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
+### 9.3 セキュリティ・プライバシー
 
-### 15.3 TDDが必要な振る舞い候補
+- secrets、tokens、credentials、private GitHub data を docs / report に追加しない。
+- Review finding body を必要以上に永続化する新 contract は追加しない。
 
-振る舞い変更がある場合のみ記述する。
+## 10. 制約
 
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
+### CON-001: Parent Epic docs non-edit constraint
 
-### 15.4 TDD不要または限定的でよい理由
+- 種別: operation / scope
+- 内容: 親 `epic-00224` docs はこの worktree / Issue で編集しない。
+- 根拠: ユーザー指示。
+- 変更可能性: fixed for this Issue.
 
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
+### CON-002: Severity blocking boundary
 
-- ...
-- ...
+- 種別: workflow / compatibility
+- 内容: P0/P1 だけが semantic merge blocker。P2/P3 は reportable but non-blocking。
+- 根拠: 添付 bundle、user-approved clarification。
+- 変更可能性: fixed.
 
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
+### CON-003: root_cause_family docs-only boundary
 
-### 16.2 更新が必要なテンプレート（templates）
+- 種別: implementation scope
+- 内容: `root_cause_family` は review / repair planning の運用語彙に留め、runtime JSON / stalled logic へ組み込まない。
+- 根拠: ユーザー回答 Option B。
+- 変更可能性: fixed for this Issue.
 
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
+### CON-004: Mirror parity
 
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
+- 種別: shipped asset compatibility
+- 内容: Provider-side shipped assets と dogfooding assets の対応ファイルを同期する。
+- 根拠: Dogfooding repo policy and existing parity tests。
+- 変更可能性: fixed.
 
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
+### CON-005: Workflow-scoped named role authorization boundary
 
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
+- 種別: workflow / operation
+- 内容: SpecDock workflow 利用依頼は、SpecDock-defined named sub-agent / reviewer を workflow に従って使う明示許可として扱う。ただし active repo/worktree、active SpecDock scope、current session、documented role responsibility に限定する。
+- 根拠: ユーザー補足指示。
+- 変更可能性: fixed for this Issue.
 
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
+### CON-006: Escalation remains required outside workflow-scoped authorization
 
----
+- 種別: safety / operation
+- 内容: Scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途ユーザー確認を必要とする。
+- 根拠: ユーザー補足指示。
+- 変更可能性: fixed.
 
-## 17. 用語
+## 11. Trace
 
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
+| Requirement item | Source |
+|---|---|
+| P0/P1 blocking, P2/P3 non-blocking | attached bundle, research artifact |
+| P2 protected-domain + machine-evidence promotion 廃止 | `20260701t022257z-interview-parent-epic-p2-promotion-policy.md` |
+| root_cause_family docs / LLM judgement scope | `20260701t023858z-interview-root-cause-family-runtime-scope.md` |
+| parent Epic docs non-edit | user instruction, `CON-001` |
+| Issue Planning dogfooding record | user instruction, `20260701t025116z-research-issue-planning-dogfooding-notes.md` |
+| SpecDock workflow-scoped named role authorization | user supplemental instruction, `AC-010`, `CON-005`, `CON-006` |
 
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
+## 12. 未解決事項
 
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-07-01 | 初稿（Initial draft） | ... | ... |
+なし。次工程へ進む前に、この要件定義書の fresh `spec-reviewer` pass を取得する。
