@@ -46,7 +46,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "status=deprecated" in p.stdout
         assert "reason=deprecated_scope_local_discussion_drafts" in p.stdout
         assert "manifest_path=" not in p.stdout
-        assert not (_issue_dir(target) / "discussions" / "delegated-authoring").exists()
+        assert not (_issue_dir(target) / "artifacts" / "delegated-authoring").exists()
 
     def test_scoped_context_subcommand_is_not_registered(self) -> None:
         target = self._make_target_repo_with_scope()
@@ -103,7 +103,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         baseline = _write_delegated_authoring_baseline(self, target)
         delegated_link.unlink()
         delegated_link.symlink_to("payload/target")
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -144,11 +144,11 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: blocked (delegated-authoring baseline-status)" in p.stdout
         assert "reason=baseline_status_inside_repo" in p.stdout
 
-    def test_diff_guard_allows_new_flat_discussion_markdown(self) -> None:
+    def test_diff_guard_allows_new_flat_artifact_markdown(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -170,14 +170,128 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "status=pass" in p.stdout
         assert "reason=ok" in p.stdout
 
-    @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_discussion_created_by_different_authorized_role"
-    )
-    def test_diff_guard_rejects_new_discussion_from_different_authorized_role(self) -> None:
+    def test_diff_guard_rejects_future_discussion_output_even_when_allow_existing_discussion_is_set(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
         discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion.write_text(_draft_text("# draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--role",
+                "system-architect",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+                "--allow-existing-discussion",
+                str(discussion.relative_to(target)),
+            ],
+        )
+
+        assert p.returncode != 0, p.stdout + p.stderr
+        assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
+        assert "reason=future_noncompliant_discussion_output" in p.stdout
+        assert "reason=expected_exactly_one_new_artifact_draft count=0" in p.stdout
+
+    def test_diff_guard_allows_valid_artifact_when_allow_existing_discussion_is_unchanged(self) -> None:
+        target = self._make_target_repo_with_scope()
+        legacy_discussion = _issue_dir(target) / "discussions" / "001-legacy-evidence.md"
+        legacy_discussion.write_text("# legacy evidence\n", encoding="utf-8")
+        _commit_all(target)
+        baseline = _write_delegated_authoring_baseline(self, target)
+        artifact = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
+        artifact.write_text(_draft_text("# draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--role",
+                "system-architect",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+                "--allow-existing-discussion",
+                str(legacy_discussion.relative_to(target)),
+            ],
+        )
+
+        assert p.returncode == 0, p.stdout + p.stderr
+        assert "spec-dock: ok (delegated-authoring diff-guard)" in p.stdout
+        assert "status=pass" in p.stdout
+        assert "reason=ok" in p.stdout
+        assert "reason=existing_artifact_update_unsupported" not in p.stdout
+
+    def test_diff_guard_rejects_existing_artifact_update_even_when_allow_existing_discussion_is_set(self) -> None:
+        target = self._make_target_repo_with_scope()
+        artifact = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
+        artifact.write_text(_draft_text("# initial"), encoding="utf-8")
+        _commit_all(target)
+        baseline = _write_delegated_authoring_baseline(self, target)
+        artifact.write_text(_draft_text("# updated"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--role",
+                "system-architect",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+                "--allow-existing-discussion",
+                str(artifact.relative_to(target)),
+            ],
+        )
+
+        assert p.returncode != 0, p.stdout + p.stderr
+        assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
+        assert "reason=existing_artifact_update_unsupported" in p.stdout
+
+    def test_diff_guard_rejects_artifacts_rules_md_output(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        baseline = _write_delegated_authoring_baseline(self, target)
+        rules = _issue_dir(target) / "artifacts" / "rules.md"
+        rules.unlink()
+        rules.write_text(_draft_text("# draft"), encoding="utf-8")
+
+        p = self._run_runtime_capture(
+            target,
+            [
+                "delegated-authoring",
+                "diff-guard",
+                "--role",
+                "system-architect",
+                "--scope",
+                "iss-00003",
+                "--baseline-status",
+                str(baseline),
+            ],
+        )
+
+        assert p.returncode != 0, p.stdout + p.stderr
+        assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
+        assert "path=spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-delegated-authoring/artifacts/rules.md" in p.stdout
+        assert "reason=artifact_name_noncompliant" in p.stdout
+
+    @pytest.mark.skip(
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_artifact_created_by_different_authorized_role"
+    )
+    def test_diff_guard_rejects_new_artifact_from_different_authorized_role(self) -> None:
+        target = self._make_target_repo_with_scope()
+        _commit_all(target)
+        baseline = _write_delegated_authoring_baseline(self, target)
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft", role="implementation-planner"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -196,16 +310,16 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "reason=new_discussion_created_by_role_mismatch" in p.stdout
+        assert "reason=new_artifact_created_by_role_mismatch" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_new_discussion_without_required_provenance"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_new_artifact_without_required_provenance"
     )
-    def test_diff_guard_rejects_new_discussion_without_required_provenance(self) -> None:
+    def test_diff_guard_rejects_new_artifact_without_required_provenance(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text("---\nadoption_status: unreviewed\n---\n# draft\n", encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -224,18 +338,18 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "reason=new_discussion_missing_provenance:" in p.stdout
+        assert "reason=new_artifact_missing_provenance:" in p.stdout
         assert "created_by_role" in p.stdout
         assert "diff_guard_result" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_multiple_new_discussion_drafts"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_multiple_new_artifact_drafts"
     )
-    def test_diff_guard_rejects_multiple_new_discussion_drafts(self) -> None:
+    def test_diff_guard_rejects_multiple_new_artifact_drafts(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
-        discussions_dir = _issue_dir(target) / "discussions"
+        discussions_dir = _issue_dir(target) / "artifacts"
         first = discussions_dir / "20260525t010203z-disc-first-draft.md"
         second = discussions_dir / "20260525t010204z-disc-second-draft.md"
         first.write_text(_draft_text("# first"), encoding="utf-8")
@@ -257,12 +371,12 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "reason=expected_exactly_one_new_discussion_draft count=2" in p.stdout
+        assert "reason=expected_exactly_one_new_artifact_draft count=2" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_zero_new_discussion_drafts"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_zero_new_artifact_drafts"
     )
-    def test_diff_guard_rejects_zero_new_discussion_drafts(self) -> None:
+    def test_diff_guard_rejects_zero_new_artifact_drafts(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
@@ -283,7 +397,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "reason=expected_exactly_one_new_discussion_draft count=0" in p.stdout
+        assert "reason=expected_exactly_one_new_artifact_draft count=0" in p.stdout
 
     def test_diff_guard_parser_requires_role(self) -> None:
         target = self._make_target_repo_with_scope()
@@ -308,7 +422,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
     def test_diff_guard_parser_requires_baseline_status(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -345,7 +459,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
             encoding="utf-8",
         )
         fake_git.chmod(0o755)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -374,7 +488,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
             line for line in baseline.read_text(encoding="utf-8").splitlines() if not line.startswith("# head\t")
         ]
         baseline.write_text("\n".join(baseline_lines) + "\n", encoding="utf-8")
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -404,7 +518,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         ignored = target / "manual-tests" / "delegated-output.txt"
         ignored.parent.mkdir()
         ignored.write_text("ignored side effect\n", encoding="utf-8")
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -424,7 +538,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "manual-tests/delegated-output.txt" in p.stdout
-        assert "reason=outside_target_discussions" in p.stdout
+        assert "reason=outside_target_artifacts" in p.stdout
 
     def test_diff_guard_ignores_unbounded_ignored_cache_written_after_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
@@ -434,7 +548,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         ignored = target / ".venv" / "delegated-output.txt"
         ignored.parent.mkdir()
         ignored.write_text("ignored side effect\n", encoding="utf-8")
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -461,7 +575,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
         (target / ".venv").mkdir()
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -495,7 +609,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         forbidden.write_text("# ignored forbidden side effect\n", encoding="utf-8")
         baseline_mtime = baseline.stat().st_mtime
         os.utime(forbidden, (baseline_mtime - 10, baseline_mtime - 10))
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -529,7 +643,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
         cache.write_text("delegated mutation\n", encoding="utf-8")
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -549,7 +663,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "manual-tests/preexisting.txt" in p.stdout
-        assert "reason=outside_target_discussions" in p.stdout
+        assert "reason=outside_target_artifacts" in p.stdout
 
     @pytest.mark.skip(
         reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
@@ -564,7 +678,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
         child.write_text("delegated mutation\n", encoding="utf-8")
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -584,10 +698,10 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
         assert "manual-tests/cache" in p.stdout
-        assert "reason=outside_target_discussions" in p.stdout
+        assert "reason=outside_target_artifacts" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_artifact_markdown"
     )
     def test_diff_guard_ignores_preexisting_ignored_cache_from_baseline(self) -> None:
         target = self._make_target_repo_with_scope()
@@ -597,7 +711,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         cache.write_text("pre-existing ignored cache\n", encoding="utf-8")
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -619,14 +733,14 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "cache/preexisting.txt" not in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_artifact_markdown"
     )
     def test_diff_guard_allows_new_draft_artifact_discussion_markdown(self) -> None:
         for doc_type in ("draft-requirement", "draft-design", "draft-plan"):
             target = self._make_target_repo_with_scope()
             _commit_all(target)
             baseline = _write_delegated_authoring_baseline(self, target)
-            discussions_dir = _issue_dir(target) / "discussions"
+            discussions_dir = _issue_dir(target) / "artifacts"
             (discussions_dir / f"20260525t010203z-{doc_type}-agent-draft.md").write_text(
                 _draft_text(f"# {doc_type}"),
                 encoding="utf-8",
@@ -655,7 +769,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         target = self._make_target_repo_with_scope()
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
         subdir = target / "nested" / "cwd"
         subdir.mkdir(parents=True)
@@ -684,7 +798,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
         baseline_arg = os.path.relpath(baseline, start=target)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
         subdir = target / "nested" / "cwd"
         subdir.mkdir(parents=True)
@@ -746,7 +860,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         active_issue.symlink_to(issue_dir, target_is_directory=True)
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
-        discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -768,7 +882,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "reason=scope_not_found" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_artifact_markdown"
     )
     def test_diff_guard_ignores_unchanged_preexisting_dirty_canonical_doc(self) -> None:
         target = self._make_target_repo_with_scope()
@@ -776,7 +890,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         design = _issue_dir(target) / "design.md"
         design.write_text("# pre-existing orchestrator draft\n", encoding="utf-8")
         baseline = _write_delegated_authoring_baseline(self, target)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -797,7 +911,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: ok (delegated-authoring diff-guard)" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_artifact_markdown"
     )
     def test_diff_guard_ignores_unchanged_preexisting_dirty_path_with_space(self) -> None:
         target = self._make_target_repo_with_scope()
@@ -805,7 +919,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         notes = target / "manual notes.md"
         notes.write_text("# pre-existing notes\n", encoding="utf-8")
         baseline = _write_delegated_authoring_baseline(self, target)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -832,7 +946,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         notes.write_text("# pre-existing notes\n", encoding="utf-8")
         baseline = _write_delegated_authoring_baseline(self, target)
         assert '"manual\\tnotes.md"' in baseline.read_text(encoding="utf-8")
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -862,7 +976,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         env_file.write_text("SECRET=before\n", encoding="utf-8")
         baseline = _write_delegated_authoring_baseline(self, target)
         env_file.unlink()
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -889,7 +1003,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         notes = target / "manual -> notes.md"
         notes.write_text("# pre-existing notes\n", encoding="utf-8")
         baseline = _write_delegated_authoring_baseline(self, target)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -919,7 +1033,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         baseline = _write_delegated_authoring_baseline(self, target)
         baseline_text = baseline.read_text(encoding="utf-8")
         assert '"manual -> notes.md" -> "renamed notes.md"' in baseline_text
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -940,11 +1054,11 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: ok (delegated-authoring diff-guard)" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_artifact_update_even_when_allowlisted"
     )
-    def test_diff_guard_rejects_explicit_existing_discussion_update(self) -> None:
+    def test_diff_guard_rejects_explicit_existing_artifact_update(self) -> None:
         target = self._make_target_repo_with_scope()
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-01-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-01-disc-agent-draft.md"
         discussion.write_text("---\nadoption_status: unreviewed\n---\n# initial\n", encoding="utf-8")
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
@@ -968,14 +1082,14 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "reason=existing_discussion_update_unsupported" in p.stdout
+        assert "reason=existing_artifact_update_unsupported" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_artifact_update_even_when_allowlisted"
     )
     def test_diff_guard_rejects_explicit_existing_draft_artifact_update(self) -> None:
         target = self._make_target_repo_with_scope()
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-draft-requirement-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-draft-requirement-agent-draft.md"
         discussion.write_text("---\nadoption_status: unreviewed\n---\n# initial\n", encoding="utf-8")
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
@@ -999,7 +1113,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "reason=existing_discussion_update_unsupported" in p.stdout
+        assert "reason=existing_artifact_update_unsupported" in p.stdout
 
     @pytest.mark.skip(
         reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
@@ -1039,7 +1153,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         target = self._make_target_repo_with_scope()
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# committed draft"), encoding="utf-8")
         _commit_all(target)
 
@@ -1106,7 +1220,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         design.write_text("# staged after baseline\n", encoding="utf-8")
         _run_git(target, ["add", str(design.relative_to(target))])
         design.write_text("# worktree snapshot\n", encoding="utf-8")
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -1128,11 +1242,11 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "reason=canonical_doc" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_artifact_update_even_when_allowlisted"
     )
     def test_diff_guard_rejects_allowlisted_update_when_previous_state_was_accepted(self) -> None:
         target = self._make_target_repo_with_scope()
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-01-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-01-disc-agent-draft.md"
         discussion.write_text("---\nstatus: accepted\n---\n# accepted\n", encoding="utf-8")
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
@@ -1156,10 +1270,10 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "reason=existing_discussion_update_unsupported" in p.stdout
+        assert "reason=existing_artifact_update_unsupported" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_allowlisted_existing_discussion_without_state_as_unsupported_update"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_allowlisted_existing_artifact_without_state_as_unsupported_update"
     )
     def test_diff_guard_rejects_allowlisted_update_when_current_draft_claims_non_editable_authority(
         self,
@@ -1180,7 +1294,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         )
         for filename, current_text in cases:
             target = self._make_target_repo_with_scope()
-            discussion = _issue_dir(target) / "discussions" / filename
+            discussion = _issue_dir(target) / "artifacts" / filename
             discussion.write_text("---\nadoption_status: unreviewed\n---\n# initial\n", encoding="utf-8")
             _commit_all(target)
             baseline = _write_delegated_authoring_baseline(self, target)
@@ -1204,14 +1318,11 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
             assert p.returncode != 0, p.stdout + p.stderr
             assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-            assert "reason=existing_discussion_update_unsupported" in p.stdout
+            assert "reason=existing_artifact_update_unsupported" in p.stdout
 
-    @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted"
-    )
-    def test_diff_guard_rejects_dirty_baseline_discussion_state_rewrite(self) -> None:
+    def test_diff_guard_rejects_dirty_baseline_artifact_state_rewrite(self) -> None:
         target = self._make_target_repo_with_scope()
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-01-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-01-disc-agent-draft.md"
         discussion.write_text("---\nadoption_status: unreviewed\n---\n# initial\n", encoding="utf-8")
         _commit_all(target)
         discussion.write_text("---\nstatus: accepted\n---\n# dirty before run\n", encoding="utf-8")
@@ -1236,15 +1347,12 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "reason=dirty_baseline_discussion" in p.stdout
+        assert "reason=dirty_baseline_artifact" in p.stdout
 
-    @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_malformed_discussion_diffs"
-    )
-    def test_diff_guard_rejects_nested_dirty_baseline_discussion(self) -> None:
+    def test_diff_guard_rejects_nested_dirty_baseline_artifact(self) -> None:
         target = self._make_target_repo_with_scope()
         _commit_all(target)
-        nested = _issue_dir(target) / "discussions" / "nested" / "20260525t010203z-disc-agent-draft.md"
+        nested = _issue_dir(target) / "artifacts" / "nested" / "20260525t010203z-disc-agent-draft.md"
         nested.parent.mkdir()
         nested.write_text("# dirty before run\n", encoding="utf-8")
         baseline = _write_delegated_authoring_baseline(self, target)
@@ -1265,14 +1373,14 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "reason=dirty_baseline_discussion" in p.stdout
+        assert "reason=dirty_baseline_artifact" in p.stdout
 
     @pytest.mark.skip(
         reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_symlinked_discussions_dir_without_status_entries"
     )
     def test_diff_guard_rejects_committed_symlinked_discussions_dir_without_diff(self) -> None:
         target = self._make_target_repo_with_scope()
-        discussions_dir = _issue_dir(target) / "discussions"
+        discussions_dir = _issue_dir(target) / "artifacts"
         external_discussions = target / "external-discussions"
         external_discussions.mkdir()
         (discussions_dir / "rules.md").unlink()
@@ -1297,14 +1405,14 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "reason=discussions_dir_symlink" in p.stdout
+        assert "reason=artifacts_dir_symlink" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_discussion_symlink_without_status_entries"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_artifact_symlink_without_status_entries"
     )
-    def test_diff_guard_rejects_committed_discussion_symlink_without_diff(self) -> None:
+    def test_diff_guard_rejects_committed_artifact_symlink_without_diff(self) -> None:
         target = self._make_target_repo_with_scope()
-        symlink = _issue_dir(target) / "discussions" / "20260525t010203z-disc-link.md"
+        symlink = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-link.md"
         symlink.symlink_to(_issue_dir(target) / "design.md")
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
@@ -1325,7 +1433,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "reason=discussion_symlink" in p.stdout
+        assert "reason=artifact_symlink" in p.stdout
 
     @pytest.mark.skip(
         reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_forbidden_paths"
@@ -1336,7 +1444,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
         (target / ".env.local").write_text("SECRET=delegated\n", encoding="utf-8")
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -1368,7 +1476,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         nested_dir = target / "tmp"
         nested_dir.mkdir()
         (nested_dir / ".env.secret").write_text("SECRET=delegated\n", encoding="utf-8")
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -1400,7 +1508,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         secret_dir = target / "tmp" / ".env.d"
         secret_dir.mkdir(parents=True)
         (secret_dir / "secret.txt").write_text("SECRET=delegated\n", encoding="utf-8")
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -1437,7 +1545,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         baseline = _write_delegated_authoring_baseline(self, target)
         ignored_symlink.unlink()
         ignored_symlink.symlink_to(second_target)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -1459,7 +1567,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "reason=env_file" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_discussion_markdown"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_allows_new_flat_artifact_markdown"
     )
     def test_diff_guard_ignores_unchanged_baseline_ignored_env_symlink(self) -> None:
         target = self._make_target_repo_with_scope()
@@ -1470,7 +1578,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         ignored_symlink.symlink_to(symlink_target)
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-disc-agent-draft.md"
         discussion.write_text(_draft_text("# delegated draft"), encoding="utf-8")
 
         p = self._run_runtime_capture(
@@ -1491,11 +1599,11 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
         assert "spec-dock: ok (delegated-authoring diff-guard)" in p.stdout
 
     @pytest.mark.skip(
-        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted"
+        reason="S05: covered by TestDelegatedAuthoringRuntimeDomain.test_diff_guard_rejects_existing_artifact_update_even_when_allowlisted"
     )
     def test_diff_guard_rejects_non_utf8_head_discussion_without_crashing(self) -> None:
         target = self._make_target_repo_with_scope()
-        discussion = _issue_dir(target) / "discussions" / "20260525t010203z-01-disc-agent-draft.md"
+        discussion = _issue_dir(target) / "artifacts" / "20260525t010203z-01-disc-agent-draft.md"
         discussion.write_bytes(b"---\nadoption_status: unreviewed\n---\n# invalid \xff\n")
         _commit_all(target)
         baseline = _write_delegated_authoring_baseline(self, target)
@@ -1519,7 +1627,7 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "reason=existing_discussion_update_unsupported" in p.stdout
+        assert "reason=existing_artifact_update_unsupported" in p.stdout
 
     def _make_target_repo_with_scope(self) -> Path:
         self._tmpdir = getattr(self, "_tmpdir", [])

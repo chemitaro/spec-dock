@@ -54,7 +54,7 @@ class TestDelegatedAuthoringRuntimeDomain:
             assert not result.ok
             assert result.status == "deprecated"
             assert result.reason == "deprecated_scope_local_discussion_drafts"
-            assert not (issue_dir / "discussions" / "delegated-authoring").exists()
+            assert not (issue_dir / "artifacts" / "delegated-authoring").exists()
 
     def test_application_diff_guard_rejects_missing_baseline_status(self) -> None:
         request_cls, run_diff_guard = _application_diff_guard_modules()
@@ -76,12 +76,12 @@ class TestDelegatedAuthoringRuntimeDomain:
             assert result.status == "blocked"
             assert result.reason == "missing_baseline_status"
 
-    def test_diff_guard_allows_new_flat_discussion_markdown(self) -> None:
+    def test_diff_guard_allows_new_flat_artifact_markdown(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
             discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
@@ -94,12 +94,12 @@ class TestDelegatedAuthoringRuntimeDomain:
             assert result.ok, result.details
             assert result.status == "pass"
 
-    def test_diff_guard_allows_new_pr_repair_batch_discussion_markdown(self) -> None:
+    def test_diff_guard_allows_new_pr_repair_batch_artifact_markdown(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-pr-repair-batch-agent-draft.md"
+            discussion = issue_dir / "artifacts" / "20260525t010203z-pr-repair-batch-agent-draft.md"
             discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
@@ -112,31 +112,13 @@ class TestDelegatedAuthoringRuntimeDomain:
             assert result.ok, result.details
             assert result.status == "pass"
 
-    def test_diff_guard_allows_runtime_generated_pr_repair_batch_template(self) -> None:
+    def test_diff_guard_allows_blank_artifact_markdown(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-pr-repair-batch-pr-repair-batch.md"
-            template = (
-                Path(__file__).resolve().parents[3]
-                / "src"
-                / "spec_dock"
-                / "assets"
-                / "spec_dock"
-                / "templates"
-                / "discussions"
-                / "pr-repair-batch.md"
-            ).read_text(encoding="utf-8")
-            discussion.write_text(
-                template
-                .replace("<PR_REPAIR_BATCH_ID>", "20260525t010203z-pr-repair-batch")
-                .replace("<PR_REPAIR_BATCH_TITLE>", "PR Repair Batch")
-                .replace("<SCOPE_ID>", "iss-00003")
-                .replace("<YOUR_NAME>", "spec-dock")
-                .replace("YYYY-MM-DD", "2026-05-25"),
-                encoding="utf-8",
-            )
+            discussion = issue_dir / "artifacts" / "20260525t010203z-agent-draft.md"
+            discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
                 authorized_role="system-architect",
@@ -149,84 +131,51 @@ class TestDelegatedAuthoringRuntimeDomain:
             assert result.ok, result.details
             assert result.status == "pass"
 
-    def test_diff_guard_rejects_pr_repair_batch_template_with_mismatched_generated_id(self) -> None:
-        _request_cls, _generate, domain = _runtime_modules()
-        with tempfile.TemporaryDirectory() as tmp:
-            repo_root = Path(tmp)
-            issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-pr-repair-batch-pr-repair-batch.md"
-            template = (
-                Path(__file__).resolve().parents[3]
-                / "src"
-                / "spec_dock"
-                / "assets"
-                / "spec_dock"
-                / "templates"
-                / "discussions"
-                / "pr-repair-batch.md"
-            ).read_text(encoding="utf-8")
-            discussion.write_text(
-                template
-                .replace("<PR_REPAIR_BATCH_ID>", "20260525t010204z-pr-repair-batch")
-                .replace("<PR_REPAIR_BATCH_TITLE>", "PR Repair Batch")
-                .replace("<SCOPE_ID>", "iss-00003")
-                .replace("<YOUR_NAME>", "spec-dock")
-                .replace("YYYY-MM-DD", "2026-05-25"),
-                encoding="utf-8",
-            )
-
-            result = domain.evaluate_diff_guard(
-                scope_id="iss-00003",
-                repo_root=repo_root,
-                scope_dir=issue_dir,
-                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
-            )
-
-            assert not result.ok
-            assert "reason=new_discussion_pr_repair_batch_id_mismatch" in "\n".join(result.details)
-
-    def test_diff_guard_rejects_pr_repair_batch_template_with_mismatched_scope(self) -> None:
-        _request_cls, _generate, domain = _runtime_modules()
-        with tempfile.TemporaryDirectory() as tmp:
-            repo_root = Path(tmp)
-            issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-pr-repair-batch-pr-repair-batch.md"
-            template = (
-                Path(__file__).resolve().parents[3]
-                / "src"
-                / "spec_dock"
-                / "assets"
-                / "spec_dock"
-                / "templates"
-                / "discussions"
-                / "pr-repair-batch.md"
-            ).read_text(encoding="utf-8")
-            discussion.write_text(
-                template
-                .replace("<PR_REPAIR_BATCH_ID>", "20260525t010203z-pr-repair-batch")
-                .replace("<PR_REPAIR_BATCH_TITLE>", "PR Repair Batch")
-                .replace("<SCOPE_ID>", "iss-99999")
-                .replace("<YOUR_NAME>", "spec-dock")
-                .replace("YYYY-MM-DD", "2026-05-25"),
-                encoding="utf-8",
-            )
-
-            result = domain.evaluate_diff_guard(
-                scope_id="iss-00003",
-                repo_root=repo_root,
-                scope_dir=issue_dir,
-                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
-            )
-
-            assert not result.ok
-            assert "reason=new_discussion_scope_id_mismatch" in "\n".join(result.details)
-
-    def test_diff_guard_allows_implementation_planner_discussion_markdown(self) -> None:
+    def test_diff_guard_rejects_future_discussion_output(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
             discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion.parent.mkdir()
+            discussion.write_text(_draft_text("# draft"), encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            assert not result.ok
+            joined = "\n".join(result.details)
+            assert "reason=future_noncompliant_discussion_output" in joined
+            assert "reason=expected_exactly_one_new_artifact_draft count=0" in joined
+
+    def test_diff_guard_rejects_artifact_with_mismatched_scope(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "artifacts" / "20260525t010203z-pr-repair-batch-pr-repair-batch.md"
+            discussion.write_text(_draft_text("# draft").replace("scope_id: iss-00003", "scope_id: iss-99999"), encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            assert not result.ok
+            assert "reason=new_artifact_scope_id_mismatch" in "\n".join(result.details)
+
+    def test_diff_guard_allows_implementation_planner_artifact_markdown(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
             discussion.write_text(_draft_text("# draft", role="implementation-planner"), encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
@@ -245,7 +194,7 @@ class TestDelegatedAuthoringRuntimeDomain:
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
             text = _draft_text("# draft", role="implementation-planner")
             text = text.replace(
                 "created_by_role: implementation-planner",
@@ -264,12 +213,12 @@ class TestDelegatedAuthoringRuntimeDomain:
             assert result.ok, result.details
             assert result.status == "pass"
 
-    def test_diff_guard_rejects_discussion_created_by_different_authorized_role(self) -> None:
+    def test_diff_guard_rejects_artifact_created_by_different_authorized_role(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
             discussion.write_text(_draft_text("# draft", role="implementation-planner"), encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
@@ -281,14 +230,14 @@ class TestDelegatedAuthoringRuntimeDomain:
             )
 
             assert not result.ok
-            assert "reason=new_discussion_created_by_role_mismatch" in "\n".join(result.details)
+            assert "reason=new_artifact_created_by_role_mismatch" in "\n".join(result.details)
 
     def test_diff_guard_rejects_arbitrary_diff_guard_result_frontmatter(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
             discussion.write_text(
                 _draft_text("# draft").replace("diff_guard_result: pending", "diff_guard_result: banana"),
                 encoding="utf-8",
@@ -303,14 +252,14 @@ class TestDelegatedAuthoringRuntimeDomain:
             )
 
             assert not result.ok
-            assert "reason=new_discussion_missing_provenance:diff_guard_result" in "\n".join(result.details)
+            assert "reason=new_artifact_missing_provenance:diff_guard_result" in "\n".join(result.details)
 
-    def test_diff_guard_rejects_new_discussion_without_frontmatter_editable_state(self) -> None:
+    def test_diff_guard_rejects_new_artifact_without_frontmatter_editable_state(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
             discussion.write_text("# draft\n\nadoption_status: unreviewed\n", encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
@@ -321,14 +270,14 @@ class TestDelegatedAuthoringRuntimeDomain:
             )
 
             assert not result.ok
-            assert "reason=new_discussion_missing_proposed_state" in "\n".join(result.details)
+            assert "reason=new_artifact_missing_proposed_state" in "\n".join(result.details)
 
-    def test_diff_guard_rejects_new_discussion_with_non_editable_state_claim(self) -> None:
+    def test_diff_guard_rejects_new_artifact_with_non_editable_state_claim(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
             discussion.write_text("---\nadoption_status: adopted\n---\n# draft\n", encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
@@ -339,14 +288,14 @@ class TestDelegatedAuthoringRuntimeDomain:
             )
 
             assert not result.ok
-            assert "reason=new_discussion_claims_non_editable_state" in "\n".join(result.details)
+            assert "reason=new_artifact_claims_non_editable_state" in "\n".join(result.details)
 
-    def test_diff_guard_rejects_new_discussion_without_required_provenance(self) -> None:
+    def test_diff_guard_rejects_new_artifact_without_required_provenance(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+            discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
             discussion.write_text("---\nadoption_status: unreviewed\n---\n# draft\n", encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
@@ -358,7 +307,7 @@ class TestDelegatedAuthoringRuntimeDomain:
 
             assert not result.ok
             joined = "\n".join(result.details)
-            assert "reason=new_discussion_missing_provenance:" in joined
+            assert "reason=new_artifact_missing_provenance:" in joined
             assert "created_by_role" in joined
             assert "diff_guard_result" in joined
 
@@ -367,7 +316,7 @@ class TestDelegatedAuthoringRuntimeDomain:
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            discussions_dir = issue_dir / "discussions"
+            discussions_dir = issue_dir / "artifacts"
             mixed_create = discussions_dir / "20260525t010203z-disc-mixed-create.md"
             mixed_create.write_text(_draft_text("# mixed create"), encoding="utf-8")
             mixed_update = discussions_dir / "20260525t010204z-disc-mixed-update.md"
@@ -389,15 +338,15 @@ class TestDelegatedAuthoringRuntimeDomain:
 
             assert not result.ok
             joined = "\n".join(result.details)
-            assert joined.count("reason=mixed_staged_unstaged_discussion") == 2
+            assert joined.count("reason=mixed_staged_unstaged_artifact") == 2
             assert "reason=unmerged_status" in joined
 
-    def test_diff_guard_rejects_existing_discussion_update_even_when_allowlisted(self) -> None:
+    def test_diff_guard_rejects_existing_artifact_update_even_when_allowlisted(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-01-research-agent-draft.md"
+            discussion = issue_dir / "artifacts" / "20260525t010203z-01-research-agent-draft.md"
             discussion.write_text(_draft_text("# draft"), encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
@@ -409,15 +358,57 @@ class TestDelegatedAuthoringRuntimeDomain:
             )
 
             assert not result.ok
-            assert "reason=existing_discussion_update_unsupported" in "\n".join(result.details)
+            assert "reason=existing_artifact_update_unsupported" in "\n".join(result.details)
 
-    def test_diff_guard_rejects_multiple_new_discussion_drafts(self) -> None:
+    def test_diff_guard_ignores_unchanged_allow_existing_discussion_with_valid_artifact(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            first = issue_dir / "discussions" / "20260525t010203z-disc-first-draft.md"
-            second = issue_dir / "discussions" / "20260525t010204z-disc-second-draft.md"
+            legacy_discussion = issue_dir / "discussions" / "001-legacy-evidence.md"
+            legacy_discussion.parent.mkdir()
+            legacy_discussion.write_text("# legacy evidence\n", encoding="utf-8")
+            artifact = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
+            artifact.write_text(_draft_text("# draft"), encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=artifact.relative_to(repo_root)),),
+                allow_existing_discussions=(legacy_discussion.relative_to(repo_root),),
+            )
+
+            assert result.ok
+            joined = "\n".join(result.details)
+            assert "reason=existing_artifact_update_unsupported" not in joined
+            assert f"allowed path={artifact.relative_to(repo_root).as_posix()}" in joined
+
+    def test_diff_guard_rejects_new_artifact_rules_md_output(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            rules = issue_dir / "artifacts" / "rules.md"
+            rules.write_text(_draft_text("# draft"), encoding="utf-8")
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=rules.relative_to(repo_root)),),
+            )
+
+            assert not result.ok
+            assert "reason=artifact_name_noncompliant" in "\n".join(result.details)
+
+    def test_diff_guard_rejects_multiple_new_artifact_drafts(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            first = issue_dir / "artifacts" / "20260525t010203z-disc-first-draft.md"
+            second = issue_dir / "artifacts" / "20260525t010204z-disc-second-draft.md"
             first.write_text(_draft_text("# first"), encoding="utf-8")
             second.write_text(_draft_text("# second"), encoding="utf-8")
 
@@ -432,9 +423,9 @@ class TestDelegatedAuthoringRuntimeDomain:
             )
 
             assert not result.ok
-            assert "reason=expected_exactly_one_new_discussion_draft count=2" in "\n".join(result.details)
+            assert "reason=expected_exactly_one_new_artifact_draft count=2" in "\n".join(result.details)
 
-    def test_diff_guard_rejects_zero_new_discussion_drafts(self) -> None:
+    def test_diff_guard_rejects_zero_new_artifact_drafts(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
@@ -448,9 +439,9 @@ class TestDelegatedAuthoringRuntimeDomain:
             )
 
             assert not result.ok
-            assert "reason=expected_exactly_one_new_discussion_draft count=0" in "\n".join(result.details)
+            assert "reason=expected_exactly_one_new_artifact_draft count=0" in "\n".join(result.details)
 
-    def test_diff_guard_rejects_new_discussion_with_mismatched_scope_or_role(self) -> None:
+    def test_diff_guard_rejects_new_artifact_with_mismatched_scope_or_role(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         cases = (
             (
@@ -469,7 +460,7 @@ class TestDelegatedAuthoringRuntimeDomain:
             with tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
                 issue_dir = _make_issue_scope(repo_root)
-                discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+                discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
                 discussion.write_text(text, encoding="utf-8")
 
                 result = domain.evaluate_diff_guard(
@@ -480,9 +471,9 @@ class TestDelegatedAuthoringRuntimeDomain:
                 )
 
                 assert not result.ok, case
-                assert f"reason=new_discussion_{expected}" in "\n".join(result.details), case
+                assert f"reason=new_artifact_{expected}" in "\n".join(result.details), case
 
-    def test_diff_guard_rejects_new_discussion_with_empty_source_or_target_provenance(self) -> None:
+    def test_diff_guard_rejects_new_artifact_with_empty_source_or_target_provenance(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         cases = (
             (
@@ -498,15 +489,27 @@ class TestDelegatedAuthoringRuntimeDomain:
                 "empty_intended_targets",
             ),
             (
-                "inline_source_paths",
+                "scalar_source_paths",
                 "source_paths:\n  - spec-dock/active/issue/requirement.md",
                 "source_paths: spec-dock/active/issue/requirement.md",
                 "empty_source_paths",
             ),
             (
-                "inline_intended_targets",
+                "scalar_intended_targets",
                 "intended_targets:\n  - spec-dock/active/issue/design.md",
                 "intended_targets: spec-dock/active/issue/design.md",
+                "empty_intended_targets",
+            ),
+            (
+                "quoted_empty_source_paths",
+                "source_paths:\n  - spec-dock/active/issue/requirement.md",
+                'source_paths:\n  - ""',
+                "empty_source_paths",
+            ),
+            (
+                "list_like_empty_intended_targets",
+                "intended_targets:\n  - spec-dock/active/issue/design.md",
+                "intended_targets:\n  - []",
                 "empty_intended_targets",
             ),
         )
@@ -515,7 +518,7 @@ class TestDelegatedAuthoringRuntimeDomain:
             with tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
                 issue_dir = _make_issue_scope(repo_root)
-                discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+                discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
                 discussion.write_text(_draft_text("# draft").replace(old, new), encoding="utf-8")
 
                 result = domain.evaluate_diff_guard(
@@ -526,7 +529,35 @@ class TestDelegatedAuthoringRuntimeDomain:
                 )
 
                 assert not result.ok, case
-                assert f"reason=new_discussion_{expected}" in "\n".join(result.details), case
+                assert f"reason=new_artifact_{expected}" in "\n".join(result.details), case
+
+    def test_diff_guard_accepts_new_artifact_with_inline_source_and_target_lists(self) -> None:
+        _request_cls, _generate, domain = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            issue_dir = _make_issue_scope(repo_root)
+            discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
+            discussion.write_text(
+                _draft_text("# draft")
+                .replace(
+                    "source_paths:\n  - spec-dock/active/issue/requirement.md",
+                    'source_paths: ["spec-dock/active/issue/requirement.md"]',
+                )
+                .replace(
+                    "intended_targets:\n  - spec-dock/active/issue/design.md",
+                    "intended_targets: ['spec-dock/active/issue/design.md']",
+                ),
+                encoding="utf-8",
+            )
+
+            result = domain.evaluate_diff_guard(
+                scope_id="iss-00003",
+                repo_root=repo_root,
+                scope_dir=issue_dir,
+                entries=(domain.DiffGuardEntry(status="??", path=discussion.relative_to(repo_root)),),
+            )
+
+            assert result.ok
 
     def test_diff_guard_rejects_duplicate_frontmatter_provenance_keys(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -544,7 +575,7 @@ class TestDelegatedAuthoringRuntimeDomain:
             with tempfile.TemporaryDirectory() as tmp:
                 repo_root = Path(tmp)
                 issue_dir = _make_issue_scope(repo_root)
-                discussion = issue_dir / "discussions" / "20260525t010203z-disc-agent-draft.md"
+                discussion = issue_dir / "artifacts" / "20260525t010203z-disc-agent-draft.md"
                 discussion.write_text(
                     _draft_text("# draft").replace("---\n", f"---\n{duplicate_line}\n", 1),
                     encoding="utf-8",
@@ -558,14 +589,14 @@ class TestDelegatedAuthoringRuntimeDomain:
                 )
 
                 assert not result.ok, case
-                assert f"reason=new_discussion_duplicate_provenance:{key}" in "\n".join(result.details), case
+                assert f"reason=new_artifact_duplicate_provenance:{key}" in "\n".join(result.details), case
 
-    def test_diff_guard_rejects_allowlisted_existing_discussion_without_state_as_unsupported_update(self) -> None:
+    def test_diff_guard_rejects_allowlisted_existing_artifact_without_state_as_unsupported_update(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            unstated = issue_dir / "discussions" / "20260525t010204z-disc-unstated-draft.md"
+            unstated = issue_dir / "artifacts" / "20260525t010204z-disc-unstated-draft.md"
             unstated.write_text("# missing state\n", encoding="utf-8")
             non_editable_paths = []
             for index, state in enumerate(
@@ -582,7 +613,7 @@ class TestDelegatedAuthoringRuntimeDomain:
                 ),
                 start=1,
             ):
-                discussion = issue_dir / "discussions" / f"20260525t0102{index:02d}z-disc-{state.replace('_', '-')}.md"
+                discussion = issue_dir / "artifacts" / f"20260525t0102{index:02d}z-disc-{state.replace('_', '-')}.md"
                 field = "adoption_status" if "adopted" in state else "status"
                 discussion.write_text(f"---\n{field}: {state}\n---\n# {state}\n", encoding="utf-8")
                 non_editable_paths.append(discussion)
@@ -602,14 +633,14 @@ class TestDelegatedAuthoringRuntimeDomain:
 
             assert not result.ok
             joined = "\n".join(result.details)
-            assert joined.count("reason=existing_discussion_update_unsupported") == (len(non_editable_paths) + 1) * 2
+            assert joined.count("reason=existing_artifact_update_unsupported") == len(non_editable_paths) + 1
 
     def test_diff_guard_rejects_allowlisted_update_with_body_only_state_as_unsupported_update(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            discussion = issue_dir / "discussions" / "20260525t010203z-01-research-agent-draft.md"
+            discussion = issue_dir / "artifacts" / "20260525t010203z-01-research-agent-draft.md"
             discussion.write_text("# body-only\n\nstatus: proposed\n", encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
@@ -621,7 +652,7 @@ class TestDelegatedAuthoringRuntimeDomain:
             )
 
             assert not result.ok
-            assert "reason=existing_discussion_update_unsupported" in "\n".join(result.details)
+            assert "reason=existing_artifact_update_unsupported" in "\n".join(result.details)
 
     def test_diff_guard_rejects_symlinked_discussions_dir_without_status_entries(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -630,7 +661,7 @@ class TestDelegatedAuthoringRuntimeDomain:
             issue_dir = _make_issue_scope(repo_root)
             external_discussions = repo_root / "external-discussions"
             external_discussions.mkdir()
-            discussions_dir = issue_dir / "discussions"
+            discussions_dir = issue_dir / "artifacts"
             discussions_dir.rmdir()
             discussions_dir.symlink_to(external_discussions, target_is_directory=True)
 
@@ -642,14 +673,14 @@ class TestDelegatedAuthoringRuntimeDomain:
             )
 
             assert not result.ok
-            assert "reason=discussions_dir_symlink" in "\n".join(result.details)
+            assert "reason=artifacts_dir_symlink" in "\n".join(result.details)
 
-    def test_diff_guard_rejects_discussion_symlink_without_status_entries(self) -> None:
+    def test_diff_guard_rejects_artifact_symlink_without_status_entries(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
-            symlink = issue_dir / "discussions" / "20260525t010203z-disc-link.md"
+            symlink = issue_dir / "artifacts" / "20260525t010203z-disc-link.md"
             symlink.symlink_to(issue_dir / "design.md")
 
             result = domain.evaluate_diff_guard(
@@ -660,7 +691,7 @@ class TestDelegatedAuthoringRuntimeDomain:
             )
 
             assert not result.ok
-            assert "reason=discussion_symlink" in "\n".join(result.details)
+            assert "reason=artifact_symlink" in "\n".join(result.details)
 
     def test_diff_guard_rejects_forbidden_paths(self) -> None:
         _request_cls, _generate, domain = _runtime_modules()
@@ -696,7 +727,7 @@ class TestDelegatedAuthoringRuntimeDomain:
             repo_root = Path(tmp)
             issue_dir = _make_issue_scope(repo_root)
             other_issue_dir = _make_issue_scope(repo_root, scope_id="iss-00004", slug="other")
-            discussions_dir = issue_dir / "discussions"
+            discussions_dir = issue_dir / "artifacts"
             nested = discussions_dir / "nested" / "20260525t010203z-disc-nested.md"
             nested.parent.mkdir()
             nested.write_text("# nested\n", encoding="utf-8")
@@ -712,7 +743,7 @@ class TestDelegatedAuthoringRuntimeDomain:
             retired_note_kind.write_text("# retired note kind\n", encoding="utf-8")
             unallowlisted = discussions_dir / "20260525t010204z-disc-existing-draft.md"
             unallowlisted.write_text("# existing\n", encoding="utf-8")
-            other_discussion = other_issue_dir / "discussions" / "20260525t010205z-disc-other.md"
+            other_discussion = other_issue_dir / "artifacts" / "20260525t010205z-disc-other.md"
             other_discussion.write_text("# other\n", encoding="utf-8")
 
             result = domain.evaluate_diff_guard(
@@ -742,13 +773,13 @@ class TestDelegatedAuthoringRuntimeDomain:
 
             assert not result.ok
             joined = "\n".join(result.details)
-            assert "reason=outside_target_discussions" in joined
+            assert "reason=outside_target_artifacts" in joined
             assert "reason=symlink" in joined
             assert "reason=non_markdown" in joined
-            assert "reason=discussion_name_noncompliant" in joined
+            assert "reason=artifact_name_noncompliant" in joined
             assert "reason=delete" in joined
             assert "reason=rename_or_copy" in joined
-            assert "reason=existing_discussion_update_unsupported" in joined
+            assert "reason=existing_artifact_update_unsupported" in joined
 
 
 def _make_issue_scope(repo_root: Path, *, scope_id: str = "iss-00003", slug: str = "delegated-authoring") -> Path:
@@ -763,7 +794,7 @@ def _make_issue_scope(repo_root: Path, *, scope_id: str = "iss-00003", slug: str
         / f"{scope_id}-{slug}"
     )
     issue_dir.mkdir(parents=True)
-    (issue_dir / "discussions").mkdir()
+    (issue_dir / "artifacts").mkdir()
     (issue_dir / ".meta.json").write_text(f'{{"id": "{scope_id}"}}\n', encoding="utf-8")
     for name in ("requirement.md", "design.md", "plan.md", "report.md"):
         (issue_dir / name).write_text("---\nstatus: draft\n---\n", encoding="utf-8")

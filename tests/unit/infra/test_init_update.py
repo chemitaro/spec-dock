@@ -1866,7 +1866,10 @@ class TestInitUpdate(CliRuntimeHarness):
             "report evidence destination",
             "Evidence Adoption Ledger fields",
         ):
-            assert field in text, f"{source}: missing scope-local discussion evidence field {field}"
+            assert field in text, f"{source}: missing delegated artifact evidence field {field}"
+        assert "artifacts/" in text, f"{source}: missing artifacts/ delegated draft output guidance"
+        assert "legacy `discussions/`" in text, f"{source}: missing legacy discussions historical evidence guidance"
+        assert "grandfathered evidence" in text, f"{source}: missing grandfathered evidence wording"
         for retired_heavy_field in (
             "manifest_hash",
             "permission_profile_name",
