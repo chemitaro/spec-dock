@@ -21786,6 +21786,124 @@ exit 44
         assert payload["decision"]["status_reason"] == "actionable_unresolved_thread"
         assert payload["decision"]["recommended_next_action"] != "merge_prepared"
 
+    def test_issue_222_s03_wait_explicit_empty_actionable_unresolved_overrides_raw_selected_count(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "passed",
+            "status_reason": "blocker_policy_no_action",
+            "recommended_next_action": "merge_prepared",
+            "observation_complete": True,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [301],
+            "selected_review_thread_ids": ["RT_selected"],
+            "selected_unresolved_thread_ids": ["RT_selected"],
+            "selected_unresolved_count": 1,
+            "current_selected_unresolved_count": 1,
+            "current_selected_unresolved_thread_ids": ["RT_selected"],
+            "carryover_unresolved_count": 0,
+            "carryover_unresolved_thread_ids": [],
+            "actionable_unresolved_count": 0,
+            "actionable_unresolved_thread_ids": [],
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "submitted_pull_request_review",
+            "fingerprint": "explicit-empty-actionable-unresolved-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "passed",
+                        "overall_status": "passed",
+                        "normalized_status": "passed",
+                        "recommended_next_action": "merge_prepared",
+                        "decision": decision,
+                        "decision_fingerprint": "explicit-empty-actionable-unresolved-s03",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "submitted",
+                                "completion_signal": "submitted_pull_request_review",
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_selected"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["overall_status"] == "passed"
+        assert payload["normalized_status"] == "passed"
+        assert payload["recommended_next_action"] == "merge_prepared"
+        assert payload["observation_complete"] is True
+        assert payload["decision"]["status_reason"] == "blocker_policy_no_action"
+
+    def test_issue_222_s03_wait_explicit_actionable_unresolved_blocks_with_raw_selected_zero(self) -> None:
+        decision = {
+            "scope": "current_trigger_boundary",
+            "status": "passed",
+            "status_reason": "blocker_policy_no_action",
+            "recommended_next_action": "merge_prepared",
+            "observation_complete": True,
+            "selected_review_ids": [],
+            "selected_review_comment_ids": [301],
+            "selected_review_thread_ids": ["RT_actionable"],
+            "selected_unresolved_thread_ids": [],
+            "selected_unresolved_count": 0,
+            "current_selected_unresolved_count": 0,
+            "current_selected_unresolved_thread_ids": [],
+            "carryover_unresolved_count": 0,
+            "carryover_unresolved_thread_ids": [],
+            "actionable_unresolved_count": 1,
+            "actionable_unresolved_thread_ids": ["RT_actionable"],
+            "selected_changes_requested_evidence": [],
+            "completion_signal": "submitted_pull_request_review",
+            "fingerprint": "explicit-actionable-unresolved-raw-zero-s03",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result, _out_dir = self._issue_174_run_wait_fake_snapshots(
+                Path(tmp_dir),
+                [
+                    {
+                        "ci": "passed",
+                        "review": "approved",
+                        "status": "passed",
+                        "overall_status": "passed",
+                        "normalized_status": "passed",
+                        "recommended_next_action": "merge_prepared",
+                        "decision": decision,
+                        "decision_fingerprint": "explicit-actionable-unresolved-raw-zero-s03",
+                        "codex_review": {
+                            "lifecycle": {
+                                "status": "submitted",
+                                "completion_signal": "submitted_pull_request_review",
+                            }
+                        },
+                        "check_runs": {"total": 1, "success": 1},
+                        "threads": {"total": 1, "unresolved": 1, "items": [{"id": "RT_actionable"}]},
+                    }
+                ],
+                timeout_seconds=2,
+                quiet_seconds=1,
+                same_fingerprint_count=1,
+                progress="none",
+            )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["overall_status"] == "human_gate"
+        assert payload["normalized_status"] == "human_gate"
+        assert payload["recommended_next_action"] == "address_review_feedback"
+        assert payload["observation_complete"] is False
+        assert payload["decision"]["status_reason"] == "actionable_unresolved_thread"
+
     def test_issue_219_s01_wait_fallback_no_findings_with_unresolved_review_blocks_pass(self) -> None:
         decision = {
             "scope": "current_trigger_boundary",
@@ -29243,6 +29361,7 @@ esac
         normalized_status: str = "unknown",
         decision_overrides: dict[str, object] | None = None,
         review_status: str = "none",
+        lifecycle_completion_signal: str = "codex_no_findings_issue_comment",
     ) -> tuple[str, str, bool, str | None]:
         module = self._issue_218_s02_load_observation_snapshot_module()
         decision: dict[str, object] = {
@@ -29270,7 +29389,7 @@ esac
                 "decision": decision,
                 "codex_review": {
                     "lifecycle": {
-                        "completion_signal": "codex_no_findings_issue_comment",
+                        "completion_signal": lifecycle_completion_signal,
                     },
                 },
             },
@@ -29483,6 +29602,52 @@ esac
         assert complete is True
         assert reason == "actionable_unresolved_thread"
         assert action != "merge_prepared"
+
+    def test_issue_222_s03_snapshot_explicit_empty_actionable_unresolved_overrides_raw_selected_count(self) -> None:
+        status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
+            decision_overrides={
+                "status": "passed",
+                "status_reason": "blocker_policy_no_action",
+                "recommended_next_action": "merge_prepared",
+                "observation_complete": True,
+                "selected_unresolved_count": 1,
+                "current_selected_unresolved_count": 1,
+                "selected_unresolved_thread_ids": ["RT_selected"],
+                "current_selected_unresolved_thread_ids": ["RT_selected"],
+                "actionable_unresolved_count": 0,
+                "actionable_unresolved_thread_ids": [],
+            },
+            review_status="approved",
+        )
+
+        assert status == "passed"
+        assert action == "merge_prepared"
+        assert complete is True
+        assert reason == "passed"
+
+    def test_issue_222_s03_snapshot_explicit_actionable_unresolved_blocks_with_raw_selected_zero(self) -> None:
+        status, action, complete, reason = self._issue_218_s02_classify_no_findings_snapshot(
+            decision_overrides={
+                "status": "passed",
+                "status_reason": "blocker_policy_no_action",
+                "recommended_next_action": "merge_prepared",
+                "observation_complete": True,
+                "completion_signal": "submitted_pull_request_review",
+                "selected_unresolved_count": 0,
+                "current_selected_unresolved_count": 0,
+                "selected_unresolved_thread_ids": [],
+                "current_selected_unresolved_thread_ids": [],
+                "actionable_unresolved_count": 1,
+                "actionable_unresolved_thread_ids": ["RT_actionable"],
+            },
+            review_status="approved",
+            lifecycle_completion_signal="submitted_pull_request_review",
+        )
+
+        assert status == "human_gate"
+        assert action == "address_review_feedback"
+        assert complete is True
+        assert reason == "actionable_unresolved_thread"
 
     def test_issue_170_pr_observation_review_collector_keeps_feedback_with_trigger_text(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -32211,6 +32376,201 @@ esac
             assert blocker_policy["blocker_count"] == 1
             assert blocker_policy["findings"][0]["kind"] == "pull_review"
             assert blocker_policy["findings"][0]["id"] == 201
+            assert blocker_policy["findings"][0]["priority"] == "P1"
+            assert blocker_policy["findings"][0]["disposition"] == "blocker"
+            assert len(blocker_policy["blocker_fingerprints"]) == 1
+            assert blocker_policy["findings"][0]["fingerprint"] == blocker_policy["blocker_fingerprints"][0]
+
+    def test_issue_232_review_collector_treats_p2_inline_thread_as_non_blocking(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"Inline follow-up review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"[P2] consider a clearer helper name."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_selected","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:06:00Z","body":"[P2] consider a clearer helper name."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "passed"
+            assert payload["decision"]["status_reason"] == "blocker_policy_no_action"
+            assert payload["decision"]["recommended_next_action"] == "merge_prepared"
+            assert payload["decision"]["current_selected_unresolved_thread_ids"] == ["RT_selected"]
+            assert payload["decision"]["actionable_unresolved_thread_ids"] == []
+            blocker_policy = payload["decision"]["blocker_policy"]
+            assert blocker_policy["status"] == "non_blocking_only"
+            assert blocker_policy["blocker_count"] == 0
+            assert blocker_policy["blocker_fingerprints"] == []
+            assert blocker_policy["findings"] == [
+                {
+                    "kind": "pull_review_comment",
+                    "id": 301,
+                    "review_id": 201,
+                    "thread_id": "RT_selected",
+                    "thread_state": "unresolved",
+                    "priority": "P2",
+                    "disposition": "non_blocking_followup",
+                    "reason": "p2_p3_default_non_blocking",
+                    "protected_domain": False,
+                    "machine_evidence": False,
+                    "fingerprint": blocker_policy["findings"][0]["fingerprint"],
+                }
+            ]
+
+    def test_issue_232_review_collector_treats_p1_inline_thread_as_blocker(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/fetch_pr_review_snapshot.sh"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            fake_bin = tmp_path / "bin"
+            fake_bin.mkdir()
+            fake_gh = fake_bin / "gh"
+            fake_gh.write_text(
+                """#!/usr/bin/env bash
+case "$*" in
+  "api repos/owner/repo/issues/13/comments --paginate")
+    cat <<'JSON'
+[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/reviews --paginate")
+    cat <<'JSON'
+[{"id":201,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:05:00Z","body":"Inline blocker review."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13/comments --paginate")
+    cat <<'JSON'
+[{"id":301,"user":{"login":"codex"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"[P1] this lets unresolved selected threads bypass a blocker."}]
+JSON
+    ;;
+  "api repos/owner/repo/pulls/13 --paginate")
+    cat <<'JSON'
+{"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"requested_reviewers":[],"requested_teams":[]}
+JSON
+    ;;
+  api\\ graphql*)
+    cat <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_selected","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:06:00Z","body":"[P1] this lets unresolved selected threads bypass a blocker."}]}}]}}}}}
+JSON
+    ;;
+  *)
+    printf 'unexpected gh call: %s\\n' "$*" >&2
+    exit 44
+    ;;
+esac
+""",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            }
+
+            result = subprocess.run(
+                [
+                    str(script_path),
+                    "--repo",
+                    "owner/repo",
+                    "--pr",
+                    "13",
+                    "--head-sha",
+                    "a" * 40,
+                    "--trigger-comment-id",
+                    "99",
+                    "--trigger-created-at",
+                    "2026-06-08T01:00:00Z",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["decision"]["status"] == "human_gate"
+            assert payload["decision"]["status_reason"] == "blocker_policy_validated_blocker"
+            assert payload["decision"]["recommended_next_action"] == "address_review_feedback"
+            assert payload["decision"]["current_selected_unresolved_thread_ids"] == ["RT_selected"]
+            assert payload["decision"]["actionable_unresolved_thread_ids"] == ["RT_selected"]
+            blocker_policy = payload["decision"]["blocker_policy"]
+            assert blocker_policy["status"] == "blocker_present"
+            assert blocker_policy["blocker_count"] == 1
+            assert blocker_policy["findings"][0]["kind"] == "pull_review_comment"
+            assert blocker_policy["findings"][0]["id"] == 301
+            assert blocker_policy["findings"][0]["review_id"] == 201
+            assert blocker_policy["findings"][0]["thread_id"] == "RT_selected"
+            assert blocker_policy["findings"][0]["thread_state"] == "unresolved"
             assert blocker_policy["findings"][0]["priority"] == "P1"
             assert blocker_policy["findings"][0]["disposition"] == "blocker"
             assert len(blocker_policy["blocker_fingerprints"]) == 1

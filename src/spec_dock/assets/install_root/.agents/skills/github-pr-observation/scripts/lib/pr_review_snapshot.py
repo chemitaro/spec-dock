@@ -1145,7 +1145,7 @@ if pending_codex_review_signals:
     current_pending_codex_review_present = True
 
 blocker_policy_findings = []
-for item in [*current_codex_issue_comments, *selected_review_signals]:
+for item in [*current_codex_issue_comments, *selected_review_signals, *selected_comment_signals]:
     raw_body = item.get("_fallback_pass_raw_body") or item.get("body") or item.get("_raw_body_artifact") or ""
     priorities = finding_priorities(raw_body)
     if not priorities:
@@ -1165,6 +1165,9 @@ for item in [*current_codex_issue_comments, *selected_review_signals]:
         blocker_policy_findings.append({
             "kind": item.get("kind"),
             "id": item.get("id"),
+            "review_id": item.get("review_id"),
+            "thread_id": item.get("thread_id"),
+            "thread_state": item.get("thread_state"),
             "priority": priority,
             "disposition": disposition,
             "reason": reason,
@@ -1176,6 +1179,26 @@ blocker_policy_blockers = [item for item in blocker_policy_findings if item.get(
 blocker_policy_non_blocking = [
     item for item in blocker_policy_findings if item.get("disposition") == "non_blocking_followup"
 ]
+non_blocking_selected_unresolved_thread_ids = []
+for item in blocker_policy_non_blocking:
+    thread_id = item.get("thread_id")
+    if (
+        item.get("kind") == "pull_review_comment"
+        and item.get("thread_state") == "unresolved"
+        and thread_id is not None
+        and str(thread_id) in selected_unresolved_thread_id_set
+        and thread_id not in non_blocking_selected_unresolved_thread_ids
+    ):
+        non_blocking_selected_unresolved_thread_ids.append(thread_id)
+selected_actionable_unresolved_thread_ids = [
+    thread_id
+    for thread_id in selected_unresolved_thread_ids
+    if thread_id not in non_blocking_selected_unresolved_thread_ids
+]
+actionable_unresolved_thread_ids = list(selected_actionable_unresolved_thread_ids)
+for thread_id in carryover_unresolved_thread_ids:
+    if thread_id not in actionable_unresolved_thread_ids:
+        actionable_unresolved_thread_ids.append(thread_id)
 blocker_policy_status = (
     "blocker_present" if blocker_policy_blockers else "non_blocking_only" if blocker_policy_non_blocking else "none"
 )
@@ -1212,11 +1235,7 @@ blocker_policy_no_action_promotes = bool(
     and not current_pending_codex_review_present
     and not blocking_collection_failure
 )
-if selected_review_signals:
-    lifecycle_status = "unresolved" if selected_thread_ids else "completed"
-    completion_signal = "submitted_pull_request_review"
-    lifecycle_confidence = "high"
-elif no_findings_completion_promotes:
+if no_findings_completion_promotes:
     lifecycle_status = "completed"
     completion_signal = "codex_no_findings_issue_comment"
     lifecycle_confidence = "medium"
@@ -1224,6 +1243,10 @@ elif blocker_policy_no_action_promotes:
     lifecycle_status = "completed"
     completion_signal = "blocker_policy_no_action"
     lifecycle_confidence = "medium"
+elif selected_review_signals:
+    lifecycle_status = "unresolved" if selected_actionable_unresolved_thread_ids else "completed"
+    completion_signal = "submitted_pull_request_review"
+    lifecycle_confidence = "high"
 elif current_pending_codex_review_present:
     lifecycle_status = "pending"
     completion_signal = "none"
@@ -1280,7 +1303,7 @@ selected_changes_requested_evidence.extend(
 )
 pending_review_present = lifecycle_status == "pending" or current_pending_codex_review_present
 blocking_limitation_present = bool(blocking_collection_failure)
-selected_blocker_present = bool(selected_unresolved_thread_ids or selected_changes_requested_evidence)
+selected_blocker_present = bool(selected_actionable_unresolved_thread_ids or selected_changes_requested_evidence)
 explicit_completion_present = completion_signal in {
     "submitted_pull_request_review",
     "codex_no_findings_issue_comment",
@@ -1408,7 +1431,7 @@ fallback_pass_promotes = bool(
     and sha_prefix_matches(current_pr_head_sha, expected_head_sha)
     and fallback_pass_source_ids
     and not stale_codex_head_context_present
-    and not selected_unresolved_thread_ids
+    and not selected_actionable_unresolved_thread_ids
     and not selected_changes_requested_evidence
     and not review_decision_changes_requested
     and not review_decision_requires_review
@@ -1436,7 +1459,7 @@ if blocker_policy_blockers:
     decision_status_reason = "blocker_policy_validated_blocker"
     decision_status = "human_gate"
     decision_action = "address_review_feedback"
-elif selected_unresolved_thread_ids:
+elif selected_actionable_unresolved_thread_ids:
     decision_status_reason = "current_selected_unresolved_thread"
     decision_status = "human_gate"
     decision_action = "address_review_feedback"

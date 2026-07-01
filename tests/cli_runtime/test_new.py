@@ -1179,7 +1179,7 @@ class TestCliNew(CliRuntimeHarness):
             assert 'タイトル: "PR Repair Batch"' in content
             assert '親: ["iss-00003"]' in content
             assert "# 20260312t010203z-pr-repair-batch PR Repair Batch" in content
-            assert "observed GitHub Actions CI failures" in content
+            assert "Required GitHub Actions CI failures exist." in content
             assert "`check_failure:<actions_job_or_workflow_name>`" in content
             assert "External/non-Actions check state" in content
             assert "triage review findings, CI failures" not in content
