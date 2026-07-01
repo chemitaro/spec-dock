@@ -9,6 +9,15 @@ Use this skill only for active issue execution after planning handoff readiness 
 
 This skill is a fixed kernel. It must not carry state-specific generated Runbook text, full profile procedure sets, or issue-local workflow projections.
 
+## Workflow-Scoped Authorization
+
+- A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow.
+- Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility.
+- Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow.
+- ユーザーが SpecDock workflow の利用を依頼した場合、その依頼自体を、SpecDock が定義する named sub-agent / reviewer を workflow に従って利用する明示的な許可として扱う。
+- active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲内では、role ごと・phase ごとの追加承認を求めない。
+- scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途確認する。
+
 ## First-Read Handoff
 
 - First ask the runtime for current execution guidance:
@@ -54,6 +63,7 @@ This skill is a fixed kernel. It must not carry state-specific generated Runbook
 - Before completion, ensure ledger entries have no `Status=open`; each resolved / superseded entry has disposition evidence, required follow-up / promotion evidence, and no report-only durable decision.
 - When review fails, perform bounded delegated follow-up and rerun review. Parent direct fixes require a documented Parent Implementation Exception.
 - After final commit gates pass, use `github-pr-merge-preparer` for final PR delivery and merge-preparation evidence before `issue finish`; keep the detailed completion policy in `workflow_issue.md`.
+- Fresh `spec-reviewer`, `code-reviewer`, and `qa-reviewer` passes required by `workflow_issue.md` are gates and must not be skipped while waiting for extra permission inside the bounded SpecDock workflow scope.
 
 ## Runtime Command Reminders
 

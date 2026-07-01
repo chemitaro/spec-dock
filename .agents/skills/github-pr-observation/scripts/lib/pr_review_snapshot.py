@@ -1156,9 +1156,6 @@ for item in [*current_codex_issue_comments, *selected_review_signals]:
         if priority in {"P0", "P1"}:
             disposition = "blocker"
             reason = "p0_p1_priority"
-        elif priority == "P2" and protected_domain and machine_evidence:
-            disposition = "promoted_blocker"
-            reason = "p2_protected_domain_with_machine_evidence"
         elif priority in {"P2", "P3"}:
             disposition = "non_blocking_followup"
             reason = "p2_p3_default_non_blocking"
@@ -1176,7 +1173,7 @@ for item in [*current_codex_issue_comments, *selected_review_signals]:
             "fingerprint": blocker_fingerprint(item.get("kind"), priority, raw_body),
         })
 blocker_policy_blockers = [
-    item for item in blocker_policy_findings if item.get("disposition") in {"blocker", "promoted_blocker"}
+    item for item in blocker_policy_findings if item.get("disposition") == "blocker"
 ]
 blocker_policy_non_blocking = [
     item for item in blocker_policy_findings if item.get("disposition") == "non_blocking_followup"

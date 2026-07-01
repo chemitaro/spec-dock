@@ -9,6 +9,15 @@ Use this skill for issue planning work: create or update issue-level requirement
 
 This skill is a fixed kernel. It must not carry state-specific generated Runbook text, full profile procedure sets, or issue-local workflow projections.
 
+## Workflow-Scoped Authorization
+
+- A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow.
+- Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility.
+- Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow.
+- ユーザーが SpecDock workflow の利用を依頼した場合、その依頼自体を、SpecDock が定義する named sub-agent / reviewer を workflow に従って利用する明示的な許可として扱う。
+- active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲内では、role ごと・phase ごとの追加承認を求めない。
+- scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途確認する。
+
 ## First-Read Handoff
 
 - First ask the runtime for current planning guidance:
@@ -50,6 +59,7 @@ This skill is a fixed kernel. It must not carry state-specific generated Runbook
 - `system-architect` and `implementation-planner` are delegated agent roles only; their drafts are scope-local evidence only and do not replace main orchestrator adoption, fresh `spec-reviewer` pass, phase promotion, or execution handoff readiness.
 - Delegated drafts, research, discussions, and generated Runbooks are evidence only until adopted into canonical artifacts and recorded in `report.md`.
 - Fresh means the current artifact candidate was reviewed after its latest substantive change and fresh `spec-reviewer` returns `review_status: pass`.
+- Fresh `spec-reviewer` passes are required gates and must not be skipped while waiting for extra permission inside the bounded SpecDock workflow scope.
 - Record Spec Authoring Gate evidence in `report.md` when canonical artifacts are promoted or execution handoff readiness changes.
 
 ## Kernel Boundary

@@ -35,104 +35,224 @@ reflected_to: []
 
 ## Batch Purpose
 
-Use this batch to triage review findings, observed GitHub Actions CI failures, merge blockers, and observation limitations after PR observation and before repair delegation. The batch separates validity from need-to-fix, groups related concerns, creates repair units when needed, and records residual risk for the final merge-prepared decision. PR observation intentionally does not observe external/non-Actions checks; record GitHub UI or external CI confirmation as residual risk or a human gate when branch protection depends on them.
+Use this repo-persistent batch to triage and repair blocking PR observation
+results. A blocking result is a `P0`/`P1` review finding, required GitHub Actions
+CI failure, visible merge conflict, blocking observation limitation, or other
+merge-prepared blocker.
 
-## Concern Catalog
+This batch separates raw intake from severity decisions, groups related findings
+by `root_cause_family`, creates repair units only for blocking families, records
+non-blocking findings only when a blocking repair commit is already being made,
+and preserves residual risk for the final merge-prepared decision.
 
-| concern_id | concern | related_inventory_ids | suspected_root_cause | repair_unit | notes |
-| --- | --- | --- | --- | --- | --- |
+`root_cause_family` is documentation and LLM judgment vocabulary for this
+discussion artifact. It is not a required runtime JSON field, parser contract,
+blocker fingerprint, or stalled-observation contract.
 
-Add one row per real concern. Leave this table empty when no concern exists.
+## Persistence Policy
 
-## Inventory
+This file is for blocking repair work.
 
-| ID | source_type | concern | failure_class | evidence | summary | validity | risk_class | need_to_fix | disposition | repair_unit | status | rationale | residual_risk |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+Use this repo-persistent batch when:
 
-Add one row per real review finding, CI failure, merge blocker, or observation limitation. Do not keep example rows as active inventory.
+- `P0`/`P1` review findings exist.
+- Required GitHub Actions CI failures exist.
+- Merge blockers exist.
+- Blocking observation limitations require repair or human-gate tracking.
+- Branch mutation is already required for blocking repair and non-blocking
+  findings can be recorded in the same commit without causing an extra CI run.
+
+Do not update this batch solely to record terminal `P2`/`P3` findings after the
+latest pushed head has no blockers. Record terminal `P2`/`P3` findings in the
+final merge-prepared report instead, unless the user explicitly requests
+separate follow-up tracking outside the current PR branch.
+
+## Observation Batch Summary
+
+| field | value |
+| --- | --- |
+| latest_head_sha |  |
+| observation_status |  |
+| required_ci_status |  |
+| review_status |  |
+| p0_count |  |
+| p1_count |  |
+| p2_count |  |
+| p3_count |  |
+| required_ci_failure_count |  |
+| merge_blocker_count |  |
+| blocking_family_count |  |
+| non_blocking_family_count |  |
+| terminal_non_blocking_only | yes / no |
+| branch_mutation_required | yes / no |
+| ci_rerun_expected | yes / no |
+| review_clean | yes / no |
+| merge_prepared_candidate | yes / no |
+
+## Raw Intake Inventory
+
+Add one row per observed review finding, required CI failure, merge blocker, or
+observation limitation from the same observation batch. Keep raw reviewer
+priority separate from the final severity decision.
+
+| item_id | source_type | source_id | reported_priority | path | line | raw_summary | evidence_type | current_head_sha | family_id | intake_status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| RXXX | review / ci / merge / limitation |  | P0 / P1 / P2 / P3 / CI / unknown |  |  |  | failing-test / repro / code-path / contract / observation |  | FXXX | untriaged |
+
+Do not keep example rows as active inventory.
+
+## Concern Family Catalog
+
+Group inventory items by shared root cause. Do not repair comments one-by-one.
+
+| family_id | root_cause_family | family_title | protected_domain | invariant_or_contract | related_items | max_reported_priority | decided_priority | merge_blocking | disposition | repair_unit | family_status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| FXXX | issue_readiness.placeholder_contract |  | yes / no |  | RXXX | P0 / P1 / P2 / P3 / CI | P0 / P1 / P2 / P3 / required-ci / platform | yes / no / platform-only | fix-now / no-action / follow-up / needs-human / covered-by | UXXX / N/A | open |
 
 ## Classification Values
 
+- `reported_priority`: `P0` / `P1` / `P2` / `P3` / `CI` / `unknown`
+- `decided_priority`: `P0` / `P1` / `P2` / `P3` / `required-ci` / `platform` / `unknown`
+- `merge_blocking`: `yes` / `no` / `platform-only` / `unknown`
 - `validity`: `valid` / `partially-valid` / `false-positive` / `duplicate` / `unknown`
-- `failure_class`: `check_failure:<actions_job_or_workflow_name>` / `review_feedback:<topic>` / `merge_conflict` / `base_branch_conflict` / `permission_or_auth` / `external_or_flaky` / `timeout` / `unknown`
-- `risk_class`: `blocking` / `material-follow-up` / `minor` / `false-positive` / `duplicate`
+- `failure_class`: `check_failure:<actions_job_or_workflow_name>` / `review_feedback:<stable_topic>` / `merge_conflict` / `base_branch_conflict` / `permission_or_auth` / `external_or_flaky` / `platform_conversation_resolution` / `timeout` / `unknown`
 - `need_to_fix`: `yes` / `no` / `follow-up` / `human-decision`
 - `disposition`: `fix-now` / `follow-up` / `no-action` / `covered-by` / `needs-human`
 - `status`: `untriaged` / `triaged` / `unit-needed` / `unit-created` / `implemented` / `reobserved-pass` / `blocked`
 
-## Per-Concern Analysis
+## Per-Family Analysis
 
-### CXXX
+Create one subsection per real family.
 
-- Covered inventory IDs:
+### FXXX <root_cause_family>
+
+- Related inventory IDs:
+- Reported priorities:
+- Decided priority:
+- Merge-blocking: yes / no / platform-only
+- Protected domain:
+- Contract / invariant:
+- Root cause:
+- Why this is one family:
 - Validity analysis:
 - Need-to-fix decision:
-- Root cause:
 - Options considered:
 - Recommended disposition:
-- Rationale:
+- Repair scope:
+- Out of scope:
+- Quality gates:
 - Residual risk:
+- Follow-up handling:
 
-## Repair Queue
+## Blocking Repair Queue
 
-| unit_id | source_batch | covered_ids | disposition | risk_class | repair_unit_disc | status | Implementation Plan | Re-observation Result | Residual Risk |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+Create repair units only for `P0`/`P1` families, required CI failures, or
+blocking merge issues. Do not create repair units for `P2`/`P3` findings unless
+they are directly and unavoidably covered by the same `P0`/`P1` root-cause fix.
 
-Add one row per real repair unit. Leave this table empty when no repair unit is needed.
+| unit_id | source_batch | family_id | covered_items | decided_priority | merge_blocking | disposition | repair_unit_disc | status | implementation_plan | quality_gate | commit_evidence | re_observation_result | residual_risk |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| UXXX | <PR_REPAIR_BATCH_ID> | FXXX | RXXX | P1 | yes | fix-now | path / N/A | unit-needed |  |  |  |  |  |
 
-## Unit Discussion Plan
+## Non-Blocking Follow-up Register
 
-Create a repair unit `disc` for each `fix-now` item and each `needs-human` item that needs implementation analysis, design judgment, or options comparison. The worker must use the repair unit discussion, not raw findings, as the source of truth.
+Use this section only when a blocking repair commit is already being made and
+`P2`/`P3` findings can be recorded without causing an additional record-only
+push.
 
-Required repair unit checklist:
+If the latest observation has only `P2`/`P3` findings and no blockers, do not
+update this file. Put those findings in the terminal merge-prepared report
+instead.
 
-- `source_batch`
-- `unit_id`
-- `covered_ids`
-- `source_links`
-- `failure_class`
-- `risk_class`
-- `disposition`
-- `Validity Analysis`
-- `Need-To-Fix Decision`
-- `Root Cause`
-- `Options Considered`
-- `Recommended Design`
-- `Implementation Plan`
-- `Validation Plan`
-- `Implementation Result`
-- `Commit Evidence`
-- `Re-observation Result`
-- `Residual Risk / Follow-up`
+| followup_id | family_id | related_items | priority | rationale_for_no_action | residual_risk | suggested_followup_target |
+| --- | --- | --- | --- | --- | --- | --- |
+| NBXXX | FXXX | RXXX | P2 / P3 |  |  |  |
+
+## Quality Gate Plan
+
+Define family-level gates, not comment-level checks.
+
+| gate_id | family_id | command_or_check | expected_result | covers_items | required_before_push |
+| --- | --- | --- | --- | --- | --- |
+| GXXX | FXXX |  |  | RXXX | yes / no |
+
+## Re-observation Plan
+
+- Latest head before repair:
+- Expected head after repair:
+- Re-observation command:
+- Trigger mode: post-once / resume
+- Resume trigger comment id:
+- Resume trigger created_at:
+- New trigger approved: yes / no
+- Re-observation required because:
+- Re-observation skipped because:
+
+## Loop Control
+
+| iteration | head_sha | observation_status | family_id | action_taken | fix_commit | reappeared_after_fix | next_action |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 |  |  | FXXX |  |  | yes / no |  |
+
+Stop at a human gate when the same `root_cause_family` reappears after a repair
+commit, unless a human explicitly approves a new strategy.
+
+## Terminal Non-Blocking Report Boundary
+
+When final re-observation contains only `P2`/`P3` findings:
+
+- Do not update this batch solely to record them.
+- Do not push a record-only commit.
+- Do not trigger another review.
+- Report those findings in the final response grouped by `root_cause_family`.
+- State `branch mutation: no`.
+- State `ci rerun avoided: yes`.
+- State `review-clean: no`.
+- State `merge-prepared: yes` if all blocking predicates are satisfied.
 
 ## Stop Conditions
 
 Stop at a human gate when any condition applies:
 
-- Any inventory item remains `untriaged`.
-- Any unresolved `needs-human` item remains.
-- A `blocking` `fix-now` repair unit is incomplete or repeatedly fails.
+- Any blocking inventory item remains `untriaged`.
+- Any unresolved blocking `needs-human` item remains.
+- A `P0`/`P1` `fix-now` repair unit is incomplete or repeatedly fails.
+- The same `root_cause_family` reappears after a repair commit.
 - Observation output is not for the latest head SHA.
 - Timeout or observation limitation lacks resume metadata.
 - Resume would cross the recorded trigger boundary.
 - A new trigger would be required but has not been approved.
-- Scope expansion, requirement expansion, breaking change, migration, secret, deployment setting, permission/auth, external/flaky, or ambiguous review intent is involved.
-- Loop limits for the same failure class or total repair attempts are reached.
+- Scope expansion, requirement expansion, breaking change, migration, secret,
+  deployment setting, permission/auth, external/flaky, or ambiguous review
+  intent is involved.
+- Loop limits for the same root-cause family or total repair attempts are
+  reached.
+- GitHub branch protection requires conversation resolution for unresolved
+  `P2`/`P3` threads; this is a platform human gate, not a code repair target.
 
 ## Merge-Prepared Gate
 
 Report `merge-prepared: yes` only when all conditions are true:
 
 - PR is open.
-- Latest head re-observation is complete and matches the latest head SHA.
-- No observed GitHub Actions CI failure remains.
-- External/non-Actions check state has either been confirmed outside PR observation or is recorded as a human gate/residual risk; do not treat missing Checks API/status rollup evidence as observed pass evidence.
-- No blocking review feedback remains.
-- No visible merge conflict or equivalent merge blocker remains.
-- No `untriaged` inventory item remains.
-- No unresolved `needs-human` item remains.
-- No `blocking` item has an incomplete `fix-now` repair unit.
-- Every `follow-up`, `no-action`, `covered-by`, `duplicate`, or `false-positive` item has rationale and residual risk where relevant.
-- Observation limitation handling, resume metadata, trigger boundary, and new trigger approval status are recorded.
-- Review-thread unresolved state is known, or any unresolved-thread limitation is explicitly waived and recorded as residual risk.
-- `review-clean` is reported separately from `merge-prepared`; `review-clean: no` may still be `merge-prepared: yes` when all remaining items are triaged and non-blocking.
+- Latest observation is complete and matches the latest head SHA.
+- No observed required GitHub Actions CI failure remains.
+- External/non-Actions check state has either been confirmed outside PR
+  observation or is recorded as a human gate/residual risk.
+- No unresolved `P0`/`P1` review feedback remains.
+- Remaining `P2`/`P3` findings, if any, are grouped and reported as
+  non-blocking terminal findings or recorded here because a blocking repair
+  commit was already required.
+- No visible merge conflict or equivalent semantic merge blocker remains.
+- No blocking `untriaged` inventory item remains.
+- No unresolved blocking `needs-human` item remains.
+- No blocking item has an incomplete `fix-now` repair unit.
+- Every repo-persistent `follow-up`, `no-action`, `covered-by`, `duplicate`, or
+  `false-positive` item has rationale and residual risk where relevant.
+- Observation limitation handling, resume metadata, trigger boundary, and new
+  trigger approval status are recorded.
+- Review-thread unresolved state is known, or unresolved-thread limitations are
+  disclosed. If platform conversation resolution is required, stop at a human
+  gate instead of claiming GitHub mergeability.
+- `review-clean` is reported separately from `merge-prepared`.
+- `github-mergeable` is not claimed unless platform requirements were confirmed.
