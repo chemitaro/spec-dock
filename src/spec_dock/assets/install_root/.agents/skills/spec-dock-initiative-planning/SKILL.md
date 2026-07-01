@@ -28,7 +28,7 @@ description: Leaf skill for initiative planning tasks in spec-dock.
 - In spec authoring mode, do not move from requirement to design, design to plan, or plan to Epic decomposition until a fresh `spec-reviewer` returns `review_status: pass`; fix findings and re-run a fresh reviewer until pass.
 - Record each `Spec Authoring Gate` in the initiative `report.md`, including investigation, user questions/answers, reviewer verdict, fixes, and promotion decision.
 - Fresh reviewer passes required by the workflow are gates and must not be skipped while waiting for extra permission inside the bounded SpecDock workflow scope.
-- Do not default to create/import; keep new-initiative rationale in `discussions/`.
+- Do not default to create/import; keep new-initiative rationale in `artifacts/`.
 - `spec-dock/docs/reference_github.md`
 - `spec-dock/docs/reference_sync.md`
 - `spec-dock/docs/reference_naming.md`

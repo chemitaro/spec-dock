@@ -98,7 +98,7 @@ Sxx behavior slice
 - `red or alternative evidence requirement` は `red-required`、`covered-existing`、`inspect-only`、`manual-required` のいずれかを使い、failing-first を完全要求できない場合も test sensitivity または代替 evidence path を固定する。
 - docs-only / template-only / skill-text-only step は code test を無理に作らず、inspection、structural assertion、manual evidence、docs diff、spec-review evidence を planned verification として書く。
 - `report evidence destination` は、実行結果を `report.md` のどの ledger に残すかを明示する。`plan.md` へ observed evidence を戻して正本を二重化しない。
-- scope-local discussion direct-write step は、target scope `discussions/` direct child、filename rule、allowed paths、forbidden paths、post-run diff guard、fallback decision、lightweight provenance、report evidence destination を step-local contract に置く。最低 fields は `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、allowed paths、forbidden paths、fallback decision、report evidence destination。
+- scope-local artifact direct-write step は、target scope `artifacts/` direct child、filename rule、allowed paths、forbidden paths、post-run diff guard、fallback decision、lightweight provenance、report evidence destination を step-local contract に置く。最低 fields は `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、allowed paths、forbidden paths、fallback decision、report evidence destination。
 - report evidence destination は、candidate evidence path だけでなく scope-local `report.md` の Evidence Adoption Ledger、Delegated Draft Evidence、Workflow-Scoped Authorization、Step Contract Closure、Test Contract Closure のどこへ採否・diff guard・fallback を記録するかを示す。Evidence Adoption Ledger に採否がない delegated evidence は downstream authority に使えない。
 - `amendment trigger` は、どの発見が report 記録だけで足りず plan amendment / re-review を必要にするかを示す。
 
@@ -127,7 +127,7 @@ Sxx behavior slice
   - 入力 docs の矛盾、許可パス外変更が必要、検証不能、delegated role 不適合、host policy / tool 制約、acceptance 未達など。
 - `output required`:
   - changed files、worker summary、verification result、unresolved risks、report へ転記する delegation evidence。
-  - scope-local discussion direct-write authoring の場合は discussion draft path、lightweight provenance、diff guard result、fallback decision、draft artifact metadata、Evidence Adoption Ledger に転記できる採否 note。
+  - scope-local artifact direct-write authoring の場合は artifact draft path、lightweight provenance、diff guard result、fallback decision、draft artifact metadata、Evidence Adoption Ledger に転記できる採否 note。
   - `Ledger Note` または `No material implementation decisions beyond the approved plan.`。
   - `Ledger Note` は worker の一次情報であり accepted decision ではない。material な仕様解釈、判断、逸脱、tradeoff、open question、follow-up がある場合は、source-agent、topic、trigger、ambiguity / constraint、observed facts、options considered、proposed decision、rationale、affected files、affected tests、risk if wrong、rollback or revisit、confidence、needs orchestrator decision を含める。
 
@@ -180,5 +180,5 @@ Sxx behavior slice
 - 標準の下位項目は `前提`、`操作`、`期待結果`、`失敗検出`、`検証方法` の5つにする。
 - 必要な場合だけ `対象ファイル`、`fixture`、`manual evidence` を追加する。
 - `関連 closure id` は、step に複数の closure id または複数の concrete test case がある場合は必須にする。1 step = 1 closure id = 1 concrete case で対応が明らかな場合だけ省略してよい。
-- 1項目が長くなりすぎる場合は2文までに抑え、詳細は `discussions/` または `report.md` に分離する。
+- 1項目が長くなりすぎる場合は2文までに抑え、詳細は `artifacts/` または `report.md` に分離する。
 - 仕様固定クロージャ索引（`Spec-Locked Closure Index`）は coverage ledger なので table のままでよい。具体テストケース本文とは役割を分ける。

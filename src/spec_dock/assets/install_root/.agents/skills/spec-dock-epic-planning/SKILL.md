@@ -27,7 +27,7 @@ description: Leaf skill for epic planning tasks in spec-dock.
 - Keep scope-specific constraints and decisions in `workflow_epic.md`.
 - In spec authoring mode, do not move from requirement to design, design to plan, or plan to Issue decomposition until a fresh `spec-reviewer` returns `review_status: pass`; fix findings and re-run a fresh reviewer until pass.
 - Record each `Spec Authoring Gate` in the epic `report.md`, including investigation, user questions/answers, reviewer verdict, fixes, and promotion decision.
-- For non-trivial Epic planning, consider a `system-architect` scope-local discussion draft before canonical design / plan promotion; keep the draft as evidence only, and keep canonical `requirement.md` / `design.md` / `plan.md` / `report.md` under main orchestrator authority.
+- For non-trivial Epic planning, consider a `system-architect` scope-local artifact draft before canonical design / plan promotion; keep the draft as evidence only, and keep canonical `requirement.md` / `design.md` / `plan.md` / `report.md` under main orchestrator authority.
 - Do not make heavyweight delegation mandatory for every Epic. If the `system-architect` draft cycle is trivial or intentionally skipped, record a `skip reason` and continue through manual authoring plus the same fresh `spec-reviewer` gates.
 - If `system-architect` delegation is unavailable, denied, or unsupported, record the `fallback` path; do not claim delegated draft evidence, and do not weaken reviewer or promotion gates.
 - If delegated drafting exposes a requirement / design / plan gap, return to the prior authoring phase or `workflow_clarification.md`; do not absorb the gap as an Epic planning assumption.
@@ -38,7 +38,7 @@ description: Leaf skill for epic planning tasks in spec-dock.
 - Leaf-only evidence producers must not edit canonical artifacts, perform implementation edits, claim final authority, claim reviewer pass, or claim phase promotion / issue ready / issue finish.
 - Preflight reviewer output is improvement input only; final fresh reviewer pass remains independent.
 - Fresh reviewer passes required by the workflow are gates and must not be skipped while waiting for extra permission inside the bounded SpecDock workflow scope.
-- Do not default to create/import; keep new-epic rationale in `discussions/`.
+- Do not default to create/import; keep new-epic rationale in `artifacts/`.
 - `spec-dock/docs/reference_github.md`
 - `spec-dock/docs/reference_sync.md`
 - `spec-dock/docs/reference_naming.md`

@@ -2,7 +2,7 @@
 Body-section scaffold only.
 
 For writable SpecDock scopes, create the artifact with:
-`./spec-dock/scripts/spec-dock new doc pr-repair-batch --issue <issue-id> --title "PR Repair Batch"`
+`./spec-dock/scripts/spec-dock new artifact pr-repair-batch --issue <issue-id> --title "PR Repair Batch"`
 
 The runtime-generated file owns front matter identity and the generated heading.
 Do not copy front matter from this skill-local template over the generated file.
