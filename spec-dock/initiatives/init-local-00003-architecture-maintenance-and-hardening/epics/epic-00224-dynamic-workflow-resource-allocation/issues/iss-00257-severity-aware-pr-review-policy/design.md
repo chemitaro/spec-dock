@@ -19,6 +19,8 @@ authorized_profile: "standard"
 
 `root_cause_family` は review instruction、merge-preparer skill、repair-batch template の運用語彙として採用する。runtime JSON、`blocker_fingerprint`、automation stalled 判定の first-class contract にはしない。
 
+加えて、SpecDock workflow invocation は workflow-scoped named role authorization として扱う。これは LLM/orchestrator が迷わないための instruction / docs / skill 明文化であり、runtime consent schema や新しい permission persistence は追加しない。
+
 ## 1. Profile / Assurance
 
 - `assurance classify --stage requirement` の結果は `authorized_profile: standard`。
@@ -34,6 +36,7 @@ authorized_profile: "standard"
 | Clarification | `discussions/20260701t022257z-interview-parent-epic-p2-promotion-policy.md` | issue-local に旧 P2 promotion を廃止 |
 | Clarification | `discussions/20260701t023858z-interview-root-cause-family-runtime-scope.md` | `root_cause_family` は docs/LLM 運用語彙 |
 | Research | `discussions/20260701t023648z-research-pr-review-policy-clarification-research.md` | 現行 code/test/asset 差分の根拠 |
+| User supplemental instruction | current conversation | SpecDock workflow 利用依頼を workflow-defined named role 利用許可として明文化する追加 scope |
 
 ## 3. 全体像
 
@@ -75,6 +78,13 @@ endif
 | `.agents/skills/github-pr-merge-preparer/SKILL.md` | PR merge preparation workflow | P2/P3 terminal no-mutation policy を明示 |
 | `spec-dock/templates/discussions/pr-repair-batch.md` | Repair batch discussion template | repo-persistent batch が blocking repair 用であることを明示 |
 | `tests/unit/infra/test_init_update.py` | Installer / asset / observation regression tests | 旧 P2 promotion expectation と旧 instruction phrase expectation を更新 |
+| `src/spec_dock/assets/install_root/.codex/config.toml` | Provider-side Codex orchestrator instruction | SpecDock workflow-scoped named role authorization を明示 |
+| `.codex/config.toml` | Dogfooding Codex orchestrator instruction | Provider mirror と同趣旨を反映 |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md` and mirror | SpecDock workflow routing skill | SpecDock workflow invocation authorization の入口を明示 |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` and mirror | Issue Planning skill | Requirement/design/plan/reviewer gate で追加 per-role permission を求めないことを明示 |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md` and mirror | Issue Execution skill | code-reviewer / qa-reviewer など required gate を明示許可待ちで省略しないことを明示 |
+| `spec-dock/docs/workflow_spec_authoring.md` and provider mirror | Spec authoring workflow docs | Canonical docs single-writer authority と sub-agent evidence adoption の関係を明示 |
+| `spec-dock/docs/workflow_issue.md` and provider mirror | Issue execution workflow docs | Scope boundary and escalation exceptions を明示 |
 
 ## 5. Target Design Delta
 
@@ -87,6 +97,7 @@ endif
 | DES-005 | AC-007 | Provider/dogfooding mirror は現状一致 | 更新後も mirror parity を維持 | `[N]` |
 | DES-006 | AC-008 | 親 Epic には旧 promotion 方針が残る可能性 | 親 docs は非編集。issue-local override を requirement/report に固定 | `[N]` |
 | DES-007 | AC-009 | Dogfooding note は discussion に存在 | classify/compose/reviewer 制約の観測を report へ採用 | `[N]` |
+| DES-008 | AC-010 | SpecDock workflow invocation 時に named role 利用許可の扱いが不明確で、orchestrator が追加許可待ちし得る | instruction / workflow docs / skill docs に workflow-scoped named role authorization を明示 | `[N]` |
 
 ## 6. Blocker Policy Contract
 
@@ -153,6 +164,9 @@ Expected local delta:
 | Auto-resolve GitHub conversations | reject | Platform / human gate, not semantic repair target |
 | Re-request Codex review for P2/P3-only terminal state | reject | Terminal no-mutation requirement |
 | Treat protected domain as severity escalation | reject | Metadata only; no P2/P3 promotion |
+| Add runtime consent schema or new permission persistence | reject | User requested documentation / instruction hardening only |
+| Treat SpecDock workflow request as unlimited permission | reject | Authorization is limited to active repo/worktree, active SpecDock scope, current session, documented role responsibility |
+| Let sub-agents directly own canonical docs | reject | Main orchestrator keeps single-writer canonical authority; sub-agent outputs are evidence |
 
 ## 9. Requirement-to-Design Traceability
 
@@ -167,6 +181,7 @@ Expected local delta:
 | AC-007 | DES-005 |
 | AC-008 / CON-001 | DES-006 |
 | AC-009 | DES-007 |
+| BH-006 / AC-010 / CON-005 / CON-006 | DES-008 |
 
 ## 10. Verification Strategy
 

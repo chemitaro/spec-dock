@@ -24,6 +24,7 @@ ID: "iss-00257"
 | D-004 | resolved | operation | orchestrator | 誤って no-op spec-reviewer を起動した | 採用 / 不採用 | no-op reviewer は workflow evidence として不採用 | 対象 artifact をレビューしていないため | rejected | subagent `019f1ba9-9921-7212-83a5-e26b782610c3` | none |
 | D-005 | resolved | test-strategy | spec-reviewer | Plan の CLOS-004 が terminal P2/P3-only no-mutation 境界を具体的に閉じていなかった | そのまま / CLOS と step を追加 | `CLOS-004A` と `S40` を追加し、batch persistence / commit-push / re-review / repair loop の証跡を要求 | Plan phase review P1 finding | applied | plan review `019f1baf-8f38-7833-bca6-21c4a48fe275`, `plan.md` | none |
 | D-006 | resolved | test-strategy | spec-reviewer | Parent Epic 非編集 evidence が symlink path だけだと弱い | symlink path / real parent docs path | 実体 parent Epic docs path を plan の検証コマンドと report evidence requirement に明示 | Plan re-review P2 finding | applied | plan re-review `019f1bb1-e3c3-7b70-a79a-94be1be82475`, `plan.md` | none |
+| D-007 | resolved | operation | user | SpecDock workflow が必要とする named sub-agent / reviewer を追加許可待ちで省略する判断が発生した | 現状維持 / runtime consent schema / instruction hardening | SpecDock workflow invocation を workflow-scoped named role authorization として instruction / docs / skill に明文化する | SpecDock は workflow-defined named roles を orchestrator が自律的に使い分ける前提であり、複雑な runtime consent schema は不要 | applied | supplemental user instruction, `requirement.md`, `design.md`, `plan.md` | none |
 
 ## Evidence Adoption Ledger
 
@@ -39,6 +40,8 @@ ID: "iss-00257"
 | EAL-008 | partially_adopted | reviewer | `plan.md` | Initial plan review failed with one P1 finding; finding was fixed and re-reviewed | spec-reviewer `019f1baf-8f38-7833-bca6-21c4a48fe275` | none |
 | EAL-009 | adopted | reviewer | `plan.md` | Re-review passed; P2 evidence-path correction was incorporated | spec-reviewer `019f1bb1-e3c3-7b70-a79a-94be1be82475` | none |
 | EAL-010 | rejected | reviewer | none | Accidental no-op reviewer reviewed no artifacts and is not valid workflow evidence | spec-reviewer `019f1ba9-9921-7212-83a5-e26b782610c3` | none |
+| EAL-011 | adopted | user instruction | requirement.md and design.md and plan.md | SpecDock workflow invocation authorization hardening was added to planning scope | supplemental user instruction in current session | fresh spec-reviewer after scope update |
+| EAL-012 | adopted | reviewer | requirement.md and design.md and plan.md and report.md | Supplemental authorization scope re-review passed after P1/P2 fixes | spec-reviewer `019f1bc3-0837-73c2-841d-6c935120e3a7` | none |
 
 ## Objective Alignment Ledger
 
@@ -50,9 +53,9 @@ ID: "iss-00257"
 
 | Phase | Investigated facts | Open questions / answers | Adoption decision | Reviewer verdict | Blocking | Promotion / next_action |
 |---|---|---|---|---|---|---|
-| requirement | ZIP bundle, current code/tests/assets, parent Epic constraint, discussions | Parent docs do not edit; root_cause_family Option B docs-only | adopted into requirement artifact | passed | no | promote |
-| design | Requirement pass, current runtime and asset structure, mirror parity tests | none | adopted into design artifact | passed | no | promote |
-| plan | Design pass, closure IDs, target files, focused tests, forbidden changes | Initial no-mutation verification gap fixed via CLOS-004A and S40 | adopted into plan artifact | passed | no | promote |
+| requirement | ZIP bundle, current code/tests/assets, parent Epic constraint, discussions, supplemental authorization scope | Parent docs do not edit; root_cause_family Option B docs-only; workflow-scoped named role authorization | adopted into requirement artifact | passed | no | promote |
+| design | Requirement pass, current runtime and asset structure, mirror parity tests, authorization docs surfaces | none | adopted into design artifact | passed | no | promote |
+| plan | Design pass, closure IDs, target files, focused tests, forbidden changes, authorization hardening step | Initial no-mutation verification gap fixed via CLOS-004A and S40; CLOS-010 added | adopted into plan artifact | passed | no | promote |
 
 ## Delegated Draft Evidence
 
@@ -93,6 +96,7 @@ ID: "iss-00257"
 - Plan を具体化し、spec-reviewer review を実施した。
 - Plan review P1 finding に従い、terminal P2/P3-only no-mutation 境界を `CLOS-004A` / `S40` として追加した。
 - Plan re-review pass 後、P2 finding に従い parent Epic docs 実体 path の diff evidence を plan に明記した。
+- User supplemental instruction に従い、SpecDock workflow-scoped named role authorization hardening を requirement/design/plan scope に追加した。
 
 #### 実行コマンド / 結果
 
@@ -119,6 +123,7 @@ ID: "iss-00257"
 | design authoring | spec-reviewer `019f1bac-2f1c-7720-bf8b-4e95f443562b` | pass | no findings |
 | plan authoring | spec-reviewer `019f1baf-8f38-7833-bca6-21c4a48fe275` | fail | P1 no-mutation verification gap |
 | plan re-review | spec-reviewer `019f1bb1-e3c3-7b70-a79a-94be1be82475` | pass | P1 fixed; P2 evidence path incorporated |
+| final scope update review | pending fresh spec-reviewer | pending | authorization hardening scope added after previous pass |
 
 #### 変更したファイル
 
@@ -137,13 +142,13 @@ ID: "iss-00257"
 |---|---|---|---|---|
 | Issue-local requirement/design/plan/report | yes | main orchestrator | this report | pass |
 | Parent Epic docs | no | N/A | real parent doc path diff required by `plan.md` | N/A |
-| Non-issue docs / global workflow docs | no | N/A | Dogfooding note only, no direct docs change | N/A |
+| Non-issue workflow docs / skill docs / orchestrator instructions | yes | dev-coder or doc-writer during implementation | CLOS-010 / S50 require provider and dogfooding updates for workflow-scoped named role authorization | pass |
 
 ### Final Spec Review Gate
 
 | Reviewer | Scope | Findings / fixes | Re-review count | Result |
 |---|---|---|---|---|
-| spec-reviewer | requirement/design/plan alignment | P1 plan finding fixed; P2 plan evidence-path correction applied | 1 | pass |
+| spec-reviewer | requirement/design/plan/report alignment after supplemental authorization scope | Fresh review found report/docs-impact and skill-scope issues; fixes applied; re-review passed | 2 | pass |
 
 ### Final Commit
 
@@ -155,6 +160,7 @@ ID: "iss-00257"
 
 - 誤って no-op spec-reviewer を一件起動したが、対象 artifact をレビューしていないため workflow evidence として不採用にした。
 - Plan review で terminal P2/P3-only no-mutation の検証不足が見つかったため、`CLOS-004A` と `S40` を追加して再レビュー pass を得た。
+- Supplemental authorization scope review で stale docs impact gate と epic/initiative skill path ambiguity が見つかったため、`report.md` と `plan.md` を更新した。
 
 ## 省略/例外メモ
 
