@@ -402,6 +402,8 @@ class TestRuntimeSyncS07:
         *,
         doc_id: str,
         scope_id: str,
+        authority: str = "draft",
+        mirror_eligible: bool = False,
     ) -> Path:
         artifacts_dir = scope_dir / "artifacts"
         artifacts_dir.mkdir(parents=True, exist_ok=True)
@@ -412,10 +414,12 @@ class TestRuntimeSyncS07:
                 "種別: ADR（Architecture Decision Record）",
                 f'ID: "{doc_id}"',
                 'タイトル: "ADR"',
-                '状態: "draft"',
+                f'状態: "{authority}"',
                 '作成者: "Tester"',
                 '最終更新: "2026-03-29"',
                 f'親: ["{scope_id}"]',
+                f'authority: "{authority}"',
+                f"mirror_eligible: {str(mirror_eligible).lower()}",
                 "---",
                 "",
                 f"# {filename}",
@@ -476,11 +480,19 @@ class TestRuntimeSyncS07:
                 doc_id="20260312t010205z-01-adr",
                 scope_id="iss-local-00001",
             )
-            artifact_doc = self._write_valid_artifact_adr_doc(
+            draft_artifact_doc = self._write_valid_artifact_adr_doc(
                 issue_db_dir,
-                "20260312t010211z-adr-artifact-decision.md",
+                "20260312t010211z-adr-draft-artifact-decision.md",
                 doc_id="20260312t010211z-adr",
                 scope_id="iss-local-00002",
+            )
+            artifact_doc = self._write_valid_artifact_adr_doc(
+                issue_db_dir,
+                "20260312t010213z-adr-accepted-artifact-decision.md",
+                doc_id="20260312t010213z-adr",
+                scope_id="iss-local-00002",
+                authority="accepted",
+                mirror_eligible=True,
             )
             self._write_valid_artifact_adr_doc(
                 issue_db_dir,
@@ -564,11 +576,12 @@ class TestRuntimeSyncS07:
             sources = app_sync_state._collect_adr_mirror_sources(state.graph)
 
             assert {source.source_path for source in sources} == {initiative_doc, epic_doc, issue_doc, artifact_doc}
+            assert draft_artifact_doc not in {source.source_path for source in sources}
             assert {source.basename for source in sources} == {
                 "20260312t010203z-adr-init-decision.md",
                 "20260312t010204z-adr-epic-decision.md",
                 "20260312t010205z-01-adr-issue-decision.md",
-                "20260312t010211z-adr-artifact-decision.md",
+                "20260312t010213z-adr-accepted-artifact-decision.md",
             }
 
     def test_sync_fails_before_write_on_adr_mirror_basename_collision_and_preserves_adrs(self) -> None:
@@ -601,6 +614,8 @@ class TestRuntimeSyncS07:
                 basename,
                 doc_id="20260312t010203z-adr",
                 scope_id="iss-local-00001",
+                authority="accepted",
+                mirror_eligible=True,
             )
             adrs_dir = specdock_dir / "adrs"
             adrs_dir.mkdir(parents=True, exist_ok=True)
@@ -675,6 +690,8 @@ class TestRuntimeSyncS07:
                 "20260312t010206z-adr-artifact-decision.md",
                 doc_id="20260312t010206z-adr",
                 scope_id="iss-local-00001",
+                authority="accepted",
+                mirror_eligible=True,
             )
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
