@@ -173,6 +173,35 @@ def _to_repo_relative_specdock_path(path: Path, *, repo_root: Path | None) -> st
     raise RuntimeError(f"Node path missing 'spec-dock' segment: {path}")
 
 
+def _document_surfaces_payload(node: SpecNode, *, repo_root: Path | None) -> dict[str, object]:
+    canonical_docs = []
+    for kind, filename in (
+        ("requirement", "requirement.md"),
+        ("design", "design.md"),
+        ("plan", "plan.md"),
+        ("report", "report.md"),
+    ):
+        path = node.path / filename
+        canonical_docs.append({
+            "kind": kind,
+            "path": _to_repo_relative_specdock_path(path, repo_root=repo_root),
+            "present": path.is_file(),
+        })
+    artifacts_dir = node.path / "artifacts"
+    discussions_dir = node.path / "discussions"
+    return {
+        "canonical_docs": canonical_docs,
+        "future_artifacts": {
+            "path": _to_repo_relative_specdock_path(artifacts_dir, repo_root=repo_root),
+            "present": artifacts_dir.is_dir(),
+        },
+        "legacy_discussions": {
+            "path": _to_repo_relative_specdock_path(discussions_dir, repo_root=repo_root),
+            "present": discussions_dir.is_dir(),
+        },
+    }
+
+
 def _active_to_json(active: ActiveSelection | None) -> dict[str, object] | None:
     if active is None:
         return None
@@ -434,6 +463,7 @@ def _build_state_payloads(result: SyncStateResult) -> StatePayloads:
             "id": node.id,
             "title": node.title,
             "path": _to_repo_relative_specdock_path(node.path, repo_root=result.repo_root),
+            "document_surfaces": _document_surfaces_payload(node, repo_root=result.repo_root),
             "parent_id": node.parent_id,
             "initiative_id": node.initiative_id,
             "epic_id": node.epic_id,

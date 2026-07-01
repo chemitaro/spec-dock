@@ -36,6 +36,7 @@ from spec_dock_runtime.application.repo_context import (
 from spec_dock_runtime.application.set_active import build_active_manifest, build_context_pack_text, commit_active_state
 from spec_dock_runtime.application.status_context import resolve_issue_status_context
 from spec_dock_runtime.domain.active import infer_active_node_from_branch
+from spec_dock_runtime.domain.artifacts import parse_artifact_filename
 from spec_dock_runtime.domain.deps import (
     build_deps_state,
     build_effective_deps_map,
@@ -251,6 +252,13 @@ def _adr_doc_id_from_basename(basename: str) -> str | None:
     return f"{timestamp}-{int(suffix_raw):02d}-adr"
 
 
+def _artifact_adr_doc_id_from_basename(basename: str) -> str | None:
+    parsed = parse_artifact_filename(basename)
+    if parsed is None or parsed.artifact_type != "adr":
+        return None
+    return parsed.artifact_id
+
+
 def _collect_adr_mirror_sources(graph: SpecGraph) -> list[_AdrMirrorSource]:
     sources: list[_AdrMirrorSource] = []
     scope_nodes = sorted(
@@ -259,11 +267,34 @@ def _collect_adr_mirror_sources(graph: SpecGraph) -> list[_AdrMirrorSource]:
     )
     for scope in scope_nodes:
         discussions_dir = scope.path / "discussions"
-        if not discussions_dir.exists():
+        if discussions_dir.exists():
+            for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
+                basename = path.name
+                doc_id = _adr_doc_id_from_basename(basename)
+                if doc_id is None:
+                    continue
+                front_matter = _parse_required_adr_front_matter(path)
+                if front_matter is None:
+                    continue
+                front_matter_doc_id, parent_scope_id = front_matter
+                if front_matter_doc_id != doc_id:
+                    continue
+                if parent_scope_id != scope.id:
+                    continue
+                sources.append(
+                    _AdrMirrorSource(
+                        scope_id=scope.id,
+                        source_path=path,
+                        basename=basename,
+                        doc_id=doc_id,
+                    )
+                )
+        artifacts_dir = scope.path / "artifacts"
+        if not artifacts_dir.exists():
             continue
-        for path in sorted(discussions_dir.glob("*.md"), key=lambda p: p.as_posix()):
+        for path in sorted(artifacts_dir.glob("*.md"), key=lambda p: p.as_posix()):
             basename = path.name
-            doc_id = _adr_doc_id_from_basename(basename)
+            doc_id = _artifact_adr_doc_id_from_basename(basename)
             if doc_id is None:
                 continue
             front_matter = _parse_required_adr_front_matter(path)
