@@ -68,7 +68,7 @@ class TestCliTestTreeSplitS12:
             test_active.TestCliActive: ["test_active_set_force_overrides_deps_guard"],
             test_deps.TestCliDeps: ["test_deps_check_json_stdout_only"],
             test_import.TestCliImport: ["test_import_initiative_creates_node_and_runs_sync_without_updating_active"],
-            test_new.TestCliNew: ["test_new_doc_adr_increments_id_within_scope_discussions"],
+            test_new.TestCliNew: ["test_new_artifact_blank_issue_omits_blank_token_and_uses_artifacts_dir"],
             test_sync.TestCliSync: ["test_sync_emits_deps_issues_json_and_puml_todo_only"],
             test_validate.TestCliValidate: ["test_validate_detects_broken_parent_id"],
             test_runtime_shell_s11.TestRuntimeShellS11: ["test_staged_delegation_path_regression"],

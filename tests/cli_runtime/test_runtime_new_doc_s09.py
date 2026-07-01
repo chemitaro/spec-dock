@@ -1348,7 +1348,7 @@ class TestRuntimeNewDocS09:
             assert result.node.parent_id == "epic-local-00001"
             assert (result.node.path / "README.md").exists()
 
-    def test_renderer_text_regression(self) -> None:
+    def test_new_artifact_renderer_text_regression(self) -> None:
         (
             _runtime_app,
             app_contracts,
@@ -1358,27 +1358,27 @@ class TestRuntimeNewDocS09:
             _infra_contracts,
             presentation_cli_text,
         ) = _runtime_modules()
-        result = app_contracts.CreateDiscussionDocResult(
-            doc_id="20260312t010203z-03-adr",
-            doc_type="adr",
+        result = app_contracts.CreateArtifactDocResult(
+            artifact_id="20260312t010203z-03-adr",
+            artifact_type="adr",
             scope_node_id="iss-local-00001",
             path=Path(
                 "/repo/spec-dock/initiatives/init-local-00001-auth/epics/epic-local-00001-login/"
-                "issues/iss-local-00001-refresh-token/discussions/20260312t010203z-03-adr-decision-one.md"
+                "issues/iss-local-00001-refresh-token/artifacts/20260312t010203z-03-adr-decision-one.md"
             ),
             warnings=[],
         )
-        text = presentation_cli_text.render_new_doc_text(result)
+        text = presentation_cli_text.render_new_artifact_text(result)
         assert text.stdout_lines == [
             (
-                "spec-dock: ok (new doc) "
+                "spec-dock: ok (new artifact) "
                 "type=adr id=20260312t010203z-03-adr scope=iss-local-00001 "
                 "path=spec-dock/initiatives/init-local-00001-auth/epics/epic-local-00001-login/"
-                "issues/iss-local-00001-refresh-token/discussions/20260312t010203z-03-adr-decision-one.md"
+                "issues/iss-local-00001-refresh-token/artifacts/20260312t010203z-03-adr-decision-one.md"
             )
         ]
 
-    def test_command_new_doc_smoke(self) -> None:
+    def test_command_new_artifact_smoke(self) -> None:
         (
             _runtime_app,
             app_contracts,
@@ -1395,13 +1395,13 @@ class TestRuntimeNewDocS09:
 
         def _fake_create(req):
             calls.append(req)
-            return app_contracts.CreateDiscussionDocResult(
-                doc_id="20260312t010203z-adr",
-                doc_type="adr",
+            return app_contracts.CreateArtifactDocResult(
+                artifact_id="20260312t010203z-adr",
+                artifact_type="adr",
                 scope_node_id=req.scope_node_id,
                 path=Path(
                     "/repo/spec-dock/initiatives/init-local-00001-auth/epics/epic-local-00001-login/"
-                    "issues/iss-local-00001-refresh-token/discussions/20260312t010203z-adr-decision-one.md"
+                    "issues/iss-local-00001-refresh-token/artifacts/20260312t010203z-adr-decision-one.md"
                 ),
                 warnings=[],
             )
@@ -1410,7 +1410,7 @@ class TestRuntimeNewDocS09:
             create_initiative=_unexpected,
             create_epic=_unexpected,
             create_issue=_unexpected,
-            create_discussion_doc=_fake_create,
+            create_artifact_doc=_fake_create,
             import_initiative=_unexpected,
             import_epic=_unexpected,
             import_issue=_unexpected,
@@ -1421,9 +1421,9 @@ class TestRuntimeNewDocS09:
             check_deps=_unexpected,
             validate_tree=_unexpected,
         )
-        outcome = new_commands._run_new_doc(
-            new_commands.NewDocArgs(
-                doc_type="adr",
+        outcome = new_commands._run_new_artifact(
+            new_commands.NewArtifactArgs(
+                artifact_type="adr",
                 scope_node_id="iss-local-00001",
                 scope_kind="issue",
                 title="Decision one",
@@ -1433,7 +1433,7 @@ class TestRuntimeNewDocS09:
         )
 
         assert len(calls) == 1
-        assert calls[0].doc_type == "adr"
+        assert calls[0].artifact_type == "adr"
         assert calls[0].scope_node_id == "iss-local-00001"
         assert outcome.exit_code == 0
-        assert "spec-dock: ok (new doc) type=adr id=20260312t010203z-adr" in "\n".join(outcome.text.stdout_lines)
+        assert "spec-dock: ok (new artifact) type=adr id=20260312t010203z-adr" in "\n".join(outcome.text.stdout_lines)

@@ -472,6 +472,37 @@ class CreateDiscussionDocResult:
 
 
 @dataclass(frozen=True)
+class CreateArtifactDocRequest:
+    artifact_type: Literal[
+        "blank",
+        "research",
+        "interview",
+        "disc",
+        "decision-candidate",
+        "pr-repair-batch",
+        "adr",
+        "draft-requirement",
+        "draft-design",
+        "draft-plan",
+        "scratch",
+        "note",
+    ]
+    scope_node_id: str
+    title: str
+    slug: str | None
+    scope_kind: Literal["initiative", "epic", "issue"] | None = None
+
+
+@dataclass(frozen=True)
+class CreateArtifactDocResult:
+    artifact_id: str
+    artifact_type: str
+    scope_node_id: str
+    path: Path
+    warnings: list[str]
+
+
+@dataclass(frozen=True)
 class CheckDepsRequest:
     target: TargetRef
     use_github: bool
@@ -824,7 +855,7 @@ class UseCases:
     create_initiative: Callable[[CreateNodeRequest], CreateNodeResult]
     create_epic: Callable[[CreateNodeRequest], CreateNodeResult]
     create_issue: Callable[[CreateNodeRequest], CreateNodeResult]
-    create_discussion_doc: Callable[[CreateDiscussionDocRequest], CreateDiscussionDocResult]
+    create_artifact_doc: Callable[[CreateArtifactDocRequest], CreateArtifactDocResult]
     import_initiative: Callable[[ImportNodeRequest], ImportNodeResult]
     import_epic: Callable[[ImportNodeRequest], ImportNodeResult]
     import_issue: Callable[[ImportNodeRequest], ImportNodeResult]

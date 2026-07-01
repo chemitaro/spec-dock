@@ -1613,7 +1613,7 @@ class TestRuntimeImportS10:
             create_initiative=_unexpected,
             create_epic=_unexpected,
             create_issue=_unexpected,
-            create_discussion_doc=_unexpected,
+            create_artifact_doc=_unexpected,
             import_initiative=_unexpected,
             import_epic=_unexpected,
             import_issue=_fake_import,
