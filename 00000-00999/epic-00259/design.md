@@ -30,6 +30,9 @@ ID: "epic-00259"
   - Initiative design の architecture maintenance context。ここでは Epic 固有の runtime / artifact 境界だけを示す。
 
 ## 設計決定
+- D-000: Artifact domain / filename / draft template routing は Epic-level ADR で固定する。
+  - Accepted ADR `artifacts/20260701t072851z-adr-artifact-domain-filename-template-contract.md` を基礎契約とする。
+  - Child Issue はこの契約を実装・検証する単位であり、artifact identity / filename shape / supported catalog / draft template routing を再決定しない。
 - D-001: Discussion docs と artifacts は domain model を分ける。
   - `discussion_docs.py` は legacy validation / historical parsing の owner として残す。
   - 新規 `artifacts.py` 相当の domain module が future artifact type、filename parser、id generation、collision handling、malformed candidate detection を所有する。
@@ -39,6 +42,8 @@ ID: "epic-00259"
 - D-003: ADR / draft-* / delegated output を artifact catalog に含める。
   - ADR は future original を `artifacts/` に作成し、legacy ADR original は `discussions/` に残す。
   - draft-* は `new artifact` に統一しつつ、issue scope 専用の safety-sensitive artifact として扱い、assurance/profile no-write fail-closed behavior を維持する。
+  - draft-* は独自の draft-only content templates を持たず、既存の requirement / design / plan template contract を再利用する。
+  - Issue scope の `draft-design` / `draft-plan` は既存の Issue grade / authorized profile template selection を使う。
   - `new artifact draft-requirement|draft-design|draft-plan --initiative ...` と `--epic ...` は unsupported scope として preflight no-write で失敗させる。non-issue scope 用の assurance model はこの Epic では定義しない。
   - delegated authoring output は `artifacts/` direct child へ移行し、canonical docs への直接 write 禁止を維持する。
 - D-006: Delegated authoring diff guard は artifacts boundary を所有する。
@@ -297,7 +302,7 @@ DiscussionDoc ..> CanonicalDoc : reflected_to when adopted
   1. CLI parses `draft-requirement`, `draft-design`, or `draft-plan`.
   2. Application requires issue scope. Initiative / epic scope fails before template resolution and before writing.
   3. Application verifies issue target and `.assurance.json` / authorized profile when required.
-  4. Profile-specific template selection occurs before write.
+  4. Existing requirement / design / plan template selection occurs before write; Issue design/plan selection remains grade/profile-aware.
   5. Invalid profile or stale assurance fails before writing.
 - Flow-D: validate / sync mixed layout.
   1. Graph loads scope nodes.

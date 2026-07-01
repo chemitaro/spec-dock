@@ -18,8 +18,8 @@ validate / sync / `.agent` projection / ADR mirror を artifacts-aware にし、
 ## 上位 trace
 - Epic requirements: E-RQ-002, E-RQ-006.
 - Epic acceptance criteria: E-AC-005, E-AC-007.
-- Epic design decisions: D-001, D-005.
-- Depends on: `iss-00261`, `iss-00263`, `iss-00264`.
+- Epic design decisions: D-000, D-001, D-005.
+- Depends on: `iss-00263`, `iss-00264`, and accepted Epic ADR `artifacts/20260701t072851z-adr-artifact-domain-filename-template-contract.md`.
 
 ## スコープ
 - 必須:
@@ -50,4 +50,5 @@ validate / sync / `.agent` projection / ADR mirror を artifacts-aware にし、
 - `uv run pytest tests/cli_runtime` and focused unit lanes。
 
 ## 依存
-- `iss-00261`, `iss-00263`, `iss-00264`。
+- `iss-00263`, `iss-00264`。
+- Epic-level artifact domain / filename / draft template ADR。

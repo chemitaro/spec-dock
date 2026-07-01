@@ -29,34 +29,22 @@ ID: "epic-00259"
 - 分割原則:
   - Policy-only Issue は作成しない。Issue 01 相当の判断は accepted ADR とこの Epic requirement/design/plan で所有する。
   - Issue は実装可能な成果物単位に分ける。
-  - Domain / filename contract を先に固定し、その上に template / command / scaffold / validation-sync / docs-skills / dogfooding を積む。
+  - Domain / filename / draft template routing contract は Epic-level ADR `artifacts/20260701t072851z-adr-artifact-domain-filename-template-contract.md` で固定し、その上に template / command / scaffold / validation-sync / docs-skills / dogfooding を積む。
   - `new doc` removal は command 実装 Issue に含め、compatibility shim を別 Issue にしない。
   - Draft-* と ADR は例外扱いせず、artifact command / template / safety preflight の中で扱う。
+  - `draft-requirement`, `draft-design`, `draft-plan` は独自の draft-only templates を作らず、既存の requirement / design / plan templates と Issue grade/profile-aware template selection を再利用する。
   - Dogfooding Issue は最後に置き、provider-side implementation と docs/skills alignment の後に実施する。
 - 例外:
   - Implementation 中に scope / acceptance criteria を変える必要が出た場合は、この Epic の requirement/design に戻して fresh spec-reviewer gate を再実行する。
   - Existing discussion validation を緩める必要が出た場合は ADR と requirement に反するため、実装 Issue 内で判断せず Epic へ戻す。
 
 ## 課題一覧（Issue list / 順序 / tranche 付き）
-- iss-00261-artifact-domain-model-and-filename-contract（GitHub #261）:
-  - 目的:
-    - `artifacts/` 用の domain model、type catalog、filename parser、artifact id、collision handling、malformed candidate detection を追加する。
-  - 成果物:
-    - Artifact domain module.
-    - Parser / generator / validation helpers.
-    - Unit tests for typed / blank / ADR / draft-* / malformed / legacy non-interference.
-  - tranche:
-    - T1 foundation.
-  - closes:
-    - E-RQ-001, E-RQ-004, part of E-RQ-006.
-    - E-AC-001, E-AC-002, E-AC-004, E-AC-007 foundations.
-  - 依存:
-    - accepted ADR and Epic requirement/design.
 - iss-00262-artifact-templates-and-rules（GitHub #262）:
   - 目的:
-    - `templates/artifacts/` catalog and rules を追加し、blank / generic / ADR / draft-* / delegated evidence-friendly templates の境界を固定する。
+    - `templates/artifacts/` catalog and rules を追加し、Epic ADR で確定した blank / generic / ADR / draft-* / delegated evidence-friendly template routing の境界を実装する。
   - 成果物:
     - `blank`, `research`, `interview`, `disc`, `decision-candidate`, `pr-repair-batch`, `adr`, `draft-requirement`, `draft-design`, `draft-plan` templates or template routing.
+    - Draft-* routing that reuses existing requirement / design / plan templates and Issue grade/profile-aware template selection.
     - `artifacts/rules.md` source docs.
     - Template README update.
   - tranche:
@@ -65,7 +53,7 @@ ID: "epic-00259"
     - E-RQ-004, E-RQ-005, part of E-RQ-008.
     - E-AC-001, E-AC-002, E-AC-004, E-AC-006.
   - 依存:
-    - `iss-00261` for type naming and id contract.
+    - Epic-level artifact domain / filename / draft template ADR.
 - iss-00263-new-artifact-command-and-new-doc-removal（GitHub #263）:
   - 目的:
     - `spec-dock new artifact <type>` runtime command を追加し、`new doc` を parser / help / registry から削除する。
@@ -86,7 +74,6 @@ ID: "epic-00259"
     - E-RQ-001, E-RQ-003, E-RQ-004, E-RQ-005.
     - E-AC-001, E-AC-002, E-AC-003, E-AC-004, E-AC-006, E-AC-009.
   - 依存:
-    - `iss-00261`.
     - `iss-00262` for templates.
 - iss-00264-future-node-scaffold-artifacts-default（GitHub #264）:
   - 目的:
@@ -118,7 +105,6 @@ ID: "epic-00259"
     - E-RQ-002, E-RQ-006.
     - E-AC-005, E-AC-007.
   - 依存:
-    - `iss-00261`.
     - `iss-00263`.
     - `iss-00264` for scaffold fixtures.
 - iss-00266-delegated-authoring-artifacts-boundary（GitHub #266）:
@@ -166,13 +152,12 @@ ID: "epic-00259"
     - E-RQ-007.
     - E-AC-010 and final cross-E-AC evidence.
   - 依存:
-    - `iss-00261` through `iss-00267`.
+    - `iss-00262` through `iss-00267`.
 
 ## Issue-local planning artifacts
 | Issue | GitHub | Requirement | Design draft | Plan draft | Authorized profile | Notes |
 |---|---:|---|---|---|---|---|
-| `iss-00261` | #261 | `approved` | `draft` | `draft` | `standard` | Foundation domain contract. |
-| `iss-00262` | #262 | `approved` | `draft` | `draft` | `standard` | Depends on `iss-00261`. |
+| `iss-00262` | #262 | `approved` | `draft` | `draft` | `standard` | First executable Issue; implements template/routing part of Epic ADR. |
 | `iss-00263` | #263 | `approved` | `draft` | `draft` | `standard` | Command and `draft-*` safety owner. |
 | `iss-00264` | #264 | `approved` | `draft` | `draft` | `standard` | Scaffold default owner. |
 | `iss-00265` | #265 | `approved` | `draft` | `draft` | `standard` | Validation/sync/ADR mirror owner. |
@@ -189,46 +174,47 @@ skinparam monochrome true
 left to right direction
 
 rectangle "T1 Foundation" {
-  [01 domain + filename]
-  [02 templates + rules]
+  [Epic ADR domain + filename]
+  [01 templates + rules]
 }
 rectangle "T2 Runtime" {
-  [03 new artifact + remove new doc]
-  [04 scaffold artifacts default]
+  [02 new artifact + remove new doc]
+  [03 scaffold artifacts default]
 }
 rectangle "T3 Integration" {
-  [05 validate/sync/ADR mirror/projection]
-  [06 delegated authoring boundary]
+  [04 validate/sync/ADR mirror/projection]
+  [05 delegated authoring boundary]
 }
 rectangle "T4 Guidance" {
-  [07 docs/skills/README alignment]
+  [06 docs/skills/README alignment]
 }
 rectangle "T5 Proof" {
-  [08 dogfooding closeout]
+  [07 dogfooding closeout]
 }
 
-[01 domain + filename] --> [02 templates + rules]
-[01 domain + filename] --> [03 new artifact + remove new doc]
-[02 templates + rules] --> [03 new artifact + remove new doc]
-[02 templates + rules] --> [04 scaffold artifacts default]
-[03 new artifact + remove new doc] --> [04 scaffold artifacts default]
-[03 new artifact + remove new doc] --> [05 validate/sync/ADR mirror/projection]
-[04 scaffold artifacts default] --> [05 validate/sync/ADR mirror/projection]
-[05 validate/sync/ADR mirror/projection] --> [06 delegated authoring boundary]
-[06 delegated authoring boundary] --> [07 docs/skills/README alignment]
-[07 docs/skills/README alignment] --> [08 dogfooding closeout]
+[Epic ADR domain + filename] --> [01 templates + rules]
+[Epic ADR domain + filename] --> [02 new artifact + remove new doc]
+[01 templates + rules] --> [02 new artifact + remove new doc]
+[01 templates + rules] --> [03 scaffold artifacts default]
+[02 new artifact + remove new doc] --> [03 scaffold artifacts default]
+[02 new artifact + remove new doc] --> [04 validate/sync/ADR mirror/projection]
+[03 scaffold artifacts default] --> [04 validate/sync/ADR mirror/projection]
+[04 validate/sync/ADR mirror/projection] --> [05 delegated authoring boundary]
+[05 delegated authoring boundary] --> [06 docs/skills/README alignment]
+[06 docs/skills/README alignment] --> [07 dogfooding closeout]
 @enduml
 ```
 
 ## 実行 lane / Epic単位PR 方針
 - Delivery policy:
   - 各 Issue ごとに個別 PR は作成しない。
-  - `iss-00261` から `iss-00268` までを同一 Epic delivery branch 上で段階的に実装する。
+  - `iss-00262` から `iss-00268` までを同一 Epic delivery branch 上で段階的に実装する。
   - 各 Issue は issue-local execution gate、report evidence、reviewer gates、commit/no-op gate を閉じる。
   - 全 Issue 完了後、`iss-00268` で dogfooding evidence と Epic report closeout を行う。
   - その後、Epic-wide pre-PR quality gate を実行し、問題がなければ Epic単位で1つの PR を作成する。
 - Execution wave:
-  - Wave 1 foundation: `iss-00261`, then `iss-00262`.
+  - Wave 0 foundation decision: accepted Epic ADR `artifacts/20260701t072851z-adr-artifact-domain-filename-template-contract.md`.
+  - Wave 1 foundation implementation: `iss-00262`.
   - Wave 2 runtime: `iss-00263`, then `iss-00264`.
   - Wave 3 integration: `iss-00265`, then `iss-00266`.
   - Wave 4 guidance: `iss-00267`.
@@ -248,8 +234,9 @@ rectangle "T5 Proof" {
   - Fresh `spec-reviewer` pass を得るまで plan promotion は incomplete。
 - G3 Plan gate:
   - Issue candidate が execution-slice であり、decision-only Issue を含まない。
-  - Actual Issues `iss-00261` through `iss-00268` were created after fresh Epic plan reviewer pass.
-  - Issue-local requirement/design/plan draft package is created for all Issues before implementation.
+  - Decision-only `iss-00261` was abolished and replaced by Epic-level ADR authority before implementation.
+  - Actual executable Issues `iss-00262` through `iss-00268` remain after plan correction.
+  - Issue-local requirement/design/plan draft package is created for all executable Issues before implementation.
 - G4 Integration checkpoint:
   - T2 終了時点で `new artifact` command と `new doc` removal の runtime behavior が観測可能である。
   - T2 終了時点で `draft-*` issue-scope artifacts preserve `.assurance.json` / authorized profile checks and fail closed without writes for unsupported or invalid contexts.
@@ -261,7 +248,7 @@ rectangle "T5 Proof" {
   - All required Issues are complete, dogfooding evidence is recorded, and Epic-wide final spec/code/QA review gates are complete before PR handoff.
 - G10 Epic PR delivery gate:
   - One Epic-level PR is created only after G9 passes.
-  - The PR body links Epic `#259` and child Issues `#261` through `#268`, and summarizes Epic-wide quality gate evidence.
+  - The PR body links Epic `#259`, notes abolished child Issue `#261`, links executable child Issues `#262` through `#268`, and summarizes Epic-wide quality gate evidence.
 
 ## 品質ゲート
 - test:
@@ -303,8 +290,9 @@ rectangle "T5 Proof" {
   - Each Issue requirement/design/plan authored through issue planning workflow after creation.
   - Dependency edges added only via `spec-dock deps add` after actual issue IDs exist; no direct `.meta.json` editing.
 - Issue creation result:
-  - Created Issues: `iss-00261` (#261), `iss-00262` (#262), `iss-00263` (#263), `iss-00264` (#264), `iss-00265` (#265), `iss-00266` (#266), `iss-00267` (#267), `iss-00268` (#268).
-  - Dependency edges were added by `spec-dock deps add`.
+  - Created then abolished: `iss-00261` (#261) because it represented an Epic foundation decision rather than an executable implementation slice.
+  - Remaining executable Issues: `iss-00262` (#262), `iss-00263` (#263), `iss-00264` (#264), `iss-00265` (#265), `iss-00266` (#266), `iss-00267` (#267), `iss-00268` (#268).
+  - Dependency edges were added by `spec-dock deps add` and corrected by `spec-dock deps remove` after abolishing `iss-00261`.
   - Each Issue has approved `requirement.md` plus draft `design.md` and draft `plan.md` authored as a cross-Issue package.
 - Each Issue must include:
   - Scope and non-scope mapped to E-RQ / E-AC.
