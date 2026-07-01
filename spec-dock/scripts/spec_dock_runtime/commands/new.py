@@ -152,10 +152,7 @@ def _add_new_artifact_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "artifact_type",
         metavar="type",
-        help=(
-            "Artifact type: "
-            f"{', '.join(_artifact_types)}."
-        ),
+        help=(f"Artifact type: {', '.join(_artifact_types)}."),
     )
     scope_group = parser.add_mutually_exclusive_group(required=True)
     scope_group.add_argument("--initiative", help="Scope initiative (e.g. 123 / init-00123 / init-local-00001)")

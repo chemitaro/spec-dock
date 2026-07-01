@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import re
+import shutil
 import tempfile
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
@@ -330,6 +331,35 @@ class TestCliRulesContract(CliRuntimeHarness):
                 f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
             )
             assert "spec-dock: ok (validate)" in validate_result.stdout
+
+    def test_validate_rejects_symlinked_artifacts_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+            artifacts_dir = issue_dir / "artifacts"
+            external_artifacts = target / "external-artifacts"
+            external_artifacts.mkdir()
+            shutil.rmtree(artifacts_dir)
+            artifacts_dir.symlink_to(external_artifacts)
+
+            validate_result = self._run_runtime_capture(target, ["validate"])
+
+            assert validate_result.returncode != 0
+            assert "Unsafe artifact directory" in validate_result.stderr
+            assert "must not be a symlink" in validate_result.stderr
 
     def test_runtime_entrypoint_fails_fast_when_runtime_module_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

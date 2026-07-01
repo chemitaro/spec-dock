@@ -1256,6 +1256,27 @@ class TestCliNew(CliRuntimeHarness):
             assert malformed_name in p.stderr
             assert len(sorted(artifacts_dir.glob("*-adr-decision-two.md"))) == 0
 
+    def test_new_artifact_preserves_grandfathered_legacy_artifact_basenames(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
+            artifacts_dir = issue_dir / "artifacts"
+            for filename in (
+                "001-adr-token-rotation.md",
+                "002-disc-api-options.md",
+                "001-note-kickoff-memo.md",
+            ):
+                (artifacts_dir / filename).write_text("legacy artifact\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target, ["new", "artifact", "adr", "--issue", "iss-00003", "--title", "Decision one"]
+            )
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert len(sorted(artifacts_dir.glob("*-adr-decision-one.md"))) == 1
+
     def test_new_artifact_old_node_setup_preserves_discussions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

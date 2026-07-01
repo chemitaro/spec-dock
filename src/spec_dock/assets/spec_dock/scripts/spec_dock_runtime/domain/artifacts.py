@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 import re
 from typing import TYPE_CHECKING
 
@@ -33,6 +34,7 @@ _BLANK_ARTIFACT_FILENAME_RE = re.compile(
     r"^(?P<ts>[0-9]{8}t[0-9]{6}z)(?:-(?P<nn>0[1-9]|[1-9][0-9]))?"
     r"-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
 )
+_GRANDFATHERED_LEGACY_ARTIFACT_FILENAME_RE = re.compile(r"^[0-9]{3}-(?:adr|disc|note)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
 
 
 @dataclass(frozen=True)
@@ -60,6 +62,10 @@ def is_ambiguous_blank_artifact_slug(slug: str) -> bool:
     return any(
         slug == artifact_type or slug.startswith(f"{artifact_type}-") for artifact_type in SUPPORTED_ARTIFACT_TYPES
     )
+
+
+def is_grandfathered_legacy_artifact_filename(name: str) -> bool:
+    return _GRANDFATHERED_LEGACY_ARTIFACT_FILENAME_RE.fullmatch(name) is not None
 
 
 def parse_artifact_filename(name: str) -> ArtifactFilename | None:
@@ -117,6 +123,8 @@ def is_malformed_artifact_candidate(path: Path) -> bool:
         return False
     if path.suffix != ".md":
         return False
+    if is_grandfathered_legacy_artifact_filename(path.name):
+        return False
     if parse_artifact_filename(path.name) is not None:
         return False
     stem = path.stem
@@ -142,6 +150,10 @@ def is_malformed_artifact_candidate(path: Path) -> bool:
 
 def scan_artifact_duplicate_state(artifacts_dir: Path) -> tuple[str | None, set[str]]:
     refs: list[ArtifactFilename] = []
+    if artifacts_dir.is_symlink():
+        return f"Unsafe artifact directory under {artifacts_dir}: artifacts directory must not be a symlink", set()
+    if os.path.lexists(artifacts_dir) and not artifacts_dir.is_dir():
+        return f"Unsafe artifact directory under {artifacts_dir}: artifacts path is not a directory", set()
     if artifacts_dir.exists():
         for path in sorted(artifacts_dir.glob("*.md"), key=lambda p: p.as_posix()):
             if path.name == "rules.md":
