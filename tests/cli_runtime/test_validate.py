@@ -627,6 +627,32 @@ class TestCliValidate(CliRuntimeHarness):
             assert "20260701t010101z-ADR-future-decision.md" in p.stderr
             assert "Malformed discussion document filename" not in p.stderr
 
+    def test_validate_rejects_symlinked_artifact_file_with_artifact_diagnostic(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+            artifacts_dir = issue_dir / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            external = target / "external-artifact.md"
+            external.write_text("external\n", encoding="utf-8")
+            (artifacts_dir / "20260701t010101z-adr-external-decision.md").symlink_to(external)
+
+            p = self._run_runtime_capture(target, ["validate"])
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Unsafe artifact file" in p.stderr
+            assert "20260701t010101z-adr-external-decision.md" in p.stderr
+
     def test_validate_rejects_duplicate_artifact_id_with_artifact_diagnostic(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
