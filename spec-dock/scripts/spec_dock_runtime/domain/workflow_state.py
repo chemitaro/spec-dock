@@ -229,8 +229,10 @@ def _has_unresolved_eal_row(rows: tuple[_TableRow, ...]) -> bool:
         if "evidence adoption ledger" not in row.section:
             continue
         cells = row.cells
-        if not cells or not cells[0].startswith("eal-") or len(cells) < 2:
+        if not cells or not cells[0].startswith("eal-"):
             continue
+        if len(cells) < 2:
+            return True
         if _is_unresolved_eal_row(cells):
             return True
     return False
@@ -551,7 +553,7 @@ def _row_has_grade_specialist_evidence(cells: tuple[str, ...], profile: Workflow
         and _has_substantive_evidence(evidence)
     )
     has_skip_reason = _has_substantive_skip_reason(usage_and_evidence)
-    has_fallback = (
+    has_fallback = _has_substantive_evidence(evidence) and (
         "manual authoring fallback" in fallback_and_evidence
         or "manual-authored canonical docs" in fallback_and_evidence
         or "manual fallback" in fallback_and_evidence
@@ -592,11 +594,18 @@ def _is_scaffold_placeholder(value: str) -> bool:
         "path / command / reviewer finding",
         "path / command",
         "reviewer finding",
+        "manual evidence",
+        "manual fallback evidence",
+        "explicit approval and risk acceptance",
         "yyyy-mm-dd",
         "ac-___",
         "ec-___",
     }
     if value in placeholder_values:
+        return True
+    if "..." in value:
+        return True
+    if _is_scaffold_choice_list(value):
         return True
     if value.endswith(": ...") or value.endswith("： ..."):
         return True
@@ -608,6 +617,16 @@ def _is_scaffold_placeholder(value: str) -> bool:
         tail = value.split("skip reason:", 1)[1].strip(" :：-")
         return not tail or _is_scaffold_placeholder(tail)
     return False
+
+
+def _is_scaffold_choice_list(value: str) -> bool:
+    known_choice_groups = (
+        ("sub-agent", "reviewer", "discussion", "command", "research"),
+        ("artifact", "issue", "follow-up"),
+        ("used", "skipped", "unavailable", "denied"),
+        ("ready", "blocked"),
+    )
+    return any(" / " in value and all(choice in value for choice in group) for group in known_choice_groups)
 
 
 def _has_critical_fallback_approval(value: str) -> bool:
