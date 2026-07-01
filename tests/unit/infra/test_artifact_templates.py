@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ASSET_ROOT = REPO_ROOT / "src/spec_dock/assets/spec_dock"
 ARTIFACT_TEMPLATES = ASSET_ROOT / "templates/artifacts"
@@ -42,9 +41,9 @@ def test_adr_artifact_template_supports_accepted_authority_and_mirror_surfaces()
     for expected in (
         '状態: "draft"',
         'authority: "draft"',
-        "accepted_authority: \"\"",
-        "accepted_at: \"\"",
-        "accepted_by: \"\"",
+        'accepted_authority: ""',
+        'accepted_at: ""',
+        'accepted_by: ""',
         "mirror_eligible: false",
     ):
         assert expected in frontmatter
@@ -52,9 +51,9 @@ def test_adr_artifact_template_supports_accepted_authority_and_mirror_surfaces()
     for expected in (
         '状態: "accepted"',
         '`authority: "accepted"`',
-        "`accepted_authority: \"accepted ADR\"`",
-        "`accepted_at: \"YYYY-MM-DD\"`",
-        "`accepted_by: \"<DECISION_OWNER>\"`",
+        '`accepted_authority: "accepted ADR"`',
+        '`accepted_at: "YYYY-MM-DD"`',
+        '`accepted_by: "<DECISION_OWNER>"`',
         "`mirror_eligible: true`",
         "accepted_authority",
         "artifacts/",

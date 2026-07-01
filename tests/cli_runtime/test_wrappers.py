@@ -23,12 +23,7 @@ class TestCliRulesContract(CliRuntimeHarness):
                     target / "spec-dock" / "docs" / "rules" / "initiative" / "artifacts.md"
                 ),
                 epic_dir / "issues" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md",
-                epic_dir / "artifacts" / "rules.md": target
-                / "spec-dock"
-                / "docs"
-                / "rules"
-                / "epic"
-                / "artifacts.md",
+                epic_dir / "artifacts" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "artifacts.md",
                 issue_dir / "artifacts" / "rules.md": target
                 / "spec-dock"
                 / "docs"

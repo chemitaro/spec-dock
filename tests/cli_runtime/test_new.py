@@ -798,7 +798,9 @@ class TestCliNew(CliRuntimeHarness):
 
             assert p.returncode == 0, p.stdout + p.stderr
             assert "type=research id=20260312t010203z-research scope=epic-00002" in p.stdout
-            epic_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / "epics" / "epic-00002-jwt-auth"
+            epic_dir = (
+                target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / "epics" / "epic-00002-jwt-auth"
+            )
             created = epic_dir / "artifacts" / "20260312t010203z-research-research-one.md"
             assert created.is_file()
             assert 'ID: "20260312t010203z-research"' in created.read_text(encoding="utf-8")
@@ -818,7 +820,7 @@ class TestCliNew(CliRuntimeHarness):
                     "20260312t010203z",
                     "20260312t010203z-working-title.md",
                     (
-                        '種別: artifact',
+                        "種別: artifact",
                         'template: "blank"',
                         "型を先に決めず",
                     ),
@@ -1205,7 +1207,18 @@ class TestCliNew(CliRuntimeHarness):
             epic_dir = init_dir / "epics" / "epic-00002-jwt-auth"
 
             for command, scope_dir in (
-                (["new", "artifact", "draft-requirement", "--initiative", "init-00001", "--title", "Requirement Draft"], init_dir),
+                (
+                    [
+                        "new",
+                        "artifact",
+                        "draft-requirement",
+                        "--initiative",
+                        "init-00001",
+                        "--title",
+                        "Requirement Draft",
+                    ],
+                    init_dir,
+                ),
                 (["new", "artifact", "draft-plan", "--epic", "epic-00002", "--title", "Plan Draft"], epic_dir),
             ):
                 artifact_files_before = sorted((scope_dir / "artifacts").glob("*.md"))
@@ -1223,7 +1236,9 @@ class TestCliNew(CliRuntimeHarness):
             discussions_dir = issue_dir / "discussions"
             artifacts_dir = issue_dir / "artifacts"
             discussions_dir.mkdir(exist_ok=True)
-            (discussions_dir / "20260312t010203z-00-disc-malformed.md").write_text("legacy malformed\n", encoding="utf-8")
+            (discussions_dir / "20260312t010203z-00-disc-malformed.md").write_text(
+                "legacy malformed\n", encoding="utf-8"
+            )
 
             p = self._run_runtime_capture(
                 target, ["new", "artifact", "adr", "--issue", "iss-00003", "--title", "Decision one"]
@@ -1371,7 +1386,9 @@ class TestCliNew(CliRuntimeHarness):
             assert "--id" not in p_artifact.stdout
             assert "--seq" not in p_artifact.stdout
 
-            p_doc = self._run_runtime_capture(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Doc title"])
+            p_doc = self._run_runtime_capture(
+                target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Doc title"]
+            )
             assert p_doc.returncode == 2, p_doc.stdout + p_doc.stderr
             assert "invalid choice: 'doc'" in p_doc.stderr
             assert "new artifact" not in p_doc.stderr

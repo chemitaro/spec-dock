@@ -281,7 +281,10 @@ class TestDelegatedAuthoringCli(CliRuntimeHarness):
 
         assert p.returncode != 0, p.stdout + p.stderr
         assert "spec-dock: blocked (delegated-authoring diff-guard)" in p.stdout
-        assert "path=spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-delegated-authoring/artifacts/rules.md" in p.stdout
+        assert (
+            "path=spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/issues/iss-00003-delegated-authoring/artifacts/rules.md"
+            in p.stdout
+        )
         assert "reason=artifact_name_noncompliant" in p.stdout
 
     @pytest.mark.skip(
