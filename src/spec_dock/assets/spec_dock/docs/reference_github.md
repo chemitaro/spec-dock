@@ -74,7 +74,7 @@ spec-dock は `gh` の全コマンドで一律に `--repo owner/repo` を省略�
 - `new {initiative,epic,issue} --github-issue <n>` は「既存番号へリンク」するだけで、GitHub Issue は作りません（`gh` を呼びません）
 - `./spec-dock/scripts/spec-dock update [path]` は `gh` を呼びません。固定 upstream の installer update を `uvx --no-cache` で呼び出し、managed files/docs/templates/scripts/skills を更新します
 - `spec-dock uninstall [path]` / `./spec-dock/scripts/spec-dock uninstall [path]` は `gh` を呼びません。target repo 内の SpecDock-managed artifacts を dry-run / explicit apply で取り外すだけで、GitHub Issue close/delete、package/environment uninstall、`uvx` cache cleanup は行いません
-- 生成される `epics/rules.md` / `issues/rules.md` / `discussions/rules.md` は `spec-dock/docs/rules/**` への symlink です。`rules.md` は入口/ナビゲーション用で、ルールの正本は `spec-dock/docs/rules/**` にあります。runtime command はサポートされた実行経路です
+- 生成される `epics/rules.md` / `issues/rules.md` / `artifacts/rules.md` は `spec-dock/docs/rules/**` への symlink です。`rules.md` は入口/ナビゲーション用で、ルールの正本は `spec-dock/docs/rules/**` にあります。runtime command はサポートされた実行経路です。既存 `discussions/rules.md` は legacy / preservation surface として残り得ますが、新規 working artifact の default destination ではありません
 
 ## 3. `import` の URL 入力に関する注意（事故防止）
 

@@ -150,7 +150,7 @@ Notes:
 - Treat direct `active set` / `active set --checkout` as manual / recovery / low-level commands. `active set` updates active pointers from local nodes first. Branch operations are opt-in via `--checkout`.
 - With `active set --checkout`, the branch name is normalized to `<id>-<slug>` (fallback: `<id>`) to keep branch names ASCII.
 - `github.issue_number` links (initiative/epic/issue) must be globally unique; duplicates are rejected/detected. See `src/spec_dock/assets/spec_dock/docs/reference_github.md` for details.
-- Generated initiative/epic/issue nodes include `artifacts/` and legacy `discussions/` (`rules.md` included).
+- Generated initiative/epic/issue nodes include `artifacts/rules.md` as the default working-artifact surface.
 - New working artifacts are created under the target scope `artifacts/` direct child with `./spec-dock/scripts/spec-dock new artifact <type> --{initiative|epic|issue} <id> --title "..."`.
 - Existing `discussions/` docs are legacy/preservation evidence; do not use them as the recommended destination for new working artifacts.
 - Generated nodes do not include template-derived `README.md`.
@@ -165,7 +165,8 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
   - `templates/` (initiative/epic/issue/adr templates)
   - `scripts/` (runtime scripts; local operations)
   - `initiatives/` (spec tree root; always-on)
-    - generated nodes include `artifacts/` and legacy `discussions/` (`rules.md`) and do not include scope-local node creation wrappers
+    - generated nodes include `artifacts/rules.md` for new working artifacts and do not include scope-local node creation wrappers
+    - legacy `discussions/` content is preserved when present, but is not the default destination for new working artifacts
   - `active/` (generated pointers; gitignored)
   - `.agent/` (generated agent state; gitignored)
   - `.gitignore` (ignores `active/` and `.agent/` (and legacy `.work/`))

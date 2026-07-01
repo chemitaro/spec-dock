@@ -8,7 +8,7 @@
 - Delegated authoring の future draft / analysis / artifact-local report は対象 scope の `artifacts/` direct child に flat Markdown として保存します。per-agent directory、run/task directory、global draft store、`discussions/delegated-authoring/`、`artifacts/delegated-authoring/` は新規出力先にしません。
 - Sub-agent-created draft は canonical docs への直接書き込みではなく、scope-local `artifacts/` 直下の flat Markdown として保存します。`draft-requirement` / `draft-design` / `draft-plan` は draft 専用 template を持たず、scope kind に応じた canonical template を直接 source として render します。canonical docs remain main-orchestrator-only. `authority: accepted`、`adoption_status: adopted`、non-empty `reflected_to` は自己主張しません。
 - Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator single-writer authority です。artifact draft は evidence であり、採用は canonical `report.md` の Evidence Adoption Ledger と canonical docs への再記述で成立します。
-- `report.md` は canonical observed evidence ledger です。legacy `new doc report` として作成する discussion catalog には含めません。
+- `report.md` は canonical observed evidence ledger です。legacy discussion-local report artifact catalog には含めません。
 - Historical delegated-authoring manifest/Profile/probe/session artifacts は grandfathered evidence です。current delegated drafts が flat model を使うことだけを理由に削除、rename、validation failure 化しません。
 - 実行場所: コマンドはリポジトリ root から実行してください。`./spec-dock/scripts/spec-dock ...` はその位置で保証される実行経路で、nested directory では相対 path が変わります。
 - Legacy discussion catalog:
@@ -23,13 +23,5 @@
   - `draft-plan`: scope kind に応じた canonical plan template を直接 source として render する discussion-local draft。
 - `note` は retired。既存 artifact は grandfathered です。future raw / untyped capture は `new artifact blank` を使います。
 - `disc` が大きくなりすぎたら、質問回答は `interview`、事実調査は `research`、生ログは `scratch`、長期判断は `adr` へ分割してください。`report.md` へ synthesis 本文を抱え込ませず、採用済み evidence と canonical 反映結果だけを残します。
-- Legacy create commands retained only for historical/preservation context; new working artifacts use `./spec-dock/scripts/spec-dock new artifact <type> --initiative <id> --title "<title>"` and target `artifacts/`:
-  - `./spec-dock/scripts/spec-dock new doc scratch --initiative <id> --title "<title>"`
-  - `./spec-dock/scripts/spec-dock new doc interview --initiative <id> --title "<title>"`
-  - `./spec-dock/scripts/spec-dock new doc research --initiative <id> --title "<title>"`
-  - `./spec-dock/scripts/spec-dock new doc disc --initiative <id> --title "<title>"`
-  - `./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title "<title>"`
-  - `./spec-dock/scripts/spec-dock new doc pr-repair-batch --initiative <id> --title "<title>"`
-  - `./spec-dock/scripts/spec-dock new doc draft-requirement --initiative <id> --title "<title>"`
-  - `./spec-dock/scripts/spec-dock new doc draft-design --initiative <id> --title "<title>"`
-  - `./spec-dock/scripts/spec-dock new doc draft-plan --initiative <id> --title "<title>"`
+- Do not create new files in this directory for routine work. New working artifacts use `./spec-dock/scripts/spec-dock new artifact <type> --initiative <id> --title "<title>"` and target `artifacts/`.
+- Historical creation command examples are intentionally omitted so this preservation surface is not advertised as a runnable path.

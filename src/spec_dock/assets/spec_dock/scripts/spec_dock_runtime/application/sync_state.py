@@ -95,6 +95,14 @@ class _AdrMirrorSource:
 
 
 @dataclass(frozen=True)
+class _AdrFrontMatter:
+    doc_id: str
+    parent_scope_id: str
+    authority: str | None
+    mirror_eligible: str | None
+
+
+@dataclass(frozen=True)
 class _AdrMirrorProbeLocation:
     probe_dir: Path
     remove_probe_dir_after: bool
@@ -201,7 +209,7 @@ def _path_for_output(path: Path, *, repo_root: Path | None = None) -> str:
     return path.as_posix()
 
 
-def _parse_required_adr_front_matter(path: Path) -> tuple[str, str] | None:
+def _parse_required_adr_front_matter(path: Path) -> _AdrFrontMatter | None:
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
@@ -238,7 +246,22 @@ def _parse_required_adr_front_matter(path: Path) -> tuple[str, str] | None:
         return None
     if not isinstance(parents, list) or not parents or not isinstance(parents[0], str):
         return None
-    return (doc_id[1:-1], parents[0])
+    return _AdrFrontMatter(
+        doc_id=doc_id[1:-1],
+        parent_scope_id=parents[0],
+        authority=_front_matter_scalar(entries.get("authority")),
+        mirror_eligible=_front_matter_scalar(entries.get("mirror_eligible")),
+    )
+
+
+def _front_matter_scalar(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return value.strip().strip('"').strip("'")
+
+
+def _artifact_adr_mirror_eligible(front_matter: _AdrFrontMatter) -> bool:
+    return front_matter.authority == "accepted" and front_matter.mirror_eligible == "true"
 
 
 def _adr_doc_id_from_basename(basename: str) -> str | None:
@@ -276,10 +299,9 @@ def _collect_adr_mirror_sources(graph: SpecGraph) -> list[_AdrMirrorSource]:
                 front_matter = _parse_required_adr_front_matter(path)
                 if front_matter is None:
                     continue
-                front_matter_doc_id, parent_scope_id = front_matter
-                if front_matter_doc_id != doc_id:
+                if front_matter.doc_id != doc_id:
                     continue
-                if parent_scope_id != scope.id:
+                if front_matter.parent_scope_id != scope.id:
                     continue
                 sources.append(
                     _AdrMirrorSource(
@@ -300,10 +322,11 @@ def _collect_adr_mirror_sources(graph: SpecGraph) -> list[_AdrMirrorSource]:
             front_matter = _parse_required_adr_front_matter(path)
             if front_matter is None:
                 continue
-            front_matter_doc_id, parent_scope_id = front_matter
-            if front_matter_doc_id != doc_id:
+            if not _artifact_adr_mirror_eligible(front_matter):
                 continue
-            if parent_scope_id != scope.id:
+            if front_matter.doc_id != doc_id:
+                continue
+            if front_matter.parent_scope_id != scope.id:
                 continue
             sources.append(
                 _AdrMirrorSource(

@@ -11,9 +11,17 @@ if TYPE_CHECKING:
 
 CANONICAL_DOC_NAMES: tuple[str, ...] = ("requirement.md", "design.md", "plan.md", "report.md")
 FORBIDDEN_ROOT_NAMES: tuple[str, ...] = (".agents", ".codex", ".github", "src", "tests")
-NON_EDITABLE_ARTIFACT_STATE_RE = re.compile(
-    r"(?im)^\s*(?:status|adoption_status|authority)\s*:\s*"
-    r"(?:accepted|adopted|partially_adopted|integrated|partially_integrated|rejected|superseded|blocked|stale)\b"
+NON_EDITABLE_ARTIFACT_STATE_FIELDS: tuple[str, ...] = ("status", "adoption_status", "authority")
+NON_EDITABLE_ARTIFACT_STATE_VALUES: tuple[str, ...] = (
+    "accepted",
+    "adopted",
+    "partially_adopted",
+    "integrated",
+    "partially_integrated",
+    "rejected",
+    "superseded",
+    "blocked",
+    "stale",
 )
 EDITABLE_ARTIFACT_STATE_RE = re.compile(r"(?im)^\s*(?:status\s*:\s*proposed|adoption_status\s*:\s*unreviewed)\b")
 REQUIRED_ARTIFACT_FRONTMATTER_FIELDS: tuple[str, ...] = (
@@ -258,7 +266,7 @@ def _validate_new_artifact_create(path: Path, *, scope_id: str, authorized_role:
     except UnicodeDecodeError:
         return "new_artifact_non_utf8"
     metadata = _frontmatter_metadata(text)
-    if NON_EDITABLE_ARTIFACT_STATE_RE.search(metadata):
+    if _has_non_editable_artifact_state(metadata):
         return "new_artifact_claims_non_editable_state"
     if not EDITABLE_ARTIFACT_STATE_RE.search(metadata):
         return "new_artifact_missing_proposed_state"
@@ -296,6 +304,13 @@ def _validate_required_artifact_frontmatter(
     if not _frontmatter_list_has_value(metadata, "intended_targets"):
         return "new_artifact_empty_intended_targets"
     return None
+
+
+def _has_non_editable_artifact_state(metadata: str) -> bool:
+    return any(
+        _frontmatter_scalar_value(metadata, field) in NON_EDITABLE_ARTIFACT_STATE_VALUES
+        for field in NON_EDITABLE_ARTIFACT_STATE_FIELDS
+    )
 
 
 def _duplicate_artifact_frontmatter_provenance_key(metadata: str) -> str | None:

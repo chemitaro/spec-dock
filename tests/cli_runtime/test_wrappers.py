@@ -65,13 +65,22 @@ class TestCliRulesContract(CliRuntimeHarness):
             initiative_discussions_rules = (
                 target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
             ).read_text(encoding="utf-8")
+            initiative_artifacts_rules = (
+                target / "spec-dock" / "docs" / "rules" / "initiative" / "artifacts.md"
+            ).read_text(encoding="utf-8")
             epic_issues_rules = (target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md").read_text(
                 encoding="utf-8"
             )
             epic_discussions_rules = (target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md").read_text(
                 encoding="utf-8"
             )
+            epic_artifacts_rules = (target / "spec-dock" / "docs" / "rules" / "epic" / "artifacts.md").read_text(
+                encoding="utf-8"
+            )
             issue_discussions_rules = (target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md").read_text(
+                encoding="utf-8"
+            )
+            issue_artifacts_rules = (target / "spec-dock" / "docs" / "rules" / "issue" / "artifacts.md").read_text(
                 encoding="utf-8"
             )
             hub_skill = (target / ".agents" / "skills" / "spec-dock-hub" / "SKILL.md").read_text(encoding="utf-8")
@@ -145,24 +154,35 @@ class TestCliRulesContract(CliRuntimeHarness):
                     '`./spec-dock/scripts/spec-dock new epic --initiative <id> --title "<title>"`',
                 ),
                 (
-                    initiative_discussions_rules,
-                    '`./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title "<title>"`',
-                ),
-                (
                     epic_issues_rules,
                     '`./spec-dock/scripts/spec-dock new issue --epic <id> --title "<title>"`',
-                ),
-                (
-                    epic_discussions_rules,
-                    '`./spec-dock/scripts/spec-dock new doc adr --epic <id> --title "<title>"`',
-                ),
-                (
-                    issue_discussions_rules,
-                    '`./spec-dock/scripts/spec-dock new doc adr --issue <id> --title "<title>"`',
                 ),
             ):
                 assert "spec-dock/docs/" in text
                 assert expected_command in text
+                assert "./spec " not in text
+            for text, expected_command in (
+                (
+                    initiative_artifacts_rules,
+                    "future `new artifact` surface",
+                ),
+                (
+                    epic_artifacts_rules,
+                    "future `new artifact` surface",
+                ),
+                (
+                    issue_artifacts_rules,
+                    "future `new artifact` surface",
+                ),
+            ):
+                assert "spec-dock/docs/" in text
+                assert expected_command in text
+                assert "new doc " not in text
+                assert "./spec " not in text
+            for text in (initiative_discussions_rules, epic_discussions_rules, issue_discussions_rules):
+                assert "preservation surface" in text
+                assert "Historical creation command examples are intentionally omitted" in text
+                assert "new doc " not in text
                 assert "./spec " not in text
             for skill_text in (hub_skill, issue_skill, codex_adapter_skill, copilot_adapter_skill):
                 assert "./spec-dock/scripts/spec-dock" in skill_text

@@ -510,19 +510,17 @@ class TestInitUpdate(CliRuntimeHarness):
         "docs/rules/initiative/discussions.md": {
             "contains": (
                 "# 議論ルール（discussions/rules.md）",
-                "このディレクトリには initiative に紐づく議論資料を置きます。",
+                "このディレクトリは initiative に紐づく legacy / historical discussion docs の preservation surface です。",
+                "新規 working artifacts は対象 scope の `artifacts/` direct child に作成します。",
                 "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
                 "リポジトリ root から実行してください",
-                "./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title",
-                "./spec-dock/scripts/spec-dock new doc disc --initiative <id> --title",
-                "./spec-dock/scripts/spec-dock new doc research --initiative <id> --title",
-                "./spec-dock/scripts/spec-dock new doc interview --initiative <id> --title",
-                "./spec-dock/scripts/spec-dock new doc scratch --initiative <id> --title",
+                "./spec-dock/scripts/spec-dock new artifact <type> --initiative <id> --title",
+                "Historical creation command examples are intentionally omitted",
             ),
             "absent": (
                 "--epic <id>",
                 "--issue <id>",
-                "new doc note",
+                "new doc ",
             ),
         },
         "docs/rules/initiative/epics.md": {
@@ -551,19 +549,17 @@ class TestInitUpdate(CliRuntimeHarness):
         "docs/rules/epic/discussions.md": {
             "contains": (
                 "# 議論ルール（discussions/rules.md）",
-                "このディレクトリには epic に紐づく議論資料を置きます。",
+                "このディレクトリは epic に紐づく legacy / historical discussion docs の preservation surface です。",
+                "新規 working artifacts は対象 scope の `artifacts/` direct child に作成します。",
                 "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
                 "リポジトリ root から実行してください",
-                "./spec-dock/scripts/spec-dock new doc adr --epic <id> --title",
-                "./spec-dock/scripts/spec-dock new doc disc --epic <id> --title",
-                "./spec-dock/scripts/spec-dock new doc research --epic <id> --title",
-                "./spec-dock/scripts/spec-dock new doc interview --epic <id> --title",
-                "./spec-dock/scripts/spec-dock new doc scratch --epic <id> --title",
+                "./spec-dock/scripts/spec-dock new artifact <type> --epic <id> --title",
+                "Historical creation command examples are intentionally omitted",
             ),
             "absent": (
                 "--initiative <id>",
                 "--issue <id>",
-                "new doc note",
+                "new doc ",
             ),
         },
         "docs/rules/epic/issues.md": {
@@ -592,19 +588,17 @@ class TestInitUpdate(CliRuntimeHarness):
         "docs/rules/issue/discussions.md": {
             "contains": (
                 "# 議論ルール（discussions/rules.md）",
-                "このディレクトリには issue に紐づく議論資料を置きます。",
+                "このディレクトリは issue に紐づく legacy / historical discussion docs の preservation surface です。",
+                "新規 working artifacts は対象 scope の `artifacts/` direct child に作成します。",
                 "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
                 "リポジトリ root から実行してください",
-                "./spec-dock/scripts/spec-dock new doc adr --issue <id> --title",
-                "./spec-dock/scripts/spec-dock new doc disc --issue <id> --title",
-                "./spec-dock/scripts/spec-dock new doc research --issue <id> --title",
-                "./spec-dock/scripts/spec-dock new doc interview --issue <id> --title",
-                "./spec-dock/scripts/spec-dock new doc scratch --issue <id> --title",
+                "./spec-dock/scripts/spec-dock new artifact <type> --issue <id> --title",
+                "Historical creation command examples are intentionally omitted",
             ),
             "absent": (
                 "--initiative <id>",
                 "--epic <id>",
-                "new doc note",
+                "new doc ",
             ),
         },
     }
@@ -1657,6 +1651,16 @@ class TestInitUpdate(CliRuntimeHarness):
                 content = re.sub(r"^\d+[.)]\s+", "", content)
             if content.startswith(("`", "./", "/", "[", "<")):
                 return
+            if (
+                "New working artifacts use `./spec-dock/scripts/spec-dock new artifact <type>" in content
+                and "target `artifacts/`" in content
+            ):
+                return
+            if content == (
+                "Historical creation command examples are intentionally omitted so this preservation surface "
+                "is not advertised as a runnable path."
+            ):
+                return
             if re.search(r"[ぁ-んァ-ヶ一-龠]", content):
                 return
 
@@ -1868,7 +1872,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             assert field in text, f"{source}: missing delegated artifact evidence field {field}"
         assert "artifacts/" in text, f"{source}: missing artifacts/ delegated draft output guidance"
-        assert "legacy `discussions/`" in text, f"{source}: missing legacy discussions historical evidence guidance"
+        assert (
+            "legacy `discussions/`" in text or "`discussions/` は legacy / preservation evidence" in text
+        ), f"{source}: missing legacy discussions historical evidence guidance"
         assert "grandfathered evidence" in text, f"{source}: missing grandfathered evidence wording"
         for retired_heavy_field in (
             "manifest_hash",
@@ -2399,9 +2405,9 @@ class TestInitUpdate(CliRuntimeHarness):
             "Workspace-write is not a hard path allow-list",
             "scope-local",
             "flat Markdown draft/analysis/report",
-            "initiative, epic, or issue `discussions/`",
+            "initiative, epic, or issue `artifacts/`",
             "create exactly one new",
-            "Existing discussion draft updates are out of scope",
+            "Existing artifact draft updates are out of scope",
             "post-run diff guard",
             "Never edit implementation files",
             "Do not promote phases",
@@ -2413,7 +2419,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "[sandbox_workspace_write]",
             "network_access = false",
             "lightweight",
-            "discussion draft provenance",
+            "artifact draft provenance",
             "Manual spec authoring remains valid",
             "fresh `spec-reviewer` pass remains required",
         ):
@@ -3164,7 +3170,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "具体テストケース一覧" in workflow_spec_authoring
             for fragment in (
                 "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
-                "Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `discussions/` 直下に置く flat Markdown draft / analysis / discussion-local report",
+                "Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `artifacts/` 直下に置く flat Markdown draft / analysis / artifact-local report",
                 "Sub-agent-created draft は最低限",
                 "`source_paths` と `intended_targets` は non-empty block list",
                 "inline scalar や `source_paths: []` / `intended_targets: []` は post-run diff guard で不合格",
@@ -3480,8 +3486,8 @@ class TestInitUpdate(CliRuntimeHarness):
             assert (target / ".github" / "agents" / "orchestrator.agent.md").is_file()
 
             workflow_skill_text = (skills_root / "spec-dock-hub" / "SKILL.md").read_text(encoding="utf-8")
-            assert "`discussions/`" in workflow_skill_text
-            assert "./spec-dock/scripts/spec-dock new doc adr --issue" in workflow_skill_text
+            assert "`artifacts/`" in workflow_skill_text
+            assert "./spec-dock/scripts/spec-dock new artifact adr --issue" in workflow_skill_text
             assert "`spec-dock/docs/reference_deps.md`" in workflow_skill_text
             assert "`spec-dock/docs/reference_sync.md`" in workflow_skill_text
             assert "./spec-dock/scripts/spec-dock ..." in workflow_skill_text
@@ -4656,7 +4662,7 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "三者最終品質ゲート（final quality gate）" in phase_plan_issue
         assert "delegated plan draft" in phase_plan_issue
         assert "phase gate preservation" in phase_plan_issue
-        assert "scope-local discussion direct-write consent" in phase_plan_issue
+        assert "scope-local artifact direct-write consent" in phase_plan_issue
         assert "forbidden canonical/implementation paths" in phase_plan_issue
         assert "post-run diff guard" in phase_plan_issue
         assert "adoption-ineligible" in phase_plan_issue
@@ -4680,7 +4686,7 @@ class TestInitUpdate(CliRuntimeHarness):
         )
         assert "delegated plan draft" in phase_plan_epic
         assert "fresh requirement/design reviewer pass" in phase_plan_epic
-        assert "scope-local discussion direct-write consent" in phase_plan_epic
+        assert "scope-local artifact direct-write consent" in phase_plan_epic
         assert "forbidden canonical/implementation paths" in phase_plan_epic
         assert "post-run diff guard" in phase_plan_epic
         assert "adoption-ineligible" in phase_plan_epic
@@ -10211,7 +10217,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "needs orchestrator decision",
                 "No material implementation decisions beyond the approved plan.",
                 "durable decision",
-                "scope-local discussion direct-write step",
+                "scope-local artifact direct-write step",
                 "diff guard result",
                 "lightweight provenance",
                 "最低 fields は `created_by_role`",
@@ -10582,7 +10588,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "issue discussions rules": (
                 "Canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
                 "`report.md` は canonical observed evidence ledger",
-                "`new doc report` として作成する discussion catalog には含めません",
+                "legacy discussion-local report artifact catalog には含めません",
             ),
             "workflow authoring": (
                 "workflow_clarification.md",
@@ -10674,12 +10680,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "phase design docs": (
                 "## 委任 design authoring ゲート（delegated design authoring gate）",
                 "fresh requirement reviewer pass",
-                "read-only specialist consent と scope-local discussion direct-write consent は分離",
+                "read-only specialist consent と scope-local artifact direct-write consent は分離",
                 "guarded workspace-write",
                 "workspace-write は hard path allow-list ではなく canonical target write の許可でもない",
                 "proposal-only ではありません",
                 "scope-local",
-                "discussions/` 直下",
+                "artifacts/` 直下",
                 "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
                 "main orchestrator",
                 "single-writer authority",
@@ -10709,12 +10715,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "fresh requirement reviewer pass",
                 "fresh design reviewer pass",
                 "design dependency analysis",
-                "read-only specialist consent と scope-local discussion direct-write consent は分離",
+                "read-only specialist consent と scope-local artifact direct-write consent は分離",
                 "guarded workspace-write",
                 "workspace-write は hard path allow-list ではなく canonical target write の許可でもない",
                 "proposal-only ではありません",
                 "scope-local",
-                "discussions/` 直下",
+                "artifacts/` 直下",
                 "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
                 "main orchestrator",
                 "single-writer authority",
@@ -10741,10 +10747,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             ),
             "phase epic plan docs": (
                 "delegated plan draft",
-                "read-only specialist consent と scope-local discussion direct-write consent が分離",
+                "read-only specialist consent と scope-local artifact direct-write consent が分離",
                 "guarded workspace-write",
                 "hard path allow-list",
-                "target scope `discussions/` direct child",
+                "target scope `artifacts/` direct child",
                 "stale / superseded handling",
                 "phase gate preservation",
                 "final authority",
@@ -10754,10 +10760,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             ),
             "phase issue plan docs": (
                 "delegated plan draft",
-                "read-only specialist consent と scope-local discussion direct-write consent が分離",
+                "read-only specialist consent と scope-local artifact direct-write consent が分離",
                 "guarded workspace-write",
                 "hard path allow-list",
-                "target scope `discussions/` direct child",
+                "target scope `artifacts/` direct child",
                 "stale / superseded handling",
                 "phase gate preservation",
                 "step reviewer gate",
@@ -10858,11 +10864,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         assert "`spec-dock-clarification`: first-class docs-aware clarification companion" in hub_text
         assert (
-            "`system-architect` agent role: delegated architecture analysis and draft design evidence created through `./spec-dock/scripts/spec-dock new doc ...` and written to the returned scope-local discussion path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/system-architect.toml`, not in a skill."
+            "`system-architect` agent role: delegated architecture analysis and draft design evidence created through `./spec-dock/scripts/spec-dock new artifact ...` and written to the returned scope-local `artifacts/` path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/system-architect.toml`, not in a skill."
             in hub_text
         )
         assert (
-            "`implementation-planner` agent role: delegated planning analysis and draft plan evidence created through `./spec-dock/scripts/spec-dock new doc ...` and written to the returned scope-local discussion path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/implementation-planner.toml`, not in a skill."
+            "`implementation-planner` agent role: delegated planning analysis and draft plan evidence created through `./spec-dock/scripts/spec-dock new artifact ...` and written to the returned scope-local `artifacts/` path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/implementation-planner.toml`, not in a skill."
             in hub_text
         )
         assert (

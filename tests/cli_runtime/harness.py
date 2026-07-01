@@ -572,14 +572,14 @@ class CliRuntimeHarness:
     def _assert_discussion_guidance_contract(self, text_map: dict[str, str]) -> None:
         combined = "\n".join(text_map.values())
 
-        _assert_in("new doc adr", combined)
-        _assert_in("new doc disc", combined)
-        _assert_in("new doc research", combined)
-        _assert_in("new doc interview", combined)
-        _assert_in("new doc scratch", combined)
-        _assert_in("new doc draft-requirement", combined)
-        _assert_in("new doc draft-design", combined)
-        _assert_in("new doc draft-plan", combined)
+        _assert_in("new artifact adr", combined)
+        _assert_in("new artifact disc", combined)
+        _assert_in("new artifact research", combined)
+        _assert_in("new artifact interview", combined)
+        _assert_in("new artifact blank", combined)
+        _assert_in("new artifact draft-requirement", combined)
+        _assert_in("new artifact draft-design", combined)
+        _assert_in("new artifact draft-plan", combined)
         _assert_in("canonical docs remain main-orchestrator-only", combined)
         _assert_in("<ts>-<kind>-<slug>.md", combined)
         _assert_in("<ts>-<nn>-<kind>-<slug>.md", combined)
@@ -592,7 +592,18 @@ class CliRuntimeHarness:
         _assert_in("archive", combined)
 
         _assert_not_in("new adr --", combined)
-        _assert_not_in("new doc note", combined)
+        for retired_doc_command in (
+            "new doc adr",
+            "new doc disc",
+            "new doc research",
+            "new doc interview",
+            "new doc scratch",
+            "new doc draft-requirement",
+            "new doc draft-design",
+            "new doc draft-plan",
+        ):
+            _assert_not_in(retired_doc_command, combined)
+        _assert_not_in("new artifact scratch", combined)
         _assert_not_in("<type>-00001-<slug>.md", combined)
         _assert_not_in("<type>-xxxxx-<slug>.md", combined)
         for rel_path, text in text_map.items():
