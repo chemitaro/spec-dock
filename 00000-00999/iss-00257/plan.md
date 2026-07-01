@@ -61,6 +61,7 @@ authorized_profile: "standard"
 | CLOS-004 | AC-004 | DES-003 | P2/P3-only clean state can reach `blocker_policy_no_action` / merge-prepared without repair loop | existing/updated focused unit test |
 | CLOS-004A | AC-004 | DES-003, DES-004 | Terminal P2/P3-only state does not trigger repo-persistent repair batch update, commit/push, re-review request, or another autonomous repair loop | focused test where feasible plus text/runtime inspection tied to merge-preparer and repair-batch surfaces |
 | CLOS-005 | AC-005 | DES-003 | `CHANGES_REQUESTED` / unresolved / collection gates remain separate from severity policy | existing focused unit tests / inspection |
+| CLOS-005A | AC-005 | DES-003 | Clean no-findings fallback/pass context excludes only trigger-boundary-old Codex-only carryover threads from actionable unresolved output; human-authored or human-participated carryover remains actionable | focused unit test plus mirror parity inspection |
 | CLOS-006 | AC-006 | DES-004 | Merge-preparer and repair-batch docs separate P0/P1 repair from P2/P3 terminal report and keep `root_cause_family` docs-only | text inspection / tests if asset assertions exist |
 | CLOS-007 | AC-007 | DES-005 | Provider/dogfooding mirrors match after updates | existing parity tests / `cmp` |
 | CLOS-008 | AC-008 | DES-006 | Parent Epic docs are untouched | `git diff -- spec-dock/active/epic` and status inspection |
@@ -106,12 +107,14 @@ authorized_profile: "standard"
   - Remove P2 protected-domain + machine-evidence promotion.
   - Ensure blocker filtering is P0/P1-only.
   - Preserve existing platform gate separation and no-action path.
+  - If PR observation shows stale Codex-authored carryover from a previous trigger overriding current no-findings evidence, exclude only trigger-boundary-old Codex-only carryover threads from `actionable_unresolved_thread_ids` in clean no-findings fallback/pass context while retaining them in carryover inventory.
+  - Preserve human-authored or human-participated carryover threads as actionable unresolved gates.
   - If PR observation shows downstream decision classifiers still promote raw selected unresolved P2/P3-only threads, update `pr_observation_snapshot.py` and `pr_observation_wait.py` mirror pairs so explicit actionable unresolved fields control blocking while legacy payloads without those fields keep fallback behavior.
 - Red:
   - Existing protected-domain + machine-evidence P2 promotion test should fail until expectation and implementation are updated.
 - Verification:
   - `uv run pytest tests/unit/infra/test_init_update.py -k "issue_232"`
-- Closures: CLOS-002, CLOS-003, CLOS-004, CLOS-004A, CLOS-005, CLOS-007.
+- Closures: CLOS-002, CLOS-003, CLOS-004, CLOS-004A, CLOS-005, CLOS-005A, CLOS-007.
 
 ### S30: Test updates and focused verification
 
@@ -139,12 +142,14 @@ authorized_profile: "standard"
 - Actions:
   - Verify that observation runtime treats P2/P3-only findings as `blocker_policy_no_action` / merge-prepared when other gates are clean.
   - Verify that downstream PR observation snapshot/wait classifiers do not re-promote explicit non-actionable P2/P3-only selected unresolved threads into `human_gate`.
+  - Verify that stale Codex-only carryover from an older trigger does not re-promote a clean current no-findings fallback/pass context to `human_gate`.
+  - Verify that human-authored or human-participated carryover still blocks as actionable unresolved evidence.
   - Verify that merge-preparer instructions do not direct branch mutation, repo-persistent batch updates, pushes, or re-review requests solely for terminal P2/P3-only findings.
   - Verify that repair-batch template says persistent batches are for blocking repair / blocking triage, not non-blocking P2/P3-only follow-ups.
   - Record in `report.md` whether each no-mutation boundary was covered by unit test, text inspection, or runtime inspection.
 - Verification:
   ```bash
-  uv run pytest tests/unit/infra/test_init_update.py -k "issue_232"
+  uv run pytest tests/unit/infra/test_init_update.py -k "issue_219_s01_review_collector_no_findings_with_carryover or issue_222_s03 or issue_232"
   rg -n "P2/P3|non-blocking|re-review|push|persistent|repair batch|blocker_policy_no_action" .agents/skills/github-pr-merge-preparer/SKILL.md spec-dock/templates/discussions/pr-repair-batch.md
   ```
 - Required report evidence:
@@ -230,6 +235,7 @@ authorized_profile: "standard"
 | B-003 | S20 | P0/P1 blocker path remains intact | CLOS-003 | planned |
 | B-004 | S20/S40 | P2/P3-only clean terminal state avoids repair mutation | CLOS-004, CLOS-004A | planned |
 | B-005 | S20 | Platform/human gates remain separate | CLOS-005 | planned |
+| B-005A | S20/S40 | Stale Codex-only carryover is inventory-only under clean current no-findings fallback/pass, while human-participated carryover remains actionable | CLOS-005A | planned |
 | B-006 | S10 | Merge-preparer and repair-batch express blocking repair boundary | CLOS-006 | planned |
 | B-007 | S10-S30 | Provider/dogfooding mirrors remain in sync | CLOS-007 | planned |
 | B-008 | S90 | Parent Epic docs remain untouched | CLOS-008 | planned |
@@ -264,7 +270,7 @@ authorized_profile: "standard"
 The implementation should be a small, focused policy update:
 
 1. Update three Markdown asset pairs to express severity-aware review / repair policy.
-2. Update observation runtime mirror files so only P0/P1 are semantic blockers and downstream snapshot/wait classifiers honor explicit actionable unresolved fields.
+2. Update observation runtime mirror files so only P0/P1 are semantic blockers, stale Codex-only carryover does not override clean current no-findings fallback/pass, human-participated carryover stays actionable, and downstream snapshot/wait classifiers honor explicit actionable unresolved fields.
 3. Update focused unit tests and mirror parity assertions.
 4. Preserve current `blocker_fingerprint` contract and platform gate separation.
 5. Add bounded SpecDock workflow named role authorization wording to provider/dogfooding instructions, skills, and workflow docs without adding runtime consent logic.
