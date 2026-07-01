@@ -2,7 +2,7 @@
 種別: interview
 ID: "20260701t023858z-interview"
 タイトル: "Root Cause Family Runtime Scope Clarification"
-状態: "draft | answered | archived"
+状態: "answered"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-01"
 親: ["iss-00257"]
@@ -11,9 +11,9 @@ scope: "<initiative | epic | issue | local-topic>"
 scope_id: "iss-00257"
 created_at: "2026-07-01T02:38:58Z"
 created_by: "iwasawayuuta"
-status: "unanswered"
-authority: "proposed"
-adoption_status: "unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked"
+status: "answered"
+authority: "user-approved"
+adoption_status: "adopted"
 derived_from:
   - "specdock-pr-review-policy-update.zip/docs/codex-initial-prompt.md"
   - "specdock-pr-review-policy-update.zip/repo-files/.agents/skills/github-pr-observation/scripts/codex-review-instructions.md"
@@ -108,41 +108,46 @@ reflected_to: []
 
 ## ユーザー回答 (回答後に必須)
 - answer capture:
-  - ...
+  - Option B を採用する。`root_cause_family` は code-level runtime contract へ強引に組み込まず、document / LLM judgement / operational triage vocabulary として扱う。
 - 回答:
-  - ...
+  - 今回の Issue では、`root_cause_family` を `pr_review_snapshot.py` の JSON output、blocker fingerprint、automation stalled 判定へ組み込まない。
+  - Review instruction、merge-preparer skill、repair-batch template では、LLM が observation batch を family grouping して判断するための運用語彙として明示する。
+  - Runtime は既存 `blocker_fingerprint` contract を維持し、P0/P1-only blocker policy と P2/P3 non-blocking policy の修正に集中する。
 - 回答日時:
-  - ...
+  - 2026-07-01
 
 ## 追加確認の要否 (回答後に必須)
 - 追加確認が必要か:
-  - yes | no
+  - no
 - 必要な場合に次の unanswered `interview` として切り出す質問:
-  - ...
+  - none
 
 ## 採用判断 (回答後に必須)
 - adoption_status:
-  - unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked
+  - adopted
 - adoption target:
-  - `requirement.md` | `design.md` | `plan.md` | `ADR` | `report.md` Evidence Adoption Ledger | none
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
+  - `report.md` Evidence Adoption Ledger
 - 採用 / 棄却 / deferred の理由:
-  - ...
+  - 採用する。今回の主目的は P2/P3 の自動 blocking 化と terminal P2/P3-only branch mutation を止めることであり、`root_cause_family` の runtime contract 化は別リスクを伴うため、この Issue では docs / LLM operational vocabulary に限定する。
 - `report.md` Evidence Adoption Ledger への反映要否:
-  - yes | no
+  - yes
 
 ## requirement / design / plan / ADR への含意 (回答後に必須)
 - `requirement.md`:
-  - ...
+  - `root_cause_family` は review / merge-preparer / repair-batch の運用語彙として扱うが、runtime JSON contract の追加要求にはしない。
 - `design.md`:
-  - ...
+  - `pr_review_snapshot.py` は `root_cause_family:` 行を parse しない。既存 `blocker_fingerprint` を維持し、P0/P1 のみを blocker fingerprint 対象にする。
 - `plan.md`:
-  - ...
+  - `root_cause_family` parser / JSON / automation stalled tests は scope 外にする。Markdown asset tests または inspection で family-based triage vocabulary が入ることを確認する。
 - `ADR`:
-  - ...
+  - 不要。
 - reflected_to 更新方針:
-  - ...
+  - Requirement / design / plan 作成時に採用し、`report.md` Evidence Adoption Ledger にこの artifact を採用証跡として記録する。
 - adoption reflection:
-  - ...
+  - 未反映。canonical authoring phase で反映する。
 
 ## 条件付き補足 (必要な場合だけ)
 - PlantUML 図:
