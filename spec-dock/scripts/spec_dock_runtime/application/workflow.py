@@ -17,6 +17,7 @@ from spec_dock_runtime.domain.workflow_state import (
     RunbookAuthority,
     WorkflowState,
     classify_requirement_text,
+    evaluate_report_evidence_gate,
 )
 
 if TYPE_CHECKING:
@@ -154,6 +155,19 @@ def _resolve_state(store: WorkflowAssuranceStoreLike) -> WorkflowState:
                     "Add implementation steps, verification obligations, reviewer/no-review rationale, and report evidence destinations.",
                 ),
             )
+        report_gate = evaluate_report_evidence_gate(
+            _read_optional_text(Path(target.issue_dir) / "report.md"),
+            authority.authorized_profile,
+        )
+        if report_gate.status != "pass":
+            return WorkflowState(
+                kind="blocked",
+                active_issue_id=target.issue_id,
+                reason_code=report_gate.reason_code,
+                artifact_readiness="substantive",
+                authority=authority,
+                details=report_gate.details,
+            )
         return WorkflowState(
             kind="ready",
             active_issue_id=target.issue_id,
@@ -196,6 +210,19 @@ def _resolve_state(store: WorkflowAssuranceStoreLike) -> WorkflowState:
                 "Add implementation steps, verification obligations, reviewer/no-review rationale, and report evidence destinations.",
             ),
         )
+    report_gate = evaluate_report_evidence_gate(
+        _read_optional_text(Path(target.issue_dir) / "report.md"),
+        STRICT_LEGACY_AUTHORITY.authorized_profile,
+    )
+    if report_gate.status != "pass":
+        return WorkflowState(
+            kind="blocked",
+            active_issue_id=target.issue_id,
+            reason_code=report_gate.reason_code,
+            artifact_readiness="substantive",
+            authority=STRICT_LEGACY_AUTHORITY,
+            details=report_gate.details,
+        )
     return WorkflowState(
         kind="ready",
         active_issue_id=target.issue_id,
@@ -225,24 +252,23 @@ def _classify_plan_text(plan_text: str | None) -> str:
         '状態: "draft',
         "状態: draft",
         "draft | proposed",
+        "artifact_state: awaiting-assurance-compose",
         "todo",
         "tbd",
     )
     if _frontmatter_has_any(lower, frontmatter_scaffold_markers):
         return "scaffold"
-    markers = (
+    executable_markers = (
         "実装ステップ",
         "具体テストケース",
         "振る舞いバックログ",
         "実行中の振る舞い",
         "tdd サイクル",
-        "validation gate",
-        "報告証跡",
         "step closure contract",
         "approved-no-op",
         "decision-only closure",
     )
-    has_executable_marker = any(marker in lower for marker in markers)
+    has_executable_marker = any(marker in lower for marker in executable_markers) or _has_lite_executable_plan(lower)
     scaffold_markers = (
         "no structured implementation steps",
         "no implementation steps",
@@ -261,13 +287,19 @@ def _classify_plan_text(plan_text: str | None) -> str:
     return "scaffold"
 
 
+def _has_lite_executable_plan(text: str) -> bool:
+    has_change_checklist = "変更チェックリスト" in text
+    has_verification = "軽量検証" in text or "lightweight verification" in text
+    return has_change_checklist and has_verification
+
+
 def _has_placeholder_table_rows(text: str) -> bool:
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped.startswith("|") or stripped.count("|") < 3:
             continue
         cells = [cell.strip().strip("`").lower() for cell in stripped.strip("|").split("|")]
-        if any(_is_generated_placeholder_token(cell) for cell in cells):
+        if any(_has_generated_placeholder_token(cell) for cell in cells):
             return True
     return False
 
@@ -284,8 +316,6 @@ def _classify_design_text(design_text: str | None) -> str:
         "状態: draft",
         "draft | proposed",
         "artifact_state: awaiting-assurance-compose",
-        "template",
-        "placeholder",
         "todo",
         "tbd",
     )
@@ -294,6 +324,9 @@ def _classify_design_text(design_text: str | None) -> str:
     scaffold_markers = (
         "未記入",
         "記載してください",
+        "設計 placeholder",
+        "design placeholder",
+        "placeholder design",
     )
     if any(marker in lower for marker in scaffold_markers):
         return "scaffold"
@@ -317,7 +350,11 @@ def _classify_design_text(design_text: str | None) -> str:
 
 
 def _has_placeholder_entries(text: str) -> bool:
-    return _has_placeholder_list_items(text) or _has_placeholder_table_rows(text)
+    return _has_placeholder_list_items(text) or _has_placeholder_table_rows(text) or _has_placeholder_code_spans(text)
+
+
+def _has_placeholder_code_spans(text: str) -> bool:
+    return any(_has_generated_placeholder_id_token(token) for token in re.findall(r"`([^`]+)`", text))
 
 
 def _has_placeholder_list_items(text: str) -> bool:
@@ -326,9 +363,23 @@ def _has_placeholder_list_items(text: str) -> bool:
         if item_match is None:
             continue
         item_text = item_match.group(1).strip().strip("`").lower()
-        if _is_generated_placeholder_token(item_text) or item_text.endswith(": ...") or item_text.endswith("： ..."):
+        if _has_generated_placeholder_token(item_text) or item_text.endswith(": ...") or item_text.endswith("： ..."):
             return True
     return False
+
+
+def _has_generated_placeholder_token(text: str) -> bool:
+    normalized = text.strip().strip("`").lower()
+    if _is_generated_placeholder_token(normalized):
+        return True
+    tokens = re.findall(r"[a-z][a-z0-9_-]*-(?:\.\.\.|xxx)|#\.\.\.", normalized)
+    return any(_is_generated_placeholder_token(token) for token in tokens)
+
+
+def _has_generated_placeholder_id_token(text: str) -> bool:
+    normalized = text.strip().strip("`").lower()
+    tokens = re.findall(r"[a-z][a-z0-9_-]*-(?:\.\.\.|xxx)|#\.\.\.", normalized)
+    return any(_is_generated_placeholder_token(token) for token in tokens)
 
 
 def _is_generated_placeholder_token(text: str) -> bool:

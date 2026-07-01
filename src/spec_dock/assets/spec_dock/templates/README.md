@@ -7,7 +7,7 @@
 - `epic/` → `.../epics/epic-xxxx-<slug>/`
 - `issue/` → `.../issues/iss-xxxx-<slug>/`
 - `discussions/{scratch,interview,research,disc,adr,pr-repair-batch}.md` → `<scope>/discussions/<ts>-<kind>-<slug>.md`
-- `draft-requirement` / `draft-design` / `draft-plan` は draft 専用 template file を持たず、scope kind に応じた canonical `templates/{initiative,epic,issue}/{requirement,design,plan}.md` を直接 source として render します。
+- `draft-requirement` は scope kind に応じた canonical `templates/{initiative,epic,issue}/requirement.md` を source として render します。Initiative / Epic の `draft-design` / `draft-plan` も scope kind に応じた canonical design / plan template を source とします。Issue の `draft-design` / `draft-plan` は verified `.assurance.json` の `authorized_profile` に対応する `templates/issue-profiles/<profile>/design.md` / `plan.md` を source として render します。
 - same-second collision 時は `<scope>/discussions/<ts>-<nn>-<kind>-<slug>.md`
 
 注意:
