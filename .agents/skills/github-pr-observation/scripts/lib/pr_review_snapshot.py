@@ -1129,6 +1129,14 @@ no_findings_source_ids = (
     if latest_current_codex_issue_comment_is_no_findings and latest_current_codex_issue_comment.get("id") is not None
     else []
 )
+current_codex_unclassified_fallback_issue_comments = [
+    item
+    for item in current_codex_issue_comments
+    if not finding_priorities(
+        item.get("_fallback_pass_raw_body") or item.get("body") or item.get("_raw_body_artifact") or ""
+    )
+    and not is_strict_no_findings_issue_comment(item)
+]
 stale_codex_head_context_present = any(
     item.get("codex_authored")
     and item.get("stale")
@@ -1279,6 +1287,7 @@ blocker_policy_no_action_promotes = bool(
     and not review_decision_requires_review
     and not active_changes_requested_review_present
     and not current_pending_codex_review_present
+    and not current_codex_unclassified_fallback_issue_comments
     and not blocking_collection_failure
 )
 if no_findings_completion_promotes:
@@ -1289,6 +1298,10 @@ elif blocker_policy_no_action_promotes:
     lifecycle_status = "completed"
     completion_signal = "blocker_policy_no_action"
     lifecycle_confidence = "medium"
+elif current_codex_unclassified_fallback_issue_comments:
+    lifecycle_status = "fallback"
+    completion_signal = "fallback_issue_comment"
+    lifecycle_confidence = "low"
 elif selected_review_signals:
     lifecycle_status = "unresolved" if selected_actionable_unresolved_thread_ids else "completed"
     completion_signal = "submitted_pull_request_review"
