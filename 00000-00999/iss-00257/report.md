@@ -226,6 +226,18 @@ ID: "iss-00257"
 | `./spec-dock/scripts/spec-dock validate` | pass | Re-run after P1 closure: `spec-dock: ok (validate) nodes=163`. |
 | `./spec-dock/scripts/spec-dock assurance verify` | pass | Re-run after P1 closure: `assurance verify: ok`; issue `iss-00257`, authorized profile `standard`. |
 
+#### PR observation / CI repair
+
+| Evidence | Result | Notes |
+|---|---|---|
+| PR creation | pass | PR #260 created against `main` from `iss-00257-severity-aware-pr-review-policy`, head `7515ecd6ef416a2c103cdc3102d3acccd89e324d`. |
+| `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 260 --head-sha 7515ecd6...` | failed | Observation triggered Codex review comment and found Provider CI failed in `make lint`; recommended action `fix_ci`. |
+| `gh run view 28495918351 --job 84462042332 --log` | fail evidence | `ruff format check` reported `src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_review_snapshot.py` would be reformatted at `blocker_policy_blockers`. |
+| dev-coder `019f1c2b-a184-7212-b453-4733b308127c` | complete | Applied formatter-equivalent one-line change to provider and dogfooding `pr_review_snapshot.py` mirror files only. |
+| `uv run ruff format --check .agents/.../pr_review_snapshot.py src/spec_dock/assets/install_root/.../pr_review_snapshot.py` | pass | Worker-reported `2 files already formatted`. |
+| `cmp -s .agents/.../pr_review_snapshot.py src/spec_dock/assets/install_root/.../pr_review_snapshot.py` | pass | Worker-reported mirror parity passed. |
+| `make lint` | pass | Worker-reported ruff check pass, ruff format check pass, mypy pass. |
+
 ## Final Quality Gate
 
 ### Docs Impact Resolution
