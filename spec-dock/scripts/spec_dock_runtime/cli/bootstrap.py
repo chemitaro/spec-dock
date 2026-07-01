@@ -335,7 +335,12 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         create_initiative=lambda req: application_create_initiative(req, ports),
         create_epic=lambda req: application_create_epic(req, ports),
         create_issue=lambda req: application_create_issue(req, ports),
-        create_discussion_doc=lambda req: application_create_discussion_doc(req, ports),
+        create_discussion_doc=lambda req: application_create_discussion_doc(
+            req,
+            ports,
+            assurance_store=assurance_store,
+            artifact_store=artifact_store,
+        ),
         import_initiative=lambda req: application_import_initiative(req, ports),
         import_epic=lambda req: application_import_epic(req, ports),
         import_issue=lambda req: application_import_issue(req, ports),

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00254",
+  "title": "Add Grade Aware Spec Review And Evidence Gates",
+  "slug": "add-grade-aware-spec-review-and-evidence-gates",
+  "created_at": "2026-07-01T00:13:38+09:00",
+  "updated_at": "2026-07-01T00:15:07+09:00",
+  "parent_id": "epic-00224",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00224",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 254,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "depends_on": [
+    "iss-00252",
+    "iss-00251"
+  ]
+}

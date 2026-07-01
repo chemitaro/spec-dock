@@ -73,6 +73,15 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
   - agent は、プロジェクトの目的、作業内容、人間の理解しやすさ、エージェントの実行可能性に合わせて、項目を追加・削除・統合・並べ替えてよい
   - 不要な placeholder や該当しない節は削ってよいが、要件、設計判断、検証可能性、人間の理解に必要な情報は削らない
 
+## グレード補足（issue grade guidance）
+
+Issue design は [workflow_spec_authoring.md](workflow_spec_authoring.md) の `グレード別authoring matrix（Issue grade authoring matrix）` と `authorized_profile` を入口にします。manual escalation は design obligation を強める補助判断であり、`authorized_profile` を置き換えません。
+
+- Standard では `system-architect` などの design specialist 使用を推奨する。使わない場合は、既存 pattern で十分な理由、確認した source、skip reason、残リスクを `report.md` に残す。
+- Strict / Critical では design specialist を原則必須にする。specialist が unavailable / denied / host conflict の場合は、manual fallback として利用不可理由、代替調査、採否判断、fresh `spec-reviewer` への提示 evidence を `report.md` に残す。
+- Critical で specialist fallback が必要な場合は、blocked を基本判定にし、明示承認、risk acceptance、追加 reviewer の要否を design に固定する。
+- Delegated design draft は `draft routing` の入力 evidence であり、canonical `design.md`、phase promotion、fresh `spec-reviewer` pass、G3 の `report evidence gate` の代替ではない。
+
 ## 委任 design authoring ゲート（delegated design authoring gate）
 
 Delegated design authoring は、対象 scope の `discussions/` 直下へ flat Markdown draft / analysis / discussion-local report を直接保存できる支援です。proposal-only ではありませんが、canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator の single-writer authority であり、sub-agent は直接編集しません。Delegated draft は evidence であり、fresh `spec-reviewer` pass の代替ではありません。
