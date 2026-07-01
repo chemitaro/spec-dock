@@ -102,7 +102,7 @@ Epic completion gate は、required Issues が完了済みまたは fresh spec-r
 - epic-wide pre-PR:
   - Epic の全 Issue 実装が完了し、Epic PR を更新する前に、開発ベースラインから最終実装状態までの全差分を対象に品質ゲートを置く
   - `gh pr view <pr> --json baseRefName,baseRefOid,headRefName,headRefOid` で base endpoint を記録し、local `HEAD` を final endpoint として固定する
-  - `git diff --stat <baseRefOid>...HEAD` と `git diff --name-status <baseRefOid>...HEAD` を `report.md` または `discussions/` の共有証跡に残す
+  - `git diff --stat <baseRefOid>...HEAD` と `git diff --name-status <baseRefOid>...HEAD` を `report.md` または `artifacts/` の共有証跡に残す
   - fresh `deep-consultant` と fresh `spec-reviewer` が同じ共有証跡と endpoint を参照して Epic 全体をレビューする
   - すべての指摘は `fixed` / `superseded` / `explicitly_deferred_with_user_acceptance` のいずれかに disposition されるまで PR update / push を行わない
   - `fixed` または `superseded` の指摘は再検証と fresh re-review を通してから PR update / push に進む

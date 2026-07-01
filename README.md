@@ -98,8 +98,8 @@ After `init`, day-to-day operations are done via the runtime script installed in
 
 # Node creation does not accept `--no-github`; use `--github-issue <n>` to link an existing issue.
 
-# ADRs are created via runtime command (no scope-local ADR wrapper)
-./spec-dock/scripts/spec-dock new doc adr --issue iss-00123 --title "Token rotation strategy"
+# Working artifacts such as ADR originals are created via runtime command.
+./spec-dock/scripts/spec-dock new artifact adr --issue iss-00123 --title "Token rotation strategy"
 
 # Import an existing GitHub issue into the spec tree (does not create/update the issue on GitHub)
 ./spec-dock/scripts/spec-dock import initiative 10 --title "Auth platform"                 # id=init-00010
@@ -150,9 +150,9 @@ Notes:
 - Treat direct `active set` / `active set --checkout` as manual / recovery / low-level commands. `active set` updates active pointers from local nodes first. Branch operations are opt-in via `--checkout`.
 - With `active set --checkout`, the branch name is normalized to `<id>-<slug>` (fallback: `<id>`) to keep branch names ASCII.
 - `github.issue_number` links (initiative/epic/issue) must be globally unique; duplicates are rejected/detected. See `src/spec_dock/assets/spec_dock/docs/reference_github.md` for details.
-- Generated initiative/epic/issue nodes include `discussions/` (`rules.md` included).
-- For non-ADR notes/discussions/research docs, copy templates from `spec-dock/templates/discussions/{note,disc,research}.md`.
-- ADR docs are created by `./spec-dock/scripts/spec-dock new doc adr --{initiative|epic|issue} <id> --title "..."`.
+- Generated initiative/epic/issue nodes include `artifacts/` and legacy `discussions/` (`rules.md` included).
+- New working artifacts are created under the target scope `artifacts/` direct child with `./spec-dock/scripts/spec-dock new artifact <type> --{initiative|epic|issue} <id> --title "..."`.
+- Existing `discussions/` docs are legacy/preservation evidence; do not use them as the recommended destination for new working artifacts.
 - Generated nodes do not include template-derived `README.md`.
 
 See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + GitHub state.
@@ -165,7 +165,7 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
   - `templates/` (initiative/epic/issue/adr templates)
   - `scripts/` (runtime scripts; local operations)
   - `initiatives/` (spec tree root; always-on)
-    - generated nodes include `discussions/` (`rules.md`) and do not include scope-local node creation wrappers
+    - generated nodes include `artifacts/` and legacy `discussions/` (`rules.md`) and do not include scope-local node creation wrappers
   - `active/` (generated pointers; gitignored)
   - `.agent/` (generated agent state; gitignored)
   - `.gitignore` (ignores `active/` and `.agent/` (and legacy `.work/`))

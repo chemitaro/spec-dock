@@ -105,9 +105,9 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 - canonical docs の single-writer authority は main orchestrator に残る。Sub-agent / reviewer output は evidence であり、canonical docs への採用は main orchestrator が行う。
 - fresh `spec-reviewer` / `code-reviewer` / `qa-reviewer` pass は required gate であり、bounded SpecDock workflow scope 内の追加許可待ちを理由に省略してはならない。
 - user request と host policy が衝突し、required named role が利用できない場合は `denied` または `unavailable` として記録し、required reviewer gate を満たしたことにしてはならない。
-- read-only specialist authorization と scope-local discussion direct-write authorization は分離する。Sub-agent authoring output は proposal-only に限定しないが、canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator single-writer authority である。
-- scope-local discussion direct-write authorization は task-local に記録する。最低限、target node、role、source artifacts、allowed discussion path rule、forbidden canonical/implementation paths、post-run diff guard、report ledger destination を含める。
-- unguarded workspace-write、static broad profile edit、Desktop-only fallback は adoption-ready delegated output に数えない。System architect / implementation planner の static adapters は guarded workspace-write で scope-local `discussions/` Markdown draft を作成できるが、workspace-write は hard path allow-list ではなく canonical target write の許可でもない。diff guard pass と report ledger entry まで adoption-ineligible とする。
+- read-only specialist authorization と scope-local artifact direct-write authorization は分離する。Sub-agent authoring output は proposal-only に限定しないが、canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator single-writer authority である。
+- scope-local artifact direct-write authorization は task-local に記録する。最低限、target node、role、source artifacts、allowed artifact path rule、forbidden canonical/implementation paths、post-run diff guard、report ledger destination を含める。
+- unguarded workspace-write、static broad profile edit、Desktop-only fallback は adoption-ready delegated output に数えない。System architect / implementation planner の static adapters は guarded workspace-write で scope-local `artifacts/` Markdown draft を作成できるが、workspace-write は hard path allow-list ではなく canonical target write の許可でもない。diff guard pass と report ledger entry まで adoption-ineligible とする。
 
 ## 報告判断台帳ライフサイクル（report decision ledger lifecycle）
 - `report.md` は observed evidence ledger に加えて仕様解釈 / 判断台帳（`Spec Interpretation / Decision Ledger`）を持つ。ここには実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up だけを記録し、shell transcript、worker raw note、private reasoning、secret、逐次作業ログは置かない。
@@ -188,7 +188,7 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 ## 報告証跡（report）
 
 - `spec-dock/active/issue/report.md` に、実行コマンド、結果、判断、想定外と対処を残す
-- scope-local discussion direct-write authoring を使う場合は、created discussion path、created_by_role、scope_id、source_paths、intended_targets、`adoption_status: unreviewed`、`reflected_to: []`、diff_guard_result、canonical Evidence Adoption Ledger disposition を `report.md` に記録する。採否の正本は scope-local `report.md` の Evidence Adoption Ledger とする
+- scope-local artifact direct-write authoring を使う場合は、created artifact path、created_by_role、scope_id、source_paths、intended_targets、`adoption_status: unreviewed`、`reflected_to: []`、diff_guard_result、canonical Evidence Adoption Ledger disposition を `report.md` に記録する。採否の正本は scope-local `report.md` の Evidence Adoption Ledger とする
 - 仕様解釈 / 判断台帳（`Spec Interpretation / Decision Ledger`）に material な仕様解釈、判断、逸脱、tradeoff、open question、promotion / follow-up を残す。material decision がない場合は `No material interpretation changes.` と `No decision entries.` を残す
 - ledger entry は `Status`、`Type`、`Options Considered`、`Disposition`、evidence、必要な follow-up / promotion を持つ。`Status=open` は completion blocker とし、`Disposition` に必要な evidence がない entry、report-only durable decision、根拠のない `no_action` / `deferred` / `superseded` は reviewer finding として扱う
 - step 契約クロージャ（`Step Contract Closure`）に step、closure id、close condition、evidence、result を残す

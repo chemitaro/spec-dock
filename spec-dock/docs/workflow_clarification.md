@@ -7,18 +7,18 @@ Source-grounded grill loop の手順は `spec-dock-clarification` skill が持�
 関連:
 - Spec authoring workflow: [workflow_spec_authoring.md](workflow_spec_authoring.md)
 - Issue execution workflow: [workflow_issue.md](workflow_issue.md)
-- Discussion rules: 対象 scope 配下の `discussions/rules.md`
+- Artifact rules: 対象 scope 配下の `artifacts/rules.md`
 - Naming rules: [reference_naming.md](reference_naming.md)
 
 ## 基本契約
 
 - `spec-dock-clarification` skill を読める環境では、実行順序と質問境界は skill を優先する。
-- この文書は、質問・調査・統合の成果物をどの discussion artifact に残し、どの canonical artifact へ採用するかを説明する。
-- 先に source-grounded read を行う。active docs、parent docs、`discussions/`、関連 source / tests / templates、既存 ADR を確認し、local context で解ける疑問を人間へ質問しない。
+- この文書は、質問・調査・統合の成果物をどの artifact に残し、どの canonical artifact へ採用するかを説明する。
+- 先に source-grounded read を行う。active docs、parent docs、scope-local `artifacts/`、historical / preservation input としての legacy `discussions/`、関連 source / tests / templates、既存 ADR を確認し、local context で解ける疑問を人間へ質問しない。
 - 人間ユーザーへの本質的な質問は orchestrator が一問ずつ行う。ユーザー意図の確認が blocking の場合は、代行や専門 agent ではなくユーザー本人へ直接質問する。
 - 用語、責務境界、domain relationship が曖昧な場合は、既存 docs / code の言葉を照合し、domain language を sharpen する。
 - 抽象論で閉じず、必要に応じて concrete scenario、edge case、code / docs cross-check で境界を確認する。
-- 合意内容は docs synthesis を通じて `requirement.md` / `design.md` / `plan.md` / ADR / `report.md` へ反映する。discussion artifact は evidence / proposal であり、採用判断なしに canonical source of truth にしない。
+- 合意内容は docs synthesis を通じて `requirement.md` / `design.md` / `plan.md` / ADR / `report.md` へ反映する。artifact は evidence / proposal であり、採用判断なしに canonical source of truth にしない。
 - ADR は sparingly に使う。後から戻しにくく、将来の読者に意外性があり、実質的な tradeoff がある判断だけを ADR candidate にする。
 
 ## 実行モード
@@ -34,12 +34,13 @@ Source-grounded grill loop の手順は `spec-dock-clarification` skill が持�
 
 ## 成果物の使い分け（artifact selection）
 
-- `scratch`: raw capture。非 authoritative。
+- `blank`: raw / freeform capture。非 authoritative。
 - `research`: source-grounding。事実、推測、未検証事項、用語衝突、edge case、判断への含意、質問候補を分ける。
 - `interview`: 正式質問シート。重要判断は回答前に unanswered artifact を作り、回答後に同じ artifact へユーザー回答、採用判断、反映先を追記する。追加の高影響質問が生じたら、同じ artifact に質問を増やさず次の unanswered `interview` を作る。
 - `disc`: 複数質問 / research の synthesis、中間レポート、reflection proposal、adoption target、ADR candidate triage。
 - `adr`: durable architecture / contract / migration decision。
-- `report.md`: canonical observed evidence ledger。discussion catalog ではなく、Evidence Adoption Ledger、Objective Alignment Ledger、Spec Authoring Gate の採用証跡を持つ。
+- `report.md`: canonical observed evidence ledger。artifact catalog ではなく、Evidence Adoption Ledger、Objective Alignment Ledger、Spec Authoring Gate の採用証跡を持つ。
+- Legacy `scratch` / `discussions/` content is historical / preservation input only; future clarification output uses `new artifact` under the scope-local `artifacts/` catalog.
 
 ## 正式質問の起動条件（formal question trigger）
 

@@ -1,19 +1,19 @@
 # 要件フェーズ playbook（phase playbook: requirement）
 
 Initiative / Epic / Issue に共通する requirement の shared playbook です。
-scope 固有の entry / quality gate は `workflow_*.md` が additive に定義します。議論資料の置き方は対象 scope 配下の `discussions/rules.md`、命名は [reference_naming.md](reference_naming.md) を参照してください。
+scope 固有の entry / quality gate は `workflow_*.md` が additive に定義します。作業成果物の置き方は対象 scope 配下の `artifacts/rules.md`、legacy discussion preservation は `discussions/rules.md`、命名は [reference_naming.md](reference_naming.md) を参照してください。
 
 関連:
 - 全体像: [guide.md](guide.md)
 - Spec authoring workflow: [workflow_spec_authoring.md](workflow_spec_authoring.md)
 - Scope workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
-- 議論資料の置き方と命名: 対象 scope 配下の `discussions/rules.md`, [reference_naming.md](reference_naming.md)
+- 作業成果物の置き方と命名: 対象 scope 配下の `artifacts/rules.md`, legacy `discussions/rules.md`, [reference_naming.md](reference_naming.md)
 
 ## フェーズ契約（phase contract）
 
 - 位置: 全体 workflow の `調査分析 → requirement → design → plan → 実装/品質ゲート` の `requirement`
 - 責務: 調査分析の結果を `何を / なぜ / スコープ / 成功条件（WHAT / WHY / scope / success）` に固定する
-- 前提入力: 対象 scope、As-Is の一次情報、対象 `workflow_*.md`、既存 `discussions/` / ADR
+- 前提入力: 対象 scope、As-Is の一次情報、対象 `workflow_*.md`、既存 `artifacts/` / legacy `discussions/` / ADR
 - 固定すること: 目的、背景・現状、成功条件、スコープ / 非スコープ、主要 TBD の置き場
 - 出力: reviewer が design へ送れる `requirement.md` と必要な `research` / `disc` / `adr`
 - 非ゴール: HOW の先取り、source のない断定、未確定論点の隠蔽
@@ -79,7 +79,7 @@ Issue requirement は [workflow_spec_authoring.md](workflow_spec_authoring.md) �
 - As-Is は一次情報を根拠にし、事実 / 推測 / 未確定を混ぜない
 - `何を / なぜ / スコープ / 成功条件（WHAT / WHY / scope / success）` を先に固め、HOW は入れすぎない
 - `MUST / MUST NOT / OUT OF SCOPE` と `Always / Ask / Never` を早めに仮置きする
-- requirement 本文には結論と制約を残し、長い比較や調査ログは `discussions/` へ逃がす
+- requirement 本文には結論と制約を残し、長い比較や調査ログは `artifacts/` へ分離する
 - generic DoR / DoD や `省略/例外メモ` は template に戻さない
 - 先に埋める節:
   - Initiative: `目的`, `背景と Why now`, `成功指標`, `スコープ`, `境界`, `非交渉制約`, `未確定事項`
