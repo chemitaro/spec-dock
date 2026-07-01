@@ -265,14 +265,13 @@ def _classify_plan_text(plan_text: str | None) -> str:
         "実行中の振る舞い",
         "変更チェックリスト",
         "軽量検証",
-        "完了条件",
         "lightweight verification",
         "tdd サイクル",
         "step closure contract",
         "approved-no-op",
         "decision-only closure",
     )
-    has_executable_marker = any(marker in lower for marker in executable_markers)
+    has_executable_marker = any(marker in lower for marker in executable_markers) or _has_lite_executable_plan(lower)
     scaffold_markers = (
         "no structured implementation steps",
         "no implementation steps",
@@ -289,6 +288,12 @@ def _classify_plan_text(plan_text: str | None) -> str:
     if has_executable_marker:
         return "executable"
     return "scaffold"
+
+
+def _has_lite_executable_plan(text: str) -> bool:
+    has_change_checklist = "変更チェックリスト" in text
+    has_verification = "軽量検証" in text or "lightweight verification" in text
+    return has_change_checklist and has_verification
 
 
 def _has_placeholder_table_rows(text: str) -> bool:
