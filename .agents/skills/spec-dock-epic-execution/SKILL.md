@@ -7,6 +7,15 @@ description: First-read coordinator for executing a planned spec-dock Epic throu
 
 Use this skill after Epic planning is complete and the Epic requirement, design, and plan are ready for downstream Issue work. This skill is a coordinator only; keep detailed lifecycle rules in `spec-dock/docs/workflow_epic.md`, `spec-dock/docs/workflow_issue.md`, and the existing leaf skills.
 
+## Workflow-Scoped Authorization
+
+- A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow.
+- Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility.
+- Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow.
+- ユーザーが SpecDock workflow の利用を依頼した場合、その依頼自体を、SpecDock が定義する named sub-agent / reviewer を workflow に従って利用する明示的な許可として扱う。
+- active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲内では、role ごと・phase ごとの追加承認を求めない。
+- scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途確認する。
+
 ## First-Read Coordinator Flow
 
 1. Bootstrap current state.
@@ -30,6 +39,7 @@ Use this skill after Epic planning is complete and the Epic requirement, design,
    - Missing, stale, unreviewed, template-only, or non-executable Issue requirement/design/plan -> `spec-dock-issue-planning`.
    - Approved, reviewer-pass, executable Issue plan -> `spec-dock-issue-execution`.
    - If execution exposes a spec gap, return to Issue planning or clarification; do not invent assumptions in Epic execution.
+   - Fresh reviewer passes required by the routed workflow are gates and must not be skipped while waiting for extra permission inside the bounded SpecDock workflow scope.
 6. After Issue final local gates, route PR delivery and merge preparation.
    - Hand off to `github-pr-merge-preparer` for PR creation/reuse, observation, repair loop coordination, and merge-prepared evidence.
    - If PR preparation is blocked, stale, limited, or returns a human gate, preserve that evidence and stop; do not claim merge readiness.
