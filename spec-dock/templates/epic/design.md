@@ -14,6 +14,12 @@ ID: "<EPIC_ID>"
 
 > このテンプレートは design scaffold / evidence slot です。必要な境界、図、契約、未確定事項を書き始めるための starting shape であり、workflow / compliance authority ではありません。詳細な lifecycle policy や field semantics は skills / docs / accepted ADRs / reviewer gates を参照します。
 
+## 作成方針
+- この文書は Epic が固定する Issue 横断の設計境界と契約を記述する。
+- 日本語ファーストで作成し、ファイルパス、コマンド、コード識別子、SpecDock 固定語は原文のまま扱ってよい。
+- DDD / EDA は必須前提にしない。対象システムの既存アーキテクチャが明確な場合だけ、その語彙に合わせて整理する。
+- Issue-level の実装手順、TDD の細かなサイクル、private implementation design を必須にしない。
+
 ## 全体像
 - 対象境界:
   - ...
@@ -23,6 +29,32 @@ ID: "<EPIC_ID>"
   - ...
 - 参照する親 diagram:
   - ...
+
+## 課題横断境界（cross-Issue boundary）
+- Epic が固定する判断:
+  - ...
+- Issue に委譲する local delta:
+  - ...
+- forbidden parent boundary changes:
+  - ...
+- cross-Issue invariant:
+  - ...
+
+## 設計スライス一覧（design slice catalog）
+- DS-001:
+  - 目的:
+    - ...
+  - closes:
+    - E-RQ:
+      - ...
+    - E-AC:
+      - ...
+  - owning Issue candidate:
+    - ...
+  - contract impact:
+    - ...
+  - expected evidence:
+    - ...
 
 ## コンポーネント / モジュール構成（Component / Module View）
 - タイトル:
@@ -89,6 +121,18 @@ ID: "<EPIC_ID>"
 - N/A: 理由
 
 ## 契約
+### 契約ポートフォリオ（contract portfolio）
+- API / CLI:
+  - ...
+- event / metadata:
+  - ...
+- docs / template:
+  - ...
+- system of record:
+  - ...
+- compatibility expectation:
+  - ...
+
 ### インターフェース契約（API / 必要時）
 - API-001:
   - リクエスト:
@@ -105,6 +149,17 @@ ID: "<EPIC_ID>"
 - データの authoritative source / system of record:
   - ...
 - 一貫性モデル:
+  - ...
+
+## 証跡採用（artifact adoption）
+- raw evidence:
+  - `artifacts/`:
+    - ...
+- accepted ADR:
+  - ...
+- `report.md` Evidence Adoption Ledger:
+  - ...
+- canonical docs へ反映する範囲:
   - ...
 
 ## データモデル
@@ -182,6 +237,8 @@ ID: "<EPIC_ID>"
   - ...
 - 部分失敗:
   - ...
+- rollback boundary:
+  - ...
 
 ## 移行戦略
 - 移行戦略:
@@ -208,6 +265,8 @@ ID: "<EPIC_ID>"
   - ...
 - E-AC 対応:
   - E-AC-001 -> ...
+- reviewer focus:
+  - ...
 
 ## 関連 ADR
 - adr-...:
