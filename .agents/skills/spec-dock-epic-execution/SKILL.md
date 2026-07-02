@@ -45,10 +45,10 @@ Use this skill after Epic planning is complete and the Epic requirement, design,
    - Fresh reviewer passes required by the routed workflow are gates and must not be skipped while waiting for extra permission inside the bounded SpecDock workflow scope.
 6. After Issue final local gates, route PR delivery and merge preparation when the Epic plan requires per-Issue PR delivery.
    - For normal workflows, hand off to `github-pr-merge-preparer` for PR creation/reuse, observation, repair loop coordination, and merge-prepared evidence.
-   - If the reviewed Epic plan intentionally runs Issues one by one without per-Issue PR and reserves final PR delivery for a final quality Issue such as `iss-00276`, record that plan-aware evidence and do not invoke PR preparation for the intermediate Issue.
+   - If the reviewed Epic plan intentionally runs Issues one by one without per-Issue PR and reserves final PR delivery for a final quality Issue such as `iss-00276`, require the intermediate Issue report to contain the `workflow_issue.md` deferred PR delivery gate evidence and do not invoke PR preparation for that intermediate Issue.
    - If PR preparation is blocked, stale, limited, or returns a human gate, preserve that evidence and stop; do not claim merge readiness.
 7. Return to `workflow_issue.md` only after merge-prepared evidence.
-   - If PR delivery is intentionally deferred by the reviewed Epic plan, use the plan-specific local completion and `issue finish` gates instead of requiring intermediate merge-prepared evidence.
+   - If PR delivery is intentionally deferred by the reviewed Epic plan, return to `workflow_issue.md` only after the intermediate Issue has deferred PR delivery gate evidence. That gate must identify the final quality Issue, dependency edge, no-per-Issue-PR rationale, no merge-prepared claim before final PR delivery, and reviewer-confirmed local completion / issue finish conditions.
    - If `github-pr-merge-preparer` returns blocked, stale, limited, or human-gate evidence, preserve that terminal PR-preparation evidence and stop; do not run `issue finish`.
    - Only after `github-pr-merge-preparer` returns merge-prepared evidence, use `spec-dock/docs/workflow_issue.md` to decide whether `./spec-dock/scripts/spec-dock issue finish` may run.
    - This skill does not claim reviewer pass, issue finish, delivery completion, PR merge readiness, or GitHub closure.
