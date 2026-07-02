@@ -4428,11 +4428,45 @@ class TestInitUpdate(CliRuntimeHarness):
                 source=str(path.relative_to(repo_root)),
             )
 
+        initiative_requirement = (template_root / "initiative" / "requirement.md").read_text(encoding="utf-8")
         initiative_design = (template_root / "initiative" / "design.md").read_text(encoding="utf-8")
+        initiative_plan = (template_root / "initiative" / "plan.md").read_text(encoding="utf-8")
         epic_design = (template_root / "epic" / "design.md").read_text(encoding="utf-8")
         issue_design = (template_root / "issue" / "design.md").read_text(encoding="utf-8")
         issue_plan = (template_root / "issue" / "plan.md").read_text(encoding="utf-8")
         issue_report = (template_root / "issue" / "report.md").read_text(encoding="utf-8")
+        for fragment in (
+            "戦略目的（strategic purpose）",
+            "source-of-truth",
+            "## 能力領域の整理（capability landscape）",
+            "trigger / request origin",
+            "エピックへ渡す初期材料（Epic handoff seed）",
+            "日本語ファースト",
+            "DDD / EDA などの特定アーキテクチャ語彙は前提にしない",
+        ):
+            assert fragment in initiative_requirement
+        for fragment in (
+            "## 対象範囲と責務境界（scope boundary）",
+            "## 意思決定権限（decision authority）",
+            "## 証跡採用（artifact adoption）",
+            "## レビューゲート（reviewer gate）",
+            "## エピック分割境界（Epic boundary）",
+            "Issue-level の実装詳細、TDD の細かなサイクル、内部 class / file 設計はここで必須化しない",
+            "authoring reference が存在する場合に接続する",
+        ):
+            assert fragment in initiative_design
+        for fragment in (
+            "## エピックへ渡す準備完了条件（handoff readiness）",
+            "report evidence",
+            "fresh reviewer gate（最新レビューゲート）",
+            "## エピック / Issue 分割変更（controlled re-slicing）",
+            "Epic planning 完了条件",
+            "設計書 / 実装計画書の draft artifact",
+            "## 最終 PR / closeout 方針（final PR / closeout）",
+        ):
+            assert fragment in initiative_plan
+        for text in (initiative_requirement, initiative_design, initiative_plan):
+            assert "docs/authoring/scope-layering.md" not in text
         assert "### 図表（UML / 推奨: システムコンテキスト / 目指す状態の全体像）" in initiative_design
         assert "```plantuml" in initiative_design
         assert "!include C4_Context.puml" in initiative_design
