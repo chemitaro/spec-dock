@@ -80,11 +80,11 @@ Downstream Issue は、Epic planning outputs とこの completion / handoff cont
 
 ## 実行ライフサイクル（Epic Execution Lifecycle）
 
-Epic planning completion 後の実行調整は `spec-dock-epic-execution` を first-read coordinator とします。この coordinator は reviewer-gated Epic `requirement.md` / `design.md` / `plan.md` / `report.md` と downstream Issue handoff package を読んでから、ready Issue を一つずつ選び、Issue planning / execution へ渡します。Issue の詳細な実行規約と `issue finish` 判断は [workflow_issue.md](workflow_issue.md) を正本とし、この workflow では重複定義しません。
+Epic planning completion 後の実行調整は `spec-dock-epic-execution` を first-read coordinator とします。この coordinator は reviewer-gated Epic `requirement.md` / `design.md` / `plan.md`、evidence ledger としての Epic `report.md`、downstream Issue handoff package を読んでから、ready Issue を一つずつ選び、Issue planning / execution へ渡します。Issue の詳細な実行規約と `issue finish` 判断は [workflow_issue.md](workflow_issue.md) を正本とし、この workflow では重複定義しません。
 
 Epic execution の readiness inspection は structural gate であり、semantic reviewer ではありません。次は structural blocker として fail-closed で止めます: missing canonical docs、missing / stale reviewer pass、missing Issue readiness contract、missing executable plan structure、missing delegation contract、missing verification、missing reviewer focus、unresolved blocking / stale report entries、raw artifact authority、decision-only execution-ready、grade が要求する specialist / fallback evidence の欠落。構造はあるが acceptance criteria、test strategy、採用理由、設計妥当性、日本語ファースト wording の十分性が疑わしい場合は reviewer finding として記録し、`spec-reviewer` や Issue planning に route します。
 
-Issue 実装後の PR delivery は通常 `github-pr-merge-preparer` へ handoff します。ただし reviewed Epic plan が、Issue を一つずつ `issue finish` で進め、final PR delivery を `iss-00276` のような final quality Issue に意図的に集約すると定義している場合は、その plan-aware evidence を残し、中間 Issue ごとの PR preparation を要求しません。この例外は通常 workflow の PR-preparer guidance を削除するものではありません。
+Issue 実装後の PR delivery は通常 `github-pr-merge-preparer` へ handoff します。ただし reviewed Epic plan が、Issue を一つずつ進め、final PR delivery を `iss-00276` のような final quality Issue に意図的に集約すると定義している場合は、中間 Issue の `report.md` に deferred PR delivery gate evidence を残します。この evidence は、defer 先 final quality Issue id、defer 先 dependency edge、per-Issue PR を作らない理由、final PR delivery まで merge-prepared を主張しないこと、reviewer が確認した local completion / issue finish 条件を含みます。中間 Issue ごとの PR preparation は要求しませんが、[workflow_issue.md](workflow_issue.md) の `issue finish` 条件を迂回してはなりません。この例外は通常 workflow の PR-preparer guidance を削除するものではありません。
 
 日本語運用では、Epic execution / readiness 中に作成・更新する docs、`report.md`、artifacts の本文は日本語ファーストにします。commands、paths、IDs、role 名などの正確な識別子はそのまま保持します。
 
