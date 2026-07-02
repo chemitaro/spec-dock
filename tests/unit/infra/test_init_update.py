@@ -4431,7 +4431,9 @@ class TestInitUpdate(CliRuntimeHarness):
         initiative_requirement = (template_root / "initiative" / "requirement.md").read_text(encoding="utf-8")
         initiative_design = (template_root / "initiative" / "design.md").read_text(encoding="utf-8")
         initiative_plan = (template_root / "initiative" / "plan.md").read_text(encoding="utf-8")
+        epic_requirement = (template_root / "epic" / "requirement.md").read_text(encoding="utf-8")
         epic_design = (template_root / "epic" / "design.md").read_text(encoding="utf-8")
+        epic_plan = (template_root / "epic" / "plan.md").read_text(encoding="utf-8")
         issue_design = (template_root / "issue" / "design.md").read_text(encoding="utf-8")
         issue_plan = (template_root / "issue" / "plan.md").read_text(encoding="utf-8")
         issue_report = (template_root / "issue" / "report.md").read_text(encoding="utf-8")
@@ -4467,6 +4469,43 @@ class TestInitUpdate(CliRuntimeHarness):
             assert fragment in initiative_plan
         for text in (initiative_requirement, initiative_design, initiative_plan):
             assert "docs/authoring/scope-layering.md" not in text
+        for fragment in (
+            "能力 / モデル envelope（capability / model envelope）",
+            "後続 Issue seed",
+            "証跡の権限境界（artifact authority）",
+            "日本語ファースト",
+            "DDD / EDA は必須前提にしない",
+        ):
+            assert fragment in epic_requirement
+        for fragment in (
+            "## 課題横断境界（cross-Issue boundary）",
+            "## 設計スライス一覧（design slice catalog）",
+            "### 契約ポートフォリオ（contract portfolio）",
+            "## 証跡採用（artifact adoption）",
+            "rollback boundary",
+            "private implementation design を必須にしない",
+        ):
+            assert fragment in epic_design
+        for fragment in (
+            "## 課題引き渡しパッケージ（Issue handoff package）",
+            "suggested grade",
+            "allowed local delta",
+            "forbidden parent boundary changes",
+            "expected evidence",
+            "## 最終品質ゲート（final quality gate）",
+            "Issue-level の TDD step や private implementation design は必須前提にせず",
+        ):
+            assert fragment in epic_plan
+        for text in (epic_requirement, epic_design, epic_plan):
+            assert "docs/authoring/scope-layering.md" not in text
+            assert "iss-00272" not in text
+            assert "iss-00273" not in text
+            assert "DDD / EDA を必須前提にする" not in text
+            assert "DDD / EDA 必須" not in text
+            assert "TDD の細かなサイクルを必須化" not in text
+            assert "private implementation design を必須にする" not in text
+            assert "private implementation design は各 Issue plan で具体化する" not in text
+            assert "private class / file design を必須化" not in text
         assert "### 図表（UML / 推奨: システムコンテキスト / 目指す状態の全体像）" in initiative_design
         assert "```plantuml" in initiative_design
         assert "!include C4_Context.puml" in initiative_design
