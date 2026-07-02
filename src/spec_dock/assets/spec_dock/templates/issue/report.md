@@ -79,7 +79,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / discussions / 外部証跡（docs / code / discussions / external evidence） | なし / `discussions/...`（none / `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -91,8 +91,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - 昇格不可 state:
   - `stale`, `rejected`, `superseded`, `blocked`
 - 標準出力先:
-  - 対象 scope の `discussions/` direct child にある flat Markdown
-  - filename: `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md`
+  - 対象 scope の `artifacts/` direct child にある flat Markdown
+  - filename: typed artifacts use `<ts>-<type>-<slug>.md` or `<ts>-<nn>-<type>-<slug>.md`; blank artifacts use `<ts>-<slug>.md` or `<ts>-<nn>-<slug>.md`
 - 軽量 provenance:
   - `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
   - 互換 label: source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
@@ -103,9 +103,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - 標準必須にしない field:
   - task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
 - historical note:
-  - 既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
+  - legacy `discussions/` と既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
 
-| ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（discussion draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
+| ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
 
@@ -215,9 +215,9 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
 | `lite` | `not applicable` | `not applicable` | ライト該当なし理由（lite not applicable reason） | `pass / fail / blocked` | `ready / blocked` |
-| `standard` | `system-architect / implementation-planner / manual fallback` | `used / skipped / unavailable / denied` | `discussions/...` / manual evidence / skip reason: ... | `pass / fail / blocked` | `ready / blocked` |
-| `strict` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `discussions/...` / manual fallback evidence | `pass / fail / blocked` | `ready / blocked` |
-| `critical` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `discussions/...` / explicit approval and risk acceptance | `pass / fail / blocked` | `ready / blocked` |
+| `standard` | `system-architect / implementation-planner / manual fallback` | `used / skipped / unavailable / denied` | `artifacts/...` / manual evidence / skip reason: ... | `pass / fail / blocked` | `ready / blocked` |
+| `strict` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / manual fallback evidence | `pass / fail / blocked` | `ready / blocked` |
+| `critical` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / explicit approval and risk acceptance | `pass / fail / blocked` | `ready / blocked` |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |

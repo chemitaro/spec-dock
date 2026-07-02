@@ -107,6 +107,16 @@ class TestCliSync(CliRuntimeHarness):
             issue_item = epic_item["issues"][0]
             assert issue_item["id"] == "iss-00003"
             assert issue_item["type"] == "issue"
+            surfaces = issue_item["document_surfaces"]
+            assert [doc["kind"] for doc in surfaces["canonical_docs"]] == [
+                "requirement",
+                "design",
+                "plan",
+                "report",
+            ]
+            assert surfaces["future_artifacts"]["path"].endswith("/artifacts")
+            assert surfaces["legacy_discussions"]["path"].endswith("/discussions")
+            assert "depends_on" not in index_nodes["iss-00003"]
 
             # `tree.json` nodes match the same node schema as `index.json` nodes.
             assert issue_item == index_nodes["iss-00003"]

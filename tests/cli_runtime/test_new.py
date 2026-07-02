@@ -109,8 +109,20 @@ class TestCliNew(CliRuntimeHarness):
         payload["obligations"]["profile_preset"] = profile
         contract_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    def _discussion_file_names(self, issue_dir: Path) -> tuple[str, ...]:
-        return tuple(sorted(path.name for path in (issue_dir / "discussions").glob("*.md")))
+    def _artifact_tree_snapshot(self, issue_dir: Path) -> tuple[tuple[str, str, str], ...] | None:
+        artifacts_dir = issue_dir / "artifacts"
+        if not artifacts_dir.exists():
+            return None
+        snapshot: list[tuple[str, str, str]] = []
+        for path in sorted(artifacts_dir.rglob("*"), key=lambda item: item.as_posix()):
+            rel = path.relative_to(artifacts_dir).as_posix()
+            if path.is_symlink():
+                snapshot.append((rel, "symlink", str(path.readlink())))
+            elif path.is_dir():
+                snapshot.append((rel, "dir", ""))
+            else:
+                snapshot.append((rel, "file", path.read_text(encoding="utf-8")))
+        return tuple(snapshot)
 
     def _assert_profile_draft_no_write_failure(
         self,
@@ -119,12 +131,15 @@ class TestCliNew(CliRuntimeHarness):
         command: list[str],
         expected_stderr: str,
     ) -> None:
-        before = self._discussion_file_names(issue_dir)
+        before = self._artifact_tree_snapshot(issue_dir)
         p = self._run_runtime_capture(target, command)
         assert p.returncode != 0, p.stdout + p.stderr
         assert expected_stderr in p.stderr
-        after = self._discussion_file_names(issue_dir)
-        assert after == before
+        if before is None:
+            assert not (issue_dir / "artifacts").exists()
+        else:
+            after = self._artifact_tree_snapshot(issue_dir)
+            assert after == before
 
     def test_new_issue_creates_assurance_compose_placeholders_for_design_and_plan(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -746,178 +761,186 @@ class TestCliNew(CliRuntimeHarness):
                 assert not (scope_dir / "artifacts").exists()
                 assert list((scope_dir / "discussions").glob("new-*")) == []
 
-    def test_new_doc_adr_increments_id_within_scope_discussions(self) -> None:
+    def test_new_artifact_blank_issue_omits_blank_token_and_uses_artifacts_dir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
-            p_one = self._run_runtime_capture(
-                target,
-                ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"],
-            )
-            p_two = self._run_runtime_capture(
-                target,
-                ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision two"],
-            )
-            assert p_one.returncode == 0, p_one.stdout + p_one.stderr
-            assert p_two.returncode == 0, p_two.stdout + p_two.stderr
+            self._write_runtime_clock(target, now_iso="2026-03-12T01:02:03+00:00", today="2026-03-11")
 
-            issue_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-                / "iss-00003-add-refresh-token"
+            p = self._run_runtime_capture(
+                target,
+                ["new", "artifact", "blank", "--issue", "iss-00003", "--title", "Working Notes"],
             )
-            discussions_dir = issue_dir / "discussions"
-            created_one = sorted(discussions_dir.glob("*-adr-decision-one.md"))
-            created_two = sorted(discussions_dir.glob("*-adr-decision-two.md"))
-            assert len(created_one) == 1
-            assert len(created_two) == 1
-            assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$", created_one[0].name)
-            assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-two\.md$", created_two[0].name)
-            assert re.search(r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr\b", p_one.stdout)
-            assert re.search(r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr\b", p_two.stdout)
-            assert list(issue_dir.glob("adrs")) == []
 
-    def test_new_doc_scope_shorthand_resolves_local_ids(self) -> None:
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "spec-dock: ok (new artifact) type=blank id=20260312t010203z scope=iss-00003" in p.stdout
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
+            created = issue_dir / "artifacts" / "20260312t010203z-working-notes.md"
+            assert created.is_file()
+            assert "blank" not in created.name
+            content = created.read_text(encoding="utf-8")
+            assert 'ID: "20260312t010203z"' in content
+            assert "2026-03-12" in content
+            assert "2026-03-11" not in content
+
+    def test_new_artifact_typed_epic_success_and_scope_shorthand(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
+            self._write_runtime_clock(target, now_iso="2026-03-12T01:02:03+00:00", today="2026-03-12")
 
-            p_init = self._run_runtime_capture(
+            p = self._run_runtime_capture(
                 target,
-                ["new", "doc", "scratch", "--initiative", "1", "--title", "Initiative note"],
+                ["new", "artifact", "research", "--epic", "2", "--title", "Research One"],
             )
-            p_epic = self._run_runtime_capture(
-                target,
-                ["new", "doc", "scratch", "--epic", "2", "--title", "Epic note"],
-            )
-            p_issue = self._run_runtime_capture(
-                target,
-                ["new", "doc", "scratch", "--issue", "3", "--title", "Issue note"],
-            )
-            assert p_init.returncode == 0, p_init.stdout + p_init.stderr
-            assert p_epic.returncode == 0, p_epic.stdout + p_epic.stderr
-            assert p_issue.returncode == 0, p_issue.stdout + p_issue.stderr
-            assert "scope=init-00001" in p_init.stdout
-            assert "scope=epic-00002" in p_epic.stdout
-            assert "scope=iss-00003" in p_issue.stdout
 
-            init_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
-            epic_dir = init_dir / "epics" / "epic-00002-jwt-auth"
-            issue_dir = epic_dir / "issues" / "iss-00003-add-refresh-token"
-            assert len(sorted((init_dir / "discussions").glob("*-scratch-initiative-note.md"))) == 1
-            assert len(sorted((epic_dir / "discussions").glob("*-scratch-epic-note.md"))) == 1
-            assert len(sorted((issue_dir / "discussions").glob("*-scratch-issue-note.md"))) == 1
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "type=research id=20260312t010203z-research scope=epic-00002" in p.stdout
+            epic_dir = (
+                target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / "epics" / "epic-00002-jwt-auth"
+            )
+            created = epic_dir / "artifacts" / "20260312t010203z-research-research-one.md"
+            assert created.is_file()
+            assert 'ID: "20260312t010203z-research"' in created.read_text(encoding="utf-8")
 
-    def test_new_doc_uses_timestamp_family_across_discussion_types(self) -> None:
+    def test_new_artifact_full_direct_catalog_success(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
-            self._run_runtime(target, ["new", "doc", "disc", "--issue", "iss-00003", "--title", "Discussion one"])
-            self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"])
-            self._run_runtime(target, ["new", "doc", "research", "--issue", "iss-00003", "--title", "Research one"])
-            self._run_runtime(target, ["new", "doc", "interview", "--issue", "iss-00003", "--title", "Interview one"])
-            self._run_runtime(target, ["new", "doc", "scratch", "--issue", "iss-00003", "--title", "Scratch one"])
-
-            issue_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-                / "iss-00003-add-refresh-token"
-            )
-            discussions_dir = issue_dir / "discussions"
-            assert len(sorted(discussions_dir.glob("*-disc-discussion-one.md"))) == 1
-            assert len(sorted(discussions_dir.glob("*-adr-decision-one.md"))) == 1
-            assert len(sorted(discussions_dir.glob("*-research-research-one.md"))) == 1
-            assert len(sorted(discussions_dir.glob("*-interview-interview-one.md"))) == 1
-            assert len(sorted(discussions_dir.glob("*-scratch-scratch-one.md"))) == 1
-
-    def test_new_doc_creates_draft_artifacts_from_scope_specific_templates(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            self._create_same_repo_linked_hierarchy(target)
+            self._write_runtime_clock(target, now_iso="2026-03-12T01:02:03+00:00", today="2026-03-12")
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
 
             cases = (
                 (
-                    ["new", "doc", "draft-requirement", "--initiative", "init-00001", "--title", "Requirement Draft"],
-                    target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / "discussions",
-                    "draft-requirement",
-                    "templates/initiative/requirement.md",
-                    "requirement.md",
-                    "要件定義（何を、なぜ行うか）",
+                    "blank",
+                    "Working Title",
+                    "20260312t010203z",
+                    "20260312t010203z-working-title.md",
+                    (
+                        "種別: artifact",
+                        'template: "blank"',
+                        "型を先に決めず",
+                    ),
                 ),
                 (
-                    ["new", "doc", "draft-requirement", "--issue", "iss-00003", "--title", "Issue Requirement"],
-                    target
-                    / "spec-dock"
-                    / "initiatives"
-                    / "init-00001-auth-platform"
-                    / "epics"
-                    / "epic-00002-jwt-auth"
-                    / "issues"
-                    / "iss-00003-add-refresh-token"
-                    / "discussions",
-                    "draft-requirement",
-                    "templates/issue/requirement.md",
-                    "requirement.md",
-                    "Issue 要件定義",
+                    "research",
+                    "research Title",
+                    "20260312t010203z-01-research",
+                    "20260312t010203z-01-research-research-title.md",
+                    (
+                        "種別: research",
+                        "調査目的",
+                        "source-grounded research evidence surface",
+                    ),
                 ),
                 (
-                    ["new", "doc", "draft-plan", "--epic", "epic-00002", "--title", "Plan Draft"],
-                    target
-                    / "spec-dock"
-                    / "initiatives"
-                    / "init-00001-auth-platform"
-                    / "epics"
-                    / "epic-00002-jwt-auth"
-                    / "discussions",
-                    "draft-plan",
-                    "templates/epic/plan.md",
-                    "plan.md",
-                    "計画（Issue と実施順序）",
+                    "interview",
+                    "interview Title",
+                    "20260312t010203z-02-interview",
+                    "20260312t010203z-02-interview-interview-title.md",
+                    (
+                        "種別: interview",
+                        "正式質問として扱う理由",
+                        "one essential question",
+                    ),
+                ),
+                (
+                    "disc",
+                    "disc Title",
+                    "20260312t010203z-03-disc",
+                    "20260312t010203z-03-disc-disc-title.md",
+                    (
+                        "種別: disc",
+                        "対象論点",
+                        "synthesis / reflection proposal",
+                    ),
+                ),
+                (
+                    "decision-candidate",
+                    "decision-candidate Title",
+                    "20260312t010203z-04-decision-candidate",
+                    "20260312t010203z-04-decision-candidate-decision-candidate-title.md",
+                    (
+                        "種別: decision-candidate",
+                        "判断候補",
+                        "proposed decision",
+                    ),
+                ),
+                (
+                    "pr-repair-batch",
+                    "pr-repair-batch Title",
+                    "20260312t010203z-05-pr-repair-batch",
+                    "20260312t010203z-05-pr-repair-batch-pr-repair-batch-title.md",
+                    (
+                        "種別: pr-repair-batch",
+                        "PR / Observation Metadata",
+                        "Required GitHub Actions CI failures",
+                    ),
+                ),
+                (
+                    "adr",
+                    "adr Title",
+                    "20260312t010203z-06-adr",
+                    "20260312t010203z-06-adr-adr-title.md",
+                    (
+                        "種別: ADR（Architecture Decision Record）",
+                        "ADR 化基準",
+                        "accepted authority fields",
+                    ),
                 ),
             )
-
-            for command, discussions_dir, doc_type, template_source, _intended_target, body_heading in cases:
-                p = self._run_runtime_capture(target, command)
-                assert p.returncode == 0, p.stdout + p.stderr
-                assert f"type={doc_type}" in p.stdout
-                created = sorted(discussions_dir.glob(f"*-{doc_type}-*.md"))
-                assert len(created) == 1
-                assert re.search(
-                    rf"^[0-9]{{8}}t[0-9]{{6}}z(?:-[0-9]{{2}})?-{doc_type}-[a-z0-9-]+\.md$", created[0].name
+            for artifact_type, title, artifact_id, filename, content_markers in cases:
+                p = self._run_runtime_capture(
+                    target,
+                    ["new", "artifact", artifact_type, "--issue", "iss-00003", "--title", title],
                 )
-                content = created[0].read_text(encoding="utf-8")
-                frontmatter = content.split("---", 2)[1]
-                assert '状態: "draft | approved"' in frontmatter
-                assert "---#" not in content
-                assert content.split("---", 2)[2].lstrip().startswith("#")
-                assert "artifact_state: awaiting-assurance-compose" not in frontmatter
-                assert "adoption_status" not in frontmatter
-                assert "template_source" not in frontmatter
-                assert "created_by_role" not in frontmatter
-                assert "placeholder" not in content
-                assert "Canonical `" not in content
-                assert "remains main-orchestrator-only" not in content
-                canonical_source = target / "spec-dock" / template_source
-                assert canonical_source.is_file(), f"missing source template: {canonical_source}"
-                canonical_text = canonical_source.read_text(encoding="utf-8")
-                assert canonical_text.splitlines()[1] in content
-                assert body_heading in content
+                assert p.returncode == 0, p.stdout + p.stderr
+                expected_path = (
+                    "spec-dock/initiatives/init-00001-auth-platform/epics/epic-00002-jwt-auth/"
+                    f"issues/iss-00003-add-refresh-token/artifacts/{filename}"
+                )
+                assert (
+                    f"spec-dock: ok (new artifact) type={artifact_type} "
+                    f"id={artifact_id} scope=iss-00003 path={expected_path}"
+                ) in p.stdout
+                created = issue_dir / "artifacts" / filename
+                assert created.is_file()
+                content = created.read_text(encoding="utf-8")
+                assert f'ID: "{artifact_id}"' in content
+                assert f'タイトル: "{title}"' in content
+                assert '親: ["iss-00003"]' in content
+                assert "2026-03-12" in content
+                assert f"# {artifact_id} {title}" in content
+                for marker in content_markers:
+                    assert marker in content
 
-    def test_new_doc_issue_design_and_plan_use_authorized_profile_templates(self) -> None:
+            created_names = sorted(path.name for path in (issue_dir / "artifacts").glob("*.md"))
+            assert created_names == sorted(["rules.md", *(filename for _, _, _, filename, _ in cases)])
+
+    def test_new_artifact_issue_draft_requirement_uses_issue_requirement_template(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+
+            p = self._run_runtime_capture(
+                target,
+                ["new", "artifact", "draft-requirement", "--issue", "iss-00003", "--title", "Issue Requirement"],
+            )
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
+            created = sorted((issue_dir / "artifacts").glob("*-draft-requirement-issue-requirement.md"))
+            assert len(created) == 1
+            content = created[0].read_text(encoding="utf-8")
+            assert "Issue 要件定義" in content
+            assert "artifact_state: awaiting-assurance-compose" not in content
+            assert "Issue 設計書" not in content
+
+    def test_new_artifact_issue_design_and_plan_use_authorized_profile_templates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -937,24 +960,24 @@ class TestCliNew(CliRuntimeHarness):
                 self._set_assurance_contract_profile(issue_dir, profile, complexity_tier=complexity_tier)
                 cases = (
                     (
-                        ["new", "doc", "draft-design", "--issue", "iss-00003", "--title", f"{profile} Design"],
+                        ["new", "artifact", "draft-design", "--issue", "iss-00003", "--title", f"{profile} Design"],
                         "draft-design",
                         design_heading,
                         f"templates/issue-profiles/{profile}/design.md",
                     ),
                     (
-                        ["new", "doc", "draft-plan", "--issue", "iss-00003", "--title", f"{profile} Plan"],
+                        ["new", "artifact", "draft-plan", "--issue", "iss-00003", "--title", f"{profile} Plan"],
                         "draft-plan",
                         plan_heading,
                         f"templates/issue-profiles/{profile}/plan.md",
                     ),
                 )
                 for command, doc_type, profile_heading, template_source in cases:
-                    before = set((issue_dir / "discussions").glob(f"*-{doc_type}-*.md"))
+                    before = set((issue_dir / "artifacts").glob(f"*-{doc_type}-*.md"))
                     p = self._run_runtime_capture(target, command)
                     assert p.returncode == 0, p.stdout + p.stderr
                     assert f"type={doc_type}" in p.stdout
-                    after = set((issue_dir / "discussions").glob(f"*-{doc_type}-*.md"))
+                    after = set((issue_dir / "artifacts").glob(f"*-{doc_type}-*.md"))
                     created = sorted(after - before)
                     assert len(created) == 1
                     content = created[0].read_text(encoding="utf-8")
@@ -977,7 +1000,7 @@ class TestCliNew(CliRuntimeHarness):
                         assert "report:" in content
                         assert "commit候補:" in content
 
-    def test_new_doc_issue_profile_drafts_fail_closed_without_valid_assurance_contract(self) -> None:
+    def test_new_artifact_issue_profile_drafts_fail_closed_without_valid_assurance_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -992,7 +1015,7 @@ class TestCliNew(CliRuntimeHarness):
                 self._assert_profile_draft_no_write_failure(
                     target,
                     issue_dir,
-                    ["new", "doc", doc_type, "--issue", "iss-00003", "--title", title],
+                    ["new", "artifact", doc_type, "--issue", "iss-00003", "--title", title],
                     "missing_assurance_contract",
                 )
 
@@ -1001,7 +1024,7 @@ class TestCliNew(CliRuntimeHarness):
                 self._assert_profile_draft_no_write_failure(
                     target,
                     issue_dir,
-                    ["new", "doc", doc_type, "--issue", "iss-00003", "--title", f"Invalid {title}"],
+                    ["new", "artifact", doc_type, "--issue", "iss-00003", "--title", f"Invalid {title}"],
                     "invalid_json",
                 )
 
@@ -1012,7 +1035,7 @@ class TestCliNew(CliRuntimeHarness):
                 self._assert_profile_draft_no_write_failure(
                     target,
                     issue_dir,
-                    ["new", "doc", doc_type, "--issue", "iss-00003", "--title", f"Stale {title}"],
+                    ["new", "artifact", doc_type, "--issue", "iss-00003", "--title", f"Stale {title}"],
                     "stale_source_binding",
                 )
 
@@ -1023,11 +1046,11 @@ class TestCliNew(CliRuntimeHarness):
                 self._assert_profile_draft_no_write_failure(
                     target,
                     issue_dir,
-                    ["new", "doc", doc_type, "--issue", "iss-00003", "--title", f"Unsupported {title}"],
+                    ["new", "artifact", doc_type, "--issue", "iss-00003", "--title", f"Unsupported {title}"],
                     "invalid_classification",
                 )
 
-    def test_new_doc_issue_profile_drafts_fail_closed_for_invalid_profile_templates(self) -> None:
+    def test_new_artifact_issue_profile_drafts_fail_closed_for_invalid_profile_templates(self) -> None:
         cases = (
             ("missing", "Profile template not found"),
             ("directory", "Profile template is not a file"),
@@ -1054,11 +1077,11 @@ class TestCliNew(CliRuntimeHarness):
                 self._assert_profile_draft_no_write_failure(
                     target,
                     issue_dir,
-                    ["new", "doc", "draft-plan", "--issue", "iss-00003", "--title", f"{template_state} Plan"],
+                    ["new", "artifact", "draft-plan", "--issue", "iss-00003", "--title", f"{template_state} Plan"],
                     expected_stderr,
                 )
 
-    def test_new_doc_issue_profile_drafts_fail_closed_for_symlinked_profile_template(self) -> None:
+    def test_new_artifact_issue_profile_drafts_fail_closed_for_symlinked_profile_template(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             if not self._can_create_symlink(target):
@@ -1077,62 +1100,51 @@ class TestCliNew(CliRuntimeHarness):
             self._assert_profile_draft_no_write_failure(
                 target,
                 issue_dir,
-                ["new", "doc", "draft-plan", "--issue", "iss-00003", "--title", "Symlink Plan"],
-                "Profile template is outside spec-dock workspace",
+                ["new", "artifact", "draft-plan", "--issue", "iss-00003", "--title", "Symlink Plan"],
+                "Profile template is symlinked",
             )
 
-    def test_new_doc_note_is_retired_with_scratch_guidance(self) -> None:
+    def test_new_artifact_unsupported_types_fail_no_write(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
 
-            p = self._run_runtime_capture(
-                target,
-                ["new", "doc", "note", "--issue", "iss-00003", "--title", "Note one"],
-            )
+            for artifact_type in ("scratch", "note", "unknown"):
+                artifact_files_before = sorted((issue_dir / "artifacts").glob("*.md"))
+                p = self._run_runtime_capture(
+                    target,
+                    ["new", "artifact", artifact_type, "--issue", "iss-00003", "--title", f"{artifact_type} one"],
+                )
 
-            assert p.returncode != 0, p.stdout + p.stderr
-            assert "note" in p.stderr
-            assert "retired" in p.stderr
-            assert "scratch" in p.stderr
-            assert "invalid choice" not in p.stderr
+                assert p.returncode != 0, p.stdout + p.stderr
+                assert artifact_type in p.stderr
+                assert sorted((issue_dir / "artifacts").glob("*.md")) == artifact_files_before
 
-            issue_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-                / "iss-00003-add-refresh-token"
-            )
-            assert list((issue_dir / "discussions").glob("*-note-note-one.md")) == []
-
-    def test_new_doc_stdout_uses_slugless_id_and_discussions_path(self) -> None:
+    def test_new_artifact_stdout_uses_slugless_id_and_artifacts_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
             p = self._run_runtime_capture(
                 target,
-                ["new", "doc", "disc", "--issue", "iss-00003", "--title", "Discussion one"],
+                ["new", "artifact", "disc", "--issue", "iss-00003", "--title", "Discussion one"],
             )
             assert p.returncode == 0, p.stdout + p.stderr
 
             assert re.search(
                 (
-                    r"spec-dock: ok \(new doc\) type=disc "
+                    r"spec-dock: ok \(new artifact\) type=disc "
                     r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc "
                     r"scope=iss-00003 "
-                    r"path=spec-dock/.*/discussions/[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-discussion-one\.md"
+                    r"path=spec-dock/.*/artifacts/[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-discussion-one\.md"
                 ),
                 p.stdout,
             )
             assert "discussion-one" not in re.search(r"id=([^\s]+)", p.stdout).group(1)
 
-    def test_new_doc_creates_pr_repair_batch_with_generated_identity_and_template(self) -> None:
+    def test_new_artifact_creates_pr_repair_batch_with_generated_identity_and_template(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -1145,16 +1157,16 @@ class TestCliNew(CliRuntimeHarness):
 
             p = self._run_runtime_capture(
                 target,
-                ["new", "doc", "pr-repair-batch", "--issue", "iss-00003", "--title", "PR Repair Batch"],
+                ["new", "artifact", "pr-repair-batch", "--issue", "iss-00003", "--title", "PR Repair Batch"],
             )
 
             assert p.returncode == 0, p.stdout + p.stderr
             assert re.search(
                 (
-                    r"spec-dock: ok \(new doc\) type=pr-repair-batch "
+                    r"spec-dock: ok \(new artifact\) type=pr-repair-batch "
                     r"id=20260312t010203z-pr-repair-batch "
                     r"scope=iss-00003 "
-                    r"path=spec-dock/.*/discussions/"
+                    r"path=spec-dock/.*/artifacts/"
                     r"20260312t010203z-pr-repair-batch-pr-repair-batch\.md"
                 ),
                 p.stdout,
@@ -1169,7 +1181,7 @@ class TestCliNew(CliRuntimeHarness):
                 / "epic-00002-jwt-auth"
                 / "issues"
                 / "iss-00003-add-refresh-token"
-                / "discussions"
+                / "artifacts"
                 / "20260312t010203z-pr-repair-batch-pr-repair-batch.md"
             )
             assert created.is_file()
@@ -1186,165 +1198,126 @@ class TestCliNew(CliRuntimeHarness):
             assert "`check_failure:<job_or_check_name>`" not in content
             assert "No required check failure remains." not in content
 
-    def test_new_doc_renders_body_date_from_same_utc_instant_as_doc_id(self) -> None:
+    def test_new_artifact_draft_scope_failures_do_not_setup_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
-            self._write_runtime_clock(
-                target,
-                now_iso="2026-03-12T00:30:00+00:00",
-                today="2026-03-11",
-            )
+            init_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-00002-jwt-auth"
 
-            self._run_runtime(target, ["new", "doc", "scratch", "--issue", "iss-00003", "--title", "UTC date check"])
-
-            issue_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-                / "iss-00003-add-refresh-token"
-            )
-            created = issue_dir / "discussions" / "20260312t003000z-scratch-utc-date-check.md"
-            assert created.is_file()
-            assert "2026-03-12" in created.read_text(encoding="utf-8")
-            assert "2026-03-11" not in created.read_text(encoding="utf-8")
-
-    def test_new_doc_ignores_unrelated_files_for_timestamp_allocation(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            self._create_same_repo_linked_hierarchy(target)
-
-            issue_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-                / "iss-00003-add-refresh-token"
-            )
-            discussions_dir = issue_dir / "discussions"
-            (discussions_dir / "foo.md").write_text("nonconforming\n", encoding="utf-8")
-            (discussions_dir / "009-disc-migrated.md").write_text("existing new format\n", encoding="utf-8")
-            (discussions_dir / "1000-adr-legacy-overflow.md").write_text(
-                "4-digit should be ignored\n", encoding="utf-8"
-            )
-
-            self._run_runtime(target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"])
-
-            assert len(sorted(discussions_dir.glob("*-adr-decision-one.md"))) == 1
-            assert list(discussions_dir.glob("001-adr-*.md")) == []
-
-    def test_new_doc_rejects_malformed_discussion_doc_candidates(self) -> None:
-        cases = (
-            "002-bogus-random.md",
-            "foo-adr-kickoff.md",
-            "bogus-01-adr-kickoff.md",
-        )
-        for malformed_name in cases:
-            with tempfile.TemporaryDirectory() as tmp:
-                target = Path(tmp)
-                assert main(["init", str(target)]) == 0
-                self._create_same_repo_linked_hierarchy(target)
-
-                issue_dir = (
-                    target
-                    / "spec-dock"
-                    / "initiatives"
-                    / "init-00001-auth-platform"
-                    / "epics"
-                    / "epic-00002-jwt-auth"
-                    / "issues"
-                    / "iss-00003-add-refresh-token"
-                )
-                discussions_dir = issue_dir / "discussions"
-                (discussions_dir / malformed_name).write_text("nonconforming type\n", encoding="utf-8")
-
-                p = self._run_runtime_capture(
-                    target,
-                    ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"],
-                )
-
+            for command, scope_dir in (
+                (
+                    [
+                        "new",
+                        "artifact",
+                        "draft-requirement",
+                        "--initiative",
+                        "init-00001",
+                        "--title",
+                        "Requirement Draft",
+                    ],
+                    init_dir,
+                ),
+                (["new", "artifact", "draft-plan", "--epic", "epic-00002", "--title", "Plan Draft"], epic_dir),
+            ):
+                artifact_files_before = sorted((scope_dir / "artifacts").glob("*.md"))
+                p = self._run_runtime_capture(target, command)
                 assert p.returncode != 0, p.stdout + p.stderr
-                assert "Malformed discussion document filename" in p.stderr
-                assert malformed_name in p.stderr
-                assert len(sorted(discussions_dir.glob("*-adr-decision-one.md"))) == 0
+                assert "issue scope" in p.stderr
+                assert sorted((scope_dir / "artifacts").glob("*.md")) == artifact_files_before
 
-    def test_new_doc_rejects_timestamp_shaped_malformed_discussion_doc_candidates(self) -> None:
+    def test_new_artifact_malformed_artifact_candidates_block_but_discussions_do_not(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
-
-            issue_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-                / "iss-00003-add-refresh-token"
-            )
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
             discussions_dir = issue_dir / "discussions"
-            malformed_name = "20260312t010203z-00-disc-malformed.md"
-            (discussions_dir / malformed_name).write_text("nonconforming type\n", encoding="utf-8")
+            artifacts_dir = issue_dir / "artifacts"
+            discussions_dir.mkdir(exist_ok=True)
+            (discussions_dir / "20260312t010203z-00-disc-malformed.md").write_text(
+                "legacy malformed\n", encoding="utf-8"
+            )
 
             p = self._run_runtime_capture(
-                target,
-                ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Decision one"],
-            )
-
-            assert p.returncode != 0, p.stdout + p.stderr
-            assert "Malformed discussion document filename" in p.stderr
-            assert malformed_name in p.stderr
-            assert len(sorted(discussions_dir.glob("*-adr-decision-one.md"))) == 0
-
-    def test_new_doc_preserves_legacy_files_without_reusing_sequence_names(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-            self._create_same_repo_linked_hierarchy(target)
-
-            issue_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-                / "iss-00003-add-refresh-token"
-            )
-            discussions_dir = issue_dir / "discussions"
-            (discussions_dir / "001-adr-first.md").write_text("first\n", encoding="utf-8")
-            (discussions_dir / "001-disc-second.md").write_text("second\n", encoding="utf-8")
-
-            p = self._run_runtime_capture(
-                target, ["new", "doc", "scratch", "--issue", "iss-00003", "--title", "Note one"]
+                target, ["new", "artifact", "adr", "--issue", "iss-00003", "--title", "Decision one"]
             )
             assert p.returncode == 0, p.stdout + p.stderr
-            assert re.search(r"id=[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-scratch\b", p.stdout)
-            assert len(sorted(discussions_dir.glob("*-scratch-note-one.md"))) == 1
+            assert len(sorted(artifacts_dir.glob("*-adr-decision-one.md"))) == 1
 
-    def test_new_doc_rejects_invalid_slug(self) -> None:
+            malformed_name = "20260312t010203z-00-disc-malformed.md"
+            (artifacts_dir / malformed_name).write_text("artifact malformed\n", encoding="utf-8")
+            p = self._run_runtime_capture(
+                target, ["new", "artifact", "adr", "--issue", "iss-00003", "--title", "Decision two"]
+            )
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Malformed artifact filename" in p.stderr
+            assert malformed_name in p.stderr
+            assert len(sorted(artifacts_dir.glob("*-adr-decision-two.md"))) == 0
+
+    def test_new_artifact_preserves_grandfathered_legacy_artifact_basenames(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
+            artifacts_dir = issue_dir / "artifacts"
+            for filename in (
+                "001-adr-token-rotation.md",
+                "002-disc-api-options.md",
+                "001-note-kickoff-memo.md",
+            ):
+                (artifacts_dir / filename).write_text("legacy artifact\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(
+                target, ["new", "artifact", "adr", "--issue", "iss-00003", "--title", "Decision one"]
+            )
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert len(sorted(artifacts_dir.glob("*-adr-decision-one.md"))) == 1
+
+    def test_new_artifact_old_node_setup_preserves_discussions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
+            discussions_dir = issue_dir / "discussions"
+            shutil.rmtree(issue_dir / "artifacts")
+            discussions_dir.mkdir()
+            (discussions_dir / "rules.md").write_text("legacy issue discussion rules\n", encoding="utf-8")
+            (discussions_dir / "20260312t010203z-research-existing.md").write_text(
+                "legacy research\n",
+                encoding="utf-8",
+            )
+            discussions_before = sorted(path.name for path in discussions_dir.glob("*.md"))
+            assert not (issue_dir / "artifacts").exists()
+
+            p = self._run_runtime_capture(
+                target,
+                ["new", "artifact", "research", "--issue", "iss-00003", "--title", "Research One"],
+            )
+            assert p.returncode == 0, p.stdout + p.stderr
+            rules_link = issue_dir / "artifacts" / "rules.md"
+            target_rules = target / "spec-dock" / "docs" / "rules" / "issue" / "artifacts.md"
+            assert rules_link.is_symlink()
+            assert rules_link.resolve() == target_rules.resolve()
+            assert str(rules_link.readlink()) == os.path.relpath(target_rules, start=rules_link.parent)
+            assert sorted(path.name for path in discussions_dir.glob("*.md")) == discussions_before
+
+    def test_new_artifact_rejects_invalid_slug_before_setup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
 
             p = self._run_runtime_capture(
                 target,
                 [
                     "new",
-                    "doc",
+                    "artifact",
                     "adr",
                     "--issue",
                     "iss-00003",
@@ -1357,63 +1330,61 @@ class TestCliNew(CliRuntimeHarness):
             assert p.returncode != 0, p.stdout + p.stderr
             assert "--slug" in p.stderr
             assert "expected regex" in p.stderr
+            assert sorted(path.name for path in (issue_dir / "artifacts").glob("*.md")) == ["rules.md"]
 
-            issue_dir = (
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-auth-platform"
-                / "epics"
-                / "epic-00002-jwt-auth"
-                / "issues"
-                / "iss-00003-add-refresh-token"
-            )
-            discussions_dir = issue_dir / "discussions"
-            assert list(discussions_dir.glob("001-adr-*.md")) == []
+    def test_new_artifact_blank_rejects_ambiguous_supported_type_slug_before_setup(self) -> None:
+        cases = (
+            (["new", "artifact", "blank", "--issue", "iss-00003", "--title", "Research Notes"], "research-notes"),
+            (
+                [
+                    "new",
+                    "artifact",
+                    "blank",
+                    "--issue",
+                    "iss-00003",
+                    "--title",
+                    "Choice",
+                    "--slug",
+                    "adr-choice",
+                ],
+                "adr-choice",
+            ),
+        )
+        for command, slug in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                self._create_same_repo_linked_hierarchy(target)
+                issue_dir = self._find_issue_dir_by_id(target, "iss-00003")
 
-    def test_new_doc_rejects_unexpected_sequence_override_option(self) -> None:
+                p = self._run_runtime_capture(target, command)
+
+                assert p.returncode != 0, p.stdout + p.stderr
+                assert "Ambiguous blank artifact slug" in p.stderr
+                assert slug in p.stderr
+                assert sorted(path.name for path in (issue_dir / "artifacts").glob("*.md")) == ["rules.md"]
+
+    def test_new_artifact_rejects_unexpected_sequence_override_option(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
 
             p = self._run_runtime_capture(
                 target,
-                [
-                    "new",
-                    "doc",
-                    "adr",
-                    "--issue",
-                    "iss-00003",
-                    "--seq",
-                    "1",
-                    "--title",
-                    "Decision one",
-                ],
+                ["new", "artifact", "adr", "--issue", "iss-00003", "--seq", "1", "--title", "Decision one"],
             )
             assert p.returncode == 2, p.stdout + p.stderr
             assert "unrecognized arguments: --seq 1" in p.stderr
 
-    def test_new_discussion_per_type_commands_are_not_available(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-
-            for per_type in ("adr", "disc", "research", "interview", "scratch", "note"):
-                p = self._run_runtime_capture(
-                    target,
-                    ["new", per_type, "--issue", "iss-00003", "--title", "Doc title"],
-                )
-                assert p.returncode == 2, p.stdout + p.stderr
-                assert f"invalid choice: '{per_type}'" in p.stderr
-
-    def test_new_help_exposes_only_doc_discussion_entrypoint(self) -> None:
+    def test_new_help_exposes_artifact_and_removes_doc_entrypoint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
 
             p_new = self._run_runtime_capture(target, ["new", "--help"])
             assert p_new.returncode == 0, p_new.stdout + p_new.stderr
-            assert " doc " in p_new.stdout
+            assert "artifact" in p_new.stdout
+            assert " doc " not in p_new.stdout
             assert "\n    adr" not in p_new.stdout
             assert "\n    disc" not in p_new.stdout
             assert "\n    research" not in p_new.stdout
@@ -1421,28 +1392,34 @@ class TestCliNew(CliRuntimeHarness):
             assert "\n    scratch" not in p_new.stdout
             assert "\n    note" not in p_new.stdout
 
-            p_doc = self._run_runtime_capture(target, ["new", "doc", "--help"])
-            assert p_doc.returncode == 0, p_doc.stdout + p_doc.stderr
-            assert "adr" in p_doc.stdout
-            assert "disc" in p_doc.stdout
-            assert "research" in p_doc.stdout
-            assert "interview" in p_doc.stdout
-            assert "scratch" in p_doc.stdout
-            assert "pr-repair-batch" in p_doc.stdout
-            assert "note" in p_doc.stdout
-            assert "--template-file" not in p_doc.stdout
-            assert "--body-file" not in p_doc.stdout
-            assert "--basename" not in p_doc.stdout
-            assert "--doc-id" not in p_doc.stdout
-            assert "--id" not in p_doc.stdout
-            assert "--seq" not in p_doc.stdout
+            p_artifact = self._run_runtime_capture(target, ["new", "artifact", "--help"])
+            assert p_artifact.returncode == 0, p_artifact.stdout + p_artifact.stderr
+            assert "blank" in p_artifact.stdout
+            assert "research" in p_artifact.stdout
+            assert "pr-repair-batch" in p_artifact.stdout
+            assert "draft-plan" in p_artifact.stdout
+            assert "scratch" not in p_artifact.stdout
+            assert "note" not in p_artifact.stdout
+            assert "--template-file" not in p_artifact.stdout
+            assert "--body-file" not in p_artifact.stdout
+            assert "--basename" not in p_artifact.stdout
+            assert "--doc-id" not in p_artifact.stdout
+            assert "--id" not in p_artifact.stdout
+            assert "--seq" not in p_artifact.stdout
+
+            p_doc = self._run_runtime_capture(
+                target, ["new", "doc", "adr", "--issue", "iss-00003", "--title", "Doc title"]
+            )
+            assert p_doc.returncode == 2, p_doc.stdout + p_doc.stderr
+            assert "invalid choice: 'doc'" in p_doc.stderr
+            assert "new artifact" not in p_doc.stderr
 
             for forbidden_option in ("--template-file", "--body-file", "--basename", "--doc-id", "--id"):
                 p_forbidden = self._run_runtime_capture(
                     target,
                     [
                         "new",
-                        "doc",
+                        "artifact",
                         "pr-repair-batch",
                         "--issue",
                         "iss-00003",
@@ -1497,17 +1474,17 @@ class TestCliNew(CliRuntimeHarness):
         assert resolved["iss-00301"].status == "done"
         assert resolved["iss-00301"].source == "cache"
 
-    def test_new_doc_rejects_unknown_type(self) -> None:
+    def test_new_artifact_rejects_unknown_type(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
 
             p = self._run_runtime_capture(
                 target,
-                ["new", "doc", "unknown", "--issue", "iss-00003", "--title", "Doc title"],
+                ["new", "artifact", "unknown", "--issue", "iss-00003", "--title", "Doc title"],
             )
             assert p.returncode == 1, p.stdout + p.stderr
-            assert "Unknown discussion doc type: unknown" in p.stderr
+            assert "Unknown artifact type: unknown" in p.stderr
             assert "invalid choice" not in p.stderr
 
     def test_new_nodes_do_not_generate_readme_files(self) -> None:

@@ -655,14 +655,14 @@ def _rules_source_paths(
     if kind == "initiative":
         return [
             docs_rules_dir / "initiative" / "epics.md",
-            docs_rules_dir / "initiative" / "discussions.md",
+            docs_rules_dir / "initiative" / "artifacts.md",
         ]
     if kind == "epic":
         return [
             docs_rules_dir / "epic" / "issues.md",
-            docs_rules_dir / "epic" / "discussions.md",
+            docs_rules_dir / "epic" / "artifacts.md",
         ]
-    return [docs_rules_dir / "issue" / "discussions.md"]
+    return [docs_rules_dir / "issue" / "artifacts.md"]
 
 
 def _rules_scaffold_specs(
@@ -675,15 +675,15 @@ def _rules_scaffold_specs(
     if kind == "initiative":
         return [
             (dest_dir / "epics" / "rules.md", rules_source_paths[0]),
-            (dest_dir / "discussions" / "rules.md", rules_source_paths[1]),
+            (dest_dir / "artifacts" / "rules.md", rules_source_paths[1]),
         ]
     if kind == "epic":
         return [
             (dest_dir / "issues" / "rules.md", rules_source_paths[0]),
-            (dest_dir / "discussions" / "rules.md", rules_source_paths[1]),
+            (dest_dir / "artifacts" / "rules.md", rules_source_paths[1]),
         ]
     return [
-        (dest_dir / "discussions" / "rules.md", rules_source_paths[0]),
+        (dest_dir / "artifacts" / "rules.md", rules_source_paths[0]),
     ]
 
 

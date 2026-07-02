@@ -8,13 +8,13 @@
 ## 委任ドラフト証跡 schema（Delegated Draft Evidence Schema / reference）
 - lifecycle state（契約値）: `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
 - 昇格不可 state: `stale`, `rejected`, `superseded`, `blocked`
-- 標準出力先: target scope `discussions/` direct child の flat Markdown。filename は `<ts>-<kind>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<kind>-<slug>.md`
+- 標準出力先: target scope `artifacts/` direct child の flat Markdown。typed artifact filename は `<ts>-<type>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<type>-<slug>.md`。blank artifact filename は `<ts>-<slug>.md` または same-second collision 用 `<ts>-<nn>-<slug>.md`
 - 軽量 provenance field: `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
 - 互換 label: role, phase, scope, authorization source, source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
 - 禁止 self-claim: `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
 - 標準必須にしない field: task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
 - 禁止 wildcard token: `*`, `grants.*`, `all`
-- historical note: 既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない
+- historical note: legacy `discussions/` と既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない
 - Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
 - Promotion Record / `promotion_record` fields: `status`, `authority`, `owner_role`, `draft_author_role`, `approval`, `source_revision`, `approved_revision`, `approved_hash`, `reviewer_target_hash`, `promoted_at`, `promoted_by`, `promotion_decision`
 - `reviewer_target_hash` / `approved_hash` の不一致、または stale な `source_revision` / `approved_revision` は promotion と下流 authority をブロックする。

@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import re
+import shutil
 import tempfile
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
@@ -19,22 +20,17 @@ class TestCliRulesContract(CliRuntimeHarness):
             issue_dir = epic_dir / "issues" / "iss-00003-add-refresh-token"
             expected_rules_links = {
                 init_dir / "epics" / "rules.md": target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md",
-                init_dir / "discussions" / "rules.md": (
-                    target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
+                init_dir / "artifacts" / "rules.md": (
+                    target / "spec-dock" / "docs" / "rules" / "initiative" / "artifacts.md"
                 ),
                 epic_dir / "issues" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md",
-                epic_dir / "discussions" / "rules.md": target
-                / "spec-dock"
-                / "docs"
-                / "rules"
-                / "epic"
-                / "discussions.md",
-                issue_dir / "discussions" / "rules.md": target
+                epic_dir / "artifacts" / "rules.md": target / "spec-dock" / "docs" / "rules" / "epic" / "artifacts.md",
+                issue_dir / "artifacts" / "rules.md": target
                 / "spec-dock"
                 / "docs"
                 / "rules"
                 / "issue"
-                / "discussions.md",
+                / "artifacts.md",
             }
             for link_path, target_path in expected_rules_links.items():
                 assert link_path.is_symlink(), f"missing rules symlink: {link_path}"
@@ -45,6 +41,9 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert not (epic_dir / "issues" / "new-issue").exists()
             assert list((init_dir / "epics").glob("new-*")) == []
             assert list((epic_dir / "issues").glob("new-*")) == []
+            assert not (init_dir / "discussions").exists()
+            assert not (epic_dir / "discussions").exists()
+            assert not (issue_dir / "discussions").exists()
 
     def test_scaffold_docs_point_to_runtime_commands_and_rules_docs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -62,13 +61,22 @@ class TestCliRulesContract(CliRuntimeHarness):
             initiative_discussions_rules = (
                 target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
             ).read_text(encoding="utf-8")
+            initiative_artifacts_rules = (
+                target / "spec-dock" / "docs" / "rules" / "initiative" / "artifacts.md"
+            ).read_text(encoding="utf-8")
             epic_issues_rules = (target / "spec-dock" / "docs" / "rules" / "epic" / "issues.md").read_text(
                 encoding="utf-8"
             )
             epic_discussions_rules = (target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md").read_text(
                 encoding="utf-8"
             )
+            epic_artifacts_rules = (target / "spec-dock" / "docs" / "rules" / "epic" / "artifacts.md").read_text(
+                encoding="utf-8"
+            )
             issue_discussions_rules = (target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md").read_text(
+                encoding="utf-8"
+            )
+            issue_artifacts_rules = (target / "spec-dock" / "docs" / "rules" / "issue" / "artifacts.md").read_text(
                 encoding="utf-8"
             )
             hub_skill = (target / ".agents" / "skills" / "spec-dock-hub" / "SKILL.md").read_text(encoding="utf-8")
@@ -142,24 +150,35 @@ class TestCliRulesContract(CliRuntimeHarness):
                     '`./spec-dock/scripts/spec-dock new epic --initiative <id> --title "<title>"`',
                 ),
                 (
-                    initiative_discussions_rules,
-                    '`./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title "<title>"`',
-                ),
-                (
                     epic_issues_rules,
                     '`./spec-dock/scripts/spec-dock new issue --epic <id> --title "<title>"`',
-                ),
-                (
-                    epic_discussions_rules,
-                    '`./spec-dock/scripts/spec-dock new doc adr --epic <id> --title "<title>"`',
-                ),
-                (
-                    issue_discussions_rules,
-                    '`./spec-dock/scripts/spec-dock new doc adr --issue <id> --title "<title>"`',
                 ),
             ):
                 assert "spec-dock/docs/" in text
                 assert expected_command in text
+                assert "./spec " not in text
+            for text, expected_command in (
+                (
+                    initiative_artifacts_rules,
+                    "future `new artifact` surface",
+                ),
+                (
+                    epic_artifacts_rules,
+                    "future `new artifact` surface",
+                ),
+                (
+                    issue_artifacts_rules,
+                    "future `new artifact` surface",
+                ),
+            ):
+                assert "spec-dock/docs/" in text
+                assert expected_command in text
+                assert "new doc " not in text
+                assert "./spec " not in text
+            for text in (initiative_discussions_rules, epic_discussions_rules, issue_discussions_rules):
+                assert "preservation surface" in text
+                assert "Historical creation command examples are intentionally omitted" in text
+                assert "new doc " not in text
                 assert "./spec " not in text
             for skill_text in (hub_skill, issue_skill, codex_adapter_skill, copilot_adapter_skill):
                 assert "./spec-dock/scripts/spec-dock" in skill_text
@@ -192,7 +211,7 @@ class TestCliRulesContract(CliRuntimeHarness):
 
             assert "--no-github" not in initiative_epics_rules
 
-    def test_new_doc_numbering_and_validate_ignore_initiative_discussion_rules_symlink(self) -> None:
+    def test_new_artifact_numbering_and_validate_ignore_initiative_artifact_rules_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -201,23 +220,22 @@ class TestCliRulesContract(CliRuntimeHarness):
             self._run_runtime(target, ["new", "initiative", "--title", "Auth platform", "--github-issue", "1"])
 
             initiative_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
-            discussions_dir = initiative_dir / "discussions"
-            rules_target = target / "spec-dock" / "docs" / "rules" / "initiative" / "discussions.md"
+            artifacts_dir = initiative_dir / "artifacts"
+            rules_target = target / "spec-dock" / "docs" / "rules" / "initiative" / "artifacts.md"
 
-            rules_link = discussions_dir / "rules.md"
+            self._run_runtime(target, ["new", "artifact", "adr", "--initiative", "1", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "artifact", "disc", "--initiative", "1", "--title", "Why now"])
+
+            rules_link = artifacts_dir / "rules.md"
             assert rules_link.is_symlink(), f"missing rules symlink: {rules_link}"
             assert rules_link.resolve() == rules_target.resolve()
-
-            self._run_runtime(target, ["new", "doc", "adr", "--initiative", "1", "--title", "Decision one"])
-            self._run_runtime(target, ["new", "doc", "disc", "--initiative", "1", "--title", "Why now"])
-
-            adr_files = sorted(discussions_dir.glob("*-adr-decision-one.md"))
-            disc_files = sorted(discussions_dir.glob("*-disc-why-now.md"))
+            adr_files = sorted(artifacts_dir.glob("*-adr-decision-one.md"))
+            disc_files = sorted(artifacts_dir.glob("*-disc-why-now.md"))
             assert len(adr_files) == 1
             assert len(disc_files) == 1
             assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$", adr_files[0].name)
             assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$", disc_files[0].name)
-            assert sorted(path.name for path in discussions_dir.iterdir()) == sorted([
+            assert sorted(path.name for path in artifacts_dir.iterdir()) == sorted([
                 adr_files[0].name,
                 disc_files[0].name,
                 "rules.md",
@@ -229,7 +247,7 @@ class TestCliRulesContract(CliRuntimeHarness):
             )
             assert "spec-dock: ok (validate)" in validate_result.stdout
 
-    def test_new_doc_numbering_and_validate_ignore_epic_discussion_rules_symlink(self) -> None:
+    def test_new_artifact_numbering_and_validate_ignore_epic_artifact_rules_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -243,22 +261,22 @@ class TestCliRulesContract(CliRuntimeHarness):
             epic_dir = (
                 target / "spec-dock" / "initiatives" / "init-00001-auth-platform" / "epics" / "epic-00002-jwt-auth"
             )
-            discussions_dir = epic_dir / "discussions"
-            rules_target = target / "spec-dock" / "docs" / "rules" / "epic" / "discussions.md"
-            rules_link = discussions_dir / "rules.md"
+            artifacts_dir = epic_dir / "artifacts"
+            rules_target = target / "spec-dock" / "docs" / "rules" / "epic" / "artifacts.md"
+
+            self._run_runtime(target, ["new", "artifact", "adr", "--epic", "2", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "artifact", "disc", "--epic", "2", "--title", "Why now"])
+
+            rules_link = artifacts_dir / "rules.md"
             assert rules_link.is_symlink(), f"missing rules symlink: {rules_link}"
             assert rules_link.resolve() == rules_target.resolve()
-
-            self._run_runtime(target, ["new", "doc", "adr", "--epic", "2", "--title", "Decision one"])
-            self._run_runtime(target, ["new", "doc", "disc", "--epic", "2", "--title", "Why now"])
-
-            adr_files = sorted(discussions_dir.glob("*-adr-decision-one.md"))
-            disc_files = sorted(discussions_dir.glob("*-disc-why-now.md"))
+            adr_files = sorted(artifacts_dir.glob("*-adr-decision-one.md"))
+            disc_files = sorted(artifacts_dir.glob("*-disc-why-now.md"))
             assert len(adr_files) == 1
             assert len(disc_files) == 1
             assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$", adr_files[0].name)
             assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$", disc_files[0].name)
-            assert sorted(path.name for path in discussions_dir.iterdir()) == sorted([
+            assert sorted(path.name for path in artifacts_dir.iterdir()) == sorted([
                 adr_files[0].name,
                 disc_files[0].name,
                 "rules.md",
@@ -270,7 +288,7 @@ class TestCliRulesContract(CliRuntimeHarness):
             )
             assert "spec-dock: ok (validate)" in validate_result.stdout
 
-    def test_new_doc_numbering_and_validate_ignore_issue_discussion_rules_symlink(self) -> None:
+    def test_new_artifact_numbering_and_validate_ignore_issue_artifact_rules_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
@@ -287,22 +305,22 @@ class TestCliRulesContract(CliRuntimeHarness):
                 / "issues"
                 / "iss-00003-add-refresh-token"
             )
-            discussions_dir = issue_dir / "discussions"
-            rules_target = target / "spec-dock" / "docs" / "rules" / "issue" / "discussions.md"
-            rules_link = discussions_dir / "rules.md"
+            artifacts_dir = issue_dir / "artifacts"
+            rules_target = target / "spec-dock" / "docs" / "rules" / "issue" / "artifacts.md"
+
+            self._run_runtime(target, ["new", "artifact", "adr", "--issue", "3", "--title", "Decision one"])
+            self._run_runtime(target, ["new", "artifact", "disc", "--issue", "3", "--title", "Why now"])
+
+            rules_link = artifacts_dir / "rules.md"
             assert rules_link.is_symlink(), f"missing rules symlink: {rules_link}"
             assert rules_link.resolve() == rules_target.resolve()
-
-            self._run_runtime(target, ["new", "doc", "adr", "--issue", "3", "--title", "Decision one"])
-            self._run_runtime(target, ["new", "doc", "disc", "--issue", "3", "--title", "Why now"])
-
-            adr_files = sorted(discussions_dir.glob("*-adr-decision-one.md"))
-            disc_files = sorted(discussions_dir.glob("*-disc-why-now.md"))
+            adr_files = sorted(artifacts_dir.glob("*-adr-decision-one.md"))
+            disc_files = sorted(artifacts_dir.glob("*-disc-why-now.md"))
             assert len(adr_files) == 1
             assert len(disc_files) == 1
             assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-adr-decision-one\.md$", adr_files[0].name)
             assert re.search(r"^[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?-disc-why-now\.md$", disc_files[0].name)
-            assert sorted(path.name for path in discussions_dir.iterdir()) == sorted([
+            assert sorted(path.name for path in artifacts_dir.iterdir()) == sorted([
                 adr_files[0].name,
                 disc_files[0].name,
                 "rules.md",
@@ -313,6 +331,35 @@ class TestCliRulesContract(CliRuntimeHarness):
                 f"validate stdout:\n{validate_result.stdout}\nvalidate stderr:\n{validate_result.stderr}"
             )
             assert "spec-dock: ok (validate)" in validate_result.stdout
+
+    def test_validate_rejects_symlinked_artifacts_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            self._create_same_repo_linked_hierarchy(target)
+
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+            artifacts_dir = issue_dir / "artifacts"
+            external_artifacts = target / "external-artifacts"
+            external_artifacts.mkdir()
+            shutil.rmtree(artifacts_dir)
+            artifacts_dir.symlink_to(external_artifacts)
+
+            validate_result = self._run_runtime_capture(target, ["validate"])
+
+            assert validate_result.returncode != 0
+            assert "Unsafe artifact directory" in validate_result.stderr
+            assert "must not be a symlink" in validate_result.stderr
 
     def test_runtime_entrypoint_fails_fast_when_runtime_module_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -101,6 +101,8 @@ class ArtifactStore:
         if profile not in ("lite", "standard", "strict", "critical"):
             raise ValueError(f"Unsupported profile template profile: {profile}")
         path = self.specdock_dir / "templates" / "issue-profiles" / profile / f"{artifact}.md"
+        if path.is_symlink():
+            raise RuntimeError(f"Profile template is symlinked: {path.relative_to(self.repo_root)}")
         resolved = path.resolve()
         if not _is_relative_to(resolved, self.specdock_dir.resolve()):
             raise RuntimeError(f"Profile template is outside spec-dock workspace: {path}")

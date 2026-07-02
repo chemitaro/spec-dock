@@ -281,10 +281,10 @@ class TestRuntimeNewS08:
             (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\n", encoding="utf-8")
         rules_docs = {
             ("initiative", "epics.md"): "initiative epics rules\n",
-            ("initiative", "discussions.md"): "initiative discussions rules\n",
+            ("initiative", "artifacts.md"): "initiative artifacts rules\n",
             ("epic", "issues.md"): "epic issues rules\n",
-            ("epic", "discussions.md"): "epic discussions rules\n",
-            ("issue", "discussions.md"): "issue discussions rules\n",
+            ("epic", "artifacts.md"): "epic artifacts rules\n",
+            ("issue", "artifacts.md"): "issue artifacts rules\n",
         }
         for (scope, name), content in rules_docs.items():
             rules_path = specdock_dir / "docs" / "rules" / scope / name
@@ -385,7 +385,8 @@ class TestRuntimeNewS08:
             assert plan.dest_dir / "README.md" in plan.planned_paths
             assert plan.dest_dir / "docs" / "checklist.md" in plan.planned_paths
             assert plan.dest_dir / "epics" / "rules.md" in plan.planned_paths
-            assert plan.dest_dir / "discussions" / "rules.md" in plan.planned_paths
+            assert plan.dest_dir / "artifacts" / "rules.md" in plan.planned_paths
+            assert plan.dest_dir / "discussions" / "rules.md" not in plan.planned_paths
 
     def test_execution_regression_and_write_order(self) -> None:
         (
@@ -429,7 +430,8 @@ class TestRuntimeNewS08:
             assert (plan.dest_dir / ".meta.json").exists()
             assert (plan.dest_dir / "README.md").exists()
             assert (plan.dest_dir / "epics" / "rules.md").is_symlink()
-            assert (plan.dest_dir / "discussions" / "rules.md").is_symlink()
+            assert (plan.dest_dir / "artifacts" / "rules.md").is_symlink()
+            assert not (plan.dest_dir / "discussions").exists()
 
     def test_full_candidate_set_no_write_preflight_collision(self) -> None:
         (
@@ -633,7 +635,7 @@ class TestRuntimeNewS08:
         collision_paths = {
             "initiative": ("epics", "README.md"),
             "epic": ("issues", "README.md"),
-            "issue": ("discussions", ".meta.json"),
+            "issue": ("artifacts", ".meta.json"),
         }
 
         for kind, (collision_name, sentinel_name) in collision_paths.items():
@@ -831,7 +833,7 @@ class TestRuntimeNewS08:
         collision_paths = {
             "initiative": "epics",
             "epic": "issues",
-            "issue": "discussions",
+            "issue": "artifacts",
         }
 
         for kind, collision_name in collision_paths.items():
@@ -2991,7 +2993,7 @@ class TestRuntimeNewS08:
                         "github_mode": "create",
                         "github_issue_number": None,
                     },
-                    specdock_dir / "docs" / "rules" / "initiative" / "epics.md",
+                    specdock_dir / "docs" / "rules" / "initiative" / "artifacts.md",
                 ),
                 (
                     "epic",
@@ -3003,7 +3005,7 @@ class TestRuntimeNewS08:
                         "github_mode": "create",
                         "github_issue_number": None,
                     },
-                    specdock_dir / "docs" / "rules" / "epic" / "issues.md",
+                    specdock_dir / "docs" / "rules" / "epic" / "artifacts.md",
                 ),
                 (
                     "issue",
@@ -3015,7 +3017,7 @@ class TestRuntimeNewS08:
                         "github_mode": "create",
                         "github_issue_number": None,
                     },
-                    specdock_dir / "docs" / "rules" / "issue" / "discussions.md",
+                    specdock_dir / "docs" / "rules" / "issue" / "artifacts.md",
                 ),
             ]
             for case_name, create_fn, request_kwargs, missing_rules_path in cases:
@@ -3717,7 +3719,7 @@ class TestRuntimeNewS08:
             create_initiative=_fake_create,
             create_epic=_unexpected,
             create_issue=_unexpected,
-            create_discussion_doc=_unexpected,
+            create_artifact_doc=_unexpected,
             import_initiative=_unexpected,
             import_epic=_unexpected,
             import_issue=_unexpected,

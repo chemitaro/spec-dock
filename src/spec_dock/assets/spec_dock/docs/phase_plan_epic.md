@@ -50,7 +50,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governanc
 - issue handoff に必要な readiness がある
 - delegated plan draft を使う場合、lightweight provenance、fresh requirement/design reviewer pass、approved artifacts への traceability、stale / superseded handling、scope discipline、phase gate preservation が確認できる
 - delegated draft を fresh `spec-reviewer` pass の代替にしていない
-- read-only specialist consent と scope-local discussion direct-write consent が分離され、direct-write delegated authoring は target scope `discussions/` direct child、allowed filename rule、forbidden canonical/implementation paths、post-run diff guard、report evidence destination を step-local に固定している
-- implementation planner が direct-write draft authoring を使う場合でも、出力は scope-local flat discussion Markdown に限られ、canonical `plan.md` edit、final authority、phase promotion、reviewer-pass claim、requirement/design rewrite、implementation-readiness claim、完了済み issue plan/report の修正を含まない
-- static adapter は guarded workspace-write で scope-local `discussions/` Markdown draft を作成し、workspace-write が hard path allow-list ではない前提で delegated plan authoring output は invocation scope、diff guard pass、report ledger adoption evidence が揃うまで adoption-ineligible として扱われている
+- read-only specialist consent と scope-local artifact direct-write consent が分離され、direct-write delegated authoring は target scope `artifacts/` direct child、allowed filename rule、forbidden canonical/implementation paths、post-run diff guard、report evidence destination を step-local に固定している
+- implementation planner が direct-write draft authoring を使う場合でも、出力は scope-local flat artifact Markdown に限られ、canonical `plan.md` edit、final authority、phase promotion、reviewer-pass claim、requirement/design rewrite、implementation-readiness claim、完了済み issue plan/report の修正を含まない
+- static adapter は guarded workspace-write で scope-local `artifacts/` Markdown draft を作成し、workspace-write が hard path allow-list ではない前提で delegated plan authoring output は invocation scope、diff guard pass、report ledger adoption evidence が揃うまで adoption-ineligible として扱われている
 - delegated authoring unavailable / skipped の場合も manual authoring path が有効である

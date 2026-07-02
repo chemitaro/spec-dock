@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from spec_dock_runtime.domain.artifacts import scan_artifact_duplicate_state
 from spec_dock_runtime.domain.deps import validate_deps_cycles
 from spec_dock_runtime.domain.discussion_docs import (
     discussion_filename_expectation,
@@ -201,6 +202,26 @@ def _validate_discussion_filenames(graph: SpecGraph, *, repo_root: Path | None =
                 f"{_path_for_output(discussions_dir, repo_root=repo_root)}: "
                 f"doc_id={duplicate_doc_id} files=[{files}]"
             )
+
+
+def _validate_artifact_filenames(graph: SpecGraph, *, repo_root: Path | None = None) -> None:
+    scopes = sorted(
+        (node for node in graph.nodes_by_id.values() if node.kind in ("initiative", "epic", "issue")),
+        key=lambda node: (node.kind, node.id, node.path.as_posix()),
+    )
+    for scope in scopes:
+        artifacts_dir = scope.path / "artifacts"
+        if not artifacts_dir.exists():
+            continue
+        error, _artifact_ids = scan_artifact_duplicate_state(artifacts_dir)
+        if error is None:
+            continue
+        if repo_root is not None:
+            error = error.replace(
+                artifacts_dir.as_posix(),
+                _path_for_output(artifacts_dir, repo_root=repo_root),
+            )
+        raise RuntimeError(error)
 
 
 def validate_github_issue_numbers_unique(
@@ -410,3 +431,4 @@ def _validate_graph_or_raise(
         raise RuntimeError(f"Unknown node type: {node.kind} ({node.meta_path})")
 
     _validate_discussion_filenames(graph, repo_root=repo_root)
+    _validate_artifact_filenames(graph, repo_root=repo_root)

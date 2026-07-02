@@ -279,12 +279,17 @@ _JAPANESE_PRIMARY_TABLE_ROLE_TOKENS = {
 
 class TestInitUpdate(CliRuntimeHarness):
     _CANONICAL_RULES_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
+        "spec-dock/docs/rules/initiative/artifacts.md": (
+            "src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md"
+        ),
         "spec-dock/docs/rules/initiative/discussions.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md"
         ),
         "spec-dock/docs/rules/initiative/epics.md": ("src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md"),
+        "spec-dock/docs/rules/epic/artifacts.md": ("src/spec_dock/assets/spec_dock/docs/rules/epic/artifacts.md"),
         "spec-dock/docs/rules/epic/discussions.md": ("src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md"),
         "spec-dock/docs/rules/epic/issues.md": ("src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md"),
+        "spec-dock/docs/rules/issue/artifacts.md": ("src/spec_dock/assets/spec_dock/docs/rules/issue/artifacts.md"),
         "spec-dock/docs/rules/issue/discussions.md": ("src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"),
     }
 
@@ -493,22 +498,29 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
     }
     _CANONICAL_RULES_EXPECTATIONS: ClassVar[dict[str, object]] = {
+        "docs/rules/initiative/artifacts.md": {
+            "contains": (
+                "# 成果物ルール（artifacts/rules.md）",
+                "このディレクトリには initiative に紐づく future working artifacts を置きます。",
+                "Legacy `discussions/` は preservation surface です。",
+                "`blank`: 型を先に決めない working evidence。",
+            ),
+            "absent": ("new doc note",),
+        },
         "docs/rules/initiative/discussions.md": {
             "contains": (
                 "# 議論ルール（discussions/rules.md）",
-                "このディレクトリには initiative に紐づく議論資料を置きます。",
+                "このディレクトリは initiative に紐づく legacy / historical discussion docs の preservation surface です。",
+                "新規 working artifacts は対象 scope の `artifacts/` direct child に作成します。",
                 "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
                 "リポジトリ root から実行してください",
-                "./spec-dock/scripts/spec-dock new doc adr --initiative <id> --title",
-                "./spec-dock/scripts/spec-dock new doc disc --initiative <id> --title",
-                "./spec-dock/scripts/spec-dock new doc research --initiative <id> --title",
-                "./spec-dock/scripts/spec-dock new doc interview --initiative <id> --title",
-                "./spec-dock/scripts/spec-dock new doc scratch --initiative <id> --title",
+                "./spec-dock/scripts/spec-dock new artifact <type> --initiative <id> --title",
+                "Historical creation command examples are intentionally omitted",
             ),
             "absent": (
                 "--epic <id>",
                 "--issue <id>",
-                "new doc note",
+                "new doc ",
             ),
         },
         "docs/rules/initiative/epics.md": {
@@ -525,22 +537,29 @@ class TestInitUpdate(CliRuntimeHarness):
                 "new doc adr",
             ),
         },
+        "docs/rules/epic/artifacts.md": {
+            "contains": (
+                "# 成果物ルール（artifacts/rules.md）",
+                "このディレクトリには epic に紐づく future working artifacts を置きます。",
+                "Legacy `discussions/` は preservation surface です。",
+                "`blank`: 型を先に決めない working evidence。",
+            ),
+            "absent": ("new doc note",),
+        },
         "docs/rules/epic/discussions.md": {
             "contains": (
                 "# 議論ルール（discussions/rules.md）",
-                "このディレクトリには epic に紐づく議論資料を置きます。",
+                "このディレクトリは epic に紐づく legacy / historical discussion docs の preservation surface です。",
+                "新規 working artifacts は対象 scope の `artifacts/` direct child に作成します。",
                 "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
                 "リポジトリ root から実行してください",
-                "./spec-dock/scripts/spec-dock new doc adr --epic <id> --title",
-                "./spec-dock/scripts/spec-dock new doc disc --epic <id> --title",
-                "./spec-dock/scripts/spec-dock new doc research --epic <id> --title",
-                "./spec-dock/scripts/spec-dock new doc interview --epic <id> --title",
-                "./spec-dock/scripts/spec-dock new doc scratch --epic <id> --title",
+                "./spec-dock/scripts/spec-dock new artifact <type> --epic <id> --title",
+                "Historical creation command examples are intentionally omitted",
             ),
             "absent": (
                 "--initiative <id>",
                 "--issue <id>",
-                "new doc note",
+                "new doc ",
             ),
         },
         "docs/rules/epic/issues.md": {
@@ -557,22 +576,29 @@ class TestInitUpdate(CliRuntimeHarness):
                 "new doc adr",
             ),
         },
+        "docs/rules/issue/artifacts.md": {
+            "contains": (
+                "# 成果物ルール（artifacts/rules.md）",
+                "このディレクトリには issue に紐づく future working artifacts を置きます。",
+                "Legacy `discussions/` は preservation surface です。",
+                "`blank`: 型を先に決めない working evidence。",
+            ),
+            "absent": ("new doc note",),
+        },
         "docs/rules/issue/discussions.md": {
             "contains": (
                 "# 議論ルール（discussions/rules.md）",
-                "このディレクトリには issue に紐づく議論資料を置きます。",
+                "このディレクトリは issue に紐づく legacy / historical discussion docs の preservation surface です。",
+                "新規 working artifacts は対象 scope の `artifacts/` direct child に作成します。",
                 "Discussion workflow: `spec-dock/docs/workflow_adr.md`",
                 "リポジトリ root から実行してください",
-                "./spec-dock/scripts/spec-dock new doc adr --issue <id> --title",
-                "./spec-dock/scripts/spec-dock new doc disc --issue <id> --title",
-                "./spec-dock/scripts/spec-dock new doc research --issue <id> --title",
-                "./spec-dock/scripts/spec-dock new doc interview --issue <id> --title",
-                "./spec-dock/scripts/spec-dock new doc scratch --issue <id> --title",
+                "./spec-dock/scripts/spec-dock new artifact <type> --issue <id> --title",
+                "Historical creation command examples are intentionally omitted",
             ),
             "absent": (
                 "--initiative <id>",
                 "--epic <id>",
-                "new doc note",
+                "new doc ",
             ),
         },
     }
@@ -1625,6 +1651,16 @@ class TestInitUpdate(CliRuntimeHarness):
                 content = re.sub(r"^\d+[.)]\s+", "", content)
             if content.startswith(("`", "./", "/", "[", "<")):
                 return
+            if (
+                "New working artifacts use `./spec-dock/scripts/spec-dock new artifact <type>" in content
+                and "target `artifacts/`" in content
+            ):
+                return
+            if content == (
+                "Historical creation command examples are intentionally omitted so this preservation surface "
+                "is not advertised as a runnable path."
+            ):
+                return
             if re.search(r"[ぁ-んァ-ヶ一-龠]", content):
                 return
 
@@ -1834,7 +1870,12 @@ class TestInitUpdate(CliRuntimeHarness):
             "report evidence destination",
             "Evidence Adoption Ledger fields",
         ):
-            assert field in text, f"{source}: missing scope-local discussion evidence field {field}"
+            assert field in text, f"{source}: missing delegated artifact evidence field {field}"
+        assert "artifacts/" in text, f"{source}: missing artifacts/ delegated draft output guidance"
+        assert "legacy `discussions/`" in text or "`discussions/` は legacy / preservation evidence" in text, (
+            f"{source}: missing legacy discussions historical evidence guidance"
+        )
+        assert "grandfathered evidence" in text, f"{source}: missing grandfathered evidence wording"
         for retired_heavy_field in (
             "manifest_hash",
             "permission_profile_name",
@@ -2364,9 +2405,9 @@ class TestInitUpdate(CliRuntimeHarness):
             "Workspace-write is not a hard path allow-list",
             "scope-local",
             "flat Markdown draft/analysis/report",
-            "initiative, epic, or issue `discussions/`",
+            "initiative, epic, or issue `artifacts/`",
             "create exactly one new",
-            "Existing discussion draft updates are out of scope",
+            "Existing artifact draft updates are out of scope",
             "post-run diff guard",
             "Never edit implementation files",
             "Do not promote phases",
@@ -2378,7 +2419,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "[sandbox_workspace_write]",
             "network_access = false",
             "lightweight",
-            "discussion draft provenance",
+            "artifact draft provenance",
             "Manual spec authoring remains valid",
             "fresh `spec-reviewer` pass remains required",
         ):
@@ -3129,7 +3170,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "具体テストケース一覧" in workflow_spec_authoring
             for fragment in (
                 "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
-                "Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `discussions/` 直下に置く flat Markdown draft / analysis / discussion-local report",
+                "Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `artifacts/` 直下に置く flat Markdown draft / analysis / artifact-local report",
                 "Sub-agent-created draft は最低限",
                 "`source_paths` と `intended_targets` は non-empty block list",
                 "inline scalar や `source_paths: []` / `intended_targets: []` は post-run diff guard で不合格",
@@ -3286,10 +3327,13 @@ class TestInitUpdate(CliRuntimeHarness):
             assert not (issue_templates_dir / "discussions" / "rules.md").exists()
 
             rules_dir = target / "spec-dock" / "docs" / "rules"
+            assert (rules_dir / "initiative" / "artifacts.md").is_file()
             assert (rules_dir / "initiative" / "discussions.md").is_file()
             assert (rules_dir / "initiative" / "epics.md").is_file()
+            assert (rules_dir / "epic" / "artifacts.md").is_file()
             assert (rules_dir / "epic" / "discussions.md").is_file()
             assert (rules_dir / "epic" / "issues.md").is_file()
+            assert (rules_dir / "issue" / "artifacts.md").is_file()
             assert (rules_dir / "issue" / "discussions.md").is_file()
 
             discussions_templates_dir = templates_dir / "discussions"
@@ -3442,8 +3486,8 @@ class TestInitUpdate(CliRuntimeHarness):
             assert (target / ".github" / "agents" / "orchestrator.agent.md").is_file()
 
             workflow_skill_text = (skills_root / "spec-dock-hub" / "SKILL.md").read_text(encoding="utf-8")
-            assert "`discussions/`" in workflow_skill_text
-            assert "./spec-dock/scripts/spec-dock new doc adr --issue" in workflow_skill_text
+            assert "`artifacts/`" in workflow_skill_text
+            assert "./spec-dock/scripts/spec-dock new artifact adr --issue" in workflow_skill_text
             assert "`spec-dock/docs/reference_deps.md`" in workflow_skill_text
             assert "`spec-dock/docs/reference_sync.md`" in workflow_skill_text
             assert "./spec-dock/scripts/spec-dock ..." in workflow_skill_text
@@ -3585,10 +3629,13 @@ class TestInitUpdate(CliRuntimeHarness):
 
             guidance_paths = [
                 "spec-dock/templates/README.md",
+                "spec-dock/docs/rules/initiative/artifacts.md",
                 "spec-dock/docs/rules/initiative/discussions.md",
                 "spec-dock/docs/rules/initiative/epics.md",
+                "spec-dock/docs/rules/epic/artifacts.md",
                 "spec-dock/docs/rules/epic/discussions.md",
                 "spec-dock/docs/rules/epic/issues.md",
+                "spec-dock/docs/rules/issue/artifacts.md",
                 "spec-dock/docs/rules/issue/discussions.md",
                 "spec-dock/docs/reference_naming.md",
                 "spec-dock/docs/workflow_adr.md",
@@ -3679,10 +3726,13 @@ class TestInitUpdate(CliRuntimeHarness):
 
             guidance_paths = [
                 "spec-dock/templates/README.md",
+                "spec-dock/docs/rules/initiative/artifacts.md",
                 "spec-dock/docs/rules/initiative/discussions.md",
                 "spec-dock/docs/rules/initiative/epics.md",
+                "spec-dock/docs/rules/epic/artifacts.md",
                 "spec-dock/docs/rules/epic/discussions.md",
                 "spec-dock/docs/rules/epic/issues.md",
+                "spec-dock/docs/rules/issue/artifacts.md",
                 "spec-dock/docs/rules/issue/discussions.md",
                 "spec-dock/docs/reference_naming.md",
                 "spec-dock/docs/workflow_adr.md",
@@ -3760,10 +3810,13 @@ class TestInitUpdate(CliRuntimeHarness):
         repo_root = Path(__file__).resolve().parents[3]
         guidance_paths = [
             "src/spec_dock/assets/spec_dock/templates/README.md",
+            "src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md",
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md",
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md",
+            "src/spec_dock/assets/spec_dock/docs/rules/epic/artifacts.md",
             "src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md",
             "src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md",
+            "src/spec_dock/assets/spec_dock/docs/rules/issue/artifacts.md",
             "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md",
             "src/spec_dock/assets/spec_dock/docs/reference_naming.md",
             "src/spec_dock/assets/spec_dock/docs/workflow_adr.md",
@@ -4609,7 +4662,7 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "三者最終品質ゲート（final quality gate）" in phase_plan_issue
         assert "delegated plan draft" in phase_plan_issue
         assert "phase gate preservation" in phase_plan_issue
-        assert "scope-local discussion direct-write consent" in phase_plan_issue
+        assert "scope-local artifact direct-write consent" in phase_plan_issue
         assert "forbidden canonical/implementation paths" in phase_plan_issue
         assert "post-run diff guard" in phase_plan_issue
         assert "adoption-ineligible" in phase_plan_issue
@@ -4633,7 +4686,7 @@ class TestInitUpdate(CliRuntimeHarness):
         )
         assert "delegated plan draft" in phase_plan_epic
         assert "fresh requirement/design reviewer pass" in phase_plan_epic
-        assert "scope-local discussion direct-write consent" in phase_plan_epic
+        assert "scope-local artifact direct-write consent" in phase_plan_epic
         assert "forbidden canonical/implementation paths" in phase_plan_epic
         assert "post-run diff guard" in phase_plan_epic
         assert "adoption-ineligible" in phase_plan_epic
@@ -5126,6 +5179,7 @@ with tempfile.TemporaryDirectory() as td:
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
     rules_dir = specdock_dir / "docs" / "rules" / "issue"
     rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "artifacts.md").write_text("# issue artifacts\\n", encoding="utf-8")
     (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
@@ -5405,6 +5459,7 @@ with tempfile.TemporaryDirectory() as td:
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
     rules_dir = specdock_dir / "docs" / "rules" / "issue"
     rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "artifacts.md").write_text("# issue artifacts\\n", encoding="utf-8")
     (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
@@ -5650,6 +5705,7 @@ with tempfile.TemporaryDirectory() as td:
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
     rules_dir = specdock_dir / "docs" / "rules" / "issue"
     rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "artifacts.md").write_text("# issue artifacts\\n", encoding="utf-8")
     (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
@@ -5908,6 +5964,7 @@ with tempfile.TemporaryDirectory() as td:
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
     rules_dir = specdock_dir / "docs" / "rules" / "issue"
     rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "artifacts.md").write_text("# issue artifacts\\n", encoding="utf-8")
     (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
@@ -6156,6 +6213,7 @@ with tempfile.TemporaryDirectory() as td:
         (issue_template_dir / filename).write_text(f"template:{{filename}}\\n", encoding="utf-8")
     rules_dir = specdock_dir / "docs" / "rules" / "issue"
     rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "artifacts.md").write_text("# issue artifacts\\n", encoding="utf-8")
     (rules_dir / "discussions.md").write_text("# issue discussions\\n", encoding="utf-8")
 
     records = [
@@ -6902,10 +6960,13 @@ def _prepare_templates(specdock_dir):
         (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
     rules_root = specdock_dir / "docs" / "rules"
     for scope, filename in (
+        ("initiative", "artifacts.md"),
         ("initiative", "epics.md"),
         ("initiative", "discussions.md"),
+        ("epic", "artifacts.md"),
         ("epic", "issues.md"),
         ("epic", "discussions.md"),
+        ("issue", "artifacts.md"),
         ("issue", "discussions.md"),
     ):
         rules_path = rules_root / scope / filename
@@ -7790,10 +7851,13 @@ def _prepare_templates(specdock_dir):
         (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
     rules_root = specdock_dir / "docs" / "rules"
     for scope, filename in (
+        ("initiative", "artifacts.md"),
         ("initiative", "epics.md"),
         ("initiative", "discussions.md"),
+        ("epic", "artifacts.md"),
         ("epic", "issues.md"),
         ("epic", "discussions.md"),
+        ("issue", "artifacts.md"),
         ("issue", "discussions.md"),
     ):
         rules_path = rules_root / scope / filename
@@ -8016,10 +8080,13 @@ def _prepare_templates(specdock_dir):
         (template_root / "docs" / "checklist.md").write_text("owner=<YOUR_NAME> YYYY-MM-DD\\n", encoding="utf-8")
     rules_root = specdock_dir / "docs" / "rules"
     for scope, filename in (
+        ("initiative", "artifacts.md"),
         ("initiative", "epics.md"),
         ("initiative", "discussions.md"),
+        ("epic", "artifacts.md"),
         ("epic", "issues.md"),
         ("epic", "discussions.md"),
+        ("issue", "artifacts.md"),
         ("issue", "discussions.md"),
     ):
         rules_path = rules_root / scope / filename
@@ -10150,7 +10217,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "needs orchestrator decision",
                 "No material implementation decisions beyond the approved plan.",
                 "durable decision",
-                "scope-local discussion direct-write step",
+                "scope-local artifact direct-write step",
                 "diff guard result",
                 "lightweight provenance",
                 "最低 fields は `created_by_role`",
@@ -10521,7 +10588,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "issue discussions rules": (
                 "Canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
                 "`report.md` は canonical observed evidence ledger",
-                "`new doc report` として作成する discussion catalog には含めません",
+                "legacy discussion-local report artifact catalog には含めません",
             ),
             "workflow authoring": (
                 "workflow_clarification.md",
@@ -10584,8 +10651,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "`scratch` / `interview` / `research` / `disc` / `adr` / `pr-repair-batch`",
             ),
             "scripts readme": (
-                "`scratch` / `interview` / `research` / `disc` / `adr` / `pr-repair-batch`",
-                './spec-dock/scripts/spec-dock new doc pr-repair-batch --issue iss-00123 --title "PR Repair Batch"',
+                "current catalog: `blank` / `interview` / `research` / `disc` / `decision-candidate` / `adr` / `pr-repair-batch`",
+                './spec-dock/scripts/spec-dock new artifact pr-repair-batch --issue iss-00123 --title "PR Repair Batch"',
+                "typed artifact のファイル名 contract は `<ts>-<type>-<slug>.md`",
             ),
         }
 
@@ -10612,12 +10680,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "phase design docs": (
                 "## 委任 design authoring ゲート（delegated design authoring gate）",
                 "fresh requirement reviewer pass",
-                "read-only specialist consent と scope-local discussion direct-write consent は分離",
+                "read-only specialist consent と scope-local artifact direct-write consent は分離",
                 "guarded workspace-write",
                 "workspace-write は hard path allow-list ではなく canonical target write の許可でもない",
                 "proposal-only ではありません",
                 "scope-local",
-                "discussions/` 直下",
+                "artifacts/` 直下",
                 "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
                 "main orchestrator",
                 "single-writer authority",
@@ -10647,12 +10715,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "fresh requirement reviewer pass",
                 "fresh design reviewer pass",
                 "design dependency analysis",
-                "read-only specialist consent と scope-local discussion direct-write consent は分離",
+                "read-only specialist consent と scope-local artifact direct-write consent は分離",
                 "guarded workspace-write",
                 "workspace-write は hard path allow-list ではなく canonical target write の許可でもない",
                 "proposal-only ではありません",
                 "scope-local",
-                "discussions/` 直下",
+                "artifacts/` 直下",
                 "canonical `requirement.md` / `design.md` / `plan.md` / `report.md`",
                 "main orchestrator",
                 "single-writer authority",
@@ -10679,10 +10747,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             ),
             "phase epic plan docs": (
                 "delegated plan draft",
-                "read-only specialist consent と scope-local discussion direct-write consent が分離",
+                "read-only specialist consent と scope-local artifact direct-write consent が分離",
                 "guarded workspace-write",
                 "hard path allow-list",
-                "target scope `discussions/` direct child",
+                "target scope `artifacts/` direct child",
                 "stale / superseded handling",
                 "phase gate preservation",
                 "final authority",
@@ -10692,10 +10760,10 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             ),
             "phase issue plan docs": (
                 "delegated plan draft",
-                "read-only specialist consent と scope-local discussion direct-write consent が分離",
+                "read-only specialist consent と scope-local artifact direct-write consent が分離",
                 "guarded workspace-write",
                 "hard path allow-list",
-                "target scope `discussions/` direct child",
+                "target scope `artifacts/` direct child",
                 "stale / superseded handling",
                 "phase gate preservation",
                 "step reviewer gate",
@@ -10796,11 +10864,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         assert "`spec-dock-clarification`: first-class docs-aware clarification companion" in hub_text
         assert (
-            "`system-architect` agent role: delegated architecture analysis and draft design evidence created through `./spec-dock/scripts/spec-dock new doc ...` and written to the returned scope-local discussion path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/system-architect.toml`, not in a skill."
+            "`system-architect` agent role: delegated architecture analysis and draft design evidence created through `./spec-dock/scripts/spec-dock new artifact ...` and written to the returned scope-local `artifacts/` path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/system-architect.toml`, not in a skill."
             in hub_text
         )
         assert (
-            "`implementation-planner` agent role: delegated planning analysis and draft plan evidence created through `./spec-dock/scripts/spec-dock new doc ...` and written to the returned scope-local discussion path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/implementation-planner.toml`, not in a skill."
+            "`implementation-planner` agent role: delegated planning analysis and draft plan evidence created through `./spec-dock/scripts/spec-dock new artifact ...` and written to the returned scope-local `artifacts/` path. Canonical docs remain main-orchestrator-only. Role behavior is encapsulated in `.codex/agents/implementation-planner.toml`, not in a skill."
             in hub_text
         )
         assert (

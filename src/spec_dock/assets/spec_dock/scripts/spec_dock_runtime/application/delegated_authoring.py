@@ -131,7 +131,7 @@ def run_delegated_authoring_diff_guard(
                 details=("baseline_head=unborn", f"current_head={current_head}"),
             )
         baseline_path = _repo_path(baseline_status_path, req.repo_root)
-        baseline_errors = _dirty_discussion_baseline_errors(
+        baseline_errors = _dirty_artifact_baseline_errors(
             baseline.entries,
             repo_root=req.repo_root,
             scope_dir=scope_dir,
@@ -141,7 +141,7 @@ def run_delegated_authoring_diff_guard(
             return domain.DiffGuardResult(
                 ok=False,
                 status="blocked",
-                reason="dirty_baseline_discussion",
+                reason="dirty_baseline_artifact",
                 scope_id=req.scope_id,
                 details=tuple(baseline_errors),
             )
@@ -745,32 +745,32 @@ def _git_head_text(repo_root: Path, rel_path: Path) -> _GitHeadTextResult:
     try:
         return _GitHeadTextResult(text=result.stdout.decode("utf-8"))
     except UnicodeDecodeError:
-        return _GitHeadTextResult(error="existing_discussion_head_non_utf8")
+        return _GitHeadTextResult(error="existing_artifact_head_non_utf8")
 
 
 def _is_update_status(status: str) -> bool:
     return len(status) == 2 and (status[0] in ("M", "T") or status[1] in ("M", "T"))
 
 
-def _dirty_discussion_baseline_errors(
+def _dirty_artifact_baseline_errors(
     entries: tuple[domain.DiffGuardEntry, ...],
     *,
     repo_root: Path,
     scope_dir: Path,
     baseline_path: Path,
 ) -> list[str]:
-    discussions_dir = scope_dir / "discussions"
+    artifacts_dir = scope_dir / "artifacts"
     errors: list[str] = []
     for entry in entries:
         rel_path = _repo_path(entry.path, repo_root)
         if rel_path == baseline_path:
             continue
         try:
-            (repo_root / rel_path).relative_to(discussions_dir)
+            (repo_root / rel_path).relative_to(artifacts_dir)
         except ValueError:
             continue
         else:
-            errors.append(f"blocked path={rel_path.as_posix()} reason=dirty_baseline_discussion")
+            errors.append(f"blocked path={rel_path.as_posix()} reason=dirty_baseline_artifact")
     return errors
 
 

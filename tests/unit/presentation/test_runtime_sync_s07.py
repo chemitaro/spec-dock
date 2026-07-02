@@ -395,6 +395,40 @@ class TestRuntimeSyncS07:
             ],
         )
 
+    def _write_valid_artifact_adr_doc(
+        self,
+        scope_dir: Path,
+        filename: str,
+        *,
+        doc_id: str,
+        scope_id: str,
+        authority: str = "draft",
+        mirror_eligible: bool = False,
+    ) -> Path:
+        artifacts_dir = scope_dir / "artifacts"
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+        path = artifacts_dir / filename
+        path.write_text(
+            "\n".join([
+                "---",
+                "種別: ADR（Architecture Decision Record）",
+                f'ID: "{doc_id}"',
+                'タイトル: "ADR"',
+                f'状態: "{authority}"',
+                '作成者: "Tester"',
+                '最終更新: "2026-03-29"',
+                f'親: ["{scope_id}"]',
+                f'authority: "{authority}"',
+                f"mirror_eligible: {str(mirror_eligible).lower()}",
+                "---",
+                "",
+                f"# {filename}",
+                "",
+            ]),
+            encoding="utf-8",
+        )
+        return path
+
     def _expected_sync_artifact_relpaths(self) -> set[str]:
         return {
             ".agent/index-all.json",
@@ -445,6 +479,26 @@ class TestRuntimeSyncS07:
                 "20260312t010205z-01-adr-issue-decision.md",
                 doc_id="20260312t010205z-01-adr",
                 scope_id="iss-local-00001",
+            )
+            draft_artifact_doc = self._write_valid_artifact_adr_doc(
+                issue_db_dir,
+                "20260312t010211z-adr-draft-artifact-decision.md",
+                doc_id="20260312t010211z-adr",
+                scope_id="iss-local-00002",
+            )
+            artifact_doc = self._write_valid_artifact_adr_doc(
+                issue_db_dir,
+                "20260312t010213z-adr-accepted-artifact-decision.md",
+                doc_id="20260312t010213z-adr",
+                scope_id="iss-local-00002",
+                authority="accepted",
+                mirror_eligible=True,
+            )
+            self._write_valid_artifact_adr_doc(
+                issue_db_dir,
+                "20260312t010212z-disc-artifact-discussion.md",
+                doc_id="20260312t010212z-disc",
+                scope_id="iss-local-00002",
             )
             self._write_valid_adr_doc(
                 initiative_dir,
@@ -521,11 +575,13 @@ class TestRuntimeSyncS07:
             state = app_sync_state.collect_sync_state(self._request(app_contracts), ports)
             sources = app_sync_state._collect_adr_mirror_sources(state.graph)
 
-            assert {source.source_path for source in sources} == {initiative_doc, epic_doc, issue_doc}
+            assert {source.source_path for source in sources} == {initiative_doc, epic_doc, issue_doc, artifact_doc}
+            assert draft_artifact_doc not in {source.source_path for source in sources}
             assert {source.basename for source in sources} == {
                 "20260312t010203z-adr-init-decision.md",
                 "20260312t010204z-adr-epic-decision.md",
                 "20260312t010205z-01-adr-issue-decision.md",
+                "20260312t010213z-adr-accepted-artifact-decision.md",
             }
 
     def test_sync_fails_before_write_on_adr_mirror_basename_collision_and_preserves_adrs(self) -> None:
@@ -553,11 +609,13 @@ class TestRuntimeSyncS07:
                 doc_id="20260312t010203z-adr",
                 scope_id="init-local-00001",
             )
-            self._write_valid_adr_doc(
+            self._write_valid_artifact_adr_doc(
                 issue_api_dir,
                 basename,
                 doc_id="20260312t010203z-adr",
                 scope_id="iss-local-00001",
+                authority="accepted",
+                mirror_eligible=True,
             )
             adrs_dir = specdock_dir / "adrs"
             adrs_dir.mkdir(parents=True, exist_ok=True)
@@ -597,6 +655,106 @@ class TestRuntimeSyncS07:
             assert "failed (sync)" in rendered.stderr_lines[0]
             assert "ADR mirror basename collision" in rendered.stderr_lines[0]
 
+    def test_sync_rejects_symlinked_artifacts_dir_before_adr_collection(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            issue_api_dir = Path(records[2].path)
+            external_artifacts = repo_root / "external-artifacts"
+            external_artifacts.mkdir()
+            artifacts_dir = issue_api_dir / "artifacts"
+            artifacts_dir.symlink_to(external_artifacts)
+            spy_writer = _SpyArtifactWriter()
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=spy_writer,
+                clock=_StubClock(),
+            )
+
+            with pytest.raises(RuntimeError, match=r"Unsafe artifact directory: .* is a symlink"):
+                app_sync_state.sync(self._request(app_contracts, force=True), ports)
+            assert not spy_writer.called
+
+    def test_sync_rejects_symlinked_artifact_file_before_adr_collection(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            issue_api_dir = Path(records[2].path)
+            external_doc = repo_root / "external-adr.md"
+            external_doc.write_text(
+                "\n".join([
+                    "---",
+                    "種別: ADR（Architecture Decision Record）",
+                    'ID: "20260312t010206z-adr"',
+                    'タイトル: "External ADR"',
+                    '状態: "accepted"',
+                    '作成者: "Tester"',
+                    '最終更新: "2026-03-29"',
+                    '親: ["iss-local-00001"]',
+                    'authority: "accepted"',
+                    "mirror_eligible: true",
+                    "---",
+                    "",
+                ]),
+                encoding="utf-8",
+            )
+            artifacts_dir = issue_api_dir / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            artifact_link = artifacts_dir / "20260312t010206z-adr-external-decision.md"
+            artifact_link.symlink_to(external_doc)
+            spy_writer = _SpyArtifactWriter()
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                artifact_writer=spy_writer,
+                clock=_StubClock(),
+            )
+
+            with pytest.raises(RuntimeError, match=r"Unsafe artifact file: .* is a symlink"):
+                app_sync_state.sync(self._request(app_contracts, force=True), ports)
+            assert not spy_writer.called
+
     def test_sync_builds_flat_adr_mirror_symlinks_on_success(self) -> None:
         (
             _runtime_app,
@@ -627,6 +785,14 @@ class TestRuntimeSyncS07:
                 doc_id="20260312t010205z-01-adr",
                 scope_id="iss-local-00001",
             )
+            artifact_doc = self._write_valid_artifact_adr_doc(
+                issue_api_dir,
+                "20260312t010206z-adr-artifact-decision.md",
+                doc_id="20260312t010206z-adr",
+                scope_id="iss-local-00001",
+                authority="accepted",
+                mirror_eligible=True,
+            )
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
                 repo_root=repo_root,
@@ -647,13 +813,18 @@ class TestRuntimeSyncS07:
             assert result.artifact_failure is None
             adrs_dir = specdock_dir / "adrs"
             assert adrs_dir.is_dir()
-            assert sorted(path.name for path in adrs_dir.iterdir()) == [initiative_doc.name, issue_doc.name]
-            for source in (initiative_doc, issue_doc):
+            assert sorted(path.name for path in adrs_dir.iterdir()) == [
+                initiative_doc.name,
+                issue_doc.name,
+                artifact_doc.name,
+            ]
+            for source in (initiative_doc, issue_doc, artifact_doc):
                 link_path = adrs_dir / source.name
                 assert link_path.is_symlink(), f"missing ADR mirror symlink: {link_path}"
                 link_target = str(link_path.readlink())
                 assert not link_target.startswith("/"), link_target
                 assert link_path.resolve() == source.resolve()
+                assert source.is_file()
 
     def test_sync_warns_and_succeeds_with_empty_adrs_when_symlinks_are_unsupported(self) -> None:
         (
@@ -1490,6 +1661,10 @@ class TestRuntimeSyncS07:
             specdock_dir = repo_root / "spec-dock"
             specdock_dir.mkdir(parents=True, exist_ok=True)
             records = self._records(infra_contracts, repo_root)
+            issue_api_dir = Path(records[2].path)
+            issue_db_dir = Path(records[3].path)
+            (issue_api_dir / "artifacts").mkdir(parents=True, exist_ok=True)
+            (issue_db_dir / "discussions").mkdir(parents=True, exist_ok=True)
             events: list[str] = []
             ports = app_ports.Ports(
                 node_reader=_StubNodeReader(records),
@@ -1529,6 +1704,33 @@ class TestRuntimeSyncS07:
             assert "iss-local-00001" in index_todo["nodes"]
             assert "iss-local-00002" not in index_todo["nodes"]
             assert "iss-local-00002" in index_all["nodes"]
+            issue_api_surfaces = index_all["nodes"]["iss-local-00001"]["document_surfaces"]
+            issue_db_surfaces = index_all["nodes"]["iss-local-00002"]["document_surfaces"]
+            assert issue_api_surfaces["future_artifacts"] == {
+                "path": (
+                    "spec-dock/initiatives/init-local-00001-auth/epics/"
+                    "epic-local-00001-core/issues/iss-local-00001-api/artifacts"
+                ),
+                "present": True,
+            }
+            assert issue_api_surfaces["legacy_discussions"] == {
+                "path": (
+                    "spec-dock/initiatives/init-local-00001-auth/epics/"
+                    "epic-local-00001-core/issues/iss-local-00001-api/discussions"
+                ),
+                "present": False,
+            }
+            assert issue_db_surfaces["future_artifacts"]["present"] is False
+            assert issue_db_surfaces["legacy_discussions"]["present"] is True
+            assert [doc["kind"] for doc in issue_api_surfaces["canonical_docs"]] == [
+                "requirement",
+                "design",
+                "plan",
+                "report",
+            ]
+            assert all("/artifacts" not in doc["path"] for doc in issue_api_surfaces["canonical_docs"])
+            assert "depends_on" not in index_todo["nodes"]["iss-local-00001"]
+            assert index_all["nodes"]["iss-local-00001"]["depends_on"] == ["iss-local-00002"]
             assert "@startuml" in deps_raw_puml
             assert "iss-local-00001" not in deps_raw_puml
             assert "iss-local-00002" not in deps_raw_puml
@@ -3521,7 +3723,7 @@ class TestRuntimeSyncS07:
                 create_initiative=lambda req: None,  # type: ignore[return-value]
                 create_epic=lambda req: None,  # type: ignore[return-value]
                 create_issue=lambda req: None,  # type: ignore[return-value]
-                create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+                create_artifact_doc=lambda req: None,  # type: ignore[return-value]
                 import_initiative=lambda req: None,  # type: ignore[return-value]
                 import_epic=lambda req: None,  # type: ignore[return-value]
                 import_issue=lambda req: None,  # type: ignore[return-value]

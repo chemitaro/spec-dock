@@ -33,15 +33,15 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     parser = _RuntimeArgumentParser(prog="spec-dock/scripts/spec-dock")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_new = sub.add_parser("new", help="Create a new node (initiative/epic/issue/doc)")
+    p_new = sub.add_parser("new", help="Create a new node or artifact (initiative/epic/issue/artifact)")
     new_sub = p_new.add_subparsers(dest="new_kind", required=True)
     _bind_leaf(new_sub.add_parser("initiative", help="Create a new initiative"), registry, "new_initiative")
     _bind_leaf(new_sub.add_parser("epic", help="Create a new epic under an initiative"), registry, "new_epic")
     _bind_leaf(new_sub.add_parser("issue", help="Create a new issue under an epic"), registry, "new_issue")
     _bind_leaf(
-        new_sub.add_parser("doc", help="Create a discussion doc under a scope (initiative/epic/issue)"),
+        new_sub.add_parser("artifact", help="Create an artifact under a scope (initiative/epic/issue)"),
         registry,
-        "new_doc",
+        "new_artifact",
     )
 
     p_active = sub.add_parser("active", help="Manage the active pointers")
