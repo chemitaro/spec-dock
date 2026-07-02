@@ -13,51 +13,73 @@ ID: "iss-00273"
 # iss-00273 Scope-layering reference と planning guidance 更新 — レポート
 
 ## 進捗サマリー
-- Issue scaffold を作成した。
-- 正規 `requirement.md` を作成した。
-- 旧 canonical `design.md` / `plan.md` に置かれていた pre-start draft body は、Issue-local `draft-design` / `draft-plan` artifact へ移した。
-- Canonical `design.md` / `plan.md` は `awaiting-assurance-compose` placeholder に戻した。
-- 実装、テスト、Issue完了、PR作成は未実施。
+- Issue scaffold と正規 `requirement.md` は作成済み。
+- `assurance classify --stage requirement` は `authorized_profile: standard` を返した。
+- `assurance compose --artifact all` を実行し、その後 `design.md` / `plan.md` を Issue 固有の正規文書へ更新した。
+- Issue requirement / Epic plan は `strict` 相当の specialist evidence を要求するため、system-architect draft と implementation-planner draft を取得した。
+- 実装、最終検証、Issue完了、PR作成は未実施。
 
 ## 仕様解釈・判断台帳
 | ID | 状態 | 種別 | 判断 / 解釈 | 根拠 | 処置 | フォローアップ |
 |---|---|---|---|---|---|---|
-| D-273-001 | resolved | scope | この Issue の正本は `requirement.md` であり、`design.md` / `plan.md` は実行時に正規化する先行ドラフトである。 | ユーザー指示、Issue Planning workflow | applied | `issue start` 後に `iss-00271` / `iss-00272` の結果を取り込み、正規設計・正規計画へ更新する。 |
-| D-273-002 | resolved | operation | この Issue では PR を作成せず、完了後に `issue finish` で `iss-00274` へバトンを渡す。 | Epic plan の1PR delivery方針、dependency chain | applied | final PR delivery は `iss-00276` が扱う。 |
+| D-273-001 | resolved | scope | `scope-layering.md` は狭い operational reference とし、workflow docs / phase docs / skills / templates は thin link に留める。 | Issue requirement, Epic D-001, system-architect draft | promoted_to_design | `design.md` の authority model と変更対象へ反映した。 |
+| D-273-002 | resolved | operation | この Issue では PR を作成せず、完了後に `issue finish` で `iss-00274` へバトンを渡す。 | Epic plan の 1PR delivery 方針 | promoted_to_plan | `plan.md` の S99 に反映した。 |
+| D-273-003 | resolved | grade | runtime authorized profile は `standard` だが、Issue requirement と Epic plan の `strict` obligation に合わせて specialist evidence と final reviewer gates を維持する。 | `assurance classify`, Issue requirement | applied | Grade Specialist Evidence Gate に記録した。 |
 
-## 証跡採用台帳
+## Evidence Adoption Ledger（証跡採用台帳）
 | ID | 採用状態 | 出所 | 対象 | 判断理由 | 証跡 | 次アクション |
 |---|---|---|---|---|---|---|
-| EAL-273-001 | adopted | `epic-00270` canonical docs | `requirement.md` / `design.md` / `plan.md` | Epic の Slice 03 handoff を Issue 要件と pre-start seed へ落とした。要件は正本として採用し、design / plan seed は evidence-only artifact として保持する。 | `epic-00270/requirement.md`, `epic-00270/design.md`, `epic-00270/plan.md` | Issue開始時に前段テンプレート結果を反映する。 |
-| EAL-273-002 | adopted | accepted ADR | `requirement.md` | scope-layering reference は1つの provider-side reference と thin links で扱う方針を採用した。 | `artifacts/20260702t022907z-adr-scope-layering-reference-publication-surface.md` | 実装時に reference と link 範囲を正規化する。 |
-| EAL-273-003 | adopted | Epic EAL-023 / local validation commands | `report.md` | Batch planning artifact の検証は Epic-level evidence として記録済みであり、この Issue では実装検証とは分けて参照する。 | `./spec-dock/scripts/spec-dock validate` -> pass (`nodes=178`); `deps check epic-00270` / `deps check iss-00276` -> expected blocked | Issue固有の実装検証は `issue start` 後に行う。 |
-| EAL-00273-DESIGN | deferred | migrated pre-start canonical body | `artifacts/20260702t081004z-draft-design-scope-layering-planning-guidance-pre-start-seed.md` | 旧 canonical `design.md` body は pre-start handoff seed として有用だが canonical authority ではないため、Issue-local draft artifact へ移した。採用可否は Issue Start 後の EAL で判断する。 | old `design.md` before placeholder restore | Issue Start 後に採用 / 部分採用 / 棄却を判断する。 |
-| EAL-00273-PLAN | deferred | migrated pre-start canonical body | `artifacts/20260702t081005z-draft-plan-scope-layering-planning-guidance-pre-start-seed.md` | 旧 canonical `plan.md` body は pre-start handoff seed として有用だが executable canonical plan ではないため、Issue-local draft artifact へ移した。採用可否は Issue Start 後の EAL で判断する。 | old `plan.md` before placeholder restore | Issue Start 後に採用 / 部分採用 / 棄却を判断する。 |
+| EAL-273-001 | adopted | `epic-00270` canonical docs | `requirement.md` / `design.md` / `plan.md` | Slice 03 handoff と accepted ADR を Issue 要件・設計・計画へ落とす。 | `epic-00270/requirement.md`, `epic-00270/design.md`, `epic-00270/plan.md` | 実装で reference / link / skills を更新する。 |
+| EAL-273-002 | adopted | accepted ADR | `design.md` | scope-layering reference は single provider-side reference と thin links で扱う。 | `artifacts/20260702t022907z-adr-scope-layering-reference-publication-surface.md` | S02-S06 で実装する。 |
+| EAL-273-003 | adopted | `iss-00271` / `iss-00272` completion evidence | `design.md` / `plan.md` | Initiative / Epic templates の接続点と日本語ファースト / authority 語彙を前提にする。 | commit `10e17424`, commit `0a959794`, `deps check iss-00273` -> ready | S06 で final thin links を接続する。 |
+| EAL-273-DESIGN-SEED | partially_adopted | migrated pre-start canonical body | `design.md` | target surfaces、scope-layering 方針、検証観点を採用した。正本設計は現物調査と system-architect draft で再構成した。 | `artifacts/20260702t081004z-draft-design-scope-layering-planning-guidance-pre-start-seed.md` | Fresh `spec-reviewer` で正本設計を確認する。 |
+| EAL-273-PLAN-SEED | partially_adopted | migrated pre-start canonical body | `plan.md` | 実行順、バトン、検証候補を採用した。正本計画は implementation-planner draft で具体化した。 | `artifacts/20260702t081005z-draft-plan-scope-layering-planning-guidance-pre-start-seed.md` | Fresh `spec-reviewer` で正本計画を確認する。 |
+| EAL-273-DESIGN-DRAFT | adopted | system-architect draft | `design.md` | authority model、AC/EC mapping、target surfaces、risk/test strategy を採用した。draft 自体は evidence-only とする。 | `artifacts/20260702t101615z-draft-design-draft-design-scope-layering-guidance-system-architect.md` | Fresh `spec-reviewer` で正本設計を確認する。 |
+| EAL-273-PLAN-DRAFT | adopted | implementation-planner draft | `plan.md` | step order、closure index、verification ladder、review gates を採用した。draft 自体は evidence-only とする。 | `artifacts/20260702t101719z-draft-plan-scope-layering-guidance-implementation-planner.md` | Fresh `spec-reviewer` で正本計画を確認する。 |
+| EAL-273-ASSURANCE | adopted | assurance commands | `design.md` / `plan.md` / `report.md` | runtime assurance は `authorized_profile: standard` と判定し、compose を実行した。Issue requirement 上の strict obligation は追加 gate として維持する。 | `assurance classify --stage requirement`, `assurance compose --artifact all` | `assurance verify` と reviewer gate を通す。 |
 
-## 仕様 authoring ゲート
-| フェーズ | 状態 | 採用判断 | レビュアー判定 | ブロック有無 | 次アクション |
-|---|---|---|---|---|---|
-| requirement | 作成済み | Epic handoff から採用 | Pascal の batch pass は historical evidence。current post-ADR requirement は fresh spec-review 対象。 | no | current planning set の fresh spec-review 後、Issue開始時に再確認する。 |
-| design | placeholder restored | Issue-local draft artifact を evidence として保持し、正規設計は未合成 | Pascal の batch pass は historical evidence。current placeholder / draft artifact boundary は fresh spec-review 対象。 | no | `issue start` 後に artifact 採否を判断し、assurance compose と fresh reviewer gate を通す。 |
-| plan | placeholder restored | Issue-local draft artifact を evidence として保持し、正規計画は未合成 | Pascal の batch pass は historical evidence。current placeholder / draft artifact boundary は fresh spec-review 対象。 | no | `issue start` 後に artifact 採否を判断し、assurance compose と fresh reviewer gate を通す。 |
+## Spec Authoring Gate
+| phase | investigated_facts | open_questions | adoption_decision | reviewer_verdict | blocking | promotion_decision |
+|---|---|---|---|---|---|---|
+| requirement | Epic handoff、accepted ADR、pre-start seed を確認した。 | none | adopted | pass | no | execute approved plan |
+| design | system-architect draft、pre-start seed、現物 docs / skills / templates を確認した。 | none | adopted | pass | no | execute approved plan |
+| plan | implementation-planner draft、pre-start seed、実行順と検証梯子を確認した。 | none | adopted | pass | no | execute approved plan |
 
 ## Grade Specialist Evidence Gate
-- issue grade: `strict`
-- draft-design artifact: `artifacts/20260702t081004z-draft-design-scope-layering-planning-guidance-pre-start-seed.md`
-- draft-plan artifact: `artifacts/20260702t081005z-draft-plan-scope-layering-planning-guidance-pre-start-seed.md`
-- specialist obligation: system-architect / implementation-planner または manual fallback evidence が必要
-- 現在状態: migration artifact は存在するが、specialist enrichment / manual fallback evidence は Issue Start まで未実施である。
-- readiness への影響: draft artifact が存在するだけでは、この Issue は execution-ready にならない。
+| Grade | required specialist / fallback | usage | evidence | fresh spec-reviewer verdict | execution readiness |
+|---|---|---|---|---|---|
+| standard | system-architect / implementation-planner | used | `artifacts/20260702t101615z-draft-design-draft-design-scope-layering-guidance-system-architect.md`; `artifacts/20260702t101719z-draft-plan-scope-layering-guidance-implementation-planner.md`; canonical `design.md` / `plan.md` に採用判断を反映 | pass | ready |
+| strict | system-architect / implementation-planner | used | `artifacts/20260702t101615z-draft-design-draft-design-scope-layering-guidance-system-architect.md`; `artifacts/20260702t101719z-draft-plan-scope-layering-guidance-implementation-planner.md`; canonical `design.md` / `plan.md` に採用判断を反映 | pass | ready |
+
+## Delegated Draft Evidence（委任ドラフト証跡）
+| created_by_role | scope_id | artifact_path | source_paths | intended_targets | adoption_status | reflected_to | diff_guard_result | integration_result | fallback_decision | blockers | reviewer_result | promotion_decision |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| system-architect | iss-00273 | `artifacts/20260702t101615z-draft-design-draft-design-scope-layering-guidance-system-architect.md` | active issue docs; parent epic docs; predecessor issues; provider docs / skills / templates | `design.md` | source input evidence only（adopted） | `design.md` | passed | source input integrated into canonical `design.md`; draft itself is evidence-only | none | none | canonical artifact fresh reviewer gate（pass）; canonical docs hold authority | execute approved plan via canonical artifact; draft remains evidence-only |
+| implementation-planner | iss-00273 | `artifacts/20260702t101719z-draft-plan-scope-layering-guidance-implementation-planner.md` | active issue docs; parent epic docs; predecessor issues; provider docs / skills / templates; tests | `plan.md` | source input evidence only（adopted） | `plan.md` | passed | source input integrated into canonical `plan.md`; draft itself is evidence-only | none | none | canonical artifact fresh reviewer gate（pass）; canonical docs hold authority | execute approved plan via canonical artifact; draft remains evidence-only |
+| migrated pre-start seed | iss-00273 | `artifacts/20260702t081004z-draft-design-scope-layering-planning-guidance-pre-start-seed.md` | pre-start canonical body | `design.md` | historical input only（partially_adopted） | `design.md` | passed by manual reconciliation | seed input integrated where still current; seed itself is evidence-only | none | none | canonical artifact fresh reviewer gate（pass）; canonical docs hold authority | execute approved plan via canonical artifact; seed remains evidence-only |
+| migrated pre-start seed | iss-00273 | `artifacts/20260702t081005z-draft-plan-scope-layering-planning-guidance-pre-start-seed.md` | pre-start canonical body | `plan.md` | historical input only（partially_adopted） | `plan.md` | passed by manual reconciliation | seed input integrated where still current; seed itself is evidence-only | none | none | canonical artifact fresh reviewer gate（pass）; canonical docs hold authority | execute approved plan via canonical artifact; seed remains evidence-only |
+
+## Reviewer Gate Status（レビュアーゲート状態）
+| gate | reviewer | reviewer_role | freshness | state | risk_acceptance | promotion_decision | note |
+|---|---|---|---|---|---|---|---|
+| planning | Beauvoir (`019f225f-01d5-7963-be80-0e3648cf8aa2`) | spec-reviewer | fresh | pass | no | execute approved plan | 正規 `requirement.md` / `design.md` / `plan.md` / `report.md`、Issue-local artifacts、親 Epic、前段 Issue を確認し、findings なし。 |
 
 ## 実装記録
-- 未実施。
+- S00 planning normalization: completed。
+- S01 以降の実装は未実施。
 
 ## 検証
 - 実施済み:
-  - Batch planning artifact validation: Epic EAL-023 に従い `./spec-dock/scripts/spec-dock validate` が成功した（`nodes=178`）。
-  - Dependency-chain confirmation: Epic EAL-023 に従い `deps check epic-00270` / `deps check iss-00276` は前段Issue未完了で blocked となり、リレー依存どおりであることを確認した。
+  - `./spec-dock/scripts/spec-dock deps check iss-00273` -> ready。
+  - `./spec-dock/scripts/spec-dock assurance classify --stage requirement` -> `authorized_profile: standard`。
+  - `./spec-dock/scripts/spec-dock assurance compose --artifact all` -> design / plan / report changed。
 - 未実施:
-  - このIssue固有の実装・対象ファイル検証は未実施。`issue start` 後に正規 plan に従って実施する。
+  - `assurance verify`。
+  - focused pytest。
+  - targeted grep。
+  - `./spec-dock/scripts/spec-dock validate`。
+  - `git diff --check`。
+  - final reviewer gates。
 
 ## 完了 / PR
 - Issue完了: 未実施。
