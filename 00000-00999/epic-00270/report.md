@@ -40,8 +40,9 @@ ID: "epic-00270"
   - Manual scaffold dogfooding として一時ディレクトリに `spec-dock init` し、生成された docs/templates が provider assets と一致すること、generated workflow / templates に handoff-ready / execution-ready、日本語ファースト、draft artifact boundary が反映されることを確認した。
   - PR #277 を作成した。初回 observation で latest head の `validate` は成功したが、`provider-tests` は ruff format check failure で失敗したため、format repair を実施し、local `make lint` は成功した。
   - format repair 後の PR observation で CI は成功したが、Codex review がP1を2件検出した。Epic `report.md` の reviewer-gated wording と deferred PR delivery / issue finish gate semantics を修正し、provider / dogfooding mirror parity を確認した。
+  - P1修復後の head `42c8f4d9` で PR observation を再実行し、CI / Provider CI は成功、PR は open / ready、`mergeStateStatus=CLEAN`、P0/P1 blocker は0件となった。Codex review の残りはP2/P3の terminal non-blocking findings のみであり、`github-pr-merge-preparer` policy に従って branch mutation / CI rerun 対象外として扱う。report 更新 commit 後の head / PR observation / clean state は external delivery evidence として確認する。
 - 次のマイルストーン:
-  - `iss-00276` の S07 に従い、P1修復を push し、PR observation を再実行する。
+  - `iss-00276` の final evidence commit 後に `issue finish` を実行し、Epic completion gate を確認する。
 - ブロッカー:
   - 現時点で作業停止ブロッカーはなし。
 
@@ -91,6 +92,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-032 | adopted | `iss-00276` planning review | `iss-00276/design.md`, `iss-00276/plan.md`, `iss-00276/report.md` | `iss-00276` は assurance compose 後に critical final gate として正規 design / plan を具体化し、Sartre のP1を修正したうえで Socrates re-review が `review_status: pass` とした。 | Sartre `019f22d4-fc6a-77b1-a2f0-1441a2cc226e`; Socrates `019f22d8-1185-7250-92b9-1d2c4787f600`; `assurance verify` -> pass; `validate` -> pass | S00-S07 を実行する。 |
 | EAL-033 | adopted | `iss-00276` final automated gate | `spec-dock/docs/workflow_epic.md`, `tests/unit/infra/test_init_update.py`, `iss-00276/report.md` | Final gate の初回 `tests/unit` は、provider-side `workflow_epic.md` と今回追加された dogfooding Epic / Issue metadata / dependencies が checked-in dogfooding mirror / snapshots に未反映であることを検出した。mirror と snapshots を current source に追従させた後、focused regression、full unit / CLI runtime / full pytest / SpecDock structural checks が成功した。 | 初回 `tests/unit` -> 4 failed / 962 passed; targeted regression -> 4 passed; rerun `tests/unit` -> 966 passed; `tests/cli_runtime` -> 730 passed, 74 skipped; full `uv run pytest` -> 1699 passed, 74 skipped; `validate` -> nodes=178; `assurance verify` -> ok; `deps check iss-00276` -> ready | reviewer re-check、PR delivery へ進む。 |
 | EAL-034 | adopted | final reviewer gates | `iss-00276/report.md` | `code-reviewer` は current diff を pass と判定した。初回 `spec-reviewer` / `qa-reviewer` は automated gate が manual / reviewer / PR closure IDs を閉じたように読める traceability defect をP1として検出したため、Step Evidence の Closure を修正し、manual / reviewer / PR closure は S03 / S04 / S07 に残した。その後 full pytest と scaffold dogfooding evidence を追加し、`spec-reviewer` / `qa-reviewer` re-review は pass となった。P2 の Epic E-AC-006 stale manual wording も修正した。 | Harvey `019f236e-2728-72e2-adf5-8848a086037f` -> pass; Planck initial `019f236e-265c-78e2-b7c4-aa9551622f4a` -> fail P1; Ramanujan initial `019f236e-27e4-7602-a80b-647843af6ca2` -> fail P1/P2; Step Evidence repair; full pytest pass; scaffold dogfooding evidence; Planck re-review -> pass; Ramanujan re-review -> pass; final local commit evidence | PR delivery へ進む。 |
+| EAL-035 | adopted | PR delivery and observation | PR #277 / `iss-00276/report.md` | Final PR delivery は1PR方針どおり PR #277 に集約した。初回 Provider CI format failure と2回目 observation のP1 2件を修復し、P1修復後head `42c8f4d9` の再観測で CI / Provider CI success、P0/P1 なし、PR open / ready / `mergeStateStatus=CLEAN` を確認した。残るP2/P3は terminal non-blocking findings として人間判断に残し、branch mutation / CI rerun は行わない。report 更新 commit 後の最終head確認は external delivery evidence として残す。 | PR #277 `https://github.com/chemitaro/spec-dock/pull/277`; observation artifacts `/private/tmp/spec-dock-pr277-observation-3/result.json`; `gh pr view 277` -> open / ready / `CLEAN`; head `42c8f4d949238af736dd10e5f3e6f46313521d37` | `iss-00276` final evidence commit と `issue finish` 判定へ進む。 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -185,32 +187,32 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
   - #277: `https://github.com/chemitaro/spec-dock/pull/277`
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
-- E-AC-001: pending
-  - 実装担当Issue `iss-00271` は完了済み。最終達成判定は `iss-00276` の integrated quality gate で確認する。
-- E-AC-002: pending
-  - 実装担当Issue `iss-00272` は完了済み。最終達成判定は `iss-00276` の integrated quality gate で確認する。
-- E-AC-003: pending
-  - 実装担当Issue `iss-00273` は完了済み。最終達成判定は `iss-00276` の integrated quality gate で確認する。
-- E-AC-004: pending
-  - 実装担当Issue `iss-00274` は完了済み。最終達成判定は `iss-00276` の integrated quality gate で確認する。
-- E-AC-005: pending
-  - 実装担当Issue `iss-00275` は完了済み。最終達成判定は `iss-00276` の integrated quality gate で確認する。
-- E-AC-006: pending
-  - 実装担当Issue `iss-00276` は active planning review pass 済み。final automated gate、manual scaffold dogfooding / hygiene read-through、reviewer gates final re-review、final local commit、PR creation は実施済み。初回 PR observation は provider-tests failure で repair-needed となり、format repair 後の observation で CI は成功した。Codex review P1 2件を修復済みであり、再push / 再observation は未実施。
-- E-AC-007: pending
-  - `iss-00271` から `iss-00275` で反映・検証済み。`iss-00276` final automated gate でも unit / CLI runtime / SpecDock structural checks は通過した。manual / reviewer / PR gate で最終確認する。
-- E-AC-008: partially_completed
+- E-AC-001: completed
+  - `iss-00271` は完了済みで、`iss-00276` の integrated quality gate で automated / manual / reviewer / PR evidence を確認した。
+- E-AC-002: completed
+  - `iss-00272` は完了済みで、`iss-00276` の integrated quality gate で template / workflow / snapshot evidence を確認した。
+- E-AC-003: completed
+  - `iss-00273` は完了済みで、`iss-00276` の integrated quality gate で scope-layering reference と planning guidance の検証 evidence を確認した。
+- E-AC-004: completed
+  - `iss-00274` は完了済みで、`iss-00276` の integrated quality gate で Epic execution handoff / readiness wording と skill mirror evidence を確認した。
+- E-AC-005: completed
+  - `iss-00275` は完了済みで、`iss-00276` の integrated quality gate で upstream planning smoke / validation evidence を確認した。
+- E-AC-006: completed
+  - `iss-00276` は active planning review pass、final automated gate、manual scaffold dogfooding / hygiene read-through、reviewer gates final re-review、final local commit、PR creation、P1 repair、P1修復後head PR observation を完了した。head `42c8f4d9` で CI / Provider CI は成功し、P0/P1 blocker は0件。残るP2/P3は terminal non-blocking findings として branch mutation / CI rerun 対象外に分類した。report 更新 commit 後の最終head確認は external delivery evidence として残す。
+- E-AC-007: completed
+  - `iss-00271` から `iss-00275` で反映・検証済み。`iss-00276` final automated gate、manual dogfooding、fresh reviewer gates、PR observation で最終確認した。
+- E-AC-008: completed
   - planning correction として、`iss-00271` から `iss-00276` の pre-start design / plan seed を Issue-local draft artifacts へ移し、canonical `design.md` / `plan.md` を awaiting-assurance-compose placeholder に戻した。
-  - `iss-00274` / `iss-00275` で workflow / command / validation として固定済み。`iss-00276` final automated gate で snapshot / smoke checks は通過した。manual / reviewer / PR gate で最終確認する。
+  - `iss-00274` / `iss-00275` で workflow / command / validation として固定済み。`iss-00276` final automated gate、manual dogfooding、reviewer gates、PR observation で最終確認した。
 
 ## ロールアウト結果（必要なら） (任意)
 - 該当なし:
-  - まだ planning authoring phase であり、runtime rollout は未実施。
+  - この Epic は docs / templates / skills / tests / dogfooding scaffold の変更であり、外部 runtime rollout はこのPRのmerge後に利用可能になる。
 
 ## フォローアップ（別Issue化） (必須)
-- なし:
-  - 追加Issueは現時点では作成していない。
-  - 次の作業は `iss-00276` の manual dogfooding、reviewer gates、PR delivery を実施すること。
+- 非ブロッキング follow-up:
+  - PR #277 の最新 Codex review はP2/P3のみを返した。`github-pr-merge-preparer` policy 上、これらは merge-blocking ではなく、P2/P3だけを理由に branch mutation / CI rerun は行わない。
+  - 残るP2/P3: draft artifacts の assurance prerequisite 明示、Initiative template の Epic completion canonicality、template reference path、deferred PR exception wording。
 
 ## 省略/例外メモ (必須)
 - 該当なし
