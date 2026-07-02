@@ -86,6 +86,16 @@ ID: "epic-00270"
 | `iss-00274` | `iss-00275` | structural blocker / reviewer finding 分離と readiness guidance |
 | `iss-00275` | `iss-00276` | focused tests / smoke / validation evidence |
 
+## 現在の実行状況
+| Issue | 状態 | 現在の扱い | 後続への意味 |
+|---|---|---|---|
+| `iss-00271` | completed | Initiative template redesign は完了済み。 | `iss-00272` と `iss-00275` の検証入力。 |
+| `iss-00272` | completed | Epic template redesign は完了済み。 | `iss-00273` / `iss-00275` の検証入力。 |
+| `iss-00273` | completed | scope-layering reference と planning guidance は完了済み。 | `iss-00274` / `iss-00275` の検証入力。 |
+| `iss-00274` | completed | Epic execution handoff / Issue readiness workflow は完了済み。 | `iss-00275` の主要検証入力。 |
+| `iss-00275` | active planning | 正規 `requirement.md` / `design.md` / `plan.md` を具体化し、focused tests / smoke checks の実装準備中。 | 完了後、`iss-00276` に validation evidence を渡す。 |
+| `iss-00276` | pending | final quality gate / PR delivery は未開始。 | `iss-00275` 完了後に開始する。 |
+
 ## Issue引き継ぎパッケージ
 
 ### Slice 01 / `iss-00271`: Initiative 要件・設計・計画テンプレートの再設計
