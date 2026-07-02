@@ -61,7 +61,8 @@ ID: "iss-00274"
 #### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 | Grade | required specialist / fallback | usage | evidence | fresh spec-reviewer verdict | execution readiness |
 |---|---|---|---|---|---|
-| standard | system-architect / implementation-planner | used | system-architect draft and implementation-planner draft integrated through EAL-274-006 / EAL-274-007 | pass | ready |
+| standard | system-architect / implementation-planner | used | Runtime `authorized_profile=standard` に対し、system-architect draft and implementation-planner draft integrated through EAL-274-006 / EAL-274-007 | pass | ready |
+| strict | system-architect / implementation-planner | used | Issue requirement / design の strict override に対し、system-architect draft and implementation-planner draft integrated through EAL-274-006 / EAL-274-007 | pass | ready |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
@@ -69,7 +70,21 @@ ID: "iss-00274"
 | planning | planning spec-review | spec-reviewer | fresh | pass | no | execute approved plan | Initial P1/P2 findings were resolved in EAL disposition and re-review passed. |
 
 ## 実装記録
-- 未実施。
+- S01 Red / characterization baseline:
+  - `rg -n "handoff-ready|execution-ready|structural blocker|reviewer finding|draft-plan|draft-design|iss-00276|issue finish" ...` を実行した。
+  - 現行 `workflow_epic.md` は Issue-local `draft-design` / `draft-plan` primitive を持つが、Epic execution skill は `handoff-ready` / `execution-ready`、structural blocker / reviewer finding、`iss-00276` final delivery 集約を十分に案内していなかった。
+  - 期待どおり docs / skill guidance の不足を Red / characterization evidence として固定した。
+- S02 Runtime change 要否判定:
+  - 現行 `new artifact draft-design` / `draft-plan` surface は存在し、今回の欠落は command behavior ではなく workflow / skill guidance の不足である。
+  - `assurance compose` の canonical compose 専用境界も docs / skill guidance で明示すれば足りるため、runtime code / tests の変更は不要と判断した。
+  - S03 / S04 は `doc-writer` に委譲し、provider skill、dogfooding skill、workflow docs の更新に限定する。
+- S03 Epic execution skill 更新:
+  - `doc-writer` に委譲し、provider-side `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md` と dogfooding `.agents/skills/spec-dock-epic-execution/SKILL.md` を更新した。
+  - reviewer-gated Epic docs / report と downstream Issue handoff package の first-read、`handoff-ready` / `execution-ready` 分離、structural blocker / reviewer finding 境界、Issue-local `draft-design` / `draft-plan` primitive、plan-aware no per-Issue PR / `iss-00276` final delivery、日本語ファースト guidance を追加した。
+- S04 Workflow docs 更新:
+  - `doc-writer` に委譲し、`workflow_epic.md` と `workflow_issue.md` を更新した。
+  - `assurance compose` は canonical compose 専用であり draft artifact 作成 command ではないこと、actor / specialist / depth 別 draft command を作らないこと、handoff-ready は実装開始許可ではないことを明示した。
+  - `workflow_issue.md` には execution-ready 条件、structural blocker / reviewer finding 分離、日本語ファースト guidance を追加した。
 
 ## 検証
 - 実施済み:
@@ -90,8 +105,15 @@ ID: "iss-00274"
   - `design.md` / `plan.md` の状態を `approved` に更新し、placeholder判定に引っかかる省略パスを実パスに置換した。
   - `report.md` の Evidence Adoption Ledger / Spec Authoring Gate / Delegated Draft Evidence / Grade Specialist Evidence Gate / Reviewer Gate Status を `guidance issue-execution` の report evidence gate に合わせて正規化した。
   - `./spec-dock/scripts/spec-dock guidance issue-execution` が `state: ready`、`reason_code: assurance-valid`、`may_execute_approved_plan: true` を返した。
+  - S01 baseline grep により、Epic execution skill / workflow docs の guidance gap を確認した。
+  - S02 scope decision として runtime behavior / tests は変更せず、docs / skills-only で進める判断を記録した。
+  - `doc-writer` が S03 / S04 の skill / workflow docs 更新を実施した。
+  - 指定 grep 2本が成功し、`structural blocker`、`reviewer finding`、`handoff-ready`、`execution-ready`、`draft-design`、`draft-plan`、`assurance compose`、`iss-00276`、`semantic reviewer`、`spec-reviewer`、`raw artifact`、`decision-only`、`日本語ファースト` の導線を確認した。
+  - `./spec-dock/scripts/spec-dock validate` が成功した（`nodes=178`）。
+  - `git diff --check` が成功した。
+  - `cmp -s src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md .agents/skills/spec-dock-epic-execution/SKILL.md` が成功し、provider skill と dogfooding skill copy の一致を確認した。
 - 未実施:
-  - このIssue固有の実装・対象ファイル検証は未実施。正規 plan に従って実施する。
+  - S06 runtime / test verification は docs / skills-only 判定により not applicable。runtime code、tests、template behavior は変更していない。
 
 ## 完了 / PR
 - Issue完了: 未実施。
@@ -99,6 +121,13 @@ ID: "iss-00274"
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
-- Record Red, Green, and refactor evidence for each executed step.
-- Link each closure id to its observed verification result.
+| Step | Closure | Evidence | Result |
+|---|---|---|---|
+| S01 | `C274-001..008` | baseline `rg` で Epic execution skill / workflow docs の handoff-ready、execution-ready、structural blocker、reviewer finding、`iss-00276` 導線不足を確認した。 | pass |
+| S02 | `C274-007`, `C274-008` | 既存 `new artifact draft-design` / `draft-plan` surface と `assurance compose` 境界を確認し、今回の不足は docs / skill guidance と判定した。 | approved-no-op for runtime |
+| S03 | `C274-001`, `C274-002`, `C274-003`, `C274-005`, `C274-006`, `C274-007`, `C274-008` | `doc-writer` が provider / dogfooding `spec-dock-epic-execution` skill を更新し、provider copy と `.agents` copy の `cmp -s` が成功した。 | pass |
+| S04 | `C274-001`, `C274-002`, `C274-004`, `C274-007`, `C274-008` | `doc-writer` が `workflow_epic.md` / `workflow_issue.md` を更新し、draft artifact primitive、canonical compose、readiness境界を明記した。 | pass |
+| S05 | `C274-001..008` | 指定 grep 2本、`./spec-dock/scripts/spec-dock validate`、`git diff --check` が成功した。 | pass |
+| S06 | `C274-007`, `C274-008` | runtime / tests は変更なし。docs / skills-only 判定により `uv run pytest` は not applicable。 | approved-no-op |
+| S07 | `C274-001..008` | fresh `spec-reviewer` が実装diffをreviewし、`review_status: pass`。P2 report cleanup はこの追記で対応した。 | pass |
 <!-- spec-dock:managed-section end id="report.step-evidence" -->

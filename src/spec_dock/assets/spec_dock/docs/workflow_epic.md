@@ -72,15 +72,21 @@ Cross-issue draft package は planning evidence であり、Issue の canonical 
 ./spec-dock/scripts/spec-dock new artifact draft-plan --issue <issue-id> --title "..."
 ```
 
-各 command が返す `path=...` が artifact path です。Epic handoff package には、target Issue id ごとにこれらの path index を置きます。これらの Issue-local drafts は artifact evidence / planning input として扱い、ad hoc file writes や canonical issue docs への直接書き込みで代替してはいけません。Canonical Issue `design.md` / `plan.md` は pre-start で本文化せず、個別 Issue planning workflow、assurance compose、[workflow_issue.md](workflow_issue.md) の authoring contract で正式化します。
+各 command が返す `path=...` が artifact path です。Epic handoff package には、target Issue id ごとにこれらの path index を置きます。これらの Issue-local drafts は artifact evidence / planning input として扱い、ad hoc file writes や canonical issue docs への直接書き込みで代替してはいけません。Canonical Issue `design.md` / `plan.md` は pre-start で本文化せず、個別 Issue planning workflow、assurance compose、[workflow_issue.md](workflow_issue.md) の authoring contract で正式化します。`assurance compose` は canonical compose 専用であり、draft artifact 作成 command ではありません。actor / specialist / depth 別の draft command は作らず、grade 別 obligation は handoff evidence、Issue planning、reviewer gate で扱います。
 
 Target Issue が draft-requirement、`draft-design`、`draft-plan` の一部または全部を意図的に受け取らない場合、Epic report / handoff evidence は target Issue id、skipped draft type(s)、理由、その omission が Issue planning handoff を block しない理由、必要に応じた revisit / follow-up condition を記録します。
 
-Downstream Issue は、Epic planning outputs とこの completion / handoff contract を input として参照できます。各 downstream Issue は、Epic plan が dependency edge を明示しない限り独立した Issue として扱います。Epic execution coordinator behavior、issue start / finish cycle、PR merge-ready preparation は、later Issue が明示的に定義しない限り、この Epic planning handoff section の外側に置きます。
+Downstream Issue は、Epic planning outputs とこの completion / handoff contract を input として参照できます。各 downstream Issue は、Epic plan が dependency edge を明示しない限り独立した Issue として扱います。Epic execution coordinator は downstream Issue handoff package を読み、`handoff-ready` と `execution-ready` を分けます。`handoff-ready` は Issue planning へ渡せる状態であり、canonical Issue `design.md` / `plan.md` が compose 前でもよいが実装開始は許可しません。`execution-ready` は Issue planning が evidence 採否、canonical compose、fresh `spec-reviewer` pass、実行可能 plan、required verification、delegation contract、reviewer focus を揃えた状態です。Epic execution coordinator behavior、issue start / finish cycle、PR merge-ready preparation は、later Issue が明示的に定義しない限り、この Epic planning handoff section の外側に置きます。
 
 ## 実行ライフサイクル（Epic Execution Lifecycle）
 
-Epic planning completion 後の実行調整は `spec-dock-epic-execution` を first-read coordinator とします。この coordinator は ready Issue を一つずつ選び、Issue planning / execution へ渡し、Issue 実装後の PR delivery は `github-pr-merge-preparer` へ handoff します。Issue の詳細な実行規約と `issue finish` 判断は [workflow_issue.md](workflow_issue.md) を正本とし、この workflow では重複定義しません。
+Epic planning completion 後の実行調整は `spec-dock-epic-execution` を first-read coordinator とします。この coordinator は reviewer-gated Epic `requirement.md` / `design.md` / `plan.md` / `report.md` と downstream Issue handoff package を読んでから、ready Issue を一つずつ選び、Issue planning / execution へ渡します。Issue の詳細な実行規約と `issue finish` 判断は [workflow_issue.md](workflow_issue.md) を正本とし、この workflow では重複定義しません。
+
+Epic execution の readiness inspection は structural gate であり、semantic reviewer ではありません。次は structural blocker として fail-closed で止めます: missing canonical docs、missing / stale reviewer pass、missing Issue readiness contract、missing executable plan structure、missing delegation contract、missing verification、missing reviewer focus、unresolved blocking / stale report entries、raw artifact authority、decision-only execution-ready、grade が要求する specialist / fallback evidence の欠落。構造はあるが acceptance criteria、test strategy、採用理由、設計妥当性、日本語ファースト wording の十分性が疑わしい場合は reviewer finding として記録し、`spec-reviewer` や Issue planning に route します。
+
+Issue 実装後の PR delivery は通常 `github-pr-merge-preparer` へ handoff します。ただし reviewed Epic plan が、Issue を一つずつ `issue finish` で進め、final PR delivery を `iss-00276` のような final quality Issue に意図的に集約すると定義している場合は、その plan-aware evidence を残し、中間 Issue ごとの PR preparation を要求しません。この例外は通常 workflow の PR-preparer guidance を削除するものではありません。
+
+日本語運用では、Epic execution / readiness 中に作成・更新する docs、`report.md`、artifacts の本文は日本語ファーストにします。commands、paths、IDs、role 名などの正確な識別子はそのまま保持します。
 
 Epic completion gate は、required Issues が完了済みまたは fresh spec-reviewed plan により明示的に不要化され、Epic-level evidence、品質ゲート、PR handoff expectation が揃った状態です。no-op / small Epic でも、不要な Issue を作らず、skipped-work rationale と completion evidence を Epic `report.md` に残します。
 
