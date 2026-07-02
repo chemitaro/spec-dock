@@ -5,7 +5,7 @@ description: First-read coordinator for executing a planned spec-dock Epic throu
 
 # Spec-Dock Epic Execution
 
-Use this skill after Epic planning is complete and the Epic requirement, design, plan, and report are reviewer-gated for downstream Issue work. This skill is a coordinator only; it is not a semantic reviewer. Keep detailed lifecycle rules in `spec-dock/docs/workflow_epic.md`, `spec-dock/docs/workflow_issue.md`, and the existing leaf skills.
+Use this skill after Epic planning is complete and the Epic requirement, design, and plan are reviewer-gated for downstream Issue work. Read the Epic report as an evidence ledger for unresolved blockers, decisions, and handoff state; do not treat it as a reviewer-gated planning artifact. This skill is a coordinator only; it is not a semantic reviewer. Keep detailed lifecycle rules in `spec-dock/docs/workflow_epic.md`, `spec-dock/docs/workflow_issue.md`, and the existing leaf skills.
 
 ## Workflow-Scoped Authorization
 
@@ -20,7 +20,7 @@ Use this skill after Epic planning is complete and the Epic requirement, design,
 
 1. Bootstrap current state.
    - Resolve an explicitly requested Epic to the active Epic, or route the required lifecycle activation / selection step before applying active-Epic checks.
-   - Confirm the active Epic and read its reviewer-gated `requirement.md`, `design.md`, `plan.md`, and `report.md`.
+   - Confirm the active Epic and read its reviewer-gated `requirement.md`, `design.md`, and `plan.md`, plus `report.md` as an evidence ledger for unresolved blockers, decisions, and handoff state.
    - Read the downstream Issue handoff package: Issue list, dependency order, responsibility boundaries, draft artifact path index or skip evidence, expected verification, reviewer focus, delegation contract, and any unresolved / stale report entries.
    - Check `./spec-dock/scripts/spec-dock active show` for an active Issue.
    - Check git/projection/GitHub freshness as needed for the user's request, using `sync`, `sync --github`, `validate`, `git status`, `git fetch`, or GitHub inspection when stale state could affect Issue readiness or PR delivery.
