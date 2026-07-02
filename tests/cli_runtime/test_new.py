@@ -126,8 +126,7 @@ class TestCliNew(CliRuntimeHarness):
 
     def _canonical_design_plan_snapshot(self, issue_dir: Path) -> tuple[tuple[str, str], ...]:
         return tuple(
-            (filename, (issue_dir / filename).read_text(encoding="utf-8"))
-            for filename in ("design.md", "plan.md")
+            (filename, (issue_dir / filename).read_text(encoding="utf-8")) for filename in ("design.md", "plan.md")
         )
 
     def _assert_profile_draft_no_write_failure(
