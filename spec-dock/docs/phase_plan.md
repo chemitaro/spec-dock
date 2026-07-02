@@ -9,6 +9,7 @@ workflow は `workflow_initiative.md` / `workflow_epic.md` が lifecycle / gover
 - Scope workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
 - Spec authoring workflow: [workflow_spec_authoring.md](workflow_spec_authoring.md)
 - Scope plan playbook: [phase_plan_initiative.md](phase_plan_initiative.md), [phase_plan_epic.md](phase_plan_epic.md), [phase_plan_issue.md](phase_plan_issue.md)
+- Scope layering: [authoring/scope-layering.md](authoring/scope-layering.md)
 
 ## フェーズ契約（phase contract）
 
@@ -45,6 +46,7 @@ workflow は `workflow_initiative.md` / `workflow_epic.md` が lifecycle / gover
 - trace rule:
   - 各 plan item は requirement item または design decision に紐づける
   - trace できない step / issue / epic は scope creep として削るか、前 phase に戻す
+  - scope ownership や handoff authority が曖昧な場合は [authoring/scope-layering.md](authoring/scope-layering.md) と対象 `workflow_*.md` を authoritative routing として確認する
 
 ## 共有 terminology（shared terminology）
 

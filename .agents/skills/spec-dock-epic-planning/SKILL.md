@@ -15,6 +15,7 @@ description: Leaf skill for epic planning tasks in spec-dock.
   - `spec-dock/docs/phase_design.md`
   - `spec-dock/docs/phase_plan.md`
 - Decision routing examples and detailed placement guidance: `spec-dock/docs/authoring/decision-routing.md`.
+- Scope ownership / authority layering に迷う場合の薄い参照: `spec-dock/docs/authoring/scope-layering.md`.
 - First-read gate: keep cross-issue design backbone decisions in Epic planning, but stop and route cross-epic operating decisions to Initiative, ADR-worthy decisions to ADR, and missing source-of-truth gaps to clarification.
 - A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow.
 - Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility.
@@ -23,6 +24,7 @@ description: Leaf skill for epic planning tasks in spec-dock.
 - active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲内では、role ごと・phase ごとの追加承認を求めない。
 - scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途確認する。
 - When decomposing work into Issues, do not create a decision-only Issue as execution-ready; create only executable Issue slices or record the remaining Epic-level decision/follow-up.
+- Issue decomposition 時、Epic は pre-start Issue handoff package として Issue-local `artifacts/` evidence を用意してよい。含める候補は `draft-design`、`draft-plan`、path index までに留め、canonical Issue `design.md` / `plan.md` は Issue planning / assurance compose 後に main orchestrator が作成する。
 - Keep this skill as routing guidance only; use `spec-dock/docs/authoring/decision-routing.md` for examples and detailed routing.
 - Keep scope-specific constraints and decisions in `workflow_epic.md`.
 - In spec authoring mode, do not move from requirement to design, design to plan, or plan to Issue decomposition until a fresh `spec-reviewer` returns `review_status: pass`; fix findings and re-run a fresh reviewer until pass.

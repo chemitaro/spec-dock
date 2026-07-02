@@ -15,6 +15,7 @@ ID: "<EPIC_ID>"
 ## 作成方針
 - この文書は Epic から後続 Issue へ渡す handoff package、実施順序、依存、統合ゲートを固定する。
 - 日本語ファーストで作成し、ファイルパス、コマンド、コード識別子、SpecDock 固定語は原文のまま扱ってよい。
+- Scope ownership と authority flow は `docs/authoring/scope-layering.md` を参照し、この template には責務表を複製しない。
 - Issue-level の TDD step や private implementation design は必須前提にせず、必要な場合だけ各 Issue の grade とスコープに応じて扱う。
 
 ## この計画で閉じる E-RQ / E-AC
@@ -47,6 +48,17 @@ ID: "<EPIC_ID>"
   - ...
 - expected evidence:
   - ...
+- Issue-local draft path index:
+  - draft-requirement:
+    - ...
+  - `draft-design`:
+    - ...
+  - `draft-plan`:
+    - ...
+- skip / fallback evidence:
+  - ...
+- pre-start canonical Issue boundary:
+  - canonical Issue `design.md` / `plan.md` は pre-start で本文化せず、Issue planning で正式化する。
 - suggested grade:
   - ...
 - dependencies:

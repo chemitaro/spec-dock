@@ -7,6 +7,7 @@ Source-grounded grill loop の手順は `spec-dock-clarification` skill が持�
 関連:
 - Spec authoring workflow: [workflow_spec_authoring.md](workflow_spec_authoring.md)
 - Issue execution workflow: [workflow_issue.md](workflow_issue.md)
+- Scope layering: [authoring/scope-layering.md](authoring/scope-layering.md)
 - Artifact rules: 対象 scope 配下の `artifacts/rules.md`
 - Naming rules: [reference_naming.md](reference_naming.md)
 
@@ -17,6 +18,7 @@ Source-grounded grill loop の手順は `spec-dock-clarification` skill が持�
 - 先に source-grounded read を行う。active docs、parent docs、scope-local `artifacts/`、historical / preservation input としての legacy `discussions/`、関連 source / tests / templates、既存 ADR を確認し、local context で解ける疑問を人間へ質問しない。
 - 人間ユーザーへの本質的な質問は orchestrator が一問ずつ行う。ユーザー意図の確認が blocking の場合は、代行や専門 agent ではなくユーザー本人へ直接質問する。
 - 用語、責務境界、domain relationship が曖昧な場合は、既存 docs / code の言葉を照合し、domain language を sharpen する。
+- Initiative / Epic / Issue の責務境界や authority flow が曖昧な場合は、scope 表をここへ複製せず [authoring/scope-layering.md](authoring/scope-layering.md) を参照し、対象 scope の canonical docs / report ledger へ採用判断を残す。
 - 抽象論で閉じず、必要に応じて concrete scenario、edge case、code / docs cross-check で境界を確認する。
 - 合意内容は docs synthesis を通じて `requirement.md` / `design.md` / `plan.md` / ADR / `report.md` へ反映する。artifact は evidence / proposal であり、採用判断なしに canonical source of truth にしない。
 - ADR は sparingly に使う。後から戻しにくく、将来の読者に意外性があり、実質的な tradeoff がある判断だけを ADR candidate にする。

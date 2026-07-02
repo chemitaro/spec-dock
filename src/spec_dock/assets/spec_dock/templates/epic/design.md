@@ -17,6 +17,7 @@ ID: "<EPIC_ID>"
 ## 作成方針
 - この文書は Epic が固定する Issue 横断の設計境界と契約を記述する。
 - 日本語ファーストで作成し、ファイルパス、コマンド、コード識別子、SpecDock 固定語は原文のまま扱ってよい。
+- Scope ownership と authority flow は `docs/authoring/scope-layering.md` を参照し、この template には責務表を複製しない。
 - DDD / EDA は必須前提にしない。対象システムの既存アーキテクチャが明確な場合だけ、その語彙に合わせて整理する。
 - Issue-level の実装手順、TDD の細かなサイクル、private implementation design を必須にしない。
 

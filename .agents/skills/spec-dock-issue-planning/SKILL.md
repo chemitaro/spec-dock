@@ -38,6 +38,7 @@ This skill is a fixed kernel. It must not carry state-specific generated Runbook
 - Issue plan phase playbook: `spec-dock/docs/phase_plan_issue.md`.
 - Issue plan field semantics and executable step schema: `spec-dock/docs/authoring/issue-plan.md`.
 - Decision routing examples and detailed placement guidance: `spec-dock/docs/authoring/decision-routing.md`.
+- Scope ownership / authority layering に迷う場合の薄い参照: `spec-dock/docs/authoring/scope-layering.md`.
 
 ## Issue grade 補足
 
@@ -56,6 +57,7 @@ This skill is a fixed kernel. It must not carry state-specific generated Runbook
 - Stop if `requirement.md`, `design.md`, or `plan.md` is template-only, unresolved, or not reviewer-passed for the current phase.
 - Stop if planning reveals unresolved requirement / design / plan gaps; route back to `spec-dock/docs/workflow_clarification.md` or the relevant authoring phase.
 - Keep canonical `requirement.md` / `design.md` / `plan.md` / `report.md` main-orchestrator-owned. This skill does not grant delegated canonical write authority.
+- 受け取った delegated draft / pre-start seed は evidence-only input として扱う。Issue planning authority として使う前に、採用または不採用を `report.md` と該当する canonical docs に反映する。
 - `system-architect` and `implementation-planner` are delegated agent roles only; their drafts are scope-local evidence only and do not replace main orchestrator adoption, fresh `spec-reviewer` pass, phase promotion, or execution handoff readiness.
 - Delegated drafts, research, discussions, and generated Runbooks are evidence only until adopted into canonical artifacts and recorded in `report.md`.
 - Fresh means the current artifact candidate was reviewed after its latest substantive change and fresh `spec-reviewer` returns `review_status: pass`.

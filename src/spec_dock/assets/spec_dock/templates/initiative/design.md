@@ -36,7 +36,7 @@ ID: "<INIT_ID>"
 - 対象外として固定するもの:
   - ...
 - scope-layering reference:
-  - authoring reference が存在する場合に接続する。現時点では未作成ファイルへのリンクを作らない。
+  - `docs/authoring/scope-layering.md` を参照する。この template には責務表を複製しない。
 
 ## システムコンテキスト
 - タイトル:
