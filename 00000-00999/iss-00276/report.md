@@ -126,11 +126,12 @@ ID: "iss-00276"
   - Fresh `qa-reviewer` Ramanujan re-review -> pass。P2: Epic E-AC-006 の manual status wording を現状に合わせること。
   - Reviewer repair: Epic E-AC-006 を、manual scaffold dogfooding / hygiene read-through は実施済み、reviewer gates final re-review と PR delivery は未実施、という文面へ更新した。
 - 未実施:
-  - PR creation / observation は未実施。
+  - PR observation の再実行は未実施。
 
 ## 完了 / PR
 - Issue完了: 未実施。
-- PR作成: 未実施。この Issue の S07 で扱う。
+- PR作成: 実施済み。PR #277 (`https://github.com/chemitaro/spec-dock/pull/277`)。
+- PR observation: 初回 observation で latest head の `validate` は成功、`provider-tests` は `make lint` の ruff format check failure により失敗した。`tests/cli_runtime/test_new.py` と `tests/unit/infra/test_init_update.py` を `uv run ruff format` で整形し、local `make lint` は成功した。再push / 再observation は次アクション。
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
@@ -147,4 +148,6 @@ ID: "iss-00276"
 | reviewer-gate-initial | `C276-004`, `C276-005`, `C276-013`, `C276-014` | fresh `spec-reviewer`, `qa-reviewer`, `code-reviewer` | repair-needed | Harvey code-review pass; Planck spec-review P1 closure ID overclaim; Ramanujan QA P1 closure ID overclaim and PR observation pending; QA P2 broad suite gap | re-review after closure ID repair and full pytest |
 | reviewer-gate-recheck | `C276-004`, `C276-005`, `C276-013`, `C276-014` | fresh `spec-reviewer` and `qa-reviewer` re-review after repairs | pass | Planck re-review pass after closure ID repair; Ramanujan re-review pass after scaffold dogfooding evidence; Epic E-AC-006 stale manual wording repaired | final commit |
 | final-local-commit | `C276-015` | staged diff review and local commit | pass | staged files were workflow mirror, active Epic / Issue reports, and checked-in dogfooding snapshot test; this commit is the S06 local commit evidence | PR delivery |
+| pr-delivery-initial | `C276-006`, `C276-007`, `C276-011`, `C276-016` | PR #277 creation and observation | repair-needed | PR #277 created against `main`; latest head observation reported `validate` success and `provider-tests` failure in `make lint` ruff format check | format repair and rerun PR observation |
+| pr-ci-format-repair | `C276-013`, `C276-014`, `C276-015` | `uv run ruff format`, `make lint` | pass | `tests/cli_runtime/test_new.py` and `tests/unit/infra/test_init_update.py` reformatted; local `make lint` passed (`ruff check`, `ruff format check`, `mypy`) | push and observe latest head |
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
