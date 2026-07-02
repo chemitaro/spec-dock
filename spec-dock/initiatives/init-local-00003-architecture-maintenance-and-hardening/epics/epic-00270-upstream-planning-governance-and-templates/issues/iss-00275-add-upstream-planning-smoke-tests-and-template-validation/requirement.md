@@ -3,7 +3,7 @@
 ID: "iss-00275"
 タイトル: "Add Upstream Planning Smoke Tests And Template Validation"
 関連GitHub: ["#275"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-02"
 親: ["epic-00270", "init-local-00003"]
