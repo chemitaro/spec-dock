@@ -32,8 +32,9 @@ ID: "epic-00270"
   - Issue Start 前の `draft-design` / `draft-plan` 作成方針について再分析し、command は既存 `new artifact draft-*` primitive を強化し、actor obligation は grade-aware workflow / EAL で管理する方針を accepted ADR とした。
   - `iss-00271` から `iss-00276` の pre-start design / plan seed を Issue-local `draft-design` / `draft-plan` artifacts へ移し、canonical Issue `design.md` / `plan.md` を awaiting-assurance-compose placeholder に戻す planning correction を実施した。
   - 修正後の current planning set は Goodall (`019f21f9-b2ab-7182-8246-96997f8571d9`) により fresh `spec-reviewer` gate で `review_status: pass` となった。
+  - `iss-00271` から `iss-00274` は完了済みである。現在は `iss-00275` を active にし、system-architect / implementation-planner draft を採用して正規 `design.md` / `plan.md` を具体化している。
 - 次のマイルストーン:
-  - `iss-00271` を開始し、Issue-local draft artifacts の採否を判断してから正規 `design.md` / `plan.md` を compose / review する。
+  - `iss-00275` の正規 `requirement.md` / `design.md` / `plan.md` / `report.md` を fresh `spec-reviewer` に通し、focused tests / smoke checks の実装へ進む。
 - ブロッカー:
   - 現時点で作業停止ブロッカーはなし。
 
@@ -75,7 +76,10 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-024 | adopted | user decision / ADR | draft artifact command and grade role policy | ユーザーは、Issue Start 前の draft artifact 作成では actor 別 command を作らず、既存 `new artifact draft-design` / `draft-plan` を統一 primitive として強化し、system-architect / implementation-planner の関与は grade-aware workflow / EAL で管理する方針を採用した。 | `artifacts/20260702t073715z-decision-candidate-unified-draft-artifact-command-grade-role-policy.md`, `artifacts/20260702t074332z-adr-unified-draft-artifact-command-grade-role-policy.md` | 後続Issueで workflow docs / skills / runtime tests へ反映する。 |
 | EAL-025 | adopted | planning correction | `iss-00271` から `iss-00276` の canonical `design.md` / `plan.md` と Issue-local draft artifacts | accepted ADR に従い、pre-start draft body を Issue-local `draft-design` / `draft-plan` artifacts へ移し、canonical Issue `design.md` / `plan.md` は awaiting-assurance-compose placeholder に戻した。各 Issue report に draft artifact path と Grade Specialist Evidence Gate を記録した。 | `issues/iss-00271-*/artifacts/*draft-design*`, `issues/iss-00271-*/artifacts/*draft-plan*`, `issues/iss-00272-*/artifacts/*draft-design*`, `issues/iss-00272-*/artifacts/*draft-plan*`, `issues/iss-00273-*/artifacts/*draft-design*`, `issues/iss-00273-*/artifacts/*draft-plan*`, `issues/iss-00274-*/artifacts/*draft-design*`, `issues/iss-00274-*/artifacts/*draft-plan*`, `issues/iss-00275-*/artifacts/*draft-design*`, `issues/iss-00275-*/artifacts/*draft-plan*`, `issues/iss-00276-*/artifacts/*draft-design*`, `issues/iss-00276-*/artifacts/*draft-plan*` | Goodall の fresh `spec-reviewer` pass で整合性確認済み。 |
 | EAL-026 | adopted | local validation commands | current planning correction set | migration 後の canonical docs / Issue docs / report ledgers に対して `validate` を再実行し、blocking EAL が残らないことを確認した。targeted grep では canonical docs 上の `draft-before-issue-start` は検証要件の文字列としてのみ残り、canonical Issue `design.md` / `plan.md` には 12件すべて `artifact_state: awaiting-assurance-compose` が存在した。 | `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=178`; `rg 'artifact_state: awaiting-assurance-compose' ...issues/*/{design.md,plan.md}` -> 12件 | Goodall の fresh `spec-reviewer` pass で semantic consistency 確認済み。 |
-| EAL-027 | adopted | fresh `spec-reviewer` gate | current Epic / Issue planning set | Goodall は current Epic requirement / design / plan / report、accepted ADR、全6 Issue の requirement / design / plan / report、draft-design / draft-plan artifacts を確認し、古い reviewer evidence、draft provenance、日本語ファースト文面、canonical placeholder boundary、責務分担、6 Issue coverage に P0/P1/P2 が残っていないと判定した。 | Goodall: `019f21f9-b2ab-7182-8246-96997f8571d9`; `review_status: pass`; `overall_confidence_score: 0.9` | `iss-00271` を開始する。 |
+| EAL-027 | adopted | fresh `spec-reviewer` gate | current Epic / Issue planning set | Goodall は current Epic requirement / design / plan / report、accepted ADR、全6 Issue の requirement / design / plan / report、draft-design / draft-plan artifacts を確認し、古い reviewer evidence、draft provenance、日本語ファースト文面、canonical placeholder boundary、責務分担、6 Issue coverage に P0/P1/P2 が残っていないと判定した。 | Goodall: `019f21f9-b2ab-7182-8246-96997f8571d9`; `review_status: pass`; `overall_confidence_score: 0.9` | `iss-00271` からリレー実行を開始する。現在は `iss-00275` active planning 中である。 |
+| EAL-028 | adopted | completed Issue relay | `plan.md` / `report.md` | `iss-00271` から `iss-00274` は完了済みであり、`iss-00275` はそれらを検証入力として扱う active validation slice になった。 | completed Issues: `iss-00271`, `iss-00272`, `iss-00273`, `iss-00274`; active Issue: `iss-00275` | `iss-00275` の fresh planning review と実装へ進む。 |
+| EAL-029 | partially_adopted | `iss-00275` specialist drafts | `iss-00275/design.md`, `iss-00275/plan.md`, `iss-00275/report.md` | system-architect / implementation-planner の draft は、machine / smoke / reviewer 境界、closure mapping、focused command ladder、no-PR handoff を具体化しており、正規 Issue 設計・計画へ部分採用した。final authority、reviewer pass、実行済み command claims は採用していない。 | `issues/iss-00275-*/artifacts/20260702t114631z-draft-design-system-architect-upstream-planning-validation-design.md`, `issues/iss-00275-*/artifacts/20260702t114630z-draft-plan-implementation-planner-canonical-plan-draft.md` | `iss-00275` の fresh `spec-reviewer` gate を通す。 |
+| EAL-030 | adopted | fresh `spec-reviewer` gate | `iss-00275` planning set and Epic current-state references | Dewey は active Epic / Issue docs、specialist drafts、unified draft artifact ADR を確認し、`iss-00275` の AC/EC trace、machine / smoke / reviewer 境界、draft authority isolation、no-PR handoff に P0/P1/P2 がないと判定した。P3 として Epic report の古い next-action wording が指摘されたため、この更新で current state に合わせた。 | Dewey: `019f22ae-51a7-7ea2-a13c-8a2ed1806d72`; `review_status: pass`; `overall_confidence_score: 0.88` | `iss-00275` の実装へ進む。 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -94,8 +98,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | clarification | V3 ZIP、parent initiative docs、provider templates、planning / execution skills、workflow docs、git history、split artifacts、Matt Pocock Grill With Docs public sources、日本語ファーストuser clarification | 回答済み: six-Issue baseline は medium gate 付きで柔軟に扱う。回答済み: 原則1PR。回答済み: canonical docs は中程度の詳細で split references を使う。回答済み: complete understanding は必須で、自力調査後に user-intent gap だけ質問し、知識を外部化する。回答済み: handoff package inspection は structural blockers と semantic reviewer findings を分ける。回答済み: Japanese requirement / design / plan / report / artifacts を支援する。 | requirement / design / plan drafting のsource evidenceとして採用 | Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` | no | downstream Issue scaffold / planning へ進める。 |
 | requirement | V3 ZIP、parent initiative requirement / design / plan、repo survey、accepted interviews / ADRs、split artifacts、日本語ファーストADR | blocking open question はない。Epic-level user intent decisions は解決済み。 | `requirement.md` に採用 | Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` | no | downstream Issue scaffold / planning へ進める。 |
 | design | concrete `requirement.md`、accepted ADRs、split scope / template / handoff / quality artifacts、advisory system-architect design draft、日本語ファーストADR | blocking user question はない。delegated draft は promotion evidence として不適格だったため advisory input としてのみ利用した。 | main orchestrator manual authoring により `design.md` に採用 | Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` | no | downstream Issue scaffold / planning へ進める。 |
-| plan | concrete `requirement.md` / `design.md`、V3 six-Issue baseline、user-approved re-slicing and delivery policy、advisory system-architect plan draft、日本語ファーストADR、unified draft artifact command ADR | blocking user question はない。actual Issue IDs は `iss-00271` から `iss-00276` として作成済み。delegated draft は promotion evidence として不適格だったため advisory input としてのみ利用した。 | main orchestrator manual authoring により `plan.md` に採用し、batch Issue planning と後続の draft artifact boundary correction へ反映 | Goodall (`019f21f9-b2ab-7182-8246-96997f8571d9`) により current planning correction 後の `review_status: pass` | no | `iss-00271` を開始する。 |
-| batch Issue planning | `iss-00271` から `iss-00276` の正規 `requirement.md`、Issue-local draft artifacts、placeholder canonical `design.md` / `plan.md`、Epic plan / report 更新 | 初回reviewで Issue report 判断台帳不足が見つかり、6件すべてへ判断台帳を追加済み。その後のADRにより、pre-start draft body は canonical `design.md` / `plan.md` から Issue-local artifacts へ移行した。 | Issue実行前のバトン設計として採用。要件は正本、design / plan seed は evidence-only artifact、canonical design / plan は Issue Planning で compose する。 | Goodall (`019f21f9-b2ab-7182-8246-96997f8571d9`) により current planning correction 後の `review_status: pass` | no | `iss-00271` を開始し、Issue-local draft artifacts の採否を判断して正規 design / plan を作る。 |
+| plan | concrete `requirement.md` / `design.md`、V3 six-Issue baseline、user-approved re-slicing and delivery policy、advisory system-architect plan draft、日本語ファーストADR、unified draft artifact command ADR | blocking user question はない。actual Issue IDs は `iss-00271` から `iss-00276` として作成済み。delegated draft は promotion evidence として不適格だったため advisory input としてのみ利用した。 | main orchestrator manual authoring により `plan.md` に採用し、batch Issue planning と後続の draft artifact boundary correction へ反映 | Goodall (`019f21f9-b2ab-7182-8246-96997f8571d9`) により current planning correction 後の `review_status: pass` | no | `iss-00271` から `iss-00274` は完了済み。現在は `iss-00275` を実装へ進める。 |
+| batch Issue planning | `iss-00271` から `iss-00276` の正規 `requirement.md`、Issue-local draft artifacts、placeholder canonical `design.md` / `plan.md`、Epic plan / report 更新 | 初回reviewで Issue report 判断台帳不足が見つかり、6件すべてへ判断台帳を追加済み。その後のADRにより、pre-start draft body は canonical `design.md` / `plan.md` から Issue-local artifacts へ移行した。 | Issue実行前のバトン設計として採用。要件は正本、design / plan seed は evidence-only artifact、canonical design / plan は Issue Planning で compose する。 | Goodall (`019f21f9-b2ab-7182-8246-96997f8571d9`) と Dewey (`019f22ae-51a7-7ea2-a13c-8a2ed1806d72`) により current planning / `iss-00275` planning が `review_status: pass` | no | `iss-00275` を実装し、完了後に `iss-00276` へ検証証跡を渡す。 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -154,7 +158,10 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 完了した Issue / PR / Release (必須)
 - 完了したIssue:
-  - なし。`iss-00271` から `iss-00276` は作成済みだが、まだ実装・完了していない。
+  - `iss-00271` / #271: Initiative templates
+  - `iss-00272` / #272: Epic templates
+  - `iss-00273` / #273: scope-layering reference / planning guidance
+  - `iss-00274` / #274: Epic execution handoff / readiness
 - 作成済みIssue:
   - `iss-00271` / #271: Initiative templates
   - `iss-00272` / #272: Epic templates
@@ -167,19 +174,19 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
 - E-AC-001: pending
-  - 実装担当Issue `iss-00271` は作成済み。実装は未実施。
+  - 実装担当Issue `iss-00271` は完了済み。最終達成判定は `iss-00276` の integrated quality gate で確認する。
 - E-AC-002: pending
-  - 実装担当Issue `iss-00272` は作成済み。実装は未実施。
+  - 実装担当Issue `iss-00272` は完了済み。最終達成判定は `iss-00276` の integrated quality gate で確認する。
 - E-AC-003: pending
-  - 実装担当Issue `iss-00273` は作成済み。実装は未実施。
+  - 実装担当Issue `iss-00273` は完了済み。最終達成判定は `iss-00276` の integrated quality gate で確認する。
 - E-AC-004: pending
-  - 実装担当Issue `iss-00274` は作成済み。実装は未実施。
+  - 実装担当Issue `iss-00274` は完了済み。最終達成判定は `iss-00276` の integrated quality gate で確認する。
 - E-AC-005: pending
-  - 実装担当Issue `iss-00275` は作成済み。実装は未実施。
+  - 実装担当Issue `iss-00275` は active planning 中。focused tests / smoke checks は未実施。
 - E-AC-006: pending
   - 実装担当Issue `iss-00276` は作成済み。実装は未実施。
 - E-AC-007: pending
-  - `iss-00271` から `iss-00276` で反映・検証する。実装は未実施。
+  - `iss-00271` から `iss-00274` で反映済み。`iss-00275` / `iss-00276` で検証する。
 - E-AC-008: partially_completed
   - planning correction として、`iss-00271` から `iss-00276` の pre-start design / plan seed を Issue-local draft artifacts へ移し、canonical `design.md` / `plan.md` を awaiting-assurance-compose placeholder に戻した。
   - 将来の workflow / command / validation としての固定は、`iss-00274` / `iss-00275` / `iss-00276` で扱う。
@@ -191,7 +198,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ## フォローアップ（別Issue化） (必須)
 - なし:
   - 追加Issueは現時点では作成していない。
-  - 次の作業は current planning set の fresh spec-review 後に `iss-00271` を開始すること。
+  - 次の作業は `iss-00275` の focused tests / smoke checks を実装し、完了後に `iss-00276` へ validation evidence を渡すこと。
 
 ## 省略/例外メモ (必須)
 - 該当なし
