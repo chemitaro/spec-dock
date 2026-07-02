@@ -59,6 +59,13 @@ ID: "epic-00270"
   - 日本語運用では、requirement / design / plan / report / artifacts の本文を日本語ファーストで作成する。
   - ファイルパス、コマンド、コード識別子、SpecDock の固定用語、外部固有名詞は原文を保持してよい。
   - templates、skills、workflow docs、reviewer guidance、smoke tests は、英語混在を放置せず、日本語ファースト authoring を誘導・確認できるようにする。
+- E-RQ-010: Issue-local draft artifact boundary and grade-aware role policy
+  - Issue Start 前の Issue design / plan seed は、canonical `design.md` / `plan.md` ではなく Issue-local `draft-design` / `draft-plan` artifact に置く。
+  - Canonical Issue `design.md` / `plan.md` は、Issue Planning で `assurance compose` されるまで `artifact_state: awaiting-assurance-compose` placeholder として保持する。
+  - Draft artifact 作成 surface は `new artifact draft-design --issue <issue-id>` と `new artifact draft-plan --issue <issue-id>` に統一し、actor別、specialist別、深さ別 command は作らない。
+  - system-architect / implementation-planner の関与は、Issue grade に応じた workflow / skill / EAL / reviewer gate で管理する。
+  - `assurance compose` は canonical compose 専用であり、pre-start draft artifact 作成に使わない。
+  - `compose-draft`、`issue prepare`、`epic prepare-issues` は初期実装必須 surface にしない。将来追加する場合も thin wrapper に限定する。
 
 ## エピック受け入れ条件
 - E-AC-001: Initiative template readiness
@@ -96,6 +103,11 @@ ID: "epic-00270"
   - 操作: 新規または更新された requirement / design / plan / report / artifacts の作成導線を確認する。
   - 期待結果: 説明文、判断理由、受け入れ条件、設計説明、計画説明、artifact本文が日本語ファーストになり、許容される英語は識別子・固定語・外部固有名詞に限定される。
   - 観測点: template snapshot、docs diff、skill read-through、smoke test、reviewer result。
+- E-AC-008: pre-start Issue draft migration readiness
+  - 前提: `iss-00271` から `iss-00276` の canonical `design.md` / `plan.md` に pre-start draft body が存在する。
+  - 操作: 各 draft body を Issue-local `draft-design` / `draft-plan` artifact へ移し、canonical `design.md` / `plan.md` を awaiting-assurance-compose placeholder に戻す。
+  - 期待結果: 未開始 Issue の canonical `design.md` / `plan.md` は本文入り draft ではなくなり、Issue-local draft artifacts は evidence-only として report EAL に記録される。
+  - 観測点: artifact path index、Issue report EAL、Epic report EAL、fresh `spec-reviewer` result、`rg` / `validate` 結果。
 
 ## スコープ
 - 必須:
@@ -111,6 +123,9 @@ ID: "epic-00270"
   - DDD / EDA を SpecDock の標準前提にすること。
   - 日本語運用の canonical docs / artifacts に、説明文としての英語本文を混在させたままにすること。
   - decision-only Issue を execution-ready として作ること。
+  - Issue Start 前に canonical Issue `design.md` / `plan.md` へ pre-start draft body を置くこと。
+  - actor / specialist / depth 別の draft artifact command を作ること。
+  - `assurance compose` を Issue-local draft artifact 作成に流用すること。
   - Issue grade templates を直接 redesign すること。ただし compatibility fix は許容する。
 - 対象外:
   - multi-repo / multi-tracker strategy。
