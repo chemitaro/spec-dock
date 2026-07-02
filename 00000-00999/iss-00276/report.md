@@ -132,6 +132,7 @@ ID: "iss-00276"
 - Issue完了: 未実施。
 - PR作成: 実施済み。PR #277 (`https://github.com/chemitaro/spec-dock/pull/277`)。
 - PR observation: 初回 observation で latest head の `validate` は成功、`provider-tests` は `make lint` の ruff format check failure により失敗した。`tests/cli_runtime/test_new.py` と `tests/unit/infra/test_init_update.py` を `uv run ruff format` で整形し、local `make lint` は成功した。再push / 再observation は次アクション。
+- PR observation re-run: latest head `e7f32efe` で CI は成功したが、Codex review がP1を2件検出した。P1-1 は Epic `report.md` を reviewer-gated artifact と読ませる wording、P1-2 は deferred PR delivery が Issue finish gate を迂回しうる wording。`workflow_epic.md`、`workflow_issue.md`、`spec-dock-epic-execution` skill を修正し、provider / dogfooding mirror parity を確認した。P2 の `iss-00271` assurance ledger mismatch は非ブロッキング follow-up として残す。
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
@@ -150,4 +151,6 @@ ID: "iss-00276"
 | final-local-commit | `C276-015` | staged diff review and local commit | pass | staged files were workflow mirror, active Epic / Issue reports, and checked-in dogfooding snapshot test; this commit is the S06 local commit evidence | PR delivery |
 | pr-delivery-initial | `C276-006`, `C276-007`, `C276-011`, `C276-016` | PR #277 creation and observation | repair-needed | PR #277 created against `main`; latest head observation reported `validate` success and `provider-tests` failure in `make lint` ruff format check | format repair and rerun PR observation |
 | pr-ci-format-repair | `C276-013`, `C276-014`, `C276-015` | `uv run ruff format`, `make lint` | pass | `tests/cli_runtime/test_new.py` and `tests/unit/infra/test_init_update.py` reformatted; local `make lint` passed (`ruff check`, `ruff format check`, `mypy`) | push and observe latest head |
+| pr-observation-recheck | `C276-006`, `C276-007`, `C276-011`, `C276-016` | PR observation on latest head `e7f32efe` | repair-needed | CI passed; Codex review reported two P1 findings about Epic report reviewer-gate wording and deferred PR delivery / issue finish gate semantics; one P2 assurance ledger mismatch is non-blocking | repair P1 findings and re-observe |
+| pr-review-p1-repair | `C276-013`, `C276-014` | provider / dogfooding docs and skill repair | pass | `workflow_epic.md` now treats Epic `report.md` as evidence ledger, not reviewer-gated artifact; `workflow_issue.md` defines deferred PR delivery gate for intermediate Issues; `spec-dock-epic-execution` requires that gate before returning to issue finish; provider / dogfooding mirrors match | run validation and re-observe |
 <!-- spec-dock:managed-section end id="report.step-evidence" -->

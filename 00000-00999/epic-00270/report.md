@@ -39,8 +39,9 @@ ID: "epic-00270"
   - Initial reviewer gates では `code-reviewer` が pass し、`spec-reviewer` / `qa-reviewer` が automated evidence の closure ID 過剰主張をP1として検出した。`iss-00276/report.md` の Step Evidence を修正し、automated gate は manual / reviewer / PR closure を閉じないようにした。
   - Manual scaffold dogfooding として一時ディレクトリに `spec-dock init` し、生成された docs/templates が provider assets と一致すること、generated workflow / templates に handoff-ready / execution-ready、日本語ファースト、draft artifact boundary が反映されることを確認した。
   - PR #277 を作成した。初回 observation で latest head の `validate` は成功したが、`provider-tests` は ruff format check failure で失敗したため、format repair を実施し、local `make lint` は成功した。
+  - format repair 後の PR observation で CI は成功したが、Codex review がP1を2件検出した。Epic `report.md` の reviewer-gated wording と deferred PR delivery / issue finish gate semantics を修正し、provider / dogfooding mirror parity を確認した。
 - 次のマイルストーン:
-  - `iss-00276` の S07 に従い、format repair を push し、PR observation を再実行する。
+  - `iss-00276` の S07 に従い、P1修復を push し、PR observation を再実行する。
 - ブロッカー:
   - 現時点で作業停止ブロッカーはなし。
 
@@ -195,7 +196,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - E-AC-005: pending
   - 実装担当Issue `iss-00275` は完了済み。最終達成判定は `iss-00276` の integrated quality gate で確認する。
 - E-AC-006: pending
-  - 実装担当Issue `iss-00276` は active planning review pass 済み。final automated gate、manual scaffold dogfooding / hygiene read-through、reviewer gates final re-review、final local commit、PR creation は実施済み。初回 PR observation は provider-tests failure で repair-needed となり、local format repair / `make lint` は成功した。再push / 再observation は未実施。
+  - 実装担当Issue `iss-00276` は active planning review pass 済み。final automated gate、manual scaffold dogfooding / hygiene read-through、reviewer gates final re-review、final local commit、PR creation は実施済み。初回 PR observation は provider-tests failure で repair-needed となり、format repair 後の observation で CI は成功した。Codex review P1 2件を修復済みであり、再push / 再observation は未実施。
 - E-AC-007: pending
   - `iss-00271` から `iss-00275` で反映・検証済み。`iss-00276` final automated gate でも unit / CLI runtime / SpecDock structural checks は通過した。manual / reviewer / PR gate で最終確認する。
 - E-AC-008: partially_completed
