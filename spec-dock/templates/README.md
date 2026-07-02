@@ -6,6 +6,7 @@
 - `initiative/` → `initiatives/init-xxxx-<slug>/`
 - `epic/` → `.../epics/epic-xxxx-<slug>/`
 - `issue/` → `.../issues/iss-xxxx-<slug>/`
+- Initiative / Epic / Issue の責務境界と authority flow は `docs/authoring/scope-layering.md` を参照します。テンプレートは薄い scaffold に留め、scope 表や workflow 詳細は複製しません。
 - legacy `discussions/{scratch,interview,research,disc,adr,pr-repair-batch}.md` → `<scope>/discussions/<ts>-<kind>-<slug>.md`
 - `draft-requirement` / `draft-design` / `draft-plan` は safety-sensitive draft work です。Future `new artifact draft-*` は Issue scope only で、Initiative / Epic scope は unsupported のため write 前に no-write fail-closed します。Issue の `draft-design` / `draft-plan` は verified `.assurance.json` の `authorized_profile` に対応する `templates/issue-profiles/<profile>/design.md` / `plan.md` を source として render します。
 - legacy discussion same-second collision 時は `<scope>/discussions/<ts>-<nn>-<kind>-<slug>.md`

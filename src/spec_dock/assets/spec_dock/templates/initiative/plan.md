@@ -14,6 +14,7 @@ ID: "<INIT_ID>"
 ## 作成方針
 - この文書は Initiative から Epic 群へ作業を渡すロードマップを固定する。
 - 日本語を主文とし、ファイルパス、コマンド、コード識別子、SpecDock 固定語は原文のまま扱ってよい。
+- Scope ownership と authority flow は `docs/authoring/scope-layering.md` を参照し、この template には責務表を複製しない。
 - Epic / Issue の詳細実装順序は、各スコープの planning / execution で具体化する。
 
 ## この計画が達成する目標 / 指標

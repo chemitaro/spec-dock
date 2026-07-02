@@ -2,9 +2,12 @@
 
 このガイドは、authoring agent が execution handoff 前に発見事項の配置先を判断するための参照です。Workflow docs は入口ルールを持ち、この文書は再利用できる例と good / bad routing pattern を持ちます。Templates と skills は薄く保ち、生成 artifact へ例を複製せず、この文書へ link します。
 
+Scope ownership、decision radius、authority flow の共通定義は [authoring/scope-layering.md](scope-layering.md) を authoritative reference とします。この文書は routing 例を補うものであり、責務表を複製しません。
+
 ## 配置ルール（Routing rule）
 
 未来の作業を隠さずに判断を所有できる、最小の durable scope へ配置します。
+Issue-local / Epic / Initiative のどれが owning scope か迷う場合は、先に [authoring/scope-layering.md](scope-layering.md) の ownership と authority flow を確認し、そのうえで下の routing rule を適用します。
 
 | 発見種別（finding type） | 配置先（destination） | 使う条件（use when） | 引き渡し結果（handoff result） |
 |---|---|---|---|

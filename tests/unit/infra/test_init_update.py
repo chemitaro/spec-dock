@@ -418,6 +418,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/authoring/decision-routing.md": (
             "src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md"
         ),
+        "spec-dock/docs/authoring/scope-layering.md": (
+            "src/spec_dock/assets/spec_dock/docs/authoring/scope-layering.md"
+        ),
         "spec-dock/docs/workflow_initiative.md": ("src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"),
         "spec-dock/docs/workflow_epic.md": "src/spec_dock/assets/spec_dock/docs/workflow_epic.md",
         "spec-dock/docs/workflow_issue.md": "src/spec_dock/assets/spec_dock/docs/workflow_issue.md",
@@ -4395,6 +4398,7 @@ class TestInitUpdate(CliRuntimeHarness):
             )
 
         docs_root = repo_root / "src/spec_dock/assets/spec_dock/docs"
+        assert (docs_root / "authoring" / "scope-layering.md").is_file()
         phase_docs = [
             docs_root / "phase_requirement.md",
             docs_root / "phase_design.md",
@@ -4454,9 +4458,10 @@ class TestInitUpdate(CliRuntimeHarness):
             "## レビューゲート（reviewer gate）",
             "## エピック分割境界（Epic boundary）",
             "Issue-level の実装詳細、TDD の細かなサイクル、内部 class / file 設計はここで必須化しない",
-            "authoring reference が存在する場合に接続する",
+            "この template には責務表を複製しない",
         ):
             assert fragment in initiative_design
+        assert "docs/authoring/scope-layering.md" in initiative_design
         for fragment in (
             "## エピックへ渡す準備完了条件（handoff readiness）",
             "report evidence",
@@ -4468,7 +4473,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             assert fragment in initiative_plan
         for text in (initiative_requirement, initiative_design, initiative_plan):
-            assert "docs/authoring/scope-layering.md" not in text
+            assert "iss-00271" not in text
+            assert "iss-00272" not in text
+            assert "iss-00273" not in text
         for fragment in (
             "能力 / モデル envelope（capability / model envelope）",
             "後続 Issue seed",
@@ -4496,8 +4503,12 @@ class TestInitUpdate(CliRuntimeHarness):
             "Issue-level の TDD step や private implementation design は必須前提にせず",
         ):
             assert fragment in epic_plan
+        assert "docs/authoring/scope-layering.md" in epic_plan
+        assert "Issue-local" in epic_plan
+        assert "`draft-design`" in epic_plan
+        assert "`draft-plan`" in epic_plan
+        assert "path index" in epic_plan
         for text in (epic_requirement, epic_design, epic_plan):
-            assert "docs/authoring/scope-layering.md" not in text
             assert "iss-00272" not in text
             assert "iss-00273" not in text
             assert "DDD / EDA を必須前提にする" not in text

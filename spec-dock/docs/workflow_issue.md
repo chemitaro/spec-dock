@@ -19,6 +19,7 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 - Issue plan playbook: [phase_plan_issue.md](phase_plan_issue.md)
 - Issue plan authoring contract: [authoring/issue-plan.md](authoring/issue-plan.md)
 - Decision routing: [authoring/decision-routing.md](authoring/decision-routing.md)
+- Scope layering: [authoring/scope-layering.md](authoring/scope-layering.md)
 - Hard cutover reference: [reference_hard_cutover.md](reference_hard_cutover.md)
 
 ## 作成と issue start
@@ -78,13 +79,13 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 ## 仕様 authoring（spec authoring）
 
 - Issue planning は `.agents/skills/spec-dock-issue-planning/SKILL.md` を operational entrypoint にし、仕様作成の phase promotion detail は `workflow_spec_authoring.md`、未解決の曖昧さは `spec-dock-clarification` skill と `workflow_clarification.md` の bridge/reference に route する
-- Decision-only Issue は execution-ready ではない。Issue-local な軽量判断なら issue requirement / design / plan / report に閉じてよいが、複数 Issue の責務境界、分解、依存方向、shared workflow policy に影響する判断は Epic へ戻し、複数 Epic または投資判断に影響する判断は Initiative へ戻す。長期 architecture decision は ADR 候補にし、判断に必要な情報が足りない場合は clarification へ戻す。具体例と good / bad routing pattern は [authoring/decision-routing.md](authoring/decision-routing.md) を参照する
+- Decision-only Issue は execution-ready ではない。Issue-local な軽量判断なら issue requirement / design / plan / report に閉じてよいが、複数 Issue の責務境界、分解、依存方向、shared workflow policy に影響する判断は Epic へ戻し、複数 Epic または投資判断に影響する判断は Initiative へ戻す。Issue は parent envelope を再定義せず、上位 scope の目的・責務境界・handoff boundary は [authoring/scope-layering.md](authoring/scope-layering.md) と親 docs を参照する。長期 architecture decision は ADR 候補にし、判断に必要な情報が足りない場合は clarification へ戻す。具体例と good / bad routing pattern は [authoring/decision-routing.md](authoring/decision-routing.md) を参照する
 - Issue execution は `.agents/skills/spec-dock-issue-execution/SKILL.md` を operational entrypoint にし、承認済み / reviewer-pass 済みの `requirement.md` / `design.md` / `plan.md` と executable `plan.md` を前提に、この workflow の execution gate / report gate / completion gate detail に route する
 - active issue 配下の `requirement.md` / `design.md` / `plan.md` を埋める
 - Requirement / design / plan の phase promotion は `workflow_spec_authoring.md` の detail / reference semantics に従い、各 artifact ごとに fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
 - Requirement / design / plan に未解決の仕様 gap、用語衝突、責務境界の曖昧さがある場合は、実装で仮定せず [workflow_clarification.md](workflow_clarification.md) へ戻す。
 - `artifacts/`: `new artifact <type> --issue <issue-id> --title "..."` で、この issue の `artifacts/` 配下に timestamp-prefixed original を作成する。current catalog は `blank` / `adr` / `disc` / `research` / `interview` / `decision-candidate` / `pr-repair-batch` / `draft-requirement` / `draft-design` / `draft-plan`。runtime が filename / path を生成し、caller は stdout の `path=...` を正本として扱う。標準形は `<ts>-<kind>-<slug>.md`、same-second collision fallback は `<ts>-<nn>-<kind>-<slug>.md`。既存 `discussions/` 配下の artifact は legacy/grandfathered として保持する。詳細 contract は [reference_naming.md](reference_naming.md) を参照する
-- artifact docs は思考、知識、未確定情報を外部化する作業面であり、それ自体を正本へ昇格させない。`blank` / `interview` / `research` / `disc` の文脈をもとに、必要な `adr` を新規作成し、`requirement.md` / `design.md` / `plan.md` へ織り込む。
+- artifact docs は思考、知識、未確定情報を外部化する作業面であり、それ自体を正本へ昇格させない。Epic planning から渡された Issue-local `draft-design` / `draft-plan` も evidence として採否判断し、採用・部分採用・棄却・stale / blocked の disposition を canonical docs または `report.md` ledger に反映してから `design.md` / `plan.md` の正本根拠にする。`blank` / `interview` / `research` / `disc` の文脈をもとに、必要な `adr` を新規作成し、`requirement.md` / `design.md` / `plan.md` へ織り込む。
 - `note` は新規作成 catalog から retired。既存 `note` artifact は grandfathered として壊さない。
 - templates は完成形ではなく、書き始めるための最小 scaffold に留める。仕様書作成の説明や判断基準は docs / skills を参照する
 - Issue の `templates/issue/design.md` と `templates/issue/plan.md` は compose 前 placeholder であり、手動 authoring の開始点ではない。実体の `design.md` / `plan.md` 本文は、`.assurance.json` の `authorized_profile` に従って `templates/issue-profiles/{lite,standard,strict,critical}/{design,plan}.md` から `assurance compose` が合成する

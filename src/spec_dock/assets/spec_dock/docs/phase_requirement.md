@@ -7,6 +7,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 - 全体像: [guide.md](guide.md)
 - Spec authoring workflow: [workflow_spec_authoring.md](workflow_spec_authoring.md)
 - Scope workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
+- Scope layering: [authoring/scope-layering.md](authoring/scope-layering.md)
 - 作業成果物の置き方と命名: 対象 scope 配下の `artifacts/rules.md`, legacy `discussions/rules.md`, [reference_naming.md](reference_naming.md)
 
 ## フェーズ契約（phase contract）
@@ -39,6 +40,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 - trace rule:
   - 下位文書は上位文書を再記述せず、参照と具体化差分だけを書く
   - 下位で上位 requirement と矛盾する場合は、下位で上書きせず上位文書または ADR / decision log を更新する
+  - 判断の置き場に迷う場合は [authoring/scope-layering.md](authoring/scope-layering.md) と対象 `workflow_*.md` を authoritative routing として確認する
 
 ## 標準順
 

@@ -8,6 +8,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 - Spec authoring workflow: [workflow_spec_authoring.md](workflow_spec_authoring.md)
 - Clarification workflow: [workflow_clarification.md](workflow_clarification.md)
 - Scope workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
+- Scope layering: [authoring/scope-layering.md](authoring/scope-layering.md)
 - 作業成果物の置き方と命名: 対象 scope 配下の `artifacts/rules.md`, legacy `discussions/rules.md`, [reference_naming.md](reference_naming.md)
 
 ## フェーズ契約（phase contract）
@@ -40,6 +41,7 @@ scope 固有の entry / quality gate は `workflow_*.md` が additive に定義�
 - ADR rule:
   - 長寿命・横断的・不可逆寄りの判断は ADR / decision log に分離する
   - 局所的で可逆な判断は対象 scope の design に置く
+  - 判断半径や親 scope との所有境界に迷う場合は [authoring/scope-layering.md](authoring/scope-layering.md) と対象 `workflow_*.md` に戻して routing する
 
 ## 標準順
 
