@@ -561,6 +561,124 @@ class TestCliValidate(CliRuntimeHarness):
             assert p.returncode == 0, p.stdout + p.stderr
             assert "spec-dock: ok" in p.stdout
 
+    def test_validate_accepts_old_new_and_mixed_document_surfaces(self) -> None:
+        cases = ("old-only", "new-only", "mixed")
+        for case in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                assert main(["init", str(target)]) == 0
+                self._create_same_repo_linked_hierarchy(target)
+                issue_dir = (
+                    target
+                    / "spec-dock"
+                    / "initiatives"
+                    / "init-00001-auth-platform"
+                    / "epics"
+                    / "epic-00002-jwt-auth"
+                    / "issues"
+                    / "iss-00003-add-refresh-token"
+                )
+                for artifacts_dir in (target / "spec-dock" / "initiatives").rglob("artifacts"):
+                    shutil.rmtree(artifacts_dir)
+                for discussions_dir in (target / "spec-dock" / "initiatives").rglob("discussions"):
+                    shutil.rmtree(discussions_dir)
+
+                if case in {"old-only", "mixed"}:
+                    discussions_dir = issue_dir / "discussions"
+                    discussions_dir.mkdir(parents=True, exist_ok=True)
+                    (discussions_dir / "20260329t123456z-adr-legacy-decision.md").write_text(
+                        "legacy adr\n",
+                        encoding="utf-8",
+                    )
+                if case in {"new-only", "mixed"}:
+                    artifacts_dir = issue_dir / "artifacts"
+                    artifacts_dir.mkdir(parents=True, exist_ok=True)
+                    (artifacts_dir / "20260701t010101z-adr-future-decision.md").write_text(
+                        "future adr\n",
+                        encoding="utf-8",
+                    )
+
+                p = self._run_runtime_capture(target, ["validate"])
+                assert p.returncode == 0, p.stdout + p.stderr
+                assert "spec-dock: ok" in p.stdout
+
+    def test_validate_rejects_malformed_artifact_filename_with_artifact_diagnostic(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+            artifacts_dir = issue_dir / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            (artifacts_dir / "20260701t010101z-ADR-future-decision.md").write_text("bad\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Malformed artifact filename" in p.stderr
+            assert "20260701t010101z-ADR-future-decision.md" in p.stderr
+            assert "Malformed discussion document filename" not in p.stderr
+
+    def test_validate_rejects_symlinked_artifact_file_with_artifact_diagnostic(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+            artifacts_dir = issue_dir / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            external = target / "external-artifact.md"
+            external.write_text("external\n", encoding="utf-8")
+            (artifacts_dir / "20260701t010101z-adr-external-decision.md").symlink_to(external)
+
+            p = self._run_runtime_capture(target, ["validate"])
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Unsafe artifact file" in p.stderr
+            assert "20260701t010101z-adr-external-decision.md" in p.stderr
+
+    def test_validate_rejects_duplicate_artifact_id_with_artifact_diagnostic(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            issue_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+            )
+            artifacts_dir = issue_dir / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            (artifacts_dir / "20260701t010101z-adr-first.md").write_text("first\n", encoding="utf-8")
+            (artifacts_dir / "20260701t010101z-adr-second.md").write_text("second\n", encoding="utf-8")
+
+            p = self._run_runtime_capture(target, ["validate"])
+            assert p.returncode != 0, p.stdout + p.stderr
+            assert "Duplicate artifact id detected" in p.stderr
+            assert "id=20260701t010101z-adr" in p.stderr
+            assert "Duplicate discussion" not in p.stderr
+
     def test_validate_blocks_proposed_or_missing_metadata_delegated_draft_artifacts(self) -> None:
         cases = (
             (

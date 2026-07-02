@@ -47,7 +47,7 @@ Epic は設計の背骨です。
 - `plan.md`: Issue 分割、依存順、品質ゲート。shared axiom は `phase_plan.md`、Epic 固有の書き方は `phase_plan_epic.md`
 - Epic は複数 Issue の設計の背骨を所有する。Issue 分割、責務境界、依存方向、shared component / workflow policy、rollout 順に影響する durable decision は Epic requirement / design / plan に反映してから Issue へ落とす。Epic をまたいで product / operating model / 投資判断へ広がる場合は Initiative へ戻し、長期 architecture decision として独立に記録すべき場合は ADR 候補にする。routing 例は [authoring/decision-routing.md](authoring/decision-routing.md) を参照する
 - Requirement / design / plan の phase promotion は `workflow_spec_authoring.md` を正本にし、各 artifact ごとに fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
-- `discussions/`: `new doc <type> --epic <epic-id> --title "..."` で、この epic の `discussions/` 配下に timestamp-prefixed original を作成する。current catalog は `adr` / `disc` / `research` / `interview` / `scratch` / `pr-repair-batch` / `draft-requirement` / `draft-design` / `draft-plan`。runtime が filename / path を生成し、caller は stdout の `path=...` を正本として扱う。標準形は `<ts>-<kind>-<slug>.md`、same-second collision fallback は `<ts>-<nn>-<kind>-<slug>.md`。詳細 contract は [reference_naming.md](reference_naming.md) を参照する
+- `artifacts/`: `new artifact <type> --epic <epic-id> --title "..."` で、この epic の `artifacts/` 配下に timestamp-prefixed original を作成する。current catalog は `blank` / `adr` / `disc` / `research` / `interview` / `decision-candidate` / `pr-repair-batch`。`draft-requirement` / `draft-design` / `draft-plan` は Issue-only artifact として扱う。runtime が filename / path を生成し、caller は stdout の `path=...` を正本として扱う。標準形は `<ts>-<kind>-<slug>.md`、same-second collision fallback は `<ts>-<nn>-<kind>-<slug>.md`。既存 `discussions/` 配下の artifact は legacy/grandfathered として保持する。詳細 contract は [reference_naming.md](reference_naming.md) を参照する
 - `note` は新規作成 catalog から retired。既存 `note` artifact は grandfathered として壊さない。
 - shared な書き方は `phase_*.md`、lifecycle / governance と Epic 固有の分割判断はこの workflow を正本とする
 
@@ -63,14 +63,14 @@ Handoff package は少なくとも次を含みます。
 - cross-issue draft package covering shared vocabulary, responsibility boundaries, dependency order, handoff inputs / outputs, and validation strategy across the planned Issues
 - issue-local draft requirement / draft design artifact paths for each target Issue after Issue creation, or explicit skip / fallback evidence
 
-Cross-issue draft package は planning evidence であり、Issue の canonical `requirement.md` / `design.md` / `plan.md` ではありません。個別 Issue の draft requirement / draft design は、既存の runtime-owned discussion creation command で作成します。
+Cross-issue draft package は planning evidence であり、Issue の canonical `requirement.md` / `design.md` / `plan.md` ではありません。個別 Issue の draft requirement / draft design は、runtime-owned artifact creation command で作成します。
 
 ```bash
-./spec-dock/scripts/spec-dock new doc draft-requirement --issue <issue-id> --title "..."
-./spec-dock/scripts/spec-dock new doc draft-design --issue <issue-id> --title "..."
+./spec-dock/scripts/spec-dock new artifact draft-requirement --issue <issue-id> --title "..."
+./spec-dock/scripts/spec-dock new artifact draft-design --issue <issue-id> --title "..."
 ```
 
-各 command が返す `path=...` が artifact path です。これらの issue-local drafts は discussion evidence / planning input として扱い、ad hoc file writes や canonical issue docs への直接書き込みで代替してはいけません。Canonical issue docs は個別 Issue planning workflow と [workflow_issue.md](workflow_issue.md) の authoring contract で正式化します。
+各 command が返す `path=...` が artifact path です。これらの issue-local drafts は artifact evidence / planning input として扱い、ad hoc file writes や canonical issue docs への直接書き込みで代替してはいけません。Canonical issue docs は個別 Issue planning workflow と [workflow_issue.md](workflow_issue.md) の authoring contract で正式化します。
 
 Target Issue が draft-requirement または draft-design の一方または両方を意図的に受け取らない場合、Epic report / handoff evidence は target Issue id、skipped draft type(s)、理由、その omission が Issue planning handoff を block しない理由、必要に応じた revisit / follow-up condition を記録します。
 
@@ -102,7 +102,7 @@ Epic completion gate は、required Issues が完了済みまたは fresh spec-r
 - epic-wide pre-PR:
   - Epic の全 Issue 実装が完了し、Epic PR を更新する前に、開発ベースラインから最終実装状態までの全差分を対象に品質ゲートを置く
   - `gh pr view <pr> --json baseRefName,baseRefOid,headRefName,headRefOid` で base endpoint を記録し、local `HEAD` を final endpoint として固定する
-  - `git diff --stat <baseRefOid>...HEAD` と `git diff --name-status <baseRefOid>...HEAD` を `report.md` または `discussions/` の共有証跡に残す
+  - `git diff --stat <baseRefOid>...HEAD` と `git diff --name-status <baseRefOid>...HEAD` を `report.md` または `artifacts/` の共有証跡に残す
   - fresh `deep-consultant` と fresh `spec-reviewer` が同じ共有証跡と endpoint を参照して Epic 全体をレビューする
   - すべての指摘は `fixed` / `superseded` / `explicitly_deferred_with_user_acceptance` のいずれかに disposition されるまで PR update / push を行わない
   - `fixed` または `superseded` の指摘は再検証と fresh re-review を通してから PR update / push に進む

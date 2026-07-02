@@ -49,7 +49,11 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-268-001 | resolved | implementation | orchestrator | Need dogfooding target that proves on-demand `artifacts/` creation without disturbing legacy `discussions/`. | use Epic scope; use new test fixture; use active Issue `iss-00268` | Use active Issue `iss-00268` because it has legacy `discussions/` and no `artifacts/` before smoke. | This gives direct evidence for artifact creation and non-migration with minimal side effects. | promoted_to_design | `design.md` DES-268-001 through DES-268-003 | none |
+| D-268-002 | resolved | scope | orchestrator | Epic report closeout is required but main direct edit boundary excludes Epic-level report. | main edits Epic report; delegate to doc-writer; skip Epic report | Delegate Epic `report.md` closeout to `doc-writer` in S90. | Keeps direct-edit boundary while satisfying AC-268-006. | promoted_to_plan | `plan.md` S90 | none |
+| D-268-003 | resolved | test-strategy | orchestrator | Need at least one ADR/draft/delegated smoke, but delegated smoke would create extra delegated evidence. | run ADR smoke; run draft smoke; run delegated diff guard smoke; skip all with rationale | Run Issue-scope `draft-requirement` smoke and skip delegated smoke as non-blocking because `iss-00266` already covered delegated diff guard. | Draft smoke exercises safety-sensitive artifact creation without adding unnecessary delegated authoring artifacts. | promoted_to_design | `design.md` DES-268-004; `plan.md` S03 | none |
+| D-268-004 | resolved | test-strategy | spec-reviewer | AC-268-003 includes not rewriting legacy `discussions/` links, but `find -type f` does not cover symlinks. | compare only regular files; add symlink `ls -l` / `readlink`; run broad checksum | Add before/after `ls -l` and `readlink` comparison for `discussions/rules.md`. | This directly covers the no-link-rewrite requirement without broadening scope. | promoted_to_plan | `plan.md` S01/S04; reviewer `019f1e2b-21b2-7f62-a3b2-7628232e393c` P1 finding | none |
+| D-268-005 | resolved | operation | spec-reviewer | S04 may run `sync`, but allowed outputs did not state how to treat sync-generated projection diffs. | forbid all sync diffs; allow deterministic projection evidence; skip sync | Allow deterministic sync projection output only as recorded evidence and stop on unrelated/unstable diffs. | Preserves AC-268-004 while keeping commit scope explicit. | promoted_to_plan | `plan.md` S04 and Allowed Files / Outputs; reviewer `019f1e2b-21b2-7f62-a3b2-7628232e393c` P2 finding | none |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +67,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-268-001 | adopted | command / repo inspection | `design.md`, `plan.md` | Existing active Issue structure and prior Issue completions provide enough planning evidence to define dogfood target and smoke sequence. | `active show`; `find` over `epic-00259` showed `iss-00268/discussions`; `deps check iss-00268`; prior commits `f48d505b`, `6d532548`, `c9e29244`, `1e9031e9`, `3f7ee2f9`, `510d1945` | S01-S04 executed; proceed to S90 Epic report closeout. |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +75,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-268-001 | Primary objective is dogfooding `new artifact` under `artifacts/` and proving no legacy `discussions/` migration. | Secondary objective is Epic closeout and one-PR handoff preparation. | low | passed by fresh S00 spec-reviewer |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +83,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...`（none / `artifacts/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | `requirement.md` approved; dependencies `iss-00262` through `iss-00267` complete; active Issue and dogfooding workspace inspected. | none | adopted | passed | no | promote |
+| design | Design promoted to active Issue dogfood target, snapshot/non-migration contract, draft smoke choice, and Epic report delegation boundary. | none | adopted | passed | no | promote |
+| plan | Plan promoted to S00-S99 plus E99 Epic pre-PR gate, explicit commands, closures, allowed/forbidden files, delegated Epic report closeout, and P1 symlink check amendment. | none | adopted | passed | no | execute approved plan |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +113,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | passed | manual-authored canonical docs |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -124,127 +130,199 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S00 planning readiness を実施し、active Issue `iss-00268` を dogfooding target とする design / plan を approved に具体化した。
+- Dogfooding command smoke は fresh spec-reviewer planning pass 後に実行する。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-07-01 HH:MM - HH:MM）
+### セッションログ（2026-07-01 S00 planning）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S00 Plan Readiness and Assurance Gate
+- AC/EC: AC-268-001 through AC-268-006; CLOS-268-001 through CLOS-268-009
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: S00 Plan Readiness and Assurance Gate
+  - closure ids: CLOS-268-001 through CLOS-268-009
 
 #### 実施内容
-- ...
+- Active Issue, dependency readiness, and target dogfooding workspace were inspected.
+- `design.md` was promoted to an approved design that uses `iss-00268` as the dogfood target and preserves legacy `discussions/`.
+- `plan.md` was promoted to an approved S00-S99 / E99 plan with explicit artifact smoke commands, non-migration checks, validate/sync checks, Epic report delegation, and Epic-wide PR gate.
+- `report.md` recorded planning decisions, evidence adoption, objective alignment, and reviewer gate evidence.
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+./spec-dock/scripts/spec-dock active show
+# initiative=init-local-00003, epic=epic-00259, issue=iss-00268
 
-<result>
+./spec-dock/scripts/spec-dock deps check iss-00268
+# ready=true blockers=0
+
+find spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption -maxdepth 3 -type d \( -name artifacts -o -name discussions \) -print | sort
+# Shows Epic artifacts/discussions and Issue discussions directories, including iss-00268/discussions.
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S00 | planning characterization | inspect-only | active Issue has `discussions/`; design/plan were draft and `guidance issue-planning` reported `design-not-substantive` | command + document inspection | pass | Established planning gap before dogfood execution. |
+| S00 | planning update | manual-required | design / plan promoted to substantive approved artifacts | issue doc update + fresh spec-reviewer | pass | Fresh spec-reviewer passed before S01. |
+| S01-S04 | dogfood execution | manual-required | `blank`, `research`, and `draft-requirement` artifacts plus `artifacts/rules.md` symlink created under `artifacts/`; `discussions/rules.md` symlink unchanged; validate/sync passed | command + inspection | pass | S90 Epic report closeout remains. |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S00 | Epic report closeout is outside main direct edit boundary | orchestrator | delegated S90 to doc-writer | CLOS-268-007 | no | D-268-002 |
+| S00 | delegated smoke is not required if draft smoke satisfies AC-268-005 | orchestrator | selected `draft-requirement` smoke and skip delegated output smoke with rationale | CLOS-268-004 | no | D-268-003 |
+| S00 | `find -type f` does not prove `discussions/rules.md` symlink was preserved | spec-reviewer | added before/after `ls -l` and `readlink` comparison to S01/S04 | CLOS-268-003 | yes | D-268-004 |
+| S00 | `sync` output boundary was under-specified | spec-reviewer | allowed only deterministic sync projection evidence and stop on unrelated/unstable diffs | CLOS-268-005 / CLOS-268-006 | yes | D-268-005 |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S00 | CLOS-268-001 through CLOS-268-009 | design/plan/report planning authority established | design / plan / report updated; fresh spec-reviewer passed | pass | Execution may proceed to S01. |
+| S01-S04 | CLOS-268-001 through CLOS-268-006, CLOS-268-009 | dogfood commands and validation evidence | three artifacts and `artifacts/rules.md` symlink created; legacy `discussions/` unchanged; `validate` and `sync` passed; no source/test diff | pass | Proceed to S90. |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| CLOS-268-001 | S02 | yes | command-required | `artifacts/` absent before smoke | `new artifact blank --issue iss-00268` | pass | Created `20260701t145916z-dogfood-blank-artifact.md` and `artifacts/rules.md` symlink under active Issue `artifacts/`. |
+| CLOS-268-002 | S02 | yes | command-required | `artifacts/` absent before smoke | `new artifact research --issue iss-00268` | pass | Created `20260701t145919z-research-dogfood-research-artifact.md` with `research` template/frontmatter. |
+| CLOS-268-003 | S01/S04 | yes | manual-required | regular-file list empty; `rules.md` symlink target `../../../../../../../docs/rules/issue/discussions.md`; `artifacts/` absent | before/after sorted discussions snapshot plus `rules.md` `ls -l` / `readlink` comparison | pass | After smoke, regular-file list remained empty and symlink target unchanged. |
+| CLOS-268-004 | S03 | yes | command-required | canonical `requirement.md` unchanged before draft smoke | `new artifact draft-requirement --issue iss-00268`; `git diff -- requirement.md` | pass | Created `20260701t145944z-draft-requirement-dogfood-draft-requirement.md`; canonical requirement diff empty. |
+| CLOS-268-005 | S04 | yes | command-required | artifacts created | `validate` / `sync` | pass | `validate` returned `nodes=171`; `sync` returned ok and active unchanged. |
+| CLOS-268-006 | S04 | yes | inspect-only | projection available before sync | projection / generated output inspection | pass | `sync` wrote projection paths but produced no tracked projection diff; node projection remains separate from artifact files and legacy discussion symlink. |
+| CLOS-268-007 | S90 | yes | delegated-doc-required | S01-S04 dogfood evidence ready | Epic report doc-writer evidence | pass | Epic report updated with EAL-009, Issue completion status, E-AC status, and pending Epic-wide gates. |
+| CLOS-268-008 | E99 | yes | reviewer-required | not yet run | Epic-wide spec/code/QA review | planned | After Issue 268 commit; outside Issue-local finish gate. |
+| CLOS-268-009 | S99 | yes | inspect-only | planning and dogfood diff | `git diff --name-only`; `git ls-files --others --exclude-standard`; `readlink artifacts/rules.md` | pass | Diff scope is Issue docs, Epic report, `.assurance.json`, three dogfood artifacts, and `artifacts/rules.md` symlink; no source/runtime/test diff. |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| CLOS-268-001 | S02 | blank artifact command and path inspection | pass | `artifacts/20260701t145916z-dogfood-blank-artifact.md`. |
+| CLOS-268-002 | S02 | research artifact command and content inspection | pass | `artifacts/20260701t145919z-research-dogfood-research-artifact.md`. |
+| CLOS-268-003 | S01/S04 | before/after discussions file list and `rules.md` symlink comparison | pass | No regular files before/after; symlink target unchanged. |
+| CLOS-268-004 | S03 | draft-requirement artifact command and canonical requirement diff | pass | Draft artifact created; `git diff -- requirement.md` empty. |
+| CLOS-268-005 | S04 | `validate` and `sync` command output | pass | `validate` ok; `sync` ok. |
+| CLOS-268-006 | S04 | projection inspection and git diff check | pass | Projection command wrote expected paths but tracked projection files stayed unchanged. |
+| CLOS-268-007 | S90 | doc-writer Epic report update | pass | Epic report records dogfood closeout and pending Epic-wide gates. |
+| CLOS-268-008 | E99 | Epic-wide quality gate plan | planned | Runs after Issue commit; not claimed complete in Issue 268. |
+| CLOS-268-009 | S99 | diff scope inspection | pass | Issue docs, Epic report, `.assurance.json`, three artifacts, and `artifacts/rules.md` symlink only. |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| amended check | CLOS-268-003 | symlink-state comparison | CLOS-268-003 | Reviewer found `find -type f` did not cover `discussions/rules.md` symlink rewrite risk. | yes | yes, fresh S00 spec-reviewer required |
+| amended boundary | CLOS-268-005 / CLOS-268-006 | sync output handling | CLOS-268-005 / CLOS-268-006 | Reviewer found `sync` generated-output boundary needed explicit allowed/no-commit handling. | yes | yes, fresh S00 spec-reviewer required |
 
 #### ワークフロー委任同意の証跡（Workflow Delegation Consent）
 `workflow_issue.md` is the policy source for workflow-scoped delegation consent. This report records observed consent, boundary, expiry, and denied / unavailable handling only.
 
 | 同意元（consent source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可理由（denied / unavailable reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user instruction / explicit approval / none | ... | iss-00268 | current session / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / write-capable delegation / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none / denied / unavailable / host conflict | proceed / ask user / block gate / record waiver request |
+| user instruction / workflow role policy | `/Users/iwasawayuuta/.codex/worktrees/b4d4/spec-dock` | iss-00268 | current session | spec-reviewer, doc-writer for Epic report, code-reviewer/qa-reviewer at E99 | same repo, active issue, session, named role; no destructive action / publishing / credentialed access / scope expansion / private external system use | issue complete / session end / scope change / host policy conflict / user revocation | none | proceed with final Issue review |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S00 | approved-local-execution | issue-level planning artifact authority | N/A | issue design/plan/report | requirement/design/plan/report | issue planning docs | source/tests/runtime changes | assurance + spec-reviewer | reviewer fail | planning docs and gates | pass |
+| S90 | delegated | Epic report is outside main direct edit boundary | doc-writer | Epic report closeout after dogfood evidence | issue report + Epic plan | Epic report only | source/tests/runtime changes, PR creation | updated Epic report evidence | scope expansion | changed files / verification / risks | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S90 | doc-writer | Updated Epic report with `iss-00262` through `iss-00267` completion, `iss-00268` dogfood evidence, EAL-009, E-AC status, and pending Epic-wide gates / one PR. | `spec-dock/active/epic/report.md` | `git diff --check`; placeholder search for `iss-xxxx`, `...`, and `Pass / Fail` | passed | `iss-00268` final commit/review and Epic-wide gates remain pending by design | integrated |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S00 | parent can directly edit issue-level planning artifacts | workflow role boundary | issue `design.md`, `plan.md`, `report.md` | planning artifact edits | git diff can revert issue docs if needed | assurance verify passed | spec-reviewer passed | proceed to S01 |
 
 #### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
 
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
-| `lite` | `not applicable` | `not applicable` | ライト該当なし理由（lite not applicable reason） | `pass / fail / blocked` | `ready / blocked` |
-| `standard` | `system-architect / implementation-planner / manual fallback` | `used / skipped / unavailable / denied` | `discussions/...` / manual evidence / skip reason: ... | `pass / fail / blocked` | `ready / blocked` |
-| `strict` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `discussions/...` / manual fallback evidence | `pass / fail / blocked` | `ready / blocked` |
-| `critical` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `discussions/...` / explicit approval and risk acceptance | `pass / fail / blocked` | `ready / blocked` |
+| `standard` | `system-architect / implementation-planner / manual fallback` | manual fallback | manual-authored canonical docs using approved Epic plan, active Issue inspection, and prior Issue completion evidence. | passed | ready |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| S00 | planning spec review | spec-reviewer | fresh | passed | no | execute approved plan | Review `019f1e2d-2bfa-7c90-85ec-c0bfc602ec79` passed after P1 symlink-state amendment; no P0/P1 blockers. |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S90 | issue-evidence-and-epic-report-ready-no-commit-yet | issue planning docs, Issue `artifacts/`, `.assurance.json`, and Epic `report.md` | pending Issue commit | not yet clean; S99 pending | no-op not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `design.md` - promoted to substantive approved Issue design.
+- `plan.md` - promoted to substantive approved implementation plan.
+- `report.md` - recorded S00 planning evidence and S01-S04 dogfood evidence.
+- Epic `report.md` - updated by doc-writer with dogfood closeout and remaining Epic-wide gates.
+- `artifacts/20260701t145916z-dogfood-blank-artifact.md` - blank artifact smoke output.
+- `artifacts/20260701t145919z-research-dogfood-research-artifact.md` - research artifact smoke output.
+- `artifacts/20260701t145944z-draft-requirement-dogfood-draft-requirement.md` - draft-requirement artifact smoke output.
 
 #### コミット
-- <hash> <message>
+- not yet committed; S99 final gate pending.
 
 #### メモ
-- ...
+- `iss-00268` started after `iss-00267` commit `510d1945`; dependency check reported ready.
 
 ---
 
-### セッションログ（2026-07-01 HH:MM - HH:MM）
+### セッションログ（2026-07-01 S01-S04 dogfood execution）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S01-S04
+- AC/EC: AC-268-001 through AC-268-006
 
 #### 実施内容
-- ...
+- Baseline confirmed `iss-00268` had no regular files under `discussions/`, had `discussions/rules.md` symlink to `../../../../../../../docs/rules/issue/discussions.md`, and had no `artifacts/` directory.
+- Created `blank`, `research`, and `draft-requirement` artifacts plus `artifacts/rules.md` symlink under active Issue `artifacts/`.
+- Confirmed after snapshot kept `discussions/` regular-file list empty and `rules.md` symlink target unchanged.
+- Confirmed `draft-requirement` artifact reused the Issue requirement template and did not mutate canonical `requirement.md`.
+- Ran `validate` and `sync`; both succeeded.
+- `sync` reported writing projection outputs, but `git diff --name-only` showed no tracked projection file diff.
+- Final diff inspection showed no source/runtime/test files; untracked outputs are the three dogfood artifacts and `artifacts/rules.md` symlink to `../../../../../../../docs/rules/issue/artifacts.md`.
+
+#### 実行コマンド / 結果
+```bash
+find spec-dock/active/issue/discussions -maxdepth 1 -type f -print
+# no output before or after smoke
+
+ls -l spec-dock/active/issue/discussions/rules.md
+# rules.md -> ../../../../../../../docs/rules/issue/discussions.md
+
+readlink spec-dock/active/issue/discussions/rules.md
+# ../../../../../../../docs/rules/issue/discussions.md
+
+readlink spec-dock/active/issue/artifacts/rules.md
+# ../../../../../../../docs/rules/issue/artifacts.md
+
+./spec-dock/scripts/spec-dock new artifact blank --issue iss-00268 --title "Dogfood Blank Artifact"
+# ok, path artifacts/20260701t145916z-dogfood-blank-artifact.md
+
+./spec-dock/scripts/spec-dock new artifact research --issue iss-00268 --title "Dogfood Research Artifact"
+# ok, path artifacts/20260701t145919z-research-dogfood-research-artifact.md
+
+./spec-dock/scripts/spec-dock new artifact draft-requirement --issue iss-00268 --title "Dogfood Draft Requirement"
+# ok, path artifacts/20260701t145944z-draft-requirement-dogfood-draft-requirement.md
+
+git diff -- spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00268-dogfood-artifacts-without-migrating-discussions/requirement.md
+# no output
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=171
+
+./spec-dock/scripts/spec-dock sync
+# spec-dock: ok (sync)
+```
 
 ---
 
@@ -253,37 +331,39 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| Epic report closeout | yes | doc-writer after S01-S04 evidence | Epic report updated with EAL-009, Issue completion status, E-AC status, and pending Epic-wide gates | final Issue spec review passed |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | Issue 268 dogfood evidence | deferred to Epic-wide E99 gate; final spec-reviewer did not require issue-local QA review | S01-S04 command evidence and S90 Epic report evidence | not required locally |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | Issue 268 diff | not applicable unless runtime/source/tests change in Issue 268 | 0 | not applicable for Issue 268 dogfood/docs-only diff |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / dogfood evidence / Epic closeout alignment | Final review passed after S90/CLOS-268-007 and CLOS-268-009 fixes; findings=[] | 1 planning review + 1 final re-review | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| final ledger recorded | Issue docs, Epic report, `.assurance.json`, three dogfood artifacts, and `artifacts/rules.md` symlink | final response now; Epic PR after E99 | issue finish passed; commit pending |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: `guidance issue-planning` reported `design-not-substantive`.
+  - 解決: `design.md` and `plan.md` were promoted to substantive approved artifacts; assurance passed and fresh S00 spec-reviewer passed after adding symlink-state comparison.
+- 問題: final spec review found stale CLOS-268-007 S90 closure rows.
+  - 解決: CLOS-268-007 rows were updated to pass, CLOS-268-008 was kept planned for E99, CLOS-268-009 was closed with final diff scope evidence, and final re-review passed.
 
 ## 学んだこと (任意)
-- ...
+- Dogfooding should use `iss-00268` itself as a minimal target because it has legacy `discussions/` and no `artifacts/` yet.
 
 ## 今後の推奨事項 (任意)
-- ...
+- After Issue 268 commit, run Epic-wide spec/code/QA review before creating the single Epic PR.
 
 ## 省略/例外メモ (必須)
 - 該当なし

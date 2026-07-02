@@ -262,6 +262,31 @@ def test_report_evidence_gate_accepts_localized_adopted_eal_status_references() 
     assert result.reason_code == "report-evidence-valid"
 
 
+def test_report_evidence_gate_accepts_artifact_delegated_draft_references() -> None:
+    _runbook_module, workflow_state = _workflow_modules()
+
+    result = workflow_state.evaluate_report_evidence_gate(
+        "## 証跡採用台帳（Evidence Adoption Ledger / 必須）\n"
+        "| EAL-001 | adopted | system-architect | design.md | rationale | artifacts/20260701t010203z-draft-design-system-draft.md | none |\n\n"
+        "## 仕様 authoring ゲート（Spec Authoring Gate / 必須）\n"
+        "| requirement | docs | none | adopted | pass | no | execute approved plan |\n"
+        "| design | docs | none | adopted | pass | no | execute approved plan |\n"
+        "| plan | docs | none | adopted | pass | no | execute approved plan |\n\n"
+        "## 委任ドラフト証跡（Delegated Draft Evidence / 必須）\n"
+        "| system-architect | iss-00301 | artifacts/20260701t010203z-draft-design-system-draft.md | active docs | design.md | partially_adopted | design.md | orchestrator inspection pass | source input integrated | none | none | pass | execute manual-authored canonical docs |\n\n"
+        "#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）\n"
+        "| Grade | required specialist / fallback | usage | evidence | fresh spec-reviewer verdict | execution readiness |\n"
+        "|---|---|---|---|---|---|\n"
+        "| standard | system-architect / implementation-planner | skipped | skip reason: existing pattern sufficient | pass | ready |\n\n"
+        "#### レビューゲート状態（Reviewer Gate Status）\n"
+        "| planning | planning spec-review | spec-reviewer | fresh | pass | no | execute approved plan | note |\n",
+        "standard",
+    )
+
+    assert result.status == "pass"
+    assert result.reason_code == "report-evidence-valid"
+
+
 def test_report_evidence_gate_requires_fresh_spec_review_for_standard_plus() -> None:
     _runbook_module, workflow_state = _workflow_modules()
 

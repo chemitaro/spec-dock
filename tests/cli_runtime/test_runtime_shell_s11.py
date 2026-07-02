@@ -172,7 +172,7 @@ class TestRuntimeShellS11:
             create_initiative=_unexpected,
             create_epic=_unexpected,
             create_issue=_unexpected,
-            create_discussion_doc=_unexpected,
+            create_artifact_doc=_unexpected,
             import_initiative=_unexpected,
             import_epic=_unexpected,
             import_issue=_unexpected,
@@ -231,7 +231,7 @@ class TestRuntimeShellS11:
             create_initiative=lambda req: None,  # type: ignore[return-value]
             create_epic=lambda req: None,  # type: ignore[return-value]
             create_issue=lambda req: None,  # type: ignore[return-value]
-            create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+            create_artifact_doc=lambda req: None,  # type: ignore[return-value]
             import_initiative=lambda req: None,  # type: ignore[return-value]
             import_epic=lambda req: None,  # type: ignore[return-value]
             import_issue=lambda req: None,  # type: ignore[return-value]
@@ -292,7 +292,7 @@ class TestRuntimeShellS11:
             create_initiative=lambda req: None,  # type: ignore[return-value]
             create_epic=lambda req: None,  # type: ignore[return-value]
             create_issue=lambda req: None,  # type: ignore[return-value]
-            create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+            create_artifact_doc=lambda req: None,  # type: ignore[return-value]
             import_initiative=lambda req: None,  # type: ignore[return-value]
             import_epic=lambda req: None,  # type: ignore[return-value]
             import_issue=lambda req: None,  # type: ignore[return-value]
@@ -349,7 +349,7 @@ class TestRuntimeShellS11:
             create_initiative=lambda req: None,  # type: ignore[return-value]
             create_epic=lambda req: None,  # type: ignore[return-value]
             create_issue=lambda req: None,  # type: ignore[return-value]
-            create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+            create_artifact_doc=lambda req: None,  # type: ignore[return-value]
             import_initiative=lambda req: None,  # type: ignore[return-value]
             import_epic=lambda req: None,  # type: ignore[return-value]
             import_issue=lambda req: None,  # type: ignore[return-value]
@@ -454,7 +454,7 @@ class TestRuntimeShellS11:
             create_initiative=lambda req: None,  # type: ignore[return-value]
             create_epic=lambda req: None,  # type: ignore[return-value]
             create_issue=lambda req: None,  # type: ignore[return-value]
-            create_discussion_doc=lambda req: None,  # type: ignore[return-value]
+            create_artifact_doc=lambda req: None,  # type: ignore[return-value]
             import_initiative=lambda req: None,  # type: ignore[return-value]
             import_epic=lambda req: None,  # type: ignore[return-value]
             import_issue=lambda req: None,  # type: ignore[return-value]

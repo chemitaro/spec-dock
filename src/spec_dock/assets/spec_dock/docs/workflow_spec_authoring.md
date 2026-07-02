@@ -38,25 +38,26 @@ Lite は automatic default ではありません。Issue が小さく、低リ�
 | `strict` | 要件（requirement）は上位 requirement / ADR / workflow contract との trace と non-scope を明確にし、曖昧な判断を plan へ送らない。 | 専門家（specialist）は原則必須。unavailable / denied / host conflict の場合だけ manual fallback を使い、利用不可理由、代替調査、採用判断を `report.md` に残す。 | 専門家（specialist）は原則必須。plan は closure index、step-local evidence、review / QA / docs gate、commit 候補を持つ。fallback 時は manual planning evidence を残す。 | 新鮮な `spec-reviewer` pass に加え、specialist evidence または manual fallback evidence、failure-mode record、promotion evidence を残す。 |
 | `critical` | 要件（requirement）は安全性、不可逆性、外部契約、運用影響、rollback / risk acceptance を明示する。 | 専門家（specialist）は必須。複数観点 review、ADR / escalation、risk acceptance が必要な場合は design で固定する。利用不可時は blocked を基本とし、manual fallback は明示承認と強い evidence がある場合だけ使う。 | 専門家（specialist）は必須。integration / rollback / observability / smoke / manual gate を plan に固定し、実行前に final quality gate を明示する。 | 新鮮な `spec-reviewer` pass、必要な追加 reviewer、manual fallback approval、risk acceptance、report evidence gate を残す。 |
 
-Downstream stable wording として、G2 は `draft routing` を `authorized_profile` に従う runtime-owned discussion draft selection と呼び、G3 は `report evidence gate` を grade / specialist / fallback / promotion evidence の `report.md` 記録確認と呼び、G4 は `integrated smoke matrix` を Lite / Standard / Strict / Critical の各 grade が draft routing、report evidence gate、execution handoff の整合を保つことを確認する matrix と呼びます。G1 の guidance はこれらの用語を提供するだけで、routing enforcement、report validation、smoke 実装は行いません。
+Downstream stable wording として、G2 は `draft routing` を `authorized_profile` に従う runtime-owned artifact draft selection と呼び、G3 は `report evidence gate` を grade / specialist / fallback / promotion evidence の `report.md` 記録確認と呼び、G4 は `integrated smoke matrix` を Lite / Standard / Strict / Critical の各 grade が draft routing、report evidence gate、execution handoff の整合を保つことを確認する matrix と呼びます。G1 の guidance はこれらの用語を提供するだけで、routing enforcement、report validation、smoke 実装は行いません。
 
 `report evidence gate` は implementation start 前 readiness に含まれます。`workflow status` / `guidance issue-execution` は、`report.md` に fresh `spec-reviewer` pass、Spec Authoring Gate、Evidence Adoption Ledger、Delegated Draft Evidence、Grade Specialist Evidence Gate、Reviewer Gate Status、未解決でない EAL がない場合、execution-ready として扱いません。Lite でも fresh review / report evidence は必要です。ただし Lite は specialist / fallback evidence 自体を必須化せず、Grade Specialist Evidence Gate には not applicable / skip reason を短く残します。Standard は specialist use、skip reason、または manual fallback evidence を残します。Strict / Critical は specialist use、または明示的な unavailable / manual fallback evidence を残します。skip reason だけでは Strict / Critical の readiness evidence になりません。
 
 ## 権限境界（Authority boundary / Promotion Record）
 
-Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator の single-writer authority です。Sub-agent は canonical docs を直接編集しません。Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `discussions/` 直下に置く flat Markdown draft / analysis / discussion-local report です。
+Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator の single-writer authority です。Sub-agent は canonical docs を直接編集しません。Sub-agent が作る authoring output は、対象 initiative / epic / issue の scope-local `artifacts/` 直下に置く flat Markdown draft / analysis / artifact-local report です。
 
-Discussion output は runtime-owned `new doc <type>` generation で作成し、returned `path=...` を本文更新の正本にします。Generated filenames は existing discussion rules に従います:
+Artifact output は runtime-owned `new artifact <type>` generation で作成し、returned `path=...` を本文更新の正本にします。Generated filenames は artifact rules に従います:
 
 - `<ts>-<kind>-<slug>.md`
 - `<ts>-<nn>-<kind>-<slug>.md` for same-second collisions
+- `<ts>-<slug>.md` / `<ts>-<nn>-<slug>.md` for blank artifacts
 
 Sub-agent-created draft は最低限、`created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、fallback decision、report evidence destination、adoption ledger note を持ちます。Evidence Adoption Ledger fields は ID、adoption_status、source、source_role、claim、target_artifact、target_section、rationale、evidence_strength、evidence_path、adopter、reviewer、blocking、next_action を標準にします。標準 delegated draft evidence として task manifest hash、Permission Profile hash、session invocation hash、probe run id、session hash を要求しません。これらは historical evidence または明示された例外証跡としてだけ扱います。
-権限や採用可否の wildcard 指定は使いません。`*`、`grants.*`、`all` は invalid wildcard token として扱い、scope-local discussion direct-write の根拠にしてはなりません。
+権限や採用可否の wildcard 指定は使いません。`*`、`grants.*`、`all` は invalid wildcard token として扱い、scope-local artifact direct-write の根拠にしてはなりません。
 
 Sub-agent-created draft は `authority: accepted`、`adoption_status: adopted`、non-empty `reflected_to`、reviewer pass、phase completion、implementation readiness を自己主張してはなりません。`reflected_to` は実際に canonical artifact へ反映済みの対象だけを表し、予定先は `intended_targets` で表します。
 
-Accepted ADR は architecture decision authority を持ち得ますが、discussion draft / research / disc は evidence です。Implementation readiness、phase promotion、issue ready、issue finish、phase completion は、main orchestrator が evidence を canonical docs と `report.md` に再記述し、required reviewer gates が pass した後に成立します。
+Accepted ADR は architecture decision authority を持ち得ますが、artifact draft / research / disc は evidence です。Implementation readiness、phase promotion、issue ready、issue finish、phase completion は、main orchestrator が evidence を canonical docs と `report.md` に再記述し、required reviewer gates が pass した後に成立します。
 
 Promotion Record は delegated draft や reviewer output を canonical authority に昇格した事実だけを記録します。canonical artifact promotion の `promotion_record` は少なくとも `status`, `authority`, `owner_role`, `draft_author_role`, `approval`, `source_revision`, `approved_revision`, `approved_hash`, `reviewer_target_hash`, `promoted_at`, `promoted_by`, `promotion_decision` を持ちます。runtime active selection の promotion record は lifecycle gate 用の最小 record として `status`, `authority`, `source_revision`, `approved_revision`, `approved_hash`, `reviewer_target_hash`, `promotion_decision` を持ち、`source_revision` / `approved_revision` / `approved_hash` / `reviewer_target_hash` は active entry id に対応する `active:<id>` と一致している必要があります。`reviewer_target_hash` と `approved_hash` が一致しない場合、`source_revision` / `approved_revision` が一致しない場合、または active entry id と promotion record が一致しない場合、その promotion は invalid であり downstream authority には使えません。Mismatch / stale を発見した場合は report に reason と next action を残し、fresh reviewer gate と Promotion Record の再作成まで block します。
 
@@ -70,15 +71,15 @@ Active manifest と context-pack は同じ authority/grant 状態を示す必要
 - この許可は「ユーザーがすべてを許可した」ことを意味しない。範囲は current repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility に限る。
 - canonical docs の single-writer authority は main orchestrator に残る。Sub-agent / reviewer output は evidence であり、canonical docs への採用は main orchestrator が行う。
 - fresh `spec-reviewer` pass など workflow が要求する reviewer pass は gate であり、bounded SpecDock workflow scope 内の追加許可待ちを理由に省略してはならない。
-- read-only specialist authorization と scope-local discussion direct-write authorization は別物として扱う。Sub-agent authoring output は proposal-only に限定しないが、採用可能な write は対象 scope `discussions/` direct child の flat Markdown draft / analysis / discussion-local report に限る。
-- scope-local discussion direct-write authorization は、target node、role、source artifacts、allowed discussion path rule、forbidden canonical/implementation paths、post-run diff guard、report ledger destination を明示した task-local authorization として別途記録する。workflow-wide authorization、unguarded workspace-write、static broad profile、または Desktop-only fallback は adoption-ready delegated output に数えない。
+- read-only specialist authorization と scope-local artifact direct-write authorization は別物として扱う。Sub-agent authoring output は proposal-only に限定しないが、採用可能な write は対象 scope `artifacts/` direct child の flat Markdown draft / analysis / artifact-local report に限る。
+- scope-local artifact direct-write authorization は、target node、role、source artifacts、allowed artifact path rule、forbidden canonical/implementation paths、post-run diff guard、report ledger destination を明示した task-local authorization として別途記録する。workflow-wide authorization、unguarded workspace-write、static broad profile、または Desktop-only fallback は adoption-ready delegated output に数えない。
 
 ## 委任 authoring policy foundation（delegated authoring policy foundation）
 
 - Main orchestrator は canonical `requirement.md` / `design.md` / `plan.md` / `report.md` の最終 ownership、user dialogue、canonical integration、Evidence Adoption Ledger、Promotion Record、phase promotion を所有する。
-- Delegated authoring は scope-local flat `discussions/` evidence であり、final canonical authority ではない。delegated output は main orchestrator が採否を判断し、fresh `spec-reviewer` が canonical artifact を pass して初めて phase promotion の根拠にできる。
-- Delegated authoring を使う場合は、invocation ごとに node、role、scope、source artifacts、allowed discussion path rule、forbidden actions、output expectation、stop / invalidation condition を明示し、`report.md` に残す。workflow-wide blanket consent は direct-write authoring delegation の根拠にしない。
-- Delegated role は対象 scope `discussions/` direct child に naming-rule compliant Markdown を 1 ファイルだけ新規作成できる。既存 discussion file の編集は static adapter contract の対象外とし、将来必要な場合は別 workflow / follow-up で narrower allowlist と追加 gate を定義する。
+- Delegated authoring は scope-local flat `artifacts/` evidence であり、final canonical authority ではない。delegated output は main orchestrator が採否を判断し、fresh `spec-reviewer` が canonical artifact を pass して初めて phase promotion の根拠にできる。
+- Delegated authoring を使う場合は、invocation ごとに node、role、scope、source artifacts、allowed artifact path rule、forbidden actions、output expectation、stop / invalidation condition を明示し、`report.md` に残す。workflow-wide blanket consent は direct-write authoring delegation の根拠にしない。
+- Delegated role は対象 scope `artifacts/` direct child に naming-rule compliant Markdown を 1 ファイルだけ新規作成できる。既存 artifact file の編集は static adapter contract の対象外とし、将来必要な場合は別 workflow / follow-up で narrower allowlist と追加 gate を定義する。
 - Delegated role は previous phase artifact、implementation code、tests、package/config、GitHub state、reviewer result を編集・確定・上書きしてはならない。destructive action、external publishing、credentialed access、`.github/agents` / Copilot support はこの workflow の delegated authoring policy では許可しない。
 - Delegated draft が unavailable / skipped / blocked / stale / rejected / superseded の場合でも、manual authoring path は有効である。ただし delegated authoring を使った evidence として扱ってはならない。
 - Delegated draft は fresh `spec-reviewer` pass の代替ではない。`spec-reviewer` は draft 自体ではなく、main orchestrator が統合した canonical artifact と evidence を review する。
@@ -112,15 +113,15 @@ Main orchestrator が canonical artifact と final reviewer gate を所有しま
 
 - allowed depth=2: main orchestrator -> authoring specialist -> leaf-only evidence producer
 - forbidden depth=3: main orchestrator -> authoring specialist -> leaf producer -> grandchild
-- authoring specialist は、task-local consent がある場合に限り scope-local `discussions/` direct child の flat Markdown evidence を 1 件新規作成できる。leaf-only evidence producer は repo analysis、research、consultation、QA-style evidence を返すだけで、discussion write を含む file mutation を行わない。authoring specialist と leaf-only evidence producer は canonical edit、implementation edit、phase promotion、reviewer-pass claim、final authority、issue ready / issue finish claim を行わない
+- authoring specialist は、task-local consent がある場合に限り scope-local `artifacts/` direct child の flat Markdown evidence を 1 件新規作成できる。leaf-only evidence producer は repo analysis、research、consultation、QA-style evidence を返すだけで、artifact write を含む file mutation を行わない。authoring specialist と leaf-only evidence producer は canonical edit、implementation edit、phase promotion、reviewer-pass claim、final authority、issue ready / issue finish claim を行わない
 - preflight reviewer output は設計・計画の改善 input として扱い、final fresh reviewer pass とは分離する
 - reviewer independence: final `spec-reviewer` / `code-reviewer` / `qa-reviewer` は、同じ artifact を作成した authoring specialist や leaf-only evidence producer の代替ではない fresh gate として実行する
 
-## Scope-local discussion write gate
+## Scope-local artifact write gate
 
-System architect / implementation planner の static adapter は、guarded workspace-write により scope-local `discussions/` Markdown draft を作成する delegated authoring surface です。Workspace-write は hard path allow-list ではなく、canonical target write の許可でもありません。Run ごとの permission context 生成は標準経路にせず、post-run diff guard pass と canonical `report.md` の ledger entry 記録まで adoption-ineligible として扱います。
+System architect / implementation planner の static adapter は、guarded workspace-write により scope-local `artifacts/` Markdown draft を作成する delegated authoring surface です。Workspace-write は hard path allow-list ではなく、canonical target write の許可でもありません。Run ごとの permission context 生成は標準経路にせず、post-run diff guard pass と canonical `report.md` の ledger entry 記録まで adoption-ineligible として扱います。
 
-Allowed delegated output は target scope `discussions/` direct-child Markdown file 1 件の新規作成に限定し、creation は runtime-owned `new doc <type>` を使って returned `path=...` を正本にします。post-run diff guard は generated filename が `<ts>-<kind>-<slug>.md` または `<ts>-<nn>-<kind>-<slug>.md` に一致することを確認します。新規 discussion draft は frontmatter に `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result` を持たなければなりません。`created_by_role` は supported delegated authoring role、`scope_id` は requested scope id と一致する値、`source_paths` と `intended_targets` は non-empty block list である必要があります。inline scalar や `source_paths: []` / `intended_targets: []` は post-run diff guard で不合格になります。
+Allowed delegated output は target scope `artifacts/` direct-child Markdown file 1 件の新規作成に限定し、creation は runtime-owned `new artifact <type>` を使って returned `path=...` を正本にします。post-run diff guard は generated filename が typed artifact の `<ts>-<kind>-<slug>.md` / `<ts>-<nn>-<kind>-<slug>.md`、または blank artifact の `<ts>-<slug>.md` / `<ts>-<nn>-<slug>.md` に一致することを確認します。新規 artifact draft は frontmatter に `created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result` を持たなければなりません。`created_by_role` は supported delegated authoring role、`scope_id` は requested scope id と一致する値、`source_paths` と `intended_targets` は non-empty block list である必要があります。inline scalar や `source_paths: []` / `intended_targets: []` は post-run diff guard で不合格になります。
 
 ```yaml
 source_paths:
@@ -129,9 +130,9 @@ intended_targets:
   - spec-dock/active/issue/report.md
 ```
 
-既存 discussion update は static adapter contract の対象外です。accepted ADR、superseded、stale、rejected、adopted evidence、または proposed draft の既存 file update が必要な場合は、別 workflow / follow-up で narrower allowlist と追加 gate を定義します。Delegated authoring agent は `git add`、`git commit`、`git push`、または orchestrator から file changes を隠す操作を実行してはいけません。diff guard は `--baseline-status` を必須入力として実行し、target scope `discussions/` は run 開始時点で clean にします。baseline に target discussion subtree の dirty/untracked entry がある delegated output は adoption-ineligible とします。baseline-status に `HEAD` が含まれる場合、diff guard は current `HEAD` と一致しない delegated output を committed side effect として fail-closed に扱います。baseline-status に `HEAD` がない場合は HEAD 比較だけを省略し、discussion draft と side effect 検査は継続します。pre-existing non-target dirtiness は repo 外に生成した `delegated-authoring baseline-status --output <path>` の file-state snapshot が current file content and mode と一致する場合に限り delegated output diff から除外できます。baseline entry が current status から消えた場合や、baseline 後に ignored file / directory side effect が増えた場合は、delegated run 中の non-target 変更として fail-closed に扱います。
+既存 artifact update は static adapter contract の対象外です。accepted ADR、superseded、stale、rejected、adopted evidence、または proposed draft の既存 file update が必要な場合は、別 workflow / follow-up で narrower allowlist と追加 gate を定義します。Delegated authoring agent は `git add`、`git commit`、`git push`、または orchestrator から file changes を隠す操作を実行してはいけません。diff guard は `--baseline-status` を必須入力として実行し、target scope `artifacts/` は run 開始時点で clean にします。baseline に target artifacts subtree の dirty/untracked entry がある delegated output は adoption-ineligible とします。baseline-status に `HEAD` が含まれる場合、diff guard は current `HEAD` と一致しない delegated output を committed side effect として fail-closed に扱います。baseline-status に `HEAD` がない場合は HEAD 比較だけを省略し、artifact draft と side effect 検査は継続します。pre-existing non-target dirtiness は repo 外に生成した `delegated-authoring baseline-status --output <path>` の file-state snapshot が current file content and mode と一致する場合に限り delegated output diff から除外できます。baseline entry が current status から消えた場合や、baseline 後に ignored file / directory side effect が増えた場合は、delegated run 中の non-target 変更として fail-closed に扱います。
 
-Forbidden output は canonical docs、implementation files、tests、package/config、`.agents`、`.codex`、`.github`、`.env*`、nested discussion directories、symlinks、non-Markdown files、deletes、renames、copied paths、out-of-scope discussions、mixed staged/unstaged discussion states、unmerged discussion states を含みます。
+Forbidden output は canonical docs、implementation files、tests、package/config、`.agents`、`.codex`、`.github`、`.env*`、nested artifact directories、symlinks、non-Markdown files、deletes、renames、copied paths、out-of-scope artifacts、mixed staged/unstaged artifact states、unmerged artifact states を含みます。
 
 `.env*` read denial は hard sandbox や diff guard で証明されるものではありません。Permission Profile を標準経路から完全削除する方針では、`.env*` read は instruction-forbidden / soft control として扱います。post-run diff guard が検出できるのは `.env*` write、または baseline 後に増えた ignored side effect であり、`.env*` read 自体ではありません。
 
@@ -155,7 +156,7 @@ Historical `iss-00126` task manifest / Permission Profile / probe / session arti
 1. 対象 scope と既存 node を確認する。
 2. 対象 artifact に対応する `docs/authoring/<scope>-<phase>.md` がある場合は最初に読む。
 3. 対象 scope の `workflow_*.md` と phase playbook を読む。
-4. 調査結果、仮説、選択肢、質問を必要に応じて `discussions/` に分離する。raw capture は `scratch`、人間への正式質問は一問一答の `interview`、事実調査は `research`、論点整理 / synthesis は `disc`、長期判断は `adr` を使う。formal question trigger と lightweight chat question の境界は `workflow_clarification.md` の bridge/reference detail を参照する。
+4. 調査結果、仮説、選択肢、質問を必要に応じて `artifacts/` に分離する。raw / untyped capture は `blank`、人間への正式質問は一問一答の `interview`、事実調査は `research`、論点整理 / synthesis は `disc`、長期判断は `adr` を使う。formal question trigger と lightweight chat question の境界は `workflow_clarification.md` の bridge/reference detail を参照する。
 5. 対象 artifact を更新する。
 6. fresh `spec-reviewer` を起動し、対象 artifact と upstream artifact を review する。
 7. `fail` なら修正し、fresh `spec-reviewer` で再レビューする。
@@ -204,4 +205,4 @@ Historical `iss-00126` task manifest / Permission Profile / probe / session arti
 - fixes: 指摘に対する修正要約
 - promotion: 次 phase へ進めるか、`blocked` / `incomplete` の reason と next action
 
-長い調査、比較、ヒアリング transcript は `discussions/` に分離してよい。ただし `report.md` には判断に必要な要約と参照を残す。discussion docs は未確定情報の作業面なので、確定させる内容は新しい `adr`、または `requirement.md` / `design.md` / `plan.md` へ反映する。
+長い調査、比較、ヒアリング transcript は `artifacts/` に分離してよい。ただし `report.md` には判断に必要な要約と参照を残す。artifact docs は未確定情報の作業面なので、確定させる内容は新しい `adr`、または `requirement.md` / `design.md` / `plan.md` へ反映する。既存 `discussions/` は legacy / preservation evidence として参照してよいが、新規 working artifact の推奨先にはしない。

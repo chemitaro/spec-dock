@@ -294,7 +294,7 @@ class TestCliAssuranceCompose(CliRuntimeHarness):
             assert payload["ok"] is False
             assert payload["status"] == "invalid"
             assert payload["reason"] == "template_validation_failed"
-            assert "Profile template is outside spec-dock workspace" in " ".join(payload["details"])
+            assert "Profile template is symlinked" in " ".join(payload["details"])
             assert self._artifact_texts(issue_dir) == before
             assert contract_path.read_text(encoding="utf-8") == contract_before
 

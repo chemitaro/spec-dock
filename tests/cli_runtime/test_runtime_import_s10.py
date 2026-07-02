@@ -269,10 +269,13 @@ class TestRuntimeImportS10:
         epic_dir = specdock_dir / "templates" / "epic"
         issue_dir = specdock_dir / "templates" / "issue"
         rules_docs = {
+            specdock_dir / "docs" / "rules" / "initiative" / "artifacts.md": "# initiative artifacts rules\n",
             specdock_dir / "docs" / "rules" / "initiative" / "discussions.md": "# initiative discussions rules\n",
             specdock_dir / "docs" / "rules" / "initiative" / "epics.md": "# initiative epics rules\n",
+            specdock_dir / "docs" / "rules" / "epic" / "artifacts.md": "# epic artifacts rules\n",
             specdock_dir / "docs" / "rules" / "epic" / "discussions.md": "# epic discussions rules\n",
             specdock_dir / "docs" / "rules" / "epic" / "issues.md": "# epic issues rules\n",
+            specdock_dir / "docs" / "rules" / "issue" / "artifacts.md": "# issue artifacts rules\n",
             specdock_dir / "docs" / "rules" / "issue" / "discussions.md": "# issue discussions rules\n",
         }
         for path in (initiative_dir, epic_dir, issue_dir):
@@ -1478,11 +1481,12 @@ class TestRuntimeImportS10:
             assert len(calls) == 1
             assert calls[0][0] == "iss-00909"
             assert result.node.id == "iss-00909"
-            rules_link = result.node.path / "discussions" / "rules.md"
-            rules_target = specdock_dir / "docs" / "rules" / "issue" / "discussions.md"
+            rules_link = result.node.path / "artifacts" / "rules.md"
+            rules_target = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
             assert rules_link.is_symlink(), f"missing imported rules symlink: {rules_link}"
             assert rules_link.resolve() == rules_target.resolve()
             assert str(rules_link.readlink()) == os.path.relpath(rules_target, start=rules_link.parent)
+            assert not (result.node.path / "discussions").exists()
             assert list(result.node.path.rglob("new-*")) == []
 
     def test_renderer_text_regression(self) -> None:
@@ -1613,7 +1617,7 @@ class TestRuntimeImportS10:
             create_initiative=_unexpected,
             create_epic=_unexpected,
             create_issue=_unexpected,
-            create_discussion_doc=_unexpected,
+            create_artifact_doc=_unexpected,
             import_initiative=_unexpected,
             import_epic=_unexpected,
             import_issue=_fake_import,

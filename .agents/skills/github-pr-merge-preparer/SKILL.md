@@ -154,12 +154,12 @@ terminal `P2`/`P3` findings after the latest pushed head has no blockers.
 When a writable SpecDock issue scope exists and a batch is required, run:
 
 ```bash
-./spec-dock/scripts/spec-dock new doc pr-repair-batch --issue <issue-id> --title "PR Repair Batch"
+./spec-dock/scripts/spec-dock new artifact pr-repair-batch --issue <issue-id> --title "PR Repair Batch"
 ```
 
 Use the appropriate scope flag, capture `path=...`, and edit only that generated
 path. The generated file owns all front matter identity fields. Use
-`templates/discussions/pr-repair-batch.md` only as body-section scaffold below
+`templates/pr-repair-batch.md` from this skill directory only as body-section scaffold below
 the generated heading/front matter. When continuing an existing batch path,
 preserve its front matter identity fields and update only the batch body.
 
@@ -226,7 +226,7 @@ Repair units remain ordinary `disc` artifacts; do not require or invent a
 `pr-repair-unit` doc type. When a writable SpecDock issue scope exists, run:
 
 ```bash
-./spec-dock/scripts/spec-dock new doc disc --issue <issue-id> --title "PR Repair Unit <unit_id>" --slug "pr-repair-unit-<unit-slug>"
+./spec-dock/scripts/spec-dock new artifact disc --issue <issue-id> --title "PR Repair Unit <unit_id>" --slug "pr-repair-unit-<unit-slug>"
 ```
 
 Use the appropriate scope flag, capture `path=...`, and edit only that generated
@@ -343,7 +343,7 @@ Report `merge-prepared: yes` only when all of these are evidenced:
   a repair commit was already required.
 - No visible merge conflict or equivalent semantic merge blocker remains.
 - If blocking repair was performed, a PR repair batch exists at the
-  runtime-generated `new doc pr-repair-batch` path when a writable SpecDock
+  runtime-generated `new artifact pr-repair-batch` path when a writable SpecDock
   scope exists, or as an inline batch with `batch_path: N/A` when no writable
   scope exists.
 - No `untriaged` blocking inventory item remains in any repo-persistent repair
@@ -414,7 +414,7 @@ When stopping for a human gate, report:
 - State whether a repo-persistent repair batch was required.
 - Include repair batch path when one exists.
 - Include classification summary grouped by `root_cause_family`.
-- State whether repair workers used repair unit discussions instead of raw
+- State whether repair workers used repair unit artifacts instead of raw
   findings.
 - Include `Implementation Plan`, `Re-observation Result`, and `Residual Risk`
   status for each repair unit that affected the final decision.

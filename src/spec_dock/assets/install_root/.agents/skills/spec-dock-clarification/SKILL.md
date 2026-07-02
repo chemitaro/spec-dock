@@ -13,7 +13,7 @@ Decision routing examples and detailed placement guidance live in `spec-dock/doc
 
 ## Source-Grounded Grill Loop
 
-1. Read sources before asking: active docs, parent docs, `discussions/`, related code/tests/templates, ADRs, and the current request.
+1. Read sources before asking: active docs, parent docs, scope-local `artifacts/`, legacy `discussions/` when present for historical context, related code/tests/templates, ADRs, and the current request.
 2. Build a provisional understanding in plain language: what seems decided, what is ambiguous, what local context already answers, and what would change downstream artifacts.
 3. Do gap classification:
    - source-grounded answer available: answer or proceed without asking the user.
@@ -22,7 +22,8 @@ Decision routing examples and detailed placement guidance live in `spec-dock/doc
    - user-intent blocker: stop and ask the user directly.
    - durable tradeoff: prepare `disc` or ADR triage, then route adoption through canonical docs.
 4. Pick one pressure-test question only when it would change scope, requirement, design, plan, ADR, template, workflow, or adoption evidence.
-5. Do artifact capture before asking important questions:
+5. Do artifact capture before asking important questions with `new artifact` under the scope-local `artifacts/` catalog:
+   - use `blank` for raw or freeform capture.
    - create unanswered `interview` for one important user question.
    - use `research` for facts, uncertainty, edge cases, and question candidates.
    - use `disc` for synthesis, options, ADR candidate triage, and adoption target.
@@ -41,7 +42,7 @@ Decision routing examples and detailed placement guidance live in `spec-dock/doc
 ## Modes
 
 - `analysis-only`: return sources read, provisional understanding, resolved assumptions, unresolved questions, recommended next question, and suggested artifact. Do not force canonical docs.
-- `draft-only`: write scope-local discussion drafts only when requested or workflow-approved. Drafts are proposed evidence until adopted.
+- `draft-only`: write scope-local artifact drafts only when requested or workflow-approved. Drafts are proposed evidence until adopted.
 - `canonical authoring`: route adopted clarification evidence into requirement / design / plan / ADR and record adoption in `report.md`.
 
 ## Handoff Output
@@ -53,7 +54,7 @@ Return:
 - gap classification
 - unresolved questions, or `none`
 - one recommended pressure-test question, if any
-- suggested artifact: `scratch` / `research` / `interview` / `disc` / `adr`
+- suggested artifact: `blank` / `research` / `interview` / `disc`
 - mode: `analysis-only` / `draft-only` / `canonical authoring`
 - answer adoption / handoff target
 - adoption evidence needed in `report.md`

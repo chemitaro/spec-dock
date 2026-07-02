@@ -371,7 +371,14 @@ def _evidence_reference_tokens(value: str) -> tuple[str, ...]:
     return tuple(
         token.strip("`.;,")
         for token in value.replace(";", " ").split()
-        if token.strip("`.;,").startswith(("discussions/", "design.md", "plan.md", "requirement.md", "report.md"))
+        if token.strip("`.;,").startswith((
+            "artifacts/",
+            "discussions/",
+            "design.md",
+            "plan.md",
+            "requirement.md",
+            "report.md",
+        ))
     )
 
 
@@ -398,7 +405,7 @@ def _row_has_delegated_draft_evidence(cells: tuple[str, ...], eal_tokens: tuple[
     draft_path = cells[2] if len(cells) > 2 else ""
     source_paths = cells[3] if len(cells) > 3 else ""
     return (
-        "discussions/" in draft_path
+        ("artifacts/" in draft_path or "discussions/" in draft_path)
         and _delegated_row_has_eal_reference((draft_path,), eal_tokens)
         and _has_substantive_evidence(source_paths)
         and _has_substantive_evidence(reflected_to)
