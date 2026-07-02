@@ -19,7 +19,7 @@ ID: "iss-00276"
 - Pre-start draft artifacts と specialist draft artifacts を採用判断し、正規 `design.md` / `plan.md` に統合した。
 - Planning fresh `spec-reviewer` は re-review で pass。P2 として Epic report の stale handoff state が指摘されたため、current handoff state へ更新した。
 - S00/S02 の自動検証を実施し、初回 `tests/unit` で dogfooding mirror / checked-in snapshot の未追従が4件検出された。provider 側 `workflow_epic.md` を dogfooding mirror へ同期し、`epic-00270` / `iss-00271` から `iss-00276` の `.meta.json` と dependency snapshot を `tests/unit/infra/test_init_update.py` へ追記した。
-- 修正後、targeted regression、`tests/unit`、`tests/cli_runtime`、full `uv run pytest`、`validate`、`assurance verify`、`deps check iss-00276` は成功した。manual dogfooding summary、fresh reviewer gates、final local commit は実施済み。PR作成 / observation は未実施である。
+- 修正後、targeted regression、`tests/unit`、`tests/cli_runtime`、full `uv run pytest`、`validate`、`assurance verify`、`deps check iss-00276` は成功した。manual dogfooding summary、fresh reviewer gates、final local commit、PR作成、PR observation、P1修復、P1修復後headの再観測は実施済みである。
 
 ## 仕様解釈・判断台帳
 | ID | 状態 | 種別 | 判断 / 解釈 | 根拠 | 処置 | フォローアップ |
@@ -86,7 +86,7 @@ ID: "iss-00276"
 - S03-S07:
   - manual dogfooding summary は実施済み。fresh `code-reviewer` は pass 済み。`spec-reviewer` / `qa-reviewer` は初回P1を検出したが、closure ID 修正、full pytest 追加、scaffold dogfooding 追加後の re-review で pass となった。
   - final local commit は実施済み。この commit 自体を S06 の approved local diff 証跡とする。
-  - PR作成 / observation は未実施。
+  - PR #277 を作成し、初回 observation の Provider CI format failure と2回目 observation のP1 2件を修復した。最新 head `42c8f4d9` の再観測では CI / Provider CI は成功し、P0/P1 は残っていない。P2/P3 は terminal non-blocking findings として残し、`github-pr-merge-preparer` policy に従って P2/P3 だけを理由にした branch mutation / CI rerun は行わない。
 
 ## 検証
 - 実施済み:
@@ -126,13 +126,14 @@ ID: "iss-00276"
   - Fresh `qa-reviewer` Ramanujan re-review -> pass。P2: Epic E-AC-006 の manual status wording を現状に合わせること。
   - Reviewer repair: Epic E-AC-006 を、manual scaffold dogfooding / hygiene read-through は実施済み、reviewer gates final re-review と PR delivery は未実施、という文面へ更新した。
 - 未実施:
-  - PR observation の再実行は未実施。
+  - PR merge、auto-merge、GitHub Issue close、review thread resolve は未実施。これらはこの Issue の対象外であり、人間の操作として残す。
 
 ## 完了 / PR
-- Issue完了: 未実施。
+- Issue完了: `issue finish` 実行前。P1修復後headの evidence では final PR delivery gate / merge-prepared predicate は満たしている。report 更新 commit 後の head / PR observation / clean state は external delivery evidence として確認したうえで `issue finish` 判定へ進める。
 - PR作成: 実施済み。PR #277 (`https://github.com/chemitaro/spec-dock/pull/277`)。
-- PR observation: 初回 observation で latest head の `validate` は成功、`provider-tests` は `make lint` の ruff format check failure により失敗した。`tests/cli_runtime/test_new.py` と `tests/unit/infra/test_init_update.py` を `uv run ruff format` で整形し、local `make lint` は成功した。再push / 再observation は次アクション。
+- PR observation: 初回 observation で latest head の `validate` は成功、`provider-tests` は `make lint` の ruff format check failure により失敗した。`tests/cli_runtime/test_new.py` と `tests/unit/infra/test_init_update.py` を `uv run ruff format` で整形し、local `make lint`、再push、再observation まで完了した。
 - PR observation re-run: latest head `e7f32efe` で CI は成功したが、Codex review がP1を2件検出した。P1-1 は Epic `report.md` を reviewer-gated artifact と読ませる wording、P1-2 は deferred PR delivery が Issue finish gate を迂回しうる wording。`workflow_epic.md`、`workflow_issue.md`、`spec-dock-epic-execution` skill を修正し、provider / dogfooding mirror parity を確認した。P2 の `iss-00271` assurance ledger mismatch は非ブロッキング follow-up として残す。
+- PR observation final: P1修復後head `42c8f4d949238af736dd10e5f3e6f46313521d37` を再観測し、CI / Provider CI は success、PR state は open / ready、`mergeStateStatus=CLEAN`、P0/P1 blocker は0件だった。Codex review はP2/P3のみを terminal non-blocking findings として返したため、`review-clean: no`、`merge-prepared: yes`、branch mutation: no、ci rerun avoided: yes と扱う。P2/P3 summary: assurance prerequisite for draft artifacts、Epic completion canonicality in initiative template、installed docs path reference、deferred PR exception wording。report 更新 commit 後の最終head確認は external delivery evidence として残し、PR merge と unresolved non-blocking thread handling は人間判断として残す。
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
@@ -153,4 +154,5 @@ ID: "iss-00276"
 | pr-ci-format-repair | `C276-013`, `C276-014`, `C276-015` | `uv run ruff format`, `make lint` | pass | `tests/cli_runtime/test_new.py` and `tests/unit/infra/test_init_update.py` reformatted; local `make lint` passed (`ruff check`, `ruff format check`, `mypy`) | push and observe latest head |
 | pr-observation-recheck | `C276-006`, `C276-007`, `C276-011`, `C276-016` | PR observation on latest head `e7f32efe` | repair-needed | CI passed; Codex review reported two P1 findings about Epic report reviewer-gate wording and deferred PR delivery / issue finish gate semantics; one P2 assurance ledger mismatch is non-blocking | repair P1 findings and re-observe |
 | pr-review-p1-repair | `C276-013`, `C276-014` | provider / dogfooding docs and skill repair | pass | `workflow_epic.md` now treats Epic `report.md` as evidence ledger, not reviewer-gated artifact; `workflow_issue.md` defines deferred PR delivery gate for intermediate Issues; `spec-dock-epic-execution` requires that gate before returning to issue finish; provider / dogfooding mirrors match | run validation and re-observe |
+| pr-observation-final | `C276-006`, `C276-007`, `C276-011`, `C276-016` | PR observation on P1修復後head `42c8f4d9` and `gh pr view` | pass | CI / Provider CI success; PR open and ready; `mergeStateStatus=CLEAN`; P0/P1 blocker count 0; only P2/P3 terminal non-blocking findings remain, so `review-clean: no` and `merge-prepared: yes`; no branch mutation solely for P2/P3 | commit final evidence, verify final head externally, and evaluate `issue finish` |
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
