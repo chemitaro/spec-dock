@@ -34,8 +34,12 @@ ID: "epic-00270"
   - 修正後の current planning set は Goodall (`019f21f9-b2ab-7182-8246-96997f8571d9`) により fresh `spec-reviewer` gate で `review_status: pass` となった。
   - `iss-00271` から `iss-00275` は完了済みである。現在は `iss-00276` を active にし、final quality gate / PR delivery の正規 `design.md` / `plan.md` を具体化した。
   - `iss-00276` の planning fresh `spec-reviewer` re-review は Socrates (`019f22d8-1185-7250-92b9-1d2c4787f600`) により `review_status: pass` となった。P2 として指摘されたこの Epic report の stale handoff state は、この更新で current state に合わせた。
+  - `iss-00276` の final automated quality gate で、初回 `tests/unit` が dogfooding mirror / checked-in snapshot drift を検出した。`workflow_epic.md` mirror と `epic-00270` / `iss-00271` から `iss-00276` の metadata / dependency snapshots を current source に追従させた。
+  - 修正後、targeted regression、`tests/unit`、`tests/cli_runtime`、full `uv run pytest`、`validate`、`assurance verify`、`deps check iss-00276` は成功した。
+  - Initial reviewer gates では `code-reviewer` が pass し、`spec-reviewer` / `qa-reviewer` が automated evidence の closure ID 過剰主張をP1として検出した。`iss-00276/report.md` の Step Evidence を修正し、automated gate は manual / reviewer / PR closure を閉じないようにした。
+  - Manual scaffold dogfooding として一時ディレクトリに `spec-dock init` し、生成された docs/templates が provider assets と一致すること、generated workflow / templates に handoff-ready / execution-ready、日本語ファースト、draft artifact boundary が反映されることを確認した。
 - 次のマイルストーン:
-  - `iss-00276` の S00-S07 に従い、final automated checks、manual dogfooding、reviewer gates、Epic report final update、commit、PR creation / observation を実施する。
+  - `iss-00276` の S07 に従い、PR creation / observation を実施する。
 - ブロッカー:
   - 現時点で作業停止ブロッカーはなし。
 
@@ -83,6 +87,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-030 | adopted | fresh `spec-reviewer` gate | `iss-00275` planning set and Epic current-state references | Dewey は active Epic / Issue docs、specialist drafts、unified draft artifact ADR を確認し、`iss-00275` の AC/EC trace、machine / smoke / reviewer 境界、draft authority isolation、no-PR handoff に P0/P1/P2 がないと判定した。P3 として Epic report の古い next-action wording が指摘されたため、この更新で current state に合わせた。 | Dewey: `019f22ae-51a7-7ea2-a13c-8a2ed1806d72`; `review_status: pass`; `overall_confidence_score: 0.88` | `iss-00275` の実装へ進む。 |
 | EAL-031 | adopted | completed Issue relay and `iss-00275` closeout | `plan.md` / `report.md` | `iss-00275` は focused structural tests、validate、assurance、fresh code / spec review を通して完了し、`issue finish` 済みである。`iss-00276` は dependency ready となり active start 済み。 | commit `53d6e924`; `issue finish` output for `iss-00275`; `deps check iss-00276` -> ready; active issue `iss-00276` | `iss-00276` final gate へ進む。 |
 | EAL-032 | adopted | `iss-00276` planning review | `iss-00276/design.md`, `iss-00276/plan.md`, `iss-00276/report.md` | `iss-00276` は assurance compose 後に critical final gate として正規 design / plan を具体化し、Sartre のP1を修正したうえで Socrates re-review が `review_status: pass` とした。 | Sartre `019f22d4-fc6a-77b1-a2f0-1441a2cc226e`; Socrates `019f22d8-1185-7250-92b9-1d2c4787f600`; `assurance verify` -> pass; `validate` -> pass | S00-S07 を実行する。 |
+| EAL-033 | adopted | `iss-00276` final automated gate | `spec-dock/docs/workflow_epic.md`, `tests/unit/infra/test_init_update.py`, `iss-00276/report.md` | Final gate の初回 `tests/unit` は、provider-side `workflow_epic.md` と今回追加された dogfooding Epic / Issue metadata / dependencies が checked-in dogfooding mirror / snapshots に未反映であることを検出した。mirror と snapshots を current source に追従させた後、focused regression、full unit / CLI runtime / full pytest / SpecDock structural checks が成功した。 | 初回 `tests/unit` -> 4 failed / 962 passed; targeted regression -> 4 passed; rerun `tests/unit` -> 966 passed; `tests/cli_runtime` -> 730 passed, 74 skipped; full `uv run pytest` -> 1699 passed, 74 skipped; `validate` -> nodes=178; `assurance verify` -> ok; `deps check iss-00276` -> ready | reviewer re-check、PR delivery へ進む。 |
+| EAL-034 | adopted | final reviewer gates | `iss-00276/report.md` | `code-reviewer` は current diff を pass と判定した。初回 `spec-reviewer` / `qa-reviewer` は automated gate が manual / reviewer / PR closure IDs を閉じたように読める traceability defect をP1として検出したため、Step Evidence の Closure を修正し、manual / reviewer / PR closure は S03 / S04 / S07 に残した。その後 full pytest と scaffold dogfooding evidence を追加し、`spec-reviewer` / `qa-reviewer` re-review は pass となった。P2 の Epic E-AC-006 stale manual wording も修正した。 | Harvey `019f236e-2728-72e2-adf5-8848a086037f` -> pass; Planck initial `019f236e-265c-78e2-b7c4-aa9551622f4a` -> fail P1; Ramanujan initial `019f236e-27e4-7602-a80b-647843af6ca2` -> fail P1/P2; Step Evidence repair; full pytest pass; scaffold dogfooding evidence; Planck re-review -> pass; Ramanujan re-review -> pass; final local commit evidence | PR delivery へ進む。 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -188,12 +194,12 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - E-AC-005: pending
   - 実装担当Issue `iss-00275` は完了済み。最終達成判定は `iss-00276` の integrated quality gate で確認する。
 - E-AC-006: pending
-  - 実装担当Issue `iss-00276` は active planning review pass 済み。final automated / manual / PR delivery は未実施。
+  - 実装担当Issue `iss-00276` は active planning review pass 済み。final automated gate、manual scaffold dogfooding / hygiene read-through、reviewer gates final re-review、final local commit は実施済み。PR delivery は未実施。
 - E-AC-007: pending
-  - `iss-00271` から `iss-00275` で反映・検証済み。`iss-00276` final gate で最終確認する。
+  - `iss-00271` から `iss-00275` で反映・検証済み。`iss-00276` final automated gate でも unit / CLI runtime / SpecDock structural checks は通過した。manual / reviewer / PR gate で最終確認する。
 - E-AC-008: partially_completed
   - planning correction として、`iss-00271` から `iss-00276` の pre-start design / plan seed を Issue-local draft artifacts へ移し、canonical `design.md` / `plan.md` を awaiting-assurance-compose placeholder に戻した。
-  - `iss-00274` / `iss-00275` で workflow / command / validation として固定済み。`iss-00276` final gate で最終確認する。
+  - `iss-00274` / `iss-00275` で workflow / command / validation として固定済み。`iss-00276` final automated gate で snapshot / smoke checks は通過した。manual / reviewer / PR gate で最終確認する。
 
 ## ロールアウト結果（必要なら） (任意)
 - 該当なし:
@@ -202,7 +208,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ## フォローアップ（別Issue化） (必須)
 - なし:
   - 追加Issueは現時点では作成していない。
-  - 次の作業は `iss-00276` の final automated checks、manual dogfooding、reviewer gates、PR delivery を実施すること。
+  - 次の作業は `iss-00276` の manual dogfooding、reviewer gates、PR delivery を実施すること。
 
 ## 省略/例外メモ (必須)
 - 該当なし
