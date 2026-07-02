@@ -129,6 +129,13 @@ raw artifacts と delegated drafts は証跡であり、canonical authority で�
   - ファイルパス、コマンド、コード識別子、SpecDock の固定用語、外部固有名詞は原文を保持してよい。
   - templates、skills、workflow docs、reviewer guidance、smoke tests は、日本語ファースト authoring を誘導・確認できるようにする。
   - 根拠: accepted ADR `20260702t040113z-adr-japanese-first-spec-authoring-policy.md`
+- D-009 unified draft artifact command and grade-role policy:
+  - Issue-local `draft-design` / `draft-plan` は evidence-only artifact であり、canonical Issue `design.md` / `plan.md` ではない。
+  - Draft artifact 作成 command は `new artifact draft-design --issue <issue-id>` / `new artifact draft-plan --issue <issue-id>` に統一する。
+  - `assurance compose` は canonical compose 専用とし、pre-start draft artifact 作成では使わない。
+  - `composed` / `authored` の違いは command 名ではなく artifact lifecycle / provenance / EAL state で扱う。
+  - Grade別の specialist obligation は workflow / skills / reviewer gates が管理する。
+  - 根拠: accepted ADR `20260702t074332z-adr-unified-draft-artifact-command-grade-role-policy.md`
 
 ## データフロー / メインシーケンス
 - タイトル:
@@ -166,6 +173,17 @@ Quality -> Canonical: final readiness / repair needs を報告
 @enduml
 ```
 
+Issue Start 前の設計・計画 seed は次の状態遷移で扱う。
+
+```text
+Epic planning handoff seed
+  -> Issue-local draft-design / draft-plan artifacts
+    -> Issue Planning EAL adoption decision
+      -> assurance compose による canonical design.md / plan.md
+        -> fresh spec-reviewer pass
+          -> execution-ready
+```
+
 ## Issue引き継ぎパッケージ契約
 各 downstream Issue には次を渡す。
 - parent Initiative / Epic ID
@@ -180,6 +198,14 @@ Quality -> Canonical: final readiness / repair needs を報告
 - dependencies
 - escalation triggers
 - relevant artifacts and accepted ADRs
+- canonical Issue requirement state
+- canonical Issue design state: `awaiting-assurance-compose` / composed / promoted
+- canonical Issue plan state: `awaiting-assurance-compose` / composed / promoted
+- Issue-local `draft-design` artifact path、または blocked / fallback evidence
+- Issue-local `draft-plan` artifact path、または blocked / fallback evidence
+- draft artifact adoption state
+- grade-specific specialist obligation
+- handoff-ready と execution-ready の区別
 
 suggested grade の目安:
 - docs-only wording: `lite`
@@ -213,17 +239,20 @@ suggested grade の目安:
 |---|---|
 | `src/spec_dock/assets/spec_dock/docs/authoring/scope-layering.md` | scope ownership、decision radius、authority flow、anti-rules を扱う狭い provider-side reference を追加する。 |
 | `src/spec_dock/assets/spec_dock/docs/workflow_initiative.md` | scope-layering reference への薄いリンクを追加し、全文テーブルの重複を避ける。 |
-| `src/spec_dock/assets/spec_dock/docs/workflow_epic.md` | scope-layering reference への薄いリンクと、Epic-level handoff / readiness guidance を追加する。 |
-| `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` | Issue が parent envelope を再定義しないことを強調する薄いリンクを追加する。 |
+| `src/spec_dock/assets/spec_dock/docs/workflow_epic.md` | scope-layering reference への薄いリンクと、Epic-level handoff / readiness guidance を追加する。Issue handoff package に `draft-design` / `draft-plan` path index と canonical placeholder boundary を含める。 |
+| `src/spec_dock/assets/spec_dock/docs/workflow_issue.md` | Issue が parent envelope を再定義しないことを強調する薄いリンクを追加する。Issue-local draft artifact adoption、`assurance compose`、canonical review の順序を明確にする。 |
+| `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` | grade-aware specialist obligation と draft artifact EAL state を追加し、artifact existence だけで execution-ready としない。 |
 | `src/spec_dock/assets/spec_dock/docs/phase_*` | phase gate が scope-layering または handoff context を必要とする箇所にだけ、焦点を絞った参照を追加する。 |
 | `src/spec_dock/assets/spec_dock/templates/initiative/{requirement,design,plan}.md` | implementation-level overreach を避けつつ、strategic / capability / source-of-truth / Epic handoff prompts を追加する。 |
 | `src/spec_dock/assets/spec_dock/templates/epic/{requirement,design,plan}.md` | capability / model envelope、design slice catalog、Issue handoff package、suggested grade、final gate prompts を追加する。 |
 | `src/spec_dock/assets/spec_dock/templates/**` | 日本語運用では本文を日本語ファーストにし、英語は識別子・固定語・外部固有名詞へ限定する guidance を追加する。 |
 | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md` | first-read と output expectations を新しい template / reference flow に合わせ、日本語ファースト authoring を明示する。 |
-| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` | Epic design / plan authoring を、flexible six-Issue baseline と handoff package に合わせ、日本語ファースト authoring を明示する。 |
-| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md` | Option B handoff inspection の structural blockers と reviewer findings の分離を追加する。 |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` | Epic design / plan authoring を、flexible six-Issue baseline と handoff package に合わせ、日本語ファースト authoring を明示する。Issue Start 前に canonical Issue `design.md` / `plan.md` へ本文入り draft を置かない hard rule を追加する。 |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` | Issue-local draft artifacts を adopt / partial / reject してから canonical `assurance compose` と fresh review へ進む導線を追加する。 |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-execution/SKILL.md` | Option B handoff inspection の structural blockers と reviewer findings の分離を追加する。handoff-ready と execution-ready を区別する。 |
 | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md` | interview / research / disc artifacts の本文を日本語ファーストで外部化する guidance を追加する。 |
-| `tests/` | scaffold / template / doc / skill の focused smoke assertion と、振る舞い変更がある場合の runtime check を追加する。 |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_artifact_doc.py` と関連箇所 | `new artifact draft-design` / `draft-plan` の metadata、canonical docs non-mutation、missing / invalid / stale assurance の fail-closed を扱う。 |
+| `tests/` | scaffold / template / doc / skill の focused smoke assertion と、振る舞い変更がある場合の runtime check を追加する。draft artifact command、canonical non-mutation、stale assurance、Strict / Critical readiness の回帰を含める。 |
 | `spec-dock/` | provider-side 変更後の dogfooding confirmation として確認または refresh する。 |
 
 ## 移行 / 互換性 / rollback
@@ -235,6 +264,7 @@ suggested grade の目安:
   - 既存の Issue grade / TDD workflow は Issue execution の下流 authority として維持する。
   - 既存の historical artifacts / discussions は preservation input として維持する。
   - 新しい working evidence は `artifacts/` と `new artifact` を使う。
+  - Issue Start 前の design / plan seed は Issue-local draft artifact として扱い、canonical Issue `design.md` / `plan.md` は `assurance compose` まで placeholder に保つ。
   - 日本語運用で新規作成・更新する canonical docs / artifacts は日本語ファーストにする。既存 historical artifacts は無理に全文翻訳しない。
 - rollback:
   - 検証に失敗した場合、provider asset changes は Issue または PR 単位で revert する。
@@ -265,6 +295,8 @@ suggested grade の目安:
   - planning skills が source-grounded clarification、fresh reviewer gates、report evidence を指すこと。
   - Epic execution handoff が structural blockers と reviewer findings を区別すること。
   - planning / clarification skills が、日本語の requirement / design / plan / artifacts 作成を促すこと。
+  - `new artifact draft-design` / `draft-plan` が Issue-local artifact を作成し、canonical Issue `design.md` / `plan.md` を変更しないこと。
+  - Strict / Critical Issue は draft artifact の存在だけで execution-ready にならず、grade別 specialist obligation と fresh reviewer gate を要求すること。
 - dogfooding / manual checks:
   - 新しい Initiative / Epic scaffold shape。
   - planning skill read-through。
@@ -281,6 +313,8 @@ suggested grade の目安:
   - canonical authoring前に必要なsource-grounded understandingの方針を決めたADR。
 - `artifacts/20260702t040113z-adr-japanese-first-spec-authoring-policy.md`:
   - 日本語ファーストのspec / artifact authoring方針を決めたADR。
+- `artifacts/20260702t074332z-adr-unified-draft-artifact-command-grade-role-policy.md`:
+  - Issue-local draft artifact command を統一し、grade別 specialist obligation を workflow / EAL / reviewer gate に置く方針を決めたADR。
 
 ## 未確定事項
 - なし:

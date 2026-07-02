@@ -23,6 +23,7 @@ ID: "epic-00270"
   - E-RQ-007: Slice 04 で Option B handoff inspection を反映し、Slice 05 で structural fail と reviewer finding の分離を検証する。
   - E-RQ-008: Slice 06 で final automated / manual quality gates、review repair、one-PR delivery readiness を扱う。
   - E-RQ-009: Slice 01、Slice 02、Slice 03、Slice 04、Slice 05、Slice 06 で日本語ファーストの spec / artifact authoring を反映・検証する。
+  - E-RQ-010: Slice 03 で workflow / skill guidance、Slice 04 で draft artifact primitive と readiness workflow、Slice 05 / Slice 06 で検証と最終確認を扱う。
 - E-AC:
   - E-AC-001: Slice 01 で対応し、Slice 05 と Slice 06 で検証する。
   - E-AC-002: Slice 02 で対応し、Slice 05 と Slice 06 で検証する。
@@ -31,12 +32,16 @@ ID: "epic-00270"
   - E-AC-005: Slice 05 と Slice 06 で対応する。
   - E-AC-006: Slice 06 で対応する。
   - E-AC-007: Slice 01、Slice 02、Slice 03、Slice 04 で反映し、Slice 05 と Slice 06 で検証する。
+  - E-AC-008: planning correction で既存 Issue docs を移行し、Slice 04 / Slice 05 / Slice 06 で将来の workflow / command / validation として固定する。
 
 ## 課題分割方針
 - 基本方針:
   - V3 の6 Issueを provisional baseline とする。
   - Slice 01-05 は `strict`、Slice 06 は `critical` を suggested grade とする。
-  - actual Issue scaffold は、この plan と fresh `spec-reviewer` gate の後に作成する。この plan 自体では Issue を作成しない。
+  - actual Issue scaffold は `iss-00271` から `iss-00276` として作成済みである。
+  - 各 Issue の正規 `requirement.md` は先行作成済みである。
+  - Issue Start 前の design / plan seed は canonical `design.md` / `plan.md` ではなく、Issue-local `draft-design` / `draft-plan` artifact として保持する。
+  - Canonical Issue `design.md` / `plan.md` は、Issue Planning の `assurance compose` と fresh reviewer gate まで `artifact_state: awaiting-assurance-compose` placeholder とする。
 - 分割原則:
   - Issue は、1つの coherent observable outcome を持つ。
   - decision-only container を execution-ready Issue にしない。
@@ -47,26 +52,43 @@ ID: "epic-00270"
   - 既存6 Issueでは独立レビュー性、責務境界、検証可能性、PR delivery が明確に悪化する場合だけ許可する。
   - 追加 Issue / 再分割を行う場合は、理由、影響、baselineとの差分、dependency / order、grade、handoff package を `plan.md` に反映し、fresh `spec-reviewer` gate を通す。
   - re-slicing evidence は `report.md` Evidence Adoption Ledger / Spec Authoring Gate に記録する。
+- pre-start draft correction gate:
+  - `iss-00271` から `iss-00276` の canonical `design.md` / `plan.md` に置かれていた pre-start draft body は、Issue-local `draft-design` / `draft-plan` artifacts へ移す。
+  - canonical Issue `design.md` / `plan.md` は awaiting-assurance-compose placeholder に戻す。
+  - 各 Issue `report.md` に migration EAL と Grade Specialist Evidence Gate を記録する。
+  - Epic `report.md` の EAL-021 / EAL-022 は historical batch planning evidence と現在の authority boundary に合わせて再分類する。
+  - 移行後に `rg` / `validate` / fresh `spec-reviewer` を実行し、planning set の整合性を確認する。
 - PR 方針:
   - Epic delivery は原則1PR。
   - IssueごとのPR分割は通常方針に入れない。
+  - `iss-00271` から `iss-00275` は、それぞれ実装・検証後に `issue finish` し、次Issueを `issue start` するリレー方式で進める。
+  - PR readiness / PR creation は `iss-00276` だけが扱う。
   - 1PRが reviewability / delivery risk の面で破綻すると判断できる場合だけ、証跡を残して PR boundary を再検討する。
 
 ## 課題一覧
-以下は planned slice であり、まだ actual SpecDock Issue ID ではない。
+以下の6件を actual SpecDock Issue として作成済みである。要件定義書は正本であり、設計書と実装計画書の seed は Issue-local draft artifacts に置く。各Issueの canonical `design.md` / `plan.md` は、Issue開始後に改めて `assurance compose` し、fresh reviewer gate を通して正規化する。
 
-| Slice | 予定タイトル | Suggested grade | Tranche | 目的 | 主に閉じるもの | 依存 |
-|---|---|---|---|---|---|---|
-| 01 | Initiative 要件・設計・計画 templates の再設計 | `strict` | T1 templates | Initiative templates を strategic planning と Epic handoff の surface にする | E-RQ-001, E-RQ-004, E-RQ-009, E-AC-001, E-AC-007 | plan gate |
-| 02 | Epic 要件・設計・計画 templates の再設計 | `strict` | T1 templates | Epic templates を target model、design slice、Issue handoff、suggested grade の surface にする | E-RQ-001, E-RQ-004, E-RQ-006, E-RQ-009, E-AC-002, E-AC-007 | plan gate、Slice 01 との語彙整合 |
-| 03 | Scope-layering reference と planning guidance の更新 | `strict` | T2 guidance | scope-layering reference を作成し、workflow docs、phase docs、skills、更新済み templates へ thin links を追加する | E-RQ-002, E-RQ-003, E-RQ-005, E-RQ-009, E-AC-003, E-AC-007 | Slice 01, 02、accepted ADRs |
-| 04 | Epic execution handoff と Issue readiness workflow の更新 | `strict` | T2 execution readiness | Epic execution が downstream Issue readiness を調整し、Option B handoff inspection と日本語ファーストguidanceを適用できるようにする | E-RQ-006, E-RQ-007, E-RQ-009, E-AC-004, E-AC-007 | Slice 02、Slice 03 と調整 |
-| 05 | Upstream planning smoke tests と template validation の追加 | `strict` | T3 validation | templates、skills、workflow docs、scope-layering links、artifact authority、handoff readiness、日本語ファースト authoring を検証する | E-RQ-003, E-RQ-004, E-RQ-005, E-RQ-007, E-RQ-009, E-AC-005, E-AC-007 | Slice 01-04 |
-| 06 | Epic quality gate、manual tests、PR delivery | `critical` | T4 final delivery | Epic全体の automated / manual quality gates、review repair、mergeable PR readiness を扱う | E-RQ-008, E-RQ-009, E-AC-006, E-AC-007 | Slice 01-05 |
+| Slice | Issue | 予定タイトル | Suggested grade | Tranche | 目的 | 主に閉じるもの | 依存 |
+|---|---|---|---|---|---|---|---|
+| 01 | `iss-00271` / #271 | Initiative 要件・設計・計画 templates の再設計 | `strict` | T1 templates | Initiative templates を strategic planning と Epic handoff の surface にする | E-RQ-001, E-RQ-004, E-RQ-009, E-AC-001, E-AC-007 | batch Issue planning gate |
+| 02 | `iss-00272` / #272 | Epic 要件・設計・計画 templates の再設計 | `strict` | T1 templates | Epic templates を target model、design slice、Issue handoff、suggested grade の surface にする | E-RQ-001, E-RQ-004, E-RQ-006, E-RQ-009, E-AC-002, E-AC-007 | `iss-00271` |
+| 03 | `iss-00273` / #273 | Scope-layering reference と planning guidance の更新 | `strict` | T2 guidance | scope-layering reference を作成し、workflow docs、phase docs、skills、更新済み templates へ thin links と draft artifact handoff guidance を追加する | E-RQ-002, E-RQ-003, E-RQ-005, E-RQ-009, E-RQ-010, E-AC-003, E-AC-007, E-AC-008 | `iss-00272` |
+| 04 | `iss-00274` / #274 | Epic execution handoff と Issue readiness workflow の更新 | `strict` | T2 execution readiness | Epic execution が downstream Issue readiness を調整し、Option B handoff inspection、unified draft artifact primitive、日本語ファーストguidanceを適用できるようにする | E-RQ-006, E-RQ-007, E-RQ-009, E-RQ-010, E-AC-004, E-AC-007, E-AC-008 | `iss-00273` |
+| 05 | `iss-00275` / #275 | Upstream planning smoke tests と template validation の追加 | `strict` | T3 validation | templates、skills、workflow docs、scope-layering links、artifact authority、draft artifact boundary、handoff readiness、日本語ファースト authoring を検証する | E-RQ-003, E-RQ-004, E-RQ-005, E-RQ-007, E-RQ-009, E-RQ-010, E-AC-005, E-AC-007, E-AC-008 | `iss-00274` |
+| 06 | `iss-00276` / #276 | Epic quality gate、manual tests、PR delivery | `critical` | T4 final delivery | Epic全体の automated / manual quality gates、pre-start draft migration確認、review repair、mergeable PR readiness を扱う | E-RQ-008, E-RQ-009, E-RQ-010, E-AC-006, E-AC-007, E-AC-008 | `iss-00275` |
+
+## Issueリレー依存
+| 先に完了するIssue | 後続Issue | バトン |
+|---|---|---|
+| `iss-00271` | `iss-00272` | Initiative / Epic 共通の scope 語彙と日本語ファースト guidance |
+| `iss-00272` | `iss-00273` | Epic handoff package fields と template link 導線 |
+| `iss-00273` | `iss-00274` | scope-layering reference、artifact authority、planning guidance |
+| `iss-00274` | `iss-00275` | structural blocker / reviewer finding 分離と readiness guidance |
+| `iss-00275` | `iss-00276` | focused tests / smoke / validation evidence |
 
 ## Issue引き継ぎパッケージ
 
-### Slice 01: Initiative 要件・設計・計画テンプレートの再設計
+### Slice 01 / `iss-00271`: Initiative 要件・設計・計画テンプレートの再設計
 - parent trace:
   - E-RQ-001, E-RQ-004, E-RQ-009, E-AC-001, E-AC-007
   - design decisions: D-001, D-002, D-003, D-005, D-008
@@ -91,7 +113,7 @@ ID: "epic-00270"
 - suggested grade:
   - `strict`
 - dependencies / blockers:
-  - canonical plan gate に依存する。Slice 02 と語彙を合わせる。
+  - batch Issue planning gate に依存する。`iss-00272` と語彙を合わせる。
 - reviewer focus:
   - `spec-reviewer` は scope-layering、template authority、日本語ファースト authoring を確認する。
   - docs / template smoke coverage は Slice 05 で確認する。
@@ -104,7 +126,7 @@ ID: "epic-00270"
   - `20260702t025127z-adr-complete-understanding-before-canonical-authoring.md`
   - `20260702t040113z-adr-japanese-first-spec-authoring-policy.md`
 
-### Slice 02: Epic 要件・設計・計画テンプレートの再設計
+### Slice 02 / `iss-00272`: Epic 要件・設計・計画テンプレートの再設計
 - parent trace:
   - E-RQ-001, E-RQ-004, E-RQ-006, E-RQ-009, E-AC-002, E-AC-007
   - design decisions: D-001, D-002, D-003, D-004, D-005, D-008
@@ -127,7 +149,7 @@ ID: "epic-00270"
 - suggested grade:
   - `strict`
 - dependencies / blockers:
-  - canonical plan gate と Slice 01 との語彙整合に依存する。
+  - `iss-00271` の完了と語彙整合に依存する。
 - reviewer focus:
   - `spec-reviewer` は scope ownership、artifact authority、handoff completeness、日本語ファースト authoring を確認する。
   - smoke coverage は Slice 05 で確認する。
@@ -141,25 +163,28 @@ ID: "epic-00270"
   - `20260702t025127z-adr-complete-understanding-before-canonical-authoring.md`
   - `20260702t040113z-adr-japanese-first-spec-authoring-policy.md`
 
-### Slice 03: Scope-layering reference と計画ガイダンスの更新
+### Slice 03 / `iss-00273`: Scope-layering reference と計画ガイダンスの更新
 - parent trace:
-  - E-RQ-002, E-RQ-003, E-RQ-005, E-RQ-009, E-AC-003, E-AC-007
-  - design decisions: D-001, D-003, D-005, D-008
-  - ADRs: scope-layering reference publication、complete-understanding before canonical authoring、Japanese-first spec authoring policy
+  - E-RQ-002, E-RQ-003, E-RQ-005, E-RQ-009, E-RQ-010, E-AC-003, E-AC-007, E-AC-008
+  - design decisions: D-001, D-003, D-005, D-008, D-009
+  - ADRs: scope-layering reference publication、complete-understanding before canonical authoring、Japanese-first spec authoring policy、unified draft artifact command and grade role policy
 - 許可される local delta:
   - `docs/authoring/scope-layering.md` を single provider-side reference として追加する。
   - Initiative / Epic planning skills と workflow / phase docs を、thin links、source-grounded clarification、evidence adoption、fresh reviewer gates、日本語ファースト authoring に合わせて更新する。
-  - reference 作成後、Slice 01 と Slice 02 で準備した wording を使い、Initiative / Epic templates から `authoring/scope-layering.md` への final thin links を追加する。
+  - reference 作成後、`iss-00271` と `iss-00272` で準備した wording を使い、Initiative / Epic templates から `authoring/scope-layering.md` への final thin links を追加する。
   - artifact guidance で、interview / research / disc artifacts の本文を日本語ファーストにする方針を示す。
+  - Epic planning handoff guidance に、Issue-local `draft-design` / `draft-plan` path index と、pre-start canonical Issue `design.md` / `plan.md` を本文入りdraftにしない境界を追加する。
 - 禁止される parent boundary change:
   - full responsibility table を各 template / doc / skill に重複させない。
   - ADRs を日常的な operational reference surface にしない。
   - canonical single-writer authority や fresh reviewer gates を弱めない。
-  - Slice 01 / 02 が明示した follow-up 以外の template content を、thin reference links を超えて変更しない。
+  - `iss-00271` / `iss-00272` が明示した follow-up 以外の template content を、thin reference links を超えて変更しない。
+  - `assurance compose` を draft artifact 作成 command として説明しない。
 - acceptance seed:
   - planning skills が `artifacts -> requirement -> review -> design -> review -> plan -> review -> handoff` の流れを案内する。
   - 新しい working evidence は `artifacts/` を指し、legacy `discussions/` は preservation input として扱う。
   - 日本語運用では、skills / docs が日本語の canonical docs / artifacts 作成を促す。
+  - EpicからIssueへ渡す pre-start seed は、canonical `design.md` / `plan.md` ではなく Issue-local draft artifact として参照される。
 - model / contract / lifecycle constraints:
   - workflow docs は lifecycle authority に留まる。
   - `scope-layering.md` は narrow scope / decision-routing reference とする。
@@ -168,35 +193,44 @@ ID: "epic-00270"
 - suggested grade:
   - `strict`
 - dependencies / blockers:
-  - Slice 01 / 02 の template vocabulary と accepted ADRs に依存する。
+  - `iss-00271` / `iss-00272` の template vocabulary と accepted ADRs に依存する。
   - reference 作成と final thin links を同じ slice で扱うことで dangling template links を避ける。
 - reviewer focus:
   - `spec-reviewer` は discoverability、authority table の重複回避、artifact authority leak、日本語ファースト authoring guidance を確認する。
 - escalation triggers:
-  - docs が guidance / readiness wording を超える runtime command behavior change を必要とする場合、Slice 04 と調整する、または follow-up を作る。
+  - docs が guidance / readiness wording を超える runtime command behavior change を必要とする場合、`iss-00274` と調整する、または follow-up を作る。
 - relevant artifacts:
   - `20260702t022907z-adr-scope-layering-reference-publication-surface.md`
   - `20260702t024118z-adr-architecture-neutral-template-authoring-policy.md`
   - `20260702t025127z-adr-complete-understanding-before-canonical-authoring.md`
   - `20260702t025127z-01-research-grill-with-docs-research.md`
   - `20260702t040113z-adr-japanese-first-spec-authoring-policy.md`
+  - `20260702t074332z-adr-unified-draft-artifact-command-grade-role-policy.md`
 
-### Slice 04: Epic execution handoff と Issue準備完了workflowの更新
+### Slice 04 / `iss-00274`: Epic execution handoff と Issue準備完了workflowの更新
 - parent trace:
-  - E-RQ-006, E-RQ-007, E-RQ-009, E-AC-004, E-AC-007
-  - design decisions: D-005, D-006, D-008
-  - interview: handoff inspection Option B
+  - E-RQ-006, E-RQ-007, E-RQ-009, E-RQ-010, E-AC-004, E-AC-007, E-AC-008
+  - design decisions: D-005, D-006, D-008, D-009
+  - interview / ADR: handoff inspection Option B、unified draft artifact command and grade role policy
 - 許可される local delta:
   - Epic execution skill / workflow guidance を更新し、reviewer-gated Epic planning outputs を消費し、Issue start / execution routing の前に structural handoff readiness を確認する。
   - structural blockers と reviewer findings の違いを明確にする。
   - execution / readiness guidance でも、日本語運用では日本語ファースト authoring を維持するよう明示する。
+  - `new artifact draft-design --issue <issue-id>` / `new artifact draft-plan --issue <issue-id>` を、Issue Start 前にも Issue-local draft artifact を作る統一 primitive として強化する。
+  - `assurance compose` は canonical `design.md` / `plan.md` を作る command として保持し、draft artifact 作成には使わない。
+  - handoff-ready と execution-ready を分離し、draft artifact の存在だけで Strict / Critical Issue を execution-ready にしない。
+  - grade別の system-architect / implementation-planner obligation を workflow / skill / EAL / reviewer gate で管理する。
 - 禁止される parent boundary change:
   - Epic execution を semantic reviewer にしない。
   - Issue planning、Issue execution、dependency checks、fresh reviewer gates を bypass しない。
   - GitHub mutation、PR merge、Issue close を行わない。
+  - actor / specialist / depth 別の draft artifact command を増やさない。
+  - pre-start draft artifact 作成のために canonical Issue `design.md` / `plan.md` を変更しない。
 - acceptance seed:
   - missing canonical docs、stale / missing reviewer pass、missing Issue readiness contract、missing executable plan structure、unresolved EAL / Spec Authoring Gate、raw artifact authority leak、decision-only Issue treated ready は blocking になる。
   - weak but present semantic content は reviewer finding になる。
+  - `new artifact draft-design` / `draft-plan` は Issue-local artifact を生成し、canonical Issue `design.md` / `plan.md` を non-mutation に保つ。
+  - missing / invalid / stale assurance metadata は fail-closed になり、artifact existence だけで readiness を進めない。
 - model / contract / lifecycle constraints:
   - Epic execution は coordinator / structural gate であり、semantic spec sufficiency は `spec-reviewer` が担う。
 - expected evidence:
@@ -204,7 +238,7 @@ ID: "epic-00270"
 - suggested grade:
   - `strict`
 - dependencies / blockers:
-  - Slice 02 の handoff fields に依存し、Slice 03 と wording を調整する。
+  - `iss-00272` の handoff fields に依存し、`iss-00273` と wording を調整する。
 - reviewer focus:
   - `spec-reviewer` は lifecycle / authority correctness と日本語ファースト guidance の反映を確認する。
   - command behavior が変わる場合だけ runtime tests を追加する。
@@ -215,20 +249,24 @@ ID: "epic-00270"
   - `20260702t020503z-02-disc-phase3-issue-slicing-handoff-model.md`
   - `20260702t025127z-adr-complete-understanding-before-canonical-authoring.md`
   - `20260702t040113z-adr-japanese-first-spec-authoring-policy.md`
+  - `20260702t074332z-adr-unified-draft-artifact-command-grade-role-policy.md`
 
-### Slice 05: Upstream planningスモークテストとテンプレート検証の追加
+### Slice 05 / `iss-00275`: Upstream planningスモークテストとテンプレート検証の追加
 - parent trace:
-  - E-RQ-003, E-RQ-004, E-RQ-005, E-RQ-007, E-RQ-009, E-AC-005, E-AC-007
-  - design decisions: D-001, D-002, D-003, D-005, D-006, D-008
+  - E-RQ-003, E-RQ-004, E-RQ-005, E-RQ-007, E-RQ-009, E-RQ-010, E-AC-005, E-AC-007, E-AC-008
+  - design decisions: D-001, D-002, D-003, D-005, D-006, D-008, D-009
 - 許可される local delta:
-  - updated templates、scope-layering links、artifact authority、architecture-neutral wording、handoff package fields、Option B structural blocker / finding split、日本語ファースト authoring guidance を対象に focused tests / smoke checks を追加する。
+  - updated templates、scope-layering links、artifact authority、architecture-neutral wording、handoff package fields、Option B structural blocker / finding split、日本語ファースト authoring guidance、draft artifact boundary を対象に focused tests / smoke checks を追加する。
+  - canonical Issue `design.md` / `plan.md` に pre-start draft body marker が残らないこと、Issue-local draft artifact path index が report / handoff に存在することを確認する。
+  - `new artifact draft-design` / `draft-plan` の canonical non-mutation、missing / invalid / stale assurance fail-closed、Strict / Critical readiness gate を検証する。
 - 禁止される parent boundary change:
   - brittle semantic judgments を machine-only checks として固定しない。
   - DDD / EDA terms を mandatory sections にしない。
   - raw manual-test workspaces を inspect / commit しない。
   - 技術識別子まで日本語化する machine check を入れない。
+  - draft artifact の存在だけをもって Issue execution-ready と判定する check を入れない。
 - acceptance seed:
-  - tests / smoke checks が、missing scope-layering reference、duplicated full responsibility table、raw artifact canonical authority language、decision-only Issue ready language、missing handoff fields、mandatory DDD / EDA-only template expectation、日本語ファースト guidance の欠落を検出できる。
+  - tests / smoke checks が、missing scope-layering reference、duplicated full responsibility table、raw artifact canonical authority language、decision-only Issue ready language、missing handoff fields、mandatory DDD / EDA-only template expectation、日本語ファースト guidance の欠落、pre-start canonical draft body、draft artifact path index 欠落を検出できる。
 - model / contract / lifecycle constraints:
   - machine checks は構造を扱う。
   - semantic sufficiency と自然言語品質の最終判断は reviewer が担う。
@@ -237,7 +275,7 @@ ID: "epic-00270"
 - suggested grade:
   - `strict`
 - dependencies / blockers:
-  - Slice 01-04 に依存する。
+  - `iss-00271` から `iss-00274` に依存する。
 - reviewer focus:
   - `spec-reviewer` は smoke coverage relevance、false-positive risk、日本語ファースト authoring の確認粒度を確認する。
 - escalation triggers:
@@ -249,27 +287,32 @@ ID: "epic-00270"
   - `20260702t024118z-adr-architecture-neutral-template-authoring-policy.md`
   - `20260702t025127z-adr-complete-understanding-before-canonical-authoring.md`
   - `20260702t040113z-adr-japanese-first-spec-authoring-policy.md`
+  - `20260702t074332z-adr-unified-draft-artifact-command-grade-role-policy.md`
 
-### Slice 06: Epic品質gate、手動テスト、PR delivery
+### Slice 06 / `iss-00276`: Epic品質gate、手動テスト、PR delivery
 - parent trace:
-  - E-RQ-008, E-RQ-009, E-AC-006, E-AC-007
-  - design decisions: D-007, D-008、および final quality / test strategy に関わるすべての判断
+  - E-RQ-008, E-RQ-009, E-RQ-010, E-AC-006, E-AC-007, E-AC-008
+  - design decisions: D-007, D-008, D-009、および final quality / test strategy に関わるすべての判断
   - delivery interview: one PR default
 - 許可される local delta:
   - Epic-wide automated checks、manual tests、dogfooding inspection、review repair loop、final report updates、PR readiness preparation を実行する。
   - final gates で見つかった in-scope issues を修正する。
   - final report / PR description で、日本語ファースト authoring の確認結果を記録する。
+  - final gates で、pre-start draft migration が完了し、canonical Issue `design.md` / `plan.md` に本文入り draft が戻っていないことを確認する。
+  - PR description で、Issue-local draft artifacts と canonical compose / review boundary を説明する。
 - 禁止される parent boundary change:
   - gate repairs を超える新機能 scope を導入しない。
   - planning に戻すべき新しい Initiative / Epic planning policy を作らない。
   - raw manual-test workspaces、fixtures、logs、captures、evidence files を commit しない。
   - 明示許可なしに PR merge や credentialed external mutation を行わない。
+  - final quality gate の都合で、未開始 Issue の canonical `design.md` / `plan.md` を本文入り draft に戻さない。
 - acceptance seed:
   - automated / manual gates が完了している、または failure が理由と次アクション付きで記録されている。
   - reviewer feedback が修正され、再検証されている。
   - PR description が scope、validation、manual tests、follow-ups を説明している。
   - raw manual-test files が staged されていない。
   - 日本語運用の canonical docs / artifacts が、識別子を除き日本語ファーストになっている。
+  - Issue-local draft artifacts は evidence-only として残り、canonical Issue `design.md` / `plan.md` は Issue Planning の compose / review を経る。
 - model / contract / lifecycle constraints:
   - final delivery は、integrated Epic diff を原則1PRとして検証する。
 - expected evidence:
@@ -277,7 +320,7 @@ ID: "epic-00270"
 - suggested grade:
   - `critical`
 - dependencies / blockers:
-  - Slice 01-05 に依存する。
+  - `iss-00271` から `iss-00275` に依存する。
 - reviewer focus:
   - `qa-reviewer` は test adequacy を確認する。
   - implementation diff が大きい場合は `code-reviewer` を使う。
@@ -289,6 +332,7 @@ ID: "epic-00270"
   - `20260702t020503z-03-disc-phase3-quality-delivery-gate-model.md`
   - `20260702t025127z-adr-complete-understanding-before-canonical-authoring.md`
   - `20260702t040113z-adr-japanese-first-spec-authoring-policy.md`
+  - `20260702t074332z-adr-unified-draft-artifact-command-grade-role-policy.md`
 
 ## 共通 handoff package 項目
 各 downstream Issue には次を渡す。
@@ -307,6 +351,13 @@ ID: "epic-00270"
 - reviewer focus
 - escalation triggers
 - relevant artifacts and accepted ADRs
+- canonical Issue requirement state
+- canonical Issue design state
+- canonical Issue plan state
+- Issue-local `draft-design` / `draft-plan` artifact paths
+- draft artifact adoption state
+- grade-specific specialist obligation
+- handoff-ready / execution-ready distinction
 
 ## Option B検査方針
 - blocking fail:
@@ -329,7 +380,7 @@ ID: "epic-00270"
 ## 統合チェックポイント
 - G0 canonical plan readiness:
   - `requirement.md`、`design.md`、`plan.md` が downstream Issue planning に十分具体化されている。
-  - actual Issue scaffold の前に fresh `spec-reviewer` pass が存在する。
+  - actual Issue scaffold と Issue planning docs が Epic handoff と矛盾せず、fresh `spec-reviewer` pass に提示できる。
 - G1 template boundary review:
   - Initiative / Epic templates が architecture-neutral / architecture-aware wording を使う。
   - templates が DDD / EDA、private implementation design、Issue-level TDD cycles を強制しない。
@@ -339,13 +390,16 @@ ID: "epic-00270"
   - raw artifacts は canonical authority として扱われない。
 - G3 handoff readiness review:
   - Epic plan と Epic execution guidance が handoff package fields、suggested grades、dependencies、verification expectations、Option B inspection policy を含む。
+  - Issue-local draft artifacts は evidence-only として path index に記録され、canonical Issue `design.md` / `plan.md` は `assurance compose` まで placeholder である。
+  - handoff-ready と execution-ready が区別され、Strict / Critical は specialist obligation と fresh reviewer gate を要求する。
 - G4 日本語ファースト authoring review:
   - requirement / design / plan / report / artifacts guidance が、日本語運用で本文を日本語ファーストにすることを示す。
   - 許容される英語は、識別子、コマンド、固定語、外部固有名詞に限定される。
 - G5 integrated smoke matrix:
   - template shape、planning skill wording、workflow links、artifact guidance、execution handoff、日本語ファースト guidance をまとめて確認する。
+  - `new artifact draft-design` / `draft-plan`、canonical non-mutation、pre-start draft body absence、draft artifact path index、stale assurance fail-closed を確認する。
 - G9 final quality / PR readiness:
-  - Slice 06 が prior slices の完了または明示的 defer、automated / manual gates、review repairs、one-PR delivery readiness を確認する。
+  - `iss-00276` が `iss-00271` から `iss-00275` の完了または明示的 defer、automated / manual gates、review repairs、one-PR delivery readiness を確認する。
 
 ## 品質ゲート
 - suggested automated gates:
@@ -391,7 +445,7 @@ ID: "epic-00270"
   11. generated / dogfooding docs が validate / sync 後も coherent である。
 
 ## 課題準備完了条件
-- actual downstream Issues を作成する前に満たすこと:
+- actual downstream Issues は作成済みである。実行へ進める前に満たすこと:
   - canonical `requirement.md`、`design.md`、`plan.md` が fresh reviewer-gated adoption 済みである、または明示的な non-promotion state が記録されている。
   - provisional six-Issue baseline が、採用済み flexibility gate なしに変更されていない。
   - `report.md` EAL に、planning / handoff に影響する unresolved `blocked` または `stale` entry がない。
@@ -407,8 +461,8 @@ ID: "epic-00270"
   - major open questions が解消されている、または明示的に scope 外にされている。
 
 ## 最終delivery Issue
-- Slice 06 は意図的に `critical` quality / delivery Issue とする。
-- Slice 06 が持つもの:
+- `iss-00276` は意図的に `critical` quality / delivery Issue とする。
+- `iss-00276` が持つもの:
   - Epic全体の検証
   - 自動チェック
   - 利用可能な static analysis
@@ -422,7 +476,7 @@ ID: "epic-00270"
   - final report evidence
   - PR readiness checklist
   - active environment で許可される場合の PR creation
-- Slice 06 が持たないもの:
+- `iss-00276` が持たないもの:
   - gates で見つかった修正を超える新機能scope
   - 新しい Initiative / Epic planning decisions
   - 破壊的操作
@@ -430,7 +484,7 @@ ID: "epic-00270"
   - 明示許可のない PR merge
 
 ## 最終完了条件
-- すべての planned Issues が完了している、または defer が明示的な証跡と main orchestrator の受容を持つ。
+- `iss-00271` から `iss-00276` が完了している、または defer が明示的な証跡と main orchestrator の受容を持つ。
 - Initiative / Epic templates が provider-side scaffold assets で更新されている。
 - planning / execution skills と docs が、更新後の templates と accepted ADRs に整合している。
 - 日本語運用の requirement / design / plan / report / artifacts 作成導線が、日本語ファースト authoring を促す。
@@ -444,9 +498,9 @@ ID: "epic-00270"
 
 ## 依存 / ブロッカー
 - D-001:
-  - downstream Issue scaffold / planning の前に fresh `spec-reviewer` pass が必要である。
+  - `iss-00271` から `iss-00276` の batch Issue planning docs を実行入力として扱う前に、fresh `spec-reviewer` pass が必要である。
 - D-002:
-  - actual Issue IDs はまだ存在しないため、この plan で推測して書かない。
+  - actual Issue IDs は `iss-00271` から `iss-00276` として確定済みである。再分割する場合はこの plan と dependency chain を更新し、fresh review を通す。
 - D-003:
   - generated readiness projections を証跡として使う前に `./spec-dock/scripts/spec-dock sync` を実行する。
 

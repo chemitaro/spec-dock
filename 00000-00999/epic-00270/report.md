@@ -25,8 +25,15 @@ ID: "epic-00270"
   - Fresh `spec-reviewer` gate は Lovelace (`019f20e7-b841-77d0-894d-ad2f68bde70e`) により一度 `review_status: pass` となった。
   - その後、ユーザー補足により日本語ファースト spec / artifact authoring を Epic scope へ追加し、`requirement.md` / `design.md` / `plan.md` を日本語ファーストへ更新した。
   - 更新後の canonical set は Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` となった。残ったP2/P3の日本語説明修正はこの report 更新で反映した。
+  - `plan.md` の6 Slice を actual Issue として `iss-00271` から `iss-00276` に変換し、Issue間のリレー依存を設定した。
+  - 各Issueに正規 `requirement.md` を作成した。当初 canonical `design.md` / `plan.md` に置いた pre-start draft body は、後続分析により Issue-local draft artifacts へ移す対象として再分類した。
+  - 当時の batch Issue planning set は Pascal (`019f212c-b416-7a31-b2c8-60b746a3ce99`) により `review_status: pass` となった。その後のADRにより canonical Issue `design.md` / `plan.md` 境界を修正したため、Pascal pass は historical evidence として扱う。
+  - ローカル検証では `./spec-dock/scripts/spec-dock validate` が成功した。`deps check` は、前段Issue未完了のため `epic-00270` / `iss-00276` が blocked となり、これはリレー依存どおりの状態である。
+  - Issue Start 前の `draft-design` / `draft-plan` 作成方針について再分析し、command は既存 `new artifact draft-*` primitive を強化し、actor obligation は grade-aware workflow / EAL で管理する方針を accepted ADR とした。
+  - `iss-00271` から `iss-00276` の pre-start design / plan seed を Issue-local `draft-design` / `draft-plan` artifacts へ移し、canonical Issue `design.md` / `plan.md` を awaiting-assurance-compose placeholder に戻す planning correction を実施した。
+  - 修正後の current planning set は Goodall (`019f21f9-b2ab-7182-8246-96997f8571d9`) により fresh `spec-reviewer` gate で `review_status: pass` となった。
 - 次のマイルストーン:
-  - `plan.md` の planned slices 01-06 を actual Issue scaffold / planning へ変換する。
+  - `iss-00271` を開始し、Issue-local draft artifacts の採否を判断してから正規 `design.md` / `plan.md` を compose / review する。
 - ブロッカー:
   - 現時点で作業停止ブロッカーはなし。
 
@@ -60,6 +67,15 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-016 | deferred | fresh `spec-reviewer` gate | previous `requirement.md` / `design.md` / `plan.md` / `report.md` | Lovelace は previous canonical set を review して `review_status: pass` としたが、その後に日本語ファースト spec / artifact authoring を追加したため、現在のpromotion gateではなく historical evidence として扱う。 | reviewer: `019f20e7-b841-77d0-894d-ad2f68bde70e` | 更新後の canonical set に対して fresh `spec-reviewer` を再実行する。 |
 | EAL-017 | adopted | user clarification / ADR | `requirement.md` / `design.md` / `plan.md` / `report.md` | ユーザーは、現在のファイル修正だけでなく、日本語の requirement / design / plan と artifacts を作成できること自体をこの Epic scope に含めるべきだと補足した。これを accepted ADR として昇格し、canonical requirement / design / plan へ反映した。 | `artifacts/20260702t040113z-adr-japanese-first-spec-authoring-policy.md` | EAL-018 の reviewer pass により反映確認済み。 |
 | EAL-018 | adopted | fresh `spec-reviewer` gate | updated `requirement.md` / `design.md` / `plan.md` / `report.md` | Zeno が日本語ファースト更新後の canonical set と指定 artifacts / ADRs / research を確認し、blocking finding なしで `review_status: pass` とした。P2/P3 の局所的な英語説明残りは、この更新で日本語へ修正した。 | reviewer: `019f210e-28c1-7150-99ad-c5ab59e07e3a` | downstream Issue scaffold / planning へ進める。 |
+| EAL-019 | adopted | `spec-dock new issue` / GitHub Issue creation | `plan.md` / Issue docs | Epic plan の6 Slice を actual Issue `iss-00271` から `iss-00276` として作成し、それぞれ GitHub Issue #271-#276 に紐づけた。 | `iss-00271` / #271, `iss-00272` / #272, `iss-00273` / #273, `iss-00274` / #274, `iss-00275` / #275, `iss-00276` / #276 | batch spec-review pass 済み。`iss-00271` から順に実行する。 |
+| EAL-020 | adopted | `spec-dock deps add` | Issue dependency chain | ユーザー方針どおり、IssueごとのPRではなく、`issue finish` から次の `issue start` へ進むリレー依存を設定した。 | `iss-00272 -> iss-00271`, `iss-00273 -> iss-00272`, `iss-00274 -> iss-00273`, `iss-00275 -> iss-00274`, `iss-00276 -> iss-00275` | final PR delivery は `iss-00276` だけが扱う。 |
+| EAL-021 | partially_adopted | batch Issue planning authoring | `iss-00271` から `iss-00276` の `requirement.md` と Issue-local draft artifacts | Epic全体の抜け漏れ・重複を制御するため、6 Issue をまとめて正規要件と pre-start design / plan seed へ具体化した。ただし pre-start seed を canonical `design.md` / `plan.md` に置いた状態は現在のADRと矛盾するため、seed本文は Issue-local draft artifacts へ移し、canonical design / plan は placeholder に戻した。 | `issues/iss-00271-*/requirement.md`, `issues/iss-00272-*/requirement.md`, `issues/iss-00273-*/requirement.md`, `issues/iss-00274-*/requirement.md`, `issues/iss-00275-*/requirement.md`, `issues/iss-00276-*/requirement.md`, 各Issueの `artifacts/*draft-design*`, `artifacts/*draft-plan*` | Fresh `spec-reviewer` で、移行後の planning set を再確認する。 |
+| EAL-022 | partially_adopted | fresh `spec-reviewer` gate | historical batch Issue planning set | Popper の初回reviewで Issue report の判断台帳不足が P1 として検出され、6件すべてに `仕様解釈・判断台帳` を追加した。再レビューで Pascal は当時の batch planning set を `review_status: pass` と判定したが、その後 accepted ADR により Issue canonical design / plan boundary を修正したため、現在のpromotion gateではなく historical consistency evidence として扱う。 | Popper: `019f2129-6a7b-7b71-b24a-6037ea886013`, Pascal: `019f212c-b416-7a31-b2c8-60b746a3ce99` | Current planning set は EAL-027 の Goodall pass で確認済み。 |
+| EAL-023 | deferred | local validation commands | historical batch Issue planning set | `./spec-dock/scripts/spec-dock validate` は当時成功した。`deps check epic-00270` と `deps check iss-00276` は前段Issue未完了のため blocked を返し、リレー依存が有効であることを確認した。ただしその後に Issue draft migration と Epic docs update を行ったため、現在のvalidation evidenceとしては扱わず、historical evidence として残す。 | `spec-dock: ok (validate) nodes=178`; blockers: `iss-00271`-`iss-00275` | current validation は EAL-026 に記録する。 |
+| EAL-024 | adopted | user decision / ADR | draft artifact command and grade role policy | ユーザーは、Issue Start 前の draft artifact 作成では actor 別 command を作らず、既存 `new artifact draft-design` / `draft-plan` を統一 primitive として強化し、system-architect / implementation-planner の関与は grade-aware workflow / EAL で管理する方針を採用した。 | `artifacts/20260702t073715z-decision-candidate-unified-draft-artifact-command-grade-role-policy.md`, `artifacts/20260702t074332z-adr-unified-draft-artifact-command-grade-role-policy.md` | 後続Issueで workflow docs / skills / runtime tests へ反映する。 |
+| EAL-025 | adopted | planning correction | `iss-00271` から `iss-00276` の canonical `design.md` / `plan.md` と Issue-local draft artifacts | accepted ADR に従い、pre-start draft body を Issue-local `draft-design` / `draft-plan` artifacts へ移し、canonical Issue `design.md` / `plan.md` は awaiting-assurance-compose placeholder に戻した。各 Issue report に draft artifact path と Grade Specialist Evidence Gate を記録した。 | `issues/iss-00271-*/artifacts/*draft-design*`, `issues/iss-00271-*/artifacts/*draft-plan*`, `issues/iss-00272-*/artifacts/*draft-design*`, `issues/iss-00272-*/artifacts/*draft-plan*`, `issues/iss-00273-*/artifacts/*draft-design*`, `issues/iss-00273-*/artifacts/*draft-plan*`, `issues/iss-00274-*/artifacts/*draft-design*`, `issues/iss-00274-*/artifacts/*draft-plan*`, `issues/iss-00275-*/artifacts/*draft-design*`, `issues/iss-00275-*/artifacts/*draft-plan*`, `issues/iss-00276-*/artifacts/*draft-design*`, `issues/iss-00276-*/artifacts/*draft-plan*` | Goodall の fresh `spec-reviewer` pass で整合性確認済み。 |
+| EAL-026 | adopted | local validation commands | current planning correction set | migration 後の canonical docs / Issue docs / report ledgers に対して `validate` を再実行し、blocking EAL が残らないことを確認した。targeted grep では canonical docs 上の `draft-before-issue-start` は検証要件の文字列としてのみ残り、canonical Issue `design.md` / `plan.md` には 12件すべて `artifact_state: awaiting-assurance-compose` が存在した。 | `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=178`; `rg 'artifact_state: awaiting-assurance-compose' ...issues/*/{design.md,plan.md}` -> 12件 | Goodall の fresh `spec-reviewer` pass で semantic consistency 確認済み。 |
+| EAL-027 | adopted | fresh `spec-reviewer` gate | current Epic / Issue planning set | Goodall は current Epic requirement / design / plan / report、accepted ADR、全6 Issue の requirement / design / plan / report、draft-design / draft-plan artifacts を確認し、古い reviewer evidence、draft provenance、日本語ファースト文面、canonical placeholder boundary、責務分担、6 Issue coverage に P0/P1/P2 が残っていないと判定した。 | Goodall: `019f21f9-b2ab-7182-8246-96997f8571d9`; `review_status: pass`; `overall_confidence_score: 0.9` | `iss-00271` を開始する。 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -78,7 +94,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | clarification | V3 ZIP、parent initiative docs、provider templates、planning / execution skills、workflow docs、git history、split artifacts、Matt Pocock Grill With Docs public sources、日本語ファーストuser clarification | 回答済み: six-Issue baseline は medium gate 付きで柔軟に扱う。回答済み: 原則1PR。回答済み: canonical docs は中程度の詳細で split references を使う。回答済み: complete understanding は必須で、自力調査後に user-intent gap だけ質問し、知識を外部化する。回答済み: handoff package inspection は structural blockers と semantic reviewer findings を分ける。回答済み: Japanese requirement / design / plan / report / artifacts を支援する。 | requirement / design / plan drafting のsource evidenceとして採用 | Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` | no | downstream Issue scaffold / planning へ進める。 |
 | requirement | V3 ZIP、parent initiative requirement / design / plan、repo survey、accepted interviews / ADRs、split artifacts、日本語ファーストADR | blocking open question はない。Epic-level user intent decisions は解決済み。 | `requirement.md` に採用 | Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` | no | downstream Issue scaffold / planning へ進める。 |
 | design | concrete `requirement.md`、accepted ADRs、split scope / template / handoff / quality artifacts、advisory system-architect design draft、日本語ファーストADR | blocking user question はない。delegated draft は promotion evidence として不適格だったため advisory input としてのみ利用した。 | main orchestrator manual authoring により `design.md` に採用 | Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` | no | downstream Issue scaffold / planning へ進める。 |
-| plan | concrete `requirement.md` / `design.md`、V3 six-Issue baseline、user-approved re-slicing and delivery policy、advisory system-architect plan draft、日本語ファーストADR | blocking user question はない。actual Issue IDs はまだ存在せず、この計画では推測しない。delegated draft は promotion evidence として不適格だったため advisory input としてのみ利用した。 | main orchestrator manual authoring により `plan.md` に採用 | Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` | no | downstream Issue scaffold / planning へ進める。 |
+| plan | concrete `requirement.md` / `design.md`、V3 six-Issue baseline、user-approved re-slicing and delivery policy、advisory system-architect plan draft、日本語ファーストADR、unified draft artifact command ADR | blocking user question はない。actual Issue IDs は `iss-00271` から `iss-00276` として作成済み。delegated draft は promotion evidence として不適格だったため advisory input としてのみ利用した。 | main orchestrator manual authoring により `plan.md` に採用し、batch Issue planning と後続の draft artifact boundary correction へ反映 | Goodall (`019f21f9-b2ab-7182-8246-96997f8571d9`) により current planning correction 後の `review_status: pass` | no | `iss-00271` を開始する。 |
+| batch Issue planning | `iss-00271` から `iss-00276` の正規 `requirement.md`、Issue-local draft artifacts、placeholder canonical `design.md` / `plan.md`、Epic plan / report 更新 | 初回reviewで Issue report 判断台帳不足が見つかり、6件すべてへ判断台帳を追加済み。その後のADRにより、pre-start draft body は canonical `design.md` / `plan.md` から Issue-local artifacts へ移行した。 | Issue実行前のバトン設計として採用。要件は正本、design / plan seed は evidence-only artifact、canonical design / plan は Issue Planning で compose する。 | Goodall (`019f21f9-b2ab-7182-8246-96997f8571d9`) により current planning correction 後の `review_status: pass` | no | `iss-00271` を開始し、Issue-local draft artifacts の採否を判断して正規 design / plan を作る。 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -106,8 +123,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| system-architect | epic-00270 | `artifacts/20260702t031957z-disc-epic-design-draft-upstream-planning-governance.md` | active epic docs、parent initiative docs、V3 intake、split artifacts、accepted ADRs、user interviews | `design.md`, `plan.md`, `report.md` | deferred | なし（[]） | failed | advisory input のみ。canonical design は main orchestrator が手動authoringした。 | direct delegated promotion、final authority claims、冗長な raw draft wording は採用しない。 | downgrade 後のblockingはない。failed diff guard により draft は promotion evidence として使えない。 | previous canonical set は reviewer pass 済みだが、現在の日本語ファースト更新後は fresh re-review が必要。 | promotion evidence ではない。reviewer は current canonical docs を評価する。 |
-| system-architect | epic-00270 | `artifacts/20260702t032014z-disc-epic-plan-draft-upstream-planning-governance-templates.md` | active epic docs、parent initiative docs、V3 intake、split artifacts、accepted ADRs、report EAL | `plan.md`, `report.md` | deferred | なし（[]） | pending | advisory input のみ。canonical plan は main orchestrator が手動authoringした。 | direct delegated promotion、actual Issue creation、reviewer-pass claims は採用しない。 | downgrade 後のblockingはない。delegated promotion prerequisites を満たしていなかった。 | previous canonical set は reviewer pass 済みだが、現在の日本語ファースト更新後は fresh re-review が必要。 | promotion evidence ではない。reviewer は current canonical docs を評価する。 |
+| system-architect | epic-00270 | `artifacts/20260702t031957z-disc-epic-design-draft-upstream-planning-governance.md` | active epic docs、parent initiative docs、V3 intake、split artifacts、accepted ADRs、user interviews | `design.md`, `plan.md`, `report.md` | deferred | なし（[]） | failed | advisory input のみ。canonical design は main orchestrator が手動authoringした。 | direct delegated promotion、final authority claims、冗長な raw draft wording は採用しない。 | downgrade 後のblockingはない。failed diff guard により draft は promotion evidence として使えない。 | previous canonical set は reviewer pass 済み。その後の日本語ファースト更新と batch Issue planning は EAL-018 / EAL-022 で re-review 済み。 | promotion evidence ではない。reviewer は current canonical docs を評価する。 |
+| system-architect | epic-00270 | `artifacts/20260702t032014z-disc-epic-plan-draft-upstream-planning-governance-templates.md` | active epic docs、parent initiative docs、V3 intake、split artifacts、accepted ADRs、report EAL | `plan.md`, `report.md` | deferred | なし（[]） | pending | advisory input のみ。canonical plan は main orchestrator が手動authoringした。 | direct delegated promotion、actual Issue creation、reviewer-pass claims は採用しない。 | downgrade 後のblockingはない。delegated promotion prerequisites を満たしていなかった。 | previous canonical set は reviewer pass 済み。その後の日本語ファースト更新と batch Issue planning は EAL-018 / EAL-022 で re-review 済み。 | promotion evidence ではない。reviewer は current canonical docs を評価する。 |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -132,34 +149,49 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
   - Canonical authoring 前に完全な source-grounded understanding を作り、自力調査で分かることは人間に聞かず、必要な user intent gap だけを interview し、採用知識を artifacts / ADR / canonical docs / report ledger に外部化する。
 - `artifacts/20260702t040113z-adr-japanese-first-spec-authoring-policy.md`:
   - 日本語運用では requirement / design / plan / report / artifacts の本文を日本語ファーストで作成し、英語は識別子・固定語・外部固有名詞を中心に許容する。
+- `artifacts/20260702t074332z-adr-unified-draft-artifact-command-grade-role-policy.md`:
+  - Issue-local `draft-design` / `draft-plan` の作成 command は actor semantics を持たず、既存 `new artifact draft-*` primitive を強化する。system-architect / implementation-planner の関与は Issue grade に応じた workflow / EAL / reviewer gate で管理する。
 
 ## 完了した Issue / PR / Release (必須)
-- なし:
-  - この Epic planning では downstream Issue scaffold はまだ作成していない。Actual Issue は reviewer pass 済みの canonical set から次工程で作成する。
+- 完了したIssue:
+  - なし。`iss-00271` から `iss-00276` は作成済みだが、まだ実装・完了していない。
+- 作成済みIssue:
+  - `iss-00271` / #271: Initiative templates
+  - `iss-00272` / #272: Epic templates
+  - `iss-00273` / #273: scope-layering reference / planning guidance
+  - `iss-00274` / #274: Epic execution handoff / readiness
+  - `iss-00275` / #275: upstream planning smoke tests / validation
+  - `iss-00276` / #276: final quality gate / PR delivery
+- PR:
+  - 未作成。PR は `iss-00276` で扱う。
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
 - E-AC-001: pending
-  - Initiative template 実装 Issue 未作成。
+  - 実装担当Issue `iss-00271` は作成済み。実装は未実施。
 - E-AC-002: pending
-  - Epic template 実装 Issue 未作成。
+  - 実装担当Issue `iss-00272` は作成済み。実装は未実施。
 - E-AC-003: pending
-  - Planning skills / workflow docs 実装 Issue 未作成。
+  - 実装担当Issue `iss-00273` は作成済み。実装は未実施。
 - E-AC-004: pending
-  - Epic execution handoff 実装 Issue 未作成。
+  - 実装担当Issue `iss-00274` は作成済み。実装は未実施。
 - E-AC-005: pending
-  - Upstream planning validation Issue 未作成。
+  - 実装担当Issue `iss-00275` は作成済み。実装は未実施。
 - E-AC-006: pending
-  - Final delivery Issue 未作成。
+  - 実装担当Issue `iss-00276` は作成済み。実装は未実施。
 - E-AC-007: pending
-  - Japanese-first authoring validation Issue 未作成。
+  - `iss-00271` から `iss-00276` で反映・検証する。実装は未実施。
+- E-AC-008: partially_completed
+  - planning correction として、`iss-00271` から `iss-00276` の pre-start design / plan seed を Issue-local draft artifacts へ移し、canonical `design.md` / `plan.md` を awaiting-assurance-compose placeholder に戻した。
+  - 将来の workflow / command / validation としての固定は、`iss-00274` / `iss-00275` / `iss-00276` で扱う。
 
 ## ロールアウト結果（必要なら） (任意)
 - 該当なし:
   - まだ planning authoring phase であり、runtime rollout は未実施。
 
 ## フォローアップ（別Issue化） (必須)
-- 未作成:
-  - `plan.md` の planned slices 01-06 を actual Issue scaffold へ変換する。
+- なし:
+  - 追加Issueは現時点では作成していない。
+  - 次の作業は current planning set の fresh spec-review 後に `iss-00271` を開始すること。
 
 ## 省略/例外メモ (必須)
 - 該当なし
