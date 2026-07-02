@@ -4430,7 +4430,10 @@ class TestInitUpdate(CliRuntimeHarness):
         scope_layering = docs_root / "authoring" / "scope-layering.md"
         assert scope_layering.is_file()
         scope_layering_text = scope_layering.read_text(encoding="utf-8")
-        assert "| スコープ（Scope） | 所有責務（Ownership） | 判断半径（Decision radius） | 正本成果物（Canonical artifact） |" in scope_layering_text
+        assert (
+            "| スコープ（Scope） | 所有責務（Ownership） | 判断半径（Decision radius） | 正本成果物（Canonical artifact） |"
+            in scope_layering_text
+        )
         assert scope_layering_text.count("| スコープ（Scope） | 所有責務（Ownership） |") == 1
         for fragment in (
             "`artifacts/`、research、interview、delegated draft は evidence であり、canonical authority ではない",
