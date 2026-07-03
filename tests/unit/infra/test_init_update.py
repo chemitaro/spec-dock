@@ -418,6 +418,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/authoring/decision-routing.md": (
             "src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md"
         ),
+        "spec-dock/docs/authoring/scope-layering.md": (
+            "src/spec_dock/assets/spec_dock/docs/authoring/scope-layering.md"
+        ),
         "spec-dock/docs/workflow_initiative.md": ("src/spec_dock/assets/spec_dock/docs/workflow_initiative.md"),
         "spec-dock/docs/workflow_epic.md": "src/spec_dock/assets/spec_dock/docs/workflow_epic.md",
         "spec-dock/docs/workflow_issue.md": "src/spec_dock/assets/spec_dock/docs/workflow_issue.md",
@@ -1197,6 +1200,13 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00266-delegated-authoring-artifacts-boundary/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00267-workflow-docs-skills-and-readme-alignment/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00259-artifacts-directory-future-only-adoption/issues/iss-00268-dogfood-artifacts-without-migrating-discussions/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/issues/iss-00271-redesign-initiative-requirement-design-plan-templates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/issues/iss-00272-redesign-epic-requirement-design-plan-templates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/issues/iss-00273-update-scope-layering-reference-planning-skills-and-workflow-docs/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/issues/iss-00274-update-epic-execution-handoff-and-issue-readiness-workflow/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/issues/iss-00275-add-upstream-planning-smoke-tests-and-template-validation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/issues/iss-00276-epic-quality-gate-manual-tests-and-pr-delivery/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1499,6 +1509,23 @@ class TestInitUpdate(CliRuntimeHarness):
             "iss-00266",
             "iss-00267",
         ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/issues/iss-00271-redesign-initiative-requirement-design-plan-templates/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/issues/iss-00272-redesign-epic-requirement-design-plan-templates/.meta.json": [
+            "iss-00271",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/issues/iss-00273-update-scope-layering-reference-planning-skills-and-workflow-docs/.meta.json": [
+            "iss-00272",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/issues/iss-00274-update-epic-execution-handoff-and-issue-readiness-workflow/.meta.json": [
+            "iss-00273",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/issues/iss-00275-add-upstream-planning-smoke-tests-and-template-validation/.meta.json": [
+            "iss-00274",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00270-upstream-planning-governance-and-templates/issues/iss-00276-epic-quality-gate-manual-tests-and-pr-delivery/.meta.json": [
+            "iss-00275",
+        ],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -1542,6 +1569,11 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00266": ["iss-00263", "iss-00265"],
         "iss-00267": ["iss-00263", "iss-00266"],
         "iss-00268": ["iss-00262", "iss-00263", "iss-00264", "iss-00265", "iss-00266", "iss-00267"],
+        "iss-00272": ["iss-00271"],
+        "iss-00273": ["iss-00272"],
+        "iss-00274": ["iss-00273"],
+        "iss-00275": ["iss-00274"],
+        "iss-00276": ["iss-00275"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -4395,6 +4427,50 @@ class TestInitUpdate(CliRuntimeHarness):
             )
 
         docs_root = repo_root / "src/spec_dock/assets/spec_dock/docs"
+        scope_layering = docs_root / "authoring" / "scope-layering.md"
+        assert scope_layering.is_file()
+        scope_layering_text = scope_layering.read_text(encoding="utf-8")
+        assert (
+            "| スコープ（Scope） | 所有責務（Ownership） | 判断半径（Decision radius） | 正本成果物（Canonical artifact） |"
+            in scope_layering_text
+        )
+        assert scope_layering_text.count("| スコープ（Scope） | 所有責務（Ownership） |") == 1
+        for fragment in (
+            "`artifacts/`、research、interview、delegated draft は evidence であり、canonical authority ではない",
+            "path が存在するだけでは authority になりません",
+            "Workflow docs、phase docs、skills、templates にこの責務表全文を複製しない",
+            "DDD / EDA は分析や設計の補助語彙として使ってよい",
+            "SpecDock の標準アーキテクチャ、必須プロセス、必須分割単位ではありません",
+            "日本語ファーストで説明する。ただし path、command、code identifier、SpecDock 固有語、外部固有名詞は原文を保持する",
+        ):
+            assert fragment in scope_layering_text
+
+        scope_reference_surfaces = (
+            docs_root / "workflow_initiative.md",
+            docs_root / "workflow_epic.md",
+            docs_root / "workflow_issue.md",
+            docs_root / "workflow_spec_authoring.md",
+            docs_root / "workflow_clarification.md",
+            docs_root / "phase_requirement.md",
+            docs_root / "phase_design.md",
+            docs_root / "phase_plan.md",
+            docs_root / "phase_plan_initiative.md",
+            docs_root / "phase_plan_epic.md",
+            docs_root / "phase_plan_issue.md",
+            template_root / "README.md",
+            template_root / "initiative" / "design.md",
+            template_root / "initiative" / "plan.md",
+            template_root / "epic" / "design.md",
+            template_root / "epic" / "plan.md",
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md",
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md",
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md",
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md",
+        )
+        for path in scope_reference_surfaces:
+            text = path.read_text(encoding="utf-8")
+            assert "scope-layering.md" in text, f"missing scope-layering reference: {path}"
+            assert "| スコープ（Scope） | 所有責務（Ownership） |" not in text
         phase_docs = [
             docs_root / "phase_requirement.md",
             docs_root / "phase_design.md",
@@ -4428,11 +4504,155 @@ class TestInitUpdate(CliRuntimeHarness):
                 source=str(path.relative_to(repo_root)),
             )
 
+        initiative_requirement = (template_root / "initiative" / "requirement.md").read_text(encoding="utf-8")
         initiative_design = (template_root / "initiative" / "design.md").read_text(encoding="utf-8")
+        initiative_plan = (template_root / "initiative" / "plan.md").read_text(encoding="utf-8")
+        epic_requirement = (template_root / "epic" / "requirement.md").read_text(encoding="utf-8")
         epic_design = (template_root / "epic" / "design.md").read_text(encoding="utf-8")
+        epic_plan = (template_root / "epic" / "plan.md").read_text(encoding="utf-8")
         issue_design = (template_root / "issue" / "design.md").read_text(encoding="utf-8")
         issue_plan = (template_root / "issue" / "plan.md").read_text(encoding="utf-8")
         issue_report = (template_root / "issue" / "report.md").read_text(encoding="utf-8")
+        skill_root = repo_root / "src/spec_dock/assets/install_root/.agents/skills"
+        epic_execution_skill_path = skill_root / "spec-dock-epic-execution" / "SKILL.md"
+        epic_execution_skill = epic_execution_skill_path.read_text(encoding="utf-8")
+        for text in (
+            initiative_requirement,
+            initiative_design,
+            initiative_plan,
+            epic_requirement,
+            epic_design,
+            epic_plan,
+        ):
+            assert "日本語" in text
+            assert "ファイルパス" in text or "path" in text
+            assert "コマンド" in text or "command" in text
+            assert "識別子" in text or "identifier" in text
+            for line in text.splitlines():
+                if "DDD / EDA" in line and ("必須" in line or "mandatory" in line):
+                    assert "しない" in line or "ではありません" in line or "not " in line
+        for fragment in (
+            "戦略目的（strategic purpose）",
+            "source-of-truth",
+            "## 能力領域の整理（capability landscape）",
+            "trigger / request origin",
+            "エピックへ渡す初期材料（Epic handoff seed）",
+            "日本語ファースト",
+            "DDD / EDA などの特定アーキテクチャ語彙は前提にしない",
+        ):
+            assert fragment in initiative_requirement
+        for fragment in (
+            "## 対象範囲と責務境界（scope boundary）",
+            "## 意思決定権限（decision authority）",
+            "## 証跡採用（artifact adoption）",
+            "## レビューゲート（reviewer gate）",
+            "## エピック分割境界（Epic boundary）",
+            "Issue-level の実装詳細、TDD の細かなサイクル、内部 class / file 設計はここで必須化しない",
+            "この template には責務表を複製しない",
+        ):
+            assert fragment in initiative_design
+        assert "docs/authoring/scope-layering.md" in initiative_design
+        assert "この template には責務表を複製しない" in initiative_design
+        for fragment in (
+            "## エピックへ渡す準備完了条件（handoff readiness）",
+            "report evidence",
+            "fresh reviewer gate（最新レビューゲート）",
+            "## エピック / Issue 分割変更（controlled re-slicing）",
+            "Epic planning 完了条件",
+            "設計書 / 実装計画書の draft artifact",
+            "## 最終 PR / closeout 方針（final PR / closeout）",
+        ):
+            assert fragment in initiative_plan
+        for text in (initiative_requirement, initiative_design, initiative_plan):
+            assert "iss-00271" not in text
+            assert "iss-00272" not in text
+            assert "iss-00273" not in text
+        for fragment in (
+            "能力 / モデル envelope（capability / model envelope）",
+            "後続 Issue seed",
+            "証跡の権限境界（artifact authority）",
+            "日本語ファースト",
+            "DDD / EDA は必須前提にしない",
+        ):
+            assert fragment in epic_requirement
+        for fragment in (
+            "## 課題横断境界（cross-Issue boundary）",
+            "## 設計スライス一覧（design slice catalog）",
+            "### 契約ポートフォリオ（contract portfolio）",
+            "## 証跡採用（artifact adoption）",
+            "rollback boundary",
+            "private implementation design を必須にしない",
+        ):
+            assert fragment in epic_design
+        for fragment in (
+            "## 課題引き渡しパッケージ（Issue handoff package）",
+            "suggested grade",
+            "allowed local delta",
+            "forbidden parent boundary changes",
+            "expected evidence",
+            "## 最終品質ゲート（final quality gate）",
+            "Issue-level の TDD step や private implementation design は必須前提にせず",
+        ):
+            assert fragment in epic_plan
+        assert "docs/authoring/scope-layering.md" in epic_plan
+        assert "Issue-local" in epic_plan
+        assert "`draft-design`" in epic_plan
+        assert "`draft-plan`" in epic_plan
+        assert "path index" in epic_plan
+        for text in (epic_requirement, epic_design, epic_plan):
+            assert "iss-00272" not in text
+            assert "iss-00273" not in text
+            assert "DDD / EDA を必須前提にする" not in text
+            assert "DDD / EDA 必須" not in text
+            assert "TDD の細かなサイクルを必須化" not in text
+            assert "private implementation design を必須にする" not in text
+            assert "private implementation design は各 Issue plan で具体化する" not in text
+            assert "private class / file design を必須化" not in text
+        workflow_epic = (docs_root / "workflow_epic.md").read_text(encoding="utf-8")
+        for text in (workflow_epic, epic_execution_skill):
+            assert "`handoff-ready`" in text
+            assert "`execution-ready`" in text
+            assert "structural blocker" in text or "structural blockers" in text
+            assert "reviewer finding" in text or "reviewer findings" in text
+            assert "raw artifact authority" in text
+            assert "decision-only execution-ready" in text
+            assert "日本語" in text or "Japanese-first" in text
+            assert "commands" in text or "command" in text
+            assert "paths" in text or "path" in text
+        provider_planning_surfaces = (
+            docs_root / "workflow_epic.md",
+            docs_root / "workflow_issue.md",
+            docs_root / "workflow_spec_authoring.md",
+            docs_root / "authoring" / "scope-layering.md",
+            docs_root / "authoring" / "decision-routing.md",
+            template_root / "initiative" / "requirement.md",
+            template_root / "initiative" / "design.md",
+            template_root / "initiative" / "plan.md",
+            template_root / "epic" / "requirement.md",
+            template_root / "epic" / "design.md",
+            template_root / "epic" / "plan.md",
+            epic_execution_skill_path,
+            skill_root / "spec-dock-epic-planning" / "SKILL.md",
+            skill_root / "spec-dock-issue-planning" / "SKILL.md",
+        )
+        forbidden_authority_or_readiness_claims = (
+            "raw artifacts are canonical authority",
+            "raw artifact is canonical authority",
+            "raw artifact を canonical authority として扱う",
+            "raw artifacts を canonical authority として扱う",
+            "raw artifact を正本として扱う",
+            "raw artifacts を正本として扱う",
+            "decision-only issue is execution-ready",
+            "decision-only issues are execution-ready",
+            "decision-only issue を execution-ready として扱う",
+            "decision-only issues を execution-ready として扱う",
+            "decision-only issue は execution-ready である",
+            "decision-only issues は execution-ready である",
+        )
+        for path in provider_planning_surfaces:
+            text = path.read_text(encoding="utf-8").lower()
+            for forbidden in forbidden_authority_or_readiness_claims:
+                assert forbidden.lower() not in text, f"{path} leaks forbidden authority/readiness claim"
         assert "### 図表（UML / 推奨: システムコンテキスト / 目指す状態の全体像）" in initiative_design
         assert "```plantuml" in initiative_design
         assert "!include C4_Context.puml" in initiative_design
