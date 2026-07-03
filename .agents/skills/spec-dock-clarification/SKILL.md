@@ -15,7 +15,10 @@ Decision routing examples and detailed placement guidance live in `spec-dock/doc
 
 ## Source-Grounded Grill Loop
 
-1. Read sources before asking: active docs, parent docs, scope-local `artifacts/`, legacy `discussions/` when present for historical context, related code/tests/templates, ADRs, and the current request.
+1. Read sources before asking: current request and attachments, `./spec-dock/scripts/spec-dock active show`, active docs, parent docs, scope-local `artifacts/`, legacy `discussions/` when present for historical context, related code/tests/templates, and ADRs.
+   - For attachments, first create an inventory of filenames, paths, and high-level contents before deciding what to ask.
+   - If the final target scope does not exist yet and a parent scope is known, keep attachment inventory as provisional evidence under that parent scope. If no parent scope is known, do not create durable repo artifacts yet; keep only session-local inventory in the host/session temp area outside canonical docs until placement is resolved.
+   - If parent scope is required, inspect active state and nearby nodes before asking the user to choose placement.
 2. Build a provisional understanding in plain language: what seems decided, what is ambiguous, what local context already answers, and what would change downstream artifacts.
 3. Do gap classification:
    - source-grounded answer available: answer or proceed without asking the user.

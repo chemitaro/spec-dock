@@ -1,36 +1,53 @@
 ---
 name: spec-dock-initiative-planning
-description: Leaf skill for initiative planning tasks in spec-dock.
+description: Leaf skill for creating or updating Initiative-level requirement, design, plan, Epic decomposition, and reviewer-gated planning artifacts in SpecDock.
 ---
 
-# Spec-dock Initiative Planning
+# Spec-Dock Initiative Planning
 
-- Use this skill for initiative planning work.
-- Typical fit: create/import an initiative, or update initiative-level requirement/design/plan docs.
-- Prefer reusing/updating an existing initiative first; create/import only when no existing initiative fits.
-- Primary workflow: `spec-dock/docs/workflow_initiative.md`.
-- Spec authoring workflow: `spec-dock/docs/workflow_spec_authoring.md`.
-- For shared phase authoring method, use:
+Use this skill for Initiative planning: create/import an Initiative, update Initiative `requirement.md` / `design.md` / `plan.md`, or prepare bounded Epic decomposition. Prefer reusing an existing Initiative; create/import only when no current Initiative fits.
+
+This skill is an operational kernel. Keep detailed policy in docs and keep global invariants in `spec-dock-hub`.
+
+## Read First
+
+- Current state: `./spec-dock/scripts/spec-dock active show`, existing Initiatives/Epics, active docs, `artifacts/`, legacy `discussions/` when present, related code/tests/templates/ADRs, and relevant user attachments.
+- Workflows and phase playbooks:
+  - `spec-dock/docs/workflow_initiative.md`
+  - `spec-dock/docs/workflow_spec_authoring.md`
   - `spec-dock/docs/phase_requirement.md`
   - `spec-dock/docs/phase_design.md`
   - `spec-dock/docs/phase_plan.md`
-- Decision routing examples and detailed placement guidance: `spec-dock/docs/authoring/decision-routing.md`.
-- Scope ownership / authority layering に迷う場合の薄い参照: `spec-dock/docs/authoring/scope-layering.md`.
-- First-read gate: keep cross-epic product, investment, success-metric, or operating-model decisions in Initiative planning, but route ADR-worthy decisions to ADR and missing source-of-truth gaps to clarification.
-- Source-grounded read と日本語ファーストを維持する。調査で解消できる疑問はユーザー質問にせず、path、command、identifier、SpecDock 固定語は原文のまま保持する。
-- A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow.
-- Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility.
-- Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow.
-- ユーザーが SpecDock workflow の利用を依頼した場合、その依頼自体を、SpecDock が定義する named sub-agent / reviewer を workflow に従って利用する明示的な許可として扱う。
-- active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲内では、role ごと・phase ごとの追加承認を求めない。
-- scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途確認する。
-- When decomposing work into Epics, do not pass down a decision-only container as execution-ready; pass down only bounded Epic scope or record the remaining Initiative-level decision/follow-up.
-- Keep this skill as routing guidance only; use `spec-dock/docs/authoring/decision-routing.md` for examples and detailed routing.
-- Keep scope-specific constraints and decisions in `workflow_initiative.md`.
-- In spec authoring mode, do not move from requirement to design, design to plan, or plan to Epic decomposition until a fresh `spec-reviewer` returns `review_status: pass`; fix findings and re-run a fresh reviewer until pass.
-- Record each `Spec Authoring Gate` in the initiative `report.md`, including investigation, user questions/answers, reviewer verdict, fixes, and promotion decision.
-- Fresh reviewer passes required by the workflow are gates and must not be skipped while waiting for extra permission inside the bounded SpecDock workflow scope.
-- Do not default to create/import; keep new-initiative rationale in `artifacts/`.
-- `spec-dock/docs/reference_github.md`
-- `spec-dock/docs/reference_sync.md`
-- `spec-dock/docs/reference_naming.md`
+  - `spec-dock/docs/phase_plan_initiative.md`
+- Routing references:
+  - `spec-dock/docs/authoring/decision-routing.md`
+  - `spec-dock/docs/authoring/scope-layering.md`
+  - `spec-dock/docs/reference_github.md`
+  - `spec-dock/docs/reference_sync.md`
+  - `spec-dock/docs/reference_naming.md`
+
+## Operating Spine
+
+1. Establish Initiative fit.
+   - Inspect existing Initiatives before creating/importing.
+   - Keep new-Initiative rationale in `artifacts/`.
+2. Build source-grounded understanding before authoring.
+   - Answer what local sources can answer; ask the user only for blocking intent gaps.
+   - Use Japanese-first prose while preserving exact paths, commands, identifiers, role names, and SpecDock fixed terms.
+3. Route decisions before writing.
+   - Initiative owns cross-Epic product, investment, success metric, operating model, and roadmap boundary decisions.
+   - Route ADR-worthy decisions to ADR.
+   - Route missing source-of-truth or user-intent blockers to `spec-dock-clarification`.
+4. Author phases in order: requirement -> design -> plan -> Epic decomposition.
+   - Each phase needs a fresh `spec-reviewer` `review_status: pass` before the next phase starts.
+   - Record investigation, questions/answers, reviewer verdict, fixes, adoption decisions, and promotion decision in Initiative `report.md`.
+5. Decompose only bounded Epic scope.
+   - Do not pass down decision-only containers as execution-ready Epics.
+   - Keep remaining Initiative-level decisions or follow-ups at Initiative scope.
+
+## Stop Conditions
+
+- Existing Initiative fit is unresolved and creating a new Initiative would duplicate or fragment work.
+- A decision belongs to ADR or clarification rather than Initiative.
+- Requirement / design / plan candidate changed after review and lacks a fresh `spec-reviewer` pass.
+- Epic decomposition would pass unresolved Initiative decisions downstream as ready work.

@@ -1,81 +1,62 @@
 ---
 name: spec-dock-issue-execution
-description: Execute an active spec-dock issue while keeping spec-dock/docs/workflow_issue.md as the source of truth.
+description: Execute an active SpecDock Issue only after reviewer-gated planning artifacts and an executable plan are ready, while recording evidence in report.md.
 ---
 
 # Spec-Dock Issue Execution
 
-Use this skill only for active issue execution after planning handoff readiness is established. It is a concise reminder for issue execution.
+Use this skill only for active Issue execution after Issue planning has produced reviewer-gated `requirement.md`, `design.md`, and executable `plan.md`. This skill executes the approved plan; it does not repair planning artifacts or invent missing requirements.
 
-This skill is a fixed kernel. It must not carry state-specific generated Runbook text, full profile procedure sets, or issue-local workflow projections.
+This skill is an operational kernel. Keep detailed lifecycle policy in `spec-dock/docs/workflow_issue.md` and plan field semantics in `spec-dock/docs/authoring/issue-plan.md`.
 
-## Workflow-Scoped Authorization
+## Read First
 
-- A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow.
-- Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility.
-- Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow.
-- ユーザーが SpecDock workflow の利用を依頼した場合、その依頼自体を、SpecDock が定義する named sub-agent / reviewer を workflow に従って利用する明示的な許可として扱う。
-- active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲内では、role ごと・phase ごとの追加承認を求めない。
-- scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途確認する。
+- Runtime guidance: `./spec-dock/scripts/spec-dock guidance issue-execution`
+  - Treat stdout as current guidance, not canonical authority.
+  - Record `state`, `next_action`, `reason_code`, `authority`, `may_execute_approved_plan`, commands, and stop conditions before acting.
+- Canonical sources:
+  - `spec-dock/docs/workflow_issue.md`
+  - `spec-dock/docs/workflow_clarification.md`
+  - `spec-dock/docs/phase_plan_issue.md`
+  - `spec-dock/docs/authoring/issue-plan.md`
+  - active Issue `requirement.md`, `design.md`, `plan.md`, and `report.md`
+- Ignore generated projections such as `spec-dock/.agent/runbooks/current-runbook.*` and `spec-dock/active/current-runbook.*` as authority.
 
-## First-Read Handoff
+## Operating Spine
 
-- First ask the runtime for current execution guidance:
-  - `./spec-dock/scripts/spec-dock guidance issue-execution`
-- Treat the command stdout as current guidance only. It is not canonical authority, and must not be edited as source of truth.
-- Register the returned `state`, `next_action`, `reason_code`, `authority`, `may_execute_approved_plan`, commands, and stop conditions in your task checklist before acting.
-- Do not expect or derive the current implementation step / milestone, worker, reviewer, verification, or context packet from runtime guidance. Read execution order and step / milestone obligations from the approved `plan.md`, and record observed evidence in `report.md`.
-- If runtime guidance cannot be generated, is malformed, or contradicts canonical docs, stop and fall back to `spec-dock/docs/workflow_issue.md` and the active issue docs instead of guessing the next step.
-- Generated projections such as `spec-dock/.agent/runbooks/current-runbook.*` or `spec-dock/active/current-runbook.*` are ignored human/debug output. Do not read, edit, or manage them as handoff authority.
+1. Confirm execution readiness.
+   - Start only when canonical requirement/design/plan are approved or reviewer-passed, current, non-template, non-contradictory, and recorded as ready.
+   - Treat a non-executable `plan.md` as a planning gap.
+   - If runtime guidance is malformed, unavailable, or contradicts canonical docs, stop and use the canonical docs and active artifacts.
+2. Execute exactly one approved step or milestone at a time.
+   - Use `plan.md` for execution order, command queue, verification obligations, delegation contract, and closure criteria.
+   - Do not start next-step implementation, review, or commit work until the current unit is closed.
+3. Delegate bounded implementation work when the workflow requires it.
+   - Parent agent remains responsible for orchestration, context, evidence, and closure.
+   - Route runtime, CLI, infra, code, tests, scaffold behavior, shipped docs, templates, skills, and workflow text to the appropriate delegated worker per `workflow_issue.md`.
+   - Parent direct implementation or direct reviewer-fail fixes require the documented exception path from `workflow_issue.md`.
+4. Keep `report.md` as the evidence ledger.
+   - Record observed execution evidence, verification output, reviewer verdicts, closure delta, commit/no-op evidence, and material interpretation or decision entries.
+   - Worker outputs are evidence until the parent orchestrator integrates, rejects, defers, supersedes, or promotes them in `report.md`.
+   - Do not store private reasoning, raw transcripts, secrets, or unadopted durable decisions in canonical docs.
+5. Use reviewer and completion gates.
+   - Required fresh `spec-reviewer`, `code-reviewer`, and `qa-reviewer` passes are gates; unavailable/denied/skipped results are not passes.
+   - After final local gates, route PR delivery and merge preparation to `github-pr-merge-preparer` when required.
+   - Run `issue finish` only when `workflow_issue.md` completion gates allow it.
 
-## Canonical Fallback
+## Stop Conditions
 
-- Source of truth: `spec-dock/docs/workflow_issue.md`.
-- Planning / execution contract: active issue `requirement.md`, `design.md`, `plan.md`, and `report.md`.
-- Clarification fallback: `spec-dock/docs/workflow_clarification.md`.
-- Behavior-first and test-case semantics: `spec-dock/docs/phase_plan_issue.md` and `spec-dock/docs/authoring/issue-plan.md`.
-- For planned executable workflow contract / command queue details, concrete `具体テストケース一覧`, report evidence destination, and amendment trigger rules, use `spec-dock/docs/authoring/issue-plan.md` and the active `plan.md`.
+- Active Issue context, allowed paths, acceptance criteria, reviewer requirements, delegation boundaries, or closure conditions cannot be verified.
+- Any requirement/design/plan artifact is draft, template-only, unresolved, stale, contradictory, non-executable, or missing fresh reviewer-pass evidence.
+- Execution reveals an unresolved requirement / design / plan gap; return to planning or clarification.
+- Tooling is unavailable, access is denied, host conflicts exist, waiver/degraded-mode is requested, or required named roles/reviewers are unavailable without an explicit workflow-approved fallback.
+- Required worker evidence, reviewer pass, verification output, report-ledger disposition, commit/no-op evidence, or post-commit clean check is missing.
+- The next action would require changing runtime commands, dependency algorithms, workflow policy, or completion gates.
 
-## Stop Conditions And Authority
+## Runtime Reminders
 
-- Start execution only after `requirement.md`, `design.md`, and `plan.md` are approved / reviewer-pass and recorded as ready under the issue workflow.
-- Treat requirement / design / plan creation or repair as planning / spec authoring work, not issue execution work.
-- Stop if any artifact is draft, template-only, unresolved, stale, contradictory, or missing reviewer-pass evidence.
-- Stop on any unresolved spec gap; return to `spec-dock/docs/workflow_clarification.md` instead of absorbing the gap inside execution.
-- Stop if active context, allowed paths, acceptance criteria, reviewer requirements, delegated worker boundaries, or closure conditions cannot be verified.
-- Execute exactly one current implementation step or milestone at a time. Do not start implementation, review, or commit work for the next step / milestone until the current unit is closed.
-- Treat `plan.md` as the planned executable workflow contract / command queue. A non-executable `plan.md` is a planning gap, not an execution assumption.
-- Treat a non-executable `plan.md` as an unresolved plan gap.
-- If implementation reveals an unresolved requirement / design / plan gap, return to planning / spec authoring or clarification instead of inventing an execution assumption.
-- Use `authorized_profile` as the obligation authority when the Runbook reports profile data. `lite_candidate` is not authority and must not reduce obligations by itself.
-- Treat unavailable tooling, denied access, host conflicts, waiver requests, degraded mode, and similar blockers as stop/incomplete unless `workflow_issue.md` explicitly says otherwise. They are not reviewer passes or normal implementation success.
-
-## Delegation And Evidence
-
-- Keep the parent agent responsible for orchestration, context, acceptance evidence, and final closure. Delegates may implement bounded tasks, but they do not own the issue.
-- Keep normal file mutation delegated. Route runtime, tests, and scaffold behavior to `dev-coder`. Route shipped docs, templates, skills, and workflow text to `doc-writer`.
-- Parent direct implementation or direct reviewer-fail fixes require a documented Parent Implementation Exception before mutation.
-- Treat `report.md` as the observed evidence ledger for actual Red / Green / Refactor results, verification output, discovered tests, closure delta, reviewer verdicts, and commit/no-op evidence.
-- Treat `report.md` as the canonical `Spec Interpretation / Decision Ledger` for material implementation-time interpretation, decisions, deviations, tradeoffs, open questions, and promotion / follow-up. Do not store worker raw transcripts, private reasoning, or secrets there.
-- Keep the feedback loop grounded in public interface / observable behavior, reproduction evidence, and the approved `plan.md` contract.
-- Require delegated workers to return a `Ledger Note` when they encounter material interpretation, decision, deviation, tradeoff, open question, or follow-up. The minimum fields are `source-agent`, `topic`, `trigger`, `ambiguity / constraint`, `observed facts`, `options considered`, `proposed decision`, `rationale`, `affected files`, `affected tests`, `risk if wrong`, `rollback or revisit`, `confidence`, and `needs orchestrator decision`.
-- Require workers with no material decision to state `No material implementation decisions beyond the approved plan.` A worker `proposed decision` is not an accepted decision; the parent orchestrator must integrate, reject, defer, supersede, or promote it in the canonical report ledger.
-- Before completion, ensure ledger entries have no `Status=open`; each resolved / superseded entry has disposition evidence, required follow-up / promotion evidence, and no report-only durable decision.
-- When review fails, perform bounded delegated follow-up and rerun review. Parent direct fixes require a documented Parent Implementation Exception.
-- After final commit gates pass, use `github-pr-merge-preparer` for final PR delivery and merge-preparation evidence before `issue finish`; keep the detailed completion policy in `workflow_issue.md`.
-- Fresh `spec-reviewer`, `code-reviewer`, and `qa-reviewer` passes required by `workflow_issue.md` are gates and must not be skipped while waiting for extra permission inside the bounded SpecDock workflow scope.
-
-## Runtime Command Reminders
-
-- Use the shipped runtime path: `./spec-dock/scripts/spec-dock ...`.
-- Normal lifecycle is `issue start <target>` before execution and `issue finish` only after the workflow completion gates pass.
-- `issue start -f` / `issue start --force` bypasses only the unfinished-active-issue guard; it does not bypass readiness, target validation, or checkout safety.
-- After `issue finish`, avoid `sync` on the just-finished issue branch when active clear must remain clear.
-- Mutate dependencies command-first with `deps add`, `deps remove`, and `deps check`: `./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>`, `./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>`, and `./spec-dock/scripts/spec-dock deps check <target>`.
-- Evidence commands include `validate` and `sync`: `./spec-dock/scripts/spec-dock validate` and `./spec-dock/scripts/spec-dock sync`.
-- Use `--no-github` only for explicit cache/local verification without GitHub calls.
-- Step / milestone completion still requires required verification, a fresh reviewer pass, commit候補 or approved-no-op evidence, and a post-commit clean check as defined by `workflow_issue.md`.
-
-## Kernel Boundary
-
-Do not copy the full workflow here; update `workflow_issue.md` when execution policy changes.
+- Use only the shipped runtime path: `./spec-dock/scripts/spec-dock ...`.
+- Normal lifecycle is `issue start <target>` before execution and `issue finish` only after completion gates pass.
+- `issue start -f` / `issue start --force` bypasses only the unfinished-active-issue guard.
+- Mutate dependencies command-first with `deps add`, `deps remove`, and `deps check`.
+- Evidence commands include `validate` and `sync`; use `--no-github` only for explicit cache/local verification.

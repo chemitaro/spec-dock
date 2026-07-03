@@ -1,46 +1,64 @@
 ---
 name: spec-dock-epic-planning
-description: Leaf skill for epic planning tasks in spec-dock.
+description: Leaf skill for creating or updating Epic-level requirement, design, plan, Issue handoff evidence, and reviewer-gated planning artifacts in SpecDock.
 ---
 
-# Spec-dock Epic Planning
+# Spec-Dock Epic Planning
 
-- Use this skill for epic planning work.
-- Typical fit: create/import an epic, or update epic-level requirement/design/plan docs.
-- Prefer reusing/updating an existing epic first; create/import only when no existing epic fits.
-- Primary workflow: `spec-dock/docs/workflow_epic.md`.
-- Spec authoring workflow: `spec-dock/docs/workflow_spec_authoring.md`.
-- For shared phase authoring method, use:
+Use this skill for Epic planning: create/import an Epic, update Epic `requirement.md` / `design.md` / `plan.md`, preserve planning evidence, or prepare downstream Issue handoff. Prefer reusing an existing Epic; create/import only when no current Epic fits.
+
+This skill is an operational kernel. Keep detailed policy in docs and keep global invariants in `spec-dock-hub`.
+
+## Read First
+
+- Current state: `./spec-dock/scripts/spec-dock active show`, active Initiative/Epic docs, existing sibling Epics, `artifacts/`, legacy `discussions/` when present, related code/tests/templates/ADRs, and relevant user attachments.
+- Workflows and phase playbooks:
+  - `spec-dock/docs/workflow_epic.md`
+  - `spec-dock/docs/workflow_spec_authoring.md`
   - `spec-dock/docs/phase_requirement.md`
   - `spec-dock/docs/phase_design.md`
   - `spec-dock/docs/phase_plan.md`
-- Decision routing examples and detailed placement guidance: `spec-dock/docs/authoring/decision-routing.md`.
-- Scope ownership / authority layering に迷う場合の薄い参照: `spec-dock/docs/authoring/scope-layering.md`.
-- First-read gate: keep cross-issue design backbone decisions in Epic planning, but stop and route cross-epic operating decisions to Initiative, ADR-worthy decisions to ADR, and missing source-of-truth gaps to clarification.
-- A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow.
-- Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility.
-- Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow.
-- ユーザーが SpecDock workflow の利用を依頼した場合、その依頼自体を、SpecDock が定義する named sub-agent / reviewer を workflow に従って利用する明示的な許可として扱う。
-- active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲内では、role ごと・phase ごとの追加承認を求めない。
-- scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途確認する。
-- When decomposing work into Issues, do not create a decision-only Issue as execution-ready; create only executable Issue slices or record the remaining Epic-level decision/follow-up.
-- Issue decomposition 時、Epic は pre-start Issue handoff package として Issue-local `artifacts/` evidence を用意してよい。含める候補は `draft-design`、`draft-plan`、path index までに留め、canonical Issue `design.md` / `plan.md` は Issue planning / assurance compose 後に main orchestrator が作成する。
-- Keep this skill as routing guidance only; use `spec-dock/docs/authoring/decision-routing.md` for examples and detailed routing.
-- Keep scope-specific constraints and decisions in `workflow_epic.md`.
-- In spec authoring mode, do not move from requirement to design, design to plan, or plan to Issue decomposition until a fresh `spec-reviewer` returns `review_status: pass`; fix findings and re-run a fresh reviewer until pass.
-- Record each `Spec Authoring Gate` in the epic `report.md`, including investigation, user questions/answers, reviewer verdict, fixes, and promotion decision.
-- For non-trivial Epic planning, consider a `system-architect` scope-local artifact draft before canonical design / plan promotion; keep the draft as evidence only, and keep canonical `requirement.md` / `design.md` / `plan.md` / `report.md` under main orchestrator authority.
-- Do not make heavyweight delegation mandatory for every Epic. If the `system-architect` draft cycle is trivial or intentionally skipped, record a `skip reason` and continue through manual authoring plus the same fresh `spec-reviewer` gates.
-- If `system-architect` delegation is unavailable, denied, or unsupported, record the `fallback` path; do not claim delegated draft evidence, and do not weaken reviewer or promotion gates.
-- If delegated drafting exposes a requirement / design / plan gap, return to the prior authoring phase or `workflow_clarification.md`; do not absorb the gap as an Epic planning assumption.
-- Before adopting any delegated draft, require formal pre-delegation `baseline-status` evidence and post-delegation `diff-guard` pass per `workflow_spec_authoring.md`.
-- Adopt delegated evidence only through the Evidence Adoption Ledger, then run a fresh `spec-reviewer` against the orchestrator-integrated canonical artifact before phase promotion.
-- Bounded depth=2 delegation is allowed only as main orchestrator -> epic planning authoring specialist -> leaf-only evidence producer.
-- Depth=3 / grandchild delegation is forbidden.
-- Leaf-only evidence producers must not edit canonical artifacts, perform implementation edits, claim final authority, claim reviewer pass, or claim phase promotion / issue ready / issue finish.
-- Preflight reviewer output is improvement input only; final fresh reviewer pass remains independent.
-- Fresh reviewer passes required by the workflow are gates and must not be skipped while waiting for extra permission inside the bounded SpecDock workflow scope.
-- Do not default to create/import; keep new-epic rationale in `artifacts/`.
-- `spec-dock/docs/reference_github.md`
-- `spec-dock/docs/reference_sync.md`
-- `spec-dock/docs/reference_naming.md`
+  - `spec-dock/docs/phase_plan_epic.md`
+- Routing references:
+  - `spec-dock/docs/authoring/decision-routing.md`
+  - `spec-dock/docs/authoring/scope-layering.md`
+  - `spec-dock/docs/reference_github.md`
+  - `spec-dock/docs/reference_sync.md`
+  - `spec-dock/docs/reference_naming.md`
+  - Command syntax: `./spec-dock/scripts/spec-dock new --help`, `workflow_epic.md`, and `reference_naming.md` are the authority. Do not hand-build artifact paths; use `new artifact` stdout `path=...`.
+
+## Operating Spine
+
+1. Establish parent Initiative and Epic fit.
+   - If active scope is missing or ambiguous, inspect local state first; ask the user one blocking question only if local sources cannot determine placement.
+   - Keep new-Epic rationale in scope-local `artifacts/`.
+2. Build source-grounded understanding before authoring.
+   - Preserve raw research separately from synthesized decisions.
+   - If the target Epic does not exist yet and the parent Initiative is known, create only attachment inventory and fit analysis under the parent Initiative `artifacts/`; after Epic creation, adopt the relevant research into Epic `artifacts/` and record the move/adoption in `report.md`.
+   - If both target Epic and parent Initiative are unknown, do not create durable repo artifacts yet; keep only session-local inventory in the host/session temp area outside canonical docs, resolve parent scope, then create scope-local artifacts.
+   - Do not ask the user about facts or constraints available from repo docs, artifacts, code, tests, templates, ADRs, or attachment contents.
+3. Route decisions before writing.
+   - Epic owns cross-Issue scope, backbone design, Issue slicing, Issue dependency, and handoff package decisions.
+   - Route cross-Epic operating/product decisions to Initiative.
+   - Route durable decision records to ADR.
+   - Route missing source-of-truth or user-intent blockers to `spec-dock-clarification`.
+4. Author phases in order: requirement -> design -> plan -> Issue handoff.
+   - Each phase needs a fresh `spec-reviewer` `review_status: pass` before the next phase starts. In Codex, use the `spec-reviewer` sub-agent role; in other hosts, use the equivalent reviewer mechanism. Treat unavailable or denied reviewer access as a blocked gate rather than a pass.
+   - Record investigation, questions/answers, reviewer verdict, fixes, adoption decisions, and promotion decision in Epic `report.md`.
+5. Use specialists as evidence producers, not authorities.
+   - For non-trivial planning, a `system-architect` draft may be useful, but it is optional.
+   - If delegation is skipped, unavailable, denied, or unsupported, record the skip/fallback reason and continue only if reviewer gates remain intact.
+   - Adopt specialist output only through `report.md` Evidence Adoption Ledger and canonical-doc integration by the main orchestrator.
+6. Prepare Issue handoff without finalizing Issue execution docs.
+   - Create executable Issue slices only; do not create decision-only Issues as execution-ready work.
+   - Epic planning may create Issue-local `artifacts/` evidence such as `draft-design`, `draft-plan`, and a path index.
+   - Canonical Issue `design.md` / `plan.md` remain Issue planning outputs; do not finalize them during Epic planning.
+
+## Stop Conditions
+
+- Parent Initiative / active scope cannot be determined from local sources.
+- Existing Epic fit is unresolved and creating a new Epic would duplicate or fragment work.
+- A decision belongs to Initiative, ADR, or clarification rather than Epic.
+- Requirement / design / plan candidate changed after review and lacks a fresh `spec-reviewer` pass.
+- Specialist output has not been adopted into canonical docs and `report.md`.
+- Issue handoff would require execution-ready claims for template-only, draft-only, or unreviewed Issue docs.
