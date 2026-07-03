@@ -15,7 +15,9 @@ description: Leaf skill for initiative planning tasks in spec-dock.
   - `spec-dock/docs/phase_design.md`
   - `spec-dock/docs/phase_plan.md`
 - Decision routing examples and detailed placement guidance: `spec-dock/docs/authoring/decision-routing.md`.
+- Scope ownership / authority layering に迷う場合の薄い参照: `spec-dock/docs/authoring/scope-layering.md`.
 - First-read gate: keep cross-epic product, investment, success-metric, or operating-model decisions in Initiative planning, but route ADR-worthy decisions to ADR and missing source-of-truth gaps to clarification.
+- Source-grounded read と日本語ファーストを維持する。調査で解消できる疑問はユーザー質問にせず、path、command、identifier、SpecDock 固定語は原文のまま保持する。
 - A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow.
 - Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility.
 - Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow.

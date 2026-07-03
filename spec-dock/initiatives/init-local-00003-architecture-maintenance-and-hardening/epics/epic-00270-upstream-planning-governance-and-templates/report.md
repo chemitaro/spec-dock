@@ -2,7 +2,7 @@
 種別: レポート（Epic）
 ID: "epic-00270"
 タイトル: "Upstream Planning Governance And Templates"
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-02"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -15,11 +15,36 @@ ID: "epic-00270"
 
 ## 進捗サマリー (必須)
 - 現在地（何が完了し、何が未完か）:
-  - ...
+  - V3 planning pack を raw intake artifact として保存し、repo 実装状況と直近履歴を調査した。
+  - ユーザー interview により、Issue slicing flexibility、PR delivery boundary、canonical detail level の方針を採用した。
+  - V3 reference を全文貼りせず、canonical docs / split artifacts / decision candidate / future ADR 候補へ流す参照地図を作成した。
+  - 完全理解・自力調査・必要最小限のユーザー質問・知識外部化を canonical authoring 前提として ADR 化した。
+  - Matt Pocock 氏の `/grill-me` / `/grill-with-docs` を ChatGPT browser synthesis と primary sources で調査し、SpecDock 版への写像を research artifact に保存した。
+  - Handoff package inspection は Option B を採用し、machine-checkable な構造欠落を blocking fail、意味的品質を reviewer finding とする方針を決めた。
+  - `system-architect` に design / plan draft artifact の作成を委任し、採用可能な内容を main orchestrator が canonical `requirement.md` / `design.md` / `plan.md` へ再記述した。
+  - Fresh `spec-reviewer` gate は Lovelace (`019f20e7-b841-77d0-894d-ad2f68bde70e`) により一度 `review_status: pass` となった。
+  - その後、ユーザー補足により日本語ファースト spec / artifact authoring を Epic scope へ追加し、`requirement.md` / `design.md` / `plan.md` を日本語ファーストへ更新した。
+  - 更新後の canonical set は Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` となった。残ったP2/P3の日本語説明修正はこの report 更新で反映した。
+  - `plan.md` の6 Slice を actual Issue として `iss-00271` から `iss-00276` に変換し、Issue間のリレー依存を設定した。
+  - 各Issueに正規 `requirement.md` を作成した。当初 canonical `design.md` / `plan.md` に置いた pre-start draft body は、後続分析により Issue-local draft artifacts へ移す対象として再分類した。
+  - 当時の batch Issue planning set は Pascal (`019f212c-b416-7a31-b2c8-60b746a3ce99`) により `review_status: pass` となった。その後のADRにより canonical Issue `design.md` / `plan.md` 境界を修正したため、Pascal pass は historical evidence として扱う。
+  - ローカル検証では `./spec-dock/scripts/spec-dock validate` が成功した。`deps check` は、前段Issue未完了のため `epic-00270` / `iss-00276` が blocked となり、これはリレー依存どおりの状態である。
+  - Issue Start 前の `draft-design` / `draft-plan` 作成方針について再分析し、command は既存 `new artifact draft-*` primitive を強化し、actor obligation は grade-aware workflow / EAL で管理する方針を accepted ADR とした。
+  - `iss-00271` から `iss-00276` の pre-start design / plan seed を Issue-local `draft-design` / `draft-plan` artifacts へ移し、canonical Issue `design.md` / `plan.md` を awaiting-assurance-compose placeholder に戻す planning correction を実施した。
+  - 修正後の current planning set は Goodall (`019f21f9-b2ab-7182-8246-96997f8571d9`) により fresh `spec-reviewer` gate で `review_status: pass` となった。
+  - `iss-00271` から `iss-00275` は完了済みである。現在は `iss-00276` を active にし、final quality gate / PR delivery の正規 `design.md` / `plan.md` を具体化した。
+  - `iss-00276` の planning fresh `spec-reviewer` re-review は Socrates (`019f22d8-1185-7250-92b9-1d2c4787f600`) により `review_status: pass` となった。P2 として指摘されたこの Epic report の stale handoff state は、この更新で current state に合わせた。
+  - `iss-00276` の final automated quality gate で、初回 `tests/unit` が dogfooding mirror / checked-in snapshot drift を検出した。`workflow_epic.md` mirror と `epic-00270` / `iss-00271` から `iss-00276` の metadata / dependency snapshots を current source に追従させた。
+  - 修正後、targeted regression、`tests/unit`、`tests/cli_runtime`、full `uv run pytest`、`validate`、`assurance verify`、`deps check iss-00276` は成功した。
+  - Initial reviewer gates では `code-reviewer` が pass し、`spec-reviewer` / `qa-reviewer` が automated evidence の closure ID 過剰主張をP1として検出した。`iss-00276/report.md` の Step Evidence を修正し、automated gate は manual / reviewer / PR closure を閉じないようにした。
+  - Manual scaffold dogfooding として一時ディレクトリに `spec-dock init` し、生成された docs/templates が provider assets と一致すること、generated workflow / templates に handoff-ready / execution-ready、日本語ファースト、draft artifact boundary が反映されることを確認した。
+  - PR #277 を作成した。初回 observation で latest head の `validate` は成功したが、`provider-tests` は ruff format check failure で失敗したため、format repair を実施し、local `make lint` は成功した。
+  - format repair 後の PR observation で CI は成功したが、Codex review がP1を2件検出した。Epic `report.md` の reviewer-gated wording と deferred PR delivery / issue finish gate semantics を修正し、provider / dogfooding mirror parity を確認した。
+  - P1修復後の head `42c8f4d9` で PR observation を再実行し、CI / Provider CI は成功、PR は open / ready、`mergeStateStatus=CLEAN`、P0/P1 blocker は0件となった。Codex review の残りはP2/P3の terminal non-blocking findings のみであり、`github-pr-merge-preparer` policy に従って branch mutation / CI rerun 対象外として扱う。report 更新 commit 後の head / PR observation / clean state は external delivery evidence として確認する。
 - 次のマイルストーン:
-  - ...
+  - `iss-00276` の final evidence commit 後に `issue finish` を実行し、Epic completion gate を確認する。
 - ブロッカー:
-  - ...
+  - 現時点で作業停止ブロッカーはなし。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -33,7 +58,41 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | V3 ZIP intake | `requirement.md` / `design.md` / `plan.md` の根拠 | V3 clean pack は prior V2 intake を置き換え、この Epic に必要な upstream planning analysis を含む。 | `artifacts/20260702t014409z-01-phase3-v3-planning-pack-full-intake.md` | 必要な主張だけを canonical docs へ反映し、全文貼り付けはしない。 |
+| EAL-002 | adopted | repo survey | `design.md` / `plan.md` の根拠 | 現在の repo には artifacts と Issue grade / TDD hardening がすでにあり、主な不足は Initiative / Epic upstream planning surface である。 | `artifacts/20260702t014409z-research-phase3-repo-context-implementation-survey.md` | 実装Issueのscopeと検証計画に使う。 |
+| EAL-003 | adopted | user interview | `plan.md` の Issue slicing policy | V3の6 Issueは provisional baseline であり、追加Issue / 再分割は必要時だけ許可し、medium gate を通す。 | `artifacts/20260702t014409z-02-interview-phase3-first-scope-interview.md`, `artifacts/20260702t015012z-interview-phase3-issue-slicing-flexibility-criteria.md` | `plan.md` に反映し、将来の再分割証跡を記録する。 |
+| EAL-004 | adopted | user interview | `requirement.md` / `plan.md` の delivery gate | この Epic は原則1PRで収める想定であり、1PR delivery が現実的でなくなる場合だけ Issue単位のPR分割を再検討する。 | `artifacts/20260702t015343z-interview-phase3-delivery-pr-boundary.md` | final quality Issue と 1PR PR-readiness gate に反映する。 |
+| EAL-005 | adopted | user interview / synthesis | `design.md` / `plan.md` の reference flow | canonical docs には採用済みdecisionとhandoffを含め、詳細なV3分析は必要に応じて artifacts と ADR候補へ分割する。 | `artifacts/20260702t015700z-interview-phase3-canonical-detail-level.md`, `artifacts/20260702t020436z-01-disc-phase3-reference-adoption-map.md`, `artifacts/20260702t020436z-decision-candidate-phase3-canonical-reference-flow-decision.md` | 分割参照を使ってauthoringし、durable decisionだけADR化する。 |
+| EAL-006 | adopted | deep consultant / user decision / ADR | `design.md` / `plan.md` / provider docs scope | Scope-layering publication surface は、provider-side reference `docs/authoring/scope-layering.md` 1つと、workflow / docs / skills / templates からの thin links として採用された。 | `artifacts/20260702t022727z-research-deep-consultant-scope-layering-publication-recommendation.md`, `artifacts/20260702t022907z-adr-scope-layering-reference-publication-surface.md` | accepted ADR を canonical docs に反映し、Epic plan に実装とsmoke workを割り当てる。 |
+| EAL-007 | adopted | user interview | `design.md` / `plan.md` / Slice 05 acceptance criteria | scope-layering enforcement は medium strictness とし、構造的に機械検出できる違反はfail、解釈を要する問題は reviewer finding とする。 | `artifacts/20260702t023036z-interview-phase3-scope-layering-review-strictness.md` | fail / reviewer-finding の分離を design と smoke-test plan に反映する。 |
+| EAL-008 | adopted | user interview | `requirement.md` / `design.md` / `plan.md` / Slice 01-02 acceptance criteria | Initiative / Epic templates は architecture-aware だが architecture-neutral とし、DDD / EDA を標準前提にせず、既存architectureが明確ならそれに合わせる。 | `artifacts/20260702t023501z-interview-phase3-ddd-eda-template-weight.md` | template design principles に反映し、DDD / EDA-only smoke expectations を避ける。 |
+| EAL-009 | adopted | user decision / ADR | `requirement.md` / `design.md` / `plan.md` / Slice 01-02 acceptance criteria | architecture-neutral template authoring policy は accepted ADR として採用され、templates は DDD / EDA を標準前提にせず、明確なarchitectureへ適応する。 | `artifacts/20260702t024118z-adr-architecture-neutral-template-authoring-policy.md` | accepted ADR を canonical docs と template redesign criteria に反映する。 |
+| EAL-010 | adopted | user decision / ADR | `design.md` / `plan.md` / clarification workflow / authoring gates | canonical authoring 前に完全な source-grounded understanding を作り、自力調査、必要なuser-intent gapの質問、採用知識の外部化を必須にする。 | `artifacts/20260702t024032z-interview-phase3-artifact-adoption-requiredness.md`, `artifacts/20260702t025127z-adr-complete-understanding-before-canonical-authoring.md` | clarification workflow design、Spec Authoring Gate、downstream planning skill guidance に反映する。 |
+| EAL-011 | adopted | ChatGPT browser synthesis / public primary-source research | `design.md` / `plan.md` の clarification workflow model | Matt Pocock氏の `/grill-with-docs` は、一問ずつのsource-grounded grilling、codebase self-investigation、語彙やdecisionの外部化、sparse ADR、downstream authoring前のdecision preservation という望ましいバランスを示す。 | `artifacts/20260702t025127z-01-research-grill-with-docs-research.md` | SpecDock-native clarification flow の設計参考にし、`CONTEXT.md` や slash-command layout はそのままコピーしない。 |
+| EAL-012 | adopted | user interview | `design.md` / `plan.md` の handoff package inspection policy | Epic execution handoff inspection は medium strictness とし、machine-checkable structural omission は blocking fail、semantic sufficiency と quality concern は reviewer finding とする。 | `artifacts/20260702t030615z-interview-phase3-handoff-package-inspection-strength.md` | fail / finding の分離を execution entrypoint design、Issue readiness contract、smoke / reviewer plan に反映する。 |
+| EAL-013 | deferred | delegated draft | `design.md` / `report.md` の design authoring evidence | `system-architect` design draft は有用な構造を提供したが、diff guard が既存/並行dirty stateで失敗し、fresh prior requirement reviewer pass もなかったため、promotion evidence ではない。 | `artifacts/20260702t031957z-disc-epic-design-draft-upstream-planning-governance.md` | canonical design は main orchestrator が手動authoringした。draft は advisory provenance として残す。 |
+| EAL-014 | deferred | delegated draft | `plan.md` / `report.md` の plan authoring evidence | `system-architect` plan draft は有用な構造を提供したが、delegated plan promotion prerequisites を満たしていなかったため、promotion evidence ではない。 | `artifacts/20260702t032014z-disc-epic-plan-draft-upstream-planning-governance-templates.md` | canonical plan は main orchestrator が手動authoringした。draft は advisory provenance として残す。 |
+| EAL-015 | adopted | main orchestrator integration | `requirement.md` / `design.md` / `plan.md` | V3 intake、user interviews、accepted ADRs、Grill With Docs research、split disc artifacts を raw transcript dump にせず canonical Epic requirement / design / plan へ採用した。delegated drafts は構造参考のみで promotion evidence ではない。 | `requirement.md`, `design.md`, `plan.md` | EAL-017 の日本語ファースト更新後、fresh `spec-reviewer` を再実行する。 |
+| EAL-016 | deferred | fresh `spec-reviewer` gate | previous `requirement.md` / `design.md` / `plan.md` / `report.md` | Lovelace は previous canonical set を review して `review_status: pass` としたが、その後に日本語ファースト spec / artifact authoring を追加したため、現在のpromotion gateではなく historical evidence として扱う。 | reviewer: `019f20e7-b841-77d0-894d-ad2f68bde70e` | 更新後の canonical set に対して fresh `spec-reviewer` を再実行する。 |
+| EAL-017 | adopted | user clarification / ADR | `requirement.md` / `design.md` / `plan.md` / `report.md` | ユーザーは、現在のファイル修正だけでなく、日本語の requirement / design / plan と artifacts を作成できること自体をこの Epic scope に含めるべきだと補足した。これを accepted ADR として昇格し、canonical requirement / design / plan へ反映した。 | `artifacts/20260702t040113z-adr-japanese-first-spec-authoring-policy.md` | EAL-018 の reviewer pass により反映確認済み。 |
+| EAL-018 | adopted | fresh `spec-reviewer` gate | updated `requirement.md` / `design.md` / `plan.md` / `report.md` | Zeno が日本語ファースト更新後の canonical set と指定 artifacts / ADRs / research を確認し、blocking finding なしで `review_status: pass` とした。P2/P3 の局所的な英語説明残りは、この更新で日本語へ修正した。 | reviewer: `019f210e-28c1-7150-99ad-c5ab59e07e3a` | downstream Issue scaffold / planning へ進める。 |
+| EAL-019 | adopted | `spec-dock new issue` / GitHub Issue creation | `plan.md` / Issue docs | Epic plan の6 Slice を actual Issue `iss-00271` から `iss-00276` として作成し、それぞれ GitHub Issue #271-#276 に紐づけた。 | `iss-00271` / #271, `iss-00272` / #272, `iss-00273` / #273, `iss-00274` / #274, `iss-00275` / #275, `iss-00276` / #276 | batch spec-review pass 済み。`iss-00271` から順に実行する。 |
+| EAL-020 | adopted | `spec-dock deps add` | Issue dependency chain | ユーザー方針どおり、IssueごとのPRではなく、`issue finish` から次の `issue start` へ進むリレー依存を設定した。 | `iss-00272 -> iss-00271`, `iss-00273 -> iss-00272`, `iss-00274 -> iss-00273`, `iss-00275 -> iss-00274`, `iss-00276 -> iss-00275` | final PR delivery は `iss-00276` だけが扱う。 |
+| EAL-021 | partially_adopted | batch Issue planning authoring | `iss-00271` から `iss-00276` の `requirement.md` と Issue-local draft artifacts | Epic全体の抜け漏れ・重複を制御するため、6 Issue をまとめて正規要件と pre-start design / plan seed へ具体化した。ただし pre-start seed を canonical `design.md` / `plan.md` に置いた状態は現在のADRと矛盾するため、seed本文は Issue-local draft artifacts へ移し、canonical design / plan は placeholder に戻した。 | `issues/iss-00271-*/requirement.md`, `issues/iss-00272-*/requirement.md`, `issues/iss-00273-*/requirement.md`, `issues/iss-00274-*/requirement.md`, `issues/iss-00275-*/requirement.md`, `issues/iss-00276-*/requirement.md`, 各Issueの `artifacts/*draft-design*`, `artifacts/*draft-plan*` | Fresh `spec-reviewer` で、移行後の planning set を再確認する。 |
+| EAL-022 | partially_adopted | fresh `spec-reviewer` gate | historical batch Issue planning set | Popper の初回reviewで Issue report の判断台帳不足が P1 として検出され、6件すべてに `仕様解釈・判断台帳` を追加した。再レビューで Pascal は当時の batch planning set を `review_status: pass` と判定したが、その後 accepted ADR により Issue canonical design / plan boundary を修正したため、現在のpromotion gateではなく historical consistency evidence として扱う。 | Popper: `019f2129-6a7b-7b71-b24a-6037ea886013`, Pascal: `019f212c-b416-7a31-b2c8-60b746a3ce99` | Current planning set は EAL-027 の Goodall pass で確認済み。 |
+| EAL-023 | deferred | local validation commands | historical batch Issue planning set | `./spec-dock/scripts/spec-dock validate` は当時成功した。`deps check epic-00270` と `deps check iss-00276` は前段Issue未完了のため blocked を返し、リレー依存が有効であることを確認した。ただしその後に Issue draft migration と Epic docs update を行ったため、現在のvalidation evidenceとしては扱わず、historical evidence として残す。 | `spec-dock: ok (validate) nodes=178`; blockers: `iss-00271`-`iss-00275` | current validation は EAL-026 に記録する。 |
+| EAL-024 | adopted | user decision / ADR | draft artifact command and grade role policy | ユーザーは、Issue Start 前の draft artifact 作成では actor 別 command を作らず、既存 `new artifact draft-design` / `draft-plan` を統一 primitive として強化し、system-architect / implementation-planner の関与は grade-aware workflow / EAL で管理する方針を採用した。 | `artifacts/20260702t073715z-decision-candidate-unified-draft-artifact-command-grade-role-policy.md`, `artifacts/20260702t074332z-adr-unified-draft-artifact-command-grade-role-policy.md` | 後続Issueで workflow docs / skills / runtime tests へ反映する。 |
+| EAL-025 | adopted | planning correction | `iss-00271` から `iss-00276` の canonical `design.md` / `plan.md` と Issue-local draft artifacts | accepted ADR に従い、pre-start draft body を Issue-local `draft-design` / `draft-plan` artifacts へ移し、canonical Issue `design.md` / `plan.md` は awaiting-assurance-compose placeholder に戻した。各 Issue report に draft artifact path と Grade Specialist Evidence Gate を記録した。 | `issues/iss-00271-*/artifacts/*draft-design*`, `issues/iss-00271-*/artifacts/*draft-plan*`, `issues/iss-00272-*/artifacts/*draft-design*`, `issues/iss-00272-*/artifacts/*draft-plan*`, `issues/iss-00273-*/artifacts/*draft-design*`, `issues/iss-00273-*/artifacts/*draft-plan*`, `issues/iss-00274-*/artifacts/*draft-design*`, `issues/iss-00274-*/artifacts/*draft-plan*`, `issues/iss-00275-*/artifacts/*draft-design*`, `issues/iss-00275-*/artifacts/*draft-plan*`, `issues/iss-00276-*/artifacts/*draft-design*`, `issues/iss-00276-*/artifacts/*draft-plan*` | Goodall の fresh `spec-reviewer` pass で整合性確認済み。 |
+| EAL-026 | adopted | local validation commands | current planning correction set | migration 後の canonical docs / Issue docs / report ledgers に対して `validate` を再実行し、blocking EAL が残らないことを確認した。targeted grep では canonical docs 上の `draft-before-issue-start` は検証要件の文字列としてのみ残り、canonical Issue `design.md` / `plan.md` には 12件すべて `artifact_state: awaiting-assurance-compose` が存在した。 | `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=178`; `rg 'artifact_state: awaiting-assurance-compose' ...issues/*/{design.md,plan.md}` -> 12件 | Goodall の fresh `spec-reviewer` pass で semantic consistency 確認済み。 |
+| EAL-027 | adopted | fresh `spec-reviewer` gate | current Epic / Issue planning set | Goodall は current Epic requirement / design / plan / report、accepted ADR、全6 Issue の requirement / design / plan / report、draft-design / draft-plan artifacts を確認し、古い reviewer evidence、draft provenance、日本語ファースト文面、canonical placeholder boundary、責務分担、6 Issue coverage に P0/P1/P2 が残っていないと判定した。 | Goodall: `019f21f9-b2ab-7182-8246-96997f8571d9`; `review_status: pass`; `overall_confidence_score: 0.9` | `iss-00271` からリレー実行を開始する。現在は `iss-00275` active planning 中である。 |
+| EAL-028 | adopted | completed Issue relay | `plan.md` / `report.md` | `iss-00271` から `iss-00274` は完了済みであり、`iss-00275` はそれらを検証入力として扱う active validation slice になった。 | completed Issues: `iss-00271`, `iss-00272`, `iss-00273`, `iss-00274`; active Issue: `iss-00275` | `iss-00275` の fresh planning review と実装へ進む。 |
+| EAL-029 | partially_adopted | `iss-00275` specialist drafts | `iss-00275/design.md`, `iss-00275/plan.md`, `iss-00275/report.md` | system-architect / implementation-planner の draft は、machine / smoke / reviewer 境界、closure mapping、focused command ladder、no-PR handoff を具体化しており、正規 Issue 設計・計画へ部分採用した。final authority、reviewer pass、実行済み command claims は採用していない。 | `issues/iss-00275-*/artifacts/20260702t114631z-draft-design-system-architect-upstream-planning-validation-design.md`, `issues/iss-00275-*/artifacts/20260702t114630z-draft-plan-implementation-planner-canonical-plan-draft.md` | `iss-00275` の fresh `spec-reviewer` gate を通す。 |
+| EAL-030 | adopted | fresh `spec-reviewer` gate | `iss-00275` planning set and Epic current-state references | Dewey は active Epic / Issue docs、specialist drafts、unified draft artifact ADR を確認し、`iss-00275` の AC/EC trace、machine / smoke / reviewer 境界、draft authority isolation、no-PR handoff に P0/P1/P2 がないと判定した。P3 として Epic report の古い next-action wording が指摘されたため、この更新で current state に合わせた。 | Dewey: `019f22ae-51a7-7ea2-a13c-8a2ed1806d72`; `review_status: pass`; `overall_confidence_score: 0.88` | `iss-00275` の実装へ進む。 |
+| EAL-031 | adopted | completed Issue relay and `iss-00275` closeout | `plan.md` / `report.md` | `iss-00275` は focused structural tests、validate、assurance、fresh code / spec review を通して完了し、`issue finish` 済みである。`iss-00276` は dependency ready となり active start 済み。 | commit `53d6e924`; `issue finish` output for `iss-00275`; `deps check iss-00276` -> ready; active issue `iss-00276` | `iss-00276` final gate へ進む。 |
+| EAL-032 | adopted | `iss-00276` planning review | `iss-00276/design.md`, `iss-00276/plan.md`, `iss-00276/report.md` | `iss-00276` は assurance compose 後に critical final gate として正規 design / plan を具体化し、Sartre のP1を修正したうえで Socrates re-review が `review_status: pass` とした。 | Sartre `019f22d4-fc6a-77b1-a2f0-1441a2cc226e`; Socrates `019f22d8-1185-7250-92b9-1d2c4787f600`; `assurance verify` -> pass; `validate` -> pass | S00-S07 を実行する。 |
+| EAL-033 | adopted | `iss-00276` final automated gate | `spec-dock/docs/workflow_epic.md`, `tests/unit/infra/test_init_update.py`, `iss-00276/report.md` | Final gate の初回 `tests/unit` は、provider-side `workflow_epic.md` と今回追加された dogfooding Epic / Issue metadata / dependencies が checked-in dogfooding mirror / snapshots に未反映であることを検出した。mirror と snapshots を current source に追従させた後、focused regression、full unit / CLI runtime / full pytest / SpecDock structural checks が成功した。 | 初回 `tests/unit` -> 4 failed / 962 passed; targeted regression -> 4 passed; rerun `tests/unit` -> 966 passed; `tests/cli_runtime` -> 730 passed, 74 skipped; full `uv run pytest` -> 1699 passed, 74 skipped; `validate` -> nodes=178; `assurance verify` -> ok; `deps check iss-00276` -> ready | reviewer re-check、PR delivery へ進む。 |
+| EAL-034 | adopted | final reviewer gates | `iss-00276/report.md` | `code-reviewer` は current diff を pass と判定した。初回 `spec-reviewer` / `qa-reviewer` は automated gate が manual / reviewer / PR closure IDs を閉じたように読める traceability defect をP1として検出したため、Step Evidence の Closure を修正し、manual / reviewer / PR closure は S03 / S04 / S07 に残した。その後 full pytest と scaffold dogfooding evidence を追加し、`spec-reviewer` / `qa-reviewer` re-review は pass となった。P2 の Epic E-AC-006 stale manual wording も修正した。 | Harvey `019f236e-2728-72e2-adf5-8848a086037f` -> pass; Planck initial `019f236e-265c-78e2-b7c4-aa9551622f4a` -> fail P1; Ramanujan initial `019f236e-27e4-7602-a80b-647843af6ca2` -> fail P1/P2; Step Evidence repair; full pytest pass; scaffold dogfooding evidence; Planck re-review -> pass; Ramanujan re-review -> pass; final local commit evidence | PR delivery へ進む。 |
+| EAL-035 | adopted | PR delivery and observation | PR #277 / `iss-00276/report.md` | Final PR delivery は1PR方針どおり PR #277 に集約した。初回 Provider CI format failure と2回目 observation のP1 2件を修復し、P1修復後head `42c8f4d9` の再観測で CI / Provider CI success、P0/P1 なし、PR open / ready / `mergeStateStatus=CLEAN` を確認した。残るP2/P3は terminal non-blocking findings として人間判断に残し、branch mutation / CI rerun は行わない。report 更新 commit 後の最終head確認は external delivery evidence として残す。 | PR #277 `https://github.com/chemitaro/spec-dock/pull/277`; observation artifacts `/private/tmp/spec-dock-pr277-observation-3/result.json`; `gh pr view 277` -> open / ready / `CLEAN`; head `42c8f4d949238af736dd10e5f3e6f46313521d37` | `iss-00276` final evidence commit と `issue finish` 判定へ進む。 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -41,7 +100,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | primary objective は upstream Initiative / Epic planning governance と executable downstream Issue handoff である。 | secondary requirements は、V3 reference assets の保存、controlled re-slicing、1PR delivery default、日本語ファースト spec / artifact authoring を含む。 | low | Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -49,20 +108,24 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| clarification | V3 ZIP、parent initiative docs、provider templates、planning / execution skills、workflow docs、git history、split artifacts、Matt Pocock Grill With Docs public sources、日本語ファーストuser clarification | 回答済み: six-Issue baseline は medium gate 付きで柔軟に扱う。回答済み: 原則1PR。回答済み: canonical docs は中程度の詳細で split references を使う。回答済み: complete understanding は必須で、自力調査後に user-intent gap だけ質問し、知識を外部化する。回答済み: handoff package inspection は structural blockers と semantic reviewer findings を分ける。回答済み: Japanese requirement / design / plan / report / artifacts を支援する。 | requirement / design / plan drafting のsource evidenceとして採用 | Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` | no | downstream Issue scaffold / planning へ進める。 |
+| requirement | V3 ZIP、parent initiative requirement / design / plan、repo survey、accepted interviews / ADRs、split artifacts、日本語ファーストADR | blocking open question はない。Epic-level user intent decisions は解決済み。 | `requirement.md` に採用 | Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` | no | downstream Issue scaffold / planning へ進める。 |
+| design | concrete `requirement.md`、accepted ADRs、split scope / template / handoff / quality artifacts、advisory system-architect design draft、日本語ファーストADR | blocking user question はない。delegated draft は promotion evidence として不適格だったため advisory input としてのみ利用した。 | main orchestrator manual authoring により `design.md` に採用 | Zeno (`019f210e-28c1-7150-99ad-c5ab59e07e3a`) により `review_status: pass` | no | downstream Issue scaffold / planning へ進める。 |
+| plan | concrete `requirement.md` / `design.md`、V3 six-Issue baseline、user-approved re-slicing and delivery policy、advisory system-architect plan draft、日本語ファーストADR、unified draft artifact command ADR | blocking user question はない。actual Issue IDs は `iss-00271` から `iss-00276` として作成済み。delegated draft は promotion evidence として不適格だったため advisory input としてのみ利用した。 | main orchestrator manual authoring により `plan.md` に採用し、batch Issue planning と後続の draft artifact boundary correction へ反映 | Goodall (`019f21f9-b2ab-7182-8246-96997f8571d9`) により current planning correction 後の `review_status: pass` | no | `iss-00271` から `iss-00275` は完了済み。現在は `iss-00276` final gate を実行する。 |
+| batch Issue planning | `iss-00271` から `iss-00276` の正規 `requirement.md`、Issue-local draft artifacts、placeholder canonical `design.md` / `plan.md`、Epic plan / report 更新 | 初回reviewで Issue report 判断台帳不足が見つかり、6件すべてへ判断台帳を追加済み。その後のADRにより、pre-start draft body は canonical `design.md` / `plan.md` から Issue-local artifacts へ移行した。 | Issue実行前のバトン設計として採用。要件は正本、design / plan seed は evidence-only artifact、canonical design / plan は Issue Planning で compose する。 | Goodall (`019f21f9-b2ab-7182-8246-96997f8571d9`)、Dewey (`019f22ae-51a7-7ea2-a13c-8a2ed1806d72`)、Socrates (`019f22d8-1185-7250-92b9-1d2c4787f600`) により current planning / `iss-00275` / `iss-00276` planning が `review_status: pass` | no | `iss-00276` の final quality gate と PR delivery へ進む。 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
-  - used / not used
+  - used
 - 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
+  - 該当なし。Design / plan draft を `system-architect` に委任した。ただし canonical docs は main orchestrator が再記述した。
 - lifecycle state（契約値）:
   - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
 - 昇格不可 state:
   - `stale`, `rejected`, `superseded`, `blocked`
 - 標準出力先:
   - 対象 scope の `artifacts/` direct child にある flat Markdown
-  - filename: typed artifacts use `<ts>-<type>-<slug>.md` or `<ts>-<nn>-<type>-<slug>.md`; blank artifacts use `<ts>-<slug>.md` or `<ts>-<nn>-<slug>.md`
+  - filename: typed artifact は `<ts>-<type>-<slug>.md` または `<ts>-<nn>-<type>-<slug>.md` を使う。blank artifact は `<ts>-<slug>.md` または `<ts>-<nn>-<slug>.md` を使う。
 - 軽量 provenance:
   - `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
   - 互換 label: role, phase, scope, authorization source, source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
@@ -77,7 +140,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| system-architect | epic-00270 | `artifacts/20260702t031957z-disc-epic-design-draft-upstream-planning-governance.md` | active epic docs、parent initiative docs、V3 intake、split artifacts、accepted ADRs、user interviews | `design.md`, `plan.md`, `report.md` | deferred | なし（[]） | failed | advisory input のみ。canonical design は main orchestrator が手動authoringした。 | direct delegated promotion、final authority claims、冗長な raw draft wording は採用しない。 | downgrade 後のblockingはない。failed diff guard により draft は promotion evidence として使えない。 | previous canonical set は reviewer pass 済み。その後の日本語ファースト更新と batch Issue planning は EAL-018 / EAL-022 で re-review 済み。 | promotion evidence ではない。reviewer は current canonical docs を評価する。 |
+| system-architect | epic-00270 | `artifacts/20260702t032014z-disc-epic-plan-draft-upstream-planning-governance-templates.md` | active epic docs、parent initiative docs、V3 intake、split artifacts、accepted ADRs、report EAL | `plan.md`, `report.md` | deferred | なし（[]） | pending | advisory input のみ。canonical plan は main orchestrator が手動authoringした。 | direct delegated promotion、actual Issue creation、reviewer-pass claims は採用しない。 | downgrade 後のblockingはない。delegated promotion prerequisites を満たしていなかった。 | previous canonical set は reviewer pass 済み。その後の日本語ファースト更新と batch Issue planning は EAL-018 / EAL-022 で re-review 済み。 | promotion evidence ではない。reviewer は current canonical docs を評価する。 |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -94,28 +158,61 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（reviewer gate evidence） | ineligible |
 
 ## 決定事項（ADRリンク） (必須)
-- adr-xxxx-...: <1行要約>
-- ...
+- `artifacts/20260702t022907z-adr-scope-layering-reference-publication-surface.md`:
+  - Scope-layering / Initiative-Epic-Issue責務モデルは、1つのprovider-side reference `docs/authoring/scope-layering.md` として公開し、既存workflow/docs/skills/templatesは薄くリンクする。
+- `artifacts/20260702t024118z-adr-architecture-neutral-template-authoring-policy.md`:
+  - Initiative/Epic templates は DDD/EDA を標準前提にせず、既存または明確化されたアーキテクチャに合わせる architecture-neutral / architecture-aware 方針を採る。
+- `artifacts/20260702t025127z-adr-complete-understanding-before-canonical-authoring.md`:
+  - Canonical authoring 前に完全な source-grounded understanding を作り、自力調査で分かることは人間に聞かず、必要な user intent gap だけを interview し、採用知識を artifacts / ADR / canonical docs / report ledger に外部化する。
+- `artifacts/20260702t040113z-adr-japanese-first-spec-authoring-policy.md`:
+  - 日本語運用では requirement / design / plan / report / artifacts の本文を日本語ファーストで作成し、英語は識別子・固定語・外部固有名詞を中心に許容する。
+- `artifacts/20260702t074332z-adr-unified-draft-artifact-command-grade-role-policy.md`:
+  - Issue-local `draft-design` / `draft-plan` の作成 command は actor semantics を持たず、既存 `new artifact draft-*` primitive を強化する。system-architect / implementation-planner の関与は Issue grade に応じた workflow / EAL / reviewer gate で管理する。
 
 ## 完了した Issue / PR / Release (必須)
-- iss-xxxx-...: Done（PR: ...）
-- ...
+- 完了したIssue:
+  - `iss-00271` / #271: Initiative templates
+  - `iss-00272` / #272: Epic templates
+  - `iss-00273` / #273: scope-layering reference / planning guidance
+  - `iss-00274` / #274: Epic execution handoff / readiness
+  - `iss-00275` / #275: upstream planning smoke tests / validation
+- 作成済みIssue:
+  - `iss-00271` / #271: Initiative templates
+  - `iss-00272` / #272: Epic templates
+  - `iss-00273` / #273: scope-layering reference / planning guidance
+  - `iss-00274` / #274: Epic execution handoff / readiness
+  - `iss-00275` / #275: upstream planning smoke tests / validation
+  - `iss-00276` / #276: final quality gate / PR delivery
+- PR:
+  - #277: `https://github.com/chemitaro/spec-dock/pull/277`
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
-- E-AC-001: Pass / Fail（証拠: ...）
-- E-AC-002: ...
+- E-AC-001: completed
+  - `iss-00271` は完了済みで、`iss-00276` の integrated quality gate で automated / manual / reviewer / PR evidence を確認した。
+- E-AC-002: completed
+  - `iss-00272` は完了済みで、`iss-00276` の integrated quality gate で template / workflow / snapshot evidence を確認した。
+- E-AC-003: completed
+  - `iss-00273` は完了済みで、`iss-00276` の integrated quality gate で scope-layering reference と planning guidance の検証 evidence を確認した。
+- E-AC-004: completed
+  - `iss-00274` は完了済みで、`iss-00276` の integrated quality gate で Epic execution handoff / readiness wording と skill mirror evidence を確認した。
+- E-AC-005: completed
+  - `iss-00275` は完了済みで、`iss-00276` の integrated quality gate で upstream planning smoke / validation evidence を確認した。
+- E-AC-006: completed
+  - `iss-00276` は active planning review pass、final automated gate、manual scaffold dogfooding / hygiene read-through、reviewer gates final re-review、final local commit、PR creation、P1 repair、P1修復後head PR observation を完了した。head `42c8f4d9` で CI / Provider CI は成功し、P0/P1 blocker は0件。残るP2/P3は terminal non-blocking findings として branch mutation / CI rerun 対象外に分類した。report 更新 commit 後の最終head確認は external delivery evidence として残す。
+- E-AC-007: completed
+  - `iss-00271` から `iss-00275` で反映・検証済み。`iss-00276` final automated gate、manual dogfooding、fresh reviewer gates、PR observation で最終確認した。
+- E-AC-008: completed
+  - planning correction として、`iss-00271` から `iss-00276` の pre-start design / plan seed を Issue-local draft artifacts へ移し、canonical `design.md` / `plan.md` を awaiting-assurance-compose placeholder に戻した。
+  - `iss-00274` / `iss-00275` で workflow / command / validation として固定済み。`iss-00276` final automated gate、manual dogfooding、reviewer gates、PR observation で最終確認した。
 
 ## ロールアウト結果（必要なら） (任意)
-- 段階公開の状況:
-  - ...
-- 監視値（エラー率/レイテンシなど）:
-  - ...
-- 障害/アラート:
-  - ...
+- 該当なし:
+  - この Epic は docs / templates / skills / tests / dogfooding scaffold の変更であり、外部 runtime rollout はこのPRのmerge後に利用可能になる。
 
 ## フォローアップ（別Issue化） (必須)
-- iss-xxxx-...:
-  - ...
+- 非ブロッキング follow-up:
+  - PR #277 の最新 Codex review はP2/P3のみを返した。`github-pr-merge-preparer` policy 上、これらは merge-blocking ではなく、P2/P3だけを理由に branch mutation / CI rerun は行わない。
+  - 残るP2/P3: draft artifacts の assurance prerequisite 明示、Initiative template の Epic completion canonicality、template reference path、deferred PR exception wording。
 
 ## 省略/例外メモ (必須)
 - 該当なし

@@ -11,6 +11,8 @@ This skill owns the source-grounded grill loop. Use `spec-dock/docs/workflow_cla
 
 Decision routing examples and detailed placement guidance live in `spec-dock/docs/authoring/decision-routing.md`. Use that doc when clarification finds a decision-only Issue, cross-issue Epic decision, cross-epic Initiative decision, ADR candidate, or missing source-of-truth gap; keep this skill limited to the stop/routing loop.
 
+質問、調査結果、adoption target の配置判断で scope ownership が迷う場合は、Initiative / Epic / Issue の authority boundary を確認する薄い入口として `spec-dock/docs/authoring/scope-layering.md` を参照する。
+
 ## Source-Grounded Grill Loop
 
 1. Read sources before asking: active docs, parent docs, scope-local `artifacts/`, legacy `discussions/` when present for historical context, related code/tests/templates, ADRs, and the current request.

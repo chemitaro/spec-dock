@@ -1,7 +1,7 @@
 # 課題計画フェーズ playbook（phase playbook: plan / issue）
 
 Issue plan の playbook です。
-shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / execution / reviewer / completion policy は [workflow_issue.md](workflow_issue.md)、Issue plan の field semantics と executable step schema は [authoring/issue-plan.md](authoring/issue-plan.md) を参照します。
+shared axiom は [phase_plan.md](phase_plan.md)、Issue の lifecycle / execution / reviewer / completion policy は [workflow_issue.md](workflow_issue.md)、Issue plan の field semantics と executable step schema は [authoring/issue-plan.md](authoring/issue-plan.md)、scope ownership と authority flow は [authoring/scope-layering.md](authoring/scope-layering.md) を参照します。
 Operational entrypoint / first-read spine は `spec-dock-issue-planning` skill です。この文書は skill から到達する detail / reference surface として、field-level template manual ではなく、Issue plan をどう設計し、どう review するかに集中します。
 
 ## 範囲契約（scope contract）
@@ -27,6 +27,7 @@ Operational entrypoint / first-read spine は `spec-dock-issue-planning` skill �
 ## 作成方針（authoring philosophy）
 
 - `workflow_issue.md` が所有する `1 step = 1 observable behavior` invariant を behavior slice 設計へ落とす
+- Issue-local plan は親 scope の目的、責務境界、Issue handoff boundary を再定義しない。Epic から渡された Issue-local `draft-design` / `draft-plan` は evidence として採否判断し、Canonical Issue `design.md` / `plan.md` へ採用する場合だけ本文化する
 - `block` は optional concern group とし、単純な step では最小 wrapper 1 個でよい
 - `behavior slice` は 1 つの観測可能な振る舞いを実装・検証・レビューできる単位とする
 - Epic から Issue へ切る場合、各 Issue は `vertical behavior slice` として、利用者価値または運用上観測できる 1 つの振る舞いを thin end-to-end に閉じる。DB / API / UI / docs のような層別作業だけで切る `horizontal batching` は避け、層別作業が必要な場合も最初に薄い縦の完了点を置く

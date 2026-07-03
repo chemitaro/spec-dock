@@ -124,6 +124,11 @@ class TestCliNew(CliRuntimeHarness):
                 snapshot.append((rel, "file", path.read_text(encoding="utf-8")))
         return tuple(snapshot)
 
+    def _canonical_design_plan_snapshot(self, issue_dir: Path) -> tuple[tuple[str, str], ...]:
+        return tuple(
+            (filename, (issue_dir / filename).read_text(encoding="utf-8")) for filename in ("design.md", "plan.md")
+        )
+
     def _assert_profile_draft_no_write_failure(
         self,
         target: Path,
@@ -132,6 +137,7 @@ class TestCliNew(CliRuntimeHarness):
         expected_stderr: str,
     ) -> None:
         before = self._artifact_tree_snapshot(issue_dir)
+        canonical_before = self._canonical_design_plan_snapshot(issue_dir)
         p = self._run_runtime_capture(target, command)
         assert p.returncode != 0, p.stdout + p.stderr
         assert expected_stderr in p.stderr
@@ -140,6 +146,7 @@ class TestCliNew(CliRuntimeHarness):
         else:
             after = self._artifact_tree_snapshot(issue_dir)
             assert after == before
+        assert self._canonical_design_plan_snapshot(issue_dir) == canonical_before
 
     def test_new_issue_creates_assurance_compose_placeholders_for_design_and_plan(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -974,12 +981,14 @@ class TestCliNew(CliRuntimeHarness):
                 )
                 for command, doc_type, profile_heading, template_source in cases:
                     before = set((issue_dir / "artifacts").glob(f"*-{doc_type}-*.md"))
+                    canonical_before = self._canonical_design_plan_snapshot(issue_dir)
                     p = self._run_runtime_capture(target, command)
                     assert p.returncode == 0, p.stdout + p.stderr
                     assert f"type={doc_type}" in p.stdout
                     after = set((issue_dir / "artifacts").glob(f"*-{doc_type}-*.md"))
                     created = sorted(after - before)
                     assert len(created) == 1
+                    assert self._canonical_design_plan_snapshot(issue_dir) == canonical_before
                     content = created[0].read_text(encoding="utf-8")
                     assert profile_heading in content
                     assert "artifact_state: awaiting-assurance-compose" not in content

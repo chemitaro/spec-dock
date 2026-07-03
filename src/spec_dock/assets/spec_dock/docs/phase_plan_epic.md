@@ -1,7 +1,7 @@
 # エピック計画フェーズ playbook（phase playbook: plan / epic）
 
 Epic plan の playbook です。
-shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governance は [workflow_epic.md](workflow_epic.md) を参照します。
+shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governance は [workflow_epic.md](workflow_epic.md)、scope ownership と authority flow は [authoring/scope-layering.md](authoring/scope-layering.md) を参照します。
 
 ## 範囲契約（scope contract）
 
@@ -18,6 +18,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governanc
   - issue 内 step の切り方
   - TDD cadence
   - commit rhythm
+  - pre-start canonical Issue `design.md` / `plan.md` の本文
 
 ## 入場 focus（entry focus）
 
@@ -34,6 +35,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governanc
 - `品質ゲート` に observability / migration / docs を置く
 - `ロールアウト / docs impact` を置く
 - `Issue readiness contract` を置く
+- Issue handoff readiness には、Issue-local `draft-design` / `draft-plan` の path index、または明示的な skip / fallback evidence を含める。これらは planning evidence であり、Canonical Issue `design.md` / `plan.md` は pre-start で本文化せず、[workflow_epic.md](workflow_epic.md) と [authoring/scope-layering.md](authoring/scope-layering.md) の boundary に従って downstream Issue planning へ渡す
 - `final exit contract` を置く
 
 ## 図表 / trace 指針（diagram / trace guidance）
@@ -48,6 +50,7 @@ shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governanc
 - integration checkpoint がある
 - rollout / docs impact が露出している
 - issue handoff に必要な readiness がある
+- Issue-local `draft-design` / `draft-plan` を渡す場合、path index と evidence-only status が明示され、pre-start canonical Issue `design.md` / `plan.md` 本文化を促していない
 - delegated plan draft を使う場合、lightweight provenance、fresh requirement/design reviewer pass、approved artifacts への traceability、stale / superseded handling、scope discipline、phase gate preservation が確認できる
 - delegated draft を fresh `spec-reviewer` pass の代替にしていない
 - read-only specialist consent と scope-local artifact direct-write consent が分離され、direct-write delegated authoring は target scope `artifacts/` direct child、allowed filename rule、forbidden canonical/implementation paths、post-run diff guard、report evidence destination を step-local に固定している
