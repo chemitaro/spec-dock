@@ -1,70 +1,72 @@
 ---
 name: spec-dock-issue-planning
-description: Actor-based issue requirement, design, and plan authoring workflow spine for spec-dock.
+description: Leaf skill for Issue-level requirement, design, plan authoring, draft adoption, reviewer-gated readiness, and execution handoff in SpecDock.
 ---
 
-# Spec-dock Issue Planning
+# Spec-Dock Issue Planning
 
-Use this skill for issue planning work: create or update issue-level requirement/design/plan docs, prepare review readiness, or return unresolved execution gaps to authoring.
+Use this skill for Issue planning: create or update Issue-level `requirement.md` / `design.md` / `plan.md`, adopt or reject pre-start draft evidence, prepare fresh reviewer gates, or return unresolved execution gaps to authoring.
 
-This skill is a fixed kernel. It must not carry state-specific generated Runbook text, full profile procedure sets, or issue-local workflow projections.
+This skill is a fixed kernel / operational kernel. Do not copy full profile procedures, generated Runbooks, or issue-local workflow projections here.
 
-## Workflow-Scoped Authorization
+state-specific generated Runbook text is runtime guidance. It is not canonical authority, must not be edited as source of truth, and must not replace canonical docs.
 
-- A user request to use a SpecDock workflow is explicit workflow-scoped authorization to use the SpecDock-defined named sub-agents and reviewers required by that workflow.
-- Do not ask for additional per-role or per-phase permission before invoking SpecDock-defined named roles within the active repo/worktree, active SpecDock scope, current session, and documented role responsibility.
-- Ask the user only for scope expansion, destructive actions, external publishing, credentialed external mutation, private external systems, or roles outside the SpecDock workflow.
-- ユーザーが SpecDock workflow の利用を依頼した場合、その依頼自体を、SpecDock が定義する named sub-agent / reviewer を workflow に従って利用する明示的な許可として扱う。
-- active repo/worktree、active SpecDock scope、current session、documented role responsibility の範囲内では、role ごと・phase ごとの追加承認を求めない。
-- scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用は別途確認する。
+## Read First
 
-## First-Read Handoff
+- Runtime guidance: `./spec-dock/scripts/spec-dock guidance issue-planning`
+  - Treat stdout as current guidance, not canonical authority.
+  - Record `state`, `next_action`, `reason_code`, `authority`, commands, and stop conditions before acting.
+  - Register the returned `state`, `next_action`, `reason_code`, `authority`, commands, and stop conditions before acting.
+- Canonical docs and active artifacts:
+  - `spec-dock/docs/workflow_issue.md`
+  - `spec-dock/docs/workflow_spec_authoring.md`
+  - `spec-dock/docs/workflow_clarification.md`
+  - `spec-dock/docs/phase_requirement.md`
+  - `spec-dock/docs/phase_design.md`
+  - `spec-dock/docs/phase_plan_issue.md`
+  - `spec-dock/docs/authoring/issue-plan.md`
+  - `spec-dock/docs/authoring/decision-routing.md`
+  - `spec-dock/docs/authoring/scope-layering.md`
+  - active Issue `requirement.md`, `design.md`, `plan.md`, `report.md`, and scope-local `artifacts/`
 
-- First ask the runtime for current planning guidance:
-  - `./spec-dock/scripts/spec-dock guidance issue-planning`
-- Treat the command stdout as current guidance only. It is not canonical authority, and must not be edited as source of truth.
-- Register the returned `state`, `next_action`, `reason_code`, `authority`, commands, and stop conditions in your task checklist before acting.
-- Do not expect or derive authoring phase, implementation step, worker, reviewer, verification, or context packet details from runtime guidance. Use canonical docs and the active artifacts for phase and planning obligations.
-- If runtime guidance cannot be generated, is malformed, or contradicts canonical docs, stop and fall back to the canonical docs below instead of guessing the next phase.
-- Generated projections such as `spec-dock/.agent/runbooks/current-runbook.*` or `spec-dock/active/current-runbook.*` are ignored human/debug output. Do not read, edit, or manage them as handoff authority.
+## Operating Spine
 
-## Canonical Fallback
+1. Confirm active Issue and planning phase.
+   - If runtime guidance is malformed, unavailable, or contradicts canonical docs, stop and fall back to docs plus active artifacts.
+   - Ignore generated projections such as `spec-dock/.agent/runbooks/current-runbook.*` and `spec-dock/active/current-runbook.*` as authority.
+   - Do not expect or derive canonical docs from `current-runbook.*`; Do not read, edit, or manage them as handoff authority.
+2. Confirm Issue grade and obligation.
+   - Read the Issue grade matrix in `workflow_spec_authoring.md` before creating or updating canonical docs.
+   - `authorized_profile` is template/guidance/obligation authority.
+   - Lite is not an automatic default; unknown or ambiguous grade/scope/impact/reviewer obligation escalates to Standard or higher.
+3. Treat drafts as evidence, not authority.
+   - Pre-start `draft-design`, `draft-plan`, delegated drafts, research, discussions, and generated Runbooks remain evidence until adopted.
+   - Adoption or rejection must be reflected in `report.md` and the relevant canonical docs.
+   - `system-architect` and `implementation-planner` outputs never replace main-orchestrator adoption, fresh `spec-reviewer` pass, phase promotion, or execution handoff readiness.
+4. Author phases in order.
+   - Requirement, design, and plan each need a fresh `spec-reviewer` `review_status: pass` after the latest substantive change.
+   - Record Spec Authoring Gate evidence in `report.md` whenever canonical artifacts are promoted or execution handoff readiness changes.
+5. Produce execution handoff only when ready.
+   - Execution-ready requires reviewer-passed canonical docs, executable `plan.md`, required verification/delegation/reviewer-focus evidence, adopted draft evidence, and no unresolved report-ledger blockers.
+   - Handoff-ready evidence from Epic planning is not execution-ready by itself.
 
-- Primary lifecycle / execution workflow: `spec-dock/docs/workflow_issue.md`.
-- Spec authoring workflow: `spec-dock/docs/workflow_spec_authoring.md`.
-- Clarification workflow for unresolved ambiguity, interview evidence, and source-grounded questions: `spec-dock/docs/workflow_clarification.md`.
-- Requirement phase playbook: `spec-dock/docs/phase_requirement.md`.
-- Design phase playbook: `spec-dock/docs/phase_design.md`.
-- Issue plan phase playbook: `spec-dock/docs/phase_plan_issue.md`.
-- Issue plan field semantics and executable step schema: `spec-dock/docs/authoring/issue-plan.md`.
-- Decision routing examples and detailed placement guidance: `spec-dock/docs/authoring/decision-routing.md`.
-- Scope ownership / authority layering に迷う場合の薄い参照: `spec-dock/docs/authoring/scope-layering.md`.
+## Contract Anchors
 
-## Issue grade 補足
+- Use this skill for issue planning work: create or update issue-level requirement/design/plan docs while keeping canonical docs main-orchestrator-owned.
+- Delegated authoring is scope-local evidence only and does not grant delegated canonical write authority.
+- fresh `spec-reviewer` returns `review_status: pass`; record Spec Authoring Gate evidence before handoff.
+- Stop if planning authority, freshness, reviewer gates, draft adoption, or execution handoff readiness cannot be verified.
 
-- Issue の `requirement.md`、`design.md`、`plan.md` を作成または更新する前に、`spec-dock/docs/workflow_spec_authoring.md` の Issue grade matrix を読む。
-- `authorized_profile` は runtime template、guidance、obligation authority として扱う。manual escalation は reviewer / specialist / evidence gate を追加で強める判断であり、authority override ではない。
-- Lite は automatic default ではない。低リスク根拠が明示される場合だけ Lite を使う。grade、scope、impact、reviewer obligation が unknown / ambiguous の場合は Standard 以上へ倒す。
-- Standard では specialist 使用を推奨する。使わない場合は、確認した source、skip reason、残リスクを `report.md` に残す。
-- Strict / Critical では specialist 使用を原則必須にする。unavailable、denied、host constraint で使えない場合は、継続前に manual fallback evidence を `report.md` に残す。Critical の fallback は明示承認がない限り通常 blocked のまま扱う。
-- 後続作業の stable term として、G2 `draft routing`、G3 `report evidence gate`、G4 `integrated smoke matrix` を維持する。この skill は用語を固定するだけで、routing、report validation、smoke coverage は実装しない。
+## Stop Conditions
 
-## Stop Conditions And Authority
-
-- Stop if active context, artifact freshness, reviewer pass evidence, or delegated draft adoption evidence is missing, stale, failed, unavailable, denied, waived, provisional, or contradictory.
-- Stop if `authorized_profile` is missing, ambiguous, or inconsistent with the requested obligation.
-- Stop if the Issue grade is missing or ambiguous, unless the plan explicitly escalates to Standard or higher and records the reason.
-- Stop if `requirement.md`, `design.md`, or `plan.md` is template-only, unresolved, or not reviewer-passed for the current phase.
-- Stop if planning reveals unresolved requirement / design / plan gaps; route back to `spec-dock/docs/workflow_clarification.md` or the relevant authoring phase.
-- Keep canonical `requirement.md` / `design.md` / `plan.md` / `report.md` main-orchestrator-owned. This skill does not grant delegated canonical write authority.
-- 受け取った delegated draft / pre-start seed は evidence-only input として扱う。Issue planning authority として使う前に、採用または不採用を `report.md` と該当する canonical docs に反映する。
-- `system-architect` and `implementation-planner` are delegated agent roles only; their drafts are scope-local evidence only and do not replace main orchestrator adoption, fresh `spec-reviewer` pass, phase promotion, or execution handoff readiness.
-- Delegated drafts, research, discussions, and generated Runbooks are evidence only until adopted into canonical artifacts and recorded in `report.md`.
-- Fresh means the current artifact candidate was reviewed after its latest substantive change and fresh `spec-reviewer` returns `review_status: pass`.
-- Fresh `spec-reviewer` passes are required gates and must not be skipped while waiting for extra permission inside the bounded SpecDock workflow scope.
-- Record Spec Authoring Gate evidence in `report.md` when canonical artifacts are promoted or execution handoff readiness changes.
+- Active context is missing, stale, or inconsistent.
+- Runtime guidance, canonical docs, active artifacts, or `authorized_profile` disagree and the conflict cannot be resolved locally.
+- Issue grade, scope, impact, or reviewer obligation is missing or ambiguous without escalation evidence.
+- `requirement.md`, `design.md`, or `plan.md` is template-only, unresolved, stale, contradictory, or lacks fresh reviewer pass for the current phase.
+- Draft adoption evidence is missing, stale, failed, unavailable, denied, waived, provisional, or contradictory.
+- Planning exposes unresolved requirement / design / plan gaps; route to clarification or the relevant authoring phase instead of execution.
 
 ## Kernel Boundary
 
-- Use the runtime Runbook and canonical docs for phase-specific procedure details; do not copy the full workflow here.
-- Keep only durable entrypoint, authority, freshness, fallback, and stop-condition reminders in this skill.
+- Keep detailed profile procedures in docs and templates.
+- Keep only durable entrypoint, authority, freshness, fallback, draft-adoption, and stop-condition reminders here.

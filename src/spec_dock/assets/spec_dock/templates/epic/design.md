@@ -18,8 +18,8 @@ ID: "<EPIC_ID>"
 - この文書は Epic が固定する Issue 横断の設計境界と契約を記述する。
 - 日本語ファーストで作成し、ファイルパス、コマンド、コード識別子、SpecDock 固定語は原文のまま扱ってよい。
 - Scope ownership と authority flow は `docs/authoring/scope-layering.md` を参照し、この template には責務表を複製しない。
-- DDD / EDA は必須前提にしない。対象システムの既存アーキテクチャが明確な場合だけ、その語彙に合わせて整理する。
-- Issue-level の実装手順、TDD の細かなサイクル、private implementation design を必須にしない。
+- 既存プロダクトでは、対象システムの現行アーキテクチャ、設計指針、用語、境界に合わせて設計する。方針が不明または新規開発の場合は、コード・既存資料・ユーザー確認に基づいて方針を明確化してから設計する。
+- Issue-level の実装手順、検証の細かな実行手順、private implementation design を必須にしない。
 
 ## 全体像
 - 対象境界:
@@ -95,14 +95,14 @@ ID: "<EPIC_ID>"
 @enduml
 ```
 
-## ドメインモデル（Domain Model / DDD 必要時）
-- ユビキタス言語の参照:
+## 概念モデル / 業務ルール（必要時）
+- 主要用語 / 概念の参照:
   - ...
-- 集約ルート:
+- 主要概念 / 責務単位:
   - ...
-- エンティティ / 値オブジェクト:
+- 状態を持つ対象 / 値として扱う対象:
   - ...
-- ドメインイベント / ポリシー / 仕様:
+- 重要な状態変化 / ルール / 仕様:
   - ...
 - 不変条件:
   - ...
@@ -116,9 +116,9 @@ ID: "<EPIC_ID>"
   - 含めない詳細:
     - persistence schema / full implementation classes
   - 更新条件:
-    - aggregate / entity / value object / event / invariant が変わるとき
+    - 主要概念 / ルール / 状態変化 / 不変条件が変わるとき
 
-### 図表（UML / 任意: domain model / aggregate）
+### 図表（UML / 任意: concept model / rule model）
 - N/A: 理由
 
 ## 契約
@@ -176,7 +176,7 @@ ID: "<EPIC_ID>"
   - 範囲:
     - ...
   - 含めない詳細:
-    - domain model の代替にはしない
+    - 概念モデルや業務ルールの代替にはしない
   - 更新条件:
     - persistence model / migration impact が変わるとき
 
