@@ -7,13 +7,16 @@ description: Leaf skill for Issue-level requirement, design, plan authoring, dra
 
 Use this skill for Issue planning: create or update Issue-level `requirement.md` / `design.md` / `plan.md`, adopt or reject pre-start draft evidence, prepare fresh reviewer gates, or return unresolved execution gaps to authoring.
 
-This skill is an operational kernel. Do not copy full profile procedures, generated Runbooks, or issue-local workflow projections here.
+This skill is a fixed kernel / operational kernel. Do not copy full profile procedures, generated Runbooks, or issue-local workflow projections here.
+
+state-specific generated Runbook text is runtime guidance. It is not canonical authority, must not be edited as source of truth, and must not replace canonical docs.
 
 ## Read First
 
 - Runtime guidance: `./spec-dock/scripts/spec-dock guidance issue-planning`
   - Treat stdout as current guidance, not canonical authority.
   - Record `state`, `next_action`, `reason_code`, `authority`, commands, and stop conditions before acting.
+  - Register the returned `state`, `next_action`, `reason_code`, `authority`, commands, and stop conditions before acting.
 - Canonical docs and active artifacts:
   - `spec-dock/docs/workflow_issue.md`
   - `spec-dock/docs/workflow_spec_authoring.md`
@@ -31,6 +34,7 @@ This skill is an operational kernel. Do not copy full profile procedures, genera
 1. Confirm active Issue and planning phase.
    - If runtime guidance is malformed, unavailable, or contradicts canonical docs, stop and fall back to docs plus active artifacts.
    - Ignore generated projections such as `spec-dock/.agent/runbooks/current-runbook.*` and `spec-dock/active/current-runbook.*` as authority.
+   - Do not expect or derive canonical docs from `current-runbook.*`; Do not read, edit, or manage them as handoff authority.
 2. Confirm Issue grade and obligation.
    - Read the Issue grade matrix in `workflow_spec_authoring.md` before creating or updating canonical docs.
    - `authorized_profile` is template/guidance/obligation authority.
@@ -45,6 +49,13 @@ This skill is an operational kernel. Do not copy full profile procedures, genera
 5. Produce execution handoff only when ready.
    - Execution-ready requires reviewer-passed canonical docs, executable `plan.md`, required verification/delegation/reviewer-focus evidence, adopted draft evidence, and no unresolved report-ledger blockers.
    - Handoff-ready evidence from Epic planning is not execution-ready by itself.
+
+## Contract Anchors
+
+- Use this skill for issue planning work: create or update issue-level requirement/design/plan docs while keeping canonical docs main-orchestrator-owned.
+- Delegated authoring is scope-local evidence only and does not grant delegated canonical write authority.
+- fresh `spec-reviewer` returns `review_status: pass`; record Spec Authoring Gate evidence before handoff.
+- Stop if planning authority, freshness, reviewer gates, draft adoption, or execution handoff readiness cannot be verified.
 
 ## Stop Conditions
 

@@ -9,6 +9,8 @@ Use this skill for Initiative planning: create/import an Initiative, update Init
 
 This skill is an operational kernel. Keep detailed policy in docs and keep global invariants in `spec-dock-hub`.
 
+Contract anchor: create/import an initiative when no existing Initiative fits; capture scope-specific constraints and decisions before Epic decomposition; record Spec Authoring Gate evidence after fresh `spec-reviewer` pass.
+
 ## Read First
 
 - Current state: `./spec-dock/scripts/spec-dock active show`, existing Initiatives/Epics, active docs, `artifacts/`, legacy `discussions/` when present, related code/tests/templates/ADRs, and relevant user attachments.

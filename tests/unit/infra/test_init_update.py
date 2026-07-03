@@ -4528,9 +4528,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "ファイルパス" in text or "path" in text
             assert "コマンド" in text or "command" in text
             assert "識別子" in text or "identifier" in text
-            for line in text.splitlines():
-                if "DDD / EDA" in line and ("必須" in line or "mandatory" in line):
-                    assert "しない" in line or "ではありません" in line or "not " in line
+            assert "DDD / EDA" not in text
         for fragment in (
             "戦略目的（strategic purpose）",
             "source-of-truth",
@@ -4538,7 +4536,8 @@ class TestInitUpdate(CliRuntimeHarness):
             "trigger / request origin",
             "エピックへ渡す初期材料（Epic handoff seed）",
             "日本語ファースト",
-            "DDD / EDA などの特定アーキテクチャ語彙は前提にしない",
+            "現行のアーキテクチャ、設計指針、用語、境界に合わせて整理する",
+            "方針が不明または新規開発の場合は、コード・既存資料・ユーザー確認に基づいて方針を明確化",
         ):
             assert fragment in initiative_requirement
         for fragment in (
@@ -4547,7 +4546,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "## 証跡採用（artifact adoption）",
             "## レビューゲート（reviewer gate）",
             "## エピック分割境界（Epic boundary）",
-            "Issue-level の実装詳細、TDD の細かなサイクル、内部 class / file 設計はここで必須化しない",
+            "Issue-level の実装詳細、検証の細かな実行手順、内部 class / file 設計はここで必須化しない",
             "この template には責務表を複製しない",
         ):
             assert fragment in initiative_design
@@ -4572,7 +4571,8 @@ class TestInitUpdate(CliRuntimeHarness):
             "後続 Issue seed",
             "証跡の権限境界（artifact authority）",
             "日本語ファースト",
-            "DDD / EDA は必須前提にしない",
+            "現行のアーキテクチャ、設計指針、用語、境界に合わせて整理する",
+            "方針が不明または新規開発の場合は、コード・既存資料・ユーザー確認に基づいて方針を明確化",
         ):
             assert fragment in epic_requirement
         for fragment in (
@@ -4591,7 +4591,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "forbidden parent boundary changes",
             "expected evidence",
             "## 最終品質ゲート（final quality gate）",
-            "Issue-level の TDD step や private implementation design は必須前提にせず",
+            "Issue-level の実装・検証の詳細手順や private implementation design は必須前提にせず",
         ):
             assert fragment in epic_plan
         assert "docs/authoring/scope-layering.md" in epic_plan
@@ -4663,7 +4663,7 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "Rel(user, system" in initiative_design
         assert "## システムコンテキスト" in initiative_design
         assert "- タイトル:\n  - システムコンテキスト / 目指す状態の全体像" in initiative_design
-        assert "## ドメイン境界 / ユビキタス言語（必要時）" in initiative_design
+        assert "## 業務領域 / 概念境界（必要時）" in initiative_design
         assert "## コンテナ概要（必要時）" in initiative_design
         container_overview_section = initiative_design.split("## コンテナ概要（必要時）", 1)[1].split(
             "## 対象境界 / 依存", 1
@@ -4674,12 +4674,10 @@ class TestInitUpdate(CliRuntimeHarness):
         assert "## パッケージ依存（Package Dependency）" in epic_design
         assert "### 図表（UML / 推奨: パッケージ依存 / 依存差分）" in epic_design
         assert "diagram メタデータ:" in epic_design
-        assert "## ドメインモデル（Domain Model / DDD 必要時）" in epic_design
+        assert "## 概念モデル / 業務ルール（必要時）" in epic_design
         assert "### 図表（UML / 推奨: コンポーネント / モジュール）" in epic_design
         assert "### 図表（UML / 推奨: main sequence）" in epic_design
-        domain_model_section = epic_design.split("## ドメインモデル（Domain Model / DDD 必要時）", 1)[1].split(
-            "## 契約", 1
-        )[0]
+        domain_model_section = epic_design.split("## 概念モデル / 業務ルール（必要時）", 1)[1].split("## 契約", 1)[0]
         data_model_section = epic_design.split("## データモデル", 1)[1].split("## 主要フロー", 1)[0]
         assert "```plantuml" not in domain_model_section
         assert "```plantuml" not in data_model_section
@@ -11079,7 +11077,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             in hub_text
         )
         assert (
-            "`spec-dock-issue-execution`: issue-level TDD execution and report updates after approved / reviewer-pass planning artifacts and an executable `plan.md` are ready."
+            "`spec-dock-issue-execution`: issue-level implementation / verification execution and report updates after approved / reviewer-pass planning artifacts and an executable `plan.md` are ready."
             in hub_text
         )
         assert "`spec-dock-clarification`: first-class docs-aware clarification companion" in hub_text

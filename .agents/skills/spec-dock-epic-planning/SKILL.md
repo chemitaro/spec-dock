@@ -9,6 +9,8 @@ Use this skill for Epic planning: create/import an Epic, update Epic `requiremen
 
 This skill is an operational kernel. Keep detailed policy in docs and keep global invariants in `spec-dock-hub`.
 
+Contract anchor: create/import an epic when no existing Epic fits; capture scope-specific constraints and decisions before Issue handoff; record Spec Authoring Gate evidence after fresh `spec-reviewer` pass.
+
 ## Read First
 
 - Current state: `./spec-dock/scripts/spec-dock active show`, active Initiative/Epic docs, existing sibling Epics, `artifacts/`, legacy `discussions/` when present, related code/tests/templates/ADRs, and relevant user attachments.
@@ -49,6 +51,8 @@ This skill is an operational kernel. Keep detailed policy in docs and keep globa
    - For non-trivial planning, a `system-architect` draft may be useful, but it is optional.
    - If delegation is skipped, unavailable, denied, or unsupported, record the skip/fallback reason and continue only if reviewer gates remain intact.
    - Adopt specialist output only through `report.md` Evidence Adoption Ledger and canonical-doc integration by the main orchestrator.
+   - Bounded depth=2 delegation only: Depth=3 / grandchild delegation is forbidden.
+   - Leaf-only evidence producers must not edit canonical artifacts; final fresh reviewer pass remains independent.
 6. Prepare Issue handoff without finalizing Issue execution docs.
    - Create executable Issue slices only; do not create decision-only Issues as execution-ready work.
    - Epic planning may create Issue-local `artifacts/` evidence such as `draft-design`, `draft-plan`, and a path index.
