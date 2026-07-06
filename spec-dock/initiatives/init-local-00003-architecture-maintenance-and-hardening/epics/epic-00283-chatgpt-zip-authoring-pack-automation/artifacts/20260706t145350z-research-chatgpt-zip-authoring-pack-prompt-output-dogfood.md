@@ -21,8 +21,8 @@ local_branch: "codex/chatgpt"
 local_head_sha: "209811098dc3067a94a3894cb89f9c6f5f6eae31"
 zip_sha256: "1a84b8ad9b04663a2118c37c1d2360b229346dd1eb26c78c40a25d9de11786c4"
 derived_from:
-  - "/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/epic-00283-zip-authoring-pack-prompt.md"
-  - "/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/chatgpt-output.md"
+  - "redacted-managed-temp://epic-00283-zip-authoring-pack-prompt.md"
+  - "redacted-managed-temp://chatgpt-output.md"
   - "redacted-chatgpt-generated-zip://specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip"
 reflected_to: []
 ---
@@ -46,13 +46,13 @@ reflected_to: []
   - branch: `codex/chatgpt`
   - local / origin HEAD: `209811098dc3067a94a3894cb89f9c6f5f6eae31`
 - Prompt:
-  - `/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/epic-00283-zip-authoring-pack-prompt.md`
+  - `redacted-managed-temp://epic-00283-zip-authoring-pack-prompt.md`
 - ChatGPT text output:
-  - `/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/chatgpt-output.md`
+  - `redacted-managed-temp://chatgpt-output.md`
 - ChatGPT generated ZIP:
   - `redacted-chatgpt-generated-zip://specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip`
-- Managed temp copy:
-  - `/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip`
+- Managed temp ZIP copy:
+  - not retained as durable evidence; use `zip_sha256` and repo-local adopted artifacts only.
 - Attached context:
   - parent Initiative requirement / design / plan
   - `epic-00283` requirement / design / plan / report
@@ -354,10 +354,10 @@ reflected_to:
 ## 参考（References）
 
 - Prompt:
-  - `/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/epic-00283-zip-authoring-pack-prompt.md`
+  - `redacted-managed-temp://epic-00283-zip-authoring-pack-prompt.md`
 - ChatGPT output:
-  - `/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/chatgpt-output.md`
+  - `redacted-managed-temp://chatgpt-output.md`
 - ZIP:
   - `redacted-chatgpt-generated-zip://specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip`
 - ZIP managed temp copy:
-  - `/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip`
+  - not retained as durable evidence.
