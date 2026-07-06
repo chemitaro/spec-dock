@@ -3,7 +3,7 @@
 ID: "epic-00283"
 タイトル: "ChatGPT ZIP 仕様作成パック自動化"
 関連GitHub: ["#283"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 依存: ["requirement.md", "design.md"]
@@ -50,6 +50,8 @@ C04 -> C07 -> C09
 C03 -> C08 -> C09
 C09 -> C10
 ```
+
+この依存図はリレー実行順と handoff prerequisite の正本であり、現時点では `.meta.json.depends_on` の runtime dependency edge を直接更新しません。Issue execution は `issue finish` / `issue start` と各 `report.md` の gate evidence で順序を守ります。運用上このリレー順を metadata blocker として扱う必要が出た場合だけ、`./spec-dock/scripts/spec-dock deps add --from <dependent> --to <prerequisite>` で明示的に追加します。
 
 ## 並列化できるレーン
 
@@ -140,6 +142,27 @@ strict 相当の追加 obligation を持つ Issue は、Issue planning 時に sp
   - 推奨グレード: `strict`
   - ディレクトリ: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr`
 
+## E-RQ / E-AC trace matrix
+
+| Epic trace | Primary Issue | Supporting Issue | Required evidence |
+|---|---|---|---|
+| E-RQ-001 / E-RQ-002 / E-RQ-003 / E-AC-001 | `iss-00284` | `iss-00285`, `iss-00287` | repo / ref / source_paths / stale_if / denylist / profile snapshot と prompt pack が evidence-only boundary を持つ。 |
+| ZIP safety / schema validation / unsafe claim rejection | `iss-00285` | `iss-00290` | 危険ファイル種別、禁止 path、unsafe authority claim、schema mismatch を fail-closed で拒否する。 |
+| Staged adoption / no direct canonical overwrite | `iss-00286` | `iss-00291` | valid ZIP でも canonical docs へ直接上書きせず、diff / staged artifact / EAL 候補を生成する。 |
+| Local profile authority / selected skeleton fill | `iss-00287` | `iss-00289`, `iss-00290` | `.assurance.json` / `authorized_profile` を ChatGPT output で変更せず、選択済み skeleton だけを埋める。 |
+| Dogfood scenario A | `iss-00288` | `iss-00292` | Epic から Issue 候補を作るが、candidate-only pack は profile recommendation だけを返す。 |
+| Dogfood scenario B | `iss-00289` | `iss-00287`, `iss-00292` | 既存 Issue の selected profile skeleton fill を dogfood し、未記入 section と staged adoption を記録する。 |
+| Dogfood scenario C | `iss-00290` | `iss-00285`, `iss-00287`, `iss-00292` | stale profile、profile mismatch、source hash mismatch、unsafe claim を negative probe で止める。 |
+| Documentation / adoption ledger examples | `iss-00291` | `iss-00286` | workflow docs と EAL 例は evidence-only / dogfood-only boundary を保つ。 |
+| Metrics / runtime promotion decision material | `iss-00292` | `iss-00288`, `iss-00289`, `iss-00290` | runtime 昇格、保留、却下の判断材料を作るが、昇格自体は決めない。 |
+| Final quality / PR delivery / mergeable confirmation | `iss-00293` | all prior Issues | manual test evidence、PR URL、CI / review correction、mergeable state を Epic final gate に集約する。 |
+
+## Deferred PR delivery contract
+
+`iss-00284` から `iss-00292` は、各 Issue の local completion と `issue finish` を目指すが、個別 Pull Request や merge-prepared status を主張しない。各 intermediate Issue report は defer target を `iss-00293` として記録し、最終 PR Delivery Gate / Merge Preparation Gate は `iss-00293` が通常 workflow として実行する。
+
+この deferred PR delivery は、レビュー済み Epic plan が final quality Issue に PR delivery を集約する例外運用であり、Issue 実装や local verification、fresh reviewer gate、closure evidence を省略するものではない。
+
 ## 統合チェックポイント
 
 - G1: 10 件の Issue が E-RQ / E-AC に対応している。
@@ -210,10 +233,12 @@ strict 相当の追加 obligation を持つ Issue は、Issue planning 時に sp
 
 ## 未解決だがブロックしない判断
 
-- raw ZIP / 展開済みツリーを repo 外だけに残すか、将来 artifact-pack 契約を作るか。
-- ランタイム昇格の正確なしきい値。
-- ChatGPT のプロファイル推奨と local classify が食い違った場合の salvage 方針。
-- Strict / Critical で ChatGPT Use を named specialist evidence として扱う将来経路。
+| 論点 | 現時点の扱い | owner / revisit condition |
+|---|---|---|
+| raw ZIP / 展開済みツリー | repo 外の raw ZIP と `zip_sha256`、Issue-local staged evidence で扱い、canonical docs へ raw ZIP を直接採用しない。 | artifact-pack 契約が必要になった時点で follow-up / ADR 候補にする。 |
+| ランタイム昇格のしきい値 | この Epic では判断材料作成まで。昇格自体は決めない。 | `iss-00292` の指標評価後に runtime promotion / defer / reject を判断する。 |
+| profile mismatch salvage | mismatch は fail-closed を基本とし、salvage は未決の operational policy として残す。 | `iss-00287` / `iss-00290` の negative probe 結果で再検討する。 |
+| Strict / Critical での ChatGPT Use evidence | ChatGPT output は evidence-only。named specialist evidence としての扱いは未採用。 | workflow policy / assurance policy が明示的に採用した場合だけ再検討する。 |
 
 ## 最終品質ゲート
 

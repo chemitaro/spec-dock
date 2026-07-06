@@ -3,7 +3,7 @@
 ID: "iss-00286"
 タイトル: "仕様作成パックの差分表示と段階配置を実装する"
 関連GitHub: ["#286"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 依存: ["requirement.md", "design.md"]
@@ -43,7 +43,7 @@ ID: "iss-00286"
 |---|---|---|---|---|---|---|
 | tc-001 | S01 | 親 Epic trace と依存 Issue output を確認する | 親 E-RQ / E-AC、依存関係 | 親 docs / 依存 Issue report の確認メモ | 対応する親 trace と依存 output を説明できる | Issue `report.md` の Closure Evidence Ledger |
 | tc-002 | S02 | Issue 固有成果物を実装または作成する | Issue AC-001〜AC-004 | 変更差分、生成 artifact、または no-op rationale | 成果物が存在し、正本直接上書きがない | Issue `report.md` の実行証跡 / EAL |
-| tc-003 | S03 | 正常系 / negative fixture / safety boundary を検証する | Issue AC-005〜AC-006 | validation report、fixture 結果、`.assurance.json` 差分確認 | pass / blocked / stale / rejected / deferred を区別できる | Issue `report.md` の Closure Evidence Ledger |
+| tc-003 | S03 | 正常系 / negative fixture / safety boundary を検証する | Issue AC-005〜AC-007 | validation report、fixture 結果、`.assurance.json` 差分確認 | pass / blocked / stale / rejected / deferred と `unreviewed` adoption candidate を区別できる | Issue `report.md` の Closure Evidence Ledger |
 | tc-004 | S90 | docs impact と adoption ledger を解消する | docs / report integrity | docs impact 判断、EAL 更新、Closure Delta 有無 | 関連 docs / report の更新または no-op 理由が記録されている | Issue `report.md` の Docs Impact / EAL |
 | tc-005 | S99 | final QA / code / spec gate を閉じる | all AC / EC | `spec-dock validate`、関連テスト、fresh reviewer result | P0/P1 blocker がなく、残リスクと次アクションが明確 | Issue `report.md` の Final Gate / Closure Evidence Ledger |
 
@@ -76,8 +76,8 @@ ID: "iss-00286"
 | step | delegated role | input docs | allowed paths | forbidden changes | acceptance criteria | required tests or docs-only verification | reviewer focus | stop conditions | output required | report destination | amendment trigger | step gate |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | main orchestrator / implementation-planner | Epic docs, this Issue `requirement.md` / `design.md` / `plan.md`, `.assurance.json` | inspect-only; this Issue `report.md` for evidence | `.assurance.json` mutation, source/runtime edits, PR creation | parent trace and dependency outputs are understood | docs-only inspection; no command required beyond optional `spec-dock validate` | scope, dependency, local assurance consistency | missing dependency evidence, stale profile, unclear parent trace | S01 evidence row and blocker/no-blocker note | Issue `report.md` Closure Evidence Ledger | parent trace or allowed paths differ from plan | S01 closed before S02 |
-| S02 | dev-coder or doc-writer matching touched surface | this Issue `requirement.md`, `design.md`, S01 evidence | `src/spec_dock/**`, `tests/**`, this Issue `artifacts/**`, this Issue `report.md` | unrelated initiatives, unrelated Issue docs, `.assurance.json`, direct canonical overwrite by generated ZIP, PR/CI operations | Issue AC-001〜AC-004 and issue-specific deliverables | focused unit/integration/docs-only check selected before edit; `git diff --check` | implementation scope, no authority-boundary regression | outside allowed paths, public contract expansion not in requirement, unsafe ZIP/adoption claim | changed files, generated/staged artifacts, verification result, residual risks | Issue `report.md` execution evidence / EAL | new public command, new persistence, or scope wider than AC | S02 reviewer-ready before S03 |
-| S03 | qa-reviewer or dev-coder | S02 output, fixtures, validation report contract | `tests/**`, this Issue `artifacts/**`, this Issue `report.md`; source fixes only if failing test reveals in-scope defect | unrelated refactor, broad fixture rewrite, `.assurance.json` mutation, self-review pass claim | Issue AC-005〜AC-006 and negative fixtures are covered | normal fixture, negative fixture, `spec-dock validate`, `git diff --check`, focused pytest or documented no-op | fail-closed behavior, validation status taxonomy, no canonical overwrite | missing negative fixture, ambiguous validation status, test requires broader design | test output, blocked/stale/rejected/deferred evidence, defect notes | Issue `report.md` Closure Evidence Ledger | new failure mode not covered by design | S03 closed before S90 |
+| S02 | dev-coder or doc-writer matching touched surface | this Issue `requirement.md`, `design.md`, S01 evidence | `scripts/authoring-pack/**`, `tests/fixtures/authoring_pack/**`, `tests/manual_tests/**`, this Issue `artifacts/**`, this Issue `report.md`, `scripts/authoring-pack/README.md` when directly needed | unrelated initiatives, unrelated Issue docs, `.assurance.json`, direct canonical overwrite by generated ZIP, PR/CI operations | Issue AC-001〜AC-004 and issue-specific deliverables | focused unit/integration/docs-only check selected before edit; `git diff --check` | implementation scope, no authority-boundary regression | outside allowed paths, public contract expansion not in requirement, unsafe ZIP/adoption claim | changed files, generated/staged artifacts, verification result, residual risks | Issue `report.md` execution evidence / EAL | new public command, new persistence, or scope wider than AC | S02 reviewer-ready before S03 |
+| S03 | qa-reviewer or dev-coder | S02 output, fixtures, validation report contract | `tests/**`, this Issue `artifacts/**`, this Issue `report.md`; source fixes only if failing test reveals in-scope defect | unrelated refactor, broad fixture rewrite, `.assurance.json` mutation, self-review pass claim | Issue AC-005〜AC-007 and negative fixtures are covered | normal fixture, negative fixture, `spec-dock validate`, `git diff --check`, focused pytest or documented no-op | fail-closed behavior, validation status taxonomy, no canonical overwrite, no diagnostic leakage | missing negative fixture, ambiguous validation status, test requires broader design | test output, blocked/stale/rejected/deferred evidence, defect notes | Issue `report.md` Closure Evidence Ledger | new failure mode not covered by design | S03 closed before S90 |
 | S90 | main orchestrator / doc-writer | S01〜S03 evidence, Epic docs, workflow docs if touched | this Issue docs/report, Epic report; `spec-dock/docs/**` only for direct contradiction | broad docs cleanup, template changes unrelated to this Issue, historical ledger deletion | docs impact and adoption ledger are resolved | docs-only inspection; `rg` for direct contradictions; `spec-dock validate` | report consistency, EAL/SID/closure integrity | unresolved contradiction or required docs update | docs impact decision, EAL/SID updates or no-op rationale | Issue `report.md`, Epic `report.md` when needed | docs impact changes canonical workflow | S90 closed before S99 |
 | S99 | main orchestrator + fresh reviewers | all closure evidence, final diff, reviewer results | this Issue `report.md`, Epic report for summary; bounded fixes only in previously allowed paths | new behavior implementation, PR creation, unrelated cleanup | all required closure ids pass or approved no-op | `spec-dock validate`, `git diff --check`, focused tests from S02/S03, fresh `spec-reviewer` result | final readiness, P0/P1 blocker absence, residual risk clarity | any P0/P1 finding, stale reviewer, missing closure evidence | final gate result, reviewer status, remaining risks | Issue `report.md` Final Gate / Closure Evidence Ledger | reviewer requires plan/design change | Issue completion-ready only after S99 |
 
@@ -108,10 +108,10 @@ ID: "iss-00286"
   - 関連 closure id: `tc-002`
 
 - `tc-s03-00286-001` acceptance: adoption-map を EAL 候補へ変換する
-  - 前提: adoption-map に source artifact、target doc、adoption_status、reflected_to 候補がある。
+  - 前提: adoption-map に source artifact、target doc、adoption_status、required local validation がある。
   - 操作: adoption-map 引き渡し確認を実行し、EAL candidate row に必要な field を確認する。
-  - 期待結果: target、evidence、adoption_status、review requirement が EAL 候補として出る。
-  - 失敗検出: adoption-map が adopted と self-claim する、または target / evidence が欠ける回帰を検出する。
+  - 期待結果: target、evidence、adoption_status、review requirement が EAL 候補として出て、`adoption_status` は常に `unreviewed` である。
+  - 失敗検出: adoption-map が adopted と self-claim する、target / evidence が欠ける、または execution status と adoption status が混ざる回帰を検出する。
   - 検証方法: validation report、EAL candidate inspection、Issue `report.md` Closure Evidence Ledger。
   - 関連 closure id: `tc-003`
 
@@ -121,6 +121,30 @@ ID: "iss-00286"
   - 期待結果: status は blocked / rejected になり、正本更新候補として扱わない。
   - 失敗検出: ChatGPT generated content が local adoption review なしに canonical update として扱われる回帰を検出する。
   - 検証方法: negative fixture report と `git diff --name-only`。
+  - 関連 closure id: `tc-003`
+
+- `tc-s03-00286-003` negative: non-pass review input は staged artifact を作らない
+  - 前提: `validation-report.json.status` が `fail` / `blocked` / `stale` / `rejected` / `deferred` のいずれかである。
+  - 操作: staging renderer を実行する。
+  - 期待結果: status は入力 review status に対応し、`staged-artifacts/`、`dry-run-diff.json`、`adoption/eal-candidates.json` は作られない。
+  - 失敗検出: safe review を通っていない pack が staged artifact 化される回帰を検出する。
+  - 検証方法: parametrized focused test と output directory inspection。
+  - 関連 closure id: `tc-003`
+
+- `tc-s03-00286-004` negative: diagnostics は unsafe path / secret / raw transcript を漏えいしない
+  - 前提: adoption-map、candidate text、output path に host absolute path、secret-looking string、raw transcript marker が含まれる。
+  - 操作: staging renderer を実行する。
+  - 期待結果: status は `rejected` または `blocked` になり、CLI stdout/stderr、`staging-report.json`、`staging-summary.md` に raw unsafe value が出ず、`staged-artifacts/`、candidate artifact、`dry-run-diff.json`、`adoption/eal-candidates.json` は作られない。
+  - 失敗検出: 診断や summary から host-local path、secret、raw transcript が漏れる回帰、または unsafe content が staged artifact 化される回帰を検出する。
+  - 検証方法: focused negative test と artifact inspection。
+  - 関連 closure id: `tc-003`
+
+- `tc-s03-00286-005` negative: output directory ownership と cleanup が安全である
+  - 前提: empty dir、stage-owned dir、unowned non-empty dir、偽 marker dir がある。
+  - 操作: staging renderer を実行する。
+  - 期待結果: empty / stage-owned dir は利用でき、unowned non-empty / 偽 marker dir は user file を保持したまま `blocked` になる。
+  - 失敗検出: user file を削除する、または unowned output dir へ staged artifact を混入する回帰を検出する。
+  - 検証方法: focused output ownership test。
   - 関連 closure id: `tc-003`
 
 - `tc-s90-00286-001` inspect: staging と EAL の表現を docs/report で揃える

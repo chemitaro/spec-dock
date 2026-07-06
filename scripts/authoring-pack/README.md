@@ -9,6 +9,7 @@ The helpers in this directory are not SpecDock runtime commands and are not ship
 - Observe repository ref, source hashes, and local assurance state before prompting ChatGPT.
 - Generate a prompt pack only when preflight status is `pass`.
 - Review a returned ChatGPT ZIP or an already isolated tree before any local adoption work.
+- Stage a passing reviewed tree into dry-run diffs, fixed-name staged artifacts, and unreviewed EAL candidates.
 - Keep ChatGPT output as `authority: evidence_only`.
 - Keep `authorized_profile` controlled by local assurance, not ChatGPT.
 
@@ -32,4 +33,12 @@ python scripts/authoring-pack/review_chatgpt_authoring_pack.py \
   --input /tmp/specdock-authoring-pack/result.zip \
   --preflight /tmp/specdock-authoring-pack/iss-00284-prompt-pack/preflight.json \
   --output-dir /tmp/specdock-authoring-pack/iss-00285-review
+```
+
+```bash
+python scripts/authoring-pack/stage_chatgpt_authoring_pack.py \
+  --review-report /tmp/specdock-authoring-pack/iss-00285-review/validation-report.json \
+  --pack-tree /tmp/specdock-authoring-pack/iss-00285-extract/specdock-authoring-pack \
+  --issue-dir spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00286-implement-authoring-pack-diff-and-staged-artifact-rendering \
+  --output-dir /tmp/specdock-authoring-pack/iss-00286-stage
 ```

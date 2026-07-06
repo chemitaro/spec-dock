@@ -3,7 +3,7 @@
 ID: "iss-00293"
 タイトル: "最終品質ゲートとマージ可能な Pull Request を作成する"
 関連GitHub: ["#293"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 親: ["epic-00283", "init-local-00003"]

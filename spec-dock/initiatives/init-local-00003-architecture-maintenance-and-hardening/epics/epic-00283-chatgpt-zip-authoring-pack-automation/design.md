@@ -3,7 +3,7 @@
 ID: "epic-00283"
 タイトル: "ChatGPT ZIP 仕様作成パック自動化"
 関連GitHub: ["#283"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 依存: ["requirement.md"]
