@@ -30,7 +30,9 @@ local assurance が決めた選択済みプロファイル、テンプレート�
 
 - local assurance が決めた選択済みプロファイル、テンプレートハッシュ、セクション一覧と、ChatGPT の section fill を照合する。
 - 親 Epic の権威境界を守り、ChatGPT 出力を証跡として扱う。
-- 期待する成果物: profile-resolution validator、template hash validator、section-map validator、missing-section-report validator。
+- 期待する成果物: selected skeleton fill validator、profile-resolution validator、template hash validator、section-map validator、missing-section-report validator。
+- local selected skeleton manifest を唯一の selected skeleton authority とし、candidate の target metadata と照合する。
+- ChatGPT の `profile_suggestion` は advisory evidence として report に残せるが、`authorized_profile` の決定や変更には使わない。
 - ローカル検証、採用判断、fresh reviewer gate を後続条件として残す。
 
 ## 対象外
@@ -89,16 +91,30 @@ ChatGPT の推奨が authorized profile と誤認されるリスクを遮断す�
 ### AC-005: authorized_profile を ChatGPT 推奨で上書きしない
 
 - 前提: この Issue の成果物または fixture が存在する。
-- 操作: `.assurance.json` と ChatGPT profile recommendation が異なる fixture を検査する。
-- 期待結果: `.assurance.json` は変更されず、ChatGPT 推奨は advisory evidence に留まる。
+- 操作: `.assurance.json` と ChatGPT `profile_suggestion` が異なる fixture を検査する。
+- 期待結果: `.assurance.json` は変更されず、ChatGPT 推奨は advisory evidence に留まる。candidate の `target.profile` が local `authorized_profile` と異なる場合は `stale` として止まる。
 - 観測点: validation report、staged artifact、または Issue report。
 
 ### AC-006: section-map と skeleton hash を照合する
 
 - 前提: この Issue の成果物または fixture が存在する。
 - 操作: selected skeleton、section inventory、section-map、missing-section-report を持つ fixture を検査する。
-- 期待結果: 不一致がある section fill は adoption-ineligible になる。
+- 期待結果: `template_sha256`、`skeleton_sha256`、`section_inventory_sha256` が local selected skeleton manifest と一致する場合だけ section fill validation に進む。不一致は `stale`、allowed section 外の fill は `rejected`、required section 欠落は `fail` になる。
 - 観測点: validation report、staged artifact、または Issue report。
+
+### AC-007: 検証 report は採用可否を section 単位で説明できる
+
+- 前提: selected skeleton fill validator の output が存在する。
+- 操作: `selected-skeleton-fill-validation-report.json` と summary を確認する。
+- 期待結果: `eligible_section_ids`、`missing_section_ids`、`extra_section_ids`、section body の unsafe claim 検査結果、`canonical_written=false`、`assurance_mutated=false` を確認できる。
+- 観測点: validation report、summary、Issue report。
+
+### AC-008: validator は正本と assurance を直接変更しない
+
+- 前提: `.assurance.json` と canonical docs の bytes を記録する。
+- 操作: selected skeleton fill validator を実行する。
+- 期待結果: `.assurance.json`、`requirement.md`、`design.md`、`plan.md`、`report.md` は validator によって変更されない。
+- 観測点: focused test、git diff、validation report。
 
 
 ## 例外ケース
@@ -106,3 +122,4 @@ ChatGPT の推奨が authorized profile と誤認されるリスクを遮断す�
 - GitHub connector / ChatGPT / ZIP generation が使えない場合は blocked または skipped evidence とし、手動 authoring path へ戻る。
 - source hash mismatch または stale_if hit は regeneration / reconciliation 対象にする。
 - 危険な権威表現が混入した場合は local validation で止める。
+- optional section 欠落は warning として report に残す。required section 欠落は成功扱いにしない。

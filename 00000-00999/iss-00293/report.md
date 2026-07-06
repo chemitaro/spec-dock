@@ -34,7 +34,7 @@ ID: "iss-00293"
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | adopted | Epic plan / user workflow decision | `requirement.md`; `design.md`; `plan.md`; `report.md` | `iss-00293` は final quality gate / PR delivery / merge preparation を集約する Issue として必要である。 | Epic `plan.md`; this Issue `requirement.md`; `design.md`; `plan.md` | fresh `spec-reviewer` review |
+| EAL-001 | adopted | Epic plan / user workflow decision | `requirement.md`; `design.md`; `plan.md`; `report.md` | `iss-00293` は final quality gate / PR delivery / merge preparation を集約する Issue として必要である。 | Epic `plan.md`; this Issue `requirement.md`; `design.md`; `plan.md` | execute approved plan |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate）
 
