@@ -3,7 +3,7 @@
 ID: "iss-00286"
 タイトル: "仕様作成パックの差分表示と段階配置を実装する"
 関連GitHub: ["#286"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 親: ["epic-00283", "init-local-00003"]
@@ -86,19 +86,26 @@ ZIP 内容が正本ファイルを直接上書きするリスクを遮断する�
 - 期待結果: reviewer が local adoption 可否を判断する観測点を持つ。
 - 観測点: candidate report evidence。
 
-### AC-005: 正本を直接上書きしない
+### AC-005: pass review result だけを staging でき、正本を直接上書きしない
 
-- 前提: この Issue の成果物または fixture が存在する。
-- 操作: valid ZIP fixture を stage する。
-- 期待結果: canonical `requirement.md` / `design.md` / `plan.md` は直接変更されず、dry-run diff と staged artifact だけが出る。
-- 観測点: validation report、staged artifact、または Issue report。
+- 前提: `review_chatgpt_authoring_pack.py` が出した `validation-report.json` と隔離済み `specdock-authoring-pack/` tree が存在する。
+- 操作: `validation-report.json.status == "pass"` の場合だけ staging renderer を実行する。
+- 期待結果: canonical `requirement.md` / `design.md` / `plan.md` は直接変更されず、output directory 配下の `staging-report.json`、`staging-summary.md`、`dry-run-diff.*`、`diffs/*`、`staged-artifacts/*`、`adoption/eal-candidates.json` だけが出る。
+- 観測点: staging report、dry-run diff、staged artifact、canonical docs の byte snapshot。
 
-### AC-006: adoption-map を EAL 候補へ変換できる
+### AC-006: adoption-map を unreviewed EAL 候補へ変換できる
 
-- 前提: この Issue の成果物または fixture が存在する。
-- 操作: adoption-map を含む fixture を処理する。
-- 期待結果: claim ごとの adopted / rejected / stale / blocked 候補を report へ引き渡せる。
-- 観測点: validation report、staged artifact、または Issue report。
+- 前提: pass review 済み pack に `adoption/adoption-map.json` が含まれる。
+- 操作: staging renderer が adoption-map item を EAL candidate row に変換する。
+- 期待結果: 各 candidate row の `adoption_status` は常に `unreviewed` であり、`adopted` / `rejected` / `stale` / `blocked` は採用済み状態として出力されない。
+- 観測点: `adoption/eal-candidates.json`、`staging-report.json`、negative fixture report。
+
+### AC-007: 診断と staged surface は漏えいを防ぐ
+
+- 前提: pack metadata、adoption-map、candidate text、output path に host absolute path、secret-looking text、raw transcript marker、unsafe path string が混入する。
+- 操作: staging renderer を実行する。
+- 期待結果: diagnostics / summary / CLI stdout に host absolute path、secret、raw transcript、unsafe path string を出さず、unsafe content は redaction して staged artifact 化するのではなく staging を拒否する。
+- 観測点: CLI stdout/stderr、`staging-report.json`、`staging-summary.md`、staged artifact の不存在。
 
 
 ## 例外ケース

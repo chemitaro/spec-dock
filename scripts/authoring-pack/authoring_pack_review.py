@@ -517,6 +517,7 @@ def _validate_pack_files(
         )
 
     checks.extend(_checks("authoring-pack-review", "pass"))
+    pack_digest = _pack_content_digest(files)
     return _base_result(
         "pass",
         generated_at,
@@ -526,6 +527,7 @@ def _validate_pack_files(
         checks=checks,
         preflight=preflight,
         entries=entries,
+        pack_digest=pack_digest,
         sources=_source_snapshot(parsed_json[f"{EXPECTED_ROOT}source-manifest.json"]),
     )
 
@@ -751,6 +753,7 @@ def _base_result(
     checks: list[dict[str, str]] | None = None,
     preflight: dict[str, Any] | None = None,
     entries: list[dict[str, Any]] | None = None,
+    pack_digest: dict[str, Any] | None = None,
     sources: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     return {
@@ -766,6 +769,7 @@ def _base_result(
         },
         "preflight": _preflight_snapshot(preflight or {}),
         "entries": entries or [],
+        "pack_digest": pack_digest or {},
         "checks": checks or [],
         "errors": _safe_diagnostic_value(errors or []),
         "warnings": _safe_diagnostic_value(warnings or []),
@@ -945,6 +949,20 @@ def _source_snapshot(source_manifest: dict[str, Any]) -> list[dict[str, Any]]:
             "role": _safe_diagnostic_value(source.get("role")),
         })
     return sources
+
+
+def _pack_content_digest(files: dict[str, str]) -> dict[str, Any]:
+    digest = hashlib.sha256()
+    for path in sorted(files):
+        digest.update(path.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(files[path].encode("utf-8"))
+        digest.update(b"\0")
+    return {
+        "algorithm": "sha256",
+        "content_sha256": digest.hexdigest(),
+        "file_count": len(files),
+    }
 
 
 def _preflight_snapshot(preflight: dict[str, Any]) -> dict[str, Any]:

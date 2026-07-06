@@ -2,7 +2,7 @@
 種別: レポート（Epic）
 ID: "epic-00283"
 タイトル: "ChatGPT ZIP 仕様作成パック自動化"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -22,7 +22,7 @@ ID: "epic-00283"
   - local assurance は全 Issue `standard` / `provisional` であり、ChatGPT 推奨や Epic 側のリスク判断で `.assurance.json` / `authorized_profile` を上書きしない。strict 推奨 Issue には strict 相当の追加 obligation を Issue plan に記録済み。
   - 実装と dogfood scripts は未着手。この Epic report は spec authoring / planning package の現状を記録する。
 - 次のマイルストーン:
-  - 更新後スコープで fresh `spec-reviewer` gate を通し、`iss-00284`〜`iss-00293` を後続 Issue execution-ready に向けた reviewable planning package として扱えるか確認する。
+  - fresh `spec-reviewer` gate `019f3999-911a-7381-8155-3cda5fcf3403` が pass し、`iss-00284`〜`iss-00293` を後続 Issue execution-ready に向けた reviewable planning package として扱える状態になった。
 - ブロッカー:
   - 現時点の Epic package 全体には仕様 authoring を止める blocker はない。
   - `iss-00284` の current planning refresh に対する fresh `spec-reviewer` gate は別途 Issue report に記録する。過去の Epic/package review pass は current `iss-00284` execution-ready pass ではない。
@@ -44,21 +44,23 @@ ID: "epic-00283"
 | EAL-008c | 採用（`adopted`） | Issue-local draft artifacts | `issues/iss-00284-*`〜`issues/iss-00292-*` の canonical `requirement.md` / `design.md` / `plan.md` / `report.md` | Issue-local draft artifacts は正本ではない。main orchestrator が各 Issue の scope、non-scope、入出力、失敗時設計、検証、reviewer obligation を確認し、採用した内容だけを canonical Issue docs へ再記述した。 | `issues/iss-00284-*`〜`issues/iss-00292-*` の canonical docs と report | fresh `spec-reviewer` gate で確認する |
 | EAL-009 | 採用（`adopted`） | user workflow decision | `plan.md` / `issues/iss-00293-*` | 個別 Issue ごとに PR を作成せず、Issue 完了後に `issue finish` して次 Issue を `issue start` するリレー実行方針を採用した。最終 Issue `iss-00293` が Epic 単位の品質ゲート、manual test evidence、PR 作成、review / CI 修正、mergeable 確認を担当する。 | user instruction 2026-07-07; `plan.md`; `issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/*` | `iss-00293` 実行時に最終証跡を記録する |
 
+| EAL-010 | `adopted` | ChatGPT Use / GPT-5.5 Pro Extended readiness review | Epic / Issue specs | P1 findings を修正対象として採用した。ChatGPT output は reviewer pass ではなく、canonical docs の更新 input として扱う。 | `artifacts/20260706t164600z-research-chatgpt-authoring-pack-readiness-review.md` | 修正後に fresh `spec-reviewer` review |
+
 ## 目的整合台帳（Objective Alignment Ledger）
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | `requirement.md` は ChatGPT ZIP authoring pack を evidence-only delivery として扱い、SpecDock local authority を維持することを主目的にした。 | dogfood-only script、future runtime promotion、Issue seeds を副次要件として分離した。 | 低。reviewer gate replacement / shipped runtime 化を v1 scope 外に明記した。 | passed（fresh `spec-reviewer` re-review, agent `019f383f-7de2-7da3-8f52-98258c6c1209`） |
+| OAL-001 | `requirement.md` は ChatGPT ZIP authoring pack を evidence-only delivery として扱い、SpecDock local authority を維持することを主目的にした。 | dogfood-only script、future runtime promotion、Issue seeds を副次要件として分離した。 | 低。reviewer gate replacement / shipped runtime 化を v1 scope 外に明記した。 | passed: fresh `spec-reviewer` 019f3999-911a-7381-8155-3cda5fcf3403 |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate）
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | Parent initiative docs、workflow docs、`epic-00283/artifacts/`、ChatGPT Use manual dogfood output、ZIP authoring pack dogfood output、Issue-local draft artifacts、`.assurance.json` | Blocking question: none。Non-blocking design questions は raw ZIP storage、runtime promotion threshold、profile mismatch salvage、Strict/Critical specialist evidence path。 | EAL-001〜EAL-008c を採用 / 部分採用し、Epic `requirement.md` と Issue canonical `requirement.md` へ再記述した。 | passed（fresh `spec-reviewer` re-review, agent `019f383f-7de2-7da3-8f52-98258c6c1209`） | いいえ | 後続 Issue execution-ready 確認へ進める |
-| design-epic | ZIP authoring pack design draft、naming proposal、workflow docs、requirement seeds、local Issue creation result | Blocking question: none。provider detail は human-facing surface に出さない。 | EAL-008a を採用し、Epic `design.md` へ control plane / data plane、ZIP lifecycle、profile boundary、failure design、test strategy を再記述した。 | passed（fresh `spec-reviewer` re-review, agent `019f383f-7de2-7da3-8f52-98258c6c1209`） | いいえ | 後続 Issue execution-ready 確認へ進める |
-| design-issues | Issue-local draft designs、Issue canonical requirements、Epic readiness contract | Blocking question: none。draft artifact は証跡専用であり正本ではない。 | EAL-008c を採用し、`iss-00284`〜`iss-00292` の canonical `design.md` へ scope、non-scope、入出力、失敗時設計、検証観点を再記述した。 | passed（fresh `spec-reviewer` re-review, agent `019f383f-7de2-7da3-8f52-98258c6c1209`） | いいえ | 後続 Issue execution-ready 確認へ進める |
-| plan-epic | ZIP authoring pack plan draft、Issue candidate drafts、Issue creation result、Issue-local draft artifact path index、Issue readiness contract | Blocking question: none。local assurance profile は現行 classifier で全 Issue `standard` / `provisional`。strict 推奨 Issue は `authorized_profile` を上書きせず strict 相当 obligation を追加する。 | EAL-008a / EAL-009 を採用し、Epic `plan.md` へ 10 Issue slicing、dependency order、dogfood scenarios、handoff path index、Issue readiness contract、`iss-00293` の最終品質ゲートを再記述した。 | passed（fresh `spec-reviewer` re-review, agent `019f383f-7de2-7da3-8f52-98258c6c1209`） | いいえ | 後続 Issue execution-ready 確認へ進める |
-| plan-issues | Issue-local draft plans、Issue canonical requirements / designs、Epic strict 相当 obligation | Blocking question: none。ChatGPT output は reviewer pass claim に使わない。 | EAL-008c を採用し、`iss-00284`〜`iss-00292` の canonical `plan.md` へ実装ステップ、検証計画、完了条件、Spec-Locked Closure Index、Assurance / reviewer obligation を再記述した。 | passed（fresh `spec-reviewer` re-review, agent `019f383f-7de2-7da3-8f52-98258c6c1209`） | いいえ | 後続 Issue execution-ready 確認へ進める |
+| requirement | Parent initiative docs、workflow docs、`epic-00283/artifacts/`、ChatGPT Use manual dogfood output、ZIP authoring pack dogfood output、Issue-local draft artifacts、`.assurance.json` | Blocking question: none。Non-blocking design questions は raw ZIP storage、runtime promotion threshold、profile mismatch salvage、Strict/Critical specialist evidence path。 | EAL-001〜EAL-008c を採用 / 部分採用し、Epic `requirement.md` と Issue canonical `requirement.md` へ再記述した。 | passed: fresh `spec-reviewer` 019f3999-911a-7381-8155-3cda5fcf3403 | いいえ | 後続 Issue execution-ready 確認へ進める |
+| design-epic | ZIP authoring pack design draft、naming proposal、workflow docs、requirement seeds、local Issue creation result | Blocking question: none。provider detail は human-facing surface に出さない。 | EAL-008a を採用し、Epic `design.md` へ control plane / data plane、ZIP lifecycle、profile boundary、failure design、test strategy を再記述した。 | passed: fresh `spec-reviewer` 019f3999-911a-7381-8155-3cda5fcf3403 | いいえ | 後続 Issue execution-ready 確認へ進める |
+| design-issues | Issue-local draft designs、Issue canonical requirements、Epic readiness contract | Blocking question: none。draft artifact は証跡専用であり正本ではない。 | EAL-008c を採用し、`iss-00284`〜`iss-00292` の canonical `design.md` へ scope、non-scope、入出力、失敗時設計、検証観点を再記述した。 | passed: fresh `spec-reviewer` 019f3999-911a-7381-8155-3cda5fcf3403 | いいえ | 後続 Issue execution-ready 確認へ進める |
+| plan-epic | ZIP authoring pack plan draft、Issue candidate drafts、Issue creation result、Issue-local draft artifact path index、Issue readiness contract | Blocking question: none。local assurance profile は現行 classifier で全 Issue `standard` / `provisional`。strict 推奨 Issue は `authorized_profile` を上書きせず strict 相当 obligation を追加する。 | EAL-008a / EAL-009 を採用し、Epic `plan.md` へ 10 Issue slicing、dependency order、dogfood scenarios、handoff path index、Issue readiness contract、`iss-00293` の最終品質ゲートを再記述した。 | passed: fresh `spec-reviewer` 019f3999-911a-7381-8155-3cda5fcf3403 | いいえ | 後続 Issue execution-ready 確認へ進める |
+| plan-issues | Issue-local draft plans、Issue canonical requirements / designs、Epic strict 相当 obligation | Blocking question: none。ChatGPT output は reviewer pass claim に使わない。 | EAL-008c を採用し、`iss-00284`〜`iss-00292` の canonical `plan.md` へ実装ステップ、検証計画、完了条件、Spec-Locked Closure Index、Assurance / reviewer obligation を再記述した。 | passed: fresh `spec-reviewer` 019f3999-911a-7381-8155-3cda5fcf3403 | いいえ | 後続 Issue execution-ready 確認へ進める |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence）
 
@@ -77,15 +79,15 @@ ID: "epic-00283"
 
 | ID | reviewer verdict | finding | correction | status |
 |---|---|---|---|---|
-| SR-20260707-001 | failed / P1 -> passed | Issue-local draft artifact に delegated draft provenance fields が不足していた。 | 27 個の `*from-authoring-pack.md` に provenance / adoption metadata を追加した。 | fixed in prior review cycle |
-| SR-20260707-002 | failed / P1 -> passed | strict 推奨 Issue と local `authorized_profile=standard` の関係が不明確だった。 | Epic `plan.md` と各 Issue `plan.md` に、local assurance は上書きせず strict 相当 obligation を追加する方針を明記した。 | fixed |
-| SR-20260707-003 | failed / P1 -> passed | 各 Issue の AC が共通 trace 確認に偏り、成果物固有の検証条件が不足していた。 | 9 Issue の canonical `requirement.md` と draft requirement artifact に、成果物固有の AC-005 / AC-006 を追加した。 | fixed in prior review cycle |
-| SR-20260707-004 | failed / P1 -> passed | C07 の profile mismatch probe が C04 / `iss-00287` に依存することが Epic plan の依存グラフに反映されていなかった。 | `plan.md` の依存グラフに `C04 -> C07 -> C09` を追加した。 | fixed in prior review cycle |
+| SR-20260707-001 | failed / P1 -> fixed | Issue-local draft artifact に delegated draft provenance fields が不足していた。 | 27 個の `*from-authoring-pack.md` に provenance / adoption metadata を追加した。 | fixed in prior review cycle |
+| SR-20260707-002 | failed / P1 -> fixed | strict 推奨 Issue と local `authorized_profile=standard` の関係が不明確だった。 | Epic `plan.md` と各 Issue `plan.md` に、local assurance は上書きせず strict 相当 obligation を追加する方針を明記した。 | fixed |
+| SR-20260707-003 | failed / P1 -> fixed | 各 Issue の AC が共通 trace 確認に偏り、成果物固有の検証条件が不足していた。 | 9 Issue の canonical `requirement.md` と draft requirement artifact に、成果物固有の AC-005 / AC-006 を追加した。 | fixed in prior review cycle |
+| SR-20260707-004 | failed / P1 -> fixed | C07 の profile mismatch probe が C04 / `iss-00287` に依存することが Epic plan の依存グラフに反映されていなかった。 | `plan.md` の依存グラフに `C04 -> C07 -> C09` を追加した。 | fixed in prior review cycle |
 | SR-20260707-005 | chatgpt-use review -> fixed | Child Issue canonical `design.md` / `plan.md` が未具体化のままだと、current request の spec-reviewer readiness に不足する。 | `iss-00284`〜`iss-00292` の canonical `design.md` / `plan.md` / `report.md` を Issue-local draft artifacts から main orchestrator が採否判断した内容として作成した。 | fixed; current `iss-00284` post-fix re-review passed（agent `019f387a-e7c2-73b3-ae10-89d8dd487cfb`） |
 | SR-20260707-006 | spec-reviewer failed / P1 -> fixed | Issue reports と Epic report に adopted-vs-candidate contradiction が残っていた。 | EAL-008c、Spec Authoring Gate、Issue EAL / SID を採用済み状態に統一した。 | fixed; current `iss-00284` post-fix re-review passed（agent `019f387a-e7c2-73b3-ae10-89d8dd487cfb`） |
 | SR-20260707-007 | spec-reviewer failed / P1 -> fixed | Issue plans が memo 状態で、executable closure contract が不足していた。 | `iss-00284`〜`iss-00293` の `plan.md` に canonical implementation plan、Spec-Locked Closure Index、S90、S99、Final Exit Contract を追加した。 | fixed; current `iss-00284` post-fix re-review passed（agent `019f387a-e7c2-73b3-ae10-89d8dd487cfb`） |
 | SR-20260707-008 | spec-reviewer failed / P2 -> fixed | ZIP evidence artifact に host-local absolute path が残っていた。 | research artifact 内の ChatGPT generated ZIP path を redacted evidence reference へ置換し、`zip_sha256` を正本証跡として使う方針へ寄せた。 | fixed; current `iss-00284` post-fix re-review passed（agent `019f387a-e7c2-73b3-ae10-89d8dd487cfb`） |
-| SR-20260707-009 | spec-reviewer failed / P1 -> passed | Epic `report.md` は Issue canonical docs を採用済みと記録していたが、Epic `plan.md` の Issue 引き渡し paragraph が「採用は後続 Issue planning」と古い状態を残していた。 | `plan.md` の Issue 引き渡し paragraph を、Issue-local draft artifacts は evidence-only、`iss-00284`〜`iss-00292` の canonical docs は main orchestrator が採否判断して再記述済み、後続 execution では fresh reviewer result と Issue report evidence を readiness 確認する、という current state へ更新した。 | fixed; fresh re-review passed（agent `019f383f-7de2-7da3-8f52-98258c6c1209`） |
+| SR-20260707-009 | ChatGPT readiness review / P1 -> fixed | Epic `report.md` は Issue canonical docs を採用済みと記録していたが、Epic `plan.md` の Issue 引き渡し paragraph が「採用は後続 Issue planning」と古い状態を残していた。 | `plan.md` の Issue 引き渡し paragraph を、Issue-local draft artifacts は evidence-only、`iss-00284`〜`iss-00292` の canonical docs は main orchestrator が採否判断して再記述済み、後続 execution では fresh reviewer result と Issue report evidence を readiness 確認する、という current state へ更新した。 | fixed; fixed; fresh `spec-reviewer` re-review passed |
 
 ## Relay execution correction ledger
 
@@ -99,7 +101,7 @@ ID: "epic-00283"
 
 | ID | decision | status | evidence | next_action |
 |---|---|---|---|---|
-| SID-epic-00283-001 | `iss-00284`〜`iss-00292` の Issue-local draft artifacts は evidence-only handoff であり、採否判断済みの内容だけを canonical Issue docs へ再記述する。 | accepted | EAL-008b / EAL-008c; Issue report SID entries | fresh `spec-reviewer` gate を実行する |
+| SID-epic-00283-001 | `iss-00284`〜`iss-00292` の Issue-local draft artifacts は evidence-only handoff であり、採否判断済みの内容だけを canonical Issue docs へ再記述する。 | accepted | EAL-008b / EAL-008c; Issue report SID entries | 後続 Issue execution-ready 確認へ進める |
 | SID-epic-00283-002 | 個別 Issue ごとに Pull Request を作成せず、実装完了後は `issue finish` して次 Issue を `issue start` するリレー実行とする。 | accepted | EAL-009; Epic `plan.md` リレー実行 / PR 方針; `iss-00293` specs | `iss-00284` から順番に実行し、PR は `iss-00293` に集約する |
 | SID-epic-00283-003 | `iss-00293` は Epic 最後の品質ゲート、manual test evidence、PR 作成、CI / review 修正、mergeable 確認を担当する。 | accepted | `iss-00293` requirement / design / plan / report; assurance classify result | `iss-00292` 完了後に開始する |
 
@@ -146,3 +148,7 @@ ID: "epic-00283"
 - `epic-00283` の作成時、runtime が GitHub issue `#283` を自動作成した。
 - ChatGPT ZIP dogfood run では、GitHub connector が `codex/chatgpt` 上の対象 file / expected commit を参照できた一方、branch head SHA の直接 observation は limited と記録された。local preflight では `HEAD == origin/codex/chatgpt == 209811098dc3067a94a3894cb89f9c6f5f6eae31` を確認済みだが、ZIP output 自体は引き続き advisory evidence として扱う。
 - ZIP の raw host-local path は canonical evidence として扱わない。research artifact には redacted reference と `zip_sha256` を残す。
+
+## Local Path Evidence Boundary
+
+- Historical local wrapper paths that remain in older research artifacts are host-local invocation evidence only. Canonical adoption evidence uses redacted references, repo-relative paths, and `zip_sha256`; host-local paths are not adoption targets or shipped documentation.

@@ -3,7 +3,7 @@
 ID: "iss-00293"
 タイトル: "最終品質ゲートとマージ可能な Pull Request を作成する"
 関連GitHub: ["#293"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 依存: ["requirement.md"]
@@ -44,3 +44,55 @@ iss-00293 quality gate -> manual tests -> PR -> review/CI fix loop -> mergeable
 5. 変更を push し、PR の状態を再確認する。
 
 修正が Epic スコープを超える場合は、この Issue で抱え込まず、残課題として明記する。
+
+
+## 依存関係分析
+
+- 上流入力: 親 Epic requirement / acceptance criteria、親 Epic の Issue readiness contract、Issue-local draft artifact の採否台帳。
+- 下流出力: Issue 固有成果物、検証証跡、report ledger
+- 実行順: Epic `plan.md` のリレー実行順と handoff prerequisite を前提にする。これは実行上の順序契約であり、現時点では `.meta.json.depends_on` の runtime dependency edge を直接更新しない。
+- 権威境界: ChatGPT output、ZIP、staged artifact は evidence-only であり、canonical `requirement.md` / `design.md` / `plan.md` / `report.md` への反映は main orchestrator の採否判断と reviewer gate を通す。
+- 実装境界: この Issue は最終品質ゲートと PR delivery を所有し、先行 Issue の実装 slice を再定義しない。欠陥修正は owning Issue の allowed paths に戻して bounded に扱う。
+
+## Module Dependency Diagram
+
+```plantuml
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+title iss-00293 module dependency sketch
+
+component "親 Epic
+readiness contract" as EpicContract
+component "Issue canonical docs
+requirement/design/plan" as IssueDocs
+component "scripts/authoring-pack
+dogfood-only scripts" as ManualPack
+component "Issue artifacts/report
+evidence ledger" as EvidenceLedger
+component "SpecDock canonical docs
+main orchestrator adoption" as CanonicalDocs
+
+EpicContract --> IssueDocs : scope / acceptance / relay order
+IssueDocs --> ManualPack : allowed dogfood work
+ManualPack --> EvidenceLedger : validation / staged output
+EvidenceLedger --> CanonicalDocs : adoption decision only
+@enduml
+```
+
+## ディレクトリ / ファイル変更計画
+
+```text
+spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/
+|-- artifacts/                            # final manual-test / PR evidence when needed
+`-- report.md                             # final gate evidence ledger
+spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/
+`-- report.md                             # Epic-level final quality gate summary
+# Bounded defect fixes stay in the prior owning Issue's allowed paths.
+```
+
+- 通常の許可パス: `iss-00293/report.md`, Epic `report.md`, PR / manual-test evidence artifacts; bounded fixes are limited to the allowed paths of the prior Issue that owns the defect。
+- `src/spec_dock/**` と `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/**` は v1 の通常許可 path ではない。配布 runtime へ昇格する場合は、`iss-00292` の判断材料、plan amendment、fresh reviewer gate を経て明示的に scope を拡張する。
+- generated ZIP / staged artifact は canonical docs を直接上書きしない。

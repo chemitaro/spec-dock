@@ -327,16 +327,16 @@ CLI exit code は次に固定する。
 `authoring_pack_review.py`:
 
 - `review_input(input_path, preflight_path, output_dir, input_kind, extract_dir=None) -> dict`
-- `review_zip(...) -> dict`
-- `review_tree(...) -> dict`
-- `inspect_zip_entries(...) -> list[EntryObservation]`
-- `normalize_pack_path(...) -> str`
-- `validate_root_structure(...) -> list[CheckResult]`
-- `validate_required_metadata(...) -> list[CheckResult]`
-- `validate_source_manifest(...) -> list[CheckResult]`
-- `scan_unsafe_claims(...) -> list[CheckResult]`
-- `sanitize_diagnostic_value(...) -> Any`
-- `aggregate_status(...) -> str`
+- `review_zip(zip_path) -> dict`
+- `review_tree(tree_path) -> dict`
+- `inspect_zip_entries(zip_path) -> list[EntryObservation]`
+- `normalize_pack_path(raw_path) -> str`
+- `validate_root_structure(entries) -> list[CheckResult]`
+- `validate_required_metadata(manifest) -> list[CheckResult]`
+- `validate_source_manifest(manifest) -> list[CheckResult]`
+- `scan_unsafe_claims(markdown_files) -> list[CheckResult]`
+- `sanitize_diagnostic_value(value) -> Any`
+- `aggregate_status(results) -> str`
 
 `review_chatgpt_authoring_pack.py`:
 
@@ -378,3 +378,63 @@ CLI exit code は次に固定する。
 - status taxonomy と親 Epic trace が崩れていないか。
 - dogfood-only helper が runtime command として見えないか。
 - ChatGPT output が reviewer pass / canonical adoption を claim できないか。
+
+
+## 依存関係分析
+
+- 上流入力: 親 Epic requirement / acceptance criteria、親 Epic の Issue readiness contract、Issue-local draft artifact の採否台帳。
+- 下流出力: Issue 固有成果物、検証証跡、report ledger
+- 実行順: Epic `plan.md` のリレー実行順と handoff prerequisite を前提にする。これは実行上の順序契約であり、現時点では `.meta.json.depends_on` の runtime dependency edge を直接更新しない。
+- 権威境界: ChatGPT output、ZIP、staged artifact は evidence-only であり、canonical `requirement.md` / `design.md` / `plan.md` / `report.md` への反映は main orchestrator の採否判断と reviewer gate を通す。
+- 実装境界: この Issue は runtime 昇格判断を行わず、`scripts/authoring-pack/`、`tests/fixtures/authoring_pack/`、`tests/manual_tests/` と scope-local evidence で dogfood behavior を閉じる。
+
+## Module Dependency Diagram
+
+```plantuml
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+title iss-00285 module dependency sketch
+
+component "親 Epic
+readiness contract" as EpicContract
+component "Issue canonical docs
+requirement/design/plan" as IssueDocs
+component "scripts/authoring-pack
+dogfood-only scripts" as ManualPack
+component "Issue artifacts/report
+evidence ledger" as EvidenceLedger
+component "SpecDock canonical docs
+main orchestrator adoption" as CanonicalDocs
+
+EpicContract --> IssueDocs : scope / acceptance / relay order
+IssueDocs --> ManualPack : allowed dogfood work
+ManualPack --> EvidenceLedger : validation / staged output
+EvidenceLedger --> CanonicalDocs : adoption decision only
+@enduml
+```
+
+## ディレクトリ / ファイル変更計画
+
+```text
+scripts/
+`-- authoring-pack/
+    |-- README.md                         # dogfood-only usage / boundary notes
+    |-- *.py                              # dogfood-only helpers
+    `-- reports/                          # generated summaries when needed
+tests/
+|-- fixtures/
+|   `-- authoring_pack/                   # valid / negative dogfood fixtures
+`-- manual_tests/                         # focused pytest for dogfood helpers
+spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00285-implement-safe-authoring-pack-review-and-schema-validation/
+|-- artifacts/                            # issue-local evidence only
+`-- report.md                             # observed evidence ledger
+tests/
+`-- test_authoring_pack_review.py            # focused regression tests when behavior is promoted in this Issue
+```
+
+- 通常の許可パス: `scripts/authoring-pack/**`, `tests/fixtures/authoring_pack/**`, `tests/manual_tests/**`, this Issue `artifacts/**`, this Issue `report.md`, `scripts/authoring-pack/README.md` when directly needed。
+- `src/spec_dock/**` と `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/**` は v1 の通常許可 path ではない。配布 runtime へ昇格する場合は、`iss-00292` の判断材料、plan amendment、fresh reviewer gate を経て明示的に scope を拡張する。
+- generated ZIP / staged artifact は canonical docs を直接上書きしない。
