@@ -70,22 +70,22 @@ Pull Request 作成、CI / review 指摘対応、manual test evidence、mergeabl
 
 ## Issue readiness contract
 
-`authorized_profile` の権威は各 Issue の `.assurance.json` / `assurance classify` にあります。現時点の local assurance は全 Issue `standard` / `provisional` です。これは ChatGPT 推奨や Epic 側のリスク判断によって上書きしません。
+`authorized_profile` の権威は各 Issue の `.assurance.json` / `assurance classify` にあります。現時点の local assurance は全 Issue `authorized_profile: standard` かつ `assurance status: provisional` です。これは ChatGPT 推奨や Epic 側のリスク判断によって上書きしません。
 
 一方で、ZIP 受け入れ、安全検査、差分・段階配置、プロファイル制御、選択済みスケルトン、不一致 probe に関わる Issue は、実行前の Issue planning で **strict 相当の追加 obligation** を満たす必要があります。これは `authorized_profile` を変更するものではなく、manual escalation として reviewer / specialist / failure-mode evidence を強める運用判断です。
 
-| Issue | local authorized_profile | 追加 obligation | 理由 |
-|---|---|---|---|
-| `iss-00284` | `standard` / `provisional` | strict 相当 | branch/ref/source/stale_if を固定する制御プレーン入口であり、以降の ZIP 生成の信頼性を左右するため。 |
-| `iss-00285` | `standard` / `provisional` | strict 相当 | 危険 ZIP の拒否と unsafe authority claim の検査を担うため。 |
-| `iss-00286` | `standard` / `provisional` | strict 相当 | 正本直接上書きを防ぎ、EAL へ採用候補を渡すため。 |
-| `iss-00287` | `standard` / `provisional` | strict 相当 | selected skeleton / profile authority を守るため。 |
-| `iss-00288` | `standard` / `provisional` | standard | candidate-only の dogfood であり、profile-specific canonical template を出さない範囲に限定するため。 |
-| `iss-00289` | `standard` / `provisional` | strict 相当 | 既存 Issue の selected-profile skeleton fill を扱い、canonical adoption と混同しやすいため。 |
-| `iss-00290` | `standard` / `provisional` | strict 相当 | stale / mismatch / unsafe claim を fail-closed にブロックするため。 |
-| `iss-00291` | `standard` / `provisional` | standard | 文書化と EAL 例が中心であり、配布ランタイムや正本採用を行わないため。 |
-| `iss-00292` | `standard` / `provisional` | standard | 指標評価と昇格判断材料の作成に留め、昇格自体は後続判断に残すため。 |
-| `iss-00293` | `standard` / `provisional` | strict 相当 | Epic 全体の品質ゲート、手動テスト、PR 作成、CI / review 修正、mergeable 確認を担当するため。 |
+| Issue | authorized_profile | assurance status | 追加 obligation | 理由 |
+|---|---|---|---|---|
+| `iss-00284` | `standard` | `provisional` | strict 相当 | branch/ref/source/stale_if を固定する制御プレーン入口であり、以降の ZIP 生成の信頼性を左右するため。 |
+| `iss-00285` | `standard` | `provisional` | strict 相当 | 危険 ZIP の拒否と unsafe authority claim の検査を担うため。 |
+| `iss-00286` | `standard` | `provisional` | strict 相当 | 正本直接上書きを防ぎ、EAL へ採用候補を渡すため。 |
+| `iss-00287` | `standard` | `provisional` | strict 相当 | selected skeleton / profile authority を守るため。 |
+| `iss-00288` | `standard` | `provisional` | standard | candidate-only の dogfood であり、profile-specific canonical template を出さない範囲に限定するため。 |
+| `iss-00289` | `standard` | `provisional` | strict 相当 | 既存 Issue の selected-profile skeleton fill を扱い、canonical adoption と混同しやすいため。 |
+| `iss-00290` | `standard` | `provisional` | strict 相当 | stale / mismatch / unsafe claim を fail-closed にブロックするため。 |
+| `iss-00291` | `standard` | `provisional` | standard | 文書化と EAL 例が中心であり、配布ランタイムや正本採用を行わないため。 |
+| `iss-00292` | `standard` | `provisional` | standard | 指標評価と昇格判断材料の作成に留め、昇格自体は後続判断に残すため。 |
+| `iss-00293` | `standard` | `provisional` | strict 相当 | Epic 全体の品質ゲート、手動テスト、PR 作成、CI / review 修正、mergeable 確認を担当するため。 |
 
 strict 相当の追加 obligation を持つ Issue は、Issue planning 時に specialist evidence または manual fallback evidence、failure-mode record、fresh `spec-reviewer` pass を `report.md` に残すまで execution-ready と扱いません。
 
@@ -229,56 +229,66 @@ strict 相当の追加 obligation を持つ Issue は、Issue planning 時に sp
 
 ## Issue 引き渡しパッケージのパス一覧
 
-この一覧は、ChatGPT 仕様作成パック由来のドラフト artifact を Issue-local `artifacts/` へ配置した結果である。各 draft は証跡専用の authoring evidence であり、正本ではない。`iss-00284`〜`iss-00292` の `design.md` / `plan.md` へ採用するかどうかは、後続の各 Issue planning で改めて判断し、fresh `spec-reviewer` gate と実装前 readiness 確認を通す。
+この一覧は、ChatGPT 仕様作成パック由来のドラフト artifact を Issue-local `artifacts/` へ配置した結果である。各 draft は証跡専用の authoring evidence であり、正本ではない。`iss-00284`〜`iss-00292` の canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は、main orchestrator が draft artifact を採否判断し、採用した内容だけを正本へ再記述済みである。後続 Issue execution では、これらの canonical docs と fresh `spec-reviewer` result、Issue report evidence を実装前 readiness として確認する。
 
 - `iss-00284` / GitHub `#284`: 仕様作成パックの事前確認とプロンプトパックを作る
   - `draft-requirement`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00284-build-authoring-pack-preflight-and-prompt-pack/artifacts/20260706t150659z-draft-requirement-draft-requirement-from-authoring-pack.md`
   - `draft-design`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00284-build-authoring-pack-preflight-and-prompt-pack/artifacts/20260706t151018z-draft-design-draft-design-from-authoring-pack.md`
   - `draft-plan`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00284-build-authoring-pack-preflight-and-prompt-pack/artifacts/20260706t151018z-01-draft-plan-draft-plan-from-authoring-pack.md`
-  - local_assurance_profile: `standard`
+  - authorized_profile: `standard`
+  - assurance_status: `provisional`
 - `iss-00285` / GitHub `#285`: 安全な仕様作成パック検査とスキーマ検証を実装する
   - `draft-requirement`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00285-implement-safe-authoring-pack-review-and-schema-validation/artifacts/20260706t151018z-draft-requirement-draft-requirement-from-authoring-pack.md`
   - `draft-design`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00285-implement-safe-authoring-pack-review-and-schema-validation/artifacts/20260706t151018z-01-draft-design-draft-design-from-authoring-pack.md`
   - `draft-plan`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00285-implement-safe-authoring-pack-review-and-schema-validation/artifacts/20260706t151019z-draft-plan-draft-plan-from-authoring-pack.md`
-  - local_assurance_profile: `standard`
+  - authorized_profile: `standard`
+  - assurance_status: `provisional`
 - `iss-00286` / GitHub `#286`: 仕様作成パックの差分表示と段階配置を実装する
   - `draft-requirement`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00286-implement-authoring-pack-diff-and-staged-artifact-rendering/artifacts/20260706t151019z-draft-requirement-draft-requirement-from-authoring-pack.md`
   - `draft-design`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00286-implement-authoring-pack-diff-and-staged-artifact-rendering/artifacts/20260706t151019z-01-draft-design-draft-design-from-authoring-pack.md`
   - `draft-plan`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00286-implement-authoring-pack-diff-and-staged-artifact-rendering/artifacts/20260706t151019z-02-draft-plan-draft-plan-from-authoring-pack.md`
-  - local_assurance_profile: `standard`
+  - authorized_profile: `standard`
+  - assurance_status: `provisional`
 - `iss-00287` / GitHub `#287`: プロファイル制御されたスケルトン記入検証を実装する
   - `draft-requirement`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00287-implement-profile-controlled-selected-skeleton-fill-validation/artifacts/20260706t151019z-draft-requirement-draft-requirement-from-authoring-pack.md`
   - `draft-design`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00287-implement-profile-controlled-selected-skeleton-fill-validation/artifacts/20260706t151019z-01-draft-design-draft-design-from-authoring-pack.md`
   - `draft-plan`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00287-implement-profile-controlled-selected-skeleton-fill-validation/artifacts/20260706t151019z-02-draft-plan-draft-plan-from-authoring-pack.md`
-  - local_assurance_profile: `standard`
+  - authorized_profile: `standard`
+  - assurance_status: `provisional`
 - `iss-00288` / GitHub `#288`: Epic から Issue 候補を作る候補専用パックをドッグフードする
   - `draft-requirement`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00288-dogfood-candidate-only-epic-to-issue-authoring-pack/artifacts/20260706t151020z-draft-requirement-draft-requirement-from-authoring-pack.md`
   - `draft-design`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00288-dogfood-candidate-only-epic-to-issue-authoring-pack/artifacts/20260706t151020z-01-draft-design-draft-design-from-authoring-pack.md`
   - `draft-plan`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00288-dogfood-candidate-only-epic-to-issue-authoring-pack/artifacts/20260706t151020z-02-draft-plan-draft-plan-from-authoring-pack.md`
-  - local_assurance_profile: `standard`
+  - authorized_profile: `standard`
+  - assurance_status: `provisional`
 - `iss-00289` / GitHub `#289`: 既存 Issue の選択済みプロファイル向けパックをドッグフードする
   - `draft-requirement`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00289-dogfood-existing-issue-selected-profile-authoring-pack/artifacts/20260706t151020z-draft-requirement-draft-requirement-from-authoring-pack.md`
   - `draft-design`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00289-dogfood-existing-issue-selected-profile-authoring-pack/artifacts/20260706t151020z-01-draft-design-draft-design-from-authoring-pack.md`
   - `draft-plan`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00289-dogfood-existing-issue-selected-profile-authoring-pack/artifacts/20260706t151020z-02-draft-plan-draft-plan-from-authoring-pack.md`
-  - local_assurance_profile: `standard`
+  - authorized_profile: `standard`
+  - assurance_status: `provisional`
 - `iss-00290` / GitHub `#290`: 不一致・期限切れパックをブロックできるか検証する
   - `draft-requirement`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00290-dogfood-authoring-pack-mismatch-and-stale-probe/artifacts/20260706t151020z-draft-requirement-draft-requirement-from-authoring-pack.md`
   - `draft-design`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00290-dogfood-authoring-pack-mismatch-and-stale-probe/artifacts/20260706t151021z-draft-design-draft-design-from-authoring-pack.md`
   - `draft-plan`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00290-dogfood-authoring-pack-mismatch-and-stale-probe/artifacts/20260706t151021z-01-draft-plan-draft-plan-from-authoring-pack.md`
-  - local_assurance_profile: `standard`
+  - authorized_profile: `standard`
+  - assurance_status: `provisional`
 - `iss-00291` / GitHub `#291`: 仕様作成パックのワークフローと採用台帳例を文書化する
   - `draft-requirement`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00291-document-authoring-pack-workflow-and-adoption-ledger-examples/artifacts/20260706t151021z-draft-requirement-draft-requirement-from-authoring-pack.md`
   - `draft-design`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00291-document-authoring-pack-workflow-and-adoption-ledger-examples/artifacts/20260706t151021z-01-draft-design-draft-design-from-authoring-pack.md`
   - `draft-plan`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00291-document-authoring-pack-workflow-and-adoption-ledger-examples/artifacts/20260706t151021z-02-draft-plan-draft-plan-from-authoring-pack.md`
-  - local_assurance_profile: `standard`
+  - authorized_profile: `standard`
+  - assurance_status: `provisional`
 - `iss-00292` / GitHub `#292`: ドッグフード指標とランタイム昇格基準を評価する
   - `draft-requirement`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/artifacts/20260706t151021z-draft-requirement-draft-requirement-from-authoring-pack.md`
   - `draft-design`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/artifacts/20260706t151021z-01-draft-design-draft-design-from-authoring-pack.md`
   - `draft-plan`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/artifacts/20260706t151022z-draft-plan-draft-plan-from-authoring-pack.md`
-  - local_assurance_profile: `standard`
+  - authorized_profile: `standard`
+  - assurance_status: `provisional`
 - `iss-00293` / GitHub `#293`: 最終品質ゲートとマージ可能な Pull Request を作成する
   - canonical requirement: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/requirement.md`
   - canonical design: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/design.md`
   - canonical plan: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/plan.md`
   - draft artifact: なし。この Issue は ChatGPT ZIP authoring pack 由来ではなく、Epic 実行方針の後続補正として追加した final gate Issue である。
-  - local_assurance_profile: `standard` / `provisional`
+  - authorized_profile: `standard`
+  - assurance_status: `provisional`

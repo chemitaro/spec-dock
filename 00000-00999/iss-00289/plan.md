@@ -83,14 +83,61 @@ ID: "iss-00289"
 
 ## 具体テストケース一覧
 
-| test id | step | kind | concrete case | expected result | evidence path |
-|---|---|---|---|---|---|
-| tc-001-a | S01 | inspect | 親 Epic trace、依存 Issue、local assurance を確認する | parent trace / dependency / `authorized_profile` が report に記録される | Issue `report.md` Closure Evidence Ledger |
-| tc-002-a | S02 | implementation/docs | Issue 固有成果物を作成し、generated ZIP / staged artifact が正本を直接上書きしないことを確認する | deliverable と no-overwrite evidence が残る | Issue `report.md`; staged artifact path |
-| tc-003-a | S03 | normal fixture | 正常系 fixture を実行する、または docs-only Issue では expected artifact inspection を行う | validation status が pass として記録される | validation report / Issue `report.md` |
-| tc-003-b | S03 | negative fixture | stale source、profile mismatch、unsafe authority claim、または Issue 固有の拒否条件を検証する | blocked / stale / rejected / deferred のいずれかで fail-closed になる | validation report / Issue `report.md` |
-| tc-004-a | S90 | docs impact | docs / report / EAL / SID に直接矛盾がないか確認する | update または approved no-op rationale が記録される | Issue `report.md`; Epic `report.md` when touched |
-| tc-005-a | S99 | final gate | `spec-dock validate`、`git diff --check`、focused tests、fresh `spec-reviewer` を確認する | P0/P1 blocker がない、または blocker と次アクションが明確 | Issue `report.md` Final Gate |
+- `tc-s01-00289-001` inspect: 既存 Issue の selected profile 前提を確認する
+  - 前提: 対象既存 Issue の `.assurance.json` と local composed skeleton がある。
+  - 操作: selected-profile ZIP fixture が local assurance で選択済みの profile だけを対象にすることを確認する。
+  - 期待結果: candidate-only generation ではなく selected-profile fill の dogfood であることが report に記録される。
+  - 失敗検出: Epic-to-Issue candidate pack と selected-profile pack の境界混同を検出する。
+  - 検証方法: docs-only inspection と Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-001`
+
+- `tc-s02-00289-001` acceptance: local assurance compose 済み skeleton だけを埋める
+  - 前提: selected-profile skeleton、profile validation report、ChatGPT fill candidate がある。
+  - 操作: selected-profile ZIP fixture を検証し、fill 対象が local composed skeleton に限定されるか確認する。
+  - 期待結果: selected profile と skeleton hash が一致する場合だけ section fill が review 対象になる。
+  - 失敗検出: ChatGPT が新しい skeleton や別 profile の body を生成する回帰を検出する。
+  - 検証方法: profile validation report、focused dogfood fixture inspection。
+  - 関連 closure id: `tc-002`
+
+- `tc-s02-00289-002` acceptance: missing section を report に出す
+  - 前提: 必須 section の一部が未記入の selected-profile ZIP fixture がある。
+  - 操作: profile validation report を生成する。
+  - 期待結果: missing section は pass として隠されず、reviewer が補完要否を判断できる。
+  - 失敗検出: 未記入 section が silent success になる回帰を検出する。
+  - 検証方法: validation report inspection と Issue `report.md` execution evidence。
+  - 関連 closure id: `tc-002`
+
+- `tc-s03-00289-001` acceptance: staged adoption dry run を確認する
+  - 前提: profile validation が pass した selected-profile ZIP fixture がある。
+  - 操作: 段階的採用 dry run を実行し、staged artifact、diff summary、adoption-map を確認する。
+  - 期待結果: canonical docs は直接上書きされず、reviewer が staged content を採否判断できる。
+  - 失敗検出: selected-profile fill が local review なしに正本反映される回帰を検出する。
+  - 検証方法: dry-run output、`git diff --name-only`、Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-003`
+
+- `tc-s03-00289-002` negative: profile mismatch / stale skeleton を block する
+  - 前提: profile mismatch または skeleton hash mismatch を含む selected-profile ZIP fixture がある。
+  - 操作: profile validation と staged adoption dry run を実行する。
+  - 期待結果: validation status は blocked / stale になり、staged adoption へ進めない。
+  - 失敗検出: 別 profile や古い skeleton から generated content が採用候補になる回帰を検出する。
+  - 検証方法: negative fixture validation report。
+  - 関連 closure id: `tc-003`
+
+- `tc-s90-00289-001` inspect: dogfood evidence と docs impact を確認する
+  - 前提: selected-profile dogfood の validation report と staged adoption dry run evidence がある。
+  - 操作: report / EAL / docs に selected-profile、staged-only、review-required の扱いが残っているか確認する。
+  - 期待結果: update または approved no-op rationale が記録される。
+  - 失敗検出: dogfood result を runtime promotion や canonical adoption と誤読できる記述を検出する。
+  - 検証方法: docs-only inspection と `rg`。
+  - 関連 closure id: `tc-004`
+
+- `tc-s99-00289-001` final-gate: 構造検証と fresh reviewer を通す
+  - 前提: S01〜S03 と S90 が closed または approved no-op である。
+  - 操作: `./spec-dock/scripts/spec-dock validate`、`git diff --check`、selected-profile dogfood focused tests、fresh `spec-reviewer` result を確認する。
+  - 期待結果: P0/P1 blocker がなく、残リスクまたは次アクションが Issue `report.md` Final Gate に記録される。
+  - 失敗検出: staged adoption dry run の no-overwrite evidence 欠落を検出する。
+  - 検証方法: command output、focused tests、reviewer result の report 記録。
+  - 関連 closure id: `tc-005`
 
 ### S90 ドキュメント影響解消
 

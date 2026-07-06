@@ -38,11 +38,11 @@ ID: "iss-00293"
 
 | closure id | step | purpose | maps to | required evidence | close condition | report destination |
 |---|---|---|---|---|---|---|
-| tc-001 | S01 | 先行 Issue 完了と scope isolation を確認する | AC-001 / AC-002 | `iss-00284`〜`iss-00292` report、`git status --short` | 先行 Issue の完了証跡と Epic 外混入なしを説明できる | `report.md` の Closure Evidence Ledger |
-| tc-002 | S02 | 構造検証と関連自動テストを実行する | AC-003 | `spec-dock validate`、`git diff --check`、関連 pytest | 実行結果が pass、または blocker と次アクションが明確 | `report.md` の実行証跡 |
-| tc-003 | S03 | Epic manual test matrix を実行する | AC-004 / AC-005 | manual test evidence、失敗時の修正 / 再検証記録 | preflight / safe review / staging / profile / dogfood / docs / metrics を確認済み | `report.md` の manual test evidence |
-| tc-004 | S04 | PR 作成、CI / review 修正、mergeable 確認を行う | AC-006 / AC-007 | PR URL、base/head、CI、review、mergeable status | PR が mergeable、または blocker と次アクションが明確 | `report.md` と Epic `report.md` |
-| tc-005 | S90 | docs impact と report ledger を解消する | AC-008 | Epic / Issue report 更新、docs impact no-op または更新 | final evidence が canonical reports に残っている | `report.md` の Docs Impact / EAL |
+| tc-001 | S01 | 先行 Issue 完了と scope isolation を確認する | AC-001 | `iss-00284`〜`iss-00292` report、`git status --short` | 先行 Issue の完了証跡と Epic 外混入なしを説明できる | `report.md` の Closure Evidence Ledger |
+| tc-002 | S02 | 構造検証と関連自動テストを実行する | AC-002 / AC-003 | `spec-dock validate`、`git diff --check`、関連 pytest | 実行結果が pass、または blocker と次アクションが明確 | `report.md` の実行証跡 |
+| tc-003 | S03 | Epic manual test matrix を実行する | AC-004 | manual test evidence、失敗時の修正 / 再検証記録 | preflight / safe review / staging / profile / dogfood / docs / metrics を確認済み | `report.md` の manual test evidence |
+| tc-004 | S04 | PR 作成、CI / review 修正、mergeable 確認を行う | AC-005 / AC-006 / AC-007 | PR URL、base/head、CI、review、mergeable status | PR が mergeable、または blocker と次アクションが明確 | `report.md` と Epic `report.md` |
+| tc-005 | S90 | docs impact と report ledger を解消する | AC-008 / AC-010 | Epic / Issue report 更新、docs impact no-op または更新 | final evidence が canonical reports に残っている | `report.md` の Docs Impact / EAL |
 | tc-006 | S99 | final QA / code / spec gate を閉じる | AC-009 | fresh reviewer results、再 push / 再検証結果 | P0/P1 blocker がない | `report.md` の Final Gate |
 
 ## ステップ別実行契約
@@ -79,22 +79,76 @@ ID: "iss-00293"
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | main orchestrator | Epic docs, `iss-00284`〜`iss-00292` reports, git status | inspect-only; `iss-00293/report.md`; Epic `report.md` summary | source edits, unrelated docs cleanup, PR creation before scope is clean | AC-001 / AC-002 | `git status --short`; prior Issue report inspection | prior closure, scope isolation | incomplete prior Issue, dirty unrelated change | prior Issue completion matrix | `iss-00293/report.md` Closure Evidence Ledger | prior Issue incomplete or scope changes | S01 closed before S02 |
 | S02 | qa-reviewer / main orchestrator | final diff, repo commands, prior Issue evidence | `iss-00293/report.md`; bounded fixes in prior allowed paths only if blocker found | broad refactor, unplanned features, `.assurance.json` mutation | AC-003 | `spec-dock validate`, `git diff --check`, relevant pytest | structural validity, regression risk | failing command or test without bounded fix path | command outputs and disposition | `iss-00293/report.md` execution evidence | new failure requiring design/plan amendment | S02 closed before S03 |
-| S03 | qa-reviewer / main orchestrator | Epic manual test matrix, outputs from S02 | manual evidence artifacts, `iss-00293/report.md`, Epic `report.md` | skipping required scenario, claiming unexecuted manual tests | AC-004 / AC-005 | manual test matrix; scenario-by-scenario evidence | preflight/safety/staging/profile/dogfood/docs/metrics coverage | missing scenario, ambiguous result | manual test evidence and defects | `iss-00293/report.md`; Epic `report.md` | new dogfood failure mode | S03 closed before S04 |
-| S04 | main orchestrator | PR branch, final diff, CI/review status | PR metadata/report updates; bounded fixes in prior allowed paths | unrelated GitHub changes, force-push/destructive actions, hiding CI/review failures | AC-006 / AC-007 | PR URL, base/head, CI, review, mergeable status | PR readiness, repair loop integrity | PR blocked, CI failure, review P0/P1 | PR URL and status ledger | `iss-00293/report.md`; Epic `report.md` | blocker outside Epic scope | S04 closed before S90 |
-| S90 | main orchestrator / doc-writer | S01〜S04 evidence, Epic report, Issue reports | Epic `report.md`, `iss-00293/report.md`, docs only for direct contradiction | broad docs cleanup, changing earlier Issue decisions without evidence | AC-008 | docs/report impact inspection; `spec-dock validate` | final ledger completeness | stale or contradictory report | docs impact decision and EAL updates | `iss-00293/report.md`; Epic `report.md` | canonical docs need amendment | S90 closed before S99 |
+| S03 | qa-reviewer / main orchestrator | Epic manual test matrix, outputs from S02 | manual evidence artifacts, `iss-00293/report.md`, Epic `report.md` | skipping required scenario, claiming unexecuted manual tests | AC-004 | manual test matrix; scenario-by-scenario evidence | preflight/safety/staging/profile/dogfood/docs/metrics coverage | missing scenario, ambiguous result | manual test evidence and defects | `iss-00293/report.md`; Epic `report.md` | new dogfood failure mode | S03 closed before S04 |
+| S04 | main orchestrator | PR branch, final diff, CI/review status | PR metadata/report updates; bounded fixes in prior allowed paths | unrelated GitHub changes, force-push/destructive actions, hiding CI/review failures | AC-005 / AC-006 / AC-007 | PR URL, base/head, CI, review, mergeable status | PR readiness, repair loop integrity | PR blocked, CI failure, review P0/P1 | PR URL and status ledger | `iss-00293/report.md`; Epic `report.md` | blocker outside Epic scope | S04 closed before S90 |
+| S90 | main orchestrator / doc-writer | S01〜S04 evidence, Epic report, Issue reports | Epic `report.md`, `iss-00293/report.md`, docs only for direct contradiction | broad docs cleanup, changing earlier Issue decisions without evidence | AC-008 / AC-010 | docs/report impact inspection; `spec-dock validate` | final ledger completeness | stale or contradictory report | docs impact decision and EAL updates | `iss-00293/report.md`; Epic `report.md` | canonical docs need amendment | S90 closed before S99 |
 | S99 | main orchestrator + fresh reviewers | all closure evidence, PR status, final diff | final reports; bounded fixes in previously allowed paths only | new feature work, unreviewed scope expansion, merge claim without evidence | AC-009 | fresh spec/code/QA review as needed; final command evidence | no P0/P1 blocker, residual risk clarity | any P0/P1 finding or stale reviewer | final gate result and completion recommendation | `iss-00293/report.md`; Epic `report.md` | reviewer requires plan/design change | Epic PR-ready only after S99 |
 
 ## 具体テストケース一覧
 
-| test id | step | kind | concrete case | expected result | evidence path |
-|---|---|---|---|---|---|
-| tc-001-a | S01 | inspect | `iss-00284`〜`iss-00292` の completion/report evidence と `git status --short` を確認する | prior issue completion and scope isolation are recorded | `iss-00293/report.md` Closure Evidence Ledger |
-| tc-002-a | S02 | command | `./spec-dock/scripts/spec-dock validate` と `git diff --check` を実行する | both pass or blocker disposition is recorded | `iss-00293/report.md` execution evidence |
-| tc-002-b | S02 | focused test | 実装範囲に応じた pytest を選択して実行、または docs-only no-op rationale を残す | pass or explicit blocker | `iss-00293/report.md` execution evidence |
-| tc-003-a | S03 | manual matrix | preflight / safe review / diff-staging / profile / dogfood / docs / metrics の manual matrix を確認する | each scenario has pass/fail evidence | manual test evidence artifact; `iss-00293/report.md` |
-| tc-004-a | S04 | PR readiness | PR URL、base/head、CI、review、mergeable status を確認する | PR is mergeable or blocker is explicit | `iss-00293/report.md`; Epic `report.md` |
-| tc-005-a | S90 | docs impact | Epic / Issue reports と docs impact を確認する | final reports are coherent and no stale ledger remains | `iss-00293/report.md`; Epic `report.md` |
-| tc-006-a | S99 | final gate | fresh reviewer results and closure ids are checked | P0/P1 blocker absent or next action explicit | final gate ledger |
+- `tc-s01-00293-001` inspect: `iss-00284`〜`iss-00292` の completion evidence を確認する
+  - 前提: 各 child Issue の `report.md`、Closure Evidence Ledger、Final Gate が読める。
+  - 操作: `iss-00284`〜`iss-00292` の required closure id が pass または approved no-op であるか確認する。
+  - 期待結果: prior Issue completion matrix と未完了 blocker が `iss-00293/report.md` に記録される。
+  - 失敗検出: 未完了 Issue や stale report を完了済みとして最終 PR へ進める回帰を検出する。
+  - 検証方法: report inspection、`git status --short`、Closure Evidence Ledger 確認。
+  - 関連 closure id: `tc-001`
+
+- `tc-s02-00293-001` command: spec-dock 構造検証を実行する
+  - 前提: child Issue の修正がすべて working tree に反映されている。
+  - 操作: `./spec-dock/scripts/spec-dock validate` を実行する。
+  - 期待結果: command は成功し、失敗時は blocker disposition と bounded fix path が report に残る。
+  - 失敗検出: 構造不整合や stale projection を見逃して PR-ready とする回帰を検出する。
+  - 検証方法: command output を `iss-00293/report.md` execution evidence に記録する。
+  - 関連 closure id: `tc-002`
+
+- `tc-s02-00293-002` command: diff whitespace / patch hygiene を確認する
+  - 前提: final diff が存在する。
+  - 操作: `git diff --check` を実行する。
+  - 期待結果: whitespace error や patch hygiene failure がない、または blocker disposition が明示される。
+  - 失敗検出: trailing whitespace や malformed patch を残したまま PR を作る回帰を検出する。
+  - 検証方法: command output を `iss-00293/report.md` execution evidence に記録する。
+  - 関連 closure id: `tc-002`
+
+- `tc-s02-00293-003` inspect: focused pytest または docs-only no-op rationale を固定する
+  - 前提: final diff に runtime / tests / docs-only の変更種別がある。
+  - 操作: 実装範囲に応じた focused pytest を選ぶか、docs-only no-op rationale を記録する。
+  - 期待結果: 未実行テストを実施済みと主張せず、必要な focused verification が明示される。
+  - 失敗検出: docs-only 変更なのに不明な pytest pass を主張する、または runtime 変更なのに test が欠落する回帰を検出する。
+  - 検証方法: command output または no-op rationale inspection。
+  - 関連 closure id: `tc-002`
+
+- `tc-s03-00293-001` manual: manual matrix の各 scenario を確認する
+  - 前提: preflight、safe review、diff-staging、profile、dogfood、docs、metrics の manual matrix がある。
+  - 操作: 各 scenario の pass/fail evidence、未実施理由、blocker を scenario-by-scenario に確認する。
+  - 期待結果: coverage gap がある場合は明示され、実施していない manual test を pass としない。
+  - 失敗検出: manual matrix の一部 scenario が空欄のまま Epic 完了扱いになる回帰を検出する。
+  - 検証方法: manual evidence artifact inspection と `iss-00293/report.md` 記録。
+  - 関連 closure id: `tc-003`
+
+- `tc-s04-00293-001` pr-readiness: PR URL / base / head / CI / review / mergeable status を確認する
+  - 前提: final branch に PR 作成または更新の準備がある。
+  - 操作: PR URL、base/head、CI、review、mergeable status を確認し、repair loop が必要か判断する。
+  - 期待結果: PR は mergeable または blocker が explicit で、実行していない CI / review を成功済みと書かない。
+  - 失敗検出: PR 未作成・CI 未確認のまま mergeable と主張する回帰を検出する。
+  - 検証方法: PR metadata inspection、GitHub / local report evidence。
+  - 関連 closure id: `tc-004`
+
+- `tc-s90-00293-001` inspect: Epic / Issue reports の最終整合を確認する
+  - 前提: final gate の command evidence、manual matrix、PR status がある。
+  - 操作: Epic report、`iss-00293/report.md`、child Issue reports に stale ledger や矛盾がないか確認する。
+  - 期待結果: final reports are coherent で、docs impact は update または approved no-op として記録される。
+  - 失敗検出: 過去の candidate / draft / blocked 状態が現状と矛盾して残る回帰を検出する。
+  - 検証方法: docs-only inspection と `rg`。
+  - 関連 closure id: `tc-005`
+
+- `tc-s99-00293-001` final-gate: fresh reviewer results と closure ids を確認する
+  - 前提: S01〜S04 と S90 が closed または approved no-op である。
+  - 操作: fresh spec / code / QA review の必要性を判断し、結果と closure id の状態を確認する。
+  - 期待結果: P0/P1 blocker がなく、残る場合は次アクションが explicit である。
+  - 失敗検出: stale reviewer result、未確認 closure、未解決 P0/P1 を残して completion-ready とする回帰を検出する。
+  - 検証方法: final gate ledger と reviewer result の report 記録。
+  - 関連 closure id: `tc-006`
 
 ### S90 ドキュメント影響解消
 

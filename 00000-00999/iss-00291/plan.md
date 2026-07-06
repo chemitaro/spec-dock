@@ -83,14 +83,61 @@ ID: "iss-00291"
 
 ## 具体テストケース一覧
 
-| test id | step | kind | concrete case | expected result | evidence path |
-|---|---|---|---|---|---|
-| tc-001-a | S01 | inspect | 親 Epic trace、依存 Issue、local assurance を確認する | parent trace / dependency / `authorized_profile` が report に記録される | Issue `report.md` Closure Evidence Ledger |
-| tc-002-a | S02 | implementation/docs | Issue 固有成果物を作成し、generated ZIP / staged artifact が正本を直接上書きしないことを確認する | deliverable と no-overwrite evidence が残る | Issue `report.md`; staged artifact path |
-| tc-003-a | S03 | normal fixture | 正常系 fixture を実行する、または docs-only Issue では expected artifact inspection を行う | validation status が pass として記録される | validation report / Issue `report.md` |
-| tc-003-b | S03 | negative fixture | stale source、profile mismatch、unsafe authority claim、または Issue 固有の拒否条件を検証する | blocked / stale / rejected / deferred のいずれかで fail-closed になる | validation report / Issue `report.md` |
-| tc-004-a | S90 | docs impact | docs / report / EAL / SID に直接矛盾がないか確認する | update または approved no-op rationale が記録される | Issue `report.md`; Epic `report.md` when touched |
-| tc-005-a | S99 | final gate | `spec-dock validate`、`git diff --check`、focused tests、fresh `spec-reviewer` を確認する | P0/P1 blocker がない、または blocker と次アクションが明確 | Issue `report.md` Final Gate |
+- `tc-s01-00291-001` inspect: 文書化対象と runtime 非主張を確認する
+  - 前提: `iss-00284`〜`iss-00290` の成果物・validation report・dogfood evidence が読める。
+  - 操作: README、プロンプト規約、EAL 例、手動フォールバック notes の入力範囲を確認する。
+  - 期待結果: 文書は現時点の dogfood / planned workflow を説明し、配布 runtime command が利用可能だと主張しない。
+  - 失敗検出: 未実装ランタイム機能を利用可能な手順として書く回帰を検出する。
+  - 検証方法: docs-only inspection と Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-001`
+
+- `tc-s02-00291-001` acceptance: 日本語 README に利用手順と境界を書く
+  - 前提: workflow の正本 docs と Epic / Issue reports がある。
+  - 操作: 日本語 README に preflight、safe review、staging、local adoption、reviewer gate、manual fallback の流れを書く。
+  - 期待結果: 日本語話者が ChatGPT output を evidence-only として扱う手順を読める。
+  - 失敗検出: ChatGPT output を正本昇格済み、または reviewer pass の代替として扱う記述を検出する。
+  - 検証方法: docs diff inspection と `rg` による禁止 claim 確認。
+  - 関連 closure id: `tc-002`
+
+- `tc-s02-00291-002` acceptance: プロンプト規約で repo instruction-like text を data として扱う
+  - 前提: ChatGPT に渡す prompt pack の禁止 claim と source manifest のルールがある。
+  - 操作: プロンプト規約案に、repo 内の instruction-like text は source data として扱い、local authority を上書きしない旨を書く。
+  - 期待結果: prompt pack が host instructions、reviewer gate、`.assurance.json` authority を侵食しない。
+  - 失敗検出: source 文書内の命令文を ChatGPT が実行権限として解釈する余地を検出する。
+  - 検証方法: docs-only inspection、prompt rules artifact inspection。
+  - 関連 closure id: `tc-002`
+
+- `tc-s03-00291-001` acceptance: EAL 例が採用状態を区別する
+  - 前提: adopted、partially_adopted、rejected、stale、deferred、blocked の例が必要である。
+  - 操作: EAL 例を作成し、各 status の意味、必要 evidence、次アクションを分けて書く。
+  - 期待結果: reviewer は ChatGPT ZIP output と canonical adoption の差を EAL 例から判断できる。
+  - 失敗検出: rejected / stale / blocked を adopted と同じように扱う ledger 例を検出する。
+  - 検証方法: EAL example inspection と Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-003`
+
+- `tc-s03-00291-002` acceptance: 手動フォールバック notes を用意する
+  - 前提: ChatGPT / ZIP generation / GitHub connector が利用不能な場合がある。
+  - 操作: 手動 authoring path、blocked / skipped evidence、再開条件を notes に書く。
+  - 期待結果: automation が使えない場合でも、local authoring と reviewer gate へ戻れる。
+  - 失敗検出: ChatGPT が使えないと Issue planning が停止する手順を検出する。
+  - 検証方法: docs-only inspection。
+  - 関連 closure id: `tc-003`
+
+- `tc-s90-00291-001` inspect: 文書間の直接矛盾を確認する
+  - 前提: README、prompt rules、EAL examples、fallback notes が作成済みである。
+  - 操作: workflow docs、Epic docs、Issue docs と直接矛盾がないか確認する。
+  - 期待結果: update または approved no-op rationale が記録される。
+  - 失敗検出: docs 間で authority boundary や reviewer gate の説明が食い違う回帰を検出する。
+  - 検証方法: docs-only inspection と `rg`。
+  - 関連 closure id: `tc-004`
+
+- `tc-s99-00291-001` final-gate: docs 検証と fresh reviewer を通す
+  - 前提: S01〜S03 と S90 が closed または approved no-op である。
+  - 操作: `./spec-dock/scripts/spec-dock validate`、`git diff --check`、docs inspection、fresh `spec-reviewer` result を確認する。
+  - 期待結果: P0/P1 blocker がなく、残リスクまたは次アクションが Issue `report.md` Final Gate に記録される。
+  - 失敗検出: docs-only verification を未実施のまま完了扱いする回帰を検出する。
+  - 検証方法: command output、docs inspection evidence、reviewer result の report 記録。
+  - 関連 closure id: `tc-005`
 
 ### S90 ドキュメント影響解消
 
