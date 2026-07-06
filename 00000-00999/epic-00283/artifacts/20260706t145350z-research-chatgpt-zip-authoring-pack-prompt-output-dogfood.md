@@ -23,7 +23,7 @@ zip_sha256: "1a84b8ad9b04663a2118c37c1d2360b229346dd1eb26c78c40a25d9de11786c4"
 derived_from:
   - "/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/epic-00283-zip-authoring-pack-prompt.md"
   - "/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/chatgpt-output.md"
-  - "/Users/iwasawayuuta/.oracle/sessions/specdock-epic-00283-zip-authoring/artifacts/specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip"
+  - "redacted-chatgpt-generated-zip://specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip"
 reflected_to: []
 ---
 
@@ -50,7 +50,7 @@ reflected_to: []
 - ChatGPT text output:
   - `/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/chatgpt-output.md`
 - ChatGPT generated ZIP:
-  - `/Users/iwasawayuuta/.oracle/sessions/specdock-epic-00283-zip-authoring/artifacts/specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip`
+  - `redacted-chatgpt-generated-zip://specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip`
 - Managed temp copy:
   - `/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip`
 - Attached context:
@@ -358,6 +358,6 @@ reflected_to:
 - ChatGPT output:
   - `/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/chatgpt-output.md`
 - ZIP:
-  - `/Users/iwasawayuuta/.oracle/sessions/specdock-epic-00283-zip-authoring/artifacts/specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip`
+  - `redacted-chatgpt-generated-zip://specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip`
 - ZIP managed temp copy:
   - `/private/tmp/codex-agent-work/501/session-20260706t142841z-specdock-epic-00283-zip-authoring-pack-e0cc2fa8/specdock-epic-00283-authoring-pack-codex-chatgpt-2098110.zip`

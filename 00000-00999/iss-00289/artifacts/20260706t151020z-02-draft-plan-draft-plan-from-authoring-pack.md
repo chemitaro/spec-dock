@@ -73,6 +73,13 @@ adoption_ledger_note: "EAL-008 records ZIP pack adoption to issue-local draft ar
 - 正本上書きがない。
 - fresh reviewer gate が別途必要であることが report に残る。
 
+## リレー実行 / PR 方針
+
+- このドラフト計画単独では Pull Request を作成しない。
+- 実装と検証が完了したら、この Issue の `report.md` に完了証跡を記録し、`./spec-dock/scripts/spec-dock issue finish` を実行する。
+- その後、次 Issue `iss-00290` を `./spec-dock/scripts/spec-dock issue start iss-00290` で開始する。
+- PR 作成、CI / review 修正、mergeable 確認は最後の `iss-00293` に集約する。
+
 ## レビュアー引き渡しメモ
 
 - この Issue は `strict` 推奨だが、最終グレードは local assurance が決める。

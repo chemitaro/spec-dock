@@ -14,7 +14,7 @@ ID: "epic-00283"
 
 ## 結論
 
-この計画では、ZIP 仕様作成パックのワークフローを 9 件の Issue に分割する。実施順序は、事前確認 -> 安全検査 / スキーマ検証 -> 差分 / 段階配置 / プロファイル検証 -> ドッグフード A/B/C -> 文書化 / 指標評価である。
+この計画では、ZIP 仕様作成パックのワークフローを 10 件の Issue に分割する。実施順序は、事前確認 -> 安全検査 / スキーマ検証 -> 差分 / 段階配置 / プロファイル検証 -> ドッグフード A/B/C -> 文書化 / 指標評価 -> 最終品質ゲート / マージ可能な Pull Request 作成である。
 
 すべての Issue は、ChatGPT 出力を証跡として扱う。正本昇格やレビュアー通過は、このパックの生成だけでは成立しない。
 
@@ -26,6 +26,7 @@ ID: "epic-00283"
 4. 文書化、命名、採用台帳例は実装スクリプトと分ける。
 5. 指標評価とランタイム昇格判断は、ドッグフード証跡が出た後に行う。
 6. Epic から Issue 候補を作る pack は、プロファイル推奨だけを返し、プロファイル別の正本テンプレート本文を出さない。
+7. 個別 Issue ごとに Pull Request を作成せず、最後の品質ゲート Issue で Epic 単位の Pull Request を作成する。
 
 ## 実施単位と依存順序
 
@@ -35,6 +36,7 @@ T1: C02 安全検査 / スキーマ検証 + C04 プロファイル制御検証
 T2: C03 差分 / 段階配置 + C05 ドッグフード A + C06 ドッグフード B + C07 ドッグフード C
 T3: C08 ワークフロー文書 / 採用台帳例
 T4: C09 指標評価 / ランタイム昇格判断材料
+T5: C10 最終品質ゲート / 手動テスト / マージ可能な Pull Request
 ```
 
 依存関係:
@@ -46,6 +48,7 @@ C02 -> C05 -> C09
 C02 -> C07 -> C09
 C04 -> C07 -> C09
 C03 -> C08 -> C09
+C09 -> C10
 ```
 
 ## 並列化できるレーン
@@ -55,8 +58,15 @@ C03 -> C08 -> C09
 - レーン C: ドッグフード。validator が揃った後に C05 / C06 / C07 を進める。
 - レーン D: 文書化と命名。C01 / C02 の出力が安定した後に C08 を進める。
 - レーン E: 指標評価。ドッグフード証跡が揃った後に C09 を進める。
+- レーン F: 最終品質ゲート。C09 と先行 Issue が完了した後に C10 を進め、PR 作成と mergeable 確認を集約する。
 
 共有スキーマ、期限切れ条件、プロファイル権威境界が固定されている場合だけ、並列実行を許可する。
+
+## リレー実行 / PR 方針
+
+この Epic では、個別 Issue ごとに Pull Request を作成しない。`iss-00284` から `iss-00292` までは、各 Issue の実装と検証が完了したら `report.md` に証跡を残し、`./spec-dock/scripts/spec-dock issue finish` を実行したうえで、次 Issue を `./spec-dock/scripts/spec-dock issue start <next-issue-id>` で開始する。
+
+Pull Request 作成、CI / review 指摘対応、manual test evidence、mergeable 確認は、最後の `iss-00293` に集約する。最終品質ゲートで見つかった不具合は、Epic スコープ内であれば `iss-00293` の作業として修正し、再検証、再 push、PR 状態確認まで行う。
 
 ## Issue readiness contract
 
@@ -75,6 +85,7 @@ C03 -> C08 -> C09
 | `iss-00290` | `standard` / `provisional` | strict 相当 | stale / mismatch / unsafe claim を fail-closed にブロックするため。 |
 | `iss-00291` | `standard` / `provisional` | standard | 文書化と EAL 例が中心であり、配布ランタイムや正本採用を行わないため。 |
 | `iss-00292` | `standard` / `provisional` | standard | 指標評価と昇格判断材料の作成に留め、昇格自体は後続判断に残すため。 |
+| `iss-00293` | `standard` / `provisional` | strict 相当 | Epic 全体の品質ゲート、手動テスト、PR 作成、CI / review 修正、mergeable 確認を担当するため。 |
 
 strict 相当の追加 obligation を持つ Issue は、Issue planning 時に specialist evidence または manual fallback evidence、failure-mode record、fresh `spec-reviewer` pass を `report.md` に残すまで execution-ready と扱いません。
 
@@ -124,13 +135,19 @@ strict 相当の追加 obligation を持つ Issue は、Issue planning 時に sp
   - 推奨グレード: `standard`
   - ディレクトリ: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria`
 
+- `iss-00293` / GitHub `#293`: 最終品質ゲートとマージ可能な Pull Request を作成する
+  - 現在のタイトル: `Final Epic Quality Gate And Mergeable Pull Request`
+  - 推奨グレード: `strict`
+  - ディレクトリ: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr`
+
 ## 統合チェックポイント
 
-- G1: 9 件の Issue が E-RQ / E-AC に対応している。
+- G1: 10 件の Issue が E-RQ / E-AC に対応している。
 - G2: ZIP root、ファイル種別、パス安全性、スキーマ、ソース一覧、期限切れ条件、危険な権威主張、プロファイル検証が fail-closed で定義されている。
 - G3: valid ZIP からドライラン差分と段階配置証跡を作れても、正本を直接上書きしない。
 - G4: ドッグフード A/B/C が、それぞれ候補生成、選択済みプロファイル記入、不一致ブロックを確認する。
 - G9: ランタイム昇格、保留、却下の判断材料が揃い、手動フォールバックが維持されている。
+- G10: 先行 Issue の完了後、最終品質ゲートで manual test evidence、PR URL、mergeable 状態、レビュー / CI 修正証跡が揃っている。
 
 ## ドッグフードシナリオ
 
@@ -203,15 +220,16 @@ strict 相当の追加 obligation を持つ Issue は、Issue planning 時に sp
 - 必須ファイルが存在する。
 - ZIP 内は Markdown / JSON 中心で、危険なファイル種別を含まない。
 - 禁止パスが存在しない。
-- Issue 数は 9 件である。
+- Issue 数は 10 件である。
 - 候補の `profile.json` は `authorized_profile: null` を維持する。
 - 候補専用 pack は all-profile variants を含まない。
 - branch / repo provenance が宣言されている。
 - ローカル検証が引き続き必須である。
+- 個別 Issue ごとに PR を作成せず、`iss-00293` で Epic 単位の Pull Request と mergeable 確認を行う。
 
 ## Issue 引き渡しパッケージのパス一覧
 
-この一覧は、ChatGPT 仕様作成パック由来のドラフト artifact を Issue-local `artifacts/` へ配置した結果である。各 draft は証跡専用の planning input であり、Issue の正本 `design.md` / `plan.md` へ採用するには、個別の Issue planning と fresh `spec-reviewer` gate が必要である。
+この一覧は、ChatGPT 仕様作成パック由来のドラフト artifact を Issue-local `artifacts/` へ配置した結果である。各 draft は証跡専用の authoring evidence であり、正本ではない。`iss-00284`〜`iss-00292` の `design.md` / `plan.md` へ採用するかどうかは、後続の各 Issue planning で改めて判断し、fresh `spec-reviewer` gate と実装前 readiness 確認を通す。
 
 - `iss-00284` / GitHub `#284`: 仕様作成パックの事前確認とプロンプトパックを作る
   - `draft-requirement`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00284-build-authoring-pack-preflight-and-prompt-pack/artifacts/20260706t150659z-draft-requirement-draft-requirement-from-authoring-pack.md`
@@ -258,3 +276,9 @@ strict 相当の追加 obligation を持つ Issue は、Issue planning 時に sp
   - `draft-design`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/artifacts/20260706t151021z-01-draft-design-draft-design-from-authoring-pack.md`
   - `draft-plan`: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/artifacts/20260706t151022z-draft-plan-draft-plan-from-authoring-pack.md`
   - local_assurance_profile: `standard`
+- `iss-00293` / GitHub `#293`: 最終品質ゲートとマージ可能な Pull Request を作成する
+  - canonical requirement: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/requirement.md`
+  - canonical design: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/design.md`
+  - canonical plan: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/plan.md`
+  - draft artifact: なし。この Issue は ChatGPT ZIP authoring pack 由来ではなく、Epic 実行方針の後続補正として追加した final gate Issue である。
+  - local_assurance_profile: `standard` / `provisional`
