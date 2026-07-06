@@ -3,7 +3,7 @@
 ID: "iss-00285"
 タイトル: "安全な仕様作成パック検査とスキーマ検証を実装する"
 関連GitHub: ["#285"]
-状態: "review-ready"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 依存: ["requirement.md"]
