@@ -70,6 +70,28 @@ ID: "iss-00286"
   - close 条件: `spec-dock validate`、必要な関連テスト、fresh `spec-reviewer` result を揃え、P0/P1 blocker を残さない。
   - closure id: `tc-005`。
 
+
+## 委任契約（Delegation Contract）
+
+| step | delegated role | input docs | allowed paths | forbidden changes | acceptance criteria | required tests or docs-only verification | reviewer focus | stop conditions | output required | report destination | amendment trigger | step gate |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | main orchestrator / implementation-planner | Epic docs, this Issue `requirement.md` / `design.md` / `plan.md`, `.assurance.json` | inspect-only; this Issue `report.md` for evidence | `.assurance.json` mutation, source/runtime edits, PR creation | parent trace and dependency outputs are understood | docs-only inspection; no command required beyond optional `spec-dock validate` | scope, dependency, local assurance consistency | missing dependency evidence, stale profile, unclear parent trace | S01 evidence row and blocker/no-blocker note | Issue `report.md` Closure Evidence Ledger | parent trace or allowed paths differ from plan | S01 closed before S02 |
+| S02 | dev-coder or doc-writer matching touched surface | this Issue `requirement.md`, `design.md`, S01 evidence | `src/spec_dock/**`, `tests/**`, this Issue `artifacts/**`, this Issue `report.md` | unrelated initiatives, unrelated Issue docs, `.assurance.json`, direct canonical overwrite by generated ZIP, PR/CI operations | Issue AC-001〜AC-004 and issue-specific deliverables | focused unit/integration/docs-only check selected before edit; `git diff --check` | implementation scope, no authority-boundary regression | outside allowed paths, public contract expansion not in requirement, unsafe ZIP/adoption claim | changed files, generated/staged artifacts, verification result, residual risks | Issue `report.md` execution evidence / EAL | new public command, new persistence, or scope wider than AC | S02 reviewer-ready before S03 |
+| S03 | qa-reviewer or dev-coder | S02 output, fixtures, validation report contract | `tests/**`, this Issue `artifacts/**`, this Issue `report.md`; source fixes only if failing test reveals in-scope defect | unrelated refactor, broad fixture rewrite, `.assurance.json` mutation, self-review pass claim | Issue AC-005〜AC-006 and negative fixtures are covered | normal fixture, negative fixture, `spec-dock validate`, `git diff --check`, focused pytest or documented no-op | fail-closed behavior, validation status taxonomy, no canonical overwrite | missing negative fixture, ambiguous validation status, test requires broader design | test output, blocked/stale/rejected/deferred evidence, defect notes | Issue `report.md` Closure Evidence Ledger | new failure mode not covered by design | S03 closed before S90 |
+| S90 | main orchestrator / doc-writer | S01〜S03 evidence, Epic docs, workflow docs if touched | this Issue docs/report, Epic report; `spec-dock/docs/**` only for direct contradiction | broad docs cleanup, template changes unrelated to this Issue, historical ledger deletion | docs impact and adoption ledger are resolved | docs-only inspection; `rg` for direct contradictions; `spec-dock validate` | report consistency, EAL/SID/closure integrity | unresolved contradiction or required docs update | docs impact decision, EAL/SID updates or no-op rationale | Issue `report.md`, Epic `report.md` when needed | docs impact changes canonical workflow | S90 closed before S99 |
+| S99 | main orchestrator + fresh reviewers | all closure evidence, final diff, reviewer results | this Issue `report.md`, Epic report for summary; bounded fixes only in previously allowed paths | new behavior implementation, PR creation, unrelated cleanup | all required closure ids pass or approved no-op | `spec-dock validate`, `git diff --check`, focused tests from S02/S03, fresh `spec-reviewer` result | final readiness, P0/P1 blocker absence, residual risk clarity | any P0/P1 finding, stale reviewer, missing closure evidence | final gate result, reviewer status, remaining risks | Issue `report.md` Final Gate / Closure Evidence Ledger | reviewer requires plan/design change | Issue completion-ready only after S99 |
+
+## 具体テストケース一覧
+
+| test id | step | kind | concrete case | expected result | evidence path |
+|---|---|---|---|---|---|
+| tc-001-a | S01 | inspect | 親 Epic trace、依存 Issue、local assurance を確認する | parent trace / dependency / `authorized_profile` が report に記録される | Issue `report.md` Closure Evidence Ledger |
+| tc-002-a | S02 | implementation/docs | Issue 固有成果物を作成し、generated ZIP / staged artifact が正本を直接上書きしないことを確認する | deliverable と no-overwrite evidence が残る | Issue `report.md`; staged artifact path |
+| tc-003-a | S03 | normal fixture | 正常系 fixture を実行する、または docs-only Issue では expected artifact inspection を行う | validation status が pass として記録される | validation report / Issue `report.md` |
+| tc-003-b | S03 | negative fixture | stale source、profile mismatch、unsafe authority claim、または Issue 固有の拒否条件を検証する | blocked / stale / rejected / deferred のいずれかで fail-closed になる | validation report / Issue `report.md` |
+| tc-004-a | S90 | docs impact | docs / report / EAL / SID に直接矛盾がないか確認する | update または approved no-op rationale が記録される | Issue `report.md`; Epic `report.md` when touched |
+| tc-005-a | S99 | final gate | `spec-dock validate`、`git diff --check`、focused tests、fresh `spec-reviewer` を確認する | P0/P1 blocker がない、または blocker と次アクションが明確 | Issue `report.md` Final Gate |
+
 ### S90 ドキュメント影響解消
 
 - この Issue の実装が workflow docs、template、README、Epic docs、Issue docs に影響する場合だけ更新する。

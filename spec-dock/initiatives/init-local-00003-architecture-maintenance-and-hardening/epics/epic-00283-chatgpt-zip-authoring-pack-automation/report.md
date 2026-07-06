@@ -22,7 +22,7 @@ ID: "epic-00283"
   - local assurance は全 Issue `standard` / `provisional` であり、ChatGPT 推奨や Epic 側のリスク判断で `.assurance.json` / `authorized_profile` を上書きしない。strict 推奨 Issue には strict 相当の追加 obligation を Issue plan に記録済み。
   - 実装と dogfood scripts は未着手。この Epic report は spec authoring / planning package の現状を記録する。
 - 次のマイルストーン:
-  - 更新後スコープで fresh `spec-reviewer` gate を通し、`iss-00284`〜`iss-00293` を後続 Issue execution-ready な planning package として扱えるか確認する。
+  - 更新後スコープで fresh `spec-reviewer` gate を通し、`iss-00284`〜`iss-00293` を後続 Issue execution-ready に向けた reviewable planning package として扱えるか確認する。
 - ブロッカー:
   - 現時点で main orchestrator が把握している仕様 authoring blocker はない。fresh `spec-reviewer` gate の結果で P0/P1 が出た場合は、この report の correction ledger に追記して修正する。
 
