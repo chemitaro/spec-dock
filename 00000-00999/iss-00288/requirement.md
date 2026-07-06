@@ -3,7 +3,7 @@
 ID: "iss-00288"
 タイトル: "Epic から Issue 候補を作る候補専用パックをドッグフードする"
 関連GitHub: ["#288"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 親: ["epic-00283", "init-local-00003"]

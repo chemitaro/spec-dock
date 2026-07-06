@@ -3,7 +3,7 @@
 ID: "iss-00293"
 タイトル: "最終品質ゲートとマージ可能な Pull Request を作成する"
 関連GitHub: ["#293"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 依存: ["requirement.md", "design.md"]
@@ -18,7 +18,7 @@ ID: "iss-00293"
 
 ## Assurance / reviewer obligation
 
-この Issue の local `authorized_profile` は `.assurance.json` / `assurance classify` を権威とし、ChatGPT 推奨や Epic 側の推奨グレードでは上書きしません。ただし、この Issue は Epic 全体の品質ゲート、手動テスト、PR 作成、CI / review 修正、mergeable 確認を担当するため、strict 相当の追加 obligation を持ちます。execution-ready と扱うには、先行 Issue の完了証跡、manual test evidence、fresh `spec-reviewer` result を `report.md` に残します。
+この Issue の local `authorized_profile` は `.assurance.json` / `assurance classify` を権威とし、ChatGPT 推奨や Epic 側の推奨グレードでは上書きしません。ただし、この Issue は Epic 全体の品質ゲート、手動テスト、PR 作成、CI / review 修正、mergeable 確認を担当するため、strict 相当の追加 obligation を持ちます。execution-ready と扱うには、先行 Issue の完了証跡、manual test evidence、fresh `spec-reviewer`、issue-wide `code-reviewer`、`qa-reviewer` の三者 final gate result を `report.md` に残します。
 
 ## 実装ステップ
 
@@ -69,7 +69,7 @@ ID: "iss-00293"
   - closure id: `tc-005`。
 - S99:
   - 担当: main orchestrator と fresh reviewers。
-  - close 条件: final QA / code / spec reviewer が fresh pass、または blocker と次アクションが明確である。
+  - close 条件: fresh `spec-reviewer`、issue-wide `code-reviewer`、`qa-reviewer` がすべて pass、または blocker と次アクションが明確である。
   - closure id: `tc-006`。
 
 
@@ -82,7 +82,7 @@ ID: "iss-00293"
 | S03 | qa-reviewer / main orchestrator | Epic manual test matrix, outputs from S02 | manual evidence artifacts, `iss-00293/report.md`, Epic `report.md` | skipping required scenario, claiming unexecuted manual tests | AC-004 | manual test matrix; scenario-by-scenario evidence | preflight/safety/staging/profile/dogfood/docs/metrics coverage | missing scenario, ambiguous result | manual test evidence and defects | `iss-00293/report.md`; Epic `report.md` | new dogfood failure mode | S03 closed before S04 |
 | S04 | main orchestrator | PR branch, final diff, CI/review status | PR metadata/report updates; bounded fixes in prior allowed paths | unrelated GitHub changes, force-push/destructive actions, hiding CI/review failures | AC-005 / AC-006 / AC-007 | PR URL, base/head, CI, review, mergeable status | PR readiness, repair loop integrity | PR blocked, CI failure, review P0/P1 | PR URL and status ledger | `iss-00293/report.md`; Epic `report.md` | blocker outside Epic scope | S04 closed before S90 |
 | S90 | main orchestrator / doc-writer | S01〜S04 evidence, Epic report, Issue reports | Epic `report.md`, `iss-00293/report.md`, docs only for direct contradiction | broad docs cleanup, changing earlier Issue decisions without evidence | AC-008 / AC-010 | docs/report impact inspection; `spec-dock validate` | final ledger completeness | stale or contradictory report | docs impact decision and EAL updates | `iss-00293/report.md`; Epic `report.md` | canonical docs need amendment | S90 closed before S99 |
-| S99 | main orchestrator + fresh reviewers | all closure evidence, PR status, final diff | final reports; bounded fixes in previously allowed paths only | new feature work, unreviewed scope expansion, merge claim without evidence | AC-009 | fresh spec/code/QA review as needed; final command evidence | no P0/P1 blocker, residual risk clarity | any P0/P1 finding or stale reviewer | final gate result and completion recommendation | `iss-00293/report.md`; Epic `report.md` | reviewer requires plan/design change | Epic PR-ready only after S99 |
+| S99 | main orchestrator + fresh reviewers | all closure evidence, PR status, final diff | final reports; bounded fixes in previously allowed paths only | new feature work, unreviewed scope expansion, merge claim without evidence | AC-009 | fresh `spec-reviewer`, issue-wide `code-reviewer`, `qa-reviewer`; final command evidence | no P0/P1 blocker, residual risk clarity | any P0/P1 finding or stale reviewer | final gate result and completion recommendation | `iss-00293/report.md`; Epic `report.md` | reviewer requires plan/design change | Epic PR-ready only after S99 |
 
 ## 具体テストケース一覧
 
@@ -144,7 +144,7 @@ ID: "iss-00293"
 
 - `tc-s99-00293-001` final-gate: fresh reviewer results と closure ids を確認する
   - 前提: S01〜S04 と S90 が closed または approved no-op である。
-  - 操作: fresh spec / code / QA review の必要性を判断し、結果と closure id の状態を確認する。
+  - 操作: fresh `spec-reviewer`、issue-wide `code-reviewer`、`qa-reviewer` をすべて実行し、結果と closure id の状態を確認する。
   - 期待結果: P0/P1 blocker がなく、残る場合は次アクションが explicit である。
   - 失敗検出: stale reviewer result、未確認 closure、未解決 P0/P1 を残して completion-ready とする回帰を検出する。
   - 検証方法: final gate ledger と reviewer result の report 記録。
@@ -159,7 +159,7 @@ ID: "iss-00293"
 ### S99 最終品質ゲート
 
 - 前提: S01〜S04 と S90 が closed または approved no-op である。
-- 必須確認: fresh `spec-reviewer`、必要に応じた code / QA reviewer、CI / review / mergeable 状態。
+- 必須確認: fresh `spec-reviewer`、issue-wide `code-reviewer`、`qa-reviewer`、CI / review / mergeable 状態。
 - P0/P1 finding はこの Issue 内で最小修正し、再検証、再 push、再レビュー結果を記録する。
 
 ## Final Exit Contract

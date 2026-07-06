@@ -71,11 +71,19 @@ ID: "iss-00285"
 | chatgpt-use | gpt-5.5-pro extended | `artifacts/20260706t210249z-chatgpt-use-planning-summary.md` | Issue docs、Epic docs、`scripts/authoring-pack/prepare_chatgpt_authoring_pack.py`、focused tests | 2026-07-06 | unreviewed | [] | pass | main orchestrator が EAL-004 として採用範囲を再記述した。raw draft 自体は authority を持たない | ZIP fail-closed、tree 補助境界、no runtime command、no canonical overwrite、taxonomy consistency | none | pending after review repair | planning spec-review requested |
 | manual-authoring | orchestrator canonical integration | `artifacts/20260706t210249z-chatgpt-use-planning-summary.md` | EAL-004 | 2026-07-06 | not used | `requirement.md`; `design.md`; `plan.md`; `report.md` | pass | manual-authored canonical docs integrated through Evidence Adoption Ledger; delegated direct-write authority not used | authority boundary、report gate、step contract | none | pass | execute approved plan |
 
+| created_by_role | scope_id | draft_artifact_path | source_paths | intended_targets | adoption_status | reflected_to | diff_guard_result | integration_result | reviewer_focus | blockers | reviewer_result | promotion_decision |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ChatGPT Use / GPT-5.5 Pro Extended | iss-00285 | `artifacts/20260706t151018z-01-draft-design-draft-design-from-authoring-pack.md` | Epic `requirement.md`; Epic `design.md`; Epic `plan.md`; Issue-local draft artifacts | `requirement.md`; `design.md`; `plan.md`; `report.md` | adopted | `requirement.md`; `design.md`; `plan.md`; `report.md` | pass | manual-authored canonical docs integrated through Evidence Adoption Ledger | authority boundary; no direct canonical overwrite | none | pass | execute approved plan |
+
 ## Grade Specialist Evidence Gate
 
 | Grade | required specialist / fallback | usage | evidence | fresh spec-reviewer verdict | execution readiness |
 |---|---|---|---|---|---|
 | standard | manual fallback | ChatGPT Use planning + main orchestrator adoption; failure-mode record below | `artifacts/20260706t210249z-chatgpt-use-planning-summary.md`; `assurance verify` ok; `spec-dock validate` ok | pass | ready |
+
+| profile | required_or_fallback | usage | evidence | reviewer_verdict | readiness |
+|---|---|---|---|---|---|
+| standard | manual fallback | used | manual evidence: fresh spec-reviewer `019f3999-911a-7381-8155-3cda5fcf3403` passed and canonical docs were integrated by main orchestrator | pass | ready |
 
 ## Reviewer Gate Status
 
@@ -84,7 +92,11 @@ ID: "iss-00285"
 | planning | planning spec-review | spec-reviewer | fresh | pass | no | execute approved plan | fresh pass `019f394e-65e0-72f3-9c71-ccd2ae0d607d`; no findings |
 | implementation | implementation code-review | code-reviewer | fresh | pass | no | final-spec-review-ready | fresh pass `019f396b-cded-74c1-af5f-b6049b08cf41`; no findings |
 | implementation | implementation QA-review | qa-reviewer | fresh | pass | no | final-spec-review-ready | fresh pass `019f3971-dc4f-7ea0-8693-5344ee1c32ae`; no findings; focused suite 40 passed |
-| final | issue finish spec-review | spec-reviewer | fresh | pass | no | issue-finish-ready | fresh pass `019f3986-8e1a-7091-b8cb-b14f64ea497c`; no findings |
+| final | issue finish spec-review | spec-reviewer | fresh | pass | no | execute approved plan | fresh pass `019f3986-8e1a-7091-b8cb-b14f64ea497c`; no findings |
+
+| phase | gate | reviewer_role | freshness | state | risk_acceptance | promotion_decision | evidence |
+|---|---|---|---|---|---|---|---|
+| planning | spec-authoring | spec-reviewer | fresh | pass | no | execute approved plan | fresh pass `019f3999-911a-7381-8155-3cda5fcf3403` |
 
 ## Planning Spec Review History
 

@@ -171,6 +171,35 @@ end
 - `iss-00288`〜`iss-00290`: dogfood scenarios A / B / C を実行する。
 - `iss-00293`: final PR / mergeable check を集約する。
 
+## Module Dependency Diagram
+
+```plantuml
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+title iss-00284 module dependency sketch
+
+component "親 Epic
+readiness contract" as EpicContract
+component "Issue canonical docs
+requirement/design/plan" as IssueDocs
+component "scripts/authoring-pack
+prepare helper" as PreflightHelper
+component "tests/fixtures + manual_tests
+normal / negative coverage" as Tests
+component "Issue report
+evidence ledger" as EvidenceLedger
+
+EpicContract --> IssueDocs : scope / acceptance / relay order
+IssueDocs --> PreflightHelper : dogfood-only implementation contract
+PreflightHelper --> Tests : observable behavior
+Tests --> EvidenceLedger : command / fixture evidence
+PreflightHelper --> EvidenceLedger : generated prompt-pack diagnostics
+@enduml
+```
+
 ## ディレクトリ / ファイル変更計画
 
 追加する path:

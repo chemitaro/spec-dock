@@ -3,7 +3,7 @@
 ID: "iss-00289"
 タイトル: "既存 Issue の選択済みプロファイル向けパックをドッグフードする"
 関連GitHub: ["#289"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 親: ["epic-00283", "init-local-00003"]

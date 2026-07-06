@@ -2,7 +2,7 @@
 種別: レポート（Issue）
 ID: "iss-00284"
 タイトル: "仕様作成パックの事前確認とプロンプトパックを作る"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -67,11 +67,19 @@ ID: "iss-00284"
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | chatgpt-use | gpt-5.5-pro extended | artifacts/20260706t171812z-chatgpt-use-planning-refresh-summary.md | requirement.md; design.md; plan.md; report.md | 2026-07-06 | adopted | requirement.md; design.md; plan.md; report.md | pass | manual-authored canonical docs integrated by main orchestrator | authority boundary、path scope、AC closure | none | pass | execute approved plan |
 
+| created_by_role | scope_id | draft_artifact_path | source_paths | intended_targets | adoption_status | reflected_to | diff_guard_result | integration_result | reviewer_focus | blockers | reviewer_result | promotion_decision |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ChatGPT Use / GPT-5.5 Pro Extended | iss-00284 | `artifacts/20260706t150659z-draft-requirement-draft-requirement-from-authoring-pack.md` | Epic `requirement.md`; Epic `design.md`; Epic `plan.md`; Issue-local draft artifacts | `requirement.md`; `design.md`; `plan.md`; `report.md` | adopted | `requirement.md`; `design.md`; `plan.md`; `report.md` | pass | manual-authored canonical docs integrated through Evidence Adoption Ledger | authority boundary; no direct canonical overwrite | none | pass | execute approved plan |
+
 ## Grade Specialist Evidence Gate
 
 | Grade | required specialist / fallback | usage | evidence | fresh spec-reviewer verdict | execution readiness |
 |---|---|---|---|---|---|
 | standard | manual fallback | manual fallback | manual fallback evidence: ChatGPT Use summary artifact、main-orchestrator adoption、assurance verify ok、spec-dock validate ok | pass | ready |
+
+| profile | required_or_fallback | usage | evidence | reviewer_verdict | readiness |
+|---|---|---|---|---|---|
+| standard | manual fallback | used | manual evidence: fresh spec-reviewer `019f3999-911a-7381-8155-3cda5fcf3403` passed and canonical docs were integrated by main orchestrator | pass | ready |
 
 ## Reviewer Gate Status
 
@@ -80,7 +88,11 @@ ID: "iss-00284"
 | planning | planning spec-review | spec-reviewer | fresh | pass | no | execute approved plan | post-fix fresh pass `019f387a-e7c2-73b3-ae10-89d8dd487cfb`; no P0/P1/P2 findings |
 | implementation | implementation code-review | code-reviewer | fresh | pass | no | ready for final spec-review | fresh pass `019f3926-506d-7fb3-9107-dd92a1ee1768`; no P0/P1/P2 findings |
 | implementation | implementation QA-review | qa-reviewer | fresh | pass | no | ready for final spec-review | fresh pass `019f3926-8788-75a0-a541-2cf7f41623d8`; no P0/P1/P2 findings |
-| final | issue finish spec-review | spec-reviewer | fresh | pass | no | issue finish ready | post-fix fresh pass `019f392e-e19d-71b2-addc-4dc77511217a`; no P0/P1/P2 findings |
+| final | issue finish spec-review | spec-reviewer | fresh | pass | no | execute approved plan | post-fix fresh pass `019f392e-e19d-71b2-addc-4dc77511217a`; no P0/P1/P2 findings |
+
+| phase | gate | reviewer_role | freshness | state | risk_acceptance | promotion_decision | evidence |
+|---|---|---|---|---|---|---|---|
+| planning | spec-authoring | spec-reviewer | fresh | pass | no | execute approved plan | fresh pass `019f3999-911a-7381-8155-3cda5fcf3403` |
 
 ## Post-Implementation Reviewer Obligations
 

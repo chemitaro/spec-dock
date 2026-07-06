@@ -3,7 +3,7 @@
 ID: "iss-00287"
 タイトル: "プロファイル制御されたスケルトン記入検証を実装する"
 関連GitHub: ["#287"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-07"
 依存: ["requirement.md"]
@@ -47,6 +47,63 @@ local assurance が決めた選択済みプロファイル、テンプレート�
   "bundle_generation_not_promotion": true
 }
 ```
+
+## 依存関係分析
+
+- 上流入力: E-RQ-008, E-RQ-009 / E-AC-005, E-AC-006、親 Epic の Issue readiness contract、Issue-local draft artifact の採否台帳。
+- 下流出力: profile-resolution validator、template hash validator、section-map validator、missing-section-report validator
+- 実行順: Epic `plan.md` のリレー実行順と handoff prerequisite を前提にする。これは実行上の順序契約であり、現時点では `.meta.json.depends_on` の runtime dependency edge を直接更新しない。
+- 権威境界: ChatGPT output、ZIP、staged artifact は evidence-only であり、canonical `requirement.md` / `design.md` / `plan.md` / `report.md` への反映は main orchestrator の採否判断と reviewer gate を通す。
+- 実装境界: この Issue は runtime 昇格判断を行わず、`scripts/authoring-pack/`、`tests/fixtures/authoring_pack/`、`tests/manual_tests/` と scope-local evidence で dogfood behavior を閉じる。
+
+## Module Dependency Diagram
+
+```plantuml
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+title iss-00287 module dependency sketch
+
+component "親 Epic
+readiness contract" as EpicContract
+component "Issue canonical docs
+requirement/design/plan" as IssueDocs
+component "scripts/authoring-pack
+dogfood-only scripts" as ManualPack
+component "Issue artifacts/report
+evidence ledger" as EvidenceLedger
+component "SpecDock canonical docs
+main orchestrator adoption" as CanonicalDocs
+
+EpicContract --> IssueDocs : scope / acceptance / relay order
+IssueDocs --> ManualPack : allowed dogfood work
+ManualPack --> EvidenceLedger : validation / staged output
+EvidenceLedger --> CanonicalDocs : adoption decision only
+@enduml
+```
+
+## ディレクトリ / ファイル変更計画
+
+```text
+scripts/
+`-- authoring-pack/
+    |-- README.md                         # dogfood-only usage / boundary notes
+    |-- *.py                              # dogfood-only helpers
+    `-- reports/                          # generated summaries when needed
+tests/
+|-- fixtures/
+|   `-- authoring_pack/                   # valid / negative dogfood fixtures
+`-- manual_tests/                         # focused pytest for dogfood helpers
+spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00287-implement-profile-controlled-selected-skeleton-fill-validation/
+|-- artifacts/                            # issue-local evidence only
+`-- report.md                             # observed evidence ledger
+```
+
+- 通常の許可パス: `scripts/authoring-pack/**`, `tests/fixtures/authoring_pack/**`, `tests/manual_tests/**`, this Issue `artifacts/**`, this Issue `report.md`, `scripts/authoring-pack/README.md` when directly needed。
+- `src/spec_dock/**` と `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/**` は v1 の通常許可 path ではない。配布 runtime へ昇格する場合は、`iss-00292` の判断材料、plan amendment、fresh reviewer gate を経て明示的に scope を拡張する。
+- generated ZIP / staged artifact は canonical docs を直接上書きしない。
 
 ## 処理の流れ
 
