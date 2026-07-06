@@ -25,7 +25,7 @@ ID: "iss-00284"
 1. S01: 親 Epic trace、Issue scope、local assurance、allowed / forbidden paths、no-per-Issue-PR relay policy を確認する。
 2. S02: `scripts/authoring-pack/prepare_chatgpt_authoring_pack.py` に preflight model、status taxonomy、diagnostics、exit code policy を実装する。
 3. S03: source hashing、repo / ref observation、`.assurance.json` read-only snapshot、`stale_if` comparison を実装する。
-4. S04: preflight status が `pass` の場合だけ prompt-pack files を生成する renderer、denylist、safe output constraints を実装する。
+4. S04: preflight status が `pass` の場合だけ prompt-pack files を生成する renderer、built-in path/secret rules、safe output constraints を実装する。
 5. S05: valid / invalid fixtures、deterministic examples、`tests/manual_tests/test_prepare_chatgpt_authoring_pack.py` を追加する。
 6. S90: Issue `report.md` に EAL / SID / Closure Evidence Ledger / Relay Policy を更新する。
 7. S99: targeted pytest、`spec-dock validate`、`git diff --check`、fresh reviewer readiness を閉じる。
@@ -72,7 +72,7 @@ S03 が `source-manifest.json` と `assurance_snapshot` を出力しない限り
   - closure id: `tc-002` / `tc-003`。
 - S04:
   - 担当: 実装 worker / doc-writer。
-  - close 条件: prompt-pack renderer、denylist、safe output constraints を実装し、unsafe claim が `rejected` になり、prompt に authority boundary と no-per-Issue-PR relay policy が入る。
+  - close 条件: prompt-pack renderer、built-in path/secret rules、safe output constraints を実装し、unsafe claim が `rejected` になり、prompt に authority boundary と no-per-Issue-PR relay policy が入る。
   - closure id: `tc-004` / `tc-005`。
 - S05:
   - 担当: QA / 実装 worker。
@@ -94,7 +94,7 @@ S03 が `source-manifest.json` と `assurance_snapshot` を出力しない限り
 | S01 | 親 Epic trace、Issue scope、local assurance、no-per-Issue-PR relay を確認する | inspect-only。必要な場合だけ Issue `report.md` に evidence を追記する | `inspect-only` | 親 trace、非スコープ、allowed paths、`.assurance.json` read-only、relay policy を説明できる | 実装変更を行わない | Scope / non-scope / local assurance / relay の確認が report に残り blocker がない | Closure Evidence Ledger / SID | ZIP intake、runtime command、profile mutation、PR 作成が必要に見えた場合 |
 | S02 | preflight 入力、status taxonomy、diagnostics、exit code policy を実装する | stdlib-only script と focused pytest。required field missing を `fail` にする | `red-required`: required field missing が fail になるテストを先に置く | required field missing が exit code `1` / status `fail` で、taxonomy が JSON で出る | runtime package へ昇格しない。external dependency を追加しない | taxonomy / diagnostics の基本構造があり、targeted pytest が pass | Closure Evidence Ledger / EAL | public runtime command、external dependency、ZIP validation が必要になった場合 |
 | S03 | source hash、repo/ref observation、assurance snapshot、stale_if を固定する | source path normalization、hash、assurance read-only snapshot、stale comparison を実装する | `red-required`: missing source と stale hash が fail-closed になるテストを置く | valid preflight が `preflight.json` / `source-manifest.json` を生成し、missing source / missing assurance / stale hash が expected status になる | `.assurance.json` を書かない。local Git metadata を推測で補完しない | Valid output と fail-closed negative が report に記録可能 | Closure Evidence Ledger | repo boundary を保証できない、profile mutation が必要、GitHub API/network 依存が必要になった場合 |
-| S04 | prompt-pack renderer、denylist、safe constraints を実装する | status `pass` の場合だけ prompt-pack files を生成し、authority boundary と forbidden claims を含める | `red-required`: unsafe authority claim が `rejected` になるテストを置く | generated prompt が evidence-only、expected ZIP root、no-per-Issue-PR relay を含む | prompt template を shipped docs / runtime docs へ昇格しない | Prompt-pack sample と unsafe claim rejected evidence が report に記録可能 | Closure Evidence Ledger | prompt-pack output root / required files / ZIP validation contract が変わる場合 |
+| S04 | prompt-pack renderer、built-in path/secret rules、safe constraints を実装する | status `pass` の場合だけ prompt-pack files を生成し、authority boundary と forbidden claims を含める | `red-required`: unsafe authority claim が `rejected` になるテストを置く | generated prompt が evidence-only、expected ZIP root、no-per-Issue-PR relay を含む | prompt template を shipped docs / runtime docs へ昇格しない | Prompt-pack sample と unsafe claim rejected evidence が report に記録可能 | Closure Evidence Ledger | prompt-pack output root / required files / ZIP validation contract が変わる場合 |
 | S05 | fixtures、examples、targeted pytest を追加する | valid / missing-source / missing-assurance / unsafe-claim / stale-hash fixture を追加する | `red-required`: missing-source と unsafe-claim が fail する状態を確認する | `uv run pytest tests/manual_tests/test_prepare_chatgpt_authoring_pack.py` が normal / negative を coverage する | fixtures に secrets、host-local absolute path、raw transcript を入れない | Fixture list、test output、generated example path が report に記録可能 | Closure Evidence Ledger | fixture が external network / live GitHub API / host-specific path を必要とする場合 |
 | S90 | docs impact、EAL、report consistency、relay policy を解消する | Issue `report.md` を更新し、Epic report は直接矛盾がある場合だけ更新する | `inspect-only` | EAL、Spec Authoring Gate、Closure Evidence Ledger、Reviewer Gate Status、Relay Policy が矛盾しない | historical ledger を削除しない。broad docs cleanup をしない | Report update と no-op rationale が残り direct contradiction がない | EAL / SID / Closure Evidence Ledger / Deferred PR Delivery Gate | workflow docs や Epic docs の正本判断が必要になった場合 |
 | S99 | final quality gate を閉じる | targeted pytest、`spec-dock validate`、`git diff --check`、fresh `spec-reviewer` / `code-reviewer` / `qa-reviewer` を確認する | `manual-required`: reviewer gate evidence が必要 | P0/P1 blocker がなく、各 reviewer gate の pass / blocker / next action が明確 | S99 で新 behavior を追加しない。必要なら bounded fix 後に S02〜S05 evidence を更新する | Commands と fresh review が report に記録され、issue finish 可能か判断できる | Final Gate / Reviewer Gate Status | reviewer が requirement / design / plan / code / QA 不足を指摘した場合 |
@@ -123,7 +123,7 @@ S03 が `source-manifest.json` と `assurance_snapshot` を出力しない限り
   - 関連 closure id: `tc-001`
 
 - `tc-s02-00284-001` acceptance: 事前確認 JSON スキーマ案を生成する
-  - 前提: repo、ref、source_paths、source hashes、stale_if、denylist、profile snapshot の入力候補がある。
+  - 前提: repo、ref、source_paths、source hashes、stale_if、built-in path/secret rules、`safe_output_constraints.forbidden_claims`、profile snapshot の入力候補がある。
   - 操作: 事前確認 JSON スキーマ案とソース一覧 fixture を作成し、必須 field の有無を検査する。
   - 期待結果: 必須 field がすべて含まれ、欠落時は prompt pack 生成へ進めない条件が明示される。
   - 失敗検出: source provenance が曖昧なまま ChatGPT ZIP 生成へ進む回帰を検出する。
