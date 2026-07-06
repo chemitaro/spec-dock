@@ -83,14 +83,61 @@ ID: "iss-00288"
 
 ## 具体テストケース一覧
 
-| test id | step | kind | concrete case | expected result | evidence path |
-|---|---|---|---|---|---|
-| tc-001-a | S01 | inspect | 親 Epic trace、依存 Issue、local assurance を確認する | parent trace / dependency / `authorized_profile` が report に記録される | Issue `report.md` Closure Evidence Ledger |
-| tc-002-a | S02 | implementation/docs | Issue 固有成果物を作成し、generated ZIP / staged artifact が正本を直接上書きしないことを確認する | deliverable と no-overwrite evidence が残る | Issue `report.md`; staged artifact path |
-| tc-003-a | S03 | normal fixture | 正常系 fixture を実行する、または docs-only Issue では expected artifact inspection を行う | validation status が pass として記録される | validation report / Issue `report.md` |
-| tc-003-b | S03 | negative fixture | stale source、profile mismatch、unsafe authority claim、または Issue 固有の拒否条件を検証する | blocked / stale / rejected / deferred のいずれかで fail-closed になる | validation report / Issue `report.md` |
-| tc-004-a | S90 | docs impact | docs / report / EAL / SID に直接矛盾がないか確認する | update または approved no-op rationale が記録される | Issue `report.md`; Epic `report.md` when touched |
-| tc-005-a | S99 | final gate | `spec-dock validate`、`git diff --check`、focused tests、fresh `spec-reviewer` を確認する | P0/P1 blocker がない、または blocker と次アクションが明確 | Issue `report.md` Final Gate |
+- `tc-s01-00288-001` inspect: candidate-only dogfood の前提を確認する
+  - 前提: Epic から Issue 候補を作る candidate-only pack の requirement / design が読める。
+  - 操作: この Issue が profile-specific skeleton fill ではなく Issue 候補比較を扱うことを確認する。
+  - 期待結果: `authorized_profile` 決定や profile-specific template body 生成を対象外にする境界が report に記録される。
+  - 失敗検出: candidate-only pack が selected profile 実装と混同される回帰を検出する。
+  - 検証方法: docs-only inspection と Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-001`
+
+- `tc-s02-00288-001` acceptance: candidate-only ZIP fixture を作る
+  - 前提: Epic requirement / design / plan から Issue 候補を切り出せる入力 fixture がある。
+  - 操作: candidate-only ZIP fixture を生成し、複数 Issue 候補の scope、dependency、non-scope を含める。
+  - 期待結果: 候補は比較可能だが、canonical Issue docs や `.assurance.json` を直接生成済みとは主張しない。
+  - 失敗検出: ZIP 生成時点で Issue が accepted / reviewed / profile-classified になったと主張する回帰を検出する。
+  - 検証方法: fixture inspection、candidate validation report。
+  - 関連 closure id: `tc-002`
+
+- `tc-s02-00288-002` acceptance: Issue 比較 summary を作る
+  - 前提: 複数の candidate Issue entry がある。
+  - 操作: candidate validation report と Issue 比較 summary を生成する。
+  - 期待結果: 重複 scope、依存、分割粒度、採用可否の観測点を reviewer が比較できる。
+  - 失敗検出: 候補間の境界や依存が見えず、後続の local adoption 判断ができない回帰を検出する。
+  - 検証方法: summary artifact inspection と Issue `report.md` execution evidence。
+  - 関連 closure id: `tc-002`
+
+- `tc-s03-00288-001` negative: profile-specific template body を出さない
+  - 前提: candidate-only ZIP fixture に profile-specific section body を混入させた negative fixture がある。
+  - 操作: candidate validator を実行する。
+  - 期待結果: profile-specific template body、selected skeleton fill、`authorized_profile` claim は blocked / rejected になる。
+  - 失敗検出: candidate-only pack が local assurance compose 済みの skeleton 本文を生成する回帰を検出する。
+  - 検証方法: validation report、`rg` inspection。
+  - 関連 closure id: `tc-003`
+
+- `tc-s03-00288-002` negative: candidate metadata 欠落を adoption-ineligible にする
+  - 前提: parent trace、scope、dependency、non-scope のいずれかを欠く candidate fixture がある。
+  - 操作: candidate validation report を生成する。
+  - 期待結果: 欠落候補は adoption-ineligible になり、Issue 比較 summary で理由が分かる。
+  - 失敗検出: 境界不明な candidate がそのまま Issue 化候補として pass する回帰を検出する。
+  - 検証方法: negative fixture validation report。
+  - 関連 closure id: `tc-003`
+
+- `tc-s90-00288-001` inspect: candidate-only 境界の docs / EAL 表現を確認する
+  - 前提: candidate validation report と Issue 比較 summary がある。
+  - 操作: report / EAL / docs に candidate-only、unreviewed、review-required の扱いが残っているか確認する。
+  - 期待結果: update または approved no-op rationale が記録される。
+  - 失敗検出: candidate output が canonical Issue として採用済みに見える記述を検出する。
+  - 検証方法: docs-only inspection と `rg`。
+  - 関連 closure id: `tc-004`
+
+- `tc-s99-00288-001` final-gate: 構造検証と fresh reviewer を通す
+  - 前提: S01〜S03 と S90 が closed または approved no-op である。
+  - 操作: `./spec-dock/scripts/spec-dock validate`、`git diff --check`、candidate-only focused tests、fresh `spec-reviewer` result を確認する。
+  - 期待結果: P0/P1 blocker がなく、残リスクまたは次アクションが Issue `report.md` Final Gate に記録される。
+  - 失敗検出: profile-specific output の未検証を完了扱いする回帰を検出する。
+  - 検証方法: command output、focused tests、reviewer result の report 記録。
+  - 関連 closure id: `tc-005`
 
 ### S90 ドキュメント影響解消
 

@@ -83,14 +83,61 @@ ID: "iss-00292"
 
 ## 具体テストケース一覧
 
-| test id | step | kind | concrete case | expected result | evidence path |
-|---|---|---|---|---|---|
-| tc-001-a | S01 | inspect | 親 Epic trace、依存 Issue、local assurance を確認する | parent trace / dependency / `authorized_profile` が report に記録される | Issue `report.md` Closure Evidence Ledger |
-| tc-002-a | S02 | implementation/docs | Issue 固有成果物を作成し、generated ZIP / staged artifact が正本を直接上書きしないことを確認する | deliverable と no-overwrite evidence が残る | Issue `report.md`; staged artifact path |
-| tc-003-a | S03 | normal fixture | 正常系 fixture を実行する、または docs-only Issue では expected artifact inspection を行う | validation status が pass として記録される | validation report / Issue `report.md` |
-| tc-003-b | S03 | negative fixture | stale source、profile mismatch、unsafe authority claim、または Issue 固有の拒否条件を検証する | blocked / stale / rejected / deferred のいずれかで fail-closed になる | validation report / Issue `report.md` |
-| tc-004-a | S90 | docs impact | docs / report / EAL / SID に直接矛盾がないか確認する | update または approved no-op rationale が記録される | Issue `report.md`; Epic `report.md` when touched |
-| tc-005-a | S99 | final gate | `spec-dock validate`、`git diff --check`、focused tests、fresh `spec-reviewer` を確認する | P0/P1 blocker がない、または blocker と次アクションが明確 | Issue `report.md` Final Gate |
+- `tc-s01-00292-001` inspect: metric source と dogfood evidence を確認する
+  - 前提: `iss-00288`〜`iss-00291` の dogfood / docs evidence がある。
+  - 操作: dogfood metrics report の入力が validation reports、correction loop、manual edit evidence、fallback evidence に trace できるか確認する。
+  - 期待結果: metrics の source と未計測項目が Issue `report.md` に記録される。
+  - 失敗検出: 観測していない成功率や品質指標を推測で書く回帰を検出する。
+  - 検証方法: docs-only inspection と Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-001`
+
+- `tc-s02-00292-001` acceptance: dogfood metrics report を集計する
+  - 前提: validation failure rate、correction loop count、manual edit volume、profile mismatch block rate、fallback success の source evidence がある。
+  - 操作: dogfood metrics report を作成し、各 metric の定義、source、観測値または未計測理由を書く。
+  - 期待結果: runtime promotion 判断に使う量的・質的 evidence が、推測ではなく観測として残る。
+  - 失敗検出: source evidence のない metric を成功指標として扱う回帰を検出する。
+  - 検証方法: metrics report inspection、source evidence trace check。
+  - 関連 closure id: `tc-002`
+
+- `tc-s02-00292-002` acceptance: validation failure を分類する
+  - 前提: stale、mismatch、unsafe claim、schema failure、manual fallback の result がある。
+  - 操作: dogfood metrics report で failure class と発生数または未計測理由を分類する。
+  - 期待結果: どの失敗が runtime blocker か、どれが docs/process 改善で済むかが分かる。
+  - 失敗検出: すべての失敗を同じ「失敗」として扱い、昇格判断材料にならない回帰を検出する。
+  - 検証方法: metrics report inspection と Issue `report.md` execution evidence。
+  - 関連 closure id: `tc-002`
+
+- `tc-s03-00292-001` acceptance: 昇格 / 保留 / 却下の判断材料を分ける
+  - 前提: dogfood metrics report と runtime promotion criteria draft がある。
+  - 操作: promotion criteria draft に promote、defer、reject の条件と必要 evidence を分けて書く。
+  - 期待結果: この Issue は runtime promotion の実施判断ではなく、判断材料と未確定点を提示する。
+  - 失敗検出: metrics report だけで runtime promotion を決定済みと主張する回帰を検出する。
+  - 検証方法: criteria draft inspection、Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-003`
+
+- `tc-s03-00292-002` acceptance: defer / reject rationale template を作る
+  - 前提: promote できない failure class または missing evidence がある。
+  - 操作: defer / reject rationale template に理由、必要 evidence、再評価条件、follow-up の書式を作る。
+  - 期待結果: 昇格しない判断も後続 Issue へ引き継げる構造で記録できる。
+  - 失敗検出: 保留・却下理由が自由記述だけになり、再評価不能になる回帰を検出する。
+  - 検証方法: template inspection と sample rationale check。
+  - 関連 closure id: `tc-003`
+
+- `tc-s90-00292-001` inspect: metrics / criteria の docs impact を確認する
+  - 前提: metrics report、promotion criteria draft、rationale template がある。
+  - 操作: report / EAL / docs に promotion 実施ではなく criteria draft であることが残っているか確認する。
+  - 期待結果: update または approved no-op rationale が記録される。
+  - 失敗検出: runtime promotion が accepted decision になったと誤読できる記述を検出する。
+  - 検証方法: docs-only inspection と `rg`。
+  - 関連 closure id: `tc-004`
+
+- `tc-s99-00292-001` final-gate: metrics 検証と fresh reviewer を通す
+  - 前提: S01〜S03 と S90 が closed または approved no-op である。
+  - 操作: `./spec-dock/scripts/spec-dock validate`、`git diff --check`、metrics source trace inspection、fresh `spec-reviewer` result を確認する。
+  - 期待結果: P0/P1 blocker がなく、残リスクまたは次アクションが Issue `report.md` Final Gate に記録される。
+  - 失敗検出: 未計測 metric や promotion decision claim を残したまま完了扱いする回帰を検出する。
+  - 検証方法: command output、metrics inspection evidence、reviewer result の report 記録。
+  - 関連 closure id: `tc-005`
 
 ### S90 ドキュメント影響解消
 

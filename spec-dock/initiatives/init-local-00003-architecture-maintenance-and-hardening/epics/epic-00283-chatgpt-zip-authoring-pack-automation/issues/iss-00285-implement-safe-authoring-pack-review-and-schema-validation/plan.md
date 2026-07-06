@@ -83,14 +83,61 @@ ID: "iss-00285"
 
 ## 具体テストケース一覧
 
-| test id | step | kind | concrete case | expected result | evidence path |
-|---|---|---|---|---|---|
-| tc-001-a | S01 | inspect | 親 Epic trace、依存 Issue、local assurance を確認する | parent trace / dependency / `authorized_profile` が report に記録される | Issue `report.md` Closure Evidence Ledger |
-| tc-002-a | S02 | implementation/docs | Issue 固有成果物を作成し、generated ZIP / staged artifact が正本を直接上書きしないことを確認する | deliverable と no-overwrite evidence が残る | Issue `report.md`; staged artifact path |
-| tc-003-a | S03 | normal fixture | 正常系 fixture を実行する、または docs-only Issue では expected artifact inspection を行う | validation status が pass として記録される | validation report / Issue `report.md` |
-| tc-003-b | S03 | negative fixture | stale source、profile mismatch、unsafe authority claim、または Issue 固有の拒否条件を検証する | blocked / stale / rejected / deferred のいずれかで fail-closed になる | validation report / Issue `report.md` |
-| tc-004-a | S90 | docs impact | docs / report / EAL / SID に直接矛盾がないか確認する | update または approved no-op rationale が記録される | Issue `report.md`; Epic `report.md` when touched |
-| tc-005-a | S99 | final gate | `spec-dock validate`、`git diff --check`、focused tests、fresh `spec-reviewer` を確認する | P0/P1 blocker がない、または blocker と次アクションが明確 | Issue `report.md` Final Gate |
+- `tc-s01-00285-001` inspect: `iss-00284` 由来の preflight 契約を入力として確認する
+  - 前提: `iss-00284` の preflight / prompt pack 成果物または採用台帳が存在する。
+  - 操作: manifest、source_paths、stale_if、denylist、profile snapshot が安全検査の入力として trace できるか確認する。
+  - 期待結果: `iss-00285` の ZIP 検証は `iss-00284` の provenance 契約に依存することが report に記録される。
+  - 失敗検出: provenance 未確認の ZIP を検査対象にしてしまう回帰を検出する。
+  - 検証方法: docs-only inspection と Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-001`
+
+- `tc-s02-00285-001` negative: 危険な ZIP path を展開前に拒否する
+  - 前提: path traversal、absolute path、hidden path を含む ZIP fixture がある。
+  - 操作: central directory 検査と safe extraction prototype を展開前に実行する。
+  - 期待結果: fixture は reject され、repo 内にファイル作成・上書きの副作用を残さない。
+  - 失敗検出: `../`、absolute path、hidden path が staging root 外へ出る回帰を検出する。
+  - 検証方法: focused unit test または validation report と post-run `git status --short`。
+  - 関連 closure id: `tc-002`
+
+- `tc-s02-00285-002` negative: unsafe file type を展開前に拒否する
+  - 前提: symlink、binary、nested archive を含む ZIP fixture がある。
+  - 操作: central directory と file type validator を実行する。
+  - 期待結果: unsafe file type は reject または adoption-ineligible として分類される。
+  - 失敗検出: symlink / binary / nested archive が staged artifact として採用候補に残る回帰を検出する。
+  - 検証方法: focused unit test、fixture inspection、validation report。
+  - 関連 closure id: `tc-002`
+
+- `tc-s03-00285-001` negative: 必須 manifest / provenance 欠落を検出する
+  - 前提: manifest、provenance、source hash、adoption-map のいずれかを欠く ZIP fixture がある。
+  - 操作: schema validator を実行し、欠落 field の disposition を確認する。
+  - 期待結果: 欠落は adoption-ineligible または reject として report に出る。
+  - 失敗検出: 必須 metadata 欠落の ZIP が pass になる回帰を検出する。
+  - 検証方法: schema validator test または validation report。
+  - 関連 closure id: `tc-003`
+
+- `tc-s03-00285-002` negative: 危険な権威主張を検出する
+  - 前提: reviewer pass、accepted、canonical overwrite、`.assurance.json` update claim を含む ZIP fixture がある。
+  - 操作: 危険な権威主張 validator を実行する。
+  - 期待結果: 危険 claim は reject または adoption-ineligible になり、reviewer input と gate result が混同されない。
+  - 失敗検出: ChatGPT output が self-review pass や adopted claim を持ったまま downstream に流れる回帰を検出する。
+  - 検証方法: validator test、`rg` inspection、Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-003`
+
+- `tc-s90-00285-001` inspect: 安全検査結果の docs / EAL 表現を確認する
+  - 前提: S02 / S03 の validation report が作成済みである。
+  - 操作: report と docs に fail-closed taxonomy、reject / adoption-ineligible の意味、正本非昇格が残っているか確認する。
+  - 期待結果: update または approved no-op rationale が記録される。
+  - 失敗検出: reject された ZIP を採用候補に見せる EAL 記述を検出する。
+  - 検証方法: docs-only inspection と `rg`。
+  - 関連 closure id: `tc-004`
+
+- `tc-s99-00285-001` final-gate: 検証と fresh reviewer を通す
+  - 前提: S01〜S03 と S90 が closed または approved no-op である。
+  - 操作: `./spec-dock/scripts/spec-dock validate`、`git diff --check`、safe ZIP / schema focused tests、fresh `spec-reviewer` result を確認する。
+  - 期待結果: P0/P1 blocker がなく、残リスクまたは次アクションが Issue `report.md` Final Gate に記録される。
+  - 失敗検出: unsafe fixture 未検証のまま完了扱いする回帰を検出する。
+  - 検証方法: command output、focused tests、reviewer result の report 記録。
+  - 関連 closure id: `tc-005`
 
 ### S90 ドキュメント影響解消
 

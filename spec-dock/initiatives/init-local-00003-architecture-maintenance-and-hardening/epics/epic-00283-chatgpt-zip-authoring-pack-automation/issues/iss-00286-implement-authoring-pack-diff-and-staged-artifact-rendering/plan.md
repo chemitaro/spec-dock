@@ -83,14 +83,61 @@ ID: "iss-00286"
 
 ## 具体テストケース一覧
 
-| test id | step | kind | concrete case | expected result | evidence path |
-|---|---|---|---|---|---|
-| tc-001-a | S01 | inspect | 親 Epic trace、依存 Issue、local assurance を確認する | parent trace / dependency / `authorized_profile` が report に記録される | Issue `report.md` Closure Evidence Ledger |
-| tc-002-a | S02 | implementation/docs | Issue 固有成果物を作成し、generated ZIP / staged artifact が正本を直接上書きしないことを確認する | deliverable と no-overwrite evidence が残る | Issue `report.md`; staged artifact path |
-| tc-003-a | S03 | normal fixture | 正常系 fixture を実行する、または docs-only Issue では expected artifact inspection を行う | validation status が pass として記録される | validation report / Issue `report.md` |
-| tc-003-b | S03 | negative fixture | stale source、profile mismatch、unsafe authority claim、または Issue 固有の拒否条件を検証する | blocked / stale / rejected / deferred のいずれかで fail-closed になる | validation report / Issue `report.md` |
-| tc-004-a | S90 | docs impact | docs / report / EAL / SID に直接矛盾がないか確認する | update または approved no-op rationale が記録される | Issue `report.md`; Epic `report.md` when touched |
-| tc-005-a | S99 | final gate | `spec-dock validate`、`git diff --check`、focused tests、fresh `spec-reviewer` を確認する | P0/P1 blocker がない、または blocker と次アクションが明確 | Issue `report.md` Final Gate |
+- `tc-s01-00286-001` inspect: safe-reviewed ZIP だけを staging 対象にする
+  - 前提: `iss-00285` の safe review / schema validation evidence がある。
+  - 操作: staging renderer の入力条件が reject / adoption-ineligible ZIP を除外することを確認する。
+  - 期待結果: safe-reviewed でない ZIP は dry-run diff や staged artifact 生成へ進めない。
+  - 失敗検出: unsafe ZIP が staging root に展開される回帰を検出する。
+  - 検証方法: docs-only inspection と Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-001`
+
+- `tc-s02-00286-001` acceptance: ドライラン差分レポートを生成する
+  - 前提: valid authoring pack fixture と empty staging root がある。
+  - 操作: diff renderer を dry-run で実行し、正本候補との差分と target path を出力する。
+  - 期待結果: 差分レポートは staged artifact として作成され、canonical docs は直接上書きされない。
+  - 失敗検出: generated ZIP が `requirement.md` / `design.md` / `plan.md` を直接変更する回帰を検出する。
+  - 検証方法: focused test または dry-run command output、`git diff --name-only`。
+  - 関連 closure id: `tc-002`
+
+- `tc-s02-00286-002` acceptance: 段階配置 renderer が採用前の review surface を作る
+  - 前提: valid ZIP fixture に candidate Markdown と adoption-map が含まれる。
+  - 操作: renderer を実行し、staged artifact path と review summary を生成する。
+  - 期待結果: reviewer は正本に触れる前に staged content、target path、diff summary を読める。
+  - 失敗検出: artifact がどの正本へ反映されるか不明なまま置かれる回帰を検出する。
+  - 検証方法: staged artifact inspection と Issue `report.md` execution evidence。
+  - 関連 closure id: `tc-002`
+
+- `tc-s03-00286-001` acceptance: adoption-map を EAL 候補へ変換する
+  - 前提: adoption-map に source artifact、target doc、adoption_status、reflected_to 候補がある。
+  - 操作: adoption-map 引き渡し確認を実行し、EAL candidate row に必要な field を確認する。
+  - 期待結果: target、evidence、adoption_status、review requirement が EAL 候補として出る。
+  - 失敗検出: adoption-map が adopted と self-claim する、または target / evidence が欠ける回帰を検出する。
+  - 検証方法: validation report、EAL candidate inspection、Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-003`
+
+- `tc-s03-00286-002` negative: canonical overwrite claim を block する
+  - 前提: ZIP 内に direct-write または adopted claim を持つ adoption-map fixture がある。
+  - 操作: staging validation を実行する。
+  - 期待結果: status は blocked / rejected になり、正本更新候補として扱わない。
+  - 失敗検出: ChatGPT generated content が local adoption review なしに canonical update として扱われる回帰を検出する。
+  - 検証方法: negative fixture report と `git diff --name-only`。
+  - 関連 closure id: `tc-003`
+
+- `tc-s90-00286-001` inspect: staging と EAL の表現を docs/report で揃える
+  - 前提: dry-run diff、staged artifact、adoption-map validation report がある。
+  - 操作: report / EAL / docs に staged-only、evidence-only、review-required が残っているか確認する。
+  - 期待結果: update または approved no-op rationale が記録される。
+  - 失敗検出: staged artifact を正本反映済みと読める記述を検出する。
+  - 検証方法: docs-only inspection と `rg`。
+  - 関連 closure id: `tc-004`
+
+- `tc-s99-00286-001` final-gate: 構造検証と fresh reviewer を通す
+  - 前提: S01〜S03 と S90 が closed または approved no-op である。
+  - 操作: `./spec-dock/scripts/spec-dock validate`、`git diff --check`、diff/staging focused tests、fresh `spec-reviewer` result を確認する。
+  - 期待結果: P0/P1 blocker がなく、残リスクまたは次アクションが Issue `report.md` Final Gate に記録される。
+  - 失敗検出: no-overwrite evidence 欠落のまま完了扱いする回帰を検出する。
+  - 検証方法: command output、focused tests、reviewer result の report 記録。
+  - 関連 closure id: `tc-005`
 
 ### S90 ドキュメント影響解消
 
