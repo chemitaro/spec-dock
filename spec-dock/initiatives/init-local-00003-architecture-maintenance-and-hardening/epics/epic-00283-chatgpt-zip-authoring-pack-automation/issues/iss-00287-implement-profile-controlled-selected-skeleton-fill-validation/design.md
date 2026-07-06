@@ -32,10 +32,14 @@ local assurance が決めた選択済みプロファイル、テンプレート�
 
 - 親 Epic trace: E-RQ-008, E-RQ-009 / E-AC-005, E-AC-006
 - 必要な前提 Issue: iss-00284, iss-00285
-- 必要に応じた source manifest、stale_if、profile snapshot。
+- review 済み ChatGPT authoring pack の `validation-report.json` と pack tree。
+- local `.assurance.json`。
+- local selected skeleton manifest。最小構造は `authorized_profile`、`template_sha256`、`skeleton_sha256`、`section_inventory_sha256`、`section_inventory`、`allowed_section_ids`、`required_section_ids` を持つ。
 
 出力:
 
+- `selected-skeleton-fill-validation-report.json`
+- `selected-skeleton-fill-validation-summary.md`
 - profile-resolution validator、template hash validator、section-map validator、missing-section-report validator
 
 すべての出力は次の境界を持つ。
@@ -109,16 +113,24 @@ spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/ep
 
 1. 親 Epic の権威境界とこの Issue の candidate metadata を読む。
 2. 直接依存する Issue / artifact を確認する。
-3. ドッグフード専用かつ証跡専用の境界で成果物を作る。
-4. ソース、スキーマ、プロファイル、権威主張を検証する。
-5. 正本を書き換えず、reviewer-focus と adoption-map の候補を出す。
+3. `review-report` が `pass` であり、pack tree digest が `pack_digest` と一致することを確認する。
+4. `.assurance.json` を read-only で読み、local `authorized_profile` と assurance snapshot を取得する。
+5. local selected skeleton manifest を読み、profile、template hash、skeleton hash、section inventory hash、section id 一覧を正規化する。
+6. pack tree の `selected-skeleton-fill/section-fills.json` を candidate fill manifest として読み込む。
+7. candidate boundary、target profile、template hash、skeleton hash、section inventory hash を local snapshot と照合する。
+8. ChatGPT `profile_suggestion` は advisory evidence として記録し、local profile authority には使わない。
+9. section fill を allowed / required inventory と照合し、eligible / missing / extra を分類する。
+10. metadata と section body の unsafe authority claim を検査する。
+11. 正本を書き換えず、owned output directory に JSON report と Markdown summary だけを出す。
 
 ## 失敗時の設計
 
 - 前提証跡が不足する場合は blocked evidence にする。
-- source / ref が古い場合は stale evidence にする。
+- review report と pack tree の digest 不一致、profile mismatch、template hash mismatch、skeleton hash mismatch、section inventory hash mismatch は stale evidence にする。
 - 危険な権威主張は staging 前に拒否する。
-- profile mismatch は section fill をブロックする。
+- allowed section 外の fill、candidate による `authorized_profile` 決定 claim、`.assurance.json updated` claim は rejected にする。
+- required section 欠落は fail にする。
+- optional section 欠落は warning として report に残す。
 - tool unavailable は手動フォールバックへ戻す。
 
 ## 観測性
@@ -126,12 +138,13 @@ spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/ep
 - 実行ごとに簡潔な JSON report と人間が読める Markdown summary を出す。
 - 診断出力に secrets、credentials、raw transcripts、host-local absolute paths を含めない。
 - validation status は blocked、stale、rejected、deferred、unreviewed を区別する。
+- report は `profile_validation`、`skeleton_validation`、`section_inventory_validation`、`section_results`、`adoption.overall_adoption_eligible`、`adoption.canonical_written=false`、`adoption.assurance_mutated=false` を持つ。
 
 ## テスト戦略
 
-- Unit: この Issue に関係する schema / path / profile / claim validation。
-- Integration: valid fixture と negative fixture で candidate flow を実行する。
-- Regression: 正本上書きなし、ChatGPT による `.assurance.json` mutation なし、candidate-only pack で all-profile variants なし。
+- Unit: selected skeleton manifest、candidate fill manifest、profile / hash / section-map / claim validation。
+- Integration: valid fixture、profile mismatch fixture、hash mismatch fixture、extra section fixture、missing required section fixture、unsafe claim fixture で candidate flow を実行する。
+- Regression: 正本上書きなし、ChatGPT による `.assurance.json` mutation なし、candidate-only pack で local selected profile 以外の section fill を採用しない。
 
 ## レビュアー注目点
 
@@ -139,3 +152,5 @@ spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/ep
 - profile と reviewer の権威境界を守っているか。
 - 失敗時の扱いが fail-closed か。
 - repo artifact 内の instruction-like text を命令ではなくデータとして扱っているか。
+- `target.profile` mismatch と `profile_suggestion` mismatch が混同されていないか。
+- pass report が spec-reviewer pass や canonical adoption と誤読されないか。

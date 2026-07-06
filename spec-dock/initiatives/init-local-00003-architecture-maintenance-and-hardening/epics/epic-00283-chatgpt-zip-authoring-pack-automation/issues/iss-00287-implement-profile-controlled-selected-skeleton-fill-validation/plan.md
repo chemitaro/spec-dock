@@ -24,17 +24,20 @@ ID: "iss-00287"
 
 1. 親 Epic の `requirement.md` / `design.md` / `plan.md` と、この Issue の要件定義を読む。
 2. 依存関係を確認する: iss-00284, iss-00285。
-3. local assurance が決めた選択済みプロファイル、テンプレートハッシュ、セクション一覧と、ChatGPT の section fill を照合する。
-4. 成果物を profile-resolution validator、template hash validator、section-map validator、missing-section-report validator として作る。
-5. 正本ファイルを直接変更せず、検証 report と staged artifact を出す。
-6. Evidence Adoption Ledger へ採用候補を引き渡せる形に整える。
+3. `scripts/authoring-pack/authoring_pack_selected_skeleton_fill.py` を追加し、review report / pack digest / local assurance / selected skeleton manifest / candidate section fills を検証する。
+4. `scripts/authoring-pack/validate_selected_skeleton_fill.py` を追加し、CLI から JSON report と Markdown summary を owned output directory に出す。
+5. local assurance が決めた選択済みプロファイル、テンプレートハッシュ、スケルトンハッシュ、セクション一覧と、ChatGPT の section fill を照合する。
+6. 成果物を selected skeleton fill validator、profile-resolution validator、template hash validator、section-map validator、missing-section-report validator として作る。
+7. 正本ファイルと `.assurance.json` を直接変更せず、検証 report だけを出す。
+8. Evidence Adoption Ledger へ採用判断候補を引き渡せる形に整える。
 
 ## 検証計画
 
 - 正常系 fixture で expected output が作られることを確認する。
-- negative fixture で危険な claim、stale source、profile mismatch をブロックする。
+- negative fixture で危険な claim、review digest mismatch、profile mismatch、template / skeleton / section inventory hash mismatch、extra section、missing required section をブロックする。
 - `git status` または差分確認で正本直接上書きがないことを確認する。
 - `.assurance.json` が ChatGPT 出力によって変更されていないことを確認する。
+- `scripts/authoring-pack/README.md` は dogfood-only helper としての usage だけを追加し、配布ランタイム契約とは書かない。
 
 
 ## 仕様固定クロージャ索引（Spec-Locked Closure Index）
@@ -43,7 +46,7 @@ ID: "iss-00287"
 |---|---|---|---|---|---|---|
 | tc-001 | S01 | 親 Epic trace と依存 Issue output を確認する | 親 E-RQ / E-AC、依存関係 | 親 docs / 依存 Issue report の確認メモ | 対応する親 trace と依存 output を説明できる | Issue `report.md` の Closure Evidence Ledger |
 | tc-002 | S02 | Issue 固有成果物を実装または作成する | Issue AC-001〜AC-004 | 変更差分、生成 artifact、または no-op rationale | 成果物が存在し、正本直接上書きがない | Issue `report.md` の実行証跡 / EAL |
-| tc-003 | S03 | 正常系 / negative fixture / safety boundary を検証する | Issue AC-005〜AC-006 | validation report、fixture 結果、`.assurance.json` 差分確認 | pass / blocked / stale / rejected / deferred を区別できる | Issue `report.md` の Closure Evidence Ledger |
+| tc-003 | S03 | 正常系 / negative fixture / safety boundary を検証する | Issue AC-005〜AC-008 | validation report、fixture 結果、`.assurance.json` 差分確認 | pass / blocked / stale / rejected / fail / warning を区別できる | Issue `report.md` の Closure Evidence Ledger |
 | tc-004 | S90 | docs impact と adoption ledger を解消する | docs / report integrity | docs impact 判断、EAL 更新、Closure Delta 有無 | 関連 docs / report の更新または no-op 理由が記録されている | Issue `report.md` の Docs Impact / EAL |
 | tc-005 | S99 | final QA / code / spec gate を閉じる | all AC / EC | `spec-dock validate`、関連テスト、fresh reviewer result | P0/P1 blocker がなく、残リスクと次アクションが明確 | Issue `report.md` の Final Gate / Closure Evidence Ledger |
 
@@ -55,11 +58,11 @@ ID: "iss-00287"
   - closure id: `tc-001`。
 - S02:
   - 担当: 実装 worker。
-  - close 条件: この Issue 固有の成果物を作り、ChatGPT / ZIP / staged artifact が正本を直接上書きしていないことを確認する。
+  - close 条件: selected skeleton fill validator と CLI wrapper を作り、ChatGPT / ZIP / staged artifact が正本や `.assurance.json` を直接上書きしていないことを確認する。
   - closure id: `tc-002`。
 - S03:
   - 担当: QA / 実装 worker。
-  - close 条件: 正常系 fixture と negative fixture を実行し、validation status を区別して report に残す。
+  - close 条件: 正常系 fixture と negative fixture を実行し、profile suggestion advisory、target profile stale、hash stale、extra section rejected、missing required fail、unsafe claim rejected、output ownership blocked を区別して report に残す。
   - closure id: `tc-003`。
 - S90:
   - 担当: main orchestrator。
@@ -94,7 +97,7 @@ ID: "iss-00287"
 - `tc-s02-00287-001` acceptance: profile-resolution validator を作る
   - 前提: selected profile、local composed skeleton、ChatGPT fill candidate の fixture がある。
   - 操作: profile-resolution validator を実行し、candidate の profile が selected profile と一致するか確認する。
-  - 期待結果: 一致する candidate だけが section fill review へ進み、不一致は blocked になる。
+  - 期待結果: 一致する candidate だけが section fill review へ進み、candidate `target.profile` 不一致は stale になる。ChatGPT `profile_suggestion` 不一致は advisory warning に留まる。
   - 失敗検出: candidate 側の profile 名を根拠に selected profile を切り替える回帰を検出する。
   - 検証方法: focused validator test または validation report。
   - 関連 closure id: `tc-002`
@@ -102,9 +105,17 @@ ID: "iss-00287"
 - `tc-s02-00287-002` acceptance: template hash validator を作る
   - 前提: local composed skeleton hash と、同一 / 不一致の candidate hash fixture がある。
   - 操作: template hash validator を実行する。
-  - 期待結果: hash 一致時のみ section fill 候補として扱い、不一致時は stale / blocked になる。
+  - 期待結果: hash 一致時のみ section fill 候補として扱い、不一致時は stale になる。
   - 失敗検出: 古い skeleton に対する ChatGPT fill が pass する回帰を検出する。
   - 検証方法: focused validator test、validation report、Issue `report.md` execution evidence。
+  - 関連 closure id: `tc-002`
+
+- `tc-s02-00287-003` acceptance: skeleton hash と section inventory hash を照合する
+  - 前提: local selected skeleton manifest と、同一 / 不一致の candidate hash fixture がある。
+  - 操作: selected skeleton fill validator を実行する。
+  - 期待結果: `skeleton_sha256` と `section_inventory_sha256` が一致する場合だけ section fill validation へ進み、不一致時は stale になる。
+  - 失敗検出: 古い section inventory に対する ChatGPT fill が pass する回帰を検出する。
+  - 検証方法: focused validator test と validation report。
   - 関連 closure id: `tc-002`
 
 - `tc-s03-00287-001` acceptance: section-map と missing-section-report を検証する
@@ -121,6 +132,14 @@ ID: "iss-00287"
   - 期待結果: candidate は rejected または adoption-ineligible になり、section fill と authority claim が分離される。
   - 失敗検出: 本文中の権威主張が staged artifact に残る回帰を検出する。
   - 検証方法: `rg` inspection、negative fixture validation report。
+  - 関連 closure id: `tc-003`
+
+- `tc-s03-00287-003` negative: 正本と `.assurance.json` を変更しない
+  - 前提: local `.assurance.json` と canonical docs の bytes を記録する。
+  - 操作: selected skeleton fill validator を実行する。
+  - 期待結果: validator の出力は output dir に限定され、`.assurance.json` と canonical docs の bytes は一致する。
+  - 失敗検出: ChatGPT section fill 検証が local profile authority や正本を直接変更する回帰を検出する。
+  - 検証方法: focused validator test、`git diff --check`。
   - 関連 closure id: `tc-003`
 
 - `tc-s90-00287-001` inspect: profile / skeleton validation の docs impact を解消する
@@ -167,10 +186,10 @@ ID: "iss-00287"
 
 ## 完了条件
 
-- profile-resolution validator、template hash validator、section-map validator、missing-section-report validator が存在する。
+- selected skeleton fill validator、profile-resolution validator、template hash validator、section-map validator、missing-section-report validator が存在する。
 - 親 trace E-RQ-008, E-RQ-009 / E-AC-005, E-AC-006 を説明できる。
-- validation report が pass / fail / blocked / stale を区別する。
-- 正本上書きがない。
+- validation report が pass / fail / blocked / stale / rejected / warning を区別する。
+- 正本上書きと `.assurance.json` mutation がない。
 - fresh reviewer gate result と closure evidence が report に残る。
 
 ## レビュアー引き渡しメモ
