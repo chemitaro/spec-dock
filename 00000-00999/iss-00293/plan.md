@@ -72,6 +72,30 @@ ID: "iss-00293"
   - close 条件: final QA / code / spec reviewer が fresh pass、または blocker と次アクションが明確である。
   - closure id: `tc-006`。
 
+
+## 委任契約（Delegation Contract）
+
+| step | delegated role | input docs | allowed paths | forbidden changes | acceptance criteria | required tests or docs-only verification | reviewer focus | stop conditions | output required | report destination | amendment trigger | step gate |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| S01 | main orchestrator | Epic docs, `iss-00284`〜`iss-00292` reports, git status | inspect-only; `iss-00293/report.md`; Epic `report.md` summary | source edits, unrelated docs cleanup, PR creation before scope is clean | AC-001 / AC-002 | `git status --short`; prior Issue report inspection | prior closure, scope isolation | incomplete prior Issue, dirty unrelated change | prior Issue completion matrix | `iss-00293/report.md` Closure Evidence Ledger | prior Issue incomplete or scope changes | S01 closed before S02 |
+| S02 | qa-reviewer / main orchestrator | final diff, repo commands, prior Issue evidence | `iss-00293/report.md`; bounded fixes in prior allowed paths only if blocker found | broad refactor, unplanned features, `.assurance.json` mutation | AC-003 | `spec-dock validate`, `git diff --check`, relevant pytest | structural validity, regression risk | failing command or test without bounded fix path | command outputs and disposition | `iss-00293/report.md` execution evidence | new failure requiring design/plan amendment | S02 closed before S03 |
+| S03 | qa-reviewer / main orchestrator | Epic manual test matrix, outputs from S02 | manual evidence artifacts, `iss-00293/report.md`, Epic `report.md` | skipping required scenario, claiming unexecuted manual tests | AC-004 / AC-005 | manual test matrix; scenario-by-scenario evidence | preflight/safety/staging/profile/dogfood/docs/metrics coverage | missing scenario, ambiguous result | manual test evidence and defects | `iss-00293/report.md`; Epic `report.md` | new dogfood failure mode | S03 closed before S04 |
+| S04 | main orchestrator | PR branch, final diff, CI/review status | PR metadata/report updates; bounded fixes in prior allowed paths | unrelated GitHub changes, force-push/destructive actions, hiding CI/review failures | AC-006 / AC-007 | PR URL, base/head, CI, review, mergeable status | PR readiness, repair loop integrity | PR blocked, CI failure, review P0/P1 | PR URL and status ledger | `iss-00293/report.md`; Epic `report.md` | blocker outside Epic scope | S04 closed before S90 |
+| S90 | main orchestrator / doc-writer | S01〜S04 evidence, Epic report, Issue reports | Epic `report.md`, `iss-00293/report.md`, docs only for direct contradiction | broad docs cleanup, changing earlier Issue decisions without evidence | AC-008 | docs/report impact inspection; `spec-dock validate` | final ledger completeness | stale or contradictory report | docs impact decision and EAL updates | `iss-00293/report.md`; Epic `report.md` | canonical docs need amendment | S90 closed before S99 |
+| S99 | main orchestrator + fresh reviewers | all closure evidence, PR status, final diff | final reports; bounded fixes in previously allowed paths only | new feature work, unreviewed scope expansion, merge claim without evidence | AC-009 | fresh spec/code/QA review as needed; final command evidence | no P0/P1 blocker, residual risk clarity | any P0/P1 finding or stale reviewer | final gate result and completion recommendation | `iss-00293/report.md`; Epic `report.md` | reviewer requires plan/design change | Epic PR-ready only after S99 |
+
+## 具体テストケース一覧
+
+| test id | step | kind | concrete case | expected result | evidence path |
+|---|---|---|---|---|---|
+| tc-001-a | S01 | inspect | `iss-00284`〜`iss-00292` の completion/report evidence と `git status --short` を確認する | prior issue completion and scope isolation are recorded | `iss-00293/report.md` Closure Evidence Ledger |
+| tc-002-a | S02 | command | `./spec-dock/scripts/spec-dock validate` と `git diff --check` を実行する | both pass or blocker disposition is recorded | `iss-00293/report.md` execution evidence |
+| tc-002-b | S02 | focused test | 実装範囲に応じた pytest を選択して実行、または docs-only no-op rationale を残す | pass or explicit blocker | `iss-00293/report.md` execution evidence |
+| tc-003-a | S03 | manual matrix | preflight / safe review / diff-staging / profile / dogfood / docs / metrics の manual matrix を確認する | each scenario has pass/fail evidence | manual test evidence artifact; `iss-00293/report.md` |
+| tc-004-a | S04 | PR readiness | PR URL、base/head、CI、review、mergeable status を確認する | PR is mergeable or blocker is explicit | `iss-00293/report.md`; Epic `report.md` |
+| tc-005-a | S90 | docs impact | Epic / Issue reports と docs impact を確認する | final reports are coherent and no stale ledger remains | `iss-00293/report.md`; Epic `report.md` |
+| tc-006-a | S99 | final gate | fresh reviewer results and closure ids are checked | P0/P1 blocker absent or next action explicit | final gate ledger |
+
 ### S90 ドキュメント影響解消
 
 - 最終品質ゲートで変わった仕様、計画、運用方針は Epic / Issue report に反映する。
