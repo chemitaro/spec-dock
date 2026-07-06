@@ -9,11 +9,11 @@ ID: "iss-00289"
 親: ["epic-00283", "init-local-00003"]
 ---
 
-# iss-00289 既存 Issue の選択済みプロファイル向けパックをドッグフードする — Issue 要件定義ドラフト
+# iss-00289 既存 Issue の選択済みプロファイル向けパックをドッグフードする — 要件定義
 
 ## 位置づけ
 
-この文書は `epic-00283` から切り出した Issue の要件定義ドラフトです。fresh `spec-reviewer` 前の planning input であり、`authority: evidence_only`、`adoption_status: unreviewed`、`bundle_generation_not_promotion: true` の範囲で扱います。
+この文書は `epic-00283` から切り出した Issue の canonical 要件定義です。ChatGPT ZIP 仕様作成パック由来の draft artifact は証跡として採用し、この文書では Issue scope、非スコープ、受け入れ条件、例外ケースを正本として再記述します。実装開始には、この文書、`design.md`、`plan.md`、`report.md` の evidence と fresh `spec-reviewer` gate が必要です。
 
 ## 目的
 
@@ -61,7 +61,7 @@ Issue の設計・計画を ChatGPT が正本として完了したように見�
 ### AC-001: 親 Epic への trace が保たれる
 
 - 前提: この Issue の候補情報を読む。
-- 操作: candidate metadata とこの要件定義ドラフトを確認する。
+- 操作: candidate metadata とこの要件定義を確認する。
 - 期待結果: E-RQ-008, E-RQ-009, E-RQ-010 / E-AC-005, E-AC-006, E-AC-010, E-AC-011 へ trace できる。
 - 観測点: candidate metadata、Epic report の採用台帳。
 
