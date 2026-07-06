@@ -25,7 +25,8 @@ ZIP を生成できたことは、正本を昇格してよいことを意味し�
 
 ## コンポーネント境界
 
-- `manual-tests/authoring-pack/` にドッグフード専用スクリプトを置く。
+- `scripts/authoring-pack/` にドッグフード専用スクリプトを置く。
+- tracked fixture は `tests/fixtures/authoring_pack/` に置き、`manual-tests/` は untracked trial workspace 用に残す。
 - v1 では配布ランタイムコマンドを追加しない。
 - raw ZIP はリポジトリ外の隔離領域へ置く。
 - リポジトリへ残すのは、検証済みでサニタイズされた Markdown 証跡、検証レポート、採用判断材料に限定する。
@@ -33,7 +34,7 @@ ZIP を生成できたことは、正本を昇格してよいことを意味し�
 
 ## 制御プレーン
 
-- `authoring-pack-preflight`: repo、ref、source_paths、source hashes、stale_if、denylist、profile snapshot を固定し、プロンプトパックの入力を作る。
+- `prepare-chatgpt-authoring-pack`: repo、ref、source_paths、source hashes、stale_if、denylist、profile snapshot を固定し、プロンプトパックの入力を作る。
 - `spec-dock-authoring-pack`: ユーザー向けのスキル / ワークフロー面として、事前確認、検査、段階配置、Issue 引き渡しを束ねる。
 - `authoring-pack-review`: ZIP の central directory、パス、スキーマ、ソースハッシュ、プロファイル不一致、危険な権威主張を検査する。
 - `authoring-pack-stage`: 正本を上書きせず、ドライラン差分と段階配置 artifact を作る。
@@ -56,7 +57,7 @@ ZIP を生成できたことは、正本を昇格してよいことを意味し�
 ## ZIP ライフサイクル
 
 1. 保守担当者が Epic / Issue の範囲、参照ソース、期限切れ条件を決める。
-2. `authoring-pack-preflight` が repo / ref / source hash / stale_if / profile snapshot を固定する。
+2. `prepare-chatgpt-authoring-pack` が repo / ref / source hash / stale_if / profile snapshot を固定する。
 3. プロンプトパックが ChatGPT へ権威境界と出力スキーマを渡す。
 4. ChatGPT が単一 root `specdock-authoring-pack/` を持つ ZIP を返す。
 5. ZIP はリポジトリ外の隔離領域へ保存される。

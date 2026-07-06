@@ -30,7 +30,7 @@ ID: "epic-00283"
 
 一方で、ChatGPT はローカルの未追跡ファイル、最新の Git 状態、テンプレートハッシュ、`.assurance.json`、テスト実行結果、独立したレビュアー判定を保証できない。したがって、ChatGPT 出力をそのまま正本やレビュアー通過として扱うと、SpecDock の権威境界が崩れる。
 
-そのため、この Epic では `manual-tests/authoring-pack/` 配下のドッグフード専用スクリプト群として開始し、配布ランタイムへの昇格は後続判断に残す。
+そのため、この Epic では `scripts/authoring-pack/` 配下のドッグフード専用スクリプト群として開始し、配布ランタイムへの昇格は後続判断に残す。`manual-tests/` は tracked workspace / fixture / evidence を置かない既存方針を維持する。
 
 ## 不変条件
 
@@ -64,7 +64,7 @@ ID: "epic-00283"
 
 ## 要件
 
-- E-RQ-001: 初期実装は `manual-tests/authoring-pack/` のドッグフード専用スクリプトとして扱う。
+- E-RQ-001: 初期実装は `scripts/authoring-pack/` のドッグフード専用スクリプトとして扱い、tracked fixture は `tests/fixtures/authoring_pack/` に置く。`manual-tests/` には tracked workspace / fixture / evidence を追加しない。
 - E-RQ-002: 事前確認では repo、ref、source_paths、source_hashes、denylist、stale_if、profile state を記録する。
 - E-RQ-003: プロンプトは ZIP スキーマ、権威境界、プロファイル制御、禁止主張、出力ルートを明記する。
 - E-RQ-004: ZIP は単一 root `specdock-authoring-pack/` を持ち、必須メタデータと採用マップを含む。

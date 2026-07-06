@@ -83,14 +83,61 @@ ID: "iss-00287"
 
 ## 具体テストケース一覧
 
-| test id | step | kind | concrete case | expected result | evidence path |
-|---|---|---|---|---|---|
-| tc-001-a | S01 | inspect | 親 Epic trace、依存 Issue、local assurance を確認する | parent trace / dependency / `authorized_profile` が report に記録される | Issue `report.md` Closure Evidence Ledger |
-| tc-002-a | S02 | implementation/docs | Issue 固有成果物を作成し、generated ZIP / staged artifact が正本を直接上書きしないことを確認する | deliverable と no-overwrite evidence が残る | Issue `report.md`; staged artifact path |
-| tc-003-a | S03 | normal fixture | 正常系 fixture を実行する、または docs-only Issue では expected artifact inspection を行う | validation status が pass として記録される | validation report / Issue `report.md` |
-| tc-003-b | S03 | negative fixture | stale source、profile mismatch、unsafe authority claim、または Issue 固有の拒否条件を検証する | blocked / stale / rejected / deferred のいずれかで fail-closed になる | validation report / Issue `report.md` |
-| tc-004-a | S90 | docs impact | docs / report / EAL / SID に直接矛盾がないか確認する | update または approved no-op rationale が記録される | Issue `report.md`; Epic `report.md` when touched |
-| tc-005-a | S99 | final gate | `spec-dock validate`、`git diff --check`、focused tests、fresh `spec-reviewer` を確認する | P0/P1 blocker がない、または blocker と次アクションが明確 | Issue `report.md` Final Gate |
+- `tc-s01-00287-001` inspect: local assurance が profile authority であることを確認する
+  - 前提: `.assurance.json`、Issue `requirement.md`、profile-controlled skeleton fill の design が読める。
+  - 操作: `authorized_profile` が ChatGPT output ではなく local assurance 由来であることを確認する。
+  - 期待結果: profile authority と ChatGPT 推奨非採用の境界が Issue `report.md` に記録される。
+  - 失敗検出: ZIP 内の profile 推奨で `.assurance.json` を上書きする回帰を検出する。
+  - 検証方法: docs-only inspection と Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-001`
+
+- `tc-s02-00287-001` acceptance: profile-resolution validator を作る
+  - 前提: selected profile、local composed skeleton、ChatGPT fill candidate の fixture がある。
+  - 操作: profile-resolution validator を実行し、candidate の profile が selected profile と一致するか確認する。
+  - 期待結果: 一致する candidate だけが section fill review へ進み、不一致は blocked になる。
+  - 失敗検出: candidate 側の profile 名を根拠に selected profile を切り替える回帰を検出する。
+  - 検証方法: focused validator test または validation report。
+  - 関連 closure id: `tc-002`
+
+- `tc-s02-00287-002` acceptance: template hash validator を作る
+  - 前提: local composed skeleton hash と、同一 / 不一致の candidate hash fixture がある。
+  - 操作: template hash validator を実行する。
+  - 期待結果: hash 一致時のみ section fill 候補として扱い、不一致時は stale / blocked になる。
+  - 失敗検出: 古い skeleton に対する ChatGPT fill が pass する回帰を検出する。
+  - 検証方法: focused validator test、validation report、Issue `report.md` execution evidence。
+  - 関連 closure id: `tc-002`
+
+- `tc-s03-00287-001` acceptance: section-map と missing-section-report を検証する
+  - 前提: section-map、local skeleton、missing section を含む candidate fixture がある。
+  - 操作: section-map validator と missing-section-report validator を実行する。
+  - 期待結果: 許可 section だけが埋められ、未記入・余剰 section は report に出る。
+  - 失敗検出: ChatGPT が許可外 section を生成したり、未記入 section を成功扱いする回帰を検出する。
+  - 検証方法: validation report inspection と focused tests。
+  - 関連 closure id: `tc-003`
+
+- `tc-s03-00287-002` negative: unsafe authority claim を section fill 内で拒否する
+  - 前提: section body に accepted / reviewer-pass / canonical-overwrite claim を含む candidate fixture がある。
+  - 操作: section-map validation と authority claim scan を実行する。
+  - 期待結果: candidate は rejected または adoption-ineligible になり、section fill と authority claim が分離される。
+  - 失敗検出: 本文中の権威主張が staged artifact に残る回帰を検出する。
+  - 検証方法: `rg` inspection、negative fixture validation report。
+  - 関連 closure id: `tc-003`
+
+- `tc-s90-00287-001` inspect: profile / skeleton validation の docs impact を解消する
+  - 前提: S02 / S03 の validation result と report がある。
+  - 操作: docs / report / EAL に profile authority、template hash、section-map の扱いが矛盾なく残っているか確認する。
+  - 期待結果: update または approved no-op rationale が記録される。
+  - 失敗検出: ChatGPT profile suggestion を profile authority と読める記述を検出する。
+  - 検証方法: docs-only inspection と `rg`。
+  - 関連 closure id: `tc-004`
+
+- `tc-s99-00287-001` final-gate: 構造検証と fresh reviewer を通す
+  - 前提: S01〜S03 と S90 が closed または approved no-op である。
+  - 操作: `./spec-dock/scripts/spec-dock validate`、`git diff --check`、profile / section focused tests、fresh `spec-reviewer` result を確認する。
+  - 期待結果: P0/P1 blocker がなく、残リスクまたは次アクションが Issue `report.md` Final Gate に記録される。
+  - 失敗検出: profile mismatch / hash mismatch の未検証を完了扱いする回帰を検出する。
+  - 検証方法: command output、focused tests、reviewer result の report 記録。
+  - 関連 closure id: `tc-005`
 
 ### S90 ドキュメント影響解消
 

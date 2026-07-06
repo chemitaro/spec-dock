@@ -83,14 +83,61 @@ ID: "iss-00290"
 
 ## 具体テストケース一覧
 
-| test id | step | kind | concrete case | expected result | evidence path |
-|---|---|---|---|---|---|
-| tc-001-a | S01 | inspect | 親 Epic trace、依存 Issue、local assurance を確認する | parent trace / dependency / `authorized_profile` が report に記録される | Issue `report.md` Closure Evidence Ledger |
-| tc-002-a | S02 | implementation/docs | Issue 固有成果物を作成し、generated ZIP / staged artifact が正本を直接上書きしないことを確認する | deliverable と no-overwrite evidence が残る | Issue `report.md`; staged artifact path |
-| tc-003-a | S03 | normal fixture | 正常系 fixture を実行する、または docs-only Issue では expected artifact inspection を行う | validation status が pass として記録される | validation report / Issue `report.md` |
-| tc-003-b | S03 | negative fixture | stale source、profile mismatch、unsafe authority claim、または Issue 固有の拒否条件を検証する | blocked / stale / rejected / deferred のいずれかで fail-closed になる | validation report / Issue `report.md` |
-| tc-004-a | S90 | docs impact | docs / report / EAL / SID に直接矛盾がないか確認する | update または approved no-op rationale が記録される | Issue `report.md`; Epic `report.md` when touched |
-| tc-005-a | S99 | final gate | `spec-dock validate`、`git diff --check`、focused tests、fresh `spec-reviewer` を確認する | P0/P1 blocker がない、または blocker と次アクションが明確 | Issue `report.md` Final Gate |
+- `tc-s01-00290-001` inspect: negative probe の対象分類を確認する
+  - 前提: stale / mismatch validation report と block disposition summary の設計が読める。
+  - 操作: stale、source mismatch、profile mismatch、unsafe claim を別々の failure class として扱うことを確認する。
+  - 期待結果: 各 failure class の expected disposition が Issue `report.md` に記録される。
+  - 失敗検出: failure class が曖昧で、blocked / stale / rejected の判断が実装者任せになる回帰を検出する。
+  - 検証方法: docs-only inspection と Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-001`
+
+- `tc-s02-00290-001` negative: `stale_if` 期限切れを block する
+  - 前提: stale_if 期限切れの authoring pack fixture がある。
+  - 操作: stale validation を実行し、disposition を確認する。
+  - 期待結果: status は stale / blocked になり、再生成または reconciliation 対象として記録される。
+  - 失敗検出: stale pack が pass または staged adoption 候補になる回帰を検出する。
+  - 検証方法: negative fixture validation report。
+  - 関連 closure id: `tc-002`
+
+- `tc-s02-00290-002` negative: source hash mismatch を block する
+  - 前提: source_paths は同じだが source hash が不一致の fixture がある。
+  - 操作: source hash validation を実行する。
+  - 期待結果: status は source_mismatch / blocked になり、どの source が不一致か report に出る。
+  - 失敗検出: 古い source 内容を根拠にした generated content が採用候補になる回帰を検出する。
+  - 検証方法: negative fixture validation report、block disposition summary。
+  - 関連 closure id: `tc-002`
+
+- `tc-s03-00290-001` negative: profile mismatch を block する
+  - 前提: selected profile と ZIP 内 profile metadata が不一致の fixture がある。
+  - 操作: profile mismatch validation を実行する。
+  - 期待結果: status は profile_mismatch / blocked になり、`.assurance.json` は変更されない。
+  - 失敗検出: ChatGPT output の profile metadata で local profile が上書きされる回帰を検出する。
+  - 検証方法: negative fixture validation report と post-run `git diff --name-only -- .assurance.json` 相当の確認。
+  - 関連 closure id: `tc-003`
+
+- `tc-s03-00290-002` negative: unsafe authority claim を rejected にする
+  - 前提: accepted、reviewer-pass、canonical-overwrite、`.assurance.json` mutation claim を含む fixture がある。
+  - 操作: unsafe claim validation を実行する。
+  - 期待結果: status は rejected または adoption-ineligible になり、block disposition summary に理由が残る。
+  - 失敗検出: 危険 claim が reviewer input として混入し、正本採用済みと読める回帰を検出する。
+  - 検証方法: validation report、`rg` inspection、Issue `report.md` Closure Evidence Ledger。
+  - 関連 closure id: `tc-003`
+
+- `tc-s90-00290-001` inspect: block disposition summary の docs impact を確認する
+  - 前提: stale / mismatch / unsafe claim の negative validation reports がある。
+  - 操作: report / EAL / docs に failure class、disposition、再生成条件が残っているか確認する。
+  - 期待結果: update または approved no-op rationale が記録される。
+  - 失敗検出: blocked result を pass と同じ扱いで EAL に載せる記述を検出する。
+  - 検証方法: docs-only inspection と `rg`。
+  - 関連 closure id: `tc-004`
+
+- `tc-s99-00290-001` final-gate: negative probe 検証と fresh reviewer を通す
+  - 前提: S01〜S03 と S90 が closed または approved no-op である。
+  - 操作: `./spec-dock/scripts/spec-dock validate`、`git diff --check`、negative probe focused tests、fresh `spec-reviewer` result を確認する。
+  - 期待結果: P0/P1 blocker がなく、残リスクまたは次アクションが Issue `report.md` Final Gate に記録される。
+  - 失敗検出: stale / mismatch probe 未検証のまま完了扱いする回帰を検出する。
+  - 検証方法: command output、focused tests、reviewer result の report 記録。
+  - 関連 closure id: `tc-005`
 
 ### S90 ドキュメント影響解消
 
