@@ -17,7 +17,7 @@ ID: "iss-00284"
 
 ## 目的
 
-ChatGPT に ZIP authoring pack の生成を依頼する前に、SpecDock 側で repo / ref / source / freshness / denylist / profile observation を固定し、ChatGPT Use に渡す prompt-pack を決定的に作れるようにする。
+ChatGPT に ZIP authoring pack の生成を依頼する前に、SpecDock 側で repo / ref / source / freshness / built-in path/secret rules / `safe_output_constraints.forbidden_claims` / profile observation を固定し、ChatGPT Use に渡す prompt-pack を決定的に作れるようにする。
 
 この Issue の成果物は **dogfood-only / evidence-only** である。preflight JSON、prompt-pack、fixture、validation report は、正本採用、reviewer pass、Issue 完了、Pull Request 作成、または配布 runtime command の存在を意味しない。正本化は、main orchestrator が採用判断を `report.md` に記録し、fresh `spec-reviewer` gate を通した後にだけ成立する。
 
@@ -31,7 +31,7 @@ ChatGPT に ZIP authoring pack の生成を依頼する前に、SpecDock 側で 
 ## 範囲
 
 - `scripts/authoring-pack/` 配下に dogfood-only の preflight / prompt-pack authoring surface を追加する。
-- repo / ref / source_paths / source hashes / stale_if / denylist / safe output constraints / profile snapshot を固定し、ChatGPT に渡すプロンプトパックを作る。
+- repo / ref / source_paths / source hashes / stale_if / built-in path/secret rules / `safe_output_constraints.forbidden_claims` / profile snapshot を固定し、ChatGPT に渡すプロンプトパックを作る。
 - Issue-local `.assurance.json` を read-only で観測し、`authorized_profile`、`status`、`stage`、file hash を snapshot として記録する。
 - preflight が `pass` の場合だけ、`README.md`、`preflight.json`、`source-manifest.json`、`stale-if.json`、`validation-taxonomy.json`、`safe-output-constraints.md`、`chatgpt-use-prompt.md` で構成する prompt-pack を生成する。
 - normal fixture と negative fixture を追加し、source 欠落、assurance 欠落、unsafe claim、stale hash を fail-closed に検証できるようにする。
@@ -79,7 +79,7 @@ branch / ref / source provenance が曖昧なまま ZIP 生成へ進むリスク
 ### AC-002: 事前確認 JSON が repo / ref / source freshness を固定する
 
 - 前提: この Issue の成果物または fixture が存在する。
-- 操作: repo、ref、source_paths、source hashes、stale_if、denylist、profile snapshot を含む JSON を生成する。
+- 操作: repo、ref、source_paths、source hashes、stale_if、built-in path/secret rules、`safe_output_constraints.forbidden_claims`、profile snapshot を含む JSON を生成する。
 - 期待結果: 欠落 field がある場合は fail として扱い、prompt pack 生成へ進めない。
 - 観測点: validation report、staged artifact、または Issue report。
 

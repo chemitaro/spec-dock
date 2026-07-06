@@ -26,7 +26,7 @@ preflight status が `pass` の場合だけ ChatGPT Use へ渡せる prompt-pack
 
 ## 責務境界
 
-- この Issue が持つ責務: repo / ref / source_paths / source hashes / stale_if / denylist / safe output constraints / profile snapshot を固定し、ChatGPT に渡すプロンプトパックを作る。
+- この Issue が持つ責務: repo / ref / source_paths / source hashes / stale_if / built-in path/secret rules / `safe_output_constraints.forbidden_claims` / profile snapshot を固定し、ChatGPT に渡すプロンプトパックを作る。
 - この Issue が持たない責務: ZIP intake、ZIP validation、staged artifact rendering、正本採用、reviewer gate result、profile authority、ランタイム昇格判断、Pull Request 作成。
 - 親 Epic の境界: ZIP は証跡専用、ローカル検証が権威、fresh `spec-reviewer` result は execution readiness evidence として残す。
 
@@ -80,7 +80,8 @@ Exit code:
 
 - 親 Epic trace: E-RQ-001, E-RQ-002, E-RQ-003 / E-AC-001
 - 必要な前提 Issue: なし
-- JSON config: `issue_id`、`repository.full_name`、`repository.requested_ref`、`sources[]`、`assurance_path`、`stale_if[]`、`denylist`、`safe_output_constraints`、`output_dir`。
+- JSON config: `issue_id`、`repository.full_name`、`repository.requested_ref`、`sources[]`、`assurance_path`、`stale_if[]`、`safe_output_constraints`、`output_dir`。
+- denylist 相当の契約は独立した `denylist` field ではなく、組み込みの path / secret-looking rules と `safe_output_constraints.forbidden_claims` として表現する。
 - repo-relative source paths。absolute path、`..`、NUL byte、`.env*`、secret-looking path、repo 外 symlink は拒否する。
 
 出力:
@@ -106,7 +107,7 @@ Exit code:
 3. `git rev-parse HEAD` と `git rev-parse --abbrev-ref HEAD` で local Git observation を取る。
 4. requested ref と observed ref / HEAD を記録する。
 5. source path を repo-relative として normalize する。
-6. source path の denylist を評価する。
+6. source path の built-in path / secret-looking rules を評価する。
 7. required source の存在、symlink、repo boundary を確認する。
 8. source の `sha256`、`size_bytes`、`line_count` を計算する。
 9. `.assurance.json` を read-only で読み、hash と `authorized_profile` / `status` / `stage` を snapshot する。
@@ -131,7 +132,7 @@ participant "ChatGPT Use" as ChatGPT
 Maintainer -> Preflight : config / requested_ref / source paths
 Preflight -> Repo : Git ref と source hashes を観測
 Preflight -> Assurance : authorized_profile を observation として読む
-Preflight -> Preflight : stale_if / denylist / safe constraints を評価
+Preflight -> Preflight : stale_if / path-secret rules / forbidden claims を評価
 
 alt status == pass
   Preflight -> PromptPack : preflight.json / prompt files を生成
