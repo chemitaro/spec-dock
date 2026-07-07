@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "epic",
+  "id": "epic-00283",
+  "title": "ChatGPT Zip Authoring Pack Automation",
+  "slug": "chatgpt-zip-authoring-pack-automation",
+  "created_at": "2026-07-06T22:44:35+09:00",
+  "updated_at": "2026-07-06T22:44:35+09:00",
+  "parent_id": "init-local-00003",
+  "initiative_id": "init-local-00003",
+  "epic_id": null,
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 283,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}

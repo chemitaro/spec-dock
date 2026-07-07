@@ -1,0 +1,20 @@
+{
+  "authority": "evidence_only",
+  "adoption_status": "unreviewed",
+  "bundle_generation_not_promotion": true,
+  "status": "stale",
+  "generated_at": "2026-07-07T02:04:29Z",
+  "input_kind": "tree",
+  "trace": {
+    "issue_id": "iss-00290",
+    "parent_epic": "epic-00283",
+    "requirements": ["E-RQ-005", "E-RQ-008", "E-RQ-010"],
+    "acceptance": ["E-AC-002", "E-AC-004", "E-AC-005", "E-AC-011"]
+  },
+  "errors": ["source hash mismatch"],
+  "pack_digest": {
+    "algorithm": "sha256",
+    "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "file_count": 0
+  }
+}

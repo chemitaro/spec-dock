@@ -1,0 +1,36 @@
+{
+  "authority": "evidence_only",
+  "adoption_status": "unreviewed",
+  "bundle_generation_not_promotion": true,
+  "issue_id": "iss-00292",
+  "sources": [
+    {
+      "source_id": "EV-A",
+      "issue_id": "iss-00288",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00288-dogfood-candidate-only-epic-to-issue-authoring-pack/report.md",
+      "scenario": "candidate-only Epic-to-Issue authoring pack",
+      "observed_summary": "candidate validation and full authoring-pack suite passed"
+    },
+    {
+      "source_id": "EV-B",
+      "issue_id": "iss-00289",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00289-dogfood-existing-issue-selected-profile-authoring-pack/report.md",
+      "scenario": "selected-profile skeleton fill",
+      "observed_summary": "review, validation, dry-run passed while local authority was preserved"
+    },
+    {
+      "source_id": "EV-C",
+      "issue_id": "iss-00290",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00290-dogfood-authoring-pack-mismatch-and-stale-probe/report.md",
+      "scenario": "negative stale / mismatch / unsafe-claim probes",
+      "observed_summary": "6 / 6 probes remained adoption-ineligible"
+    },
+    {
+      "source_id": "EV-D",
+      "issue_id": "iss-00291",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00291-document-authoring-pack-workflow-and-adoption-ledger-examples/report.md",
+      "scenario": "workflow documentation",
+      "observed_summary": "README, prompt contract, EAL examples, manual fallback notes were created"
+    }
+  ]
+}

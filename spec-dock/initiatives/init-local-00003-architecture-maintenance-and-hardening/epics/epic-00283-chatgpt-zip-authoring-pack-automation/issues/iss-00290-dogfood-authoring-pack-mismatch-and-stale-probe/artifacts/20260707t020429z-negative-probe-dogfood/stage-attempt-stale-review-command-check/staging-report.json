@@ -1,0 +1,65 @@
+{
+  "adoption_status": "unreviewed",
+  "authority": "evidence_only",
+  "bundle_generation_not_promotion": true,
+  "checks": [
+    {
+      "name": "review-report",
+      "status": "stale"
+    }
+  ],
+  "errors": [
+    "review report status is not pass: stale"
+  ],
+  "generated_at": "2026-07-07T02:25:56Z",
+  "items": [],
+  "outputs": {},
+  "review": {
+    "input_kind": "tree",
+    "pack_digest": {
+      "algorithm": "sha256",
+      "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "file_count": 0
+    },
+    "source_count": 0,
+    "status": "stale",
+    "trace": {
+      "acceptance": [
+        "E-AC-002",
+        "E-AC-004",
+        "E-AC-005",
+        "E-AC-011"
+      ],
+      "issue_id": "iss-00290",
+      "parent_epic": "epic-00283",
+      "requirements": [
+        "E-RQ-005",
+        "E-RQ-008",
+        "E-RQ-010"
+      ]
+    }
+  },
+  "status": "stale",
+  "status_taxonomy": {
+    "blocked": "Required local observation or filesystem operation is unavailable.",
+    "deferred": "Recognized later-stage responsibility; never treated as pass.",
+    "fail": "Input shape or required metadata is invalid.",
+    "pass": "Staging passed; adoption remains unreviewed.",
+    "rejected": "A safety boundary was violated.",
+    "stale": "Review/source snapshot is no longer valid.",
+    "unreviewed": "Artifact adoption state, not an execution status."
+  },
+  "trace": {
+    "acceptance": [
+      "E-AC-008",
+      "E-AC-009"
+    ],
+    "issue_id": "iss-00286",
+    "parent_epic": "epic-00283",
+    "requirements": [
+      "E-RQ-006",
+      "E-RQ-007"
+    ]
+  },
+  "warnings": []
+}
