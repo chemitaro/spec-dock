@@ -916,7 +916,7 @@ def _base_result(
     section_results: list[dict[str, Any]] | None = None,
     adoption: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    trace = _result_trace(selected_skeleton)
+    trace = _result_trace(selected_skeleton, review)
     return {
         **AUTHORITY_BOUNDARY,
         "status": status,
@@ -946,10 +946,14 @@ def _base_result(
     }
 
 
-def _result_trace(selected_skeleton: dict[str, Any] | None) -> dict[str, Any]:
+def _result_trace(selected_skeleton: dict[str, Any] | None, review: dict[str, Any] | None) -> dict[str, Any]:
     if selected_skeleton:
         trace = selected_skeleton.get("trace")
         if isinstance(trace, dict):
+            return _safe_diagnostic_value(trace)
+    if review:
+        trace = review.get("trace")
+        if isinstance(trace, dict) and trace:
             return _safe_diagnostic_value(trace)
     return _default_trace()
 
