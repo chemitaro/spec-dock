@@ -8,8 +8,14 @@ from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
     GitHubSyncPreflightRequest,
     run_github_sync_preflight,
 )
+from spec_dock_runtime.application.authoring_pack.pack_prepare import prepare_prompt_pack
 from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import PromptPackPrepareRequest
 from spec_dock_runtime.presentation.authoring_pack.diagnostics import render_preflight_json, render_preflight_text
+from spec_dock_runtime.presentation.authoring_pack.pack_prepare_renderer import (
+    render_pack_prepare_json,
+    render_pack_prepare_text,
+)
 from spec_dock_runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
@@ -39,8 +45,17 @@ class AuthoringPreflightGithubSyncArgs(CommandArgs):
     unsynced_reason: str | None
 
 
+@dataclass(frozen=True)
+class AuthoringPackPrepareArgs(CommandArgs):
+    preflight: Path
+    output_dir: Path
+    output_format: str
+    mode: str | None
+    source_manifest: Path | None
+    stale_if: Path | None
+
+
 _DEFERRED_COMMANDS: dict[str, tuple[str, str]] = {
-    "authoring_pack_prepare": ("authoring pack prepare", "iss-00299"),
     "authoring_backend_invoke": ("authoring backend invoke", "iss-00300"),
     "authoring_pack_review": ("authoring pack review", "iss-00301"),
     "authoring_pack_stage": ("authoring pack stage", "iss-00301"),
@@ -69,6 +84,11 @@ def command_specs() -> dict[str, CommandSpec]:
         args_factory=_preflight_github_sync_args,
         run=_run_preflight_github_sync,
     )
+    specs["authoring_pack_prepare"] = CommandSpec(
+        add_arguments=_add_pack_prepare_arguments,
+        args_factory=_pack_prepare_args,
+        run=_run_pack_prepare,
+    )
     return specs
 
 
@@ -90,6 +110,15 @@ def _add_preflight_github_sync_arguments(parser: argparse.ArgumentParser) -> Non
     parser.add_argument("--unsynced-reason")
 
 
+def _add_pack_prepare_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--preflight", required=True)
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
+    parser.add_argument("--mode", choices=("initiative", "epic", "issue", "selected-skeleton"))
+    parser.add_argument("--source-manifest")
+    parser.add_argument("--stale-if")
+
+
 def _preflight_github_sync_args(ns: argparse.Namespace) -> CommandArgs:
     return AuthoringPreflightGithubSyncArgs(
         evidence_mode=ns.evidence_mode,
@@ -103,6 +132,17 @@ def _preflight_github_sync_args(ns: argparse.Namespace) -> CommandArgs:
         provided_context_paths=tuple(ns.provided_context_path or ()),
         diff_summary=ns.diff_summary,
         unsynced_reason=ns.unsynced_reason,
+    )
+
+
+def _pack_prepare_args(ns: argparse.Namespace) -> CommandArgs:
+    return AuthoringPackPrepareArgs(
+        preflight=Path(ns.preflight),
+        output_dir=Path(ns.output_dir),
+        output_format=ns.output_format,
+        mode=ns.mode,
+        source_manifest=Path(ns.source_manifest) if ns.source_manifest else None,
+        stale_if=Path(ns.stale_if) if ns.stale_if else None,
     )
 
 
@@ -148,6 +188,30 @@ def _run_preflight_github_sync(args: CommandArgs, use_cases: UseCases) -> Comman
     )
 
 
+def _run_pack_prepare(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    del use_cases
+    pack_args = _expect_pack_prepare_args(args)
+    result = prepare_prompt_pack(
+        PromptPackPrepareRequest(
+            preflight_path=pack_args.preflight,
+            output_dir=pack_args.output_dir,
+            output_format=pack_args.output_format,  # type: ignore[arg-type]
+            mode=pack_args.mode,  # type: ignore[arg-type]
+            source_manifest_path=pack_args.source_manifest,
+            stale_if_path=pack_args.stale_if,
+        )
+    )
+    exit_code = 0 if result.status == "pass" else 1
+    if pack_args.output_format == "json":
+        stdout_lines = [render_pack_prepare_json(result)]
+    else:
+        stdout_lines = render_pack_prepare_text(result)
+    return CommandOutcome(
+        exit_code=exit_code,
+        text=CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=[]),
+    )
+
+
 def _run_deferred(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     del use_cases
     deferred_args = _expect_deferred_args(args)
@@ -176,4 +240,10 @@ def _expect_deferred_args(args: CommandArgs) -> AuthoringDeferredArgs:
 def _expect_preflight_github_sync_args(args: CommandArgs) -> AuthoringPreflightGithubSyncArgs:
     if not isinstance(args, AuthoringPreflightGithubSyncArgs):
         raise RuntimeError("Invalid command args for authoring preflight github-sync")
+    return args
+
+
+def _expect_pack_prepare_args(args: CommandArgs) -> AuthoringPackPrepareArgs:
+    if not isinstance(args, AuthoringPackPrepareArgs):
+        raise RuntimeError("Invalid command args for authoring pack prepare")
     return args

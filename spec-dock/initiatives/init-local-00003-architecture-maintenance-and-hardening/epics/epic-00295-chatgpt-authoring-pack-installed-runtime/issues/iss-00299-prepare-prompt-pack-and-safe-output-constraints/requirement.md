@@ -3,830 +3,491 @@
 ID: "iss-00299"
 タイトル: "Prompt Pack Constraints"
 関連GitHub: ["#299"]
-状態: "draft | approved"
+状態: "planning-ready"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-08"
 親: ["epic-00295", "init-local-00003"]
 ---
 
-# iss-00299 Prompt Pack Constraints — Issue 要件定義
+# iss-00299 Prompt Pack Constraints — 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
+## 0. 結論
 
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
+この Issue は、`authoring pack prepare` を installed runtime surface として実装し、`authoring preflight github-sync` で得た preflight/source evidence から、ChatGPT に渡す deterministic prompt pack input を生成する。
 
----
+生成物は evidence-only の prompt pack であり、ChatGPT output の ZIP/tree format、metadata、provenance、safe output constraints、禁止 authority claim を明示する。生成物は canonical adoption、`.assurance.json` mutation、`authorized_profile` 決定、reviewer pass、execution-ready、PR-ready、PR delivery を主張してはならない。
 
-## 0. 文書の位置づけ
+## 1. 目的
 
-### この文書が定義すること
+`authoring preflight github-sync` の結果と source manifest を入力に、同じ input から同じ prompt pack tree を生成し、ChatGPT に対して安全な ZIP/tree output contract を明示する。
 
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
+この Issue は iss-00298 の後続であり、iss-00298 で deferred/fail-closed のまま残された `authoring pack prepare` を実装対象にする。backend invocation、ZIP review/stage、candidate/adoption validators は後続 Issue の責務として残す。
 
-### この文書が定義しないこと
+## 2. 観測可能な成果
 
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
+完了後に観測できること:
 
----
+- `./spec-dock/scripts/spec-dock authoring pack prepare ...` が deferred ではなく command-local status を返す。
+- preflight/source evidence から prompt pack tree が deterministic に生成される。
+- prompt pack tree には少なくとも次が含まれる。
+  - `manifest.json`
+  - `provenance.json`
+  - `source-manifest.json`
+  - `stale-if.json`
+  - `safe-output-constraints.md`
+  - `chatgpt-use-prompt.md`
+  - `expected-output-contract.md` または同等の prompt guidance
+- generated metadata は以下を固定する。
+  - `authority: evidence_only`
+  - `adoption_status: unreviewed`
+  - `bundle_generation_not_promotion: true`
+- `github-synced` と `local-context` は provenance 上で区別される。
+- `local-context` pack は `sync_state: local_context`、`github_sync: not_verified`、`provided_context_paths`、`diff_summary`、`unsynced_reason`、`adoption_requires: explicit_eal_disposition` を保持する。
+- source manifest は `__pycache__`、`.pyc`、`.pyo` など生成 cache を含めない。
+- prompt guidance は expected ZIP root `specdock-authoring-pack/` と required metadata を明示する。
+- prompt guidance は forbidden authority claims を明示し、ChatGPT output がそれらを主張しないよう制約する。
+- provider-side source of truth と dogfood mirror の両方で同等の behavior を検証できる。
 
-## 1. 概要
+完了後に観測できてはいけないこと:
 
-### 1.1 目的
-
-このIssueで達成したい目的を1〜3文で記述する。
-
-- 目的:
-  - ...
-
-### 1.2 観測可能な成果
-
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
-
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
-
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
-
-### 1.3 このIssueの種類
-
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
+- backend process の実行。
+- ChatGPT output ZIP の review、safe extraction、stage。
+- candidate/adoption validator の実装。
+- canonical docs の自動上書き。
+- `.assurance.json` の作成または更新。
+- `authorized_profile` の決定。
+- reviewer pass、execution-ready、PR-ready、PR delivery の自己主張。
+- broad `--force` bypass。
+- raw transcript、secret、credential、private key、host-local absolute path の durable 保存契約。
 
 ## 3. 親スコープと継承条件
 
-このIssueが属する上位スコープを記述する。
+### 3.1 親 Epic
 
-### 3.1 親Initiative
+- Epic ID: `epic-00295`
+- Epic title: `ChatGPT Authoring Pack Installed Runtime`
+- 継承する要件群:
+  - Runtime command group。
+  - GitHub sync / evidence mode。
+  - Prompt pack contract。
+  - ZIP/tree artifact contract。
+  - Evidence-only authority boundary。
+  - Provider-side source-of-truth / dogfood mirror distinction。
+  - relay execution / final PR delivery defer policy。
 
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
+### 3.2 この Issue で再定義しない境界
 
-### 3.2 親Epic
+- `authoring preflight github-sync` の preflight 判定そのものは iss-00298 の成果を前提にし、この Issue では prompt pack input として読む。
+- backend invocation は iss-00300。
+- ZIP review / stage は iss-00301。
+- candidate/adoption validators は後続 Issue。
+- approval check と node creation boundary は後続 Issue。
+- PR delivery は final quality Issue `iss-00307`。
 
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
+## 4. Actor / Trigger
 
-### 3.3 このIssueで再定義してはいけないもの
-
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
-
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
-
----
-
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
-
-### 4.1 主な関係者（Actor）
-
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
-
-| 関係者（Actor） | 役割 | このIssueとの関係 |
+| Actor | 役割 | この Issue との関係 |
 |---|---|---|
-| ... | ... | ... |
+| Maintainer / main orchestrator | Issue planning / execution owner | prompt pack prepare を実行し、evidence-only output を確認する |
+| ChatGPT evidence lane | draft / candidate evidence producer | prompt pack guidance に従って ZIP/tree output を作るが、正本権限を持たない |
+| dev-coder | 実装担当 | provider-side runtime と mirror 更新を行う |
+| code-reviewer | 実装レビュー | command dispatch、determinism、boundary leakage を確認する |
+| qa-reviewer | テストレビュー | positive / negative fixture と CLI verification を確認する |
+| spec-reviewer | 仕様レビュー | scope、non-scope、authority boundary、relay policy を確認する |
 
-### 4.2 開始条件（Trigger）
+Trigger:
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
-
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
-
-### 4.3 代表シナリオ
-
-#### シナリオ SC-001:
-
-- Actor:
-  - ...
+- CLI command:
+  - `./spec-dock/scripts/spec-dock authoring pack prepare`
 - 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+  - preflight evidence が存在する、または `local-context` 用 provenance が明示されている。
+  - output directory は明示指定され、canonical docs ではない場所に限定される。
 
-#### シナリオ SC-002:
+## 5. Scope
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+### 5.1 対象範囲
 
-#### シナリオ SC-XXX:
+- `authoring pack prepare` の runtime command implementation。
+- `application/authoring_pack/pack_prepare.py` の use case orchestration。
+- `domain/authoring_pack/*` に prompt pack / safe output constraints の契約を定義。
+- `presentation/authoring_pack/*` に JSON/text diagnostics と renderer を定義。
+- preflight result / source manifest から deterministic prompt pack tree を生成。
+- `github-synced` / `local-context` provenance の分岐。
+- source manifest の cache exclusion。
+- safe output constraints の生成。
+- forbidden authority claim list の生成。
+- expected ZIP root / required metadata / allowed output paths の prompt guidance。
+- provider-side asset と dogfood mirror の同時更新。
+- CLI / unit / fixture tests。
+- issue-local report evidence proposal。
 
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+### 5.2 対象外
 
----
+- backend invocation command の実装。
+- ChatGPT backend command resolution。
+- ZIP central directory review。
+- ZIP extraction。
+- tree fallback review。
+- stage / dry-run diff / EAL candidate generation。
+- candidate validators。
+- issue draft adoption validators。
+- approval check。
+- automatic canonical adoption。
+- automatic GitHub Issue creation。
+- `.assurance.json` mutation。
+- `authorized_profile` assignment。
+- reviewer pass / execution-ready / PR-ready marking。
+- broad `--force` bypass。
+- PR 作成または PR delivery。
 
-## 5. スコープ
+### 5.3 変更しないもの
 
-### 5.1 対象範囲（In 対象範囲（Scope））
-
-このIssueで必ず実現することを列挙する。
-
-- ...
-- ...
-
-### 5.2 対象外（Out of 対象範囲（Scope））
-
-このIssueでは実現しないことを列挙する。
-
-- ...
-- ...
-
-### 5.3 変更しないもの（Unchanged / Must Not Change）
-
-関連はあるが、このIssueで変更してはいけないものを列挙する。
-
-- ...
-- ...
-
-### 5.4 判断が必要な境界
-
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
-
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
-
----
+- `authoring preflight github-sync` の既存 status taxonomy と evidence mode contract。
+- `local-context` が lower authority であること。
+- `pass` が command-local validation pass であり reviewer pass ではないこと。
+- provider-side assets が source of truth であり `spec-dock/...` dogfood mirror は validation target であること。
+- 中間 Issue で PR delivery しない relay policy。
 
 ## 6. 要求される振る舞い
 
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
-
-### 振る舞い BH-001:
+### BH-001: preflight pass から deterministic prompt pack を生成する
 
 - Given:
-  - ...
+  - `authoring preflight github-sync` が `status=pass` の JSON evidence を出力済み。
+  - source manifest が存在する。
+  - output directory が指定されている。
 - When:
-  - ...
+  - `authoring pack prepare --preflight <path> --output-dir <path>` を実行する。
 - Then:
-  - ...
+  - status は `pass`。
+  - prompt pack tree が生成される。
+  - 同一 input から同一 logical payload が生成される。
+  - generated metadata は evidence-only boundary を含む。
 - And:
-  - ...
-- 観測点:
-  - ...
+  - canonical docs と `.assurance.json` は変更されない。
 
-### 振る舞い BH-002:
+### BH-002: stale / blocked preflight では prompt pack を pass にしない
 
 - Given:
-  - ...
+  - preflight evidence が `blocked` または `stale`。
 - When:
-  - ...
+  - `authoring pack prepare` を実行する。
 - Then:
-  - ...
+  - status は `blocked` または `stale`。
+  - prompt pack は ChatGPT invocation-ready として扱われない。
+  - diagnostics は regeneration / reconciliation の必要性を示す。
 - And:
-  - ...
-- 観測点:
-  - ...
+  - output が存在する場合も diagnostics-only に限定する。
 
-### 振る舞い BH-XXX:
+### BH-003: local-context は明示 provenance と lower authority を保持する
 
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+- Given:
+  - preflight evidence mode が `local-context`。
+  - `provided_context_paths`、`diff_summary`、`unsynced_reason` の少なくとも必要項目が記録されている。
+- When:
+  - prompt pack を生成する。
+- Then:
+  - `provenance.json` と prompt guidance は `github_sync: not_verified` を明示する。
+  - `adoption_requires: explicit_eal_disposition` を明示する。
+  - `github-synced` と同等の authority を主張しない。
 
----
+### BH-004: forbidden authority claims を prompt guidance に固定する
+
+- Given:
+  - prompt pack generation input が valid。
+- When:
+  - `safe-output-constraints.md` と `chatgpt-use-prompt.md` を生成する。
+- Then:
+  - ChatGPT output が以下を主張してはならないことを明示する。
+    - canonical adoption。
+    - `.assurance.json` 作成・更新。
+    - `authorized_profile` 決定。
+    - reviewer pass。
+    - execution-ready。
+    - PR-ready。
+    - PR delivery。
+  - `pass` は command-local validation pass であり reviewer pass ではない、と明示する。
+
+### BH-005: ZIP/tree output contract を明示する
+
+- Given:
+  - valid prompt pack input。
+- When:
+  - prompt pack guidance を生成する。
+- Then:
+  - expected root `specdock-authoring-pack/` を明示する。
+  - required metadata entries を明示する。
+  - unsafe path、secret、raw transcript、nested archive、binary、executable、symlink、wrong root、forbidden authority claim が後続 review で拒否対象になることを明示する。
+- And:
+  - この Issue では review 実装は行わない。
+
+### BH-006: source manifest は generated cache を含めない
+
+- Given:
+  - source path 配下に `__pycache__`、`.pyc`、`.pyo` が存在する。
+- When:
+  - source manifest を生成または転記する。
+- Then:
+  - manifest hash と source file list に cache files は含まれない。
 
 ## 7. 受け入れ条件
 
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
+### AC-001: `authoring pack prepare` が deferred を脱する
 
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
 - 操作:
-  - ...
+  - `./spec-dock/scripts/spec-dock authoring pack prepare --help`
+  - valid fixture で `./spec-dock/scripts/spec-dock authoring pack prepare ...`
 - 期待結果:
-  - ...
+  - command は iss-00299 deferred diagnostics を返さない。
+  - supported options と status output が確認できる。
 - 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
+  - CLI output、pytest。
 
-### 受け入れ条件 AC-002:
+### AC-002: valid github-synced input から prompt pack tree を生成する
 
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
 - 操作:
-  - ...
+  - valid `github-synced` preflight fixture を入力する。
 - 期待結果:
-  - ...
+  - `manifest.json`、`provenance.json`、`source-manifest.json`、`stale-if.json`、`safe-output-constraints.md`、`chatgpt-use-prompt.md` が生成される。
+  - status は `pass`。
 - 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
+  - generated tree、JSON snapshot test。
 
-### 受け入れ条件 AC-XXX:
+### AC-003: output は deterministic である
 
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+- 操作:
+  - 同じ fixture と同じ option で 2 回生成する。
+- 期待結果:
+  - timestamp 等の非決定要素を除いた logical payload digest が一致する。
+  - deterministic field ordering が維持される。
+- 観測点:
+  - pytest digest comparison。
 
----
+### AC-004: evidence-only metadata が固定される
+
+- 操作:
+  - generated metadata を確認する。
+- 期待結果:
+  - `authority: evidence_only`
+  - `adoption_status: unreviewed`
+  - `bundle_generation_not_promotion: true`
+- 観測点:
+  - `manifest.json`、`provenance.json`、`safe-output-constraints.md`。
+
+### AC-005: forbidden authority claim guidance が含まれる
+
+- 操作:
+  - `safe-output-constraints.md` と `chatgpt-use-prompt.md` を確認する。
+- 期待結果:
+  - canonical adoption、`.assurance.json` mutation、authorized profile、reviewer pass、execution-ready、PR-ready、PR delivery を禁止する guidance がある。
+- 観測点:
+  - fixture assertion。
+
+### AC-006: expected ZIP/tree contract が明示される
+
+- 操作:
+  - generated guidance を確認する。
+- 期待結果:
+  - root `specdock-authoring-pack/`。
+  - required metadata entries。
+  - unsafe entry categories。
+  - review/stage は後続 Issue であること。
+- 観測点:
+  - fixture assertion。
+
+### AC-007: local-context provenance が lower authority を保持する
+
+- 操作:
+  - `local-context` fixture で pack を生成する。
+- 期待結果:
+  - `sync_state: local_context`
+  - `github_sync: not_verified`
+  - `provided_context_paths`
+  - `diff_summary`
+  - `unsynced_reason`
+  - `adoption_requires: explicit_eal_disposition`
+- 観測点:
+  - `provenance.json`、prompt guidance。
+
+### AC-008: stale / blocked input は fail-closed になる
+
+- 操作:
+  - stale source hash、blocked preflight、missing preflight metadata の fixture で実行する。
+- 期待結果:
+  - non-zero exit。
+  - status は `stale` / `blocked` / `fail` のいずれか適切な分類。
+  - ChatGPT invocation-ready と誤読できる output を生成しない。
+- 観測点:
+  - CLI output、diagnostics JSON。
+
+### AC-009: source manifest は cache files を除外する
+
+- 操作:
+  - `__pycache__` / `.pyc` / `.pyo` を含む fixture を使う。
+- 期待結果:
+  - generated source manifest に cache files が含まれない。
+- 観測点:
+  - source manifest JSON assertion。
+
+### AC-010: broad `--force` bypass が存在しない
+
+- 操作:
+  - help output と parser を確認する。
+- 期待結果:
+  - `--force` または同等の broad bypass がない。
+  - `local-context` は explicit evidence mode と provenance requirement で表現される。
+- 観測点:
+  - CLI help assertion、parser test。
+
+### AC-011: provider-side source と dogfood mirror が一致する
+
+- 操作:
+  - provider-side asset と `spec-dock/...` mirror を比較または installed runtime smoke test を実行する。
+- 期待結果:
+  - behavior と help が一致する。
+- 観測点:
+  - pytest、dogfood runtime command。
+
+### AC-012: canonical docs / `.assurance.json` / PR delivery を変更しない
+
+- 操作:
+  - 実装後に `git status --short`、`git diff --check` を確認する。
+- 期待結果:
+  - canonical docs の自動上書きなし。
+  - `.assurance.json` mutation なし。
+  - PR delivery claim なし。
+- 観測点:
+  - command output、Issue report。
 
 ## 8. 例外・エッジケース
 
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
+### EC-001: preflight evidence が存在しない
 
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
 - 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
+  - `fail` または `blocked`。
+  - required input missing を diagnostics に出す。
+  - prompt pack pass にしない。
 
-### 例外・エッジケース EC-002:
+### EC-002: preflight status が `pass` ではない
 
-- 条件:
-  - ...
 - 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
-
-```text
-...
-```
-
-### 例 EX-002: 出力例
-
-```text
-...
-```
-
-### 例 EX-003: エラー例
-
-```text
-...
-```
-
-### 契約上の注意
-
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
+  - preflight status を継承または pack prepare status へ明確に mapping。
+  - ChatGPT invocation-ready と誤読させない。
 
-### 10.2 移行性
+### EC-003: local-context の provenance が不足する
 
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
+- 期待される扱い:
+  - `blocked`。
+  - `unsynced_reason` または context evidence が必要だと示す。
 
-### 10.3 可観測性
+### EC-004: source hash mismatch
 
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
+- 期待される扱い:
+  - `stale`。
+  - regenerate / reconcile を促す。
+  - adoption-sensitive evidence として分類する。
 
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
-
-### 13.3 リスク事実（Risk Facts）
-
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
-
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
-
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
-
-#### `strict` 以上を検討する条件
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
-
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
-
-#### `lite` を検討できる条件
-
-すべて満たす場合のみ `lite` を検討できる。
-
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
-
----
-
-## 14. 設計への引き渡し
-
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
-
-### 14.1 設計で必ず扱うべき論点
-
-- ...
-- ...
-
-### 14.2 責任所有者が未確定のもの
-
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.3 境界が未確定のもの
-
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.4 契約影響が未確定のもの
-
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.5 上位へ昇格すべき可能性がある判断
-
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 15. 実装計画への引き渡し
-
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
-
-### 15.1 計画で分解すべき成果
-
-- ...
-- ...
-
-### 15.2 検証が必要な観測点
-
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
-
-### 15.3 TDDが必要な振る舞い候補
-
-振る舞い変更がある場合のみ記述する。
-
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
-
-### 15.4 TDD不要または限定的でよい理由
-
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
-
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-07-08 | 初稿（Initial draft） | ... | ... |
+### EC-005: output-dir が repo 内 canonical path を指す
+
+- 期待される扱い:
+  - `rejected` または `blocked`。
+  - canonical docs 直接書き込みを防ぐ。
+
+### EC-006: secret-looking path / host-local absolute path が input に含まれる
+
+- 期待される扱い:
+  - `rejected`。
+  - durable output に含めない。
+
+### EC-007: prompt guidance 内の禁止語の扱い
+
+- 期待される扱い:
+  - 禁止 claim は「禁止対象として列挙する」ことは許可。
+  - 生成物自身が達成済み claim として主張する文脈は不可。
+
+## 9. 非機能要求
+
+- Deterministic:
+  - 同じ input から同じ logical output。
+- Fail-closed:
+  - provenance 不足、stale、unsafe、missing metadata は pass にしない。
+- Privacy:
+  - raw transcript、secret、credential、private key、host-local absolute path を durable output に含めない。
+- Portability:
+  - installed runtime asset と dogfood mirror の両方で動作する。
+- Minimal dependency:
+  - 既存 runtime architecture に合わせ、不要な外部依存を追加しない。
+- Observability:
+  - JSON と human-readable diagnostics を持つ。
+- Authority clarity:
+  - validation pass と adoption / reviewer pass を混同しない。
+
+## 10. Issue Grade 判定材料
+
+Workflow authority としての Issue Grade: `standard`
+
+`assurance classify --stage requirement` は `authorized_profile=standard` を返したため、この Issue の obligation authority は `standard` とする。
+
+ただし、ChatGPT Use は次の理由で `strict` 相当のリスク信号を提示した。
+
+- installed runtime CLI behavior を変更する。
+- prompt pack metadata / generated contract に影響する。
+- safe output constraints は authority / security / privacy 境界に関係する。
+- provider-side asset と dogfood mirror の両方を更新する。
+- 後続 iss-00300 / iss-00301 / validators の入力契約になる。
+- broad bypass、secret leakage、forbidden authority claim の混入が高リスクである。
+
+そのため、実行義務は `standard` としつつ、上記は reviewer focus として扱う。実装範囲は backend invocation や ZIP extraction を含まないため、`critical` 相当の扱いにはしない。
+
+## 11. 依存関係
+
+前提:
+
+- iss-00298:
+  - `authoring preflight github-sync`
+  - `github-synced` / `local-context` evidence mode
+  - source manifest cache exclusion
+  - deferred/fail-closed authoring commands
+
+後続:
+
+- iss-00300:
+  - backend invocation
+- iss-00301:
+  - ZIP review / stage
+- 後続 validators:
+  - candidate/adoption validation
+- iss-00307:
+  - final quality gate / PR delivery
+
+## 12. 設計への引き渡し
+
+design.md では以下を必ず扱う。
+
+- `commands/authoring.py` の CLI dispatch。
+- `application/authoring_pack/pack_prepare.py` の use case orchestration。
+- `domain/authoring_pack/prompt_pack_contract.py` または同等 contract。
+- `domain/authoring_pack/zip_contract.py` の expected output guidance。
+- `domain/authoring_pack/source_manifest.py` の cache exclusion reuse。
+- `presentation/authoring_pack/pack_prepare_renderer.py` または同等 renderer。
+- `github-synced` / `local-context` provenance model。
+- deterministic output strategy。
+- diagnostics / status taxonomy。
+- provider-side source / dogfood mirror sync。
+- no backend / no ZIP review / no adoption boundary。
+
+## 13. 実装計画への引き渡し
+
+plan.md では以下を必ず分解する。
+
+- CLI args / parser update。
+- domain contract / schema implementation。
+- use case orchestration。
+- renderer / file writing。
+- fixture generation。
+- deterministic tests。
+- local-context tests。
+- forbidden claim tests。
+- source cache exclusion tests。
+- mirror smoke tests。
+- report evidence / PR defer evidence。

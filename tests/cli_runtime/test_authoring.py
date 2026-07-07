@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import hashlib
 
 import pytest
 
@@ -12,7 +13,6 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 _DEFERRED_COMMANDS = (
-    (["authoring", "pack", "prepare"], "authoring pack prepare", "iss-00299"),
     (["authoring", "backend", "invoke"], "authoring backend invoke", "iss-00300"),
     (["authoring", "pack", "review"], "authoring pack review", "iss-00301"),
     (["authoring", "pack", "stage"], "authoring pack stage", "iss-00301"),
@@ -63,12 +63,27 @@ class TestAuthoringCli(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["authoring", "--help"])
 
             assert p.returncode == 0, p.stdout + p.stderr
-            assert "Run deferred ChatGPT authoring helper commands" in p.stdout
+            assert "Run ChatGPT authoring helper commands" in p.stdout
             for expected in ("preflight", "pack", "backend", "validate", "approval"):
                 assert expected in p.stdout
             assert "authoring preflight github-sync" in p.stdout
+            assert "authoring pack prepare" in p.stdout
             for _args, command, _next_issue in _DEFERRED_COMMANDS:
                 assert command in p.stdout
+
+    def test_authoring_pack_prepare_help_exposes_inputs_without_force(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            p = self._run_runtime_capture(target, ["authoring", "pack", "prepare", "--help"])
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "--preflight" in p.stdout
+            assert "--output-dir" in p.stdout
+            assert "--format" in p.stdout
+            assert "--mode" in p.stdout
+            assert "--force" not in p.stdout
 
     @pytest.mark.parametrize(("args", "command", "next_issue"), _DEFERRED_COMMANDS)
     def test_authoring_deferred_commands_fail_closed_with_stable_diagnostics(
@@ -524,6 +539,610 @@ class TestAuthoringCli(CliRuntimeHarness):
         assert all("__pycache__" not in path for path in payload["source_hashes"])
         assert all(not path.endswith(".pyc") for path in payload["source_hashes"])
 
+    def test_authoring_pack_prepare_generates_deterministic_prompt_pack_from_github_synced_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "preflight.json"
+            output_one = repo / "pack-one"
+            output_two = repo / "pack-two"
+            preflight_payload = _run_preflight_json(self, repo)
+            preflight.write_text(json.dumps(preflight_payload, sort_keys=True) + "\n", encoding="utf-8")
+
+            first = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_one),
+                    "--mode",
+                    "issue",
+                    "--format",
+                    "json",
+                ],
+            )
+            second = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_two),
+                    "--mode",
+                    "issue",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            first_payload = _json_stdout(first)
+            second_payload = _json_stdout(second)
+            assert first.returncode == 0, first.stdout + first.stderr
+            assert second.returncode == 0, second.stdout + second.stderr
+            assert first_payload["status"] == "pass"
+            assert first_payload["authority"] == "evidence_only"
+            assert first_payload["adoption_status"] == "unreviewed"
+            assert first_payload["bundle_generation_not_promotion"] is True
+            assert first_payload["evidence_mode"] == "github-synced"
+            assert first_payload["github_sync"] == "verified"
+
+            required_files = {
+                ".specdock-authoring-pack",
+                "manifest.json",
+                "provenance.json",
+                "source-manifest.json",
+                "stale-if.json",
+                "safe-output-constraints.md",
+                "chatgpt-use-prompt.md",
+                "expected-output-contract.md",
+            }
+            assert set(first_payload["output_files"]) == required_files
+            for rel_path in required_files:
+                assert (output_one / rel_path).exists()
+
+            assert _normalized_pack_payload(output_one) == _normalized_pack_payload(output_two)
+            manifest = json.loads((output_one / "manifest.json").read_text(encoding="utf-8"))
+            assert manifest["expected_output_root"] == "specdock-authoring-pack/"
+            assert manifest["authority"] == "evidence_only"
+            prompt = (output_one / "chatgpt-use-prompt.md").read_text(encoding="utf-8")
+            assert "specdock-authoring-pack/" in prompt
+            assert "Do not claim canonical adoption" in prompt
+
+    def test_authoring_pack_prepare_preserves_local_context_lower_authority(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "local-preflight.json"
+            output_dir = repo / "local-pack"
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--evidence-mode",
+                    "local-context",
+                    "--provided-context-path",
+                    "source.txt",
+                    "--unsynced-reason",
+                    "offline review",
+                    "--format",
+                    "json",
+                ],
+            )
+            preflight_payload = _json_stdout(p)
+            preflight.write_text(json.dumps(preflight_payload, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            provenance = json.loads((output_dir / "provenance.json").read_text(encoding="utf-8"))
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert payload["status"] == "pass"
+            assert provenance["sync_state"] == "local_context"
+            assert provenance["github_sync"] == "not_verified"
+            assert provenance["provided_context_paths"] == ["source.txt"]
+            assert provenance["adoption_requires"] == "explicit_eal_disposition"
+
+    def test_authoring_pack_prepare_fails_closed_for_stale_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "stale-preflight.json"
+            output_dir = repo / "stale-pack"
+            payload = _run_preflight_json(self, repo, "--expected-source-hash", "old", expected_returncode=1)
+            preflight.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            pack_payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert pack_payload["status"] == "stale"
+            assert pack_payload["output_files"] == []
+            assert (output_dir / "diagnostics.json").is_file()
+
+    def test_authoring_pack_prepare_fails_closed_for_blocked_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "blocked-preflight.json"
+            output_dir = repo / "blocked-pack"
+            payload = _run_preflight_json(self, repo, "--ref", "missing", expected_returncode=1)
+            preflight.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            pack_payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert pack_payload["status"] == "blocked"
+            assert pack_payload["output_files"] == []
+            assert not (output_dir / "manifest.json").exists()
+            assert (output_dir / "diagnostics.json").is_file()
+
+    def test_authoring_pack_prepare_fails_closed_for_missing_required_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "missing-preflight.json"
+            output_dir = repo / "missing-pack"
+            preflight.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "evidence_mode": "github-synced",
+                        "sync_state": "synced",
+                        "github_sync": "verified",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "fail"
+            assert "missing_source_manifest_hash" in payload["blockers"]
+            assert "missing_source_hashes" in payload["blockers"]
+            assert payload["output_files"] == []
+            assert not (output_dir / "manifest.json").exists()
+            assert (output_dir / "diagnostics.json").is_file()
+
+    def test_authoring_pack_prepare_filters_cache_entries_from_explicit_source_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "preflight.json"
+            source_manifest = repo / "source-manifest.json"
+            output_dir = repo / "pack"
+            preflight_payload = _run_preflight_json(self, repo)
+            preflight.write_text(json.dumps(preflight_payload, sort_keys=True) + "\n", encoding="utf-8")
+            source_manifest.write_text(
+                json.dumps(
+                    {
+                        "source_manifest_hash": "fixture-hash",
+                        "source_paths": ["package", "package/__pycache__"],
+                        "source_hashes": {
+                            "package/module.py": "source",
+                            "package/__pycache__/module.cpython-312.pyc": "cache",
+                            "package/old.pyo": "cache",
+                        },
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--source-manifest",
+                    str(source_manifest),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            generated = json.loads((output_dir / "source-manifest.json").read_text(encoding="utf-8"))
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert payload["status"] == "pass"
+            assert "package/module.py" in generated["source_hashes"]
+            assert all("__pycache__" not in path for path in generated["source_hashes"])
+            assert all(not path.endswith((".pyc", ".pyo")) for path in generated["source_hashes"])
+            assert "package/__pycache__" not in generated["source_paths"]
+            assert generated["source_manifest_hash"] == _manifest_hash(generated["source_hashes"])
+
+    def test_authoring_pack_prepare_rejects_canonical_output_target_and_achieved_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight_payload = _run_preflight_json(self, repo)
+            preflight_payload["reviewer_pass"] = True
+            preflight = repo / "preflight.json"
+            preflight.write_text(json.dumps(preflight_payload, sort_keys=True) + "\n", encoding="utf-8")
+            canonical_output = repo / "spec-dock" / "active" / "issue" / "artifacts" / "pack"
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(canonical_output),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "canonical_output_target" in payload["blockers"]
+            assert "forbidden_achieved_claim:reviewer_pass" in payload["blockers"]
+
+    def test_authoring_pack_prepare_rejects_symlinked_output_entries(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "preflight.json"
+            output_dir = repo / "pack"
+            preflight_payload = _run_preflight_json(self, repo)
+            preflight.write_text(json.dumps(preflight_payload, sort_keys=True) + "\n", encoding="utf-8")
+            output_dir.mkdir()
+            target = repo / "spec-dock" / ".assurance.json"
+            os.symlink(target, output_dir / "manifest.json")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_output_entry_symlink:manifest.json" in payload["blockers"]
+            assert not target.exists()
+
+    def test_authoring_pack_prepare_reports_non_object_json_inputs_as_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "preflight.json"
+            source_manifest = repo / "source-manifest.json"
+            output_dir = repo / "pack"
+            preflight_payload = _run_preflight_json(self, repo)
+            preflight.write_text(json.dumps(preflight_payload, sort_keys=True) + "\n", encoding="utf-8")
+            source_manifest.write_text("[]\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--source-manifest",
+                    str(source_manifest),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "fail"
+            assert "pack_input_unreadable" in payload["blockers"]
+            assert (output_dir / "diagnostics.json").is_file()
+
+    def test_authoring_pack_prepare_rejects_symlinked_diagnostics_output(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "stale-preflight.json"
+            output_dir = repo / "pack"
+            output_dir.mkdir()
+            target = repo / "spec-dock" / ".assurance.json"
+            os.symlink(target, output_dir / "diagnostics.json")
+            payload = _run_preflight_json(self, repo, "--expected-source-hash", "old", expected_returncode=1)
+            preflight.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            pack_payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert pack_payload["status"] == "rejected"
+            assert "unsafe_output_entry_symlink:diagnostics.json" in pack_payload["blockers"]
+            assert not target.exists()
+
+    def test_authoring_pack_prepare_rejects_unsafe_source_and_context_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "unsafe-preflight.json"
+            output_dir = repo / "unsafe-pack"
+            preflight.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "evidence_mode": "local-context",
+                        "sync_state": "local_context",
+                        "github_sync": "not_verified",
+                        "source_manifest_hash": "hash",
+                        "source_paths": ["/Users/example/private.txt"],
+                        "source_hashes": {"../secret.txt": "hash"},
+                        "provided_context_paths": [".env"],
+                        "unsynced_reason": "unsafe path fixture",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_source_path:/Users/example/private.txt" in payload["blockers"]
+            assert "unsafe_source_path:../secret.txt" in payload["blockers"]
+            assert "unsafe_source_path:.env" in payload["blockers"]
+
+    def test_authoring_pack_prepare_rejects_unsafe_local_context_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "unsafe-text-preflight.json"
+            output_dir = repo / "unsafe-text-pack"
+            preflight.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "evidence_mode": "local-context",
+                        "sync_state": "local_context",
+                        "github_sync": "not_verified",
+                        "source_manifest_hash": "hash",
+                        "source_paths": ["source.txt"],
+                        "source_hashes": {"source.txt": "hash"},
+                        "provided_context_paths": ["source.txt"],
+                        "diff_summary": "/Users/example/.env changed",
+                        "unsynced_reason": "local token review",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_context_text:diff_summary" in payload["blockers"]
+            assert "unsafe_context_text:unsynced_reason" in payload["blockers"]
+
+    def test_authoring_pack_prepare_prompt_guidance_contains_lower_authority_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "local-preflight.json"
+            output_dir = repo / "pack"
+            preflight.write_text(
+                (Path(__file__).resolve().parents[2] / "tests/fixtures/authoring_pack/prepare/valid-local-context-preflight.json").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            prompt = (output_dir / "chatgpt-use-prompt.md").read_text(encoding="utf-8")
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "sync_state: `local_context`" in prompt
+            assert "github_sync: `not_verified`" in prompt
+            assert "adoption_requires: `explicit_eal_disposition`" in prompt
+            assert "provided_context_paths: `source.txt`" in prompt
+            assert "diff_summary: `fixture local diff summary`" in prompt
+            assert "unsynced_reason: `fixture local context`" in prompt
+            assert "`.assurance.json` mutation" in prompt
+            assert "`authorized_profile` decision" in prompt
+
+    def test_authoring_pack_prepare_dogfood_runtime_path_smoke(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = repo_root / "spec-dock" / "scripts" / "spec-dock"
+        with tempfile.TemporaryDirectory() as tmp:
+            preflight = Path(tmp) / "preflight.json"
+            output_dir = Path(tmp) / "pack"
+            preflight.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "evidence_mode": "local-context",
+                        "sync_state": "local_context",
+                        "github_sync": "not_verified",
+                        "source_manifest_hash": "hash",
+                        "source_paths": ["source.txt"],
+                        "source_hashes": {"source.txt": "hash"},
+                        "provided_context_paths": ["source.txt"],
+                        "unsynced_reason": "dogfood mirror smoke",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            p = subprocess.run(
+                [
+                    str(script),
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo_root),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert (output_dir / "manifest.json").is_file()
+
 
 def _run_preflight_json(
     testcase: CliRuntimeHarness,
@@ -568,6 +1187,19 @@ def _json_stdout(p: subprocess.CompletedProcess[str]) -> dict[str, object]:
         raise AssertionError(p.stdout + p.stderr) from error
     assert isinstance(payload, dict)
     return payload
+
+
+def _normalized_pack_payload(pack_dir: Path) -> dict[str, str]:
+    payload: dict[str, str] = {}
+    for path in sorted(item for item in pack_dir.rglob("*") if item.is_file()):
+        rel_path = path.relative_to(pack_dir).as_posix()
+        payload[rel_path] = path.read_text(encoding="utf-8") if path.stat().st_size else ""
+    return payload
+
+
+def _manifest_hash(source_hashes: dict[str, object]) -> str:
+    payload = json.dumps(source_hashes, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _create_synced_git_repo(root: Path) -> Path:
