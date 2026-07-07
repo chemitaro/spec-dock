@@ -1,0 +1,38 @@
+{
+  "adoption_status": "unreviewed",
+  "assurance_mutated": false,
+  "authority": "evidence_only",
+  "bundle_generation_not_promotion": true,
+  "canonical_written": false,
+  "eligible_section_ids": [],
+  "extra_section_ids": [],
+  "missing_optional_section_ids": [],
+  "missing_section_ids": [],
+  "next_action": "manual section adoption review; do not treat as reviewer pass",
+  "non_adoptable_sections": [
+    {
+      "adoption_eligible": false,
+      "body_sha256": "8d4ce3d7bd83d74da599650d0fd3d23718e91a2c449e208ed54e49c7f5c8986b",
+      "canonical_written": false,
+      "section_id": "purpose",
+      "status": "rejected"
+    }
+  ],
+  "staged_sections": [],
+  "status": "rejected",
+  "trace": {
+    "acceptance": [
+      "E-AC-002",
+      "E-AC-004",
+      "E-AC-005",
+      "E-AC-011"
+    ],
+    "issue_id": "iss-00290",
+    "parent_epic": "epic-00283",
+    "requirements": [
+      "E-RQ-005",
+      "E-RQ-008",
+      "E-RQ-010"
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "returncode": 3,
+  "stdout": "{\"errors\": [\"source hash mismatch: spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00290-dogfood-authoring-pack-mismatch-and-stale-probe/requirement.md\"], \"output_dir\": \"preflight-source-hash-mismatch\", \"status\": \"stale\"}",
+  "stderr": ""
+}

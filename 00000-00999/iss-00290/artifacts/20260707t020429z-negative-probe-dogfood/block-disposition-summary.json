@@ -1,0 +1,83 @@
+{
+  "authority": "evidence_only",
+  "adoption_status": "unreviewed",
+  "bundle_generation_not_promotion": true,
+  "issue_id": "iss-00290",
+  "parent_epic": "epic-00283",
+  "generated_at": "2026-07-07T02:08:29Z",
+  "canonical_written": false,
+  "assurance_mutated": false,
+  "reviewer_pass_claimed": false,
+  "trace": {
+    "requirements": ["E-RQ-005", "E-RQ-008", "E-RQ-010"],
+    "acceptance": ["E-AC-002", "E-AC-004", "E-AC-005", "E-AC-011"]
+  },
+  "cases": [
+    {
+      "case_id": "preflight-source-hash-mismatch",
+      "failure_class": "source_hash_mismatch",
+      "validator": "prepare_chatgpt_authoring_pack.py",
+      "expected_status": "stale",
+      "observed_status": "stale",
+      "returncode": 3,
+      "adoption_eligible": false,
+      "evidence": "preflight-source-hash-mismatch/diagnostics.json"
+    },
+    {
+      "case_id": "selected-profile-drift",
+      "failure_class": "selected_profile_drift",
+      "validator": "validate_selected_skeleton_fill.py",
+      "expected_status": "stale",
+      "observed_status": "stale",
+      "returncode": 3,
+      "adoption_eligible": false,
+      "evidence": "selected-profile-drift/validation/selected-skeleton-fill-validation-report.json"
+    },
+    {
+      "case_id": "candidate-profile-mismatch",
+      "failure_class": "candidate_profile_mismatch",
+      "validator": "validate_selected_skeleton_fill.py",
+      "expected_status": "stale",
+      "observed_status": "stale",
+      "returncode": 3,
+      "adoption_eligible": false,
+      "evidence": "candidate-profile-mismatch/validation/selected-skeleton-fill-validation-report.json"
+    },
+    {
+      "case_id": "unsafe-authority-claim",
+      "failure_class": "unsafe_authority_claim",
+      "validator": "validate_selected_skeleton_fill.py",
+      "expected_status": "rejected",
+      "observed_status": "rejected",
+      "returncode": 4,
+      "adoption_eligible": false,
+      "evidence": "unsafe-authority-claim/validation/selected-skeleton-fill-validation-report.json"
+    },
+    {
+      "case_id": "pack-digest-mismatch",
+      "failure_class": "pack_digest_mismatch",
+      "validator": "validate_selected_skeleton_fill.py",
+      "expected_status": "stale",
+      "observed_status": "stale",
+      "returncode": 3,
+      "adoption_eligible": false,
+      "evidence": "pack-digest-mismatch/validation/selected-skeleton-fill-validation-report.json"
+    },
+    {
+      "case_id": "stage-attempt-stale-review",
+      "failure_class": "stale_review_staging_attempt",
+      "validator": "stage_chatgpt_authoring_pack.py",
+      "expected_status": "stale",
+      "observed_status": "stale",
+      "returncode": 3,
+      "adoption_eligible": false,
+      "staged_artifact_count": 0,
+      "evidence": "stage-attempt-stale-review-command-check/command-result.json",
+      "staging_report": "stage-attempt-stale-review-command-check/staging-report.json",
+      "issue_evidence_trace": "stage-attempt-stale-review-command-check/staging-report.json#/review/trace",
+      "top_level_trace_note": "stage helper contract trace is not the iss-00290 evidence authority"
+    }
+  ],
+  "overall_status": "pass",
+  "next_action": "keep all cases evidence-only; do not stage or adopt generated content"
+}
