@@ -1,0 +1,339 @@
+{
+  "schema_version": "1.0",
+  "pack_id": "epic-00295-chatgpt-authoring-final-pack",
+  "repository": "chemitaro/spec-dock",
+  "branch": "codex/authoring-pack-installed-runtime",
+  "default_branch": "main",
+  "epic_id": "epic-00295",
+  "epic_title": "ChatGPT Authoring Pack Installed Runtime",
+  "epic_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/",
+  "authority": "evidence_only",
+  "adoption_status": "unreviewed",
+  "bundle_generation_not_promotion": true,
+  "generated_date": "2026-07-07",
+  "zip_root": "epic-00295-chatgpt-authoring-final-pack/",
+  "repository_connector_inspection": {
+    "github_connector_access": "succeeded",
+    "current_branch_source_fetch": "succeeded",
+    "current_branch_compare": {
+      "base": "main",
+      "head": "codex/authoring-pack-installed-runtime",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1,
+      "base_commit_sha": "39beeb96a62ea39e407d1039528199870e357652",
+      "merge_base_commit_sha": "fc74bd68e8e971b96701fa3dca17f80bee5f747b"
+    },
+    "note": "This manifest records connector observations used to create the pack. It is not independent Codex verification and must be rechecked before canonical adoption."
+  },
+  "source_files_consulted": [
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/.meta.json",
+      "role": "epic metadata",
+      "sha": "76455e7467a3d324d8fb9893f44377d46d363a3b"
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/requirement.md",
+      "role": "canonical Epic requirement draft on branch",
+      "sha": "9fc22b248d3753a7fadf38052954b1d7d7fd9b80"
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/design.md",
+      "role": "canonical Epic design draft on branch",
+      "sha": "351fa3054218f5035fd143574f2c72791118d241"
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/plan.md",
+      "role": "canonical Epic plan draft on branch",
+      "sha": "8167d8ceeeb685b032476af2dd26ad4dd2cf8602"
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/report.md",
+      "role": "Evidence Adoption Ledger and progress report",
+      "sha": "509c8ac0e01210eb6f35daecd4740626424a2d8c"
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/artifacts/20260707t152834z-research-chatgpt-multi-skill-authoring-workflow-analysis.md",
+      "role": "multi-skill workflow and runtime taxonomy research",
+      "sha": "aec46887fad4c054b73ba9f29d15d2309915236f"
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/artifacts/20260707t155254z-research-chatgpt-requirement-design-plan-concretization.md",
+      "role": "requirement/design/plan concretization research",
+      "sha": "534f685bd32b24eba24f2489289a807384db1fd4"
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/artifacts/20260707t161305z-interview-offline-authoring-mode-and-relay-pr-delivery-policy.md",
+      "role": "user-approved local-context and relay PR delivery policy",
+      "sha": "5c8522f7308e3afc0e3afac8ea240a6ee152e6f9"
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/artifacts/rules.md",
+      "role": "artifact authority and adoption rules",
+      "sha": "2e2f776ca81421652a88c1ce9434d076e0c49a20"
+    }
+  ],
+  "adoption_boundary": {
+    "canonical_docs": "Files in epic/ are final draft candidates only. They require Codex/SpecDock review and explicit adoption before replacing canonical Epic docs.",
+    "issue_drafts": "Issue draft packs are not canonical Issue docs until adopted by spec-dock-issue-planning in draft-adoption mode.",
+    "reviewer_pass": "No file in this pack claims fresh reviewer pass.",
+    "assurance": "No file in this pack authorizes .assurance.json mutation or authorized_profile selection.",
+    "pr_delivery": "Issues 01-11 defer PR delivery; Issue 12 is the only PR delivery Issue."
+  },
+  "issue_candidates": [
+    {
+      "order": 1,
+      "candidate_id": "C01",
+      "slug": "promote-authoring-pack-assets",
+      "path": "issues/01-promote-authoring-pack-assets/",
+      "title": "Promote authoring pack assets into provider-side installed layout",
+      "pr_delivery": false,
+      "dependencies": [],
+      "draft_files": [
+        "issues/01-promote-authoring-pack-assets/draft-requirement.md",
+        "issues/01-promote-authoring-pack-assets/draft-design.md",
+        "issues/01-promote-authoring-pack-assets/draft-plan.md"
+      ]
+    },
+    {
+      "order": 2,
+      "candidate_id": "C02",
+      "slug": "add-authoring-command-skeleton",
+      "path": "issues/02-add-authoring-command-skeleton/",
+      "title": "Add runtime `authoring` command group skeleton",
+      "pr_delivery": false,
+      "dependencies": [
+        "01-promote-authoring-pack-assets"
+      ],
+      "draft_files": [
+        "issues/02-add-authoring-command-skeleton/draft-requirement.md",
+        "issues/02-add-authoring-command-skeleton/draft-design.md",
+        "issues/02-add-authoring-command-skeleton/draft-plan.md"
+      ]
+    },
+    {
+      "order": 3,
+      "candidate_id": "C03",
+      "slug": "implement-github-sync-preflight",
+      "path": "issues/03-implement-github-sync-preflight/",
+      "title": "Implement block-first GitHub sync preflight",
+      "pr_delivery": false,
+      "dependencies": [
+        "02-add-authoring-command-skeleton"
+      ],
+      "draft_files": [
+        "issues/03-implement-github-sync-preflight/draft-requirement.md",
+        "issues/03-implement-github-sync-preflight/draft-design.md",
+        "issues/03-implement-github-sync-preflight/draft-plan.md"
+      ]
+    },
+    {
+      "order": 4,
+      "candidate_id": "C04",
+      "slug": "prepare-prompt-pack-and-safe-output-constraints",
+      "path": "issues/04-prepare-prompt-pack-and-safe-output-constraints/",
+      "title": "Prepare prompt pack and safe output constraints",
+      "pr_delivery": false,
+      "dependencies": [
+        "03-implement-github-sync-preflight"
+      ],
+      "draft_files": [
+        "issues/04-prepare-prompt-pack-and-safe-output-constraints/draft-requirement.md",
+        "issues/04-prepare-prompt-pack-and-safe-output-constraints/draft-design.md",
+        "issues/04-prepare-prompt-pack-and-safe-output-constraints/draft-plan.md"
+      ]
+    },
+    {
+      "order": 5,
+      "candidate_id": "C05",
+      "slug": "implement-backend-invocation-adapter",
+      "path": "issues/05-implement-backend-invocation-adapter/",
+      "title": "Implement backend invocation adapter",
+      "pr_delivery": false,
+      "dependencies": [
+        "04-prepare-prompt-pack-and-safe-output-constraints"
+      ],
+      "draft_files": [
+        "issues/05-implement-backend-invocation-adapter/draft-requirement.md",
+        "issues/05-implement-backend-invocation-adapter/draft-design.md",
+        "issues/05-implement-backend-invocation-adapter/draft-plan.md"
+      ]
+    },
+    {
+      "order": 6,
+      "candidate_id": "C06",
+      "slug": "promote-zip-review-and-staging",
+      "path": "issues/06-promote-zip-review-and-staging/",
+      "title": "Promote ZIP/tree review and staging into runtime commands",
+      "pr_delivery": false,
+      "dependencies": [
+        "04-prepare-prompt-pack-and-safe-output-constraints"
+      ],
+      "draft_files": [
+        "issues/06-promote-zip-review-and-staging/draft-requirement.md",
+        "issues/06-promote-zip-review-and-staging/draft-design.md",
+        "issues/06-promote-zip-review-and-staging/draft-plan.md"
+      ]
+    },
+    {
+      "order": 7,
+      "candidate_id": "C07",
+      "slug": "validate-initiative-epic-and-epic-issue-candidates",
+      "path": "issues/07-validate-initiative-epic-and-epic-issue-candidates/",
+      "title": "Validate Initiative/Epic and Epic/Issue candidates",
+      "pr_delivery": false,
+      "dependencies": [
+        "06-promote-zip-review-and-staging"
+      ],
+      "draft_files": [
+        "issues/07-validate-initiative-epic-and-epic-issue-candidates/draft-requirement.md",
+        "issues/07-validate-initiative-epic-and-epic-issue-candidates/draft-design.md",
+        "issues/07-validate-initiative-epic-and-epic-issue-candidates/draft-plan.md"
+      ]
+    },
+    {
+      "order": 8,
+      "candidate_id": "C08",
+      "slug": "validate-issue-draft-adoption-and-selected-skeleton",
+      "path": "issues/08-validate-issue-draft-adoption-and-selected-skeleton/",
+      "title": "Validate issue draft adoption and selected skeleton",
+      "pr_delivery": false,
+      "dependencies": [
+        "06-promote-zip-review-and-staging"
+      ],
+      "draft_files": [
+        "issues/08-validate-issue-draft-adoption-and-selected-skeleton/draft-requirement.md",
+        "issues/08-validate-issue-draft-adoption-and-selected-skeleton/draft-design.md",
+        "issues/08-validate-issue-draft-adoption-and-selected-skeleton/draft-plan.md"
+      ]
+    },
+    {
+      "order": 9,
+      "candidate_id": "C09",
+      "slug": "add-chatgpt-authoring-skill-and-update-planning-skills",
+      "path": "issues/09-add-chatgpt-authoring-skill-and-update-planning-skills/",
+      "title": "Add `spec-dock-chatgpt-authoring` skill and update planning skills",
+      "pr_delivery": false,
+      "dependencies": [
+        "02-add-authoring-command-skeleton"
+      ],
+      "draft_files": [
+        "issues/09-add-chatgpt-authoring-skill-and-update-planning-skills/draft-requirement.md",
+        "issues/09-add-chatgpt-authoring-skill-and-update-planning-skills/draft-design.md",
+        "issues/09-add-chatgpt-authoring-skill-and-update-planning-skills/draft-plan.md"
+      ]
+    },
+    {
+      "order": 10,
+      "candidate_id": "C10",
+      "slug": "implement-approval-check-and-stop-gate-reports",
+      "path": "issues/10-implement-approval-check-and-stop-gate-reports/",
+      "title": "Implement approval check and stop-gate evidence reports",
+      "pr_delivery": false,
+      "dependencies": [
+        "07-validate-initiative-epic-and-epic-issue-candidates"
+      ],
+      "draft_files": [
+        "issues/10-implement-approval-check-and-stop-gate-reports/draft-requirement.md",
+        "issues/10-implement-approval-check-and-stop-gate-reports/draft-design.md",
+        "issues/10-implement-approval-check-and-stop-gate-reports/draft-plan.md"
+      ]
+    },
+    {
+      "order": 11,
+      "candidate_id": "C11",
+      "slug": "update-runtime-docs-and-workflow-guidance",
+      "path": "issues/11-update-runtime-docs-and-workflow-guidance/",
+      "title": "Update runtime docs and workflow guidance",
+      "pr_delivery": false,
+      "dependencies": [
+        "03-implement-github-sync-preflight",
+        "07-validate-initiative-epic-and-epic-issue-candidates",
+        "08-validate-issue-draft-adoption-and-selected-skeleton",
+        "09-add-chatgpt-authoring-skill-and-update-planning-skills",
+        "10-implement-approval-check-and-stop-gate-reports"
+      ],
+      "draft_files": [
+        "issues/11-update-runtime-docs-and-workflow-guidance/draft-requirement.md",
+        "issues/11-update-runtime-docs-and-workflow-guidance/draft-design.md",
+        "issues/11-update-runtime-docs-and-workflow-guidance/draft-plan.md"
+      ]
+    },
+    {
+      "order": 12,
+      "candidate_id": "C12",
+      "slug": "final-quality-gate-and-mergeable-pr-delivery",
+      "path": "issues/12-final-quality-gate-and-mergeable-pr-delivery/",
+      "title": "Final quality gate and mergeable PR delivery",
+      "pr_delivery": true,
+      "dependencies": [
+        "01-promote-authoring-pack-assets",
+        "02-add-authoring-command-skeleton",
+        "03-implement-github-sync-preflight",
+        "04-prepare-prompt-pack-and-safe-output-constraints",
+        "05-implement-backend-invocation-adapter",
+        "06-promote-zip-review-and-staging",
+        "07-validate-initiative-epic-and-epic-issue-candidates",
+        "08-validate-issue-draft-adoption-and-selected-skeleton",
+        "09-add-chatgpt-authoring-skill-and-update-planning-skills",
+        "10-implement-approval-check-and-stop-gate-reports",
+        "11-update-runtime-docs-and-workflow-guidance"
+      ],
+      "draft_files": [
+        "issues/12-final-quality-gate-and-mergeable-pr-delivery/draft-requirement.md",
+        "issues/12-final-quality-gate-and-mergeable-pr-delivery/draft-design.md",
+        "issues/12-final-quality-gate-and-mergeable-pr-delivery/draft-plan.md"
+      ]
+    }
+  ],
+  "generated_files": [
+    "README.md",
+    "epic/design.md",
+    "epic/plan.md",
+    "epic/requirement.md",
+    "issues/01-promote-authoring-pack-assets/draft-design.md",
+    "issues/01-promote-authoring-pack-assets/draft-plan.md",
+    "issues/01-promote-authoring-pack-assets/draft-requirement.md",
+    "issues/02-add-authoring-command-skeleton/draft-design.md",
+    "issues/02-add-authoring-command-skeleton/draft-plan.md",
+    "issues/02-add-authoring-command-skeleton/draft-requirement.md",
+    "issues/03-implement-github-sync-preflight/draft-design.md",
+    "issues/03-implement-github-sync-preflight/draft-plan.md",
+    "issues/03-implement-github-sync-preflight/draft-requirement.md",
+    "issues/04-prepare-prompt-pack-and-safe-output-constraints/draft-design.md",
+    "issues/04-prepare-prompt-pack-and-safe-output-constraints/draft-plan.md",
+    "issues/04-prepare-prompt-pack-and-safe-output-constraints/draft-requirement.md",
+    "issues/05-implement-backend-invocation-adapter/draft-design.md",
+    "issues/05-implement-backend-invocation-adapter/draft-plan.md",
+    "issues/05-implement-backend-invocation-adapter/draft-requirement.md",
+    "issues/06-promote-zip-review-and-staging/draft-design.md",
+    "issues/06-promote-zip-review-and-staging/draft-plan.md",
+    "issues/06-promote-zip-review-and-staging/draft-requirement.md",
+    "issues/07-validate-initiative-epic-and-epic-issue-candidates/draft-design.md",
+    "issues/07-validate-initiative-epic-and-epic-issue-candidates/draft-plan.md",
+    "issues/07-validate-initiative-epic-and-epic-issue-candidates/draft-requirement.md",
+    "issues/08-validate-issue-draft-adoption-and-selected-skeleton/draft-design.md",
+    "issues/08-validate-issue-draft-adoption-and-selected-skeleton/draft-plan.md",
+    "issues/08-validate-issue-draft-adoption-and-selected-skeleton/draft-requirement.md",
+    "issues/09-add-chatgpt-authoring-skill-and-update-planning-skills/draft-design.md",
+    "issues/09-add-chatgpt-authoring-skill-and-update-planning-skills/draft-plan.md",
+    "issues/09-add-chatgpt-authoring-skill-and-update-planning-skills/draft-requirement.md",
+    "issues/10-implement-approval-check-and-stop-gate-reports/draft-design.md",
+    "issues/10-implement-approval-check-and-stop-gate-reports/draft-plan.md",
+    "issues/10-implement-approval-check-and-stop-gate-reports/draft-requirement.md",
+    "issues/11-update-runtime-docs-and-workflow-guidance/draft-design.md",
+    "issues/11-update-runtime-docs-and-workflow-guidance/draft-plan.md",
+    "issues/11-update-runtime-docs-and-workflow-guidance/draft-requirement.md",
+    "issues/12-final-quality-gate-and-mergeable-pr-delivery/draft-design.md",
+    "issues/12-final-quality-gate-and-mergeable-pr-delivery/draft-plan.md",
+    "issues/12-final-quality-gate-and-mergeable-pr-delivery/draft-requirement.md",
+    "manifest.json"
+  ],
+  "notes": [
+    "This pack is generated evidence and not promotion.",
+    "Do not inline or directly copy generated issue drafts into canonical Issue docs without draft-adoption review.",
+    "Default evidence mode is github-synced.",
+    "Unsynced execution is allowed only through explicit local-context evidence mode and requires EAL disposition.",
+    "No authoring adopt/create-issues-from-zip/mark-reviewer-pass/set-authorized-profile/issue-execution-ready/pr-ready command is included in initial scope."
+  ]
+}
