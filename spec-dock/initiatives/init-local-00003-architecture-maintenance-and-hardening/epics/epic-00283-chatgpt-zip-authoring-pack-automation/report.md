@@ -18,10 +18,11 @@ ID: "epic-00283"
   - ChatGPT Use / GPT-5.5 Pro Extended による調査・議論・ZIP authoring pack dogfood artifact を `epic-00283/artifacts/` へ集約済み。
   - Epic `requirement.md` / `design.md` / `plan.md` は具体化済み。
   - `iss-00284`〜`iss-00292` の canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は、Issue-local draft artifacts を evidence-only input として main orchestrator が採否判断し、正本へ再記述済み。
+  - `iss-00292` で dogfood metrics report、runtime promotion criteria draft、defer / reject rationale template を Issue-local evidence として作成済み。runtime promotion 自体は未決定で、現時点の推奨 stance は `defer_formal_runtime_promotion` として `iss-00293` final gate へ引き継ぐ。
   - `iss-00293` は、Epic 最後の品質ゲート、manual test evidence、PR 作成、CI / review 修正、mergeable 確認を担当する final gate Issue として作成済み。
   - 2026-07-07 のユーザー補足に基づき、`iss-00293` の PR 作成前 gate に ChatGPT Use / Oracle backend command adapter / invocation contract の実装・検証を追加した。
   - local assurance は全 Issue `standard` / `provisional` であり、ChatGPT 推奨や Epic 側のリスク判断で `.assurance.json` / `authorized_profile` を上書きしない。strict 推奨 Issue には strict 相当の追加 obligation を Issue plan に記録済み。
-  - 実装と dogfood scripts は未着手。この Epic report は spec authoring / planning package の現状を記録する。
+  - authoring-pack helper、dogfood scenarios、workflow docs、metrics decision material は `iss-00284`〜`iss-00292` で段階的に実装 / 記録済み。final quality gate、backend command adapter verification、mergeable PR は `iss-00293` に残る。
 - 次のマイルストーン:
   - fresh `spec-reviewer` gate `019f3999-911a-7381-8155-3cda5fcf3403` が pass し、`iss-00284`〜`iss-00293` を後続 Issue execution-ready に向けた reviewable planning package として扱える状態になった。
 - ブロッカー:
@@ -47,6 +48,7 @@ ID: "epic-00283"
 
 | EAL-010 | `adopted` | ChatGPT Use / GPT-5.5 Pro Extended readiness review | Epic / Issue specs | P1 findings を修正対象として採用した。ChatGPT output は reviewer pass ではなく、canonical docs の更新 input として扱う。 | `artifacts/20260706t164600z-research-chatgpt-authoring-pack-readiness-review.md` | 修正後に fresh `spec-reviewer` review |
 | EAL-011 | `adopted` | user supplemental requirement | Epic `plan.md`; `iss-00293` specs | SpecDock 正式ワークフローやスクリプトが個人環境固有の ChatGPT Use / Oracle wrapper 絶対パスに依存しないよう、backend command adapter / invocation contract を `iss-00293` の PR 作成前品質ゲートへ追加した。 | user instruction 2026-07-07; Epic `plan.md`; `issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/*` | `iss-00293` execution の S04 で実装 / 検証する |
+| EAL-012 | `partially_adopted` | `iss-00292` dogfood metrics / runtime criteria artifacts | Epic `report.md`; `iss-00293` handoff | dogfood metrics と promote / defer / reject criteria は判断材料として採用するが、runtime promotion approval は採用しない。backend adapter readiness、manual fallback exercise、human edit burden、aggregate reviewer loop は `iss-00293` または後続判断へ残す。 | `issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/artifacts/20260707t031203z-dogfood-metrics-and-runtime-criteria/`; `issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/report.md` | `iss-00293` final quality gate で再評価する |
 
 ## 目的整合台帳（Objective Alignment Ledger）
 
@@ -107,6 +109,7 @@ ID: "epic-00283"
 | SID-epic-00283-002 | 個別 Issue ごとに Pull Request を作成せず、実装完了後は `issue finish` して次 Issue を `issue start` するリレー実行とする。 | accepted | EAL-009; Epic `plan.md` リレー実行 / PR 方針; `iss-00293` specs | `iss-00284` から順番に実行し、PR は `iss-00293` に集約する |
 | SID-epic-00283-003 | `iss-00293` は Epic 最後の品質ゲート、manual test evidence、PR 作成、CI / review 修正、mergeable 確認を担当する。 | accepted | `iss-00293` requirement / design / plan / report; assurance classify result | `iss-00292` 完了後に開始する |
 | SID-epic-00283-004 | ChatGPT Use / Oracle 実行の backend command は SpecDock repo に直書きされた個人環境絶対パスではなく、設定で差し替え可能な invocation contract として扱う。 | accepted | EAL-011; amended Epic `plan.md`; amended `iss-00293` docs | `iss-00293` の PR 作成前に実装 / 検証する |
+| SID-epic-00283-005 | `iss-00292` の runtime promotion criteria は decision material であり、runtime promotion を承認しない。formal runtime promotion の現時点 stance は defer とし、final gate / backend adapter / manual fallback / human edit burden の確認後に再評価する。 | accepted | EAL-012; `iss-00292` artifacts and report | `iss-00293` final quality gate へ引き継ぐ |
 
 ## 完了した Issue / PR / Release
 
@@ -129,8 +132,11 @@ ID: "epic-00283"
 
 ## 受け入れ条件（E-AC）の達成状況
 
-- E-AC-001〜E-AC-012:
-  - 未実施。Spec authoring / planning phase であり、implementation / dogfood scripts は未着手。
+- E-AC-001〜E-AC-010:
+  - 実施済み。`iss-00284`〜`iss-00291` の実装 / dogfood / docs Issue で evidence を記録済み。
+- E-AC-011〜E-AC-012:
+  - 判断材料は作成済み。`iss-00292` の dogfood metrics / runtime criteria artifacts に成功・失敗・ブロック理由と promote / defer / reject criteria を記録した。
+  - runtime promotion 自体は未決定。現時点では formal runtime promotion を defer し、`iss-00293` の final quality gate と backend adapter verification へ引き継ぐ。
 
 ## フォローアップ（別Issue化）
 
