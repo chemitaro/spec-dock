@@ -13,7 +13,7 @@ ID: "iss-00293"
 
 ## 現在の状態
 
-- 状態: 実行中。S04 backend adapter は実装 / focused verification 済み。最終 PR delivery / merge preparation gate は未完了。
+- 状態: 実行中。S01〜S04 と final local verification は実施済み。最終 PR delivery / merge preparation gate は未完了。
 - 目的: Epic 全体の品質ゲート、手動テスト、Pull Request 作成、レビュー / CI 指摘対応、mergeable 確認を最後に集約する。
 - 前提: `iss-00284` から `iss-00292` までを順番に完了し、この Issue で PR を作成または更新する。
 - 追加責務: PR 作成前に ChatGPT Use / Oracle 実行まわりの個人環境絶対パス依存を解消し、backend command adapter / invocation contract を品質ゲート対象に含める。
@@ -33,11 +33,9 @@ ID: "iss-00293"
   - `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=189`。
   - scoped local wrapper hardcode guard over `scripts/authoring-pack`, `tests/manual_tests`, and active Issue docs -> no matches。
 - Remaining:
-  - 先行 Issue 完了 matrix。
-  - Epic manual test matrix。
   - PR URL と base/head。
   - CI / review / mergeable 状態。
-  - 発見した不具合、修正、再検証結果。
+  - PR 作成後のレビュー / CI 指摘と修正再検証。
 
 
 ## 証跡採用台帳（Evidence Adoption Ledger）
@@ -117,8 +115,57 @@ ID: "iss-00293"
 |---|---|---|---|---|
 | PR Delivery Gate | `iss-00293` | PR URL、selected base、head branch / SHA、issue linkage、existing PR reuse / new PR creation decision | 未実施 | `iss-00292` 完了後、この Issue execution で記録する |
 | Merge Preparation Gate | `iss-00293` | required checks、non-required checks / waiver、blocking review、merge conflict、unresolved blockers、final merge-prepared decision | 未実施 | PR 作成 / 更新後に記録する |
-| Backend Adapter Gate | `iss-00293` | backend command adapter / invocation contract、未設定 fail-closed、設定時 command 解決、個人環境絶対パス非直書き確認 | S04 implemented; focused verification passed before reviewer P2 fixes and is being rerun after fixes | final aggregate gate で再確認する |
-| Epic report update | `iss-00293` | Epic report の final gate evidence、manual test matrix、review / CI correction summary | 未実施 | S90 / S99 で記録する |
+| Backend Adapter Gate | `iss-00293` | backend command adapter / invocation contract、未設定 fail-closed、設定時 command 解決、個人環境絶対パス非直書き確認 | pass: S04 implemented, reviewer P2/P3 fixed, focused tests and full suite passed | final aggregate reviewer gate で再確認する |
+| Epic report update | `iss-00293` | Epic report の final gate evidence、manual test matrix、review / CI correction summary | partial: S04 evidence reflected; final PR evidence pending | S90 / S99 で記録する |
+
+## Prior Issue Completion Matrix
+
+| issue | GitHub state | local / report evidence | PR policy |
+|---|---|---|---|
+| `iss-00284` / #284 | CLOSED | final spec / code / QA reviewer evidence recorded; closure ledger pass | PR deferred to `iss-00293` |
+| `iss-00285` / #285 | CLOSED | closure ledger pass; safe review / schema validation evidence recorded | PR deferred to `iss-00293` |
+| `iss-00286` / #286 | CLOSED | closure ledger pass; staging / diff evidence recorded | PR deferred to `iss-00293` |
+| `iss-00287` / #287 | CLOSED | closure ledger pass; selected skeleton validation evidence recorded | PR deferred to `iss-00293` |
+| `iss-00288` / #288 | CLOSED | closure ledger pass; candidate Issue dogfood evidence recorded | PR deferred to `iss-00293` |
+| `iss-00289` / #289 | CLOSED | closure ledger pass; selected profile dogfood evidence recorded | PR deferred to `iss-00293` |
+| `iss-00290` / #290 | CLOSED | closure ledger pass; mismatch / stale probe evidence recorded | PR deferred to `iss-00293` |
+| `iss-00291` / #291 | CLOSED | closure ledger pass; workflow docs / adoption ledger evidence recorded | PR deferred to `iss-00293` |
+| `iss-00292` / #292 | CLOSED | `issue finish` completed; metrics / runtime criteria evidence recorded | PR deferred to `iss-00293` |
+| `iss-00293` / #293 | OPEN | active final gate issue; `deps check iss-00293` ready with blockers=0 | this Issue creates the Epic PR |
+
+Supporting commands:
+
+- `./spec-dock/scripts/spec-dock active show` -> active `init-local-00003` / `epic-00283` / `iss-00293`.
+- `./spec-dock/scripts/spec-dock deps check iss-00293` -> `ready=true`, `blockers=0`, `effective_status=open`, `source=github`, `stale=false`.
+- `gh issue list --repo chemitaro/spec-dock --state all --search "284 285 286 287 288 289 290 291 292 293"` -> #284〜#292 CLOSED、#293 OPEN。
+
+## Final Local Verification Evidence
+
+| check | result | evidence |
+|---|---|---|
+| `spec-dock validate` | pass | `spec-dock: ok (validate) nodes=189` |
+| whitespace / patch hygiene | pass | `git diff --check` pass after snapshot fix |
+| backend adapter focused tests | pass | `uv run pytest tests/manual_tests/test_invoke_chatgpt_backend.py -q` -> `10 passed in 0.41s` |
+| authoring-pack focused suite | pass | `uv run pytest tests/manual_tests/test_prepare_chatgpt_authoring_pack.py tests/manual_tests/test_review_chatgpt_authoring_pack.py tests/manual_tests/test_stage_chatgpt_authoring_pack.py tests/manual_tests/test_validate_selected_skeleton_fill.py tests/manual_tests/test_validate_issue_candidates.py tests/manual_tests/test_invoke_chatgpt_backend.py -q` -> `211 passed in 9.81s` |
+| full baseline first run | fail -> fixed | `uv run pytest` initially failed 1 test: checked-in dogfooding `.meta.json` snapshot did not include `epic-00283` / `iss-00284`〜`iss-00293` metadata |
+| focused failure rerun | pass | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -q` -> `1 passed in 1.52s` |
+| full baseline after fix | pass | `uv run pytest` -> `1910 passed, 74 skipped in 934.21s (0:15:34)` |
+
+## Epic Manual Test Matrix
+
+| scenario | status | evidence |
+|---|---|---|
+| preflight / prompt pack | pass | `iss-00284` closure ledger and full baseline covered preflight output, source manifest, stale / forbidden claim negative cases |
+| safe ZIP / tree review | pass | `iss-00285` closure ledger and full baseline covered status taxonomy, redaction, valid / invalid no-mutation behavior |
+| staged rendering / diff | pass | `iss-00286` closure ledger and full baseline covered staging output, canonical byte snapshot, EAL candidate boundary |
+| selected skeleton fill | pass | `iss-00287` closure ledger and full baseline covered profile-controlled section filling and mismatch protection |
+| candidate Issue slicing | pass | `iss-00288` closure ledger and full baseline covered candidate-only pack validation and profile boundary metadata |
+| selected profile dogfood | pass | `iss-00289` closure ledger records ZIP review / selected skeleton validation / dry-run pass |
+| mismatch / stale probes | pass | `iss-00290` closure ledger records negative probe evidence and stale review command coverage |
+| workflow docs / adoption examples | pass | `iss-00291` closure ledger and README updates covered prompt contract, status examples, fallback boundary |
+| metrics / promotion criteria | pass | `iss-00292` artifacts and report recorded dogfood metrics, runtime promotion criteria, and defer stance |
+| backend command adapter | pass | S04 adapter evidence, reviewer finding disposition, focused tests, scoped local wrapper hardcode guard |
+| dogfooding metadata snapshot | pass | `tests/unit/infra/test_init_update.py` updated to include `epic-00283` / `iss-00284`〜`iss-00293` `.meta.json` paths and empty `depends_on` baseline |
 
 ## ChatGPT Use Planning Evidence
 
@@ -185,12 +232,12 @@ ID: "iss-00293"
 
 | closure id | status | required evidence | current evidence | next_action |
 |---|---|---|---|---|
-| tc-001 | pending | 先行 Issue 完了 / scope isolation | `iss-00292` は `issue finish` 済み。full prior Issue completion matrix は S01 で記録する。 | S01 で全先行 Issue を確認する |
-| tc-002 | pending | `spec-dock validate` / `git diff --check` / 関連テスト | S04 partial gate: `py_compile` pass、adapter focused `9 passed`、authoring-pack focused `210 passed`、`git diff --check` pass、`spec-dock validate` pass。PR 前の最終 aggregate gate は未完了。 | S99 で final aggregate gate を再実行する |
-| tc-003 | pending | Epic manual test matrix | 未実施 | final gate execution で記録する |
+| tc-001 | pass | 先行 Issue 完了 / scope isolation | #284〜#292 CLOSED、#293 OPEN、`deps check iss-00293` ready / blockers=0。working tree diff は snapshot/report final evidence に限定。 | closed |
+| tc-002 | pass | `spec-dock validate` / `git diff --check` / 関連テスト | `spec-dock validate` pass、`git diff --check` pass、focused adapter 10 passed、authoring-pack suite 211 passed、full baseline after snapshot fix 1910 passed / 74 skipped。 | closed |
+| tc-003 | pass | Epic manual test matrix | scenario-by-scenario matrix を記録。preflight / safe review / staging / profile / dogfood / docs / metrics / backend adapter / metadata snapshot を確認済み。 | closed |
 | tc-004 | pass | backend command adapter / invocation contract | S04 adapter implemented; ChatGPT Use advisory recommendations adopted; focused tests and authoring-pack suite passed; no local wrapper dependency added | closed |
 | tc-005 | pending | PR URL / CI / review / mergeable status | 未実施 | PR 作成後に記録する |
-| tc-006 | pending | Epic / Issue report 更新 / docs impact | 未実施 | S90 で記録する |
+| tc-006 | pending | Epic / Issue report 更新 / docs impact | Issue report 更新中。Epic report には S04 evidence と final local verification / manual matrix / PR evidence を反映する必要がある。 | S90 で記録する |
 | tc-007 | pending | fresh reviewer results / blocker disposition | 未実施 | S99 で記録する |
 
 ## 残リスク
