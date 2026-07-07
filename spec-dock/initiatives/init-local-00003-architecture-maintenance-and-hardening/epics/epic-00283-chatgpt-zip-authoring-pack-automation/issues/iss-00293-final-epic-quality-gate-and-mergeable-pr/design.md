@@ -55,6 +55,33 @@ SpecDock repo 内の正式ワークフローやスクリプトは、ユーザー
 - 未設定時: command を推測せず、どの設定が必要かを示す明確なエラーで fail する。
 - 既存のローカル `oracle-chatgpt` wrapper: ユーザー環境で `SPECDOCK_CHATGPT_COMMAND` などに指定できる一例であり、SpecDock repo の必須依存ではない。
 
+### Adapter ABI v1
+
+この Issue で実装する backend adapter は、Oracle 互換の ChatGPT backend を「設定された argv prefix」として扱う。設定値を shell script として評価しない。
+
+- command resolution:
+  - `SPECDOCK_CHATGPT_COMMAND` が空でなければそれを使う。
+  - 未設定または空なら `ORACLE_CHATGPT_COMMAND` を使う。
+  - どちらも未設定または空なら `blocked` とし、`SPECDOCK_CHATGPT_COMMAND` または `ORACLE_CHATGPT_COMMAND` の設定が必要であることを stdout / stderr から分かる形で返す。
+- parsing:
+  - 設定値は `shlex.split(..., posix=True)` で argv に分解する。
+  - shell expansion、pipe、redirect、command substitution は adapter では解釈しない。
+  - quoted path with spaces は `shlex.split` の範囲で許可する。
+- invocation shape:
+  - adapter CLI は `--slug <slug>`、`-p/--prompt <text>`、`--file <path>`（repeatable）を受け取る。
+  - 実行時は `backend_argv + ["--slug", slug, "-p", prompt, "--file", file1, ...]` を `subprocess.run(..., shell=False)` で呼ぶ。
+  - backend がこの ABI と異なる場合、ユーザーは自身の環境でこの ABI に合わせた shim を `SPECDOCK_CHATGPT_COMMAND` に指定する。
+- cwd / env:
+  - cwd は呼び出し元の current working directory を維持する。
+  - 環境変数は既存環境を継承し、adapter は provider token、cookie、Oracle binary、ChatGPT automation を追加しない。
+- output and exit:
+  - `--dry-run` は backend を実行せず、resolved source、argv、files、cwd を JSON で返す。
+  - 実行モードでは backend の stdout / stderr をそのまま転送し、exit code も backend の終了コードを返す。
+  - adapter 自身の設定不足、parse error、file path error、timeout は backend を起動せず、明確な診断を返す。
+- timeout:
+  - `--timeout-seconds` は任意。未指定または `0` の場合は adapter 側 timeout を無効にする。
+  - timeout した場合は backend process を停止し、`blocked` 診断を返す。
+
 この contract は、`iss-00293` の PR 作成前に品質ゲート対象として確認する。検証では、未設定時の fail-closed、設定時の command 解決、個人環境絶対パスの非直書きを確認し、結果を `report.md` に残す。
 
 

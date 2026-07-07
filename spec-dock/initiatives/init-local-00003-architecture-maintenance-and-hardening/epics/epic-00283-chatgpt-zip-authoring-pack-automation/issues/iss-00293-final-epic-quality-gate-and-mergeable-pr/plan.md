@@ -65,7 +65,7 @@ ID: "iss-00293"
   - closure id: `tc-003`。
 - S04:
   - 担当: main orchestrator または dev-coder。
-  - close 条件: ChatGPT backend command adapter / invocation contract を実装または確認し、未設定時の fail-closed、設定時の command 解決、個人環境絶対パス非直書きを検証する。
+  - close 条件: ChatGPT backend command adapter / invocation contract を実装または確認し、未設定時の fail-closed、設定時の command 解決、argv ABI、stdout / stderr / exit code、timeout、個人環境絶対パス非直書きを検証する。
   - closure id: `tc-004`。
 - S05:
   - 担当: main orchestrator。
@@ -146,12 +146,28 @@ ID: "iss-00293"
 - `tc-s04-00293-002` command: 設定された backend command を解決する
   - 前提: `SPECDOCK_CHATGPT_COMMAND` または `ORACLE_CHATGPT_COMMAND` にテスト用 command が指定されている。
   - 操作: backend command adapter / invocation contract を呼び出す。
-  - 期待結果: 指定された command を backend として扱い、SpecDock repo に Oracle / ChatGPT automation 本体を要求しない。
+  - 期待結果: 指定された command を `shlex.split` で argv prefix として解決し、SpecDock repo に Oracle / ChatGPT automation 本体を要求しない。
   - 失敗検出: 設定値を無視する、または個人環境 path を必須依存として扱う回帰を検出する。
   - 検証方法: focused pytest または adapter の dry-run / no-op command output。
   - 関連 closure id: `tc-004`
 
-- `tc-s04-00293-003` inspect: 個人環境 wrapper の絶対パス非直書きを確認する
+- `tc-s04-00293-003` command: adapter ABI を検証する
+  - 前提: `SPECDOCK_CHATGPT_COMMAND` にテスト用 backend command が指定されている。
+  - 操作: adapter に `--slug`、`-p/--prompt`、複数 `--file` を渡し、dry-run と実行モードを確認する。
+  - 期待結果: backend は `backend_argv + ["--slug", slug, "-p", prompt, "--file", file1, ...]` として `shell=False` で呼ばれ、stdout / stderr / exit code は backend に従う。
+  - 失敗検出: shell 経由実行、引数順序の崩れ、prompt / file の欠落、backend exit code の握りつぶしを検出する。
+  - 検証方法: focused pytest。
+  - 関連 closure id: `tc-004`
+
+- `tc-s04-00293-004` command: timeout / parse error を診断する
+  - 前提: malformed command または timeout を発生させるテスト用 backend がある。
+  - 操作: adapter を実行する。
+  - 期待結果: backend 未起動または timeout 停止が明確な診断として返り、個人環境 path や secret-looking value を出力しない。
+  - 失敗検出: parse error を shell に渡す、timeout した backend を放置する、host-local path を診断へ混入する回帰を検出する。
+  - 検証方法: focused pytest。
+  - 関連 closure id: `tc-004`
+
+- `tc-s04-00293-005` inspect: 個人環境 wrapper の絶対パス非直書きを確認する
   - 前提: final diff が存在する。
   - 操作: repo 内の正式ワークフロー / スクリプト対象に対して、個人環境 wrapper path が直書きされていないことを確認する。
   - 期待結果: 既存のローカル `oracle-chatgpt` wrapper は設定例としてのみ扱われ、正式ワークフローの必須 path ではない。
