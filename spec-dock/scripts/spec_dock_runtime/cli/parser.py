@@ -118,10 +118,10 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "authoring_pack_stage",
     )
 
-    authoring_backend = authoring_sub.add_parser("backend", help="Deferred ChatGPT backend skeletons")
+    authoring_backend = authoring_sub.add_parser("backend", help="ChatGPT backend helpers")
     authoring_backend_sub = authoring_backend.add_subparsers(dest="authoring_backend_cmd", required=True)
     _bind_leaf(
-        authoring_backend_sub.add_parser("invoke", help="Deferred backend invocation skeleton"),
+        authoring_backend_sub.add_parser("invoke", help="Invoke a configured ChatGPT backend with a prompt pack"),
         registry,
         "authoring_backend_invoke",
     )

@@ -8,10 +8,16 @@ from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
     GitHubSyncPreflightRequest,
     run_github_sync_preflight,
 )
+from spec_dock_runtime.application.authoring_pack.backend_invoke import invoke_backend
 from spec_dock_runtime.application.authoring_pack.pack_prepare import prepare_prompt_pack
 from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.domain.authoring_pack.backend_invoke_contract import BackendInvokeRequest
 from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import PromptPackPrepareRequest
 from spec_dock_runtime.presentation.authoring_pack.diagnostics import render_preflight_json, render_preflight_text
+from spec_dock_runtime.presentation.authoring_pack.backend_invoke_renderer import (
+    render_backend_invoke_json,
+    render_backend_invoke_text,
+)
 from spec_dock_runtime.presentation.authoring_pack.pack_prepare_renderer import (
     render_pack_prepare_json,
     render_pack_prepare_text,
@@ -55,8 +61,20 @@ class AuthoringPackPrepareArgs(CommandArgs):
     stale_if: Path | None
 
 
+@dataclass(frozen=True)
+class AuthoringBackendInvokeArgs(CommandArgs):
+    prompt_pack: Path
+    output_dir: Path
+    output_format: str
+    backend_command: str | None
+    slug: str | None
+    prompt: str | None
+    evidence_mode: str
+    timeout_seconds: float | None
+    dry_run: bool
+
+
 _DEFERRED_COMMANDS: dict[str, tuple[str, str]] = {
-    "authoring_backend_invoke": ("authoring backend invoke", "iss-00300"),
     "authoring_pack_review": ("authoring pack review", "iss-00301"),
     "authoring_pack_stage": ("authoring pack stage", "iss-00301"),
     "authoring_validate_initiative_epic_candidates": (
@@ -89,6 +107,11 @@ def command_specs() -> dict[str, CommandSpec]:
         args_factory=_pack_prepare_args,
         run=_run_pack_prepare,
     )
+    specs["authoring_backend_invoke"] = CommandSpec(
+        add_arguments=_add_backend_invoke_arguments,
+        args_factory=_backend_invoke_args,
+        run=_run_backend_invoke,
+    )
     return specs
 
 
@@ -119,6 +142,18 @@ def _add_pack_prepare_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--stale-if")
 
 
+def _add_backend_invoke_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--prompt-pack", required=True)
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
+    parser.add_argument("--backend-command")
+    parser.add_argument("--slug")
+    parser.add_argument("--prompt")
+    parser.add_argument("--evidence-mode", choices=("github-synced", "local-context"), default="github-synced")
+    parser.add_argument("--timeout-seconds", type=float)
+    parser.add_argument("--dry-run", action="store_true")
+
+
 def _preflight_github_sync_args(ns: argparse.Namespace) -> CommandArgs:
     return AuthoringPreflightGithubSyncArgs(
         evidence_mode=ns.evidence_mode,
@@ -143,6 +178,20 @@ def _pack_prepare_args(ns: argparse.Namespace) -> CommandArgs:
         mode=ns.mode,
         source_manifest=Path(ns.source_manifest) if ns.source_manifest else None,
         stale_if=Path(ns.stale_if) if ns.stale_if else None,
+    )
+
+
+def _backend_invoke_args(ns: argparse.Namespace) -> CommandArgs:
+    return AuthoringBackendInvokeArgs(
+        prompt_pack=Path(ns.prompt_pack),
+        output_dir=Path(ns.output_dir),
+        output_format=ns.output_format,
+        backend_command=ns.backend_command,
+        slug=ns.slug,
+        prompt=ns.prompt,
+        evidence_mode=ns.evidence_mode,
+        timeout_seconds=ns.timeout_seconds,
+        dry_run=bool(ns.dry_run),
     )
 
 
@@ -212,6 +261,33 @@ def _run_pack_prepare(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     )
 
 
+def _run_backend_invoke(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    del use_cases
+    backend_args = _expect_backend_invoke_args(args)
+    result = invoke_backend(
+        BackendInvokeRequest(
+            prompt_pack=backend_args.prompt_pack,
+            output_dir=backend_args.output_dir,
+            output_format=backend_args.output_format,  # type: ignore[arg-type]
+            backend_command=backend_args.backend_command,
+            slug=backend_args.slug,
+            prompt=backend_args.prompt,
+            evidence_mode=backend_args.evidence_mode,  # type: ignore[arg-type]
+            timeout_seconds=backend_args.timeout_seconds,
+            dry_run=backend_args.dry_run,
+        )
+    )
+    exit_code = 0 if result.status == "pass" else 1
+    if backend_args.output_format == "json":
+        stdout_lines = [render_backend_invoke_json(result)]
+    else:
+        stdout_lines = render_backend_invoke_text(result)
+    return CommandOutcome(
+        exit_code=exit_code,
+        text=CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=[]),
+    )
+
+
 def _run_deferred(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     del use_cases
     deferred_args = _expect_deferred_args(args)
@@ -246,4 +322,10 @@ def _expect_preflight_github_sync_args(args: CommandArgs) -> AuthoringPreflightG
 def _expect_pack_prepare_args(args: CommandArgs) -> AuthoringPackPrepareArgs:
     if not isinstance(args, AuthoringPackPrepareArgs):
         raise RuntimeError("Invalid command args for authoring pack prepare")
+    return args
+
+
+def _expect_backend_invoke_args(args: CommandArgs) -> AuthoringBackendInvokeArgs:
+    if not isinstance(args, AuthoringBackendInvokeArgs):
+        raise RuntimeError("Invalid command args for authoring backend invoke")
     return args
