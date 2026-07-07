@@ -1,0 +1,240 @@
+{
+  "authority": "evidence_only",
+  "adoption_status": "unreviewed",
+  "bundle_generation_not_promotion": true,
+  "issue_id": "iss-00292",
+  "parent_epic": "epic-00283",
+  "generated_at": "2026-07-07T03:12:03Z",
+  "runtime_promotion_decision": "not_decided",
+  "recommended_current_stance": "defer_formal_runtime_promotion",
+  "metric_coverage": "complete_for_dogfood_metrics_report",
+  "complete_metric_source": "dogfood-metrics-report.ja.md",
+  "metrics": [
+    {
+      "metric_id": "M-A-001",
+      "scenario": "A",
+      "metric_name": "candidate-only focused tests",
+      "measurement_type": "computed",
+      "observed_value": "19 / 19 pass",
+      "source_evidence": "iss-00288 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-A-002",
+      "scenario": "A",
+      "metric_name": "full authoring-pack suite at iss-00288",
+      "measurement_type": "computed",
+      "observed_value": "188 / 188 pass",
+      "source_evidence": "iss-00288 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-A-003",
+      "scenario": "A",
+      "metric_name": "candidate helper correction deltas",
+      "measurement_type": "computed",
+      "observed_value": "2 dispositions",
+      "source_evidence": "iss-00288 report",
+      "promotion_signal": false,
+      "defer_signal": true,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-B-001",
+      "scenario": "B",
+      "metric_name": "selected-profile review / validation / dry-run",
+      "measurement_type": "computed",
+      "observed_value": "pass / pass / pass",
+      "source_evidence": "iss-00289 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-B-002",
+      "scenario": "B",
+      "metric_name": "local authority preserved",
+      "measurement_type": "computed",
+      "observed_value": "canonical_written=false; assurance_mutated=false; reviewer_pass_claimed=false",
+      "source_evidence": "iss-00289 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-B-003",
+      "scenario": "B",
+      "metric_name": "profile suggestion ignored for authority",
+      "measurement_type": "computed",
+      "observed_value": "ChatGPT strict suggestion ignored; local target standard",
+      "source_evidence": "iss-00289 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-B-004",
+      "scenario": "B",
+      "metric_name": "staged section eligibility",
+      "measurement_type": "computed",
+      "observed_value": "3 / 3 required sections eligible; 1 optional missing",
+      "source_evidence": "iss-00289 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-B-005",
+      "scenario": "B",
+      "metric_name": "dry-run canonical write prevention",
+      "measurement_type": "computed",
+      "observed_value": "3 staged sections; all canonical_written=false",
+      "source_evidence": "iss-00289 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-C-001",
+      "scenario": "C",
+      "metric_name": "negative probe block success",
+      "measurement_type": "computed",
+      "observed_value": "6 / 6 adoption_eligible=false",
+      "source_evidence": "iss-00290 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-C-002",
+      "scenario": "C",
+      "metric_name": "negative status distribution",
+      "measurement_type": "computed",
+      "observed_value": "stale=5; rejected=1",
+      "source_evidence": "iss-00290 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-C-003",
+      "scenario": "C",
+      "metric_name": "stale staging prevention",
+      "measurement_type": "computed",
+      "observed_value": "returncode=3; status=stale; staged_artifact_count=0",
+      "source_evidence": "iss-00290 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-C-004",
+      "scenario": "C",
+      "metric_name": "final authoring-pack manual suite",
+      "measurement_type": "computed",
+      "observed_value": "201 / 201 pass",
+      "source_evidence": "iss-00290 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-DOC-001",
+      "scenario": "docs",
+      "metric_name": "workflow docs deliverables",
+      "measurement_type": "computed",
+      "observed_value": "README + 4 Issue-local docs + summary",
+      "source_evidence": "iss-00291 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-DOC-002",
+      "scenario": "docs",
+      "metric_name": "leakage / unsafe-claim inspection",
+      "measurement_type": "computed",
+      "observed_value": "pass",
+      "source_evidence": "iss-00291 report",
+      "promotion_signal": true,
+      "defer_signal": false,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-RR-001",
+      "scenario": "cross",
+      "metric_name": "reviewer repair loop count",
+      "measurement_type": "partial",
+      "observed_value": "issue-local findings exist; aggregate rule not fixed",
+      "source_evidence": "iss-00288..iss-00291 reports",
+      "promotion_signal": false,
+      "defer_signal": true,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-UN-001",
+      "scenario": "cross",
+      "metric_name": "human edit burden",
+      "measurement_type": "unmeasured",
+      "observed_value": "not measured",
+      "source_evidence": "none",
+      "promotion_signal": false,
+      "defer_signal": true,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-UN-002",
+      "scenario": "cross",
+      "metric_name": "manual fallback success rate",
+      "measurement_type": "partial_unmeasured",
+      "observed_value": "fallback docs exist; outage run not exercised",
+      "source_evidence": "iss-00291 docs",
+      "promotion_signal": false,
+      "defer_signal": true,
+      "reject_signal": false
+    },
+    {
+      "metric_id": "M-UN-003",
+      "scenario": "cross",
+      "metric_name": "backend command adapter readiness",
+      "measurement_type": "deferred",
+      "observed_value": "owned by iss-00293",
+      "source_evidence": "epic plan; iss-00293 docs",
+      "promotion_signal": false,
+      "defer_signal": true,
+      "reject_signal": false
+    }
+  ],
+  "summary": {
+    "metric_count": 18,
+    "computed_positive_signals": 13,
+    "defer_signals": 5,
+    "reject_signals": 0,
+    "computed_positive_metric_ids": [
+      "M-A-001",
+      "M-A-002",
+      "M-B-001",
+      "M-B-002",
+      "M-B-003",
+      "M-B-004",
+      "M-B-005",
+      "M-C-001",
+      "M-C-002",
+      "M-C-003",
+      "M-C-004",
+      "M-DOC-001",
+      "M-DOC-002"
+    ],
+    "defer_metric_ids": [
+      "M-A-003",
+      "M-RR-001",
+      "M-UN-001",
+      "M-UN-002",
+      "M-UN-003"
+    ]
+  }
+}
