@@ -83,9 +83,9 @@ ID: "iss-00293"
 
 | gate | required state | current state | promotion / completion decision |
 |---|---|---|---|
-| spec-reviewer | fresh final gate | planning pass: `019f3999-911a-7381-8155-3cda5fcf3403`; backend adapter amendment pass: `019f3a4c-0104-7562-bd52-a5bd9154057f`; final gate `019f3b1d-c36f-76b2-886e-b4a84a2f629f` found workflow P1 only: final evidence was still local-only and `tc-007` was pending | no spec-content P0/P1. This report update is the corrective action; commit / push and post-push confirmation are required before final close. |
-| code-reviewer | required in this Issue final gate | S04 focused pass: `019f3ab7-5f18-7a00-9720-a26ba56a577b`; final issue-wide pass: `019f3b1d-ece6-7681-bbfc-165c6a8c2c39` | pass. No P0/P1 blocker; four P2 contract / safety hardening items are tracked as non-blocking follow-up decisions. |
-| qa-reviewer | required in this Issue final gate | S04 focused pass: `019f3ab7-8932-7133-a1f3-d1089d86467d`; final gate `019f3b1e-4184-7da1-b712-d3434dd81136` found workflow P1 only: final evidence was local-only / ledger not closed, plus P2 traceability hardening | no separate implementation / test coverage P0/P1. This report update closes the ledger and adds durable P2 disposition. |
+| spec-reviewer | fresh final gate | planning pass: `019f3999-911a-7381-8155-3cda5fcf3403`; backend adapter amendment pass: `019f3a4c-0104-7562-bd52-a5bd9154057f`; final pass: `019f3b37-81c6-7fb2-a64b-abd51aa53567` | pass. No P0/P1 spec / workflow blocker remains; post-push evidence and terminal P2 tracking are accepted for final close. |
+| code-reviewer | required in this Issue final gate | S04 focused pass: `019f3ab7-5f18-7a00-9720-a26ba56a577b`; final issue-wide pass: `019f3b37-cf97-7fe3-925d-882cbce3dfe1` | pass. No P0/P1 blocker; terminal P2 contract / safety hardening items are tracked as non-blocking follow-up decisions. |
+| qa-reviewer | required in this Issue final gate | S04 focused pass: `019f3ab7-8932-7133-a1f3-d1089d86467d`; final pass: `019f3b37-ab20-7303-a65e-ce1d4be61f10` | pass. No P0/P1 QA blocker; P2 evidence-ledger traceability findings are recorded as non-blocking. |
 
 | phase | gate | reviewer_role | freshness | state | risk_acceptance | promotion_decision | evidence |
 |---|---|---|---|---|---|---|---|
@@ -94,9 +94,9 @@ ID: "iss-00293"
 | planning-readiness | backend-adapter-abi | spec-reviewer | fresh | pass | no | execute approved plan | `019f3aa2-e9cc-7a20-9939-627fbc235385`; prior P1 fixed and focused re-review passed |
 | S04-implementation | backend-adapter-code | code-reviewer | fresh | pass | no | P2/P3 fixed and verification rerun | `019f3ab7-5f18-7a00-9720-a26ba56a577b` |
 | S04-verification | backend-adapter-qa | qa-reviewer | fresh | pass | no | P2 fixed and verification rerun | `019f3ab7-8932-7133-a1f3-d1089d86467d` |
-| final-gate | issue-wide-spec | spec-reviewer | fresh | corrective-action-required | no spec-content P0/P1 | commit this report and rerun final confirmation on pushed head | `019f3b1d-c36f-76b2-886e-b4a84a2f629f` found only local-only evidence / pending ledger P1 |
-| final-gate | issue-wide-code | code-reviewer | fresh | pass | no | P2 follow-up tracked; no branch mutation for P2-only items | `019f3b1d-ece6-7681-bbfc-165c6a8c2c39` |
-| final-gate | issue-wide-qa | qa-reviewer | fresh | corrective-action-required | no implementation P0/P1 | commit this report and rerun final confirmation on pushed head | `019f3b1e-4184-7da1-b712-d3434dd81136` found only local-only evidence / pending ledger P1 plus P2 traceability |
+| final-gate | issue-wide-spec | spec-reviewer | fresh | pass | no | execute approved plan | `019f3b37-81c6-7fb2-a64b-abd51aa53567`; P2: record post-push head / extra terminal P2s, non-blocking |
+| final-gate | issue-wide-code | code-reviewer | fresh | pass | no | execute approved plan | `019f3b37-cf97-7fe3-925d-882cbce3dfe1`; P2: durable report evidence cleanup, non-blocking |
+| final-gate | issue-wide-qa | qa-reviewer | fresh | pass | no | execute approved plan | `019f3b37-ab20-7303-a65e-ce1d4be61f10`; P2: terminal P2 traceability / tc-007 wording, non-blocking |
 
 ## Delegated Draft Evidence
 
@@ -115,10 +115,10 @@ ID: "iss-00293"
 
 | gate | owner | required evidence | current evidence | next_action |
 |---|---|---|---|---|
-| PR Delivery Gate | `iss-00293` | PR URL、selected base、head branch / SHA、issue linkage、existing PR reuse / new PR creation decision | PR #294 created for `main` <- `iss-00293-final-epic-quality-gate-and-mergeable-pr`; issue linkage recorded; P1 repair head observed | final evidence report commit / push, then post-push confirmation |
-| Merge Preparation Gate | `iss-00293` | required checks、non-required checks / waiver、blocking review、merge conflict、unresolved blockers、final merge-prepared decision | Provider CI / mypy failure fixed; carryover Codex P1 4件 fixed; latest observation on `9a1f939c106f5bc48b9280ac5718700223746ab2` shows CI pass, current P2 only, `MERGEABLE` / `CLEAN` | re-confirm after this report-only evidence commit |
+| PR Delivery Gate | `iss-00293` | PR URL、selected base、head branch / SHA、issue linkage、existing PR reuse / new PR creation decision | PR #294 created for `main` <- `iss-00293-final-epic-quality-gate-and-mergeable-pr`; issue linkage recorded; report evidence commit `bb3a847895389f030b550971aecf3b0809fd2348` observed after push | closed; final closeout-only report update is validated externally without recursive report churn |
+| Merge Preparation Gate | `iss-00293` | required checks、non-required checks / waiver、blocking review、merge conflict、unresolved blockers、final merge-prepared decision | Provider CI / mypy failure fixed; carryover Codex P1 4件 fixed; post-push observation on `bb3a847895389f030b550971aecf3b0809fd2348` shows CI pass, current P2 only, `MERGEABLE` / `CLEAN` | closed; P2 only remains non-blocking |
 | Backend Adapter Gate | `iss-00293` | backend command adapter / invocation contract、未設定 fail-closed、設定時 command 解決、個人環境絶対パス非直書き確認 | pass: S04 implemented, reviewer P2/P3 fixed, focused tests and full suite passed | final aggregate reviewer gate で再確認する |
-| Epic report update | `iss-00293` | Epic report の final gate evidence、manual test matrix、review / CI correction summary | pass after this evidence update: S04、PR delivery、CI repair、P1 repair、terminal P2 disposition を反映 | commit / push and post-push confirmation |
+| Epic report update | `iss-00293` | Epic report の final gate evidence、manual test matrix、review / CI correction summary | pass: S04、PR delivery、CI repair、P1 repair、terminal P2 disposition、fresh final reviewers を反映 | closed |
 
 ## Prior Issue Completion Matrix
 
@@ -162,6 +162,7 @@ Supporting commands:
 | Codex P1 repair lint / structure | pass | `make lint` -> pass; `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=189`; `git diff --check` pass |
 | PR re-observation after P1 repair | human_gate / non-blocking only | head `9a1f939c106f5bc48b9280ac5718700223746ab2`; Actions runs 4/4 success; current Codex review completed and selected P2 findings only; blocker_policy `non_blocking_only`; observation status `human_gate` due unresolved review threads. |
 | GitHub mergeability check | pass | `gh pr view 294 --json ...` -> `mergeable=MERGEABLE`, `mergeStateStatus=CLEAN`, state `OPEN`, `isDraft=false`, head `9a1f939c106f5bc48b9280ac5718700223746ab2` |
+| post-push report evidence observation | pass / human_gate with P2 only | head `bb3a847895389f030b550971aecf3b0809fd2348`; Actions runs 4/4 success; current Codex review completed and selected P2 findings only; blocker_policy `non_blocking_only`; `gh pr view` reports `MERGEABLE` / `CLEAN` |
 
 ## PR Delivery / CI Repair Evidence
 
@@ -179,7 +180,7 @@ Supporting commands:
 | second observation result | CI passed for head `2a7456163a0ef78db8a049fa24e83c2d5e923387`, but observation timed out with 4 unresolved carryover Codex P1 threads from reviewed commit `40af0ea3fe`. |
 | P1 repair scope | safe ZIP extraction rejects symlinked extract dirs; pack review rejects unsafe text payloads; provenance repository/ref must match preflight; selected skeleton fill rejects nested `authorized_profile` claims. |
 | P1 repair evidence | focused authoring-pack suite `215 passed`; `make lint` pass; `spec-dock validate` pass; `git diff --check` pass |
-| final observation | CI pass and no current P0/P1. Current P2 threads remain non-blocking; old P1 threads are fixed by code and not re-raised as current P1, but some GitHub conversation threads remain unresolved. |
+| final observation | CI pass and no current P0/P1 on pushed evidence head `bb3a847895389f030b550971aecf3b0809fd2348`. Current P2 threads remain non-blocking; old P1 threads are fixed by code and not re-raised as current P1, but some GitHub conversation threads remain unresolved. |
 
 ## Terminal Non-Blocking Review Findings
 
@@ -189,6 +190,8 @@ Supporting commands:
 | `stale-if-schema-contract-drift` | P2 | no | no | deferred coverage decision: track as post-merge hardening. Candidate fix is to reject or normalize non-reviewable `stale_if` shapes before preflight pass. Not fixed in this PR because it is a preflight/review contract hardening item, not a current merge blocker. |
 | `tree-hardlink-type-check` | P2 | no | no | deferred coverage decision: track as post-merge hardening. Candidate fix is to reject hardlinked tree entries in fallback tree review. Not fixed in this PR because ZIP path safety P1 was fixed and this remaining tree fallback case is P2. |
 | `source-manifest-superset-check` | P2 | no | no | deferred coverage decision: track as post-merge hardening. Candidate fix is to require pack source set to equal preflight source set or explicitly reject/stale extras. Not fixed in this PR because it is non-blocking provenance hardening after P1 provenance binding was fixed. |
+| `tree-resource-limits` | P2 | no | no | deferred coverage decision: track as post-merge hardening. Candidate fix is to mirror ZIP `MAX_ENTRY_COUNT` / `MAX_TOTAL_SIZE` limits for fallback tree review before reading payloads. Not fixed in this PR because it is a tree fallback resource-limit hardening item and current review marks it non-blocking. |
+| `issue-candidate-draft-suffix` | P2 | no | no | deferred coverage decision: track as post-merge hardening. Candidate fix is to require `.md` for candidate draft `requirement` / `design_brief` / `plan_brief` while keeping profile JSON. Not fixed in this PR because current candidate pack gate remains safe enough for merge and review marks it non-blocking. |
 
 Terminal P2/P3 policy: latest observation contains no current P0/P1 and no CI failure, so the PR branch is not mutated solely for these P2 findings. `review-clean: no`; `merge-prepared for human judgment: yes`; `branch mutation: no`; `ci rerun avoided: yes` for P2-only findings.
 
@@ -283,9 +286,9 @@ Traceability rule: the table above is the durable deferred-coverage record for t
 | tc-002 | pass | `spec-dock validate` / `git diff --check` / 関連テスト | `spec-dock validate` pass、`git diff --check` pass、focused adapter 10 passed、authoring-pack suite 211 passed、full baseline after snapshot fix 1910 passed / 74 skipped。 | closed |
 | tc-003 | pass | Epic manual test matrix | scenario-by-scenario matrix を記録。preflight / safe review / staging / profile / dogfood / docs / metrics / backend adapter / metadata snapshot を確認済み。 | closed |
 | tc-004 | pass | backend command adapter / invocation contract | S04 adapter implemented; ChatGPT Use advisory recommendations adopted; focused tests and authoring-pack suite passed; no local wrapper dependency added | closed |
-| tc-005 | pass | PR URL / CI / review / mergeable status | PR #294 open, ready, base `main`, head `9a1f939c106f5bc48b9280ac5718700223746ab2`; CI 4/4 success; current Codex review has P2 non-blocking findings only; `gh pr view` reports `MERGEABLE` / `CLEAN`. | closed; record P2 follow-up / conversation residual risk |
-| tc-006 | pass | Epic / Issue report 更新 / docs impact | Issue / Epic report updated with PR delivery, CI repair, P1 repair, terminal P2 findings, mergeability evidence, and final reviewer disposition. | commit / push this report-only evidence update |
-| tc-007 | corrective-action-recorded | fresh reviewer results / blocker disposition | final code-reviewer `019f3b1d-ece6-7681-bbfc-165c6a8c2c39` pass with P2 only。final spec-reviewer `019f3b1d-c36f-76b2-886e-b4a84a2f629f` and qa-reviewer `019f3b1e-4184-7da1-b712-d3434dd81136` found workflow P1 because final evidence was local-only and the ledger was pending; this report update is the corrective action. | commit / push and run post-push final confirmation |
+| tc-005 | pass | PR URL / CI / review / mergeable status | PR #294 open, ready, base `main`, observed head `bb3a847895389f030b550971aecf3b0809fd2348`; CI 4/4 success; current Codex review has P2 non-blocking findings only; `gh pr view` reports `MERGEABLE` / `CLEAN`. | closed; P2 follow-up / conversation residual risk recorded |
+| tc-006 | pass | Epic / Issue report 更新 / docs impact | Issue / Epic report updated with PR delivery, CI repair, P1 repair, terminal P2 findings, mergeability evidence, and final reviewer disposition. | closed |
+| tc-007 | pass | fresh reviewer results / blocker disposition | final spec-reviewer `019f3b37-81c6-7fb2-a64b-abd51aa53567` pass、final code-reviewer `019f3b37-cf97-7fe3-925d-882cbce3dfe1` pass、final qa-reviewer `019f3b37-ab20-7303-a65e-ce1d4be61f10` pass。P2のみで P0/P1 blocker なし。 | closed |
 
 ## 残リスク
 
