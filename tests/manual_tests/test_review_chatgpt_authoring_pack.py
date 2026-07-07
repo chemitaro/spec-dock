@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 import hashlib
 import importlib.util
 import json
@@ -101,7 +102,7 @@ def write_preflight(tmp_path: Path, data: dict | None = None) -> Path:
     return path
 
 
-def pack_files(*, source_sha: str | None = None, readme: str = "draft evidence\n") -> dict[str, str]:
+def pack_files(*, source_sha: str | None = None, readme: str = "draft evidence\n") -> dict[str, str | bytes]:
     source_sha = source_sha or sha256(REPO_ROOT / FIXTURE_SOURCE)
     source_manifest = {
         "sources": [
@@ -152,7 +153,7 @@ def pack_files(*, source_sha: str | None = None, readme: str = "draft evidence\n
     }
 
 
-def write_zip(path: Path, files: dict[str, str | bytes], *, modes: dict[str, int] | None = None) -> Path:
+def write_zip(path: Path, files: Mapping[str, str | bytes], *, modes: Mapping[str, int] | None = None) -> Path:
     modes = modes or {}
     with zipfile.ZipFile(path, "w") as archive:
         for name, payload in files.items():
@@ -175,12 +176,15 @@ def mark_first_zip_entry_encrypted(path: Path) -> None:
     path.write_bytes(data)
 
 
-def write_tree(root: Path, files: dict[str, str]) -> Path:
+def write_tree(root: Path, files: Mapping[str, str | bytes]) -> Path:
     for name, payload in files.items():
         relative = name.removeprefix("specdock-authoring-pack/")
         path = root / "specdock-authoring-pack" / relative
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(payload, encoding="utf-8")
+        if isinstance(payload, bytes):
+            path.write_bytes(payload)
+        else:
+            path.write_text(payload, encoding="utf-8")
     return root / "specdock-authoring-pack"
 
 
