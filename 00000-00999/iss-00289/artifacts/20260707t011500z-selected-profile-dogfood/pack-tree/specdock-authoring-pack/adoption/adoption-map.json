@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "adoption_status": "unreviewed",
+      "rationale": "selected-profile section fill candidates require local validation before any canonical rewrite.",
+      "required_local_validation": [
+        "selected-skeleton-fill-validation",
+        "manual-section-adoption-review",
+        "fresh-spec-reviewer"
+      ],
+      "source_path": "selected-skeleton-fill/section-fills.json"
+    }
+  ]
+}

@@ -1,0 +1,221 @@
+{
+  "adoption": {
+    "assurance_mutated": false,
+    "canonical_written": false,
+    "next_action": "manual adoption review; do not treat as reviewer pass",
+    "overall_adoption_eligible": true
+  },
+  "adoption_status": "unreviewed",
+  "authority": "evidence_only",
+  "bundle_generation_not_promotion": true,
+  "candidate": {
+    "issue_id": "iss-00289",
+    "path": "selected-skeleton-fill/section-fills.json",
+    "profile_suggestion": {
+      "advisory_only": true,
+      "ignored_for_authority": true,
+      "profile": "strict"
+    },
+    "section_fill_count": 3,
+    "target_profile": "standard",
+    "target_section_inventory_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "target_skeleton_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "target_template_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "checks": [
+    {
+      "name": "review-report",
+      "status": "pass"
+    },
+    {
+      "name": "pack-digest",
+      "status": "pass"
+    },
+    {
+      "name": "assurance",
+      "status": "pass"
+    },
+    {
+      "name": "selected-skeleton",
+      "status": "pass"
+    },
+    {
+      "name": "candidate-fill",
+      "status": "pass"
+    },
+    {
+      "name": "profile-resolution",
+      "status": "pass"
+    },
+    {
+      "name": "skeleton-hash",
+      "status": "pass"
+    },
+    {
+      "name": "section-map",
+      "status": "pass"
+    },
+    {
+      "name": "unsafe-authority-claims",
+      "status": "pass"
+    }
+  ],
+  "errors": [],
+  "generated_at": "2026-07-07T01:16:48Z",
+  "inputs": {
+    "assurance_snapshot": {
+      "authorized_profile": "standard",
+      "path": "<redacted>",
+      "sha256": "27d12cdc1e544c9cd4485d4105832c4983fa3a346bc4a3498de2ccc09b648bce",
+      "status": "provisional"
+    },
+    "review": {
+      "input_kind": "zip",
+      "pack_digest": {
+        "algorithm": "sha256",
+        "content_sha256": "6784eafa345c27457b74366b87d2c5ff9938bac4b5d4342451495a0b8a590a22",
+        "file_count": 6
+      },
+      "source_count": 4,
+      "status": "pass",
+      "trace": {
+        "acceptance": [
+          "E-AC-005",
+          "E-AC-006",
+          "E-AC-010",
+          "E-AC-011"
+        ],
+        "issue_id": "iss-00289",
+        "parent_epic": "epic-00283",
+        "requirements": [
+          "E-RQ-008",
+          "E-RQ-009",
+          "E-RQ-010"
+        ]
+      }
+    },
+    "selected_skeleton": {
+      "allowed_section_ids": [
+        "profile-resolution-snapshot",
+        "section-map",
+        "missing-section-report",
+        "staged-adoption-dry-run"
+      ],
+      "authorized_profile": "standard",
+      "issue_id": "iss-00289",
+      "required_section_ids": [
+        "profile-resolution-snapshot",
+        "section-map",
+        "staged-adoption-dry-run"
+      ],
+      "section_count": 4,
+      "section_inventory_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "skeleton_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "template_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "trace": {
+        "acceptance": [
+          "E-AC-005",
+          "E-AC-006",
+          "E-AC-010",
+          "E-AC-011"
+        ],
+        "issue_id": "iss-00289",
+        "parent_epic": "epic-00283",
+        "requirements": [
+          "E-RQ-008",
+          "E-RQ-009",
+          "E-RQ-010"
+        ]
+      }
+    }
+  },
+  "profile_validation": {
+    "candidate_target_profile": "standard",
+    "local_authorized_profile": "standard",
+    "profile_suggestion_used_for_authority": false,
+    "selected_skeleton_profile": "standard",
+    "target_profile_matches": true
+  },
+  "section_inventory_validation": {
+    "allowed_section_ids": [
+      "profile-resolution-snapshot",
+      "section-map",
+      "missing-section-report",
+      "staged-adoption-dry-run"
+    ],
+    "candidate_section_ids": [
+      "profile-resolution-snapshot",
+      "section-map",
+      "staged-adoption-dry-run"
+    ],
+    "eligible_section_ids": [
+      "profile-resolution-snapshot",
+      "section-map",
+      "staged-adoption-dry-run"
+    ],
+    "extra_section_ids": [],
+    "missing_optional_section_ids": [
+      "missing-section-report"
+    ],
+    "missing_section_ids": [],
+    "required_section_ids": [
+      "profile-resolution-snapshot",
+      "section-map",
+      "staged-adoption-dry-run"
+    ]
+  },
+  "section_results": [
+    {
+      "body_sha256": "9da0129a35d7fbe25aedf15b2a8f9065e86ae61f75cca8b54922ca4794c3900b",
+      "section_id": "profile-resolution-snapshot",
+      "status": "eligible",
+      "unsafe_claim_detected": false
+    },
+    {
+      "body_sha256": "ea5d7c74254da9e29f89e8456a526f31c65a1960bec4436f287a6fe12e9a4f8a",
+      "section_id": "section-map",
+      "status": "eligible",
+      "unsafe_claim_detected": false
+    },
+    {
+      "body_sha256": "4f13bb5491120702afad210f151cbb0a2eddfb3f7988f585c850af76b1405d07",
+      "section_id": "staged-adoption-dry-run",
+      "status": "eligible",
+      "unsafe_claim_detected": false
+    }
+  ],
+  "skeleton_validation": {
+    "section_inventory_sha256_matches": true,
+    "skeleton_sha256_matches": true,
+    "template_sha256_matches": true
+  },
+  "status": "pass",
+  "status_taxonomy": {
+    "blocked": "Required local observation or filesystem operation is unavailable.",
+    "deferred": "Recognized later-stage responsibility; never treated as pass.",
+    "fail": "Input schema or required selected-fill data is invalid.",
+    "pass": "Selected skeleton fill validation passed; adoption remains unreviewed.",
+    "rejected": "A safety boundary, unauthorized authority claim, or extra section fill was detected.",
+    "stale": "Local assurance, selected skeleton, review digest, or candidate target snapshot no longer matches.",
+    "unreviewed": "Artifact adoption state, not an execution status."
+  },
+  "trace": {
+    "acceptance": [
+      "E-AC-005",
+      "E-AC-006",
+      "E-AC-010",
+      "E-AC-011"
+    ],
+    "issue_id": "iss-00289",
+    "parent_epic": "epic-00283",
+    "requirements": [
+      "E-RQ-008",
+      "E-RQ-009",
+      "E-RQ-010"
+    ]
+  },
+  "warnings": [
+    "profile_suggestion differs from local authorized_profile and was ignored for authority",
+    "optional section fill missing"
+  ]
+}

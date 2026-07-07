@@ -1,0 +1,55 @@
+{
+  "adoption_status": "unreviewed",
+  "assurance_mutated": false,
+  "authority": "evidence_only",
+  "bundle_generation_not_promotion": true,
+  "canonical_written": false,
+  "eligible_section_ids": [
+    "profile-resolution-snapshot",
+    "section-map",
+    "staged-adoption-dry-run"
+  ],
+  "extra_section_ids": [],
+  "missing_optional_section_ids": [
+    "missing-section-report"
+  ],
+  "missing_section_ids": [],
+  "next_action": "manual section adoption review; do not treat as reviewer pass",
+  "non_adoptable_sections": [],
+  "staged_sections": [
+    {
+      "body_sha256": "9da0129a35d7fbe25aedf15b2a8f9065e86ae61f75cca8b54922ca4794c3900b",
+      "canonical_written": false,
+      "section_id": "profile-resolution-snapshot",
+      "status": "eligible"
+    },
+    {
+      "body_sha256": "ea5d7c74254da9e29f89e8456a526f31c65a1960bec4436f287a6fe12e9a4f8a",
+      "canonical_written": false,
+      "section_id": "section-map",
+      "status": "eligible"
+    },
+    {
+      "body_sha256": "4f13bb5491120702afad210f151cbb0a2eddfb3f7988f585c850af76b1405d07",
+      "canonical_written": false,
+      "section_id": "staged-adoption-dry-run",
+      "status": "eligible"
+    }
+  ],
+  "status": "pass",
+  "trace": {
+    "acceptance": [
+      "E-AC-005",
+      "E-AC-006",
+      "E-AC-010",
+      "E-AC-011"
+    ],
+    "issue_id": "iss-00289",
+    "parent_epic": "epic-00283",
+    "requirements": [
+      "E-RQ-008",
+      "E-RQ-009",
+      "E-RQ-010"
+    ]
+  }
+}

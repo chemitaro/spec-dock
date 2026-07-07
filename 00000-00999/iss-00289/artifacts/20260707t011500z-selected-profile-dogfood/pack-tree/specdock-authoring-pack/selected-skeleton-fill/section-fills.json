@@ -1,0 +1,35 @@
+{
+  "adoption_status": "unreviewed",
+  "authority": "evidence_only",
+  "bundle_generation_not_promotion": true,
+  "issue_id": "iss-00289",
+  "profile_suggestion": {
+    "advisory_only": true,
+    "profile": "strict",
+    "rationale": "selected-profile dogfood は正本採用と混同しやすいため、レビュー観点を強める提案に留める。"
+  },
+  "schema_version": "1",
+  "section_fills": [
+    {
+      "body": "local assurance が authorized_profile=standard を選択した前提で、ChatGPT は profile を決定せず、section body だけを返す。",
+      "body_sha256": "9da0129a35d7fbe25aedf15b2a8f9065e86ae61f75cca8b54922ca4794c3900b",
+      "section_id": "profile-resolution-snapshot"
+    },
+    {
+      "body": "fillable section は profile-resolution-snapshot、section-map、missing-section-report、staged-adoption-dry-run である。この候補は任意 section の missing-section-report を未記入として残す。",
+      "body_sha256": "ea5d7c74254da9e29f89e8456a526f31c65a1960bec4436f287a6fe12e9a4f8a",
+      "section_id": "section-map"
+    },
+    {
+      "body": "dry run は section body の sha256 と採用候補 status だけを出し、正本ファイルと .assurance.json を変更しない。",
+      "body_sha256": "4f13bb5491120702afad210f151cbb0a2eddfb3f7988f585c850af76b1405d07",
+      "section_id": "staged-adoption-dry-run"
+    }
+  ],
+  "target": {
+    "profile": "standard",
+    "section_inventory_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "skeleton_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "template_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  }
+}

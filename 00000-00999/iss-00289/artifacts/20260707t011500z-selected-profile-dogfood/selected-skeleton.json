@@ -1,0 +1,64 @@
+{
+  "allowed_section_ids": [
+    "profile-resolution-snapshot",
+    "section-map",
+    "missing-section-report",
+    "staged-adoption-dry-run"
+  ],
+  "authority": "local_assurance",
+  "authorized_profile": "standard",
+  "issue_id": "iss-00289",
+  "parent_trace": {
+    "acceptance": [
+      "E-AC-005",
+      "E-AC-006",
+      "E-AC-010",
+      "E-AC-011"
+    ],
+    "issue_id": "iss-00289",
+    "parent_epic": "epic-00283",
+    "requirements": [
+      "E-RQ-008",
+      "E-RQ-009",
+      "E-RQ-010"
+    ]
+  },
+  "required_section_ids": [
+    "profile-resolution-snapshot",
+    "section-map",
+    "staged-adoption-dry-run"
+  ],
+  "section_inventory": [
+    {
+      "fillable": true,
+      "heading": "## Profile Resolution Snapshot",
+      "order": 10,
+      "required": true,
+      "section_id": "profile-resolution-snapshot"
+    },
+    {
+      "fillable": true,
+      "heading": "## Section Map",
+      "order": 20,
+      "required": true,
+      "section_id": "section-map"
+    },
+    {
+      "fillable": true,
+      "heading": "## Missing Section Report",
+      "order": 30,
+      "required": false,
+      "section_id": "missing-section-report"
+    },
+    {
+      "fillable": true,
+      "heading": "## Staged Adoption Dry Run",
+      "order": 40,
+      "required": true,
+      "section_id": "staged-adoption-dry-run"
+    }
+  ],
+  "section_inventory_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "skeleton_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "template_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+}

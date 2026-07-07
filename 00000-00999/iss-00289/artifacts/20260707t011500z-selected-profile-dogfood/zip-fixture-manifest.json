@@ -1,0 +1,10 @@
+{
+  "adoption_status": "unreviewed",
+  "authority": "evidence_only",
+  "bundle_generation_not_promotion": true,
+  "pack_tree": "pack-tree/specdock-authoring-pack",
+  "rationale": "binary ZIP is regenerated in an untracked temporary workspace; durable repository evidence stores the extracted tree and digest.",
+  "raw_zip_committed": false,
+  "zip_entry_count": 6,
+  "zip_sha256": "8a25a77929cc374abf064b4b8f54c16639cfdf409df9902dc9c340f3e9dd3408"
+}
