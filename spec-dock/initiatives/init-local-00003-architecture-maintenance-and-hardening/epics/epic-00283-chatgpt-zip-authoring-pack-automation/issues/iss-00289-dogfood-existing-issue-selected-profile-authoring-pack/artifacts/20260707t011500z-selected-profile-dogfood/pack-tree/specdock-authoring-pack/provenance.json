@@ -1,0 +1,8 @@
+{
+  "authority": "evidence_only",
+  "repository": {
+    "full_name": "chemitaro/spec-dock",
+    "requested_ref": "iss-00289-dogfood-existing-issue-selected-profile-authoring-pack"
+  },
+  "source": "chatgpt_zip_authoring_pack"
+}

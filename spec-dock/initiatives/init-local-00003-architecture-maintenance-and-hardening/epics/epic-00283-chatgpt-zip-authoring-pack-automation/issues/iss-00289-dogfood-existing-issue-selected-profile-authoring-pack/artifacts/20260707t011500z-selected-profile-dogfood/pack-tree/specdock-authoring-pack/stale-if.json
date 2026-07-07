@@ -1,0 +1,13 @@
+{
+  "stale_if": [
+    {
+      "kind": "source_hash_changed",
+      "source_paths": [
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00289-dogfood-existing-issue-selected-profile-authoring-pack/requirement.md",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00289-dogfood-existing-issue-selected-profile-authoring-pack/design.md",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00289-dogfood-existing-issue-selected-profile-authoring-pack/plan.md",
+        "scripts/authoring-pack/validate_selected_skeleton_fill.py"
+      ]
+    }
+  ]
+}

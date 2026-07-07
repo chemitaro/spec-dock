@@ -198,6 +198,9 @@ def write_validation_outputs(output_dir: Path, result: dict[str, Any]) -> dict[s
     _write_text(output_dir / OWNERSHIP_MARKER_FILE, OWNERSHIP_MARKER)
     _write_json(output_dir / "selected-skeleton-fill-validation-report.json", result)
     _write_text(output_dir / "selected-skeleton-fill-validation-summary.md", _summary_markdown(result))
+    dry_run = _section_fill_dry_run(result)
+    _write_json(output_dir / "selected-skeleton-fill-dry-run.json", dry_run)
+    _write_text(output_dir / "selected-skeleton-fill-dry-run.md", _dry_run_markdown(dry_run))
     return result
 
 
@@ -376,6 +379,8 @@ def _load_selected_skeleton(path: Path) -> dict[str, Any]:
     if not set(required_ids).issubset(set(allowed_ids)):
         errors.append("selected-skeleton.required_section_ids must be a subset of allowed_section_ids")
 
+    trace = _optional_parent_trace(data, data.get("issue_id"), errors)
+
     if errors:
         return {
             "status": "fail",
@@ -391,6 +396,7 @@ def _load_selected_skeleton(path: Path) -> dict[str, Any]:
         "section_count": len(section_ids),
         "allowed_section_ids": allowed_ids,
         "required_section_ids": required_ids,
+        "trace": trace,
     }
     manifest = {
         **data,
@@ -417,6 +423,61 @@ def _ids_from_optional_list(value: Any, default: list[str], label: str, errors: 
         errors.append(f"selected-skeleton.{label} contains invalid section_id")
     if len(value) != len(set(value)):
         errors.append(f"selected-skeleton.{label} contains duplicate section_id")
+    return list(value)
+
+
+def _optional_parent_trace(data: dict[str, Any], issue_id: Any, errors: list[str]) -> dict[str, Any]:
+    default_trace = _default_trace()
+    if isinstance(issue_id, str) and issue_id:
+        default_trace["issue_id"] = issue_id
+    value = data.get("parent_trace")
+    if value is None:
+        value = data.get("trace")
+    if value is None:
+        return default_trace
+    if not isinstance(value, dict):
+        errors.append("selected-skeleton.parent_trace must be an object when present")
+        return default_trace
+
+    parent_epic = value.get("parent_epic", value.get("epic_id", default_trace["parent_epic"]))
+    requirements = value.get("requirements", default_trace["requirements"])
+    acceptance = value.get("acceptance", default_trace["acceptance"])
+    trace_issue_id = value.get("issue_id", default_trace["issue_id"])
+    if not isinstance(trace_issue_id, str) or not trace_issue_id:
+        errors.append("selected-skeleton.parent_trace.issue_id must be a non-empty string when present")
+        trace_issue_id = default_trace["issue_id"]
+    elif isinstance(issue_id, str) and issue_id and trace_issue_id != issue_id:
+        errors.append("selected-skeleton.parent_trace.issue_id must match selected-skeleton.issue_id")
+    if not isinstance(parent_epic, str) or not parent_epic:
+        errors.append("selected-skeleton.parent_trace.parent_epic must be a non-empty string when present")
+        parent_epic = default_trace["parent_epic"]
+    requirements = _trace_string_array(requirements, "requirements", default_trace["requirements"], errors)
+    acceptance = _trace_string_array(acceptance, "acceptance", default_trace["acceptance"], errors)
+    trace_text = json.dumps(
+        {
+            "issue_id": trace_issue_id,
+            "parent_epic": parent_epic,
+            "requirements": requirements,
+            "acceptance": acceptance,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    if _unsafe_text_error(trace_text):
+        errors.append("selected-skeleton.parent_trace contains unsafe text")
+        return default_trace
+    return {
+        "issue_id": trace_issue_id,
+        "parent_epic": parent_epic,
+        "requirements": requirements,
+        "acceptance": acceptance,
+    }
+
+
+def _trace_string_array(value: Any, label: str, default: list[str], errors: list[str]) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+        errors.append(f"selected-skeleton.parent_trace.{label} must be a string array when present")
+        return default
     return list(value)
 
 
@@ -855,16 +916,12 @@ def _base_result(
     section_results: list[dict[str, Any]] | None = None,
     adoption: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    trace = _result_trace(selected_skeleton)
     return {
         **AUTHORITY_BOUNDARY,
         "status": status,
         "generated_at": generated_at,
-        "trace": {
-            "issue_id": "iss-00287",
-            "parent_epic": "epic-00283",
-            "requirements": ["E-RQ-008", "E-RQ-009"],
-            "acceptance": ["E-AC-005", "E-AC-006"],
-        },
+        "trace": trace,
         "inputs": {
             "review": _safe_diagnostic_value(review or {}),
             "assurance_snapshot": _safe_diagnostic_value(assurance_snapshot or {}),
@@ -886,6 +943,23 @@ def _base_result(
         "errors": _safe_diagnostic_value(errors or []),
         "warnings": _safe_diagnostic_value(warnings or []),
         "status_taxonomy": _status_taxonomy(),
+    }
+
+
+def _result_trace(selected_skeleton: dict[str, Any] | None) -> dict[str, Any]:
+    if selected_skeleton:
+        trace = selected_skeleton.get("trace")
+        if isinstance(trace, dict):
+            return _safe_diagnostic_value(trace)
+    return _default_trace()
+
+
+def _default_trace() -> dict[str, Any]:
+    return {
+        "issue_id": "iss-00287",
+        "parent_epic": "epic-00283",
+        "requirements": ["E-RQ-008", "E-RQ-009"],
+        "acceptance": ["E-AC-005", "E-AC-006"],
     }
 
 
@@ -1061,6 +1135,99 @@ Errors:
 
 Warnings:
 {warnings}
+"""
+
+
+def _section_fill_dry_run(result: dict[str, Any]) -> dict[str, Any]:
+    status = result["status"]
+    section_inventory = result.get("section_inventory_validation", {})
+    section_results = result.get("section_results", [])
+    if not isinstance(section_results, list):
+        section_results = []
+    staged_sections = section_results if status == "pass" else []
+    non_adoptable_sections = section_results if status != "pass" else []
+    return {
+        **AUTHORITY_BOUNDARY,
+        "status": status,
+        "trace": _safe_diagnostic_value(result.get("trace", _default_trace())),
+        "eligible_section_ids": _safe_diagnostic_value(section_inventory.get("eligible_section_ids", [])),
+        "missing_section_ids": _safe_diagnostic_value(section_inventory.get("missing_section_ids", [])),
+        "missing_optional_section_ids": _safe_diagnostic_value(
+            section_inventory.get("missing_optional_section_ids", [])
+        ),
+        "extra_section_ids": _safe_diagnostic_value(section_inventory.get("extra_section_ids", [])),
+        "staged_sections": [
+            {
+                "section_id": _safe_diagnostic_value(section.get("section_id")),
+                "status": _safe_diagnostic_value(section.get("status")),
+                "body_sha256": _safe_diagnostic_value(section.get("body_sha256")),
+                "canonical_written": False,
+            }
+            for section in staged_sections
+            if isinstance(section, dict)
+        ],
+        "non_adoptable_sections": [
+            {
+                "section_id": _safe_diagnostic_value(section.get("section_id")),
+                "status": _safe_diagnostic_value(section.get("status")),
+                "body_sha256": _safe_diagnostic_value(section.get("body_sha256")),
+                "canonical_written": False,
+                "adoption_eligible": False,
+            }
+            for section in non_adoptable_sections
+            if isinstance(section, dict)
+        ],
+        "adoption_status": "unreviewed",
+        "canonical_written": False,
+        "assurance_mutated": False,
+        "next_action": "manual section adoption review; do not treat as reviewer pass",
+    }
+
+
+def _dry_run_markdown(dry_run: dict[str, Any]) -> str:
+    staged = dry_run.get("staged_sections", [])
+    non_adoptable = dry_run.get("non_adoptable_sections", [])
+    rows = [
+        f"| {section.get('section_id', '')} | {section.get('status', '')} | {section.get('body_sha256', '')} | false |"
+        for section in staged
+        if isinstance(section, dict)
+    ]
+    staged_rows = "\n".join(rows) or "| none | none | none | false |"
+    non_adoptable_rows = [
+        f"| {section.get('section_id', '')} | {section.get('status', '')} | {section.get('body_sha256', '')} | false |"
+        for section in non_adoptable
+        if isinstance(section, dict)
+    ]
+    blocked_rows = "\n".join(non_adoptable_rows) or "| none | none | none | false |"
+    return f"""# Selected skeleton fill dry run
+
+Status: `{dry_run["status"]}`
+
+Authority:
+- authority: evidence_only
+- adoption_status: unreviewed
+- bundle_generation_not_promotion: true
+
+Safety:
+- canonical_written: `false`
+- assurance_mutated: `false`
+- next_action: manual section adoption review; do not treat as reviewer pass
+
+Section inventory:
+- eligible_section_ids: `{dry_run.get("eligible_section_ids", [])}`
+- missing_section_ids: `{dry_run.get("missing_section_ids", [])}`
+- missing_optional_section_ids: `{dry_run.get("missing_optional_section_ids", [])}`
+- extra_section_ids: `{dry_run.get("extra_section_ids", [])}`
+
+| section_id | status | body_sha256 | canonical_written |
+|---|---|---|---|
+{staged_rows}
+
+Non-adoptable sections:
+
+| section_id | status | body_sha256 | adoption_eligible |
+|---|---|---|---|
+{blocked_rows}
 """
 
 
