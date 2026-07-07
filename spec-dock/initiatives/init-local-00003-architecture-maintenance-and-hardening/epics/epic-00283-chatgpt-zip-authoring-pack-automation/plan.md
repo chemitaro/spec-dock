@@ -27,6 +27,7 @@ ID: "epic-00283"
 5. 指標評価とランタイム昇格判断は、ドッグフード証跡が出た後に行う。
 6. Epic から Issue 候補を作る pack は、プロファイル推奨だけを返し、プロファイル別の正本テンプレート本文を出さない。
 7. 個別 Issue ごとに Pull Request を作成せず、最後の品質ゲート Issue で Epic 単位の Pull Request を作成する。
+8. ChatGPT Use / Oracle 実行は個人環境の絶対パスに依存させず、SpecDock 側の薄い backend command adapter / invocation contract で差し替え可能にする。
 
 ## 実施単位と依存順序
 
@@ -69,6 +70,8 @@ C09 -> C10
 この Epic では、個別 Issue ごとに Pull Request を作成しない。`iss-00284` から `iss-00292` までは、各 Issue の実装と検証が完了したら `report.md` に証跡を残し、`./spec-dock/scripts/spec-dock issue finish` を実行したうえで、次 Issue を `./spec-dock/scripts/spec-dock issue start <next-issue-id>` で開始する。
 
 Pull Request 作成、CI / review 指摘対応、manual test evidence、mergeable 確認は、最後の `iss-00293` に集約する。最終品質ゲートで見つかった不具合は、Epic スコープ内であれば `iss-00293` の作業として修正し、再検証、再 push、PR 状態確認まで行う。
+
+`iss-00293` の Pull Request 作成前に、SpecDock repo 内の正式ワークフローやスクリプトが個人環境固有の ChatGPT Use / Oracle wrapper 絶対パスへ依存していないことを確認する。必要な場合は、`SPECDOCK_CHATGPT_COMMAND` を第一候補、`ORACLE_CHATGPT_COMMAND` を互換 fallback とする薄い backend command adapter / invocation contract を追加し、未設定時は明確なエラーで fail する。既存のローカル `oracle-chatgpt` wrapper は、ユーザー環境で指定できる backend の一例としてのみ扱う。
 
 ## Issue readiness contract
 
@@ -140,6 +143,7 @@ strict 相当の追加 obligation を持つ Issue は、Issue planning 時に sp
 - `iss-00293` / GitHub `#293`: 最終品質ゲートとマージ可能な Pull Request を作成する
   - 現在のタイトル: `Final Epic Quality Gate And Mergeable Pull Request`
   - 推奨グレード: `strict`
+  - 追加責務: PR 作成前に ChatGPT Use / Oracle 実行まわりの個人環境絶対パス依存を解消し、backend command adapter / invocation contract を品質ゲート対象に含める。
   - ディレクトリ: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr`
 
 ## E-RQ / E-AC trace matrix
@@ -155,7 +159,7 @@ strict 相当の追加 obligation を持つ Issue は、Issue planning 時に sp
 | Dogfood scenario C | `iss-00290` | `iss-00285`, `iss-00287`, `iss-00292` | stale profile、profile mismatch、source hash mismatch、unsafe claim を negative probe で止める。 |
 | Documentation / adoption ledger examples | `iss-00291` | `iss-00286` | workflow docs と EAL 例は evidence-only / dogfood-only boundary を保つ。 |
 | Metrics / runtime promotion decision material | `iss-00292` | `iss-00288`, `iss-00289`, `iss-00290` | runtime 昇格、保留、却下の判断材料を作るが、昇格自体は決めない。 |
-| Final quality / PR delivery / mergeable confirmation | `iss-00293` | all prior Issues | manual test evidence、PR URL、CI / review correction、mergeable state を Epic final gate に集約する。 |
+| Final quality / PR delivery / mergeable confirmation | `iss-00293` | all prior Issues | manual test evidence、backend command adapter verification、PR URL、CI / review correction、mergeable state を Epic final gate に集約する。 |
 
 ## Deferred PR delivery contract
 
@@ -171,6 +175,7 @@ strict 相当の追加 obligation を持つ Issue は、Issue planning 時に sp
 - G4: ドッグフード A/B/C が、それぞれ候補生成、選択済みプロファイル記入、不一致ブロックを確認する。
 - G9: ランタイム昇格、保留、却下の判断材料が揃い、手動フォールバックが維持されている。
 - G10: 先行 Issue の完了後、最終品質ゲートで manual test evidence、PR URL、mergeable 状態、レビュー / CI 修正証跡が揃っている。
+- G11: PR 作成前に、SpecDock repo 内の正式ワークフロー / スクリプトが個人環境の ChatGPT Use wrapper 絶対パスへ依存しておらず、backend command 未設定時の fail-closed と設定時の呼び出し契約が検証されている。
 
 ## ドッグフードシナリオ
 
@@ -251,6 +256,7 @@ strict 相当の追加 obligation を持つ Issue は、Issue planning 時に sp
 - branch / repo provenance が宣言されている。
 - ローカル検証が引き続き必須である。
 - 個別 Issue ごとに PR を作成せず、`iss-00293` で Epic 単位の Pull Request と mergeable 確認を行う。
+- ChatGPT Use / Oracle backend は設定で差し替え可能であり、個人環境の絶対パスを正式ワークフローに直書きしていない。
 
 ## Issue 引き渡しパッケージのパス一覧
 
