@@ -1,0 +1,28 @@
+{
+  "adoption_requires": "explicit_eal_disposition",
+  "authority": "evidence_only",
+  "blockers": [],
+  "bundle_generation_not_promotion": true,
+  "current_source_hash": "fixture-source-manifest-hash",
+  "diff_summary": null,
+  "effective_ref": "main",
+  "evidence_mode": "github-synced",
+  "expected_source_hash": null,
+  "github_sync": "verified",
+  "local_head": "0000000000000000000000000000000000000000",
+  "provided_context_paths": [],
+  "remediation": [],
+  "remote_head": "0000000000000000000000000000000000000000",
+  "requested_ref": "main",
+  "source_hash_mismatch_checked": false,
+  "source_hashes": {
+    "source.txt": "fixture-source-hash"
+  },
+  "source_manifest_hash": "fixture-source-manifest-hash",
+  "source_paths": [
+    "source.txt"
+  ],
+  "status": "pass",
+  "sync_state": "synced",
+  "unsynced_reason": null
+}

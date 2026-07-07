@@ -73,10 +73,10 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
 
     p_authoring = sub.add_parser(
         "authoring",
-        help="Run deferred ChatGPT authoring helper commands",
-        description="Run deferred ChatGPT authoring helper commands.",
+        help="Run ChatGPT authoring helper commands",
+        description="Run ChatGPT authoring helper commands.",
         epilog=(
-            "Deferred skeleton commands:\n"
+            "Authoring commands:\n"
             "  authoring preflight github-sync\n"
             "  authoring pack prepare\n"
             "  authoring backend invoke\n"
@@ -100,10 +100,10 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "authoring_preflight_github_sync",
     )
 
-    authoring_pack = authoring_sub.add_parser("pack", help="Deferred authoring pack skeletons")
+    authoring_pack = authoring_sub.add_parser("pack", help="Authoring pack helpers")
     authoring_pack_sub = authoring_pack.add_subparsers(dest="authoring_pack_cmd", required=True)
     _bind_leaf(
-        authoring_pack_sub.add_parser("prepare", help="Deferred prompt pack preparation skeleton"),
+        authoring_pack_sub.add_parser("prepare", help="Prepare a ChatGPT prompt pack from preflight evidence"),
         registry,
         "authoring_pack_prepare",
     )
