@@ -13,7 +13,6 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 _DEFERRED_COMMANDS = (
-    (["authoring", "backend", "invoke"], "authoring backend invoke", "iss-00300"),
     (["authoring", "pack", "review"], "authoring pack review", "iss-00301"),
     (["authoring", "pack", "stage"], "authoring pack stage", "iss-00301"),
     (
@@ -83,6 +82,21 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert "--output-dir" in p.stdout
             assert "--format" in p.stdout
             assert "--mode" in p.stdout
+            assert "--force" not in p.stdout
+
+    def test_authoring_backend_invoke_help_exposes_contract_without_force(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            p = self._run_runtime_capture(target, ["authoring", "backend", "invoke", "--help"])
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "--prompt-pack" in p.stdout
+            assert "--output-dir" in p.stdout
+            assert "--backend-command" in p.stdout
+            assert "--evidence-mode" in p.stdout
+            assert "--dry-run" in p.stdout
             assert "--force" not in p.stdout
 
     @pytest.mark.parametrize(("args", "command", "next_issue"), _DEFERRED_COMMANDS)
@@ -1143,6 +1157,1098 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == "pass"
             assert (output_dir / "manifest.json").is_file()
 
+    def test_authoring_backend_invoke_unset_backend_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            output_dir = repo / "invoke-output"
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert payload["backend_source"] == "unset"
+            assert "backend_command_unset:set_SPECDOCK_CHATGPT_COMMAND" in payload["blockers"]
+            assert (output_dir / "invocation-summary.json").is_file()
+
+    def test_authoring_backend_invoke_cli_backend_command_overrides_env_and_dry_run_skips_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            output_dir = repo / "invoke-output"
+            sentinel = repo / "sentinel.txt"
+            backend = _write_fake_backend(repo / "backend.py", sentinel)
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(output_dir),
+                    "--backend-command",
+                    f"{sys.executable} {backend}",
+                    "--slug",
+                    "explicit-slug",
+                    "--prompt",
+                    "literal ; shell text",
+                    "--dry-run",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert payload["status"] == "pass"
+            assert payload["backend_source"] == "cli"
+            assert payload["dry_run"] is True
+            assert not sentinel.exists()
+            assert "--slug" in payload["invocation_argv"]
+            assert "explicit-slug" in payload["invocation_argv"]
+            assert "-p" in payload["invocation_argv"]
+            assert "literal ; shell text" in payload["invocation_argv"]
+            assert "--output-dir" not in payload["invocation_argv"]
+            assert (output_dir / "invocation-summary.json").is_file()
+
+    def test_authoring_backend_invoke_cli_backend_command_overrides_conflicting_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            cli_backend = _write_fake_backend(repo / "cli.py", repo / "cli.txt")
+            primary_backend = _write_fake_backend(repo / "primary.py", repo / "primary.txt")
+            fallback_backend = _write_fake_backend(repo / "fallback.py", repo / "fallback.txt")
+
+            result = self._run_runtime_capture(
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    f"{sys.executable} {cli_backend}",
+                    "--format",
+                    "json",
+                ],
+                env={
+                    "PATH": os.environ.get("PATH", ""),
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                    "SPECDOCK_CHATGPT_COMMAND": f"{sys.executable} {primary_backend}",
+                    "ORACLE_CHATGPT_COMMAND": f"{sys.executable} {fallback_backend}",
+                },
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert payload["backend_source"] == "cli"
+            assert (repo / "cli.txt").is_file()
+            assert not (repo / "primary.txt").exists()
+            assert not (repo / "fallback.txt").exists()
+
+    def test_authoring_backend_invoke_passes_argv_without_shell(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            captured = repo / "captured-argv.json"
+            backend = _write_fake_backend(repo / "backend.py", captured)
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    f"{sys.executable} {backend}",
+                    "--slug",
+                    "argv-slug",
+                    "--prompt",
+                    "literal ; touch should-not-run",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            captured_argv = json.loads(captured.read_text(encoding="utf-8"))
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert payload["status"] == "pass"
+            assert "literal ; touch should-not-run" in captured_argv
+            assert "--output-dir" not in captured_argv
+            assert not (repo / "should-not-run").exists()
+            assert captured_argv.count("--file") == 7
+
+    def test_authoring_backend_invoke_redacts_summary_argv_and_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            captured = repo / "captured-argv.json"
+            backend = _write_fake_backend(repo / "backend.py", captured)
+            output_dir = repo / "invoke-output"
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(output_dir),
+                    "--backend-command",
+                    f"{sys.executable} {backend} --token=secret-value --config=/Users/example/.oracle/config.json --cache=/tmp",
+                    "--prompt",
+                    "read /private/tmp/local-context.txt and /var/folders",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            summary = json.loads((output_dir / "invocation-summary.json").read_text(encoding="utf-8"))
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "--token=secret-value" not in json.dumps(payload)
+            assert "--token=secret-value" not in json.dumps(summary)
+            assert "/Users/example/.oracle/config.json" not in json.dumps(summary)
+            assert "/private/tmp/local-context.txt" not in json.dumps(summary)
+            assert "--cache=/tmp" not in json.dumps(summary)
+            assert "/var/folders" not in json.dumps(summary)
+            assert str(pack.resolve()) not in json.dumps(summary)
+            assert "[redacted]" in summary["backend_argv"]
+            assert "[redacted]" in summary["invocation_argv"]
+
+    def test_authoring_backend_invoke_redacts_separate_secret_option_values(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            output_dir = repo / "invoke-output"
+            captured = repo / "captured-argv.json"
+            backend = _write_fake_backend(repo / "backend.py", captured)
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(output_dir),
+                    "--backend-command",
+                    f"{sys.executable} {backend} --token abc123 --password hunter2 --api-key rawkey",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            summary = json.loads((output_dir / "invocation-summary.json").read_text(encoding="utf-8"))
+            serialized = json.dumps(payload)
+            summary_serialized = json.dumps(summary)
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "abc123" not in serialized
+            assert "hunter2" not in serialized
+            assert "rawkey" not in serialized
+            assert "abc123" not in summary_serialized
+            assert "hunter2" not in summary_serialized
+            assert "rawkey" not in summary_serialized
+            assert summary["backend_argv"].count("[redacted]") >= 3
+            assert summary["invocation_argv"].count("[redacted]") >= 3
+
+    def test_authoring_backend_invoke_primary_env_precedes_oracle_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            output_dir = repo / "invoke-output"
+            primary_backend = _write_fake_backend(repo / "primary.py", repo / "primary.txt")
+            fallback_backend = _write_fake_backend(repo / "fallback.py", repo / "fallback.txt")
+
+            result = self._run_runtime_capture(
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+                env={
+                    "PATH": os.environ.get("PATH", ""),
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                    "SPECDOCK_CHATGPT_COMMAND": f"{sys.executable} {primary_backend}",
+                    "ORACLE_CHATGPT_COMMAND": f"{sys.executable} {fallback_backend}",
+                },
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert payload["backend_source"] == "env:SPECDOCK_CHATGPT_COMMAND"
+            assert payload["compatibility_fallback"] is False
+            assert (repo / "primary.txt").is_file()
+            assert not (repo / "fallback.txt").exists()
+
+    def test_authoring_backend_invoke_oracle_fallback_when_primary_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            fallback_backend = _write_fake_backend(repo / "fallback.py", repo / "fallback.txt")
+
+            result = self._run_runtime_capture(
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--format",
+                    "json",
+                ],
+                env={
+                    "PATH": os.environ.get("PATH", ""),
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                    "SPECDOCK_CHATGPT_COMMAND": "",
+                    "ORACLE_CHATGPT_COMMAND": f"{sys.executable} {fallback_backend}",
+                },
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert payload["backend_source"] == "env:ORACLE_CHATGPT_COMMAND"
+            assert payload["compatibility_fallback"] is True
+            assert (repo / "fallback.txt").is_file()
+
+    def test_authoring_backend_invoke_missing_metadata_and_unsafe_output_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            (pack / "manifest.json").write_text("{}", encoding="utf-8")
+
+            missing = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+            missing_payload = _json_stdout(missing)
+            assert missing.returncode == 1, missing.stdout + missing.stderr
+            assert missing_payload["status"] == "blocked"
+            assert "missing_manifest_field:schema_version" in missing_payload["blockers"]
+
+    def test_authoring_backend_invoke_rejects_manifest_files_outside_prompt_pack(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            manifest_path = pack / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["files"].extend(["../source.txt", str(repo / "source.txt")])
+            manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert "unsafe_manifest_file:parent-traversal" in payload["blockers"]
+            assert "unsafe_manifest_file:absolute-path" in payload["blockers"]
+            assert str(repo / "source.txt") not in json.dumps(payload)
+
+    def test_authoring_backend_invoke_rejects_unsafe_output_target_with_valid_pack(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+
+            unsafe = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "spec-dock" / "active" / "issue" / "artifacts" / "invoke"),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+            unsafe_payload = _json_stdout(unsafe)
+            assert unsafe.returncode == 1, unsafe.stdout + unsafe.stderr
+            assert unsafe_payload["status"] == "rejected"
+            assert "canonical_output_target" in unsafe_payload["blockers"]
+
+    def test_authoring_backend_invoke_rejects_file_output_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            output_file = repo / "invoke-output"
+            output_file.write_text("not a directory\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(output_file),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            serialized = json.dumps(payload)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_output_dir_not_directory" in payload["blockers"]
+            assert str(output_file) not in serialized
+
+    def test_authoring_backend_invoke_rejects_symlinked_output_parent(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            canonical = repo / "spec-dock" / "active" / "issue" / "artifacts"
+            canonical.mkdir(parents=True, exist_ok=True)
+            link = repo / "out-link"
+            os.symlink(canonical, link)
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(link / "nested"),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "canonical_output_target" in payload["blockers"]
+            assert "unsafe_output_parent_symlink" in payload["blockers"]
+
+    def test_authoring_backend_invoke_rejects_noncanonical_symlinked_output_parent(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            target = repo / "ordinary-output-root"
+            target.mkdir()
+            link = repo / "ordinary-output-link"
+            os.symlink(target, link)
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(link / "nested"),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_output_parent_symlink" in payload["blockers"]
+            assert not (target / "nested" / "invocation-summary.json").exists()
+
+    def test_authoring_backend_invoke_rejects_relative_symlinked_output_parent(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            target = repo / "ordinary-output-root"
+            target.mkdir()
+            link = repo / "relative-output-link"
+            os.symlink(target, link)
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    "relative-output-link/nested",
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_output_parent_symlink" in payload["blockers"]
+            assert not (target / "nested" / "invocation-summary.json").exists()
+
+    def test_authoring_backend_invoke_blocks_missing_prompt_pack_and_prompt_file_symlink(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            missing = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(repo / "missing-pack"),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+            missing_payload = _json_stdout(missing)
+            assert missing.returncode == 1, missing.stdout + missing.stderr
+            assert missing_payload["status"] == "blocked"
+            assert "prompt_pack_missing" in missing_payload["blockers"]
+
+            pack = _write_valid_prompt_pack(repo / "pack")
+            (pack / "chatgpt-use-prompt.md").unlink()
+            os.symlink(repo / "source.txt", pack / "chatgpt-use-prompt.md")
+            symlinked = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "symlink-output"),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+            symlinked_payload = _json_stdout(symlinked)
+            assert symlinked.returncode == 1, symlinked.stdout + symlinked.stderr
+            assert symlinked_payload["status"] == "blocked"
+            assert "unsafe_prompt_pack_file_symlink:chatgpt-use-prompt.md" in symlinked_payload["blockers"]
+
+    def test_authoring_backend_invoke_malformed_command_blocks_without_shell(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    "\"unterminated",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert "malformed_backend_command:cli" in payload["blockers"]
+
+    def test_authoring_backend_invoke_timeout_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            slow_backend = repo / "slow_backend.py"
+            slow_backend.write_text("import time\ntime.sleep(3)\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    f"{sys.executable} {slow_backend}",
+                    "--timeout-seconds",
+                    "0.01",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert "backend_timeout" in payload["blockers"]
+
+    def test_authoring_backend_invoke_backend_os_error_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            non_executable = repo / "not-executable.py"
+            non_executable.write_text("print('nope')\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    str(non_executable),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert "backend_os_error" in payload["blockers"]
+
+    def test_authoring_backend_invoke_missing_executable_blocks_with_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            output_dir = repo / "invoke-output"
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(output_dir),
+                    "--backend-command",
+                    str(repo / "missing-executable"),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            summary = json.loads((output_dir / "invocation-summary.json").read_text(encoding="utf-8"))
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert "backend_command_not_found" in payload["blockers"]
+            assert summary["status"] == "blocked"
+
+    def test_authoring_backend_invoke_rejects_symlinked_summary(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            output_dir = repo / "invoke-output"
+            output_dir.mkdir()
+            target = repo / "spec-dock" / ".assurance.json"
+            os.symlink(target, output_dir / "invocation-summary.json")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(output_dir),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_output_entry:invocation-summary.json" in payload["blockers"]
+            assert not target.exists()
+
+    def test_authoring_backend_invoke_backend_non_zero_timeout_redaction_and_local_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack", evidence_mode="local-context")
+            failing_backend = repo / "fail_backend.py"
+            failing_backend.write_text(
+                "import sys\n"
+                "print('secret=/Users/example/.env token=abc123 password=hunter2 key=rawkey sk-testsecret12345')\n"
+                "print('DATABASE_PASSWORD=hunter2 MY_API_KEY=rawkey SERVICE_TOKEN=abc123 CUSTOM_SECRET=value')\n"
+                "print('--token abc123 --password hunter2 --api-key rawkey')\n"
+                "print('--secret value --credential rawcred', file=sys.stderr)\n"
+                "print('ghp_abcdefghijklmnop xoxb-1234567890-secret AKIAABCDEFGHIJKLMNOP')\n"
+                "print('/private/tmp/file /tmp /tmp/raw-local /var/folders /var/folders/raw-local', file=sys.stderr)\n"
+                "raise SystemExit(7)\n",
+                encoding="utf-8",
+            )
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    f"{sys.executable} {failing_backend}",
+                    "--evidence-mode",
+                    "local-context",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            summary = json.loads((repo / "invoke-output" / "invocation-summary.json").read_text(encoding="utf-8"))
+            serialized = json.dumps(payload)
+            summary_serialized = json.dumps(summary)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert "backend_exit_code:7" in payload["blockers"]
+            assert payload["local_context_requires_eal_disposition"] is True
+            assert "[redacted-path]" in payload["stderr"]
+            assert "sk-[redacted]" in payload["stdout"]
+            assert "/Users/example/.env" not in serialized
+            assert "token=abc123" not in serialized
+            assert "password=hunter2" not in serialized
+            assert "key=rawkey" not in serialized
+            assert "DATABASE_PASSWORD=hunter2" not in serialized
+            assert "MY_API_KEY=rawkey" not in serialized
+            assert "SERVICE_TOKEN=abc123" not in serialized
+            assert "CUSTOM_SECRET=value" not in serialized
+            assert "--token abc123" not in serialized
+            assert "--password hunter2" not in serialized
+            assert "--api-key rawkey" not in serialized
+            assert "--secret value" not in serialized
+            assert "--credential rawcred" not in serialized
+            assert "ghp_abcdefghijklmnop" not in serialized
+            assert "xoxb-1234567890-secret" not in serialized
+            assert "AKIAABCDEFGHIJKLMNOP" not in serialized
+            assert "/Users/example/.env" not in summary_serialized
+            assert "token=abc123" not in summary_serialized
+            assert "password=hunter2" not in summary_serialized
+            assert "key=rawkey" not in summary_serialized
+            assert "DATABASE_PASSWORD=hunter2" not in summary_serialized
+            assert "MY_API_KEY=rawkey" not in summary_serialized
+            assert "SERVICE_TOKEN=abc123" not in summary_serialized
+            assert "CUSTOM_SECRET=value" not in summary_serialized
+            assert "--token abc123" not in summary_serialized
+            assert "--password hunter2" not in summary_serialized
+            assert "--api-key rawkey" not in summary_serialized
+            assert "--secret value" not in summary_serialized
+            assert "--credential rawcred" not in summary_serialized
+            assert "ghp_abcdefghijklmnop" not in summary_serialized
+            assert "xoxb-1234567890-secret" not in summary_serialized
+            assert "AKIAABCDEFGHIJKLMNOP" not in summary_serialized
+            assert " /tmp " not in payload["stderr"]
+            assert "/tmp/raw-local" not in payload["stderr"]
+            assert "/var/folders " not in payload["stderr"]
+            assert "/var/folders/raw-local" not in payload["stderr"]
+
+    def test_authoring_backend_invoke_decodes_non_utf8_backend_streams(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            backend = repo / "non_utf8_backend.py"
+            output_dir = repo / "invoke-output"
+            backend.write_text(
+                "import sys\n"
+                "sys.stdout.buffer.write(b'prefix-\\xff-suffix')\n"
+                "sys.stderr.buffer.write(b'err-\\xfe')\n"
+                "raise SystemExit(9)\n",
+                encoding="utf-8",
+            )
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(output_dir),
+                    "--backend-command",
+                    f"{sys.executable} {backend}",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            summary = json.loads((output_dir / "invocation-summary.json").read_text(encoding="utf-8"))
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert "backend_exit_code:9" in payload["blockers"]
+            assert "prefix-" in payload["stdout"]
+            assert "err-" in payload["stderr"]
+            assert summary["stdout"] == payload["stdout"]
+            assert summary["stderr"] == payload["stderr"]
+
+    def test_authoring_backend_invoke_dogfood_runtime_path_smoke(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = repo_root / "spec-dock" / "scripts" / "spec-dock"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pack = _write_valid_prompt_pack(root / "pack")
+            backend = _write_fake_backend(root / "backend.py", root / "sentinel.txt")
+
+            p = subprocess.run(
+                [
+                    str(script),
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(root / "invoke-output"),
+                    "--backend-command",
+                    f"{sys.executable} {backend}",
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo_root),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert (root / "sentinel.txt").is_file()
+
+    def test_authoring_backend_invoke_dogfood_runtime_rejects_unsafe_manifest_files(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = repo_root / "spec-dock" / "scripts" / "spec-dock"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pack = _write_valid_prompt_pack(root / "pack")
+            manifest_path = pack / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["files"].extend(["../outside.txt", str(root / "outside.txt")])
+            manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+
+            p = subprocess.run(
+                [
+                    str(script),
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(root / "invoke-output"),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo_root),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "blocked"
+            assert "unsafe_manifest_file:parent-traversal" in payload["blockers"]
+            assert "unsafe_manifest_file:absolute-path" in payload["blockers"]
+            assert str(root / "outside.txt") not in json.dumps(payload)
+
+    def test_authoring_backend_invoke_compatibility_script_smoke(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "authoring-pack" / "invoke_chatgpt_backend.py"
+        dogfood_script = repo_root / "spec-dock" / "scripts" / "authoring-pack" / "invoke_chatgpt_backend.py"
+        assert os.access(script, os.X_OK)
+        assert os.access(dogfood_script, os.X_OK)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pack = _write_valid_prompt_pack(root / "pack")
+            captured = root / "captured.json"
+            backend = _write_fake_backend(root / "backend.py", captured)
+
+            p = self._run_wrapper_capture(
+                script,
+                [
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(root / "invoke-output"),
+                    "--backend-command",
+                    f"{sys.executable} {backend}",
+                    "--slug",
+                    "compat-slug",
+                    "--prompt",
+                    "compat prompt",
+                    "--format",
+                    "json",
+                ],
+                env={
+                    "PATH": os.environ.get("PATH", ""),
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                },
+                cwd=repo_root,
+            )
+
+            payload = _json_stdout(p)
+            captured_argv = json.loads(captured.read_text(encoding="utf-8"))
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert "--slug" in captured_argv
+            assert "compat-slug" in captured_argv
+            assert "-p" in captured_argv
+            assert "compat prompt" in captured_argv
+            assert captured_argv.count("--file") == 7
+            assert (root / "invoke-output" / "invocation-summary.json").is_file()
+
+    def test_authoring_backend_invoke_compatibility_script_legacy_file_mode(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "authoring-pack" / "invoke_chatgpt_backend.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prompt = root / "prompt.md"
+            contract = root / "contract.md"
+            extra = root / "extra.md"
+            captured = root / "captured.json"
+            backend = _write_fake_backend(root / "backend.py", captured)
+            prompt.write_text("legacy prompt\n", encoding="utf-8")
+            contract.write_text("legacy contract\n", encoding="utf-8")
+            extra.write_text("legacy extra\n", encoding="utf-8")
+
+            p = self._run_wrapper_capture(
+                script,
+                [
+                    "--slug",
+                    "legacy-slug",
+                    "-p",
+                    "legacy prompt text",
+                    "--file",
+                    str(prompt),
+                    "--file",
+                    str(contract),
+                    "--file",
+                    str(extra),
+                    "--backend-command",
+                    f"{sys.executable} {backend}",
+                    "--format",
+                    "json",
+                ],
+                env={
+                    "PATH": os.environ.get("PATH", ""),
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                },
+                cwd=repo_root,
+            )
+
+            payload = _json_stdout(p)
+            captured_argv = json.loads(captured.read_text(encoding="utf-8"))
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert "legacy-slug" in captured_argv
+            assert "legacy prompt text" in captured_argv
+            assert captured_argv.count("--file") == 10
+            assert any("extra.md" in item for item in captured_argv)
+
+    def test_authoring_backend_invoke_compatibility_script_legacy_prompt_only_mode(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "authoring-pack" / "invoke_chatgpt_backend.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            captured = root / "captured.json"
+            backend = _write_fake_backend(root / "backend.py", captured)
+
+            p = self._run_wrapper_capture(
+                script,
+                [
+                    "--slug",
+                    "legacy-slug",
+                    "-p",
+                    "legacy prompt text",
+                    "--backend-command",
+                    f"{sys.executable} {backend}",
+                    "--format",
+                    "json",
+                ],
+                env={
+                    "PATH": os.environ.get("PATH", ""),
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                },
+                cwd=repo_root,
+            )
+
+            payload = _json_stdout(p)
+            captured_argv = json.loads(captured.read_text(encoding="utf-8"))
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert "legacy-slug" in captured_argv
+            assert "legacy prompt text" in captured_argv
+            assert captured_argv.count("--file") == 7
+
+    def test_authoring_backend_invoke_compatibility_script_legacy_file_mode_blocks_missing_file(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "authoring-pack" / "invoke_chatgpt_backend.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            backend = _write_fake_backend(root / "backend.py", root / "captured.json")
+
+            p = self._run_wrapper_capture(
+                script,
+                [
+                    "--slug",
+                    "legacy-slug",
+                    "-p",
+                    "legacy prompt text",
+                    "--file",
+                    str(root / "missing.md"),
+                    "--backend-command",
+                    f"{sys.executable} {backend}",
+                    "--format",
+                    "json",
+                ],
+                env={
+                    "PATH": os.environ.get("PATH", ""),
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                },
+                cwd=repo_root,
+            )
+
+            assert p.returncode != 0
+            assert "legacy --file attachment is not a readable file" in p.stderr
+
 
 def _run_preflight_json(
     testcase: CliRuntimeHarness,
@@ -1195,6 +2301,67 @@ def _normalized_pack_payload(pack_dir: Path) -> dict[str, str]:
         rel_path = path.relative_to(pack_dir).as_posix()
         payload[rel_path] = path.read_text(encoding="utf-8") if path.stat().st_size else ""
     return payload
+
+
+def _write_valid_prompt_pack(pack_dir: Path, *, evidence_mode: str = "github-synced") -> Path:
+    pack_dir.mkdir(parents=True, exist_ok=True)
+    (pack_dir / ".specdock-authoring-pack").write_bytes(b"")
+    sync_state = "local_context" if evidence_mode == "local-context" else "synced"
+    github_sync = "not_verified" if evidence_mode == "local-context" else "verified"
+    manifest = {
+        "schema_version": 1,
+        "generated_by": "test fixture",
+        "expected_output_root": "specdock-authoring-pack/",
+        "required_metadata": ["manifest.json"],
+        "files": [
+            "manifest.json",
+            "provenance.json",
+            "source-manifest.json",
+            "stale-if.json",
+            "safe-output-constraints.md",
+            "chatgpt-use-prompt.md",
+            "expected-output-contract.md",
+        ],
+        "authority": "evidence_only",
+        "adoption_status": "unreviewed",
+        "bundle_generation_not_promotion": True,
+    }
+    provenance = {
+        "evidence_mode": evidence_mode,
+        "sync_state": sync_state,
+        "github_sync": github_sync,
+        "source_manifest_hash": "hash",
+        "authority": "evidence_only",
+        "adoption_status": "unreviewed",
+        "bundle_generation_not_promotion": True,
+    }
+    source_manifest = {
+        "source_paths": ["source.txt"],
+        "source_hashes": {"source.txt": "hash"},
+        "source_manifest_hash": "hash",
+    }
+    for name, payload in (
+        ("manifest.json", manifest),
+        ("provenance.json", provenance),
+        ("source-manifest.json", source_manifest),
+        ("stale-if.json", {}),
+    ):
+        (pack_dir / name).write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+    (pack_dir / "safe-output-constraints.md").write_text("constraints\n", encoding="utf-8")
+    (pack_dir / "chatgpt-use-prompt.md").write_text("prompt\n", encoding="utf-8")
+    (pack_dir / "expected-output-contract.md").write_text("contract\n", encoding="utf-8")
+    return pack_dir
+
+
+def _write_fake_backend(path: Path, sentinel: Path) -> Path:
+    path.write_text(
+        "from pathlib import Path\n"
+        "import json\n"
+        "import sys\n"
+        f"Path({str(sentinel)!r}).write_text(json.dumps(sys.argv[1:]), encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    return path
 
 
 def _manifest_hash(source_hashes: dict[str, object]) -> str:
