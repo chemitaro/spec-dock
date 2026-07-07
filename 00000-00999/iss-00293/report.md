@@ -13,7 +13,7 @@ ID: "iss-00293"
 
 ## 現在の状態
 
-- 状態: 実行中。S01〜S04 と final local verification は実施済み。PR #294 は作成済みだが、初回観測で Provider CI の mypy failure が出たため修正ループ中。
+- 状態: 実行中。S01〜S04 と final local verification は実施済み。PR #294 は作成済み。Provider CI / mypy failure は修正済みで、再観測では CI pass を確認したが、Codex review の carryover P1 thread 4件を修正中。
 - 目的: Epic 全体の品質ゲート、手動テスト、Pull Request 作成、レビュー / CI 指摘対応、mergeable 確認を最後に集約する。
 - 前提: `iss-00284` から `iss-00292` までを順番に完了し、この Issue で PR を作成または更新する。
 - 追加責務: PR 作成前に ChatGPT Use / Oracle 実行まわりの個人環境絶対パス依存を解消し、backend command adapter / invocation contract を品質ゲート対象に含める。
@@ -33,7 +33,7 @@ ID: "iss-00293"
   - `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=189`。
   - scoped local wrapper hardcode guard over `scripts/authoring-pack`, `tests/manual_tests`, and active Issue docs -> no matches。
 - Remaining:
-  - PR #294 の修正 commit push 後の CI / review / mergeable 再観測。
+  - PR #294 の P1 repair commit push 後の CI / review / mergeable 再観測。
   - final issue-wide `spec-reviewer` / `code-reviewer` / `qa-reviewer`。
 
 
@@ -154,6 +154,9 @@ Supporting commands:
 | CI repair lint | pass | after type-only manual test helper fixes, `make lint` -> ruff check pass, ruff format check pass, mypy pass |
 | CI repair focused tests | pass | `uv run pytest tests/manual_tests/test_review_chatgpt_authoring_pack.py tests/manual_tests/test_stage_chatgpt_authoring_pack.py tests/manual_tests/test_validate_issue_candidates.py tests/manual_tests/test_validate_selected_skeleton_fill.py tests/manual_tests/test_invoke_chatgpt_backend.py -q` -> `130 passed in 4.52s` |
 | CI repair structure / diff | pass | `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=189`; `git diff --check` pass |
+| PR re-observation after CI repair | timeout with CI pass | head `2a7456163a0ef78db8a049fa24e83c2d5e923387`; Actions runs 4/4 success; decision timed out because no current completion signal and 4 carryover unresolved Codex P1 threads remained. |
+| Codex P1 repair focused tests | pass | after fixing the four carryover P1 findings, `uv run pytest tests/manual_tests/test_review_chatgpt_authoring_pack.py tests/manual_tests/test_validate_selected_skeleton_fill.py -q` -> `84 passed in 2.47s`; authoring-pack focused suite -> `215 passed in 9.59s` |
+| Codex P1 repair lint / structure | pass | `make lint` -> pass; `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=189`; `git diff --check` pass |
 
 ## PR Delivery / CI Repair Evidence
 
@@ -168,7 +171,10 @@ Supporting commands:
 | failure | `make lint` / mypy type errors in manual test helper files |
 | repair scope | type-only test helper annotations, import order, local variable naming to avoid mypy assignment conflicts |
 | local repair evidence | `make lint` pass; focused manual tests `130 passed`; `spec-dock validate` pass; `git diff --check` pass |
-| next observation | push repair commit and re-run PR observation for the new head SHA |
+| second observation result | CI passed for head `2a7456163a0ef78db8a049fa24e83c2d5e923387`, but observation timed out with 4 unresolved carryover Codex P1 threads from reviewed commit `40af0ea3fe`. |
+| P1 repair scope | safe ZIP extraction rejects symlinked extract dirs; pack review rejects unsafe text payloads; provenance repository/ref must match preflight; selected skeleton fill rejects nested `authorized_profile` claims. |
+| P1 repair evidence | focused authoring-pack suite `215 passed`; `make lint` pass; `spec-dock validate` pass; `git diff --check` pass |
+| next observation | push P1 repair commit and re-run PR observation for the new head SHA |
 
 ## Epic Manual Test Matrix
 
@@ -223,6 +229,10 @@ Supporting commands:
 | code-reviewer `019f3ab7-5f18-7a00-9720-a26ba56a577b` | README still said adapter is not implemented | P3 | fixed | stale sentence removed; manual fallback wording updated to current adapter behavior |
 | qa-reviewer `019f3ab7-8932-7133-a1f3-d1089d86467d` | repeatable attachment argv ordering had only one attachment in tests | P2 | fixed | `test_backend_receives_oracle_compatible_argv_without_shell` now asserts two ordered `--file` pairs |
 | qa-reviewer `019f3ab7-8932-7133-a1f3-d1089d86467d` | Backend Adapter Gate row was stale | P2 | fixed | gate table now records S04 implementation and focused verification status without claiming final issue completion |
+| Codex PR review / PRRT_kwDOQ99OK86Oy07h | reject symlinked extract directories | P1 | fixed locally | `_safe_extract_zip` rejects symlinked or non-directory `extract_dir`; `test_symlinked_extract_dir_is_blocked_before_writing` confirms no write through symlink target |
+| Codex PR review / PRRT_kwDOQ99OK86Oy07j | reject unsafe text in pack payloads | P1 | fixed locally | `_text_payload_error` applies unsafe text policy to decoded payloads; `test_unsafe_text_payload_is_rejected_without_echoing_payload` confirms raw transcript / host-local path rejection and redaction |
+| Codex PR review / PRRT_kwDOQ99OK86Oy07m | require provenance to match preflight repository | P1 | fixed locally | provenance schema now compares `repository.full_name` and `requested_ref` with preflight; `test_provenance_repository_must_match_preflight_repository` covers mismatch |
+| Codex PR review / PRRT_kwDOQ99OK86Oy07r | reject nested `authorized_profile` claims | P1 | fixed locally | candidate fill metadata now rejects `authorized_profile` recursively; `test_nested_candidate_authorized_profile_field_is_rejected` covers nested target claim |
 
 ## Parent Implementation Exception Record
 
@@ -255,7 +265,7 @@ Supporting commands:
 | tc-002 | pass | `spec-dock validate` / `git diff --check` / 関連テスト | `spec-dock validate` pass、`git diff --check` pass、focused adapter 10 passed、authoring-pack suite 211 passed、full baseline after snapshot fix 1910 passed / 74 skipped。 | closed |
 | tc-003 | pass | Epic manual test matrix | scenario-by-scenario matrix を記録。preflight / safe review / staging / profile / dogfood / docs / metrics / backend adapter / metadata snapshot を確認済み。 | closed |
 | tc-004 | pass | backend command adapter / invocation contract | S04 adapter implemented; ChatGPT Use advisory recommendations adopted; focused tests and authoring-pack suite passed; no local wrapper dependency added | closed |
-| tc-005 | in_progress | PR URL / CI / review / mergeable status | PR #294 created. Initial observation failed due Provider CI / mypy; local repair verified with `make lint`, focused pytest, `spec-dock validate`, and `git diff --check`. | push repair commit and re-observe PR |
+| tc-005 | in_progress | PR URL / CI / review / mergeable status | PR #294 created. Provider CI / mypy repair was pushed and CI passed on re-observation, but Codex review carryover P1 threads remained. Four P1 findings are fixed locally and verified with focused pytest, `make lint`, `spec-dock validate`, and `git diff --check`. | push P1 repair commit and re-observe PR |
 | tc-006 | pending | Epic / Issue report 更新 / docs impact | Issue report 更新中。Epic report には S04 evidence と final local verification / manual matrix / PR evidence を反映する必要がある。 | S90 で記録する |
 | tc-007 | pending | fresh reviewer results / blocker disposition | 未実施 | S99 で記録する |
 
