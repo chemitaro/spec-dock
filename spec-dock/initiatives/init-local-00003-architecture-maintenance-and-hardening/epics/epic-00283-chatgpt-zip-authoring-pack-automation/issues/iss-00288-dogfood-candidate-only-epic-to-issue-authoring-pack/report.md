@@ -19,7 +19,7 @@ ID: "iss-00288"
   - ChatGPT Use / GPT-5.5 Pro Extended による実装前具体化を `artifacts/20260707t000851z-chatgpt-use-planning-summary.md` に保存済み。material spec amendment は不要、`validate_issue_candidates.py` / `authoring_pack_issue_candidates.py` を dogfood-only helper として追加する方針を採用した。
   - 実装は完了。candidate-only Epic-to-Issue output を検証し、Issue 比較 summary を出す dogfood-only helper、CLI wrapper、focused manual tests、README usage を追加した。
   - Issue 単位の fresh `spec-reviewer` gate は `019f3999-911a-7381-8155-3cda5fcf3403` で pass 済み。
-  - 実装後の fresh reviewer gates は `spec-reviewer` `019f39f1-62ae-72e2-9125-1ef3a572f3db`、`code-reviewer` `019f39f7-f36f-7a52-85cc-2c0fbe72448d`、`qa-reviewer` `019f39f7-f47d-76e1-8387-204805b1b2cd` で pass 済み。
+  - 実装後の fresh reviewer gates は `spec-reviewer` `019f39fc-adea-7701-8dde-f0e3b37fd8cb`、`code-reviewer` `019f39f7-f36f-7a52-85cc-2c0fbe72448d`、`qa-reviewer` `019f39f7-f47d-76e1-8387-204805b1b2cd` で pass 済み。
 - 次のマイルストーン:
   - `issue finish` し、次 Issue `iss-00289` を `issue start` する。
 - ブロッカー:
@@ -77,14 +77,14 @@ ID: "iss-00288"
 
 | gate | required state | current state | promotion / completion decision |
 |---|---|---|---|
-| spec-reviewer | fresh `passed` | passed: fresh `spec-reviewer` 019f3999-911a-7381-8155-3cda5fcf3403 | pass まで execution-ready としない |
+| spec-reviewer | fresh `passed` | planning pass: 019f3999-911a-7381-8155-3cda5fcf3403; final execution pass: 019f39fc-adea-7701-8dde-f0e3b37fd8cb | local completion ready |
 | code-reviewer | required because implementation diff exists; final Epic-wide gate is owned by `iss-00293` | passed: fresh `code-reviewer` 019f39f7-f36f-7a52-85cc-2c0fbe72448d | local completion ready |
 | qa-reviewer | required because validation surface changed; final Epic-wide gate is owned by `iss-00293` | passed: fresh `qa-reviewer` 019f39f7-f47d-76e1-8387-204805b1b2cd | local completion ready |
 
 | phase | gate | reviewer_role | freshness | state | risk_acceptance | promotion_decision | evidence |
 |---|---|---|---|---|---|---|---|
 | planning | spec-authoring | spec-reviewer | fresh | pass | no | execute approved plan | fresh pass `019f3999-911a-7381-8155-3cda5fcf3403` |
-| execution | final-spec | spec-reviewer | fresh | pass | no | local completion ready | fresh pass `019f39f1-62ae-72e2-9125-1ef3a572f3db` |
+| execution | final-spec | spec-reviewer | fresh | pass | no | execute approved plan | fresh pass `019f39fc-adea-7701-8dde-f0e3b37fd8cb` |
 | execution | code | code-reviewer | fresh | pass | no | local completion ready | fresh pass `019f39f7-f36f-7a52-85cc-2c0fbe72448d` |
 | execution | qa | qa-reviewer | fresh | pass | no | local completion ready | fresh pass `019f39f7-f47d-76e1-8387-204805b1b2cd` |
 
