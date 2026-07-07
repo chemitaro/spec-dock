@@ -1218,6 +1218,19 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00291-document-authoring-pack-workflow-and-adoption-ledger-examples/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00296-promote-authoring-pack-assets/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00297-add-authoring-command-skeleton/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00298-implement-github-sync-preflight/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00299-prepare-prompt-pack-and-safe-output-constraints/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00300-implement-backend-invocation-adapter/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00301-promote-zip-review-and-staging/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00302-validate-initiative-epic-and-epic-issue-candidates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00303-validate-issue-draft-adoption-and-selected-skeleton/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00304-add-chatgpt-authoring-skill-and-update-planning-skills/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00305-implement-approval-check-and-stop-gate-reports/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00306-update-runtime-docs-and-workflow-guidance/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00307-final-quality-gate-and-mergeable-pr-delivery/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1548,6 +1561,41 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00291-document-authoring-pack-workflow-and-adoption-ledger-examples/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00296-promote-authoring-pack-assets/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00297-add-authoring-command-skeleton/.meta.json": [
+            "iss-00296",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00298-implement-github-sync-preflight/.meta.json": [
+            "iss-00297",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00299-prepare-prompt-pack-and-safe-output-constraints/.meta.json": [
+            "iss-00298",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00300-implement-backend-invocation-adapter/.meta.json": [
+            "iss-00299",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00301-promote-zip-review-and-staging/.meta.json": [
+            "iss-00300",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00302-validate-initiative-epic-and-epic-issue-candidates/.meta.json": [
+            "iss-00301",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00303-validate-issue-draft-adoption-and-selected-skeleton/.meta.json": [
+            "iss-00302",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00304-add-chatgpt-authoring-skill-and-update-planning-skills/.meta.json": [
+            "iss-00303",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00305-implement-approval-check-and-stop-gate-reports/.meta.json": [
+            "iss-00304",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00306-update-runtime-docs-and-workflow-guidance/.meta.json": [
+            "iss-00305",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00307-final-quality-gate-and-mergeable-pr-delivery/.meta.json": [
+            "iss-00306",
+        ],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -1596,6 +1644,17 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00274": ["iss-00273"],
         "iss-00275": ["iss-00274"],
         "iss-00276": ["iss-00275"],
+        "iss-00297": ["iss-00296"],
+        "iss-00298": ["iss-00297"],
+        "iss-00299": ["iss-00298"],
+        "iss-00300": ["iss-00299"],
+        "iss-00301": ["iss-00300"],
+        "iss-00302": ["iss-00301"],
+        "iss-00303": ["iss-00302"],
+        "iss-00304": ["iss-00303"],
+        "iss-00305": ["iss-00304"],
+        "iss-00306": ["iss-00305"],
+        "iss-00307": ["iss-00306"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -3199,6 +3258,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "phase playbook（共通の作り方）" in guide_text
             assert "[workflow_clarification.md](workflow_clarification.md)" in guide_text
             assert "[workflow_spec_authoring.md](workflow_spec_authoring.md)" in guide_text
+
             assert "[phase_requirement.md](phase_requirement.md)" in guide_text
             assert "[phase_design.md](phase_design.md)" in guide_text
             assert "[phase_plan.md](phase_plan.md)" in guide_text
@@ -3569,6 +3629,35 @@ class TestInitUpdate(CliRuntimeHarness):
                 source="generated issue-execution skill",
             )
             assert not (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
+
+    def test_init_installs_authoring_pack_helper_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+
+            exit_code = main(["init", str(target)])
+            assert exit_code == 0
+
+            authoring_pack_dir = target / "spec-dock" / "scripts" / "authoring-pack"
+            expected_files = {
+                "README.md",
+                "authoring_pack_issue_candidates.py",
+                "authoring_pack_review.py",
+                "authoring_pack_selected_skeleton_fill.py",
+                "authoring_pack_stage.py",
+                "invoke_chatgpt_backend.py",
+                "prepare_chatgpt_authoring_pack.py",
+                "review_chatgpt_authoring_pack.py",
+                "stage_chatgpt_authoring_pack.py",
+                "validate_issue_candidates.py",
+                "validate_selected_skeleton_fill.py",
+            }
+            observed_files = {path.name for path in authoring_pack_dir.iterdir() if path.is_file()}
+            assert observed_files == expected_files
+
+            readme = (authoring_pack_dir / "README.md").read_text(encoding="utf-8")
+            assert "provider-side source of truth" in readme
+            assert "installed asset" in readme
+            assert "compatibility and dogfood developer surface" in readme
 
     def test_issue_78_init_allows_install_when_legacy_hidden_workspace_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
