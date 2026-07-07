@@ -84,7 +84,26 @@ ChatGPT に渡す prompt では、次を明示します。
 - ZIP / tree output は `specdock-authoring-pack/` root と required metadata を持つ。
 - raw transcript、host-local absolute path、secret、private key、credential は出力に含めない。
 
-ChatGPT Use / Oracle の backend command adapter はこの README の helper scope では実装しません。正式 workflow から個人環境固有 wrapper path への依存を外す adapter / invocation contract は、`iss-00293` の final quality gate で扱います。
+## ChatGPT backend adapter
+
+`invoke_chatgpt_backend.py` は、dogfood workflow から ChatGPT backend を呼ぶための薄い adapter です。Oracle / ChatGPT automation 本体は同梱しません。
+
+- `SPECDOCK_CHATGPT_COMMAND` を第一候補に使う。
+- `SPECDOCK_CHATGPT_COMMAND` が未設定または空の場合だけ、`ORACLE_CHATGPT_COMMAND` を互換 fallback として使う。
+- 設定値は shell ではなく argv prefix として `shlex.split` で解釈する。
+- 未設定時は backend を推測せず、設定が必要であることを明示して fail-closed する。
+- 個人環境の `oracle-chatgpt` wrapper は、ユーザーが自身の環境で指定できる backend の一例であり、この repository の必須依存ではない。
+
+Example:
+
+```bash
+SPECDOCK_CHATGPT_COMMAND="oracle-chatgpt" \
+python scripts/authoring-pack/invoke_chatgpt_backend.py \
+  --slug "specdock-example" \
+  -p "Use the attached prompt file as the task brief." \
+  --file "$scratch_dir/iss-00284-prompt-pack/chatgpt-use-prompt.md" \
+  --dry-run
+```
 
 ## manual fallback
 
@@ -92,7 +111,7 @@ ChatGPT Use / Oracle の backend command adapter はこの README の helper sco
 - ZIP が生成できないが隔離済み tree がある場合、tree review は fallback として扱う。ZIP central directory safety evidence は提供しないため、不足分を fallback evidence として明示する。
 - GitHub connector が使えない場合は、local checkout / pushed branch / source hash の観測に戻す。
 - stale / mismatch が出た場合は、regenerate または source reconciliation を行うまで adoption しない。
-- backend command が未設定の場合は、将来の adapter contract では明確なエラーで fail する。個人環境の local wrapper path を正本 docs に直書きしない。
+- backend command が未設定の場合は、adapter が明確なエラーで fail する。個人環境の local wrapper path を正本 docs に直書きしない。
 
 ## Example
 
