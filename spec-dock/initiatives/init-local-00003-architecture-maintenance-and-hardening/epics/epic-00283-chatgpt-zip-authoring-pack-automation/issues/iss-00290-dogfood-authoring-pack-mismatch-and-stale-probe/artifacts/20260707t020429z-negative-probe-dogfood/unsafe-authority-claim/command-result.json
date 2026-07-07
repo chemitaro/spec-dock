@@ -1,0 +1,5 @@
+{
+  "returncode": 4,
+  "stdout": "{\"errors\": [\"section fill contains unsafe authority claim\"], \"output_dir\": \"validation\", \"overall_adoption_eligible\": false, \"status\": \"rejected\"}",
+  "stderr": ""
+}

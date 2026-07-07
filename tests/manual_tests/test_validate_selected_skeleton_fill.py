@@ -77,7 +77,7 @@ def pack_digest(pack_root: Path) -> dict:
     }
 
 
-def write_review_report(path: Path, pack_root: Path, *, status: str = "pass") -> Path:
+def write_review_report(path: Path, pack_root: Path, *, status: str = "pass", trace: dict | None = None) -> Path:
     payload = {
         "authority": "evidence_only",
         "adoption_status": "unreviewed",
@@ -85,7 +85,8 @@ def write_review_report(path: Path, pack_root: Path, *, status: str = "pass") ->
         "status": status,
         "generated_at": "2026-07-06T00:00:00Z",
         "input_kind": "tree",
-        "trace": {
+        "trace": trace
+        or {
             "issue_id": "iss-00287",
             "parent_epic": "epic-00283",
         },
@@ -587,7 +588,13 @@ def test_non_pass_review_input_does_not_validate(tmp_path) -> None:
 
 def test_pack_digest_mismatch_is_stale(tmp_path) -> None:
     pack_root = write_pack_tree(tmp_path / "pack")
-    review_report = write_review_report(tmp_path / "review.json", pack_root)
+    review_trace = {
+        "issue_id": "iss-00290",
+        "parent_epic": "epic-00283",
+        "requirements": ["E-RQ-005", "E-RQ-008", "E-RQ-010"],
+        "acceptance": ["E-AC-002", "E-AC-004", "E-AC-005", "E-AC-011"],
+    }
+    review_report = write_review_report(tmp_path / "review.json", pack_root, trace=review_trace)
     write_json(pack_root / "selected-skeleton-fill/section-fills.json", candidate_payload(section_fills=[]))
     assurance = write_assurance(tmp_path / "issue/.assurance.json")
     selected_skeleton = write_selected_skeleton(tmp_path / "selected-skeleton.json")
@@ -597,6 +604,7 @@ def test_pack_digest_mismatch_is_stale(tmp_path) -> None:
     assert result.returncode == 3
     report = read_json(tmp_path / "validation/selected-skeleton-fill-validation-report.json")
     assert report["status"] == "stale"
+    assert report["trace"] == review_trace
 
 
 def test_output_directory_ownership_guard_and_redaction(tmp_path) -> None:

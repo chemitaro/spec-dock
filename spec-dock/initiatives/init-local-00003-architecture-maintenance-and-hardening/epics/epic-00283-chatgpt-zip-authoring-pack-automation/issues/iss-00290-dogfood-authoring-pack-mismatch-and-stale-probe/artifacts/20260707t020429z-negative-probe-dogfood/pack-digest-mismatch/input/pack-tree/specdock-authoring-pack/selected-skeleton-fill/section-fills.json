@@ -1,0 +1,19 @@
+{
+  "authority": "evidence_only",
+  "adoption_status": "unreviewed",
+  "bundle_generation_not_promotion": true,
+  "schema_version": "1",
+  "issue_id": "iss-00290",
+  "target": {
+    "profile": "standard",
+    "template_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "skeleton_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "section_inventory_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "profile_suggestion": {
+    "profile": "strict",
+    "advisory_only": true,
+    "rationale": "negative probe should not mutate local authority"
+  },
+  "section_fills": []
+}

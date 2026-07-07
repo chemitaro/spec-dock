@@ -1,0 +1,81 @@
+{
+  "adoption": {
+    "assurance_mutated": false,
+    "canonical_written": false,
+    "next_action": "manual adoption review; do not treat as reviewer pass",
+    "overall_adoption_eligible": false
+  },
+  "adoption_status": "unreviewed",
+  "authority": "evidence_only",
+  "bundle_generation_not_promotion": true,
+  "candidate": {},
+  "checks": [
+    {
+      "name": "pack-digest",
+      "status": "stale"
+    }
+  ],
+  "errors": [
+    "pack tree digest does not match review report"
+  ],
+  "generated_at": "2026-07-07T02:08:29Z",
+  "inputs": {
+    "assurance_snapshot": {},
+    "review": {
+      "input_kind": "tree",
+      "pack_digest": {
+        "algorithm": "sha256",
+        "content_sha256": "5459c7ecada8bdadfc030f31229f9e8d88c866fff467fddd1c0aab4a25ad44f7",
+        "file_count": 1
+      },
+      "source_count": 0,
+      "status": "pass",
+      "trace": {
+        "acceptance": [
+          "E-AC-002",
+          "E-AC-004",
+          "E-AC-005",
+          "E-AC-011"
+        ],
+        "issue_id": "iss-00290",
+        "parent_epic": "epic-00283",
+        "requirements": [
+          "E-RQ-005",
+          "E-RQ-008",
+          "E-RQ-010"
+        ]
+      }
+    },
+    "selected_skeleton": {}
+  },
+  "profile_validation": {},
+  "section_inventory_validation": {},
+  "section_results": [],
+  "skeleton_validation": {},
+  "status": "stale",
+  "status_taxonomy": {
+    "blocked": "Required local observation or filesystem operation is unavailable.",
+    "deferred": "Recognized later-stage responsibility; never treated as pass.",
+    "fail": "Input schema or required selected-fill data is invalid.",
+    "pass": "Selected skeleton fill validation passed; adoption remains unreviewed.",
+    "rejected": "A safety boundary, unauthorized authority claim, or extra section fill was detected.",
+    "stale": "Local assurance, selected skeleton, review digest, or candidate target snapshot no longer matches.",
+    "unreviewed": "Artifact adoption state, not an execution status."
+  },
+  "trace": {
+    "acceptance": [
+      "E-AC-002",
+      "E-AC-004",
+      "E-AC-005",
+      "E-AC-011"
+    ],
+    "issue_id": "iss-00290",
+    "parent_epic": "epic-00283",
+    "requirements": [
+      "E-RQ-005",
+      "E-RQ-008",
+      "E-RQ-010"
+    ]
+  },
+  "warnings": []
+}

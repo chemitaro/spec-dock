@@ -1,0 +1,46 @@
+{
+  "authority": "local_assurance",
+  "issue_id": "iss-00290",
+  "authorized_profile": "strict",
+  "template_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "skeleton_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "section_inventory_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "section_inventory": [
+    {
+      "section_id": "purpose",
+      "heading": "## Purpose",
+      "required": true,
+      "fillable": true,
+      "order": 10
+    },
+    {
+      "section_id": "notes",
+      "heading": "## Notes",
+      "required": false,
+      "fillable": true,
+      "order": 20
+    }
+  ],
+  "allowed_section_ids": [
+    "purpose",
+    "notes"
+  ],
+  "required_section_ids": [
+    "purpose"
+  ],
+  "parent_trace": {
+    "issue_id": "iss-00290",
+    "parent_epic": "epic-00283",
+    "requirements": [
+      "E-RQ-005",
+      "E-RQ-008",
+      "E-RQ-010"
+    ],
+    "acceptance": [
+      "E-AC-002",
+      "E-AC-004",
+      "E-AC-005",
+      "E-AC-011"
+    ]
+  }
+}

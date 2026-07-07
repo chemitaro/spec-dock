@@ -1,0 +1,23 @@
+{
+  "command": "uv run python scripts/authoring-pack/stage_chatgpt_authoring_pack.py --review-report spec-dock/active/issue/artifacts/20260707t020429z-negative-probe-dogfood/stage-attempt-stale-review/stale-review-report-for-stage.json --pack-tree spec-dock/active/issue/artifacts/20260707t020429z-negative-probe-dogfood/stage-attempt-stale-review --issue-dir spec-dock/active/issue --output-dir spec-dock/active/issue/artifacts/20260707t020429z-negative-probe-dogfood/stage-attempt-stale-review-command-check",
+  "returncode": 3,
+  "stdout": {
+    "errors": [
+      "review report status is not pass: stale"
+    ],
+    "output_dir": "stage-attempt-stale-review-command-check",
+    "staged_artifact_count": 0,
+    "status": "stale"
+  },
+  "stderr": "",
+  "observed": {
+    "status": "stale",
+    "staged_artifact_count": 0,
+    "adoption_eligible": false
+  },
+  "trace_authority": {
+    "issue_evidence_trace": "staging-report.json#/review/trace",
+    "issue_evidence_issue_id": "iss-00290",
+    "top_level_trace_note": "staging-report.json#/trace is the stage helper's own contract trace from iss-00286 and is not used as iss-00290 evidence authority"
+  }
+}

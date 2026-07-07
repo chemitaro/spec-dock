@@ -1,0 +1,25 @@
+{
+  "authority": "evidence_only",
+  "adoption_status": "unreviewed",
+  "bundle_generation_not_promotion": true,
+  "schema_version": "1",
+  "issue_id": "iss-00290",
+  "target": {
+    "profile": "strict",
+    "template_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "skeleton_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "section_inventory_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "profile_suggestion": {
+    "profile": "strict",
+    "advisory_only": true,
+    "rationale": "negative probe should not mutate local authority"
+  },
+  "section_fills": [
+    {
+      "section_id": "purpose",
+      "body": "iss-00290 negative probe candidate body.",
+      "body_sha256": "08a5ec15ae8d2e88faaf7bc94aca4b6b8b668eabb676a1f271a5d4144239fba8"
+    }
+  ]
+}
