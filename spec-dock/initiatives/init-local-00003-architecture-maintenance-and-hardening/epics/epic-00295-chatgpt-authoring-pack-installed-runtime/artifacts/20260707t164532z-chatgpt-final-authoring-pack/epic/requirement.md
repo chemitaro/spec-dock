@@ -1,12 +1,16 @@
 ---
-種別: 要件定義書（Epic）
+種別: "要件定義書（Epic draft）"
 ID: "epic-00295"
 タイトル: "ChatGPT Authoring Pack Installed Runtime"
 関連GitHub: ["#295"]
-状態: "draft"
-作成者: "iwasawayuuta"
-最終更新: "2026-07-08"
+状態: "adoption-candidate"
+作成者: "ChatGPT"
+最終更新: "2026-07-07"
+依存: []
 親: ["init-local-00003"]
+authority: "evidence_only"
+adoption_status: "unreviewed"
+bundle_generation_not_promotion: true
 ---
 
 # epic-00295 ChatGPT Authoring Pack Installed Runtime — 要件定義
