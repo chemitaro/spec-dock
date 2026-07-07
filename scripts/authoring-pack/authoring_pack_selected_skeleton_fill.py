@@ -834,9 +834,17 @@ def _unsafe_metadata_error(value: Any) -> str | None:
     text = json.dumps(_metadata_without_section_bodies(value), ensure_ascii=False, sort_keys=True)
     if _unsafe_text_error(text):
         return "candidate fill metadata contains unsafe authority claim"
-    if isinstance(value, dict) and "authorized_profile" in value:
+    if _contains_key(value, "authorized_profile"):
         return "candidate fill must not set authorized_profile"
     return None
+
+
+def _contains_key(value: Any, key: str) -> bool:
+    if isinstance(value, dict):
+        return key in value or any(_contains_key(item, key) for item in value.values())
+    if isinstance(value, list):
+        return any(_contains_key(item, key) for item in value)
+    return False
 
 
 def _metadata_without_section_bodies(value: Any) -> Any:

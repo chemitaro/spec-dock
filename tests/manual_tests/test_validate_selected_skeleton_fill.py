@@ -547,6 +547,22 @@ def test_candidate_authorized_profile_field_is_rejected(tmp_path) -> None:
     assert report["status"] == "rejected"
 
 
+def test_nested_candidate_authorized_profile_field_is_rejected(tmp_path) -> None:
+    payload = candidate_payload()
+    payload["target"]["authorized_profile"] = "strict"
+    pack_root = write_pack_tree(tmp_path / "pack", payload)
+    review_report = write_review_report(tmp_path / "review.json", pack_root)
+    assurance = write_assurance(tmp_path / "issue/.assurance.json")
+    selected_skeleton = write_selected_skeleton(tmp_path / "selected-skeleton.json")
+
+    result = run_validate(review_report, pack_root, assurance, selected_skeleton, tmp_path / "validation")
+
+    assert result.returncode == 4
+    report = read_json(tmp_path / "validation/selected-skeleton-fill-validation-report.json")
+    assert report["status"] == "rejected"
+    assert "candidate fill must not set authorized_profile" in report["errors"]
+
+
 def test_unsafe_authority_claim_in_candidate_metadata_is_rejected(tmp_path) -> None:
     payload = candidate_payload(
         profile_suggestion={

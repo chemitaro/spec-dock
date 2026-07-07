@@ -121,7 +121,27 @@ def write_pass_review_report(tmp_path: Path, pack_tree: Path) -> Path:
     return report_path
 
 
-def write_review_report(path: Path, *, status: str = "pass") -> Path:
+def pack_digest(pack_root: Path) -> dict:
+    files: dict[str, str] = {}
+    for path in sorted(pack_root.rglob("*")):
+        if path.is_dir():
+            continue
+        relative = path.relative_to(pack_root).as_posix()
+        files[f"specdock-authoring-pack/{relative}"] = path.read_text(encoding="utf-8")
+    digest = hashlib.sha256()
+    for rel_path in sorted(files):
+        digest.update(rel_path.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(files[rel_path].encode("utf-8"))
+        digest.update(b"\0")
+    return {
+        "algorithm": "sha256",
+        "content_sha256": digest.hexdigest(),
+        "file_count": len(files),
+    }
+
+
+def write_review_report(path: Path, *, status: str = "pass", pack_tree: Path | None = None) -> Path:
     payload = {
         "authority": "evidence_only",
         "adoption_status": "unreviewed",
@@ -138,11 +158,15 @@ def write_review_report(path: Path, *, status: str = "pass") -> Path:
         "sources": [],
     }
     if status == "pass":
-        payload["pack_digest"] = {
-            "algorithm": "sha256",
-            "content_sha256": "0" * 64,
-            "file_count": 1,
-        }
+        payload["pack_digest"] = (
+            pack_digest(pack_tree)
+            if pack_tree is not None
+            else {
+                "algorithm": "sha256",
+                "content_sha256": "0" * 64,
+                "file_count": 1,
+            }
+        )
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
 
@@ -329,7 +353,7 @@ def test_adoption_map_becomes_unreviewed_eal_candidates(tmp_path) -> None:
         ({"target_path": "../requirement.md"}, "../requirement.md"),
         ({"target_path": "/tmp/requirement.md"}, "/tmp/requirement.md"),
         ({"target_path": ".assurance.json"}, ".assurance.json"),
-        ({"target_path": "config/token.md"}, "config/token.md"),
+        ({"target_path": "notes.md"}, "notes.md"),
         ({"target_path": "report.md"}, "report.md"),
         ({"write_mode": "direct"}, "direct"),
     ],
@@ -347,7 +371,7 @@ def test_unsafe_target_or_direct_write_is_rejected(
         items=[item],
         candidates={"drafts/requirement.md": "# Requirement\n\nnew\n"},
     )
-    review_report = write_pass_review_report(tmp_path, pack_tree)
+    review_report = write_review_report(tmp_path / "validation-report.json", pack_tree=pack_tree)
     output_dir = tmp_path / "stage"
 
     result = run_stage(review_report, pack_tree, issue_dir, output_dir)
@@ -428,7 +452,7 @@ def test_diagnostics_redact_unsafe_paths_secrets_and_raw_transcripts(tmp_path) -
         items=[stage_item("drafts/requirement.md", "requirement.md")],
         candidates={"drafts/requirement.md": f"# Requirement\n\n{leaked_payload}\n"},
     )
-    review_report = write_pass_review_report(tmp_path, pack_tree)
+    review_report = write_review_report(tmp_path / "validation-report.json", pack_tree=pack_tree)
     output_dir = tmp_path / "stage"
 
     result = run_stage(review_report, pack_tree, issue_dir, output_dir)
