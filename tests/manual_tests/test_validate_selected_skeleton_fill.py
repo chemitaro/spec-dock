@@ -228,10 +228,141 @@ def test_valid_fill_passes_with_advisory_profile_suggestion_and_no_mutation(tmp_
     assert report["adoption"]["overall_adoption_eligible"] is True
     assert report["adoption"]["canonical_written"] is False
     assert report["adoption"]["assurance_mutated"] is False
+    dry_run = read_json(output_dir / "selected-skeleton-fill-dry-run.json")
+    assert dry_run["status"] == "pass"
+    assert dry_run["authority"] == "evidence_only"
+    assert dry_run["adoption_status"] == "unreviewed"
+    assert dry_run["canonical_written"] is False
+    assert dry_run["assurance_mutated"] is False
+    assert dry_run["eligible_section_ids"] == ["purpose"]
+    assert dry_run["missing_optional_section_ids"] == ["notes"]
+    assert dry_run["staged_sections"] == [
+        {
+            "section_id": "purpose",
+            "status": "eligible",
+            "body_sha256": sha256_text("選択済みスケルトンに沿った候補本文です。"),
+            "canonical_written": False,
+        }
+    ]
     assert assurance.read_bytes() == assurance_before
     assert selected_skeleton.read_bytes() == skeleton_before
     for path, before in canonical_before.items():
         assert path.read_bytes() == before
+
+
+def test_selected_skeleton_parent_trace_drives_validation_report_trace(tmp_path) -> None:
+    pack_root = write_pack_tree(tmp_path / "pack", candidate_payload(issue_id="iss-00289"))
+    review_report = write_review_report(tmp_path / "review.json", pack_root)
+    assurance = write_assurance(tmp_path / "issue/.assurance.json")
+    selected_skeleton = write_selected_skeleton(
+        tmp_path / "selected-skeleton.json",
+        issue_id="iss-00289",
+        parent_trace={
+            "issue_id": "iss-00289",
+            "parent_epic": "epic-00283",
+            "requirements": ["E-RQ-008", "E-RQ-009", "E-RQ-010"],
+            "acceptance": ["E-AC-005", "E-AC-006", "E-AC-010", "E-AC-011"],
+        },
+    )
+
+    result = run_validate(review_report, pack_root, assurance, selected_skeleton, tmp_path / "validation")
+
+    assert result.returncode == 0, result.stderr
+    report = read_json(tmp_path / "validation/selected-skeleton-fill-validation-report.json")
+    assert report["trace"] == {
+        "issue_id": "iss-00289",
+        "parent_epic": "epic-00283",
+        "requirements": ["E-RQ-008", "E-RQ-009", "E-RQ-010"],
+        "acceptance": ["E-AC-005", "E-AC-006", "E-AC-010", "E-AC-011"],
+    }
+    assert report["inputs"]["selected_skeleton"]["trace"] == report["trace"]
+    dry_run = read_json(tmp_path / "validation/selected-skeleton-fill-dry-run.json")
+    assert dry_run["trace"] == report["trace"]
+
+
+def test_selected_skeleton_parent_trace_issue_mismatch_fails(tmp_path) -> None:
+    pack_root = write_pack_tree(tmp_path / "pack")
+    review_report = write_review_report(tmp_path / "review.json", pack_root)
+    assurance = write_assurance(tmp_path / "issue/.assurance.json")
+    selected_skeleton = write_selected_skeleton(
+        tmp_path / "selected-skeleton.json",
+        parent_trace={
+            "issue_id": "iss-99999",
+            "parent_epic": "epic-00283",
+            "requirements": ["E-RQ-008"],
+            "acceptance": ["E-AC-005"],
+        },
+    )
+
+    result = run_validate(review_report, pack_root, assurance, selected_skeleton, tmp_path / "validation")
+
+    assert result.returncode == 1
+    report = read_json(tmp_path / "validation/selected-skeleton-fill-validation-report.json")
+    assert report["status"] == "fail"
+    assert "selected-skeleton.parent_trace.issue_id must match selected-skeleton.issue_id" in report["errors"]
+
+
+@pytest.mark.parametrize(
+    ("trace", "expected_error", "unsafe_payload"),
+    [
+        ("not-an-object", "selected-skeleton.parent_trace must be an object when present", None),
+        (
+            {"issue_id": "iss-00287", "parent_epic": "epic-00283", "requirements": "E-RQ-008", "acceptance": []},
+            "selected-skeleton.parent_trace.requirements must be a string array when present",
+            None,
+        ),
+        (
+            {
+                "issue_id": "iss-00287",
+                "parent_epic": "epic-00283",
+                "requirements": ["spec-reviewer passed"],
+                "acceptance": ["E-AC-005"],
+            },
+            "selected-skeleton.parent_trace contains unsafe text",
+            "spec-reviewer passed",
+        ),
+        (
+            {
+                "issue_id": "iss-00287",
+                "parent_epic": "epic-00283",
+                "requirements": ["raw transcript: browser transcript"],
+                "acceptance": ["E-AC-005"],
+            },
+            "selected-skeleton.parent_trace contains unsafe text",
+            "raw transcript",
+        ),
+        (
+            {
+                "issue_id": "iss-00287",
+                "parent_epic": "epic-00283",
+                "requirements": ["/Users/example/project"],
+                "acceptance": ["E-AC-005"],
+            },
+            "selected-skeleton.parent_trace contains unsafe text",
+            "/Users/example/project",
+        ),
+    ],
+)
+def test_selected_skeleton_parent_trace_invalid_inputs_fail_closed(
+    tmp_path,
+    trace: object,
+    expected_error: str,
+    unsafe_payload: str | None,
+) -> None:
+    pack_root = write_pack_tree(tmp_path / "pack")
+    review_report = write_review_report(tmp_path / "review.json", pack_root)
+    assurance = write_assurance(tmp_path / "issue/.assurance.json")
+    selected_skeleton = write_selected_skeleton(tmp_path / "selected-skeleton.json", parent_trace=trace)
+    output_dir = tmp_path / "validation"
+
+    result = run_validate(review_report, pack_root, assurance, selected_skeleton, output_dir)
+
+    assert result.returncode == 1
+    report = read_json(output_dir / "selected-skeleton-fill-validation-report.json")
+    assert report["status"] == "fail"
+    assert expected_error in report["errors"]
+    if unsafe_payload is not None:
+        assert_no_leak(result, output_dir, unsafe_payload)
 
 
 @pytest.mark.parametrize(
@@ -338,6 +469,11 @@ def test_extra_section_is_rejected(tmp_path) -> None:
     report = read_json(tmp_path / "validation/selected-skeleton-fill-validation-report.json")
     assert report["status"] == "rejected"
     assert report["section_inventory_validation"]["extra_section_ids"] == ["outside"]
+    dry_run = read_json(tmp_path / "validation/selected-skeleton-fill-dry-run.json")
+    assert dry_run["status"] == "rejected"
+    assert dry_run["staged_sections"] == []
+    assert [section["section_id"] for section in dry_run["non_adoptable_sections"]] == ["purpose", "outside"]
+    assert all(section["adoption_eligible"] is False for section in dry_run["non_adoptable_sections"])
 
 
 def test_missing_required_section_fails(tmp_path) -> None:
@@ -352,6 +488,11 @@ def test_missing_required_section_fails(tmp_path) -> None:
     report = read_json(tmp_path / "validation/selected-skeleton-fill-validation-report.json")
     assert report["status"] == "fail"
     assert report["section_inventory_validation"]["missing_section_ids"] == ["purpose"]
+    dry_run = read_json(tmp_path / "validation/selected-skeleton-fill-dry-run.json")
+    assert dry_run["status"] == "fail"
+    assert dry_run["missing_section_ids"] == ["purpose"]
+    assert dry_run["staged_sections"] == []
+    assert dry_run["non_adoptable_sections"] == []
 
 
 @pytest.mark.parametrize(
@@ -383,6 +524,12 @@ def test_unsafe_authority_claim_in_section_body_is_rejected(tmp_path, claim: str
     report = read_json(tmp_path / "validation/selected-skeleton-fill-validation-report.json")
     assert report["status"] == "rejected"
     assert report["section_results"][0]["unsafe_claim_detected"] is True
+    dry_run = read_json(tmp_path / "validation/selected-skeleton-fill-dry-run.json")
+    assert dry_run["status"] == "rejected"
+    assert dry_run["staged_sections"] == []
+    assert dry_run["non_adoptable_sections"][0]["section_id"] == "purpose"
+    assert dry_run["non_adoptable_sections"][0]["status"] == "rejected"
+    assert dry_run["non_adoptable_sections"][0]["adoption_eligible"] is False
 
 
 def test_candidate_authorized_profile_field_is_rejected(tmp_path) -> None:

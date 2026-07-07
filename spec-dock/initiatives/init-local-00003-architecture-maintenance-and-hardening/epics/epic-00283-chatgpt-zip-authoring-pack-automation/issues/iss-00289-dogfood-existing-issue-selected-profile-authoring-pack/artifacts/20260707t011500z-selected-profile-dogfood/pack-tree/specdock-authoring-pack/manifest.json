@@ -1,0 +1,8 @@
+{
+  "adoption_status": "unreviewed",
+  "authority": "evidence_only",
+  "bundle_generation_not_promotion": true,
+  "expected_zip_root": "specdock-authoring-pack/",
+  "pack_id": "iss-00289-selected-profile-dogfood",
+  "schema_version": "1"
+}

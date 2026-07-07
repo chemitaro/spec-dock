@@ -16,12 +16,14 @@ ID: "iss-00289"
 
 - 現在地:
   - ChatGPT ZIP 仕様作成パック由来の Issue-local draft artifacts を evidence-only handoff として配置済み。採否判断済みの内容は `requirement.md` / `design.md` / `plan.md` へ canonical Issue specs として再記述済み。
-  - 実装は未着手。
+  - ChatGPT Use follow-up セッション `required-repository-connector-context-github-6` の助言を evidence-only planning input として採用し、selected-profile dogfood fixture / ZIP review report / validation report / section-level dry-run report を作成済み。
+  - `review_chatgpt_authoring_pack.py` は preflight trace を report に反映できるようになり、`validate_selected_skeleton_fill.py` は selected skeleton の trace と section-level dry-run adoption report を出力できるようになった。
+  - raw ZIP は repo に commit せず、展開済み pack tree、ZIP digest manifest、review / validation / dry-run reports を `artifacts/20260707t011500z-selected-profile-dogfood/` に保存済み。
   - Issue 単位の fresh `spec-reviewer` gate は `019f3999-911a-7381-8155-3cda5fcf3403` で pass 済み。
 - 次のマイルストーン:
-  - 依存順に従って Issue execution / implementation planning へ進む。
+  - focused tests / `spec-dock validate` / `git diff --check` と fresh final reviewers を通し、local completion 可能なら `issue finish` する。
 - ブロッカー:
-  - 現時点で仕様 authoring を止める blocker はない。
+  - 現時点で実装を止める blocker はない。
 
 ## 証跡採用台帳（Evidence Adoption Ledger）
 
@@ -30,12 +32,16 @@ ID: "iss-00289"
 | EAL-001 | `adopted` | ChatGPT ZIP authoring pack draft | `requirement.md` | 親 Epic の Issue candidate draft を Issue scope / AC / non-scope として正本化した。 | `artifacts/20260706t151020z-draft-requirement-draft-requirement-from-authoring-pack.md` | execute approved plan |
 | EAL-002 | `adopted` | ChatGPT ZIP authoring pack draft | `design.md` | draft-design の責務境界、入出力契約、失敗設計、観測性、テスト戦略を canonical design として再記述した。 | `artifacts/20260706t151020z-01-draft-design-draft-design-from-authoring-pack.md` | execute approved plan |
 | EAL-003 | `adopted` | ChatGPT ZIP authoring pack draft | `plan.md` | draft-plan の実装ステップ、検証計画、リスク、完了条件を canonical implementation plan として再記述した。 | `artifacts/20260706t151020z-02-draft-plan-draft-plan-from-authoring-pack.md` | execute approved plan |
+| EAL-004 | `adopted` | ChatGPT Use follow-up planning evidence | implementation focus | selected-profile dogfood は validator 本体の大幅拡張ではなく、trace / dry-run report / durable evidence を補強する方針が妥当と確認した。artifact 自体は evidence-only であり、reviewer pass や canonical adoption の代替ではない。 | `artifacts/20260707t010930z-chatgpt-use-planning-summary.md` | adopted as implementation evidence; no further action |
+| EAL-005 | `adopted` | selected-profile dogfood fixture | dogfood evidence | local assurance selected skeleton だけを ChatGPT fill candidate が埋め、profile suggestion は authority に使われないことを検証した。artifact 内の `adoption_status: unreviewed` は維持し、canonical rewrite には使っていない。 | `artifacts/20260707t011500z-selected-profile-dogfood/validation/selected-skeleton-fill-validation-report.json` | adopted as dogfood evidence; no canonical adoption |
+| EAL-006 | `adopted` | section-level dry-run adoption report | staged adoption candidate | section-level dry-run が `canonical_written: false` / `assurance_mutated: false` を出し、正本直接上書きなしで reviewer input を残すことを確認した。staged sections は evidence-only である。 | `artifacts/20260707t011500z-selected-profile-dogfood/validation/selected-skeleton-fill-dry-run.json` | adopted as dry-run evidence; staged artifact remains evidence-only |
 
 ## 目的整合台帳（Objective Alignment Ledger）
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
 | iss-00289 specs | `requirement.md` の目的 / 親 Epic trace / AC | `design.md` と `plan.md` の権威境界、失敗設計、検証計画 | 低。ChatGPT 出力は evidence-only handoff として保持し、採否判断済みの内容だけを canonical docs へ再記述済みである。 | pass |
+| selected-profile dogfood | `validation/selected-skeleton-fill-validation-report.json` の `trace` / `profile_validation` / `skeleton_validation` | `validation/selected-skeleton-fill-dry-run.json` の `canonical_written: false` / `assurance_mutated: false` | 低。ChatGPT の `profile_suggestion` は warning として記録され、`profile_suggestion_used_for_authority: false` が出力される。 | pass |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate）
 
@@ -50,7 +56,7 @@ ID: "iss-00289"
 | field | value |
 |---|---|
 | authorization source | ユーザーの SpecDock workflow / ChatGPT Use / reviewer gate 利用依頼 |
-| repo/worktree | `/Users/iwasawayuuta/.codex/worktrees/aa9c/spec-dock` |
+| repo/worktree | `chemitaro/spec-dock` current Issue branch checkout |
 | active scope | `epic-00283` / `iss-00289` |
 | named roles | `spec-reviewer`, `code-reviewer`, `qa-reviewer`, `dev-coder`, `doc-writer`, `spec-manager` as required by plan |
 | boundary | canonical docs は main orchestrator single-writer。sub-agent / ChatGPT output は evidence であり、reviewer pass や local authority の代替にしない。 |
@@ -63,24 +69,82 @@ ID: "iss-00289"
 | local authorized_profile | `standard` |
 | assurance status | `provisional` |
 | Epic obligation | strict 相当の追加 obligation |
-| specialist / fallback evidence | Issue execution 開始前に specialist evidence または manual fallback evidence を `report.md` へ記録する。strict 相当 Issue では skip reason だけを readiness evidence としない。 |
+| specialist / fallback evidence | ChatGPT Use planning evidence、ZIP review pass、selected skeleton validation pass、section-level dry-run report、focused tests を manual fallback evidence として記録する。strict 相当 Issue では skip reason だけを readiness evidence としない。 |
 | promotion rule | `.assurance.json` / `authorized_profile` は ChatGPT 推奨や Epic 側の推奨で上書きしない。 |
 
 | profile | required_or_fallback | usage | evidence | reviewer_verdict | readiness |
 |---|---|---|---|---|---|
 | standard | manual fallback | used | manual evidence: fresh spec-reviewer `019f3999-911a-7381-8155-3cda5fcf3403` passed and canonical docs were integrated by main orchestrator | pass | ready |
+| standard | manual fallback | used | execution evidence: ChatGPT Use follow-up `required-repository-connector-context-github-6`; ZIP review pass; selected skeleton validation pass; dry-run report generated; focused tests and final reviewers passed | pass | ready |
 
 ## Reviewer Gate Status
 
 | gate | required state | current state | promotion / completion decision |
 |---|---|---|---|
-| spec-reviewer | fresh `passed` | passed: fresh `spec-reviewer` 019f3999-911a-7381-8155-3cda5fcf3403 | pass まで execution-ready としない |
-| code-reviewer | required if implementation diff or risk profile warrants; final Epic-wide gate is owned by `iss-00293` | not yet run | code / runtime / tests / scaffold behavior diff がある場合は pass まで閉じない |
-| qa-reviewer | required if implementation diff or risk profile warrants; final Epic-wide gate is owned by `iss-00293` | not yet run | test adequacy / manual matrix risk がある場合は pass まで閉じない |
+| spec-reviewer | fresh `passed` | planning pass: `019f3999-911a-7381-8155-3cda5fcf3403`; execution pass: `019f3a43-f3e2-7df1-906a-6fe97194f2b7` | P1 dependency evidence findings were remediated; no P0/P1 blocker remains. |
+| code-reviewer | fresh `passed` if implementation diff or risk profile warrants; final Epic-wide gate is owned by `iss-00293` | passed: `019f3a38-46d2-7bf0-88b5-2d3f1ca2f6d8` | P0/P1 blocker なし。trace / path / final count findings は修正済み。 |
+| qa-reviewer | fresh `passed` if implementation diff or risk profile warrants; final Epic-wide gate is owned by `iss-00293` | passed: `019f3a38-6704-7ef0-a565-337bdc17f30e` | P0/P1 blocker なし。dry-run / trace / final evidence gaps は修正済み。 |
 
 | phase | gate | reviewer_role | freshness | state | risk_acceptance | promotion_decision | evidence |
 |---|---|---|---|---|---|---|---|
 | planning | spec-authoring | spec-reviewer | fresh | pass | no | execute approved plan | fresh pass `019f3999-911a-7381-8155-3cda5fcf3403` |
+| execution | code-review | code-reviewer | fresh | pass | no | continue final QA | fresh pass `019f3a38-46d2-7bf0-88b5-2d3f1ca2f6d8` |
+| execution | spec-review | spec-reviewer | fresh | pass | no | execute approved plan / issue finish ready | fresh pass `019f3a43-f3e2-7df1-906a-6fe97194f2b7`; prior dependency evidence findings were remediated |
+| execution | qa-review | qa-reviewer | fresh | pass | no | local completion ready | fresh pass `019f3a38-6704-7ef0-a565-337bdc17f30e`; prior QA P1/P2 findings were remediated by final evidence and trace safety tests |
+
+## ChatGPT Use Planning Evidence
+
+| field | value |
+|---|---|
+| initial session | `specdock-iss-00289-planning` |
+| initial result | completed but non-actionable; answer only stated that repository access would be checked |
+| follow-up session | `required-repository-connector-context-github-6` |
+| adopted recommendation | keep this Issue dogfood-only; add durable fixture / validation report / section-level dry-run report / report evidence; do not promote runtime command |
+| full browser conversation log | not committed |
+| durable summary | `artifacts/20260707t010930z-chatgpt-use-planning-summary.md` |
+
+## Selected-Profile Dogfood Execution Evidence
+
+| field | value |
+|---|---|
+| dogfood artifact root | `artifacts/20260707t011500z-selected-profile-dogfood/` |
+| durable pack tree | `artifacts/20260707t011500z-selected-profile-dogfood/pack-tree/specdock-authoring-pack/` |
+| ZIP digest manifest | `artifacts/20260707t011500z-selected-profile-dogfood/zip-fixture-manifest.json` |
+| raw ZIP committed | `false` |
+| preflight | `artifacts/20260707t011500z-selected-profile-dogfood/preflight.json` |
+| local assurance snapshot | `artifacts/20260707t011500z-selected-profile-dogfood/local-assurance-snapshot.json` |
+| selected skeleton | `artifacts/20260707t011500z-selected-profile-dogfood/selected-skeleton.json` |
+| review report | `artifacts/20260707t011500z-selected-profile-dogfood/review/validation-report.json` |
+| selected skeleton validation | `artifacts/20260707t011500z-selected-profile-dogfood/validation/selected-skeleton-fill-validation-report.json` |
+| section-level dry run | `artifacts/20260707t011500z-selected-profile-dogfood/validation/selected-skeleton-fill-dry-run.json` |
+| local authorized_profile | `standard` |
+| candidate profile_suggestion | `strict`; advisory only, ignored for authority |
+| validation status | `pass` |
+| dry-run status | `pass` |
+| missing optional sections | `missing-section-report` |
+| canonical_written | `false` |
+| assurance_mutated | `false` |
+| reviewer_pass_claimed | `false` |
+| trace | `iss-00289` / `epic-00283` / E-RQ-008, E-RQ-009, E-RQ-010 / E-AC-005, E-AC-006, E-AC-010, E-AC-011 |
+
+## Final Verification Evidence
+
+| command / check | result | evidence |
+|---|---|---|
+| ChatGPT Use initial planning | completed, but non-actionable | `specdock-iss-00289-planning` returned only a next-step statement; not used as implementation authority |
+| ChatGPT Use follow-up planning | completed, adopted as evidence-only | `required-repository-connector-context-github-6`; durable summary `artifacts/20260707t010930z-chatgpt-use-planning-summary.md` |
+| ZIP review | pass | `python scripts/authoring-pack/review_chatgpt_authoring_pack.py --input <untracked zip> --preflight artifacts/20260707t011500z-selected-profile-dogfood/preflight.json --output-dir artifacts/20260707t011500z-selected-profile-dogfood/review` -> `status: pass` |
+| selected skeleton validation | pass | `python scripts/authoring-pack/validate_selected_skeleton_fill.py --review-report artifacts/20260707t011500z-selected-profile-dogfood/review/validation-report.json --pack-tree artifacts/20260707t011500z-selected-profile-dogfood/pack-tree/specdock-authoring-pack --assurance .assurance.json --selected-skeleton artifacts/20260707t011500z-selected-profile-dogfood/selected-skeleton.json --output-dir artifacts/20260707t011500z-selected-profile-dogfood/validation` -> `status: pass` |
+| focused authoring-pack tests | pass | `uv run pytest tests/manual_tests/test_prepare_chatgpt_authoring_pack.py tests/manual_tests/test_review_chatgpt_authoring_pack.py tests/manual_tests/test_stage_chatgpt_authoring_pack.py tests/manual_tests/test_validate_selected_skeleton_fill.py tests/manual_tests/test_validate_issue_candidates.py` -> `201 passed` |
+| focused ruff check | pass | `uv run ruff check scripts/authoring-pack/authoring_pack_review.py scripts/authoring-pack/authoring_pack_selected_skeleton_fill.py tests/manual_tests/test_review_chatgpt_authoring_pack.py tests/manual_tests/test_validate_selected_skeleton_fill.py` -> `All checks passed!` |
+| focused format check | pass | `uv run ruff format --check scripts/authoring-pack/authoring_pack_review.py scripts/authoring-pack/authoring_pack_selected_skeleton_fill.py tests/manual_tests/test_review_chatgpt_authoring_pack.py tests/manual_tests/test_validate_selected_skeleton_fill.py` -> `4 files already formatted` |
+| whitespace diff check | pass | `git diff --check` -> no output |
+| dependency readiness | pass | `./spec-dock/scripts/spec-dock deps check iss-00289` -> `source=github`, `stale=false`, `ready=true`, `blockers=0`; `./spec-dock/scripts/spec-dock deps check --no-github iss-00289` -> `source=cache`, `stale=true`, `ready=true`, `blockers=0` |
+| SpecDock structural validation | pass | `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=189` |
+| assurance verification | pass | `./spec-dock/scripts/spec-dock assurance verify` -> `authorized_profile: standard`, `lite_authorized: false`, `reason: ok` |
+| code-reviewer | pass | `019f3a38-46d2-7bf0-88b5-2d3f1ca2f6d8` |
+| spec-reviewer | pass | `019f3a43-f3e2-7df1-906a-6fe97194f2b7`; prior dependency evidence findings were remediated |
+| qa-reviewer | pass | `019f3a38-6704-7ef0-a565-337bdc17f30e`; no findings; prior dry-run / trace / final evidence gaps resolved |
 
 ## Delegated Draft Evidence
 
@@ -104,24 +168,28 @@ ID: "iss-00289"
 ## 受け入れ条件（AC）の達成状況
 
 - AC-001〜AC-004:
-  - Not started。仕様作成済み、実装未着手。
+  - Pass。dogfood preflight / review report / validation report / dry-run report が `iss-00289` / `epic-00283` / E-RQ-008, E-RQ-009, E-RQ-010 / E-AC-005, E-AC-006, E-AC-010, E-AC-011 へ trace できる。
+  - Pass。`authority: evidence_only`、`adoption_status: unreviewed`、`bundle_generation_not_promotion: true` を維持し、ChatGPT output を reviewer pass や正本採用として扱っていない。
+  - Pass。local validation / canonical rewrite / fresh reviewer gate が引き続き必須であることを dry-run `next_action` と EAL に残した。
+  - Pass。review report、validation report、dry-run report により reviewer が adoption 可否を独立に確認できる。
 - AC-005〜AC-006:
-  - Not started。仕様作成済み、実装未着手。
+  - Pass。selected skeleton と candidate target の profile / template hash / skeleton hash / section inventory hash が一致する場合だけ `overall_adoption_eligible: true` になる。
+  - Pass。section-level dry run が eligible section、optional missing section、canonical write なし、`.assurance.json` mutation なしを出力する。
 
 
 ## Closure Evidence Ledger
 
 | closure id | status | required evidence | current evidence | next_action |
 |---|---|---|---|---|
-| tc-001 | pending | 親 Epic trace / 依存 Issue / local assurance 確認 | 未実施 | Issue execution で記録する |
-| tc-002 | pending | Issue 固有成果物 / 正本直接上書きなし | 未実施 | Issue execution で記録する |
-| tc-003 | pending | 正常系 / negative fixture / validation status | 未実施 | Issue execution で記録する |
-| tc-004 | pending | docs impact / EAL / Closure Delta | 未実施 | S90 で記録する |
-| tc-005 | pending | `spec-dock validate` / 関連テスト / fresh reviewer result | 未実施 | S99 で記録する |
+| tc-001 | pass | 親 Epic trace / 依存 Issue / local assurance 確認 | dogfood reports が `iss-00289` / `epic-00283` / E-RQ-008, E-RQ-009, E-RQ-010 / E-AC-005, E-AC-006, E-AC-010, E-AC-011 へ trace。local `authorized_profile` は `standard`。依存 output は `iss-00286` の staged artifact / EAL candidate 境界と `iss-00287` の selected skeleton fill validation を前提にし、今回の dogfood では review / selected skeleton validation / section-level dry-run を再実行済み。`deps check iss-00289` は GitHub refresh ありで `source=github`, `stale=false`, `ready=true`, `blockers=0`。offline cache fallback も `ready=true`, `blockers=0`。 | S02 evidence 参照 |
+| tc-002 | pass | Issue 固有成果物 / 正本直接上書きなし | `artifacts/20260707t011500z-selected-profile-dogfood/` に pack tree、ZIP digest manifest、review report、validation report、dry-run report を保存。raw ZIP は未 commit。canonical docs 直接上書きなし。 | S03 evidence 参照 |
+| tc-003 | pass | 正常系 / negative fixture / validation status | 正常系: ZIP review `pass`、selected skeleton validation `pass`、dry-run `pass`。既存 focused tests が profile mismatch / hash mismatch / missing required / extra section / unsafe claim / pack digest mismatch を fail-closed で確認する。 | S90 へ進む |
+| tc-004 | pass | docs impact / EAL / Closure Delta | README に dry-run report 出力を明記。EAL-004〜EAL-006 を追加。runtime docs / provider runtime の変更は scope 外として no-op。 | S99 へ進む |
+| tc-005 | pass | `spec-dock validate` / 関連テスト / fresh reviewer result | final verification table に `201 passed`、ruff、format、`git diff --check`、dependency readiness、`spec-dock validate`、`assurance verify`、code-reviewer pass、spec-reviewer pass、qa-reviewer pass を記録済み。 | `issue finish` へ進む |
 
 ## フォローアップ
 
-- spec-reviewer pass 後、Epic plan の依存順に従って実装対象として扱う。
+- `iss-00293` の PR 作成前に、ユーザー補足に基づき ChatGPT Use / Oracle 実行の個人環境絶対パス依存を解消する backend command adapter / invocation contract を Epic plan または final Issue specs に追加し、最終品質ゲート対象に含める。
 
 ## 省略 / 例外メモ
 
@@ -132,5 +200,6 @@ ID: "iss-00289"
 
 | ID | decision | status | evidence | next_action |
 |---|---|---|---|---|
-| SID-iss-00289-001 | Issue-local draft artifacts は evidence-only handoff として保持し、採否判断済みの内容を canonical `design.md` / `plan.md` へ再記述した。 | accepted | Epic EAL-008b / EAL-008c / EAL-009; Issue-local `artifacts/*from-authoring-pack.md` | fresh reviewer gate を実行する |
+| SID-iss-00289-001 | Issue-local draft artifacts は evidence-only handoff として保持し、採否判断済みの内容を canonical `design.md` / `plan.md` へ再記述した。 | accepted | Epic EAL-008b / EAL-008c / EAL-009; Issue-local `artifacts/*from-authoring-pack.md` | reviewer gate completed |
 | SID-iss-00289-002 | リレー実行方針は draft-plan artifact の補足として保持し、この Issue 単独では PR を作成しない。 | accepted | Epic `plan.md` リレー実行 / PR 方針; draft-plan のリレー節 | 実装完了後に `issue finish` し、次 Issue を `issue start` する |
+| SID-iss-00289-003 | selected-profile dogfood の durable evidence では raw ZIP を repo に commit せず、展開済み pack tree、ZIP digest manifest、review / validation / dry-run reports を証跡として残す。 | accepted | `artifacts/20260707t011500z-selected-profile-dogfood/zip-fixture-manifest.json`; `review/validation-report.json`; `validation/selected-skeleton-fill-dry-run.json` | reviewer gate completed |

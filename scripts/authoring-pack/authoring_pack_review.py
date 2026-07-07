@@ -63,6 +63,13 @@ HOST_PATH_MARKERS = (
     ".oracle",
 )
 
+RAW_TRANSCRIPT_MARKERS = (
+    "raw transcript",
+    "chatgpt transcript",
+    "browser transcript",
+    "conversation transcript",
+)
+
 ALLOWED_TEXT_SUFFIXES = {".json", ".md", ".txt"}
 NESTED_ARCHIVE_SUFFIXES = (
     ".zip",
@@ -352,6 +359,26 @@ def _validate_preflight_shape(preflight: dict[str, Any]) -> list[str]:
         errors.append("preflight safe_output_constraints must be an object")
     elif not isinstance(safe_constraints.get("forbidden_claims"), list):
         errors.append("preflight forbidden_claims must be an array")
+    errors.extend(_optional_trace_errors(preflight.get("trace")))
+    return errors
+
+
+def _optional_trace_errors(value: Any) -> list[str]:
+    if value is None:
+        return []
+    errors: list[str] = []
+    if not isinstance(value, dict):
+        return ["preflight trace must be an object when present"]
+    for field in ("issue_id", "parent_epic"):
+        if not isinstance(value.get(field), str) or not value[field]:
+            errors.append(f"preflight trace.{field} is required when trace is present")
+    for field in ("requirements", "acceptance"):
+        items = value.get(field)
+        if not isinstance(items, list) or not all(isinstance(item, str) and item for item in items):
+            errors.append(f"preflight trace.{field} must be a string array when trace is present")
+    trace_text = json.dumps(value, ensure_ascii=False, sort_keys=True)
+    if _unsafe_text_error(trace_text):
+        errors.append("preflight trace contains unsafe text")
     return errors
 
 
@@ -756,17 +783,13 @@ def _base_result(
     pack_digest: dict[str, Any] | None = None,
     sources: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    trace = _result_trace(preflight)
     return {
         **AUTHORITY_BOUNDARY,
         "status": status,
         "generated_at": generated_at,
         "input_kind": input_kind,
-        "trace": {
-            "issue_id": "iss-00285",
-            "parent_epic": "epic-00283",
-            "requirements": ["E-RQ-004", "E-RQ-005"],
-            "acceptance": ["E-AC-002", "E-AC-003", "E-AC-004"],
-        },
+        "trace": trace,
         "preflight": _preflight_snapshot(preflight or {}),
         "entries": entries or [],
         "pack_digest": pack_digest or {},
@@ -776,6 +799,23 @@ def _base_result(
         "deferred": _safe_diagnostic_value(deferred or []),
         "sources": sources or [],
         "status_taxonomy": _status_taxonomy(),
+    }
+
+
+def _result_trace(preflight: dict[str, Any] | None) -> dict[str, Any]:
+    if preflight:
+        trace = preflight.get("trace")
+        if isinstance(trace, dict):
+            return _safe_diagnostic_value(trace)
+    return _default_trace()
+
+
+def _default_trace() -> dict[str, Any]:
+    return {
+        "issue_id": "iss-00285",
+        "parent_epic": "epic-00283",
+        "requirements": ["E-RQ-004", "E-RQ-005"],
+        "acceptance": ["E-AC-002", "E-AC-003", "E-AC-004"],
     }
 
 
@@ -971,9 +1011,18 @@ def _preflight_snapshot(preflight: dict[str, Any]) -> dict[str, Any]:
     return {
         "status": _safe_diagnostic_value(preflight.get("status")),
         "repository": _safe_diagnostic_value(preflight.get("repository", {})),
+        "trace": _trace_snapshot(preflight.get("trace")),
         "source_count": len(preflight.get("sources", [])) if isinstance(preflight.get("sources"), list) else 0,
         "safe_output_constraints": _safe_diagnostic_value(preflight.get("safe_output_constraints", {})),
     }
+
+
+def _trace_snapshot(value: Any) -> dict[str, Any]:
+    if value is None:
+        return _default_trace()
+    if not isinstance(value, dict) or _optional_trace_errors(value):
+        return {"invalid": True}
+    return _safe_diagnostic_value(value)
 
 
 def _summary_markdown(result: dict[str, Any]) -> str:
@@ -1050,6 +1099,26 @@ def _safe_diagnostic_string(value: str) -> str:
     ):
         return "<redacted>"
     return value
+
+
+def _unsafe_text_error(value: str) -> str | None:
+    normalized = _normalize_claim_text(value)
+    if any(claim in normalized for claim in _forbidden_claims({"safe_output_constraints": {"forbidden_claims": []}})):
+        return "unsafe authority claim rejected"
+    lowered = value.lower()
+    if (
+        any(marker in value for marker in HOST_PATH_MARKERS)
+        or _looks_like_unsafe_path(value)
+        or "begin private key" in lowered
+        or "openssh private key" in lowered
+        or "private key" in lowered
+        or "secret" in lowered
+        or "token" in lowered
+        or "credential" in lowered
+        or any(marker in lowered for marker in RAW_TRANSCRIPT_MARKERS)
+    ):
+        return "unsafe text rejected"
+    return None
 
 
 def _looks_like_unsafe_path(value: str) -> bool:

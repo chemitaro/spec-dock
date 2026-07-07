@@ -10,7 +10,7 @@ The helpers in this directory are not SpecDock runtime commands and are not ship
 - Generate a prompt pack only when preflight status is `pass`.
 - Review a returned ChatGPT ZIP or an already isolated tree before any local adoption work.
 - Stage a passing reviewed tree into dry-run diffs, fixed-name staged artifacts, and unreviewed EAL candidates.
-- Validate selected-profile skeleton section fills against local assurance and selected skeleton evidence.
+- Validate selected-profile skeleton section fills against local assurance and selected skeleton evidence, then render a section-level dry-run adoption report without writing canonical docs.
 - Validate candidate-only Epic-to-Issue output as issue candidates with advisory profile recommendations only.
 - Keep ChatGPT output as `authority: evidence_only`.
 - Keep `authorized_profile` controlled by local assurance, not ChatGPT.

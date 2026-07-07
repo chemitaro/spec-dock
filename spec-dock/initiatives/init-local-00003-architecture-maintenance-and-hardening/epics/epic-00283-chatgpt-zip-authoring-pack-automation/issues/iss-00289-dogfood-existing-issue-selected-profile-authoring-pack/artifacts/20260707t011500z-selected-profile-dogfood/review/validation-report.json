@@ -1,0 +1,151 @@
+{
+  "adoption_status": "unreviewed",
+  "authority": "evidence_only",
+  "bundle_generation_not_promotion": true,
+  "checks": [
+    {
+      "name": "authoring-pack-review",
+      "status": "pass"
+    }
+  ],
+  "deferred": [],
+  "entries": [
+    {
+      "compress_size": 215,
+      "is_dir": false,
+      "mode": 33152,
+      "path": "specdock-authoring-pack/adoption/adoption-map.json",
+      "size_bytes": 418
+    },
+    {
+      "compress_size": 164,
+      "is_dir": false,
+      "mode": 33152,
+      "path": "specdock-authoring-pack/manifest.json",
+      "size_bytes": 240
+    },
+    {
+      "compress_size": 157,
+      "is_dir": false,
+      "mode": 33152,
+      "path": "specdock-authoring-pack/provenance.json",
+      "size_bytes": 228
+    },
+    {
+      "compress_size": 855,
+      "is_dir": false,
+      "mode": 33152,
+      "path": "specdock-authoring-pack/selected-skeleton-fill/section-fills.json",
+      "size_bytes": 1724
+    },
+    {
+      "compress_size": 458,
+      "is_dir": false,
+      "mode": 33152,
+      "path": "specdock-authoring-pack/source-manifest.json",
+      "size_bytes": 1314
+    },
+    {
+      "compress_size": 256,
+      "is_dir": false,
+      "mode": 33152,
+      "path": "specdock-authoring-pack/stale-if.json",
+      "size_bytes": 854
+    }
+  ],
+  "errors": [],
+  "generated_at": "2026-07-07T01:16:39Z",
+  "input_kind": "zip",
+  "pack_digest": {
+    "algorithm": "sha256",
+    "content_sha256": "6784eafa345c27457b74366b87d2c5ff9938bac4b5d4342451495a0b8a590a22",
+    "file_count": 6
+  },
+  "preflight": {
+    "repository": {
+      "full_name": "chemitaro/spec-dock",
+      "observed_ref": "iss-00289-dogfood-existing-issue-selected-profile-authoring-pack",
+      "requested_ref": "iss-00289-dogfood-existing-issue-selected-profile-authoring-pack"
+    },
+    "safe_output_constraints": {
+      "expected_zip_root": "specdock-authoring-pack/",
+      "forbidden_claims": [
+        "spec-reviewer passed",
+        "reviewer pass",
+        "adoption_status: adopted",
+        "<redacted>",
+        "pull request created",
+        "implementation complete",
+        "canonical overwrite",
+        "authority: canonical",
+        "qa-reviewer passed",
+        "code-reviewer passed"
+      ]
+    },
+    "source_count": 4,
+    "status": "pass",
+    "trace": {
+      "acceptance": [
+        "E-AC-005",
+        "E-AC-006",
+        "E-AC-010",
+        "E-AC-011"
+      ],
+      "issue_id": "iss-00289",
+      "parent_epic": "epic-00283",
+      "requirements": [
+        "E-RQ-008",
+        "E-RQ-009",
+        "E-RQ-010"
+      ]
+    }
+  },
+  "sources": [
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00289-dogfood-existing-issue-selected-profile-authoring-pack/requirement.md",
+      "role": "issue-requirement",
+      "sha256": "a39a6cd1d5ddcf2aa22960e621767413c22c615db12b1b4327c28a26d2b23b4c"
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00289-dogfood-existing-issue-selected-profile-authoring-pack/design.md",
+      "role": "issue-design",
+      "sha256": "0a6b1e79ddaeaffecf8b4ef692679ef6ecfbe743ba6327908a09568dcf5170b5"
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00289-dogfood-existing-issue-selected-profile-authoring-pack/plan.md",
+      "role": "issue-plan",
+      "sha256": "aaa9ccce2e404133dac40ac6b701b59098af0afd3b9d0727f9b0e0ed4171f7bb"
+    },
+    {
+      "path": "scripts/authoring-pack/validate_selected_skeleton_fill.py",
+      "role": "selected-fill-validator",
+      "sha256": "3b506af716aca224c677645733b1fe98ead25fe8bd20cac3cba5fe3f9a95a9a8"
+    }
+  ],
+  "status": "pass",
+  "status_taxonomy": {
+    "blocked": "Required local observation or filesystem operation is unavailable.",
+    "deferred": "Recognized later-stage responsibility; never treated as pass.",
+    "fail": "Input shape, schema, expected root, or required metadata is invalid.",
+    "pass": "Validation passed; adoption remains unreviewed.",
+    "rejected": "A safety boundary was violated.",
+    "stale": "Preflight, source, or stale_if snapshot no longer matches.",
+    "unreviewed": "Artifact adoption state, not a validator execution status."
+  },
+  "trace": {
+    "acceptance": [
+      "E-AC-005",
+      "E-AC-006",
+      "E-AC-010",
+      "E-AC-011"
+    ],
+    "issue_id": "iss-00289",
+    "parent_epic": "epic-00283",
+    "requirements": [
+      "E-RQ-008",
+      "E-RQ-009",
+      "E-RQ-010"
+    ]
+  },
+  "warnings": []
+}

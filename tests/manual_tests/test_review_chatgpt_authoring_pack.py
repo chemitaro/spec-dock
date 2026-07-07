@@ -216,6 +216,92 @@ def test_valid_zip_generates_pass_report(tmp_path) -> None:
     assert (output_dir / "validation-summary.md").exists()
 
 
+def test_preflight_trace_drives_review_report_trace(tmp_path) -> None:
+    data = preflight_data()
+    data["trace"] = {
+        "issue_id": "iss-00289",
+        "parent_epic": "epic-00283",
+        "requirements": ["E-RQ-008", "E-RQ-009", "E-RQ-010"],
+        "acceptance": ["E-AC-005", "E-AC-006", "E-AC-010", "E-AC-011"],
+    }
+    preflight = write_preflight(tmp_path, data)
+    zip_path = write_zip(tmp_path / "valid.zip", pack_files())
+    output_dir = tmp_path / "review"
+
+    result = run_review(zip_path, preflight, output_dir)
+
+    assert result.returncode == 0, result.stderr
+    report = read_json(output_dir / "validation-report.json")
+    assert report["trace"] == data["trace"]
+    assert report["preflight"]["trace"] == data["trace"]
+
+
+@pytest.mark.parametrize(
+    ("trace", "expected_error", "unsafe_payload"),
+    [
+        ("not-an-object", "preflight trace must be an object when present", None),
+        (
+            {"issue_id": "iss-00289", "parent_epic": "epic-00283", "requirements": "E-RQ-008", "acceptance": []},
+            "preflight trace.requirements must be a string array when trace is present",
+            None,
+        ),
+        (
+            {
+                "issue_id": "iss-00289",
+                "parent_epic": "epic-00283",
+                "requirements": ["spec-reviewer passed"],
+                "acceptance": ["E-AC-005"],
+            },
+            "preflight trace contains unsafe text",
+            "spec-reviewer passed",
+        ),
+        (
+            {
+                "issue_id": "iss-00289",
+                "parent_epic": "epic-00283",
+                "requirements": ["raw transcript: browser transcript"],
+                "acceptance": ["E-AC-005"],
+            },
+            "preflight trace contains unsafe text",
+            "raw transcript",
+        ),
+        (
+            {
+                "issue_id": "iss-00289",
+                "parent_epic": "epic-00283",
+                "requirements": ["/Users/example/project"],
+                "acceptance": ["E-AC-005"],
+            },
+            "preflight trace contains unsafe text",
+            "/Users/example/project",
+        ),
+    ],
+)
+def test_preflight_trace_invalid_inputs_fail_closed(
+    tmp_path,
+    trace: object,
+    expected_error: str,
+    unsafe_payload: str | None,
+) -> None:
+    data = preflight_data()
+    data["trace"] = trace
+    if unsafe_payload is not None:
+        data["safe_output_constraints"]["forbidden_claims"] = []
+    preflight = write_preflight(tmp_path, data)
+    zip_path = write_zip(tmp_path / "valid.zip", pack_files())
+    output_dir = tmp_path / "review"
+
+    result = run_review(zip_path, preflight, output_dir)
+
+    assert result.returncode == 1
+    report = read_json(output_dir / "validation-report.json")
+    assert report["status"] == "fail"
+    assert expected_error in report["errors"]
+    if unsafe_payload is not None:
+        assert_no_leak(result, unsafe_payload)
+        assert unsafe_payload not in (output_dir / "validation-report.json").read_text(encoding="utf-8")
+
+
 def test_valid_tree_generates_pass_report_with_tree_mode_note(tmp_path) -> None:
     preflight = write_preflight(tmp_path)
     tree = write_tree(tmp_path / "tree", pack_files())
