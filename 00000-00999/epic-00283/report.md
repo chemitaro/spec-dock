@@ -23,7 +23,7 @@ ID: "epic-00283"
   - 2026-07-07 のユーザー補足に基づき、`iss-00293` の PR 作成前 gate に ChatGPT Use / Oracle backend command adapter / invocation contract の実装・検証を追加し、S04 として実装 / focused verification 済み。
   - local assurance は全 Issue `standard` / `provisional` であり、ChatGPT 推奨や Epic 側のリスク判断で `.assurance.json` / `authorized_profile` を上書きしない。strict 推奨 Issue には strict 相当の追加 obligation を Issue plan に記録済み。
   - authoring-pack helper、dogfood scenarios、workflow docs、metrics decision material は `iss-00284`〜`iss-00292` で段階的に実装 / 記録済み。backend command adapter は `iss-00293` S04 で実装 / focused verification 済み。
-  - `iss-00293` で先行 Issue 完了 matrix、Epic manual test matrix、final local verification を記録済み。full baseline は snapshot 修正後に `1910 passed, 74 skipped` で通過した。mergeable PR 作成 / CI / review / merge preparation は `iss-00293` の残作業。
+  - `iss-00293` で先行 Issue 完了 matrix、Epic manual test matrix、final local verification を記録済み。full baseline は snapshot 修正後に `1910 passed, 74 skipped` で通過した。PR #294 は作成済みで、初回観測では Provider CI / mypy failure が出たため、manual test helper の型修正を local repair として実施済み。CI / review / mergeable の再観測は残作業。
 - 次のマイルストーン:
   - fresh `spec-reviewer` gate `019f3999-911a-7381-8155-3cda5fcf3403` が pass し、`iss-00284`〜`iss-00293` を後続 Issue execution-ready に向けた reviewable planning package として扱える状態になった。
 - ブロッカー:
@@ -50,7 +50,7 @@ ID: "epic-00283"
 | EAL-010 | `adopted` | ChatGPT Use / GPT-5.5 Pro Extended readiness review | Epic / Issue specs | P1 findings を修正対象として採用した。ChatGPT output は reviewer pass ではなく、canonical docs の更新 input として扱う。 | `artifacts/20260706t164600z-research-chatgpt-authoring-pack-readiness-review.md` | 修正後に fresh `spec-reviewer` review |
 | EAL-011 | `adopted` | user supplemental requirement | Epic `plan.md`; `iss-00293` specs | SpecDock 正式ワークフローやスクリプトが個人環境固有の ChatGPT Use / Oracle wrapper 絶対パスに依存しないよう、backend command adapter / invocation contract を `iss-00293` の PR 作成前品質ゲートへ追加した。 | user instruction 2026-07-07; Epic `plan.md`; `issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/*`; `scripts/authoring-pack/invoke_chatgpt_backend.py`; `tests/manual_tests/test_invoke_chatgpt_backend.py` | implemented in `iss-00293` S04; include in final reviewer / PR gate |
 | EAL-012 | `partially_adopted` | `iss-00292` dogfood metrics / runtime criteria artifacts | Epic `report.md`; `iss-00293` handoff | dogfood metrics と promote / defer / reject criteria は判断材料として採用するが、runtime promotion approval は採用しない。backend adapter readiness、manual fallback exercise、human edit burden、aggregate reviewer loop は `iss-00293` または後続判断へ残す。 | `issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/artifacts/20260707t031203z-dogfood-metrics-and-runtime-criteria/`; `issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/report.md` | `iss-00293` final quality gate で再評価する |
-| EAL-013 | `adopted` | `iss-00293` final local verification | Epic `report.md`; PR readiness evidence | `iss-00293` final gate で、先行 Issue 完了、manual matrix、backend adapter、snapshot correction、full baseline を確認した。PR / CI / mergeable 証跡は PR 作成後に追記する。 | `issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/report.md`; `tests/unit/infra/test_init_update.py`; `uv run pytest` -> `1910 passed, 74 skipped` | create PR and record merge preparation evidence |
+| EAL-013 | `adopted` | `iss-00293` final local verification | Epic `report.md`; PR readiness evidence | `iss-00293` final gate で、先行 Issue 完了、manual matrix、backend adapter、snapshot correction、full baseline を確認した。PR #294 初回観測の Provider CI / mypy failure は local repair 済みで、再 push / 再観測へ進める。 | `issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/report.md`; `tests/unit/infra/test_init_update.py`; `uv run pytest` -> `1910 passed, 74 skipped`; `make lint` -> pass after repair; focused manual tests -> `130 passed` | push repair and record merge preparation evidence |
 
 ## 目的整合台帳（Objective Alignment Ledger）
 
@@ -130,7 +130,8 @@ ID: "epic-00283"
   - Issue-local `draft-requirement` / `draft-design` / `draft-plan` artifact を配置済み。
   - canonical `requirement.md` / `design.md` / `plan.md` / `report.md` を具体化済み。
 - PR / Release:
-  - 未作成。PR 作成は `iss-00293` の execution scope に集約する。
+  - PR #294: `https://github.com/chemitaro/spec-dock/pull/294`
+  - 初回 PR 観測では Provider CI / mypy が失敗したため、`iss-00293` の修正ループで manual test helper の型修正を実施した。再 push / 再観測後に merge preparation gate を更新する。
 
 ## 受け入れ条件（E-AC）の達成状況
 
@@ -144,7 +145,7 @@ ID: "epic-00283"
   - `iss-00284`〜`iss-00292` は GitHub 上で CLOSED、`iss-00293` は OPEN で PR delivery を担当する。
   - `./spec-dock/scripts/spec-dock deps check iss-00293` は `ready=true` / `blockers=0`。
   - `uv run pytest` は初回、checked-in dogfooding `.meta.json` snapshot に `epic-00283` / `iss-00284`〜`iss-00293` が未登録だったため 1 failed。snapshot を更新後、targeted rerun は `1 passed`、full rerun は `1910 passed, 74 skipped`。
-  - PR URL、CI / review、mergeable status は未記録であり、`iss-00293` の PR delivery / merge preparation gate で追記する。
+  - PR #294 を作成済み。初回観測では `validate` check は pass、Provider CI は `make lint` / mypy で fail。local repair 後に `make lint`、focused manual tests、`spec-dock validate`、`git diff --check` は pass。再 push / 再観測で CI / review / mergeable status を確定する。
 
 ## フォローアップ（別Issue化）
 
