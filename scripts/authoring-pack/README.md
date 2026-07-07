@@ -11,6 +11,7 @@ The helpers in this directory are not SpecDock runtime commands and are not ship
 - Review a returned ChatGPT ZIP or an already isolated tree before any local adoption work.
 - Stage a passing reviewed tree into dry-run diffs, fixed-name staged artifacts, and unreviewed EAL candidates.
 - Validate selected-profile skeleton section fills against local assurance and selected skeleton evidence.
+- Validate candidate-only Epic-to-Issue output as issue candidates with advisory profile recommendations only.
 - Keep ChatGPT output as `authority: evidence_only`.
 - Keep `authorized_profile` controlled by local assurance, not ChatGPT.
 
@@ -51,4 +52,15 @@ python scripts/authoring-pack/validate_selected_skeleton_fill.py \
   --assurance spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00287-implement-profile-controlled-selected-skeleton-fill-validation/.assurance.json \
   --selected-skeleton /tmp/specdock-authoring-pack/iss-00287-selected-skeleton.json \
   --output-dir /tmp/specdock-authoring-pack/iss-00287-selected-fill-validation
+```
+
+```bash
+python scripts/authoring-pack/validate_issue_candidates.py \
+  --review-report /tmp/specdock-authoring-pack/iss-00285-review/validation-report.json \
+  --pack-tree /tmp/specdock-authoring-pack/iss-00288-extract/specdock-authoring-pack \
+  --expected-parent-epic epic-00283 \
+  --expected-requirement E-RQ-011 \
+  --expected-acceptance E-AC-007 \
+  --expected-acceptance E-AC-011 \
+  --output-dir /tmp/specdock-authoring-pack/iss-00288-issue-candidates
 ```
