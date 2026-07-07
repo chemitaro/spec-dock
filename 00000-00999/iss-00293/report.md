@@ -16,6 +16,7 @@ ID: "iss-00293"
 - 状態: 未着手。
 - 目的: Epic 全体の品質ゲート、手動テスト、Pull Request 作成、レビュー / CI 指摘対応、mergeable 確認を最後に集約する。
 - 前提: `iss-00284` から `iss-00292` までを順番に完了し、この Issue で PR を作成または更新する。
+- 追加責務: PR 作成前に ChatGPT Use / Oracle 実行まわりの個人環境絶対パス依存を解消し、backend command adapter / invocation contract を品質ゲート対象に含める。
 
 ## 実行証跡
 
@@ -35,6 +36,7 @@ ID: "iss-00293"
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
 | EAL-001 | adopted | Epic plan / user workflow decision | `requirement.md`; `design.md`; `plan.md`; `report.md` | `iss-00293` は final quality gate / PR delivery / merge preparation を集約する Issue として必要である。 | Epic `plan.md`; this Issue `requirement.md`; `design.md`; `plan.md` | execute approved plan |
+| EAL-002 | adopted | user supplemental requirement | Epic `plan.md`; this Issue `requirement.md`; `design.md`; `plan.md`; `report.md` | SpecDock の正式ワークフローやスクリプトが個人環境の ChatGPT Use / Oracle wrapper 絶対パスに依存すると他環境で再現できないため、PR 作成前の final gate に backend command adapter / invocation contract を追加する。 | user instruction on 2026-07-07; amended Epic and Issue docs | fresh spec-reviewer gate before execution |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate）
 
@@ -49,7 +51,7 @@ ID: "iss-00293"
 | field | value |
 |---|---|
 | authorization source | ユーザーの SpecDock workflow / ChatGPT Use / reviewer gate 利用依頼 |
-| repo/worktree | `/Users/iwasawayuuta/.codex/worktrees/aa9c/spec-dock` |
+| repo/worktree | `chemitaro/spec-dock` future final gate branch checkout |
 | active scope | `epic-00283` / `iss-00293` |
 | named roles | `spec-reviewer`, `code-reviewer`, `qa-reviewer`, `dev-coder`, `doc-writer`, `spec-manager` as required by plan |
 | boundary | canonical docs は main orchestrator single-writer。sub-agent / ChatGPT output は evidence であり、reviewer pass や local authority の代替にしない。 |
@@ -73,13 +75,14 @@ ID: "iss-00293"
 
 | gate | required state | current state | promotion / completion decision |
 |---|---|---|---|
-| spec-reviewer | fresh `passed` | passed: fresh `spec-reviewer` 019f3999-911a-7381-8155-3cda5fcf3403 | pass まで execution-ready としない |
+| spec-reviewer | fresh `passed` | planning pass: `019f3999-911a-7381-8155-3cda5fcf3403`; backend adapter amendment pass: `019f3a4c-0104-7562-bd52-a5bd9154057f` | backend adapter contract amendment は P0/P1 blocker なし。final execution 後に fresh gate を再実行する。 |
 | code-reviewer | required in this Issue final gate | not yet run | code / runtime / tests / scaffold behavior diff がある場合は pass まで閉じない |
 | qa-reviewer | required in this Issue final gate | not yet run | test adequacy / manual matrix risk がある場合は pass まで閉じない |
 
 | phase | gate | reviewer_role | freshness | state | risk_acceptance | promotion_decision | evidence |
 |---|---|---|---|---|---|---|---|
 | planning | spec-authoring | spec-reviewer | fresh | pass | no | execute approved plan | fresh pass `019f3999-911a-7381-8155-3cda5fcf3403` |
+| planning-amendment | backend-adapter-contract | spec-reviewer | fresh | pass | no | execute amended plan | fresh pass `019f3a4c-0104-7562-bd52-a5bd9154057f` |
 
 ## Delegated Draft Evidence
 
@@ -100,6 +103,7 @@ ID: "iss-00293"
 |---|---|---|---|---|
 | PR Delivery Gate | `iss-00293` | PR URL、selected base、head branch / SHA、issue linkage、existing PR reuse / new PR creation decision | 未実施 | `iss-00292` 完了後、この Issue execution で記録する |
 | Merge Preparation Gate | `iss-00293` | required checks、non-required checks / waiver、blocking review、merge conflict、unresolved blockers、final merge-prepared decision | 未実施 | PR 作成 / 更新後に記録する |
+| Backend Adapter Gate | `iss-00293` | backend command adapter / invocation contract、未設定 fail-closed、設定時 command 解決、個人環境絶対パス非直書き確認 | 未実施 | PR 作成前に実装 / 検証して記録する |
 | Epic report update | `iss-00293` | Epic report の final gate evidence、manual test matrix、review / CI correction summary | 未実施 | S90 / S99 で記録する |
 
 ## Closure Evidence Ledger
@@ -109,9 +113,10 @@ ID: "iss-00293"
 | tc-001 | pending | 先行 Issue 完了 / scope isolation | 未実施 | `iss-00292` 完了後に確認する |
 | tc-002 | pending | `spec-dock validate` / `git diff --check` / 関連テスト | 未実施 | final gate execution で記録する |
 | tc-003 | pending | Epic manual test matrix | 未実施 | final gate execution で記録する |
-| tc-004 | pending | PR URL / CI / review / mergeable status | 未実施 | PR 作成後に記録する |
-| tc-005 | pending | Epic / Issue report 更新 / docs impact | 未実施 | S90 で記録する |
-| tc-006 | pending | fresh reviewer results / blocker disposition | 未実施 | S99 で記録する |
+| tc-004 | pending | backend command adapter / invocation contract | 未実施 | PR 作成前に記録する |
+| tc-005 | pending | PR URL / CI / review / mergeable status | 未実施 | PR 作成後に記録する |
+| tc-006 | pending | Epic / Issue report 更新 / docs impact | 未実施 | S90 で記録する |
+| tc-007 | pending | fresh reviewer results / blocker disposition | 未実施 | S99 で記録する |
 
 ## 残リスク
 
@@ -125,3 +130,4 @@ ID: "iss-00293"
 | SID-iss-00293-001 | `iss-00293` は Epic 最後の品質ゲート / manual test / PR 作成 / mergeable 確認を担当する final gate Issue として扱う。 | accepted | Epic `plan.md` C09 -> C10; `requirement.md`; `design.md`; `plan.md` | `iss-00292` 完了後に開始する |
 | SID-iss-00293-002 | 個別 Issue ごとに PR を作成せず、PR 作成と CI / review 修正はこの Issue に集約する。 | accepted | Epic `plan.md` リレー実行 / PR 方針; EAL-009 | PR 作成時に PR URL、CI、review、mergeable 状態を記録する |
 | SID-iss-00293-003 | 品質ゲートで見つかった不具合は、Epic スコープ内の最小修正としてこの Issue で扱う。 | accepted | `requirement.md` AC-006 / AC-009; `design.md` 不具合修正ループ | 修正、再検証、再 push の証跡を残す |
+| SID-iss-00293-004 | PR 作成前に、SpecDock 側の ChatGPT backend command adapter / invocation contract を実装または検証し、個人環境 wrapper 絶対パスを正式ワークフローの必須依存にしない。 | accepted | user supplemental requirement; EAL-002; amended `requirement.md`; `design.md`; `plan.md` | `iss-00293` execution の S04 で実装 / 検証する |

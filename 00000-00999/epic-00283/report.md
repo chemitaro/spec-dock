@@ -19,6 +19,7 @@ ID: "epic-00283"
   - Epic `requirement.md` / `design.md` / `plan.md` は具体化済み。
   - `iss-00284`〜`iss-00292` の canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は、Issue-local draft artifacts を evidence-only input として main orchestrator が採否判断し、正本へ再記述済み。
   - `iss-00293` は、Epic 最後の品質ゲート、manual test evidence、PR 作成、CI / review 修正、mergeable 確認を担当する final gate Issue として作成済み。
+  - 2026-07-07 のユーザー補足に基づき、`iss-00293` の PR 作成前 gate に ChatGPT Use / Oracle backend command adapter / invocation contract の実装・検証を追加した。
   - local assurance は全 Issue `standard` / `provisional` であり、ChatGPT 推奨や Epic 側のリスク判断で `.assurance.json` / `authorized_profile` を上書きしない。strict 推奨 Issue には strict 相当の追加 obligation を Issue plan に記録済み。
   - 実装と dogfood scripts は未着手。この Epic report は spec authoring / planning package の現状を記録する。
 - 次のマイルストーン:
@@ -45,6 +46,7 @@ ID: "epic-00283"
 | EAL-009 | 採用（`adopted`） | user workflow decision | `plan.md` / `issues/iss-00293-*` | 個別 Issue ごとに PR を作成せず、Issue 完了後に `issue finish` して次 Issue を `issue start` するリレー実行方針を採用した。最終 Issue `iss-00293` が Epic 単位の品質ゲート、manual test evidence、PR 作成、review / CI 修正、mergeable 確認を担当する。 | user instruction 2026-07-07; `plan.md`; `issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/*` | `iss-00293` 実行時に最終証跡を記録する |
 
 | EAL-010 | `adopted` | ChatGPT Use / GPT-5.5 Pro Extended readiness review | Epic / Issue specs | P1 findings を修正対象として採用した。ChatGPT output は reviewer pass ではなく、canonical docs の更新 input として扱う。 | `artifacts/20260706t164600z-research-chatgpt-authoring-pack-readiness-review.md` | 修正後に fresh `spec-reviewer` review |
+| EAL-011 | `adopted` | user supplemental requirement | Epic `plan.md`; `iss-00293` specs | SpecDock 正式ワークフローやスクリプトが個人環境固有の ChatGPT Use / Oracle wrapper 絶対パスに依存しないよう、backend command adapter / invocation contract を `iss-00293` の PR 作成前品質ゲートへ追加した。 | user instruction 2026-07-07; Epic `plan.md`; `issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/*` | `iss-00293` execution の S04 で実装 / 検証する |
 
 ## 目的整合台帳（Objective Alignment Ledger）
 
@@ -104,6 +106,7 @@ ID: "epic-00283"
 | SID-epic-00283-001 | `iss-00284`〜`iss-00292` の Issue-local draft artifacts は evidence-only handoff であり、採否判断済みの内容だけを canonical Issue docs へ再記述する。 | accepted | EAL-008b / EAL-008c; Issue report SID entries | 後続 Issue execution-ready 確認へ進める |
 | SID-epic-00283-002 | 個別 Issue ごとに Pull Request を作成せず、実装完了後は `issue finish` して次 Issue を `issue start` するリレー実行とする。 | accepted | EAL-009; Epic `plan.md` リレー実行 / PR 方針; `iss-00293` specs | `iss-00284` から順番に実行し、PR は `iss-00293` に集約する |
 | SID-epic-00283-003 | `iss-00293` は Epic 最後の品質ゲート、manual test evidence、PR 作成、CI / review 修正、mergeable 確認を担当する。 | accepted | `iss-00293` requirement / design / plan / report; assurance classify result | `iss-00292` 完了後に開始する |
+| SID-epic-00283-004 | ChatGPT Use / Oracle 実行の backend command は SpecDock repo に直書きされた個人環境絶対パスではなく、設定で差し替え可能な invocation contract として扱う。 | accepted | EAL-011; amended Epic `plan.md`; amended `iss-00293` docs | `iss-00293` の PR 作成前に実装 / 検証する |
 
 ## 完了した Issue / PR / Release
 

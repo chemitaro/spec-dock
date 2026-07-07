@@ -45,6 +45,18 @@ iss-00293 quality gate -> manual tests -> PR -> review/CI fix loop -> mergeable
 
 修正が Epic スコープを超える場合は、この Issue で抱え込まず、残課題として明記する。
 
+## ChatGPT backend invocation contract
+
+SpecDock repo 内の正式ワークフローやスクリプトは、ユーザー個人環境の ChatGPT Use / Oracle wrapper 絶対パスを直接参照しない。Oracle 本体や ChatGPT automation は SpecDock に同梱せず、SpecDock 側は backend command を解決して呼び出す薄い adapter / invocation contract だけを持つ。
+
+- primary 設定: `SPECDOCK_CHATGPT_COMMAND`
+- compatibility fallback: `ORACLE_CHATGPT_COMMAND`
+- 将来の拡張: 必要なら設定ファイルまたは CLI 引数で同じ backend command contract を渡せるようにする。
+- 未設定時: command を推測せず、どの設定が必要かを示す明確なエラーで fail する。
+- 既存のローカル `oracle-chatgpt` wrapper: ユーザー環境で `SPECDOCK_CHATGPT_COMMAND` などに指定できる一例であり、SpecDock repo の必須依存ではない。
+
+この contract は、`iss-00293` の PR 作成前に品質ゲート対象として確認する。検証では、未設定時の fail-closed、設定時の command 解決、個人環境絶対パスの非直書きを確認し、結果を `report.md` に残す。
+
 
 ## 依存関係分析
 
@@ -53,6 +65,7 @@ iss-00293 quality gate -> manual tests -> PR -> review/CI fix loop -> mergeable
 - 実行順: Epic `plan.md` のリレー実行順と handoff prerequisite を前提にする。これは実行上の順序契約であり、現時点では `.meta.json.depends_on` の runtime dependency edge を直接更新しない。
 - 権威境界: ChatGPT output、ZIP、staged artifact は evidence-only であり、canonical `requirement.md` / `design.md` / `plan.md` / `report.md` への反映は main orchestrator の採否判断と reviewer gate を通す。
 - 実装境界: この Issue は最終品質ゲートと PR delivery を所有し、先行 Issue の実装 slice を再定義しない。欠陥修正は owning Issue の allowed paths に戻して bounded に扱う。
+- ChatGPT backend 境界: SpecDock は backend command の解決と fail-closed 契約だけを所有し、Oracle / ChatGPT automation 本体や個人環境 wrapper の配布を所有しない。
 
 ## Module Dependency Diagram
 
@@ -90,9 +103,11 @@ spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/ep
 `-- report.md                             # final gate evidence ledger
 spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/
 `-- report.md                             # Epic-level final quality gate summary
-# Bounded defect fixes stay in the prior owning Issue's allowed paths.
+scripts/authoring-pack/                  # backend command adapter / invocation contract when implemented by this Issue
+tests/manual_tests/                       # adapter contract tests when implemented by this Issue
+# Other bounded defect fixes stay in the prior owning Issue's allowed paths.
 ```
 
-- 通常の許可パス: `iss-00293/report.md`, Epic `report.md`, PR / manual-test evidence artifacts; bounded fixes are limited to the allowed paths of the prior Issue that owns the defect。
+- 通常の許可パス: `iss-00293/report.md`, Epic `report.md`, PR / manual-test evidence artifacts; backend command adapter / invocation contract の実装と検証に必要な `scripts/authoring-pack/**` と `tests/manual_tests/**`; その他の bounded fixes は prior owning Issue の allowed paths に限定する。
 - `src/spec_dock/**` と `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/**` は v1 の通常許可 path ではない。配布 runtime へ昇格する場合は、`iss-00292` の判断材料、plan amendment、fresh reviewer gate を経て明示的に scope を拡張する。
 - generated ZIP / staged artifact は canonical docs を直接上書きしない。
