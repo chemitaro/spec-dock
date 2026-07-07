@@ -1,0 +1,69 @@
+{
+  "adoption_status": "unreviewed",
+  "assurance_snapshot": {
+    "authorized_profile": "standard",
+    "complexity_tier": "normal",
+    "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00290-dogfood-authoring-pack-mismatch-and-stale-probe/.assurance.json",
+    "sha256": "10a7a94b1122d7d972c553ea99cdb3ba6c1a92f124fe1f6e406fe34a844d5f30",
+    "stage": "requirement",
+    "status": "provisional"
+  },
+  "authority": "evidence_only",
+  "bundle_generation_not_promotion": true,
+  "errors": [
+    "source hash mismatch: spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00290-dogfood-authoring-pack-mismatch-and-stale-probe/requirement.md"
+  ],
+  "generated_at": "2026-07-07T02:05:21Z",
+  "issue_id": "iss-00290",
+  "repository": {
+    "full_name": "chemitaro/spec-dock",
+    "observed_full_name": null,
+    "observed_head": "6d446590ed2846d02d3b78257333b94c3caec8db",
+    "observed_ref": "iss-00290-dogfood-authoring-pack-mismatch-and-stale-probe",
+    "requested_ref": "iss-00290-dogfood-authoring-pack-mismatch-and-stale-probe"
+  },
+  "safe_output_constraints": {
+    "expected_zip_root": "specdock-authoring-pack/",
+    "forbidden_claims": [
+      "spec-reviewer passed",
+      "reviewer pass",
+      "adoption_status: adopted",
+      ".assurance.json updated",
+      "pull request created",
+      "implementation complete",
+      "canonical overwrite",
+      "authority: canonical"
+    ],
+    "no_per_issue_pr": true
+  },
+  "sources": [
+    {
+      "line_count": 108,
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00290-dogfood-authoring-pack-mismatch-and-stale-probe/requirement.md",
+      "required": true,
+      "role": "requirement",
+      "sha256": "38edc2baf7da8a059b02477d804909daabc540499b5608ac82389a7180b1d30c",
+      "size_bytes": 5030,
+      "stale_if_changed": true
+    }
+  ],
+  "stale_if": [
+    {
+      "kind": "source_hash_changed",
+      "source_paths": [
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00290-dogfood-authoring-pack-mismatch-and-stale-probe/requirement.md"
+      ]
+    }
+  ],
+  "status": "stale",
+  "status_taxonomy": {
+    "blocked": "Required local observations are unavailable.",
+    "deferred": "The case belongs to a later workflow stage.",
+    "fail": "Inputs are invalid or required sources are missing.",
+    "pass": "Preflight passed and prompt-pack files were generated.",
+    "rejected": "A safety boundary was violated.",
+    "stale": "A source or assurance observation no longer matches the expected snapshot.",
+    "unreviewed": "Adoption state for generated artifacts, not a preflight status."
+  },
+  "warnings": []
+}

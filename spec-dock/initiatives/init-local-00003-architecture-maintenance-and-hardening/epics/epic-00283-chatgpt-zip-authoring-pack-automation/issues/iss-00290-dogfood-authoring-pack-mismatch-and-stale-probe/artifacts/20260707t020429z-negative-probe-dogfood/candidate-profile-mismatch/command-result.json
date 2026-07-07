@@ -1,0 +1,5 @@
+{
+  "returncode": 3,
+  "stdout": "{\"errors\": [\"candidate target.profile does not match local authorized_profile\"], \"output_dir\": \"validation\", \"overall_adoption_eligible\": false, \"status\": \"stale\"}",
+  "stderr": ""
+}

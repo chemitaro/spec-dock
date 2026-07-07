@@ -1,0 +1,173 @@
+{
+  "adoption": {
+    "assurance_mutated": false,
+    "canonical_written": false,
+    "next_action": "manual adoption review; do not treat as reviewer pass",
+    "overall_adoption_eligible": false
+  },
+  "adoption_status": "unreviewed",
+  "authority": "evidence_only",
+  "bundle_generation_not_promotion": true,
+  "candidate": {
+    "issue_id": "iss-00290",
+    "path": "selected-skeleton-fill/section-fills.json",
+    "profile_suggestion": {
+      "advisory_only": true,
+      "ignored_for_authority": true,
+      "profile": "strict"
+    },
+    "section_fill_count": 0,
+    "target_profile": "standard",
+    "target_section_inventory_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "target_skeleton_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "target_template_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "checks": [
+    {
+      "name": "review-report",
+      "status": "pass"
+    },
+    {
+      "name": "pack-digest",
+      "status": "pass"
+    },
+    {
+      "name": "assurance",
+      "status": "pass"
+    },
+    {
+      "name": "selected-skeleton",
+      "status": "pass"
+    },
+    {
+      "name": "candidate-fill",
+      "status": "pass"
+    },
+    {
+      "name": "profile-resolution",
+      "status": "stale"
+    }
+  ],
+  "errors": [
+    "selected skeleton authorized_profile does not match assurance authorized_profile"
+  ],
+  "generated_at": "2026-07-07T02:08:29Z",
+  "inputs": {
+    "assurance_snapshot": {
+      "authorized_profile": "standard",
+      "path": "assurance.json",
+      "sha256": "8567e5f838361152aa0708d8700fdd413c30d3d8af8f7b63c44c4a6529a76d83",
+      "status": "provisional"
+    },
+    "review": {
+      "input_kind": "tree",
+      "pack_digest": {
+        "algorithm": "sha256",
+        "content_sha256": "5459c7ecada8bdadfc030f31229f9e8d88c866fff467fddd1c0aab4a25ad44f7",
+        "file_count": 1
+      },
+      "source_count": 0,
+      "status": "pass",
+      "trace": {
+        "acceptance": [
+          "E-AC-002",
+          "E-AC-004",
+          "E-AC-005",
+          "E-AC-011"
+        ],
+        "issue_id": "iss-00290",
+        "parent_epic": "epic-00283",
+        "requirements": [
+          "E-RQ-005",
+          "E-RQ-008",
+          "E-RQ-010"
+        ]
+      }
+    },
+    "selected_skeleton": {
+      "allowed_section_ids": [
+        "purpose",
+        "notes"
+      ],
+      "authorized_profile": "strict",
+      "issue_id": "iss-00290",
+      "required_section_ids": [
+        "purpose"
+      ],
+      "section_count": 2,
+      "section_inventory_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "skeleton_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "template_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "trace": {
+        "acceptance": [
+          "E-AC-002",
+          "E-AC-004",
+          "E-AC-005",
+          "E-AC-011"
+        ],
+        "issue_id": "iss-00290",
+        "parent_epic": "epic-00283",
+        "requirements": [
+          "E-RQ-005",
+          "E-RQ-008",
+          "E-RQ-010"
+        ]
+      }
+    }
+  },
+  "profile_validation": {
+    "candidate_target_profile": "standard",
+    "local_authorized_profile": "standard",
+    "profile_suggestion_used_for_authority": false,
+    "selected_skeleton_profile": "strict",
+    "target_profile_matches": true
+  },
+  "section_inventory_validation": {
+    "allowed_section_ids": [
+      "purpose",
+      "notes"
+    ],
+    "candidate_section_ids": [],
+    "eligible_section_ids": [],
+    "extra_section_ids": [],
+    "missing_optional_section_ids": [],
+    "missing_section_ids": [],
+    "required_section_ids": [
+      "purpose"
+    ]
+  },
+  "section_results": [],
+  "skeleton_validation": {
+    "section_inventory_sha256_matches": true,
+    "skeleton_sha256_matches": true,
+    "template_sha256_matches": true
+  },
+  "status": "stale",
+  "status_taxonomy": {
+    "blocked": "Required local observation or filesystem operation is unavailable.",
+    "deferred": "Recognized later-stage responsibility; never treated as pass.",
+    "fail": "Input schema or required selected-fill data is invalid.",
+    "pass": "Selected skeleton fill validation passed; adoption remains unreviewed.",
+    "rejected": "A safety boundary, unauthorized authority claim, or extra section fill was detected.",
+    "stale": "Local assurance, selected skeleton, review digest, or candidate target snapshot no longer matches.",
+    "unreviewed": "Artifact adoption state, not an execution status."
+  },
+  "trace": {
+    "acceptance": [
+      "E-AC-002",
+      "E-AC-004",
+      "E-AC-005",
+      "E-AC-011"
+    ],
+    "issue_id": "iss-00290",
+    "parent_epic": "epic-00283",
+    "requirements": [
+      "E-RQ-005",
+      "E-RQ-008",
+      "E-RQ-010"
+    ]
+  },
+  "warnings": [
+    "profile_suggestion differs from local authorized_profile and was ignored for authority"
+  ]
+}
