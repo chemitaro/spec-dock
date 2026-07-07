@@ -65,10 +65,10 @@ def pack_digest(pack_root: Path) -> dict:
         relative = path.relative_to(pack_root).as_posix()
         files[f"specdock-authoring-pack/{relative}"] = path.read_text(encoding="utf-8")
     digest = hashlib.sha256()
-    for path in sorted(files):
-        digest.update(path.encode("utf-8"))
+    for rel_path in sorted(files):
+        digest.update(rel_path.encode("utf-8"))
         digest.update(b"\0")
-        digest.update(files[path].encode("utf-8"))
+        digest.update(files[rel_path].encode("utf-8"))
         digest.update(b"\0")
     return {
         "algorithm": "sha256",
@@ -119,7 +119,7 @@ def write_canonical_docs(root: Path) -> list[Path]:
 
 
 def write_selected_skeleton(path: Path, *, profile: str = "standard", **overrides: object) -> Path:
-    payload = {
+    payload: dict[str, object] = {
         "authority": "local_assurance",
         "issue_id": "iss-00287",
         "authorized_profile": profile,

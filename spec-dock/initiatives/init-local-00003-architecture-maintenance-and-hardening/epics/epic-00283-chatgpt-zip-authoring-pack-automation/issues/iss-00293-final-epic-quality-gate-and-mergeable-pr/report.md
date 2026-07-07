@@ -13,7 +13,7 @@ ID: "iss-00293"
 
 ## 現在の状態
 
-- 状態: 実行中。S01〜S04 と final local verification は実施済み。最終 PR delivery / merge preparation gate は未完了。
+- 状態: 実行中。S01〜S04 と final local verification は実施済み。PR #294 は作成済みだが、初回観測で Provider CI の mypy failure が出たため修正ループ中。
 - 目的: Epic 全体の品質ゲート、手動テスト、Pull Request 作成、レビュー / CI 指摘対応、mergeable 確認を最後に集約する。
 - 前提: `iss-00284` から `iss-00292` までを順番に完了し、この Issue で PR を作成または更新する。
 - 追加責務: PR 作成前に ChatGPT Use / Oracle 実行まわりの個人環境絶対パス依存を解消し、backend command adapter / invocation contract を品質ゲート対象に含める。
@@ -33,9 +33,8 @@ ID: "iss-00293"
   - `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=189`。
   - scoped local wrapper hardcode guard over `scripts/authoring-pack`, `tests/manual_tests`, and active Issue docs -> no matches。
 - Remaining:
-  - PR URL と base/head。
-  - CI / review / mergeable 状態。
-  - PR 作成後のレビュー / CI 指摘と修正再検証。
+  - PR #294 の修正 commit push 後の CI / review / mergeable 再観測。
+  - final issue-wide `spec-reviewer` / `code-reviewer` / `qa-reviewer`。
 
 
 ## 証跡採用台帳（Evidence Adoption Ledger）
@@ -113,8 +112,8 @@ ID: "iss-00293"
 
 | gate | owner | required evidence | current evidence | next_action |
 |---|---|---|---|---|
-| PR Delivery Gate | `iss-00293` | PR URL、selected base、head branch / SHA、issue linkage、existing PR reuse / new PR creation decision | 未実施 | `iss-00292` 完了後、この Issue execution で記録する |
-| Merge Preparation Gate | `iss-00293` | required checks、non-required checks / waiver、blocking review、merge conflict、unresolved blockers、final merge-prepared decision | 未実施 | PR 作成 / 更新後に記録する |
+| PR Delivery Gate | `iss-00293` | PR URL、selected base、head branch / SHA、issue linkage、existing PR reuse / new PR creation decision | PR #294 created for `main` <- `iss-00293-final-epic-quality-gate-and-mergeable-pr`; issue linkage recorded | repair commit push and re-observe new head |
+| Merge Preparation Gate | `iss-00293` | required checks、non-required checks / waiver、blocking review、merge conflict、unresolved blockers、final merge-prepared decision | initial observation failed due Provider CI / mypy; local fix prepared and verified | push repair and re-run observation |
 | Backend Adapter Gate | `iss-00293` | backend command adapter / invocation contract、未設定 fail-closed、設定時 command 解決、個人環境絶対パス非直書き確認 | pass: S04 implemented, reviewer P2/P3 fixed, focused tests and full suite passed | final aggregate reviewer gate で再確認する |
 | Epic report update | `iss-00293` | Epic report の final gate evidence、manual test matrix、review / CI correction summary | partial: S04 evidence reflected; final PR evidence pending | S90 / S99 で記録する |
 
@@ -150,6 +149,26 @@ Supporting commands:
 | full baseline first run | fail -> fixed | `uv run pytest` initially failed 1 test: checked-in dogfooding `.meta.json` snapshot did not include `epic-00283` / `iss-00284`〜`iss-00293` metadata |
 | focused failure rerun | pass | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_initiatives_do_not_ship_legacy_deps_json -q` -> `1 passed in 1.52s` |
 | full baseline after fix | pass | `uv run pytest` -> `1910 passed, 74 skipped in 934.21s (0:15:34)` |
+| PR initial observation | fail -> fixed locally | PR #294 initial observation posted `@codex review`; `validate` check passed but Provider CI failed at `make lint` / mypy for manual test helper typing. |
+| CI failure local reproduction | reproduced | `make lint` reproduced the same mypy failure in `tests/manual_tests/test_review_chatgpt_authoring_pack.py`, `test_stage_chatgpt_authoring_pack.py`, `test_validate_issue_candidates.py`, and `test_validate_selected_skeleton_fill.py`. |
+| CI repair lint | pass | after type-only manual test helper fixes, `make lint` -> ruff check pass, ruff format check pass, mypy pass |
+| CI repair focused tests | pass | `uv run pytest tests/manual_tests/test_review_chatgpt_authoring_pack.py tests/manual_tests/test_stage_chatgpt_authoring_pack.py tests/manual_tests/test_validate_issue_candidates.py tests/manual_tests/test_validate_selected_skeleton_fill.py tests/manual_tests/test_invoke_chatgpt_backend.py -q` -> `130 passed in 4.52s` |
+| CI repair structure / diff | pass | `./spec-dock/scripts/spec-dock validate` -> `spec-dock: ok (validate) nodes=189`; `git diff --check` pass |
+
+## PR Delivery / CI Repair Evidence
+
+| item | value |
+|---|---|
+| PR URL | `https://github.com/chemitaro/spec-dock/pull/294` |
+| base / head | `main` / `iss-00293-final-epic-quality-gate-and-mergeable-pr` |
+| PR title | `feat(authoring-pack): ChatGPT ZIP仕様作成パックを追加` |
+| issue linkage | PR body includes `Closes #293` and `Refs #283` |
+| initial observed head | `40af0ea3fe7f7b0743a51532495338cfe6ffc246` |
+| initial observation result | failed: Provider CI failed; validate check passed; PR remained `MERGEABLE` but `UNSTABLE` |
+| failure | `make lint` / mypy type errors in manual test helper files |
+| repair scope | type-only test helper annotations, import order, local variable naming to avoid mypy assignment conflicts |
+| local repair evidence | `make lint` pass; focused manual tests `130 passed`; `spec-dock validate` pass; `git diff --check` pass |
+| next observation | push repair commit and re-run PR observation for the new head SHA |
 
 ## Epic Manual Test Matrix
 
@@ -236,7 +255,7 @@ Supporting commands:
 | tc-002 | pass | `spec-dock validate` / `git diff --check` / 関連テスト | `spec-dock validate` pass、`git diff --check` pass、focused adapter 10 passed、authoring-pack suite 211 passed、full baseline after snapshot fix 1910 passed / 74 skipped。 | closed |
 | tc-003 | pass | Epic manual test matrix | scenario-by-scenario matrix を記録。preflight / safe review / staging / profile / dogfood / docs / metrics / backend adapter / metadata snapshot を確認済み。 | closed |
 | tc-004 | pass | backend command adapter / invocation contract | S04 adapter implemented; ChatGPT Use advisory recommendations adopted; focused tests and authoring-pack suite passed; no local wrapper dependency added | closed |
-| tc-005 | pending | PR URL / CI / review / mergeable status | 未実施 | PR 作成後に記録する |
+| tc-005 | in_progress | PR URL / CI / review / mergeable status | PR #294 created. Initial observation failed due Provider CI / mypy; local repair verified with `make lint`, focused pytest, `spec-dock validate`, and `git diff --check`. | push repair commit and re-observe PR |
 | tc-006 | pending | Epic / Issue report 更新 / docs impact | Issue report 更新中。Epic report には S04 evidence と final local verification / manual matrix / PR evidence を反映する必要がある。 | S90 で記録する |
 | tc-007 | pending | fresh reviewer results / blocker disposition | 未実施 | S99 で記録する |
 

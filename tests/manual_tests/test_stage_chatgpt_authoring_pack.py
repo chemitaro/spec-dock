@@ -158,7 +158,7 @@ def write_issue_dir(root: Path) -> Path:
 
 
 def stage_item(source_path: str, target_path: str, **extra: object) -> dict:
-    item = {
+    item: dict[str, object] = {
         "source_path": source_path,
         "target_path": target_path,
         "adoption_status": "unreviewed",

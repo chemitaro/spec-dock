@@ -133,10 +133,10 @@ def pack_digest(pack_root: Path) -> dict:
         relative = path.relative_to(pack_root).as_posix()
         files[f"specdock-authoring-pack/{relative}"] = path.read_text(encoding="utf-8")
     digest = hashlib.sha256()
-    for path in sorted(files):
-        digest.update(path.encode("utf-8"))
+    for rel_path in sorted(files):
+        digest.update(rel_path.encode("utf-8"))
         digest.update(b"\0")
-        digest.update(files[path].encode("utf-8"))
+        digest.update(files[rel_path].encode("utf-8"))
         digest.update(b"\0")
     return {
         "algorithm": "sha256",
@@ -173,7 +173,7 @@ def boundary() -> dict:
 
 
 def parent_trace(**overrides: object) -> dict:
-    trace = {
+    trace: dict[str, object] = {
         "epic_id": "epic-00283",
         "requirements": ["E-RQ-011"],
         "acceptance": ["E-AC-007", "E-AC-011"],
@@ -183,7 +183,7 @@ def parent_trace(**overrides: object) -> dict:
 
 
 def candidate_payload(candidate_id: str, title: str, **overrides: object) -> dict:
-    payload = {
+    payload: dict[str, object] = {
         **boundary(),
         "schema_version": "1",
         "candidate_id": candidate_id,
@@ -211,7 +211,7 @@ def candidate_payload(candidate_id: str, title: str, **overrides: object) -> dic
 
 
 def profile_payload(candidate_id: str, **overrides: object) -> dict:
-    payload = {
+    payload: dict[str, object] = {
         **boundary(),
         "schema_version": "1",
         "candidate_id": candidate_id,
