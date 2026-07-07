@@ -591,6 +591,27 @@ def test_preflight_repository_identity_is_required(tmp_path) -> None:
     assert "preflight repository.full_name is required" in report["errors"]
 
 
+def test_provenance_repository_must_match_preflight_repository(tmp_path) -> None:
+    preflight = write_preflight(tmp_path)
+    files = pack_files()
+    files["specdock-authoring-pack/provenance.json"] = json.dumps({
+        "authority": "evidence_only",
+        "repository": {
+            "full_name": "evil/repo",
+            "requested_ref": "wrong-ref",
+        },
+        "source": "chatgpt_zip_authoring_pack",
+    })
+    zip_path = write_zip(tmp_path / "wrong-provenance.zip", files)
+
+    result = run_review(zip_path, preflight, tmp_path / "review")
+
+    assert result.returncode == 1
+    report = read_json(tmp_path / "review/validation-report.json")
+    assert report["status"] == "fail"
+    assert "provenance.repository does not match preflight repository" in report["errors"]
+
+
 def test_preflight_observed_ref_or_head_is_required(tmp_path) -> None:
     data = preflight_data()
     del data["repository"]["observed_ref"]
@@ -760,6 +781,20 @@ def test_private_key_diagnostic_is_redacted(tmp_path) -> None:
     assert secret not in (tmp_path / "review/validation-summary.md").read_text(encoding="utf-8")
 
 
+def test_unsafe_text_payload_is_rejected_without_echoing_payload(tmp_path) -> None:
+    preflight = write_preflight(tmp_path)
+    unsafe_payload = "raw transcript from /Users/alice/.oracle session"
+    zip_path = write_zip(tmp_path / "unsafe-text.zip", pack_files(readme=unsafe_payload))
+
+    result = run_review(zip_path, preflight, tmp_path / "review")
+
+    assert result.returncode == 4
+    assert_no_leak(result, unsafe_payload)
+    assert read_json(tmp_path / "review/validation-report.json")["status"] == "rejected"
+    assert unsafe_payload not in (tmp_path / "review/validation-report.json").read_text(encoding="utf-8")
+    assert unsafe_payload not in (tmp_path / "review/validation-summary.md").read_text(encoding="utf-8")
+
+
 def test_token_like_preflight_diagnostic_is_redacted(tmp_path) -> None:
     data = preflight_data(status="blocked")
     token_like = "token-secret-value-12345"
@@ -842,6 +877,23 @@ def test_safe_extraction_failure_is_blocked(tmp_path) -> None:
     assert result.returncode == 2
     report = read_json(tmp_path / "review/validation-report.json")
     assert report["status"] == "blocked"
+
+
+def test_symlinked_extract_dir_is_blocked_before_writing(tmp_path) -> None:
+    preflight = write_preflight(tmp_path)
+    zip_path = write_zip(tmp_path / "valid.zip", pack_files())
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    extract_dir = tmp_path / "extract"
+    extract_dir.symlink_to(target_dir, target_is_directory=True)
+
+    result = run_review(zip_path, preflight, tmp_path / "review", "--extract-dir", str(extract_dir))
+
+    assert result.returncode == 2
+    report = read_json(tmp_path / "review/validation-report.json")
+    assert report["status"] == "blocked"
+    assert "extract_dir must be a real directory; safe extraction skipped" in report["errors"]
+    assert not (target_dir / "specdock-authoring-pack/README.md").exists()
 
 
 def test_status_taxonomy_keeps_unreviewed_out_of_execution_status(tmp_path) -> None:

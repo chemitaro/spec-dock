@@ -578,6 +578,13 @@ def _metadata_schema_errors(parsed_json: dict[str, dict[str, Any]], preflight: d
         repository = provenance.get("repository")
         if not isinstance(repository, dict) or not repository.get("full_name") or not repository.get("requested_ref"):
             errors.append("provenance.repository must include full_name and requested_ref")
+        else:
+            preflight_repository = preflight.get("repository", {})
+            if (
+                repository.get("full_name") != preflight_repository.get("full_name")
+                or repository.get("requested_ref") != preflight_repository.get("requested_ref")
+            ):
+                errors.append("provenance.repository does not match preflight repository")
         if provenance.get("source") != "chatgpt_zip_authoring_pack":
             errors.append("provenance.source mismatch")
 
@@ -922,12 +929,19 @@ def _text_payload_error(_path_value: str, data: bytes) -> str | None:
     lowered = text.lower()
     if "begin private key" in lowered or "openssh private key" in lowered:
         return "secret-looking payload rejected"
+    unsafe_text = _unsafe_text_error(text)
+    if unsafe_text:
+        return unsafe_text
     return None
 
 
 def _safe_extract_zip(input_path: Path, extract_dir: Path, entries: list[dict[str, Any]]) -> list[str]:
     try:
+        if extract_dir.is_symlink():
+            return ["extract_dir must be a real directory; safe extraction skipped"]
         if extract_dir.exists():
+            if not extract_dir.is_dir():
+                return ["extract_dir must be a real directory; safe extraction skipped"]
             if any(extract_dir.iterdir()):
                 return ["extract_dir is not empty; safe extraction skipped"]
         else:
