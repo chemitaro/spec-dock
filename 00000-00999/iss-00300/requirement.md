@@ -3,830 +3,155 @@
 ID: "iss-00300"
 タイトル: "Backend Invocation Adapter"
 関連GitHub: ["#300"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-08"
 親: ["epic-00295", "init-local-00003"]
+Issue Grade: "standard"
 ---
 
 # iss-00300 Backend Invocation Adapter — Issue 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
-
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
-
----
-
-## 0. 文書の位置づけ
-
-### この文書が定義すること
-
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
-
-### この文書が定義しないこと
-
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
-
----
-
-## 1. 概要
-
-### 1.1 目的
-
-このIssueで達成したい目的を1〜3文で記述する。
-
-- 目的:
-  - ...
-
-### 1.2 観測可能な成果
-
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
-
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
-
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
-
-### 1.3 このIssueの種類
-
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
-
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
-
-### 3.3 このIssueで再定義してはいけないもの
-
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
-
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
-
----
-
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
-
-### 4.1 主な関係者（Actor）
-
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
-
-| 関係者（Actor） | 役割 | このIssueとの関係 |
-|---|---|---|
-| ... | ... | ... |
-
-### 4.2 開始条件（Trigger）
-
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
-
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
-
-### 4.3 代表シナリオ
-
-#### シナリオ SC-001:
-
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
-
-#### シナリオ SC-002:
-
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
-
-#### シナリオ SC-XXX:
-
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 5. スコープ
-
-### 5.1 対象範囲（In 対象範囲（Scope））
-
-このIssueで必ず実現することを列挙する。
-
-- ...
-- ...
-
-### 5.2 対象外（Out of 対象範囲（Scope））
-
-このIssueでは実現しないことを列挙する。
-
-- ...
-- ...
-
-### 5.3 変更しないもの（Unchanged / Must Not Change）
-
-関連はあるが、このIssueで変更してはいけないものを列挙する。
-
-- ...
-- ...
-
-### 5.4 判断が必要な境界
-
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
-
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 6. 要求される振る舞い
-
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
-
-### 振る舞い BH-001:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-002:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-XXX:
-
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 7. 受け入れ条件
-
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
-
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-002:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-XXX:
-
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
-
-```text
-...
-```
-
-### 例 EX-002: 出力例
-
-```text
-...
-```
-
-### 例 EX-003: エラー例
-
-```text
-...
-```
-
-### 契約上の注意
-
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-
-### 10.2 移行性
-
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-
-### 10.3 可観測性
-
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
-
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
-
-### 13.3 リスク事実（Risk Facts）
-
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
-
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
-
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
-
-#### `strict` 以上を検討する条件
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
-
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
-
-#### `lite` を検討できる条件
-
-すべて満たす場合のみ `lite` を検討できる。
-
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
-
----
-
-## 14. 設計への引き渡し
-
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
-
-### 14.1 設計で必ず扱うべき論点
-
-- ...
-- ...
-
-### 14.2 責任所有者が未確定のもの
-
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.3 境界が未確定のもの
-
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.4 契約影響が未確定のもの
-
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.5 上位へ昇格すべき可能性がある判断
-
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 15. 実装計画への引き渡し
-
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
-
-### 15.1 計画で分解すべき成果
-
-- ...
-- ...
-
-### 15.2 検証が必要な観測点
-
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
-
-### 15.3 TDDが必要な振る舞い候補
-
-振る舞い変更がある場合のみ記述する。
-
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
-
-### 15.4 TDD不要または限定的でよい理由
-
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
-
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-07-08 | 初稿（Initial draft） | ... | ... |
+## 1. 目的
+
+この Issue は、`authoring pack prepare` が生成した prompt pack を、利用者が明示的に設定した ChatGPT backend command へ渡す installed runtime adapter を追加する。
+
+`authoring backend invoke` は backend command が未設定のときに fail-closed し、個人環境の絶対パスや特定 wrapper に依存しない。成功時も backend invocation evidence を生成するだけであり、ChatGPT output の採用、ZIP review/stage、canonical docs 更新、`.assurance.json` 更新、reviewer pass、execution-ready、PR-ready、PR delivery は主張しない。
+
+## 2. 背景
+
+`epic-00295` は ChatGPT Authoring Pack を SpecDock が install/update で consumer repository に提供できる runtime / skill / workflow として整備する Epic である。前段 Issue では `authoring` command skeleton、GitHub sync preflight、prompt pack prepare と safe output constraints を実装した。
+
+現在の未解決点は、生成済み prompt pack を実際の ChatGPT automation backend へ渡す標準 runtime surface がないことである。ローカルの `oracle-chatgpt` wrapper を直接 script に直書きすると、他環境で再現できない。そのため SpecDock 側には backend command を差し替えられる薄い invocation adapter と invocation contract が必要である。
+
+## 3. 親 Epic から継承する条件
+
+- Provider-side source of truth は `src/spec_dock/assets/spec_dock/...` に置く。
+- Dogfooding workspace の `spec-dock/...` は consumer-side mirror として検証に使う。
+- ChatGPT-derived output は evidence-only であり、明示的な採用判断までは canonical authority を持たない。
+- `github-synced` と `local-context` は provenance と authority を区別する。
+- 中間 Issue では PR を作成せず、final quality gate / PR delivery は `iss-00307` に defer する。
+
+## 4. Scope
+
+この Issue で実現すること:
+
+- `./spec-dock/scripts/spec-dock authoring backend invoke` を implemented command として提供する。
+- `--backend-command`、`SPECDOCK_CHATGPT_COMMAND`、optional compatibility fallback `ORACLE_CHATGPT_COMMAND` の順に backend command を解決する。
+- backend command string を `shlex.split(..., posix=True)` 相当に argv 化し、shell execution を使わない。
+- backend process には、resolved backend argv に `--slug <slug>`、`-p <prompt>`、prompt pack 内の各根拠ファイルを repeated `--file` で追加した固定 ABI を渡す。
+- `--output-dir` は adapter summary / diagnostics の出力先であり、backend argv には渡さない。
+- `--dry-run` では backend process を起動せず、resolved command、prompt pack、argv、provenance、authority summary を出力する。
+- prompt pack の存在、必須 metadata、authority boundary、output summary target の安全性を検証する。
+- backend non-zero、timeout、malformed command、missing prompt pack、unsafe output target を fail-closed に扱う。
+- stdout / stderr / diagnostics summary では secret-looking data と host-local absolute path を redaction する。
+- `github-synced` と `local-context` の invocation provenance を区別し、`local-context` は lower authority evidence として表示する。
+- 既存 standalone compatibility script がある場合は、provider-side runtime application へ委譲するか、同等 contract を維持する。
+
+この Issue で実現しないこと:
+
+- 任意 AI provider registry や backend autodetection。
+- backend command 未設定時の推測実行。
+- ZIP review / stage / extraction。
+- Initiative/Epic/Issue candidate validation。
+- Issue draft adoption validation。
+- human approval stop gate。
+- canonical docs への自動採用。
+- `.assurance.json` mutation。
+- `authorized_profile` 決定。
+- reviewer pass / execution-ready / PR-ready / mergeable PR の自己主張。
+- final quality gate / PR delivery。
+
+## 5. Actor / Trigger
+
+| Actor | 役割 | この Issue との関係 |
+| --- | --- | --- |
+| Codex orchestrator | prompt pack を作り backend invocation を起動する | `authoring backend invoke` の主利用者 |
+| SpecDock runtime user | consumer repo で installed runtime を使う | backend command を環境変数または CLI で指定する |
+| ChatGPT backend command | 外部 ChatGPT automation を実行する process | runtime adapter から argv と prompt pack を受け取る |
+| spec-reviewer / code-reviewer / qa-reviewer | 後続 gate | この Issue の planning / implementation / verification を評価する |
+
+Trigger:
+
+- `./spec-dock/scripts/spec-dock authoring backend invoke ...`
+- provider-side compatibility script の直接実行。
+
+## 6. Functional Requirements
+
+| ID | 要件 |
+| --- | --- |
+| RQ-001 | `authoring backend invoke --help` は implemented command として表示され、`--backend-command`、`--prompt-pack`、`--output-dir`、`--slug`、`--prompt`、`--evidence-mode`、`--dry-run`、`--timeout-seconds`、`--format` を案内する。 |
+| RQ-002 | `--backend-command` が指定された場合、env vars より優先する。 |
+| RQ-003 | `--backend-command` がない場合、非空の `SPECDOCK_CHATGPT_COMMAND` を使う。 |
+| RQ-004 | `SPECDOCK_CHATGPT_COMMAND` が未設定または空の場合のみ、非空の `ORACLE_CHATGPT_COMMAND` を optional compatibility fallback として使う。 |
+| RQ-005 | backend command が解決できない場合、backend process を起動せず `blocked` diagnostics を返す。 |
+| RQ-006 | backend command は argv list として実行し、`shell=True` 相当の shell execution を使わない。 |
+| RQ-007 | malformed backend command string は shell に渡さず、`blocked` diagnostics を返す。 |
+| RQ-008 | backend argv は `<resolved-backend-argv> --slug <slug> -p <prompt> --file <pack>/chatgpt-use-prompt.md --file <pack>/expected-output-contract.md --file <pack>/manifest.json --file <pack>/provenance.json --file <pack>/source-manifest.json --file <pack>/stale-if.json --file <pack>/safe-output-constraints.md` の形にする。 |
+| RQ-009 | `--dry-run` は backend process を起動せず、実行計画と invocation summary だけを出力する。 |
+| RQ-010 | prompt pack が存在しない、読めない、または必須 metadata を欠く場合は fail-closed する。 |
+| RQ-011 | output summary target が canonical docs、symlink、または永続 report に不適切な host-local absolute path を指す場合は rejected / blocked とする。 |
+| RQ-012 | backend non-zero exit は invocation failure として扱い、canonical adoption / reviewer pass / PR-ready を主張しない。 |
+| RQ-013 | timeout は `blocked` diagnostics として扱う。 |
+| RQ-014 | stdout / stderr summary では secret-looking data と host-local absolute path を redact する。 |
+| RQ-015 | `local-context` invocation は `github-synced` より低い authority として summary に記録し、採用には explicit EAL disposition が必要であることを残す。 |
+| RQ-016 | runtime command と provider-side compatibility script は、同じ domain/application contract を共有する。 |
+| RQ-017 | この Issue の finish evidence は PR delivery を行わず、`iss-00307` への defer rationale を記録する。 |
+
+## 7. Acceptance Criteria
+
+| ID | 受け入れ条件 | 証跡 |
+| --- | --- | --- |
+| AC-001 | `authoring backend invoke --help` が implemented command として必要 option を表示し、`--force` を表示しない。 | CLI stdout / test |
+| AC-002 | backend command 未設定時、実 process を起動せず `status=blocked` を返す。 | CLI JSON / sentinel absence |
+| AC-003 | CLI `--backend-command` が `SPECDOCK_CHATGPT_COMMAND` と `ORACLE_CHATGPT_COMMAND` より優先される。 | CLI JSON / test |
+| AC-004 | `SPECDOCK_CHATGPT_COMMAND` が `ORACLE_CHATGPT_COMMAND` より優先される。 | CLI JSON / test |
+| AC-005 | primary env が空の場合だけ `ORACLE_CHATGPT_COMMAND` fallback が使われる。 | CLI JSON / test |
+| AC-006 | malformed command string は shell 実行されず `status=blocked` になる。 | CLI JSON / sentinel absence |
+| AC-007 | `--dry-run` は backend process を起動しない。 | sentinel absence |
+| AC-008 | prompt pack missing / unreadable / missing required metadata は fail-closed する。 | CLI JSON / test |
+| AC-009 | canonical output target、symlinked output target、unsafe host-local output target は rejected / blocked になる。 | CLI JSON / filesystem inspection |
+| AC-010 | backend argv は list として渡され、固定 ABI suffix と prompt pack files を含み、prompt に shell metacharacter が含まれても shell injection されない。 | captured argv / test |
+| AC-011 | backend non-zero exit は no-adoption diagnostics になり、canonical adoption / reviewer pass / PR-ready を主張しない。 | CLI JSON/text / test |
+| AC-012 | timeout は `status=blocked` と timeout diagnostics になる。 | CLI JSON / test |
+| AC-013 | stdout/stderr summary は secret-looking data と host-local absolute path を redact する。 | CLI JSON/text / test |
+| AC-014 | `local-context` summary は lower authority provenance を保持する。 | CLI JSON / test |
+| AC-015 | provider-side runtime path と dogfood installed runtime path の両方で smoke test が通る。 | pytest / CLI |
+| AC-016 | compatibility script の既存 contract は維持されるか、runtime application への委譲後も同等 contract を満たす。 | pytest / inspection |
+| AC-017 | この Issue は PR delivery を行わず、finish evidence で `iss-00307` への defer rationale を記録する。 | `report.md` |
+
+## 8. Failure Modes
+
+| Failure mode | 期待される扱い |
+| --- | --- |
+| backend command unset | `blocked`; backend process 起動なし |
+| malformed backend command | `blocked`; shell execution なし |
+| prompt pack missing / invalid | `blocked` or `rejected`; no process execution |
+| output target points canonical docs | `rejected` |
+| symlinked summary/output target | `rejected` |
+| backend non-zero | `blocked`; no adoption claims |
+| backend timeout | `blocked`; timeout diagnostics |
+| stdout/stderr contains secret-looking data | redacted summary only |
+| stdout/stderr contains host-local absolute path | redacted summary only |
+| `local-context` を `github-synced` と同格に扱う | rejected or blocked |
+
+## 9. Grade
+
+Issue Grade は `standard` とする。
+
+根拠:
+
+- installed runtime command の追加であり、consumer-visible CLI behavior を変更する。
+- external process invocation、env var、redaction、path safety、authority boundary を扱う。
+- Provider-side runtime と dogfood mirror の両方に影響する。
+- Strict/Critical 相当の data migration、production data mutation、irreversible operation は含まない。
+
+## 10. Evidence Sources
+
+- `spec-dock/active/epic/requirement.md`
+- `spec-dock/active/epic/design.md`
+- `spec-dock/active/epic/plan.md`
+- `spec-dock/active/issue/artifacts/20260707t171251z-draft-requirement-implement-backend-invocation-adapter-draft-requirement.md`
+- `spec-dock/active/issue/artifacts/20260707t171251z-01-draft-design-implement-backend-invocation-adapter-draft-design.md`
+- `spec-dock/active/issue/artifacts/20260707t171252z-draft-plan-implement-backend-invocation-adapter-draft-plan.md`
+- ChatGPT Use session `iss-00300-planning` evidence summary to be recorded in `report.md`
