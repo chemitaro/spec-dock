@@ -19,6 +19,7 @@ ID: "iss-00304"
 | D-001 | resolved | scope | user / orchestrator | ChatGPT authoring を planning skills の置換として扱うか、shared evidence lane として扱うか | A: planning skill を置換; B: shared evidence lane を追加し planning skill は authority を保持 | B を採用 | Parent Epic は ChatGPT output を evidence-only とし、canonical adoption / reviewer gate を planning workflow に残す | promoted_to_design | `design.md` section 1, 3, 4 | none |
 | D-002 | resolved | naming | user / orchestrator | skill 名の human-friendly / stable naming | A: Oracle-specific skill 名; B: `spec-dock-chatgpt-authoring` | B を採用 | user-facing name は `spec-dock-` prefix を持ち、Oracle 実装詳細に閉じない | promoted_to_design | `requirement.md` section 1, `design.md` section 4 | none |
 | D-003 | resolved | operation | ChatGPT Use planning pass | ChatGPT Use planning result をどの権限で採用するか | A: ChatGPT result を正本化; B: evidence-only として採用し main orchestrator が再記述 | B を採用 | Oracle session `specdock-iss-00304-planning-2` は完了したが、ChatGPT output は reviewer pass や canonical authority ではない | applied | Oracle session `specdock-iss-00304-planning-2` | none |
+| D-004 | resolved | installation parity | test feedback / orchestrator | provider `install_root` と checked-in `.agents` mirror のどちらを更新対象に含めるか | A: provider only; B: provider and checked-in dogfooding mirror | B を採用 | checked-in dogfooding agent-tooling parity is covered by installer/update regression tests and must remain aligned with installed assets. | applied | `.agents/skills/*`; `src/spec_dock/assets/install_root/.agents/skills/*`; `uv run pytest tests/unit/infra/test_init_update.py -q` | none |
 
 ## Evidence Adoption Ledger（証跡採用台帳）
 
@@ -29,6 +30,7 @@ ID: "iss-00304"
 | EAL-003 | adopted | Issue-local draft plan | `plan.md` | step sequence、verification、finish evidence、relay policy を採用し、closure IDs と reviewer focus を追加した。 | artifacts/20260707t171309z-draft-plan-add-chatgpt-authoring-skill-and-update-planning-skills-draft-plan.md; `plan.md` | no_action |
 | EAL-004 | adopted | ChatGPT Use / Oracle GPT-5.5 Pro Extended | `requirement.md`, `design.md`, `plan.md` | ChatGPT Batch Evidence Lane、managed inventory、test focus、forbidden authority boundary の推奨を evidence-only として採用し、main orchestrator が再記述した。 | Oracle session `specdock-iss-00304-planning-2` | no_action |
 | EAL-005 | adopted | repo inspection | `requirement.md`, `design.md`, `plan.md` | Existing provider install_root skill files and installer inventory evidence confirm placement and likely test surface. | `find src/spec_dock/assets/install_root/.agents/skills`; `rg install_root/.agents/skills src_spec_dock tests`; `assurance verify` | no_action |
+| EAL-006 | adopted | delegated implementation evidence | installed skills, docs, installer inventory, tests | doc-writer / dev-coder / utility-worker outputs were integrated after local verification. | changed provider assets, checked-in `.agents` mirror, docs README, `src/spec_dock/cli.py`, tests | no_action |
 
 ## 目的整合台帳（Objective Alignment Ledger）
 
@@ -116,9 +118,9 @@ rg -n "managed skill|install_root|\\.agents/skills|spec-dock-chatgpt|chatgpt-aut
 | CLOS-010 | S99 | `./spec-dock/scripts/spec-dock validate` | pass | nodes=202 |
 | CLOS-011 | S99 | `./spec-dock/scripts/spec-dock assurance verify` | pass | authorized_profile=standard, reason=ok |
 | CLOS-012 | S99 | `git diff --check` | pass | no whitespace errors |
-| CLOS-013 | S90 | fresh spec-reviewer, code-reviewer, and qa-reviewer pass after implementation fixes | pass | reviewer gates closed; only lifecycle closeout remains |
-| CLOS-014 | S00/S99 | report relay policy | partial | PR delivery deferred to `iss-00307`; final no-PR evidence after commit/finish |
-| CLOS-015 | S99 | pending | pending | after commit/push/finish |
+| CLOS-013 | S90 | fresh spec-reviewer, code-reviewer, and qa-reviewer pass after implementation fixes | partial | planning spec-reviewer pass recorded; code-reviewer and qa-reviewer pending on current implementation diff |
+| CLOS-014 | S00/S99 | report relay policy and clean pushed branch | pass | PR delivery deferred to `iss-00307`; no per-Issue PR created |
+| CLOS-015 | S99 | commit `e135aaa7` pushed to branch; closeout report update pending second commit | partial | issue finish runs after closeout report commit/push |
 
 ## Step Contract Closure（ステップ契約の完了証跡）
 
@@ -130,8 +132,8 @@ rg -n "managed skill|install_root|\\.agents/skills|spec-dock-chatgpt|chatgpt-aut
 | S03 | CLOS-003, CLOS-004, CLOS-005, CLOS-006 | planning skill names preserved and modes/evidence lane documented | hub and planning skill diffs plus focused tests | pass | existing skill names preserved |
 | S04 | CLOS-008 partial | discoverability docs updated or approved-no-op recorded | provider and dogfooding `spec-dock/docs/README.md` include ChatGPT authoring evidence lane | pass | docs index updated |
 | S05 | CLOS-001 through CLOS-009 | focused install / wording tests pass | `tests/cli_runtime/test_wrappers.py` focused test; full `tests/unit/infra/test_init_update.py` | pass | managed install contract covered |
-| S90 | CLOS-013 | required reviewer gates pass | fresh spec-reviewer, code-reviewer, and qa-reviewer returned `review_status: pass` | pass | reviewer gates closed |
-| S99 | CLOS-010 through CLOS-015 | final verification, commit, push, no-PR relay, issue finish | final verification passed; commit/push/finish not yet run | partial | lifecycle closeout pending |
+| S90 | CLOS-013 | required reviewer gates pass | planning spec-reviewer pass recorded; code-reviewer and qa-reviewer pending on current implementation diff | partial | implementation reviewer gates still required before commit/finish |
+| S99 | CLOS-010 through CLOS-015 | final verification, commit, push, no-PR relay, issue finish | final verification passed; implementation commit `e135aaa7` pushed; no per-Issue PR created | partial | report closeout commit and `issue finish` pending |
 
 ## Test Contract Closure（テスト契約の完了証跡）
 
@@ -148,9 +150,9 @@ rg -n "managed skill|install_root|\\.agents/skills|spec-dock-chatgpt|chatgpt-aut
 | tc-s04-001 | S04 | yes | inspect-only | docs README inspected | focused docs/skill test and file inspection | pass | ChatGPT authoring evidence lane discoverable |
 | tc-s05-001 | S05 | yes | red-required | managed skill missing before implementation | `uv run pytest tests/unit/infra/test_init_update.py -q` | pass | 546 passed |
 | tc-s05-002 | S05 | yes | negative | local wrapper path must not be formalized | scoped `rg -n "/Users/iwasawayuuta|\\.codex/skills/chatgpt-use|oracle-chatgpt" ...` over new/changed formal skill and touched regression-test surfaces | pass | broader `tests/` contains unrelated path-safety fixtures; this Issue verifies changed product workflow surfaces |
-| tc-s90-001 | S90 | yes | manual-required | first spec-review failed; re-review plus code/QA review passed after fixes | reviewer outputs | pass | all reviewer gates closed |
-| tc-s99-001 | S99 | yes | manual-required | implementation verification passed | final command queue | partial | commit/push/finish still pending |
-| tc-s99-002 | S99 | yes | manual-required | no per-Issue PR policy recorded | git/spec-dock lifecycle output | pending | commit/push/issue finish not yet run |
+| tc-s90-001 | S90 | yes | manual-required | first spec-review failed; planning re-review passed after fixes | reviewer outputs | partial | code-reviewer and qa-reviewer pending |
+| tc-s99-001 | S99 | yes | manual-required | implementation verification passed | final command queue | partial | implementation commit/push complete; report closeout commit and issue finish pending |
+| tc-s99-002 | S99 | yes | manual-required | no per-Issue PR policy recorded and followed | git/spec-dock lifecycle output | pass | PR delivery deferred to final Issue `iss-00307` |
 
 ## Closure Delta（クロージャ差分）
 
@@ -168,7 +170,7 @@ rg -n "managed skill|install_root|\\.agents/skills|spec-dock-chatgpt|chatgpt-aut
 | S03 | parent-implemented-with-approved-local-execution | planning skill wording was a small routing update across adjacent installed skills | N/A | existing planning skill wording | requirement/design/plan | provider planning skill docs and dogfooding mirror | skill rename, runtime behavior | focused wording assertions | stop gate bypass | changed files, summary, risks | pass |
 | S04 | parent-implemented-with-approved-local-execution | installed docs discoverability was a one-line docs index update | N/A | docs README only | docs README and plan | minimal docs index update | broad workflow rewrite | docs inspection | scope expansion | changed docs or no-op rationale | pass |
 | S05 | parent-implemented-with-approved-local-execution | installer/test behavior required same-commit inventory alignment | N/A | focused installer/tests | requirement/design/plan and test suite | tests and `_MANAGED_SKILL_NAMES` | unrelated installer refactor | focused pytest and scan | non-hermetic test need | changed files, tests run | pass |
-| S90 | delegated | required reviewers | spec-reviewer / code-reviewer / qa-reviewer | read-only review | final diff and issue docs | none | edits/waiver-as-pass | reviewer_status pass | any non-pass | findings and status | planning spec-reviewer pass; code/QA pending after implementation |
+| S90 | delegated | required reviewers | spec-reviewer / code-reviewer / qa-reviewer | read-only review | final diff and issue docs | none | edits/waiver-as-pass | reviewer_status pass | any non-pass | findings and status | planning spec-reviewer pass; code/QA pending on current implementation diff |
 | S99 | approved-local-execution / spec-manager optional | lifecycle closeout | spec-manager optional | report evidence and issue lifecycle | final report and verified diff | report evidence and lifecycle commands | per-Issue PR | final command queue | missing closure or dirty post-commit | commit/push/finish evidence | pending |
 
 ## Delegated Worker Evidence（委任 worker 証跡）
@@ -184,13 +186,13 @@ rg -n "managed skill|install_root|\\.agents/skills|spec-dock-chatgpt|chatgpt-aut
 
 | 対象 | 方針 | 証跡 | 状態 |
 |---|---|---|---|
-| iss-00304 | Per-Issue PR を作成せず、PR delivery は `iss-00307` に defer する | parent Epic plan and `plan.md` Final Exit Contract | pending final closeout |
+| iss-00304 | Per-Issue PR を作成せず、PR delivery は `iss-00307` に defer する | parent Epic plan, `plan.md` Final Exit Contract, pushed branch without PR creation | pass |
 
 ## マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） |
 |---|---|---|---|---|---|
-| planning | planning spec-review passed | canonical issue docs | not committed | pending | not a no-op |
+| implementation | implementation and planning docs | commit `e135aaa7` plus closeout report update | `e135aaa7` pushed; closeout commit pending | clean before closeout report update | not a no-op |
 
 ## 最終品質ゲート（Final Quality Gate）
 
