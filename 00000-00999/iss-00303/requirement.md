@@ -3,7 +3,7 @@
 ID: "iss-00303"
 タイトル: "Issue Draft Adoption Validation"
 関連GitHub: ["#303"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-08"
 親: ["epic-00295", "init-local-00003"]
@@ -11,822 +11,176 @@ ID: "iss-00303"
 
 # iss-00303 Issue Draft Adoption Validation — Issue 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
+## 1. 目的
 
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
+この Issue は、ChatGPT authoring pack から得た Issue draft requirement / design / plan と selected skeleton fill を、canonical Issue docs へ採用する前に検証する installed runtime gate を実装する。
 
----
+実装対象は次の 2 command である。
 
-## 0. 文書の位置づけ
+- `./spec-dock/scripts/spec-dock authoring validate issue-draft-adoption`
+- `./spec-dock/scripts/spec-dock authoring validate selected-skeleton-fill`
 
-### この文書が定義すること
+これらの command は検証結果と diagnostics を返すだけであり、canonical docs を書き換えない。`.assurance.json` を作成・更新しない。fresh reviewer pass、execution-ready、PR-ready、canonical adoption を主張しない。
 
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
+## 2. 背景
 
-### この文書が定義しないこと
-
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
-
----
-
-## 1. 概要
-
-### 1.1 目的
-
-このIssueで達成したい目的を1〜3文で記述する。
-
-- 目的:
-  - ...
-
-### 1.2 観測可能な成果
-
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
-
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
-
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
-
-### 1.3 このIssueの種類
-
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
-
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
-
-### 3.3 このIssueで再定義してはいけないもの
+`iss-00302` では、Initiative/Epic candidates と Epic/Issue candidates を candidate-only evidence として検証する gate を実装した。`iss-00303` はその次の gate であり、Issue node が存在した後に使う。
 
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
+`validate epic-issue-candidates` は Issue 作成前の候補を扱う。一方、`validate issue-draft-adoption` と `validate selected-skeleton-fill` は、既に存在する Issue node に対して、draft pack と selected skeleton fill が canonical rewrite の input として安全かどうかを確認する。
 
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
+## 3. 親スコープから継承する境界
 
----
+- Parent Initiative: `init-local-00003`
+- Parent Epic: `epic-00295` `ChatGPT Authoring Pack Installed Runtime`
+- ChatGPT output は正本ではなく evidence として扱う。
+- `authority: evidence_only` を維持する。
+- `adoption_status: unreviewed` を runtime validation success と混同しない。
+- runtime command は canonical docs を直接上書きしない。
+- runtime command は `.assurance.json` を mutate しない。
+- validator pass は reviewer pass / execution-ready / PR-ready / canonical adoption を意味しない。
 
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
+## 4. Scope
 
-### 4.1 主な関係者（Actor）
+### 4.1 In scope
 
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
+- `authoring validate issue-draft-adoption` の CLI / application / domain / presentation contract を実装する。
+- `authoring validate selected-skeleton-fill` の CLI / application / domain / presentation contract を実装する。
+- provider-side installed runtime source under the `src/spec_dock/assets/spec_dock/scripts` tree を更新する。
+- dogfood mirror under the `spec-dock/scripts` runtime tree を provider-side source と一致させる。
+- compatibility wrapper を追加する。
+  - `validate_issue_draft_adoption.py`
+  - `validate_selected_skeleton_fill.py`
+- focused CLI runtime tests in `tests/cli_runtime/test_authoring.py`
+- safe positive / negative fixtures for both validators.
+- validator report output under safe non-canonical output targets.
+- text / JSON output that distinguishes validation pass from adoption / reviewer pass.
 
-| 関係者（Actor） | 役割 | このIssueとの関係 |
-|---|---|---|
-| ... | ... | ... |
+### 4.2 Out of scope
 
-### 4.2 開始条件（Trigger）
+- `authoring adopt`
+- automatic canonical docs rewrite
+- automatic Issue creation
+- automatic `.assurance.json` mutation
+- automatic `authorized_profile` decision
+- fresh reviewer pass issuance
+- execution-ready marking
+- PR-ready / merge-ready / PR delivery
+- GitHub Issue close / PR creation
+- broad `--force` bypass
+- per-Issue PR delivery for this intermediate Issue
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
+### 4.3 Unchanged
 
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
+- `authoring pack review` remains responsible for ZIP/tree safety review.
+- `authoring pack stage` remains responsible for staging evidence and dry-run diff, not canonical write.
+- `validate initiative-epic-candidates` and `validate epic-issue-candidates` remain candidate-only validators.
+- `.assurance.json` remains local assurance state owned by the assurance workflow, not by ChatGPT output.
 
-### 4.3 代表シナリオ
+## 5. Required Behavior
 
-#### シナリオ SC-001:
+### BH-001: issue draft adoption positive validation
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+Given:
 
-#### シナリオ SC-002:
+- review report status is `pass`
+- target Issue node exists
+- expected Issue ID and parent Epic match
+- draft requirement/design/plan files exist and are safe
+- draft pack digest matches review/stage evidence
+- canonical target mapping is limited to Issue `requirement.md`, `design.md`, `plan.md`, and report evidence notes
+- authority fields remain evidence-only
+- `.assurance.json` is observation-only
+- forbidden authority claims are absent
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
-
-#### シナリオ SC-XXX:
-
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 5. スコープ
-
-### 5.1 対象範囲（In 対象範囲（Scope））
-
-このIssueで必ず実現することを列挙する。
-
-- ...
-- ...
-
-### 5.2 対象外（Out of 対象範囲（Scope））
-
-このIssueでは実現しないことを列挙する。
-
-- ...
-- ...
-
-### 5.3 変更しないもの（Unchanged / Must Not Change）
-
-関連はあるが、このIssueで変更してはいけないものを列挙する。
-
-- ...
-- ...
-
-### 5.4 判断が必要な境界
-
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
-
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 6. 要求される振る舞い
-
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
-
-### 振る舞い BH-001:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-002:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-XXX:
-
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 7. 受け入れ条件
-
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
-
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-002:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-XXX:
-
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
-
-```text
-...
-```
-
-### 例 EX-002: 出力例
-
-```text
-...
-```
-
-### 例 EX-003: エラー例
-
-```text
-...
-```
-
-### 契約上の注意
-
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-
-### 10.2 移行性
-
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-
-### 10.3 可観測性
-
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
-
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
+When:
 
-### 13.3 リスク事実（Risk Facts）
+- user runs `authoring validate issue-draft-adoption`
 
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
+Then:
 
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
+- command returns `status=pass`
+- output includes draft pack digest, parent trace, canonical target mapping, EAL disposition requirement, and authority boundary fields
+- output does not claim canonical adoption, reviewer pass, execution-ready, or PR-ready
 
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
-
-#### `strict` 以上を検討する条件
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
+### BH-002: issue draft adoption rejects authority violations
 
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
+Given an adoption input or draft content claims one of canonical adoption, canonical docs written, `.assurance.json` mutation, `authorized_profile` decision, reviewer pass, execution-ready, PR-ready, merge-ready, or PR delivery, the command returns `status=rejected`, records findings, and does not write canonical docs or `.assurance.json`.
 
-#### `lite` を検討できる条件
+### BH-003: selected skeleton fill positive validation
 
-すべて満たす場合のみ `lite` を検討できる。
+Given selected skeleton evidence exists, `.assurance.json` exists and is read as observation, selected profile matches authorized profile observation, template hash matches selected skeleton, and `section-fills.json` covers required sections exactly, `authoring validate selected-skeleton-fill` returns `status=pass`.
 
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
+### BH-004: selected skeleton fill detects stale or inconsistent evidence
 
----
-
-## 14. 設計への引き渡し
-
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
-
-### 14.1 設計で必ず扱うべき論点
-
-- ...
-- ...
-
-### 14.2 責任所有者が未確定のもの
-
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.3 境界が未確定のもの
-
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.4 契約影響が未確定のもの
-
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.5 上位へ昇格すべき可能性がある判断
-
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 15. 実装計画への引き渡し
-
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
-
-### 15.1 計画で分解すべき成果
-
-- ...
-- ...
-
-### 15.2 検証が必要な観測点
-
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
-
-### 15.3 TDDが必要な振る舞い候補
-
-振る舞い変更がある場合のみ記述する。
-
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
-
-### 15.4 TDD不要または限定的でよい理由
-
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
-
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-07-08 | 初稿（Initial draft） | ... | ... |
+Selected profile mismatch, authorized profile observation mismatch, template hash mismatch, or selected skeleton hash mismatch returns `status=stale`.
+
+### BH-005: missing or malformed required input is fail-closed
+
+Missing review report, Issue node, adoption input, selected skeleton, `.assurance.json`, or section fill JSON returns `blocked` when it is a missing prerequisite. Malformed schema, missing required schema fields, duplicate section, missing draft, or malformed inventory returns `fail`.
+
+## 6. Status Taxonomy
+
+| status | 用途 |
+|---|---|
+| `pass` | command-local validation passed. Canonical adoption / reviewer pass ではない。 |
+| `fail` | JSON schema failure, missing required field, malformed inventory, duplicate section, missing required draft. |
+| `blocked` | required observation unavailable: review report missing, Issue node missing, `.assurance.json` missing, selected skeleton missing, unsupported review status. |
+| `stale` | source hash / review digest / draft pack digest / selected profile / template hash / skeleton hash / parent trace mismatch. |
+| `rejected` | unsafe path, secret/raw transcript, forbidden authority claim, `.assurance.json` mutation request, canonical write claim, unsafe report path. |
+| `unreviewed` | artifact adoption state。command status として success 扱いしない。 |
+
+## 7. Acceptance Criteria
+
+- AC-001: `authoring validate issue-draft-adoption --help` exposes real arguments and no longer says `Deferred`.
+- AC-002: `authoring validate selected-skeleton-fill --help` exposes real arguments and no longer says `Deferred`.
+- AC-003: issue draft adoption positive fixture returns `status=pass` with authority boundary fields.
+- AC-004: selected skeleton fill positive fixture returns `status=pass` with selected profile, template hash, section inventory, and authority boundary fields.
+- AC-005: non-pass review report status maps to `blocked`, `stale`, `rejected`, or `fail` as appropriate.
+- AC-006: missing Issue node is `blocked`; Issue ID / parent Epic / parent Initiative mismatch is `stale`; validator never creates an Issue node.
+- AC-007: expected draft pack digest, source manifest hash, or review digest mismatch returns `stale`. Review digest is supplied by `--expected-review-digest` and compared with the digest computed from `--review-report`.
+- AC-008: canonical target mapping is constrained to `requirement.md`, `design.md`, `plan.md`, and report evidence notes. `.assurance.json`, path traversal, absolute path, host-local path, hidden path, and secret-looking paths are `rejected`.
+- AC-009: selected skeleton inventory detects missing, extra, duplicate, and empty sections.
+- AC-010: selected profile, authorized profile observation, template hash, and selected skeleton hash mismatch return `stale`.
+- AC-011: forbidden authority claims are `rejected` and findings do not leak raw secret values or raw transcript content.
+- AC-012: `--report-path` under canonical Issue docs, `.assurance.json`, or symlinked paths are rejected; safe report paths under `.specdock-authoring` are allowed.
+- AC-013: provider and dogfood runtime paths both expose the implemented behavior.
+- AC-014: this intermediate Issue does not create a per-Issue PR and defers PR delivery to `iss-00307`.
+
+## 8. Non-Functional Requirements
+
+- Validation is deterministic.
+- Output is machine-readable JSON and reviewer-readable text.
+- Diagnostics are stable enough for tests.
+- The same input produces the same status / findings.
+- Secret-looking payloads, raw transcripts, host-local paths, and credentials are not persisted in reports.
+- Runtime command does not write canonical docs.
+- Runtime command does not mutate `.assurance.json`.
+
+## 9. Grade
+
+Authorized profile: `standard`
+
+Manual risk note: this Issue touches installed runtime CLI behavior, JSON output contract, `.assurance.json` observation boundary, and forbidden authority claims. Treat the implementation with strict-style test coverage even though the active assurance profile is Standard.
+
+## 10. Dependencies
+
+- `epic-00295` requirement/design/plan authority boundary.
+- `iss-00302` candidate validator concepts and test style.
+- Existing pack review/stage contract.
+- Existing authoring command parser/registry.
+- Existing `.assurance.json` observation contract.
+
+## 11. 確定した入力契約
+
+- `authoring validate issue-draft-adoption` は `--input PATH` を必須にする。固定 default path は初期実装では採用しない。
+- `--review-report PATH` は必須にする。
+- `--expected-review-digest TEXT` は optional にし、指定時は `--review-report` から計算した digest と比較する。
+- `--expected-source-manifest-hash TEXT` は optional にし、指定時は adoption input または source manifest observation と比較する。
+- `--issue-dir PATH` は必須にする。active issue auto-detection は初期実装に含めない。
+- `authoring validate selected-skeleton-fill` は `--input PATH`, `--issue-dir PATH`, `--assurance PATH`, `--selected-skeleton PATH` を必須にする。
+- `--adoption-input` alias は初期実装では追加しない。互換 alias が必要になった場合は follow-up とする。
+
+## 12. Open Questions / Uncertainty
+
+- Validator should validate report evidence note targets but must not write `report.md`.
+- ChatGPT connector could not open the current branch and inspected default branch fallback. Local attached context is used as supplementary evidence, not GitHub-verified branch evidence.
