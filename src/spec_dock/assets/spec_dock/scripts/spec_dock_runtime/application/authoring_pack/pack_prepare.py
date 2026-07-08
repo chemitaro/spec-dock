@@ -229,8 +229,13 @@ def _required_preflight_blockers(preflight: dict[str, Any]) -> list[str]:
     for key in ("status", "evidence_mode", "sync_state", "github_sync", "source_manifest_hash"):
         if key not in preflight:
             blockers.append(f"missing_{key}")
-    if not isinstance(preflight.get("source_hashes"), dict):
+    source_hashes = preflight.get("source_hashes")
+    if not isinstance(source_hashes, dict):
         blockers.append("missing_source_hashes")
+    else:
+        observed_hash = _manifest_hash(_filtered_source_hashes(dict(source_hashes)))
+        if preflight.get("source_manifest_hash") != observed_hash:
+            blockers.append("source_manifest_hash_mismatch")
     if preflight.get("evidence_mode") == "local-context":
         if preflight.get("github_sync") != "not_verified":
             blockers.append("local_context_github_sync_must_be_not_verified")

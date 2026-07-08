@@ -109,6 +109,7 @@ def _review_zip(input_path: Path) -> PackReviewResult:
     with zipfile.ZipFile(input_path) as archive:
         infos = archive.infolist()
         names = [info.filename for info in infos if not info.is_dir()]
+        seen_names: set[str] = set()
         if not names:
             findings.append("empty_zip")
         for info in infos:
@@ -121,6 +122,10 @@ def _review_zip(input_path: Path) -> PackReviewResult:
             rel_name = _relative_name(info.filename, root, findings)
             if rel_name is None:
                 continue
+            if rel_name in seen_names:
+                findings.append(f"duplicate_entry:{rel_name}")
+                continue
+            seen_names.add(rel_name)
             entry_findings_before = len(findings)
             _validate_entry(info, rel_name, findings)
             reviewed_files.append(rel_name)
@@ -294,6 +299,10 @@ def _validate_metadata(payloads: dict[str, str], findings: list[str]) -> str:
         except json.JSONDecodeError:
             findings.append(f"invalid_json:{metadata}")
             status = "fail"
+            continue
+        if not isinstance(objects[metadata], dict):
+            findings.append(f"non_object_json:{metadata}")
+            status = "fail"
     source_manifest = objects.get("source-manifest.json")
     stale_if = objects.get("stale-if.json")
     for metadata, payload in objects.items():
@@ -350,22 +359,22 @@ def _scan_payloads(payloads: dict[str, str]) -> tuple[str, ...]:
 def _status_from_findings(findings: tuple[str, ...], metadata_status: str) -> PackReviewStatus:
     if any(finding == "wrong_root" for finding in findings):
         return "rejected"
+    if (
+        any(finding.startswith(("missing_metadata:", "invalid_json:", "non_object_json:")) for finding in findings)
+        or metadata_status == "fail"
+    ):
+        return "fail"
     if any(_is_rejected_finding(finding) for finding in findings):
         return "rejected"
     if any(finding.startswith("source_hash_mismatch") for finding in findings) or metadata_status == "stale":
         return "stale"
-    if (
-        any(finding.startswith(("missing_metadata:", "invalid_json:")) for finding in findings)
-        or metadata_status == "fail"
-    ):
-        return "fail"
     if findings:
         return "rejected"
     return "pass"
 
 
 def _is_rejected_finding(finding: str) -> bool:
-    return not finding.startswith(("missing_metadata:", "invalid_json:", "source_hash_mismatch"))
+    return not finding.startswith(("missing_metadata:", "invalid_json:", "non_object_json:", "source_hash_mismatch"))
 
 
 def _is_supported_text(rel_name: str) -> bool:

@@ -183,6 +183,9 @@ def resolve_backend_command(backend_command: str | None, env: Mapping[str, str])
 
 def validate_prompt_pack(prompt_pack: Path) -> PromptPackValidation:
     blockers: list[str] = []
+    symlink_blocker = _symlink_path_blocker(prompt_pack)
+    if symlink_blocker:
+        return PromptPackValidation("blocked", prompt_pack, (symlink_blocker,), None, None, None, None)
     root = prompt_pack.resolve()
     if not root.is_dir():
         return PromptPackValidation("blocked", prompt_pack, ("prompt_pack_missing",), None, None, None, None)
@@ -244,6 +247,20 @@ def _read_json(path: Path, blockers: list[str], label: str) -> dict[str, Any] | 
     return payload
 
 
+def _symlink_path_blocker(path: Path) -> str | None:
+    current = path if path.is_absolute() else Path.cwd() / path
+    try:
+        relative = current.relative_to(Path.cwd())
+    except ValueError:
+        relative = Path(current.name)
+    probe = Path.cwd()
+    for part in relative.parts:
+        probe = probe / part
+        if probe.is_symlink():
+            return "prompt_pack_symlink_path"
+    return None
+
+
 def _require_fields(
     payload: dict[str, Any] | None, required_fields: tuple[str, ...], blockers: list[str], label: str
 ) -> None:
@@ -294,9 +311,9 @@ def _provenance_sync_blockers(provenance: dict[str, Any], blockers: list[str]) -
         if not provenance.get("unsynced_reason"):
             blockers.append("provenance_missing_unsynced_reason")
         provided = provenance.get("provided_context_paths")
-        if not isinstance(provided, list) and not provenance.get("diff_summary"):
+        if (not isinstance(provided, list) or not provided) and not provenance.get("diff_summary"):
             blockers.append("provenance_missing_context_provenance")
-    elif evidence_mode is not None:
+    else:
         blockers.append(f"unsupported_provenance_evidence_mode:{evidence_mode}")
 
 

@@ -1112,9 +1112,11 @@ class TestAuthoringCli(CliRuntimeHarness):
             ("hidden-path", "rejected", "hidden_path"),
             ("unsupported-suffix", "rejected", "unsupported_suffix"),
             ("symlink-draft", "rejected", "symlink_entry"),
+            ("symlink-unindexed-file", "rejected", "symlink_entry:unindexed-link.md"),
             ("executable-draft", "rejected", "executable_entry"),
             ("binary-draft", "rejected", "binary_payload"),
             ("oversized-draft", "rejected", "oversized_entry"),
+            ("candidate-id-mismatch", "fail", "candidate_identity_mismatch"),
             ("empty-index", "fail", "empty_candidates"),
         ),
     )
@@ -1501,6 +1503,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             ("assurance-target", "rejected", "forbidden_canonical_target:requirement"),
             ("extra-canonical-target", "rejected", "unexpected_canonical_target:appendix"),
             ("canonical-doc-path", "rejected", "canonical_doc_path:drafts.requirement"),
+            ("symlink-ancestor", "rejected", "symlink_entry:artifacts/linkdir/requirement-draft.md"),
         ),
     )
     def test_authoring_validate_issue_draft_adoption_negative_matrix(
@@ -1970,6 +1973,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             ("merge-ready-claim", "rejected", "forbidden_authority_claim:merge_ready"),
             ("pr-delivery-claim", "rejected", "forbidden_authority_claim:pr_delivery"),
             ("canonical-doc-path", "rejected", "canonical_doc_path:section_fills.requirement"),
+            ("symlink-ancestor", "rejected", "symlink_entry:artifacts/linkdir/requirement-fill.md"),
             ("missing-template-hash", "fail", "missing_or_invalid_field:template_hash"),
             (
                 "missing-selected-skeleton-hash",
@@ -4440,6 +4444,95 @@ class TestAuthoringCli(CliRuntimeHarness):
             Path("spec-dock/scripts/authoring-pack"),
         ),
     )
+    def test_authoring_pack_compatibility_review_rejects_duplicate_zip_entries(self, script_root: Path) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        review_script = repo_root / script_root / "review_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            duplicate = zipfile.ZipInfo("specdock-authoring-pack/issue/requirement.md")
+            pack_zip = _write_authoring_pack_zip(
+                repo / "duplicate.zip",
+                extra_infos=[(duplicate, "# Duplicate requirement\n")],
+            )
+            output_dir = repo / ".specdock-authoring" / "legacy-duplicate"
+
+            review = subprocess.run(
+                [
+                    sys.executable,
+                    str(review_script),
+                    "--input",
+                    str(pack_zip),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(review)
+            report_payload = json.loads((output_dir / "validation-report.json").read_text(encoding="utf-8"))
+            assert review.returncode == 1, review.stdout + review.stderr
+            assert payload["status"] == "rejected"
+            assert "duplicate_entry:issue/requirement.md" in payload["findings"]
+            assert report_payload["status"] == "rejected"
+
+    @pytest.mark.parametrize(
+        ("metadata_name", "metadata_payload"),
+        (
+            ("manifest.json", "[]\n"),
+            ("provenance.json", '"not-object"\n'),
+            ("source-manifest.json", "[]\n"),
+            ("stale-if.json", "[]\n"),
+            ("adoption/adoption-map.json", "[]\n"),
+            ("adoption/eal-candidates.json", "[]\n"),
+        ),
+    )
+    def test_authoring_pack_compatibility_review_fails_non_object_metadata(
+        self, metadata_name: str, metadata_payload: str
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        review_script = (
+            repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/review_chatgpt_authoring_pack.py"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "non-object-metadata.zip",
+                metadata_overrides={metadata_name: metadata_payload},
+            )
+            output_dir = repo / ".specdock-authoring" / "legacy-non-object"
+
+            review = subprocess.run(
+                [
+                    sys.executable,
+                    str(review_script),
+                    "--input",
+                    str(pack_zip),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(review)
+            assert review.returncode == 1, review.stdout + review.stderr
+            assert payload["status"] == "fail"
+            assert f"non_object_json:{metadata_name}" in payload["findings"]
+
+    @pytest.mark.parametrize(
+        "script_root",
+        (
+            Path("src/spec_dock/assets/spec_dock/scripts/authoring-pack"),
+            Path("spec-dock/scripts/authoring-pack"),
+        ),
+    )
     def test_authoring_pack_compatibility_legacy_review_report_can_stage_same_tree(self, script_root: Path) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         review_script = repo_root / script_root / "review_chatgpt_authoring_pack.py"
@@ -4941,6 +5034,51 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert not (output_dir / "manifest.json").exists()
             assert (output_dir / "diagnostics.json").is_file()
 
+    def test_authoring_pack_prepare_rejects_inconsistent_source_manifest_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "mismatched-preflight.json"
+            output_dir = repo / "mismatched-pack"
+            preflight.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "evidence_mode": "github-synced",
+                        "sync_state": "synced",
+                        "github_sync": "verified",
+                        "source_manifest_hash": "old",
+                        "source_paths": ["source.txt"],
+                        "source_hashes": {"source.txt": "hash"},
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "fail"
+            assert "source_manifest_hash_mismatch" in payload["blockers"]
+            assert payload["output_files"] == []
+            assert not (output_dir / "manifest.json").exists()
+
     def test_authoring_pack_prepare_filters_cache_entries_from_explicit_source_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -5176,7 +5314,7 @@ class TestAuthoringCli(CliRuntimeHarness):
                         "evidence_mode": "local-context",
                         "sync_state": "local_context",
                         "github_sync": "not_verified",
-                        "source_manifest_hash": "hash",
+                        "source_manifest_hash": _manifest_hash({"../secret.txt": "hash"}),
                         "source_paths": ["/Users/example/private.txt"],
                         "source_hashes": {"../secret.txt": "hash"},
                         "provided_context_paths": [".env"],
@@ -5223,7 +5361,7 @@ class TestAuthoringCli(CliRuntimeHarness):
                         "evidence_mode": "local-context",
                         "sync_state": "local_context",
                         "github_sync": "not_verified",
-                        "source_manifest_hash": "hash",
+                        "source_manifest_hash": _manifest_hash({"source.txt": "hash"}),
                         "source_paths": ["source.txt"],
                         "source_hashes": {"source.txt": "hash"},
                         "provided_context_paths": ["source.txt"],
@@ -5304,6 +5442,7 @@ class TestAuthoringCli(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             preflight = Path(tmp) / "preflight.json"
             output_dir = Path(tmp) / "pack"
+            source_hashes = {"source.txt": "hash"}
             preflight.write_text(
                 json.dumps(
                     {
@@ -5311,9 +5450,9 @@ class TestAuthoringCli(CliRuntimeHarness):
                         "evidence_mode": "local-context",
                         "sync_state": "local_context",
                         "github_sync": "not_verified",
-                        "source_manifest_hash": "hash",
+                        "source_manifest_hash": _manifest_hash(source_hashes),
                         "source_paths": ["source.txt"],
-                        "source_hashes": {"source.txt": "hash"},
+                        "source_hashes": source_hashes,
                         "provided_context_paths": ["source.txt"],
                         "unsynced_reason": "dogfood mirror smoke",
                     },
@@ -5374,6 +5513,38 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == "blocked"
             assert payload["backend_source"] == "unset"
             assert "backend_command_unset:set_SPECDOCK_CHATGPT_COMMAND" in payload["blockers"]
+            assert (output_dir / "invocation-summary.json").is_file()
+
+    def test_authoring_backend_invoke_rejects_symlink_prompt_pack_path(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            link = repo / "pack-link"
+            link.symlink_to(pack, target_is_directory=True)
+            output_dir = repo / "invoke-output"
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(link),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert "prompt_pack_symlink_path" in payload["blockers"]
             assert (output_dir / "invocation-summary.json").is_file()
 
     def test_authoring_backend_invoke_cli_backend_command_overrides_env_and_dry_run_skips_execution(self) -> None:
@@ -6951,6 +7122,8 @@ def _write_candidate_stage(
                 payload.pop("authority_claims")
             if mutator == "invalid-schema-version" and number == 1:
                 payload.pop("schema_version")
+            if mutator == "candidate-id-mismatch" and number == 1:
+                payload["candidate_id"] = "candidate-different"
         (candidate_dir / "candidate.json").write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
         index_candidates.append({
             "candidate_id": candidate_id,
@@ -6988,6 +7161,10 @@ def _write_candidate_stage(
         ]
     (candidate_root / "index.json").write_text(json.dumps(index, sort_keys=True) + "\n", encoding="utf-8")
     digest = _candidate_tree_digest(root)
+    if mutator == "symlink-unindexed-file":
+        target = root / "unindexed-target.md"
+        target.write_text("# Unindexed target\n", encoding="utf-8")
+        (root / "unindexed-link.md").symlink_to(target)
     if mutator == "review-digest-mismatch":
         digest = "wrong"
     (stage_dir / "review-report.json").write_text(
@@ -7256,6 +7433,17 @@ def _write_issue_draft_adoption_fixture(repo: Path, *, mutator: str | None = Non
         payload["authority_claims"]["pr_delivery"] = True  # type: ignore[index]
     if mutator == "canonical-doc-path":
         payload["drafts"]["requirement"]["path"] = "requirement.md"  # type: ignore[index]
+    if mutator == "symlink-ancestor":
+        outside = repo / "outside-drafts"
+        outside.mkdir()
+        outside_requirement = outside / "requirement-draft.md"
+        outside_requirement.write_text("# outside requirement\n", encoding="utf-8")
+        linkdir = artifact_dir / "linkdir"
+        linkdir.symlink_to(outside, target_is_directory=True)
+        payload["drafts"]["requirement"]["path"] = "artifacts/linkdir/requirement-draft.md"  # type: ignore[index]
+        payload["drafts"]["requirement"]["sha256"] = hashlib.sha256(  # type: ignore[index]
+            outside_requirement.read_bytes()
+        ).hexdigest()
     if mutator == "issue-id-mismatch":
         payload["issue_id"] = "iss-99999"
     if mutator == "parent-mismatch":
@@ -7363,6 +7551,15 @@ def _write_selected_skeleton_fixture(repo: Path, *, mutator: str | None = None) 
         section_fills.append({"section_id": "requirement", "path": "artifacts/design-fill.md"})
     if mutator == "canonical-doc-path":
         section_fills[0]["path"] = "requirement.md"
+    if mutator == "symlink-ancestor":
+        outside = repo / "outside-sections"
+        outside.mkdir()
+        outside_requirement = outside / "requirement-fill.md"
+        outside_requirement.write_text("# outside requirement\n", encoding="utf-8")
+        linkdir = artifact_dir / "linkdir"
+        linkdir.symlink_to(outside, target_is_directory=True)
+        section_fills[0]["path"] = "artifacts/linkdir/requirement-fill.md"
+        section_fills[0]["sha256"] = hashlib.sha256(outside_requirement.read_bytes()).hexdigest()
     if mutator == "forbidden-claim":
         authority_claims = _draft_authority_claims()
         authority_claims["execution_ready"] = True

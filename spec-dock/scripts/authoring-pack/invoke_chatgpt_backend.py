@@ -102,6 +102,7 @@ def _write_legacy_prompt_pack(prompt_pack: Path, files: tuple[Path, ...]) -> Non
     attachment_dir.mkdir()
     for index, path in enumerate(files):
         shutil.copyfile(path, attachment_dir / f"{index:03d}-{path.name}")
+    context_paths = [path.name for path in files] or ["chatgpt-use-prompt.md"]
     (prompt_pack / "manifest.json").write_text(
         json.dumps(
             {
@@ -135,7 +136,7 @@ def _write_legacy_prompt_pack(prompt_pack: Path, files: tuple[Path, ...]) -> Non
                 "sync_state": "local_context",
                 "github_sync": "not_verified",
                 "source_manifest_hash": "legacy-wrapper",
-                "provided_context_paths": [path.name for path in files],
+                "provided_context_paths": context_paths,
                 "unsynced_reason": "legacy compatibility wrapper input files",
                 "adoption_requires": "explicit_eal_disposition",
                 "authority": "evidence_only",
@@ -150,8 +151,8 @@ def _write_legacy_prompt_pack(prompt_pack: Path, files: tuple[Path, ...]) -> Non
     (prompt_pack / "source-manifest.json").write_text(
         json.dumps(
             {
-                "source_paths": [path.name for path in files],
-                "source_hashes": {path.name: "legacy-wrapper" for path in files},
+                "source_paths": context_paths,
+                "source_hashes": {path: "legacy-wrapper" for path in context_paths},
                 "source_manifest_hash": "legacy-wrapper",
             },
             sort_keys=True,
