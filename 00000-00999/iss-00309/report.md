@@ -327,7 +327,7 @@ Observed result:
 | TC-003 | M4 | yes | unit + init simulation | managed manifest lacked manual skills | focused `test_bundled_skill_assets_cover_managed_manifest` | pass | harness updated |
 | TC-004 | M7〜M90 | yes | command | provider-first mirror needed validation | `./spec-dock/scripts/spec-dock validate`; `git diff --check` | pass | nodes=203 |
 | TC-005 | M5 | yes | inspect | unsupported commands must not be advertised as supported | `rg authoring adopt ...` | pass | only appears in Deferred / unsupported section |
-| TC-006 | M95 | yes | reviewer | initial final reviewers found P1/P2 final-quality template gaps | fix applied; reviewer re-run pending | pending | re-run after full unit verification |
+| TC-006 | M95 | yes | reviewer | initial final reviewers found P1/P2 final-quality template gaps | fix applied; reviewer re-run completed | pass | final spec/code/QA re-reviews passed |
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
@@ -341,8 +341,8 @@ Observed result:
 | CLOS-007 | M5/M6 | PlantUML grep / docs inspection | pass | workflow diagrams included |
 | CLOS-008 | M7 | provider-first update and dogfood validation | pass | `uv run spec-dock update .` |
 | CLOS-009 | M5 | unsupported command grep | pass | unsupported commands appear only as unsupported examples |
-| CLOS-010 | M90 | focused tests / validate / diff check / `tests/cli_runtime` | pass | final reviewer gates pending |
-| CLOS-010 | M95 | reviewer findings repair; focused tests; `tests/unit` | pass | spec/QA re-review pending |
+| CLOS-010 | M90 | focused tests / validate / diff check / `tests/cli_runtime` | pass | final reviewer gates completed |
+| CLOS-010 | M95 | reviewer findings repair; focused tests; `tests/unit` | pass | spec/code/QA re-review passed |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -350,19 +350,19 @@ Observed result:
 | added | CLOS-002 | TC-001 | CLOS-002 | manual backup skills を provider managed assets として追加 | no | yes |
 | changed | CLOS-006 | TC-003 | CLOS-006 | managed skill manifest に manual skill 3件を追加 | no | yes |
 | changed | CLOS-007 | TC-002 | CLOS-007 | Option 3+ と lifecycle PlantUML を docs/templates に追加 | no | yes |
-| changed | CLOS-005 | TC-002 / TC-006 | CLOS-005 | final quality Issue policy の skip eligibility と relay template fields が不足していた | no | pending re-review |
+| changed | CLOS-005 | TC-002 / TC-006 | CLOS-005 | final quality Issue policy の skip eligibility と relay template fields が不足していた | no | completed |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| M1〜M7 | approved-local-execution | scoped docs/skills/templates/test update after reviewer-passed plan | N/A | provider assets, dogfood mirror, focused tests | active Issue plan / provider source of truth | planned skills/docs/templates/registry/tests only | runtime command behavior beyond managed registry; unsupported authoring commands | focused unit tests; `validate`; `diff --check`; `tests/cli_runtime`; final reviewer gates | stop on failing tests or reviewer blockers | changed files, verification results, residual risks | pass; final reviewers pending |
-| M95 | approved-local-execution | reviewer-fail repair for docs/template/skill policy | N/A | final quality policy wording and template fields | reviewer findings / active Issue requirement | provider docs/templates/skills/tests and dogfood mirror | unrelated runtime behavior | focused failing tests; `rg`; `diff --check`; full unit re-run; reviewer re-run | stop if P1/P0 remains | fix evidence and re-review result | fix applied; focused tests and `tests/unit` pass; re-review pending |
+| M1〜M7 | approved-local-execution | scoped docs/skills/templates/test update after reviewer-passed plan | N/A | provider assets, dogfood mirror, focused tests | active Issue plan / provider source of truth | planned skills/docs/templates/registry/tests only | runtime command behavior beyond managed registry; unsupported authoring commands | focused unit tests; `validate`; `diff --check`; `tests/cli_runtime`; final reviewer gates | stop on failing tests or reviewer blockers | changed files, verification results, residual risks | pass; final reviewers passed |
+| M95 | approved-local-execution | reviewer-fail repair for docs/template/skill policy | N/A | final quality policy wording and template fields | reviewer findings / active Issue requirement | provider docs/templates/skills/tests and dogfood mirror | unrelated runtime behavior | focused failing tests; `rg`; `diff --check`; full unit re-run; reviewer re-run | stop if P1/P0 remains | fix evidence and re-review result | fix applied; focused tests and `tests/unit` pass; re-review passed |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| M1〜M7/M90 | reviewed | ChatGPT-first planning route docs/skills/templates/tests | commit pending | pending | N/A | N/A | N/A | N/A |
-| M95 reviewer-fix | reviewed | final quality skip policy and template relay fields | commit pending | pending | N/A | N/A | N/A | N/A |
+| M1〜M7/M90 | reviewed | ChatGPT-first planning route docs/skills/templates/tests | `746c0ed2` | clean after push / PR observation | N/A | N/A | N/A | N/A |
+| M95 reviewer-fix | reviewed | final quality skip policy and template relay fields | `746c0ed2` | clean after push / PR observation | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - Provider assets:
@@ -422,7 +422,39 @@ Observed result:
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| PR repair | reviewed | `tests/unit/infra/test_init_update.py` format repair and report evidence | commit pending | pending | N/A | N/A | N/A | N/A |
+| PR repair | reviewed | `tests/unit/infra/test_init_update.py` format repair and report evidence | `6eb0385a` | clean after push / PR observation | N/A | N/A | N/A | N/A |
+
+### セッションログ（2026-07-09 03:40 - 04:00）
+
+#### 対象
+- Step: PR merge-preparation observation
+- AC/EC: EC-010 / CLOS-010
+
+#### 実施内容
+- PR #310 を latest head `6eb0385a2893ac8e836050cb5dae7e26d6664bfd` で観測した。
+- GitHub Actions は `validate` と `provider-tests` が成功した。
+- Codex PR review は P2 が 5件残ったが、観測スクリプトの blocker policy は全件 `non_blocking_followup` と判定した。
+- `mergeStateStatus` は `CLEAN` であり、`github-pr-merge-preparer` の `merge-prepared` 条件を満たす。
+
+#### 実行コマンド / 結果
+```bash
+./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --repo chemitaro/spec-dock --pr 310 --head-sha 6eb0385a2893ac8e836050cb5dae7e26d6664bfd --timeout-seconds 1800 --poll-interval-seconds 30 --quiet-seconds 60 --same-fingerprint-count 2 --zero-check-grace-polls 2 --progress stderr-summary
+gh pr view 310 --json number,state,isDraft,mergeStateStatus,headRefOid,statusCheckRollup,url
+git status --short --branch
+```
+
+Observed result:
+- Observation `overall_status`: `passed`
+- Observation `recommended_next_action`: `merge_prepared`
+- Observation `blocker_count`: `0`
+- Observation `non_blocking_count`: `5`
+- PR `mergeStateStatus`: `CLEAN`
+- Worktree: clean
+
+#### 非ブロッキング follow-up
+| 種別 | 件数 | 取扱い |
+|---|---:|---|
+| Codex PR review P2 | 5 | この PR branch では修正しない。必要なら別 Issue で扱う。 |
 
 ---
 
