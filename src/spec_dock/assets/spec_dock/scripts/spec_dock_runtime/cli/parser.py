@@ -161,10 +161,10 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "authoring_validate_selected_skeleton_fill",
     )
 
-    authoring_approval = authoring_sub.add_parser("approval", help="Deferred authoring approval skeletons")
+    authoring_approval = authoring_sub.add_parser("approval", help="Check authoring approval evidence")
     authoring_approval_sub = authoring_approval.add_subparsers(dest="authoring_approval_cmd", required=True)
     _bind_leaf(
-        authoring_approval_sub.add_parser("check", help="Deferred approval check skeleton"),
+        authoring_approval_sub.add_parser("check", help="Check human approval evidence before node creation"),
         registry,
         "authoring_approval_check",
     )

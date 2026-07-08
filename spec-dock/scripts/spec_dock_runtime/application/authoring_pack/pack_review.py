@@ -65,7 +65,7 @@ def _unsafe_report_path(report_path: Path) -> str | None:
     current = absolute_path
     cwd_resolved = Path.cwd().resolve()
     while current != current.parent:
-        if current.exists() and current.is_symlink():
+        if current.is_symlink():
             return "unsafe_report_path:symlink"
         if current.exists() and current.resolve() == cwd_resolved:
             break
