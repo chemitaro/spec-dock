@@ -191,7 +191,7 @@ def validate_candidate_pack(
     observed_source_hash = _source_manifest_hash(pack_root, findings)
     if expected_source_hash and observed_source_hash != expected_source_hash:
         comparison.append("source_manifest_hash_mismatch")
-    observed_review_digest = tree_digest(pack_root)
+    observed_review_digest = tree_digest(pack_root, findings)
     if expected_review_digest and observed_review_digest != expected_review_digest:
         comparison.append("review_digest_mismatch")
 
@@ -246,6 +246,7 @@ def validate_candidate_pack(
             if payload is not None:
                 findings.append(f"non_object_json:{rel_path}")
             continue
+        _validate_candidate_identity(payload, rel_path, candidate_id, title, slug, findings)
         _validate_common_authority(payload, rel_path, findings, require_claims=True)
         if payload.get("candidate_kind") != ("epic" if candidate_kind == "initiative-epic" else "issue"):
             findings.append(f"invalid_candidate_kind:{candidate_id or rel_path}")
@@ -428,12 +429,24 @@ def validate_approval_evidence(
     )
 
 
-def tree_digest(pack_root: Path) -> str | None:
+def tree_digest(pack_root: Path, findings: list[str] | None = None) -> str | None:
     if not pack_root.is_dir() or pack_root.is_symlink():
+        if findings is not None and pack_root.is_symlink():
+            findings.append("symlink_entry:candidate_pack_root")
         return None
     digest = hashlib.sha256()
-    for path in sorted(item for item in pack_root.rglob("*") if item.is_file() and not item.is_symlink()):
+    for path in sorted(pack_root.rglob("*")):
         rel_path = path.relative_to(pack_root).as_posix()
+        if path.is_symlink():
+            if findings is not None:
+                findings.append(f"symlink_entry:{rel_path}")
+            return None
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            if findings is not None:
+                findings.append(f"unsupported_entry:{rel_path}")
+            return None
         digest.update(rel_path.encode("utf-8"))
         digest.update(b"\0")
         digest.update(hashlib.sha256(path.read_bytes()).hexdigest().encode("ascii"))
@@ -449,6 +462,22 @@ def _source_manifest_hash(pack_root: Path, findings: list[str]) -> str | None:
             return value
         findings.append("missing_or_invalid_field:source_manifest_hash")
     return None
+
+
+def _validate_candidate_identity(
+    payload: dict[str, object],
+    label: str,
+    expected_candidate_id: str | None,
+    expected_title: str | None,
+    expected_slug: str | None,
+    findings: list[str],
+) -> None:
+    if expected_candidate_id and payload.get("candidate_id") != expected_candidate_id:
+        findings.append(f"candidate_identity_mismatch:{label}:candidate_id")
+    if expected_title and payload.get("title") != expected_title:
+        findings.append(f"candidate_identity_mismatch:{label}:title")
+    if expected_slug and payload.get("slug") != expected_slug:
+        findings.append(f"candidate_identity_mismatch:{label}:slug")
 
 
 def _file_digest(path: Path | None, findings: list[str]) -> str | None:

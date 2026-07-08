@@ -438,6 +438,9 @@ def _validate_draft_item(
         findings.append(f"non_artifact_draft_path:drafts.{key}")
         return False
     target = issue_dir / rel
+    if _has_symlink_component(issue_dir, target):
+        findings.append(f"symlink_entry:{rel}")
+        return False
     if not _validate_text_file(target, rel, findings):
         return False
     expected_sha = _digest_value(item.get("sha256"))
@@ -466,6 +469,9 @@ def _validate_section_fill(
         findings.append(f"non_artifact_section_path:section_fills.{section}")
         return False
     target = issue_dir / rel
+    if _has_symlink_component(issue_dir, target):
+        findings.append(f"symlink_entry:{rel}")
+        return False
     if not _validate_text_file(target, rel, findings):
         return False
     expected_sha = _digest_value(item.get("sha256"))
@@ -527,6 +533,19 @@ def _validate_text_file(path: Path, label: str, findings: list[str]) -> bool:
         return False
     findings.extend(scan_authoring_payload(text))
     return True
+
+
+def _has_symlink_component(base: Path, path: Path) -> bool:
+    try:
+        relative = path.relative_to(base)
+    except ValueError:
+        return True
+    current = base
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
 
 
 def _safe_rel(value: str, findings: list[str], *, allow_suffixes: tuple[str, ...]) -> str | None:
