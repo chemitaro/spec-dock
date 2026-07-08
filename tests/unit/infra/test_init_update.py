@@ -10166,8 +10166,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert "Evidence Adoption Ledger" in issue_planning_text
         assert "fresh `spec-reviewer` pass before execution handoff" in issue_planning_text
 
-        for required_fragment in (
-            "evidence-only",
+        assert "evidence-only" in authoring_text
+        forbidden_claims_section = self._issue_71_extract_markdown_section_by_heading_prefix(
+            markdown_text=authoring_text,
+            heading_prefix="Forbidden Claims",
+            source_label="spec-dock-chatgpt-authoring/SKILL.md",
+        )
+
+        for forbidden_claim in (
             "canonical adoption completed",
             "`.assurance.json` mutation",
             "`authorized_profile` decision",
@@ -10179,7 +10185,7 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "Epic completion",
             "PR delivery",
         ):
-            assert required_fragment in authoring_text
+            assert forbidden_claim in forbidden_claims_section
 
         local_dependency_terms = (
             "/Users/" + "iwasawayuuta",
