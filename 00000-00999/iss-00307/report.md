@@ -53,6 +53,7 @@ Disposition ごとの必須証跡:
 | D-002 | resolved | operation | orchestrator | ChatGPT UseのGitHub connector観測ではbranchが`main`に対してbehind / divergedの可能性がある | A: 現状branchのままPR deliveryへ進む; B: final PR readiness前にlocalでfetch / rev-list / 必要なmain mergeを行い、full gateを再実行する | Bを採用 | PR mergeabilityはlocal branch状態とGitHub checksに依存するため、final gateにmain syncを含める必要がある | promoted_to_plan | `plan.md` S03, S09 | S03で実コマンド結果を追記する |
 | D-003 | resolved | compatibility | user / orchestrator | local `oracle-chatgpt` wrapperへの個人環境依存をSpecDock正式workflowに持ち込む懸念 | A: ローカルwrapperを前提にする; B: configurable backend contractとして扱い、local wrapperは一例に留める | Bを採用 | SpecDock installed runtimeはconsumer repoでも再現可能である必要がある | promoted_to_requirement / promoted_to_design / promoted_to_plan | `requirement.md` AC-006/AC-007, `design.md` section 3, `plan.md` S04 | S04でgrep / backend testsを実行する |
 | D-004 | resolved | test-strategy | S06 installed simulation | `uvx --from . spec-dock init <tmp>` がこの環境ではlocal source buildではなく既存/別解決の古いtool surfaceを実行し、authoring command未導入のfalse negativeを返した | A: `uvx --from .` のままgateを維持する; B: `uvx --isolated --from <absolute-repo-path>` をlocal source install gateにする | Bを採用 | `uv build --wheel` と `uvx --isolated --from <absolute-repo-path> ...` ではprovider-side sourceがbuildされ、installed targetに新skill/docs/runtime commandが届いた | promoted_to_design / promoted_to_plan / applied | `plan.md` S06, `design.md` G2, `src/spec_dock/assets/spec_dock/scripts/authoring-pack/README.md` | なし |
+| D-005 | resolved | test-strategy | qa-reviewer | provider authoring docsの日本語primary heading修正がchecked-in dogfooding docs mirrorとparity testに反映されていなかった | A: provider docsのみ修正する; B: dogfooding docs mirrorも同期し、docs parity mapへauthoring docsを追加する | Bを採用 | consumer-side dogfooding surfaceでも同じ見出し契約を守る必要がある | applied | `spec-dock/docs/workflow_chatgpt_authoring_pack.md`, `spec-dock/docs/reference_authoring_pack_backend.md`, `spec-dock/docs/authoring/chatgpt-pack.md`, `tests/unit/infra/test_init_update.py` | focused parity / heading testsを再実行する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -134,7 +135,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - S01 planning adoptionとして、Issue-local draft artifactsとChatGPT Use analysisを採用・棄却判断し、`requirement.md`、`design.md`、`plan.md`をfinal quality gate / PR delivery Issue向けに正式化した。
 - S02〜S07のうち、closure / main sync / runtime backend / evidence safety / installed asset simulation / focused validation gateを実行した。
 - S06で`uvx --from .`がlocal source install検証として不適切なfalse negativeを返したため、`uvx --isolated --from <absolute-repo-path>`へgate記述を修正した。
-- まだfinal reviewer gate / PR deliveryは実施していない。S08以降でfresh reviewersとPR作成へ進む。
+- S08 final reviewer gateはPR作成前に一度passしたが、PR #308のGitHub CI failureを受けたrepair diffでruntime/docs/tests/reportが追加変更された。post-repair diffにはfresh reviewer gateを再実行し、blocking findingをRepair Queueで解消してからcommit/pushとPR check observationへ進む。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -258,7 +259,10 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | S01 | planning reviewer | spec-reviewer | fresh | pass | no | execute approved plan | `019f4113-eebf-7b52-a599-5da0423e6b15`; first review failed P1/P2, re-review passed with one non-blocking P3 cleaned in report |
-| S08 | final integrated reviewers | spec-reviewer / code-reviewer / qa-reviewer | pending | not_run | N/A | blocked until pass | S02〜S07完了後に実行する |
+| S08a | final integrated reviewers before PR delivery | spec-reviewer / code-reviewer / qa-reviewer | fresh at PR creation time | pass | no | allowed PR creation | PR #308作成前の統合diffに対してpass。ただし後続CI repair diffには適用しない |
+| S08b | post-CI-repair reviewer gate | spec-reviewer | fresh after CI repair | pass | no | proceed to commit/push and PR check observation | `019f418c-c087-7023-8a40-20b270999d2a`; initial P1s fixed in RQ-001/RQ-002 and re-review passed |
+| S08c | post-CI-repair code review | code-reviewer | fresh after CI repair | pass-with-p2 | accepted as non-blocking | proceed after recording risk | `019f418d-2183-7321-80da-84e5428121db`; P2 broad mypy suppression risk recorded as non-blocking |
+| S08d | post-CI-repair QA review | qa-reviewer | fresh after CI repair | pass | no | proceed to commit/push and PR check observation | `019f418d-2272-7943-862f-7e53d90e9820`; initial P1 fixed in RQ-003 and re-review passed |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -434,16 +438,27 @@ Closure conclusion: all intermediate GitHub Issues are closed, final dependency 
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
 | qa-reviewer | whole issue obligation coverage | full CLI baseline required and executed | `tests/cli_runtime` -> 1044 passed, 75 skipped after structural import repair; QA re-review pass | pass |
+| qa-reviewer | post-CI-repair docs parity coverage | dogfooding authoring docs must match provider assets and be covered by parity tests | `019f418d-2272-7943-862f-7e53d90e9820`; P1 found stale dogfooding authoring docs and missing parity coverage; fix applied in RQ-003; re-review passed | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
 | code-reviewer | issue-wide integrated diff | P1 installed planning skill checks missing from S06 plan -> fixed; P2 concrete temp paths in report -> redacted; re-review found no findings | 2 | pass |
+| code-reviewer | post-CI-repair runtime/docs/tests/report diff | P2 broad file-wide `mypy` suppression risk in shipped compatibility scripts; accepted as non-blocking maintainability risk for this CI repair | 1 | pass-with-p2 |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
 | spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | P1 durable host path evidence -> redacted; P2 D-004 disposition -> fixed; re-review found no findings | 2 | pass |
+| spec-reviewer | post-CI-repair report auditability | P1 missing CI Repair Queue entry and stale reviewer status; fixed in RQ-001/RQ-002; re-review passed | 2 | pass |
+
+### 修復キュー（Repair Queue）
+| ID | 起票元（source） | 重要度（severity） | blocking | 問題（issue） | 修復内容（repair action） | 再実行コマンド / 証跡（re-run command / evidence） | 状態（status） |
+|---|---|---|---|---|---|---|---|
+| RQ-001 | PR #308 `provider-tests` / local `make lint` | P1 | yes until GitHub checks pass | GitHub CI failed in `make lint` after PR creation | Python 3.11-compatible `timezone.utc`、ruff/import cleanup、typed JSON/test helpers、mypy-safe runtime contracts、Japanese-primary docs headings、provider-to-dogfooding runtime mirror parityを修正 | `make lint` -> pass; `uv run pytest tests/cli_runtime/test_authoring.py` -> 314 passed, 1 skipped; `uv run pytest tests/cli_runtime/test_wrappers.py` -> 7 passed; focused structural/init tests -> pass; `uv run pytest` -> 2230 passed, 75 skipped | locally repaired; unresolved until commit/push and PR #308 checks pass |
+| RQ-002 | spec-reviewer `019f418c-c087-7023-8a40-20b270999d2a` | P1 | no | CI failureをRepair Queueでdispositionせず、post-repair reviewer statusが古いpass/pending表現のままだった | Reviewer Gate Statusをpre-PR passとpost-CI-repair gateに分離し、このRepair QueueへCI failure / reviewer finding / remaining PR observationを記録 | report update; `./spec-dock/scripts/spec-dock validate` -> ok; `git diff --check` -> pass; spec-reviewer re-review -> pass | resolved |
+| RQ-003 | qa-reviewer `019f418d-2272-7943-862f-7e53d90e9820` | P1 | no | provider authoring docsの日本語primary heading修正がdogfooding docs mirrorへ反映されず、parity testにも含まれていなかった | `spec-dock/docs/workflow_chatgpt_authoring_pack.md`、`spec-dock/docs/reference_authoring_pack_backend.md`、`spec-dock/docs/authoring/chatgpt-pack.md`をprovider assetと同期し、dogfooding docs parity mapへ3ファイルを追加 | focused docs parity / heading tests -> 2 passed; provider/dogfooding authoring docs diff -> no output; QA re-review -> pass | resolved |
+| RQ-004 | code-reviewer `019f418d-2183-7321-80da-84e5428121db` | P2 | no | shipped compatibility scriptsにfile-wide `# mypy: ignore-errors` があり、将来の型 drift をCIが検出しにくい | 今回のCI repairではnon-blocking riskとして記録し、future hardeningでtargeted type fixesへ置換する余地を残す | code-reviewer passed with P2; no blocking rerun required | accepted non-blocking |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
@@ -480,5 +495,12 @@ Closure conclusion: all intermediate GitHub Issues are closed, final dependency 
 - S05 evidence safety: `uv run pytest tests/cli_runtime/test_authoring.py` -> 314 passed, 1 skipped.
 - S06 installed surface: `uvx --from .` false-negative recorded; `uvx --isolated --from <absolute-repo-path>` installed expected authoring/planning skill, workflow doc, runtime command files, and `authoring --help` passed.
 - S07 validation: `git diff --check`, `spec-dock validate`, `test_wrappers.py`, focused `test_init_update.py`, `test_authoring.py`, targeted structural test, and full `tests/cli_runtime` passed after repairing the commands-layer import violation found by the first full run.
-- S08/S09 final reviewer / PR delivery remains pending.
+- S08 final reviewer gate: spec-reviewer / code-reviewer / qa-reviewer passed before PR delivery.
+- S09 PR delivery: PR #308 was created as ready-for-review and initially mergeable, but GitHub Provider CI `provider-tests` failed in `make lint`.
+- S09 CI repair: local `make lint` reproduced ruff / format / mypy failures in the authoring pack surface. Repairs were limited to Python 3.11-compatible `timezone.utc`, ruff-format/import cleanup, typed JSON/test helpers, mypy-safe runtime contracts, Japanese-primary authoring docs headings, and provider-to-dogfooding runtime mirror parity.
+- S09 post-repair local evidence: `make lint` -> pass (`ruff check`, `ruff format --check`, `mypy`); `uv run pytest tests/cli_runtime/test_authoring.py` -> 314 passed, 1 skipped; `uv run pytest tests/cli_runtime/test_wrappers.py` -> 7 passed; `uv run pytest tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_final_api_call_site_and_structural_regression` -> 1 passed; `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_spec_document_templates_keep_policy_out_of_scaffold tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_mirror_match_provider_assets` -> 2 passed; `uv run pytest` -> 2230 passed, 75 skipped; `./spec-dock/scripts/spec-dock validate` before report update -> ok.
+- S09 reviewer repair evidence: post-CI-repair spec-reviewer found missing Repair Queue / stale reviewer status; QA reviewer found stale dogfooding authoring docs and missing docs parity coverage; code-reviewer passed with non-blocking P2 broad mypy suppression risk. Report Repair Queue, reviewer status, dogfooding docs mirror, and docs parity map were repaired. Focused docs parity / heading tests -> 2 passed; authoring docs provider-to-dogfooding diff -> clean; `./spec-dock/scripts/spec-dock validate` -> ok; `git diff --check` -> pass.
+- S09 reviewer re-review evidence: spec-reviewer `019f418c-c087-7023-8a40-20b270999d2a` re-review -> pass; QA reviewer `019f418d-2272-7943-862f-7e53d90e9820` re-review -> pass. Remaining blocking item is PR #308 GitHub check observation after commit/push.
+- S09 final pre-commit evidence after docs parity and report updates: `make lint` -> pass; focused docs parity / heading tests -> 2 passed; `./spec-dock/scripts/spec-dock validate` -> ok; `git diff --check` -> pass.
+- S09 remaining: commit/push the CI repair, wait for GitHub PR #308 checks, then record final PR mergeability evidence.
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
