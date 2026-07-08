@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from spec_dock_runtime.domain.authoring_pack.source_manifest import SourceManifest
-
+if TYPE_CHECKING:
+    from spec_dock_runtime.domain.authoring_pack.source_manifest import SourceManifest
 
 PreflightStatus = Literal["pass", "blocked", "stale"]
 EvidenceMode = Literal["github-synced", "local-context"]

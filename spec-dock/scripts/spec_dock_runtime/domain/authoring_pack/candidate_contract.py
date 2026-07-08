@@ -1,20 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
-from typing import Literal
 import hashlib
 import json
+from pathlib import Path, PurePosixPath
+from typing import Literal
 
 from spec_dock_runtime.domain.authoring_pack.authority_boundary import scan_authoring_payload, scan_sensitive_payload
 from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     ADOPTION_STATUS,
     AUTHORITY,
     BUNDLE_GENERATION_NOT_PROMOTION,
-    EXPECTED_OUTPUT_ROOT,
 )
 from spec_dock_runtime.domain.authoring_pack.zip_contract import MAX_ENTRY_BYTES
-
 
 CandidateKind = Literal["initiative-epic", "epic-issue"]
 CandidateStatus = Literal["pass", "fail", "blocked", "stale", "rejected"]
@@ -216,8 +214,8 @@ def validate_candidate_pack(
     seen_titles: dict[str, int] = {}
     seen_slugs: dict[str, int] = {}
     scope_signatures: dict[str, int] = {}
-    indexed_candidate_ids = {
-        item.get("candidate_id")
+    indexed_candidate_ids: set[str] = {
+        item["candidate_id"]
         for item in candidate_items
         if isinstance(item, dict) and isinstance(item.get("candidate_id"), str)
     }
@@ -265,7 +263,9 @@ def validate_candidate_pack(
             _validate_epic_candidate(payload, candidate_id or rel_path, indexed_candidate_ids, findings)
         else:
             _validate_issue_candidate(payload, candidate_id or rel_path, findings)
-        _validate_drafts(pack_root, payload, candidate_path=rel_path, candidate_id=candidate_id or rel_path, findings=findings)
+        _validate_drafts(
+            pack_root, payload, candidate_path=rel_path, candidate_id=candidate_id or rel_path, findings=findings
+        )
         valid_count += 1
 
     status = _status_from_findings(findings, comparison)
@@ -308,7 +308,9 @@ def validate_approval_evidence(
 ) -> ApprovalCheckResult:
     findings: list[str] = []
     comparison: list[str] = []
-    observed_candidate_evidence_digest = _file_digest(candidate_evidence_path, findings) if candidate_evidence_path else None
+    observed_candidate_evidence_digest = (
+        _file_digest(candidate_evidence_path, findings) if candidate_evidence_path else None
+    )
     payload = _read_approval_json(approval_path, findings)
     approver_kind: str | None = None
     requested_scope: str | None = None
@@ -360,12 +362,10 @@ def validate_approval_evidence(
             findings.append("self_approval_forbidden")
         requested_scope = _scope_value(payload.get("requested_scope"), "requested_scope", findings)
         effective_scope = _scope_value(payload.get("effective_scope"), "effective_scope", findings)
-        if expected_requested_scope:
-            if requested_scope != expected_requested_scope:
-                comparison.append("requested_scope_mismatch")
-        if expected_effective_scope:
-            if effective_scope != expected_effective_scope:
-                comparison.append("effective_scope_mismatch")
+        if expected_requested_scope and requested_scope != expected_requested_scope:
+            comparison.append("requested_scope_mismatch")
+        if expected_effective_scope and effective_scope != expected_effective_scope:
+            comparison.append("effective_scope_mismatch")
         candidate_pack = payload.get("candidate_pack")
         if isinstance(candidate_pack, dict):
             if candidate_pack.get("digest_algorithm") != "sha256-tree-v1":
@@ -651,12 +651,14 @@ def _validate_parent_trace(
     if not isinstance(trace, dict):
         findings.append(f"missing_or_invalid_field:{candidate_id}:parent_trace")
         return
-    if candidate_kind == "initiative-epic" and expected_parent_initiative:
-        if trace.get("initiative_id") != expected_parent_initiative:
-            comparison.append(f"parent_initiative_mismatch:{candidate_id}")
-    if candidate_kind == "epic-issue" and expected_parent_epic:
-        if trace.get("epic_id") != expected_parent_epic:
-            comparison.append(f"parent_epic_mismatch:{candidate_id}")
+    if (
+        candidate_kind == "initiative-epic"
+        and expected_parent_initiative
+        and trace.get("initiative_id") != expected_parent_initiative
+    ):
+        comparison.append(f"parent_initiative_mismatch:{candidate_id}")
+    if candidate_kind == "epic-issue" and expected_parent_epic and trace.get("epic_id") != expected_parent_epic:
+        comparison.append(f"parent_epic_mismatch:{candidate_id}")
 
 
 def _validate_boundary(

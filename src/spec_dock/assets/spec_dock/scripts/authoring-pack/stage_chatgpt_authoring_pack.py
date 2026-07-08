@@ -14,9 +14,12 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 _SPEC_DOCK_SCRIPTS_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_SPEC_DOCK_SCRIPTS_DIR))
 
-from spec_dock_runtime.application.authoring_pack.pack_stage import PackStageRequest, stage_authoring_pack
-from spec_dock_runtime.domain.authoring_pack.zip_contract import review_pack_input
-from spec_dock_runtime.presentation.authoring_pack.pack_stage_renderer import (
+from spec_dock_runtime.application.authoring_pack.pack_stage import (  # noqa: E402
+    PackStageRequest,
+    stage_authoring_pack,
+)
+from spec_dock_runtime.domain.authoring_pack.zip_contract import review_pack_input  # noqa: E402
+from spec_dock_runtime.presentation.authoring_pack.pack_stage_renderer import (  # noqa: E402
     render_pack_stage_json,
     render_pack_stage_text,
 )
@@ -96,6 +99,7 @@ def _legacy_report_digest(payload: dict[str, object]) -> str | None:
         return value if isinstance(value, str) and value else None
     return None
 
+
 def _legacy_pack_digest(input_path: Path) -> str | None:
     files: dict[str, str] = {}
     root = "specdock-authoring-pack"
@@ -129,8 +133,8 @@ def _legacy_pack_digest(input_path: Path) -> str | None:
 
 
 def _legacy_review_block_result(input_path: Path, stage_dir: Path, status: str):
-    from spec_dock_runtime.domain.authoring_pack.zip_contract import PackReviewResult
     from spec_dock_runtime.application.authoring_pack.pack_stage import PackStageResult
+    from spec_dock_runtime.domain.authoring_pack.zip_contract import PackReviewResult
 
     review = PackReviewResult(
         status=status if status in {"pass", "fail", "blocked", "stale", "rejected"} else "blocked",

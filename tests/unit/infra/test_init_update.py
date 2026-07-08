@@ -414,7 +414,14 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/phase_plan_issue.md": ("src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md"),
         "spec-dock/docs/workflow_spec_authoring.md": ("src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md"),
         "spec-dock/docs/workflow_clarification.md": ("src/spec_dock/assets/spec_dock/docs/workflow_clarification.md"),
+        "spec-dock/docs/workflow_chatgpt_authoring_pack.md": (
+            "src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md"
+        ),
+        "spec-dock/docs/reference_authoring_pack_backend.md": (
+            "src/spec_dock/assets/spec_dock/docs/reference_authoring_pack_backend.md"
+        ),
         "spec-dock/docs/authoring/issue-plan.md": ("src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md"),
+        "spec-dock/docs/authoring/chatgpt-pack.md": ("src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md"),
         "spec-dock/docs/authoring/decision-routing.md": (
             "src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md"
         ),

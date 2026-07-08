@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-from spec_dock_runtime.domain.authoring_pack.candidate_contract import ApprovalCheckResult
+if TYPE_CHECKING:
+    from spec_dock_runtime.domain.authoring_pack.candidate_contract import ApprovalCheckResult
 
 
 def render_approval_check_json(result: ApprovalCheckResult) -> str:

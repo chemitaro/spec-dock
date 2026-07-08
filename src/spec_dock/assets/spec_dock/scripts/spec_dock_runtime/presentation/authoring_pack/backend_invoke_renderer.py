@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-from spec_dock_runtime.domain.authoring_pack.backend_invoke_contract import BackendInvokeResult
+if TYPE_CHECKING:
+    from spec_dock_runtime.domain.authoring_pack.backend_invoke_contract import BackendInvokeResult
 
 
 def render_backend_invoke_json(result: BackendInvokeResult) -> str:

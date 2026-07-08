@@ -195,7 +195,13 @@ class TestCliRulesContract(CliRuntimeHarness):
                 assert "Historical creation command examples are intentionally omitted" in text
                 assert "new doc " not in text
                 assert "./spec " not in text
-            for skill_text in (hub_skill, issue_skill, chatgpt_authoring_skill, codex_adapter_skill, copilot_adapter_skill):
+            for skill_text in (
+                hub_skill,
+                issue_skill,
+                chatgpt_authoring_skill,
+                codex_adapter_skill,
+                copilot_adapter_skill,
+            ):
                 assert "./spec-dock/scripts/spec-dock" in skill_text
                 assert "./spec " not in skill_text
             assert "name: spec-dock-hub" in hub_skill

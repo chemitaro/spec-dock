@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal
 import json
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from spec_dock_runtime.application.authoring_pack.candidate_validation import (
     CandidateValidationRequest,

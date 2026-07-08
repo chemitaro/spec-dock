@@ -1,4 +1,4 @@
-# ChatGPT authoring pack ワークフロー
+# オーサリングパックワークフロー（ChatGPT authoring pack）
 
 この文書は、ChatGPT / Oracle を SpecDock planning workflow の evidence lane として使うための利用者向けガイドです。
 Operational entrypoint は `.agents/skills/spec-dock-chatgpt-authoring/SKILL.md` であり、この文書は runtime command、authority boundary、human gate、relay delivery policy の参照面です。
@@ -11,7 +11,7 @@ Operational entrypoint は `.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`
 - ChatGPT evidence を採用する場合、main orchestrator が Evidence Adoption Ledger に採否を記録し、canonical docsへ再記述し、fresh reviewer gate を通す。
 - reviewed Epic plan が final delivery Issue を明示している場合だけ、中間 Issue は個別 PR を作らず、relay-style に `issue finish` から次 Issue の `issue start` へ進む。それ以外の multi-Issue Epic では通常の PR Delivery / Merge Preparation Gate に従う。
 
-## Evidence mode
+## 証跡モード（Evidence mode）
 
 ### `github-synced`
 
@@ -29,7 +29,7 @@ local docs、diff summary、tree snapshot、artifact、必要な source snippets
 
 ## 上流から下流への使い分け
 
-### Initiative planning
+### イニシアチブ計画での利用（Initiative planning）
 
 Initiative では、要件定義書を起点に Initiative の design / plan と Epic candidate を生成できます。
 Epic candidate は提案であり、Epic node creation の前に human approval gate を必ず通します。
@@ -44,7 +44,7 @@ Epic candidate は提案であり、Epic node creation の前に human approval 
 6. `authoring validate initiative-epic-candidates` で candidate schema を検査する。
 7. 人間が Epic candidate を承認した後、main orchestrator が Epic node を作成し、canonical docs / report に採用判断を記録する。
 
-### Epic planning
+### エピック計画での利用（Epic planning）
 
 Epic では、Epic requirement / design / plan と、配下 Issue の draft requirement / draft design / draft plan をまとめて生成できます。
 Issue candidate / draft は提案であり、Issue node creation の前に human approval gate を通します。
@@ -58,7 +58,7 @@ Issue candidate / draft は提案であり、Issue node creation の前に human
 5. 人間が Issue slice を承認した後、Issue node を作成する。
 6. 作成した各 Issue の draft docs は Issue-local artifacts として扱い、Issue planning 時に正式版へ採用する。
 
-### Issue planning
+### イシュー計画での利用（Issue planning）
 
 Issue には大きく二つの入口があります。
 
@@ -68,7 +68,7 @@ Issue には大きく二つの入口があります。
 Epic draft から採用する場合も、`authoring validate issue-draft-adoption` は draft adoption input の形式や一致を確認するだけです。`pass` は reviewer pass ではありません。
 main orchestrator が採用部分を canonical docs に再記述し、fresh `spec-reviewer` pass を通してから execution-ready とします。
 
-## Supported authoring commands
+## 対応済み authoring commands（Supported authoring commands）
 
 現在 supported として案内できる command は次の通りです。
 
@@ -85,7 +85,7 @@ main orchestrator が採用部分を canonical docs に再記述し、fresh `spe
 ./spec-dock/scripts/spec-dock authoring approval check
 ```
 
-## Deferred / unsupported operations
+## 延期・未対応の操作（Deferred / unsupported operations）
 
 次の操作はこの runtime lane の supported command として案内しません。
 
@@ -95,7 +95,7 @@ main orchestrator が採用部分を canonical docs に再記述し、fresh `spe
 
 このため、`authoring adopt`、`authoring create-issues-from-zip`、`authoring mark-reviewer-pass`、`authoring set-authorized-profile`、`authoring issue-execution-ready`、`authoring pr-ready` のような操作名は、現在の supported usage example として使いません。
 
-## Human gate と relay delivery
+## 人間ゲートとリレー型 delivery（Human gate / relay delivery）
 
 Epic / Issue の node creation 前には、candidate list を人間が確認し、明示的に承認します。
 承認済み Issue の draft adoption では、commands が evidence の review / stage / validation を支援できます。ただし canonical adoption は自動化せず、main orchestrator の EAL disposition、canonical rewrite、fresh `spec-reviewer` pass を必ず通します。

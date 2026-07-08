@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 from pathlib import Path
@@ -159,16 +160,14 @@ def _provenance(preflight: dict[str, Any]) -> dict[str, object]:
         **authority_boundary(),
     }
     if preflight.get("evidence_mode") == "local-context":
-        payload.update(
-            {
-                "github_sync": "not_verified",
-                "sync_state": "local_context",
-                "provided_context_paths": list(_string_tuple(preflight.get("provided_context_paths"))),
-                "diff_summary": preflight.get("diff_summary"),
-                "unsynced_reason": preflight.get("unsynced_reason"),
-                "adoption_requires": "explicit_eal_disposition",
-            }
-        )
+        payload.update({
+            "github_sync": "not_verified",
+            "sync_state": "local_context",
+            "provided_context_paths": list(_string_tuple(preflight.get("provided_context_paths"))),
+            "diff_summary": preflight.get("diff_summary"),
+            "unsynced_reason": preflight.get("unsynced_reason"),
+            "adoption_requires": "explicit_eal_disposition",
+        })
     return payload
 
 
@@ -240,10 +239,8 @@ def _rejection_blockers(request: PromptPackPrepareRequest, preflight: dict[str, 
         blockers.append("canonical_output_target")
     blockers.extend(_unsafe_input_path_blockers(preflight))
     if request.source_manifest_path is not None:
-        try:
+        with contextlib.suppress(OSError, ValueError, json.JSONDecodeError):
             blockers.extend(_unsafe_input_path_blockers(_read_json(request.source_manifest_path)))
-        except (OSError, ValueError, json.JSONDecodeError):
-            pass
     for key in FORBIDDEN_ACHIEVED_CLAIM_KEYS:
         if key in preflight:
             blockers.append(f"forbidden_achieved_claim:{key}")
@@ -382,6 +379,13 @@ def _rejected_unsafe_diagnostics_result(
     )
 
 
+def _required_metadata(constraints: dict[str, object]) -> list[str]:
+    value = constraints.get("required_metadata")
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
 def _constraints_markdown(constraints: dict[str, object]) -> str:
     lines = [
         "# Safe Output Constraints",
@@ -393,7 +397,7 @@ def _constraints_markdown(constraints: dict[str, object]) -> str:
         "",
         "## Required Metadata",
     ]
-    lines.extend(f"- `{item}`" for item in constraints["required_metadata"])
+    lines.extend(f"- `{item}`" for item in _required_metadata(constraints))
     lines.extend(["", "## Forbidden Authority Claims"])
     lines.extend(f"- {item}" for item in FORBIDDEN_AUTHORITY_CLAIMS)
     lines.extend(["", "## Forbidden Payloads"])
@@ -402,7 +406,9 @@ def _constraints_markdown(constraints: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def _prompt_markdown(request: PromptPackPrepareRequest, provenance: dict[str, object], constraints: dict[str, object]) -> str:
+def _prompt_markdown(
+    request: PromptPackPrepareRequest, provenance: dict[str, object], constraints: dict[str, object]
+) -> str:
     del constraints
     mode_line = request.mode or "unspecified"
     provided_context_paths = provenance.get("provided_context_paths")
@@ -410,45 +416,43 @@ def _prompt_markdown(request: PromptPackPrepareRequest, provenance: dict[str, ob
         provided_context_line = ", ".join(str(path) for path in provided_context_paths) or "none"
     else:
         provided_context_line = "none"
-    return "\n".join(
-        [
-            "# ChatGPT Use Prompt Pack",
-            "",
-            "Use the attached repository context and this prompt pack to produce a ZIP or tree rooted at `specdock-authoring-pack/`.",
-            "Treat every generated file as evidence only. Do not claim canonical adoption, `.assurance.json` mutation, `authorized_profile` decision, reviewer pass, execution-ready, PR-ready, or PR delivery.",
-            "",
-            f"- mode: `{mode_line}`",
-            f"- evidence_mode: `{provenance.get('evidence_mode')}`",
-            f"- sync_state: `{provenance.get('sync_state')}`",
-            f"- github_sync: `{provenance.get('github_sync')}`",
-            f"- source_manifest_hash: `{provenance.get('source_manifest_hash')}`",
-            f"- adoption_requires: `{provenance.get('adoption_requires')}`",
-            f"- provided_context_paths: `{provided_context_line}`",
-            f"- diff_summary: `{provenance.get('diff_summary')}`",
-            f"- unsynced_reason: `{provenance.get('unsynced_reason')}`",
-            f"- authority: `{AUTHORITY}`",
-            f"- adoption_status: `{ADOPTION_STATUS}`",
-            "",
-            "## Forbidden Authority Claims",
-            "",
-            "- canonical adoption",
-            "- `.assurance.json` mutation",
-            "- `authorized_profile` decision",
-            "- reviewer pass",
-            "- execution-ready",
-            "- PR-ready",
-            "- PR delivery",
-            "",
-            "## Expected Output",
-            "",
-            "- Return a ZIP when possible.",
-            "- The ZIP root must be `specdock-authoring-pack/`.",
-            "- Include all required metadata named in `safe-output-constraints.md`.",
-            "- Keep adoption candidates explicit and unreviewed.",
-            "- Do not include raw transcripts, secrets, credentials, host-local absolute paths, nested archives, binaries, executables, symlinks, or path traversal entries.",
-            "",
-        ]
-    )
+    return "\n".join([
+        "# ChatGPT Use Prompt Pack",
+        "",
+        "Use the attached repository context and this prompt pack to produce a ZIP or tree rooted at `specdock-authoring-pack/`.",
+        "Treat every generated file as evidence only. Do not claim canonical adoption, `.assurance.json` mutation, `authorized_profile` decision, reviewer pass, execution-ready, PR-ready, or PR delivery.",
+        "",
+        f"- mode: `{mode_line}`",
+        f"- evidence_mode: `{provenance.get('evidence_mode')}`",
+        f"- sync_state: `{provenance.get('sync_state')}`",
+        f"- github_sync: `{provenance.get('github_sync')}`",
+        f"- source_manifest_hash: `{provenance.get('source_manifest_hash')}`",
+        f"- adoption_requires: `{provenance.get('adoption_requires')}`",
+        f"- provided_context_paths: `{provided_context_line}`",
+        f"- diff_summary: `{provenance.get('diff_summary')}`",
+        f"- unsynced_reason: `{provenance.get('unsynced_reason')}`",
+        f"- authority: `{AUTHORITY}`",
+        f"- adoption_status: `{ADOPTION_STATUS}`",
+        "",
+        "## Forbidden Authority Claims",
+        "",
+        "- canonical adoption",
+        "- `.assurance.json` mutation",
+        "- `authorized_profile` decision",
+        "- reviewer pass",
+        "- execution-ready",
+        "- PR-ready",
+        "- PR delivery",
+        "",
+        "## Expected Output",
+        "",
+        "- Return a ZIP when possible.",
+        "- The ZIP root must be `specdock-authoring-pack/`.",
+        "- Include all required metadata named in `safe-output-constraints.md`.",
+        "- Keep adoption candidates explicit and unreviewed.",
+        "- Do not include raw transcripts, secrets, credentials, host-local absolute paths, nested archives, binaries, executables, symlinks, or path traversal entries.",
+        "",
+    ])
 
 
 def _expected_output_contract_markdown(constraints: dict[str, object]) -> str:
@@ -474,7 +478,7 @@ def _expected_output_contract_markdown(constraints: dict[str, object]) -> str:
         "",
         "Required metadata:",
     ]
-    lines.extend(f"- `{item}`" for item in constraints["required_metadata"])
+    lines.extend(f"- `{item}`" for item in _required_metadata(constraints))
     lines.append("")
     return "\n".join(lines)
 

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 import subprocess
-from typing import Callable, Literal
+from typing import Literal
 
 from spec_dock_runtime.domain.authoring_pack.preflight_contract import GitVisibleRef, PreflightResult
 from spec_dock_runtime.domain.authoring_pack.source_manifest import (
     build_source_manifest,
     expected_hash_from_manifest,
 )
-
 
 EvidenceMode = Literal["github-synced", "local-context"]
 
@@ -269,7 +269,9 @@ def _observe_origin_ref(repo_root: Path, requested_ref: str | None, allow_fallba
 def _ahead_behind(repo_root: Path, effective_ref: str | None) -> tuple[int, int]:
     if not effective_ref:
         return (0, 0)
-    output = _git_stdout(repo_root, "rev-list", "--left-right", "--count", f"HEAD...refs/remotes/origin/{effective_ref}", check=False)
+    output = _git_stdout(
+        repo_root, "rev-list", "--left-right", "--count", f"HEAD...refs/remotes/origin/{effective_ref}", check=False
+    )
     if output is None:
         return (0, 0)
     left, right = output.split()

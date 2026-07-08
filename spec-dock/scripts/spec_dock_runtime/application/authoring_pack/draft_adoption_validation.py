@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal
 import json
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from spec_dock_runtime.application.authoring_pack.pack_review import _unsafe_report_path
 from spec_dock_runtime.domain.authoring_pack.draft_adoption_contract import (
@@ -100,7 +102,9 @@ def validate_selected_skeleton_fill(request: SelectedSkeletonFillValidationReque
             ),
             request.report_path,
         )
-    issue_gate = _issue_node_gate(request.input_path, request.issue_dir, "selected-skeleton-fill", request.evidence_mode)
+    issue_gate = _issue_node_gate(
+        request.input_path, request.issue_dir, "selected-skeleton-fill", request.evidence_mode
+    )
     if issue_gate is not None:
         return _write_report_if_requested(issue_gate, request.report_path)
     assurance, assurance_findings = read_json_payload(request.assurance, "assurance")

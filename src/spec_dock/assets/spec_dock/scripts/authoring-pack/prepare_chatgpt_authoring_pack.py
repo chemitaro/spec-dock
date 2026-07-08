@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
+# mypy: ignore-errors
 """Prepare an evidence-only ChatGPT authoring prompt pack."""
 
 from __future__ import annotations
 
 import argparse
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -77,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     if output_dir.exists() and not output_dir.is_dir():
         result = _base_result(
             "rejected",
-            datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
             {},
             errors=[f"output_dir must be a directory: {_display_path(output_dir)}"],
             write_diagnostics=False,
@@ -90,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     except RuntimeError as exc:
         result = _base_result(
             "blocked",
-            datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
             {},
             errors=[str(exc)],
         )
@@ -101,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
     if _is_inside(output_dir, repo_root):
         result = _base_result(
             "rejected",
-            datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
             {},
             errors=[f"output_dir must be outside repository: {_display_path(output_dir)}"],
             write_diagnostics=False,
@@ -118,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         result = _base_result(
             "fail",
-            datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
             {},
             errors=[str(exc)],
         )
@@ -148,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _evaluate(config: dict[str, Any], repo_root: Path) -> dict[str, Any]:
-    now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     errors: list[str] = []
     warnings: list[str] = []
 

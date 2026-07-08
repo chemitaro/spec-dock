@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-from spec_dock_runtime.domain.authoring_pack.preflight_contract import PreflightResult
+if TYPE_CHECKING:
+    from spec_dock_runtime.domain.authoring_pack.preflight_contract import PreflightResult
 
 
 def render_preflight_json(result: PreflightResult) -> str:

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-from spec_dock_runtime.application.authoring_pack.pack_stage import PackStageResult
+if TYPE_CHECKING:
+    from spec_dock_runtime.application.authoring_pack.pack_stage import PackStageResult
 
 
 def render_pack_stage_json(result: PackStageResult) -> str:

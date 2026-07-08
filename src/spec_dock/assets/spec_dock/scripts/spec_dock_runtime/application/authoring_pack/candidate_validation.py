@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal
 import json
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from spec_dock_runtime.application.authoring_pack.pack_review import _unsafe_report_path
 from spec_dock_runtime.domain.authoring_pack.candidate_contract import (
@@ -55,7 +57,11 @@ def _pack_root(input_path: Path) -> Path:
 
 
 def _discover_review_report(input_path: Path, pack_root: Path) -> Path:
-    candidates = (input_path / "review-report.json", pack_root.parent / "review-report.json", input_path.parent / "review-report.json")
+    candidates = (
+        input_path / "review-report.json",
+        pack_root.parent / "review-report.json",
+        input_path.parent / "review-report.json",
+    )
     for candidate in candidates:
         if candidate.is_file():
             return candidate

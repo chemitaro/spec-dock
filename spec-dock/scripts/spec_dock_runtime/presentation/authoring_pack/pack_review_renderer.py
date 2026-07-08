@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-from spec_dock_runtime.domain.authoring_pack.zip_contract import PackReviewResult
+if TYPE_CHECKING:
+    from spec_dock_runtime.domain.authoring_pack.zip_contract import PackReviewResult
 
 
 def render_pack_review_json(result: PackReviewResult) -> str:

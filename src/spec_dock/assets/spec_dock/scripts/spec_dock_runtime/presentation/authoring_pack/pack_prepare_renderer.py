@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import PromptPackPrepareResult
+if TYPE_CHECKING:
+    from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import PromptPackPrepareResult
 
 
 def render_pack_prepare_json(result: PromptPackPrepareResult) -> str:

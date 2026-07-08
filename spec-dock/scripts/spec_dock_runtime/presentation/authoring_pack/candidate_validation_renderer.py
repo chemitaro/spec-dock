@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-from spec_dock_runtime.domain.authoring_pack.candidate_contract import CandidateValidationResult
+if TYPE_CHECKING:
+    from spec_dock_runtime.domain.authoring_pack.candidate_contract import CandidateValidationResult
 
 
 def render_candidate_validation_json(result: CandidateValidationResult) -> str:

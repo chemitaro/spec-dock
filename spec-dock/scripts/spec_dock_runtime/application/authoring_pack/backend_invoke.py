@@ -7,7 +7,10 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 from spec_dock_runtime.domain.authoring_pack.backend_invoke_contract import (
     BACKEND_PROMPT_PACK_FILES,
@@ -28,7 +31,6 @@ from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     AUTHORITY,
     BUNDLE_GENERATION_NOT_PROMOTION,
 )
-
 
 SUMMARY_FILENAME = "invocation-summary.json"
 
@@ -121,7 +123,9 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
 
     status = "pass" if completed.returncode == 0 else "blocked"
     blockers = () if completed.returncode == 0 else (f"backend_exit_code:{completed.returncode}",)
-    remediation = () if completed.returncode == 0 else ("inspect backend stdout/stderr and rerun after fixing the backend error",)
+    remediation = (
+        () if completed.returncode == 0 else ("inspect backend stdout/stderr and rerun after fixing the backend error",)
+    )
     result = _result(
         request,
         status=status,
@@ -218,7 +222,9 @@ def validate_prompt_pack(prompt_pack: Path) -> PromptPackValidation:
         prompt_pack=prompt_pack,
         blockers=tuple(blockers),
         evidence_mode=str(provenance.get("evidence_mode")) if isinstance(provenance, dict) else None,
-        source_manifest_hash=str(source_manifest.get("source_manifest_hash")) if isinstance(source_manifest, dict) else None,
+        source_manifest_hash=str(source_manifest.get("source_manifest_hash"))
+        if isinstance(source_manifest, dict)
+        else None,
         github_sync=str(provenance.get("github_sync")) if isinstance(provenance, dict) else None,
         sync_state=str(provenance.get("sync_state")) if isinstance(provenance, dict) else None,
     )

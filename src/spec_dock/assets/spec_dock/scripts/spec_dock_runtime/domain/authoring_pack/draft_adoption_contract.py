@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
-from typing import Literal
 import hashlib
 import json
+from pathlib import Path, PurePosixPath
+from typing import Literal
 
 from spec_dock_runtime.domain.authoring_pack.authority_boundary import scan_authoring_payload, scan_sensitive_payload
 from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
@@ -13,7 +13,6 @@ from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     BUNDLE_GENERATION_NOT_PROMOTION,
 )
 from spec_dock_runtime.domain.authoring_pack.zip_contract import MAX_ENTRY_BYTES
-
 
 DraftAdoptionStatus = Literal["pass", "fail", "blocked", "stale", "rejected"]
 
@@ -367,18 +366,22 @@ def _validate_authority_claims(payload: dict[str, object], findings: list[str]) 
         if claims.get(key):
             findings.append(f"forbidden_authority_claim:{key}")
     for key, value in claims.items():
-        if key not in {
-            "canonical_adoption",
-            "canonical_written",
-            "assurance_mutation",
-            "authorized_profile_decision",
-            "reviewer_pass",
-            "execution_ready",
-            "pr_ready",
-            "merge_ready",
-            "pr_delivery",
-            "pr_delivered",
-        } and value:
+        if (
+            key
+            not in {
+                "canonical_adoption",
+                "canonical_written",
+                "assurance_mutation",
+                "authorized_profile_decision",
+                "reviewer_pass",
+                "execution_ready",
+                "pr_ready",
+                "merge_ready",
+                "pr_delivery",
+                "pr_delivered",
+            }
+            and value
+        ):
             findings.append(f"forbidden_authority_claim:{key}")
 
 
@@ -626,24 +629,22 @@ def _status_from_findings(findings: list[str], comparison: list[str]) -> DraftAd
 
 
 def _is_rejected(finding: str) -> bool:
-    return finding.startswith(
-        (
-            "path_traversal:",
-            "host_local_path:",
-            "secret_path:",
-            "hidden_path:",
-            "unsupported_suffix:",
-            "symlink_entry:",
-            "executable_entry:",
-            "oversized_entry:",
-            "binary_payload:",
-            "secret_like_payload:",
-            "raw_transcript:",
-            "forbidden_authority_claim:",
-            "forbidden_canonical_target:",
-            "unexpected_canonical_target:",
-            "canonical_doc_path:",
-            "non_artifact_draft_path:",
-            "non_artifact_section_path:",
-        )
-    )
+    return finding.startswith((
+        "path_traversal:",
+        "host_local_path:",
+        "secret_path:",
+        "hidden_path:",
+        "unsupported_suffix:",
+        "symlink_entry:",
+        "executable_entry:",
+        "oversized_entry:",
+        "binary_payload:",
+        "secret_like_payload:",
+        "raw_transcript:",
+        "forbidden_authority_claim:",
+        "forbidden_canonical_target:",
+        "unexpected_canonical_target:",
+        "canonical_doc_path:",
+        "non_artifact_draft_path:",
+        "non_artifact_section_path:",
+    ))

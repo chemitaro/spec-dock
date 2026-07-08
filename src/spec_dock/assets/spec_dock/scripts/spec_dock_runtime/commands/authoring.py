@@ -4,10 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
-    GitHubSyncPreflightRequest,
-    run_github_sync_preflight,
-)
 from spec_dock_runtime.application.authoring_pack.approval_check import ApprovalCheckRequest, check_authoring_approval
 from spec_dock_runtime.application.authoring_pack.backend_invoke import BackendInvokeRequest, invoke_backend
 from spec_dock_runtime.application.authoring_pack.candidate_validation import (
@@ -20,11 +16,14 @@ from spec_dock_runtime.application.authoring_pack.draft_adoption_validation impo
     validate_issue_draft_adoption,
     validate_selected_skeleton_fill,
 )
-from spec_dock_runtime.application.authoring_pack.pack_review import PackReviewRequest, review_authoring_pack
+from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+    GitHubSyncPreflightRequest,
+    run_github_sync_preflight,
+)
 from spec_dock_runtime.application.authoring_pack.pack_prepare import PromptPackPrepareRequest, prepare_prompt_pack
+from spec_dock_runtime.application.authoring_pack.pack_review import PackReviewRequest, review_authoring_pack
 from spec_dock_runtime.application.authoring_pack.pack_stage import PackStageRequest, stage_authoring_pack
 from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
-from spec_dock_runtime.presentation.authoring_pack.diagnostics import render_preflight_json, render_preflight_text
 from spec_dock_runtime.presentation.authoring_pack.approval_check_renderer import (
     render_approval_check_json,
     render_approval_check_text,
@@ -37,6 +36,7 @@ from spec_dock_runtime.presentation.authoring_pack.candidate_validation_renderer
     render_candidate_validation_json,
     render_candidate_validation_text,
 )
+from spec_dock_runtime.presentation.authoring_pack.diagnostics import render_preflight_json, render_preflight_text
 from spec_dock_runtime.presentation.authoring_pack.draft_adoption_renderer import (
     render_draft_adoption_json,
     render_draft_adoption_text,
