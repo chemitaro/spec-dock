@@ -188,6 +188,9 @@ def validate_selected_skeleton_payload(
     issue_dir: Path,
     assurance: dict[str, object],
     selected_skeleton: dict[str, object],
+    review_status: str | None,
+    review_digest: str | None,
+    expected_review_digest: str | None,
     expected_profile: str | None,
     expected_source_hash: str | None,
     evidence_mode: str,
@@ -214,6 +217,8 @@ def validate_selected_skeleton_payload(
     source_hash = _digest_value(payload.get("source_manifest_hash"))
     if expected_source_hash and source_hash != _digest_value(expected_source_hash):
         comparison.append("source_manifest_hash_mismatch")
+    if expected_review_digest and review_digest != _digest_value(expected_review_digest):
+        comparison.append("review_digest_mismatch")
     _compare_digest_field(payload, selected_skeleton, "template_hash", findings, comparison)
     _compare_digest_field(payload, selected_skeleton, "selected_skeleton_hash", findings, comparison)
 
@@ -246,7 +251,11 @@ def validate_selected_skeleton_payload(
         input_path=str(input_path),
         validation_kind="selected-skeleton-fill",
         evidence_mode=evidence_mode,
+        review_status=review_status,
+        review_gate_passed=review_status == "pass",
         issue_id=issue_id,
+        expected_review_digest=_digest_value(expected_review_digest),
+        observed_review_digest=review_digest,
         expected_source_manifest_hash=_digest_value(expected_source_hash),
         observed_source_manifest_hash=source_hash,
         expected_profile=expected_profile,
@@ -646,10 +655,10 @@ def _digest_value(value: object) -> str | None:
 def _status_from_findings(findings: list[str], comparison: list[str]) -> DraftAdoptionStatus:
     if any(_is_rejected(finding) for finding in findings):
         return "rejected"
-    if comparison:
-        return "stale"
     if findings:
         return "fail"
+    if comparison:
+        return "stale"
     return "pass"
 
 

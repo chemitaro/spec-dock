@@ -160,6 +160,8 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert "--issue-dir" in p.stdout
             assert "--assurance" in p.stdout
             assert "--selected-skeleton" in p.stdout
+            assert "--review-report" in p.stdout
+            assert "--expected-review-digest" in p.stdout
             assert "--expected-profile" in p.stdout
             assert "--report-path" in p.stdout
             assert "Deferred" not in p.stdout
@@ -1534,6 +1536,23 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == "stale"
             assert "draft_pack_digest_mismatch" in payload["comparison"]
 
+    def test_authoring_validate_issue_draft_adoption_binds_to_review_pack_digest_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+            Path(fixture["review_report"]).write_text(
+                json.dumps({"status": "pass", "pack_digest": {"content_sha256": "different-pack"}}, sort_keys=True)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            payload = _run_issue_draft_adoption_json(self, repo, fixture)
+
+            assert payload["status"] == "stale"
+            assert payload["expected_draft_pack_digest"] == "different-pack"
+            assert payload["observed_draft_pack_digest"] == "draft-pack-hash"
+            assert "draft_pack_digest_mismatch" in payload["comparison"]
+
     def test_authoring_validate_issue_draft_adoption_detects_source_hash_stale(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -1773,6 +1792,8 @@ class TestAuthoringCli(CliRuntimeHarness):
                     str(fixture["assurance"]),
                     "--selected-skeleton",
                     str(fixture["selected_skeleton"]),
+                    "--review-report",
+                    str(fixture["review_report"]),
                     "--expected-profile",
                     "standard",
                     "--expected-source-hash",
@@ -1815,6 +1836,8 @@ class TestAuthoringCli(CliRuntimeHarness):
                     str(fixture["assurance"]),
                     "--selected-skeleton",
                     str(fixture["selected_skeleton"]),
+                    "--review-report",
+                    str(fixture["review_report"]),
                     "--expected-profile",
                     "standard",
                     "--expected-source-hash",
@@ -1849,6 +1872,8 @@ class TestAuthoringCli(CliRuntimeHarness):
                     str(fixture["assurance"]),
                     "--selected-skeleton",
                     str(fixture["selected_skeleton"]),
+                    "--review-report",
+                    str(fixture["review_report"]),
                     "--format",
                     "json",
                 ],
@@ -1879,6 +1904,8 @@ class TestAuthoringCli(CliRuntimeHarness):
                     str(fixture["assurance"]),
                     "--selected-skeleton",
                     str(fixture["selected_skeleton"]),
+                    "--review-report",
+                    str(fixture["review_report"]),
                     "--format",
                     "json",
                 ],
@@ -1909,6 +1936,8 @@ class TestAuthoringCli(CliRuntimeHarness):
                     str(fixture["assurance"]),
                     "--selected-skeleton",
                     str(fixture["selected_skeleton"]),
+                    "--review-report",
+                    str(fixture["review_report"]),
                     "--format",
                     "json",
                 ],
@@ -2007,6 +2036,8 @@ class TestAuthoringCli(CliRuntimeHarness):
                     str(fixture["assurance"]),
                     "--selected-skeleton",
                     str(fixture["selected_skeleton"]),
+                    "--review-report",
+                    str(fixture["review_report"]),
                     "--expected-profile",
                     "standard",
                     "--format",
@@ -2124,6 +2155,8 @@ class TestAuthoringCli(CliRuntimeHarness):
                         str(fixture["assurance"]),
                         "--selected-skeleton",
                         str(fixture["selected_skeleton"]),
+                        "--review-report",
+                        str(fixture["review_report"]),
                         "--report-path",
                         str(selected_report),
                         "--format",
@@ -2152,7 +2185,7 @@ class TestAuthoringCli(CliRuntimeHarness):
                 assert "--input" in selected_help.stdout
                 assert "--issue-dir" in selected_help.stdout
                 assert "--selected-skeleton" in selected_help.stdout
-                assert "--review-report" not in selected_help.stdout
+                assert "--review-report" in selected_help.stdout
                 assert "--pack-tree" not in selected_help.stdout
                 assert "--output-dir" not in selected_help.stdout
                 issue_payload = json.loads(issue_run.stdout)
@@ -4527,6 +4560,113 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert f"non_object_json:{metadata_name}" in payload["findings"]
 
     @pytest.mark.parametrize(
+        ("metadata_name", "metadata_payload", "expected_finding"),
+        (
+            ("provenance.json", "{}\n", "missing_or_invalid_field:provenance.json.evidence_mode"),
+            (
+                "source-manifest.json",
+                json.dumps({"source_manifest_hash": "hash"}, sort_keys=True) + "\n",
+                "missing_or_invalid_field:source-manifest.json.source_hashes",
+            ),
+        ),
+    )
+    def test_authoring_pack_compatibility_review_fails_missing_metadata_contract_fields(
+        self, metadata_name: str, metadata_payload: str, expected_finding: str
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        review_script = (
+            repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/review_chatgpt_authoring_pack.py"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "missing-metadata-fields.zip",
+                metadata_overrides={metadata_name: metadata_payload},
+            )
+            output_dir = repo / ".specdock-authoring" / "legacy-missing-fields"
+
+            review = subprocess.run(
+                [
+                    sys.executable,
+                    str(review_script),
+                    "--input",
+                    str(pack_zip),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(review)
+            assert review.returncode == 1, review.stdout + review.stderr
+            assert payload["status"] == "fail"
+            assert expected_finding in payload["findings"]
+
+    def test_authoring_pack_compatibility_review_allows_null_authorized_profile_candidate(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        review_script = (
+            repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/review_chatgpt_authoring_pack.py"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            candidate_payload = {
+                "schema_version": 1,
+                "authority": "evidence_only",
+                "adoption_status": "unreviewed",
+                "bundle_generation_not_promotion": True,
+                "candidate_id": "candidate-001",
+                "candidate_kind": "issue",
+                "slug": "candidate-001",
+                "title": "Candidate 001",
+                "parent_trace": {"epic_id": "epic-00295"},
+                "boundary": {"summary": "boundary", "scope": ["scope"], "non_scope": ["other"], "dependencies": []},
+                "grade_recommendation": {"grade": "standard", "advisory_only": True},
+                "profile_recommendation": {
+                    "profile": None,
+                    "advisory_only": True,
+                    "ignored_for_authority": True,
+                    "authorized_profile": None,
+                },
+                "draft_files": {"requirement": "requirement.md", "design": "design.md", "plan": "plan.md"},
+                "authority_claims": _candidate_authority_claims(),
+            }
+            pack_zip = _write_authoring_pack_zip(
+                repo / "null-authorized-profile.zip",
+                extra_entries={
+                    "specdock-authoring-pack/candidates/issues/candidate-001/candidate.json": json.dumps(
+                        candidate_payload, sort_keys=True
+                    )
+                    + "\n",
+                },
+            )
+            output_dir = repo / ".specdock-authoring" / "legacy-null-authorized-profile"
+
+            review = subprocess.run(
+                [
+                    sys.executable,
+                    str(review_script),
+                    "--input",
+                    str(pack_zip),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(review)
+            assert review.returncode == 0, review.stdout + review.stderr
+            assert payload["status"] == "pass"
+            assert "forbidden_authority_claim:authorized_profile" not in payload["findings"]
+
+    @pytest.mark.parametrize(
         "script_root",
         (
             Path("src/spec_dock/assets/spec_dock/scripts/authoring-pack"),
@@ -6851,6 +6991,8 @@ def _run_selected_skeleton_fill_json(
             str(fixture["assurance"]),
             "--selected-skeleton",
             str(fixture["selected_skeleton"]),
+            "--review-report",
+            str(fixture["review_report"]),
             "--format",
             "json",
             *extra_args,
@@ -6984,7 +7126,16 @@ def _authoring_pack_entries() -> dict[str, str]:
     manifest = _base_authoring_pack_manifest()
     return {
         "manifest.json": json.dumps(manifest, sort_keys=True) + "\n",
-        "provenance.json": json.dumps({"evidence_mode": "github-synced"}, sort_keys=True) + "\n",
+        "provenance.json": json.dumps(
+            {
+                "evidence_mode": "github-synced",
+                "sync_state": "synced",
+                "github_sync": "verified",
+                "source_manifest_hash": "hash",
+            },
+            sort_keys=True,
+        )
+        + "\n",
         "source-manifest.json": json.dumps(source_manifest, sort_keys=True) + "\n",
         "stale-if.json": json.dumps({"source_manifest_hash": "hash"}, sort_keys=True) + "\n",
         "safe-output-constraints.md": "authority: evidence_only\nadoption_status: unreviewed\n",
@@ -7599,11 +7750,18 @@ def _write_selected_skeleton_fixture(repo: Path, *, mutator: str | None = None) 
         selected_skeleton.write_text("{not-json\n", encoding="utf-8")
     if mutator == "missing-issue-node":
         issue_dir = repo / "spec-dock" / "missing-issue-node"
+    review_report = repo / ".specdock-authoring" / "selected" / "review-report.json"
+    review_report.parent.mkdir(parents=True, exist_ok=True)
+    review_report.write_text(
+        json.dumps({"status": "pass", "pack_digest": {"content_sha256": "selected-pack-hash"}}, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return {
         "input": input_path,
         "issue_dir": issue_dir,
         "assurance": assurance,
         "selected_skeleton": selected_skeleton,
+        "review_report": review_report,
     }
 
 
