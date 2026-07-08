@@ -3,830 +3,235 @@
 ID: "iss-00309"
 タイトル: "ChatGPT First Planning Skills And Fallback Route Redesign"
 関連GitHub: ["#309"]
-状態: "draft | approved"
-作成者: "iwasawayuuta"
-最終更新: "2026-07-09"
+状態: "review-ready"
+作成者: "ChatGPT GPT-5.5 Pro / Codex adopted candidate"
+最終更新: "2026-07-08"
 親: ["epic-00295", "init-local-00003"]
+Issue Grade: "strict"
+authorized_profile: "strict"
+draft_authority: "evidence_only"
+adoption_status: "codex_adopted_review_pending"
 ---
 
 # iss-00309 ChatGPT First Planning Skills And Fallback Route Redesign — Issue 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
-
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
-
----
-
 ## 0. 文書の位置づけ
 
-### この文書が定義すること
+この文書は、`iss-00309` の canonical `requirement.md` 候補である。ChatGPT が生成した候補を Codex が比較・検査し、`report.md` の Evidence Adoption Ledger に採用判断を記録した。必要な fresh `spec-reviewer` pass を取得するまでは、承認済み・execution-ready ではない。
 
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
+この Issue は `strict` profile として扱う。理由は、installed skill surface、workflow docs、Epic plan template、installed asset distribution、Issue Planning / Epic Execution の authority boundary に影響し、複数 Issue と将来の planning workflow が依存するためである。
 
-### この文書が定義しないこと
+## 1. 結論
 
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
+`iss-00309` は、SpecDock の planning route を **ChatGPT-first primary route** として再設計し、従来 planning route を **human-approved emergency backup** として `-manual` suffix の skill に分離する。
 
----
+必須成果は次である。
 
-## 1. 概要
+- 既存 primary skill names を維持する。
+  - `spec-dock-initiative-planning`
+  - `spec-dock-epic-planning`
+  - `spec-dock-issue-planning`
+- 従来 route を manual backup skill として追加する。
+  - `spec-dock-initiative-planning-manual`
+  - `spec-dock-epic-planning-manual`
+  - `spec-dock-issue-planning-manual`
+- ChatGPT / browser / automation の capacity failure、timeout、一時 failure は `wait` / `retry` / `recover` を優先し、manual route へ自動 fallback しない。
+- Manual route は、ChatGPT / browser / automation / provider 側に hard / unrecoverable failure があり、人間がその状態を認識して明示承認した場合だけ使える。
+- Accepted ADR `artifacts/20260708t161533z-adr-chatgpt-first-option-3-plus-issue-planning-workflow.md` の Option 3+ を provider-side skills / docs / templates へ反映する。
+- Epic Planning は Issue draft requirement / draft design / draft plan と dependency / boundary handoff を作るが、canonical Issue Planning は Epic Execution 中の各 Issue start 直前または直後に current repository state、prior completed Issues、dependency state、unresolved ledgers と照合して行う。
+- Multi-Issue implementation Epic は final quality gate / PR delivery Issue を必須とする。single-Issue / docs-only / no-op Epic は skip rationale と completion evidence があれば separate final quality Issue を省略できる。
 
-### 1.1 目的
+## 2. 背景
 
-このIssueで達成したい目的を1〜3文で記述する。
+Parent Epic `epic-00295` は、ChatGPT authoring pack workflow を installed runtime surface と installed skill surface へ昇格する。ChatGPT output は requirement / design / plan draft、Issue slicing proposal、risk、reviewer focus、EAL candidate を生成できるが、canonical adoption、`.assurance.json` mutation、authorized_profile 決定、fresh reviewer pass、execution-ready、PR-ready、Issue / Epic completion を主張しない。
 
-- 目的:
-  - ...
+現行 current branch では、primary planning skills は ChatGPT を evidence lane として参照しているが、ChatGPT-first route を primary planning route として十分に強制していない。また、`-manual` backup skills は provider-side installed skill path にまだ存在しない。`iss-00309` の既存 `design.md` / `plan.md` は placeholder であり、strict profile に耐える具体設計・計画が必要である。
 
-### 1.2 観測可能な成果
+## 3. 正本・根拠
 
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
-
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
-
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
-
-### 1.3 このIssueの種類
-
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
-
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
-
-### 3.3 このIssueで再定義してはいけないもの
-
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
-
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
-
----
-
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
-
-### 4.1 主な関係者（Actor）
-
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
-
-| 関係者（Actor） | 役割 | このIssueとの関係 |
+| 種別 | パス / 識別子 | この Issue への意味 |
 |---|---|---|
-| ... | ... | ... |
+| Parent Epic requirement | `spec-dock/.../epic-00295-chatgpt-authoring-pack-installed-runtime/requirement.md` | ChatGPT evidence-only、installed runtime / skill surface、existing planning skill names 維持、final quality gate policy の上位要件。 |
+| Parent Epic design | `spec-dock/.../epic-00295-chatgpt-authoring-pack-installed-runtime/design.md` | Scope skill plane / Authoring runtime plane / Evidence data plane / Authority plane の分離、status taxonomy、skill taxonomy、GitHub preflight、ZIP contract。 |
+| Parent Epic plan | `spec-dock/.../epic-00295-chatgpt-authoring-pack-installed-runtime/plan.md` | Provider-side source-of-truth migration、skill taxonomy docs update、runtime docs update、final quality gate / PR delivery relay policy。 |
+| Issue report EAL | `report.md` | EAL-001〜EAL-005 に accepted decisions が記録済み。 |
+| Interview evidence | `artifacts/20260708t150402z-interview-chatgpt-first-planning-route-fallback-boundary-interview.md` | wait / retry / recover 優先、manual fallback は明示承認付き emergency backup。 |
+| Interview evidence | `artifacts/20260708t151122z-interview-primary-and-fallback-skill-naming-interview.md` | 既存 skill names を ChatGPT-first primary route とし、従来 route を `-manual` suffix に退避。 |
+| Interview evidence | `artifacts/20260708t152452z-interview-final-quality-gate-issue-scope-interview.md` | Multi-Issue implementation Epic の final quality Issue 必須範囲と skip 条件。 |
+| Research evidence | `artifacts/20260708t154900z-research-chatgpt-first-issue-planning-timing-and-epic-execution-workflow.md` | Option 3+、draft handoff、just-in-time canonical Issue Planning、drift feedback rule、PlantUML。 |
+| Accepted ADR | `artifacts/20260708t161533z-adr-chatgpt-first-option-3-plus-issue-planning-workflow.md` | Option 3+ を accepted decision として固定し、skills / docs / templates へ反映する必要がある。 |
+| Provider skills | `src/spec_dock/assets/install_root/.agents/skills/` | installed skill source of truth。 |
+| Provider docs | `src/spec_dock/assets/spec_dock/docs/` | installed workflow docs source of truth。 |
+| Provider templates | `src/spec_dock/assets/spec_dock/templates/` | installed template source of truth。 |
+| Installer registry | `src/spec_dock/cli.py` | `_MANAGED_SKILL_NAMES` に installed skill distribution order がある。 |
 
-### 4.2 開始条件（Trigger）
+## 4. Scope
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
+### 4.1 In scope
 
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
+- `spec-dock-initiative-planning` / `spec-dock-epic-planning` / `spec-dock-issue-planning` を ChatGPT-first primary planning route として更新する。
+- `spec-dock-initiative-planning-manual` / `spec-dock-epic-planning-manual` / `spec-dock-issue-planning-manual` を human-approved emergency backup skills として provider assets に追加する。
+- `spec-dock-chatgpt-authoring` との関係を、primary planning skills から呼び出される shared evidence lane として明確化する。
+- `src/spec_dock/cli.py` の managed skill registry を更新し、manual skills が installed repo へ配布されるようにする。
+- Workflow docs に次を反映する。
+  - ChatGPT-first primary route。
+  - manual backup の承認条件。
+  - Option 3+ の draft handoff / just-in-time canonical Issue Planning。
+  - `handoff-ready` と `execution-ready` の分離。
+  - final quality gate / PR delivery Issue policy。
+- Epic plan template に次を反映する。
+  - Epic classification: multi-Issue implementation / single-Issue / docs-only / no-op。
+  - final quality Issue required / skipped。
+  - skip rationale / completion evidence。
+  - Issue-local draft path index。
+  - pre-start canonical Issue boundary。
+- Accepted ADR と research の PlantUML を、provider-side docs / templates の implementation plan に取り込む。
+- Dogfooding workspace `spec-dock/` は provider-side update の validation / confirmation surface として扱い、必要な mirror consistency を確認する。
+- Tests / static checks / manual dogfood validation を plan に固定する。
 
-### 4.3 代表シナリオ
+### 4.2 Out of scope
 
-#### シナリオ SC-001:
+- ChatGPT に canonical docs 直接更新、`.assurance.json` mutation、authorized_profile 決定、reviewer pass 付与、execution-ready / PR-ready / merge-ready 判定をさせること。
+- `authoring adopt`、`authoring create-issues-from-zip`、`authoring mark-reviewer-pass`、`authoring set-authorized-profile`、`authoring issue-execution-ready`、`authoring pr-ready` の新規実装。
+- GitHub Issue / PR の自動作成・自動 close・自動 merge。
+- `spec-reviewer`、`code-reviewer`、`qa-reviewer` の代替や bypass。
+- 既存 workspace の retroactive migration を保証すること。
+- 全 Epic への final quality Issue retroactive 強制。
+- Single-Issue / docs-only / no-op Epic に separate final quality Issue を常時必須化すること。
+- ChatGPT backend / browser / provider の implementation repair 自体。
+- Raw transcript、credential、secret、host-local absolute path の durable repository storage。
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+## 5. 観測可能な成果
 
-#### シナリオ SC-002:
+完了後に観測できること:
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+- Provider-side installed skill path に primary planning skills と manual backup planning skills が存在する。
+- Primary planning skill を自然に呼ぶと、ChatGPT-first evidence route を最初に検討・実行する operating spine が示される。
+- Manual backup skills は description /本文で human-approved emergency backup であることを明示し、通常 route として誤用されにくい。
+- `spec-dock-chatgpt-authoring` は shared evidence lane のままで、canonical authority を主張しない。
+- Workflow docs は Option 3+ の draft handoff、just-in-time canonical Issue Planning、drift feedback、final quality Issue policy を説明する。
+- Epic plan template は final quality Issue required / skipped、Issue draft path index、pre-start canonical boundary を持つ。
+- `src/spec_dock/cli.py` の managed skill list は manual backup skills を installed asset として配布対象に含む。
+- `spec-dock init` / `spec-dock update` 相当の simulation で manual backup skills と updated docs/templates が installed output に現れる。
+- Tests / docs inspection により、ChatGPT output が canonical adoption、reviewer pass、execution-ready、PR-ready、merge-ready を主張しないことが確認される。
 
-#### シナリオ SC-XXX:
+完了後に観測できてはいけないこと:
 
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+- ChatGPT / browser capacity timeout から manual route へ自動 fallback する guidance。
+- Manual backup skills が primary skills より上位・推奨・通常 route として案内されること。
+- `spec-dock-chatgpt-authoring` が canonical docs owner、reviewer gate owner、execution-ready owner、PR delivery owner として扱われること。
+- `authoring validate ...` の `pass` を reviewer pass または execution-ready と説明すること。
+- Multi-Issue implementation Epic が final quality gate / PR delivery Issue なしで delivery complete を主張すること。
+- Dogfooding workspace の `spec-dock/` 更新だけで provider-side source of truth が更新済みと扱われること。
 
----
+## 6. 要件
 
-## 5. スコープ
+- REQ-001: Existing planning skill names `spec-dock-initiative-planning` / `spec-dock-epic-planning` / `spec-dock-issue-planning` は ChatGPT-first primary route として維持される。
+- REQ-002: Manual backup skill names `spec-dock-initiative-planning-manual` / `spec-dock-epic-planning-manual` / `spec-dock-issue-planning-manual` が provider-side installed skill assets として追加される。
+- REQ-003: Manual backup skills は human-approved emergency backup と明記し、hard / unrecoverable ChatGPT / browser / automation / provider failure と explicit human approval を利用条件にする。
+- REQ-004: 4 tab 上限、timeout、一時 browser / ChatGPT automation failure は `wait` / `retry` / `recover` の対象であり、manual route への自動 fallback 理由にしない。
+- REQ-005: `spec-dock-chatgpt-authoring` は shared evidence lane として保持され、canonical docs、reviewer gates、assurance state、execution readiness、PR delivery を所有しない。
+- REQ-006: Primary planning skills は ChatGPT / Oracle ZIP/tree output、candidate reports、draft docs を evidence-only として扱い、canonical adoption は main orchestrator / planning skill の EAL disposition、canonical rewrite、fresh `spec-reviewer` pass 後に限る。
+- REQ-007: Initiative Planning は Epic candidates / Epic node creation 前に human approval gate を維持する。
+- REQ-008: Epic Planning は Issue slicing、dependency order、responsibility boundary、Issue draft requirement / draft design / draft plan、final quality Issue candidate / skip rationale を handoff package として扱う。
+- REQ-009: Epic Planning は child Issue の canonical `requirement.md` / `design.md` / `plan.md` を全件 upfront に正式化しない。
+- REQ-010: Issue Planning は Epic Execution 中の Issue start 直前または直後に、draft を current repository state、prior completed Issues、dependency state、unresolved ledgers と照合して canonical docs へ採用・部分採用・棄却・stale / blocked 判定する。
+- REQ-011: Issue-local に吸収できない drift は Epic Planning repair / clarification / ADR へ戻す。対象は sibling Issue boundary、dependency order、final quality Issue responsibility、Epic E-RQ / E-AC closure、shared architecture、workflow policy、rollout strategy である。
+- REQ-012: Multi-Issue implementation Epic は final quality gate / PR delivery Issue を持つ。
+- REQ-013: Single-Issue / docs-only / no-op Epic は skip rationale と completion evidence を置く場合に separate final quality Issue を省略できる。
+- REQ-014: `src/spec_dock/cli.py` の `_MANAGED_SKILL_NAMES` は manual backup skills を installed managed skill として配布する。
+- REQ-015: Provider-side docs under `src/spec_dock/assets/spec_dock/docs/` は primary/manual route、Option 3+、draft lifecycle、final quality policy を説明する。
+- REQ-016: Provider-side templates under `src/spec_dock/assets/spec_dock/templates/` は Epic plan handoff / final quality / skip evidence / issue draft path index を持つ。
+- REQ-017: Accepted ADR と research の PlantUML diagrams は implementation で provider-side workflow docs / templates へ反映され、ADR-only evidence に留まらない。
+- REQ-018: Dogfooding workspace updates are validation / confirmation unless explicitly scoped as dogfooding artifacts; provider-side assets are source of truth.
+- REQ-019: Documentation and skills must not present unsupported `authoring` commands as available supported behavior.
+- REQ-020: Tests and checks must include installed asset distribution, docs consistency, skill presence/order, forbidden authority claims, and Option 3+ wording.
 
-### 5.1 対象範囲（In 対象範囲（Scope））
+## 7. 受け入れ条件（Acceptance Criteria）
 
-このIssueで必ず実現することを列挙する。
+- AC-001: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md` describes `spec-dock-chatgpt-authoring` as the primary evidence route for non-trivial Initiative planning and keeps Initiative canonical ownership / human approval gates in Initiative Planning.
+- AC-002: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` describes ChatGPT-first Epic planning, Issue draft handoff, Issue slice approval, and Option 3+ boundaries.
+- AC-003: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` describes ChatGPT-first Issue planning modes and draft adoption against current repository state / prior Issues / dependency state / unresolved ledgers.
+- AC-004: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning-manual/SKILL.md` exists and is marked human-approved emergency backup.
+- AC-005: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning-manual/SKILL.md` exists and is marked human-approved emergency backup.
+- AC-006: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning-manual/SKILL.md` exists and is marked human-approved emergency backup.
+- AC-007: Manual backup skills state that 4 tab saturation, timeout, transient backend failure, browser startup failure, and ordinary validation rejection first require wait / retry / recover / repair, not automatic manual fallback.
+- AC-008: `src/spec_dock/cli.py` `_MANAGED_SKILL_NAMES` includes the three `-manual` skills and preserves the primary skill names as the normal planning entries.
+- AC-009: `spec-dock-chatgpt-authoring` remains evidence-only and does not claim canonical adoption, reviewer pass, assurance mutation, execution-ready, PR-ready, merge-ready, Issue finish, or Epic completion authority.
+- AC-010: `workflow_spec_authoring.md` states that ChatGPT evidence adoption requires EAL disposition, canonical rewrite, and fresh `spec-reviewer` pass.
+- AC-011: `workflow_chatgpt_authoring_pack.md` explains primary planning skills as the route owner and ChatGPT authoring as evidence lane, not workflow owner.
+- AC-012: `workflow_epic.md` and `phase_plan_epic.md` explain Option 3+ Epic draft handoff, Issue draft path index, and pre-start canonical Issue boundary.
+- AC-013: `workflow_issue.md`, `phase_plan_issue.md`, or `authoring/issue-plan.md` explains draft adoption lifecycle and prohibits execution from draft-only / validation-only / raw ChatGPT output.
+- AC-014: `src/spec_dock/assets/spec_dock/templates/epic/plan.md` contains final quality Issue required/skipped fields, skip rationale, completion evidence, dependency-on-all-implementation-Issues guidance, and intermediate deferred PR delivery policy.
+- AC-015: Multi-Issue implementation Epic path requires final quality gate / PR delivery Issue; single-Issue / docs-only / no-op skip condition is explicit.
+- AC-016: Accepted ADR / research PlantUML diagrams are incorporated into workflow docs or template guidance, not only referenced from ADR.
+- AC-017: Provider-side source-of-truth paths are updated before dogfooding workspace mirrors.
+- AC-018: `spec-dock init` / `spec-dock update` simulation confirms primary and manual skills are installed.
+- AC-019: `./spec-dock/scripts/spec-dock validate` and `git diff --check` pass after changes or failures are recorded as blockers.
+- AC-020: Relevant tests under `tests/cli_runtime/` or a focused equivalent confirm managed skill distribution and docs/template consistency.
+- AC-021: `report.md` receives EAL / Spec Authoring Gate / implementation evidence entries when Codex adopts this draft; this ChatGPT draft itself does not claim that adoption occurred.
 
-- ...
-- ...
+## 8. 除外条件（Exclusion Criteria）
 
-### 5.2 対象外（Out of 対象範囲（Scope））
+- EC-001: ChatGPT output is treated as canonical source without EAL disposition.
+- EC-002: Manual route is triggered automatically by ordinary ChatGPT capacity / timeout / browser failure.
+- EC-003: Manual route can be used without explicit human approval evidence.
+- EC-004: Existing primary planning skill names are renamed away from ChatGPT-first route.
+- EC-005: Existing old route remains mixed into primary skill operating spine without `-manual` separation.
+- EC-006: Provider-side source-of-truth paths are not updated, but dogfooding mirror is updated and treated as sufficient.
+- EC-007: `authoring validate ... pass` is described as reviewer pass or execution-ready.
+- EC-008: Multi-Issue implementation Epic may complete PR delivery without a final quality gate / PR delivery Issue or explicit accepted exception.
+- EC-009: Docs/templates omit the accepted ADR diagrams and leave Option 3+ only in Issue-local ADR.
+- EC-010: Unsupported commands are advertised as available supported user commands.
 
-このIssueでは実現しないことを列挙する。
+## 9. Risk signals / Edge cases
 
-- ...
-- ...
+| Risk / Edge case | 要求される扱い |
+|---|---|
+| ChatGPT browser 4 tab saturation | `wait` / `retry`。manual fallback reason にしない。 |
+| ChatGPT backend command unset | Fail-closed diagnostics。`local-context` or backend setup repair; manual route only human-approved hard failure。 |
+| GitHub sync preflight blocked | Repo-aware invocation は止める。明示 `local-context` evidence mode は可能だが lower-authority / EAL required。manual route 自動移行はしない。 |
+| ZIP rejected by safety validation | Unsafe output は採用しない。再生成・修正・別 evidence を検討。manual route への自動 fallback はしない。 |
+| Manual skill appears before primary skill in installed list | 誤用リスク。managed order / README / docs で primary を先にする。 |
+| Issue Planning changes sibling boundary | Issue-local で処理せず Epic Planning repair / clarification / ADR。 |
+| Final quality Issue absent in multi-Issue implementation Epic | Epic plan / validation gate で block または Epic Planning repair。 |
+| Single-Issue Epic forced into separate final quality Issue | 過剰プロセス。skip rationale と issue-level quality gate evidence で許容。 |
+| Dogfooding mirror updated without provider assets | Source-of-truth drift。provider assets first へ戻す。 |
+| Reviewer unavailable | `unavailable` / `denied` / `waived` は reviewer pass ではない。risk acceptance がない限り promotion / readiness は block。 |
 
-### 5.3 変更しないもの（Unchanged / Must Not Change）
+## 10. 検証要求
 
-関連はあるが、このIssueで変更してはいけないものを列挙する。
+最低限、実装 plan は次の commands / checks を含む。
 
-- ...
-- ...
-
-### 5.4 判断が必要な境界
-
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
-
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 6. 要求される振る舞い
-
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
-
-### 振る舞い BH-001:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-002:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-XXX:
-
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 7. 受け入れ条件
-
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
-
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-002:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-XXX:
-
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
-
-```text
-...
+```bash
+git diff --check
+./spec-dock/scripts/spec-dock validate
+uv run pytest tests/cli_runtime
 ```
 
-### 例 EX-002: 出力例
+Installed asset simulation は環境に応じて次のような形で確認する。
 
-```text
-...
+```bash
+tmpdir="$(mktemp -d)"
+uv run spec-dock init "$tmpdir"
+test -f "$tmpdir/.agents/skills/spec-dock-initiative-planning/SKILL.md"
+test -f "$tmpdir/.agents/skills/spec-dock-epic-planning/SKILL.md"
+test -f "$tmpdir/.agents/skills/spec-dock-issue-planning/SKILL.md"
+test -f "$tmpdir/.agents/skills/spec-dock-initiative-planning-manual/SKILL.md"
+test -f "$tmpdir/.agents/skills/spec-dock-epic-planning-manual/SKILL.md"
+test -f "$tmpdir/.agents/skills/spec-dock-issue-planning-manual/SKILL.md"
+test -f "$tmpdir/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md"
 ```
 
-### 例 EX-003: エラー例
+必要に応じて `spec-dock update` simulation も行い、既存 managed skill の上書きと manual skill 追加を確認する。
 
-```text
-...
-```
+## 11. 未確定事項
 
-### 契約上の注意
+この draft 作成時点で、Issue の product decision と accepted ADR は十分に確定している。実装中に判断が必要になり得る未確定事項は次に限る。
 
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-
-### 10.2 移行性
-
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-
-### 10.3 可観測性
-
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
-
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
-
-### 13.3 リスク事実（Risk Facts）
-
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
-
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
-
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
-
-#### `strict` 以上を検討する条件
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
-
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
-
-#### `lite` を検討できる条件
-
-すべて満たす場合のみ `lite` を検討できる。
-
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
-
----
-
-## 14. 設計への引き渡し
-
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
-
-### 14.1 設計で必ず扱うべき論点
-
-- ...
-- ...
-
-### 14.2 責任所有者が未確定のもの
-
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.3 境界が未確定のもの
-
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.4 契約影響が未確定のもの
-
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.5 上位へ昇格すべき可能性がある判断
-
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 15. 実装計画への引き渡し
-
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
-
-### 15.1 計画で分解すべき成果
-
-- ...
-- ...
-
-### 15.2 検証が必要な観測点
-
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
-
-### 15.3 TDDが必要な振る舞い候補
-
-振る舞い変更がある場合のみ記述する。
-
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
-
-### 15.4 TDD不要または限定的でよい理由
-
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
-
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-07-09 | 初稿（Initial draft） | ... | ... |
+- Manual backup skills を `_MANAGED_SKILL_NAMES` 内で primary skill の直後に置くか、planning skill cluster の後半にまとめるか。
+  - 推奨: primary skill の直後または primary planning cluster の直後。ただし primary skills が user-facing order で先に見えることを必須にする。
+- PlantUML diagrams を `workflow_chatgpt_authoring_pack.md`、`workflow_epic.md`、`workflow_issue.md`、`phase_plan_epic.md` のどこへ重複なく置くか。
+  - 推奨: end-to-end workflow は `workflow_chatgpt_authoring_pack.md` または `workflow_epic.md`、Issue draft lifecycle は `workflow_issue.md`、Epic plan template には短い reference / checklist を置く。
+- Dogfooding mirror update の範囲。
+  - 推奨: provider-side assets first。dogfooding workspace update は validation / confirmation として `report.md` に記録する。
