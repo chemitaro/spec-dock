@@ -609,6 +609,12 @@ def _record_duplicate(seen: dict[str, int], value: str, finding: str, findings: 
 
 
 def _safe_rel(value: str, findings: list[str]) -> str | None:
+    if "\\" in value:
+        findings.append(f"path_separator_backslash:{value}")
+        return None
+    if len(value) >= 2 and value[1] == ":" and value[0].isalpha():
+        findings.append(f"host_local_path:{value}")
+        return None
     rel = PurePosixPath(value)
     if rel.is_absolute() or any(part == ".." for part in rel.parts):
         findings.append(f"path_traversal:{value}")
@@ -830,6 +836,7 @@ def _comparison_state(finding: str, comparison: tuple[str, ...]) -> str:
 def _is_rejected(finding: str) -> bool:
     prefixes = (
         "path_traversal:",
+        "path_separator_backslash:",
         "host_local_path:",
         "secret_path:",
         "hidden_path:",

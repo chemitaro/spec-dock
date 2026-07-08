@@ -115,11 +115,17 @@ def _review_zip(input_path: Path) -> PackReviewResult:
             if info.is_dir():
                 continue
             total_size += info.file_size
+            if total_size > MAX_TOTAL_BYTES:
+                findings.append("oversized_total")
+                continue
             rel_name = _relative_name(info.filename, root, findings)
             if rel_name is None:
                 continue
+            entry_findings_before = len(findings)
             _validate_entry(info, rel_name, findings)
             reviewed_files.append(rel_name)
+            if len(findings) > entry_findings_before:
+                continue
             try:
                 content = archive.read(info)
             except (RuntimeError, zipfile.BadZipFile):
@@ -133,14 +139,13 @@ def _review_zip(input_path: Path) -> PackReviewResult:
                     findings.append(f"unreadable_payload:{rel_name}")
                 except UnicodeDecodeError:
                     findings.append(f"binary_payload:{rel_name}")
-        if total_size > MAX_TOTAL_BYTES:
-            findings.append("oversized_total")
     metadata_status = _validate_metadata(payloads, findings)
     findings.extend(_scan_payloads(payloads))
     return PackReviewResult(
         status=_status_from_findings(tuple(findings), metadata_status),
         input_path=str(input_path),
         input_kind="zip",
+        evidence_mode=_payload_evidence_mode(payloads),
         findings=tuple(dict.fromkeys(findings)),
         reviewed_files=tuple(sorted(reviewed_files)),
         content_sha256=_content_digest(digest_entries)
@@ -190,6 +195,7 @@ def _review_tree(input_path: Path) -> PackReviewResult:
         status=_status_from_findings(tuple(findings), "pass"),
         input_path=str(input_path),
         input_kind="tree",
+        evidence_mode=_payload_evidence_mode(payloads),
         fallback=True,
         authority_level="lower_than_zip_review",
         missing_evidence=("zip-central-directory",),
@@ -288,22 +294,47 @@ def _validate_metadata(payloads: dict[str, str], findings: list[str]) -> str:
         except json.JSONDecodeError:
             findings.append(f"invalid_json:{metadata}")
             status = "fail"
-    manifest = objects.get("manifest.json")
     source_manifest = objects.get("source-manifest.json")
     stale_if = objects.get("stale-if.json")
-    if isinstance(manifest, dict):
-        if manifest.get("authority") != AUTHORITY:
-            findings.append("invalid_authority")
-        if manifest.get("adoption_status") != ADOPTION_STATUS:
-            findings.append("invalid_adoption_status")
-        if manifest.get("bundle_generation_not_promotion") is not BUNDLE_GENERATION_NOT_PROMOTION:
-            findings.append("invalid_bundle_generation_not_promotion")
+    for metadata, payload in objects.items():
+        if isinstance(payload, dict):
+            _validate_authority_metadata(metadata, payload, findings)
     if isinstance(source_manifest, dict) and isinstance(stale_if, dict):
         expected_hash = stale_if.get("source_manifest_hash_changes", stale_if.get("source_manifest_hash"))
         if expected_hash is not None and source_manifest.get("source_manifest_hash") != expected_hash:
             findings.append("source_hash_mismatch")
             status = "stale"
     return status
+
+
+def _validate_authority_metadata(metadata: str, payload: dict[str, object], findings: list[str]) -> None:
+    if (metadata == "manifest.json" or "authority" in payload) and payload.get("authority") != AUTHORITY:
+        findings.append("invalid_authority" if metadata == "manifest.json" else f"invalid_authority:{metadata}")
+    if (metadata == "manifest.json" or "adoption_status" in payload) and payload.get(
+        "adoption_status"
+    ) != ADOPTION_STATUS:
+        findings.append(
+            "invalid_adoption_status" if metadata == "manifest.json" else f"invalid_adoption_status:{metadata}"
+        )
+    if (metadata == "manifest.json" or "bundle_generation_not_promotion" in payload) and payload.get(
+        "bundle_generation_not_promotion"
+    ) is not BUNDLE_GENERATION_NOT_PROMOTION:
+        findings.append(
+            "invalid_bundle_generation_not_promotion"
+            if metadata == "manifest.json"
+            else f"invalid_bundle_generation_not_promotion:{metadata}"
+        )
+
+
+def _payload_evidence_mode(payloads: dict[str, str]) -> str | None:
+    try:
+        provenance = json.loads(payloads.get("provenance.json", "{}"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(provenance, dict):
+        return None
+    value = provenance.get("evidence_mode")
+    return value if isinstance(value, str) else None
 
 
 def _scan_payloads(payloads: dict[str, str]) -> tuple[str, ...]:

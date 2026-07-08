@@ -17,7 +17,8 @@ class PackReviewRequest:
 
 
 def review_authoring_pack(request: PackReviewRequest) -> PackReviewResult:
-    result = _with_evidence_mode(review_pack_input(request.input_path), request.evidence_mode)
+    result = review_pack_input(request.input_path)
+    result = _with_evidence_mode(result, _effective_evidence_mode(result.evidence_mode, request.evidence_mode))
     if request.report_path is not None:
         unsafe_report_path = _unsafe_report_path(request.report_path)
         if unsafe_report_path:
@@ -47,7 +48,16 @@ def _with_evidence_mode(result: PackReviewResult, evidence_mode: str) -> PackRev
         missing_evidence=result.missing_evidence,
         findings=result.findings,
         reviewed_files=result.reviewed_files,
+        content_sha256=result.content_sha256,
     )
+
+
+def _effective_evidence_mode(observed: str | None, requested: str) -> str:
+    if observed == "local-context":
+        return "local-context"
+    if requested == "local-context":
+        return "local-context"
+    return observed or requested
 
 
 def _unsafe_report_path(report_path: Path) -> str | None:

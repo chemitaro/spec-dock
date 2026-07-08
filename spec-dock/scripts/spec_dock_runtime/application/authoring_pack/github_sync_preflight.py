@@ -50,6 +50,10 @@ def run_github_sync_preflight(
     blockers: list[str] = []
     remediation: list[str] = []
     blockers.extend(_worktree_blockers(repo_root))
+    missing_source_paths = _missing_explicit_source_paths(repo_root, manifest_paths)
+    if missing_source_paths:
+        blockers.extend(f"missing_source_path:{path}" for path in missing_source_paths)
+        remediation.append("fix or remove missing explicit --source-path entries before authoring preflight")
     branch = _git_stdout(repo_root, "rev-parse", "--abbrev-ref", "HEAD", check=False)
     current_branch = None if branch in (None, "", "HEAD") else branch
     local_head = _git_stdout(repo_root, "rev-parse", "HEAD", check=False)
@@ -192,6 +196,15 @@ def _resolve_expected_hash(request: GitHubSyncPreflightRequest) -> str | None:
     if manifest_hash and request.expected_source_hash and manifest_hash != request.expected_source_hash:
         raise ValueError("expected source manifest hash and --expected-source-hash disagree")
     return request.expected_source_hash or manifest_hash
+
+
+def _missing_explicit_source_paths(repo_root: Path, source_paths: tuple[str, ...]) -> tuple[str, ...]:
+    missing: list[str] = []
+    for source_path in source_paths:
+        path = (repo_root / source_path).resolve() if not Path(source_path).is_absolute() else Path(source_path)
+        if not path.exists():
+            missing.append(source_path)
+    return tuple(missing)
 
 
 def _worktree_blockers(repo_root: Path) -> tuple[str, ...]:

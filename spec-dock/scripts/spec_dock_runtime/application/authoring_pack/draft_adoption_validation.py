@@ -207,6 +207,14 @@ def _review_gate(
         )
     status = payload.get("status")
     if status == "pass":
+        if _review_digest(review_report) is None:
+            return blocked_result(
+                input_path=input_path,
+                validation_kind=validation_kind,
+                evidence_mode=evidence_mode,
+                review_status="pass",
+                findings=("missing_review_digest",),
+            )
         return DraftAdoptionResult(
             status="pass",
             input_path=str(input_path),
@@ -232,6 +240,22 @@ def _review_gate(
         review_status=str(status),
         findings=(f"unsupported_review_status:{status}",),
     )
+
+
+def _review_digest(review_report: Path) -> str | None:
+    try:
+        payload = json.loads(review_report.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    pack_digest = payload.get("pack_digest")
+    if isinstance(pack_digest, dict):
+        value = pack_digest.get("content_sha256")
+        if isinstance(value, str):
+            return value
+    value = payload.get("input_sha256")
+    return value if isinstance(value, str) else None
 
 
 def _write_report_if_requested(result: DraftAdoptionResult, report_path: Path | None) -> DraftAdoptionResult:

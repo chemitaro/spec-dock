@@ -542,6 +542,36 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["valid_candidate_count"] == 3
             assert payload["review_gate_passed"] is True
 
+    def test_authoring_validate_epic_issue_candidates_rejects_backslash_candidate_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "issue", kind="epic-issue")
+            index_path = stage_dir / "specdock-authoring-pack" / "candidates" / "issues" / "index.json"
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            index["candidates"][0]["path"] = "candidates\\..\\..\\outside.json"
+            index_path.write_text(json.dumps(index, sort_keys=True) + "\n", encoding="utf-8")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "epic-issue-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-epic",
+                    "epic-00295",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "path_separator_backslash:candidates\\..\\..\\outside.json" in payload["findings"]
+
     def test_authoring_validate_candidates_blocks_passed_review_without_digest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -1402,6 +1432,34 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert p.returncode != 0
             assert payload["status"] == "stale"
             assert "review_digest_mismatch" in payload["comparison"]
+
+    def test_authoring_validate_issue_draft_adoption_blocks_passed_review_without_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+            Path(fixture["review_report"]).write_text(
+                json.dumps({"status": "pass"}, sort_keys=True) + "\n", encoding="utf-8"
+            )
+
+            payload = _run_issue_draft_adoption_json(self, repo, fixture)
+
+            assert payload["status"] == "blocked"
+            assert payload["review_gate_passed"] is False
+            assert "missing_review_digest" in payload["findings"]
+
+    def test_authoring_validate_issue_draft_adoption_rejects_backslash_draft_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+            input_path = Path(fixture["input"])
+            payload = json.loads(input_path.read_text(encoding="utf-8"))
+            payload["drafts"]["requirement"]["path"] = "artifacts\\..\\outside.md"
+            input_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_issue_draft_adoption_json(self, repo, fixture)
+
+            assert result["status"] == "rejected"
+            assert "path_separator_backslash:artifacts\\..\\outside.md" in result["findings"]
 
     @pytest.mark.parametrize(
         ("review_status", "expected_status", "expected_fragment"),
@@ -2322,6 +2380,34 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert p.returncode == 0, p.stdout + p.stderr
             assert payload["evidence_mode"] == "local-context"
             assert report_payload["evidence_mode"] == "local-context"
+            assert report_payload["pack_digest"]["content_sha256"]
+
+    def test_authoring_pack_review_derives_evidence_mode_from_pack_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            provenance = {
+                "evidence_mode": "local-context",
+                "sync_state": "local_context",
+                "github_sync": "not_verified",
+                "source_manifest_hash": "hash",
+                "authority": "evidence_only",
+                "adoption_status": "unreviewed",
+                "bundle_generation_not_promotion": True,
+            }
+            pack_zip = _write_authoring_pack_zip(
+                repo / "local-context.zip",
+                metadata_overrides={"provenance.json": json.dumps(provenance, sort_keys=True) + "\n"},
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["evidence_mode"] == "local-context"
 
     def test_authoring_pack_review_text_preserves_local_context_evidence_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2712,6 +2798,32 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert p.returncode == 1, p.stdout + p.stderr
             assert payload["status"] == "rejected"
             assert expected_finding in payload["findings"]
+
+    def test_authoring_pack_review_rejects_authority_claims_in_required_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "adopted-metadata.zip",
+                metadata_overrides={
+                    "adoption/eal-candidates.json": json.dumps(
+                        {"candidates": [], "authority": "canonical", "adoption_status": "adopted"},
+                        sort_keys=True,
+                    )
+                    + "\n"
+                },
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "invalid_authority:adoption/eal-candidates.json" in payload["findings"]
+            assert "invalid_adoption_status:adoption/eal-candidates.json" in payload["findings"]
 
     def test_authoring_pack_review_rejects_executable_zip_entry(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3549,6 +3661,16 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == "stale"
             assert "behind_remote" in payload["blockers"]
             assert payload["local_head"] != payload["remote_head"]
+
+    def test_authoring_preflight_github_sync_blocks_missing_explicit_source_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+
+            payload = _run_preflight_json(self, repo, "--source-path", "missing.py", expected_returncode=1)
+
+            assert payload["status"] == "blocked"
+            assert "missing_source_path:missing.py" in payload["blockers"]
+            assert payload["github_sync"] != "verified"
 
     def test_authoring_preflight_github_sync_blocks_missing_origin_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -5958,6 +6080,74 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert "unsafe_output_entry:invocation-summary.json" in payload["blockers"]
             assert not target.exists()
 
+    def test_authoring_backend_invoke_rejects_secret_manifest_attachment(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            manifest_path = pack / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["files"] = [*manifest["files"], "secrets/token.txt"]
+            manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+            (pack / "secrets").mkdir()
+            (pack / "secrets" / "token.txt").write_text("token\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert "unsafe_manifest_file:secret-path:secrets/token.txt" in payload["blockers"]
+
+    def test_authoring_backend_invoke_rejects_unsynced_github_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            provenance_path = pack / "provenance.json"
+            provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+            provenance["github_sync"] = "failed"
+            provenance["sync_state"] = "blocked"
+            provenance_path.write_text(json.dumps(provenance, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert "provenance_github_sync_not_verified" in payload["blockers"]
+            assert "provenance_sync_state_not_synced" in payload["blockers"]
+
     def test_authoring_backend_invoke_backend_non_zero_timeout_redaction_and_local_context(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -7036,7 +7226,10 @@ def _write_issue_draft_adoption_fixture(repo: Path, *, mutator: str | None = Non
         draft_paths[name] = f"artifacts/{name}-draft.md"
     review_report = repo / ".specdock-authoring" / "issue-draft" / "review-report.json"
     review_report.parent.mkdir(parents=True, exist_ok=True)
-    review_report.write_text(json.dumps({"status": "pass"}, sort_keys=True) + "\n", encoding="utf-8")
+    review_report.write_text(
+        json.dumps({"status": "pass", "pack_digest": {"content_sha256": "draft-pack-hash"}}, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     review_digest = hashlib.sha256(review_report.read_bytes()).hexdigest()
     payload = {
         "schema_version": "issue-draft-adoption-v1",
@@ -7260,6 +7453,12 @@ def _write_valid_prompt_pack(pack_dir: Path, *, evidence_mode: str = "github-syn
         "adoption_status": "unreviewed",
         "bundle_generation_not_promotion": True,
     }
+    if evidence_mode == "local-context":
+        provenance.update({
+            "provided_context_paths": ["source.txt"],
+            "unsynced_reason": "fixture local-context evidence",
+            "adoption_requires": "explicit_eal_disposition",
+        })
     source_manifest = {
         "source_paths": ["source.txt"],
         "source_hashes": {"source.txt": "hash"},
