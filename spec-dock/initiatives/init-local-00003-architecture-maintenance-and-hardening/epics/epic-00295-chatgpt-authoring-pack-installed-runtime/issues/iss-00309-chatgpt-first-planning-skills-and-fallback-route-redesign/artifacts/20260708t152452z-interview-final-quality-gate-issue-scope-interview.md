@@ -2,7 +2,7 @@
 種別: interview
 ID: "20260708t152452z-interview"
 タイトル: "Final Quality Gate Issue Scope Interview"
-状態: "draft"
+状態: "answered"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-09"
 親: ["iss-00309"]
@@ -11,9 +11,9 @@ scope: "<initiative | epic | issue | local-topic>"
 scope_id: "iss-00309"
 created_at: "2026-07-08THH:MM:SSZ"
 created_by: "iwasawayuuta"
-status: "unanswered"
-authority: "proposed | user-approved | synthesized"
-adoption_status: "unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked"
+status: "answered"
+authority: "user-approved"
+adoption_status: "adopted"
 derived_from: []
 reflected_to: []
 ---
@@ -109,41 +109,52 @@ reflected_to: []
 
 ## ユーザー回答 (回答後に必須)
 - answer capture:
-  - ...
+  - Option B を採用する。
+  - 単一 Issue の場合は Epic 専用の final quality gate / PR delivery Issue は不要。
+  - 単一 Issue Epic では、Issue の品質ゲートが Epic の品質ゲートを兼ねられる。
 - 回答:
-  - ...
+  - 複数 Issue を持つ implementation Epic では final quality gate / PR delivery Issue を必須にする。
+  - single-Issue / docs-only / no-op Epic は、Epic plan に skip rationale と completion evidence を置けば final quality Issue を省略できる。
+  - 特に単一 Issue Epic では、その Issue 内の品質ゲートを Epic-level gate として扱う。
 - 回答日時:
-  - ...
+  - 2026-07-09
 
 ## 追加確認の要否 (回答後に必須)
 - 追加確認が必要か:
-  - yes | no
+  - yes
 - 必要な場合に次の unanswered `interview` として切り出す質問:
-  - ...
+  - Issue Planning を Epic Planning 中に全件正式化するか、Epic Planning では各 Issue の draft requirement / draft design / draft plan までに留め、Issue Execution 直前に正式 Issue Planning を行うか。
 
 ## 採用判断 (回答後に必須)
 - adoption_status:
-  - unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked
+  - adopted
 - adoption target:
-  - `requirement.md` | `design.md` | `plan.md` | `ADR` | `report.md` Evidence Adoption Ledger | none
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
+  - `report.md` Evidence Adoption Ledger
 - 採用 / 棄却 / deferred の理由:
-  - ...
+  - 複数 Issue implementation Epic では Epic-wide verification、review repair、manual test、mergeable PR delivery が中間 Issue に分散しやすいため、final quality Issue を必須化する。
+  - 単一 Issue Epic では同じ Issue の品質ゲートで Epic-level gate を兼ねられるため、別 Issue 化を強制しない。
+  - docs-only / no-op Epic では、skip rationale と completion evidence を要求することで過剰プロセスを避ける。
 - `report.md` Evidence Adoption Ledger への反映要否:
-  - yes | no
+  - yes
 
 ## requirement / design / plan / ADR への含意 (回答後に必須)
 - `requirement.md`:
-  - ...
+  - final quality gate / PR delivery Issue の必須範囲を、複数 Issue implementation Epic に限定して明記する。
+  - single-Issue / docs-only / no-op Epic では、skip rationale と completion evidence を要求する。
 - `design.md`:
-  - ...
+  - Epic Planning / Epic Execution は、複数 Issue implementation Epic で最終 Issue を Epic-wide quality gate / PR delivery owner として扱う。
+  - 単一 Issue Epic では Issue-local quality gate が Epic gate を兼ねる設計を許容する。
 - `plan.md`:
-  - ...
+  - Epic plan template と planning skill に、final quality Issue の必須条件、skip 条件、skip evidence を追加する。
 - `ADR`:
-  - ...
+  - 現時点では不要。後続で Epic delivery policy を恒久判断として固定する場合は ADR 候補にする。
 - reflected_to 更新方針:
-  - ...
+  - canonical requirement / design / plan 作成時に反映し、report EAL に採用済みとして記録する。
 - adoption reflection:
-  - ...
+  - reflected_to は canonical docs へ反映した時点で更新する。
 
 ## 条件付き補足 (必要な場合だけ)
 - PlantUML 図:
