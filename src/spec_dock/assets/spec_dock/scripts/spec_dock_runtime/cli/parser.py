@@ -147,7 +147,7 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     _bind_leaf(
         authoring_validate_sub.add_parser(
             "issue-draft-adoption",
-            help="Deferred Issue draft adoption validation skeleton",
+            help="Validate evidence-only Issue draft adoption",
         ),
         registry,
         "authoring_validate_issue_draft_adoption",
@@ -155,7 +155,7 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     _bind_leaf(
         authoring_validate_sub.add_parser(
             "selected-skeleton-fill",
-            help="Deferred selected skeleton fill validation skeleton",
+            help="Validate evidence-only selected skeleton fill",
         ),
         registry,
         "authoring_validate_selected_skeleton_fill",

@@ -3648,7 +3648,9 @@ class TestInitUpdate(CliRuntimeHarness):
                 "prepare_chatgpt_authoring_pack.py",
                 "review_chatgpt_authoring_pack.py",
                 "stage_chatgpt_authoring_pack.py",
+                "validate_initiative_epic_candidates.py",
                 "validate_issue_candidates.py",
+                "validate_issue_draft_adoption.py",
                 "validate_selected_skeleton_fill.py",
             }
             observed_files = {path.name for path in authoring_pack_dir.iterdir() if path.is_file()}
