@@ -11,6 +11,8 @@ This skill is an operational kernel. Keep detailed policy in docs and keep globa
 
 Contract anchor: create/import an initiative when no existing Initiative fits; capture scope-specific constraints and decisions before Epic decomposition; record Spec Authoring Gate evidence after fresh `spec-reviewer` pass.
 
+ChatGPT authoring relationship: `spec-dock-chatgpt-authoring` may provide Initiative decomposition evidence, candidate Epic summaries, or comparison artifacts. Those outputs are evidence-only; Initiative planning still owns canonical Initiative docs, Evidence Adoption Ledger entries, and human approval before Epic node creation.
+
 ## Read First
 
 - Current state: `./spec-dock/scripts/spec-dock active show`, existing Initiatives/Epics, active docs, `artifacts/`, legacy `discussions/` when present, related code/tests/templates/ADRs, and relevant user attachments.
@@ -52,4 +54,6 @@ Contract anchor: create/import an initiative when no existing Initiative fits; c
 - Existing Initiative fit is unresolved and creating a new Initiative would duplicate or fragment work.
 - A decision belongs to ADR or clarification rather than Initiative.
 - Requirement / design / plan candidate changed after review and lacks a fresh `spec-reviewer` pass.
+- ChatGPT / Oracle decomposition evidence has not been adopted or rejected in `report.md`.
+- Epic candidate creation lacks explicit human approval.
 - Epic decomposition would pass unresolved Initiative decisions downstream as ready work.
