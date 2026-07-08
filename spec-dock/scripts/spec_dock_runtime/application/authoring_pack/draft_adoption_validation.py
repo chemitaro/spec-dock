@@ -40,6 +40,8 @@ class SelectedSkeletonFillValidationRequest:
     selected_skeleton: Path
     output_format: Literal["text", "json"] = "text"
     evidence_mode: Literal["github-synced", "local-context"] = "github-synced"
+    review_report: Path | None = None
+    expected_review_digest: str | None = None
     expected_profile: str | None = None
     expected_source_hash: str | None = None
     report_path: Path | None = None
@@ -75,6 +77,7 @@ def validate_issue_draft_adoption(request: IssueDraftAdoptionValidationRequest) 
     review_gate = _review_gate(request.input_path, review_report_path, "issue-draft-adoption", request.evidence_mode)
     if review_gate.status != "pass":
         return _write_report_if_requested(review_gate, request.report_path)
+    review_pack_digest = _review_digest(review_report_path)
     result = validate_issue_draft_adoption_payload(
         payload,
         input_path=request.input_path,
@@ -82,7 +85,7 @@ def validate_issue_draft_adoption(request: IssueDraftAdoptionValidationRequest) 
         review_status="pass",
         review_digest=file_sha256(review_report_path),
         expected_review_digest=request.expected_review_digest,
-        expected_draft_pack_digest=request.expected_draft_pack_digest,
+        expected_draft_pack_digest=request.expected_draft_pack_digest or review_pack_digest,
         expected_source_hash=request.expected_source_hash,
         evidence_mode=request.evidence_mode,
     )
@@ -107,6 +110,20 @@ def validate_selected_skeleton_fill(request: SelectedSkeletonFillValidationReque
     )
     if issue_gate is not None:
         return _write_report_if_requested(issue_gate, request.report_path)
+    if request.review_report is None:
+        return _write_report_if_requested(
+            blocked_result(
+                input_path=request.input_path,
+                validation_kind="selected-skeleton-fill",
+                evidence_mode=request.evidence_mode,
+                findings=("missing_review_report",),
+            ),
+            request.report_path,
+        )
+    review_report_path = request.review_report
+    review_gate = _review_gate(request.input_path, review_report_path, "selected-skeleton-fill", request.evidence_mode)
+    if review_gate.status != "pass":
+        return _write_report_if_requested(review_gate, request.report_path)
     assurance, assurance_findings = read_json_payload(request.assurance, "assurance")
     if assurance is None:
         result_factory = blocked_result if _missing_or_unreadable_json(assurance_findings) else failed_result
@@ -137,6 +154,9 @@ def validate_selected_skeleton_fill(request: SelectedSkeletonFillValidationReque
         issue_dir=request.issue_dir,
         assurance=assurance,
         selected_skeleton=selected_skeleton,
+        review_status="pass",
+        review_digest=file_sha256(review_report_path),
+        expected_review_digest=request.expected_review_digest,
         expected_profile=request.expected_profile,
         expected_source_hash=request.expected_source_hash,
         evidence_mode=request.evidence_mode,

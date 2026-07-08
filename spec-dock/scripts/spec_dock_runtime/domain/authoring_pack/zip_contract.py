@@ -308,6 +308,7 @@ def _validate_metadata(payloads: dict[str, str], findings: list[str]) -> str:
     for metadata, payload in objects.items():
         if isinstance(payload, dict):
             _validate_authority_metadata(metadata, payload, findings)
+            _validate_required_metadata_fields(metadata, payload, findings)
     if isinstance(source_manifest, dict) and isinstance(stale_if, dict):
         expected_hash = stale_if.get("source_manifest_hash_changes", stale_if.get("source_manifest_hash"))
         if expected_hash is not None and source_manifest.get("source_manifest_hash") != expected_hash:
@@ -335,6 +336,18 @@ def _validate_authority_metadata(metadata: str, payload: dict[str, object], find
         )
 
 
+def _validate_required_metadata_fields(metadata: str, payload: dict[str, object], findings: list[str]) -> None:
+    if metadata == "provenance.json":
+        for key in ("evidence_mode", "sync_state", "github_sync", "source_manifest_hash"):
+            if not isinstance(payload.get(key), str):
+                findings.append(f"missing_or_invalid_field:{metadata}.{key}")
+    if metadata == "source-manifest.json":
+        if not isinstance(payload.get("source_manifest_hash"), str):
+            findings.append(f"missing_or_invalid_field:{metadata}.source_manifest_hash")
+        if not isinstance(payload.get("source_hashes"), dict):
+            findings.append(f"missing_or_invalid_field:{metadata}.source_hashes")
+
+
 def _payload_evidence_mode(payloads: dict[str, str]) -> str | None:
     try:
         provenance = json.loads(payloads.get("provenance.json", "{}"))
@@ -352,15 +365,37 @@ def _scan_payloads(payloads: dict[str, str]) -> tuple[str, ...]:
         if rel_name in CLAIM_SCAN_EXCLUDED_PATHS:
             findings.extend(scan_constraint_sensitive_payload(text))
             continue
-        findings.extend(scan_authoring_payload(text))
+        findings.extend(scan_authoring_payload(_payload_for_authority_scan(rel_name, text)))
     return tuple(findings)
+
+
+def _payload_for_authority_scan(rel_name: str, text: str) -> str:
+    if not rel_name.endswith("/candidate.json"):
+        return text
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return text
+    if not isinstance(payload, dict):
+        return text
+    profile = payload.get("profile_recommendation")
+    if not isinstance(profile, dict) or profile.get("authorized_profile") is not None:
+        return text
+    sanitized_profile = dict(profile)
+    sanitized_profile.pop("authorized_profile", None)
+    sanitized_payload = dict(payload)
+    sanitized_payload["profile_recommendation"] = sanitized_profile
+    return json.dumps(sanitized_payload, sort_keys=True)
 
 
 def _status_from_findings(findings: tuple[str, ...], metadata_status: str) -> PackReviewStatus:
     if any(finding == "wrong_root" for finding in findings):
         return "rejected"
     if (
-        any(finding.startswith(("missing_metadata:", "invalid_json:", "non_object_json:")) for finding in findings)
+        any(
+            finding.startswith(("missing_metadata:", "invalid_json:", "non_object_json:", "missing_or_invalid_field:"))
+            for finding in findings
+        )
         or metadata_status == "fail"
     ):
         return "fail"
@@ -374,7 +409,13 @@ def _status_from_findings(findings: tuple[str, ...], metadata_status: str) -> Pa
 
 
 def _is_rejected_finding(finding: str) -> bool:
-    return not finding.startswith(("missing_metadata:", "invalid_json:", "non_object_json:", "source_hash_mismatch"))
+    return not finding.startswith((
+        "missing_metadata:",
+        "invalid_json:",
+        "non_object_json:",
+        "missing_or_invalid_field:",
+        "source_hash_mismatch",
+    ))
 
 
 def _is_supported_text(rel_name: str) -> bool:

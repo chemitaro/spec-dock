@@ -120,6 +120,8 @@ class AuthoringSelectedSkeletonFillValidationArgs(CommandArgs):
     selected_skeleton: Path
     output_format: str
     evidence_mode: str
+    review_report: Path | None
+    expected_review_digest: str | None
     expected_profile: str | None
     expected_source_hash: str | None
     report_path: Path | None
@@ -304,6 +306,8 @@ def _add_selected_skeleton_fill_arguments(parser: argparse.ArgumentParser) -> No
     parser.add_argument("--selected-skeleton", required=True)
     parser.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
     parser.add_argument("--evidence-mode", choices=("github-synced", "local-context"), default="github-synced")
+    parser.add_argument("--review-report", required=True)
+    parser.add_argument("--expected-review-digest")
     parser.add_argument("--expected-profile")
     parser.add_argument("--expected-source-manifest-hash", "--expected-source-hash", dest="expected_source_hash")
     parser.add_argument("--report-path")
@@ -491,6 +495,8 @@ def _selected_skeleton_fill_args(ns: argparse.Namespace) -> CommandArgs:
         selected_skeleton=Path(ns.selected_skeleton),
         output_format=ns.output_format,
         evidence_mode=ns.evidence_mode,
+        review_report=Path(ns.review_report) if ns.review_report else None,
+        expected_review_digest=ns.expected_review_digest,
         expected_profile=ns.expected_profile,
         expected_source_hash=ns.expected_source_hash,
         report_path=Path(ns.report_path) if ns.report_path else None,
@@ -717,6 +723,8 @@ def _run_selected_skeleton_fill(args: CommandArgs, use_cases: UseCases) -> Comma
             selected_skeleton=skeleton_args.selected_skeleton,
             output_format=skeleton_args.output_format,  # type: ignore[arg-type]
             evidence_mode=skeleton_args.evidence_mode,  # type: ignore[arg-type]
+            review_report=skeleton_args.review_report,
+            expected_review_digest=skeleton_args.expected_review_digest,
             expected_profile=skeleton_args.expected_profile,
             expected_source_hash=skeleton_args.expected_source_hash,
             report_path=skeleton_args.report_path,
