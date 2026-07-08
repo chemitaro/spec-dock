@@ -12,7 +12,9 @@ derived_from:
   - "ChatGPT GPT-5.5 Pro Extended / Oracle session: specdock-issue-planning-timing"
   - "artifacts/20260708t152310z-research-workflow-simulation-and-final-quality-gate-issue-analysis.md"
   - "artifacts/20260708t152452z-interview-final-quality-gate-issue-scope-interview.md"
-reflected_to: []
+reflected_to:
+  - "artifacts/20260708t161533z-adr-chatgpt-first-option-3-plus-issue-planning-workflow.md"
+  - "report.md"
 ---
 
 # 20260708t154900z-research ChatGPT First Issue Planning Timing And Epic Execution Workflow
