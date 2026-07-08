@@ -5,7 +5,7 @@
   "title": "ChatGPT First Planning Skills And Fallback Route Redesign",
   "slug": "chatgpt-first-planning-skills-and-fallback-route-redesign",
   "created_at": "2026-07-09T00:01:51+09:00",
-  "updated_at": "2026-07-09T00:01:51+09:00",
+  "updated_at": "2026-07-09T02:22:28+09:00",
   "parent_id": "epic-00295",
   "initiative_id": "init-local-00003",
   "epic_id": "epic-00295",
@@ -18,5 +18,8 @@
     "issue_number": 309,
     "repo_owner": "chemitaro",
     "repo_name": "spec-dock"
-  }
+  },
+  "depends_on": [
+    "iss-00306"
+  ]
 }
