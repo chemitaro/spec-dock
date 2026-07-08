@@ -687,7 +687,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == expected_status
             assert expected_fragment in json.dumps(payload, sort_keys=True)
 
-    def test_authoring_approval_check_requires_approval_source_hash_without_expected_source_hash(self) -> None:
+    def test_authoring_approval_check_allows_omitted_approval_source_hash_without_expected_source_hash(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
             stage_dir = _write_candidate_stage(
@@ -722,9 +722,10 @@ class TestAuthoringCli(CliRuntimeHarness):
             )
 
             payload = _json_stdout(p)
-            assert p.returncode != 0
-            assert payload["status"] == "fail"
-            assert "missing_or_invalid_field:candidate_pack.source_manifest_hash" in payload["findings"]
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert "missing_or_invalid_field:candidate_pack.source_manifest_hash" not in payload["findings"]
+            assert "source_manifest_hash_mismatch" not in payload["comparison"]
 
     @pytest.mark.parametrize(
         ("mutator", "expected_status", "expected_fragment"),
@@ -738,6 +739,8 @@ class TestAuthoringCli(CliRuntimeHarness):
             ("self-approval", "rejected", "self_approval_forbidden"),
             ("forbidden-claim", "rejected", "forbidden_authority_claim:execution_ready"),
             ("forbidden-extra-field", "rejected", "forbidden_authority_claim:execution-ready"),
+            ("top-level-execution-ready", "rejected", "forbidden_authority_claim:execution_ready"),
+            ("nested-pr-ready", "rejected", "forbidden_authority_claim:pr_ready"),
             ("secret-text", "rejected", "secret_like_payload:token"),
         ),
     )
@@ -6659,6 +6662,10 @@ def _write_approval_fixture(
         payload["authority_boundary"] = {**_candidate_authority_claims(), "execution_ready": True}
     if mutator == "forbidden-extra-field":
         payload["notes"] = "execution-ready"
+    if mutator == "top-level-execution-ready":
+        payload["execution_ready"] = True
+    if mutator == "nested-pr-ready":
+        payload["metadata"] = {"pr_ready": True}
     if mutator == "malformed-json":
         text = "{invalid json"
     elif mutator == "non-object-json":
