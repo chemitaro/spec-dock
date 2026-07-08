@@ -7854,7 +7854,11 @@ def _create_synced_git_repo(root: Path) -> Path:
     remote = root / "remote.git"
     repo = root / "repo"
     _git(root, "init", "--bare", str(remote))
+    _git(remote, "config", "gc.auto", "0")
+    _git(remote, "config", "maintenance.auto", "false")
     _git(root, "clone", str(remote), str(repo))
+    _git(repo, "config", "gc.auto", "0")
+    _git(repo, "config", "maintenance.auto", "false")
     _git(repo, "config", "user.name", "Test User")
     _git(repo, "config", "user.email", "test@example.com")
     assert main(["init", str(repo)]) == 0

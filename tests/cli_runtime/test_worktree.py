@@ -71,6 +71,8 @@ class TestCliWorktree(CliRuntimeHarness):
             pytest.skip("git not available")
         assert main(["init", str(target)]) == 0
         self._run_git(target, ["init"])
+        self._run_git(target, ["config", "gc.auto", "0"])
+        self._run_git(target, ["config", "maintenance.auto", "false"])
         self._run_git(target, ["add", "-A"])
         self._run_git(
             target,
