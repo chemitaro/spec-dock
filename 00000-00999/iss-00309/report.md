@@ -389,6 +389,43 @@ Observed result:
 
 ---
 
+### セッションログ（2026-07-09 03:20 - 03:40）
+
+#### 対象
+- Step: PR repair — provider-tests format failure
+- AC/EC: EC-010 / CLOS-010
+
+#### 実施内容
+- PR #310 の `provider-tests` で `ruff format check` が `tests/unit/infra/test_init_update.py` を未整形として検出したため、対象ファイルに `ruff format` を適用した。
+- 変更はテストファイルの整形のみであり、ChatGPT Use 直実行版を採用した D-001 / EAL-006 の判断は変更していない。
+
+#### 実行コマンド / 結果
+```bash
+uv run ruff format tests/unit/infra/test_init_update.py
+make lint
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_chatgpt_authoring_managed_skill_contract
+./spec-dock/scripts/spec-dock validate
+git diff --check
+```
+
+Observed result:
+- `make lint`: pass
+- focused unit test: pass (`1 passed`)
+- `./spec-dock/scripts/spec-dock validate`: pass (`nodes=203`)
+- `git diff --check`: pass
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CLOS-010 | PR repair | `make lint`; focused unit test; `validate`; `diff --check` | pass | GitHub provider-tests failure の format 指摘を修正 |
+
+#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
+| マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| PR repair | reviewed | `tests/unit/infra/test_init_update.py` format repair and report evidence | commit pending | pending | N/A | N/A | N/A | N/A |
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
