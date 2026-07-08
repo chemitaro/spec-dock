@@ -152,7 +152,7 @@ def _write_legacy_prompt_pack(prompt_pack: Path, files: tuple[Path, ...]) -> Non
         json.dumps(
             {
                 "source_paths": context_paths,
-                "source_hashes": {path: "legacy-wrapper" for path in context_paths},
+                "source_hashes": dict.fromkeys(context_paths, "legacy-wrapper"),
                 "source_manifest_hash": "legacy-wrapper",
             },
             sort_keys=True,
