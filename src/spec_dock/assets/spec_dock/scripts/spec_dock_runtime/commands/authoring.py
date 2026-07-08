@@ -9,7 +9,9 @@ from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
     run_github_sync_preflight,
 )
 from spec_dock_runtime.application.authoring_pack.backend_invoke import invoke_backend
+from spec_dock_runtime.application.authoring_pack.pack_review import PackReviewRequest, review_authoring_pack
 from spec_dock_runtime.application.authoring_pack.pack_prepare import prepare_prompt_pack
+from spec_dock_runtime.application.authoring_pack.pack_stage import PackStageRequest, stage_authoring_pack
 from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
 from spec_dock_runtime.domain.authoring_pack.backend_invoke_contract import BackendInvokeRequest
 from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import PromptPackPrepareRequest
@@ -21,6 +23,14 @@ from spec_dock_runtime.presentation.authoring_pack.backend_invoke_renderer impor
 from spec_dock_runtime.presentation.authoring_pack.pack_prepare_renderer import (
     render_pack_prepare_json,
     render_pack_prepare_text,
+)
+from spec_dock_runtime.presentation.authoring_pack.pack_review_renderer import (
+    render_pack_review_json,
+    render_pack_review_text,
+)
+from spec_dock_runtime.presentation.authoring_pack.pack_stage_renderer import (
+    render_pack_stage_json,
+    render_pack_stage_text,
 )
 from spec_dock_runtime.presentation.contracts import CliText
 
@@ -62,6 +72,22 @@ class AuthoringPackPrepareArgs(CommandArgs):
 
 
 @dataclass(frozen=True)
+class AuthoringPackReviewArgs(CommandArgs):
+    input_path: Path
+    output_format: str
+    evidence_mode: str
+    report_path: Path | None
+
+
+@dataclass(frozen=True)
+class AuthoringPackStageArgs(CommandArgs):
+    input_path: Path
+    stage_dir: Path
+    output_format: str
+    dry_run: bool
+
+
+@dataclass(frozen=True)
 class AuthoringBackendInvokeArgs(CommandArgs):
     prompt_pack: Path
     output_dir: Path
@@ -75,8 +101,6 @@ class AuthoringBackendInvokeArgs(CommandArgs):
 
 
 _DEFERRED_COMMANDS: dict[str, tuple[str, str]] = {
-    "authoring_pack_review": ("authoring pack review", "iss-00301"),
-    "authoring_pack_stage": ("authoring pack stage", "iss-00301"),
     "authoring_validate_initiative_epic_candidates": (
         "authoring validate initiative-epic-candidates",
         "iss-00302",
@@ -106,6 +130,16 @@ def command_specs() -> dict[str, CommandSpec]:
         add_arguments=_add_pack_prepare_arguments,
         args_factory=_pack_prepare_args,
         run=_run_pack_prepare,
+    )
+    specs["authoring_pack_review"] = CommandSpec(
+        add_arguments=_add_pack_review_arguments,
+        args_factory=_pack_review_args,
+        run=_run_pack_review,
+    )
+    specs["authoring_pack_stage"] = CommandSpec(
+        add_arguments=_add_pack_stage_arguments,
+        args_factory=_pack_stage_args,
+        run=_run_pack_stage,
     )
     specs["authoring_backend_invoke"] = CommandSpec(
         add_arguments=_add_backend_invoke_arguments,
@@ -140,6 +174,20 @@ def _add_pack_prepare_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--mode", choices=("initiative", "epic", "issue", "selected-skeleton"))
     parser.add_argument("--source-manifest")
     parser.add_argument("--stale-if")
+
+
+def _add_pack_review_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--input", required=True, dest="input_path")
+    parser.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
+    parser.add_argument("--evidence-mode", choices=("github-synced", "local-context"), default="github-synced")
+    parser.add_argument("--report-path")
+
+
+def _add_pack_stage_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--input", required=True, dest="input_path")
+    parser.add_argument("--stage-dir", required=True)
+    parser.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
+    parser.add_argument("--dry-run", action="store_true")
 
 
 def _add_backend_invoke_arguments(parser: argparse.ArgumentParser) -> None:
@@ -178,6 +226,24 @@ def _pack_prepare_args(ns: argparse.Namespace) -> CommandArgs:
         mode=ns.mode,
         source_manifest=Path(ns.source_manifest) if ns.source_manifest else None,
         stale_if=Path(ns.stale_if) if ns.stale_if else None,
+    )
+
+
+def _pack_review_args(ns: argparse.Namespace) -> CommandArgs:
+    return AuthoringPackReviewArgs(
+        input_path=Path(ns.input_path),
+        output_format=ns.output_format,
+        evidence_mode=ns.evidence_mode,
+        report_path=Path(ns.report_path) if ns.report_path else None,
+    )
+
+
+def _pack_stage_args(ns: argparse.Namespace) -> CommandArgs:
+    return AuthoringPackStageArgs(
+        input_path=Path(ns.input_path),
+        stage_dir=Path(ns.stage_dir),
+        output_format=ns.output_format,
+        dry_run=bool(ns.dry_run),
     )
 
 
@@ -261,6 +327,44 @@ def _run_pack_prepare(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     )
 
 
+def _run_pack_review(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    del use_cases
+    review_args = _expect_pack_review_args(args)
+    result = review_authoring_pack(
+        PackReviewRequest(
+            input_path=review_args.input_path,
+            output_format=review_args.output_format,  # type: ignore[arg-type]
+            evidence_mode=review_args.evidence_mode,  # type: ignore[arg-type]
+            report_path=review_args.report_path,
+        )
+    )
+    exit_code = 0 if result.status == "pass" else 1
+    if review_args.output_format == "json":
+        stdout_lines = [render_pack_review_json(result)]
+    else:
+        stdout_lines = render_pack_review_text(result)
+    return CommandOutcome(exit_code=exit_code, text=CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=[]))
+
+
+def _run_pack_stage(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    del use_cases
+    stage_args = _expect_pack_stage_args(args)
+    result = stage_authoring_pack(
+        PackStageRequest(
+            input_path=stage_args.input_path,
+            stage_dir=stage_args.stage_dir,
+            output_format=stage_args.output_format,  # type: ignore[arg-type]
+            dry_run=stage_args.dry_run,
+        )
+    )
+    exit_code = 0 if result.status == "pass" else 1
+    if stage_args.output_format == "json":
+        stdout_lines = [render_pack_stage_json(result)]
+    else:
+        stdout_lines = render_pack_stage_text(result)
+    return CommandOutcome(exit_code=exit_code, text=CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=[]))
+
+
 def _run_backend_invoke(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     del use_cases
     backend_args = _expect_backend_invoke_args(args)
@@ -322,6 +426,18 @@ def _expect_preflight_github_sync_args(args: CommandArgs) -> AuthoringPreflightG
 def _expect_pack_prepare_args(args: CommandArgs) -> AuthoringPackPrepareArgs:
     if not isinstance(args, AuthoringPackPrepareArgs):
         raise RuntimeError("Invalid command args for authoring pack prepare")
+    return args
+
+
+def _expect_pack_review_args(args: CommandArgs) -> AuthoringPackReviewArgs:
+    if not isinstance(args, AuthoringPackReviewArgs):
+        raise RuntimeError("Invalid command args for authoring pack review")
+    return args
+
+
+def _expect_pack_stage_args(args: CommandArgs) -> AuthoringPackStageArgs:
+    if not isinstance(args, AuthoringPackStageArgs):
+        raise RuntimeError("Invalid command args for authoring pack stage")
     return args
 
 
