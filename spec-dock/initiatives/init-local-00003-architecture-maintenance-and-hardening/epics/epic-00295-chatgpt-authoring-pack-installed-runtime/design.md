@@ -304,7 +304,7 @@ Validators do not create nodes, adopt docs, change `.assurance.json`, grant revi
 | Candidate claims `authorized_profile` | `rejected` | require advisory-only profile recommendation |
 | Approval evidence missing | `blocked` | stop before node creation |
 | Reviewer pass claimed by ChatGPT | `rejected` | require fresh local reviewer gate |
-| Tree fallback without ZIP central directory evidence | `deferred` / `blocked` | record fallback limitation |
+| Tree fallback without ZIP central directory evidence | `pass` with `fallback=true` and lower authority | stage only as evidence-only fallback; record `missing_evidence=zip-central-directory` |
 | Local-context evidence used as github-synced evidence | `rejected` | reclassify provenance and require EAL disposition |
 | Intermediate Issue attempts PR delivery | `blocked` | defer to final quality gate / PR delivery Issue |
 | Final delivery Issue missing | `blocked` | return to Epic planning and add final delivery Issue |

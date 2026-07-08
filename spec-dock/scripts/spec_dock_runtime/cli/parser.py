@@ -108,12 +108,12 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "authoring_pack_prepare",
     )
     _bind_leaf(
-        authoring_pack_sub.add_parser("review", help="Deferred ZIP review skeleton"),
+        authoring_pack_sub.add_parser("review", help="Review ChatGPT authoring pack ZIP/tree output"),
         registry,
         "authoring_pack_review",
     )
     _bind_leaf(
-        authoring_pack_sub.add_parser("stage", help="Deferred ZIP staging skeleton"),
+        authoring_pack_sub.add_parser("stage", help="Stage reviewed ChatGPT authoring pack evidence"),
         registry,
         "authoring_pack_stage",
     )

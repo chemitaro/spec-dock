@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import hashlib
+import zipfile
 
 import pytest
 
@@ -13,8 +14,6 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 _DEFERRED_COMMANDS = (
-    (["authoring", "pack", "review"], "authoring pack review", "iss-00301"),
-    (["authoring", "pack", "stage"], "authoring pack stage", "iss-00301"),
     (
         ["authoring", "validate", "initiative-epic-candidates"],
         "authoring validate initiative-epic-candidates",
@@ -99,6 +98,34 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert "--dry-run" in p.stdout
             assert "--force" not in p.stdout
 
+    def test_authoring_pack_review_help_exposes_implemented_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            p = self._run_runtime_capture(target, ["authoring", "pack", "review", "--help"])
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "--input" in p.stdout
+            assert "--format" in p.stdout
+            assert "--evidence-mode" in p.stdout
+            assert "--report-path" in p.stdout
+            assert "Deferred ZIP review skeleton" not in p.stdout
+
+    def test_authoring_pack_stage_help_exposes_implemented_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            p = self._run_runtime_capture(target, ["authoring", "pack", "stage", "--help"])
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "--input" in p.stdout
+            assert "--stage-dir" in p.stdout
+            assert "--dry-run" in p.stdout
+            assert "--format" in p.stdout
+            assert "Deferred ZIP staging skeleton" not in p.stdout
+
     @pytest.mark.parametrize(("args", "command", "next_issue"), _DEFERRED_COMMANDS)
     def test_authoring_deferred_commands_fail_closed_with_stable_diagnostics(
         self, args: list[str], command: str, next_issue: str
@@ -119,6 +146,1307 @@ class TestAuthoringCli(CliRuntimeHarness):
             output = (p.stdout + p.stderr).lower()
             for forbidden in _FORBIDDEN_AUTHORITY_CLAIMS:
                 assert forbidden not in output
+
+    def test_authoring_pack_review_valid_zip_passes_with_evidence_only_authority(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert payload["authority"] == "evidence_only"
+            assert payload["adoption_status"] == "unreviewed"
+            assert payload["bundle_generation_not_promotion"] is True
+            assert payload["input_kind"] == "zip"
+            assert payload["fallback"] is False
+
+    def test_authoring_pack_review_accepts_prepare_contract_without_manifest_source_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            manifest = _base_authoring_pack_manifest()
+            manifest.pop("source_manifest_hash", None)
+            pack_zip = _write_authoring_pack_zip(
+                repo / "prepare-contract.zip",
+                metadata_overrides={
+                    "manifest.json": json.dumps(manifest, sort_keys=True) + "\n",
+                    "stale-if.json": json.dumps({"source_manifest_hash_changes": "hash"}, sort_keys=True) + "\n",
+                },
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+
+    def test_authoring_pack_review_does_not_treat_constraint_text_as_authority_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "constraints.zip",
+                metadata_overrides={
+                    "safe-output-constraints.md": (
+                        "Do not claim reviewer pass, PR-ready, or PR delivery.\n"
+                        "Forbidden payloads include credential, private key, token, and secret material.\n"
+                        "Policy labels may mention api key: without a value.\n"
+                    )
+                },
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+
+    def test_authoring_pack_review_rejects_sensitive_constraint_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "constraint-secret.zip",
+                metadata_overrides={
+                    "safe-output-constraints.md": (
+                        "Do not leak token=SHOULD_REJECT, api key: sk-live-example, "
+                        "private_key: abcdefgh, or raw transcript text.\n"
+                    )
+                },
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "secret_like_payload:token" in payload["findings"]
+            assert "secret_like_payload:api_key" in payload["findings"]
+            assert "secret_like_payload:private key" in payload["findings"]
+            assert "raw_transcript:raw transcript" in payload["findings"]
+
+    def test_authoring_pack_review_redacts_sensitive_findings_in_report_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            report_path = repo / ".specdock-authoring" / "review-report.json"
+            pack_zip = _write_authoring_pack_zip(
+                repo / "report-secret.zip",
+                metadata_overrides={
+                    "drafts/issue/iss-00301/requirement.md": (
+                        "token=SHOULD_NOT_APPEAR\n"
+                        "private_key: abcdefgh\n"
+                        "raw transcript: browser text\n"
+                    )
+                },
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "review",
+                    "--input",
+                    str(pack_zip),
+                    "--report-path",
+                    str(report_path),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            report_text = report_path.read_text(encoding="utf-8")
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "secret_like_payload:token" in report_text
+            assert "secret_like_payload:private key" in report_text
+            assert "raw_transcript:raw transcript" in report_text
+            assert "SHOULD_NOT_APPEAR" not in report_text
+            assert "abcdefgh" not in report_text
+            assert "browser text" not in report_text
+
+    def test_authoring_pack_review_writes_json_report_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            report_path = repo / ".specdock-authoring" / "review" / "review-report.json"
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "review",
+                    "--input",
+                    str(pack_zip),
+                    "--report-path",
+                    str(report_path),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert report_payload["status"] == "pass"
+            assert report_payload["authority"] == "evidence_only"
+
+    def test_authoring_pack_review_report_preserves_local_context_evidence_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            report_path = repo / ".specdock-authoring" / "review" / "local-context-report.json"
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "review",
+                    "--input",
+                    str(pack_zip),
+                    "--evidence-mode",
+                    "local-context",
+                    "--report-path",
+                    str(report_path),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["evidence_mode"] == "local-context"
+            assert report_payload["evidence_mode"] == "local-context"
+
+    def test_authoring_pack_review_text_preserves_local_context_evidence_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "review",
+                    "--input",
+                    str(pack_zip),
+                    "--evidence-mode",
+                    "local-context",
+                ],
+            )
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "evidence_mode=local-context" in p.stdout
+
+    def test_authoring_pack_review_rejects_unsafe_zip_without_extracting(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            sentinel = repo.parent / "escaped.txt"
+            pack_zip = _write_authoring_pack_zip(
+                repo / "unsafe.zip",
+                extra_entries={"specdock-authoring-pack/../../escaped.txt": "escape\n"},
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert any("path_traversal" in finding for finding in payload["findings"])
+            assert not sentinel.exists()
+
+    @pytest.mark.parametrize(
+        ("variant", "expected_status", "expected_finding"),
+        (
+            ("wrong-root", "rejected", "wrong_root"),
+            ("missing-metadata", "fail", "missing_metadata:manifest.json"),
+            ("source-hash-mismatch", "stale", "source_hash_mismatch"),
+            ("invalid-authority", "rejected", "invalid_authority"),
+            ("invalid-adoption-status", "rejected", "invalid_adoption_status"),
+            (
+                "invalid-bundle-generation-not-promotion",
+                "rejected",
+                "invalid_bundle_generation_not_promotion",
+            ),
+        ),
+    )
+    def test_authoring_pack_review_classifies_root_metadata_and_hash_failures(
+        self, variant: str, expected_status: str, expected_finding: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / f"{variant}.zip", variant=variant)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == expected_status
+            assert expected_finding in payload["findings"]
+
+    @pytest.mark.parametrize(
+        "metadata_path",
+        (
+            "manifest.json",
+            "source-manifest.json",
+            "provenance.json",
+            "stale-if.json",
+            "adoption/adoption-map.json",
+            "adoption/eal-candidates.json",
+        ),
+    )
+    def test_authoring_pack_review_fails_for_invalid_required_json_metadata(self, metadata_path: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "invalid-json.zip",
+                metadata_overrides={metadata_path: "{invalid json"},
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "fail"
+            assert f"invalid_json:{metadata_path}" in payload["findings"]
+
+    def test_authoring_pack_review_rejects_unsafe_report_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            report_path = (
+                repo
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001"
+                / "epics"
+                / "epic-00001"
+                / "issues"
+                / "iss-00001"
+                / ".assurance.json"
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "review",
+                    "--input",
+                    str(pack_zip),
+                    "--report-path",
+                    str(report_path),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_report_path:assurance" in payload["findings"]
+            assert not report_path.exists()
+
+    def test_authoring_pack_review_rejects_canonical_report_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            report_path = (
+                repo
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001"
+                / "epics"
+                / "epic-00001"
+                / "issues"
+                / "iss-00001"
+                / "artifacts"
+                / "review-report.json"
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "review",
+                    "--input",
+                    str(pack_zip),
+                    "--report-path",
+                    str(report_path),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_report_path:canonical-docs" in payload["findings"]
+            assert not report_path.exists()
+
+    def test_authoring_pack_review_rejects_relative_canonical_report_path_from_specdock_cwd(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            specdock_cwd = repo / "spec-dock"
+            report_path = Path("active") / "issue" / "review-report.json"
+
+            p = _run_authoring_capture_from_cwd(
+                self,
+                repo,
+                specdock_cwd,
+                [
+                    "authoring",
+                    "pack",
+                    "review",
+                    "--input",
+                    str(pack_zip),
+                    "--report-path",
+                    str(report_path),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_report_path:canonical-docs" in payload["findings"]
+            assert not (specdock_cwd / report_path).exists()
+
+    def test_authoring_pack_review_rejects_symlink_parent_report_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            outside = repo / "outside"
+            outside.mkdir()
+            link_dir = repo / ".specdock-authoring" / "review-link"
+            link_dir.parent.mkdir(parents=True)
+            link_dir.symlink_to(outside)
+            report_path = link_dir / "review-report.json"
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "review",
+                    "--input",
+                    str(pack_zip),
+                    "--report-path",
+                    str(report_path),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_report_path:symlink" in payload["findings"]
+            assert not (outside / "review-report.json").exists()
+
+    def test_authoring_pack_review_rejects_nested_symlink_ancestor_report_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            outside = repo / "outside"
+            nested = outside / "existing"
+            nested.mkdir(parents=True)
+            link_dir = repo / ".specdock-authoring" / "review-link"
+            link_dir.parent.mkdir(parents=True)
+            link_dir.symlink_to(outside)
+            report_path = link_dir / "existing" / "review-report.json"
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "review",
+                    "--input",
+                    str(pack_zip),
+                    "--report-path",
+                    str(report_path),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_report_path:symlink" in payload["findings"]
+            assert not (nested / "review-report.json").exists()
+
+    def test_authoring_pack_review_rejects_symlink_ancestor_to_external_report_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            repo = _create_synced_git_repo(base)
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            external = base / "external"
+            nested = external / "existing"
+            nested.mkdir(parents=True)
+            link_dir = repo / ".specdock-authoring" / "external-link"
+            link_dir.parent.mkdir(parents=True)
+            link_dir.symlink_to(external)
+            report_path = link_dir / "existing" / "review-report.json"
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "review",
+                    "--input",
+                    str(pack_zip),
+                    "--report-path",
+                    str(report_path),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_report_path:symlink" in payload["findings"]
+            assert not (nested / "review-report.json").exists()
+
+    def test_authoring_pack_review_rejected_findings_take_precedence_over_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "stale-and-rejected.zip",
+                variant="source-hash-mismatch",
+                extra_entries={"specdock-authoring-pack/issue/claim.md": "PR delivery complete\n"},
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "source_hash_mismatch" in payload["findings"]
+            assert "forbidden_authority_claim:pr delivery" in payload["findings"]
+
+    @pytest.mark.parametrize(
+        ("case_name", "entry_name", "entry_payload", "expected_finding"),
+        (
+            ("absolute-path", "specdock-authoring-pack//Users/alice/draft.md", "x\n", "path_traversal:/Users/alice/draft.md"),
+            ("host-local-path", "specdock-authoring-pack/Users/alice/draft.md", "x\n", "host_local_path:Users/alice/draft.md"),
+            ("hidden-path", "specdock-authoring-pack/.hidden.md", "x\n", "hidden_path:.hidden.md"),
+            ("secret-path", "specdock-authoring-pack/secrets/token.md", "x\n", "secret_path:secrets/token.md"),
+            ("unsupported-suffix", "specdock-authoring-pack/issue/run.sh", "x\n", "unsupported_suffix:issue/run.sh"),
+            ("binary-payload", "specdock-authoring-pack/issue/binary.md", b"\xff\xfe", "binary_payload:issue/binary.md"),
+            ("nested-archive", "specdock-authoring-pack/issue/archive.zip", "x\n", "nested_archive:issue/archive.zip"),
+        ),
+    )
+    def test_authoring_pack_review_rejects_unsafe_zip_entry_categories(
+        self, case_name: str, entry_name: str, entry_payload: str | bytes, expected_finding: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / f"{case_name}.zip",
+                extra_entries={entry_name: entry_payload},
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert expected_finding in payload["findings"]
+
+    def test_authoring_pack_review_rejects_executable_zip_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            executable_info = zipfile.ZipInfo("specdock-authoring-pack/issue/executable.md")
+            executable_info.external_attr = 0o100755 << 16
+            pack_zip = _write_authoring_pack_zip(repo / "executable.zip", extra_infos=[(executable_info, "x\n")])
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "executable_entry:issue/executable.md" in payload["findings"]
+
+    def test_authoring_pack_review_rejects_oversized_zip_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "oversized.zip",
+                extra_entries={"specdock-authoring-pack/issue/large.md": "x" * 2_000_001},
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "oversized_entry:issue/large.md" in payload["findings"]
+
+    def test_authoring_pack_review_rejects_oversized_zip_total(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "oversized-total.zip",
+                extra_entries={
+                    f"specdock-authoring-pack/issue/large-{index}.md": "x" * 1_900_000 for index in range(6)
+                },
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "oversized_total" in payload["findings"]
+
+    def test_authoring_pack_review_rejects_symlink_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            symlink_info = zipfile.ZipInfo("specdock-authoring-pack/issue/link.md")
+            symlink_info.external_attr = 0o120777 << 16
+            pack_zip = _write_authoring_pack_zip(repo / "symlink.zip", extra_infos=[(symlink_info, "target")])
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "symlink_entry:issue/link.md" in payload["findings"]
+
+    def test_authoring_pack_review_rejects_encrypted_entry_without_crashing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            encrypted_name = "specdock-authoring-pack/issue/encrypted.md"
+            pack_zip = _write_authoring_pack_zip(
+                repo / "encrypted.zip",
+                extra_entries={encrypted_name: "encrypted-looking\n"},
+            )
+            _mark_zip_entry_encrypted(pack_zip, encrypted_name)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "encrypted_entry:issue/encrypted.md" in payload["findings"]
+
+    def test_authoring_pack_review_rejects_forbidden_authority_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "forbidden.zip",
+                extra_entries={"specdock-authoring-pack/issue/plan.md": "reviewer pass and PR-ready\n"},
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "forbidden_authority_claim:reviewer pass" in payload["findings"]
+
+    @pytest.mark.parametrize(
+        ("claim_text", "expected_finding"),
+        (
+            ("canonical adoption complete\n", "forbidden_authority_claim:canonical adoption"),
+            (".assurance.json mutation complete\n", "forbidden_authority_claim:.assurance.json mutation"),
+            ("authorized_profile decision complete\n", "forbidden_authority_claim:authorized_profile decision"),
+            ("reviewer pass complete\n", "forbidden_authority_claim:reviewer pass"),
+            ("execution-ready complete\n", "forbidden_authority_claim:execution-ready"),
+            ("PR-ready complete\n", "forbidden_authority_claim:pr-ready"),
+            ("PR delivery complete\n", "forbidden_authority_claim:pr delivery"),
+            ("mergeable PR complete\n", "forbidden_authority_claim:mergeable pr"),
+        ),
+    )
+    def test_authoring_pack_review_rejects_forbidden_authority_claim_contract(
+        self, claim_text: str, expected_finding: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "forbidden-contract.zip",
+                extra_entries={"specdock-authoring-pack/issue/claim.md": claim_text},
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert expected_finding in payload["findings"]
+
+    @pytest.mark.parametrize(
+        ("case_name", "payload_text", "expected_finding"),
+        (
+            ("token", "token=abc123\n", "secret_like_payload:token"),
+            ("json-token", '{"token": "abc123"}\n', "secret_like_payload:token"),
+            ("yaml-secret", "secret: abc123\n", "secret_like_payload:secret"),
+            ("json-api-key", '{"api_key": "abc123"}\n', "secret_like_payload:api_key"),
+            ("credential", "credential material\n", "secret_like_payload:credential"),
+            ("private-key", "private key block\n", "secret_like_payload:private key"),
+            ("raw-transcript", "raw transcript from browser\n", "raw_transcript:raw transcript"),
+        ),
+    )
+    def test_authoring_pack_review_rejects_secret_and_raw_transcript_payloads(
+        self, case_name: str, payload_text: str, expected_finding: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / f"{case_name}.zip",
+                extra_entries={"specdock-authoring-pack/issue/notes.md": payload_text},
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(pack_zip), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert expected_finding in payload["findings"]
+
+    def test_authoring_pack_review_tree_fallback_reports_lower_authority(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            tree = _write_authoring_pack_tree(repo / "tree-pack")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(tree), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert payload["input_kind"] == "tree"
+            assert payload["fallback"] is True
+            assert payload["authority_level"] == "lower_than_zip_review"
+            assert payload["missing_evidence"] == ["zip-central-directory"]
+
+    def test_authoring_pack_review_tree_fallback_rejects_symlink_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            tree = _write_authoring_pack_tree(repo / "tree-pack")
+            external = repo / "external.md"
+            external.write_text("external host-local content\n", encoding="utf-8")
+            symlink_path = tree / "specdock-authoring-pack" / "issue" / "symlink.md"
+            symlink_path.symlink_to(external)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(tree), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "symlink_entry:issue/symlink.md" in payload["findings"]
+
+    def test_authoring_pack_review_tree_fallback_rejects_executable_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            tree = _write_authoring_pack_tree(repo / "tree-pack")
+            executable_path = tree / "specdock-authoring-pack" / "issue" / "executable.md"
+            executable_path.write_text("x\n", encoding="utf-8")
+            executable_path.chmod(0o755)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(tree), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "executable_entry:issue/executable.md" in payload["findings"]
+
+    def test_authoring_pack_review_rejects_symlinked_tree_input_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            tree = _write_authoring_pack_tree(repo / "real-tree")
+            tree_link = repo / "tree-link"
+            tree_link.symlink_to(tree)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(tree_link), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "symlink_input_root" in payload["findings"]
+
+    @pytest.mark.parametrize(
+        ("case_name", "rel_path", "payload_value", "expected_finding"),
+        (
+            ("unsupported", "issue/tool.sh", "x\n", "unsupported_suffix:issue/tool.sh"),
+            ("nested", "issue/archive.zip", "x\n", "nested_archive:issue/archive.zip"),
+            ("binary", "issue/binary.md", b"\xff\xfe", "binary_payload:issue/binary.md"),
+            ("oversized", "issue/large.md", "x" * 2_000_001, "oversized_entry:issue/large.md"),
+        ),
+        ids=("unsupported", "nested", "binary", "oversized"),
+    )
+    def test_authoring_pack_review_tree_fallback_rejects_unsafe_file_categories(
+        self, case_name: str, rel_path: str, payload_value: str | bytes, expected_finding: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            tree = _write_authoring_pack_tree(repo / f"tree-{case_name}")
+            unsafe_path = tree / "specdock-authoring-pack" / rel_path
+            unsafe_path.parent.mkdir(parents=True, exist_ok=True)
+            if isinstance(payload_value, bytes):
+                unsafe_path.write_bytes(payload_value)
+            else:
+                unsafe_path.write_text(payload_value, encoding="utf-8")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(tree), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert expected_finding in payload["findings"]
+
+    def test_authoring_pack_stage_valid_zip_writes_stage_outputs_and_preserves_canonical_docs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            candidate_payload = {"candidates": [{"source": "issue/requirement.md", "target": "issue.requirement"}]}
+            pack_zip = _write_authoring_pack_zip(
+                repo / "valid.zip",
+                metadata_overrides={
+                    "issue/requirement.md": "# Draft requirement\n\ncontent-sensitive-stage-evidence\n",
+                    "adoption/eal-candidates.json": json.dumps(candidate_payload, sort_keys=True) + "\n"
+                },
+            )
+            stage_dir = repo / ".specdock-authoring" / "staged" / "valid"
+            protected_before = _protected_specdock_snapshot(repo)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(stage_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert (stage_dir / "review-report.json").is_file()
+            assert (stage_dir / "dry-run-diff.md").is_file()
+            assert (stage_dir / "adoption" / "eal-candidates.json").is_file()
+            assert (stage_dir / ".specdock-stage-owner.json").is_file()
+            assert (stage_dir / "specdock-authoring-pack" / "manifest.json").is_file()
+            dry_run_diff = (stage_dir / "dry-run-diff.md").read_text(encoding="utf-8")
+            staged_candidates = json.loads((stage_dir / "adoption" / "eal-candidates.json").read_text(encoding="utf-8"))
+            assert "issue/requirement.md" in dry_run_diff
+            assert "content-sensitive-stage-evidence" in dry_run_diff
+            assert staged_candidates == candidate_payload
+            assert "specdock-authoring-pack/manifest.json" in payload["staged_files"]
+            owner = json.loads((stage_dir / ".specdock-stage-owner.json").read_text(encoding="utf-8"))
+            assert owner["authority"] == "evidence_only"
+            assert owner["adoption_status"] == "unreviewed"
+            assert owner["bundle_generation_not_promotion"] is True
+            assert owner["created_at"].endswith("Z")
+            assert owner["input_path"] == str(pack_zip)
+            assert owner["input_sha256"]
+            assert owner["input_kind"] == "zip"
+            assert "issue_id" in owner
+            assert _protected_specdock_snapshot(repo) == protected_before
+
+    def test_authoring_pack_stage_dry_run_does_not_write_stage_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            stage_dir = repo / ".specdock-authoring" / "staged" / "dry-run"
+            protected_before = _protected_specdock_snapshot(repo)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(stage_dir),
+                    "--dry-run",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert payload["dry_run"] is True
+            assert "review-report.json" in payload["staged_files"]
+            assert not stage_dir.exists()
+            assert _protected_specdock_snapshot(repo) == protected_before
+
+    def test_authoring_pack_stage_rejects_owned_stage_dir_with_symlink_descendant(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            stage_dir = repo / ".specdock-authoring" / "staged" / "symlink"
+            stage_dir.mkdir(parents=True)
+            (stage_dir / ".specdock-stage-owner.json").write_text(
+                json.dumps(
+                    {
+                        "authority": "evidence_only",
+                        "adoption_status": "unreviewed",
+                        "bundle_generation_not_promotion": True,
+                        "created_at": "2026-07-08T00:00:00Z",
+                        "input_path": str(pack_zip),
+                        "input_kind": "zip",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (stage_dir / "specdock-authoring-pack").symlink_to(repo / "spec-dock" / "active" / "issue")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(stage_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_stage_target:symlink_descendant" in payload["findings"]
+
+    def test_authoring_pack_stage_rejects_nested_symlink_ancestor_stage_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            outside = repo / "outside"
+            nested = outside / "existing"
+            nested.mkdir(parents=True)
+            link_dir = repo / ".specdock-authoring" / "stage-link"
+            link_dir.parent.mkdir(parents=True)
+            link_dir.symlink_to(outside)
+            stage_dir = link_dir / "existing" / "stage"
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(stage_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_stage_target:symlink" in payload["findings"]
+            assert not (nested / "stage").exists()
+
+    def test_authoring_pack_stage_rejects_symlink_ancestor_to_external_stage_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            repo = _create_synced_git_repo(base)
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            external = base / "external"
+            nested = external / "existing"
+            nested.mkdir(parents=True)
+            link_dir = repo / ".specdock-authoring" / "external-stage-link"
+            link_dir.parent.mkdir(parents=True)
+            link_dir.symlink_to(external)
+            stage_dir = link_dir / "existing" / "stage"
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(stage_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_stage_target:symlink" in payload["findings"]
+            assert not (nested / "stage").exists()
+
+    def test_authoring_pack_stage_rejects_malformed_owned_marker_before_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            stage_dir = repo / ".specdock-authoring" / "staged" / "malformed-owner"
+            stage_dir.mkdir(parents=True)
+            preserved = stage_dir / "user-file.txt"
+            preserved.write_text("do not delete\n", encoding="utf-8")
+            (stage_dir / ".specdock-stage-owner.json").write_text("{bad json", encoding="utf-8")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(stage_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_stage_target:non_owned_existing" in payload["findings"]
+            assert preserved.read_text(encoding="utf-8") == "do not delete\n"
+
+    def test_authoring_pack_stage_text_output_preserves_review_boundary_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            stage_dir = repo / ".specdock-authoring" / "staged" / "text"
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(stage_dir),
+                ],
+            )
+
+            output = p.stdout.lower()
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "status=pass" in output
+            assert "review_authority=evidence_only" in output
+            assert "review_adoption_status=unreviewed" in output
+            assert "review_bundle_generation_not_promotion=true" in output
+            assert "reviewer pass" not in output
+            assert "execution-ready" not in output
+            assert "pr-ready" not in output
+
+    def test_authoring_pack_stage_rejects_non_pass_review_input_without_staging_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "rejected.zip",
+                extra_entries={"specdock-authoring-pack/issue/claim.md": "PR delivery complete\n"},
+            )
+            stage_dir = repo / ".specdock-authoring" / "staged" / "rejected"
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(stage_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "review_not_pass" in payload["findings"]
+            assert not (stage_dir / "specdock-authoring-pack").exists()
+
+    def test_authoring_pack_stage_rejects_unsafe_stage_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            unsafe_stage = repo / "spec-dock" / "active" / "issue"
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(unsafe_stage),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_stage_target:canonical-docs" in payload["findings"]
+
+    def test_authoring_pack_stage_rejects_direct_canonical_issue_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            canonical_issue = (
+                repo
+                / "spec-dock"
+                / "initiatives"
+                / "init-local-00001"
+                / "epics"
+                / "epic-00001"
+                / "issues"
+                / "iss-00001"
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(canonical_issue),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_stage_target:canonical-docs" in payload["findings"]
+            assert not (canonical_issue / "specdock-authoring-pack").exists()
+
+    def test_authoring_pack_stage_rejects_relative_canonical_target_from_specdock_cwd(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            specdock_cwd = repo / "spec-dock"
+            stage_dir = Path("active") / "issue" / "staged-pack"
+
+            p = _run_authoring_capture_from_cwd(
+                self,
+                repo,
+                specdock_cwd,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(stage_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_stage_target:canonical-docs" in payload["findings"]
+            assert not (specdock_cwd / stage_dir / "specdock-authoring-pack").exists()
+
+    def test_authoring_pack_stage_rejects_assurance_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            assurance_target = repo / "spec-dock" / ".assurance.json"
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(assurance_target),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_stage_target:assurance" in payload["findings"]
+            assert not assurance_target.exists()
+
+    def test_authoring_pack_stage_rejects_file_stage_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            stage_target = repo / ".specdock-authoring" / "stage-file"
+            stage_target.parent.mkdir(parents=True)
+            stage_target.write_text("not a directory\n", encoding="utf-8")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(stage_target),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_stage_target:not_directory" in payload["findings"]
 
     def test_authoring_preflight_github_sync_passes_for_clean_synced_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -552,6 +1880,638 @@ class TestAuthoringCli(CliRuntimeHarness):
         assert "spec-dock/scripts/spec_dock_runtime/commands/authoring.py" in payload["source_paths"]
         assert all("__pycache__" not in path for path in payload["source_hashes"])
         assert all(not path.endswith(".pyc") for path in payload["source_hashes"])
+
+    def test_authoring_pack_review_and_stage_dogfood_runtime_path(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = repo_root / "spec-dock" / "scripts" / "spec-dock"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            stage_dir = repo / ".specdock-authoring" / "staged" / "dogfood"
+
+            review = subprocess.run(
+                [
+                    str(script),
+                    "authoring",
+                    "pack",
+                    "review",
+                    "--input",
+                    str(pack_zip),
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+            stage = subprocess.run(
+                [
+                    str(script),
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(stage_dir),
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            review_payload = _json_stdout(review)
+            stage_payload = _json_stdout(stage)
+            assert review.returncode == 0, review.stdout + review.stderr
+            assert stage.returncode == 0, stage.stdout + stage.stderr
+            assert review_payload["status"] == "pass"
+            assert stage_payload["status"] == "pass"
+            assert (stage_dir / "review-report.json").is_file()
+
+    def test_authoring_pack_dogfood_runtime_path_rejects_pr_delivery_claim_and_preserves_stage_text_boundary(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = repo_root / "spec-dock" / "scripts" / "spec-dock"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            forbidden_zip = _write_authoring_pack_zip(
+                repo / "forbidden.zip",
+                extra_entries={"specdock-authoring-pack/issue/claim.md": "PR delivery complete\n"},
+            )
+            valid_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            stage_dir = repo / ".specdock-authoring" / "staged" / "dogfood-text"
+
+            review = subprocess.run(
+                [
+                    str(script),
+                    "authoring",
+                    "pack",
+                    "review",
+                    "--input",
+                    str(forbidden_zip),
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+            stage = subprocess.run(
+                [
+                    str(script),
+                    "authoring",
+                    "pack",
+                    "stage",
+                    "--input",
+                    str(valid_zip),
+                    "--stage-dir",
+                    str(stage_dir),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            review_payload = _json_stdout(review)
+            stage_output = stage.stdout.lower()
+            assert review.returncode == 1, review.stdout + review.stderr
+            assert stage.returncode == 0, stage.stdout + stage.stderr
+            assert "forbidden_authority_claim:pr delivery" in review_payload["findings"]
+            assert "review_authority=evidence_only" in stage_output
+            assert "review_adoption_status=unreviewed" in stage_output
+            assert "review_bundle_generation_not_promotion=true" in stage_output
+
+    @pytest.mark.parametrize(
+        "script_root",
+        (
+            Path("src/spec_dock/assets/spec_dock/scripts/authoring-pack"),
+            Path("spec-dock/scripts/authoring-pack"),
+        ),
+    )
+    def test_authoring_pack_compatibility_scripts_delegate_to_runtime_contract(self, script_root: Path) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        review_script = repo_root / script_root / "review_chatgpt_authoring_pack.py"
+        stage_script = repo_root / script_root / "stage_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            report_path = repo / ".specdock-authoring" / "compat" / "review-report.json"
+            stage_dir = repo / ".specdock-authoring" / "compat" / "stage"
+
+            review = subprocess.run(
+                [
+                    sys.executable,
+                    str(review_script),
+                    "--input",
+                    str(pack_zip),
+                    "--report-path",
+                    str(report_path),
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+            stage = subprocess.run(
+                [
+                    sys.executable,
+                    str(stage_script),
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(stage_dir),
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            review_payload = _json_stdout(review)
+            stage_payload = _json_stdout(stage)
+            assert review.returncode == 0, review.stdout + review.stderr
+            assert stage.returncode == 0, stage.stdout + stage.stderr
+            assert review_payload["status"] == "pass"
+            assert stage_payload["status"] == "pass"
+            assert json.loads(report_path.read_text(encoding="utf-8"))["authority"] == "evidence_only"
+            assert "/Users/" not in review_script.read_text(encoding="utf-8")
+            assert "/Users/" not in stage_script.read_text(encoding="utf-8")
+
+    @pytest.mark.parametrize(
+        "script_root",
+        (
+            Path("src/spec_dock/assets/spec_dock/scripts/authoring-pack"),
+            Path("spec-dock/scripts/authoring-pack"),
+        ),
+    )
+    def test_authoring_pack_compatibility_review_accepts_legacy_output_dir_args(self, script_root: Path) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        review_script = repo_root / script_root / "review_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            output_dir = repo / ".specdock-authoring" / "legacy-review"
+
+            review = subprocess.run(
+                [
+                    sys.executable,
+                    str(review_script),
+                    "--input",
+                    str(pack_zip),
+                    "--preflight",
+                    str(repo / "preflight.json"),
+                    "--output-dir",
+                    str(output_dir),
+                    "--input-kind",
+                    "zip",
+                    "--extract-dir",
+                    str(repo / ".specdock-authoring" / "legacy-extract"),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(review)
+            report_payload = json.loads((output_dir / "validation-report.json").read_text(encoding="utf-8"))
+            assert review.returncode == 0, review.stdout + review.stderr
+            assert payload["status"] == "pass"
+            assert report_payload["status"] == "pass"
+            assert report_payload["authority"] == "evidence_only"
+            assert report_payload["pack_digest"]["content_sha256"]
+
+    @pytest.mark.parametrize(
+        "script_root",
+        (
+            Path("src/spec_dock/assets/spec_dock/scripts/authoring-pack"),
+            Path("spec-dock/scripts/authoring-pack"),
+        ),
+    )
+    def test_authoring_pack_compatibility_review_rejects_unsafe_legacy_output_dir(
+        self, script_root: Path
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        review_script = repo_root / script_root / "review_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            output_dir = repo / "spec-dock" / "active" / "issue" / "legacy-review"
+
+            review = subprocess.run(
+                [
+                    sys.executable,
+                    str(review_script),
+                    "--input",
+                    str(pack_zip),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(review)
+            assert review.returncode == 1, review.stdout + review.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_report_path:canonical-docs" in payload["findings"]
+            assert not (output_dir / "validation-report.json").exists()
+
+    @pytest.mark.parametrize(
+        "script_root",
+        (
+            Path("src/spec_dock/assets/spec_dock/scripts/authoring-pack"),
+            Path("spec-dock/scripts/authoring-pack"),
+        ),
+    )
+    def test_authoring_pack_compatibility_review_rejects_symlink_legacy_output_dir(
+        self, script_root: Path
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        review_script = repo_root / script_root / "review_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(repo / "valid.zip")
+            outside = repo / "outside"
+            outside.mkdir()
+            output_dir = repo / ".specdock-authoring" / "legacy-link"
+            output_dir.parent.mkdir(parents=True)
+            output_dir.symlink_to(outside)
+
+            review = subprocess.run(
+                [
+                    sys.executable,
+                    str(review_script),
+                    "--input",
+                    str(pack_zip),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(review)
+            assert review.returncode == 1, review.stdout + review.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_report_path:symlink" in payload["findings"]
+            assert not (outside / "validation-report.json").exists()
+
+    def test_authoring_pack_compatibility_review_handles_encrypted_zip_without_traceback(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        review_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/review_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            encrypted_name = "specdock-authoring-pack/issue/requirement.md"
+            pack_zip = _write_authoring_pack_zip(repo / "encrypted.zip")
+            _mark_zip_entry_encrypted(pack_zip, encrypted_name)
+            output_dir = repo / ".specdock-authoring" / "legacy-encrypted"
+
+            review = subprocess.run(
+                [
+                    sys.executable,
+                    str(review_script),
+                    "--input",
+                    str(pack_zip),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(review)
+            report_payload = json.loads((output_dir / "validation-report.json").read_text(encoding="utf-8"))
+            assert review.returncode == 1, review.stdout + review.stderr
+            assert "traceback" not in review.stderr.lower()
+            assert payload["status"] == "rejected"
+            assert report_payload["status"] == "rejected"
+            assert report_payload["pack_digest"]["content_sha256"] is None
+
+    def test_authoring_pack_compatibility_review_skips_digest_for_rejected_oversized_zip(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        review_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/review_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "oversized.zip",
+                extra_entries={"specdock-authoring-pack/issue/large.md": "x" * 2_000_001},
+            )
+            output_dir = repo / ".specdock-authoring" / "legacy-oversized"
+
+            review = subprocess.run(
+                [
+                    sys.executable,
+                    str(review_script),
+                    "--input",
+                    str(pack_zip),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(review)
+            report_payload = json.loads((output_dir / "validation-report.json").read_text(encoding="utf-8"))
+            assert review.returncode == 1, review.stdout + review.stderr
+            assert payload["status"] == "rejected"
+            assert report_payload["pack_digest"]["content_sha256"] is None
+
+    @pytest.mark.parametrize(
+        "script_root",
+        (
+            Path("src/spec_dock/assets/spec_dock/scripts/authoring-pack"),
+            Path("spec-dock/scripts/authoring-pack"),
+        ),
+    )
+    def test_authoring_pack_compatibility_legacy_review_report_can_stage_same_tree(
+        self, script_root: Path
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        review_script = repo_root / script_root / "review_chatgpt_authoring_pack.py"
+        stage_script = repo_root / script_root / "stage_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            tree = _write_authoring_pack_tree(repo / "tree-pack")
+            review_output = repo / ".specdock-authoring" / "legacy-review-stage"
+            stage_output = repo / ".specdock-authoring" / "legacy-stage"
+
+            review = subprocess.run(
+                [
+                    sys.executable,
+                    str(review_script),
+                    "--input",
+                    str(tree),
+                    "--output-dir",
+                    str(review_output),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+            stage = subprocess.run(
+                [
+                    sys.executable,
+                    str(stage_script),
+                    "--review-report",
+                    str(review_output / "validation-report.json"),
+                    "--pack-tree",
+                    str(tree),
+                    "--issue-dir",
+                    str(repo / "spec-dock" / "active" / "issue"),
+                    "--output-dir",
+                    str(stage_output),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            review_payload = _json_stdout(review)
+            stage_payload = _json_stdout(stage)
+            report_payload = json.loads((review_output / "validation-report.json").read_text(encoding="utf-8"))
+            assert review.returncode == 0, review.stdout + review.stderr
+            assert stage.returncode == 0, stage.stdout + stage.stderr
+            assert review_payload["status"] == "pass"
+            assert report_payload["pack_digest"]["content_sha256"] == _legacy_authoring_tree_digest(tree)
+            assert stage_payload["status"] == "pass"
+            assert (stage_output / "specdock-authoring-pack" / "manifest.json").is_file()
+
+    def test_authoring_pack_compatibility_stage_honors_legacy_review_report_gate(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        stage_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            tree = _write_authoring_pack_tree(repo / "tree-pack")
+            review_report = repo / "legacy-review.json"
+            output_dir = repo / ".specdock-authoring" / "legacy-stage"
+            review_report.write_text(json.dumps({"status": "rejected"}, sort_keys=True) + "\n", encoding="utf-8")
+
+            stage = subprocess.run(
+                [
+                    sys.executable,
+                    str(stage_script),
+                    "--review-report",
+                    str(review_report),
+                    "--pack-tree",
+                    str(tree),
+                    "--issue-dir",
+                    str(repo / "spec-dock" / "active" / "issue"),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(stage)
+            assert stage.returncode == 1, stage.stdout + stage.stderr
+            assert payload["status"] == "rejected"
+            assert "legacy_review_report_not_pass" in payload["findings"]
+            assert not (output_dir / "specdock-authoring-pack").exists()
+
+    def test_authoring_pack_compatibility_stage_rejects_stale_legacy_review_report(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        stage_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            tree = _write_authoring_pack_tree(repo / "tree-pack")
+            review_report = repo / "legacy-review.json"
+            output_dir = repo / ".specdock-authoring" / "legacy-stage"
+            review_report.write_text(
+                json.dumps({"status": "pass", "pack_digest": {"content_sha256": "different"}}, sort_keys=True)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stage = subprocess.run(
+                [
+                    sys.executable,
+                    str(stage_script),
+                    "--review-report",
+                    str(review_report),
+                    "--pack-tree",
+                    str(tree),
+                    "--issue-dir",
+                    str(repo / "spec-dock" / "active" / "issue"),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(stage)
+            assert stage.returncode == 1, stage.stdout + stage.stderr
+            assert payload["status"] == "stale"
+            assert "legacy_review_report_not_pass" in payload["findings"]
+            assert not (output_dir / "specdock-authoring-pack").exists()
+
+    def test_authoring_pack_compatibility_stage_reviews_input_before_legacy_digest(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        stage_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack_zip = _write_authoring_pack_zip(
+                repo / "oversized.zip",
+                extra_entries={"specdock-authoring-pack/issue/large.md": "x" * 2_000_001},
+            )
+            review_report = repo / "legacy-review.json"
+            output_dir = repo / ".specdock-authoring" / "legacy-stage"
+            review_report.write_text(
+                json.dumps({"status": "pass", "pack_digest": {"content_sha256": "digest"}}, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+
+            stage = subprocess.run(
+                [
+                    sys.executable,
+                    str(stage_script),
+                    "--review-report",
+                    str(review_report),
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(stage)
+            assert stage.returncode == 1, stage.stdout + stage.stderr
+            assert payload["status"] == "stale"
+            assert "legacy_review_report_not_pass" in payload["findings"]
+            assert not (output_dir / "specdock-authoring-pack").exists()
+
+    def test_authoring_pack_compatibility_stage_handles_encrypted_zip_digest_without_traceback(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        stage_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            encrypted_name = "specdock-authoring-pack/issue/requirement.md"
+            pack_zip = _write_authoring_pack_zip(repo / "encrypted.zip")
+            _mark_zip_entry_encrypted(pack_zip, encrypted_name)
+            review_report = repo / "legacy-review.json"
+            output_dir = repo / ".specdock-authoring" / "legacy-stage"
+            review_report.write_text(
+                json.dumps({"status": "pass", "pack_digest": {"content_sha256": "digest"}}, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+
+            stage = subprocess.run(
+                [
+                    sys.executable,
+                    str(stage_script),
+                    "--review-report",
+                    str(review_report),
+                    "--input",
+                    str(pack_zip),
+                    "--stage-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(stage)
+            assert stage.returncode == 1, stage.stdout + stage.stderr
+            assert "traceback" not in stage.stderr.lower()
+            assert payload["status"] == "stale"
+            assert "legacy_review_report_not_pass" in payload["findings"]
+            assert not (output_dir / "specdock-authoring-pack").exists()
+
+    def test_authoring_pack_compatibility_stage_accepts_matching_legacy_review_report(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        stage_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            tree = _write_authoring_pack_tree(repo / "tree-pack")
+            review_report = repo / "legacy-review.json"
+            output_dir = repo / ".specdock-authoring" / "legacy-stage"
+            review_report.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "pack_digest": {"content_sha256": _legacy_authoring_tree_digest(tree)},
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stage = subprocess.run(
+                [
+                    sys.executable,
+                    str(stage_script),
+                    "--review-report",
+                    str(review_report),
+                    "--pack-tree",
+                    str(tree),
+                    "--issue-dir",
+                    str(repo / "spec-dock" / "active" / "issue"),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(stage)
+            assert stage.returncode == 0, stage.stdout + stage.stderr
+            assert payload["status"] == "pass"
+            assert (output_dir / "specdock-authoring-pack" / "issue" / "requirement.md").is_file()
 
     def test_authoring_pack_prepare_generates_deterministic_prompt_pack_from_github_synced_preflight(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2286,6 +4246,19 @@ def _run_authoring_capture(
     )
 
 
+def _run_authoring_capture_from_cwd(
+    testcase: CliRuntimeHarness, repo: Path, cwd: Path, args: list[str]
+) -> subprocess.CompletedProcess[str]:
+    script = repo / "spec-dock" / "scripts" / "spec-dock"
+    return subprocess.run(
+        [sys.executable, str(script), *args],
+        cwd=str(cwd),
+        env=testcase._runtime_env(repo, {"PATH": os.environ.get("PATH", ""), "PYTHONDONTWRITEBYTECODE": "1"}),
+        capture_output=True,
+        text=True,
+    )
+
+
 def _json_stdout(p: subprocess.CompletedProcess[str]) -> dict[str, object]:
     try:
         payload = json.loads(p.stdout)
@@ -2301,6 +4274,143 @@ def _normalized_pack_payload(pack_dir: Path) -> dict[str, str]:
         rel_path = path.relative_to(pack_dir).as_posix()
         payload[rel_path] = path.read_text(encoding="utf-8") if path.stat().st_size else ""
     return payload
+
+
+def _protected_specdock_snapshot(repo: Path) -> dict[str, str]:
+    protected_paths = [
+        repo / "spec-dock" / "active" / scope / name
+        for scope in ("initiative", "epic", "issue")
+        for name in ("requirement.md", "design.md", "plan.md")
+    ]
+    protected_paths.extend(sorted((repo / "spec-dock").rglob(".assurance.json")))
+    snapshot: dict[str, str] = {}
+    for path in protected_paths:
+        if path.exists() and path.is_file():
+            snapshot[path.relative_to(repo).as_posix()] = path.read_text(encoding="utf-8")
+    return snapshot
+
+
+def _write_authoring_pack_tree(pack_dir: Path) -> Path:
+    root = pack_dir / "specdock-authoring-pack"
+    entries = _authoring_pack_entries()
+    for name, value in entries.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(value, encoding="utf-8")
+    return pack_dir
+
+
+def _legacy_authoring_tree_digest(pack_dir: Path) -> str:
+    root = pack_dir / "specdock-authoring-pack"
+    digest = hashlib.sha256()
+    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+        rel_path = path.relative_to(root).as_posix()
+        digest.update(rel_path.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_text(encoding="utf-8").encode("utf-8"))
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _write_authoring_pack_zip(
+    zip_path: Path,
+    *,
+    variant: str | None = None,
+    extra_entries: dict[str, str | bytes] | None = None,
+    extra_infos: list[tuple[zipfile.ZipInfo, str | bytes]] | None = None,
+    metadata_overrides: dict[str, str] | None = None,
+) -> Path:
+    entries = _authoring_pack_entries()
+    root = "specdock-authoring-pack"
+    if variant == "missing-metadata":
+        entries.pop("manifest.json")
+    if variant in {"invalid-authority", "invalid-adoption-status", "invalid-bundle-generation-not-promotion"}:
+        manifest = json.loads(entries["manifest.json"])
+        if variant == "invalid-authority":
+            manifest["authority"] = "canonical"
+        if variant == "invalid-adoption-status":
+            manifest["adoption_status"] = "adopted"
+        if variant == "invalid-bundle-generation-not-promotion":
+            manifest["bundle_generation_not_promotion"] = False
+        entries["manifest.json"] = json.dumps(manifest, sort_keys=True) + "\n"
+    if variant == "source-hash-mismatch":
+        entries["stale-if.json"] = json.dumps({"source_manifest_hash": "different"}, sort_keys=True) + "\n"
+    if variant == "wrong-root":
+        root = "wrong-root"
+    for metadata_path, value in (metadata_overrides or {}).items():
+        entries[metadata_path] = value
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        for name, value in entries.items():
+            archive.writestr(f"{root}/{name}", value)
+        for name, value in (extra_entries or {}).items():
+            archive.writestr(name, value)
+        for info, value in extra_infos or ():
+            archive.writestr(info, value)
+    return zip_path
+
+
+def _mark_zip_entry_encrypted(zip_path: Path, entry_name: str) -> None:
+    data = bytearray(zip_path.read_bytes())
+    encoded_name = entry_name.encode("utf-8")
+    _set_zip_general_purpose_bit(data, b"PK\x03\x04", encoded_name, flags_offset=6, name_length_offset=26)
+    _set_zip_general_purpose_bit(data, b"PK\x01\x02", encoded_name, flags_offset=8, name_length_offset=28)
+    zip_path.write_bytes(data)
+
+
+def _set_zip_general_purpose_bit(
+    data: bytearray,
+    signature: bytes,
+    encoded_name: bytes,
+    *,
+    flags_offset: int,
+    name_length_offset: int,
+) -> None:
+    offset = 0
+    while True:
+        offset = data.find(signature, offset)
+        if offset < 0:
+            raise AssertionError(f"zip entry not found for encryption patch: {encoded_name!r}")
+        name_length = int.from_bytes(data[offset + name_length_offset : offset + name_length_offset + 2], "little")
+        if signature == b"PK\x03\x04":
+            name_start = offset + 30
+        else:
+            name_start = offset + 46
+        name = bytes(data[name_start : name_start + name_length])
+        if name == encoded_name:
+            flags_start = offset + flags_offset
+            flags = int.from_bytes(data[flags_start : flags_start + 2], "little") | 0x1
+            data[flags_start : flags_start + 2] = flags.to_bytes(2, "little")
+            return
+        offset += 4
+
+
+def _authoring_pack_entries() -> dict[str, str]:
+    source_manifest = {
+        "source_hashes": {"src/example.py": "abc123"},
+        "source_manifest_hash": "hash",
+    }
+    manifest = _base_authoring_pack_manifest()
+    return {
+        "manifest.json": json.dumps(manifest, sort_keys=True) + "\n",
+        "provenance.json": json.dumps({"evidence_mode": "github-synced"}, sort_keys=True) + "\n",
+        "source-manifest.json": json.dumps(source_manifest, sort_keys=True) + "\n",
+        "stale-if.json": json.dumps({"source_manifest_hash": "hash"}, sort_keys=True) + "\n",
+        "safe-output-constraints.md": "authority: evidence_only\nadoption_status: unreviewed\n",
+        "adoption/adoption-map.json": json.dumps({"items": []}, sort_keys=True) + "\n",
+        "adoption/eal-candidates.json": json.dumps({"candidates": []}, sort_keys=True) + "\n",
+        "issue/requirement.md": "# Draft requirement\n",
+    }
+
+
+def _base_authoring_pack_manifest() -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "authority": "evidence_only",
+        "adoption_status": "unreviewed",
+        "bundle_generation_not_promotion": True,
+        "source_manifest_hash": "hash",
+        "expected_output_root": "specdock-authoring-pack/",
+    }
 
 
 def _write_valid_prompt_pack(pack_dir: Path, *, evidence_mode: str = "github-synced") -> Path:
