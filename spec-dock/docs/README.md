@@ -43,6 +43,9 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
    - [reference_naming.md](reference_naming.md)
    - [reference_deps.md](reference_deps.md)
    - [reference_sync.md](reference_sync.md)
+   - [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md)
+   - [reference_authoring_pack_backend.md](reference_authoring_pack_backend.md)
+   - [authoring/chatgpt-pack.md](authoring/chatgpt-pack.md)
 
 ## 最短コマンド
 
@@ -80,6 +83,7 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 
 - Initiative / Epic は `new` / `import` の前に既存ノード再利用を確認する
 - Requirement / design / plan 作成は対応 planning skill を operational entrypoint にし、`workflow_spec_authoring.md` の phase promotion detail を参照して、fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
+- ChatGPT / Oracle を使う planning では `spec-dock-chatgpt-authoring` skill と [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md) を参照する。ChatGPT output、ZIP/tree、staged evidence、validation `pass` は evidence-only であり、canonical adoption / reviewer pass / execution-ready / PR-ready ではない
 - 仕様書作成前後の曖昧さ、用語衝突、責務境界、正式質問は `spec-dock-clarification` skill を operational entrypoint にし、`workflow_clarification.md` を bridge/reference として一問ずつ扱う
 - plan は shared `phase_plan.md` の後に対象 scope の `phase_plan_<scope>.md` を読む
 - `new initiative` / `new epic` / `new issue` はデフォルトで GitHub Issue を作る。node create/import で local-only create へ自動フォールバックしない

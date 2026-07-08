@@ -18,6 +18,8 @@ Epic は設計の背骨です。
 - Epic plan playbook: [phase_plan_epic.md](phase_plan_epic.md)
 - Decision routing: [authoring/decision-routing.md](authoring/decision-routing.md)
 - Scope layering: [authoring/scope-layering.md](authoring/scope-layering.md)
+- ChatGPT authoring evidence lane: [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md)
+- Prompt pack / ZIP reference: [authoring/chatgpt-pack.md](authoring/chatgpt-pack.md)
 
 ## 再利用判定
 
@@ -47,6 +49,7 @@ Epic は設計の背骨です。
 - `design.md`: 契約、移行、観測性、リスク
 - `plan.md`: Issue 分割、依存順、品質ゲート。shared axiom は `phase_plan.md`、Epic 固有の書き方は `phase_plan_epic.md`
 - Epic は複数 Issue の設計の背骨を所有する。Issue 分割、責務境界、依存方向、shared component / workflow policy、rollout 順に影響する durable decision は Epic requirement / design / plan に反映してから Issue へ落とす。Epic をまたいで product / operating model / 投資判断へ広がる場合は Initiative へ戻し、長期 architecture decision として独立に記録すべき場合は ADR 候補にする。責務境界と authority flow の共通参照は [authoring/scope-layering.md](authoring/scope-layering.md)、routing 例は [authoring/decision-routing.md](authoring/decision-routing.md) を参照する
+- ChatGPT / Oracle は Epic requirement / design / plan と Issue draft requirement / draft design / draft plan の evidence producer として使える。Issue candidate / draft は正本ではなく、Issue node 作成前に人間の承認を通す。作成後の draft adoption は Issue planning が正式 docs へ採用し、fresh `spec-reviewer` pass を通す
 - Requirement / design / plan の phase promotion は `workflow_spec_authoring.md` を正本にし、各 artifact ごとに fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
 - `artifacts/`: `new artifact <type> --epic <epic-id> --title "..."` で、この epic の `artifacts/` 配下に timestamp-prefixed original を作成する。current catalog は `blank` / `adr` / `disc` / `research` / `interview` / `decision-candidate` / `pr-repair-batch`。`draft-requirement` / `draft-design` / `draft-plan` は Issue-only artifact として扱う。runtime が filename / path を生成し、caller は stdout の `path=...` を正本として扱う。標準形は `<ts>-<kind>-<slug>.md`、same-second collision fallback は `<ts>-<nn>-<kind>-<slug>.md`。既存 `discussions/` 配下の artifact は legacy/grandfathered として保持する。詳細 contract は [reference_naming.md](reference_naming.md) を参照する
 - `note` は新規作成 catalog から retired。既存 `note` artifact は grandfathered として壊さない。
@@ -84,7 +87,7 @@ Epic planning completion 後の実行調整は `spec-dock-epic-execution` を fi
 
 Epic execution の readiness inspection は structural gate であり、semantic reviewer ではありません。次は structural blocker として fail-closed で止めます: missing canonical docs、missing / stale reviewer pass、missing Issue readiness contract、missing executable plan structure、missing delegation contract、missing verification、missing reviewer focus、unresolved blocking / stale report entries、raw artifact authority、decision-only execution-ready、grade が要求する specialist / fallback evidence の欠落。構造はあるが acceptance criteria、test strategy、採用理由、設計妥当性、日本語ファースト wording の十分性が疑わしい場合は reviewer finding として記録し、`spec-reviewer` や Issue planning に route します。
 
-Issue 実装後の PR delivery は通常 `github-pr-merge-preparer` へ handoff します。ただし reviewed Epic plan が、Issue を一つずつ進め、final PR delivery を `iss-00276` のような final quality Issue に意図的に集約すると定義している場合は、中間 Issue の `report.md` に deferred PR delivery gate evidence を残します。この evidence は、defer 先 final quality Issue id、defer 先 dependency edge、per-Issue PR を作らない理由、final PR delivery まで merge-prepared を主張しないこと、reviewer が確認した local completion / issue finish 条件を含みます。中間 Issue ごとの PR preparation は要求しませんが、[workflow_issue.md](workflow_issue.md) の `issue finish` 条件を迂回してはなりません。この例外は通常 workflow の PR-preparer guidance を削除するものではありません。
+Issue 実装後の PR delivery は通常 `github-pr-merge-preparer` へ handoff します。ただし reviewed Epic plan が、Issue を一つずつ進め、final PR delivery を `iss-00276` や `iss-00307` のような final quality Issue に意図的に集約すると定義している場合は、中間 Issue の `report.md` に deferred PR delivery gate evidence を残します。この evidence は、defer 先 final quality Issue id、defer 先 dependency edge、per-Issue PR を作らない理由、final PR delivery まで merge-prepared を主張しないこと、reviewer が確認した local completion / issue finish 条件を含みます。中間 Issue ごとの PR preparation は要求しませんが、[workflow_issue.md](workflow_issue.md) の `issue finish` 条件を迂回してはなりません。この例外は通常 workflow の PR-preparer guidance を削除するものではありません。
 
 日本語運用では、Epic execution / readiness 中に作成・更新する docs、`report.md`、artifacts の本文は日本語ファーストにします。commands、paths、IDs、role 名などの正確な識別子はそのまま保持します。
 

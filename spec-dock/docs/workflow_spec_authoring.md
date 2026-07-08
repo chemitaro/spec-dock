@@ -7,6 +7,7 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 関連:
 - 総合: [guide.md](guide.md)
 - Scope workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
+- ChatGPT evidence lane: [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md)
 - Phase playbook: [phase_requirement.md](phase_requirement.md), [phase_design.md](phase_design.md), [phase_plan.md](phase_plan.md)
 - Decision routing: [authoring/decision-routing.md](authoring/decision-routing.md)
 - Scope layering: [authoring/scope-layering.md](authoring/scope-layering.md)
@@ -25,6 +26,8 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - 調査後もユーザー意図、受け入れ条件、スコープ、非スコープ、優先順位に影響する未確定事項が残る場合は、[workflow_clarification.md](workflow_clarification.md) に従い、次 phase へ進む前に orchestrator が一問ずつヒアリングする。
 - scope / non-scope に影響する未確認事項が残る場合は `blocked` または `incomplete` として扱い、次 phase へ進めない。
 - authoring 中に Decision-only finding を見つけた場合は、execution handoff 前に [authoring/scope-layering.md](authoring/scope-layering.md) と [authoring/decision-routing.md](authoring/decision-routing.md) で placement を確認する。Issue-local なら対象 Issue に閉じ、cross-issue なら Epic、cross-epic / investment なら Initiative、long-lived architecture decision なら ADR 候補、判断材料不足なら clarification へ戻す。routing 判断は canonical artifact または `report.md` の evidence に残し、template や skill に長い例を複製しない。
+- ChatGPT / Oracle を使う場合は [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md) を参照し、output を delegated evidence として扱う。ZIP/tree/staged evidence、candidate validation、draft adoption validation、approval check の `pass` は command-local pass であり、canonical adoption、fresh reviewer pass、execution-ready、PR-ready ではない。
+- ChatGPT evidence を採用する場合は、Evidence Adoption Ledger に採否を記録し、main orchestrator が canonical docs へ再記述し、fresh `spec-reviewer` pass を通す。
 
 ## グレード別authoring matrix（Issue grade authoring matrix）
 
