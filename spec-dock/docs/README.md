@@ -17,6 +17,7 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - Epic execution: `.agents/skills/spec-dock-epic-execution/SKILL.md`
 - Issue planning: `.agents/skills/spec-dock-issue-planning/SKILL.md`
 - Issue execution: `.agents/skills/spec-dock-issue-execution/SKILL.md`
+- ChatGPT authoring evidence lane: `.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`
 - ADR: `.agents/skills/spec-dock-adr-facilitation/SKILL.md`
 
 ## 読み順

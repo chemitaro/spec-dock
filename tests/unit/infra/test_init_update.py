@@ -452,6 +452,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-issue-execution/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
         ),
+        ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md"
+        ),
         ".agents/skills/spec-dock-clarification/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md"
         ),
@@ -733,6 +736,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-initiative-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-execution/SKILL.md",
+        ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md",
         ".agents/skills/spec-dock-clarification/SKILL.md",
         ".agents/skills/spec-dock-codex-adapter/SKILL.md",
         ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
@@ -800,6 +804,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/spec-dock-initiative-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-execution/SKILL.md",
+            ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md",
             ".agents/skills/spec-dock-clarification/SKILL.md",
             ".agents/skills/spec-dock-codex-adapter/SKILL.md",
             ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
@@ -891,6 +896,12 @@ class TestInitUpdate(CliRuntimeHarness):
             "search_globs": ("**/spec-dock-issue-execution/SKILL.md",),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md",
+            ),
+        },
+        "spec-dock-chatgpt-authoring skill": {
+            "search_globs": ("**/spec-dock-chatgpt-authoring/SKILL.md",),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md",
             ),
         },
         "spec-dock-clarification skill": {
@@ -10127,6 +10138,64 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert (assets_dir / "install_root" / ".github" / "agents" / "orchestrator.agent.md").is_file(), (
                 "missing bundled copilot native shim asset"
             )
+
+    def test_chatgpt_authoring_managed_skill_contract(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            skills_root = assets_dir / "install_root" / ".agents" / "skills"
+            authoring_path = skills_root / "spec-dock-chatgpt-authoring" / "SKILL.md"
+            initiative_planning_path = skills_root / "spec-dock-initiative-planning" / "SKILL.md"
+            epic_planning_path = skills_root / "spec-dock-epic-planning" / "SKILL.md"
+            issue_planning_path = skills_root / "spec-dock-issue-planning" / "SKILL.md"
+            assert authoring_path.is_file()
+            authoring_text = authoring_path.read_text(encoding="utf-8")
+            initiative_planning_text = initiative_planning_path.read_text(encoding="utf-8")
+            epic_planning_text = epic_planning_path.read_text(encoding="utf-8")
+            issue_planning_text = issue_planning_path.read_text(encoding="utf-8")
+
+        managed_skill_names = cli._managed_skill_names()
+        assert managed_skill_names == _EXPECTED_MANAGED_SKILL_NAMES
+        assert managed_skill_names.index("spec-dock-issue-execution") < managed_skill_names.index(
+            "spec-dock-chatgpt-authoring"
+        )
+        assert authoring_text.startswith("---\nname: spec-dock-chatgpt-authoring\n")
+
+        for mode_name in ("zero-base", "requirement-first", "draft-adoption"):
+            assert mode_name in issue_planning_text
+        assert "Evidence Adoption Ledger" in issue_planning_text
+        assert "fresh `spec-reviewer` pass before execution handoff" in issue_planning_text
+
+        for required_fragment in (
+            "evidence-only",
+            "canonical adoption completed",
+            "`.assurance.json` mutation",
+            "`authorized_profile` decision",
+            "reviewer pass",
+            "execution-ready",
+            "PR-ready",
+            "merge-ready",
+            "Issue finish",
+            "Epic completion",
+            "PR delivery",
+        ):
+            assert required_fragment in authoring_text
+
+        local_dependency_terms = (
+            "/Users/" + "iwasawayuuta",
+            ".codex/skills/" + "chatgpt-use",
+            "oracle-" + "chatgpt",
+        )
+        for text in (authoring_text, initiative_planning_text, epic_planning_text, issue_planning_text):
+            for term in local_dependency_terms:
+                assert term not in text
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            installed_path = target / ".agents" / "skills" / "spec-dock-chatgpt-authoring" / "SKILL.md"
+            assert installed_path.is_file()
+            assert installed_path.read_text(encoding="utf-8") == authoring_text
 
     def test_deleted_role_skill_assets_stay_absent_from_provider_and_dogfooding_mirror(self) -> None:
         import spec_dock.cli as cli

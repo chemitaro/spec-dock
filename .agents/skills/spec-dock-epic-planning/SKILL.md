@@ -11,6 +11,8 @@ This skill is an operational kernel. Keep detailed policy in docs and keep globa
 
 Contract anchor: create/import an epic when no existing Epic fits; capture scope-specific constraints and decisions before Issue handoff; record Spec Authoring Gate evidence after fresh `spec-reviewer` pass.
 
+ChatGPT authoring relationship: `spec-dock-chatgpt-authoring` may provide Epic planning evidence, ZIP/tree output, Issue draft artifacts, candidate reports, or handoff indexes. Those outputs are evidence-only; Epic planning still owns Issue slicing, Evidence Adoption Ledger entries, and human approval before Issue node creation. Canonical Issue docs remain Issue planning outputs.
+
 ## Read First
 
 - Current state: `./spec-dock/scripts/spec-dock active show`, active Initiative/Epic docs, existing sibling Epics, `artifacts/`, legacy `discussions/` when present, related code/tests/templates/ADRs, and relevant user attachments.
@@ -56,6 +58,7 @@ Contract anchor: create/import an epic when no existing Epic fits; capture scope
 6. Prepare Issue handoff without finalizing Issue execution docs.
    - Create executable Issue slices only; do not create decision-only Issues as execution-ready work.
    - Epic planning may create Issue-local `artifacts/` evidence such as `draft-design`, `draft-plan`, and a path index.
+   - ChatGPT / Oracle ZIP/tree output may be staged as Issue draft evidence, but it is not canonical adoption and is not execution-ready.
    - Canonical Issue `design.md` / `plan.md` remain Issue planning outputs; do not finalize them during Epic planning.
 
 ## Stop Conditions
@@ -65,4 +68,6 @@ Contract anchor: create/import an epic when no existing Epic fits; capture scope
 - A decision belongs to Initiative, ADR, or clarification rather than Epic.
 - Requirement / design / plan candidate changed after review and lacks a fresh `spec-reviewer` pass.
 - Specialist output has not been adopted into canonical docs and `report.md`.
+- ChatGPT / Oracle ZIP/tree output or Issue draft artifacts have not been reviewed and adopted or rejected in `report.md`.
+- Issue node creation lacks explicit human approval.
 - Issue handoff would require execution-ready claims for template-only, draft-only, or unreviewed Issue docs.

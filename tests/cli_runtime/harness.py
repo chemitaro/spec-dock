@@ -37,6 +37,7 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
     "spec-dock-epic-execution",
     "spec-dock-issue-planning",
     "spec-dock-issue-execution",
+    "spec-dock-chatgpt-authoring",
     "spec-dock-clarification",
     "spec-dock-adr-facilitation",
     "spec-dock-codex-adapter",

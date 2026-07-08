@@ -11,6 +11,8 @@ This skill is a fixed kernel / operational kernel. Do not copy full profile proc
 
 state-specific generated Runbook text is runtime guidance. It is not canonical authority, must not be edited as source of truth, and must not replace canonical docs.
 
+ChatGPT authoring relationship: `spec-dock-chatgpt-authoring` may provide Issue draft artifacts, ZIP/tree evidence, validation reports, or candidate summaries. Those outputs are evidence-only until Issue planning adopts or rejects specific claims in `report.md`, updates canonical Issue docs, and obtains a fresh `spec-reviewer` pass.
+
 ## Read First
 
 - Runtime guidance: `./spec-dock/scripts/spec-dock guidance issue-planning`
@@ -50,6 +52,12 @@ state-specific generated Runbook text is runtime guidance. It is not canonical a
    - Execution-ready requires reviewer-passed canonical docs, executable `plan.md`, required verification/delegation/reviewer-focus evidence, adopted draft evidence, and no unresolved report-ledger blockers.
    - Handoff-ready evidence from Epic planning is not execution-ready by itself.
 
+## Issue Planning Modes
+
+- `zero-base`: start from user discussion, repo docs/code, artifacts, and current active scope. Author `requirement.md`, `design.md`, and `plan.md` in order; each promotion needs fresh `spec-reviewer` evidence.
+- `requirement-first`: start from an approved or human-authored `requirement.md`. Create `design.md` and `plan.md` from that requirement; route gaps or contradictions back to requirement authoring or clarification.
+- `draft-adoption`: start from Issue-local draft requirement/design/plan evidence from Epic planning, delegated planning, or `spec-dock-chatgpt-authoring`. Record Evidence Adoption Ledger entries for adopted and rejected draft claims, update canonical docs only through the main orchestrator, and obtain a fresh `spec-reviewer` pass before execution handoff.
+
 ## Contract Anchors
 
 - Use this skill for issue planning work: create or update issue-level requirement/design/plan docs while keeping canonical docs main-orchestrator-owned.
@@ -63,7 +71,8 @@ state-specific generated Runbook text is runtime guidance. It is not canonical a
 - Runtime guidance, canonical docs, active artifacts, or `authorized_profile` disagree and the conflict cannot be resolved locally.
 - Issue grade, scope, impact, or reviewer obligation is missing or ambiguous without escalation evidence.
 - `requirement.md`, `design.md`, or `plan.md` is template-only, unresolved, stale, contradictory, or lacks fresh reviewer pass for the current phase.
-- Draft adoption evidence is missing, stale, failed, unavailable, denied, waived, provisional, or contradictory.
+- Draft adoption evidence or Evidence Adoption Ledger entries are missing, stale, failed, unavailable, denied, waived, provisional, or contradictory.
+- `draft-adoption` is being used to bypass canonical adoption, fresh `spec-reviewer`, or execution handoff gates.
 - Planning exposes unresolved requirement / design / plan gaps; route to clarification or the relevant authoring phase instead of execution.
 
 ## Kernel Boundary
