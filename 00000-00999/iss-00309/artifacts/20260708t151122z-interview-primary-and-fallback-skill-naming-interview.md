@@ -2,7 +2,7 @@
 種別: interview
 ID: "20260708t151122z-interview"
 タイトル: "Primary And Fallback Skill Naming Interview"
-状態: "draft"
+状態: "answered"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-09"
 親: ["iss-00309"]
@@ -11,9 +11,9 @@ scope: "<initiative | epic | issue | local-topic>"
 scope_id: "iss-00309"
 created_at: "2026-07-08THH:MM:SSZ"
 created_by: "iwasawayuuta"
-status: "unanswered"
-authority: "proposed"
-adoption_status: "unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked"
+status: "answered"
+authority: "user-approved"
+adoption_status: "adopted"
 derived_from: []
 reflected_to: []
 ---
@@ -109,41 +109,52 @@ reflected_to: []
 
 ## ユーザー回答 (回答後に必須)
 - answer capture:
-  - ...
+  - Option A を採用する。
+  - 既存の `spec-dock-initiative-planning` / `spec-dock-epic-planning` / `spec-dock-issue-planning` は ChatGPT-first primary route の skill 名として維持する。
+  - 従来 planning route は `spec-dock-initiative-planning-manual` / `spec-dock-epic-planning-manual` / `spec-dock-issue-planning-manual` に退避する。
 - 回答:
-  - ...
+  - 既存名を primary ChatGPT-first route にする。従来 route は `-manual` suffix の backup route として残す。
 - 回答日時:
-  - ...
+  - 2026-07-09
 
 ## 追加確認の要否 (回答後に必須)
 - 追加確認が必要か:
-  - yes | no
+  - no
 - 必要な場合に次の unanswered `interview` として切り出す質問:
-  - ...
+  - なし
 
 ## 採用判断 (回答後に必須)
 - adoption_status:
-  - unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked
+  - adopted
 - adoption target:
-  - `requirement.md` | `design.md` | `plan.md` | `ADR` | `report.md` Evidence Adoption Ledger | none
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
+  - `report.md` Evidence Adoption Ledger
 - 採用 / 棄却 / deferred の理由:
-  - ...
+  - ChatGPT-first を正規 planning workflow とするため、ユーザーが自然に呼ぶ既存 planning skill 名を primary route として維持する。
+  - 従来 route はまだ有効な emergency backup であり、`legacy` ではなく `manual` suffix で区別する。
+  - `manual` route は人間承認つき fallback であり、平時の推奨 route ではない。
 - `report.md` Evidence Adoption Ledger への反映要否:
-  - yes | no
+  - yes
 
 ## requirement / design / plan / ADR への含意 (回答後に必須)
 - `requirement.md`:
-  - ...
+  - 既存 planning skill 名が ChatGPT-first primary route であることを要件化する。
+  - 従来 route は `-manual` suffix の backup skill として残すことを要件化する。
 - `design.md`:
-  - ...
+  - `spec-dock-initiative-planning` / `spec-dock-epic-planning` / `spec-dock-issue-planning` は ChatGPT-first orchestration を所有する。
+  - `spec-dock-initiative-planning-manual` / `spec-dock-epic-planning-manual` / `spec-dock-issue-planning-manual` は従来 planning kernel を所有する。
+  - Primary route から manual route への移行は、人間承認と fallback reason evidence を必要とする。
 - `plan.md`:
-  - ...
+  - 既存 skill を primary ChatGPT-first に書き換え、従来 skill 内容を `-manual` skill として抽出・退避する。
+  - Installed skill list / docs / tests / dogfood mirror を更新し、manual skills が primary より優先されないことを確認する。
 - `ADR`:
-  - ...
+  - 現時点では必須ではない。将来ほかの workflow でも同じ primary/manual 分離を標準化する場合は ADR 候補にする。
 - reflected_to 更新方針:
-  - ...
+  - 要件・設計・計画の具体化時に反映し、`report.md` EAL に採用行を追加する。
 - adoption reflection:
-  - ...
+  - 既存 planning skill names は ChatGPT-first primary route に残し、従来 route は `-manual` suffix の human-approved backup として分離する。
 
 ## 条件付き補足 (必要な場合だけ)
 - PlantUML 図:

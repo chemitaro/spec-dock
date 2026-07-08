@@ -63,7 +63,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | 採用（`adopted`） | ユーザー回答（`interview`） | `requirement.md` / `design.md` / `plan.md` | ChatGPT-first を正規 planning route とし、4 tab 上限・timeout・browser failure は wait / retry / recovery 対象にする。従来 planning route は、人間が修正困難な障害を認識して明示承認した場合だけ使う emergency backup とする。 | `artifacts/20260708t150402z-interview-chatgpt-first-planning-route-fallback-boundary-interview.md` | 要件・設計・計画へ反映する |
+| EAL-002 | 採用（`adopted`） | ユーザー回答（`interview`） | `requirement.md` / `design.md` / `plan.md` | 既存 planning skill 名を ChatGPT-first primary route として維持し、従来 route は `-manual` suffix の human-approved backup skill として分離する。 | `artifacts/20260708t151122z-interview-primary-and-fallback-skill-naming-interview.md` | 要件・設計・計画へ反映する |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
