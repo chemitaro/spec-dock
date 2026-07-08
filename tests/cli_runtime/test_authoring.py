@@ -542,6 +542,35 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["valid_candidate_count"] == 3
             assert payload["review_gate_passed"] is True
 
+    def test_authoring_validate_candidates_blocks_passed_review_without_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "issue", kind="epic-issue")
+            review_report = stage_dir / "review-report.json"
+            review_report.write_text(json.dumps({"status": "pass"}, sort_keys=True) + "\n", encoding="utf-8")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "epic-issue-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-epic",
+                    "epic-00295",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert payload["status"] == "blocked"
+            assert payload["review_gate_passed"] is False
+            assert "missing_review_digest" in payload["findings"]
+
     def test_authoring_approval_check_valid_epic_issue_passes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -1969,6 +1998,8 @@ class TestAuthoringCli(CliRuntimeHarness):
             for index, wrapper_root in enumerate(wrapper_roots):
                 issue_wrapper = wrapper_root / "validate_issue_draft_adoption.py"
                 selected_wrapper = wrapper_root / "validate_selected_skeleton_fill.py"
+                issue_candidates_wrapper = wrapper_root / "validate_issue_candidates.py"
+                initiative_candidates_wrapper = wrapper_root / "validate_initiative_epic_candidates.py"
                 selected_report = repo / ".specdock-authoring" / f"selected-wrapper-report-{index}.json"
                 issue_report = repo / ".specdock-authoring" / f"issue-wrapper-report-{index}.json"
                 issue_help = subprocess.run(
@@ -1981,6 +2012,20 @@ class TestAuthoringCli(CliRuntimeHarness):
                 selected_help = subprocess.run(
                     [sys.executable, str(selected_wrapper), "--help"],
                     cwd=str(repo / "spec-dock"),
+                    env=self._runtime_env(repo, {"PATH": os.environ.get("PATH", ""), "PYTHONDONTWRITEBYTECODE": "1"}),
+                    capture_output=True,
+                    text=True,
+                )
+                issue_candidates_help = subprocess.run(
+                    [sys.executable, str(issue_candidates_wrapper), "--help"],
+                    cwd=str(repo),
+                    env=self._runtime_env(repo, {"PATH": os.environ.get("PATH", ""), "PYTHONDONTWRITEBYTECODE": "1"}),
+                    capture_output=True,
+                    text=True,
+                )
+                initiative_candidates_help = subprocess.run(
+                    [sys.executable, str(initiative_candidates_wrapper), "--help"],
+                    cwd=str(repo),
                     env=self._runtime_env(repo, {"PATH": os.environ.get("PATH", ""), "PYTHONDONTWRITEBYTECODE": "1"}),
                     capture_output=True,
                     text=True,
@@ -2033,6 +2078,14 @@ class TestAuthoringCli(CliRuntimeHarness):
                 assert "--review-report" in issue_help.stdout
                 assert "--pack-tree" not in issue_help.stdout
                 assert "--output-dir" not in issue_help.stdout
+                assert issue_candidates_help.returncode == 0, (
+                    issue_candidates_help.stdout + issue_candidates_help.stderr
+                )
+                assert "--expected-parent-epic" in issue_candidates_help.stdout
+                assert initiative_candidates_help.returncode == 0, (
+                    initiative_candidates_help.stdout + initiative_candidates_help.stderr
+                )
+                assert "--expected-parent-initiative" in initiative_candidates_help.stdout
                 assert selected_help.returncode == 0, selected_help.stdout + selected_help.stderr
                 assert "--input" in selected_help.stdout
                 assert "--issue-dir" in selected_help.stdout
@@ -2623,6 +2676,12 @@ class TestAuthoringCli(CliRuntimeHarness):
             ),
             ("hidden-path", "specdock-authoring-pack/.hidden.md", "x\n", "hidden_path:.hidden.md"),
             ("secret-path", "specdock-authoring-pack/secrets/token.md", "x\n", "secret_path:secrets/token.md"),
+            (
+                "windows-backslash-traversal",
+                "specdock-authoring-pack/safe\\..\\..\\evil.md",
+                "x\n",
+                "path_separator_backslash:safe\\..\\..\\evil.md",
+            ),
             ("unsupported-suffix", "specdock-authoring-pack/issue/run.sh", "x\n", "unsupported_suffix:issue/run.sh"),
             (
                 "binary-payload",
@@ -2992,6 +3051,9 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert staged_candidates == candidate_payload
             assert "specdock-authoring-pack/manifest.json" in payload["staged_files"]
             owner = json.loads((stage_dir / ".specdock-stage-owner.json").read_text(encoding="utf-8"))
+            review_report = json.loads((stage_dir / "review-report.json").read_text(encoding="utf-8"))
+            assert review_report["pack_digest"]["algorithm"] == "sha256-tree-v1"
+            assert review_report["pack_digest"]["content_sha256"]
             assert owner["authority"] == "evidence_only"
             assert owner["adoption_status"] == "unreviewed"
             assert owner["bundle_generation_not_promotion"] is True
@@ -3469,9 +3531,29 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == expected_status
             assert reason in payload["blockers"]
 
+    def test_authoring_preflight_github_sync_fetches_before_remote_comparison(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            other = repo.parent / "other"
+            _git(repo.parent, "clone", str(repo.parent / "remote.git"), str(other))
+            _git(other, "checkout", "main")
+            _git(other, "config", "user.name", "Test User")
+            _git(other, "config", "user.email", "test@example.com")
+            (other / "source.txt").write_text("remote-only\n", encoding="utf-8")
+            _git(other, "add", "source.txt")
+            _git(other, "commit", "-m", "remote-only")
+            _git(other, "push", "origin", "main")
+
+            payload = _run_preflight_json(self, repo, expected_returncode=1)
+
+            assert payload["status"] == "stale"
+            assert "behind_remote" in payload["blockers"]
+            assert payload["local_head"] != payload["remote_head"]
+
     def test_authoring_preflight_github_sync_blocks_missing_origin_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
+            _git(repo.parent, "--git-dir", str(repo.parent / "remote.git"), "update-ref", "-d", "refs/heads/main")
             _git(repo, "update-ref", "-d", "refs/remotes/origin/main")
 
             payload = _run_preflight_json(self, repo, expected_returncode=1)
@@ -3553,6 +3635,9 @@ class TestAuthoringCli(CliRuntimeHarness):
     def test_authoring_preflight_github_sync_blocks_unknown_default_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
+            _git(
+                repo.parent, "--git-dir", str(repo.parent / "remote.git"), "symbolic-ref", "HEAD", "refs/heads/missing"
+            )
             _git(repo, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
 
             payload = _run_preflight_json(
@@ -4852,6 +4937,41 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == "rejected"
             assert "unsafe_output_entry_symlink:manifest.json" in payload["blockers"]
             assert not target.exists()
+
+    def test_authoring_pack_prepare_rejects_symlinked_output_dir(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "preflight.json"
+            outside = repo / "outside"
+            output_dir = repo / "pack-link"
+            preflight_payload = _run_preflight_json(self, repo)
+            preflight.write_text(json.dumps(preflight_payload, sort_keys=True) + "\n", encoding="utf-8")
+            outside.mkdir()
+            output_dir.symlink_to(outside)
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_output_dir_symlink" in payload["blockers"]
+            assert not (outside / "manifest.json").exists()
 
     def test_authoring_pack_prepare_reports_non_object_json_inputs_as_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

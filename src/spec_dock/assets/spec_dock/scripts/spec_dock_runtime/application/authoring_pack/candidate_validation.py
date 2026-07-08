@@ -115,6 +115,16 @@ def _review_gate(
         )
     status = payload.get("status")
     if status == "pass":
+        if _review_digest(review_report) is None:
+            return CandidateValidationResult(
+                status="blocked",
+                input_path=str(input_path),
+                candidate_kind=candidate_kind,
+                evidence_mode=evidence_mode,
+                review_status="pass",
+                review_gate_passed=False,
+                findings=("missing_review_digest",),
+            )
         return CandidateValidationResult(
             status="pass",
             input_path=str(input_path),

@@ -35,6 +35,16 @@ def prepare_prompt_pack(request: PromptPackPrepareRequest) -> PromptPackPrepareR
             remediation=(f"provide a readable preflight JSON file: {error}",),
         )
 
+    unsafe_output_dir = _unsafe_output_dir_blockers(request.output_dir)
+    if unsafe_output_dir:
+        return _result(
+            request,
+            status="rejected",
+            preflight=preflight,
+            blockers=tuple(unsafe_output_dir),
+            remediation=("remove symlinked prompt pack output directories before preparing the pack",),
+        )
+
     blockers = _required_preflight_blockers(preflight)
     if blockers:
         result = _result(
@@ -351,6 +361,24 @@ def _unsafe_output_entry_blockers(output_dir: Path) -> list[str]:
         if path.exists() and path.resolve().parent != resolved_output_dir:
             blockers.append(f"unsafe_output_entry_outside_output_dir:{relative_path}")
     return blockers
+
+
+def _unsafe_output_dir_blockers(output_dir: Path) -> list[str]:
+    if _is_canonical_output_target(output_dir):
+        return []
+    absolute_path = output_dir if output_dir.is_absolute() else Path.cwd() / output_dir
+    if absolute_path.exists() and absolute_path.is_symlink():
+        return ["unsafe_output_dir_symlink"]
+    if absolute_path.exists() and not absolute_path.is_dir():
+        return ["unsafe_output_dir_not_directory"]
+    current = absolute_path.parent
+    while current != current.parent:
+        if current.exists() and current.is_symlink():
+            return ["unsafe_output_parent_symlink"]
+        if current.exists():
+            break
+        current = current.parent
+    return []
 
 
 def _unsafe_diagnostics_entry_blockers(output_dir: Path) -> list[str]:

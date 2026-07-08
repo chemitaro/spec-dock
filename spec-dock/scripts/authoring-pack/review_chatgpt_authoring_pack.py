@@ -14,12 +14,12 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 _SPEC_DOCK_SCRIPTS_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_SPEC_DOCK_SCRIPTS_DIR))
 
-from spec_dock_runtime.application.authoring_pack.pack_review import (
+from spec_dock_runtime.application.authoring_pack.pack_review import (  # noqa: E402
     PackReviewRequest,
     _unsafe_report_path,
     review_authoring_pack,
 )
-from spec_dock_runtime.presentation.authoring_pack.pack_review_renderer import (
+from spec_dock_runtime.presentation.authoring_pack.pack_review_renderer import (  # noqa: E402
     render_pack_review_json,
     render_pack_review_text,
 )

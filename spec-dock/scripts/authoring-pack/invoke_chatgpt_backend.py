@@ -5,18 +5,18 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 import shutil
 import sys
 import tempfile
-from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _SPEC_DOCK_SCRIPTS_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_SPEC_DOCK_SCRIPTS_DIR))
 
-from spec_dock_runtime.application.authoring_pack.backend_invoke import invoke_backend
-from spec_dock_runtime.domain.authoring_pack.backend_invoke_contract import BackendInvokeRequest
-from spec_dock_runtime.presentation.authoring_pack.backend_invoke_renderer import (
+from spec_dock_runtime.application.authoring_pack.backend_invoke import invoke_backend  # noqa: E402
+from spec_dock_runtime.domain.authoring_pack.backend_invoke_contract import BackendInvokeRequest  # noqa: E402
+from spec_dock_runtime.presentation.authoring_pack.backend_invoke_renderer import (  # noqa: E402
     render_backend_invoke_json,
     render_backend_invoke_text,
 )
@@ -95,7 +95,9 @@ def _write_legacy_prompt_pack(prompt_pack: Path, files: tuple[Path, ...]) -> Non
         if not path.is_file():
             raise ValueError(f"legacy --file attachment is not a readable file: {path}")
     _copy_or_placeholder(files, prompt_pack / "chatgpt-use-prompt.md", index=0, fallback="legacy prompt attachment\n")
-    _copy_or_placeholder(files, prompt_pack / "expected-output-contract.md", index=1, fallback="legacy expected output\n")
+    _copy_or_placeholder(
+        files, prompt_pack / "expected-output-contract.md", index=1, fallback="legacy expected output\n"
+    )
     attachment_dir = prompt_pack / "legacy-attachments"
     attachment_dir.mkdir()
     for index, path in enumerate(files):
