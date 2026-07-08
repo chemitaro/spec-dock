@@ -7207,6 +7207,7 @@ def _make_ahead(repo: Path) -> None:
 def _make_behind(repo: Path) -> None:
     other = repo.parent / "other"
     _git(repo.parent, "clone", str(repo.parent / "remote.git"), str(other))
+    _git(other, "checkout", "main")
     _git(other, "config", "user.name", "Test User")
     _git(other, "config", "user.email", "test@example.com")
     (other / "source.txt").write_text("behind\n", encoding="utf-8")
