@@ -3,291 +3,203 @@
 ID: "iss-00304"
 タイトル: "ChatGPT Authoring Skill"
 関連GitHub: ["#304"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-08"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00295", "init-local-00003"]
 ---
 
-# iss-00304 ChatGPT Authoring Skill — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
+# iss-00304 ChatGPT Authoring Skill — 実装報告
 
-> `report.md` は観測証跡台帳（observed evidence ledger）の scaffold です。planned requirements、evidence destination、closure 条件は `plan.md` が持ち、この文書は実際の Red / Green / Refactor evidence、発見された tests、closure delta、reviewer status、commit/no-op evidence を記録する evidence slot です。workflow / compliance authority は skills、docs、accepted ADRs、reviewer gates に置きます。
-
-## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger / 必須）
-
-`report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
-
-Material な判断がない場合もこの section は残し、次を明示する。
-
-- No material interpretation changes.
-- No decision entries.
-
-Ledger entry は次の契約値を使う。
-
-- `Status`: `open` / `resolved` / `superseded`
-- `Type`: `interpretation` / `scope` / `implementation` / `compatibility` / `test-strategy` / `operation` / `deviation` / `follow-up`
-- `Disposition`: `applied` / `rejected` / `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` / `converted_to_followup` / `deferred` / `no_action` / `superseded`
-
-完了時の意味論（completion semantics）:
-- issue completion 前に `Status=open` の entry を残してはならない。
-- `Status=resolved` は `Disposition`、evidence、必要な follow-up を持つ。
-- `Status=superseded` または `Disposition=superseded` は置換先 entry ID を持つ。
-- `Disposition=promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` は昇格先 artifact と evidence を持つ。
-- `Disposition=converted_to_followup` は follow-up issue / discussion / ADR candidate の参照を持つ。
-- `Disposition=deferred` は scope 外である理由、blocking でない根拠、revisit 条件を持つ。
-- `Disposition=no_action` は issue-local な判断で追加対応不要である理由を持つ。将来も効く durable decision を `report.md` だけに閉じ込めてはならない。
-
-Disposition ごとの必須証跡:
-- `applied`: 変更した artifact / 実装証跡と、issue-local 適用で十分な理由。
-- `rejected`: 却下した選択肢、理由、blocking impact が残らない根拠。
-- `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan`: 昇格先 artifact 参照と証跡。
-- `converted_to_followup`: follow-up issue / discussion / ADR candidate 参照と blocking / non-blocking の分類。
-- `deferred`: scope-out 理由、non-blocking の根拠、revisit 条件。
-- `no_action`: 判断が issue-local で durable ではない理由。
-- `superseded`: 置換先 entry ID と置換理由。
+## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger）
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | user / orchestrator | ChatGPT authoring を planning skills の置換として扱うか、shared evidence lane として扱うか | A: planning skill を置換; B: shared evidence lane を追加し planning skill は authority を保持 | B を採用 | Parent Epic は ChatGPT output を evidence-only とし、canonical adoption / reviewer gate を planning workflow に残す | promoted_to_design | `design.md` section 1, 3, 4 | none |
+| D-002 | resolved | naming | user / orchestrator | skill 名の human-friendly / stable naming | A: Oracle-specific skill 名; B: `spec-dock-chatgpt-authoring` | B を採用 | user-facing name は `spec-dock-` prefix を持ち、Oracle 実装詳細に閉じない | promoted_to_design | `requirement.md` section 1, `design.md` section 4 | none |
+| D-003 | resolved | operation | ChatGPT Use planning pass | ChatGPT Use planning result をどの権限で採用するか | A: ChatGPT result を正本化; B: evidence-only として採用し main orchestrator が再記述 | B を採用 | Oracle session `specdock-iss-00304-planning-2` は完了したが、ChatGPT output は reviewer pass や canonical authority ではない | applied | Oracle session `specdock-iss-00304-planning-2` | none |
 
-## 証跡採用台帳（Evidence Adoption Ledger / 必須）
-
-Delegated draft、worker note、research、reviewer finding、discussion、command output を canonical artifact や実装判断へ取り込む場合、この台帳に採用判断を記録する。raw transcript ではなく、orchestrator が検証した採否・理由・証跡・次アクションだけを記録する。
-
-- `adoption_status`: `adopted` / `partially_adopted` / `rejected` / `deferred` / `stale` / `blocked`
-- `blocked` または `stale` の unresolved entry は promotion / implementation start / issue ready / issue finish / phase completion を止める。
-- `deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せる。
-- Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
-- Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
+## Evidence Adoption Ledger（証跡採用台帳）
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | Issue-local draft requirement | `requirement.md` | Purpose / scope / non-scope / acceptance criteria を採用し、authority boundary と no-per-Issue-PR policy を補強した。 | artifacts/20260707t171308z-draft-requirement-add-chatgpt-authoring-skill-and-update-planning-skills-draft-requirement.md; `requirement.md` | no_action |
+| EAL-002 | adopted | Issue-local draft design | `design.md` | target provider paths、skill taxonomy、failure modes、managed install impact を採用し、shared evidence lane design として再構成した。 | artifacts/20260707t171308z-01-draft-design-add-chatgpt-authoring-skill-and-update-planning-skills-draft-design.md; `design.md` | no_action |
+| EAL-003 | adopted | Issue-local draft plan | `plan.md` | step sequence、verification、finish evidence、relay policy を採用し、closure IDs と reviewer focus を追加した。 | artifacts/20260707t171309z-draft-plan-add-chatgpt-authoring-skill-and-update-planning-skills-draft-plan.md; `plan.md` | no_action |
+| EAL-004 | adopted | ChatGPT Use / Oracle GPT-5.5 Pro Extended | `requirement.md`, `design.md`, `plan.md` | ChatGPT Batch Evidence Lane、managed inventory、test focus、forbidden authority boundary の推奨を evidence-only として採用し、main orchestrator が再記述した。 | Oracle session `specdock-iss-00304-planning-2` | no_action |
+| EAL-005 | adopted | repo inspection | `requirement.md`, `design.md`, `plan.md` | Existing provider install_root skill files and installer inventory evidence confirm placement and likely test surface. | `find src/spec_dock/assets/install_root/.agents/skills`; `rg install_root/.agents/skills src_spec_dock tests`; `assurance verify` | no_action |
 
-## 目的整合台帳（Objective Alignment Ledger / 必須）
-
-主要目的と副次要件の主従が逆転していないことを記録する。特に clarification / authoring / handoff の変更では、primary objective evidence、secondary requirement evidence、inversion risk、reviewer verdict を残す。
+## 目的整合台帳（Objective Alignment Ledger）
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | `spec-dock-chatgpt-authoring` を shared evidence lane として追加し、planning workflow の canonical authority を保持する | naming、install inventory、Issue planning modes、local wrapper path scan | low | pass |
 
-## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
-
-Requirement / design / plan の phase promotion ごとに、調査、未確定事項、回答、採用判断、reviewer verdict、blocking / non-blocking、次アクションを記録する。
+## Spec Authoring Gate（仕様 authoring ゲート）
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | active Issue drafts, active Epic docs, installed skill inventory, ChatGPT Use planning result | ChatGPT output is evidence-only, not reviewer pass | Issue-local draft requirement + ChatGPT recommendation partially_integrated and reviewed | pass | no | promote |
+| design | `requirement.md`, provider install_root paths, existing planning skill docs, ChatGPT Use planning result | broad workflow docs rewrite deferred to `iss-00306` | Issue-local draft design + ChatGPT recommendation partially_integrated and reviewed | pass | no | promote |
+| plan | `requirement.md`, `design.md`, draft plan, previous Issue report pattern, spec-reviewer P1 findings | exact test names may be refined during implementation, but concrete step-local cases are now planned | Issue-local draft plan + reviewer fixes partially_integrated and reviewed | pass | no | promote |
 
-## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
-- 委任 authoring の使用:
-  - used / not used
-- 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
-- lifecycle state（契約値）:
-  - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
-- 昇格不可 state:
-  - `stale`, `rejected`, `superseded`, `blocked`
-- 標準出力先:
-  - 対象 scope の `artifacts/` direct child にある flat Markdown
-  - filename: typed artifacts use `<ts>-<type>-<slug>.md` or `<ts>-<nn>-<type>-<slug>.md`; blank artifacts use `<ts>-<slug>.md` or `<ts>-<nn>-<slug>.md`
-- 軽量 provenance:
-  - `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
-  - 互換 label: source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
-- 禁止 self-claim:
-  - `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
-- 禁止 wildcard token:
-  - `*`, `grants.*`, `all`
-- 標準必須にしない field:
-  - task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
-- historical note:
-  - legacy `discussions/` と既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
+## 委任ドラフト証跡（Delegated Draft Evidence）
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| ChatGPT Use / Oracle GPT-5.5 Pro Extended | iss-00304 | Oracle session `specdock-iss-00304-planning-2` | active Issue docs, Epic docs, installed skill files, `src/spec_dock/cli.py`, wrapper tests | `requirement.md`, `design.md`, `plan.md`, `report.md` | evidence_only_integrated_via_eal | EAL-004 and main-orchestrator canonical rewrites | passed: `validate`, `assurance verify`, `git diff --check`; independent spec-reviewer pass applies to canonical docs, not the ChatGPT output itself | ChatGPT output informed selected claims; EAL-004 is the adoption authority; reviewer pass/promote belongs to canonical docs after orchestrator integration | no raw transcript, no authority self-claim, no delegated canonical write | none | canonical-doc review pass only | promote canonical docs, not raw ChatGPT output |
+| Epic planning draft evidence | iss-00304 | artifacts/20260707t171308z-draft-requirement-add-chatgpt-authoring-skill-and-update-planning-skills-draft-requirement.md; artifacts/20260707t171308z-01-draft-design-add-chatgpt-authoring-skill-and-update-planning-skills-draft-design.md; artifacts/20260707t171309z-draft-plan-add-chatgpt-authoring-skill-and-update-planning-skills-draft-plan.md | parent Epic docs and authoring pack | `requirement.md`, `design.md`, `plan.md`, `report.md` | partially_integrated | `requirement.md`, `design.md`, `plan.md`, `report.md` | passed: `validate`, `assurance verify`, `git diff --check` | main orchestrator rewrote selected claims into reviewed canonical docs | none | none | pass | promote |
 
-### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
-| 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
-|---|---|---|---|---|
-| ワークフロー単位の許可証跡不足（missing workflow-scoped authorization evidence） | blocked / incomplete | ワークフロー利用依頼の authorization source と boundary を記録する、または手動 authoring に戻す | ワークフロー単位の named role 許可（Workflow-Scoped Authorization） / この section | ineligible |
-| 前段 reviewer pass 不足 / stale（missing/stale previous reviewer pass） | blocked / incomplete | レビューゲートを再実行する（rerun reviewer gate） | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
-| 設計中の要件 gap（requirement gap during design） | blocked / incomplete | requirement phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| 計画中の設計 gap（design gap during plan） | blocked / incomplete | design phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| ロール利用不可（role unavailable） | blocked / manual path | 利用不可を記録し、妥当なら手動で続行する | この section | ineligible |
-| 禁止行為の試行（forbidden action attempt） | rejected | ドラフトを破棄し incident を記録する | この section / decision ledger | ineligible |
-| 古いドラフト（stale draft） | stale | 再生成または差分調整する | この section | ineligible |
-| 置換済みドラフト（superseded draft） | superseded | 置換先ドラフトを参照する | この section | ineligible |
-| 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
-| reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
-
-## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
-
-## 実装記録（セッションログ） (必須)
-
-### セッションログ（2026-07-08 HH:MM - HH:MM）
-
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
-
-#### 実施内容
-- ...
-
-#### 実行コマンド / 結果
-```bash
-<command>
-
-<result>
-```
-
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
-
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
-`workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
-
-Authorization source は、ユーザーによる SpecDock workflow 利用依頼でよい。範囲は active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility に限る。この section は role ごと・phase ごとの追加承認 gate ではなく、scope 内の named role 利用前に追加許可を求める根拠にしてはならない。
-
-別途確認が必要なのは scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用である。unavailable / denied / host conflict は fail-closed とし、fresh `passed` reviewer gate の代替にしてはならない。
-
-| 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
-|---|---|---|---|---|---|---|---|---|
-| ワークフロー利用依頼 / 明示承認 / なし（user request to use SpecDock workflow / explicit approval / none） | ... | iss-00304 | 現在セッション（current session） / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | 範囲: active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility。破壊的操作 / 外部公開 / credentialed external mutation / scope expansion / private external system use / out-of-workflow role は含めない | 完了 / セッション終了 / scope 変更 / host policy conflict / user revocation（issue complete / session end / scope change / host policy conflict / user revocation） | none / denied / unavailable / host conflict | 続行 / separate-confirmation exception は user に確認 / block gate / record waiver request |
-
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
-#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
-Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
+## グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
-| `lite` | `not applicable` | `not applicable` | ライト該当なし理由（lite not applicable reason） | `pass / fail / blocked` | `ready / blocked` |
-| `standard` | `system-architect / implementation-planner / manual fallback` | `used / skipped / unavailable / denied` | `artifacts/...` / manual evidence / skip reason: ... | `pass / fail / blocked` | `ready / blocked` |
-| `strict` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / manual fallback evidence | `pass / fail / blocked` | `ready / blocked` |
-| `critical` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / explicit approval and risk acceptance | `pass / fail / blocked` | `ready / blocked` |
+| `standard` | manual fallback / ChatGPT Use evidence | manual fallback used; ChatGPT evidence partially_integrated | Issue-local draft artifacts, repo inspection, Oracle session `specdock-iss-00304-planning-2`; manual authoring fallback evidence: orchestrator rewrote canonical docs and recorded EAL | pass | ready |
 
-#### レビューゲート状態（Reviewer Gate Status）
+## レビューゲート状態（Reviewer Gate Status）
+
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| planning | spec authoring review | spec-reviewer | fresh | passed | no | promote | re-review passed; remaining P2 cleanup applied before implementation |
+| implementation | code review | code-reviewer | not_run | unavailable | no | blocked | run after installed skill/test changes |
+| implementation | QA review | qa-reviewer | not_run | unavailable | no | blocked | run after install simulation / wording tests |
 
-#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
-| マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+## 実装記録（セッションログ）
 
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
-
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
-
-### セッションログ（2026-07-08 HH:MM - HH:MM）
+### セッションログ（2026-07-08）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+
+- Step: S00 Planning evidence adoption
+- Closure IDs: CLOS-014 partial
 
 #### 実施内容
-- ...
 
----
+- Active Issue `iss-00304` の planning guidance が `requirement-capture` であることを確認した。
+- Issue-local draft requirement/design/plan を読み、canonical docs へ main orchestrator が採用・再構成した。
+- ChatGPT Use / Oracle GPT-5.5 Pro Extended の planning run `specdock-iss-00304-planning-2` が完了し、planning recommendation を evidence-only として採用した。
+- Provider-side installed skill inventory と install_root / `.agents/skills` references を確認した。
 
-## 最終品質ゲート（Final Quality Gate / 必須）
+#### 実行コマンド / 結果
 
-### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
-| 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
+```bash
+./spec-dock/scripts/spec-dock guidance issue-planning
+# state: requirement-capture
+# reason_code: requirement-scaffold
+# may_execute_approved_plan: false
+
+/Users/iwasawayuuta/.codex/skills/chatgpt-use/scripts/oracle-chatgpt --slug specdock-iss-00304-planning ...
+# session: specdock-iss-00304-planning-2
+# result: completed, gpt-5.5-pro, Pro Extended, evidence-only recommendation captured
+
+find src/spec_dock/assets/install_root/.agents/skills -maxdepth 2 -name SKILL.md | sort | rg 'spec-dock-(chatgpt|initiative|epic|issue|hub)'
+# existing planning/execution/hub skills found; spec-dock-chatgpt-authoring not yet present
+
+rg -n "managed skill|install_root|\\.agents/skills|spec-dock-chatgpt|chatgpt-authoring" src/spec_dock tests -g '!tests/unit/infra/test_init_update.py'
+# installer install_root and docs references found
+```
+
+## クロージャ網羅（Closure Coverage）
+
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| CLOS-001 | S02 | new provider and dogfooding `spec-dock-chatgpt-authoring/SKILL.md`; focused content assertions | pass | skill introduced as evidence lane |
+| CLOS-002 | S05 | `test_chatgpt_authoring_managed_skill_contract`; managed skill list includes new skill | pass | init installs the skill from provider assets |
+| CLOS-003 | S01/S03 | existing skill inventory inspection plus updated hub/planning skill routes | pass | existing planning skill names preserved |
+| CLOS-004 | S03 | `spec-dock-initiative-planning`, `spec-dock-epic-planning`, `spec-dock-issue-planning` relationship wording | pass | ChatGPT output remains evidence-only and planning-owned adoption remains explicit |
+| CLOS-005 | S03 | `Issue Planning Modes` section in `spec-dock-issue-planning` | pass | `zero-base`, `requirement-first`, and `draft-adoption` are explicit |
+| CLOS-006 | S03 | hub route and planning skill stop conditions | pass | reviewer gates and human approval are not bypassed |
+| CLOS-007 | S02 | forbidden claims in `spec-dock-chatgpt-authoring` plus tests | pass | no reviewer/assurance/readiness/PR authority claim |
+| CLOS-008 | S02/S04 | provider and dogfooding docs README entry plus installed skill route | pass | discoverable from docs and hub |
+| CLOS-009 | S05/S99 | scoped local wrapper path scan over new/changed formal skill and regression-test surfaces | pass | no `/Users/iwasawayuuta`, `.codex/skills/chatgpt-use`, or `oracle-chatgpt` dependency in changed product workflow surfaces |
+| CLOS-010 | S99 | `./spec-dock/scripts/spec-dock validate` | pass | nodes=202 |
+| CLOS-011 | S99 | `./spec-dock/scripts/spec-dock assurance verify` | pass | authorized_profile=standard, reason=ok |
+| CLOS-012 | S99 | `git diff --check` | pass | no whitespace errors |
+| CLOS-013 | S90 | fresh spec-reviewer, code-reviewer, and qa-reviewer pass after implementation fixes | pass | reviewer gates closed; only lifecycle closeout remains |
+| CLOS-014 | S00/S99 | report relay policy | partial | PR delivery deferred to `iss-00307`; final no-PR evidence after commit/finish |
+| CLOS-015 | S99 | pending | pending | after commit/push/finish |
 
-### 最終 QA ゲート（Final QA Gate）
-| レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
-|---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+## Step Contract Closure（ステップ契約の完了証跡）
 
-### 最終コードレビューゲート（Final Code Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S00 | CLOS-014 partial | canonical docs substantive; EAL records draft/ChatGPT evidence without authority | canonical docs rewritten; EAL-001 through EAL-005 recorded | pass | implementation still pending |
+| S01 | CLOS-003 partial | provider installed skill inventory and installer behavior inspected | `find` and `rg` output recorded in session log | pass | implementation still pending |
+| S02 | CLOS-001, CLOS-007, CLOS-008, CLOS-009 | new skill file exists with safe wording and no local wrapper path | provider and dogfooding `spec-dock-chatgpt-authoring/SKILL.md`; path scan | pass | implementation complete |
+| S03 | CLOS-003, CLOS-004, CLOS-005, CLOS-006 | planning skill names preserved and modes/evidence lane documented | hub and planning skill diffs plus focused tests | pass | existing skill names preserved |
+| S04 | CLOS-008 partial | discoverability docs updated or approved-no-op recorded | provider and dogfooding `spec-dock/docs/README.md` include ChatGPT authoring evidence lane | pass | docs index updated |
+| S05 | CLOS-001 through CLOS-009 | focused install / wording tests pass | `tests/cli_runtime/test_wrappers.py` focused test; full `tests/unit/infra/test_init_update.py` | pass | managed install contract covered |
+| S90 | CLOS-013 | required reviewer gates pass | fresh spec-reviewer, code-reviewer, and qa-reviewer returned `review_status: pass` | pass | reviewer gates closed |
+| S99 | CLOS-010 through CLOS-015 | final verification, commit, push, no-PR relay, issue finish | final verification passed; commit/push/finish not yet run | partial | lifecycle closeout pending |
 
-### 最終 spec review ゲート（Final Spec Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+## Test Contract Closure（テスト契約の完了証跡）
 
-### 最終 commit（Final Commit）
-| 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| tc-s00-001 | S00 | yes | inspect-only | `guidance issue-planning` showed `requirement-capture` before rewrite | `./spec-dock/scripts/spec-dock guidance issue-planning` | pass | scaffold was not executable |
+| tc-s00-002 | S00 | yes | manual-required | draft artifacts existed; ChatGPT Use result captured as evidence-only | file inspection and spec-reviewer | pass | planning re-review passed after P1 fixes; ChatGPT output was not treated as authority |
+| tc-s01-001 | S01 | yes | inspect-only | `spec-dock-chatgpt-authoring` absent before implementation | `find src/spec_dock/assets/install_root/.agents/skills -maxdepth 2 -name SKILL.md` | pass | baseline established |
+| tc-s01-002 | S01 | yes | inspect-only | installer recursive install_root and managed list references found | `rg -n "install_root|_MANAGED_SKILL_NAMES|\\.agents/skills" src/spec_dock tests` | pass | implementation must update managed list/test expectations as needed |
+| tc-s02-001 | S02 | yes | covered-existing | new skill asset added | `test_chatgpt_authoring_managed_skill_contract` | pass | frontmatter/header and install presence covered |
+| tc-s02-002 | S02 | yes | covered-existing | forbidden claim list added | `test_chatgpt_authoring_managed_skill_contract`; `test_scaffold_docs_point_to_runtime_commands_and_rules_docs` | pass | reviewer/assurance/readiness/PR authority forbidden |
+| tc-s03-001 | S03 | yes | inspect-only | baseline lacked explicit modes | `test_chatgpt_authoring_managed_skill_contract` | pass | `zero-base`, `requirement-first`, `draft-adoption` present |
+| tc-s03-002 | S03 | yes | regression | existing names observed | managed skill inventory assertions | pass | existing skill names preserved and new skill appended |
+| tc-s04-001 | S04 | yes | inspect-only | docs README inspected | focused docs/skill test and file inspection | pass | ChatGPT authoring evidence lane discoverable |
+| tc-s05-001 | S05 | yes | red-required | managed skill missing before implementation | `uv run pytest tests/unit/infra/test_init_update.py -q` | pass | 546 passed |
+| tc-s05-002 | S05 | yes | negative | local wrapper path must not be formalized | scoped `rg -n "/Users/iwasawayuuta|\\.codex/skills/chatgpt-use|oracle-chatgpt" ...` over new/changed formal skill and touched regression-test surfaces | pass | broader `tests/` contains unrelated path-safety fixtures; this Issue verifies changed product workflow surfaces |
+| tc-s90-001 | S90 | yes | manual-required | first spec-review failed; re-review plus code/QA review passed after fixes | reviewer outputs | pass | all reviewer gates closed |
+| tc-s99-001 | S99 | yes | manual-required | implementation verification passed | final command queue | partial | commit/push/finish still pending |
+| tc-s99-002 | S99 | yes | manual-required | no per-Issue PR policy recorded | git/spec-dock lifecycle output | pending | commit/push/issue finish not yet run |
+
+## Closure Delta（クロージャ差分）
+
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| changed | CLOS-013 | tc-s90-001 | CLOS-013 | spec-reviewer P1 findings required stronger executable and delegation contracts; amended plan/report passed re-review | yes | no for planning gate; yes if implementation changes alter scope |
+
+## Implementation Delegation Gate（実装委任ゲート）
+
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S00 | approved-local-execution | main orchestrator may edit issue docs | N/A | active Issue docs only | active Issue docs and parent Epic docs | requirement/design/plan/report/.assurance binding | source/runtime/tests/installed assets | guidance, assurance classify/verify, validate, diff-check | assurance failure or authority leakage | canonical docs and EAL | pass |
+| S01 | approved-local-execution | read-only inspection | N/A | repo inspection only | provider install_root and installer code/tests | none | writes | inventory commands | source-of-truth unresolved | inventory summary | pass |
+| S02 | parent-implemented-with-approved-local-execution | shipped skill asset text was small and tightly coupled to test inventory | N/A | new ChatGPT authoring skill | requirement/design/plan | new provider and dogfooding skill file | runtime/local wrapper path | file inspection and focused assertions | authority leakage | changed files, summary, risks | pass |
+| S03 | parent-implemented-with-approved-local-execution | planning skill wording was a small routing update across adjacent installed skills | N/A | existing planning skill wording | requirement/design/plan | provider planning skill docs and dogfooding mirror | skill rename, runtime behavior | focused wording assertions | stop gate bypass | changed files, summary, risks | pass |
+| S04 | parent-implemented-with-approved-local-execution | installed docs discoverability was a one-line docs index update | N/A | docs README only | docs README and plan | minimal docs index update | broad workflow rewrite | docs inspection | scope expansion | changed docs or no-op rationale | pass |
+| S05 | parent-implemented-with-approved-local-execution | installer/test behavior required same-commit inventory alignment | N/A | focused installer/tests | requirement/design/plan and test suite | tests and `_MANAGED_SKILL_NAMES` | unrelated installer refactor | focused pytest and scan | non-hermetic test need | changed files, tests run | pass |
+| S90 | delegated | required reviewers | spec-reviewer / code-reviewer / qa-reviewer | read-only review | final diff and issue docs | none | edits/waiver-as-pass | reviewer_status pass | any non-pass | findings and status | planning spec-reviewer pass; code/QA pending after implementation |
+| S99 | approved-local-execution / spec-manager optional | lifecycle closeout | spec-manager optional | report evidence and issue lifecycle | final report and verified diff | report evidence and lifecycle commands | per-Issue PR | final command queue | missing closure or dirty post-commit | commit/push/finish evidence | pending |
+
+## Delegated Worker Evidence（委任 worker 証跡）
+
+| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+|---|---|---|---|---|---|---|---|
+| S02 | N/A | Parent Implementation Exception: minimal installed skill asset added locally to keep provider/test inventory atomic. | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`; `.agents/skills/spec-dock-chatgpt-authoring/SKILL.md` | focused tests, full installer test suite, path scan | pending reviewer | pending reviewer results | integrated |
+| S03 | N/A | Parent Implementation Exception: adjacent planning skill routing text updated locally. | provider and dogfooding `spec-dock-initiative-planning`, `spec-dock-epic-planning`, `spec-dock-issue-planning`, `spec-dock-hub` | focused tests, full installer test suite | pending reviewer | pending reviewer results | integrated |
+| S04 | N/A | Parent Implementation Exception: docs README entry updated locally. | `src/spec_dock/assets/spec_dock/docs/README.md`; `spec-dock/docs/README.md` | focused tests, full installer test suite | pending reviewer | pending reviewer results | integrated |
+| S05 | N/A | Parent Implementation Exception: managed inventory and regression tests updated locally with implementation. | `src/spec_dock/cli.py`; `tests/cli_runtime/harness.py`; `tests/cli_runtime/test_wrappers.py`; `tests/unit/infra/test_init_update.py` | focused tests, full installer test suite, path scan | pending reviewer | pending reviewer results | integrated |
+
+## No-PR Relay Policy（中間 Issue の PR defer 証跡）
+
+| 対象 | 方針 | 証跡 | 状態 |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| iss-00304 | Per-Issue PR を作成せず、PR delivery は `iss-00307` に defer する | parent Epic plan and `plan.md` Final Exit Contract | pending final closeout |
 
-## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+## マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 
-## 学んだこと (任意)
-- ...
+| マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） |
+|---|---|---|---|---|---|
+| planning | planning spec-review passed | canonical issue docs | not committed | pending | not a no-op |
 
-## 今後の推奨事項 (任意)
-- ...
+## 最終品質ゲート（Final Quality Gate）
 
-## 省略/例外メモ (必須)
-- 該当なし
+| Gate | Status | Evidence |
+|---|---|---|
+| focused tests | pass | `uv run pytest tests/cli_runtime/test_wrappers.py::TestCliRulesContract::test_scaffold_docs_point_to_runtime_commands_and_rules_docs tests/unit/infra/test_init_update.py::TestInitUpdate::test_chatgpt_authoring_managed_skill_contract tests/unit/infra/test_init_update.py::TestInitUpdate::test_bundled_skill_assets_cover_managed_manifest -q` |
+| full installer/update suite | pass | `uv run pytest tests/unit/infra/test_init_update.py -q` -> 546 passed |
+| `spec-dock validate` | pass | `spec-dock: ok (validate) nodes=202` |
+| `assurance verify` | pass | `assurance verify: ok`, authorized_profile=standard |
+| `git diff --check` | pass | no output |
+| local wrapper path scan | pass | no hits for `/Users/iwasawayuuta`, `.codex/skills/chatgpt-use`, or `oracle-chatgpt` in new/changed formal skill and regression-test surfaces |
+| no per-Issue PR | pending | final closeout evidence before `issue finish` |
