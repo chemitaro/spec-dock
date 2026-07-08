@@ -20,8 +20,8 @@ ID: "iss-00309"
 
 Material な判断がない場合もこの section は残し、次を明示する。
 
-- No material interpretation changes.
-- No decision entries.
+- D-001〜D-003 に、この Issue で採用した ChatGPT Use 直実行版、final quality relay 修正、final quality skip / template field 修正の判断を記録済み。
+- 未解決の decision entry はない。
 
 Ledger entry は次の契約値を使う。
 
@@ -50,6 +50,8 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | interpretation | orchestrator | ChatGPT Use 直実行版と SpecDock authoring script 経由版のどちらを採用するか | 直実行版を採用; script 経由版を採用; 両方を併用 | 検査可能な ZIP 実体が残った直実行版を正本候補に採用し、script 経由版は不採用 evidence とする | script 経由版は transcript だけが残り、ZIP の展開検査ができなかった。直実行版は ZIP listing / unsafe token scan / transcript render を確認できた | applied | EAL-006; EAL-007; `artifacts/20260708t162512z-manifest-chatgpt-formal-spec-pack.md` | script backend ZIP materialization は必要なら別 Issue で扱う |
+| D-002 | resolved | scope / relay | spec-reviewer | `iss-00309` が parent Epic の final quality relay から漏れていた | `iss-00309` を中間 Issue として relay に追加; この Issue が個別 PR を作る; final quality Issue 側だけで吸収 | `iss-00306 -> iss-00309 -> iss-00307` の依存に更新し、中間 Issue として final quality Issue へ送る | Parent Epic は複数 Issue を順に finish し、最後の final quality Issue で Epic-wide quality gate と mergeable PR を作る方針であるため、`iss-00309` も relay に含める必要がある | applied | `iss-00309/.meta.json`; `iss-00307/.meta.json`; parent Epic `plan.md` | なし |
+| D-003 | resolved | policy / template | spec-reviewer / qa-reviewer / code-reviewer | final quality skip policy と Epic plan template fields が薄く、multi-Issue implementation Epic が skip rationale だけで final quality Issue を省略できるように読めた | skip を single-Issue/docs-only/no-op に限定; multi-Issue でも skip rationale があれば許可; template fields は現状維持 | multi-Issue implementation Epic は final quality / PR delivery Issue を必須とし、single-Issue/docs-only/no-op 以外は Issue 作成前の別 accepted decision を必要とする。Epic plan template に final quality issue id、completion evidence、dependency-on-all-implementation-Issues、intermediate deferred PR delivery policy を追加する | REQ-012/REQ-013/AC-014 は final quality Issue と relay evidence を workflow contract として要求しており、template が証跡欄を持たないと将来の Epic planning が同じ漏れを再発させる | applied | M95 reviewer-fix evidence; `src/spec_dock/assets/spec_dock/templates/epic/plan.md`; `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` | なし |
 | D-002 | resolved | scope | spec-reviewer | `iss-00309` が parent Epic の final quality relay に接続されていない | `iss-00309` を例外扱いにする; `iss-00309` を `iss-00306 -> iss-00309 -> iss-00307` の relay に接続する | `iss-00309` は追加 implementation Issue として final quality Issue の前段に接続する | parent Epic は per-Issue PR delivery を禁じ、final quality Issue で PR delivery を行う方針であるため | applied | `./spec-dock/scripts/spec-dock deps add --from iss-00309 --to iss-00306`; `./spec-dock/scripts/spec-dock deps add --from iss-00307 --to iss-00309`; `epic-00295/plan.md` | なし |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
@@ -256,6 +258,137 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 ---
 
+### セッションログ（2026-07-09 02:30 - 03:20）
+
+#### 対象
+- Step: M1〜M7 / M90 partial — ChatGPT-first planning skills, manual backup skills, provider docs/templates, dogfood mirror, and managed skill registry
+- AC/EC: REQ-001〜REQ-019 / EC-001〜EC-010
+- 計画上の出典（Planned source）:
+  - `plan.md` section: 3. Allowed change surface / 5. Milestone overview / 9. 実装ステップ / 10. 具体テストケース
+  - closure ids: CLOS-001〜CLOS-009
+
+#### 実施内容
+- Provider-side installed skill assets に `spec-dock-initiative-planning-manual`、`spec-dock-epic-planning-manual`、`spec-dock-issue-planning-manual` を追加した。
+- 既存 planning skill 名は維持し、`spec-dock-initiative-planning` / `spec-dock-epic-planning` / `spec-dock-issue-planning` を ChatGPT-first primary route として明文化した。
+- `spec-dock-chatgpt-authoring` を、primary planning skills から呼ばれる evidence lane として再定義し、retryable / recoverable / blocked / stale / rejected / hard-unrecoverable の failure classification を追加した。
+- `_MANAGED_SKILL_NAMES` と test harness の managed skill expectation に manual backup skill 3件を追加した。
+- Workflow docs、authoring docs、Epic plan template、hub skill に、Option 3+、Issue draft lifecycle、final quality Issue policy、manual backup boundary、PlantUML 図を反映した。
+- `uv run spec-dock update .` で dogfooding mirror の `.agents/skills`、`spec-dock/docs`、`spec-dock/templates` を provider-side source of truth から更新した。
+
+#### 実行コマンド / 結果
+```bash
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_chatgpt_authoring_managed_skill_contract tests/unit/infra/test_init_update.py::TestInitUpdate::test_bundled_skill_assets_cover_managed_manifest
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_chatgpt_authoring_managed_skill_contract tests/unit/infra/test_init_update.py::TestInitUpdate::test_bundled_skill_assets_cover_managed_manifest tests/unit/infra/test_init_update.py::TestInitUpdate::test_bundled_skill_routing_contract
+git diff --check
+uv run spec-dock update .
+./spec-dock/scripts/spec-dock validate
+uv run pytest tests/cli_runtime
+```
+
+Observed result:
+- focused unit tests: pass
+- `git diff --check`: pass
+- `uv run spec-dock update .`: pass with existing repo-root shortcut warning
+- `./spec-dock/scripts/spec-dock validate`: pass (`nodes=203`)
+- `uv run pytest tests/cli_runtime`: pass (`1056 passed, 75 skipped`), re-run after M95 fix also pass (`1056 passed, 75 skipped`)
+- `uv run pytest tests/unit`: pass (`968 passed`)
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|---|
+| M1 | inspect/green | manual backup skills exist and state human-approved emergency backup | 3つの `-manual` skill を provider assets と dogfood mirror に追加 | `find`; `rg human-approved emergency backup` | pass | queued/retryable/recoverable failure では使わない境界を記載 |
+| M2 | inspect/green | primary planning skills are ChatGPT-first while names remain stable | 既存 planning skills に ChatGPT-first primary route と manual backup boundary を追加 | `rg ChatGPT-first primary route` | pass | canonical docs / EAL / fresh reviewer は planning skill が所有 |
+| M3 | inspect/green | ChatGPT authoring remains evidence-only and classifies failures | `spec-dock-chatgpt-authoring` に failure classification と forbidden claims を維持 | focused unit test / docs inspection | pass | hard-unrecoverable は explicit human approval 前提 |
+| M4 | green | managed registry installs manual skills | `_MANAGED_SKILL_NAMES` と test harness を更新 | focused unit test | pass | manual skills are copied by init/update |
+| M5 | inspect/green | workflow docs include Option 3+ / diagrams / manual boundary | provider docs と dogfood docs に PlantUML と workflow text を追加 | `rg Option 3+`; `rg Issue Draft To Canonical Planning And Execution` | pass | unsupported authoring commands は supported route として案内しない |
+| M6 | inspect/green | Epic plan template includes final quality and draft handoff fields | `templates/epic/plan.md` に classification / final quality / draft lifecycle を追加 | `rg final quality Issue policy` | pass | single-Issue/docs-only/no-op skip rationale を残せる |
+| M7 | green | dogfooding mirror reflects provider-first changes | `uv run spec-dock update .` で mirror 更新 | update command / `rg` / `validate` | pass | provider side remains source of truth |
+| M90 | green | focused regression and structural checks pass | focused unit tests, `diff --check`, `validate`, `tests/cli_runtime` | commands above | pass | `tests/cli_runtime`: `1056 passed, 75 skipped` |
+| M95 | red/review-fix | final reviewer blockers are repaired before pass claim | spec-reviewer P1 and qa-reviewer P1 on final quality template/policy | reviewer output; focused tests; `rg`; `git diff --check`; `tests/unit` | pass | P1 fixed by tightening skip eligibility and adding final quality relay template fields; `tests/unit`: `968 passed` |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| M1 | CLOS-002 | 3つの `-manual` skill が provider assets に存在し human approval boundary を持つ | provider / dogfood skill files; focused tests | pass | manual route is emergency backup only |
+| M2 | CLOS-001, CLOS-004 | 既存 planning skills が ChatGPT-first primary route を示す | `rg ChatGPT-first primary route`; focused tests | pass | primary skill names remain unchanged |
+| M3 | CLOS-003 | `spec-dock-chatgpt-authoring` が evidence-only boundary を保つ | forbidden claims section; focused tests | pass | failure classification added |
+| M4 | CLOS-006 | managed skill registry と init output に manual skills が含まれる | `_MANAGED_SKILL_NAMES`; focused init test | pass | order: primary route / execution / authoring lane / manual backups |
+| M5 | CLOS-004, CLOS-005, CLOS-007 | workflow docs に Option 3+ / final quality / diagrams が反映される | provider docs; dogfood docs; `rg` | pass | PlantUML uses quoted participant names and ASCII aliases |
+| M6 | CLOS-005, CLOS-007 | Epic plan template が final quality Issue policy と draft handoff index を持つ | provider template; dogfood template | pass | final quality skip rationale included |
+| M7 | CLOS-008 | dogfooding workspace が provider update の validation surface として整合する | `uv run spec-dock update .`; `validate` pass | pass | update warning was pre-existing shortcut skip |
+| M90 | CLOS-010 | relevant pytest / validate / diff check / grep checks を実行または blocker として記録する | focused tests pass; validate pass; diff check pass; `tests/cli_runtime` pass | pass | `tests/cli_runtime`: `1056 passed, 75 skipped` |
+| M95 | CLOS-005, CLOS-007, CLOS-010 | final reviewer P1 fixes applied | final quality skip policy constrained; template fields added; focused tests and `tests/unit` pass | pass | re-review pending |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
+|---|---|---|---|---|---|---|---|
+| TC-001 | M1〜M3 | yes | unit + inspect | skill baseline had no manual backup files | focused `test_chatgpt_authoring_managed_skill_contract`; `rg` | pass | primary/manual/evidence-only boundary covered |
+| TC-002 | M5〜M6 | yes | inspect | docs/template lacked complete Option 3+ route | `rg Option 3+`; `rg Issue Draft To Canonical Planning And Execution`; template grep | pass | diagrams and final quality policy included |
+| TC-003 | M4 | yes | unit + init simulation | managed manifest lacked manual skills | focused `test_bundled_skill_assets_cover_managed_manifest` | pass | harness updated |
+| TC-004 | M7〜M90 | yes | command | provider-first mirror needed validation | `./spec-dock/scripts/spec-dock validate`; `git diff --check` | pass | nodes=203 |
+| TC-005 | M5 | yes | inspect | unsupported commands must not be advertised as supported | `rg authoring adopt ...` | pass | only appears in Deferred / unsupported section |
+| TC-006 | M95 | yes | reviewer | initial final reviewers found P1/P2 final-quality template gaps | fix applied; reviewer re-run pending | pending | re-run after full unit verification |
+
+#### クロージャ網羅（Closure Coverage）
+| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
+|---|---|---|---|---|
+| CLOS-001 | M2 | planning skill diffs; focused test | pass | ChatGPT-first primary route |
+| CLOS-002 | M1 | manual skill files; focused test | pass | human-approved emergency backup |
+| CLOS-003 | M3 | authoring skill forbidden claims; focused test | pass | evidence-only lane |
+| CLOS-004 | M2/M5 | docs and skill text | pass | Option 3+ and just-in-time Issue planning |
+| CLOS-005 | M5/M6 | docs and template | pass | final quality Issue required/skipped |
+| CLOS-006 | M4 | managed skill registry test | pass | manual skills distributed |
+| CLOS-007 | M5/M6 | PlantUML grep / docs inspection | pass | workflow diagrams included |
+| CLOS-008 | M7 | provider-first update and dogfood validation | pass | `uv run spec-dock update .` |
+| CLOS-009 | M5 | unsupported command grep | pass | unsupported commands appear only as unsupported examples |
+| CLOS-010 | M90 | focused tests / validate / diff check / `tests/cli_runtime` | pass | final reviewer gates pending |
+| CLOS-010 | M95 | reviewer findings repair; focused tests; `tests/unit` | pass | spec/QA re-review pending |
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| added | CLOS-002 | TC-001 | CLOS-002 | manual backup skills を provider managed assets として追加 | no | yes |
+| changed | CLOS-006 | TC-003 | CLOS-006 | managed skill manifest に manual skill 3件を追加 | no | yes |
+| changed | CLOS-007 | TC-002 | CLOS-007 | Option 3+ と lifecycle PlantUML を docs/templates に追加 | no | yes |
+| changed | CLOS-005 | TC-002 / TC-006 | CLOS-005 | final quality Issue policy の skip eligibility と relay template fields が不足していた | no | pending re-review |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| M1〜M7 | approved-local-execution | scoped docs/skills/templates/test update after reviewer-passed plan | N/A | provider assets, dogfood mirror, focused tests | active Issue plan / provider source of truth | planned skills/docs/templates/registry/tests only | runtime command behavior beyond managed registry; unsupported authoring commands | focused unit tests; `validate`; `diff --check`; `tests/cli_runtime`; final reviewer gates | stop on failing tests or reviewer blockers | changed files, verification results, residual risks | pass; final reviewers pending |
+| M95 | approved-local-execution | reviewer-fail repair for docs/template/skill policy | N/A | final quality policy wording and template fields | reviewer findings / active Issue requirement | provider docs/templates/skills/tests and dogfood mirror | unrelated runtime behavior | focused failing tests; `rg`; `diff --check`; full unit re-run; reviewer re-run | stop if P1/P0 remains | fix evidence and re-review result | fix applied; focused tests and `tests/unit` pass; re-review pending |
+
+#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
+| マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
+|---|---|---|---|---|---|---|---|---|
+| M1〜M7/M90 | reviewed | ChatGPT-first planning route docs/skills/templates/tests | commit pending | pending | N/A | N/A | N/A | N/A |
+| M95 reviewer-fix | reviewed | final quality skip policy and template relay fields | commit pending | pending | N/A | N/A | N/A | N/A |
+
+#### 変更したファイル
+- Provider assets:
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning-manual/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning-manual/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning-manual/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-{initiative,epic,issue}-planning/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md`
+  - `src/spec_dock/assets/spec_dock/docs/**`
+  - `src/spec_dock/assets/spec_dock/templates/epic/plan.md`
+  - `src/spec_dock/cli.py`
+- Tests:
+  - `tests/cli_runtime/harness.py`
+  - `tests/unit/infra/test_init_update.py`
+- Dogfood mirror:
+  - `.agents/skills/**`
+  - `spec-dock/docs/**`
+  - `spec-dock/templates/epic/plan.md`
+
+#### メモ
+- This Issue directly implements planned provider-side docs/skills/templates/test changes. Final PR delivery for the parent Epic remains owned by the final quality Issue relay, but this Issue still needs local final reviewer gates before `issue finish`.
+- Initial final `spec-reviewer` failed with P1 findings on final-quality skip exceptions and Epic plan template fields. Initial `qa-reviewer` failed with the same template coverage as P1. `code-reviewer` passed with a P2 on the same template field gap. The implementation was tightened so multi-Issue implementation Epics require a final quality / PR delivery Issue, skip is limited to single-Issue/docs-only/no-op unless a separate accepted exception exists, and the Epic plan template now includes final quality issue id, completion evidence, dependency-on-all-implementation-Issues, and intermediate deferred PR delivery policy.
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
@@ -266,22 +399,22 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | not applicable before implementation | planning docs only at this point | pending |
+| qa-reviewer | whole issue obligation coverage | focused tests, full unit, validate, diff check, and cli_runtime re-run are adequate | initial P1 fixed; re-review pass with P2 stale ledger cleanup, which was fixed in D-003 | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | implementation not started | 0 | pending |
+| code-reviewer | issue-wide integrated diff | initial P2 final quality template gap fixed; re-review no findings | 1 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report alignment | initial P1/P2 findings fixed; re-review no findings | 1 | pass |
+| spec-reviewer | requirement / design / plan / report alignment | initial final P1/P2 findings fixed; M95 re-review no findings | 2 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| S00 planning review-fix ledger | Issue docs / parent relay metadata | final response / PR / issue comment | ready for implementation |
+| M1〜M95 implementation ledger | provider assets / dogfood mirror / tests / report | final response / PR / issue comment | ready for commit |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: `iss-00309` が parent Epic の final quality relay から漏れていた。

@@ -49,7 +49,8 @@ Epic は設計の背骨です。
 - `design.md`: 契約、移行、観測性、リスク
 - `plan.md`: Issue 分割、依存順、品質ゲート。shared axiom は `phase_plan.md`、Epic 固有の書き方は `phase_plan_epic.md`
 - Epic は複数 Issue の設計の背骨を所有する。Issue 分割、責務境界、依存方向、shared component / workflow policy、rollout 順に影響する durable decision は Epic requirement / design / plan に反映してから Issue へ落とす。Epic をまたいで product / operating model / 投資判断へ広がる場合は Initiative へ戻し、長期 architecture decision として独立に記録すべき場合は ADR 候補にする。責務境界と authority flow の共通参照は [authoring/scope-layering.md](authoring/scope-layering.md)、routing 例は [authoring/decision-routing.md](authoring/decision-routing.md) を参照する
-- ChatGPT / Oracle は Epic requirement / design / plan と Issue draft requirement / draft design / draft plan の evidence producer として使える。Issue candidate / draft は正本ではなく、Issue node 作成前に人間の承認を通す。作成後の draft adoption は Issue planning が正式 docs へ採用し、fresh `spec-reviewer` pass を通す
+- ChatGPT / Oracle は非自明な Epic planning の ChatGPT-first primary route として、Epic requirement / design / plan と Issue draft requirement / draft design / draft plan の evidence producer に使う。Issue candidate / draft は正本ではなく、Issue node 作成前に人間の承認を通す。作成後の draft adoption は Issue planning が正式 docs へ採用し、fresh `spec-reviewer` pass を通す
+- `spec-dock-epic-planning-manual` は human-approved emergency backup であり、hard / unrecoverable ChatGPT route failure と recovery attempts、explicit approval、fresh reviewer gate の evidence がある場合だけ使う
 - Requirement / design / plan の phase promotion は `workflow_spec_authoring.md` を正本にし、各 artifact ごとに fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
 - `artifacts/`: `new artifact <type> --epic <epic-id> --title "..."` で、この epic の `artifacts/` 配下に timestamp-prefixed original を作成する。current catalog は `blank` / `adr` / `disc` / `research` / `interview` / `decision-candidate` / `pr-repair-batch`。`draft-requirement` / `draft-design` / `draft-plan` は Issue-only artifact として扱う。runtime が filename / path を生成し、caller は stdout の `path=...` を正本として扱う。標準形は `<ts>-<kind>-<slug>.md`、same-second collision fallback は `<ts>-<nn>-<kind>-<slug>.md`。既存 `discussions/` 配下の artifact は legacy/grandfathered として保持する。詳細 contract は [reference_naming.md](reference_naming.md) を参照する
 - `note` は新規作成 catalog から retired。既存 `note` artifact は grandfathered として壊さない。
@@ -79,6 +80,29 @@ Cross-issue draft package は planning evidence であり、Issue の canonical 
 
 Target Issue が draft-requirement、`draft-design`、`draft-plan` の一部または全部を意図的に受け取らない場合、Epic report / handoff evidence は target Issue id、skipped draft type(s)、理由、その omission が Issue planning handoff を block しない理由、必要に応じた revisit / follow-up condition を記録します。
 
+Option 3+ は正式な Epic planning baseline です。Epic planning では Issue slices、dependency order、Issue-local draft path index までをまとめて作成し、canonical Issue docs は各 Issue start 前後の Issue planning で current repository state と prior completed Issues を踏まえて正式化します。全 Issue を先に canonical execution-ready 化しないことで drift を抑え、draft だけでは拾いにくい Issue 間不整合は Epic execution 中の integration checkpoint と final quality Issue で検出します。
+
+```plantuml
+@startuml
+title Issue Draft To Canonical Planning And Execution
+skinparam monochrome true
+participant "Epic Planning" as EpicPlanning
+participant "Issue Draft Artifacts" as Drafts
+participant "Issue Planning" as IssuePlanning
+participant "Issue Execution" as IssueExecution
+participant "Epic Planning Repair" as Repair
+
+EpicPlanning -> Drafts : create draft requirement/design/plan
+Drafts -> IssuePlanning : handoff-ready evidence
+IssuePlanning -> IssuePlanning : refresh current repo and prior Issues
+IssuePlanning -> IssuePlanning : adopt / reject draft claims
+IssuePlanning -> IssueExecution : execution-ready after reviewer pass
+IssueExecution -> IssuePlanning : next Issue starts just-in-time planning
+IssuePlanning -> Repair : scope drift changes Epic boundary
+Repair -> EpicPlanning : revise slices / dependency order
+@enduml
+```
+
 Downstream Issue は、Epic planning outputs とこの completion / handoff contract を input として参照できます。各 downstream Issue は、Epic plan が dependency edge を明示しない限り独立した Issue として扱います。Epic execution coordinator は downstream Issue handoff package を読み、`handoff-ready` と `execution-ready` を分けます。`handoff-ready` は Issue planning へ渡せる状態であり、canonical Issue `design.md` / `plan.md` が compose 前でもよいが実装開始は許可しません。`execution-ready` は Issue planning が evidence 採否、canonical compose、fresh `spec-reviewer` pass、実行可能 plan、required verification、delegation contract、reviewer focus を揃えた状態です。Epic execution coordinator behavior、issue start / finish cycle、PR merge-ready preparation は、later Issue が明示的に定義しない限り、この Epic planning handoff section の外側に置きます。
 
 ## 実行ライフサイクル（Epic Execution Lifecycle）
@@ -91,7 +115,7 @@ Issue 実装後の PR delivery は通常 `github-pr-merge-preparer` へ handoff 
 
 日本語運用では、Epic execution / readiness 中に作成・更新する docs、`report.md`、artifacts の本文は日本語ファーストにします。commands、paths、IDs、role 名などの正確な識別子はそのまま保持します。
 
-Epic completion gate は、required Issues が完了済みまたは fresh spec-reviewed plan により明示的に不要化され、Epic-level evidence、品質ゲート、PR handoff expectation が揃った状態です。no-op / small Epic でも、不要な Issue を作らず、skipped-work rationale と completion evidence を Epic `report.md` に残します。
+Epic completion gate は、required Issues が完了済みまたは fresh spec-reviewed plan により明示的に不要化され、Epic-level evidence、品質ゲート、PR handoff expectation が揃った状態です。multi-Issue implementation Epic は final quality / PR delivery Issue を持ち、その Issue はすべての implementation Issues に依存します。single-Issue / docs-only / no-op Epic で final quality Issue を省略する場合は、skipped-work rationale と completion evidence を Epic `report.md` に残します。それ以外の省略例外は Issue 作成前に別途 accepted decision を必要とします。
 
 ## 品質ゲート
 

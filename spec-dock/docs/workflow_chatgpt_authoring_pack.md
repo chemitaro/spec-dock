@@ -6,10 +6,40 @@ Operational entrypoint は `.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`
 ## 基本原則
 
 - ChatGPT / Oracle output は常に `authority: evidence_only` として扱う。
+- ChatGPT-first planning route は、非自明な Initiative / Epic / Issue planning の正規 evidence-production route である。`spec-dock-chatgpt-authoring` は evidence lane であり、canonical adoption は各 planning skill が所有する。
 - ZIP / tree / staged evidence / candidate validation / approval check の `pass` は command-local validation pass であり、canonical adoption、fresh reviewer pass、execution-ready、PR-ready、merge-ready ではない。
 - canonical `requirement.md` / `design.md` / `plan.md` / `report.md` の single-writer は main orchestrator である。
 - ChatGPT evidence を採用する場合、main orchestrator が Evidence Adoption Ledger に採否を記録し、canonical docsへ再記述し、fresh reviewer gate を通す。
 - reviewed Epic plan が final delivery Issue を明示している場合だけ、中間 Issue は個別 PR を作らず、relay-style に `issue finish` から次 Issue の `issue start` へ進む。それ以外の multi-Issue Epic では通常の PR Delivery / Merge Preparation Gate に従う。
+- Capacity limit、queued tab、retryable timeout、recoverable browser/backend failure は wait / retry / recover で扱う。manual planning skill は hard / unrecoverable failure と user-approved emergency backup evidence がある場合だけ使う。
+
+## 正規計画と送達の全体像（ChatGPT First SpecDock Planning And Delivery Workflow）
+
+```plantuml
+@startuml
+title ChatGPT First SpecDock Planning And Delivery Workflow
+skinparam monochrome true
+actor Human
+participant "Planning Skill" as Planning
+participant "ChatGPT Authoring Evidence Lane" as ChatGPT
+participant "Report / EAL" as Report
+participant "Spec Reviewer" as Reviewer
+participant "Issue Execution" as Execution
+participant "Final Quality Issue" as FinalGate
+
+Human -> Planning : clarify scope / approve slices
+Planning -> ChatGPT : request ZIP/tree evidence
+ChatGPT --> Planning : evidence-only candidates
+Planning -> Report : adopt / reject claims
+Planning -> Reviewer : review canonical docs
+Reviewer --> Planning : review_status pass
+Planning -> Execution : handoff execution-ready Issue
+Execution -> FinalGate : relay after each Issue finish
+FinalGate -> Human : mergeable PR evidence
+@enduml
+```
+
+この図の `ChatGPT Authoring Evidence Lane` は reviewer pass や execution-ready を付与しない。採用判断、canonical rewrite、fresh reviewer gate、Issue relay、final quality / PR delivery は SpecDock 側 workflow が所有する。
 
 ## 証跡モード（Evidence mode）
 

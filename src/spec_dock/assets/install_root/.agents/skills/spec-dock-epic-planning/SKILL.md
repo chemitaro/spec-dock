@@ -11,7 +11,11 @@ This skill is an operational kernel. Keep detailed policy in docs and keep globa
 
 Contract anchor: create/import an epic when no existing Epic fits; capture scope-specific constraints and decisions before Issue handoff; record Spec Authoring Gate evidence after fresh `spec-reviewer` pass.
 
-ChatGPT authoring relationship: `spec-dock-chatgpt-authoring` may provide Epic planning evidence, ZIP/tree output, Issue draft artifacts, candidate reports, or handoff indexes. Those outputs are evidence-only; Epic planning still owns Issue slicing, Evidence Adoption Ledger entries, and human approval before Issue node creation. Canonical Issue docs remain Issue planning outputs.
+ChatGPT-first primary route: for non-trivial Epic planning, use `spec-dock-chatgpt-authoring` as the primary evidence-production route for Epic requirement/design/plan candidates, Issue slicing, Issue-local draft requirement/design/plan artifacts, dependency order, and final quality Issue policy. If ChatGPT/browser/backend capacity is busy, wait and retry; if automation is unhealthy, recover or restart the browser/backend and retry. Do not switch to manual planning for queued tabs, retryable timeouts, stale sync, or fixable prompt/backend setup.
+
+Manual backup route: use `spec-dock-epic-planning-manual` only after hard / unrecoverable ChatGPT route failure and explicit human approval. Record the failure class, recovery attempts, approval evidence, and manual-route decision in Epic `report.md`.
+
+ChatGPT authoring relationship: `spec-dock-chatgpt-authoring` may provide Epic planning evidence, ZIP/tree output, Issue draft artifacts, candidate reports, or handoff indexes. Those outputs are evidence-only; Epic planning still owns Issue slicing, Evidence Adoption Ledger entries, fresh `spec-reviewer` pass, and human approval before Issue node creation. Canonical Issue docs remain Issue planning outputs.
 
 ## Read First
 
@@ -41,6 +45,8 @@ ChatGPT authoring relationship: `spec-dock-chatgpt-authoring` may provide Epic p
    - If the target Epic does not exist yet and the parent Initiative is known, create only attachment inventory and fit analysis under the parent Initiative `artifacts/`; after Epic creation, adopt the relevant research into Epic `artifacts/` and record the move/adoption in `report.md`.
    - If both target Epic and parent Initiative are unknown, do not create durable repo artifacts yet; keep only session-local inventory in the host/session temp area outside canonical docs, resolve parent scope, then create scope-local artifacts.
    - Do not ask the user about facts or constraints available from repo docs, artifacts, code, tests, templates, ADRs, or attachment contents.
+   - For non-trivial scope, prepare a ChatGPT-first evidence request with repo/branch or local-context evidence and an explicit ZIP/tree output contract for Epic docs plus Issue draft artifacts.
+   - Adopt only source-grounded claims through `report.md`; rewrite canonical Epic docs locally and obtain fresh reviewer pass after integration.
 3. Route decisions before writing.
    - Epic owns cross-Issue scope, backbone design, Issue slicing, Issue dependency, and handoff package decisions.
    - Route cross-Epic operating/product decisions to Initiative.
@@ -60,6 +66,8 @@ ChatGPT authoring relationship: `spec-dock-chatgpt-authoring` may provide Epic p
    - Epic planning may create Issue-local `artifacts/` evidence such as `draft-design`, `draft-plan`, and a path index.
    - ChatGPT / Oracle ZIP/tree output may be staged as Issue draft evidence, but it is not canonical adoption and is not execution-ready.
    - Canonical Issue `design.md` / `plan.md` remain Issue planning outputs; do not finalize them during Epic planning.
+   - Under Option 3+, Epic planning creates Issue-local draft artifacts and an Issue draft path index; Issue planning later formalizes each Issue just-in-time before execution using current repository state and prior completed Issues.
+   - Multi-Issue implementation Epics need a final quality / PR delivery Issue. Skip rationale is valid only for single-Issue, docs-only, or no-op Epics with completion evidence; any other exception needs a separately accepted decision before Issue creation.
 
 ## Stop Conditions
 
@@ -69,5 +77,6 @@ ChatGPT authoring relationship: `spec-dock-chatgpt-authoring` may provide Epic p
 - Requirement / design / plan candidate changed after review and lacks a fresh `spec-reviewer` pass.
 - Specialist output has not been adopted into canonical docs and `report.md`.
 - ChatGPT / Oracle ZIP/tree output or Issue draft artifacts have not been reviewed and adopted or rejected in `report.md`.
+- ChatGPT-first route has a retryable, recoverable, waiting, or setup failure and manual backup has not been explicitly approved by the user.
 - Issue node creation lacks explicit human approval.
 - Issue handoff would require execution-ready claims for template-only, draft-only, or unreviewed Issue docs.
