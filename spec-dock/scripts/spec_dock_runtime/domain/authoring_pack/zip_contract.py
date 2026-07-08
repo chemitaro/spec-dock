@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import json
 from pathlib import Path, PurePosixPath
 from typing import Literal
@@ -48,6 +49,7 @@ class PackReviewResult:
     missing_evidence: tuple[str, ...] = ()
     findings: tuple[str, ...] = ()
     reviewed_files: tuple[str, ...] = ()
+    content_sha256: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -63,6 +65,10 @@ class PackReviewResult:
             "missing_evidence": list(self.missing_evidence),
             "findings": list(self.findings),
             "reviewed_files": list(self.reviewed_files),
+            "pack_digest": {
+                "algorithm": "sha256-tree-v1",
+                "content_sha256": self.content_sha256,
+            },
         }
 
 
@@ -97,6 +103,7 @@ def _review_zip(input_path: Path) -> PackReviewResult:
     findings: list[str] = []
     payloads: dict[str, str] = {}
     reviewed_files: list[str] = []
+    digest_entries: list[tuple[str, bytes]] = []
     total_size = 0
     root = EXPECTED_OUTPUT_ROOT.rstrip("/")
     with zipfile.ZipFile(input_path) as archive:
@@ -113,9 +120,15 @@ def _review_zip(input_path: Path) -> PackReviewResult:
                 continue
             _validate_entry(info, rel_name, findings)
             reviewed_files.append(rel_name)
+            try:
+                content = archive.read(info)
+            except (RuntimeError, zipfile.BadZipFile):
+                findings.append(f"unreadable_payload:{rel_name}")
+                continue
+            digest_entries.append((rel_name, content))
             if _can_read_text_payload(info, rel_name):
                 try:
-                    payloads[rel_name] = archive.read(info).decode("utf-8")
+                    payloads[rel_name] = content.decode("utf-8")
                 except (RuntimeError, zipfile.BadZipFile):
                     findings.append(f"unreadable_payload:{rel_name}")
                 except UnicodeDecodeError:
@@ -130,6 +143,9 @@ def _review_zip(input_path: Path) -> PackReviewResult:
         input_kind="zip",
         findings=tuple(dict.fromkeys(findings)),
         reviewed_files=tuple(sorted(reviewed_files)),
+        content_sha256=_content_digest(digest_entries)
+        if _status_from_findings(tuple(findings), metadata_status) == "pass"
+        else None,
     )
 
 
@@ -137,6 +153,7 @@ def _review_tree(input_path: Path) -> PackReviewResult:
     findings: list[str] = []
     payloads: dict[str, str] = {}
     reviewed_files: list[str] = []
+    digest_entries: list[tuple[str, bytes]] = []
     root = input_path / EXPECTED_OUTPUT_ROOT.rstrip("/")
     if root.is_symlink():
         findings.append("symlink_entry:specdock-authoring-pack")
@@ -156,9 +173,15 @@ def _review_tree(input_path: Path) -> PackReviewResult:
                 continue
             _validate_tree_entry(path, rel_name, findings)
             reviewed_files.append(rel_name)
+            try:
+                content = path.read_bytes()
+            except OSError:
+                findings.append(f"unreadable_payload:{rel_name}")
+                continue
+            digest_entries.append((rel_name, content))
             if _is_supported_text(rel_name):
                 try:
-                    payloads[rel_name] = path.read_text(encoding="utf-8")
+                    payloads[rel_name] = content.decode("utf-8")
                 except UnicodeDecodeError:
                     findings.append(f"binary_payload:{rel_name}")
         _validate_metadata(payloads, findings)
@@ -172,6 +195,9 @@ def _review_tree(input_path: Path) -> PackReviewResult:
         missing_evidence=("zip-central-directory",),
         findings=tuple(dict.fromkeys(findings)),
         reviewed_files=tuple(sorted(reviewed_files)),
+        content_sha256=_content_digest(digest_entries)
+        if _status_from_findings(tuple(findings), "pass") == "pass"
+        else None,
     )
 
 
@@ -185,6 +211,9 @@ def _relative_name(name: str, root: str, findings: list[str]) -> str | None:
 
 
 def _validate_relative_path(rel_name: str, findings: list[str]) -> None:
+    if "\\" in rel_name:
+        findings.append(f"path_separator_backslash:{rel_name}")
+        return
     path = PurePosixPath(rel_name)
     if path.is_absolute() or any(part == ".." for part in path.parts):
         findings.append(f"path_traversal:{rel_name}")
@@ -310,3 +339,13 @@ def _is_rejected_finding(finding: str) -> bool:
 
 def _is_supported_text(rel_name: str) -> bool:
     return PurePosixPath(rel_name).suffix.lower() in SUPPORTED_TEXT_SUFFIXES
+
+
+def _content_digest(entries: list[tuple[str, bytes]]) -> str:
+    digest = hashlib.sha256()
+    for rel_name, content in sorted(entries):
+        digest.update(rel_name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(content).hexdigest().encode("ascii"))
+        digest.update(b"\0")
+    return digest.hexdigest()

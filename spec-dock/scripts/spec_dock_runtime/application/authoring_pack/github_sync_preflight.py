@@ -62,6 +62,11 @@ def run_github_sync_preflight(
     if _git_stdout(repo_root, "remote", "get-url", "origin", check=False) is None:
         blockers.append("origin_missing")
         remediation.append("configure origin before GitHub-synced authoring preflight")
+    else:
+        fetch_error = _refresh_origin(repo_root)
+        if fetch_error is not None:
+            blockers.append("origin_fetch_failed")
+            remediation.append("fetch origin before GitHub-synced authoring preflight")
 
     upstream = _git_stdout(repo_root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}", check=False)
     if upstream is None:
@@ -264,6 +269,19 @@ def _observe_origin_ref(repo_root: Path, requested_ref: str | None, allow_fallba
             remediation=("fetch the fallback branch before authoring preflight",),
         )
     return GitVisibleRef("resolved", requested_ref, effective_ref, fallback_head)
+
+
+def _refresh_origin(repo_root: Path) -> str | None:
+    p = subprocess.run(
+        ["git", "fetch", "--prune", "origin"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if p.returncode != 0:
+        return (p.stderr or p.stdout or "git fetch origin failed").strip()
+    return None
 
 
 def _ahead_behind(repo_root: Path, effective_ref: str | None) -> tuple[int, int]:
