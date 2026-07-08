@@ -238,7 +238,7 @@ def validate_prompt_pack(prompt_pack: Path) -> PromptPackValidation:
 def _read_json(path: Path, blockers: list[str], label: str) -> dict[str, Any] | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         blockers.append(f"{label}_json_unreadable")
         return None
     if not isinstance(payload, dict):
@@ -249,11 +249,13 @@ def _read_json(path: Path, blockers: list[str], label: str) -> dict[str, Any] | 
 
 def _symlink_path_blocker(path: Path) -> str | None:
     current = path if path.is_absolute() else Path.cwd() / path
+    if current.is_symlink():
+        return "prompt_pack_symlink_path"
     try:
-        relative = current.relative_to(Path.cwd())
+        relative = current.resolve(strict=False).relative_to(Path.cwd().resolve())
     except ValueError:
-        relative = Path(current.name)
-    probe = Path.cwd()
+        return None
+    probe = Path.cwd().resolve()
     for part in relative.parts:
         probe = probe / part
         if probe.is_symlink():
@@ -330,7 +332,7 @@ def _backend_attachment_files(prompt_pack: Path) -> tuple[str, ...]:
     files = list(BACKEND_PROMPT_PACK_FILES)
     try:
         manifest = json.loads((prompt_pack / "manifest.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return tuple(files)
     if not isinstance(manifest, dict):
         return tuple(files)

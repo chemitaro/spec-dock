@@ -3866,6 +3866,75 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert all("__pycache__" not in path for path in payload["source_hashes"])
             assert all(not path.endswith(".pyc") for path in payload["source_hashes"])
 
+    def test_authoring_preflight_rejects_symlinked_source_manifest_inputs(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = _create_synced_git_repo(root)
+            outside = root / "outside.txt"
+            outside.write_text("secret\n", encoding="utf-8")
+            package = repo / "package"
+            package.mkdir()
+            (package / "safe.py").write_text("VALUE = 1\n", encoding="utf-8")
+            (package / "linked.py").symlink_to(outside)
+            source_link = repo / "source-link.txt"
+            source_link.symlink_to(outside)
+
+            child_payload = _run_preflight_json(
+                self,
+                repo,
+                "--evidence-mode",
+                "local-context",
+                "--source-path",
+                "package",
+                "--diff-summary",
+                "local source manifest fixture",
+                "--unsynced-reason",
+                "testing symlink rejection",
+                expected_returncode=1,
+            )
+            direct_payload = _run_preflight_json(
+                self,
+                repo,
+                "--evidence-mode",
+                "local-context",
+                "--source-path",
+                "source-link.txt",
+                "--diff-summary",
+                "local source manifest fixture",
+                "--unsynced-reason",
+                "testing symlink rejection",
+                expected_returncode=1,
+            )
+
+            assert child_payload["status"] == "blocked"
+            assert "unsafe_source_path:symlink:package/linked.py" in child_payload["blockers"]
+            assert "package/linked.py" not in child_payload["source_hashes"]
+            assert direct_payload["status"] == "blocked"
+            assert "unsafe_source_path:symlink:source-link.txt" in direct_payload["blockers"]
+            assert "source-link.txt" not in direct_payload["source_hashes"]
+
+    def test_authoring_preflight_rejects_missing_local_context_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+
+            payload = _run_preflight_json(
+                self,
+                repo,
+                "--evidence-mode",
+                "local-context",
+                "--provided-context-path",
+                "missing.md",
+                "--unsynced-reason",
+                "testing missing context rejection",
+                expected_returncode=1,
+            )
+
+            assert payload["status"] == "blocked"
+            assert "missing_context_path:missing.md" in payload["blockers"]
+            assert payload["provided_context_paths"] == ["missing.md"]
+
     def test_authoring_preflight_github_sync_compares_expected_manifest_hash(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -5687,6 +5756,37 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert "prompt_pack_symlink_path" in payload["blockers"]
             assert (output_dir / "invocation-summary.json").is_file()
 
+    def test_authoring_backend_invoke_rejects_absolute_symlink_prompt_pack_outside_repo(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = _create_synced_git_repo(root)
+            pack = _write_valid_prompt_pack(repo / "pack")
+            link = root / "external-pack-link"
+            link.symlink_to(pack, target_is_directory=True)
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(link),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert "prompt_pack_symlink_path" in payload["blockers"]
+
     def test_authoring_backend_invoke_cli_backend_command_overrides_env_and_dry_run_skips_execution(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -5984,6 +6084,35 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert missing.returncode == 1, missing.stdout + missing.stderr
             assert missing_payload["status"] == "blocked"
             assert "missing_manifest_field:schema_version" in missing_payload["blockers"]
+
+    def test_authoring_backend_invoke_invalid_utf8_metadata_returns_json_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            (pack / "manifest.json").write_bytes(b"\xff")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    sys.executable,
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert "manifest_json_unreadable" in payload["blockers"]
 
     def test_authoring_backend_invoke_rejects_manifest_files_outside_prompt_pack(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
