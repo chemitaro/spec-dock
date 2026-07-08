@@ -15,16 +15,6 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 _DEFERRED_COMMANDS = (
     (
-        ["authoring", "validate", "initiative-epic-candidates"],
-        "authoring validate initiative-epic-candidates",
-        "iss-00302",
-    ),
-    (
-        ["authoring", "validate", "epic-issue-candidates"],
-        "authoring validate epic-issue-candidates",
-        "iss-00302",
-    ),
-    (
         ["authoring", "validate", "issue-draft-adoption"],
         "authoring validate issue-draft-adoption",
         "iss-00303",
@@ -125,6 +115,398 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert "--dry-run" in p.stdout
             assert "--format" in p.stdout
             assert "Deferred ZIP staging skeleton" not in p.stdout
+
+    def test_authoring_validate_initiative_epic_candidates_help_exposes_implemented_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            p = self._run_runtime_capture(target, ["authoring", "validate", "initiative-epic-candidates", "--help"])
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "--input" in p.stdout
+            assert "--expected-parent-initiative" in p.stdout
+            assert "--review-report" in p.stdout
+            assert "--report-path" in p.stdout
+            assert "Deferred" not in p.stdout
+
+    def test_authoring_validate_epic_issue_candidates_help_exposes_implemented_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            p = self._run_runtime_capture(target, ["authoring", "validate", "epic-issue-candidates", "--help"])
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "--input" in p.stdout
+            assert "--expected-parent-epic" in p.stdout
+            assert "--review-report" in p.stdout
+            assert "--report-path" in p.stdout
+            assert "Deferred" not in p.stdout
+
+    def test_authoring_validate_initiative_epic_candidates_valid_stage_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "initiative", kind="initiative-epic")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "initiative-epic-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-initiative",
+                    "init-local-00003",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert payload["authority"] == "evidence_only"
+            assert payload["adoption_status"] == "unreviewed"
+            assert payload["candidate_kind"] == "initiative-epic"
+            assert payload["candidate_count"] == 2
+            assert payload["valid_candidate_count"] == 2
+            assert payload["node_creation_performed"] is False
+            assert payload["canonical_written"] is False
+            assert payload["assurance_mutated"] is False
+            assert payload["reviewer_pass_claimed"] is False
+            assert payload["execution_ready"] is False
+            assert payload["pr_ready"] is False
+
+    def test_authoring_validate_epic_issue_candidates_valid_stage_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "issue", kind="epic-issue")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "epic-issue-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-epic",
+                    "epic-00295",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert payload["candidate_kind"] == "epic-issue"
+            assert payload["candidate_count"] == 3
+            assert payload["valid_candidate_count"] == 3
+            assert payload["review_gate_passed"] is True
+
+    def test_authoring_validate_candidates_accepts_documented_source_manifest_hash_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "source-flag", kind="epic-issue")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "epic-issue-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-epic",
+                    "epic-00295",
+                    "--expected-source-manifest-hash",
+                    "hash",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert payload["expected_source_manifest_hash"] == "hash"
+            assert payload["observed_source_manifest_hash"] == "hash"
+
+    @pytest.mark.parametrize(
+        ("review_status", "expected_status"),
+        (
+            ("stale", "stale"),
+            ("rejected", "rejected"),
+            ("fail", "fail"),
+            ("blocked", "blocked"),
+            ("needs-human", "blocked"),
+        ),
+    )
+    def test_authoring_validate_review_report_non_pass_statuses_skip_candidates(
+        self, review_status: str, expected_status: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / review_status,
+                kind="epic-issue",
+                review_status=review_status,
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "epic-issue-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-epic",
+                    "epic-00295",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == expected_status
+            assert payload["review_status"] == review_status
+            assert payload["review_gate_passed"] is False
+            assert payload["candidate_count"] == 0
+
+    @pytest.mark.parametrize(
+        ("mutator", "expected_status", "finding"),
+        (
+            ("parent-mismatch", "stale", "parent_epic_mismatch"),
+            ("source-hash-mismatch", "stale", "source_manifest_hash_mismatch"),
+            ("review-digest-mismatch", "stale", "review_digest_mismatch"),
+            ("duplicate-id", "fail", "duplicate_candidate_id"),
+            ("overlap", "fail", "overlapping_boundary"),
+            ("missing-authority-claims", "fail", "authority_claims"),
+            ("invalid-schema-version", "fail", "invalid_schema_version"),
+            ("unsupported-grade", "fail", "unsupported_grade"),
+            ("unsupported-profile", "fail", "unsupported_profile"),
+            ("authorized-profile", "rejected", "authorized_profile"),
+            ("secret-text", "rejected", "secret_like_payload:token"),
+            ("raw-transcript", "rejected", "raw_transcript:raw transcript"),
+            ("forbidden-claim", "rejected", "forbidden_authority_claim:pr-ready"),
+            ("path-traversal", "rejected", "path_traversal"),
+            ("host-local-path", "rejected", "host_local_path"),
+            ("secret-path", "rejected", "secret_path"),
+            ("secret-draft-path", "rejected", "secret_path"),
+            ("hidden-path", "rejected", "hidden_path"),
+            ("unsupported-suffix", "rejected", "unsupported_suffix"),
+            ("symlink-draft", "rejected", "symlink_entry"),
+            ("executable-draft", "rejected", "executable_entry"),
+            ("binary-draft", "rejected", "binary_payload"),
+            ("oversized-draft", "rejected", "oversized_entry"),
+            ("empty-index", "fail", "empty_candidates"),
+        ),
+    )
+    def test_authoring_validate_epic_issue_candidates_negative_contracts(
+        self, mutator: str, expected_status: str, finding: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / mutator,
+                kind="epic-issue",
+                mutator=mutator,
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "epic-issue-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-epic",
+                    "epic-00295",
+                    "--expected-source-hash",
+                    "hash",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == expected_status
+            assert finding in json.dumps(payload, sort_keys=True)
+            assert "abc123secret" not in p.stdout
+
+    def test_authoring_validate_candidates_rejects_unsafe_report_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "report", kind="epic-issue")
+            unsafe_report = repo / "spec-dock" / "active" / "issue" / "artifacts" / "candidate-report.json"
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "epic-issue-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-epic",
+                    "epic-00295",
+                    "--report-path",
+                    str(unsafe_report),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == "rejected"
+            assert "unsafe_report_path:canonical-docs" in payload["findings"]
+            assert not unsafe_report.exists()
+
+    @pytest.mark.parametrize(
+        ("report_name", "expected_finding"),
+        (
+            (".assurance.json", "unsafe_report_path:assurance"),
+            ("symlink-report.json", "unsafe_report_path:symlink"),
+        ),
+    )
+    def test_authoring_validate_candidates_rejects_other_unsafe_report_paths(
+        self, report_name: str, expected_finding: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / report_name, kind="epic-issue")
+            report_path = repo / ".specdock-authoring" / report_name
+            if report_name == "symlink-report.json":
+                outside = repo / "outside-report.json"
+                outside.write_text("", encoding="utf-8")
+                report_path.symlink_to(outside)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "epic-issue-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-epic",
+                    "epic-00295",
+                    "--report-path",
+                    str(report_path),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == "rejected"
+            assert expected_finding in payload["findings"]
+
+    def test_authoring_validate_candidates_handles_binary_review_report_without_traceback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "binary-report", kind="epic-issue")
+            review_report = repo / "binary-review-report.json"
+            review_report.write_bytes(b"\xff\xfe\x00")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "epic-issue-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-epic",
+                    "epic-00295",
+                    "--review-report",
+                    str(review_report),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == "fail"
+            assert payload["findings"] == ["malformed_review_report"]
+            assert "Traceback" not in p.stderr
+
+    def test_authoring_validate_initiative_epic_candidates_rejects_unknown_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / "unknown-epic-dependency",
+                kind="initiative-epic",
+                mutator="unknown-epic-dependency",
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "initiative-epic-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-initiative",
+                    "init-local-00003",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == "fail"
+            assert "unknown_epic_candidate_dependency" in json.dumps(payload, sort_keys=True)
+
+    def test_authoring_validate_initiative_epic_candidates_accepts_same_index_forward_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / "forward-epic-dependency",
+                kind="initiative-epic",
+                mutator="forward-epic-dependency",
+            )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "initiative-epic-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-initiative",
+                    "init-local-00003",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
 
     @pytest.mark.parametrize(("args", "command", "next_issue"), _DEFERRED_COMMANDS)
     def test_authoring_deferred_commands_fail_closed_with_stable_diagnostics(
@@ -1932,6 +2314,40 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert review_payload["status"] == "pass"
             assert stage_payload["status"] == "pass"
             assert (stage_dir / "review-report.json").is_file()
+
+    def test_authoring_validate_candidate_dogfood_runtime_path(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = repo_root / "spec-dock" / "scripts" / "spec-dock"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "dogfood-candidates", kind="epic-issue")
+
+            p = subprocess.run(
+                [
+                    str(script),
+                    "authoring",
+                    "validate",
+                    "epic-issue-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--expected-parent-epic",
+                    "epic-00295",
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                capture_output=True,
+                text=True,
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert payload["candidate_kind"] == "epic-issue"
+            assert payload["node_creation_performed"] is False
+            assert payload["canonical_written"] is False
 
     def test_authoring_pack_dogfood_runtime_path_rejects_pr_delivery_claim_and_preserves_stage_text_boundary(
         self,
@@ -4400,6 +4816,201 @@ def _authoring_pack_entries() -> dict[str, str]:
         "adoption/eal-candidates.json": json.dumps({"candidates": []}, sort_keys=True) + "\n",
         "issue/requirement.md": "# Draft requirement\n",
     }
+
+
+def _write_candidate_stage(
+    stage_dir: Path,
+    *,
+    kind: str,
+    review_status: str = "pass",
+    mutator: str | None = None,
+) -> Path:
+    root = stage_dir / "specdock-authoring-pack"
+    source_manifest_hash = "different" if mutator == "source-hash-mismatch" else "hash"
+    (root / "source-manifest.json").parent.mkdir(parents=True, exist_ok=True)
+    (root / "source-manifest.json").write_text(
+        json.dumps({"source_manifest_hash": source_manifest_hash, "source_hashes": {"src/example.py": "abc123"}}, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
+    )
+    candidate_root = root / ("candidates/epics" if kind == "initiative-epic" else "candidates/issues")
+    count = 2 if kind == "initiative-epic" else 3
+    index_candidates: list[dict[str, str]] = []
+    for number in range(1, count + 1):
+        candidate_id = f"candidate-{number:03d}"
+        if mutator == "duplicate-id" and number == 2:
+            candidate_id = "candidate-001"
+        candidate_dir = candidate_root / candidate_id
+        candidate_dir.mkdir(parents=True, exist_ok=True)
+        title = f"Candidate {number}"
+        slug = f"candidate-{number}"
+        draft_files = {"requirement": "requirement.md", "design": "design.md", "plan": "plan.md"}
+        if mutator == "path-traversal" and number == 1:
+            draft_files["requirement"] = "../requirement.md"
+        if mutator == "hidden-path" and number == 1:
+            draft_files["requirement"] = ".hidden.md"
+            (candidate_dir / ".hidden.md").write_text("# Hidden\n", encoding="utf-8")
+        if mutator == "unsupported-suffix" and number == 1:
+            draft_files["requirement"] = "notes.txt"
+            (candidate_dir / "notes.txt").write_text("notes\n", encoding="utf-8")
+        if mutator == "secret-draft-path" and number == 1:
+            draft_files["requirement"] = "token-secret.md"
+            (candidate_dir / "token-secret.md").write_text("# Secret-looking path\n", encoding="utf-8")
+        if mutator == "symlink-draft" and number == 1:
+            target = candidate_dir / "real-requirement.md"
+            target.write_text("# Real requirement\n", encoding="utf-8")
+            link = candidate_dir / "linked-requirement.md"
+            link.symlink_to(target)
+            draft_files["requirement"] = "linked-requirement.md"
+        for filename in ("requirement.md", "design.md", "plan.md"):
+            text = f"# {title} {filename}\n"
+            if mutator == "secret-text" and number == 1 and filename == "requirement.md":
+                text = "token=abc123secret\n"
+            if mutator == "raw-transcript" and number == 1 and filename == "requirement.md":
+                text = "raw transcript\n"
+            if mutator == "forbidden-claim" and number == 1 and filename == "requirement.md":
+                text = "PR-ready\n"
+            path = candidate_dir / filename
+            path.write_text(text, encoding="utf-8")
+            if mutator == "executable-draft" and number == 1 and filename == "requirement.md":
+                path.chmod(0o755)
+            if mutator == "binary-draft" and number == 1 and filename == "requirement.md":
+                path.write_bytes(b"\xff\xfe\x00")
+            if mutator == "oversized-draft" and number == 1 and filename == "requirement.md":
+                path.write_text("x" * 2_000_001, encoding="utf-8")
+        parent_trace: dict[str, str]
+        if kind == "initiative-epic":
+            parent_trace = {"initiative_id": "init-local-00003"}
+            payload: dict[str, object] = {
+                "schema_version": 1,
+                "authority": "evidence_only",
+                "adoption_status": "unreviewed",
+                "bundle_generation_not_promotion": True,
+                "candidate_id": candidate_id,
+                "candidate_kind": "epic",
+                "slug": slug,
+                "title": title,
+                "approval_gate": "human_approval_before_epic_node_creation",
+                "parent_trace": parent_trace,
+                "boundary": _candidate_boundary(number, overlap=mutator == "overlap" and number == 1),
+                "epic_boundary": {"scope": [f"epic scope {number}"], "non_scope": ["other"], "depends_on_epic_candidates": []},
+                "draft_files": draft_files,
+                "authority_claims": _candidate_authority_claims(),
+            }
+            if mutator == "unknown-epic-dependency" and number == 1:
+                payload["epic_boundary"] = {
+                    "scope": [f"epic scope {number}"],
+                    "non_scope": ["other"],
+                    "depends_on_epic_candidates": ["candidate-999"],
+                }
+            if mutator == "forward-epic-dependency" and number == 1:
+                payload["epic_boundary"] = {
+                    "scope": [f"epic scope {number}"],
+                    "non_scope": ["other"],
+                    "depends_on_epic_candidates": ["candidate-002"],
+                }
+        else:
+            parent_trace = {"epic_id": "different" if mutator == "parent-mismatch" and number == 1 else "epic-00295"}
+            payload = {
+                "schema_version": 1,
+                "authority": "evidence_only",
+                "adoption_status": "unreviewed",
+                "bundle_generation_not_promotion": True,
+                "candidate_id": candidate_id,
+                "candidate_kind": "issue",
+                "slug": slug,
+                "title": title,
+                "parent_trace": parent_trace,
+                "boundary": _candidate_boundary(number, overlap=mutator == "overlap" and number == 1),
+                "grade_recommendation": {
+                    "grade": "advanced" if mutator == "unsupported-grade" and number == 1 else "standard",
+                    "advisory_only": True,
+                },
+                "profile_recommendation": {
+                    "profile": "advanced" if mutator == "unsupported-profile" and number == 1 else None,
+                    "advisory_only": True,
+                    "ignored_for_authority": True,
+                    "authorized_profile": "standard" if mutator == "authorized-profile" and number == 1 else None,
+                },
+                "draft_files": draft_files,
+                "authority_claims": _candidate_authority_claims(),
+            }
+            if mutator == "missing-authority-claims" and number == 1:
+                payload.pop("authority_claims")
+            if mutator == "invalid-schema-version" and number == 1:
+                payload.pop("schema_version")
+        (candidate_dir / "candidate.json").write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+        index_candidates.append(
+            {
+                "candidate_id": candidate_id,
+                "slug": slug,
+                "title": title,
+                "path": f"candidates/{'epics' if kind == 'initiative-epic' else 'issues'}/{candidate_id}/candidate.json",
+            }
+        )
+    index = {
+        "schema_version": 1,
+        "authority": "evidence_only",
+        "adoption_status": "unreviewed",
+        "bundle_generation_not_promotion": True,
+        "parent_trace": {"initiative_id": "init-local-00003"} if kind == "initiative-epic" else {"epic_id": "epic-00295"},
+        "candidates": [] if mutator == "empty-index" else index_candidates,
+    }
+    if mutator == "host-local-path":
+        index["candidates"] = [
+            {
+                "candidate_id": "candidate-host",
+                "slug": "candidate-host",
+                "title": "Candidate host",
+                "path": "Users/example/candidate.json",
+            }
+        ]
+    if mutator == "secret-path":
+        index["candidates"] = [
+            {
+                "candidate_id": "candidate-secret",
+                "slug": "candidate-secret",
+                "title": "Candidate secret",
+                "path": "secrets/candidate.json",
+            }
+        ]
+    (candidate_root / "index.json").write_text(json.dumps(index, sort_keys=True) + "\n", encoding="utf-8")
+    digest = _candidate_tree_digest(root)
+    if mutator == "review-digest-mismatch":
+        digest = "wrong"
+    (stage_dir / "review-report.json").write_text(
+        json.dumps({"status": review_status, "pack_digest": {"content_sha256": digest}}, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return stage_dir
+
+
+def _candidate_boundary(number: int, *, overlap: bool = False) -> dict[str, list[str]]:
+    scope = [f"scope {number}"]
+    non_scope = [f"scope {number}" if overlap else f"non-scope {number}"]
+    return {"summary": f"boundary {number}", "scope": scope, "non_scope": non_scope, "dependencies": []}
+
+
+def _candidate_authority_claims() -> dict[str, bool]:
+    return {
+        "node_creation_performed": False,
+        "canonical_written": False,
+        "assurance_mutated": False,
+        "reviewer_pass_claimed": False,
+        "execution_ready": False,
+        "pr_ready": False,
+    }
+
+
+def _candidate_tree_digest(pack_root: Path) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(item for item in pack_root.rglob("*") if item.is_file() and not item.is_symlink()):
+        rel_path = path.relative_to(pack_root).as_posix()
+        digest.update(rel_path.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(path.read_bytes()).hexdigest().encode("ascii"))
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _base_authoring_pack_manifest() -> dict[str, object]:

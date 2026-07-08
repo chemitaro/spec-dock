@@ -131,7 +131,7 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     _bind_leaf(
         authoring_validate_sub.add_parser(
             "initiative-epic-candidates",
-            help="Deferred Initiative-to-Epic candidate validation skeleton",
+            help="Validate evidence-only Initiative-to-Epic candidates",
         ),
         registry,
         "authoring_validate_initiative_epic_candidates",
@@ -139,7 +139,7 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     _bind_leaf(
         authoring_validate_sub.add_parser(
             "epic-issue-candidates",
-            help="Deferred Epic-to-Issue candidate validation skeleton",
+            help="Validate evidence-only Epic-to-Issue candidates",
         ),
         registry,
         "authoring_validate_epic_issue_candidates",
