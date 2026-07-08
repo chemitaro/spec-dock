@@ -31,7 +31,7 @@ authorized_profile: "standard"
 | CLOS-006 | AC-008 | G4 | `local-context` lower-authority evidence mode | command | positive/negative preflight output |
 | CLOS-007 | AC-009, AC-010 | G4 | ZIP/tree review, stage, authority boundary | test + command | authoring pytest / fixture output; forbidden claim checks |
 | CLOS-008 | AC-011, AC-012, AC-013 | G4 | candidate, draft adoption, approval validators | test + command | authoring pytest / validator commands |
-| CLOS-009 | AC-014 | G2 | installed asset simulation | command + inspection | `uvx --from . spec-dock init <tmp>` and installed file/help checks |
+| CLOS-009 | AC-014 | G2 | installed asset simulation | command + inspection | `uvx --isolated --from <absolute-repo-path> spec-dock init <tmp>` and installed file/help checks |
 | CLOS-010 | AC-016, AC-017 | G6 | reviewer / CI / PR repair loop and final evidence | reviewer + GitHub | fresh reviewers, PR URL, checks, repair disposition |
 
 ## 3. 実装ステップ
@@ -182,8 +182,12 @@ Commands:
 
 ```bash
 tmp="$(mktemp -d)"
-uvx --from . spec-dock init "$tmp"
+repo_root="$(pwd)"
+uvx --isolated --from "$repo_root" spec-dock init "$tmp"
 test -f "$tmp/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md"
+test -f "$tmp/.agents/skills/spec-dock-initiative-planning/SKILL.md"
+test -f "$tmp/.agents/skills/spec-dock-epic-planning/SKILL.md"
+test -f "$tmp/.agents/skills/spec-dock-issue-planning/SKILL.md"
 test -f "$tmp/spec-dock/docs/workflow_chatgpt_authoring_pack.md"
 test -f "$tmp/spec-dock/scripts/spec_dock_runtime/commands/authoring.py"
 (cd "$tmp" && ./spec-dock/scripts/spec-dock authoring --help)

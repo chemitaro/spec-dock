@@ -28,6 +28,6 @@ When this inventory changes, verify both provider and installed-consumer reachab
 ```bash
 find src/spec_dock/assets/spec_dock/scripts/authoring-pack -maxdepth 1 -type f | sort
 python -m py_compile src/spec_dock/assets/spec_dock/scripts/authoring-pack/*.py
-uvx --from . spec-dock init /private/tmp/specdock-authoring-pack-init-smoke
+uvx --isolated --from "$(pwd)" spec-dock init /private/tmp/specdock-authoring-pack-init-smoke
 test -f /private/tmp/specdock-authoring-pack-init-smoke/spec-dock/scripts/authoring-pack/README.md
 ```

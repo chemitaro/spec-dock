@@ -52,6 +52,7 @@ Disposition ごとの必須証跡:
 | D-001 | resolved | scope | orchestrator | `iss-00307` は通常実装Issueではなく、Epic 00295全体のfinal quality gate / PR delivery Issueとして扱う必要がある | A: 機能追加Issueとして扱う; B: closure / repair / PR delivery gateとして扱う | Bを採用。新機能追加ではなく、C01〜C11のclosure確認、repair、PR delivery evidenceに集中する | ユーザー指示、Epic plan、ChatGPT Use analysis、既存Issue relay policyが一致している | promoted_to_design / promoted_to_plan | `requirement.md`, `design.md`, `plan.md`, `artifacts/20260708t083000z-chatgpt-final-quality-pr-delivery-planning-analysis.md` | なし |
 | D-002 | resolved | operation | orchestrator | ChatGPT UseのGitHub connector観測ではbranchが`main`に対してbehind / divergedの可能性がある | A: 現状branchのままPR deliveryへ進む; B: final PR readiness前にlocalでfetch / rev-list / 必要なmain mergeを行い、full gateを再実行する | Bを採用 | PR mergeabilityはlocal branch状態とGitHub checksに依存するため、final gateにmain syncを含める必要がある | promoted_to_plan | `plan.md` S03, S09 | S03で実コマンド結果を追記する |
 | D-003 | resolved | compatibility | user / orchestrator | local `oracle-chatgpt` wrapperへの個人環境依存をSpecDock正式workflowに持ち込む懸念 | A: ローカルwrapperを前提にする; B: configurable backend contractとして扱い、local wrapperは一例に留める | Bを採用 | SpecDock installed runtimeはconsumer repoでも再現可能である必要がある | promoted_to_requirement / promoted_to_design / promoted_to_plan | `requirement.md` AC-006/AC-007, `design.md` section 3, `plan.md` S04 | S04でgrep / backend testsを実行する |
+| D-004 | resolved | test-strategy | S06 installed simulation | `uvx --from . spec-dock init <tmp>` がこの環境ではlocal source buildではなく既存/別解決の古いtool surfaceを実行し、authoring command未導入のfalse negativeを返した | A: `uvx --from .` のままgateを維持する; B: `uvx --isolated --from <absolute-repo-path>` をlocal source install gateにする | Bを採用 | `uv build --wheel` と `uvx --isolated --from <absolute-repo-path> ...` ではprovider-side sourceがbuildされ、installed targetに新skill/docs/runtime commandが届いた | promoted_to_design / promoted_to_plan / applied | `plan.md` S06, `design.md` G2, `src/spec_dock/assets/spec_dock/scripts/authoring-pack/README.md` | なし |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -131,7 +132,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装サマリー (任意)
 - S01 planning adoptionとして、Issue-local draft artifactsとChatGPT Use analysisを採用・棄却判断し、`requirement.md`、`design.md`、`plan.md`をfinal quality gate / PR delivery Issue向けに正式化した。
-- まだruntime repair / final quality gate / PR deliveryは実施していない。fresh `spec-reviewer`通過後にS02以降へ進む。
+- S02〜S07のうち、closure / main sync / runtime backend / evidence safety / installed asset simulation / focused validation gateを実行した。
+- S06で`uvx --from .`がlocal source install検証として不適切なfalse negativeを返したため、`uvx --isolated --from <absolute-repo-path>`へgate記述を修正した。
+- まだfinal reviewer gate / PR deliveryは実施していない。S08以降でfresh reviewersとPR作成へ進む。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -222,7 +225,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user request to execute Epic via SpecDock workflow | `/Users/iwasawayuuta/.codex/worktrees/aa9c/spec-dock` | iss-00307 | current session | spec-reviewer / code-reviewer / qa-reviewer / ChatGPT Use evidence lane | active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility。破壊的操作 / credentialed external mutation / scope expansion / private external system use / out-of-workflow role は含めない | issue complete / session end / scope change / host policy conflict / user revocation | none observed | S02へ進む |
+| user request to execute Epic via SpecDock workflow | `<current-worktree>` | iss-00307 | current session | spec-reviewer / code-reviewer / qa-reviewer / ChatGPT Use evidence lane | active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility。破壊的操作 / credentialed external mutation / scope expansion / private external system use / out-of-workflow role は含めない | issue complete / session end / scope change / host policy conflict / user revocation | none observed | S02へ進む |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
@@ -261,29 +264,162 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | ready-for-commit | planning docs/report | pending commit | pending post-commit | n/a | n/a | n/a | n/a |
+| S02〜S07 | ready-for-commit | S06 verification command correction and gate evidence | pending commit | pending post-commit | n/a | n/a | n/a | n/a |
 
 #### 変更したファイル
 - `spec-dock/active/issue/requirement.md` - final quality gate / PR delivery Issueとして正式要件を作成
 - `spec-dock/active/issue/design.md` - 6 gate構成とsource-of-truth境界を作成
-- `spec-dock/active/issue/plan.md` - S01〜S09のclosure / sync / runtime / evidence / installed / validation / reviewer / PR delivery planを作成
-- `spec-dock/active/issue/report.md` - draft / ChatGPT evidenceの採用台帳とplanning gate状態を記録
+- `spec-dock/active/issue/plan.md` - S01〜S09のclosure / sync / runtime / evidence / installed / validation / reviewer / PR delivery planを作成し、S06 installed simulation commandをabsolute local source installへ修正
+- `spec-dock/active/issue/report.md` - draft / ChatGPT evidenceの採用台帳、planning gate状態、S02〜S07 gate evidenceを記録
+- `src/spec_dock/assets/spec_dock/scripts/authoring-pack/README.md` - installed asset verification exampleをabsolute local source installへ修正
 
 #### コミット
 - pending
 
 #### メモ
-- S01 planning gateはfresh spec-review pass済み。実装・PR deliveryはS02以降で開始する。
+- S01 planning gateはfresh spec-review pass済み。S02〜S07 focused gateも通過済み。S08 final reviewer gateとS09 PR deliveryが残っている。
 
 ---
 
-### セッションログ（2026-07-08 18:45 - ）
+### セッションログ（2026-07-08 18:45 - 19:40）
 
 #### 対象
-- Step: S01 assurance / spec-review continuation
-- AC/EC: CLOS-001〜CLOS-010 planning precondition
+- Step: S02 Closure Index Gate, S03 Branch / main sync gate, S04 Runtime / backend / local wrapper gate, S05 Evidence safety and validator gate, S06 Installed asset simulation gate, S07 focused validation gate
+- AC/EC: CLOS-001〜CLOS-009
 
 #### 実施内容
-- 次に `assurance verify` / `guidance issue-execution` を再実行し、S02へ進めることを確認する。
+- S02として、`iss-00307` dependency closureとSpecDock tree validationを確認した。
+- S03として、`origin/main`をfetchし、branchがmainに対してbehindしていたため`git merge origin/main`を実行した。merge後にS02相当のdeps / validate / diff-checkを再実行した。
+- S04として、authoring command groupのhelp smoke、backend invocation tests、local wrapper hard-code grepを確認した。
+- S05として、authoring runtime safety / validator suiteを実行した。
+- S06として、installed consumer simulationを実施した。`uvx --from .` はlocal source installを証明しないfalse negativeだったため、`uvx --isolated --from <absolute-repo-path>`でprovider sourceからbuildされることを確認し、G2 / S06 gate記述を修正した。
+- S07として、focused validation lane（diff-check、SpecDock validate、wrappers、init/update focused tests、authoring suite）を実行した。
+- S07 full CLI baseline初回でcommands層のdomain direct import構造違反を検出し、provider sourceとdogfooding mirrorの`commands/authoring.py`をapplication module経由のrequest型参照へ修正した。
+- 修正後、targeted structural test、authoring suite、full CLI baseline、installed consumer simulationを再実行した。
+
+#### 実行コマンド / 結果
+```bash
+./spec-dock/scripts/spec-dock deps check iss-00307
+# ok; ready=true; blockers=0
+
+./spec-dock/scripts/spec-dock validate
+# spec-dock: ok (validate) nodes=202
+
+git fetch origin
+git rev-list --left-right --count origin/main...HEAD
+# before merge: 1 26
+
+git merge origin/main
+# Merge made by the 'ort' strategy.
+
+git rev-list --left-right --count origin/main...HEAD
+# after merge: 0 27
+
+git diff --check
+# pass
+
+./spec-dock/scripts/spec-dock authoring --help
+./spec-dock/scripts/spec-dock authoring preflight github-sync --help
+./spec-dock/scripts/spec-dock authoring pack prepare --help
+./spec-dock/scripts/spec-dock authoring backend invoke --help
+./spec-dock/scripts/spec-dock authoring pack review --help
+./spec-dock/scripts/spec-dock authoring pack stage --help
+./spec-dock/scripts/spec-dock authoring validate initiative-epic-candidates --help
+./spec-dock/scripts/spec-dock authoring validate epic-issue-candidates --help
+./spec-dock/scripts/spec-dock authoring validate issue-draft-adoption --help
+./spec-dock/scripts/spec-dock authoring validate selected-skeleton-fill --help
+./spec-dock/scripts/spec-dock authoring approval check --help
+# all help smoke passed
+
+uv run pytest tests/cli_runtime/test_authoring.py -k "backend_invoke"
+# 30 passed, 285 deselected
+
+rg -n "/Users/|\\.codex/skills/chatgpt-use/scripts/oracle-chatgpt|oracle-chatgpt" src/spec_dock/assets spec-dock/docs spec-dock/scripts .agents/skills
+# no oracle-chatgpt hard-code found; /Users matches are redaction/unsafe-path scanner lists only
+
+uv run pytest tests/cli_runtime/test_authoring.py
+# 314 passed, 1 skipped
+
+uv build --wheel
+# Successfully built dist/spec_dock-0.2.3-py3-none-any.whl
+
+python -m zipfile -l dist/spec_dock-0.2.3-py3-none-any.whl | rg 'spec-dock-chatgpt-authoring/SKILL.md|workflow_chatgpt_authoring_pack.md|commands/authoring.py'
+# wheel contains all three installed surface files
+
+uvx --isolated --from <absolute-repo-path> spec-dock init <tmp>
+# Building spec-dock @ file://<absolute-repo-path>
+# spec-dock: ok (init) -> <tmp>
+
+test -f <tmp>/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md
+test -f <tmp>/.agents/skills/spec-dock-initiative-planning/SKILL.md
+test -f <tmp>/.agents/skills/spec-dock-epic-planning/SKILL.md
+test -f <tmp>/.agents/skills/spec-dock-issue-planning/SKILL.md
+test -f <tmp>/spec-dock/docs/workflow_chatgpt_authoring_pack.md
+test -f <tmp>/spec-dock/scripts/spec_dock_runtime/commands/authoring.py
+(cd <tmp> && ./spec-dock/scripts/spec-dock authoring --help)
+# all installed file checks and authoring help passed
+
+uv run pytest tests/cli_runtime/test_wrappers.py
+# 7 passed
+
+uv run pytest tests/unit/infra/test_init_update.py -k "chatgpt_authoring_managed_skill_contract or init_installs_authoring_pack_helper_inventory"
+# 2 passed, 544 deselected
+
+uv run pytest tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_final_api_call_site_and_structural_regression
+# 1 passed
+
+uv run pytest tests/cli_runtime
+# first run: 1 failed, 1043 passed, 75 skipped
+# failure: commands/authoring.py imported domain request contracts directly
+
+uv run pytest tests/cli_runtime/test_authoring.py
+# after structural import repair: 314 passed, 1 skipped
+
+uv run pytest tests/cli_runtime
+# after structural import repair: 1044 passed, 75 skipped
+
+uvx --isolated --from <absolute-repo-path> spec-dock init <tmp>
+test -f <tmp>/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md
+test -f <tmp>/.agents/skills/spec-dock-initiative-planning/SKILL.md
+test -f <tmp>/.agents/skills/spec-dock-epic-planning/SKILL.md
+test -f <tmp>/.agents/skills/spec-dock-issue-planning/SKILL.md
+test -f <tmp>/spec-dock/scripts/spec_dock_runtime/commands/authoring.py
+(cd <tmp> && ./spec-dock/scripts/spec-dock authoring --help)
+# all post-repair installed file checks and authoring help passed
+```
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
+|---|---|---|---|---|---|
+| S02 | CLOS-001 | C01〜C11 completion / dependency closure | deps ready=true; validate ok; GitHub issues #296〜#306 closed inspection | pass | no blocking gap found |
+| S03 | CLOS-003 | main sync / divergence handling | fetch, rev-list before/after, merge origin/main, post-merge deps/validate/diff-check | pass | branch no longer behind origin/main |
+| S04 | CLOS-004, CLOS-005 | runtime command inventory / backend contract / local wrapper audit | help smoke; backend_invoke tests; grep audit | pass | no hard-coded `oracle-chatgpt` dependency |
+| S05 | CLOS-006, CLOS-007, CLOS-008 | evidence mode / ZIP / candidate / approval validators | `test_authoring.py` 314 passed, 1 skipped | pass | broad authoring suite |
+| S06 | CLOS-009 | installed consumer receives authoring skill/docs/runtime command | wheel content inspection; `uvx --isolated --from <absolute-repo-path>` init; installed file tests; `authoring --help` | pass | plan command corrected after false-negative |
+| S07 | CLOS-002, CLOS-004〜CLOS-009 | focused and full validation lane | diff-check, validate, wrappers, init/update focused tests, authoring suite, targeted structural test, full CLI baseline | pass | initial full CLI found commands/domain import violation; fixed and rerun passed |
+
+#### C01〜C11 Issue Closure Index
+| Candidate / Issue | GitHub issue | GitHub state | closed_at | local finish / defer evidence | dependency closure | blocking gap |
+|---|---|---|---|---|---|---|
+| C01 / iss-00296 | #296 Authoring Pack Assets | CLOSED | 2026-07-07T17:59:44Z | `report.md#PR delivery defer evidence` defers PR delivery to `iss-00307`; no per-Issue PR | `deps check iss-00307` ready=true | none |
+| C02 / iss-00297 | #297 Authoring Command Skeleton | CLOSED | 2026-07-07T18:34:33Z | `report.md#PR delivery defer evidence` defers PR delivery to `iss-00307`; no per-Issue PR | `deps check iss-00307` ready=true | none |
+| C03 / iss-00298 | #298 GitHub Sync Preflight | CLOSED | 2026-07-07T19:37:13Z | `report.md#PR delivery defer evidence` records no per-Issue PR and final quality Issue `iss-00307` | `deps check iss-00307` ready=true | none |
+| C04 / iss-00299 | #299 Prompt Pack Constraints | CLOSED | 2026-07-07T20:25:34Z | `report.md` records PR delivery deferred to `iss-00307`; no per-Issue PR | `deps check iss-00307` ready=true | none |
+| C05 / iss-00300 | #300 Backend Invocation Adapter | CLOSED | 2026-07-07T22:15:58Z | `report.md` records `PR delivery` deferred to final quality gate Issue `iss-00307` | `deps check iss-00307` ready=true | none |
+| C06 / iss-00301 | #301 Zip Review Staging | CLOSED | 2026-07-08T01:44:56Z | `report.md` records no PR delivery and `iss-00307` defer evidence | `deps check iss-00307` ready=true | none |
+| C07 / iss-00302 | #302 Initiative Epic Validation | CLOSED | 2026-07-08T03:11:56Z | `report.md` records final quality gate / PR delivery deferred to `iss-00307` | `deps check iss-00307` ready=true | none |
+| C08 / iss-00303 | #303 Issue Draft Adoption Validation | CLOSED | 2026-07-08T05:05:33Z | `report.md` records per-Issue PR omitted and final PR delivery belongs to `iss-00307` | `deps check iss-00307` ready=true | none |
+| C09 / iss-00304 | #304 ChatGPT Authoring Skill | CLOSED | 2026-07-08T06:08:10Z | `plan.md` final exit contract assigns PR delivery to `iss-00307`; local report contains older partial wording for pre-finish push state, but GitHub issue is closed and final PR delivery is owned here | `deps check iss-00307` ready=true | none; residual evidence wording is not blocking because final PR delivery is this Issue's scope |
+| C10 / iss-00305 | #305 Approval Stop Gate Reports | CLOSED | 2026-07-08T07:34:27Z | `report.md` records no per-Issue PR and PR delivery deferred to final Issue `iss-00307` | `deps check iss-00307` ready=true | none |
+| C11 / iss-00306 | #306 Runtime Workflow Guidance | CLOSED | 2026-07-08T09:02:00Z | `report.md` records PR delivery deferred to `iss-00307` and fresh spec-review pass for relay policy repair | `deps check iss-00307` ready=true | none |
+
+Closure conclusion: all intermediate GitHub Issues are closed, final dependency check reports `iss-00307` ready with zero blockers, and no intermediate Issue is expected to create a PR. Epic-level PR delivery remains assigned to this final Issue.
+
+#### クロージャ差分（Closure Delta）
+| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
+|---|---|---|---|---|---|---|
+| amended-verification-command | CLOS-009 | S06 installed simulation | CLOS-009 | `uvx --from .` がlocal source install gateとしてfalse negativeを返したため、absolute local source + isolated uvxへ変更 | yes | yes, S08 final reviewers |
+| repaired-structural-import | CLOS-002 | full CLI baseline | CLOS-002 | full CLI baseline detected commands layer importing domain request contracts directly | no | yes, S08 final reviewers |
 
 ---
 
@@ -292,27 +428,27 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | pending | doc-writer / N/A | S02〜S07で確認 | pending |
+| docs / templates / README / workflow / skill / migration notes | resolved | main orchestrator | S02〜S07 evidence, S06 plan/README correction, C01〜C11 closure index | spec-reviewer pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | pending | S08で実行 | pending |
+| qa-reviewer | whole issue obligation coverage | full CLI baseline required and executed | `tests/cli_runtime` -> 1044 passed, 75 skipped after structural import repair; QA re-review pass | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | pending | 0 | pending |
+| code-reviewer | issue-wide integrated diff | P1 installed planning skill checks missing from S06 plan -> fixed; P2 concrete temp paths in report -> redacted; re-review found no findings | 2 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | pending | 0 | pending |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | P1 durable host path evidence -> redacted; P2 D-004 disposition -> fixed; re-review found no findings | 2 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| pending | pending | PR / issue report / final response | blocked until S09 |
+| this report through S08 reviewer gate | S06 plan/report/README correction, commands-layer import repair, assurance binding refresh | PR / issue report / final response | ready for commit before S09 PR delivery |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: `assurance verify` が `stale_source_binding` を返した。
@@ -321,18 +457,28 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
   - 解決: `plan.md` S03を修正し、main取り込み後はS02〜S09を再実行する契約にした。
 - 問題: spec-reviewer が、S01 handoff rowsの一部が古いpending表現を残していると指摘した。
   - 解決: S01 rowsをcurrent assurance / validate / diff-check / spec-review pass evidenceへ更新した。
+- 問題: `uvx --from . spec-dock init <tmp>` がlocal source buildではなく古いinstalled surfaceを実行し、`authoring` command未導入というfalse negativeを返した。
+  - 解決: wheel内容を確認した上で、`uvx --isolated --from <absolute-repo-path> spec-dock init <tmp>` を実行し、provider-side sourceがbuildされconsumer repoへ新skill/docs/runtime commandが届くことを確認した。G2/S06のverification commandもabsolute local source installへ修正した。
+- 問題: full `tests/cli_runtime` baselineで、`commands/authoring.py` がdomain request contractsを直接importしている構造違反を検出した。
+  - 解決: provider sourceとdogfooding mirrorの`commands/authoring.py`を、`BackendInvokeRequest` / `PromptPackPrepareRequest` をapplication module経由でimportする形に修正した。targeted structural test、authoring suite、full CLI baselineを再実行してpassを確認した。
 
 ## 学んだこと (任意)
 - ChatGPT evidenceを使っても、正本採用とreviewer passはSpecDock planning workflow側で明示的に通す必要がある。
 
 ## 今後の推奨事項 (任意)
-- S02以降の実行では、各gateの実コマンド出力をこのreportへ追記する。
+- S08 final reviewersで、S06 command変更とinstalled asset gate evidenceを重点確認する。
 
 ## 省略/例外メモ (必須)
-- 現時点では該当なし。S02以降で環境制約が出た場合に追記する。
+- `uvx --from .` はこの環境でlocal source installを証明しなかったため、final gateでは `uvx --isolated --from <absolute-repo-path>` を採用した。これは検証コマンドの修正であり、installed runtimeのlocal wrapper依存を許容する例外ではない。
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
 - S01 planning adoption: canonical docs updated from issue-local draft artifacts and ChatGPT Use analysis; assurance source binding refreshed and verified valid; spec-reviewer passed after S03 repair.
-- S02以降のclosure resultは各gate実行後に追記する。
+- S02 closure index: `deps check iss-00307` ready=true; `spec-dock validate` ok.
+- S03 main sync: `git fetch origin`; before merge `rev-list` = `1 26`; `git merge origin/main`; after merge `rev-list` = `0 27`; post-merge deps / validate / diff-check passed.
+- S04 runtime/backend/local-wrapper: authoring help smoke passed; `backend_invoke` tests 30 passed; grep found no hard-coded `oracle-chatgpt` dependency.
+- S05 evidence safety: `uv run pytest tests/cli_runtime/test_authoring.py` -> 314 passed, 1 skipped.
+- S06 installed surface: `uvx --from .` false-negative recorded; `uvx --isolated --from <absolute-repo-path>` installed expected authoring/planning skill, workflow doc, runtime command files, and `authoring --help` passed.
+- S07 validation: `git diff --check`, `spec-dock validate`, `test_wrappers.py`, focused `test_init_update.py`, `test_authoring.py`, targeted structural test, and full `tests/cli_runtime` passed after repairing the commands-layer import violation found by the first full run.
+- S08/S09 final reviewer / PR delivery remains pending.
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
