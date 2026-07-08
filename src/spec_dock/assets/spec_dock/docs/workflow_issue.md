@@ -82,9 +82,30 @@ Operational entrypoint / first-read spine は issue planning / issue execution s
 ## 仕様 authoring（spec authoring）
 
 - Issue planning は `.agents/skills/spec-dock-issue-planning/SKILL.md` を operational entrypoint にし、仕様作成の phase promotion detail は `workflow_spec_authoring.md`、未解決の曖昧さは `spec-dock-clarification` skill と `workflow_clarification.md` の bridge/reference に route する
+- ChatGPT-first Issue planning route は、`zero-base`、`requirement-first`、`draft-adoption` の非自明ケースで primary evidence-production route として使う。`spec-dock-issue-planning-manual` は human-approved emergency backup であり、hard / unrecoverable ChatGPT route failure と recovery attempts、explicit approval、fresh reviewer gate の evidence がある場合だけ使う
 - Decision-only Issue は execution-ready ではない。Issue-local な軽量判断なら issue requirement / design / plan / report に閉じてよいが、複数 Issue の責務境界、分解、依存方向、shared workflow policy に影響する判断は Epic へ戻し、複数 Epic または投資判断に影響する判断は Initiative へ戻す。Issue は parent envelope を再定義せず、上位 scope の目的・責務境界・handoff boundary は [authoring/scope-layering.md](authoring/scope-layering.md) と親 docs を参照する。長期 architecture decision は ADR 候補にし、判断に必要な情報が足りない場合は clarification へ戻す。具体例と good / bad routing pattern は [authoring/decision-routing.md](authoring/decision-routing.md) を参照する
 - Handoff-ready と execution-ready は別状態である。Handoff-ready は Epic execution / Issue planning が引き継いでよい状態であり、Issue-local draft evidence や skip evidence が揃っていても実装開始を許可しない。Execution-ready は canonical `requirement.md` / `design.md` / `plan.md`、fresh `spec-reviewer` pass、executable plan、required verification、delegation contract、reviewer focus、Grade Specialist Evidence Gate / fallback evidence、未解決でない `report.md` ledger が揃った状態である
 - Epic planning から ChatGPT-generated draft requirement / draft design / draft plan を受け取った場合、Issue planning は `authoring validate issue-draft-adoption` を draft adoption evidence として使える。ただし validation `pass` は reviewer pass ではなく、canonical docs への採用完了でも execution-ready でもない
+- Option 3+ では、Epic planning が Issue-local draft path index を作り、Issue planning が各 Issue の実装直前に current repository state、prior completed Issues、dependency state、unresolved report ledgers を確認して draft claims を採否する。Issue-local drift は Issue planning で修正し、Epic boundary / Issue order / scope allocation を変える drift は Epic planning repair または clarification へ戻す。
+
+```plantuml
+@startuml
+title Issue Draft To Canonical Planning And Execution
+skinparam monochrome true
+participant "Issue Draft Evidence" as Draft
+participant "Issue Planning" as Planning
+participant "Report / EAL" as Report
+participant "Spec Reviewer" as Reviewer
+participant "Issue Execution" as Execution
+
+Draft -> Planning : draft requirement/design/plan
+Planning -> Planning : refresh current repo/prior Issues
+Planning -> Report : adopted / rejected / stale claims
+Planning -> Reviewer : canonical requirement/design/plan review
+Reviewer --> Planning : review_status pass
+Planning -> Execution : execution-ready handoff
+@enduml
+```
 - Issue execution は `.agents/skills/spec-dock-issue-execution/SKILL.md` を operational entrypoint にし、承認済み / reviewer-pass 済みの `requirement.md` / `design.md` / `plan.md` と executable `plan.md` を前提に、この workflow の execution gate / report gate / completion gate detail に route する
 - active issue 配下の `requirement.md` / `design.md` / `plan.md` を埋める
 - Requirement / design / plan の phase promotion は `workflow_spec_authoring.md` の detail / reference semantics に従い、各 artifact ごとに fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない

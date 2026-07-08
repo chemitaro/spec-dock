@@ -18,6 +18,7 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - Issue planning: `.agents/skills/spec-dock-issue-planning/SKILL.md`
 - Issue execution: `.agents/skills/spec-dock-issue-execution/SKILL.md`
 - ChatGPT authoring evidence lane: `.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`
+- Manual planning backups: `.agents/skills/spec-dock-initiative-planning-manual/SKILL.md`, `.agents/skills/spec-dock-epic-planning-manual/SKILL.md`, `.agents/skills/spec-dock-issue-planning-manual/SKILL.md`
 - ADR: `.agents/skills/spec-dock-adr-facilitation/SKILL.md`
 
 ## 読み順
@@ -83,7 +84,8 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 
 - Initiative / Epic は `new` / `import` の前に既存ノード再利用を確認する
 - Requirement / design / plan 作成は対応 planning skill を operational entrypoint にし、`workflow_spec_authoring.md` の phase promotion detail を参照して、fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
-- ChatGPT / Oracle を使う planning では `spec-dock-chatgpt-authoring` skill と [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md) を参照する。ChatGPT output、ZIP/tree、staged evidence、validation `pass` は evidence-only であり、canonical adoption / reviewer pass / execution-ready / PR-ready ではない
+- ChatGPT / Oracle を使う planning では `spec-dock-chatgpt-authoring` skill と [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md) を参照する。ChatGPT-first planning route が非自明な planning の正規 route であり、ChatGPT output、ZIP/tree、staged evidence、validation `pass` は evidence-only で、canonical adoption / reviewer pass / execution-ready / PR-ready ではない
+- manual planning backups は hard / unrecoverable ChatGPT route failure と human-approved emergency backup evidence がある場合だけ使う。queued tabs、retryable timeout、recoverable browser/backend setup は wait / retry / recover の対象であり、自動 fallback ではない
 - 仕様書作成前後の曖昧さ、用語衝突、責務境界、正式質問は `spec-dock-clarification` skill を operational entrypoint にし、`workflow_clarification.md` を bridge/reference として一問ずつ扱う
 - plan は shared `phase_plan.md` の後に対象 scope の `phase_plan_<scope>.md` を読む
 - `new initiative` / `new epic` / `new issue` はデフォルトで GitHub Issue を作る。node create/import で local-only create へ自動フォールバックしない

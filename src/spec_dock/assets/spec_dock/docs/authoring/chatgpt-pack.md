@@ -19,6 +19,7 @@ preflight evidence
 
 どの段階でも、ChatGPT output は正本ではありません。
 review / stage / validate の `pass` は、その command が担当する構造や安全性の確認結果です。
+ChatGPT-first planning route は非自明な Initiative / Epic / Issue planning の正規 evidence-production route ですが、canonical adoption、fresh reviewer pass、execution-ready、PR-ready、merge-ready は各 planning / execution workflow が所有します。manual planning skill は hard / unrecoverable ChatGPT route failure と human-approved emergency backup evidence がある場合だけ使います。
 
 ## プロンプトパックの役割（Prompt pack）
 
@@ -34,6 +35,7 @@ prompt pack には次を含めます。
 - explicit forbidden authority claims
 - expected ZIP manifest
 - evidence mode
+- failure handling expectation: wait / retry / recover before any manual route
 
 ## 出力 ZIP / tree の扱い（ZIP / tree output）
 
@@ -59,6 +61,8 @@ staged evidence から canonical docs へ反映する場合:
 2. `report.md` の Evidence Adoption Ledger に記録する。
 3. canonical docs に main orchestrator が再記述する。
 4. fresh reviewer gate を通す。
+
+Option 3+ の Epic output では、Epic docs と配下 Issue の draft requirement / draft design / draft plan を ZIP/tree でまとめて受け取れます。この場合でも Issue draft は handoff-ready evidence であり、各 Issue の canonical docs は Issue planning が current state と prior Issues を確認して正式化します。
 
 ## 候補検証（Candidate validation）
 

@@ -5,7 +5,7 @@ description: Shared evidence-lane skill for using ChatGPT / Oracle with SpecDock
 
 # Spec-Dock ChatGPT Authoring
 
-Use this skill when ChatGPT / Oracle is requested for SpecDock planning authoring. It is a shared evidence lane for Initiative, Epic, and Issue planning workflows; it does not own canonical docs, reviewer gates, assurance state, execution readiness, or PR delivery.
+Use this skill when ChatGPT / Oracle is requested for SpecDock planning authoring. It is the shared evidence lane invoked by ChatGPT-first Initiative, Epic, and Issue planning workflows; it does not own canonical docs, reviewer gates, assurance state, execution readiness, or PR delivery.
 
 This skill is an operational kernel. Keep canonical adoption in the relevant planning skill and keep global invariants in `spec-dock-hub`.
 
@@ -40,6 +40,8 @@ Contract anchor: ChatGPT / Oracle output is evidence-only until the main orchest
    - Include source constraints, target scope, expected artifact shape, and forbidden authority claims.
 4. Invoke only an operator-configured backend or runtime path.
    - Do not require private local wrapper paths, account state, or browser profile details as SpecDock product dependencies.
+   - Treat tab capacity, queued browser sessions, and retryable backend timeouts as wait/retry conditions, not as reasons to use the manual route.
+   - Treat browser/backend startup failure as recoverable when restart, session cleanup, or configuration repair is available.
 5. Review returned ZIP/tree output, candidate reports, draft docs, or summaries as evidence.
    - Preserve raw output separately from adopted canonical text.
 6. Validate candidates or draft-adoption input when runtime support exists.
@@ -55,6 +57,15 @@ Contract anchor: ChatGPT / Oracle output is evidence-only until the main orchest
 - Treat generated Requirement / Design / Plan text, Issue drafts, candidate lists, ZIPs, staged trees, review reports, and validation reports as source evidence.
 - Adopt only specific claims that are source-grounded, locally checked, and integrated by the main orchestrator.
 - Keep rejected, unsafe, stale, or unverifiable claims out of canonical docs and record why they were rejected when material.
+
+## Failure Classification
+
+- `retryable`: tab-capacity wait, queued run, transient timeout, temporary browser contention, or stale sync that can be refreshed.
+- `recoverable`: browser/backend startup failure, local configuration issue, missing backend command, or prompt-pack preparation failure that can be repaired in the current environment.
+- `blocked`: required synced evidence, account access, GitHub visibility, or source context is missing and cannot be supplied in the current run.
+- `stale`: output was produced against an older branch, commit, artifact set, or dependency state.
+- `rejected`: output is unsafe, unverifiable, contradicts source evidence, lacks requested files, or uses forbidden authority claims.
+- `hard-unrecoverable`: ChatGPT / browser / backend provider failure remains unresolved after wait / retry / recovery, and the user explicitly approves using a manual backup planning skill.
 
 ## Forbidden Claims
 

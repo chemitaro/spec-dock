@@ -28,6 +28,7 @@ Operational entrypoint / first-read spine は `spec-dock-issue-planning` skill �
 
 - `workflow_issue.md` が所有する `1 step = 1 observable behavior` invariant を behavior slice 設計へ落とす
 - Issue-local plan は親 scope の目的、責務境界、Issue handoff boundary を再定義しない。Epic から渡された Issue-local `draft-design` / `draft-plan` は evidence として採否判断し、Canonical Issue `design.md` / `plan.md` へ採用する場合だけ本文化する
+- Option 3+ の draft-adoption では、Issue planning が current repository state、prior completed Issues、dependency state、unresolved report ledger を確認してから canonical docs を正式化する。draft-only / validation-only / raw ChatGPT output は execution-ready ではない。
 - `block` は optional concern group とし、単純な step では最小 wrapper 1 個でよい
 - `behavior slice` は 1 つの観測可能な振る舞いを実装・検証・レビューできる単位とする
 - Epic から Issue へ切る場合、各 Issue は `vertical behavior slice` として、利用者価値または運用上観測できる 1 つの振る舞いを thin end-to-end に閉じる。DB / API / UI / docs のような層別作業だけで切る `horizontal batching` は避け、層別作業が必要な場合も最初に薄い縦の完了点を置く

@@ -28,6 +28,8 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - authoring 中に Decision-only finding を見つけた場合は、execution handoff 前に [authoring/scope-layering.md](authoring/scope-layering.md) と [authoring/decision-routing.md](authoring/decision-routing.md) で placement を確認する。Issue-local なら対象 Issue に閉じ、cross-issue なら Epic、cross-epic / investment なら Initiative、long-lived architecture decision なら ADR 候補、判断材料不足なら clarification へ戻す。routing 判断は canonical artifact または `report.md` の evidence に残し、template や skill に長い例を複製しない。
 - ChatGPT / Oracle を使う場合は [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md) を参照し、output を delegated evidence として扱う。ZIP/tree/staged evidence、candidate validation、draft adoption validation、approval check の `pass` は command-local pass であり、canonical adoption、fresh reviewer pass、execution-ready、PR-ready ではない。
 - ChatGPT evidence を採用する場合は、Evidence Adoption Ledger に採否を記録し、main orchestrator が canonical docs へ再記述し、fresh `spec-reviewer` pass を通す。
+- ChatGPT-first planning route is the normal route for non-trivial Initiative / Epic / Issue planning. Browser tab capacity、retryable timeout、stale sync、fixable backend setup は wait / retry / recover の対象であり、manual route へ自動 fallback しない。
+- Manual route is a human-approved emergency backup only. `spec-dock-initiative-planning-manual`、`spec-dock-epic-planning-manual`、`spec-dock-issue-planning-manual` は hard / unrecoverable failure と explicit human approval、failure evidence、recovery attempts、fresh reviewer gate を必要とする。
 
 ## グレード別authoring matrix（Issue grade authoring matrix）
 

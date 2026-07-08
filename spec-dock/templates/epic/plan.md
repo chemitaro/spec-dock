@@ -29,6 +29,28 @@ ID: "<EPIC_ID>"
   - ...
 - 例外:
   - ...
+- Epic classification:
+  - multi-issue implementation | single-issue | docs-only | no-op
+- final quality Issue policy:
+  - required: yes | no
+  - final quality issue id:
+    - ...
+  - skip rationale:
+    - ...
+  - skip eligibility:
+    - single-Issue | docs-only | no-op | accepted-exception
+  - completion evidence:
+    - ...
+  - dependency-on-all-implementation-Issues:
+    - final quality Issue depends on:
+      - iss-...
+      - iss-...
+    - command evidence:
+      - `./spec-dock/scripts/spec-dock deps add --from <final-quality-issue-id> --to <implementation-issue-id>`
+  - intermediate deferred PR delivery policy:
+    - intermediate Issues do not create per-Issue PRs when reviewed Epic plan intentionally relays PR delivery to the final quality Issue.
+    - each intermediate Issue report records deferred PR delivery gate evidence: final quality Issue id, dependency edge, no-per-Issue-PR rationale, no merge-prepared claim before final PR delivery, and remaining final PR Delivery / Merge Preparation Gate.
+    - final quality Issue cannot use deferred PR delivery gate; it owns the Epic-level quality gate, repair loop, manual test summary, push, and mergeable PR preparation.
 
 ## 課題引き渡しパッケージ（Issue handoff package）
 - parent trace:
@@ -49,11 +71,26 @@ ID: "<EPIC_ID>"
 - expected evidence:
   - ...
 - Issue-local draft path index:
-  - draft-requirement:
+  - iss-xxxx:
+    - draft-requirement:
+      - ...
+    - `draft-design`:
+      - ...
+    - `draft-plan`:
+      - ...
+  - iss-yyyy:
+    - draft-requirement:
+      - ...
+    - `draft-design`:
+      - ...
+    - `draft-plan`:
+      - ...
+- draft lifecycle:
+  - handoff-ready:
     - ...
-  - `draft-design`:
-    - ...
-  - `draft-plan`:
+  - execution-ready:
+    - Issue planning が current repository state、prior completed Issues、Evidence Adoption Ledger、canonical rewrite、fresh `spec-reviewer` pass を揃えた後だけ成立する。
+  - drift repair:
     - ...
 - skip / fallback evidence:
   - ...

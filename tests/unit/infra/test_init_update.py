@@ -1249,6 +1249,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00305-implement-approval-check-and-stop-gate-reports/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00306-update-runtime-docs-and-workflow-guidance/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00307-final-quality-gate-and-mergeable-pr-delivery/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1613,6 +1614,10 @@ class TestInitUpdate(CliRuntimeHarness):
         ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00307-final-quality-gate-and-mergeable-pr-delivery/.meta.json": [
             "iss-00306",
+            "iss-00309",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign/.meta.json": [
+            "iss-00306",
         ],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
@@ -1672,7 +1677,8 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00304": ["iss-00303"],
         "iss-00305": ["iss-00304"],
         "iss-00306": ["iss-00305"],
-        "iss-00307": ["iss-00306"],
+        "iss-00307": ["iss-00306", "iss-00309"],
+        "iss-00309": ["iss-00306"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -10155,18 +10161,32 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             initiative_planning_path = skills_root / "spec-dock-initiative-planning" / "SKILL.md"
             epic_planning_path = skills_root / "spec-dock-epic-planning" / "SKILL.md"
             issue_planning_path = skills_root / "spec-dock-issue-planning" / "SKILL.md"
+            initiative_manual_path = skills_root / "spec-dock-initiative-planning-manual" / "SKILL.md"
+            epic_manual_path = skills_root / "spec-dock-epic-planning-manual" / "SKILL.md"
+            issue_manual_path = skills_root / "spec-dock-issue-planning-manual" / "SKILL.md"
             assert authoring_path.is_file()
             authoring_text = authoring_path.read_text(encoding="utf-8")
             initiative_planning_text = initiative_planning_path.read_text(encoding="utf-8")
             epic_planning_text = epic_planning_path.read_text(encoding="utf-8")
             issue_planning_text = issue_planning_path.read_text(encoding="utf-8")
+            initiative_manual_text = initiative_manual_path.read_text(encoding="utf-8")
+            epic_manual_text = epic_manual_path.read_text(encoding="utf-8")
+            issue_manual_text = issue_manual_path.read_text(encoding="utf-8")
 
         managed_skill_names = cli._managed_skill_names()
         assert managed_skill_names == _EXPECTED_MANAGED_SKILL_NAMES
         assert managed_skill_names.index("spec-dock-issue-execution") < managed_skill_names.index(
             "spec-dock-chatgpt-authoring"
         )
+        assert managed_skill_names.index("spec-dock-chatgpt-authoring") < managed_skill_names.index(
+            "spec-dock-initiative-planning-manual"
+        )
         assert authoring_text.startswith("---\nname: spec-dock-chatgpt-authoring\n")
+
+        for planning_text in (initiative_planning_text, epic_planning_text, issue_planning_text):
+            assert "ChatGPT-first primary route" in planning_text
+            assert "wait and retry" in planning_text
+            assert "Manual backup route" in planning_text
 
         for mode_name in ("zero-base", "requirement-first", "draft-adoption"):
             assert mode_name in issue_planning_text
@@ -10174,6 +10194,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert "fresh `spec-reviewer` pass before execution handoff" in issue_planning_text
 
         assert "evidence-only" in authoring_text
+        assert "Failure Classification" in authoring_text
+        assert "hard-unrecoverable" in authoring_text
         forbidden_claims_section = self._issue_71_extract_markdown_section_by_heading_prefix(
             markdown_text=authoring_text,
             heading_prefix="Forbidden Claims",
@@ -10193,6 +10215,25 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "PR delivery",
         ):
             assert forbidden_claim in forbidden_claims_section
+
+        for manual_text in (initiative_manual_text, epic_manual_text, issue_manual_text):
+            assert "human-approved emergency backup" in manual_text
+            assert "hard / unrecoverable ChatGPT" in manual_text
+            assert "explicitly approves using the manual route" in manual_text
+            assert "does not grant degraded reviewer" in manual_text
+
+        repo_root = Path(__file__).resolve().parents[3]
+        epic_plan_template = (
+            repo_root / "src/spec_dock/assets/spec_dock/templates/epic/plan.md"
+        ).read_text(encoding="utf-8")
+        for required_template_field in (
+            "final quality issue id",
+            "completion evidence",
+            "dependency-on-all-implementation-Issues",
+            "intermediate deferred PR delivery policy",
+            "final quality Issue cannot use deferred PR delivery gate",
+        ):
+            assert required_template_field in epic_plan_template
 
         local_dependency_terms = (
             "/Users/" + "iwasawayuuta",
