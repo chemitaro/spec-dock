@@ -2,18 +2,18 @@
 種別: interview
 ID: "20260708t150402z-interview"
 タイトル: "ChatGPT First Planning Route Fallback Boundary Interview"
-状態: "draft | answered | archived"
+状態: "answered"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-08"
+最終更新: "2026-07-09"
 親: ["iss-00309"]
 関連: []
 scope: "<initiative | epic | issue | local-topic>"
 scope_id: "iss-00309"
 created_at: "2026-07-08THH:MM:SSZ"
 created_by: "iwasawayuuta"
-status: "unanswered | answered | superseded | deferred"
-authority: "proposed | user-approved | synthesized"
-adoption_status: "unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked"
+status: "answered"
+authority: "user-approved"
+adoption_status: "adopted"
 derived_from: []
 reflected_to: []
 ---
@@ -110,41 +110,59 @@ reflected_to: []
 
 ## ユーザー回答 (回答後に必須)
 - answer capture:
-  - ...
+  - Option A を採用する。
+  - ただし、ChatGPT-first route は単に一度試して失敗したら止める route ではない。
+  - 4 tab 上限に達している場合は順番待ちをし、timeout したら再度並び直す。
+  - Browser / ChatGPT automation が起動しない、壊れている、応答しない場合は、ブラウザ再起動、原因特定、復旧を試み、再度 ChatGPT の利用を行う。
+  - ChatGPT 利用が正規 route であり、基本的には待つ・直す・再試行する。
+  - 従来 planning skill route は、OpenAI 側または tool / browser 側の修正困難な不具合があり、人間ユーザーもそれを認識し、一時的に対処できないと判断した場合だけ、明示的な手動承認により使う backup route とする。
 - 回答:
-  - ...
+  - ChatGPT-first を正規 route とし、fallback は人間承認がある場合だけ許可する。
+  - Tab concurrency saturation は fallback 理由ではなく wait / retry 理由とする。
+  - Browser / automation failure は fallback 理由ではなく recovery / restart / retry 理由とする。
+  - fallback は system / provider / tool 側の一時的かつ修正困難な障害に対する emergency backup とする。
 - 回答日時:
-  - ...
+  - 2026-07-09
 
 ## 追加確認の要否 (回答後に必須)
 - 追加確認が必要か:
-  - yes | no
+  - yes
 - 必要な場合に次の unanswered `interview` として切り出す質問:
-  - ...
+  - 正規 route と fallback route の skill naming / discovery order をどうするか。
 
 ## 採用判断 (回答後に必須)
 - adoption_status:
-  - unreviewed | adopted | partially_adopted | rejected | deferred | stale | blocked
+  - adopted
 - adoption target:
-  - `requirement.md` | `design.md` | `plan.md` | `ADR` | `report.md` Evidence Adoption Ledger | none
+  - `requirement.md`
+  - `design.md`
+  - `plan.md`
+  - `report.md` Evidence Adoption Ledger
 - 採用 / 棄却 / deferred の理由:
-  - ...
+  - ChatGPT-first 正規 route と従来 route の fallback 境界を決める product / workflow decision であり、Issue 要件・設計・計画へ直接反映する。
+  - fallback の自動化は採用しない。Tab 上限・timeout・browser 起動不良は、まず待機・再試行・復旧対象であり、fallback へ自動移行する理由にはしない。
+  - fallback は人間承認つきの emergency backup とし、通常の planning workflow では ChatGPT-first route を維持する。
 - `report.md` Evidence Adoption Ledger への反映要否:
-  - yes | no
+  - yes
 
 ## requirement / design / plan / ADR への含意 (回答後に必須)
 - `requirement.md`:
-  - ...
+  - ChatGPT-first route を正規 planning workflow として定義する。
+  - 従来 route は fallback / backup route として残すが、自動 fallback は禁止し、人間承認を必須にする。
+  - Tab 上限・timeout・browser failure は wait / retry / recovery の対象として定義する。
 - `design.md`:
-  - ...
+  - Primary skill は ChatGPT-first orchestration を明示的に実行する。
+  - Fallback skill は別名・別 route として discoverable にするが、primary skill の通常 spine に混ぜない。
+  - Failure taxonomy は `wait`, `retry`, `recover`, `human-approved-fallback` を分ける。
 - `plan.md`:
-  - ...
+  - Skill naming / routing / docs / tests の変更を、primary route と fallback route の分離として実装する。
+  - Backup route は human approval evidence と fallback reason を report / artifact に残す。
 - `ADR`:
-  - ...
+  - 必須ではないが、ChatGPT-first 正規 route と manual fallback policy が他 Epic / future workflow に波及する場合は ADR 候補にする。
 - reflected_to 更新方針:
-  - ...
+  - 要件・設計・計画の具体化時に反映し、`report.md` EAL に採用行を追加する。
 - adoption reflection:
-  - ...
+  - ChatGPT-first を補助線ではなく正規 route とし、従来 route は人間承認つき backup とする。
 
 ## 条件付き補足 (必要な場合だけ)
 - PlantUML 図:
