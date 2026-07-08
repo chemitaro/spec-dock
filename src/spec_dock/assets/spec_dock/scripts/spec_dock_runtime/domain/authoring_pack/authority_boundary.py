@@ -20,12 +20,10 @@ LOCAL_FORBIDDEN_AUTHORITY_CLAIMS: tuple[str, ...] = (
 )
 
 FORBIDDEN_AUTHORITY_CLAIMS: tuple[str, ...] = tuple(
-    dict.fromkeys(
-        (
-            *(claim.lower() for claim in PROMPT_PACK_FORBIDDEN_AUTHORITY_CLAIMS),
-            *LOCAL_FORBIDDEN_AUTHORITY_CLAIMS,
-        )
-    )
+    dict.fromkeys((
+        *(claim.lower() for claim in PROMPT_PACK_FORBIDDEN_AUTHORITY_CLAIMS),
+        *LOCAL_FORBIDDEN_AUTHORITY_CLAIMS,
+    ))
 )
 
 SECRET_MARKERS: tuple[str, ...] = (

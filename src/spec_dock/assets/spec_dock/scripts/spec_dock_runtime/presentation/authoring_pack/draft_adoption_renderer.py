@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-from spec_dock_runtime.domain.authoring_pack.draft_adoption_contract import DraftAdoptionResult
+if TYPE_CHECKING:
+    from spec_dock_runtime.domain.authoring_pack.draft_adoption_contract import DraftAdoptionResult
 
 
 def render_draft_adoption_json(result: DraftAdoptionResult) -> str:

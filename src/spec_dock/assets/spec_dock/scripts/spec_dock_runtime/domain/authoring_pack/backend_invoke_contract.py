@@ -3,9 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import re
-from pathlib import Path
 from typing import Literal
-
 
 PRIMARY_BACKEND_ENV = "SPECDOCK_CHATGPT_COMMAND"
 FALLBACK_BACKEND_ENV = "ORACLE_CHATGPT_COMMAND"
@@ -187,9 +185,18 @@ def _looks_like_secret(value: str) -> bool:
         or re.search(r"gh[pousr]_[a-z0-9_]{8,}", lowered) is not None
         or re.search(r"xox[baprs]-[a-z0-9-]{8,}", lowered) is not None
         or re.search(r"akia[0-9a-z]{16}", lowered) is not None
-        or lowered.startswith(
-            ("token=", "--token", "secret=", "--secret", "credential=", "--credential", "password=", "--password", "key=", "--key")
-        )
+        or lowered.startswith((
+            "token=",
+            "--token",
+            "secret=",
+            "--secret",
+            "credential=",
+            "--credential",
+            "password=",
+            "--password",
+            "key=",
+            "--key",
+        ))
         or re.search(r"\b[a-z0-9_-]*(api[_-]?key|password|token|secret|credential|key)[a-z0-9_-]*=", lowered)
         is not None
     )

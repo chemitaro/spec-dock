@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path, PurePosixPath
 from typing import Literal
-import json
 import zipfile
 
 from spec_dock_runtime.domain.authoring_pack.authority_boundary import (
@@ -17,7 +17,6 @@ from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     EXPECTED_OUTPUT_ROOT,
     REQUIRED_METADATA,
 )
-
 
 PackReviewStatus = Literal["pass", "fail", "blocked", "stale", "rejected"]
 PackInputKind = Literal["zip", "tree"]
@@ -295,7 +294,10 @@ def _status_from_findings(findings: tuple[str, ...], metadata_status: str) -> Pa
         return "rejected"
     if any(finding.startswith("source_hash_mismatch") for finding in findings) or metadata_status == "stale":
         return "stale"
-    if any(finding.startswith(("missing_metadata:", "invalid_json:")) for finding in findings) or metadata_status == "fail":
+    if (
+        any(finding.startswith(("missing_metadata:", "invalid_json:")) for finding in findings)
+        or metadata_status == "fail"
+    ):
         return "fail"
     if findings:
         return "rejected"

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# mypy: ignore-errors
 """Validate selected-skeleton section fills from an evidence-only ChatGPT pack."""
 
 from __future__ import annotations

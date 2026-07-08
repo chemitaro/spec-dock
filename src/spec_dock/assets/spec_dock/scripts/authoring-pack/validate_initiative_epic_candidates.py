@@ -12,9 +12,14 @@ _SPEC_DOCK_SCRIPT = _SCRIPT_DIR.parent / "spec-dock"
 
 
 def main(argv: list[str] | None = None) -> int:
-    return subprocess.run(
-        [sys.executable, str(_SPEC_DOCK_SCRIPT), "authoring", "validate", "initiative-epic-candidates", *(argv or [])]
-    ).returncode
+    return subprocess.run([
+        sys.executable,
+        str(_SPEC_DOCK_SCRIPT),
+        "authoring",
+        "validate",
+        "initiative-epic-candidates",
+        *(argv or []),
+    ]).returncode
 
 
 if __name__ == "__main__":

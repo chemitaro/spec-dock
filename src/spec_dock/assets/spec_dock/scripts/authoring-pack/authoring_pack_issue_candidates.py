@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# mypy: ignore-errors
 """Validate Issue candidates from an evidence-only ChatGPT authoring pack."""
 
 from __future__ import annotations

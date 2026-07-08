@@ -5,7 +5,6 @@ import hashlib
 import json
 from pathlib import Path
 
-
 DEFAULT_SOURCE_PATHS: tuple[str, ...] = (
     "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/authoring.py",
     "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack",

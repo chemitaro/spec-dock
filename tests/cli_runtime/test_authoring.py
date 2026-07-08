@@ -1,17 +1,17 @@
-from pathlib import Path
+import hashlib
 import json
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
-import hashlib
+from typing import Any
 import zipfile
 
 import pytest
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
-
 
 _DEFERRED_COMMANDS: tuple[tuple[list[str], str, str], ...] = ()
 
@@ -288,7 +288,9 @@ class TestAuthoringCli(CliRuntimeHarness):
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
-            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / approval_mutator, kind="epic-issue")
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / approval_mutator, kind="epic-issue"
+            )
             approval = _write_approval_evidence(
                 stage_dir / "approval.json",
                 stage_dir,
@@ -326,9 +328,13 @@ class TestAuthoringCli(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
             stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "evidence", kind="epic-issue")
-            approval = _write_approval_evidence(stage_dir / "approval.json", stage_dir, kind="epic-issue", scope="epic:epic-00295")
+            approval = _write_approval_evidence(
+                stage_dir / "approval.json", stage_dir, kind="epic-issue", scope="epic:epic-00295"
+            )
             candidate_evidence = stage_dir / "candidate-evidence.json"
-            candidate_evidence.write_text(json.dumps({"source_manifest_hash": "old-source"}, sort_keys=True) + "\n", encoding="utf-8")
+            candidate_evidence.write_text(
+                json.dumps({"source_manifest_hash": "old-source"}, sort_keys=True) + "\n", encoding="utf-8"
+            )
 
             p = _run_authoring_capture(
                 self,
@@ -366,7 +372,9 @@ class TestAuthoringCli(CliRuntimeHarness):
     def test_authoring_approval_check_candidate_evidence_source_hash_cannot_mask_stale_pack_source_hash(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
-            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "stale-source", kind="epic-issue")
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / "stale-source", kind="epic-issue"
+            )
             fixture = _write_approval_fixture(
                 stage_dir,
                 kind="epic-issue",
@@ -406,7 +414,9 @@ class TestAuthoringCli(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
             stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "report", kind="epic-issue")
-            approval = _write_approval_evidence(stage_dir / "approval.json", stage_dir, kind="epic-issue", scope="epic:epic-00295")
+            approval = _write_approval_evidence(
+                stage_dir / "approval.json", stage_dir, kind="epic-issue", scope="epic:epic-00295"
+            )
             safe_report = repo / ".specdock-authoring" / "approval" / "report.json"
 
             text = _run_authoring_capture(
@@ -468,7 +478,9 @@ class TestAuthoringCli(CliRuntimeHarness):
     def test_authoring_validate_initiative_epic_candidates_valid_stage_passes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
-            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "initiative", kind="initiative-epic")
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / "initiative", kind="initiative-epic"
+            )
 
             p = _run_authoring_capture(
                 self,
@@ -553,11 +565,11 @@ class TestAuthoringCli(CliRuntimeHarness):
                     "--expected-parent-epic",
                     "epic-00295",
                     "--expected-candidate-pack-digest",
-                    fixture["candidate_pack_digest"],
+                    str(fixture["candidate_pack_digest"]),
                     "--candidate-evidence",
                     str(fixture["candidate_evidence"]),
                     "--expected-candidate-evidence-digest",
-                    fixture["candidate_evidence_digest"],
+                    str(fixture["candidate_evidence_digest"]),
                     "--expected-source-hash",
                     "hash",
                     "--format",
@@ -583,7 +595,9 @@ class TestAuthoringCli(CliRuntimeHarness):
     def test_authoring_approval_check_valid_initiative_epic_passes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
-            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "approval-epic", kind="initiative-epic")
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / "approval-epic", kind="initiative-epic"
+            )
             fixture = _write_approval_fixture(stage_dir, kind="initiative-epic", expected_scope="init-local-00003")
 
             p = _run_authoring_capture(
@@ -614,7 +628,9 @@ class TestAuthoringCli(CliRuntimeHarness):
     def test_authoring_approval_check_blocks_missing_approval(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
-            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "missing-approval", kind="epic-issue")
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / "missing-approval", kind="epic-issue"
+            )
 
             p = _run_authoring_capture(
                 self,
@@ -660,7 +676,9 @@ class TestAuthoringCli(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
             stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / mutator, kind="epic-issue")
-            fixture = _write_approval_fixture(stage_dir, kind="epic-issue", expected_scope="epic-00295", mutator=mutator)
+            fixture = _write_approval_fixture(
+                stage_dir, kind="epic-issue", expected_scope="epic-00295", mutator=mutator
+            )
 
             p = _run_authoring_capture(
                 self,
@@ -750,7 +768,9 @@ class TestAuthoringCli(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
             stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / mutator, kind="epic-issue")
-            fixture = _write_approval_fixture(stage_dir, kind="epic-issue", expected_scope="epic-00295", mutator=mutator)
+            fixture = _write_approval_fixture(
+                stage_dir, kind="epic-issue", expected_scope="epic-00295", mutator=mutator
+            )
 
             p = _run_authoring_capture(
                 self,
@@ -768,11 +788,13 @@ class TestAuthoringCli(CliRuntimeHarness):
                     "--expected-parent-epic",
                     "epic-00295",
                     "--expected-candidate-pack-digest",
-                    "wrong" if mutator == "candidate-pack-digest-mismatch" else fixture["candidate_pack_digest"],
+                    "wrong" if mutator == "candidate-pack-digest-mismatch" else str(fixture["candidate_pack_digest"]),
                     "--candidate-evidence",
                     str(fixture["candidate_evidence"]),
                     "--expected-candidate-evidence-digest",
-                    "wrong" if mutator == "candidate-evidence-digest-mismatch" else fixture["candidate_evidence_digest"],
+                    "wrong"
+                    if mutator == "candidate-evidence-digest-mismatch"
+                    else str(fixture["candidate_evidence_digest"]),
                     "--expected-source-hash",
                     "wrong" if mutator == "source-hash-mismatch" else "hash",
                     "--format",
@@ -831,7 +853,9 @@ class TestAuthoringCli(CliRuntimeHarness):
     def test_authoring_approval_check_writes_safe_report_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
-            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "approval-report", kind="epic-issue")
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / "approval-report", kind="epic-issue"
+            )
             fixture = _write_approval_fixture(stage_dir, kind="epic-issue", expected_scope="epic-00295")
             report_path = repo / ".specdock-authoring" / "approval" / "approval-report.json"
 
@@ -873,14 +897,14 @@ class TestAuthoringCli(CliRuntimeHarness):
             ("broken-symlink", "unsafe_report_path:symlink"),
         ),
     )
-    def test_authoring_approval_check_rejects_unsafe_report_path(
-        self, report_kind: str, expected_finding: str
-    ) -> None:
+    def test_authoring_approval_check_rejects_unsafe_report_path(self, report_kind: str, expected_finding: str) -> None:
         if report_kind in {"symlink", "broken-symlink"} and not hasattr(os, "symlink"):
             pytest.skip("symlink unavailable")
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
-            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "approval-unsafe-report", kind="epic-issue")
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / "approval-unsafe-report", kind="epic-issue"
+            )
             fixture = _write_approval_fixture(stage_dir, kind="epic-issue", expected_scope="epic-00295")
             if report_kind == "canonical-docs":
                 report_path = repo / "spec-dock" / "active" / "issue" / "artifacts" / "approval-report.json"
@@ -934,7 +958,9 @@ class TestAuthoringCli(CliRuntimeHarness):
     def test_authoring_validate_candidates_accepts_documented_source_manifest_hash_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
-            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "source-flag", kind="epic-issue")
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / "source-flag", kind="epic-issue"
+            )
 
             p = _run_authoring_capture(
                 self,
@@ -1143,7 +1169,9 @@ class TestAuthoringCli(CliRuntimeHarness):
     def test_authoring_validate_candidates_handles_binary_review_report_without_traceback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
-            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "binary-report", kind="epic-issue")
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / "binary-report", kind="epic-issue"
+            )
             review_report = repo / "binary-review-report.json"
             review_report.write_bytes(b"\xff\xfe\x00")
 
@@ -1249,9 +1277,9 @@ class TestAuthoringCli(CliRuntimeHarness):
                     "--review-report",
                     str(fixture["review_report"]),
                     "--expected-review-digest",
-                    fixture["review_digest"],
+                    str(fixture["review_digest"]),
                     "--expected-draft-pack-digest",
-                    fixture["draft_pack_digest"],
+                    str(fixture["draft_pack_digest"]),
                     "--expected-source-hash",
                     "source-hash",
                     "--format",
@@ -1301,9 +1329,9 @@ class TestAuthoringCli(CliRuntimeHarness):
                     "--review-report",
                     str(fixture["review_report"]),
                     "--expected-review-digest",
-                    fixture["review_digest"],
+                    str(fixture["review_digest"]),
                     "--expected-draft-pack-digest",
-                    fixture["draft_pack_digest"],
+                    str(fixture["draft_pack_digest"]),
                     "--expected-source-hash",
                     "source-hash",
                 ],
@@ -1856,7 +1884,11 @@ class TestAuthoringCli(CliRuntimeHarness):
             ("pr-delivery-claim", "rejected", "forbidden_authority_claim:pr_delivery"),
             ("canonical-doc-path", "rejected", "canonical_doc_path:section_fills.requirement"),
             ("missing-template-hash", "fail", "missing_or_invalid_field:template_hash"),
-            ("missing-selected-skeleton-hash", "fail", "missing_or_invalid_field:selected_skeleton.selected_skeleton_hash"),
+            (
+                "missing-selected-skeleton-hash",
+                "fail",
+                "missing_or_invalid_field:selected_skeleton.selected_skeleton_hash",
+            ),
             ("missing-section-sha", "fail", "missing_or_invalid_field:section_fills.requirement.sha256"),
             ("template-hash-mismatch", "stale", "template_hash_mismatch"),
             ("selected-skeleton-hash-mismatch", "stale", "selected_skeleton_hash_mismatch"),
@@ -2147,9 +2179,7 @@ class TestAuthoringCli(CliRuntimeHarness):
                 repo / "report-secret.zip",
                 metadata_overrides={
                     "drafts/issue/iss-00301/requirement.md": (
-                        "token=SHOULD_NOT_APPEAR\n"
-                        "private_key: abcdefgh\n"
-                        "raw transcript: browser text\n"
+                        "token=SHOULD_NOT_APPEAR\nprivate_key: abcdefgh\nraw transcript: browser text\n"
                     )
                 },
             )
@@ -2579,12 +2609,27 @@ class TestAuthoringCli(CliRuntimeHarness):
     @pytest.mark.parametrize(
         ("case_name", "entry_name", "entry_payload", "expected_finding"),
         (
-            ("absolute-path", "specdock-authoring-pack//Users/alice/draft.md", "x\n", "path_traversal:/Users/alice/draft.md"),
-            ("host-local-path", "specdock-authoring-pack/Users/alice/draft.md", "x\n", "host_local_path:Users/alice/draft.md"),
+            (
+                "absolute-path",
+                "specdock-authoring-pack//Users/alice/draft.md",
+                "x\n",
+                "path_traversal:/Users/alice/draft.md",
+            ),
+            (
+                "host-local-path",
+                "specdock-authoring-pack/Users/alice/draft.md",
+                "x\n",
+                "host_local_path:Users/alice/draft.md",
+            ),
             ("hidden-path", "specdock-authoring-pack/.hidden.md", "x\n", "hidden_path:.hidden.md"),
             ("secret-path", "specdock-authoring-pack/secrets/token.md", "x\n", "secret_path:secrets/token.md"),
             ("unsupported-suffix", "specdock-authoring-pack/issue/run.sh", "x\n", "unsupported_suffix:issue/run.sh"),
-            ("binary-payload", "specdock-authoring-pack/issue/binary.md", b"\xff\xfe", "binary_payload:issue/binary.md"),
+            (
+                "binary-payload",
+                "specdock-authoring-pack/issue/binary.md",
+                b"\xff\xfe",
+                "binary_payload:issue/binary.md",
+            ),
             ("nested-archive", "specdock-authoring-pack/issue/archive.zip", "x\n", "nested_archive:issue/archive.zip"),
         ),
     )
@@ -2910,7 +2955,7 @@ class TestAuthoringCli(CliRuntimeHarness):
                 repo / "valid.zip",
                 metadata_overrides={
                     "issue/requirement.md": "# Draft requirement\n\ncontent-sensitive-stage-evidence\n",
-                    "adoption/eal-candidates.json": json.dumps(candidate_payload, sort_keys=True) + "\n"
+                    "adoption/eal-candidates.json": json.dumps(candidate_payload, sort_keys=True) + "\n",
                 },
             )
             stage_dir = repo / ".specdock-authoring" / "staged" / "valid"
@@ -3774,7 +3819,9 @@ class TestAuthoringCli(CliRuntimeHarness):
         assert payload["status"] == "pass"
         assert payload["github_sync"] == "not_verified"
         assert payload["sync_state"] == "local_context"
-        assert "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/authoring.py" in payload["source_paths"]
+        assert (
+            "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/authoring.py" in payload["source_paths"]
+        )
         assert "spec-dock/scripts/spec_dock_runtime/commands/authoring.py" in payload["source_paths"]
         assert all("__pycache__" not in path for path in payload["source_hashes"])
         assert all(not path.endswith(".pyc") for path in payload["source_hashes"])
@@ -3837,7 +3884,9 @@ class TestAuthoringCli(CliRuntimeHarness):
 
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
-            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "dogfood-candidates", kind="epic-issue")
+            stage_dir = _write_candidate_stage(
+                repo / ".specdock-authoring" / "staged" / "dogfood-candidates", kind="epic-issue"
+            )
 
             p = subprocess.run(
                 [
@@ -4035,9 +4084,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             Path("spec-dock/scripts/authoring-pack"),
         ),
     )
-    def test_authoring_pack_compatibility_review_rejects_unsafe_legacy_output_dir(
-        self, script_root: Path
-    ) -> None:
+    def test_authoring_pack_compatibility_review_rejects_unsafe_legacy_output_dir(self, script_root: Path) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         review_script = repo_root / script_root / "review_chatgpt_authoring_pack.py"
 
@@ -4074,9 +4121,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             Path("spec-dock/scripts/authoring-pack"),
         ),
     )
-    def test_authoring_pack_compatibility_review_rejects_symlink_legacy_output_dir(
-        self, script_root: Path
-    ) -> None:
+    def test_authoring_pack_compatibility_review_rejects_symlink_legacy_output_dir(self, script_root: Path) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         review_script = repo_root / script_root / "review_chatgpt_authoring_pack.py"
 
@@ -4112,7 +4157,9 @@ class TestAuthoringCli(CliRuntimeHarness):
 
     def test_authoring_pack_compatibility_review_handles_encrypted_zip_without_traceback(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
-        review_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/review_chatgpt_authoring_pack.py"
+        review_script = (
+            repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/review_chatgpt_authoring_pack.py"
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -4146,7 +4193,9 @@ class TestAuthoringCli(CliRuntimeHarness):
 
     def test_authoring_pack_compatibility_review_skips_digest_for_rejected_oversized_zip(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
-        review_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/review_chatgpt_authoring_pack.py"
+        review_script = (
+            repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/review_chatgpt_authoring_pack.py"
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -4184,9 +4233,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             Path("spec-dock/scripts/authoring-pack"),
         ),
     )
-    def test_authoring_pack_compatibility_legacy_review_report_can_stage_same_tree(
-        self, script_root: Path
-    ) -> None:
+    def test_authoring_pack_compatibility_legacy_review_report_can_stage_same_tree(self, script_root: Path) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         review_script = repo_root / script_root / "review_chatgpt_authoring_pack.py"
         stage_script = repo_root / script_root / "stage_chatgpt_authoring_pack.py"
@@ -4242,7 +4289,9 @@ class TestAuthoringCli(CliRuntimeHarness):
 
     def test_authoring_pack_compatibility_stage_honors_legacy_review_report_gate(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
-        stage_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+        stage_script = (
+            repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -4278,7 +4327,9 @@ class TestAuthoringCli(CliRuntimeHarness):
 
     def test_authoring_pack_compatibility_stage_rejects_stale_legacy_review_report(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
-        stage_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+        stage_script = (
+            repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -4286,8 +4337,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             review_report = repo / "legacy-review.json"
             output_dir = repo / ".specdock-authoring" / "legacy-stage"
             review_report.write_text(
-                json.dumps({"status": "pass", "pack_digest": {"content_sha256": "different"}}, sort_keys=True)
-                + "\n",
+                json.dumps({"status": "pass", "pack_digest": {"content_sha256": "different"}}, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
 
@@ -4318,7 +4368,9 @@ class TestAuthoringCli(CliRuntimeHarness):
 
     def test_authoring_pack_compatibility_stage_reviews_input_before_legacy_digest(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
-        stage_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+        stage_script = (
+            repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -4360,7 +4412,9 @@ class TestAuthoringCli(CliRuntimeHarness):
 
     def test_authoring_pack_compatibility_stage_handles_encrypted_zip_digest_without_traceback(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
-        stage_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+        stage_script = (
+            repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -4402,7 +4456,9 @@ class TestAuthoringCli(CliRuntimeHarness):
 
     def test_authoring_pack_compatibility_stage_accepts_matching_legacy_review_report(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
-        stage_script = repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+        stage_script = (
+            repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack/stage_chatgpt_authoring_pack.py"
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -4490,7 +4546,6 @@ class TestAuthoringCli(CliRuntimeHarness):
             )
 
             first_payload = _json_stdout(first)
-            second_payload = _json_stdout(second)
             assert first.returncode == 0, first.stdout + first.stderr
             assert second.returncode == 0, second.stdout + second.stderr
             assert first_payload["status"] == "pass"
@@ -4774,7 +4829,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             preflight.write_text(json.dumps(preflight_payload, sort_keys=True) + "\n", encoding="utf-8")
             output_dir.mkdir()
             target = repo / "spec-dock" / ".assurance.json"
-            os.symlink(target, output_dir / "manifest.json")
+            Path(output_dir / "manifest.json").symlink_to(target)
 
             result = _run_authoring_capture(
                 self,
@@ -4841,7 +4896,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             output_dir = repo / "pack"
             output_dir.mkdir()
             target = repo / "spec-dock" / ".assurance.json"
-            os.symlink(target, output_dir / "diagnostics.json")
+            Path(output_dir / "diagnostics.json").symlink_to(target)
             payload = _run_preflight_json(self, repo, "--expected-source-hash", "old", expected_returncode=1)
             preflight.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -4967,9 +5022,10 @@ class TestAuthoringCli(CliRuntimeHarness):
             preflight = repo / "local-preflight.json"
             output_dir = repo / "pack"
             preflight.write_text(
-                (Path(__file__).resolve().parents[2] / "tests/fixtures/authoring_pack/prepare/valid-local-context-preflight.json").read_text(
-                    encoding="utf-8"
-                ),
+                (
+                    Path(__file__).resolve().parents[2]
+                    / "tests/fixtures/authoring_pack/prepare/valid-local-context-preflight.json"
+                ).read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
 
@@ -5478,7 +5534,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             canonical = repo / "spec-dock" / "active" / "issue" / "artifacts"
             canonical.mkdir(parents=True, exist_ok=True)
             link = repo / "out-link"
-            os.symlink(canonical, link)
+            Path(link).symlink_to(canonical)
 
             result = _run_authoring_capture(
                 self,
@@ -5513,7 +5569,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             target = repo / "ordinary-output-root"
             target.mkdir()
             link = repo / "ordinary-output-link"
-            os.symlink(target, link)
+            Path(link).symlink_to(target)
 
             result = _run_authoring_capture(
                 self,
@@ -5548,7 +5604,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             target = repo / "ordinary-output-root"
             target.mkdir()
             link = repo / "relative-output-link"
-            os.symlink(target, link)
+            Path(link).symlink_to(target)
 
             result = _run_authoring_capture(
                 self,
@@ -5603,7 +5659,7 @@ class TestAuthoringCli(CliRuntimeHarness):
 
             pack = _write_valid_prompt_pack(repo / "pack")
             (pack / "chatgpt-use-prompt.md").unlink()
-            os.symlink(repo / "source.txt", pack / "chatgpt-use-prompt.md")
+            Path(pack / "chatgpt-use-prompt.md").symlink_to(repo / "source.txt")
             symlinked = _run_authoring_capture(
                 self,
                 repo,
@@ -5643,7 +5699,7 @@ class TestAuthoringCli(CliRuntimeHarness):
                     "--output-dir",
                     str(repo / "invoke-output"),
                     "--backend-command",
-                    "\"unterminated",
+                    '"unterminated',
                     "--format",
                     "json",
                 ],
@@ -5756,7 +5812,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             output_dir = repo / "invoke-output"
             output_dir.mkdir()
             target = repo / "spec-dock" / ".assurance.json"
-            os.symlink(target, output_dir / "invocation-summary.json")
+            Path(output_dir / "invocation-summary.json").symlink_to(target)
 
             result = _run_authoring_capture(
                 self,
@@ -5983,7 +6039,16 @@ class TestAuthoringCli(CliRuntimeHarness):
 
     def test_authoring_backend_invoke_compatibility_script_smoke(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
-        script = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "authoring-pack" / "invoke_chatgpt_backend.py"
+        script = (
+            repo_root
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+            / "authoring-pack"
+            / "invoke_chatgpt_backend.py"
+        )
         dogfood_script = repo_root / "spec-dock" / "scripts" / "authoring-pack" / "invoke_chatgpt_backend.py"
         assert os.access(script, os.X_OK)
         assert os.access(dogfood_script, os.X_OK)
@@ -6029,7 +6094,16 @@ class TestAuthoringCli(CliRuntimeHarness):
 
     def test_authoring_backend_invoke_compatibility_script_legacy_file_mode(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
-        script = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "authoring-pack" / "invoke_chatgpt_backend.py"
+        script = (
+            repo_root
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+            / "authoring-pack"
+            / "invoke_chatgpt_backend.py"
+        )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             prompt = root / "prompt.md"
@@ -6077,7 +6151,16 @@ class TestAuthoringCli(CliRuntimeHarness):
 
     def test_authoring_backend_invoke_compatibility_script_legacy_prompt_only_mode(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
-        script = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "authoring-pack" / "invoke_chatgpt_backend.py"
+        script = (
+            repo_root
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+            / "authoring-pack"
+            / "invoke_chatgpt_backend.py"
+        )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             captured = root / "captured.json"
@@ -6112,7 +6195,16 @@ class TestAuthoringCli(CliRuntimeHarness):
 
     def test_authoring_backend_invoke_compatibility_script_legacy_file_mode_blocks_missing_file(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
-        script = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "authoring-pack" / "invoke_chatgpt_backend.py"
+        script = (
+            repo_root
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+            / "authoring-pack"
+            / "invoke_chatgpt_backend.py"
+        )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             backend = _write_fake_backend(root / "backend.py", root / "captured.json")
@@ -6147,7 +6239,7 @@ def _run_preflight_json(
     repo: Path,
     *extra_args: str,
     expected_returncode: int = 0,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     p = _run_authoring_capture(
         testcase,
         repo,
@@ -6191,7 +6283,7 @@ def _run_authoring_capture_from_cwd(
     )
 
 
-def _json_stdout(p: subprocess.CompletedProcess[str]) -> dict[str, object]:
+def _json_stdout(p: subprocess.CompletedProcess[str]) -> dict[str, Any]:
     try:
         payload = json.loads(p.stdout)
     except json.JSONDecodeError as error:
@@ -6233,7 +6325,7 @@ def _run_issue_draft_adoption_json(
     fixture: dict[str, str | Path],
     *extra_args: str,
     expected_returncode: int = 1,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     p = _run_authoring_capture(
         testcase,
         repo,
@@ -6262,7 +6354,7 @@ def _run_selected_skeleton_fill_json(
     fixture: dict[str, Path],
     *extra_args: str,
     expected_returncode: int = 1,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     p = _run_authoring_capture(
         testcase,
         repo,
@@ -6359,12 +6451,12 @@ def _write_authoring_pack_zip(
     for metadata_path, value in (metadata_overrides or {}).items():
         entries[metadata_path] = value
     with zipfile.ZipFile(zip_path, "w") as archive:
-        for name, value in entries.items():
-            archive.writestr(f"{root}/{name}", value)
-        for name, value in (extra_entries or {}).items():
-            archive.writestr(name, value)
-        for info, value in extra_infos or ():
-            archive.writestr(info, value)
+        for entry_name, entry_value in entries.items():
+            archive.writestr(f"{root}/{entry_name}", entry_value)
+        for extra_name, extra_value in (extra_entries or {}).items():
+            archive.writestr(extra_name, extra_value)
+        for extra_info, extra_value in extra_infos or ():
+            archive.writestr(extra_info, extra_value)
     return zip_path
 
 
@@ -6432,7 +6524,10 @@ def _write_candidate_stage(
     source_manifest_hash = "different" if mutator == "source-hash-mismatch" else "hash"
     (root / "source-manifest.json").parent.mkdir(parents=True, exist_ok=True)
     (root / "source-manifest.json").write_text(
-        json.dumps({"source_manifest_hash": source_manifest_hash, "source_hashes": {"src/example.py": "abc123"}}, sort_keys=True)
+        json.dumps(
+            {"source_manifest_hash": source_manifest_hash, "source_hashes": {"src/example.py": "abc123"}},
+            sort_keys=True,
+        )
         + "\n",
         encoding="utf-8",
     )
@@ -6496,7 +6591,11 @@ def _write_candidate_stage(
                 "approval_gate": "human_approval_before_epic_node_creation",
                 "parent_trace": parent_trace,
                 "boundary": _candidate_boundary(number, overlap=mutator == "overlap" and number == 1),
-                "epic_boundary": {"scope": [f"epic scope {number}"], "non_scope": ["other"], "depends_on_epic_candidates": []},
+                "epic_boundary": {
+                    "scope": [f"epic scope {number}"],
+                    "non_scope": ["other"],
+                    "depends_on_epic_candidates": [],
+                },
                 "draft_files": draft_files,
                 "authority_claims": _candidate_authority_claims(),
             }
@@ -6543,20 +6642,20 @@ def _write_candidate_stage(
             if mutator == "invalid-schema-version" and number == 1:
                 payload.pop("schema_version")
         (candidate_dir / "candidate.json").write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
-        index_candidates.append(
-            {
-                "candidate_id": candidate_id,
-                "slug": slug,
-                "title": title,
-                "path": f"candidates/{'epics' if kind == 'initiative-epic' else 'issues'}/{candidate_id}/candidate.json",
-            }
-        )
+        index_candidates.append({
+            "candidate_id": candidate_id,
+            "slug": slug,
+            "title": title,
+            "path": f"candidates/{'epics' if kind == 'initiative-epic' else 'issues'}/{candidate_id}/candidate.json",
+        })
     index = {
         "schema_version": 1,
         "authority": "evidence_only",
         "adoption_status": "unreviewed",
         "bundle_generation_not_promotion": True,
-        "parent_trace": {"initiative_id": "init-local-00003"} if kind == "initiative-epic" else {"epic_id": "epic-00295"},
+        "parent_trace": {"initiative_id": "init-local-00003"}
+        if kind == "initiative-epic"
+        else {"epic_id": "epic-00295"},
         "candidates": [] if mutator == "empty-index" else index_candidates,
     }
     if mutator == "host-local-path":
@@ -6743,7 +6842,7 @@ def _write_approval_evidence(
     return approval_path
 
 
-def _candidate_boundary(number: int, *, overlap: bool = False) -> dict[str, list[str]]:
+def _candidate_boundary(number: int, *, overlap: bool = False) -> dict[str, Any]:
     scope = [f"scope {number}"]
     non_scope = [f"scope {number}" if overlap else f"non-scope {number}"]
     return {"summary": f"boundary {number}", "scope": scope, "non_scope": non_scope, "dependencies": []}
@@ -6787,7 +6886,9 @@ def _candidate_tree_digest(pack_root: Path) -> str:
 
 
 def _write_issue_draft_adoption_fixture(repo: Path, *, mutator: str | None = None) -> dict[str, str | Path]:
-    issue_dir = repo / "spec-dock" / "initiatives" / "init-local-00003" / "epics" / "epic-00295" / "issues" / "iss-00303"
+    issue_dir = (
+        repo / "spec-dock" / "initiatives" / "init-local-00003" / "epics" / "epic-00295" / "issues" / "iss-00303"
+    )
     issue_dir.mkdir(parents=True, exist_ok=True)
     (issue_dir / ".meta.json").write_text(
         json.dumps(
@@ -6831,10 +6932,7 @@ def _write_issue_draft_adoption_fixture(repo: Path, *, mutator: str | None = Non
             "report_evidence": "report.md",
         },
         "eal_disposition_required": True,
-        "drafts": {
-            name: {"path": draft_paths[name], "sha256": digest}
-            for name, digest in draft_hashes.items()
-        },
+        "drafts": {name: {"path": draft_paths[name], "sha256": digest} for name, digest in draft_hashes.items()},
         "authority_claims": _draft_authority_claims(),
     }
     if mutator == "forbidden-claim":
@@ -6880,7 +6978,9 @@ def _write_issue_draft_adoption_fixture(repo: Path, *, mutator: str | None = Non
 
 
 def _write_selected_skeleton_fixture(repo: Path, *, mutator: str | None = None) -> dict[str, Path]:
-    issue_dir = repo / "spec-dock" / "initiatives" / "init-local-00003" / "epics" / "epic-00295" / "issues" / "iss-00303"
+    issue_dir = (
+        repo / "spec-dock" / "initiatives" / "init-local-00003" / "epics" / "epic-00295" / "issues" / "iss-00303"
+    )
     issue_dir.mkdir(parents=True, exist_ok=True)
     (issue_dir / ".meta.json").write_text(
         json.dumps(
@@ -6901,7 +7001,9 @@ def _write_selected_skeleton_fixture(repo: Path, *, mutator: str | None = None) 
     artifact_dir = issue_dir / "artifacts"
     artifact_dir.mkdir(exist_ok=True)
     for section in sections:
-        (artifact_dir / f"{section}-fill.md").write_text(f"# {section}\n\nFilled {section} section.\n", encoding="utf-8")
+        (artifact_dir / f"{section}-fill.md").write_text(
+            f"# {section}\n\nFilled {section} section.\n", encoding="utf-8"
+        )
     assurance = issue_dir / ".assurance.json"
     assurance_profile = "strict" if mutator == "assurance-profile-mismatch" else "standard"
     assurance.write_text(
@@ -6929,13 +7031,11 @@ def _write_selected_skeleton_fixture(repo: Path, *, mutator: str | None = None) 
     section_fills: list[dict[str, str]] = []
     for section in sections:
         path = artifact_dir / f"{section}-fill.md"
-        section_fills.append(
-            {
-                "section_id": section,
-                "path": f"artifacts/{section}-fill.md",
-                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-            }
-        )
+        section_fills.append({
+            "section_id": section,
+            "path": f"artifacts/{section}-fill.md",
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        })
     if mutator == "secret-path":
         section_fills[0]["path"] = "secrets/requirement.md"
     if mutator == "section-hash-mismatch":

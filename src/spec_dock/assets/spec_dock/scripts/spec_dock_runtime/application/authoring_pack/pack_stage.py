@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
-from pathlib import Path
-from typing import Literal
 import json
+from pathlib import Path
 import shutil
+from typing import Literal
 import zipfile
 
 from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import EXPECTED_OUTPUT_ROOT
@@ -73,14 +73,24 @@ def stage_authoring_pack(request: PackStageRequest) -> PackStageResult:
             stage_dir=str(request.stage_dir),
             review=review,
             findings=(),
-            staged_files=("review-report.json", "dry-run-diff.md", "adoption/eal-candidates.json", ".specdock-stage-owner.json"),
+            staged_files=(
+                "review-report.json",
+                "dry-run-diff.md",
+                "adoption/eal-candidates.json",
+                ".specdock-stage-owner.json",
+            ),
             dry_run=True,
         )
     request.stage_dir.mkdir(parents=True, exist_ok=True)
     _clean_owned_stage_dir(request.stage_dir)
     staged_files = list(_copy_pack(request.input_path, request.stage_dir))
     _write_stage_reports(request.stage_dir, review)
-    staged_files.extend(("review-report.json", "dry-run-diff.md", "adoption/eal-candidates.json", ".specdock-stage-owner.json"))
+    staged_files.extend((
+        "review-report.json",
+        "dry-run-diff.md",
+        "adoption/eal-candidates.json",
+        ".specdock-stage-owner.json",
+    ))
     return PackStageResult(
         status="pass",
         input_path=str(request.input_path),
@@ -118,9 +128,12 @@ def _unsafe_stage_target(stage_dir: Path) -> str | None:
         for path in stage_dir.rglob("*"):
             if path.is_symlink():
                 return "unsafe_stage_target:symlink_descendant"
-    if stage_dir.exists() and any(stage_dir.iterdir()):
-        if not marker.exists() or not _valid_stage_owner_marker(marker):
-            return "unsafe_stage_target:non_owned_existing"
+    if (
+        stage_dir.exists()
+        and any(stage_dir.iterdir())
+        and (not marker.exists() or not _valid_stage_owner_marker(marker))
+    ):
+        return "unsafe_stage_target:non_owned_existing"
     return None
 
 

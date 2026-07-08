@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 from typing import Literal
-import json
 
 from spec_dock_runtime.domain.authoring_pack.zip_contract import PackReviewResult, review_pack_input
 
