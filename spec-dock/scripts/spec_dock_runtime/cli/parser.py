@@ -92,10 +92,10 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     )
     authoring_sub = p_authoring.add_subparsers(dest="authoring_cmd", required=True)
 
-    authoring_preflight = authoring_sub.add_parser("preflight", help="Deferred authoring preflight skeletons")
+    authoring_preflight = authoring_sub.add_parser("preflight", help="Run authoring preflight checks")
     authoring_preflight_sub = authoring_preflight.add_subparsers(dest="authoring_preflight_cmd", required=True)
     _bind_leaf(
-        authoring_preflight_sub.add_parser("github-sync", help="Deferred GitHub sync preflight skeleton"),
+        authoring_preflight_sub.add_parser("github-sync", help="Check GitHub sync before repo-aware authoring"),
         registry,
         "authoring_preflight_github_sync",
     )
@@ -126,7 +126,7 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "authoring_backend_invoke",
     )
 
-    authoring_validate = authoring_sub.add_parser("validate", help="Deferred authoring validation skeletons")
+    authoring_validate = authoring_sub.add_parser("validate", help="Validate evidence-only authoring outputs")
     authoring_validate_sub = authoring_validate.add_subparsers(dest="authoring_validate_cmd", required=True)
     _bind_leaf(
         authoring_validate_sub.add_parser(
