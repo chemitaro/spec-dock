@@ -325,7 +325,7 @@ all preceding Issues -> C12
 
 ## Relay policy
 
-C01〜C11 are intermediate Issues. They finish with local verification evidence, no-per-Issue-PR rationale, and a dependency edge to C12. C12 is mandatory and is the only Issue that performs Epic-wide final quality gate, manual tests, reviewer / CI / PR review repair loop, and mergeable PR delivery.
+All non-final implementation Issues in this Epic are intermediate Issues. They finish with local verification evidence, no-per-Issue-PR rationale, and dependency coverage into the final quality gate Issue. `iss-00307` is mandatory and is the only Issue that performs Epic-wide final quality gate, manual tests, reviewer / CI / PR review repair loop, and mergeable PR delivery. Newly inserted implementation Issues, including `iss-00309`, must be linked before `iss-00307` rather than creating their own per-Issue PR delivery.
 
 ## Final quality gate checks
 

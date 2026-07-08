@@ -3,7 +3,7 @@
 ID: "iss-00309"
 タイトル: "ChatGPT First Planning Skills And Fallback Route Redesign"
 関連GitHub: ["#309"]
-状態: "draft | approved"
+状態: "reviewed"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-09"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -49,7 +49,8 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | interpretation | orchestrator | ChatGPT Use 直実行版と SpecDock authoring script 経由版のどちらを採用するか | 直実行版を採用; script 経由版を採用; 両方を併用 | 検査可能な ZIP 実体が残った直実行版を正本候補に採用し、script 経由版は不採用 evidence とする | script 経由版は transcript だけが残り、ZIP の展開検査ができなかった。直実行版は ZIP listing / unsafe token scan / transcript render を確認できた | applied | EAL-006; EAL-007; `artifacts/20260708t162512z-manifest-chatgpt-formal-spec-pack.md` | script backend ZIP materialization は必要なら別 Issue で扱う |
+| D-002 | resolved | scope | spec-reviewer | `iss-00309` が parent Epic の final quality relay に接続されていない | `iss-00309` を例外扱いにする; `iss-00309` を `iss-00306 -> iss-00309 -> iss-00307` の relay に接続する | `iss-00309` は追加 implementation Issue として final quality Issue の前段に接続する | parent Epic は per-Issue PR delivery を禁じ、final quality Issue で PR delivery を行う方針であるため | applied | `./spec-dock/scripts/spec-dock deps add --from iss-00309 --to iss-00306`; `./spec-dock/scripts/spec-dock deps add --from iss-00307 --to iss-00309`; `epic-00295/plan.md` | なし |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,13 +64,13 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） | ユーザー回答（`interview`） | `requirement.md` / `design.md` / `plan.md` | ChatGPT-first を正規 planning route とし、4 tab 上限・timeout・browser failure は wait / retry / recovery 対象にする。従来 planning route は、人間が修正困難な障害を認識して明示承認した場合だけ使う emergency backup とする。 | `artifacts/20260708t150402z-interview-chatgpt-first-planning-route-fallback-boundary-interview.md` | 要件・設計・計画へ反映する |
-| EAL-002 | 採用（`adopted`） | ユーザー回答（`interview`） | `requirement.md` / `design.md` / `plan.md` | 既存 planning skill 名を ChatGPT-first primary route として維持し、従来 route は `-manual` suffix の human-approved backup skill として分離する。 | `artifacts/20260708t151122z-interview-primary-and-fallback-skill-naming-interview.md` | 要件・設計・計画へ反映する |
-| EAL-003 | 採用（`adopted`） | ユーザー回答（`interview`） | `requirement.md` / `design.md` / `plan.md` | 複数 Issue を持つ implementation Epic では final quality gate / PR delivery Issue を必須にする。single-Issue / docs-only / no-op Epic は skip rationale と completion evidence を置けば省略でき、単一 Issue Epic では Issue の品質ゲートが Epic の品質ゲートを兼ねられる。 | `artifacts/20260708t152452z-interview-final-quality-gate-issue-scope-interview.md` | 要件・設計・計画へ反映し、Issue Planning の実施タイミングは追加 research で具体化する |
-| EAL-004 | 採用（`adopted`） | ChatGPT GPT-5.5 Pro Extended 分析（`research`） | `requirement.md` / `design.md` / `plan.md` | Issue Planning timing は Option 3+ を採用する。Epic Planning では各 Issue の draft requirement / draft design / draft plan まで作成し、canonical Issue docs は Epic Execution 中の各 Issue start 直前または直後に、current repository state と prior Issues を踏まえて Issue Planning で正式化する。Issue-local に吸収できない drift は Epic Planning repair / clarification / ADR へ戻す。 | `artifacts/20260708t154900z-research-chatgpt-first-issue-planning-timing-and-epic-execution-workflow.md` | 要件・設計・計画へ反映する |
-| EAL-005 | 採用（`adopted`） | ユーザー決定（`ADR`） | `requirement.md` / `design.md` / `plan.md` / provider workflow docs / skills / templates | Option 3+ を accepted ADR として正式採用した。今後の workflow docs には end-to-end workflow と Issue draft lifecycle の PlantUML 図を取り込み、skills / templates はこの ADR を前提に更新する。 | `artifacts/20260708t161533z-adr-chatgpt-first-option-3-plus-issue-planning-workflow.md` | 要件・設計・計画へ反映し、実装段階で provider-side docs / skills / templates へ取り込む |
-| EAL-006 | 採用（`adopted`） | ChatGPT Use 直実行（`iss-00309-formal-specs-zip-2`） | `requirement.md` / `design.md` / `plan.md` / `artifacts/20260708t162512z-manifest-chatgpt-formal-spec-pack.md` / `artifacts/20260708t162513z-research-workflow-impact-map.md` / `artifacts/20260708t162514z-disc-implementation-scope-and-test-strategy.md` | 直実行版は repository-relative path を保持した ZIP 実体をローカルに取得でき、展開前検査で traversal や unsafe path は見つからなかった。要件・設計・計画は EAL-001〜EAL-005 の決定を反映し、ChatGPT output を evidence-only とする境界も明示しているため、今回の正本候補として採用した。配置時に SpecDock artifact slot rule に合わせ、同一 timestamp の補助 artifact は一意 slot へ改名した。 | `/Users/iwasawayuuta/.oracle/sessions/iss-00309-formal-specs-zip-2/artifacts/iss-00309-chatgpt-formal-spec-pack.zip` sha256=`eb126a1ab2108528e5fc46e9b142e2b78eb80f7c2ca16fb2ed53a6ca9e25254f` / `artifacts/20260708t162512z-manifest-chatgpt-formal-spec-pack.md` | fresh `spec-reviewer` pass を取得するまでは execution-ready と扱わない |
-| EAL-007 | 棄却（`rejected`） | SpecDock authoring script 経由（`iss-00309-script-formal-specs`） | `requirement.md` / `design.md` / `plan.md` | スクリプト経由は ChatGPT 応答上では ZIP 生成に成功したが、Oracle download fallback 後にローカル artifacts へ ZIP 実体が materialize せず、検査・展開・配置できなかった。今回の採用候補としては、検査可能な直実行版を優先する。スクリプト経由のプロンプト契約・preflight/pack prepare/backend invoke の挙動は今後の authoring runtime 改善の参考 evidence として保持する。 | `/Users/iwasawayuuta/.oracle/sessions/iss-00309-script-formal-specs/artifacts/transcript.md` / script output claimed sha256=`7fd8f69dd4d9c72f0356fa2f96405359e061c0e78020a33723cc25b3c7e738e2` but local ZIP artifact was unavailable | 必要なら別 Issue で script backend ZIP download/materialization の検証と改善を扱う |
+| EAL-001 | adopted | ユーザー回答（`interview`） | `requirement.md` / `design.md` / `plan.md` | ChatGPT-first を正規 planning route とし、4 tab 上限・timeout・browser failure は wait / retry / recovery 対象にする。従来 planning route は、人間が修正困難な障害を認識して明示承認した場合だけ使う emergency backup とする。 | `artifacts/20260708t150402z-interview-chatgpt-first-planning-route-fallback-boundary-interview.md` | 要件・設計・計画へ反映する |
+| EAL-002 | adopted | ユーザー回答（`interview`） | `requirement.md` / `design.md` / `plan.md` | 既存 planning skill 名を ChatGPT-first primary route として維持し、従来 route は `-manual` suffix の human-approved backup skill として分離する。 | `artifacts/20260708t151122z-interview-primary-and-fallback-skill-naming-interview.md` | 要件・設計・計画へ反映する |
+| EAL-003 | adopted | ユーザー回答（`interview`） | `requirement.md` / `design.md` / `plan.md` | 複数 Issue を持つ implementation Epic では final quality gate / PR delivery Issue を必須にする。single-Issue / docs-only / no-op Epic は skip rationale と completion evidence を置けば省略でき、単一 Issue Epic では Issue の品質ゲートが Epic の品質ゲートを兼ねられる。 | `artifacts/20260708t152452z-interview-final-quality-gate-issue-scope-interview.md` | 要件・設計・計画へ反映し、Issue Planning の実施タイミングは追加 research で具体化する |
+| EAL-004 | adopted | ChatGPT GPT-5.5 Pro Extended 分析（`research`） | `requirement.md` / `design.md` / `plan.md` | Issue Planning timing は Option 3+ を採用する。Epic Planning では各 Issue の draft requirement / draft design / draft plan まで作成し、canonical Issue docs は Epic Execution 中の各 Issue start 直前または直後に、current repository state と prior Issues を踏まえて Issue Planning で正式化する。Issue-local に吸収できない drift は Epic Planning repair / clarification / ADR へ戻す。 | `artifacts/20260708t154900z-research-chatgpt-first-issue-planning-timing-and-epic-execution-workflow.md` | 要件・設計・計画へ反映する |
+| EAL-005 | adopted | ユーザー決定（`ADR`） | `requirement.md` / `design.md` / `plan.md` / provider workflow docs / skills / templates | Option 3+ を accepted ADR として正式採用した。今後の workflow docs には end-to-end workflow と Issue draft lifecycle の PlantUML 図を取り込み、skills / templates はこの ADR を前提に更新する。 | `artifacts/20260708t161533z-adr-chatgpt-first-option-3-plus-issue-planning-workflow.md` | 要件・設計・計画へ反映し、実装段階で provider-side docs / skills / templates へ取り込む |
+| EAL-006 | adopted | ChatGPT Use 直実行（`iss-00309-formal-specs-zip-2`） | `requirement.md` / `design.md` / `plan.md` / `artifacts/20260708t162512z-manifest-chatgpt-formal-spec-pack.md` / `artifacts/20260708t162513z-research-workflow-impact-map.md` / `artifacts/20260708t162514z-disc-implementation-scope-and-test-strategy.md` | 直実行版は repository-relative path を保持した ZIP 実体として検査でき、展開前検査で traversal や unsafe path は見つからなかった。要件・設計・計画は EAL-001〜EAL-005 の決定を反映し、ChatGPT output を evidence-only とする境界も明示しているため、今回の正本候補として採用した。配置時に SpecDock artifact slot rule に合わせ、同一 timestamp の補助 artifact は一意 slot へ改名した。 | `artifacts/20260708t162512z-manifest-chatgpt-formal-spec-pack.md`; sha256=`eb126a1ab2108528e5fc46e9b142e2b78eb80f7c2ca16fb2ed53a6ca9e25254f` | fresh `spec-reviewer` pass を取得するまでは execution-ready と扱わない |
+| EAL-007 | rejected | SpecDock authoring script 経由（`iss-00309-script-formal-specs`） | `requirement.md` / `design.md` / `plan.md` | スクリプト経由は ChatGPT 応答上では ZIP 生成に成功したが、ローカル artifacts へ ZIP 実体が materialize せず、検査・展開・配置できなかった。今回の採用候補としては、検査可能な直実行版を優先する。スクリプト経由のプロンプト契約・preflight/pack prepare/backend invoke の挙動は今後の authoring runtime 改善の参考 evidence として保持する。 | script output claimed sha256=`7fd8f69dd4d9c72f0356fa2f96405359e061c0e78020a33723cc25b3c7e738e2`; repo-portable adopted evidence は EAL-006 に集約 | 必要なら別 Issue で script backend ZIP download/materialization の検証と改善を扱う |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -77,7 +78,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ChatGPT-first planning skill redesign を正規 workflow にする目的 | script 経由も試行し、配置可能性を比較した | 低（low） | pending |
+| OAL-001 | ChatGPT-first planning skill redesign を正規 workflow にする目的 | script 経由も試行し、配置可能性を比較した | 低（low） | pass |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -85,9 +86,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | EAL-001〜EAL-006、ChatGPT Use 直実行 ZIP、既存 issue scaffold、parent Epic docs | なし | adopted | pending | いいえ（no） | fresh spec-reviewer 待ち |
-| design | EAL-001〜EAL-006、ChatGPT Use 直実行 ZIP、Option 3+ ADR、workflow impact map | なし | adopted | pending | いいえ（no） | fresh spec-reviewer 待ち |
-| plan | EAL-001〜EAL-006、ChatGPT Use 直実行 ZIP、implementation scope and test strategy artifact | なし | adopted | pending | いいえ（no） | fresh spec-reviewer 待ち |
+| requirement | EAL-001〜EAL-006、ChatGPT Use 直実行 ZIP、既存 issue scaffold、parent Epic docs | なし | adopted | pass | いいえ（no） | promote |
+| design | EAL-001〜EAL-006、ChatGPT Use 直実行 ZIP、Option 3+ ADR、workflow impact map | なし | adopted | pass | いいえ（no） | promote |
+| plan | EAL-001〜EAL-006、ChatGPT Use 直実行 ZIP、implementation scope and test strategy artifact | なし | adopted | pass | いいえ（no） | promote |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -115,8 +116,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| ChatGPT GPT-5.5 Pro Extended | iss-00309 | `/Users/iwasawayuuta/.oracle/sessions/iss-00309-formal-specs-zip-2/artifacts/iss-00309-chatgpt-formal-spec-pack.zip` | GitHub connector: `chemitaro/spec-dock` branch `iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign`; prompt file `/private/tmp/codex-agent-work/501/session-20260708t162512z-iss-00309-chatgpt-formal-specs-53de7086/prompt.md` | `requirement.md`, `design.md`, `plan.md`, `artifacts/20260708t162512z-manifest-chatgpt-formal-spec-pack.md`, `artifacts/20260708t162513z-research-workflow-impact-map.md`, `artifacts/20260708t162514z-disc-implementation-scope-and-test-strategy.md` | 採用（adopted） | [`requirement.md`, `design.md`, `plan.md`, `artifacts/20260708t162512z-manifest-chatgpt-formal-spec-pack.md`, `artifacts/20260708t162513z-research-workflow-impact-map.md`, `artifacts/20260708t162514z-disc-implementation-scope-and-test-strategy.md`] | ZIP listing / unsafe token scan / transcript render: pass | 正本候補として統合 | fresh reviewer pass / execution-ready claim は採用しない | fresh `spec-reviewer` pass 未取得 | 未実施 | canonical docs へ配置済み。reviewer gate 前の draft として扱う |
-| SpecDock authoring script + ChatGPT GPT-5.5 Pro Extended | iss-00309 | `/Users/iwasawayuuta/.oracle/sessions/iss-00309-script-formal-specs/artifacts/transcript.md` | `spec-dock authoring preflight`, `pack prepare`, `backend invoke`; GitHub connector: `chemitaro/spec-dock` branch `iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign` | `requirement.md`, `design.md`, `plan.md`, `artifacts/` | 棄却（rejected） | [] | transcript render: pass; local ZIP artifact: unavailable | 不採用 | ローカルに ZIP 実体が残らず、検査・展開できなかった | なし（今回の正本候補は直実行版で充足） | 未実施 | script backend ZIP materialization は follow-up 候補 |
+| ChatGPT GPT-5.5 Pro Extended | iss-00309 | `artifacts/20260708t162512z-manifest-chatgpt-formal-spec-pack.md` | GitHub connector: `chemitaro/spec-dock` branch `iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign`; sanitized prompt summary in manifest | `requirement.md`, `design.md`, `plan.md`, `artifacts/20260708t162512z-manifest-chatgpt-formal-spec-pack.md`, `artifacts/20260708t162513z-research-workflow-impact-map.md`, `artifacts/20260708t162514z-disc-implementation-scope-and-test-strategy.md` | adopted | [`requirement.md`, `design.md`, `plan.md`, `artifacts/20260708t162512z-manifest-chatgpt-formal-spec-pack.md`, `artifacts/20260708t162513z-research-workflow-impact-map.md`, `artifacts/20260708t162514z-disc-implementation-scope-and-test-strategy.md`] | ZIP listing / unsafe token scan / transcript render: pass | 正本候補として統合 | fresh reviewer pass / execution-ready claim は ChatGPT から採用しない | なし | pass | promote |
+| SpecDock authoring script + ChatGPT GPT-5.5 Pro Extended | iss-00309 | script-output-summary | `spec-dock authoring preflight`, `pack prepare`, `backend invoke`; GitHub connector: `chemitaro/spec-dock` branch `iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign` | `requirement.md`, `design.md`, `plan.md`, `artifacts/` | rejected | [] | transcript render: pass; local ZIP artifact: unavailable | 不採用 | ローカルに ZIP 実体が残らず、検査・展開できなかった | なし（今回の正本候補は直実行版で充足） | N/A | script backend ZIP materialization は follow-up 候補 |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -133,27 +134,32 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- ChatGPT Use 直実行版と SpecDock authoring script 経由版を比較し、検査可能な ZIP 実体を持つ ChatGPT Use 直実行版を採用した。
+- 初回 spec-reviewer は fail となり、final quality relay 接続と host-local evidence 除去を修正した。実装は fresh spec-reviewer pass まで開始しない。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-07-09 HH:MM - HH:MM）
+### セッションログ（2026-07-09 02:00 - 02:30）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S00 planning draft adoption / review-fix
+- AC/EC: REQ-001〜REQ-020 / EC-001〜EC-010
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: 9. 実装ステップ / 10. 具体テストケース / 11. Step Closure Contract
+  - closure ids: CLOS-001〜CLOS-010
 
 #### 実施内容
-- ...
+- ChatGPT Use 直実行版の ZIP 内容を Issue 正本候補へ配置した。
+- SpecDock authoring script 経由版はローカル ZIP 実体が取得できないため不採用 evidence とした。
+- `iss-00309` を `iss-00306 -> iss-00309 -> iss-00307` の final quality relay に接続した。
+- durable evidence から host-local absolute path を除去し、repo-relative artifact と hash に置き換えた。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
-
-<result>
+./spec-dock/scripts/spec-dock deps add --from iss-00309 --to iss-00306
+./spec-dock/scripts/spec-dock deps add --from iss-00307 --to iss-00309
+./spec-dock/scripts/spec-dock validate
+git diff --check
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
@@ -166,29 +172,30 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S00 | `iss-00309` が final quality relay に未接続 | spec-reviewer | deps add と parent Epic plan 修正 | D-002 / CLOS-010 | yes | `iss-00309/.meta.json`; `iss-00307/.meta.json`; `epic-00295/plan.md` |
+| S00 | host-local absolute path が durable evidence に残存 | spec-reviewer | repo-relative artifact / sha256 へ置換 | D-001 / CLOS-010 | no | `report.md` EAL-006 / EAL-007 |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S00 | CLOS-001〜CLOS-010 | ChatGPT draft adoption / report gate cleanup / review-fix | `validate` pass; `diff --check` pass; spec-reviewer re-review pass | pass | implementation may start after commit/push evidence is recorded |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| TC-004 | S00 | yes | inspect-only | ChatGPT draft adoption and review-fix | `./spec-dock/scripts/spec-dock validate`; `git diff --check` | pass | spec-reviewer re-review pass |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| CLOS-010 | S00 | `validate`; `diff --check`; spec-reviewer re-review | pass | implementation handoff allowed after commit/push evidence |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| changed | CLOS-010 | TC-004 | CLOS-010 | spec-reviewer P1 findings required relay/evidence fixes | yes | completed |
 
 #### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 `workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
@@ -199,62 +206,53 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| ワークフロー利用依頼 / 明示承認 / なし（user request to use SpecDock workflow / explicit approval / none） | ... | iss-00309 | 現在セッション（current session） / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | 範囲: active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility。破壊的操作 / 外部公開 / credentialed external mutation / scope expansion / private external system use / out-of-workflow role は含めない | 完了 / セッション終了 / scope 変更 / host policy conflict / user revocation（issue complete / session end / scope change / host policy conflict / user revocation） | none / denied / unavailable / host conflict | 続行 / separate-confirmation exception は user に確認 / block gate / record waiver request |
+| user request to use SpecDock workflow | active repo/worktree | iss-00309 | current session | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility | issue complete / session end / scope change / host policy conflict / user revocation | none | continue to fresh spec-reviewer re-review |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S00 | approved-local-execution | issue planning draft adoption / report gate cleanup | N/A | `requirement.md`, `design.md`, `plan.md`, `report.md`, issue-local artifacts | active Issue docs | docs-only canonical adoption and report evidence updates | source code changes before fresh spec-reviewer pass | `./spec-dock/scripts/spec-dock validate`; `git diff --check`; fresh spec-reviewer | stop before implementation until fresh spec-reviewer pass | adopted docs / verification / risks / integration decision | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S00 | spec-reviewer | Initial review failed with two P1 findings and one P2 report cleanup finding; re-review returned no findings | read-only | review_status: pass | pass | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S00 | no parent implementation exception required | user workflow request | active Issue docs and parent Epic plan | docs-only review-fix | revert docs/deps changes if re-review fails | `validate` pass; `diff --check` pass | spec-reviewer passed | proceed to implementation |
 
 #### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
 
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
-| strict | system-architect / implementation-planner / manual fallback | used | `artifacts/20260708t162513z-research-workflow-impact-map.md`; `artifacts/20260708t162514z-disc-implementation-scope-and-test-strategy.md`; ChatGPT Use 直実行 ZIP | pending | blocked |
+| strict | system-architect / implementation-planner / manual fallback | used | `artifacts/20260708t162513z-research-workflow-impact-map.md`; `artifacts/20260708t162514z-disc-implementation-scope-and-test-strategy.md`; ChatGPT Use 直実行 ZIP | pass | ready |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S00 | authoring gate | spec-reviewer | pending | pending | no | blocked until fresh pass | ChatGPT Use 直実行版を採用したが fresh reviewer は未実施 |
+| S00 | authoring gate | spec-reviewer | fresh | pass | no | promote | re-review confirmed relay dependency, evidence normalization, and report scaffold cleanup |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S00 | committed | ChatGPT draft adoption / review-fix scope | commit pending for review-fix delta | post-commit check pending | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `epic-00295-chatgpt-authoring-pack-installed-runtime/plan.md` - relay policy を `iss-00309` 追加後の final quality gate に合わせて修正。
+- `iss-00307-final-quality-gate-and-mergeable-pr-delivery/.meta.json` - final quality Issue が `iss-00309` に依存するよう command-first で更新。
+- `iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign/.meta.json` - `iss-00309` が `iss-00306` に依存するよう command-first で更新。
+- `iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign/report.md` - local path evidence と scaffold placeholder を整理。
 
 #### コミット
-- <hash> <message>
+- pending
 
 #### メモ
-- ...
-
----
-
-### セッションログ（2026-07-09 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
+- Fresh spec-reviewer re-review passed; implementation may proceed after this planning delta is committed.
 
 ---
 
@@ -263,7 +261,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / workflow / skill | yes | main orchestrator | `requirement.md`, `design.md`, `plan.md`, `artifacts/20260708t162513z-research-workflow-impact-map.md` | pending |
+| docs / templates / workflow / skill | yes | main orchestrator | `requirement.md`, `design.md`, `plan.md`, `artifacts/20260708t162513z-research-workflow-impact-map.md` | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
@@ -278,22 +276,24 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report alignment | fresh review not yet run | 0 | pending |
+| spec-reviewer | requirement / design / plan / report alignment | initial P1/P2 findings fixed; re-review no findings | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S00 planning review-fix ledger | Issue docs / parent relay metadata | final response / PR / issue comment | ready for implementation |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: `iss-00309` が parent Epic の final quality relay から漏れていた。
+  - 解決: `iss-00309` を `iss-00306` に依存させ、`iss-00307` を `iss-00309` に依存させた。
+- 問題: `report.md` に host-local absolute path evidence が残っていた。
+  - 解決: repo-relative artifact と sha256 に置換した。
 
 ## 学んだこと (任意)
-- ...
+- ChatGPT/Oracle の実体 ZIP はローカル検査に有用だが、repo の durable evidence にはローカル絶対パスを残さず、repo-relative artifact と hash へ正規化する必要がある。
 
 ## 今後の推奨事項 (任意)
-- ...
+- SpecDock authoring script 経由の ZIP materialization failure は、別 Issue で backend download / artifact persistence の検証対象にする。
 
 ## 省略/例外メモ (必須)
 - 該当なし
