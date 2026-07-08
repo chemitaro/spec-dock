@@ -118,7 +118,7 @@ rg -n "managed skill|install_root|\\.agents/skills|spec-dock-chatgpt|chatgpt-aut
 | CLOS-010 | S99 | `./spec-dock/scripts/spec-dock validate` | pass | nodes=202 |
 | CLOS-011 | S99 | `./spec-dock/scripts/spec-dock assurance verify` | pass | authorized_profile=standard, reason=ok |
 | CLOS-012 | S99 | `git diff --check` | pass | no whitespace errors |
-| CLOS-013 | S90 | fresh spec-reviewer, code-reviewer, and qa-reviewer pass after implementation fixes | partial | planning spec-reviewer pass recorded; code-reviewer and qa-reviewer pending on current implementation diff |
+| CLOS-013 | S90 | fresh spec-reviewer, code-reviewer, and qa-reviewer pass after implementation fixes | pass | reviewer gates closed; only lifecycle closeout remains |
 | CLOS-014 | S00/S99 | report relay policy and clean pushed branch | pass | PR delivery deferred to `iss-00307`; no per-Issue PR created |
 | CLOS-015 | S99 | implementation commit `e135aaa7` and closeout report commit `ce147fd5` pushed to branch | partial | issue finish is the remaining lifecycle action |
 
@@ -132,7 +132,7 @@ rg -n "managed skill|install_root|\\.agents/skills|spec-dock-chatgpt|chatgpt-aut
 | S03 | CLOS-003, CLOS-004, CLOS-005, CLOS-006 | planning skill names preserved and modes/evidence lane documented | hub and planning skill diffs plus focused tests | pass | existing skill names preserved |
 | S04 | CLOS-008 partial | discoverability docs updated or approved-no-op recorded | provider and dogfooding `spec-dock/docs/README.md` include ChatGPT authoring evidence lane | pass | docs index updated |
 | S05 | CLOS-001 through CLOS-009 | focused install / wording tests pass | `tests/cli_runtime/test_wrappers.py` focused test; full `tests/unit/infra/test_init_update.py` | pass | managed install contract covered |
-| S90 | CLOS-013 | required reviewer gates pass | planning spec-reviewer pass recorded; code-reviewer and qa-reviewer pending on current implementation diff | partial | implementation reviewer gates still required before commit/finish |
+| S90 | CLOS-013 | required reviewer gates pass | fresh spec-reviewer, code-reviewer, and qa-reviewer returned `review_status: pass` | pass | reviewer gates closed |
 | S99 | CLOS-010 through CLOS-015 | final verification, commit, push, no-PR relay, issue finish | final verification passed; implementation commit `e135aaa7` and closeout report commit `ce147fd5` pushed; no per-Issue PR created | partial | issue finish pending |
 
 ## Test Contract Closure（テスト契約の完了証跡）
@@ -150,7 +150,7 @@ rg -n "managed skill|install_root|\\.agents/skills|spec-dock-chatgpt|chatgpt-aut
 | tc-s04-001 | S04 | yes | inspect-only | docs README inspected | focused docs/skill test and file inspection | pass | ChatGPT authoring evidence lane discoverable |
 | tc-s05-001 | S05 | yes | red-required | managed skill missing before implementation | `uv run pytest tests/unit/infra/test_init_update.py -q` | pass | 546 passed |
 | tc-s05-002 | S05 | yes | negative | local wrapper path must not be formalized | scoped `rg -n "/Users/iwasawayuuta|\\.codex/skills/chatgpt-use|oracle-chatgpt" ...` over new/changed formal skill and touched regression-test surfaces | pass | broader `tests/` contains unrelated path-safety fixtures; this Issue verifies changed product workflow surfaces |
-| tc-s90-001 | S90 | yes | manual-required | first spec-review failed; planning re-review passed after fixes | reviewer outputs | partial | code-reviewer and qa-reviewer pending |
+| tc-s90-001 | S90 | yes | manual-required | first spec-review failed; re-review plus code/QA review passed after fixes | reviewer outputs | pass | all reviewer gates closed |
 | tc-s99-001 | S99 | yes | manual-required | implementation verification passed | final command queue | partial | implementation and closeout report commits pushed; issue finish pending |
 | tc-s99-002 | S99 | yes | manual-required | no per-Issue PR policy recorded and followed | git/spec-dock lifecycle output | pass | PR delivery deferred to final Issue `iss-00307` |
 
