@@ -5442,7 +5442,7 @@ class TestAuthoringCli(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             preflight = Path(tmp) / "preflight.json"
             output_dir = Path(tmp) / "pack"
-            source_hashes = {"source.txt": "hash"}
+            source_hashes: dict[str, object] = {"source.txt": "hash"}
             preflight.write_text(
                 json.dumps(
                     {
