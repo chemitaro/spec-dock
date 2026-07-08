@@ -14,16 +14,6 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 _DEFERRED_COMMANDS = (
-    (
-        ["authoring", "validate", "issue-draft-adoption"],
-        "authoring validate issue-draft-adoption",
-        "iss-00303",
-    ),
-    (
-        ["authoring", "validate", "selected-skeleton-fill"],
-        "authoring validate selected-skeleton-fill",
-        "iss-00303",
-    ),
     (["authoring", "approval", "check"], "authoring approval check", "iss-00305"),
 )
 
@@ -141,6 +131,38 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert "--input" in p.stdout
             assert "--expected-parent-epic" in p.stdout
             assert "--review-report" in p.stdout
+            assert "--report-path" in p.stdout
+            assert "Deferred" not in p.stdout
+
+    def test_authoring_validate_issue_draft_adoption_help_exposes_implemented_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            p = self._run_runtime_capture(target, ["authoring", "validate", "issue-draft-adoption", "--help"])
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "--input" in p.stdout
+            assert "--issue-dir" in p.stdout
+            assert "--review-report" in p.stdout
+            assert "--expected-review-digest" in p.stdout
+            assert "--expected-draft-pack-digest" in p.stdout
+            assert "--report-path" in p.stdout
+            assert "Deferred" not in p.stdout
+
+    def test_authoring_validate_selected_skeleton_fill_help_exposes_implemented_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            p = self._run_runtime_capture(target, ["authoring", "validate", "selected-skeleton-fill", "--help"])
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "--input" in p.stdout
+            assert "--issue-dir" in p.stdout
+            assert "--assurance" in p.stdout
+            assert "--selected-skeleton" in p.stdout
+            assert "--expected-profile" in p.stdout
             assert "--report-path" in p.stdout
             assert "Deferred" not in p.stdout
 
@@ -507,6 +529,800 @@ class TestAuthoringCli(CliRuntimeHarness):
             payload = _json_stdout(p)
             assert p.returncode == 0, p.stdout + p.stderr
             assert payload["status"] == "pass"
+
+    def test_authoring_validate_issue_draft_adoption_valid_payload_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "issue-draft-adoption",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--review-report",
+                    str(fixture["review_report"]),
+                    "--expected-review-digest",
+                    fixture["review_digest"],
+                    "--expected-draft-pack-digest",
+                    fixture["draft_pack_digest"],
+                    "--expected-source-hash",
+                    "source-hash",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert payload["validation_kind"] == "issue-draft-adoption"
+            assert payload["authority"] == "evidence_only"
+            assert payload["adoption_status"] == "unreviewed"
+            assert payload["review_gate_passed"] is True
+            assert payload["issue_id"] == "iss-00303"
+            assert payload["draft_count"] == 3
+            assert payload["valid_draft_count"] == 3
+            assert payload["eal_disposition_required"] is True
+            assert payload["canonical_targets"] == {
+                "requirement": "requirement.md",
+                "design": "design.md",
+                "plan": "plan.md",
+                "report_evidence": "report.md",
+            }
+            assert payload["canonical_written"] is False
+            assert payload["assurance_mutated"] is False
+            assert payload["reviewer_pass_claimed"] is False
+            assert payload["execution_ready"] is False
+            assert payload["pr_ready"] is False
+
+    def test_authoring_validate_issue_draft_adoption_text_output_valid_payload_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "issue-draft-adoption",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--review-report",
+                    str(fixture["review_report"]),
+                    "--expected-review-digest",
+                    fixture["review_digest"],
+                    "--expected-draft-pack-digest",
+                    fixture["draft_pack_digest"],
+                    "--expected-source-hash",
+                    "source-hash",
+                ],
+            )
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            _assert_text_output_preserves_draft_validation_boundary(p.stdout)
+            assert "status=pass" in p.stdout
+            assert "authoring validate issue-draft-adoption" in p.stdout
+            assert "draft_count=3" in p.stdout
+            assert "valid_draft_count=3" in p.stdout
+
+    def test_authoring_validate_issue_draft_adoption_detects_review_digest_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "issue-draft-adoption",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--review-report",
+                    str(fixture["review_report"]),
+                    "--expected-review-digest",
+                    "wrong",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == "stale"
+            assert "review_digest_mismatch" in payload["comparison"]
+
+    @pytest.mark.parametrize(
+        ("review_status", "expected_status", "expected_fragment"),
+        (
+            ("stale", "stale", "review_not_pass:stale"),
+            ("rejected", "rejected", "review_not_pass:rejected"),
+            ("fail", "fail", "review_not_pass:fail"),
+            ("blocked", "blocked", "review_not_pass:blocked"),
+            ("needs-human", "blocked", "unsupported_review_status:needs-human"),
+        ),
+    )
+    def test_authoring_validate_issue_draft_adoption_review_status_matrix(
+        self, review_status: str, expected_status: str, expected_fragment: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+            Path(fixture["review_report"]).write_text(
+                json.dumps({"status": review_status}, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+
+            payload = _run_issue_draft_adoption_json(self, repo, fixture)
+
+            assert payload["status"] == expected_status
+            assert expected_fragment in json.dumps(payload, sort_keys=True)
+
+    @pytest.mark.parametrize(
+        ("mutator", "expected_status", "expected_fragment"),
+        (
+            ("issue-id-mismatch", "stale", "issue_id_mismatch"),
+            ("parent-mismatch", "stale", "parent_epic_mismatch"),
+            ("missing-draft-pack-digest", "fail", "missing_or_invalid_field:draft_pack_digest"),
+            ("missing-eal-disposition", "fail", "missing_or_invalid_field:eal_disposition_required"),
+            ("missing-draft-sha", "fail", "missing_or_invalid_field:drafts.requirement.sha256"),
+            ("merge-ready-claim", "rejected", "forbidden_authority_claim:merge_ready"),
+            ("pr-delivery-claim", "rejected", "forbidden_authority_claim:pr_delivery"),
+            ("unsafe-target", "rejected", "path_traversal:../requirement.md"),
+            ("assurance-target", "rejected", "forbidden_canonical_target:requirement"),
+            ("extra-canonical-target", "rejected", "unexpected_canonical_target:appendix"),
+            ("canonical-doc-path", "rejected", "canonical_doc_path:drafts.requirement"),
+        ),
+    )
+    def test_authoring_validate_issue_draft_adoption_negative_matrix(
+        self, mutator: str, expected_status: str, expected_fragment: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo, mutator=mutator)
+
+            payload = _run_issue_draft_adoption_json(self, repo, fixture)
+
+            assert payload["status"] == expected_status
+            assert expected_fragment in json.dumps(payload, sort_keys=True)
+
+    def test_authoring_validate_issue_draft_adoption_detects_draft_digest_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+
+            payload = _run_issue_draft_adoption_json(
+                self,
+                repo,
+                fixture,
+                "--expected-draft-pack-digest",
+                "wrong",
+            )
+
+            assert payload["status"] == "stale"
+            assert "draft_pack_digest_mismatch" in payload["comparison"]
+
+    def test_authoring_validate_issue_draft_adoption_detects_source_hash_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+
+            payload = _run_issue_draft_adoption_json(
+                self,
+                repo,
+                fixture,
+                "--expected-source-hash",
+                "wrong",
+            )
+
+            assert payload["status"] == "stale"
+            assert "source_manifest_hash_mismatch" in payload["comparison"]
+
+    @pytest.mark.parametrize(
+        ("mutator", "expected_status", "expected_fragment"),
+        (
+            ("missing-input", "blocked", "missing_json:issue-draft-adoption"),
+            ("malformed-input", "fail", "invalid_json:issue-draft-adoption"),
+            ("non-object-input", "fail", "non_object_json:issue-draft-adoption"),
+        ),
+    )
+    def test_authoring_validate_issue_draft_adoption_input_json_matrix(
+        self, mutator: str, expected_status: str, expected_fragment: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo, mutator=mutator)
+
+            payload = _run_issue_draft_adoption_json(self, repo, fixture)
+
+            assert payload["status"] == expected_status
+            assert expected_fragment in json.dumps(payload, sort_keys=True)
+
+    @pytest.mark.parametrize(
+        ("report_name", "expected_fragment"),
+        (
+            ("report.md", "unsafe_report_path:canonical-docs"),
+            (".assurance.json", "unsafe_report_path:assurance"),
+        ),
+    )
+    def test_authoring_validate_issue_draft_adoption_rejects_unsafe_report_path(
+        self, report_name: str, expected_fragment: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+            report_path = Path(fixture["issue_dir"]) / report_name
+
+            payload = _run_issue_draft_adoption_json(
+                self,
+                repo,
+                fixture,
+                "--report-path",
+                str(report_path),
+            )
+
+            assert payload["status"] == "rejected"
+            assert expected_fragment in payload["findings"]
+            assert not report_path.exists()
+
+    def test_authoring_validate_issue_draft_adoption_rejects_symlink_report_path(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+            outside = repo / "outside-report.json"
+            outside.write_text("{}\n", encoding="utf-8")
+            report_path = repo / ".specdock-authoring" / "issue-draft" / "symlink-report.json"
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.symlink_to(outside)
+
+            payload = _run_issue_draft_adoption_json(
+                self,
+                repo,
+                fixture,
+                "--report-path",
+                str(report_path),
+            )
+
+            assert payload["status"] == "rejected"
+            assert "unsafe_report_path:symlink" in payload["findings"]
+            assert outside.read_text(encoding="utf-8") == "{}\n"
+
+    def test_authoring_validate_issue_draft_adoption_writes_safe_noncanonical_report_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+            report_path = repo / ".specdock-authoring" / "issue-draft" / "validation-report.json"
+
+            payload = _run_issue_draft_adoption_json(
+                self,
+                repo,
+                fixture,
+                "--report-path",
+                str(report_path),
+                expected_returncode=0,
+            )
+
+            report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+            assert payload["status"] == "pass"
+            assert report_payload["status"] == "pass"
+            assert report_payload["validation_kind"] == "issue-draft-adoption"
+
+    def test_authoring_validate_issue_draft_adoption_blocks_missing_issue_node(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo, mutator="missing-issue-node")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "issue-draft-adoption",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--review-report",
+                    str(fixture["review_report"]),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == "blocked"
+            assert payload["findings"] == ["missing_issue_node"]
+            assert payload["node_creation_performed"] is False
+
+    def test_authoring_validate_issue_draft_adoption_blocks_missing_review_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+            missing_report = Path(fixture["review_report"]).with_name("missing-review-report.json")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "issue-draft-adoption",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--review-report",
+                    str(missing_report),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == "blocked"
+            assert payload["findings"] == ["missing_review_report"]
+
+    def test_authoring_validate_issue_draft_adoption_rejects_authority_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo, mutator="forbidden-claim")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "issue-draft-adoption",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--review-report",
+                    str(fixture["review_report"]),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == "rejected"
+            assert "forbidden_authority_claim:canonical_written" in payload["findings"]
+
+    def test_authoring_validate_issue_draft_adoption_text_output_rejects_authority_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo, mutator="forbidden-claim")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "issue-draft-adoption",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--review-report",
+                    str(fixture["review_report"]),
+                ],
+            )
+
+            assert p.returncode != 0
+            _assert_text_output_preserves_draft_validation_boundary(p.stdout)
+            assert "status=rejected" in p.stdout
+            assert "forbidden_authority_claim:canonical_written" in p.stdout
+
+    def test_authoring_validate_selected_skeleton_fill_valid_payload_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_selected_skeleton_fixture(repo)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "selected-skeleton-fill",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--assurance",
+                    str(fixture["assurance"]),
+                    "--selected-skeleton",
+                    str(fixture["selected_skeleton"]),
+                    "--expected-profile",
+                    "standard",
+                    "--expected-source-hash",
+                    "source-hash",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert payload["validation_kind"] == "selected-skeleton-fill"
+            assert payload["observed_profile"] == "standard"
+            assert payload["expected_source_manifest_hash"] == "source-hash"
+            assert payload["observed_source_manifest_hash"] == "source-hash"
+            assert payload["section_count"] == 3
+            assert payload["valid_section_count"] == 3
+            assert payload["canonical_written"] is False
+            assert payload["assurance_mutated"] is False
+            assert payload["execution_ready"] is False
+
+    def test_authoring_validate_selected_skeleton_fill_text_output_valid_payload_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_selected_skeleton_fixture(repo)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "selected-skeleton-fill",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--assurance",
+                    str(fixture["assurance"]),
+                    "--selected-skeleton",
+                    str(fixture["selected_skeleton"]),
+                    "--expected-profile",
+                    "standard",
+                    "--expected-source-hash",
+                    "source-hash",
+                ],
+            )
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            _assert_text_output_preserves_draft_validation_boundary(p.stdout)
+            assert "status=pass" in p.stdout
+            assert "authoring validate selected-skeleton-fill" in p.stdout
+            assert "section_count=3" in p.stdout
+            assert "valid_section_count=3" in p.stdout
+
+    def test_authoring_validate_selected_skeleton_fill_rejects_secret_section_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_selected_skeleton_fixture(repo, mutator="secret-path")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "selected-skeleton-fill",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--assurance",
+                    str(fixture["assurance"]),
+                    "--selected-skeleton",
+                    str(fixture["selected_skeleton"]),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == "rejected"
+            assert "secret_path" in json.dumps(payload, sort_keys=True)
+
+    def test_authoring_validate_selected_skeleton_fill_blocks_missing_issue_node(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_selected_skeleton_fixture(repo, mutator="missing-issue-node")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "selected-skeleton-fill",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--assurance",
+                    str(fixture["assurance"]),
+                    "--selected-skeleton",
+                    str(fixture["selected_skeleton"]),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == "blocked"
+            assert payload["findings"] == ["missing_issue_node"]
+
+    def test_authoring_validate_selected_skeleton_fill_detects_section_hash_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_selected_skeleton_fixture(repo, mutator="section-hash-mismatch")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "selected-skeleton-fill",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--assurance",
+                    str(fixture["assurance"]),
+                    "--selected-skeleton",
+                    str(fixture["selected_skeleton"]),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == "stale"
+            assert "section_sha256_mismatch:requirement" in payload["comparison"]
+
+    def test_authoring_validate_selected_skeleton_fill_detects_source_hash_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_selected_skeleton_fixture(repo)
+
+            payload = _run_selected_skeleton_fill_json(
+                self,
+                repo,
+                fixture,
+                "--expected-source-hash",
+                "wrong",
+            )
+
+            assert payload["status"] == "stale"
+            assert "source_manifest_hash_mismatch" in payload["comparison"]
+            assert payload["expected_source_manifest_hash"] == "wrong"
+            assert payload["observed_source_manifest_hash"] == "source-hash"
+
+    @pytest.mark.parametrize(
+        ("mutator", "expected_status", "expected_fragment"),
+        (
+            ("missing-input", "blocked", "missing_json:selected-skeleton-fill"),
+            ("malformed-input", "fail", "invalid_json:selected-skeleton-fill"),
+            ("missing-assurance", "blocked", "missing_json:assurance"),
+            ("invalid-assurance", "fail", "invalid_json:assurance"),
+            ("missing-selected-skeleton", "blocked", "missing_json:selected-skeleton"),
+            ("invalid-selected-skeleton", "fail", "invalid_json:selected-skeleton"),
+        ),
+    )
+    def test_authoring_validate_selected_skeleton_fill_prerequisite_json_matrix(
+        self, mutator: str, expected_status: str, expected_fragment: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_selected_skeleton_fixture(repo, mutator=mutator)
+
+            payload = _run_selected_skeleton_fill_json(self, repo, fixture, "--expected-profile", "standard")
+
+            assert payload["status"] == expected_status
+            assert expected_fragment in json.dumps(payload, sort_keys=True)
+
+    @pytest.mark.parametrize(
+        ("mutator", "expected_status", "expected_fragment"),
+        (
+            ("missing-section", "fail", "missing_section_fill:plan"),
+            ("extra-section", "fail", "extra_section_fill:extra"),
+            ("duplicate-section", "fail", "duplicate_section_fill:requirement"),
+            ("empty-inventory", "fail", "selected_skeleton.required_sections"),
+            ("selected-profile-mismatch", "stale", "selected_profile_mismatch"),
+            ("assurance-profile-mismatch", "stale", "selected_profile_assurance_mismatch"),
+            ("forbidden-claim", "rejected", "forbidden_authority_claim:execution_ready"),
+            ("merge-ready-claim", "rejected", "forbidden_authority_claim:merge_ready"),
+            ("pr-delivery-claim", "rejected", "forbidden_authority_claim:pr_delivery"),
+            ("canonical-doc-path", "rejected", "canonical_doc_path:section_fills.requirement"),
+            ("missing-template-hash", "fail", "missing_or_invalid_field:template_hash"),
+            ("missing-selected-skeleton-hash", "fail", "missing_or_invalid_field:selected_skeleton.selected_skeleton_hash"),
+            ("missing-section-sha", "fail", "missing_or_invalid_field:section_fills.requirement.sha256"),
+            ("template-hash-mismatch", "stale", "template_hash_mismatch"),
+            ("selected-skeleton-hash-mismatch", "stale", "selected_skeleton_hash_mismatch"),
+        ),
+    )
+    def test_authoring_validate_selected_skeleton_fill_negative_matrix(
+        self, mutator: str, expected_status: str, expected_fragment: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_selected_skeleton_fixture(repo, mutator=mutator)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "selected-skeleton-fill",
+                    "--input",
+                    str(fixture["input"]),
+                    "--issue-dir",
+                    str(fixture["issue_dir"]),
+                    "--assurance",
+                    str(fixture["assurance"]),
+                    "--selected-skeleton",
+                    str(fixture["selected_skeleton"]),
+                    "--expected-profile",
+                    "standard",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode != 0
+            assert payload["status"] == expected_status
+            assert expected_fragment in json.dumps(payload, sort_keys=True)
+
+    def test_authoring_validate_selected_skeleton_fill_rejects_symlink_report_path(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_selected_skeleton_fixture(repo)
+            outside = repo / "outside-report.json"
+            outside.write_text("{}\n", encoding="utf-8")
+            report_path = repo / ".specdock-authoring" / "selected" / "symlink-report.json"
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.symlink_to(outside)
+
+            payload = _run_selected_skeleton_fill_json(
+                self,
+                repo,
+                fixture,
+                "--report-path",
+                str(report_path),
+            )
+
+            assert payload["status"] == "rejected"
+            assert "unsafe_report_path:symlink" in payload["findings"]
+            assert outside.read_text(encoding="utf-8") == "{}\n"
+
+    def test_authoring_provider_and_dogfood_wrapper_smoke(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            assert main(["init", str(repo)]) == 0
+            repo_root = Path(__file__).resolve().parents[2]
+            wrapper_roots = (
+                repo_root / "src/spec_dock/assets/spec_dock/scripts/authoring-pack",
+                repo_root / "spec-dock/scripts/authoring-pack",
+                repo / "spec-dock/scripts/authoring-pack",
+            )
+            issue_fixture = _write_issue_draft_adoption_fixture(repo)
+            fixture = _write_selected_skeleton_fixture(repo)
+            selected_payloads = []
+            issue_payloads = []
+            for index, wrapper_root in enumerate(wrapper_roots):
+                issue_wrapper = wrapper_root / "validate_issue_draft_adoption.py"
+                selected_wrapper = wrapper_root / "validate_selected_skeleton_fill.py"
+                selected_report = repo / ".specdock-authoring" / f"selected-wrapper-report-{index}.json"
+                issue_report = repo / ".specdock-authoring" / f"issue-wrapper-report-{index}.json"
+                issue_help = subprocess.run(
+                    [sys.executable, str(issue_wrapper), "--help"],
+                    cwd=str(repo),
+                    env=self._runtime_env(repo, {"PATH": os.environ.get("PATH", ""), "PYTHONDONTWRITEBYTECODE": "1"}),
+                    capture_output=True,
+                    text=True,
+                )
+                selected_help = subprocess.run(
+                    [sys.executable, str(selected_wrapper), "--help"],
+                    cwd=str(repo / "spec-dock"),
+                    env=self._runtime_env(repo, {"PATH": os.environ.get("PATH", ""), "PYTHONDONTWRITEBYTECODE": "1"}),
+                    capture_output=True,
+                    text=True,
+                )
+                issue_run = subprocess.run(
+                    [
+                        sys.executable,
+                        str(issue_wrapper),
+                        "--input",
+                        str(issue_fixture["input"]),
+                        "--issue-dir",
+                        str(issue_fixture["issue_dir"]),
+                        "--review-report",
+                        str(issue_fixture["review_report"]),
+                        "--report-path",
+                        str(issue_report),
+                        "--format",
+                        "json",
+                    ],
+                    cwd=str(repo),
+                    env=self._runtime_env(repo, {"PATH": os.environ.get("PATH", ""), "PYTHONDONTWRITEBYTECODE": "1"}),
+                    capture_output=True,
+                    text=True,
+                )
+                selected_run = subprocess.run(
+                    [
+                        sys.executable,
+                        str(selected_wrapper),
+                        "--input",
+                        str(fixture["input"]),
+                        "--issue-dir",
+                        str(fixture["issue_dir"]),
+                        "--assurance",
+                        str(fixture["assurance"]),
+                        "--selected-skeleton",
+                        str(fixture["selected_skeleton"]),
+                        "--report-path",
+                        str(selected_report),
+                        "--format",
+                        "json",
+                    ],
+                    cwd=str(repo),
+                    env=self._runtime_env(repo, {"PATH": os.environ.get("PATH", ""), "PYTHONDONTWRITEBYTECODE": "1"}),
+                    capture_output=True,
+                    text=True,
+                )
+
+                assert issue_help.returncode == 0, issue_help.stdout + issue_help.stderr
+                assert "issue-draft-adoption" in issue_help.stdout
+                assert "--review-report" in issue_help.stdout
+                assert "--pack-tree" not in issue_help.stdout
+                assert "--output-dir" not in issue_help.stdout
+                assert selected_help.returncode == 0, selected_help.stdout + selected_help.stderr
+                assert "--input" in selected_help.stdout
+                assert "--issue-dir" in selected_help.stdout
+                assert "--selected-skeleton" in selected_help.stdout
+                assert "--review-report" not in selected_help.stdout
+                assert "--pack-tree" not in selected_help.stdout
+                assert "--output-dir" not in selected_help.stdout
+                issue_payload = json.loads(issue_run.stdout)
+                selected_payload = json.loads(selected_run.stdout)
+                assert issue_run.returncode == 0, issue_run.stdout + issue_run.stderr
+                assert selected_run.returncode == 0, selected_run.stdout + selected_run.stderr
+                assert issue_payload["validation_kind"] == "issue-draft-adoption"
+                assert selected_payload["validation_kind"] == "selected-skeleton-fill"
+                assert issue_payload["status"] == "pass"
+                assert selected_payload["status"] == "pass"
+                assert issue_report.is_file()
+                assert selected_report.is_file()
+                issue_payloads.append(issue_payload)
+                selected_payloads.append(selected_payload)
+
+            assert {payload["validation_kind"] for payload in issue_payloads} == {"issue-draft-adoption"}
+            assert {payload["validation_kind"] for payload in selected_payloads} == {"selected-skeleton-fill"}
 
     @pytest.mark.parametrize(("args", "command", "next_issue"), _DEFERRED_COMMANDS)
     def test_authoring_deferred_commands_fail_closed_with_stable_diagnostics(
@@ -4684,6 +5500,85 @@ def _json_stdout(p: subprocess.CompletedProcess[str]) -> dict[str, object]:
     return payload
 
 
+def _assert_text_output_preserves_draft_validation_boundary(output: str) -> None:
+    lowered = output.lower()
+    assert "authority=evidence_only" in lowered
+    assert "adoption_status=unreviewed" in lowered
+    assert "canonical_written=false" in lowered
+    assert "assurance_mutated=false" in lowered
+    assert "execution_ready=false" in lowered
+    assert "pr_ready=false" in lowered
+    assert "canonical adoption" not in lowered
+    assert "adopted" not in lowered
+    assert "reviewer pass" not in lowered
+    assert "execution-ready" not in lowered
+    assert "execution ready" not in lowered
+    assert "pr-ready" not in lowered
+    assert "pr ready" not in lowered
+    assert "execution_ready=true" not in lowered
+    assert "pr_ready=true" not in lowered
+
+
+def _run_issue_draft_adoption_json(
+    testcase: CliRuntimeHarness,
+    repo: Path,
+    fixture: dict[str, str | Path],
+    *extra_args: str,
+    expected_returncode: int = 1,
+) -> dict[str, object]:
+    p = _run_authoring_capture(
+        testcase,
+        repo,
+        [
+            "authoring",
+            "validate",
+            "issue-draft-adoption",
+            "--input",
+            str(fixture["input"]),
+            "--issue-dir",
+            str(fixture["issue_dir"]),
+            "--review-report",
+            str(fixture["review_report"]),
+            "--format",
+            "json",
+            *extra_args,
+        ],
+    )
+    assert p.returncode == expected_returncode, p.stdout + p.stderr
+    return _json_stdout(p)
+
+
+def _run_selected_skeleton_fill_json(
+    testcase: CliRuntimeHarness,
+    repo: Path,
+    fixture: dict[str, Path],
+    *extra_args: str,
+    expected_returncode: int = 1,
+) -> dict[str, object]:
+    p = _run_authoring_capture(
+        testcase,
+        repo,
+        [
+            "authoring",
+            "validate",
+            "selected-skeleton-fill",
+            "--input",
+            str(fixture["input"]),
+            "--issue-dir",
+            str(fixture["issue_dir"]),
+            "--assurance",
+            str(fixture["assurance"]),
+            "--selected-skeleton",
+            str(fixture["selected_skeleton"]),
+            "--format",
+            "json",
+            *extra_args,
+        ],
+    )
+    assert p.returncode == expected_returncode, p.stdout + p.stderr
+    return _json_stdout(p)
+
+
 def _normalized_pack_payload(pack_dir: Path) -> dict[str, str]:
     payload: dict[str, str] = {}
     for path in sorted(item for item in pack_dir.rglob("*") if item.is_file()):
@@ -5002,6 +5897,21 @@ def _candidate_authority_claims() -> dict[str, bool]:
     }
 
 
+def _draft_authority_claims() -> dict[str, bool]:
+    return {
+        "canonical_adoption": False,
+        "canonical_written": False,
+        "assurance_mutation": False,
+        "authorized_profile_decision": False,
+        "reviewer_pass": False,
+        "execution_ready": False,
+        "pr_ready": False,
+        "merge_ready": False,
+        "pr_delivery": False,
+        "pr_delivered": False,
+    }
+
+
 def _candidate_tree_digest(pack_root: Path) -> str:
     digest = hashlib.sha256()
     for path in sorted(item for item in pack_root.rglob("*") if item.is_file() and not item.is_symlink()):
@@ -5011,6 +5921,217 @@ def _candidate_tree_digest(pack_root: Path) -> str:
         digest.update(hashlib.sha256(path.read_bytes()).hexdigest().encode("ascii"))
         digest.update(b"\0")
     return digest.hexdigest()
+
+
+def _write_issue_draft_adoption_fixture(repo: Path, *, mutator: str | None = None) -> dict[str, str | Path]:
+    issue_dir = repo / "spec-dock" / "initiatives" / "init-local-00003" / "epics" / "epic-00295" / "issues" / "iss-00303"
+    issue_dir.mkdir(parents=True, exist_ok=True)
+    (issue_dir / ".meta.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "type": "issue",
+                "id": "iss-00303",
+                "parent_id": "epic-00295",
+                "initiative_id": "init-local-00003",
+                "epic_id": "epic-00295",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    artifact_dir = issue_dir / "artifacts"
+    artifact_dir.mkdir(exist_ok=True)
+    draft_hashes: dict[str, str] = {}
+    draft_paths: dict[str, str] = {}
+    for name in ("requirement", "design", "plan"):
+        path = artifact_dir / f"{name}-draft.md"
+        path.write_text(f"# {name}\n\nDraft content for {name}.\n", encoding="utf-8")
+        draft_hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+        draft_paths[name] = f"artifacts/{name}-draft.md"
+    review_report = repo / ".specdock-authoring" / "issue-draft" / "review-report.json"
+    review_report.parent.mkdir(parents=True, exist_ok=True)
+    review_report.write_text(json.dumps({"status": "pass"}, sort_keys=True) + "\n", encoding="utf-8")
+    review_digest = hashlib.sha256(review_report.read_bytes()).hexdigest()
+    payload = {
+        "schema_version": "issue-draft-adoption-v1",
+        "issue_id": "iss-00303",
+        "parent_epic_id": "epic-00295",
+        "parent_initiative_id": "init-local-00003",
+        "source_manifest_hash": "source-hash",
+        "draft_pack_digest": "draft-pack-hash",
+        "canonical_targets": {
+            "requirement": "requirement.md",
+            "design": "design.md",
+            "plan": "plan.md",
+            "report_evidence": "report.md",
+        },
+        "eal_disposition_required": True,
+        "drafts": {
+            name: {"path": draft_paths[name], "sha256": digest}
+            for name, digest in draft_hashes.items()
+        },
+        "authority_claims": _draft_authority_claims(),
+    }
+    if mutator == "forbidden-claim":
+        payload["authority_claims"]["canonical_written"] = True  # type: ignore[index]
+    if mutator == "merge-ready-claim":
+        payload["authority_claims"]["merge_ready"] = True  # type: ignore[index]
+    if mutator == "pr-delivery-claim":
+        payload["authority_claims"]["pr_delivery"] = True  # type: ignore[index]
+    if mutator == "canonical-doc-path":
+        payload["drafts"]["requirement"]["path"] = "requirement.md"  # type: ignore[index]
+    if mutator == "issue-id-mismatch":
+        payload["issue_id"] = "iss-99999"
+    if mutator == "parent-mismatch":
+        payload["parent_epic_id"] = "epic-99999"
+    if mutator == "missing-draft-pack-digest":
+        payload.pop("draft_pack_digest")
+    if mutator == "missing-eal-disposition":
+        payload.pop("eal_disposition_required")
+    if mutator == "missing-draft-sha":
+        payload["drafts"]["requirement"].pop("sha256")  # type: ignore[index]
+    if mutator == "unsafe-target":
+        payload["canonical_targets"]["requirement"] = "../requirement.md"  # type: ignore[index]
+    if mutator == "assurance-target":
+        payload["canonical_targets"]["requirement"] = ".assurance.json"  # type: ignore[index]
+    if mutator == "extra-canonical-target":
+        payload["canonical_targets"]["appendix"] = "notes.md"  # type: ignore[index]
+    if mutator == "missing-issue-node":
+        shutil.rmtree(issue_dir)
+    input_path = review_report.parent / "issue-draft-adoption.json"
+    if mutator == "malformed-input":
+        input_path.write_text("{not-json\n", encoding="utf-8")
+    elif mutator == "non-object-input":
+        input_path.write_text("[]\n", encoding="utf-8")
+    elif mutator != "missing-input":
+        input_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+    return {
+        "input": input_path,
+        "issue_dir": issue_dir,
+        "review_report": review_report,
+        "review_digest": review_digest,
+        "draft_pack_digest": "draft-pack-hash",
+    }
+
+
+def _write_selected_skeleton_fixture(repo: Path, *, mutator: str | None = None) -> dict[str, Path]:
+    issue_dir = repo / "spec-dock" / "initiatives" / "init-local-00003" / "epics" / "epic-00295" / "issues" / "iss-00303"
+    issue_dir.mkdir(parents=True, exist_ok=True)
+    (issue_dir / ".meta.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "type": "issue",
+                "id": "iss-00303",
+                "parent_id": "epic-00295",
+                "initiative_id": "init-local-00003",
+                "epic_id": "epic-00295",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    sections = ("requirement", "design", "plan")
+    artifact_dir = issue_dir / "artifacts"
+    artifact_dir.mkdir(exist_ok=True)
+    for section in sections:
+        (artifact_dir / f"{section}-fill.md").write_text(f"# {section}\n\nFilled {section} section.\n", encoding="utf-8")
+    assurance = issue_dir / ".assurance.json"
+    assurance_profile = "strict" if mutator == "assurance-profile-mismatch" else "standard"
+    assurance.write_text(
+        json.dumps(
+            {"schema_version": 1, "issue_id": "iss-00303", "classification": {"authorized_profile": assurance_profile}},
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    selected_skeleton = repo / ".specdock-authoring" / "selected-skeleton.json"
+    selected_skeleton.parent.mkdir(parents=True, exist_ok=True)
+    required_sections = [] if mutator == "empty-inventory" else list(sections)
+    selected_profile = "strict" if mutator == "selected-profile-mismatch" else "standard"
+    selected_skeleton_payload = {
+        "issue_id": "iss-00303",
+        "selected_profile": selected_profile,
+        "required_sections": required_sections,
+        "template_hash": "template-hash",
+        "selected_skeleton_hash": "selected-skeleton-hash",
+    }
+    if mutator == "missing-selected-skeleton-hash":
+        selected_skeleton_payload.pop("selected_skeleton_hash")
+    selected_skeleton.write_text(json.dumps(selected_skeleton_payload, sort_keys=True) + "\n", encoding="utf-8")
+    section_fills: list[dict[str, str]] = []
+    for section in sections:
+        path = artifact_dir / f"{section}-fill.md"
+        section_fills.append(
+            {
+                "section_id": section,
+                "path": f"artifacts/{section}-fill.md",
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+        )
+    if mutator == "secret-path":
+        section_fills[0]["path"] = "secrets/requirement.md"
+    if mutator == "section-hash-mismatch":
+        section_fills[0]["sha256"] = "wrong"
+    if mutator == "missing-section-sha":
+        section_fills[0].pop("sha256")
+    if mutator == "missing-section":
+        section_fills = [item for item in section_fills if item["section_id"] != "plan"]
+    if mutator == "extra-section":
+        section_fills.append({"section_id": "extra", "path": "artifacts/requirement-fill.md"})
+    if mutator == "duplicate-section":
+        section_fills.append({"section_id": "requirement", "path": "artifacts/design-fill.md"})
+    if mutator == "canonical-doc-path":
+        section_fills[0]["path"] = "requirement.md"
+    if mutator == "forbidden-claim":
+        authority_claims = _draft_authority_claims()
+        authority_claims["execution_ready"] = True
+    elif mutator == "merge-ready-claim":
+        authority_claims = _draft_authority_claims()
+        authority_claims["merge_ready"] = True
+    elif mutator == "pr-delivery-claim":
+        authority_claims = _draft_authority_claims()
+        authority_claims["pr_delivery"] = True
+    else:
+        authority_claims = _draft_authority_claims()
+    input_path = repo / ".specdock-authoring" / "selected-skeleton-fill.json"
+    template_hash = "wrong" if mutator == "template-hash-mismatch" else "template-hash"
+    selected_skeleton_hash = "wrong" if mutator == "selected-skeleton-hash-mismatch" else "selected-skeleton-hash"
+    selected_payload = {
+        "schema_version": "selected-skeleton-fill-v1",
+        "issue_id": "iss-00303",
+        "template_hash": template_hash,
+        "selected_skeleton_hash": selected_skeleton_hash,
+        "source_manifest_hash": "source-hash",
+        "section_fills": section_fills,
+        "authority_claims": authority_claims,
+    }
+    if mutator == "missing-template-hash":
+        selected_payload.pop("template_hash")
+    if mutator == "malformed-input":
+        input_path.write_text("{not-json\n", encoding="utf-8")
+    elif mutator != "missing-input":
+        input_path.write_text(json.dumps(selected_payload, sort_keys=True) + "\n", encoding="utf-8")
+    if mutator == "missing-assurance":
+        assurance.unlink()
+    if mutator == "invalid-assurance":
+        assurance.write_text("{not-json\n", encoding="utf-8")
+    if mutator == "missing-selected-skeleton":
+        selected_skeleton.unlink()
+    if mutator == "invalid-selected-skeleton":
+        selected_skeleton.write_text("{not-json\n", encoding="utf-8")
+    if mutator == "missing-issue-node":
+        issue_dir = repo / "spec-dock" / "missing-issue-node"
+    return {
+        "input": input_path,
+        "issue_dir": issue_dir,
+        "assurance": assurance,
+        "selected_skeleton": selected_skeleton,
+    }
 
 
 def _base_authoring_pack_manifest() -> dict[str, object]:

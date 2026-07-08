@@ -13,6 +13,12 @@ from spec_dock_runtime.application.authoring_pack.candidate_validation import (
     CandidateValidationRequest,
     validate_authoring_candidates,
 )
+from spec_dock_runtime.application.authoring_pack.draft_adoption_validation import (
+    IssueDraftAdoptionValidationRequest,
+    SelectedSkeletonFillValidationRequest,
+    validate_issue_draft_adoption,
+    validate_selected_skeleton_fill,
+)
 from spec_dock_runtime.application.authoring_pack.pack_review import PackReviewRequest, review_authoring_pack
 from spec_dock_runtime.application.authoring_pack.pack_prepare import prepare_prompt_pack
 from spec_dock_runtime.application.authoring_pack.pack_stage import PackStageRequest, stage_authoring_pack
@@ -27,6 +33,10 @@ from spec_dock_runtime.presentation.authoring_pack.backend_invoke_renderer impor
 from spec_dock_runtime.presentation.authoring_pack.candidate_validation_renderer import (
     render_candidate_validation_json,
     render_candidate_validation_text,
+)
+from spec_dock_runtime.presentation.authoring_pack.draft_adoption_renderer import (
+    render_draft_adoption_json,
+    render_draft_adoption_text,
 )
 from spec_dock_runtime.presentation.authoring_pack.pack_prepare_renderer import (
     render_pack_prepare_json,
@@ -63,6 +73,32 @@ class AuthoringCandidateValidationArgs(CommandArgs):
     review_report: Path | None
     expected_parent_initiative: str | None
     expected_parent_epic: str | None
+    expected_source_hash: str | None
+    report_path: Path | None
+
+
+@dataclass(frozen=True)
+class AuthoringIssueDraftAdoptionValidationArgs(CommandArgs):
+    input_path: Path
+    issue_dir: Path
+    output_format: str
+    evidence_mode: str
+    review_report: Path | None
+    expected_review_digest: str | None
+    expected_draft_pack_digest: str | None
+    expected_source_hash: str | None
+    report_path: Path | None
+
+
+@dataclass(frozen=True)
+class AuthoringSelectedSkeletonFillValidationArgs(CommandArgs):
+    input_path: Path
+    issue_dir: Path
+    assurance: Path
+    selected_skeleton: Path
+    output_format: str
+    evidence_mode: str
+    expected_profile: str | None
     expected_source_hash: str | None
     report_path: Path | None
 
@@ -122,8 +158,6 @@ class AuthoringBackendInvokeArgs(CommandArgs):
 
 
 _DEFERRED_COMMANDS: dict[str, tuple[str, str]] = {
-    "authoring_validate_issue_draft_adoption": ("authoring validate issue-draft-adoption", "iss-00303"),
-    "authoring_validate_selected_skeleton_fill": ("authoring validate selected-skeleton-fill", "iss-00303"),
     "authoring_approval_check": ("authoring approval check", "iss-00305"),
 }
 
@@ -172,6 +206,16 @@ def command_specs() -> dict[str, CommandSpec]:
         args_factory=_epic_issue_candidate_args,
         run=_run_candidate_validation,
     )
+    specs["authoring_validate_issue_draft_adoption"] = CommandSpec(
+        add_arguments=_add_issue_draft_adoption_arguments,
+        args_factory=_issue_draft_adoption_args,
+        run=_run_issue_draft_adoption,
+    )
+    specs["authoring_validate_selected_skeleton_fill"] = CommandSpec(
+        add_arguments=_add_selected_skeleton_fill_arguments,
+        args_factory=_selected_skeleton_fill_args,
+        run=_run_selected_skeleton_fill,
+    )
     return specs
 
 
@@ -196,6 +240,30 @@ def _add_initiative_epic_candidate_arguments(parser: argparse.ArgumentParser) ->
 def _add_epic_issue_candidate_arguments(parser: argparse.ArgumentParser) -> None:
     _add_candidate_validation_arguments(parser)
     parser.add_argument("--expected-parent-epic", required=True)
+
+
+def _add_issue_draft_adoption_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--input", required=True, dest="input_path")
+    parser.add_argument("--issue-dir", required=True)
+    parser.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
+    parser.add_argument("--evidence-mode", choices=("github-synced", "local-context"), default="github-synced")
+    parser.add_argument("--review-report", required=True)
+    parser.add_argument("--expected-review-digest")
+    parser.add_argument("--expected-draft-pack-digest")
+    parser.add_argument("--expected-source-manifest-hash", "--expected-source-hash", dest="expected_source_hash")
+    parser.add_argument("--report-path")
+
+
+def _add_selected_skeleton_fill_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--input", required=True, dest="input_path")
+    parser.add_argument("--issue-dir", required=True)
+    parser.add_argument("--assurance", required=True)
+    parser.add_argument("--selected-skeleton", required=True)
+    parser.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
+    parser.add_argument("--evidence-mode", choices=("github-synced", "local-context"), default="github-synced")
+    parser.add_argument("--expected-profile")
+    parser.add_argument("--expected-source-manifest-hash", "--expected-source-hash", dest="expected_source_hash")
+    parser.add_argument("--report-path")
 
 
 def _add_preflight_github_sync_arguments(parser: argparse.ArgumentParser) -> None:
@@ -329,6 +397,34 @@ def _epic_issue_candidate_args(ns: argparse.Namespace) -> CommandArgs:
         review_report=Path(ns.review_report) if ns.review_report else None,
         expected_parent_initiative=None,
         expected_parent_epic=ns.expected_parent_epic,
+        expected_source_hash=ns.expected_source_hash,
+        report_path=Path(ns.report_path) if ns.report_path else None,
+    )
+
+
+def _issue_draft_adoption_args(ns: argparse.Namespace) -> CommandArgs:
+    return AuthoringIssueDraftAdoptionValidationArgs(
+        input_path=Path(ns.input_path),
+        issue_dir=Path(ns.issue_dir),
+        output_format=ns.output_format,
+        evidence_mode=ns.evidence_mode,
+        review_report=Path(ns.review_report) if ns.review_report else None,
+        expected_review_digest=ns.expected_review_digest,
+        expected_draft_pack_digest=ns.expected_draft_pack_digest,
+        expected_source_hash=ns.expected_source_hash,
+        report_path=Path(ns.report_path) if ns.report_path else None,
+    )
+
+
+def _selected_skeleton_fill_args(ns: argparse.Namespace) -> CommandArgs:
+    return AuthoringSelectedSkeletonFillValidationArgs(
+        input_path=Path(ns.input_path),
+        issue_dir=Path(ns.issue_dir),
+        assurance=Path(ns.assurance),
+        selected_skeleton=Path(ns.selected_skeleton),
+        output_format=ns.output_format,
+        evidence_mode=ns.evidence_mode,
+        expected_profile=ns.expected_profile,
         expected_source_hash=ns.expected_source_hash,
         report_path=Path(ns.report_path) if ns.report_path else None,
     )
@@ -489,6 +585,54 @@ def _run_candidate_validation(args: CommandArgs, use_cases: UseCases) -> Command
     return CommandOutcome(exit_code=exit_code, text=CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=[]))
 
 
+def _run_issue_draft_adoption(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    del use_cases
+    draft_args = _expect_issue_draft_adoption_args(args)
+    result = validate_issue_draft_adoption(
+        IssueDraftAdoptionValidationRequest(
+            input_path=draft_args.input_path,
+            issue_dir=draft_args.issue_dir,
+            output_format=draft_args.output_format,  # type: ignore[arg-type]
+            evidence_mode=draft_args.evidence_mode,  # type: ignore[arg-type]
+            review_report=draft_args.review_report,
+            expected_review_digest=draft_args.expected_review_digest,
+            expected_draft_pack_digest=draft_args.expected_draft_pack_digest,
+            expected_source_hash=draft_args.expected_source_hash,
+            report_path=draft_args.report_path,
+        )
+    )
+    exit_code = 0 if result.status == "pass" else 1
+    if draft_args.output_format == "json":
+        stdout_lines = [render_draft_adoption_json(result)]
+    else:
+        stdout_lines = render_draft_adoption_text(result)
+    return CommandOutcome(exit_code=exit_code, text=CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=[]))
+
+
+def _run_selected_skeleton_fill(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    del use_cases
+    skeleton_args = _expect_selected_skeleton_fill_args(args)
+    result = validate_selected_skeleton_fill(
+        SelectedSkeletonFillValidationRequest(
+            input_path=skeleton_args.input_path,
+            issue_dir=skeleton_args.issue_dir,
+            assurance=skeleton_args.assurance,
+            selected_skeleton=skeleton_args.selected_skeleton,
+            output_format=skeleton_args.output_format,  # type: ignore[arg-type]
+            evidence_mode=skeleton_args.evidence_mode,  # type: ignore[arg-type]
+            expected_profile=skeleton_args.expected_profile,
+            expected_source_hash=skeleton_args.expected_source_hash,
+            report_path=skeleton_args.report_path,
+        )
+    )
+    exit_code = 0 if result.status == "pass" else 1
+    if skeleton_args.output_format == "json":
+        stdout_lines = [render_draft_adoption_json(result)]
+    else:
+        stdout_lines = render_draft_adoption_text(result)
+    return CommandOutcome(exit_code=exit_code, text=CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=[]))
+
+
 def _run_deferred(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     del use_cases
     deferred_args = _expect_deferred_args(args)
@@ -547,4 +691,16 @@ def _expect_backend_invoke_args(args: CommandArgs) -> AuthoringBackendInvokeArgs
 def _expect_candidate_validation_args(args: CommandArgs) -> AuthoringCandidateValidationArgs:
     if not isinstance(args, AuthoringCandidateValidationArgs):
         raise RuntimeError("Invalid command args for authoring candidate validation")
+    return args
+
+
+def _expect_issue_draft_adoption_args(args: CommandArgs) -> AuthoringIssueDraftAdoptionValidationArgs:
+    if not isinstance(args, AuthoringIssueDraftAdoptionValidationArgs):
+        raise RuntimeError("Invalid command args for authoring issue draft adoption validation")
+    return args
+
+
+def _expect_selected_skeleton_fill_args(args: CommandArgs) -> AuthoringSelectedSkeletonFillValidationArgs:
+    if not isinstance(args, AuthoringSelectedSkeletonFillValidationArgs):
+        raise RuntimeError("Invalid command args for authoring selected skeleton fill validation")
     return args
