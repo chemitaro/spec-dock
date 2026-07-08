@@ -55,8 +55,8 @@ ID: "iss-00305"
 | step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
 |---|---|---|---|---|---|---|---|
 | planning | spec authoring review | spec-reviewer | fresh | passed | no | promote | re-review `019f4077-edeb-7b52-b8ae-9ac946ad856a` returned `review_status: pass`; prior P1/P2 findings resolved |
-| implementation | code review | code-reviewer | fresh | passed | no | promote | final review `019f4085-15a8-7cd3-b43f-8e1ca232ae95` returned no findings and `review_status: pass` |
-| implementation | QA review | qa-reviewer | fresh | passed | no | promote | final review `019f4085-381a-7073-aa76-619c087ceeb6` returned no findings and `review_status: pass` |
+| implementation | code review | code-reviewer | fresh | passed | no | promote | final review `019f40bd-1103-7e61-bb8a-4e3f6b2e9140` returned no findings and `review_status: pass` |
+| implementation | QA review | qa-reviewer | fresh | passed | no | promote | final review `019f40bd-11d8-77a0-8a50-1a1b5dce281b` returned no findings and `review_status: pass` |
 
 ## Closure Coverage
 
@@ -80,7 +80,7 @@ ID: "iss-00305"
 
 | step | delegated role | summary | changed files | verification | reviewer verdict | unresolved risks | parent integration decision |
 |---|---|---|---|---|---|---|---|
-| S02-S05 | dev-coder | `authoring approval check` を deferred から evidence-only approval validator へ実装し、code-reviewer / qa-reviewer P1/P2 指摘を repair した。 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/authoring.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack/approval_check.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack/candidate_contract.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/authoring_pack/approval_check_renderer.py`; dogfooding mirror under `spec-dock/scripts/spec_dock_runtime/`; `tests/cli_runtime/test_authoring.py` | `uv run pytest tests/cli_runtime/test_authoring.py -k "approval_check" -q`: 42 passed; `uv run pytest tests/cli_runtime/test_authoring.py -q`: 312 passed, 1 skipped; mirror inventory test: 1 passed; `validate`: ok; `assurance verify`: ok; `git diff --check`: pass | code-reviewer pass; qa-reviewer pass | none observed in focused runtime tests or reviewer gates after repair | integrated |
+| S02-S05 | dev-coder | `authoring approval check` を deferred から evidence-only approval validator へ実装し、code-reviewer / qa-reviewer P1/P2 指摘を repair した。 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/authoring.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack/approval_check.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack/candidate_contract.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/authoring_pack/approval_check_renderer.py`; dogfooding mirror under `spec-dock/scripts/spec_dock_runtime/`; `tests/cli_runtime/test_authoring.py` | `uv run pytest tests/cli_runtime/test_authoring.py -k "approval_check" -q`: 44 passed; `uv run pytest tests/cli_runtime/test_authoring.py -q`: 314 passed, 1 skipped; mirror inventory test: 1 passed; `validate`: ok; `assurance verify --issue iss-00305`: ok; `git diff --check`: pass | code-reviewer pass; qa-reviewer pass | none observed in focused runtime tests or reviewer gates after repair | integrated |
 
 ## Test Contract Closure
 
@@ -89,7 +89,7 @@ ID: "iss-00305"
 | tc-s00-001 | S00 | yes | `assurance classify`, `assurance compose`, `assurance verify` | classify/compose/verify passed after canonical docs finalization | planning in progress |
 | tc-s02-001 | S02 | yes | approval pass/missing/stale/scope/self-approval tests | passed | `uv run pytest tests/cli_runtime/test_authoring.py -k "approval_check" -q` passed |
 | tc-s04-001 | S04 | yes | help/json/text/auto-create tests | passed | approval help/output/boundary tests passed as part of focused and full authoring suite |
-| tc-s05-001 | S05 | yes | focused authoring tests | passed | `uv run pytest tests/cli_runtime/test_authoring.py -q` passed: 312 passed, 1 skipped |
+| tc-s05-001 | S05 | yes | focused authoring tests | passed | `uv run pytest tests/cli_runtime/test_authoring.py -q` passed: 314 passed, 1 skipped |
 | tc-s99-001 | S99 | yes | commit/push/finish evidence | pending | final closeout |
 
 ## No-PR Relay Policy
@@ -103,19 +103,19 @@ ID: "iss-00305"
 | gate | status | evidence |
 |---|---|---|
 | spec-dock validate | passed | `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=202` |
-| assurance verify | passed | `./spec-dock/scripts/spec-dock assurance verify`: ok |
-| focused tests | passed | `uv run pytest tests/cli_runtime/test_authoring.py -k "approval_check" -q`: 42 passed, 271 deselected |
-| authoring regression tests | passed | `uv run pytest tests/cli_runtime/test_authoring.py -q`: 312 passed, 1 skipped |
+| assurance verify | passed | `./spec-dock/scripts/spec-dock assurance verify --issue iss-00305`: ok |
+| focused tests | passed | `uv run pytest tests/cli_runtime/test_authoring.py -k "approval_check" -q`: 44 passed, 271 deselected |
+| authoring regression tests | passed | `uv run pytest tests/cli_runtime/test_authoring.py -q`: 314 passed, 1 skipped |
 | dogfooding runtime mirror | passed | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_mirror_match_provider_assets -q`: 1 passed |
 | git diff --check | passed | no whitespace errors |
-| code-reviewer | passed | final review `019f4085-15a8-7cd3-b43f-8e1ca232ae95`: no findings, `review_status=pass` |
-| qa-reviewer | passed | final review `019f4085-381a-7073-aa76-619c087ceeb6`: no findings, `review_status=pass` |
+| code-reviewer | passed | final review `019f40bd-1103-7e61-bb8a-4e3f6b2e9140`: no findings, `review_status=pass` |
+| qa-reviewer | passed | final review `019f40bd-11d8-77a0-8a50-1a1b5dce281b`: no findings, `review_status=pass` |
 | no per-Issue PR | pending | final closeout |
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
 - S01 Red: before implementation, `authoring approval check --help` exposed only skeletal deferred help and did not satisfy the approved CLI contract.
-- S02-S04 Green: `authoring approval check` now exposes the implemented help contract including `--candidate-evidence` and `--expected-candidate-evidence-digest`; focused approval tests passed with 42 passed / 271 deselected after repair.
-- S05 Verification: full `tests/cli_runtime/test_authoring.py` passed with 312 passed / 1 skipped; dogfooding runtime mirror test passed with 1 passed; `validate`, `assurance verify`, and `git diff --check` passed.
+- S02-S04 Green: `authoring approval check` now exposes the implemented help contract including `--candidate-evidence` and `--expected-candidate-evidence-digest`; focused approval tests passed with 44 passed / 271 deselected after repair.
+- S05 Verification: full `tests/cli_runtime/test_authoring.py` passed with 314 passed / 1 skipped; dogfooding runtime mirror test passed with 1 passed; `validate`, `assurance verify --issue iss-00305`, and `git diff --check` passed.
 - CLOS-010 relay: no per-Issue PR was created; PR delivery remains deferred to final Issue `iss-00307`.
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
