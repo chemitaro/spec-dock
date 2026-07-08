@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility wrapper for `spec-dock authoring validate epic-issue-candidates`."""
+"""Compatibility wrapper for `spec-dock authoring validate initiative-epic-candidates`."""
 
 from __future__ import annotations
 
@@ -12,7 +12,9 @@ _SPEC_DOCK_SCRIPT = _SCRIPT_DIR.parent / "spec-dock"
 
 
 def main(argv: list[str] | None = None) -> int:
-    return subprocess.run([sys.executable, str(_SPEC_DOCK_SCRIPT), "authoring", "validate", "epic-issue-candidates", *(argv or [])]).returncode
+    return subprocess.run(
+        [sys.executable, str(_SPEC_DOCK_SCRIPT), "authoring", "validate", "initiative-epic-candidates", *(argv or [])]
+    ).returncode
 
 
 if __name__ == "__main__":

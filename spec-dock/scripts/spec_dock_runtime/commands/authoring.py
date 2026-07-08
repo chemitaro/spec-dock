@@ -9,6 +9,10 @@ from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
     run_github_sync_preflight,
 )
 from spec_dock_runtime.application.authoring_pack.backend_invoke import invoke_backend
+from spec_dock_runtime.application.authoring_pack.candidate_validation import (
+    CandidateValidationRequest,
+    validate_authoring_candidates,
+)
 from spec_dock_runtime.application.authoring_pack.pack_review import PackReviewRequest, review_authoring_pack
 from spec_dock_runtime.application.authoring_pack.pack_prepare import prepare_prompt_pack
 from spec_dock_runtime.application.authoring_pack.pack_stage import PackStageRequest, stage_authoring_pack
@@ -19,6 +23,10 @@ from spec_dock_runtime.presentation.authoring_pack.diagnostics import render_pre
 from spec_dock_runtime.presentation.authoring_pack.backend_invoke_renderer import (
     render_backend_invoke_json,
     render_backend_invoke_text,
+)
+from spec_dock_runtime.presentation.authoring_pack.candidate_validation_renderer import (
+    render_candidate_validation_json,
+    render_candidate_validation_text,
 )
 from spec_dock_runtime.presentation.authoring_pack.pack_prepare_renderer import (
     render_pack_prepare_json,
@@ -44,6 +52,19 @@ if TYPE_CHECKING:
 class AuthoringDeferredArgs(CommandArgs):
     command: str
     next_issue: str
+
+
+@dataclass(frozen=True)
+class AuthoringCandidateValidationArgs(CommandArgs):
+    input_path: Path
+    candidate_kind: str
+    output_format: str
+    evidence_mode: str
+    review_report: Path | None
+    expected_parent_initiative: str | None
+    expected_parent_epic: str | None
+    expected_source_hash: str | None
+    report_path: Path | None
 
 
 @dataclass(frozen=True)
@@ -101,11 +122,6 @@ class AuthoringBackendInvokeArgs(CommandArgs):
 
 
 _DEFERRED_COMMANDS: dict[str, tuple[str, str]] = {
-    "authoring_validate_initiative_epic_candidates": (
-        "authoring validate initiative-epic-candidates",
-        "iss-00302",
-    ),
-    "authoring_validate_epic_issue_candidates": ("authoring validate epic-issue-candidates", "iss-00302"),
     "authoring_validate_issue_draft_adoption": ("authoring validate issue-draft-adoption", "iss-00303"),
     "authoring_validate_selected_skeleton_fill": ("authoring validate selected-skeleton-fill", "iss-00303"),
     "authoring_approval_check": ("authoring approval check", "iss-00305"),
@@ -146,11 +162,40 @@ def command_specs() -> dict[str, CommandSpec]:
         args_factory=_backend_invoke_args,
         run=_run_backend_invoke,
     )
+    specs["authoring_validate_initiative_epic_candidates"] = CommandSpec(
+        add_arguments=_add_initiative_epic_candidate_arguments,
+        args_factory=_initiative_epic_candidate_args,
+        run=_run_candidate_validation,
+    )
+    specs["authoring_validate_epic_issue_candidates"] = CommandSpec(
+        add_arguments=_add_epic_issue_candidate_arguments,
+        args_factory=_epic_issue_candidate_args,
+        run=_run_candidate_validation,
+    )
     return specs
 
 
 def _add_deferred_arguments(parser: argparse.ArgumentParser) -> None:
     del parser
+
+
+def _add_candidate_validation_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--input", required=True, dest="input_path")
+    parser.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
+    parser.add_argument("--evidence-mode", choices=("github-synced", "local-context"), default="github-synced")
+    parser.add_argument("--review-report")
+    parser.add_argument("--expected-source-manifest-hash", "--expected-source-hash", dest="expected_source_hash")
+    parser.add_argument("--report-path")
+
+
+def _add_initiative_epic_candidate_arguments(parser: argparse.ArgumentParser) -> None:
+    _add_candidate_validation_arguments(parser)
+    parser.add_argument("--expected-parent-initiative", required=True)
+
+
+def _add_epic_issue_candidate_arguments(parser: argparse.ArgumentParser) -> None:
+    _add_candidate_validation_arguments(parser)
+    parser.add_argument("--expected-parent-epic", required=True)
 
 
 def _add_preflight_github_sync_arguments(parser: argparse.ArgumentParser) -> None:
@@ -258,6 +303,34 @@ def _backend_invoke_args(ns: argparse.Namespace) -> CommandArgs:
         evidence_mode=ns.evidence_mode,
         timeout_seconds=ns.timeout_seconds,
         dry_run=bool(ns.dry_run),
+    )
+
+
+def _initiative_epic_candidate_args(ns: argparse.Namespace) -> CommandArgs:
+    return AuthoringCandidateValidationArgs(
+        input_path=Path(ns.input_path),
+        candidate_kind="initiative-epic",
+        output_format=ns.output_format,
+        evidence_mode=ns.evidence_mode,
+        review_report=Path(ns.review_report) if ns.review_report else None,
+        expected_parent_initiative=ns.expected_parent_initiative,
+        expected_parent_epic=None,
+        expected_source_hash=ns.expected_source_hash,
+        report_path=Path(ns.report_path) if ns.report_path else None,
+    )
+
+
+def _epic_issue_candidate_args(ns: argparse.Namespace) -> CommandArgs:
+    return AuthoringCandidateValidationArgs(
+        input_path=Path(ns.input_path),
+        candidate_kind="epic-issue",
+        output_format=ns.output_format,
+        evidence_mode=ns.evidence_mode,
+        review_report=Path(ns.review_report) if ns.review_report else None,
+        expected_parent_initiative=None,
+        expected_parent_epic=ns.expected_parent_epic,
+        expected_source_hash=ns.expected_source_hash,
+        report_path=Path(ns.report_path) if ns.report_path else None,
     )
 
 
@@ -392,6 +465,30 @@ def _run_backend_invoke(args: CommandArgs, use_cases: UseCases) -> CommandOutcom
     )
 
 
+def _run_candidate_validation(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    del use_cases
+    candidate_args = _expect_candidate_validation_args(args)
+    result = validate_authoring_candidates(
+        CandidateValidationRequest(
+            input_path=candidate_args.input_path,
+            candidate_kind=candidate_args.candidate_kind,  # type: ignore[arg-type]
+            output_format=candidate_args.output_format,  # type: ignore[arg-type]
+            evidence_mode=candidate_args.evidence_mode,  # type: ignore[arg-type]
+            review_report=candidate_args.review_report,
+            expected_parent_initiative=candidate_args.expected_parent_initiative,
+            expected_parent_epic=candidate_args.expected_parent_epic,
+            expected_source_hash=candidate_args.expected_source_hash,
+            report_path=candidate_args.report_path,
+        )
+    )
+    exit_code = 0 if result.status == "pass" else 1
+    if candidate_args.output_format == "json":
+        stdout_lines = [render_candidate_validation_json(result)]
+    else:
+        stdout_lines = render_candidate_validation_text(result)
+    return CommandOutcome(exit_code=exit_code, text=CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=[]))
+
+
 def _run_deferred(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     del use_cases
     deferred_args = _expect_deferred_args(args)
@@ -444,4 +541,10 @@ def _expect_pack_stage_args(args: CommandArgs) -> AuthoringPackStageArgs:
 def _expect_backend_invoke_args(args: CommandArgs) -> AuthoringBackendInvokeArgs:
     if not isinstance(args, AuthoringBackendInvokeArgs):
         raise RuntimeError("Invalid command args for authoring backend invoke")
+    return args
+
+
+def _expect_candidate_validation_args(args: CommandArgs) -> AuthoringCandidateValidationArgs:
+    if not isinstance(args, AuthoringCandidateValidationArgs):
+        raise RuntimeError("Invalid command args for authoring candidate validation")
     return args
