@@ -10,6 +10,7 @@ from spec_dock_runtime.domain.authoring_pack.preflight_contract import GitVisibl
 from spec_dock_runtime.domain.authoring_pack.source_manifest import (
     build_source_manifest,
     expected_hash_from_manifest,
+    source_path_blockers,
 )
 
 EvidenceMode = Literal["github-synced", "local-context"]
@@ -41,14 +42,18 @@ def run_github_sync_preflight(
     manifest_paths = request.source_paths
     if request.evidence_mode == "local-context" and not manifest_paths:
         manifest_paths = request.provided_context_paths
+    source_blockers = source_path_blockers(repo_root, manifest_paths)
     source_manifest = build_source_manifest(repo_root, manifest_paths)
 
     expected_source_hash = _resolve_expected_hash(request)
     if request.evidence_mode == "local-context":
-        return _local_context_result(request, source_manifest, expected_source_hash)
+        return _local_context_result(request, repo_root, source_manifest, expected_source_hash, source_blockers)
 
     blockers: list[str] = []
     remediation: list[str] = []
+    blockers.extend(source_blockers)
+    if source_blockers:
+        remediation.append("remove symlink, absolute-outside-repo, or parent-traversal source paths before preflight")
     blockers.extend(_worktree_blockers(repo_root))
     missing_source_paths = _missing_explicit_source_paths(repo_root, manifest_paths)
     if missing_source_paths:
@@ -143,17 +148,26 @@ def run_github_sync_preflight(
 
 def _local_context_result(
     request: GitHubSyncPreflightRequest,
+    repo_root: Path,
     source_manifest,
     expected_source_hash: str | None,
+    source_blockers: tuple[str, ...],
 ) -> PreflightResult:
     blockers: list[str] = []
     remediation: list[str] = []
+    blockers.extend(source_blockers)
+    if source_blockers:
+        remediation.append("remove symlink, absolute-outside-repo, or parent-traversal context paths before preflight")
     if not request.unsynced_reason:
         blockers.append("missing_unsynced_reason")
         remediation.append("provide --unsynced-reason for local-context evidence")
     if not request.provided_context_paths and not request.diff_summary:
         blockers.append("missing_context_provenance")
         remediation.append("provide --provided-context-path or --diff-summary for local-context evidence")
+    missing_context_paths = _missing_explicit_source_paths(repo_root, request.provided_context_paths)
+    if missing_context_paths:
+        blockers.extend(f"missing_context_path:{path}" for path in missing_context_paths)
+        remediation.append("provide readable --provided-context-path files for local-context evidence")
     status = "blocked" if blockers else "pass"
     if expected_source_hash is not None and expected_source_hash != source_manifest.source_manifest_hash:
         blockers.append("source_hash_mismatch")
