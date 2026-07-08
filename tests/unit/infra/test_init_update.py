@@ -10223,9 +10223,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert "does not grant degraded reviewer" in manual_text
 
         repo_root = Path(__file__).resolve().parents[3]
-        epic_plan_template = (
-            repo_root / "src/spec_dock/assets/spec_dock/templates/epic/plan.md"
-        ).read_text(encoding="utf-8")
+        epic_plan_template = (repo_root / "src/spec_dock/assets/spec_dock/templates/epic/plan.md").read_text(
+            encoding="utf-8"
+        )
         for required_template_field in (
             "final quality issue id",
             "completion evidence",
