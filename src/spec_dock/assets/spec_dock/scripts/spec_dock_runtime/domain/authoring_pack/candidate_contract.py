@@ -20,6 +20,14 @@ CandidateKind = Literal["initiative-epic", "epic-issue"]
 CandidateStatus = Literal["pass", "fail", "blocked", "stale", "rejected"]
 
 ALLOWED_PROFILES = {"lite", "standard", "strict", "critical"}
+FORBIDDEN_AUTHORITY_FLAG_KEYS = (
+    "node_creation_performed",
+    "canonical_written",
+    "assurance_mutated",
+    "reviewer_pass_claimed",
+    "execution_ready",
+    "pr_ready",
+)
 
 
 @dataclass(frozen=True)
@@ -315,6 +323,7 @@ def validate_approval_evidence(
 
     if isinstance(payload, dict):
         findings.extend(scan_authoring_payload(json.dumps(payload, sort_keys=True)))
+        _scan_forbidden_authority_flags(payload, findings)
         if payload.get("schema_version") != 1:
             findings.append("invalid_schema_version:approval")
         if payload.get("approval_evidence_kind") != "candidate_decomposition_approval":
@@ -365,8 +374,6 @@ def validate_approval_evidence(
             source_manifest_hash = _optional_string(candidate_pack, "source_manifest_hash", findings)
             if candidate_pack_digest is None:
                 findings.append("missing_or_invalid_field:candidate_pack.candidate_pack_digest")
-            if source_manifest_hash is None:
-                findings.append("missing_or_invalid_field:candidate_pack.source_manifest_hash")
         else:
             findings.append("missing_or_invalid_field:candidate_pack")
             candidate_pack_digest = None
@@ -388,14 +395,7 @@ def validate_approval_evidence(
             if not isinstance(claims, dict):
                 findings.append("missing_or_invalid_field:authority_boundary")
             else:
-                for key in (
-                    "node_creation_performed",
-                    "canonical_written",
-                    "assurance_mutated",
-                    "reviewer_pass_claimed",
-                    "execution_ready",
-                    "pr_ready",
-                ):
+                for key in FORBIDDEN_AUTHORITY_FLAG_KEYS:
                     if claims.get(key) is not False:
                         findings.append(f"forbidden_authority_claim:{key}")
 
@@ -558,6 +558,18 @@ def _scope_value(value: object, label: str, findings: list[str]) -> str | None:
     return None
 
 
+def _scan_forbidden_authority_flags(payload: object, findings: list[str]) -> None:
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if key in FORBIDDEN_AUTHORITY_FLAG_KEYS and bool(value):
+                findings.append(f"forbidden_authority_claim:{key}")
+            _scan_forbidden_authority_flags(value, findings)
+        return
+    if isinstance(payload, list):
+        for value in payload:
+            _scan_forbidden_authority_flags(value, findings)
+
+
 def _validate_common_authority(
     payload: dict[str, object], label: str, findings: list[str], *, require_claims: bool
 ) -> None:
@@ -577,14 +589,7 @@ def _validate_common_authority(
     if not isinstance(claims, dict):
         findings.append(f"missing_or_invalid_field:{label}:authority_claims")
         return
-    for key in (
-        "node_creation_performed",
-        "canonical_written",
-        "assurance_mutated",
-        "reviewer_pass_claimed",
-        "execution_ready",
-        "pr_ready",
-    ):
+    for key in FORBIDDEN_AUTHORITY_FLAG_KEYS:
         if claims.get(key) is not False:
             findings.append(f"forbidden_authority_claim:{key}")
 
