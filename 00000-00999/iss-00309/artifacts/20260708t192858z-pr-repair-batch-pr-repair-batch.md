@@ -167,6 +167,27 @@ Define family-level gates, not comment-level checks.
 | iteration | head_sha | observation_status | family_id | action_taken | fix_commit | reappeared_after_fix | next_action |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `2a6d951438f4c6cc0ae9db0f738981b2ed1b97b7` | `human_gate` | F001-F007 | Implement runtime guards, tests, fixture update, and dogfood mirror sync | pending | no | commit, push, re-observe |
+| 2 | `f8aeb4ef611540ae0cc17f06781b5c76387be558` | `timeout` with Provider CI still running, review unresolved | F008-F011 | Implement second review batch: required metadata field validation, selected-skeleton review gate, draft pack digest binding, and null `authorized_profile` structural scan handling | pending | pending | commit, push, re-observe |
+
+## Second Review Batch Addendum
+
+The resumed PR observation for head `f8aeb4ef611540ae0cc17f06781b5c76387be558`
+reported four additional P1 findings and one P2. The P2
+`backend-invoke.symlink-boundary` is non-blocking and is not repaired in this
+batch. The four P1 findings were implemented locally:
+
+| item_id | source_id | priority | family_id | summary | local disposition |
+| --- | --- | --- | --- | --- | --- |
+| R008 | authoring-pack.metadata-contract | P1 | F008 | ZIP review passed required metadata filenames without required provenance/source fields. | `zip_contract.py` now requires `provenance.json` and `source-manifest.json` contract fields before pass. |
+| R009 | draft-validation.review-gate | P1 | F009 | `selected-skeleton-fill` could pass without review evidence. | CLI/request/application path now require `--review-report` and pass review gate fields into the result. |
+| R010 | draft-validation.pack-digest-binding | P1 | F010 | issue draft adoption did not bind payload `draft_pack_digest` to review report pack digest by default. | application path now derives the expected draft pack digest from the pass review report when no explicit expected value is supplied. |
+| R011 | authoring-pack.authority-scan | P1 | F011 | candidate JSON with documented `authorized_profile: null` was rejected by raw substring scanning. | ZIP review now sanitizes candidate JSON structurally for null `authorized_profile` before authority scanning. |
+
+Local quality gates after this addendum:
+
+- `make lint`: pass
+- `uv run pytest tests/cli_runtime/test_authoring.py`: pass (`344 passed, 1 skipped`)
+- `./spec-dock/scripts/spec-dock validate`: pass (`nodes=203`)
 
 ## Terminal Non-Blocking Report Boundary
 
