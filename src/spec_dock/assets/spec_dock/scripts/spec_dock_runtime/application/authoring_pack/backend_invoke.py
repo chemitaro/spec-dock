@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shlex
 import subprocess
@@ -206,6 +206,8 @@ def validate_prompt_pack(prompt_pack: Path) -> PromptPackValidation:
         blockers.append("stale_if_not_object")
     if isinstance(manifest, dict):
         _manifest_file_blockers(root, manifest, blockers)
+    if isinstance(provenance, dict):
+        _provenance_sync_blockers(provenance, blockers)
 
     for name, payload in (("manifest", manifest), ("provenance", provenance)):
         if payload is None:
@@ -261,11 +263,9 @@ def _manifest_file_blockers(root: Path, manifest: dict[str, Any], blockers: list
         if not isinstance(value, str):
             blockers.append("manifest_file_not_string")
             continue
-        if value.startswith("/"):
-            blockers.append("unsafe_manifest_file:absolute-path")
-            continue
-        if ".." in Path(value).parts:
-            blockers.append("unsafe_manifest_file:parent-traversal")
+        unsafe = _unsafe_manifest_file(value)
+        if unsafe:
+            blockers.append(unsafe)
             continue
         path = root / value
         try:
@@ -275,6 +275,29 @@ def _manifest_file_blockers(root: Path, manifest: dict[str, Any], blockers: list
             continue
         if path.is_symlink():
             blockers.append(f"unsafe_manifest_file_symlink:{value}")
+
+
+def _provenance_sync_blockers(provenance: dict[str, Any], blockers: list[str]) -> None:
+    evidence_mode = provenance.get("evidence_mode")
+    sync_state = provenance.get("sync_state")
+    github_sync = provenance.get("github_sync")
+    if evidence_mode == "github-synced":
+        if github_sync != "verified":
+            blockers.append("provenance_github_sync_not_verified")
+        if sync_state != "synced":
+            blockers.append("provenance_sync_state_not_synced")
+    elif evidence_mode == "local-context":
+        if github_sync != "not_verified":
+            blockers.append("provenance_github_sync_not_not_verified")
+        if sync_state != "local_context":
+            blockers.append("provenance_sync_state_not_local_context")
+        if not provenance.get("unsynced_reason"):
+            blockers.append("provenance_missing_unsynced_reason")
+        provided = provenance.get("provided_context_paths")
+        if not isinstance(provided, list) and not provenance.get("diff_summary"):
+            blockers.append("provenance_missing_context_provenance")
+    elif evidence_mode is not None:
+        blockers.append(f"unsupported_provenance_evidence_mode:{evidence_mode}")
 
 
 def _backend_invocation_argv(
@@ -299,7 +322,7 @@ def _backend_attachment_files(prompt_pack: Path) -> tuple[str, ...]:
             continue
         if value in files:
             continue
-        if value.startswith("/") or ".." in Path(value).parts:
+        if _unsafe_manifest_file(value):
             continue
         path = prompt_pack / value
         try:
@@ -309,6 +332,29 @@ def _backend_attachment_files(prompt_pack: Path) -> tuple[str, ...]:
         if path.is_file() and not path.is_symlink():
             files.append(value)
     return tuple(files)
+
+
+def _unsafe_manifest_file(value: str) -> str | None:
+    if "\\" in value:
+        return f"unsafe_manifest_file:backslash-separator:{value}"
+    if len(value) >= 2 and value[1] == ":" and value[0].isalpha():
+        return f"unsafe_manifest_file:drive-path:{value}"
+    rel = PurePosixPath(value)
+    if rel.is_absolute():
+        return "unsafe_manifest_file:absolute-path"
+    if any(part == ".." for part in rel.parts):
+        return "unsafe_manifest_file:parent-traversal"
+    if any(part.startswith(".") for part in rel.parts):
+        return f"unsafe_manifest_file:hidden-path:{value}"
+    lowered_parts = tuple(part.lower() for part in rel.parts)
+    if any(
+        part in {"secret", "secrets", "token", "tokens", "credential", "credentials", "password", "passwords"}
+        or "api-key" in part
+        or "api_key" in part
+        for part in lowered_parts
+    ):
+        return f"unsafe_manifest_file:secret-path:{value}"
+    return None
 
 
 def _unsafe_output_blockers(output_dir: Path) -> tuple[str, ...]:
