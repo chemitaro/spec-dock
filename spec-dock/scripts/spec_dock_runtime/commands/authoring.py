@@ -8,6 +8,7 @@ from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
     GitHubSyncPreflightRequest,
     run_github_sync_preflight,
 )
+from spec_dock_runtime.application.authoring_pack.approval_check import ApprovalCheckRequest, check_authoring_approval
 from spec_dock_runtime.application.authoring_pack.backend_invoke import invoke_backend
 from spec_dock_runtime.application.authoring_pack.candidate_validation import (
     CandidateValidationRequest,
@@ -26,6 +27,10 @@ from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, Co
 from spec_dock_runtime.domain.authoring_pack.backend_invoke_contract import BackendInvokeRequest
 from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import PromptPackPrepareRequest
 from spec_dock_runtime.presentation.authoring_pack.diagnostics import render_preflight_json, render_preflight_text
+from spec_dock_runtime.presentation.authoring_pack.approval_check_renderer import (
+    render_approval_check_json,
+    render_approval_check_text,
+)
 from spec_dock_runtime.presentation.authoring_pack.backend_invoke_renderer import (
     render_backend_invoke_json,
     render_backend_invoke_text,
@@ -73,6 +78,25 @@ class AuthoringCandidateValidationArgs(CommandArgs):
     review_report: Path | None
     expected_parent_initiative: str | None
     expected_parent_epic: str | None
+    expected_source_hash: str | None
+    report_path: Path | None
+
+
+@dataclass(frozen=True)
+class AuthoringApprovalCheckArgs(CommandArgs):
+    input_path: Path
+    approval_path: Path | None
+    candidate_kind: str
+    output_format: str
+    evidence_mode: str
+    review_report: Path | None
+    candidate_evidence: Path | None
+    expected_parent_initiative: str | None
+    expected_parent_epic: str | None
+    expected_requested_scope: str | None
+    expected_effective_scope: str | None
+    expected_candidate_pack_digest: str | None
+    expected_candidate_evidence_digest: str | None
     expected_source_hash: str | None
     report_path: Path | None
 
@@ -157,9 +181,7 @@ class AuthoringBackendInvokeArgs(CommandArgs):
     dry_run: bool
 
 
-_DEFERRED_COMMANDS: dict[str, tuple[str, str]] = {
-    "authoring_approval_check": ("authoring approval check", "iss-00305"),
-}
+_DEFERRED_COMMANDS: dict[str, tuple[str, str]] = {}
 
 
 def command_specs() -> dict[str, CommandSpec]:
@@ -195,6 +217,11 @@ def command_specs() -> dict[str, CommandSpec]:
         add_arguments=_add_backend_invoke_arguments,
         args_factory=_backend_invoke_args,
         run=_run_backend_invoke,
+    )
+    specs["authoring_approval_check"] = CommandSpec(
+        add_arguments=_add_approval_check_arguments,
+        args_factory=_approval_check_args,
+        run=_run_approval_check,
     )
     specs["authoring_validate_initiative_epic_candidates"] = CommandSpec(
         add_arguments=_add_initiative_epic_candidate_arguments,
@@ -240,6 +267,24 @@ def _add_initiative_epic_candidate_arguments(parser: argparse.ArgumentParser) ->
 def _add_epic_issue_candidate_arguments(parser: argparse.ArgumentParser) -> None:
     _add_candidate_validation_arguments(parser)
     parser.add_argument("--expected-parent-epic", required=True)
+
+
+def _add_approval_check_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--input", required=True, dest="input_path")
+    parser.add_argument("--approval", dest="approval_path")
+    parser.add_argument("--candidate-kind", choices=("initiative-epic", "epic-issue"), required=True)
+    parser.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
+    parser.add_argument("--evidence-mode", choices=("github-synced", "local-context"), default="github-synced")
+    parser.add_argument("--review-report")
+    parser.add_argument("--candidate-evidence")
+    parser.add_argument("--expected-parent-initiative")
+    parser.add_argument("--expected-parent-epic")
+    parser.add_argument("--expected-requested-scope")
+    parser.add_argument("--expected-effective-scope")
+    parser.add_argument("--expected-candidate-pack-digest")
+    parser.add_argument("--expected-candidate-evidence-digest")
+    parser.add_argument("--expected-source-manifest-hash", "--expected-source-hash", dest="expected_source_hash")
+    parser.add_argument("--report-path")
 
 
 def _add_issue_draft_adoption_arguments(parser: argparse.ArgumentParser) -> None:
@@ -397,6 +442,30 @@ def _epic_issue_candidate_args(ns: argparse.Namespace) -> CommandArgs:
         review_report=Path(ns.review_report) if ns.review_report else None,
         expected_parent_initiative=None,
         expected_parent_epic=ns.expected_parent_epic,
+        expected_source_hash=ns.expected_source_hash,
+        report_path=Path(ns.report_path) if ns.report_path else None,
+    )
+
+
+def _approval_check_args(ns: argparse.Namespace) -> CommandArgs:
+    if ns.candidate_kind == "initiative-epic" and not ns.expected_parent_initiative:
+        raise RuntimeError("--expected-parent-initiative is required for --candidate-kind initiative-epic")
+    if ns.candidate_kind == "epic-issue" and not ns.expected_parent_epic:
+        raise RuntimeError("--expected-parent-epic is required for --candidate-kind epic-issue")
+    return AuthoringApprovalCheckArgs(
+        input_path=Path(ns.input_path),
+        approval_path=Path(ns.approval_path) if ns.approval_path else None,
+        candidate_kind=ns.candidate_kind,
+        output_format=ns.output_format,
+        evidence_mode=ns.evidence_mode,
+        review_report=Path(ns.review_report) if ns.review_report else None,
+        candidate_evidence=Path(ns.candidate_evidence) if ns.candidate_evidence else None,
+        expected_parent_initiative=ns.expected_parent_initiative,
+        expected_parent_epic=ns.expected_parent_epic,
+        expected_requested_scope=ns.expected_requested_scope,
+        expected_effective_scope=ns.expected_effective_scope,
+        expected_candidate_pack_digest=ns.expected_candidate_pack_digest,
+        expected_candidate_evidence_digest=ns.expected_candidate_evidence_digest,
         expected_source_hash=ns.expected_source_hash,
         report_path=Path(ns.report_path) if ns.report_path else None,
     )
@@ -585,6 +654,36 @@ def _run_candidate_validation(args: CommandArgs, use_cases: UseCases) -> Command
     return CommandOutcome(exit_code=exit_code, text=CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=[]))
 
 
+def _run_approval_check(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
+    del use_cases
+    approval_args = _expect_approval_check_args(args)
+    result = check_authoring_approval(
+        ApprovalCheckRequest(
+            input_path=approval_args.input_path,
+            approval_path=approval_args.approval_path,
+            candidate_kind=approval_args.candidate_kind,  # type: ignore[arg-type]
+            output_format=approval_args.output_format,  # type: ignore[arg-type]
+            evidence_mode=approval_args.evidence_mode,  # type: ignore[arg-type]
+            review_report=approval_args.review_report,
+            candidate_evidence=approval_args.candidate_evidence,
+            expected_parent_initiative=approval_args.expected_parent_initiative,
+            expected_parent_epic=approval_args.expected_parent_epic,
+            expected_requested_scope=approval_args.expected_requested_scope,
+            expected_effective_scope=approval_args.expected_effective_scope,
+            expected_candidate_pack_digest=approval_args.expected_candidate_pack_digest,
+            expected_candidate_evidence_digest=approval_args.expected_candidate_evidence_digest,
+            expected_source_hash=approval_args.expected_source_hash,
+            report_path=approval_args.report_path,
+        )
+    )
+    exit_code = 0 if result.status == "pass" else 1
+    if approval_args.output_format == "json":
+        stdout_lines = [render_approval_check_json(result)]
+    else:
+        stdout_lines = render_approval_check_text(result)
+    return CommandOutcome(exit_code=exit_code, text=CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=[]))
+
+
 def _run_issue_draft_adoption(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     del use_cases
     draft_args = _expect_issue_draft_adoption_args(args)
@@ -691,6 +790,12 @@ def _expect_backend_invoke_args(args: CommandArgs) -> AuthoringBackendInvokeArgs
 def _expect_candidate_validation_args(args: CommandArgs) -> AuthoringCandidateValidationArgs:
     if not isinstance(args, AuthoringCandidateValidationArgs):
         raise RuntimeError("Invalid command args for authoring candidate validation")
+    return args
+
+
+def _expect_approval_check_args(args: CommandArgs) -> AuthoringApprovalCheckArgs:
+    if not isinstance(args, AuthoringApprovalCheckArgs):
+        raise RuntimeError("Invalid command args for authoring approval check")
     return args
 
 

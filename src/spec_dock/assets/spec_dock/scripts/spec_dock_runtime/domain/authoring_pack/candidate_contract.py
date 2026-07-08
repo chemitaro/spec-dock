@@ -80,6 +80,91 @@ class CandidateValidationResult:
         }
 
 
+@dataclass(frozen=True)
+class ApprovalCheckResult:
+    status: CandidateStatus
+    input_path: str
+    candidate_kind: CandidateKind
+    authority: str = AUTHORITY
+    adoption_status: str = ADOPTION_STATUS
+    bundle_generation_not_promotion: bool = BUNDLE_GENERATION_NOT_PROMOTION
+    evidence_mode: str = "github-synced"
+    review_status: str | None = None
+    review_gate_passed: bool = False
+    approval_required: bool = True
+    approval_gate_passed: bool = False
+    approver_kind: str | None = None
+    approval_path: str | None = None
+    candidate_evidence_path: str | None = None
+    requested_scope: str | None = None
+    effective_scope: str | None = None
+    expected_requested_scope: str | None = None
+    expected_effective_scope: str | None = None
+    expected_candidate_pack_digest: str | None = None
+    observed_candidate_pack_digest: str | None = None
+    expected_candidate_evidence_digest: str | None = None
+    candidate_evidence_file_digest: str | None = None
+    expected_source_manifest_hash: str | None = None
+    observed_source_manifest_hash: str | None = None
+    candidate_count: int = 0
+    valid_candidate_count: int = 0
+    node_creation_performed: bool = False
+    canonical_written: bool = False
+    assurance_mutated: bool = False
+    reviewer_pass_claimed: bool = False
+    execution_ready: bool = False
+    pr_ready: bool = False
+    findings: tuple[str, ...] = ()
+    comparison: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "status": self.status,
+            "input_path": self.input_path,
+            "candidate_kind": self.candidate_kind,
+            "authority": self.authority,
+            "adoption_status": self.adoption_status,
+            "bundle_generation_not_promotion": self.bundle_generation_not_promotion,
+            "evidence_mode": self.evidence_mode,
+            "review_status": self.review_status,
+            "review_gate_passed": self.review_gate_passed,
+            "approval_required": self.approval_required,
+            "approval_gate_passed": self.approval_gate_passed,
+            "approver_kind": self.approver_kind,
+            "approval_path": self.approval_path,
+            "candidate_evidence_path": self.candidate_evidence_path,
+            "requested_scope": self.requested_scope,
+            "effective_scope": self.effective_scope,
+            "expected_requested_scope": self.expected_requested_scope,
+            "expected_effective_scope": self.expected_effective_scope,
+            "expected_candidate_pack_digest": self.expected_candidate_pack_digest,
+            "observed_candidate_pack_digest": self.observed_candidate_pack_digest,
+            "expected_candidate_evidence_digest": self.expected_candidate_evidence_digest,
+            "candidate_evidence_file_digest": self.candidate_evidence_file_digest,
+            "expected_source_manifest_hash": self.expected_source_manifest_hash,
+            "observed_source_manifest_hash": self.observed_source_manifest_hash,
+            "candidate_count": self.candidate_count,
+            "valid_candidate_count": self.valid_candidate_count,
+            "node_creation_performed": self.node_creation_performed,
+            "canonical_written": self.canonical_written,
+            "assurance_mutated": self.assurance_mutated,
+            "reviewer_pass_claimed": self.reviewer_pass_claimed,
+            "execution_ready": self.execution_ready,
+            "pr_ready": self.pr_ready,
+            "findings": list(self.findings),
+            "comparison": list(self.comparison),
+            "comparisons": {
+                "candidate_pack_digest": _comparison_state("candidate_pack_digest_mismatch", self.comparison),
+                "candidate_evidence_file_digest": _comparison_state(
+                    "candidate_evidence_file_digest_mismatch", self.comparison
+                ),
+                "source_manifest_hash": _comparison_state("source_manifest_hash_mismatch", self.comparison),
+                "requested_scope": _comparison_state("requested_scope_mismatch", self.comparison),
+                "effective_scope": _comparison_state("effective_scope_mismatch", self.comparison),
+            },
+        }
+
+
 def validate_candidate_pack(
     pack_root: Path,
     *,
@@ -194,6 +279,155 @@ def validate_candidate_pack(
     )
 
 
+def validate_approval_evidence(
+    approval_path: Path | None,
+    *,
+    input_path: Path,
+    candidate_kind: CandidateKind,
+    evidence_mode: str,
+    review_status: str | None,
+    review_gate_passed: bool,
+    candidate_count: int,
+    valid_candidate_count: int,
+    observed_candidate_pack_digest: str | None,
+    expected_candidate_pack_digest: str | None = None,
+    candidate_evidence_path: Path | None = None,
+    expected_candidate_evidence_digest: str | None = None,
+    expected_source_hash: str | None = None,
+    observed_source_hash: str | None = None,
+    expected_requested_scope: str | None = None,
+    expected_effective_scope: str | None = None,
+) -> ApprovalCheckResult:
+    findings: list[str] = []
+    comparison: list[str] = []
+    observed_candidate_evidence_digest = _file_digest(candidate_evidence_path, findings) if candidate_evidence_path else None
+    payload = _read_approval_json(approval_path, findings)
+    approver_kind: str | None = None
+    requested_scope: str | None = None
+    effective_scope: str | None = None
+
+    if expected_candidate_pack_digest and observed_candidate_pack_digest != expected_candidate_pack_digest:
+        comparison.append("candidate_pack_digest_mismatch")
+    if expected_candidate_evidence_digest and observed_candidate_evidence_digest != expected_candidate_evidence_digest:
+        comparison.append("candidate_evidence_file_digest_mismatch")
+    if expected_source_hash and observed_source_hash != expected_source_hash:
+        comparison.append("source_manifest_hash_mismatch")
+
+    if isinstance(payload, dict):
+        findings.extend(scan_authoring_payload(json.dumps(payload, sort_keys=True)))
+        if payload.get("schema_version") != 1:
+            findings.append("invalid_schema_version:approval")
+        if payload.get("approval_evidence_kind") != "candidate_decomposition_approval":
+            findings.append("missing_or_invalid_field:approval_evidence_kind")
+        if payload.get("approval_status") != "approved":
+            findings.append("approval_not_approved")
+        expected_approval_scope = (
+            "initiative-epic-node-creation" if candidate_kind == "initiative-epic" else "epic-issue-node-creation"
+        )
+        if payload.get("approval_scope") != expected_approval_scope:
+            comparison.append("approval_scope_mismatch")
+        if payload.get("candidate_kind") != candidate_kind:
+            comparison.append("candidate_kind_mismatch")
+        approver = payload.get("approver")
+        if isinstance(approver, dict):
+            kind = approver.get("actor_type")
+            approver_kind = kind if isinstance(kind, str) else None
+            approver_id = approver.get("id")
+            if isinstance(approver_id, str) and approver_id.lower() in {
+                "chatgpt",
+                "assistant",
+                "tool",
+                "codex",
+                "delegated-authoring",
+            }:
+                findings.append("self_approval_forbidden")
+        elif isinstance(approver, str):
+            approver_kind = approver
+        else:
+            findings.append("missing_or_invalid_field:approver")
+        if approver_kind is None:
+            findings.append("missing_or_invalid_field:approver.actor_type")
+        elif approver_kind.lower() != "human":
+            findings.append("self_approval_forbidden")
+        requested_scope = _scope_value(payload.get("requested_scope"), "requested_scope", findings)
+        effective_scope = _scope_value(payload.get("effective_scope"), "effective_scope", findings)
+        if expected_requested_scope:
+            if requested_scope != expected_requested_scope:
+                comparison.append("requested_scope_mismatch")
+        if expected_effective_scope:
+            if effective_scope != expected_effective_scope:
+                comparison.append("effective_scope_mismatch")
+        candidate_pack = payload.get("candidate_pack")
+        if isinstance(candidate_pack, dict):
+            if candidate_pack.get("digest_algorithm") != "sha256-tree-v1":
+                findings.append("missing_or_invalid_field:candidate_pack.digest_algorithm")
+            candidate_pack_digest = _optional_string(candidate_pack, "candidate_pack_digest", findings)
+            source_manifest_hash = _optional_string(candidate_pack, "source_manifest_hash", findings)
+            if candidate_pack_digest is None:
+                findings.append("missing_or_invalid_field:candidate_pack.candidate_pack_digest")
+            if source_manifest_hash is None:
+                findings.append("missing_or_invalid_field:candidate_pack.source_manifest_hash")
+        else:
+            findings.append("missing_or_invalid_field:candidate_pack")
+            candidate_pack_digest = None
+            source_manifest_hash = None
+        if candidate_pack_digest and observed_candidate_pack_digest != candidate_pack_digest:
+            comparison.append("candidate_pack_digest_mismatch")
+        if source_manifest_hash and observed_source_hash != source_manifest_hash:
+            comparison.append("source_manifest_hash_mismatch")
+        statement = payload.get("approval_statement")
+        if not isinstance(statement, str) or not statement.strip():
+            findings.append("missing_or_invalid_field:approval_statement")
+        else:
+            findings.extend(scan_authoring_payload(statement))
+        approved_at = payload.get("approved_at")
+        if not isinstance(approved_at, str) or "T" not in approved_at:
+            findings.append("missing_or_invalid_field:approved_at")
+        claims = payload.get("authority_boundary")
+        if claims is not None:
+            if not isinstance(claims, dict):
+                findings.append("missing_or_invalid_field:authority_boundary")
+            else:
+                for key in (
+                    "node_creation_performed",
+                    "canonical_written",
+                    "assurance_mutated",
+                    "reviewer_pass_claimed",
+                    "execution_ready",
+                    "pr_ready",
+                ):
+                    if claims.get(key) is not False:
+                        findings.append(f"forbidden_authority_claim:{key}")
+
+    status = _approval_status(findings, comparison)
+    return ApprovalCheckResult(
+        status=status,
+        input_path=str(input_path),
+        candidate_kind=candidate_kind,
+        evidence_mode=evidence_mode,
+        review_status=review_status,
+        review_gate_passed=review_gate_passed,
+        approval_gate_passed=status == "pass",
+        approver_kind=approver_kind,
+        approval_path=str(approval_path) if approval_path else None,
+        candidate_evidence_path=str(candidate_evidence_path) if candidate_evidence_path else None,
+        requested_scope=requested_scope,
+        effective_scope=effective_scope,
+        expected_requested_scope=expected_requested_scope,
+        expected_effective_scope=expected_effective_scope,
+        expected_candidate_pack_digest=expected_candidate_pack_digest,
+        observed_candidate_pack_digest=observed_candidate_pack_digest,
+        expected_candidate_evidence_digest=expected_candidate_evidence_digest,
+        candidate_evidence_file_digest=observed_candidate_evidence_digest,
+        expected_source_manifest_hash=expected_source_hash,
+        observed_source_manifest_hash=observed_source_hash,
+        candidate_count=candidate_count,
+        valid_candidate_count=valid_candidate_count if status == "pass" else 0,
+        findings=tuple(dict.fromkeys(findings)),
+        comparison=tuple(dict.fromkeys(comparison)),
+    )
+
+
 def tree_digest(pack_root: Path) -> str | None:
     if not pack_root.is_dir() or pack_root.is_symlink():
         return None
@@ -215,6 +449,22 @@ def _source_manifest_hash(pack_root: Path, findings: list[str]) -> str | None:
             return value
         findings.append("missing_or_invalid_field:source_manifest_hash")
     return None
+
+
+def _file_digest(path: Path | None, findings: list[str]) -> str | None:
+    if path is None:
+        return None
+    if path.is_symlink():
+        findings.append("symlink_entry:candidate_evidence")
+        return None
+    if not path.is_file():
+        findings.append("missing_candidate_evidence")
+        return None
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        findings.append("unreadable_candidate_evidence")
+        return None
 
 
 def _read_json(path: Path, label: str, findings: list[str]) -> object | None:
@@ -246,6 +496,66 @@ def _read_json(path: Path, label: str, findings: list[str]) -> object | None:
     except json.JSONDecodeError:
         findings.append(f"invalid_json:{label}")
         return None
+
+
+def _read_approval_json(path: Path | None, findings: list[str]) -> object | None:
+    if path is None:
+        findings.append("missing_approval_evidence")
+        return None
+    if path.is_symlink():
+        findings.append("symlink_entry:approval")
+        return None
+    if not path.is_file():
+        findings.append("missing_approval_evidence")
+        return None
+    try:
+        size = path.stat().st_size
+    except OSError:
+        findings.append("unreadable_payload:approval")
+        return None
+    if size > MAX_ENTRY_BYTES:
+        findings.append("oversized_entry:approval")
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        findings.append("binary_payload:approval")
+        return None
+    except OSError:
+        findings.append("unreadable_payload:approval")
+        return None
+    findings.extend(scan_sensitive_payload(text))
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        findings.append("invalid_json:approval")
+        return None
+    if not isinstance(payload, dict):
+        findings.append("non_object_json:approval")
+        return None
+    return payload
+
+
+def _optional_string(payload: dict[str, object], key: str, findings: list[str]) -> str | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if isinstance(value, str) and value:
+        return value
+    findings.append(f"missing_or_invalid_field:{key}")
+    return None
+
+
+def _scope_value(value: object, label: str, findings: list[str]) -> str | None:
+    if not isinstance(value, dict):
+        findings.append(f"missing_or_invalid_field:{label}")
+        return None
+    scope_type = value.get("scope_type")
+    scope_id = value.get("scope_id")
+    if isinstance(scope_type, str) and scope_type and isinstance(scope_id, str) and scope_id:
+        return f"{scope_type}:{scope_id}"
+    findings.append(f"missing_or_invalid_field:{label}")
+    return None
 
 
 def _validate_common_authority(
@@ -476,6 +786,40 @@ def _status_from_findings(findings: list[str], comparison: list[str]) -> Candida
     return "pass"
 
 
+def _approval_status(findings: list[str], comparison: list[str]) -> CandidateStatus:
+    if any(
+        finding
+        in {
+            "invalid_json:approval",
+            "binary_payload:approval",
+            "non_object_json:approval",
+            "invalid_schema_version:approval",
+        }
+        for finding in findings
+    ):
+        return "fail"
+    if any(_is_rejected(finding) for finding in findings):
+        return "rejected"
+    if comparison:
+        if any(
+            "scope_mismatch" in item or "candidate_kind_mismatch" in item or item == "approval_scope_mismatch"
+            for item in comparison
+        ):
+            return "blocked"
+        return "stale"
+    if any(finding.startswith("missing_approval_evidence") for finding in findings):
+        return "blocked"
+    if any(finding == "approval_not_approved" for finding in findings):
+        return "blocked"
+    if findings:
+        return "fail"
+    return "pass"
+
+
+def _comparison_state(finding: str, comparison: tuple[str, ...]) -> str:
+    return "mismatch" if finding in comparison else "match"
+
+
 def _is_rejected(finding: str) -> bool:
     prefixes = (
         "path_traversal:",
@@ -490,6 +834,7 @@ def _is_rejected(finding: str) -> bool:
         "secret_like_payload:",
         "raw_transcript:",
         "forbidden_authority_claim:",
+        "self_approval_forbidden",
         "non_advisory_",
         "secret_path:",
     )

@@ -3,7 +3,7 @@
 ID: "iss-00305"
 タイトル: "Approval Stop Gate Reports"
 関連GitHub: ["#305"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-08"
 親: ["epic-00295", "init-local-00003"]

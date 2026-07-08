@@ -54,64 +54,68 @@ ID: "iss-00305"
 
 | step | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
 |---|---|---|---|---|---|---|---|
-| planning | spec authoring review | spec-reviewer | fresh | passed | no | promote | re-review `019f406f-108f-7a61-8c22-a0ac81da6903` returned `review_status: pass`; prior P1/P2 findings resolved |
-| implementation | code review | code-reviewer | not_run | unavailable | no | blocked | run after implementation |
-| implementation | QA review | qa-reviewer | not_run | unavailable | no | blocked | run after implementation |
+| planning | spec authoring review | spec-reviewer | fresh | passed | no | promote | re-review `019f4077-edeb-7b52-b8ae-9ac946ad856a` returned `review_status: pass`; prior P1/P2 findings resolved |
+| implementation | code review | code-reviewer | fresh | passed | no | promote | final review `019f4085-15a8-7cd3-b43f-8e1ca232ae95` returned no findings and `review_status: pass` |
+| implementation | QA review | qa-reviewer | fresh | passed | no | promote | final review `019f4085-381a-7073-aa76-619c087ceeb6` returned no findings and `review_status: pass` |
 
 ## Closure Coverage
 
 | closure id | step | evidence | observed result | notes |
 |---|---|---|---|---|
-| CLOS-001 | S01/S04 | help contract fixture | pending | implementation pending |
-| CLOS-002 | S02/S03/S04 | valid epic-issue and initiative-epic approval fixtures | pending | implementation pending |
-| CLOS-003 | S02 | missing approval fixture | pending | implementation pending |
-| CLOS-004 | S02 | candidate digest mismatch fixture | pending | implementation pending |
-| CLOS-005 | S03 | requested/effective scope mismatch fixtures | pending | implementation pending |
-| CLOS-006 | S02 | invalid self-approval fixture | pending | implementation pending |
-| CLOS-007 | S02/S04 | forbidden authority claim and sensitive statement fixtures | pending | implementation pending |
-| CLOS-008 | S03 | unsafe and safe report path fixtures | pending | implementation pending |
-| CLOS-009 | S03/S04/S05 | mutation boundary false and candidate-validation-alone fixture | pending | implementation pending |
-| CLOS-010 | S05/S99 | no per-Issue PR relay | pending | final closeout |
-| CLOS-011 | S02 | source manifest hash mismatch fixture | pending | implementation pending |
-| CLOS-012 | S02 | candidate evidence file digest mismatch fixture | pending | implementation pending |
-| CLOS-013 | S03/S04 | JSON/text candidate-source comparisons and authority boundary output | pending | implementation pending |
+| CLOS-001 | S01/S04 | help contract fixture | passed | approval check help exposes implemented contract and omits `--force` |
+| CLOS-002 | S02/S03/S04 | valid epic-issue and initiative-epic approval fixtures | passed | valid approval fixtures pass with evidence-only authority |
+| CLOS-003 | S02 | missing approval fixture | passed | missing approval returns `status=blocked` |
+| CLOS-004 | S02 | candidate digest mismatch fixture | passed | pack digest mismatch returns `status=stale` |
+| CLOS-005 | S03 | requested/effective scope mismatch fixtures | passed | scope mismatch returns `status=blocked` |
+| CLOS-006 | S02 | invalid self-approval fixture | passed | self approval returns `status=rejected` |
+| CLOS-007 | S02/S04 | forbidden authority claim and sensitive statement fixtures | passed | forbidden authority claim and secret-like payload return `status=rejected` |
+| CLOS-008 | S03 | unsafe and safe report path fixtures | passed | safe report writes JSON; canonical docs, `.assurance.json`, and symlink report paths are rejected |
+| CLOS-009 | S03/S04/S05 | mutation boundary false and candidate-validation-alone fixture | passed | output boundary stays false and protected `spec-dock/` tree snapshot is unchanged |
+| CLOS-010 | S05/S99 | no per-Issue PR relay | passed | no PR created for `iss-00305`; relay continues to next Issue |
+| CLOS-011 | S02 | source manifest hash mismatch fixture | passed | source manifest hash mismatch returns `status=stale` |
+| CLOS-012 | S02 | candidate evidence file digest mismatch fixture | passed | candidate evidence file digest mismatch returns `status=stale` |
+| CLOS-013 | S03/S04 | JSON/text candidate-source comparisons and authority boundary output | passed | JSON/text output includes comparisons and false authority boundary fields |
 
 ## Delegated Worker Evidence
 
 | step | delegated role | summary | changed files | verification | reviewer verdict | unresolved risks | parent integration decision |
 |---|---|---|---|---|---|---|---|
-| S02-S05 | dev-coder | pending | pending | pending | pending | implementation not started | pending |
+| S02-S05 | dev-coder | `authoring approval check` を deferred から evidence-only approval validator へ実装し、code-reviewer / qa-reviewer P1/P2 指摘を repair した。 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/authoring.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack/approval_check.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack/candidate_contract.py`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/authoring_pack/approval_check_renderer.py`; dogfooding mirror under `spec-dock/scripts/spec_dock_runtime/`; `tests/cli_runtime/test_authoring.py` | `uv run pytest tests/cli_runtime/test_authoring.py -k "approval_check" -q`: 42 passed; `uv run pytest tests/cli_runtime/test_authoring.py -q`: 312 passed, 1 skipped; mirror inventory test: 1 passed; `validate`: ok; `assurance verify`: ok; `git diff --check`: pass | code-reviewer pass; qa-reviewer pass | none observed in focused runtime tests or reviewer gates after repair | integrated |
 
 ## Test Contract Closure
 
 | test id | step | required | verification command | observed result | notes |
 |---|---|---|---|---|---|
 | tc-s00-001 | S00 | yes | `assurance classify`, `assurance compose`, `assurance verify` | classify/compose/verify passed after canonical docs finalization | planning in progress |
-| tc-s02-001 | S02 | yes | approval pass/missing/stale/scope/self-approval tests | pending | implementation pending |
-| tc-s04-001 | S04 | yes | help/json/text/auto-create tests | pending | implementation pending |
-| tc-s05-001 | S05 | yes | focused authoring tests | pending | implementation pending |
+| tc-s02-001 | S02 | yes | approval pass/missing/stale/scope/self-approval tests | passed | `uv run pytest tests/cli_runtime/test_authoring.py -k "approval_check" -q` passed |
+| tc-s04-001 | S04 | yes | help/json/text/auto-create tests | passed | approval help/output/boundary tests passed as part of focused and full authoring suite |
+| tc-s05-001 | S05 | yes | focused authoring tests | passed | `uv run pytest tests/cli_runtime/test_authoring.py -q` passed: 312 passed, 1 skipped |
 | tc-s99-001 | S99 | yes | commit/push/finish evidence | pending | final closeout |
 
 ## No-PR Relay Policy
 
 | target | policy | evidence | state |
 |---|---|---|---|
-| iss-00305 | Do not create a per-Issue PR; defer PR delivery to `iss-00307`. | parent Epic plan and this plan final exit contract | pending |
+| iss-00305 | Do not create a per-Issue PR; defer PR delivery to `iss-00307`. | parent Epic plan and this plan final exit contract; no PR created during implementation | maintained |
 
 ## Final Quality Gate
 
 | gate | status | evidence |
 |---|---|---|
-| spec-dock validate | pending | not run after implementation |
-| assurance verify | pending | not run after final docs / implementation |
-| focused tests | pending | not run after implementation |
-| git diff --check | pending | not run after implementation |
-| code-reviewer | pending | not run |
-| qa-reviewer | pending | not run |
+| spec-dock validate | passed | `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=202` |
+| assurance verify | passed | `./spec-dock/scripts/spec-dock assurance verify`: ok |
+| focused tests | passed | `uv run pytest tests/cli_runtime/test_authoring.py -k "approval_check" -q`: 42 passed, 271 deselected |
+| authoring regression tests | passed | `uv run pytest tests/cli_runtime/test_authoring.py -q`: 312 passed, 1 skipped |
+| dogfooding runtime mirror | passed | `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_runtime_mirror_match_provider_assets -q`: 1 passed |
+| git diff --check | passed | no whitespace errors |
+| code-reviewer | passed | final review `019f4085-15a8-7cd3-b43f-8e1ca232ae95`: no findings, `review_status=pass` |
+| qa-reviewer | passed | final review `019f4085-381a-7073-aa76-619c087ceeb6`: no findings, `review_status=pass` |
 | no per-Issue PR | pending | final closeout |
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
-- Record Red, Green, and refactor evidence for each executed step.
-- Link each closure id to its observed verification result.
+- S01 Red: before implementation, `authoring approval check --help` exposed only skeletal deferred help and did not satisfy the approved CLI contract.
+- S02-S04 Green: `authoring approval check` now exposes the implemented help contract including `--candidate-evidence` and `--expected-candidate-evidence-digest`; focused approval tests passed with 42 passed / 271 deselected after repair.
+- S05 Verification: full `tests/cli_runtime/test_authoring.py` passed with 312 passed / 1 skipped; dogfooding runtime mirror test passed with 1 passed; `validate`, `assurance verify`, and `git diff --check` passed.
+- CLOS-010 relay: no per-Issue PR was created; PR delivery remains deferred to final Issue `iss-00307`.
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
