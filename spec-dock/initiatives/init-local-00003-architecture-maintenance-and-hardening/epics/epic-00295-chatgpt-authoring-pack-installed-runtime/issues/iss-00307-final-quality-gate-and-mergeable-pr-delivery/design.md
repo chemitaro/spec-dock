@@ -20,7 +20,7 @@ authorized_profile: "standard"
 | Gate | 目的 | 主な証跡 |
 |---|---|---|
 | G1 Closure Index Gate | C01〜C11の完了、deferred PR delivery、依存、blocking gapを確認する | Issue一覧、report確認、dependency確認 |
-| G2 Installed Surface Gate | provider-side source of truthからconsumer repoへinstalled assetsが届くことを確認する | `uvx --from . spec-dock init <tmp>`、installed file checks |
+| G2 Installed Surface Gate | provider-side source of truthからconsumer repoへinstalled assetsが届くことを確認する | `uvx --isolated --from <absolute-repo-path> spec-dock init <tmp>`、installed file checks |
 | G3 Runtime Contract Gate | `authoring` command groupとhelp / dispatch / status outputを確認する | help smoke、deferred command fail-closed |
 | G4 Evidence Safety Gate | backend、preflight、local-context、ZIP、stage、validators、approvalのauthority boundaryを確認する | pytest、fixture/manual command output |
 | G5 Docs / Skill Consistency Gate | docs、skills、runtime help、testsのcommand inventoryとauthority wordingを一致させる | grep / inspection / reviewer |
