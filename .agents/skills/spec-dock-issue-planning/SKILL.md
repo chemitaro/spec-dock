@@ -11,7 +11,7 @@ This skill is a fixed kernel / operational kernel. Do not copy full profile proc
 
 state-specific generated Runbook text is runtime guidance. It is not canonical authority, must not be edited as source of truth, and must not replace canonical docs.
 
-ChatGPT-first primary route: for non-trivial Issue planning, use `spec-dock-chatgpt-authoring` as the primary evidence-production route in `zero-base`, `requirement-first`, and `draft-adoption` modes. If ChatGPT/browser/backend capacity is busy, wait and retry; if automation is unhealthy, recover or restart the browser/backend and retry. Do not switch to manual planning for queued tabs, retryable timeouts, stale sync, or fixable prompt/backend setup.
+ChatGPT-first primary route: for non-trivial Issue planning, use `spec-dock-chatgpt-authoring` as the primary evidence-production route for a single Issue planning workflow. Treat `requirement-heavy`, `draft-heavy`, and `context-heavy` as input context framing only; the output contract is always canonical `requirement.md`, `design.md`, and `plan.md`, or an `information_insufficient` stop. If ChatGPT/browser/backend capacity is busy, wait and retry; if automation is unhealthy, recover or restart the browser/backend and retry. Do not switch to manual planning for queued tabs, retryable timeouts, stale sync, or fixable prompt/backend setup.
 
 Manual backup route: use `spec-dock-issue-planning-manual` only after hard / unrecoverable ChatGPT route failure and explicit human approval. Record the failure class, recovery attempts, approval evidence, and manual-route decision in Issue `report.md`.
 
@@ -49,7 +49,7 @@ ChatGPT authoring relationship: `spec-dock-chatgpt-authoring` may provide Issue 
    - Pre-start `draft-design`, `draft-plan`, delegated drafts, research, discussions, and generated Runbooks remain evidence until adopted.
    - Adoption or rejection must be reflected in `report.md` and the relevant canonical docs.
    - `system-architect` and `implementation-planner` outputs never replace main-orchestrator adoption, fresh `spec-reviewer` pass, phase promotion, or execution handoff readiness.
-   - For `draft-adoption`, refresh current repo state, dependency state, prior completed Issues, unresolved ledgers, and drift evidence before promoting any draft claim.
+   - For draft-heavy input context, refresh current repo state, dependency state, prior completed Issues, unresolved ledgers, and drift evidence before promoting any draft claim.
    - If drift is Issue-local, repair it in Issue planning; if it changes Epic boundaries, Issue order, or scope allocation, return to Epic planning repair or clarification.
 4. Author phases in order.
    - Requirement, design, and plan each need a fresh `spec-reviewer` `review_status: pass` after the latest substantive change.
@@ -58,11 +58,15 @@ ChatGPT authoring relationship: `spec-dock-chatgpt-authoring` may provide Issue 
    - Execution-ready requires reviewer-passed canonical docs, executable `plan.md`, required verification/delegation/reviewer-focus evidence, adopted draft evidence, and no unresolved report-ledger blockers.
    - Handoff-ready evidence from Epic planning is not execution-ready by itself.
 
-## Issue Planning Modes
+## Issue Planning Input Context
 
-- `zero-base`: start from user discussion, repo docs/code, artifacts, and current active scope. Use ChatGPT-first evidence for non-trivial scope, then author `requirement.md`, `design.md`, and `plan.md` in order; each promotion needs fresh `spec-reviewer` evidence.
-- `requirement-first`: start from an approved or human-authored `requirement.md`. Use ChatGPT-first evidence for design/plan options when non-trivial, then create `design.md` and `plan.md` from that requirement; route gaps or contradictions back to requirement authoring or clarification.
-- `draft-adoption`: start from Issue-local draft requirement/design/plan evidence from Epic planning, delegated planning, or `spec-dock-chatgpt-authoring`. Refresh current state and prior Issue outcomes, record Evidence Adoption Ledger entries for adopted and rejected draft claims, update canonical docs only through the main orchestrator, and obtain a fresh `spec-reviewer` pass before execution handoff.
+Issue Planning uses one workflow. The following labels describe the dominant input context, not separate workflow modes:
+
+- `context-heavy`: start from user discussion, repo docs/code, artifacts, ADRs, and current active scope. Use ChatGPT-first evidence for non-trivial scope, then author canonical `requirement.md`, `design.md`, and `plan.md` in order; each promotion needs fresh `spec-reviewer` evidence.
+- `requirement-heavy`: start from an approved, human-authored, or otherwise source-grounded `requirement.md` candidate. Use ChatGPT-first evidence for design/plan options when non-trivial, then create canonical `design.md` and `plan.md` from that requirement; route gaps or contradictions back to requirement authoring or clarification.
+- `draft-heavy`: start from Issue-local draft requirement/design/plan evidence from Epic planning, delegated planning, or `spec-dock-chatgpt-authoring`. Refresh current state and prior Issue outcomes, record Evidence Adoption Ledger entries for adopted and rejected draft claims, update canonical docs only through the main orchestrator, and obtain a fresh `spec-reviewer` pass before execution handoff.
+
+Do not split Issue Planning into separate modes based on input source. Different inputs affect context framing and review focus only; they do not change the canonical artifact contract or reviewer gates.
 
 ## Contract Anchors
 
@@ -78,11 +82,11 @@ ChatGPT authoring relationship: `spec-dock-chatgpt-authoring` may provide Issue 
 - Issue grade, scope, impact, or reviewer obligation is missing or ambiguous without escalation evidence.
 - `requirement.md`, `design.md`, or `plan.md` is template-only, unresolved, stale, contradictory, or lacks fresh reviewer pass for the current phase.
 - Draft adoption evidence or Evidence Adoption Ledger entries are missing, stale, failed, unavailable, denied, waived, provisional, or contradictory.
-- `draft-adoption` is being used to bypass canonical adoption, fresh `spec-reviewer`, or execution handoff gates.
+- Draft-heavy input is being used to bypass canonical adoption, fresh `spec-reviewer`, or execution handoff gates.
 - ChatGPT-first route has a retryable, recoverable, waiting, or setup failure and manual backup has not been explicitly approved by the user.
 - Planning exposes unresolved requirement / design / plan gaps; route to clarification or the relevant authoring phase instead of execution.
 
 ## Kernel Boundary
 
 - Keep detailed profile procedures in docs and templates.
-- Keep only durable entrypoint, authority, freshness, fallback, draft-adoption, and stop-condition reminders here.
+- Keep only durable entrypoint, authority, freshness, fallback, draft handling, and stop-condition reminders here.

@@ -5,7 +5,7 @@ description: Human-approved emergency backup skill for Issue planning when the C
 
 # Spec-Dock Issue Planning Manual Backup
 
-Use this skill only as the human-approved emergency backup for Issue planning. The normal route remains `spec-dock-issue-planning`, which is ChatGPT-first for non-trivial zero-base, requirement-first, and draft-adoption planning.
+Use this skill only as the human-approved emergency backup for Issue planning. The normal route remains `spec-dock-issue-planning`, which is ChatGPT-first for non-trivial Issue planning through a single workflow with `requirement-heavy`, `draft-heavy`, and `context-heavy` input framing.
 
 This backup route exists for hard / unrecoverable ChatGPT, browser automation, backend provider, or account-state failures that remain unresolved after wait / retry / recovery. Capacity limits, queued tabs, timeouts that can be retried, stale GitHub sync, missing prompt context, or fixable browser startup failures are not enough to use this skill.
 
@@ -19,7 +19,7 @@ This backup route exists for hard / unrecoverable ChatGPT, browser automation, b
 ## Operating Spine
 
 1. Confirm that the primary `spec-dock-issue-planning` route is unavailable for a hard / unrecoverable reason and that human approval exists.
-2. Select the Issue planning mode: `zero-base`, `requirement-first`, or `draft-adoption`.
+2. Identify the dominant input context: `requirement-heavy`, `draft-heavy`, or `context-heavy`.
 3. Refresh current repository state, prior completed Issues, dependency state, unresolved ledgers, and Issue-local draft evidence.
 4. Author or formalize Issue `requirement.md`, `design.md`, and `plan.md` by normal phase order.
 5. Record adopted and rejected draft claims, fallback rationale, reviewer verdicts, and promotion decisions in Issue `report.md`.

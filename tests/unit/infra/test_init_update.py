@@ -10188,8 +10188,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert "wait and retry" in planning_text
             assert "Manual backup route" in planning_text
 
-        for mode_name in ("zero-base", "requirement-first", "draft-adoption"):
-            assert mode_name in issue_planning_text
+        assert "Issue Planning uses one workflow" in issue_planning_text
+        for context_type in ("requirement-heavy", "draft-heavy", "context-heavy"):
+            assert context_type in issue_planning_text
+        for removed_mode_name in ("zero-base", "requirement-first"):
+            assert removed_mode_name not in issue_planning_text
+        assert "separate modes" in issue_planning_text
         assert "Evidence Adoption Ledger" in issue_planning_text
         assert "fresh `spec-reviewer` pass before execution handoff" in issue_planning_text
 
