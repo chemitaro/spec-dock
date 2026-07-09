@@ -143,7 +143,7 @@ Blocking conditions:
 | B-003 | M1 | `spec-dock-issue-planning-manual` is installed skill source and says human-approved emergency backup. | CLOS-002 | high |
 | B-004 | M2 | `spec-dock-initiative-planning` uses ChatGPT-first evidence route while preserving Initiative gates. | CLOS-001 | high |
 | B-005 | M2 | `spec-dock-epic-planning` uses ChatGPT-first route and Option 3+ draft handoff. | CLOS-001, CLOS-004 | high |
-| B-006 | M2 | `spec-dock-issue-planning` uses ChatGPT-first modes and draft adoption refresh. | CLOS-001, CLOS-004 | high |
+| B-006 | M2 | `spec-dock-issue-planning` uses one ChatGPT-first workflow with input context types and draft adoption refresh. | CLOS-001, CLOS-004 | high |
 | B-007 | M3 | `spec-dock-chatgpt-authoring` remains evidence-only and documents forbidden claims. | CLOS-003 | high |
 | B-008 | M4 | installed managed skill distribution includes manual backup skills. | CLOS-006 | high |
 | B-009 | M5 | workflow docs include end-to-end and draft lifecycle diagrams. | CLOS-007 | high |
@@ -221,7 +221,9 @@ Actions:
    - State canonical child Issue docs remain Issue Planning outputs.
 3. Update `spec-dock-issue-planning/SKILL.md`.
    - Keep existing name.
-   - Use ChatGPT-first in `zero-base`, `requirement-first`, `draft-adoption`.
+   - Use one ChatGPT-first workflow; do not introduce separate workflow modes for different input sources.
+   - Treat `requirement-heavy`, `draft-heavy`, and `context-heavy` as input context framing only.
+   - Always produce canonical `requirement.md`, `design.md`, and `plan.md`, or return `information_insufficient`.
    - Add current repo / prior Issues / dependency state / unresolved ledger check.
    - Add drift repair rule.
 4. Add primary/manual fallback boundary:

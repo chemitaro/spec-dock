@@ -135,7 +135,8 @@ Parent Epic `epic-00295` は、ChatGPT authoring pack workflow を installed run
 - REQ-007: Initiative Planning は Epic candidates / Epic node creation 前に human approval gate を維持する。
 - REQ-008: Epic Planning は Issue slicing、dependency order、responsibility boundary、Issue draft requirement / draft design / draft plan、final quality Issue candidate / skip rationale を handoff package として扱う。
 - REQ-009: Epic Planning は child Issue の canonical `requirement.md` / `design.md` / `plan.md` を全件 upfront に正式化しない。
-- REQ-010: Issue Planning は Epic Execution 中の Issue start 直前または直後に、draft を current repository state、prior completed Issues、dependency state、unresolved ledgers と照合して canonical docs へ採用・部分採用・棄却・stale / blocked 判定する。
+- REQ-010: Issue Planning は単一 workflow とし、入力差分を別モードとして分岐させない。入力は `requirement-heavy` / `draft-heavy` / `context-heavy` の context framing として扱い、最終出力は常に canonical `requirement.md` / `design.md` / `plan.md` とする。
+- REQ-010a: Issue Planning は Epic Execution 中の Issue start 直前または直後に、入力 context、draft、current repository state、prior completed Issues、dependency state、unresolved ledgers を照合して canonical docs へ採用・部分採用・棄却・stale / blocked 判定する。
 - REQ-011: Issue-local に吸収できない drift は Epic Planning repair / clarification / ADR へ戻す。対象は sibling Issue boundary、dependency order、final quality Issue responsibility、Epic E-RQ / E-AC closure、shared architecture、workflow policy、rollout strategy である。
 - REQ-012: Multi-Issue implementation Epic は final quality gate / PR delivery Issue を持つ。
 - REQ-013: Single-Issue / docs-only / no-op Epic は skip rationale と completion evidence を置く場合に separate final quality Issue を省略できる。
@@ -151,7 +152,7 @@ Parent Epic `epic-00295` は、ChatGPT authoring pack workflow を installed run
 
 - AC-001: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md` describes `spec-dock-chatgpt-authoring` as the primary evidence route for non-trivial Initiative planning and keeps Initiative canonical ownership / human approval gates in Initiative Planning.
 - AC-002: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` describes ChatGPT-first Epic planning, Issue draft handoff, Issue slice approval, and Option 3+ boundaries.
-- AC-003: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` describes ChatGPT-first Issue planning modes and draft adoption against current repository state / prior Issues / dependency state / unresolved ledgers.
+- AC-003: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` describes a single ChatGPT-first Issue Planning workflow, treats `requirement-heavy` / `draft-heavy` / `context-heavy` as input context types rather than workflow modes, and performs draft adoption against current repository state / prior Issues / dependency state / unresolved ledgers.
 - AC-004: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning-manual/SKILL.md` exists and is marked human-approved emergency backup.
 - AC-005: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning-manual/SKILL.md` exists and is marked human-approved emergency backup.
 - AC-006: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning-manual/SKILL.md` exists and is marked human-approved emergency backup.
