@@ -330,6 +330,27 @@ Forbidden claims in any generated or updated text:
 
 ### 8.3 Drift handling
 
+### 8.3a Issue Planning input context framing
+
+Issue Planning must not expose separate workflow modes for different input sources. The workflow is always the same:
+
+```text
+input context
+  -> ChatGPT-first planning request
+  -> adoption review
+  -> canonical requirement.md / design.md / plan.md
+```
+
+The only difference is the nature of the input context:
+
+| Input context type | Meaning | Output contract |
+|---|---|---|
+| `requirement-heavy` | Requirement is mostly clear; design and plan expansion are the main work. | Canonical Issue R/D/P. |
+| `draft-heavy` | Draft requirement/design/plan already exists; formalization, consistency repair, and current-state refresh are the main work. | Canonical Issue R/D/P. |
+| `context-heavy` | Background, artifacts, code state, ADRs, or discussion logs are the main inputs; requirement extraction and boundary definition are needed. | Canonical Issue R/D/P, or `information_insufficient` if the context cannot support formalization. |
+
+This classification is prompt framing only. It must not reduce artifact quality, skip adoption review, or create alternate artifact formats.
+
 Issue Planning may absorb:
 
 - local wording and acceptance seed refinement;

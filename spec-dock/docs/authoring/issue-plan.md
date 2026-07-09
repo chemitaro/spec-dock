@@ -20,7 +20,7 @@ Issue templates（共通 `requirement.md` と profile 別 `design.md` / `plan.md
 
 Option 3+ の Issue planning では、Epic planning から渡された draft requirement / draft design / draft plan を handoff-ready evidence として扱います。Issue planning は current repository state、prior completed Issues、dependency state、unresolved report ledger を確認し、Evidence Adoption Ledger に adopted / rejected / stale / blocked を記録してから canonical docs を正式化します。draft-only / validation-only / raw ChatGPT output は execution-ready ではありません。
 
-ChatGPT-first Issue planning route は非自明な `zero-base`、`requirement-first`、`draft-adoption` の primary evidence-production route です。`spec-dock-issue-planning-manual` は human-approved emergency backup であり、hard / unrecoverable ChatGPT route failure と recovery attempts、explicit approval、fresh reviewer gate evidence がある場合だけ使います。
+ChatGPT-first Issue planning route は非自明な Issue planning の primary evidence-production route です。Issue Planning は単一 workflow であり、`requirement-heavy`、`draft-heavy`、`context-heavy` は入力 context framing であって別 workflow mode ではありません。`spec-dock-issue-planning-manual` は human-approved emergency backup であり、hard / unrecoverable ChatGPT route failure と recovery attempts、explicit approval、fresh reviewer gate evidence がある場合だけ使います。
 
 ## この artifact の責務
 
