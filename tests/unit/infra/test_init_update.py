@@ -2219,14 +2219,14 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             assert fragment in text, f"{source} missing concise runtime command reminder: {fragment}"
 
-    def _assert_issue_skill_fixed_kernel_contract(
+    def _assert_issue_skill_contract(
         self,
         *,
         planning_text: str,
         execution_text: str,
         source: str,
     ) -> None:
-        common_fragments = (
+        execution_fragments = (
             "This skill is a fixed kernel",
             "state-specific generated Runbook text",
             "It is not canonical authority",
@@ -2238,21 +2238,33 @@ class TestInitUpdate(CliRuntimeHarness):
             "Do not read, edit, or manage them as handoff authority",
             "Stop if",
         )
-        for skill_name, text, command in (
-            ("planning", planning_text, "./spec-dock/scripts/spec-dock guidance issue-planning"),
-            ("execution", execution_text, "./spec-dock/scripts/spec-dock guidance issue-execution"),
-        ):
-            for fragment in common_fragments:
-                assert fragment in text, f"{source} {skill_name} skill missing fixed-kernel fragment: {fragment}"
-            assert command in text, f"{source} {skill_name} skill missing guidance handoff: {command}"
-            assert "workflow next" not in text, f"{source} {skill_name} skill still references workflow next"
+        for fragment in execution_fragments:
+            assert fragment in execution_text, f"{source} execution skill missing fixed-kernel fragment: {fragment}"
+        assert "./spec-dock/scripts/spec-dock guidance issue-execution" in execution_text
+        assert "workflow next" not in execution_text
 
-        assert "spec-dock/docs/workflow_issue.md" in planning_text
-        assert "spec-dock/docs/workflow_spec_authoring.md" in planning_text
-        assert "spec-dock/docs/workflow_clarification.md" in planning_text
-        assert "spec-dock/docs/phase_plan_issue.md" in planning_text
-        assert "spec-dock/docs/authoring/issue-plan.md" in planning_text
-        assert "spec-dock/docs/authoring/decision-routing.md" in planning_text
+        planning_fragments = (
+            "This is the primary planning route and it is ChatGPT-first.",
+            "does not split the workflow into separate planning modes",
+            "./spec-dock/scripts/spec-dock guidance issue-planning",
+            "spec-dock/docs/workflow_issue.md",
+            "spec-dock/docs/workflow_spec_authoring.md",
+            "spec-dock/docs/phase_plan_issue.md",
+            "spec-dock/docs/authoring/issue-plan.md",
+            "spec-dock/docs/authoring/decision-routing.md",
+            "Issue Planning has one workflow",
+            "requirement-heavy",
+            "draft-heavy",
+            "context-heavy",
+            "information_insufficient",
+            "spec-dock-chatgpt-authoring",
+            "Evidence Adoption Ledger",
+            "fresh `spec-reviewer` pass after canonical changes",
+            "ChatGPT output is evidence only",
+        )
+        for fragment in planning_fragments:
+            assert fragment in planning_text, f"{source} planning skill missing ChatGPT-first fragment: {fragment}"
+        assert "workflow next" not in planning_text
 
         assert "spec-dock/docs/workflow_issue.md" in execution_text
         assert "spec-dock/docs/workflow_clarification.md" in execution_text
@@ -2270,7 +2282,7 @@ class TestInitUpdate(CliRuntimeHarness):
         planning_text = (skills_root / "spec-dock-issue-planning" / "SKILL.md").read_text(encoding="utf-8")
         execution_text = (skills_root / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
 
-        self._assert_issue_skill_fixed_kernel_contract(
+        self._assert_issue_skill_contract(
             planning_text=planning_text,
             execution_text=execution_text,
             source="provider issue skills",
@@ -3647,7 +3659,7 @@ class TestInitUpdate(CliRuntimeHarness):
             issue_planning_skill_text = (skills_root / "spec-dock-issue-planning" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
-            self._assert_issue_skill_fixed_kernel_contract(
+            self._assert_issue_skill_contract(
                 planning_text=issue_planning_skill_text,
                 execution_text=issue_skill_text,
                 source="generated issue skills",
@@ -11435,14 +11447,17 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         for fragment in (
             "workflow_issue.md",
             "workflow_spec_authoring.md",
-            "workflow_clarification.md",
             "phase_plan_issue.md",
             "authoring/issue-plan.md",
-            "main-orchestrator-owned",
-            "system-architect",
-            "implementation-planner",
-            "fresh `spec-reviewer`",
-            "does not grant delegated canonical write authority",
+            "primary planning route and it is ChatGPT-first",
+            "Issue Planning has one workflow",
+            "requirement-heavy",
+            "draft-heavy",
+            "context-heavy",
+            "information_insufficient",
+            "Evidence Adoption Ledger",
+            "fresh `spec-reviewer` pass after canonical changes",
+            "ChatGPT output is evidence only",
         ):
             assert fragment in issue_planning_text
 
@@ -11522,10 +11537,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         ):
             assert fragment in implementation_planner_text
         for fragment in (
-            "Bounded depth=2 delegation",
-            "Depth=3 / grandchild delegation is forbidden",
-            "Leaf-only evidence producers must not edit canonical artifacts",
-            "final fresh reviewer pass remains independent",
+            "primary planning route and it is ChatGPT-first",
+            "spec-dock-chatgpt-authoring",
+            "Issue slice proposals",
+            "Issue-local draft requirement/design/plan artifacts",
+            "final quality / mergeable PR delivery Issue proposal or skip rationale",
+            "human approval before Issue node creation",
+            "fresh `spec-reviewer` pass after canonical changes",
+            "hard / unrecoverable ChatGPT",
         ):
             assert fragment in epic_text
         self._assert_issue_execution_runtime_command_reminders(
@@ -11545,38 +11564,44 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert "`spec-dock/docs/reference_deps.md`" in copilot_adapter_text
         assert "`spec-dock/docs/reference_sync.md`" in copilot_adapter_text
 
-        assert "`spec-dock/docs/workflow_initiative.md`" in initiative_text
-        assert "`spec-dock/docs/workflow_spec_authoring.md`" in initiative_text
-        assert "`spec-dock/docs/reference_github.md`" in initiative_text
-        assert "`spec-dock/docs/reference_sync.md`" in initiative_text
-        assert "`spec-dock/docs/reference_naming.md`" in initiative_text
-        assert "`spec-dock/docs/phase_requirement.md`" in initiative_text
-        assert "`spec-dock/docs/phase_design.md`" in initiative_text
-        assert "`spec-dock/docs/phase_plan.md`" in initiative_text
-        assert "create/import an initiative" in initiative_text
-        assert "scope-specific constraints and decisions" in initiative_text
-        assert "fresh `spec-reviewer`" in initiative_text
-        assert "Spec Authoring Gate" in initiative_text
-
-        assert "`spec-dock/docs/workflow_epic.md`" in epic_text
-        assert "`spec-dock/docs/workflow_spec_authoring.md`" in epic_text
-        assert "`spec-dock/docs/reference_github.md`" in epic_text
-        assert "`spec-dock/docs/reference_sync.md`" in epic_text
-        assert "`spec-dock/docs/reference_naming.md`" in epic_text
-        assert "`spec-dock/docs/phase_requirement.md`" in epic_text
-        assert "`spec-dock/docs/phase_design.md`" in epic_text
-        assert "`spec-dock/docs/phase_plan.md`" in epic_text
-        assert "create/import an epic" in epic_text
-        assert "scope-specific constraints and decisions" in epic_text
-        assert "fresh `spec-reviewer`" in epic_text
-        assert "Spec Authoring Gate" in epic_text
         for fragment in (
-            "Use this skill for issue planning work",
-            "create or update issue-level requirement/design/plan docs",
-            "main-orchestrator-owned",
-            "scope-local evidence only",
-            "fresh `spec-reviewer` returns `review_status: pass`",
-            "Spec Authoring Gate",
+            "spec-dock/docs/workflow_initiative.md",
+            "spec-dock/docs/workflow_spec_authoring.md",
+            "primary planning route and it is ChatGPT-first",
+            "spec-dock-chatgpt-authoring",
+            "Initiative requirement/design/plan candidates",
+            "Epic decomposition proposals",
+            "human approval gate before Epic creation",
+            "fresh `spec-reviewer` pass after canonical changes",
+            "information_insufficient",
+            "human-approved emergency backup",
+        ):
+            assert fragment in initiative_text
+
+        for fragment in (
+            "spec-dock/docs/workflow_epic.md",
+            "spec-dock/docs/workflow_spec_authoring.md",
+            "primary planning route and it is ChatGPT-first",
+            "spec-dock-chatgpt-authoring",
+            "Issue slice proposals",
+            "Issue-local draft requirement/design/plan artifacts",
+            "human approval before Issue node creation",
+            "fresh `spec-reviewer` pass after canonical changes",
+            "information_insufficient",
+            "human-approved emergency backup",
+        ):
+            assert fragment in epic_text
+        for fragment in (
+            "primary planning route and it is ChatGPT-first",
+            "Issue Planning has one workflow",
+            "canonical Issue `requirement.md`, `design.md`, and `plan.md`",
+            "requirement-heavy",
+            "draft-heavy",
+            "context-heavy",
+            "information_insufficient",
+            "Evidence Adoption Ledger",
+            "fresh `spec-reviewer` pass after canonical changes",
+            "human-approved emergency backup",
         ):
             assert fragment in issue_planning_text
         for fragment in (

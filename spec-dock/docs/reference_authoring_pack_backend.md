@@ -17,7 +17,7 @@ backend command は次のいずれかで指定します。
 未設定の場合は fail-closed で停止し、backend command の設定が必要であることを明確に示します。
 個人環境の絶対パスは SpecDock の正式 workflow や shipped docs に固定しません。既存のローカル wrapper は、利用者が自分の環境で指定できる backend の一例です。
 
-### ChatGPT Pro と Oracle implementation の選択
+### 現行ProとOracle実装の選択（ChatGPT Pro / Oracle implementation）
 
 SpecDock は `GPT-5.5` や `GPT-5.6` のようなモデル世代、または `Extended` のような廃止・変更されうる thinking label を固定しません。設定された backend wrapper が、現在の ChatGPT `Pro` を選択します。
 
