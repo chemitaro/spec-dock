@@ -1,6 +1,4 @@
 personality = "friendly"
-model = "gpt-5.5"
-model_reasoning_effort = "medium"
 
 # メイン（ユーザーと対話する）セッション＝オーケストレーターの行動規範
 developer_instructions = """
