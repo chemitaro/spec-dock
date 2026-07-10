@@ -14,6 +14,8 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 _SPEC_DOCK_SCRIPTS_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_SPEC_DOCK_SCRIPTS_DIR))
 
+from authoring_pack_review import STATUS_EXIT_CODES, cli_summary, review_input, write_review_outputs  # noqa: E402
+
 from spec_dock_runtime.application.authoring_pack.pack_review import (  # noqa: E402
     PackReviewRequest,
     _unsafe_report_path,
@@ -37,6 +39,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--extract-dir", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
+    legacy_mode = bool(args.preflight or args.extract_dir or args.input_kind != "auto")
+    if legacy_mode and not args.preflight:
+        parser.error("--preflight is required for legacy review arguments")
+    if legacy_mode and not args.output_dir:
+        parser.error("--output-dir is required for legacy review arguments")
+    if legacy_mode:
+        output_dir = Path(args.output_dir)
+        legacy_result = review_input(
+            Path(args.input),
+            Path(args.preflight),
+            input_kind=args.input_kind,
+            extract_dir=Path(args.extract_dir) if args.extract_dir else None,
+        )
+        legacy_result = write_review_outputs(output_dir, legacy_result)
+        print(json.dumps(cli_summary(legacy_result, output_dir), ensure_ascii=False, sort_keys=True))
+        return STATUS_EXIT_CODES[legacy_result["status"]]
     output_format = args.output_format or ("json" if args.output_dir or args.preflight else "text")
     report_path = Path(args.report_path) if args.report_path else None
     if report_path is None and args.output_dir:

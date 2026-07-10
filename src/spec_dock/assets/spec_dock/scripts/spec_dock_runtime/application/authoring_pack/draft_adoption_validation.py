@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 from spec_dock_runtime.application.authoring_pack.pack_review import _unsafe_report_path
+from spec_dock_runtime.domain.authoring_pack.authority_boundary import evidence_authority_boundary_findings
 from spec_dock_runtime.domain.authoring_pack.draft_adoption_contract import (
     DraftAdoptionResult,
     blocked_result,
@@ -230,6 +231,17 @@ def _review_gate(
         )
     status = payload.get("status")
     if status == "pass":
+        authority_findings = evidence_authority_boundary_findings(payload, prefix="review_report")
+        if authority_findings:
+            return DraftAdoptionResult(
+                status="rejected",
+                input_path=str(input_path),
+                validation_kind=validation_kind,
+                evidence_mode=evidence_mode,
+                review_status="pass",
+                review_gate_passed=False,
+                findings=authority_findings,
+            )
         if _review_digest(review_report) is None:
             return blocked_result(
                 input_path=input_path,

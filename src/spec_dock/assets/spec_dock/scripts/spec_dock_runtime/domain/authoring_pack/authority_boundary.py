@@ -140,6 +140,17 @@ def scan_forbidden_authority_flags(payload: object, forbidden_keys: tuple[str, .
     return tuple(dict.fromkeys(findings))
 
 
+def evidence_authority_boundary_findings(payload: dict[str, object], *, prefix: str) -> tuple[str, ...]:
+    findings: list[str] = []
+    if payload.get("authority") != "evidence_only":
+        findings.append(f"{prefix}_authority_not_evidence_only")
+    if payload.get("adoption_status") != "unreviewed":
+        findings.append(f"{prefix}_adoption_status_not_unreviewed")
+    if payload.get("bundle_generation_not_promotion") is not True:
+        findings.append(f"{prefix}_bundle_generation_not_promotion_not_true")
+    return tuple(findings)
+
+
 def _scan_structured_secret_fields(text: str, *, require_secret_like_value: bool = False) -> tuple[str, ...]:
     if not any(keyword in text for keyword in ("api", "password", "token", "secret", "credential", "private")):
         return ()

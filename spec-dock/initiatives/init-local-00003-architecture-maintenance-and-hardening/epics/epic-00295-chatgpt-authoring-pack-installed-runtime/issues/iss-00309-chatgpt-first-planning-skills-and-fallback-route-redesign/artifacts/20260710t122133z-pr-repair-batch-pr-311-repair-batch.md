@@ -21,17 +21,17 @@ reflected_to: []
 - Repository: chemitaro/spec-dock
 - Base branch: main
 - Head branch: iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign
-- Latest head SHA: c179811ee052467b87867275da3188fe71dd6f73
-- Observation command: `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 311 --head-sha c179811ee052467b87867275da3188fe71dd6f73`
-- Observation final JSON / evidence: status=timeout, one duplicate Provider CI run still running, latest review P1=3, P2=2
+- Latest head SHA: 6cb24d78105bb7f4a7d308a30bea6ac917dfe029
+- Observation command: `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 311 --head-sha 6cb24d78105bb7f4a7d308a30bea6ac917dfe029`
+- Observation final JSON / evidence: status=timeout, Provider CI still running, latest review P1=3, P2=2
 - Observation status: timeout with complete latest-head review evidence
-- Trigger comment id: 4936820635
-- Trigger created_at: 2026-07-10T15:21:10Z
-- Trigger boundary: reviewed head c179811ee052467b87867275da3188fe71dd6f73
+- Trigger comment id: 4937568250
+- Trigger created_at: 2026-07-10T16:50:22Z
+- Trigger boundary: reviewed head 6cb24d78105bb7f4a7d308a30bea6ac917dfe029
 - Resume metadata: available for unchanged head; not used because blocking repair produces a new head
 - New trigger approved: yes; human approved an invariant-based second repair loop
 - Observation limitation: GitHub Actions and Codex review only; external checks are not observed
-- Batch status: iteration 3 repairing
+- Batch status: iteration 4 repairing
 
 ## Batch Purpose
 
@@ -71,7 +71,7 @@ separate follow-up tracking outside the current PR branch.
 
 | field | value |
 | --- | --- |
-| latest_head_sha | c179811ee052467b87867275da3188fe71dd6f73 |
+| latest_head_sha | 6cb24d78105bb7f4a7d308a30bea6ac917dfe029 |
 | observation_status | timeout with actionable review |
 | required_ci_status | one Provider CI success, one duplicate run pending at timeout |
 | review_status | unresolved |
@@ -111,6 +111,12 @@ priority separate from the final severity decision.
 | R012 | review | 3560105422 | P1 | draft_adoption_contract.py | 356 | Truthy authority flags outside authority_claims bypass validation | repro | c179811ee052467b87867275da3188fe71dd6f73 | F009 | triaged |
 | R013 | review | 3560105427 | P2 | pack_prepare.py | 123 | Existing unowned output directory can be clobbered | code-path | c179811ee052467b87867275da3188fe71dd6f73 | F010 | triaged |
 | R014 | review | 3560105432 | P2 | zip_contract.py | 191 | Extracted tree fallback has no total byte cap | code-path | c179811ee052467b87867275da3188fe71dd6f73 | F011 | triaged |
+| R015 | review | 3560691385 | P1 | review_chatgpt_authoring_pack.py | 37 | Legacy review arguments are parsed but ignored | code-path | 6cb24d78105bb7f4a7d308a30bea6ac917dfe029 | F012 | triaged |
+| R016 | review | 3560691393 | P1 | invoke_chatgpt_backend.py | 102 | Legacy attachment symlink can disclose an external file | repro | 6cb24d78105bb7f4a7d308a30bea6ac917dfe029 | F013 | triaged |
+| R017 | review | 3560691397 | P2 | pack_stage.py | 122 | Broken stage-dir symlink raises instead of structured rejection | code-path | 6cb24d78105bb7f4a7d308a30bea6ac917dfe029 | F014 | triaged |
+| R018 | review | 3560691402 | P2 | pack_prepare.py | 333 | spec-dock/system is not classified as managed output | code-path | 6cb24d78105bb7f4a7d308a30bea6ac917dfe029 | F015 | triaged |
+| R019 | review | 3560691405 | P1 | candidate_validation.py | 128 | Candidate gate does not validate report authority tuple | code-path | 6cb24d78105bb7f4a7d308a30bea6ac917dfe029 | F016 | triaged |
+| R020 | observation | timeout | unknown | N/A | N/A | Provider CI remained in progress at observation deadline | timeout | 6cb24d78105bb7f4a7d308a30bea6ac917dfe029 | F017 | triaged |
 
 Do not keep example rows as active inventory.
 
@@ -131,6 +137,12 @@ Group inventory items by shared root cause. Do not repair comments one-by-one.
 | F009 | authority-claim-recursive-scan | evidence payload全体のauthority否定 | yes | payload内のどのoperational shapeにも肯定的authority flagを許さない | R012 | P1 | P1 | yes | fix-now | U008 | unit-created |
 | F010 | prompt-pack-output-clobber | output ownership | yes | 既存directoryへの上書きはownershipを要求する | R013 | P2 | P2 | no | follow-up | N/A | triaged |
 | F011 | tree-review-resource-bound | tree fallback resource cap | yes | lower-authority tree reviewにもtotal size boundを持つ | R014 | P2 | P2 | no | follow-up | N/A | triaged |
+| F012 | compatibility-review-wrapper | legacy review adapter parity | yes | accepted legacy flags retain their safety semantics | R015 | P1 | P1 | yes | fix-now | U009 | unit-created |
+| F013 | legacy-backend-attachment-symlink | legacy attachment source identity | yes | source symlinks cannot be laundered through generated names | R016 | P1 | P1 | yes | fix-now | U010 | unit-created |
+| F014 | stage-target-symlink-detection | stage output error normalization | yes | unsafe stage targets return structured rejection | R017 | P2 | P2 | no | follow-up | N/A | triaged |
+| F015 | managed-output-boundary | complete managed output roots | yes | spec-dock system content is not authoring scratch output | R018 | P2 | P2 | no | follow-up | N/A | triaged |
+| F016 | candidate-review-gate-authority | review report authority tuple | yes | pass requires evidence-only authority and exact pack identity | R019 | P1 | P1 | yes | fix-now | U011 | unit-created |
+| F017 | observation-timeout | latest-head CI observation | yes | merge preparation requires terminal required CI evidence | R020 | unknown | platform | yes | covered-by | N/A | triaged |
 
 ## Classification Values
 
@@ -321,6 +333,57 @@ Create one subsection per real family.
 - Recommended disposition: record only; no current repair unit or code mutation.
 - Residual risk: mis-targeted clobber and large tree resource use remain possible.
 
+### F012/F013 legacy adapter trust boundary
+
+- Related inventory IDs: R015, R016
+- Reported priorities: P1, P1
+- Decided priority: P1
+- Merge-blocking: yes.
+- Contract / invariant: compatibility adapters must preserve legacy safety
+  semantics and source identity before delegating to canonical runtime.
+- Root cause: parsed legacy metadata and source paths were normalized away before
+  the corresponding gates ran.
+- Validity analysis: valid and deterministic.
+- Need-to-fix decision: yes.
+- Recommended disposition: explicit legacy argument gate plus pre-copy
+  symlink/resolved-source validation.
+- Repair scope: two compatibility wrappers, provider/dogfooding mirrors, and
+  focused regressions.
+- Out of scope: removal of legacy flags and content DLP.
+
+### F014/F015 non-blocking output boundary follow-up
+
+- Related inventory IDs: R017, R018
+- Reported priorities: P2, P2
+- Decided priority: P2
+- Merge-blocking: no.
+- Need-to-fix decision: follow-up.
+- Recommended disposition: register only; do not expand the fourth blocking
+  repair attempt.
+
+### F016 candidate-review-gate-authority
+
+- Related inventory IDs: R019
+- Reported priority: P1
+- Decided priority: P1
+- Merge-blocking: yes.
+- Contract / invariant: digest identity cannot substitute for evidence-only
+  review authority.
+- Root cause: pass status and digest were validated without validating the
+  report's authority tuple.
+- Validity analysis: valid and structurally shared with draft review gates.
+- Need-to-fix decision: yes.
+- Recommended disposition: shared structural authority helper across candidate,
+  Issue draft, and selected-fill review gates.
+- Out of scope: report signatures.
+
+### F017 observation-timeout
+
+- Related inventory IDs: R020
+- Decided priority: platform.
+- Merge-blocking: yes until a later observation obtains terminal CI evidence.
+- Disposition: covered by the mandatory latest-head re-observation after repair.
+
 ## Blocking Repair Queue
 
 Create repair units only for `P0`/`P1` families, required CI failures, or
@@ -337,6 +400,9 @@ they are directly and unavoidably covered by the same `P0`/`P1` root-cause fix.
 | U006 | 20260710t122133z-pr-repair-batch | F007 | R010 | P1 | yes | fix-now | 20260710t160942z-disc-pr-repair-unit-review-gate-digest-binding.md | implemented | bind selected fill draft_pack_digest to review pack digest | focused and full suite passed | enclosing repair commit | pending | low |
 | U007 | 20260710t122133z-pr-repair-batch | F008 | R011 | P1 | yes | fix-now | 20260710t160942z-01-disc-pr-repair-unit-backend-secret-attachments.md | implemented | central credential path policy before copy/invoke | focused and full suite passed | enclosing repair commit | pending | medium |
 | U008 | 20260710t122133z-pr-repair-batch | F009 | R012 | P1 | yes | fix-now | 20260710t160943z-disc-pr-repair-unit-recursive-authority-claims.md | implemented | shared shape-aware recursive authority scan | focused and full suite passed | enclosing repair commit | pending | low |
+| U009 | 20260710t122133z-pr-repair-batch | F012 | R015 | P1 | yes | fix-now | 20260710t172152z-disc-pr-repair-unit-compatibility-review-wrapper.md | implemented | honor legacy preflight/input-kind/extraction gates | focused and full suite passed | enclosing final repair commit | pending | low |
+| U010 | 20260710t122133z-pr-repair-batch | F013 | R016 | P1 | yes | fix-now | 20260710t172152z-01-disc-pr-repair-unit-legacy-attachment-symlink.md | implemented | reject source symlink laundering before copy | focused and full suite passed | enclosing final repair commit | pending | medium |
+| U011 | 20260710t122133z-pr-repair-batch | F016 | R019 | P1 | yes | fix-now | 20260710t172152z-02-disc-pr-repair-unit-candidate-review-authority.md | implemented | require shared review authority tuple | focused and full suite passed | enclosing final repair commit | pending | low |
 
 ## Non-Blocking Follow-up Register
 
@@ -354,6 +420,8 @@ instead.
 | NB002 | F006 | R009 | P2 | non-blocking tree fallback gap; not unavoidable for P1 write fix | symlinked tree ancestor may pass review | future authoring path-boundary hardening |
 | NB003 | F010 | R013 | P2 | output ownership is independent of current P1 fixes | existing unrelated pack filenames may be overwritten | future prompt-pack output ownership |
 | NB004 | F011 | R014 | P2 | lower-authority resource cap is independent of current P1 fixes | large extracted trees may consume excess resources | future tree review bounds |
+| NB005 | F014 | R017 | P2 | stage target normalization is independent of current P1 fixes | broken stage symlink may raise FileExistsError | future stage output boundary hardening |
+| NB006 | F015 | R018 | P2 | managed output completeness is independent of current P1 fixes | prompt pack may target spec-dock/system | future managed-root policy |
 
 ## Quality Gate Plan
 
@@ -379,6 +447,13 @@ Define family-level gates, not comment-level checks.
 | G016 | F007-F009 | uv run pytest | 2286 passed, 75 skipped | R010-R012 | yes |
 | G017 | F007-F009 | ./scripts/static_analysis/run.sh | ruff, format, mypy pass | R010-R012 | yes |
 | G018 | F007-F009 | provider/dogfooding cmp and spec-dock validate | exact match; ok, nodes=203 | R010-R012 | yes |
+| G019 | F012 | legacy review compatibility matrix | stale/blocked preflight cannot pass; extraction only after pass | R015 | yes |
+| G020 | F013 | direct/ancestor symlink backend sentinel matrix | rejected before backend execution | R016 | yes |
+| G021 | F016 | candidate/draft review authority matrix | malformed tuple rejected before gate pass | R019 | yes |
+| G022 | F012,F013,F016 | uv run pytest | full provider suite passes | R015,R016,R019 | yes |
+| G023 | F012,F013,F016 | static analysis, mirror cmp, spec-dock validate | all pass | R015,R016,R019 | yes |
+| G024 | F012,F013,F016 | uv run pytest | 2294 passed, 75 skipped | R015,R016,R019 | yes |
+| G025 | F012,F013,F016 | tests/cli_runtime/test_authoring.py | 378 passed, 1 skipped | R015,R016,R019 | yes |
 
 ## Re-observation Plan
 
@@ -398,7 +473,8 @@ Define family-level gates, not comment-level checks.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 8c66118743ab55b3032d95eccd6eebf999fb06c2 | human_gate | F001-F003 | repair implemented and validated | pending | no | commit, push, re-observe |
 | 2 | 8046bc3e7f2d8817f9c6680f355e271707039172 | human_gate | F002,F004 | human approved invariant-based second strategy; Deep Consultant analysis adopted; implementation validated | pending | F002=yes | commit, push, re-observe |
-| 3 | c179811ee052467b87867275da3188fe71dd6f73 | timeout | F007-F009 | Deep Consultant second analysis adopted; three family-scoped repairs implemented and locally validated | pending | no | commit, push, re-observe |
+| 3 | c179811ee052467b87867275da3188fe71dd6f73 | timeout | F007-F009 | Deep Consultant second analysis adopted; three family-scoped repairs implemented and locally validated | 6cb24d78105bb7f4a7d308a30bea6ac917dfe029 | no | pushed and re-observed |
+| 4 | 6cb24d78105bb7f4a7d308a30bea6ac917dfe029 | timeout | F012,F013,F016,F017 | Deep Consultant third analysis adopted; final bounded P1 repair implemented and locally validated | pending | F013,F016 share prior trust-boundary families | commit, push, re-observe |
 
 ## Deep Consultant Synthesis
 
@@ -428,6 +504,22 @@ Define family-level gates, not comment-level checks.
   - candidate approval's recursive exact-key authority scan, promoted to a shape-aware shared helper.
 - P2 decision: F010 and F011 are independent lifecycle/resource concerns and remain register-only.
 - Observation timeout: resume metadata was preserved for head `c179811e`; no resume is needed because these P1 repairs require a new head.
+
+### Third Analysis
+
+- Legacy wrapper findings share an adapter trust-boundary meta-cause but remain
+  separate units because review parity and attachment disclosure have distinct
+  rollback and test surfaces.
+- The attachment finding extends the earlier filename-only F008 repair to source
+  path identity; the authority finding extends F007 from pack identity to report
+  authority. The user's standing request to repair all merge blockers authorizes
+  this final bounded strategy.
+- External regular-file compatibility is preserved; only direct symlinks and
+  repo-local lexical symlink escapes are rejected.
+- Review authority validation is shared across candidate, Issue draft, and
+  selected-fill gates to avoid another partial-gate recurrence.
+- F014 and F015 remain P2 register-only, and F017 is satisfied only by fresh
+  latest-head observation.
 
 Stop at a human gate when the same `root_cause_family` reappears after a repair
 commit, unless a human explicitly approves a new strategy.

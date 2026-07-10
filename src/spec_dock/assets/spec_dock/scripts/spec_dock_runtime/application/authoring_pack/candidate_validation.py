@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 from spec_dock_runtime.application.authoring_pack.pack_review import _unsafe_report_path
+from spec_dock_runtime.domain.authoring_pack.authority_boundary import evidence_authority_boundary_findings
 from spec_dock_runtime.domain.authoring_pack.candidate_contract import (
     CandidateKind,
     CandidateValidationResult,
@@ -115,6 +116,17 @@ def _review_gate(
         )
     status = payload.get("status")
     if status == "pass":
+        authority_findings = evidence_authority_boundary_findings(payload, prefix="review_report")
+        if authority_findings:
+            return CandidateValidationResult(
+                status="rejected",
+                input_path=str(input_path),
+                candidate_kind=candidate_kind,
+                evidence_mode=evidence_mode,
+                review_status="pass",
+                review_gate_passed=False,
+                findings=authority_findings,
+            )
         if _review_digest(review_report) is None:
             return CandidateValidationResult(
                 status="blocked",
@@ -166,8 +178,7 @@ def _review_digest(review_report: Path) -> str | None:
         value = pack_digest.get("content_sha256")
         if isinstance(value, str):
             return value
-    value = payload.get("input_sha256")
-    return value if isinstance(value, str) else None
+    return None
 
 
 def _write_report_if_requested(
