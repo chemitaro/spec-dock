@@ -769,6 +769,12 @@ def _validate_drafts(
         if not isinstance(value, str) or not value:
             findings.append(f"missing_or_invalid_field:{candidate_id}:draft_files.{key}")
             continue
+        if "\\" in value:
+            findings.append(f"path_separator_backslash:{candidate_id}:{key}")
+            continue
+        if len(value) >= 2 and value[1] == ":" and value[0].isalpha():
+            findings.append(f"host_local_path:{candidate_id}:{key}")
+            continue
         rel = PurePosixPath(value)
         if rel.is_absolute() or any(part == ".." for part in rel.parts):
             findings.append(f"path_traversal:{candidate_id}:{key}")

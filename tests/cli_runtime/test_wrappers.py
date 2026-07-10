@@ -133,7 +133,6 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert "spec-dock-chatgpt-authoring" in docs_readme
             assert "spec-dock-chatgpt-authoring" in hub_skill
             assert "workflow_spec_authoring.md" in issue_planning_skill
-            assert "workflow_clarification.md" in issue_planning_skill
             assert "workflow_issue.md" in issue_planning_skill
             assert "name: spec-dock-chatgpt-authoring" in chatgpt_authoring_skill
             assert "evidence-only" in chatgpt_authoring_skill

@@ -345,8 +345,10 @@ def _is_canonical_output_target(path: Path) -> bool:
     return (
         "/spec-dock/active" in joined
         or "/spec-dock/initiatives/" in joined
+        or joined.endswith("/spec-dock/initiatives")
         or "/spec-dock/active" in resolved_joined
         or "/spec-dock/initiatives/" in resolved_joined
+        or resolved_joined.endswith("/spec-dock/initiatives")
         or joined.endswith("/.assurance.json")
         or resolved_joined.endswith("/.assurance.json")
     )
@@ -372,13 +374,13 @@ def _unsafe_output_dir_blockers(output_dir: Path) -> list[str]:
     if _is_canonical_output_target(output_dir):
         return []
     absolute_path = output_dir if output_dir.is_absolute() else Path.cwd() / output_dir
-    if absolute_path.exists() and absolute_path.is_symlink():
+    if absolute_path.is_symlink():
         return ["unsafe_output_dir_symlink"]
     if absolute_path.exists() and not absolute_path.is_dir():
         return ["unsafe_output_dir_not_directory"]
     current = absolute_path.parent
     while current != current.parent:
-        if current.exists() and current.is_symlink():
+        if current.is_symlink():
             return ["unsafe_output_parent_symlink"]
         if current.exists():
             break
