@@ -32,7 +32,7 @@ class SourceManifest:
 
 
 def build_source_manifest(repo_root: Path, source_paths: tuple[str, ...]) -> SourceManifest:
-    paths = source_paths or DEFAULT_SOURCE_PATHS
+    paths = effective_source_paths(source_paths)
     source_hashes: dict[str, str] = {}
     selected_paths: list[str] = []
     for source_path in paths:
@@ -74,7 +74,7 @@ def expected_hash_from_manifest(path: Path) -> str:
 def source_path_blockers(repo_root: Path, source_paths: tuple[str, ...]) -> tuple[str, ...]:
     blockers: list[str] = []
     root = repo_root.resolve()
-    for source_path in source_paths:
+    for source_path in effective_source_paths(source_paths):
         raw = Path(source_path)
         if not raw.is_absolute() and ".." in raw.parts:
             blockers.append(f"unsafe_source_path:parent-traversal:{source_path}")
@@ -96,6 +96,10 @@ def source_path_blockers(repo_root: Path, source_paths: tuple[str, ...]) -> tupl
                 if child.is_symlink():
                     blockers.append(f"unsafe_source_path:symlink:{_repo_relative_lexical(repo_root, child)}")
     return tuple(dict.fromkeys(blockers))
+
+
+def effective_source_paths(source_paths: tuple[str, ...]) -> tuple[str, ...]:
+    return source_paths or DEFAULT_SOURCE_PATHS
 
 
 def _hash_file(path: Path) -> str:

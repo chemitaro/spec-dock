@@ -32,6 +32,7 @@ from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     AUTHORITY,
     BUNDLE_GENERATION_NOT_PROMOTION,
 )
+from spec_dock_runtime.domain.authoring_pack.provenance_contract import provenance_state_findings
 
 SUMMARY_FILENAME = "invocation-summary.json"
 
@@ -119,7 +120,7 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
             resolution=resolution,
             pack=pack,
             blockers=("backend_timeout",),
-            remediation=("increase --timeout-seconds or inspect the backend process",),
+        remediation=("increase --timeout-seconds or inspect protected backend-native diagnostics",),
             slug=slug,
             invocation_argv=invocation_argv,
             stdout=_decode_stream(error.stdout),
@@ -131,7 +132,7 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
     status = "pass" if completed.returncode == 0 else "blocked"
     blockers = () if completed.returncode == 0 else (f"backend_exit_code:{completed.returncode}",)
     remediation = (
-        () if completed.returncode == 0 else ("inspect backend stdout/stderr and rerun after fixing the backend error",)
+        () if completed.returncode == 0 else ("inspect protected backend-native diagnostics and rerun after fixing the error",)
     )
     result = _result(
         request,
@@ -304,26 +305,7 @@ def _manifest_file_blockers(root: Path, manifest: dict[str, Any], blockers: list
 
 
 def _provenance_sync_blockers(provenance: dict[str, Any], blockers: list[str]) -> None:
-    evidence_mode = provenance.get("evidence_mode")
-    sync_state = provenance.get("sync_state")
-    github_sync = provenance.get("github_sync")
-    if evidence_mode == "github-synced":
-        if github_sync != "verified":
-            blockers.append("provenance_github_sync_not_verified")
-        if sync_state != "synced":
-            blockers.append("provenance_sync_state_not_synced")
-    elif evidence_mode == "local-context":
-        if github_sync != "not_verified":
-            blockers.append("provenance_github_sync_not_not_verified")
-        if sync_state != "local_context":
-            blockers.append("provenance_sync_state_not_local_context")
-        if not provenance.get("unsynced_reason"):
-            blockers.append("provenance_missing_unsynced_reason")
-        provided = provenance.get("provided_context_paths")
-        if (not isinstance(provided, list) or not provided) and not provenance.get("diff_summary"):
-            blockers.append("provenance_missing_context_provenance")
-    else:
-        blockers.append(f"unsupported_provenance_evidence_mode:{evidence_mode}")
+    blockers.extend(provenance_state_findings(provenance))
 
 
 def _backend_invocation_argv(
@@ -485,8 +467,11 @@ def _result(
         backend_argv=resolution.argv,
         invocation_argv=invocation_argv,
         exit_code=exit_code,
-        stdout=_redact(stdout),
-        stderr=_redact(stderr),
+        stdout="",
+        stderr="",
+        stdout_bytes=len(stdout.encode("utf-8")),
+        stderr_bytes=len(stderr.encode("utf-8")),
+        stream_output_disposition="not_persisted",
         source_manifest_hash=pack.source_manifest_hash,
         blockers=blockers,
         remediation=remediation,

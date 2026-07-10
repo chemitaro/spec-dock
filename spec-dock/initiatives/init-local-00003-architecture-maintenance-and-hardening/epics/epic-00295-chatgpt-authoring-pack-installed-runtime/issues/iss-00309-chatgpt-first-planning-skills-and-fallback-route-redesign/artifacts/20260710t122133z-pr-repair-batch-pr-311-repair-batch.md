@@ -524,6 +524,30 @@ Define family-level gates, not comment-level checks.
 Stop at a human gate when the same `root_cause_family` reappears after a repair
 commit, unless a human explicitly approves a new strategy.
 
+## Fifth Repair Iteration (Deep Consultant)
+
+### Raw Intake Inventory
+
+| id | reported_priority | failure_class | summary | status |
+|---|---|---|---|---|
+| R021 | P1 | review_feedback:default-source-path-symlink-gap | 既定source pathsがblocker検査に渡らずsymlinkを見逃す | implemented |
+| R022 | P1 | review_feedback:pack-review-provenance-state-gap | pack reviewがprovenance状態間整合性を検証しない | implemented |
+| R023 | P1 | review_feedback:backend-stream-sensitive-payload | backend stdout/stderr本文がsummaryへ永続化される | implemented |
+| R024 | P1 | review_feedback:review-report-symlink-gate | review証跡入力がleaf/ancestor symlinkを受理する | implemented |
+
+### Root Cause Families
+
+- `authoring-pack.effective-input-boundary`: R021, R024。検証した入力集合・字句pathと後段が利用する実効入力が一致していない。
+- `authoring-pack.semantic-state-contract`: R022。field型検証だけで複数fieldが構成する許容状態を検証していない。
+- `authoring-pack.sensitive-output-retention`: R023。信頼できないsubprocess本文をheuristic redaction後にdurable evidenceへ保持している。
+
+### Deep Consultant Decision
+
+- 4件はいずれもvalid、P1、merge-blocking、fix-now。
+- 個別条件追加ではなく、実効入力の単一化、共有状態機械、stream非永続化、入力証跡identity検証を採用する。
+- 修正ユニット: U012、U013、U014、U015。
+- ユーザー承認により修正回数上限を撤廃し、最新HEADがmerge-preparedになるまでDeep Consultant分析を伴う再観測ループを継続する。
+
 ## Terminal Non-Blocking Report Boundary
 
 When final re-observation contains only `P2`/`P3` findings:

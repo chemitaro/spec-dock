@@ -22,6 +22,7 @@ from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     authority_boundary,
     safe_output_constraints,
 )
+from spec_dock_runtime.domain.authoring_pack.provenance_contract import provenance_state_findings
 
 
 def prepare_prompt_pack(request: PromptPackPrepareRequest) -> PromptPackPrepareResult:
@@ -237,15 +238,8 @@ def _required_preflight_blockers(preflight: dict[str, Any]) -> list[str]:
         observed_hash = _manifest_hash(_filtered_source_hashes(dict(source_hashes)))
         if preflight.get("source_manifest_hash") != observed_hash:
             blockers.append("source_manifest_hash_mismatch")
-    if preflight.get("evidence_mode") == "local-context":
-        if preflight.get("github_sync") != "not_verified":
-            blockers.append("local_context_github_sync_must_be_not_verified")
-        if preflight.get("sync_state") != "local_context":
-            blockers.append("local_context_sync_state_required")
-        if not preflight.get("unsynced_reason"):
-            blockers.append("missing_unsynced_reason")
-        if not preflight.get("provided_context_paths") and not preflight.get("diff_summary"):
-            blockers.append("missing_context_provenance")
+    if preflight.get("status") == "pass":
+        blockers.extend(provenance_state_findings(preflight))
     return blockers
 
 

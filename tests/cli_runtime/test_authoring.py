@@ -661,6 +661,45 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["review_gate_passed"] is False
             assert expected_finding in payload["findings"]
 
+    @pytest.mark.parametrize("symlink_kind", ("leaf", "ancestor"))
+    def test_authoring_validate_candidates_rejects_symlink_review_report_input(self, symlink_kind: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            stage_dir = _write_candidate_stage(repo / ".specdock-authoring" / "staged" / "issue", kind="epic-issue")
+            original = stage_dir / "review-report.json"
+            outside = repo / "outside-review-report.json"
+            outside.write_bytes(original.read_bytes())
+            original.unlink()
+            if symlink_kind == "leaf":
+                original.symlink_to(outside)
+            else:
+                linked = stage_dir / "linked"
+                linked.symlink_to(outside.parent, target_is_directory=True)
+                original = linked / outside.name
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "validate",
+                    "epic-issue-candidates",
+                    "--input",
+                    str(stage_dir),
+                    "--review-report",
+                    str(original),
+                    "--expected-parent-epic",
+                    "epic-00295",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1
+            assert payload["status"] == "rejected"
+            assert "unsafe_review_report_path:symlink" in payload["findings"]
+
     def test_authoring_approval_check_valid_epic_issue_passes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -1524,6 +1563,36 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == "rejected"
             assert payload["review_gate_passed"] is False
             assert "review_report_authority_not_evidence_only" in payload["findings"]
+
+    @pytest.mark.parametrize("symlink_kind", ("leaf", "ancestor"))
+    def test_authoring_validate_issue_draft_adoption_rejects_symlink_review_report_input(
+        self, symlink_kind: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_issue_draft_adoption_fixture(repo)
+            original = Path(fixture["review_report"])
+            outside = repo / "outside-review-report.json"
+            outside.write_bytes(original.read_bytes())
+            original.unlink()
+            if symlink_kind == "leaf":
+                original.symlink_to(outside)
+                review_report = original
+            else:
+                linked = original.parent / "linked"
+                linked.symlink_to(outside.parent, target_is_directory=True)
+                review_report = linked / outside.name
+
+            payload = _run_issue_draft_adoption_json(
+                self,
+                repo,
+                fixture,
+                "--review-report",
+                str(review_report),
+            )
+
+            assert payload["status"] == "rejected"
+            assert "unsafe_review_report_path:symlink" in payload["findings"]
 
     def test_authoring_validate_issue_draft_adoption_rejects_backslash_draft_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2536,6 +2605,8 @@ class TestAuthoringCli(CliRuntimeHarness):
                 "evidence_mode": "local-context",
                 "sync_state": "local_context",
                 "github_sync": "not_verified",
+                "provided_context_paths": ["source.txt"],
+                "unsynced_reason": "test local-context evidence",
                 "source_manifest_hash": "hash",
                 "authority": "evidence_only",
                 "adoption_status": "unreviewed",
@@ -2555,6 +2626,43 @@ class TestAuthoringCli(CliRuntimeHarness):
             payload = _json_stdout(p)
             assert p.returncode == 0, p.stdout + p.stderr
             assert payload["evidence_mode"] == "local-context"
+
+    @pytest.mark.parametrize("input_kind", ("zip", "tree"))
+    def test_authoring_pack_review_rejects_semantically_inconsistent_provenance(self, input_kind: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            provenance = {
+                "evidence_mode": "github-synced",
+                "sync_state": "blocked",
+                "github_sync": "failed",
+                "source_manifest_hash": "hash",
+                "authority": "evidence_only",
+                "adoption_status": "unreviewed",
+                "bundle_generation_not_promotion": True,
+            }
+            if input_kind == "zip":
+                input_path = _write_authoring_pack_zip(
+                    repo / "inconsistent.zip",
+                    metadata_overrides={"provenance.json": json.dumps(provenance, sort_keys=True) + "\n"},
+                )
+            else:
+                input_path = _write_authoring_pack_tree(repo / "inconsistent-tree")
+                (input_path / "specdock-authoring-pack" / "provenance.json").write_text(
+                    json.dumps(provenance, sort_keys=True) + "\n", encoding="utf-8"
+                )
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                ["authoring", "pack", "review", "--input", str(input_path), "--format", "json"],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1
+            assert payload["status"] == "rejected"
+            assert "provenance_github_sync_not_verified" in payload["findings"]
+            assert "provenance_sync_state_not_synced" in payload["findings"]
+            assert payload["pack_digest"]["content_sha256"] is None
 
     def test_authoring_pack_review_text_preserves_local_context_evidence_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3752,6 +3860,37 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["source_hash_mismatch_checked"] is False
             assert payload["source_paths"] == ["source.txt"]
             assert "source.txt" in payload["source_hashes"]
+
+    def test_authoring_preflight_github_sync_checks_default_source_path_symlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            target = repo / "outside-default-source"
+            target.mkdir()
+            default_path = (
+                repo
+                / "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack"
+            )
+            default_path.parent.mkdir(parents=True, exist_ok=True)
+            default_path.symlink_to(target, target_is_directory=True)
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 1
+            assert payload["status"] == "blocked"
+            assert any(item.startswith("unsafe_source_path:symlink:") for item in payload["blockers"])
 
     def test_authoring_preflight_does_not_dirty_consumer_repo_with_runtime_bytecode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -7023,8 +7162,12 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == "blocked"
             assert "backend_exit_code:7" in payload["blockers"]
             assert payload["local_context_requires_eal_disposition"] is True
-            assert "[redacted-path]" in payload["stderr"]
-            assert "sk-[redacted]" in payload["stdout"]
+            assert payload["stdout"] == ""
+            assert payload["stderr"] == ""
+            assert payload["stdout_bytes"] > 0
+            assert payload["stderr_bytes"] > 0
+            assert payload["stream_output_disposition"] == "not_persisted"
+            assert summary["stream_output_disposition"] == "not_persisted"
             assert "/Users/example/.env" not in serialized
             assert "token=abc123" not in serialized
             assert "password=hunter2" not in serialized
@@ -7099,10 +7242,13 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert result.returncode == 1, result.stdout + result.stderr
             assert payload["status"] == "blocked"
             assert "backend_exit_code:9" in payload["blockers"]
-            assert "prefix-" in payload["stdout"]
-            assert "err-" in payload["stderr"]
-            assert summary["stdout"] == payload["stdout"]
-            assert summary["stderr"] == payload["stderr"]
+            assert payload["stdout"] == ""
+            assert payload["stderr"] == ""
+            assert payload["stdout_bytes"] > 0
+            assert payload["stderr_bytes"] > 0
+            assert payload["stream_output_disposition"] == "not_persisted"
+            assert summary["stdout"] == ""
+            assert summary["stderr"] == ""
 
     def test_authoring_backend_invoke_dogfood_runtime_path_smoke(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
