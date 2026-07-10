@@ -95,19 +95,37 @@ def _run_backend(request: BackendInvokeRequest, output_format: str) -> int:
 def _write_legacy_prompt_pack(prompt_pack: Path, files: tuple[Path, ...]) -> None:
     prompt_pack.mkdir(parents=True, exist_ok=True)
     (prompt_pack / ".specdock-authoring-pack").write_bytes(b"")
+    resolved_files: list[Path] = []
     for path in files:
+        if path.is_symlink():
+            raise ValueError("legacy --file attachment must not be a symlink")
         if not path.is_file():
             raise ValueError(f"legacy --file attachment is not a readable file: {path}")
-        if is_credential_like_path(path.name):
+        try:
+            resolved = path.resolve(strict=True)
+        except (OSError, RuntimeError) as error:
+            raise ValueError("legacy --file attachment could not be resolved") from error
+        if is_credential_like_path(path.name) or is_credential_like_path(resolved.name):
             raise ValueError("legacy --file attachment has a forbidden credential-like path")
-    _copy_or_placeholder(files, prompt_pack / "chatgpt-use-prompt.md", index=0, fallback="legacy prompt attachment\n")
+        repo_root = _repository_root(path.parent)
+        if (
+            repo_root is not None
+            and _lexically_within(path, repo_root)
+            and (_has_symlink_component(path, repo_root) or not resolved.is_relative_to(repo_root.resolve()))
+        ):
+            raise ValueError("legacy --file attachment resolves outside the repository")
+        resolved_files.append(resolved)
+    copy_sources = tuple(resolved_files)
     _copy_or_placeholder(
-        files, prompt_pack / "expected-output-contract.md", index=1, fallback="legacy expected output\n"
+        copy_sources, prompt_pack / "chatgpt-use-prompt.md", index=0, fallback="legacy prompt attachment\n"
+    )
+    _copy_or_placeholder(
+        copy_sources, prompt_pack / "expected-output-contract.md", index=1, fallback="legacy expected output\n"
     )
     attachment_dir = prompt_pack / "legacy-attachments"
     attachment_dir.mkdir()
-    for index, path in enumerate(files):
-        shutil.copyfile(path, attachment_dir / f"{index:03d}-{path.name}")
+    for index, (path, source) in enumerate(zip(files, copy_sources, strict=True)):
+        shutil.copyfile(source, attachment_dir / f"{index:03d}-{path.name}")
     context_paths = [path.name for path in files] or ["chatgpt-use-prompt.md"]
     (prompt_pack / "manifest.json").write_text(
         json.dumps(
@@ -178,6 +196,30 @@ def _copy_or_placeholder(files: tuple[Path, ...], target: Path, *, index: int, f
         shutil.copyfile(files[index], target)
         return
     target.write_text(fallback, encoding="utf-8")
+
+
+def _repository_root(start: Path) -> Path | None:
+    current = start if start.is_absolute() else Path.cwd() / start
+    for candidate in (current, *current.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def _lexically_within(path: Path, root: Path) -> bool:
+    absolute = path if path.is_absolute() else Path.cwd() / path
+    return absolute.is_relative_to(root)
+
+
+def _has_symlink_component(path: Path, root: Path) -> bool:
+    absolute = path if path.is_absolute() else Path.cwd() / path
+    relative = absolute.relative_to(root)
+    current = root
+    for part in relative.parts:
+        current /= part
+        if current.is_symlink():
+            return True
+    return False
 
 
 if __name__ == "__main__":
