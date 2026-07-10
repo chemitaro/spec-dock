@@ -10184,18 +10184,19 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert authoring_text.startswith("---\nname: spec-dock-chatgpt-authoring\n")
 
         for planning_text in (initiative_planning_text, epic_planning_text, issue_planning_text):
-            assert "ChatGPT-first primary route" in planning_text
-            assert "wait and retry" in planning_text
-            assert "Manual backup route" in planning_text
+            assert "This is the primary planning route and it is ChatGPT-first." in planning_text
+            assert "Wait, retry, or recover" in planning_text
+            assert "Manual Backup" in planning_text
+            assert "information_insufficient" in planning_text
 
-        assert "Issue Planning uses one workflow" in issue_planning_text
+        assert "Issue Planning has one workflow" in issue_planning_text
         for context_type in ("requirement-heavy", "draft-heavy", "context-heavy"):
             assert context_type in issue_planning_text
         for removed_mode_name in ("zero-base", "requirement-first"):
             assert removed_mode_name not in issue_planning_text
-        assert "separate modes" in issue_planning_text
+        assert "Do not create separate workflow modes" in issue_planning_text
         assert "Evidence Adoption Ledger" in issue_planning_text
-        assert "fresh `spec-reviewer` pass before execution handoff" in issue_planning_text
+        assert "fresh `spec-reviewer` pass after canonical changes" in issue_planning_text
 
         assert "evidence-only" in authoring_text
         assert "Failure Classification" in authoring_text
