@@ -3646,6 +3646,43 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["source_paths"] == ["source.txt"]
             assert "source.txt" in payload["source_hashes"]
 
+    def test_authoring_preflight_does_not_dirty_consumer_repo_with_runtime_bytecode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            script = repo / "spec-dock" / "scripts" / "spec-dock"
+            env = self._runtime_env(repo, {"PATH": os.environ.get("PATH", "")})
+            env.pop("PYTHONDONTWRITEBYTECODE", None)
+
+            p = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--source-path",
+                    "source.txt",
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo),
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            payload = _json_stdout(p)
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload["status"] == "pass"
+            assert "untracked_files" not in payload["blockers"]
+            runtime_root = repo / "spec-dock" / "scripts" / "spec_dock_runtime"
+            assert not any(path.name == "__pycache__" for path in runtime_root.rglob("__pycache__"))
+            assert not any(path.suffix in {".pyc", ".pyo"} for path in runtime_root.rglob("*"))
+            assert _git(repo, "status", "--porcelain=v1").stdout == ""
+
     @pytest.mark.parametrize(
         ("mutate", "reason"),
         (
@@ -5484,6 +5521,44 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == "rejected"
             assert "unsafe_output_dir_symlink" in payload["blockers"]
             assert not (outside / "manifest.json").exists()
+
+    def test_authoring_pack_prepare_rejects_existing_output_below_symlinked_parent(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "preflight.json"
+            outside = repo / "outside"
+            outside_existing = outside / "existing"
+            linked_parent = repo / "linked-parent"
+            output_dir = linked_parent / "existing" / "pack"
+            preflight_payload = _run_preflight_json(self, repo)
+            preflight.write_text(json.dumps(preflight_payload, sort_keys=True) + "\n", encoding="utf-8")
+            outside_existing.mkdir(parents=True)
+            linked_parent.symlink_to(outside, target_is_directory=True)
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_output_parent_symlink" in payload["blockers"]
+            assert not (outside_existing / "pack" / "manifest.json").exists()
+            assert not (outside_existing / "pack" / "diagnostics.json").exists()
 
     def test_authoring_pack_prepare_rejects_initiatives_root_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
