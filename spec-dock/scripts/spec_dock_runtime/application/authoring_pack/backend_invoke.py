@@ -56,7 +56,13 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
 
     slug = request.slug or _default_slug(request.prompt_pack, pack.source_manifest_hash)
     prompt = request.prompt or DEFAULT_BACKEND_PROMPT
-    invocation_argv = _backend_invocation_argv(resolution.argv, request.prompt_pack, slug=slug, prompt=prompt)
+    invocation_argv = _backend_invocation_argv(
+        resolution.argv,
+        request.prompt_pack,
+        slug=slug,
+        prompt=prompt,
+        oracle_implementation=request.oracle_implementation,
+    )
 
     if request.dry_run:
         result = _result(
@@ -320,9 +326,17 @@ def _provenance_sync_blockers(provenance: dict[str, Any], blockers: list[str]) -
 
 
 def _backend_invocation_argv(
-    backend_argv: tuple[str, ...], prompt_pack: Path, *, slug: str, prompt: str
+    backend_argv: tuple[str, ...],
+    prompt_pack: Path,
+    *,
+    slug: str,
+    prompt: str,
+    oracle_implementation: str | None,
 ) -> tuple[str, ...]:
-    argv = [*backend_argv, "--slug", slug, "-p", prompt]
+    argv = [*backend_argv]
+    if oracle_implementation is not None:
+        argv.extend(["--oracle", oracle_implementation])
+    argv.extend(["--slug", slug, "-p", prompt])
     for relative_path in _backend_attachment_files(prompt_pack):
         argv.extend(["--file", str((prompt_pack / relative_path).resolve())])
     return tuple(argv)

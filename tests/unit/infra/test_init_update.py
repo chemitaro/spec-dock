@@ -10205,6 +10205,8 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert "evidence-only" in authoring_text
         assert "Failure Classification" in authoring_text
         assert "hard-unrecoverable" in authoring_text
+        assert "Omit `--oracle` to use the configured backend default" in authoring_text
+        assert "Pass `--oracle personal` only when the operator explicitly selects" in authoring_text
         forbidden_claims_section = self._issue_71_extract_markdown_section_by_heading_prefix(
             markdown_text=authoring_text,
             heading_prefix="Forbidden Claims",
