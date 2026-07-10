@@ -225,6 +225,9 @@ def _validate_relative_path(rel_name: str, findings: list[str]) -> None:
     if "\\" in rel_name:
         findings.append(f"path_separator_backslash:{rel_name}")
         return
+    if len(rel_name) >= 2 and rel_name[1] == ":" and rel_name[0].isalpha():
+        findings.append(f"host_local_path:{rel_name}")
+        return
     path = PurePosixPath(rel_name)
     if path.is_absolute() or any(part == ".." for part in path.parts):
         findings.append(f"path_traversal:{rel_name}")

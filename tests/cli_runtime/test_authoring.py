@@ -1109,6 +1109,8 @@ class TestAuthoringCli(CliRuntimeHarness):
             ("raw-transcript", "rejected", "raw_transcript:raw transcript"),
             ("forbidden-claim", "rejected", "forbidden_authority_claim:pr-ready"),
             ("path-traversal", "rejected", "path_traversal"),
+            ("windows-drive-draft", "rejected", "host_local_path"),
+            ("windows-backslash-draft", "rejected", "path_separator_backslash"),
             ("host-local-path", "rejected", "host_local_path"),
             ("secret-path", "rejected", "secret_path"),
             ("secret-draft-path", "rejected", "secret_path"),
@@ -2805,6 +2807,12 @@ class TestAuthoringCli(CliRuntimeHarness):
                 "specdock-authoring-pack/safe\\..\\..\\evil.md",
                 "x\n",
                 "path_separator_backslash:safe\\..\\..\\evil.md",
+            ),
+            (
+                "windows-drive-path",
+                "specdock-authoring-pack/C:/Users/alice/evil.md",
+                "x\n",
+                "host_local_path:C:/Users/alice/evil.md",
             ),
             ("unsupported-suffix", "specdock-authoring-pack/issue/run.sh", "x\n", "unsupported_suffix:issue/run.sh"),
             (
@@ -5443,6 +5451,70 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert "unsafe_output_dir_symlink" in payload["blockers"]
             assert not (outside / "manifest.json").exists()
 
+    def test_authoring_pack_prepare_rejects_broken_symlinked_output_dir(self) -> None:
+        if not hasattr(os, "symlink"):
+            pytest.skip("symlink unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "preflight.json"
+            outside = repo / "missing-outside"
+            output_dir = repo / "pack-link"
+            preflight_payload = _run_preflight_json(self, repo)
+            preflight.write_text(json.dumps(preflight_payload, sort_keys=True) + "\n", encoding="utf-8")
+            output_dir.symlink_to(outside)
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "unsafe_output_dir_symlink" in payload["blockers"]
+            assert not (outside / "manifest.json").exists()
+
+    def test_authoring_pack_prepare_rejects_initiatives_root_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "preflight.json"
+            output_dir = repo / "spec-dock" / "initiatives"
+            preflight_payload = _run_preflight_json(self, repo)
+            preflight.write_text(json.dumps(preflight_payload, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "rejected"
+            assert "canonical_output_target" in payload["blockers"]
+            assert not (output_dir / "manifest.json").exists()
+
     def test_authoring_pack_prepare_reports_non_object_json_inputs_as_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -7371,6 +7443,10 @@ def _write_candidate_stage(
         draft_files = {"requirement": "requirement.md", "design": "design.md", "plan": "plan.md"}
         if mutator == "path-traversal" and number == 1:
             draft_files["requirement"] = "../requirement.md"
+        if mutator == "windows-drive-draft" and number == 1:
+            draft_files["requirement"] = "C:/Users/alice/requirement.md"
+        if mutator == "windows-backslash-draft" and number == 1:
+            draft_files["requirement"] = "..\\..\\outside.md"
         if mutator == "hidden-path" and number == 1:
             draft_files["requirement"] = ".hidden.md"
             (candidate_dir / ".hidden.md").write_text("# Hidden\n", encoding="utf-8")
