@@ -17,6 +17,25 @@ backend command は次のいずれかで指定します。
 未設定の場合は fail-closed で停止し、backend command の設定が必要であることを明確に示します。
 個人環境の絶対パスは SpecDock の正式 workflow や shipped docs に固定しません。既存のローカル wrapper は、利用者が自分の環境で指定できる backend の一例です。
 
+### ChatGPT Pro と Oracle implementation の選択
+
+SpecDock は `GPT-5.5` や `GPT-5.6` のようなモデル世代、または `Extended` のような廃止・変更されうる thinking label を固定しません。設定された backend wrapper が、現在の ChatGPT `Pro` を選択します。
+
+Oracle-compatible backend wrapper を使う場合、`authoring backend invoke` は optional な selector を転送できます。
+
+```bash
+./spec-dock/scripts/spec-dock authoring backend invoke \
+  --prompt-pack <prompt-pack-dir> \
+  --output-dir <output-dir> \
+  --oracle personal
+```
+
+- `--oracle` を省略した場合、selector は転送されず、backend wrapper の standard/default implementation を使います。
+- `--oracle standard` または `--oracle personal` を明示した場合だけ、その2引数を backend command の直後へ転送します。
+- `--backend-command`、`SPECDOCK_CHATGPT_COMMAND`、`ORACLE_CHATGPT_COMMAND` 自体に `--oracle` を含める場合は、CLI の `--oracle` と併用しません。
+- Personal Oracle の checkout path、build command、browser selector implementation は利用者側 wrapper が所有し、SpecDock assets には保存しません。
+- Oracle-compatibleでない汎用backendでは`--oracle`を指定しません。
+
 ## 入力（Inputs）
 
 backend invocation の主要 input は次の通りです。

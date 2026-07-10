@@ -28,6 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-dir")
     parser.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
     parser.add_argument("--backend-command")
+    parser.add_argument("--oracle", choices=("standard", "personal"), dest="oracle_implementation")
     parser.add_argument("--slug")
     parser.add_argument("-p", "--prompt")
     parser.add_argument("--file", action="append", default=[])
@@ -45,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
                 output_dir=Path(args.output_dir),
                 output_format=args.output_format,
                 backend_command=args.backend_command,
+                oracle_implementation=args.oracle_implementation,
                 slug=args.slug,
                 prompt=args.prompt,
                 evidence_mode=args.evidence_mode,
@@ -68,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
                 output_dir=output_dir,
                 output_format=args.output_format,
                 backend_command=args.backend_command,
+                oracle_implementation=args.oracle_implementation,
                 slug=args.slug,
                 prompt=args.prompt,
                 evidence_mode=args.evidence_mode,

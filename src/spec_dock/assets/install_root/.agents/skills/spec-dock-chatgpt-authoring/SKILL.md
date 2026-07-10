@@ -40,6 +40,7 @@ Contract anchor: ChatGPT / Oracle output is evidence-only until the main orchest
    - Include source constraints, target scope, expected artifact shape, and forbidden authority claims.
 4. Invoke only an operator-configured backend or runtime path.
    - Do not require private local wrapper paths, account state, or browser profile details as SpecDock product dependencies.
+   - Omit `--oracle` to use the configured backend default. Pass `--oracle personal` only when the operator explicitly selects a compatible Personal Oracle backend.
    - Treat tab capacity, queued browser sessions, and retryable backend timeouts as wait/retry conditions, not as reasons to use the manual route.
    - Treat browser/backend startup failure as recoverable when restart, session cleanup, or configuration repair is available.
 5. Review returned ZIP/tree output, candidate reports, draft docs, or summaries as evidence.
