@@ -2492,7 +2492,7 @@ class TestInitUpdate(CliRuntimeHarness):
         assert not re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, text), (
             f"codex native shim still uses legacy instructions key ({shim_label})"
         )
-        assert 'model = "gpt-5.5"' in text, f"codex spec-manager missing model ({shim_label})"
+        assert 'model = "gpt-5.6-luna"' in text, f"codex spec-manager missing model ({shim_label})"
         assert 'model_reasoning_effort = "low"' in text, f"codex spec-manager missing reasoning effort ({shim_label})"
         assert 'approval_policy = "never"' in text, f"codex spec-manager missing approval policy ({shim_label})"
         assert 'sandbox_mode = "workspace-write"' in text, f"codex spec-manager missing sandbox mode ({shim_label})"
@@ -2502,7 +2502,7 @@ class TestInitUpdate(CliRuntimeHarness):
 
     def _assert_codex_doc_writer_contract(self, *, text: str, shim_label: str) -> None:
         assert 'name = "doc-writer"' in text, f"codex doc-writer missing name ({shim_label})"
-        assert 'model = "gpt-5.5"' in text, f"codex doc-writer missing model ({shim_label})"
+        assert 'model = "gpt-5.6-terra"' in text, f"codex doc-writer missing model ({shim_label})"
         assert 'model_reasoning_effort = "medium"' in text, f"codex doc-writer missing reasoning effort ({shim_label})"
         assert 'approval_policy = "never"' in text, f"codex doc-writer missing approval policy ({shim_label})"
         assert 'sandbox_mode = "workspace-write"' in text, f"codex doc-writer missing sandbox mode ({shim_label})"
@@ -2519,7 +2519,7 @@ class TestInitUpdate(CliRuntimeHarness):
     ) -> None:
         parsed = tomllib.loads(text)
         assert parsed.get("name") == agent_name
-        assert parsed.get("model") == "gpt-5.5"
+        assert parsed.get("model") == "gpt-5.6-sol"
         assert parsed.get("model_reasoning_effort") == "high"
         assert parsed.get("web_search") == "disabled"
         assert parsed.get("approval_policy") == "never"
@@ -2561,7 +2561,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "fresh `spec-reviewer` pass remains required",
         ):
             assert fragment in text, f"delegated author adapter missing boundary fragment ({shim_label}): {fragment}"
-        assert 'model = "gpt-5.5"' in text, f"delegated author adapter missing model ({shim_label})"
+        assert 'model = "gpt-5.6-sol"' in text, f"delegated author adapter missing model ({shim_label})"
         assert 'model_reasoning_effort = "high"' in text, (
             f"delegated author adapter missing reasoning effort ({shim_label})"
         )
@@ -2639,6 +2639,10 @@ class TestInitUpdate(CliRuntimeHarness):
             f"codex main config missing spec-manager routing guidance ({shim_label})"
         )
         parsed = tomllib.loads(text)
+        assert "model" not in parsed, f"codex main config must inherit the selected model ({shim_label})"
+        assert "model_reasoning_effort" not in parsed, (
+            f"codex main config must inherit the selected reasoning effort ({shim_label})"
+        )
         assert parsed.get("agents", {}).get("max_depth") == 2, (
             f"codex main config must set agents.max_depth = 2 ({shim_label})"
         )
@@ -10401,20 +10405,60 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         import spec_dock.cli as cli
 
         read_only_specialists = (
+            "default",
             "researcher",
             "consultant",
             "deep-consultant",
+            "explorer",
             "repo-analyst",
             "code-reviewer",
             "qa-reviewer",
             "spec-reviewer",
             "spark-worker",
+            "worker",
         )
-        workspace_write_workers = ("dev-coder", "doc-writer", "utility-worker", "worker")
+        workspace_write_workers = ("dev-coder", "doc-writer", "utility-worker")
         scoped_delegated_authors = ("system-architect", "implementation-planner")
+        expected_runtime_profiles = {
+            "system-architect": ("gpt-5.6-sol", "high"),
+            "implementation-planner": ("gpt-5.6-sol", "high"),
+            "consultant": ("gpt-5.6-sol", "high"),
+            "deep-consultant": ("gpt-5.6-sol", "max"),
+            "dev-coder": ("gpt-5.6-terra", "medium"),
+            "repo-analyst": ("gpt-5.6-terra", "medium"),
+            "researcher": ("gpt-5.6-terra", "medium"),
+            "doc-writer": ("gpt-5.6-terra", "medium"),
+            "spec-reviewer": ("gpt-5.6-terra", "high"),
+            "qa-reviewer": ("gpt-5.6-terra", "high"),
+            "code-reviewer": ("gpt-5.6-sol", "high"),
+            "spec-manager": ("gpt-5.6-luna", "low"),
+            "utility-worker": ("gpt-5.6-luna", "low"),
+            "spark-worker": ("gpt-5.3-codex-spark", "medium"),
+            "default": ("gpt-5.6-luna", "low"),
+            "worker": ("gpt-5.6-luna", "low"),
+            "explorer": ("gpt-5.6-terra", "medium"),
+        }
 
         with cli._assets_dir() as assets_dir:
             agents_dir = assets_dir / "install_root" / ".codex" / "agents"
+            provider_config_path = assets_dir / "install_root" / ".codex" / "config.toml"
+            dogfooding_root = Path(__file__).resolve().parents[3]
+            dogfooding_config_path = dogfooding_root / ".codex" / "config.toml"
+            assert dogfooding_config_path.read_bytes() == provider_config_path.read_bytes()
+            self._assert_codex_main_config_routing_contract(
+                text=dogfooding_config_path.read_text(encoding="utf-8"),
+                shim_label="dogfooding codex main config",
+            )
+
+            for agent_name, (expected_model, expected_effort) in expected_runtime_profiles.items():
+                with _case(agent=agent_name, taxonomy="runtime-profile"):
+                    provider_path = agents_dir / f"{agent_name}.toml"
+                    dogfooding_path = dogfooding_root / ".codex" / "agents" / f"{agent_name}.toml"
+                    assert dogfooding_path.read_bytes() == provider_path.read_bytes()
+                    parsed = tomllib.loads(provider_path.read_text(encoding="utf-8"))
+                    assert parsed.get("model") == expected_model
+                    assert parsed.get("model_reasoning_effort") == expected_effort
+
             for agent_name in read_only_specialists:
                 with _case(agent=agent_name, taxonomy="read-only-specialist"):
                     text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
