@@ -374,18 +374,29 @@ def _unsafe_output_dir_blockers(output_dir: Path) -> list[str]:
     if _is_canonical_output_target(output_dir):
         return []
     absolute_path = output_dir if output_dir.is_absolute() else Path.cwd() / output_dir
-    if absolute_path.is_symlink():
-        return ["unsafe_output_dir_symlink"]
+    symlink_blocker = _output_path_symlink_blocker(absolute_path)
+    if symlink_blocker is not None:
+        return [symlink_blocker]
     if absolute_path.exists() and not absolute_path.is_dir():
         return ["unsafe_output_dir_not_directory"]
-    current = absolute_path.parent
-    while current != current.parent:
-        if current.is_symlink():
-            return ["unsafe_output_parent_symlink"]
-        if current.exists():
-            break
-        current = current.parent
     return []
+
+
+def _output_path_symlink_blocker(absolute_path: Path) -> str | None:
+    trusted_anchor = Path.cwd()
+    try:
+        absolute_path.relative_to(trusted_anchor)
+    except ValueError:
+        trusted_anchor = Path(absolute_path.anchor)
+
+    current = absolute_path
+    while True:
+        root = Path(current.anchor)
+        if current.is_symlink() and current.parent != root:
+            return "unsafe_output_dir_symlink" if current == absolute_path else "unsafe_output_parent_symlink"
+        if current == trusted_anchor or current == current.parent:
+            return None
+        current = current.parent
 
 
 def _unsafe_diagnostics_entry_blockers(output_dir: Path) -> list[str]:
