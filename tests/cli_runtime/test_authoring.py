@@ -1504,6 +1504,8 @@ class TestAuthoringCli(CliRuntimeHarness):
             ("missing-draft-sha", "fail", "missing_or_invalid_field:drafts.requirement.sha256"),
             ("merge-ready-claim", "rejected", "forbidden_authority_claim:merge_ready"),
             ("pr-delivery-claim", "rejected", "forbidden_authority_claim:pr_delivery"),
+            ("top-level-execution-ready", "rejected", "forbidden_authority_claim:execution_ready"),
+            ("nested-pr-delivery", "rejected", "forbidden_authority_claim:pr_delivery"),
             ("unsafe-target", "rejected", "path_traversal:../requirement.md"),
             ("assurance-target", "rejected", "forbidden_canonical_target:requirement"),
             ("extra-canonical-target", "rejected", "unexpected_canonical_target:appendix"),
@@ -2004,6 +2006,10 @@ class TestAuthoringCli(CliRuntimeHarness):
             ("forbidden-claim", "rejected", "forbidden_authority_claim:execution_ready"),
             ("merge-ready-claim", "rejected", "forbidden_authority_claim:merge_ready"),
             ("pr-delivery-claim", "rejected", "forbidden_authority_claim:pr_delivery"),
+            ("top-level-execution-ready", "rejected", "forbidden_authority_claim:execution_ready"),
+            ("nested-pr-delivery", "rejected", "forbidden_authority_claim:pr_delivery"),
+            ("missing-draft-pack-digest", "fail", "missing_or_invalid_field:draft_pack_digest"),
+            ("draft-pack-digest-mismatch", "stale", "draft_pack_digest_mismatch"),
             ("canonical-doc-path", "rejected", "canonical_doc_path:section_fills.requirement"),
             ("symlink-ancestor", "rejected", "symlink_entry:artifacts/linkdir/requirement-fill.md"),
             ("missing-template-hash", "fail", "missing_or_invalid_field:template_hash"),
@@ -2052,6 +2058,24 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert p.returncode != 0
             assert payload["status"] == expected_status
             assert expected_fragment in json.dumps(payload, sort_keys=True)
+
+    def test_authoring_validate_selected_skeleton_fill_binds_to_reviewed_pack_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            fixture = _write_selected_skeleton_fixture(repo)
+            Path(fixture["review_report"]).write_text(
+                json.dumps({"status": "pass", "pack_digest": {"content_sha256": "unrelated-pack"}}, sort_keys=True)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            payload = _run_selected_skeleton_fill_json(self, repo, fixture, "--expected-profile", "standard")
+
+            assert payload["status"] == "stale"
+            assert payload["review_gate_passed"] is False
+            assert payload["expected_draft_pack_digest"] == "unrelated-pack"
+            assert payload["observed_draft_pack_digest"] == "selected-pack-hash"
+            assert "draft_pack_digest_mismatch" in payload["comparison"]
 
     def test_authoring_validate_selected_skeleton_fill_rejects_symlink_report_path(self) -> None:
         if not hasattr(os, "symlink"):
@@ -6762,6 +6786,48 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == "blocked"
             assert "unsafe_manifest_file:secret-path:secrets/token.txt" in payload["blockers"]
 
+    @pytest.mark.parametrize(
+        "relative_path",
+        ("id_rsa", "keys/private_key.txt", "certificates/key.pem", "legacy-attachments/000-.env"),
+    )
+    def test_authoring_backend_invoke_rejects_credential_like_manifest_attachments(self, relative_path: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            pack = _write_valid_prompt_pack(repo / "pack")
+            attachment = pack / relative_path
+            attachment.parent.mkdir(parents=True, exist_ok=True)
+            attachment.write_text("credential material\n", encoding="utf-8")
+            manifest_path = pack / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["files"] = [*manifest["files"], relative_path]
+            manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+            sentinel = repo / "backend-called.json"
+            backend = _write_fake_backend(repo / "backend.py", sentinel)
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "backend",
+                    "invoke",
+                    "--prompt-pack",
+                    str(pack),
+                    "--output-dir",
+                    str(repo / "invoke-output"),
+                    "--backend-command",
+                    f"{sys.executable} {backend}",
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "blocked"
+            assert any(item.startswith("unsafe_manifest_file:secret-path:") for item in payload["blockers"])
+            assert not sentinel.exists()
+
     def test_authoring_backend_invoke_rejects_unsynced_github_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -7194,6 +7260,44 @@ class TestAuthoringCli(CliRuntimeHarness):
 
             assert p.returncode != 0
             assert "legacy --file attachment is not a readable file" in p.stderr
+
+    def test_authoring_backend_invoke_compatibility_script_blocks_credential_like_legacy_file(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = (
+            repo_root
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+            / "authoring-pack"
+            / "invoke_chatgpt_backend.py"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            attachment = root / ".env"
+            attachment.write_text("SECRET_VALUE=not-forwarded\n", encoding="utf-8")
+            sentinel = root / "captured.json"
+            backend = _write_fake_backend(root / "backend.py", sentinel)
+
+            p = self._run_wrapper_capture(
+                script,
+                [
+                    "--file",
+                    str(attachment),
+                    "--backend-command",
+                    f"{sys.executable} {backend}",
+                    "--format",
+                    "json",
+                ],
+                env={"PATH": os.environ.get("PATH", ""), "PYTHONDONTWRITEBYTECODE": "1"},
+                cwd=repo_root,
+            )
+
+            assert p.returncode != 0
+            assert "forbidden credential-like path" in p.stderr
+            assert "SECRET_VALUE" not in p.stderr
+            assert not sentinel.exists()
 
 
 def _run_preflight_json(
@@ -7927,6 +8031,10 @@ def _write_issue_draft_adoption_fixture(repo: Path, *, mutator: str | None = Non
         payload["authority_claims"]["merge_ready"] = True  # type: ignore[index]
     if mutator == "pr-delivery-claim":
         payload["authority_claims"]["pr_delivery"] = True  # type: ignore[index]
+    if mutator == "top-level-execution-ready":
+        payload["execution_ready"] = True
+    if mutator == "nested-pr-delivery":
+        payload["state"] = {"pr_delivery": True}
     if mutator == "canonical-doc-path":
         payload["drafts"]["requirement"]["path"] = "requirement.md"  # type: ignore[index]
     if mutator == "symlink-ancestor":
@@ -8070,15 +8178,24 @@ def _write_selected_skeleton_fixture(repo: Path, *, mutator: str | None = None) 
     input_path = repo / ".specdock-authoring" / "selected-skeleton-fill.json"
     template_hash = "wrong" if mutator == "template-hash-mismatch" else "template-hash"
     selected_skeleton_hash = "wrong" if mutator == "selected-skeleton-hash-mismatch" else "selected-skeleton-hash"
-    selected_payload = {
+    selected_payload: dict[str, object] = {
         "schema_version": "selected-skeleton-fill-v1",
         "issue_id": "iss-00303",
         "template_hash": template_hash,
         "selected_skeleton_hash": selected_skeleton_hash,
         "source_manifest_hash": "source-hash",
+        "draft_pack_digest": "selected-pack-hash",
         "section_fills": section_fills,
         "authority_claims": authority_claims,
     }
+    if mutator == "top-level-execution-ready":
+        selected_payload["execution_ready"] = True
+    if mutator == "nested-pr-delivery":
+        selected_payload["state"] = {"pr_delivery": True}
+    if mutator == "missing-draft-pack-digest":
+        selected_payload.pop("draft_pack_digest")
+    if mutator == "draft-pack-digest-mismatch":
+        selected_payload["draft_pack_digest"] = "different-pack"
     if mutator == "missing-template-hash":
         selected_payload.pop("template_hash")
     if mutator == "malformed-input":

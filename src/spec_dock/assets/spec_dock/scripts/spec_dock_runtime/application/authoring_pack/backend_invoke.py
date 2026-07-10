@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+from spec_dock_runtime.domain.authoring_pack.authority_boundary import is_credential_like_path
 from spec_dock_runtime.domain.authoring_pack.backend_invoke_contract import (
     BACKEND_PROMPT_PACK_FILES,
     DEFAULT_BACKEND_PROMPT,
@@ -379,13 +380,7 @@ def _unsafe_manifest_file(value: str) -> str | None:
         return "unsafe_manifest_file:parent-traversal"
     if any(part.startswith(".") for part in rel.parts):
         return f"unsafe_manifest_file:hidden-path:{value}"
-    lowered_parts = tuple(part.lower() for part in rel.parts)
-    if any(
-        part in {"secret", "secrets", "token", "tokens", "credential", "credentials", "password", "passwords"}
-        or "api-key" in part
-        or "api_key" in part
-        for part in lowered_parts
-    ):
+    if is_credential_like_path(value):
         return f"unsafe_manifest_file:secret-path:{value}"
     return None
 

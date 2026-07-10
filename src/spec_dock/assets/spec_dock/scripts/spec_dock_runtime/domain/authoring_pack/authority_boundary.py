@@ -42,6 +42,23 @@ RAW_TRANSCRIPT_MARKERS: tuple[str, ...] = (
     "browser transcript",
 )
 
+CREDENTIAL_PATH_PARTS: tuple[str, ...] = (
+    "secret",
+    "secrets",
+    "token",
+    "tokens",
+    "credential",
+    "credentials",
+    "password",
+    "passwords",
+)
+PRIVATE_KEY_NAMES: tuple[str, ...] = (
+    "id_rsa",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+)
+
 
 def scan_authoring_payload(text: str) -> tuple[str, ...]:
     lowered = text.lower()
@@ -75,6 +92,51 @@ def scan_constraint_sensitive_payload(text: str) -> tuple[str, ...]:
     for marker in RAW_TRANSCRIPT_MARKERS:
         if marker in lowered:
             findings.append(f"raw_transcript:{marker}")
+    return tuple(dict.fromkeys(findings))
+
+
+def is_credential_like_path(value: str) -> bool:
+    for raw_part in re.split(r"[\\/]", value.lower()):
+        part = re.sub(r"^\d{3}-", "", raw_part)
+        if not part:
+            continue
+        if part == ".env" or part.startswith(".env."):
+            return True
+        if part in CREDENTIAL_PATH_PARTS:
+            return True
+        if any(re.search(rf"(^|[-_.]){re.escape(name)}($|[-_.])", part) for name in PRIVATE_KEY_NAMES):
+            return True
+        if "private_key" in part or "private-key" in part:
+            return True
+        if "api_key" in part or "api-key" in part:
+            return True
+        if part.endswith((".pem", ".key")):
+            return True
+        if re.search(
+            r"(^|[-_.])(secret|secrets|token|tokens|credential|credentials|password|passwords)($|[-_.])", part
+        ):
+            return True
+    return False
+
+
+def scan_forbidden_authority_flags(payload: object, forbidden_keys: tuple[str, ...]) -> tuple[str, ...]:
+    findings: list[str] = []
+    keys = frozenset(forbidden_keys)
+
+    def visit(value: object) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in keys:
+                    if child is True:
+                        findings.append(f"forbidden_authority_claim:{key}")
+                    elif child is not False and child is not None and not isinstance(child, (dict, list)):
+                        findings.append(f"invalid_authority_flag_shape:{key}")
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+
+    visit(payload)
     return tuple(dict.fromkeys(findings))
 
 
