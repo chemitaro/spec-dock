@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 from spec_dock_runtime.application.authoring_pack.pack_review import _unsafe_report_path
+from spec_dock_runtime.application.authoring_pack.review_report_evidence import read_review_report_evidence
 from spec_dock_runtime.domain.authoring_pack.authority_boundary import evidence_authority_boundary_findings
 from spec_dock_runtime.domain.authoring_pack.candidate_contract import (
     CandidateKind,
@@ -33,7 +34,9 @@ class CandidateValidationRequest:
 def validate_authoring_candidates(request: CandidateValidationRequest) -> CandidateValidationResult:
     pack_root = _pack_root(request.input_path)
     review_report_path = request.review_report or _discover_review_report(request.input_path, pack_root)
-    review_gate = _review_gate(request.input_path, review_report_path, request.candidate_kind, request.evidence_mode)
+    review_gate, review_digest = _review_gate(
+        request.input_path, review_report_path, request.candidate_kind, request.evidence_mode
+    )
     if review_gate.status != "pass":
         return _write_report_if_requested(review_gate, request.report_path)
     result = validate_candidate_pack(
@@ -44,7 +47,7 @@ def validate_authoring_candidates(request: CandidateValidationRequest) -> Candid
         expected_parent_initiative=request.expected_parent_initiative,
         expected_parent_epic=request.expected_parent_epic,
         expected_source_hash=request.expected_source_hash,
-        expected_review_digest=_review_digest(review_report_path),
+        expected_review_digest=review_digest,
         evidence_mode=request.evidence_mode,
     )
     return _write_report_if_requested(result, request.report_path)
@@ -71,49 +74,18 @@ def _discover_review_report(input_path: Path, pack_root: Path) -> Path:
 
 def _review_gate(
     input_path: Path, review_report: Path, candidate_kind: CandidateKind, evidence_mode: str
-) -> CandidateValidationResult:
-    if not review_report.is_file():
+) -> tuple[CandidateValidationResult, str | None]:
+    evidence = read_review_report_evidence(review_report, context_path=input_path)
+    if evidence.status != "pass":
+        status = "rejected" if evidence.status == "unsafe" else "fail" if evidence.status == "malformed" else "blocked"
         return CandidateValidationResult(
-            status="blocked",
+            status=status,  # type: ignore[arg-type]
             input_path=str(input_path),
             candidate_kind=candidate_kind,
             evidence_mode=evidence_mode,
-            findings=("missing_review_report",),
-        )
-    try:
-        payload = json.loads(review_report.read_text(encoding="utf-8"))
-    except UnicodeDecodeError:
-        return CandidateValidationResult(
-            status="fail",
-            input_path=str(input_path),
-            candidate_kind=candidate_kind,
-            evidence_mode=evidence_mode,
-            findings=("malformed_review_report",),
-        )
-    except OSError:
-        return CandidateValidationResult(
-            status="blocked",
-            input_path=str(input_path),
-            candidate_kind=candidate_kind,
-            evidence_mode=evidence_mode,
-            findings=("unreadable_review_report",),
-        )
-    except json.JSONDecodeError:
-        return CandidateValidationResult(
-            status="fail",
-            input_path=str(input_path),
-            candidate_kind=candidate_kind,
-            evidence_mode=evidence_mode,
-            findings=("malformed_review_report",),
-        )
-    if not isinstance(payload, dict):
-        return CandidateValidationResult(
-            status="fail",
-            input_path=str(input_path),
-            candidate_kind=candidate_kind,
-            evidence_mode=evidence_mode,
-            findings=("malformed_review_report",),
-        )
+            findings=(evidence.finding or "unreadable_review_report",),
+        ), None
+    payload = evidence.payload or {}
     status = payload.get("status")
     if status == "pass":
         authority_findings = evidence_authority_boundary_findings(payload, prefix="review_report")
@@ -126,8 +98,9 @@ def _review_gate(
                 review_status="pass",
                 review_gate_passed=False,
                 findings=authority_findings,
-            )
-        if _review_digest(review_report) is None:
+            ), None
+        pack_digest = _review_digest(payload)
+        if pack_digest is None:
             return CandidateValidationResult(
                 status="blocked",
                 input_path=str(input_path),
@@ -136,7 +109,7 @@ def _review_gate(
                 review_status="pass",
                 review_gate_passed=False,
                 findings=("missing_review_digest",),
-            )
+            ), None
         return CandidateValidationResult(
             status="pass",
             input_path=str(input_path),
@@ -144,7 +117,7 @@ def _review_gate(
             evidence_mode=evidence_mode,
             review_status="pass",
             review_gate_passed=True,
-        )
+        ), pack_digest
     if status in {"stale", "rejected", "fail", "blocked"}:
         return CandidateValidationResult(
             status=status,  # type: ignore[arg-type]
@@ -154,7 +127,7 @@ def _review_gate(
             review_status=str(status),
             review_gate_passed=False,
             findings=(f"review_not_pass:{status}",),
-        )
+        ), None
     return CandidateValidationResult(
         status="blocked",
         input_path=str(input_path),
@@ -163,16 +136,10 @@ def _review_gate(
         review_status=str(status),
         review_gate_passed=False,
         findings=(f"unsupported_review_status:{status}",),
-    )
+    ), None
 
 
-def _review_digest(review_report: Path) -> str | None:
-    try:
-        payload = json.loads(review_report.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(payload, dict):
-        return None
+def _review_digest(payload: dict[str, object]) -> str | None:
     pack_digest = payload.get("pack_digest")
     if isinstance(pack_digest, dict):
         value = pack_digest.get("content_sha256")

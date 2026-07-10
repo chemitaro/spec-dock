@@ -119,6 +119,9 @@ class BackendInvokeResult:
     exit_code: int | None
     stdout: str
     stderr: str
+    stdout_bytes: int
+    stderr_bytes: int
+    stream_output_disposition: str
     source_manifest_hash: str | None
     blockers: tuple[str, ...]
     remediation: tuple[str, ...]
@@ -145,6 +148,9 @@ class BackendInvokeResult:
             "exit_code": self.exit_code,
             "stdout": self.stdout,
             "stderr": self.stderr,
+            "stdout_bytes": self.stdout_bytes,
+            "stderr_bytes": self.stderr_bytes,
+            "stream_output_disposition": self.stream_output_disposition,
             "source_manifest_hash": self.source_manifest_hash,
             "blockers": [_redact_summary_value(value) for value in self.blockers],
             "remediation": [_redact_summary_value(value) for value in self.remediation],

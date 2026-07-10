@@ -18,6 +18,7 @@ from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     EXPECTED_OUTPUT_ROOT,
     REQUIRED_METADATA,
 )
+from spec_dock_runtime.domain.authoring_pack.provenance_contract import provenance_state_findings
 
 PackReviewStatus = Literal["pass", "fail", "blocked", "stale", "rejected"]
 PackInputKind = Literal["zip", "tree"]
@@ -312,6 +313,12 @@ def _validate_metadata(payloads: dict[str, str], findings: list[str]) -> str:
         if isinstance(payload, dict):
             _validate_authority_metadata(metadata, payload, findings)
             _validate_required_metadata_fields(metadata, payload, findings)
+    provenance = objects.get("provenance.json")
+    if isinstance(provenance, dict):
+        provenance_findings = provenance_state_findings(provenance)
+        findings.extend(provenance_findings)
+        if provenance_findings:
+            status = "rejected"
     if isinstance(source_manifest, dict) and isinstance(stale_if, dict):
         expected_hash = stale_if.get("source_manifest_hash_changes", stale_if.get("source_manifest_hash"))
         if expected_hash is not None and source_manifest.get("source_manifest_hash") != expected_hash:
