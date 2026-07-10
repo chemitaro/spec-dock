@@ -85,7 +85,8 @@ def validate_issue_draft_adoption(request: IssueDraftAdoptionValidationRequest) 
         review_status="pass",
         review_digest=file_sha256(review_report_path),
         expected_review_digest=request.expected_review_digest,
-        expected_draft_pack_digest=request.expected_draft_pack_digest or review_pack_digest,
+        expected_draft_pack_digest=review_pack_digest,
+        additional_expected_draft_pack_digest=request.expected_draft_pack_digest,
         expected_source_hash=request.expected_source_hash,
         evidence_mode=request.evidence_mode,
     )
@@ -124,6 +125,7 @@ def validate_selected_skeleton_fill(request: SelectedSkeletonFillValidationReque
     review_gate = _review_gate(request.input_path, review_report_path, "selected-skeleton-fill", request.evidence_mode)
     if review_gate.status != "pass":
         return _write_report_if_requested(review_gate, request.report_path)
+    review_pack_digest = _review_digest(review_report_path)
     assurance, assurance_findings = read_json_payload(request.assurance, "assurance")
     if assurance is None:
         result_factory = blocked_result if _missing_or_unreadable_json(assurance_findings) else failed_result
@@ -157,6 +159,7 @@ def validate_selected_skeleton_fill(request: SelectedSkeletonFillValidationReque
         review_status="pass",
         review_digest=file_sha256(review_report_path),
         expected_review_digest=request.expected_review_digest,
+        expected_draft_pack_digest=review_pack_digest,
         expected_profile=request.expected_profile,
         expected_source_hash=request.expected_source_hash,
         evidence_mode=request.evidence_mode,
@@ -274,8 +277,7 @@ def _review_digest(review_report: Path) -> str | None:
         value = pack_digest.get("content_sha256")
         if isinstance(value, str):
             return value
-    value = payload.get("input_sha256")
-    return value if isinstance(value, str) else None
+    return None
 
 
 def _write_report_if_requested(result: DraftAdoptionResult, report_path: Path | None) -> DraftAdoptionResult:

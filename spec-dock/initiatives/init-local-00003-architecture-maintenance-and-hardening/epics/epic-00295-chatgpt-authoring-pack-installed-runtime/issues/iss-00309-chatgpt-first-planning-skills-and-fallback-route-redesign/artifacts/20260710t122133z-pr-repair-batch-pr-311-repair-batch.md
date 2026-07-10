@@ -21,17 +21,17 @@ reflected_to: []
 - Repository: chemitaro/spec-dock
 - Base branch: main
 - Head branch: iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign
-- Latest head SHA: 8046bc3e7f2d8817f9c6680f355e271707039172
-- Observation command: `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 311 --head-sha 8046bc3e7f2d8817f9c6680f355e271707039172`
-- Observation final JSON / evidence: status=human_gate, CI passed, P1=2, P2=2
-- Observation status: human_gate
-- Trigger comment id: 4935439293
-- Trigger created_at: 2026-07-10T12:49:22Z
-- Trigger boundary: reviewed head 8046bc3e7f2d8817f9c6680f355e271707039172
-- Resume metadata: not applicable; repair produces a new head
+- Latest head SHA: c179811ee052467b87867275da3188fe71dd6f73
+- Observation command: `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 311 --head-sha c179811ee052467b87867275da3188fe71dd6f73`
+- Observation final JSON / evidence: status=timeout, one duplicate Provider CI run still running, latest review P1=3, P2=2
+- Observation status: timeout with complete latest-head review evidence
+- Trigger comment id: 4936820635
+- Trigger created_at: 2026-07-10T15:21:10Z
+- Trigger boundary: reviewed head c179811ee052467b87867275da3188fe71dd6f73
+- Resume metadata: available for unchanged head; not used because blocking repair produces a new head
 - New trigger approved: yes; human approved an invariant-based second repair loop
 - Observation limitation: GitHub Actions and Codex review only; external checks are not observed
-- Batch status: iteration 2 validated; ready to commit
+- Batch status: iteration 3 repairing
 
 ## Batch Purpose
 
@@ -71,17 +71,17 @@ separate follow-up tracking outside the current PR branch.
 
 | field | value |
 | --- | --- |
-| latest_head_sha | 8046bc3e7f2d8817f9c6680f355e271707039172 |
-| observation_status | human_gate |
-| required_ci_status | passed |
+| latest_head_sha | c179811ee052467b87867275da3188fe71dd6f73 |
+| observation_status | timeout with actionable review |
+| required_ci_status | one Provider CI success, one duplicate run pending at timeout |
 | review_status | unresolved |
 | p0_count | 0 |
-| p1_count | 2 |
+| p1_count | 3 |
 | p2_count | 2 |
 | p3_count | 0 |
 | required_ci_failure_count | 0 |
-| merge_blocker_count | 2 |
-| blocking_family_count | 2 |
+| merge_blocker_count | 3 |
+| blocking_family_count | 3 |
 | non_blocking_family_count | 2 |
 | terminal_non_blocking_only | no |
 | branch_mutation_required | yes |
@@ -106,6 +106,11 @@ priority separate from the final severity decision.
 | R007 | review | 3559156692 | P1 | pack_prepare.py | 386 | Existing descendant stops symlink ancestor traversal | repro | 8046bc3e7f2d8817f9c6680f355e271707039172 | F002 | triaged |
 | R008 | review | 3559156702 | P2 | backend_invoke.py | 263 | Read-side prompt-pack path loses lexical symlink identity | repro | 8046bc3e7f2d8817f9c6680f355e271707039172 | F005 | triaged |
 | R009 | review | 3559156706 | P2 | zip_contract.py | 83 | Tree review checks only direct input symlink | repro | 8046bc3e7f2d8817f9c6680f355e271707039172 | F006 | triaged |
+| R010 | review | 3560105408 | P1 | draft_adoption_validation.py | 162 | Passing review report is not bound to selected fill source pack | code-path | c179811ee052467b87867275da3188fe71dd6f73 | F007 | triaged |
+| R011 | review | 3560105414 | P1 | backend_invoke.py | 387 | Credential-looking manifest attachments bypass outbound filter | repro | c179811ee052467b87867275da3188fe71dd6f73 | F008 | triaged |
+| R012 | review | 3560105422 | P1 | draft_adoption_contract.py | 356 | Truthy authority flags outside authority_claims bypass validation | repro | c179811ee052467b87867275da3188fe71dd6f73 | F009 | triaged |
+| R013 | review | 3560105427 | P2 | pack_prepare.py | 123 | Existing unowned output directory can be clobbered | code-path | c179811ee052467b87867275da3188fe71dd6f73 | F010 | triaged |
+| R014 | review | 3560105432 | P2 | zip_contract.py | 191 | Extracted tree fallback has no total byte cap | code-path | c179811ee052467b87867275da3188fe71dd6f73 | F011 | triaged |
 
 Do not keep example rows as active inventory.
 
@@ -121,6 +126,11 @@ Group inventory items by shared root cause. Do not repair comments one-by-one.
 | F004 | authoring-preflight.observer-purity | preflight観測者の無副作用性 | yes | git状態を観測するruntimeは観測前にworktreeを変更しない | R006 | P1 | P1 | yes | fix-now | U004 | unit-created |
 | F005 | backend-prompt-pack-symlink-ancestor | backend read-side lexical path | yes | read-side入力もresolve前のlexical identityを保つ | R008 | P2 | P2 | no | follow-up | N/A | triaged |
 | F006 | pack-review-symlink-ancestor-input | tree review lexical path | yes | tree fallback入力もsymlink ancestorを識別する | R009 | P2 | P2 | no | follow-up | N/A | triaged |
+| F007 | review-gate-digest-binding | review gateとexact evidenceの結合 | yes | pass reportは検証中evidenceと同一packに結合される | R010 | P1 | P1 | yes | fix-now | U006 | unit-created |
+| F008 | backend-secret-attachment-filter | outbound attachment機密path policy | yes | 全attachmentはcopy前とbackend argv生成前に同じpolicyを通る | R011 | P1 | P1 | yes | fix-now | U007 | unit-created |
+| F009 | authority-claim-recursive-scan | evidence payload全体のauthority否定 | yes | payload内のどのoperational shapeにも肯定的authority flagを許さない | R012 | P1 | P1 | yes | fix-now | U008 | unit-created |
+| F010 | prompt-pack-output-clobber | output ownership | yes | 既存directoryへの上書きはownershipを要求する | R013 | P2 | P2 | no | follow-up | N/A | triaged |
+| F011 | tree-review-resource-bound | tree fallback resource cap | yes | lower-authority tree reviewにもtotal size boundを持つ | R014 | P2 | P2 | no | follow-up | N/A | triaged |
 
 ## Classification Values
 
@@ -237,6 +247,80 @@ Create one subsection per real family.
 - Residual risk: non-default read-side paths may accept symlink ancestors.
 - Follow-up handling: record below; no repair unit.
 
+### F007 review-gate-digest-binding
+
+- Related inventory IDs: R010
+- Reported priorities: P1
+- Decided priority: P1
+- Merge-blocking: yes.
+- Protected domain: reviewer gate and evidence adoption.
+- Contract / invariant: a passing report grants a gate only to the exact pack identity it reviewed.
+- Root cause: selected fill forwarded the report file hash but never compared `pack_digest.content_sha256` with detached fill metadata.
+- Why this is one family: digest identity and review-report identity were conflated.
+- Validity analysis: valid; unrelated passing reports can open the gate.
+- Need-to-fix decision: yes.
+- Options considered: recompute a raw pack; require detached `draft_pack_digest`; rely on source/template hashes.
+- Recommended disposition: reuse Issue draft adoption's detached `draft_pack_digest` contract and bind it to the report pack digest.
+- Repair scope: selected fill validation application/domain and fixtures.
+- Out of scope: cryptographic report signatures and per-file post-review immutability.
+- Quality gates: match, missing, mismatch, missing report digest, and independent review-file digest tests.
+- Residual risk: digest equality does not authenticate the report author.
+- Follow-up handling: none in this PR.
+
+### F008 backend-secret-attachment-filter
+
+- Related inventory IDs: R011
+- Reported priorities: P1
+- Decided priority: P1
+- Merge-blocking: yes.
+- Protected domain: external backend data disclosure.
+- Contract / invariant: original and outbound attachment names must satisfy one credential-path policy before subprocess execution.
+- Root cause: path classifiers drifted and the legacy rename could hide `.env` from hidden-path checks.
+- Why this is one family: all bypasses arise from incomplete/fragmented filename classification.
+- Validity analysis: valid; files can reach backend `--file`.
+- Need-to-fix decision: yes.
+- Options considered: add four backend strings; central domain classifier shared with prepare and legacy input.
+- Recommended disposition: central credential-like path classifier and fail before copy/invocation.
+- Repair scope: domain policy, prepare/backend consumers, legacy wrapper, regression sentinel.
+- Out of scope: general content DLP and unknown credential naming.
+- Quality gates: direct and legacy names blocked, backend sentinel absent, safe paths remain valid.
+- Residual risk: filename policy cannot detect every secret.
+- Follow-up handling: none in this PR.
+
+### F009 authority-claim-recursive-scan
+
+- Related inventory IDs: R012
+- Reported priorities: P1
+- Decided priority: P1
+- Merge-blocking: yes.
+- Protected domain: evidence-only authority boundary.
+- Contract / invariant: truthy readiness/adoption/review flags are forbidden anywhere in operational payload structure.
+- Root cause: draft validators checked only the declared `authority_claims` object.
+- Why this is one family: alternate top-level/nested placement bypasses the same partial scan.
+- Validity analysis: valid and deterministic.
+- Need-to-fix decision: yes.
+- Options considered: raw substring scan; validator-local walkers; shared shape-aware exact-key walker.
+- Recommended disposition: shared dict/list walker; exact keys; `True` rejected, `False`/null allowed, other scalar shapes fail closed.
+- Repair scope: authority domain helper, candidate and draft validators, nested/top-level regressions.
+- Out of scope: prose keyword policing.
+- Quality gates: Issue draft, selected fill, and candidate approval matrices.
+- Residual risk: future aliases must be added to the shared key policy.
+- Follow-up handling: none in this PR.
+
+### F010/F011 non-blocking lifecycle and resource bounds
+
+- Related inventory IDs: R013, R014
+- Reported priorities: P2, P2
+- Decided priority: P2
+- Merge-blocking: no.
+- Protected domain: generated output safety and lower-authority review availability.
+- Contract / invariant: owned outputs and bounded fallback resources.
+- Root cause: independent lifecycle/resource contracts, unrelated to current P1 families.
+- Validity analysis: valid material follow-up.
+- Need-to-fix decision: follow-up.
+- Recommended disposition: record only; no current repair unit or code mutation.
+- Residual risk: mis-targeted clobber and large tree resource use remain possible.
+
 ## Blocking Repair Queue
 
 Create repair units only for `P0`/`P1` families, required CI failures, or
@@ -250,6 +334,9 @@ they are directly and unavoidably covered by the same `P0`/`P1` root-cause fix.
 | U003 | 20260710t122133z-pr-repair-batch | F003 | R005 | required-ci | yes | fix-now | 20260710t122142z-02-disc-pr-repair-unit-planning-skill-contract.md | implemented | remove stale test expectation | wrapper test and full provider suite | pending | pending | none |
 | U004 | 20260710t122133z-pr-repair-batch | F004 | R006 | P1 | yes | fix-now | 20260710t142702z-disc-pr-repair-unit-runtime-self-dirtiness.md | implemented | suppress bytecode before local runtime import | fresh consumer preflight passed | pending | pending | low |
 | U005 | 20260710t122133z-pr-repair-batch | F002 | R007 | P1 | yes | fix-now | 20260710t142702z-01-disc-pr-repair-unit-lexical-symlink-ancestors.md | implemented | inspect every lexical component below trusted root alias | symlink ancestor regression passed | pending | pending | low |
+| U006 | 20260710t122133z-pr-repair-batch | F007 | R010 | P1 | yes | fix-now | 20260710t160942z-disc-pr-repair-unit-review-gate-digest-binding.md | implemented | bind selected fill draft_pack_digest to review pack digest | focused and full suite passed | enclosing repair commit | pending | low |
+| U007 | 20260710t122133z-pr-repair-batch | F008 | R011 | P1 | yes | fix-now | 20260710t160942z-01-disc-pr-repair-unit-backend-secret-attachments.md | implemented | central credential path policy before copy/invoke | focused and full suite passed | enclosing repair commit | pending | medium |
+| U008 | 20260710t122133z-pr-repair-batch | F009 | R012 | P1 | yes | fix-now | 20260710t160943z-disc-pr-repair-unit-recursive-authority-claims.md | implemented | shared shape-aware recursive authority scan | focused and full suite passed | enclosing repair commit | pending | low |
 
 ## Non-Blocking Follow-up Register
 
@@ -265,6 +352,8 @@ instead.
 | --- | --- | --- | --- | --- | --- | --- |
 | NB001 | F005 | R008 | P2 | non-blocking read-side gap; not unavoidable for P1 write fix | symlinked prompt-pack ancestor may pass validation | future authoring path-boundary hardening |
 | NB002 | F006 | R009 | P2 | non-blocking tree fallback gap; not unavoidable for P1 write fix | symlinked tree ancestor may pass review | future authoring path-boundary hardening |
+| NB003 | F010 | R013 | P2 | output ownership is independent of current P1 fixes | existing unrelated pack filenames may be overwritten | future prompt-pack output ownership |
+| NB004 | F011 | R014 | P2 | lower-authority resource cap is independent of current P1 fixes | large extracted trees may consume excess resources | future tree review bounds |
 
 ## Quality Gate Plan
 
@@ -284,6 +373,12 @@ Define family-level gates, not comment-level checks.
 | G010 | F002,F004 | ./scripts/static_analysis/run.sh | ruff, format, mypy pass | R006,R007 | yes |
 | G011 | F002,F004 | provider/dogfooding cmp | exact match | R006,R007 | yes |
 | G012 | all | ./spec-dock/scripts/spec-dock validate | ok, nodes=203 | R001-R009 | yes |
+| G013 | F007 | selected fill digest binding matrix | exact report pack required; stale/blocked otherwise | R010 | yes |
+| G014 | F008 | direct and legacy credential attachment matrix | blocked before backend sentinel | R011 | yes |
+| G015 | F009 | Issue draft/selected fill/candidate authority matrices | top-level/nested truthy flags rejected | R012 | yes |
+| G016 | F007-F009 | uv run pytest | 2286 passed, 75 skipped | R010-R012 | yes |
+| G017 | F007-F009 | ./scripts/static_analysis/run.sh | ruff, format, mypy pass | R010-R012 | yes |
+| G018 | F007-F009 | provider/dogfooding cmp and spec-dock validate | exact match; ok, nodes=203 | R010-R012 | yes |
 
 ## Re-observation Plan
 
@@ -303,6 +398,7 @@ Define family-level gates, not comment-level checks.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 8c66118743ab55b3032d95eccd6eebf999fb06c2 | human_gate | F001-F003 | repair implemented and validated | pending | no | commit, push, re-observe |
 | 2 | 8046bc3e7f2d8817f9c6680f355e271707039172 | human_gate | F002,F004 | human approved invariant-based second strategy; Deep Consultant analysis adopted; implementation validated | pending | F002=yes | commit, push, re-observe |
+| 3 | c179811ee052467b87867275da3188fe71dd6f73 | timeout | F007-F009 | Deep Consultant second analysis adopted; three family-scoped repairs implemented and locally validated | pending | no | commit, push, re-observe |
 
 ## Deep Consultant Synthesis
 
@@ -321,6 +417,17 @@ Define family-level gates, not comment-level checks.
   - gitignore and status filtering hide rather than eliminate the observer side effect;
   - broad shared-helper rollout would unnecessarily turn P2 findings into current repair scope.
 - Residual audit targets: candidate/adoption input ancestors, legacy helpers, TOCTOU swaps, hardlinks, Windows junctions/reparse points.
+
+### Second Analysis
+
+- Shared meta-cause: trust-boundary validators accepted partial declarations instead of validating evidence identity, outbound filename policy, and authority semantics across the complete operational payload.
+- Unit boundary decision: keep F007, F008, and F009 separate because protected assets, rollback boundaries, and tests differ.
+- Adopted existing precedents:
+  - Issue draft `draft_pack_digest` and candidate pack digest binding;
+  - pack prepare's credential path policy, promoted to domain and applied before legacy copy/backend invocation;
+  - candidate approval's recursive exact-key authority scan, promoted to a shape-aware shared helper.
+- P2 decision: F010 and F011 are independent lifecycle/resource concerns and remain register-only.
+- Observation timeout: resume metadata was preserved for head `c179811e`; no resume is needed because these P1 repairs require a new head.
 
 Stop at a human gate when the same `root_cause_family` reappears after a repair
 commit, unless a human explicitly approves a new strategy.

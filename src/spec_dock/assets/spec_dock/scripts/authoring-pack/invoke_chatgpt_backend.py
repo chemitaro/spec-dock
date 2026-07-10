@@ -15,6 +15,7 @@ _SPEC_DOCK_SCRIPTS_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_SPEC_DOCK_SCRIPTS_DIR))
 
 from spec_dock_runtime.application.authoring_pack.backend_invoke import invoke_backend  # noqa: E402
+from spec_dock_runtime.domain.authoring_pack.authority_boundary import is_credential_like_path  # noqa: E402
 from spec_dock_runtime.domain.authoring_pack.backend_invoke_contract import BackendInvokeRequest  # noqa: E402
 from spec_dock_runtime.presentation.authoring_pack.backend_invoke_renderer import (  # noqa: E402
     render_backend_invoke_json,
@@ -97,6 +98,8 @@ def _write_legacy_prompt_pack(prompt_pack: Path, files: tuple[Path, ...]) -> Non
     for path in files:
         if not path.is_file():
             raise ValueError(f"legacy --file attachment is not a readable file: {path}")
+        if is_credential_like_path(path.name):
+            raise ValueError("legacy --file attachment has a forbidden credential-like path")
     _copy_or_placeholder(files, prompt_pack / "chatgpt-use-prompt.md", index=0, fallback="legacy prompt attachment\n")
     _copy_or_placeholder(
         files, prompt_pack / "expected-output-contract.md", index=1, fallback="legacy expected output\n"

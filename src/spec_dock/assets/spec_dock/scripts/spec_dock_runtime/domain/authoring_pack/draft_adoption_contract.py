@@ -6,7 +6,11 @@ import json
 from pathlib import Path, PurePosixPath
 from typing import Literal
 
-from spec_dock_runtime.domain.authoring_pack.authority_boundary import scan_authoring_payload, scan_sensitive_payload
+from spec_dock_runtime.domain.authoring_pack.authority_boundary import (
+    scan_authoring_payload,
+    scan_forbidden_authority_flags,
+    scan_sensitive_payload,
+)
 from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     ADOPTION_STATUS,
     AUTHORITY,
@@ -15,6 +19,22 @@ from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
 from spec_dock_runtime.domain.authoring_pack.zip_contract import MAX_ENTRY_BYTES
 
 DraftAdoptionStatus = Literal["pass", "fail", "blocked", "stale", "rejected"]
+
+FORBIDDEN_DRAFT_AUTHORITY_FLAG_KEYS = (
+    "canonical_adoption",
+    "canonical_written",
+    "node_creation_performed",
+    "assurance_mutation",
+    "assurance_mutated",
+    "authorized_profile_decision",
+    "reviewer_pass",
+    "reviewer_pass_claimed",
+    "execution_ready",
+    "pr_ready",
+    "merge_ready",
+    "pr_delivery",
+    "pr_delivered",
+)
 
 
 @dataclass(frozen=True)
@@ -102,6 +122,7 @@ def validate_issue_draft_adoption_payload(
     review_digest: str | None,
     expected_review_digest: str | None,
     expected_draft_pack_digest: str | None,
+    additional_expected_draft_pack_digest: str | None,
     expected_source_hash: str | None,
     evidence_mode: str,
 ) -> DraftAdoptionResult:
@@ -127,6 +148,10 @@ def validate_issue_draft_adoption_payload(
     if not observed_draft_pack_digest:
         findings.append("missing_or_invalid_field:draft_pack_digest")
     if expected_draft_pack_digest and observed_draft_pack_digest != _digest_value(expected_draft_pack_digest):
+        comparison.append("draft_pack_digest_mismatch")
+    if additional_expected_draft_pack_digest and observed_draft_pack_digest != _digest_value(
+        additional_expected_draft_pack_digest
+    ):
         comparison.append("draft_pack_digest_mismatch")
     if expected_review_digest and review_digest != _digest_value(expected_review_digest):
         comparison.append("review_digest_mismatch")
@@ -162,7 +187,7 @@ def validate_issue_draft_adoption_payload(
         validation_kind="issue-draft-adoption",
         evidence_mode=evidence_mode,
         review_status=review_status,
-        review_gate_passed=review_status == "pass",
+        review_gate_passed=review_status == "pass" and status == "pass",
         issue_id=issue_id,
         parent_epic_id=parent_epic_id,
         parent_initiative_id=parent_initiative_id,
@@ -191,6 +216,7 @@ def validate_selected_skeleton_payload(
     review_status: str | None,
     review_digest: str | None,
     expected_review_digest: str | None,
+    expected_draft_pack_digest: str | None,
     expected_profile: str | None,
     expected_source_hash: str | None,
     evidence_mode: str,
@@ -219,6 +245,11 @@ def validate_selected_skeleton_payload(
         comparison.append("source_manifest_hash_mismatch")
     if expected_review_digest and review_digest != _digest_value(expected_review_digest):
         comparison.append("review_digest_mismatch")
+    observed_draft_pack_digest = _digest_value(payload.get("draft_pack_digest"))
+    if not observed_draft_pack_digest:
+        findings.append("missing_or_invalid_field:draft_pack_digest")
+    if expected_draft_pack_digest and observed_draft_pack_digest != _digest_value(expected_draft_pack_digest):
+        comparison.append("draft_pack_digest_mismatch")
     _compare_digest_field(payload, selected_skeleton, "template_hash", findings, comparison)
     _compare_digest_field(payload, selected_skeleton, "selected_skeleton_hash", findings, comparison)
 
@@ -252,10 +283,12 @@ def validate_selected_skeleton_payload(
         validation_kind="selected-skeleton-fill",
         evidence_mode=evidence_mode,
         review_status=review_status,
-        review_gate_passed=review_status == "pass",
+        review_gate_passed=review_status == "pass" and status == "pass",
         issue_id=issue_id,
         expected_review_digest=_digest_value(expected_review_digest),
         observed_review_digest=review_digest,
+        expected_draft_pack_digest=_digest_value(expected_draft_pack_digest),
+        observed_draft_pack_digest=observed_draft_pack_digest,
         expected_source_manifest_hash=_digest_value(expected_source_hash),
         observed_source_manifest_hash=source_hash,
         expected_profile=expected_profile,
@@ -350,6 +383,7 @@ def _read_json(path: Path, label: str, findings: list[str]) -> object | None:
 
 
 def _validate_authority_claims(payload: dict[str, object], findings: list[str]) -> None:
+    findings.extend(scan_forbidden_authority_flags(payload, FORBIDDEN_DRAFT_AUTHORITY_FLAG_KEYS))
     claims = payload.get("authority_claims")
     if not isinstance(claims, dict):
         findings.append("missing_or_invalid_field:authority_claims")

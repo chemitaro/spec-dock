@@ -6,7 +6,11 @@ import json
 from pathlib import Path, PurePosixPath
 from typing import Literal
 
-from spec_dock_runtime.domain.authoring_pack.authority_boundary import scan_authoring_payload, scan_sensitive_payload
+from spec_dock_runtime.domain.authoring_pack.authority_boundary import (
+    scan_authoring_payload,
+    scan_forbidden_authority_flags,
+    scan_sensitive_payload,
+)
 from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     ADOPTION_STATUS,
     AUTHORITY,
@@ -588,15 +592,7 @@ def _scope_value(value: object, label: str, findings: list[str]) -> str | None:
 
 
 def _scan_forbidden_authority_flags(payload: object, findings: list[str]) -> None:
-    if isinstance(payload, dict):
-        for key, value in payload.items():
-            if key in FORBIDDEN_AUTHORITY_FLAG_KEYS and bool(value):
-                findings.append(f"forbidden_authority_claim:{key}")
-            _scan_forbidden_authority_flags(value, findings)
-        return
-    if isinstance(payload, list):
-        for value in payload:
-            _scan_forbidden_authority_flags(value, findings)
+    findings.extend(scan_forbidden_authority_flags(payload, FORBIDDEN_AUTHORITY_FLAG_KEYS))
 
 
 def _validate_common_authority(

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from spec_dock_runtime.domain.authoring_pack.authority_boundary import is_credential_like_path
 from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     ADOPTION_STATUS,
     AUTHORITY,
@@ -284,25 +285,7 @@ def _unsafe_input_path_blockers(payload: dict[str, Any]) -> list[str]:
 
 def _is_unsafe_source_path(path: str) -> bool:
     parsed = Path(path)
-    lowered_parts = tuple(part.lower() for part in parsed.parts)
-    secret_markers = {
-        ".env",
-        "secret",
-        "secrets",
-        "credential",
-        "credentials",
-        "private_key",
-        "private-key",
-        "id_rsa",
-        "token",
-        "tokens",
-    }
-    return (
-        parsed.is_absolute()
-        or ".." in parsed.parts
-        or any(part in secret_markers for part in lowered_parts)
-        or any(part.endswith(".pem") or part.endswith(".key") for part in lowered_parts)
-    )
+    return parsed.is_absolute() or ".." in parsed.parts or is_credential_like_path(path)
 
 
 def _unsafe_text_blockers(payload: dict[str, Any]) -> list[str]:
