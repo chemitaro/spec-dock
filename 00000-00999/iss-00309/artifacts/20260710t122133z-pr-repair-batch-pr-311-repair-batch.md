@@ -21,17 +21,17 @@ reflected_to: []
 - Repository: chemitaro/spec-dock
 - Base branch: main
 - Head branch: iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign
-- Latest head SHA: 8c66118743ab55b3032d95eccd6eebf999fb06c2
-- Observation command: `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 311 --head-sha 8c66118743ab55b3032d95eccd6eebf999fb06c2`
-- Observation final JSON / evidence: status=human_gate, CI failed=2, P1 review findings=4
+- Latest head SHA: 8046bc3e7f2d8817f9c6680f355e271707039172
+- Observation command: `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 311 --head-sha 8046bc3e7f2d8817f9c6680f355e271707039172`
+- Observation final JSON / evidence: status=human_gate, CI passed, P1=2, P2=2
 - Observation status: human_gate
-- Trigger comment id: 4934997047
-- Trigger created_at: 2026-07-10T11:53:33Z
-- Trigger boundary: reviewed head 8c66118743ab55b3032d95eccd6eebf999fb06c2
+- Trigger comment id: 4935439293
+- Trigger created_at: 2026-07-10T12:49:22Z
+- Trigger boundary: reviewed head 8046bc3e7f2d8817f9c6680f355e271707039172
 - Resume metadata: not applicable; repair produces a new head
-- New trigger approved: no
+- New trigger approved: yes; human approved an invariant-based second repair loop
 - Observation limitation: GitHub Actions and Codex review only; external checks are not observed
-- Batch status: validated; ready to commit
+- Batch status: iteration 2 validated; ready to commit
 
 ## Batch Purpose
 
@@ -71,18 +71,18 @@ separate follow-up tracking outside the current PR branch.
 
 | field | value |
 | --- | --- |
-| latest_head_sha | 8c66118743ab55b3032d95eccd6eebf999fb06c2 |
+| latest_head_sha | 8046bc3e7f2d8817f9c6680f355e271707039172 |
 | observation_status | human_gate |
-| required_ci_status | failed |
+| required_ci_status | passed |
 | review_status | unresolved |
 | p0_count | 0 |
-| p1_count | 4 |
-| p2_count |  |
-| p3_count |  |
-| required_ci_failure_count | 2 duplicate workflow runs, one shared failure |
-| merge_blocker_count | 5 concerns |
-| blocking_family_count | 3 |
-| non_blocking_family_count | 0 |
+| p1_count | 2 |
+| p2_count | 2 |
+| p3_count | 0 |
+| required_ci_failure_count | 0 |
+| merge_blocker_count | 2 |
+| blocking_family_count | 2 |
+| non_blocking_family_count | 2 |
 | terminal_non_blocking_only | no |
 | branch_mutation_required | yes |
 | ci_rerun_expected | yes |
@@ -102,6 +102,10 @@ priority separate from the final severity decision.
 | R003 | review | 3558754361 | P1 | pack_prepare.py | 376 | Broken output-dir symlink bypasses rejection | code-path | 8c66118743ab55b3032d95eccd6eebf999fb06c2 | F002 | triaged |
 | R004 | review | 3558754366 | P1 | pack_prepare.py | 349 | Exact initiatives root bypasses canonical target rejection | repro | 8c66118743ab55b3032d95eccd6eebf999fb06c2 | F002 | triaged |
 | R005 | ci | Provider CI / test_wrappers | CI | tests/cli_runtime/test_wrappers.py | 136 | Current skill no longer references workflow_clarification.md | failing-test | 8c66118743ab55b3032d95eccd6eebf999fb06c2 | F003 | triaged |
+| R006 | review | 3559156685 | P1 | github_sync_preflight.py | 231 | Runtime import creates bytecode before git dirtiness observation | repro | 8046bc3e7f2d8817f9c6680f355e271707039172 | F004 | triaged |
+| R007 | review | 3559156692 | P1 | pack_prepare.py | 386 | Existing descendant stops symlink ancestor traversal | repro | 8046bc3e7f2d8817f9c6680f355e271707039172 | F002 | triaged |
+| R008 | review | 3559156702 | P2 | backend_invoke.py | 263 | Read-side prompt-pack path loses lexical symlink identity | repro | 8046bc3e7f2d8817f9c6680f355e271707039172 | F005 | triaged |
+| R009 | review | 3559156706 | P2 | zip_contract.py | 83 | Tree review checks only direct input symlink | repro | 8046bc3e7f2d8817f9c6680f355e271707039172 | F006 | triaged |
 
 Do not keep example rows as active inventory.
 
@@ -112,8 +116,11 @@ Group inventory items by shared root cause. Do not repair comments one-by-one.
 | family_id | root_cause_family | family_title | protected_domain | invariant_or_contract | related_items | max_reported_priority | decided_priority | merge_blocking | disposition | repair_unit | family_status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | F001 | authoring-pack.windows-path-boundary | Windows形式パスの境界検証 | yes | reviewed/staged pack内の参照はportable relative pathに限定する | R001,R002 | P1 | P1 | yes | fix-now | U001 | unit-created |
-| F002 | prompt-pack.output-boundary | prompt-pack出力先の境界検証 | yes | canonical領域とsymlink経由の出力を拒否する | R003,R004 | P1 | P1 | yes | fix-now | U002 | unit-created |
+| F002 | prompt-pack.output-boundary | prompt-pack出力先の境界検証 | yes | resolve/write前に全lexical componentを検査する | R003,R004,R007 | P1 | P1 | yes | fix-now | U002,U005 | unit-created |
 | F003 | planning-skill.current-contract | ChatGPT-first skillの回帰契約 | no | scaffold testは現行skillの必要参照だけを要求する | R005 | CI | required-ci | yes | fix-now | U003 | unit-created |
+| F004 | authoring-preflight.observer-purity | preflight観測者の無副作用性 | yes | git状態を観測するruntimeは観測前にworktreeを変更しない | R006 | P1 | P1 | yes | fix-now | U004 | unit-created |
+| F005 | backend-prompt-pack-symlink-ancestor | backend read-side lexical path | yes | read-side入力もresolve前のlexical identityを保つ | R008 | P2 | P2 | no | follow-up | N/A | triaged |
+| F006 | pack-review-symlink-ancestor-input | tree review lexical path | yes | tree fallback入力もsymlink ancestorを識別する | R009 | P2 | P2 | no | follow-up | N/A | triaged |
 
 ## Classification Values
 
@@ -152,22 +159,22 @@ Create one subsection per real family.
 
 ### F002 prompt-pack.output-boundary
 
-- Related inventory IDs: R003, R004
-- Reported priorities: P1, P1
+- Related inventory IDs: R003, R004, R007
+- Reported priorities: P1, P1, P1
 - Decided priority: P1
 - Merge-blocking: yes
 - Protected domain: generated-file writes and symlink safety.
-- Contract / invariant: prompt packs cannot write into canonical SpecDock data or through symlinked output paths.
-- Root cause: existence-gated symlink checks miss broken links; canonical detection missed the exact initiatives root.
-- Why this is one family: both defects bypass output-target rejection before file generation.
+- Contract / invariant: prompt packs cannot write until every lexical path component has been inspected before resolve.
+- Root cause: the first repair closed leaf/exact-root cases but retained `exists()` as an implicit trust anchor, so an existing descendant reached through an earlier symlink stopped traversal.
+- Why this is one family: all three defects bypass output-target rejection before generated-file writes.
 - Validity analysis: valid and deterministic.
 - Need-to-fix decision: yes.
-- Options considered: resolve-and-containment checks; minimal lexical root detection plus symlink checks independent of existence.
-- Recommended disposition: preserve current structure and close both guard gaps.
-- Repair scope: output target helpers and regression tests.
+- Options considered: first-existing-parent trust; resolved containment; full lexical component traversal with an explicit root-level system-alias exception.
+- Recommended disposition: full lexical traversal with no existence-based early exit; trust only OS-managed root-level aliases.
+- Repair scope: provider/dogfooding output guard and regression tests.
 - Out of scope: redesign of all canonical path classification.
 - Quality gates: focused authoring tests and full provider suite.
-- Residual risk: string-based canonical matching remains conservative by design.
+- Residual risk: read-side symlink ancestors, TOCTOU swaps, hardlinks, and Windows reparse points remain separate follow-up risks.
 - Follow-up handling: none.
 
 ### F003 planning-skill.current-contract
@@ -190,6 +197,46 @@ Create one subsection per real family.
 - Residual risk: none.
 - Follow-up handling: none.
 
+### F004 authoring-preflight.observer-purity
+
+- Related inventory IDs: R006
+- Reported priorities: P1
+- Decided priority: P1
+- Merge-blocking: yes
+- Protected domain: required GitHub-synced planning route.
+- Contract / invariant: a state observer must not modify the state it evaluates.
+- Root cause: the installed launcher imports local runtime modules before preflight checks git status, allowing Python bytecode generation in the managed consumer tree.
+- Why this is one family: one process-level side effect makes a clean synchronized branch appear dirty.
+- Validity analysis: valid and reproducible; existing tests masked it with `PYTHONDONTWRITEBYTECODE=1`.
+- Need-to-fix decision: yes.
+- Options considered: launcher bytecode suppression; scaffold gitignore; git-status filtering.
+- Recommended disposition: set `sys.dont_write_bytecode = True` before the first local runtime import.
+- Repair scope: provider/dogfooding installed launcher and fresh-consumer regression.
+- Out of scope: status parser exceptions and gitignore policy expansion.
+- Quality gates: run without bytecode env override, require pass, no cache files, and clean porcelain status.
+- Residual risk: caches created by old versions must be removed by users before the first upgraded run.
+- Follow-up handling: no current PR expansion.
+
+### F005/F006 read-side lexical symlink identity
+
+- Related inventory IDs: R008, R009
+- Reported priorities: P2, P2
+- Decided priority: P2
+- Merge-blocking: no.
+- Protected domain: evidence input integrity.
+- Contract / invariant: resolve must not erase user-supplied lexical path identity before read-side validation.
+- Root cause: backend validation resolves before ancestor inspection; tree review checks only the input leaf.
+- Why this is one family: both are read-side ingress gaps, distinct from the P1 write escape.
+- Validity analysis: valid material follow-up.
+- Need-to-fix decision: follow-up, not this repair loop.
+- Options considered: shared utility now; separate cross-ingress hardening.
+- Recommended disposition: separate follow-up to avoid optional P2 scope expansion.
+- Repair scope: none in this PR iteration.
+- Out of scope: candidate/adoption/legacy helper ancestor audit, TOCTOU, hardlinks, Windows reparse points.
+- Quality gates: terminal review classification only.
+- Residual risk: non-default read-side paths may accept symlink ancestors.
+- Follow-up handling: record below; no repair unit.
+
 ## Blocking Repair Queue
 
 Create repair units only for `P0`/`P1` families, required CI failures, or
@@ -201,6 +248,8 @@ they are directly and unavoidably covered by the same `P0`/`P1` root-cause fix.
 | U001 | 20260710t122133z-pr-repair-batch | F001 | R001,R002 | P1 | yes | fix-now | 20260710t122142z-disc-pr-repair-unit-windows-path-boundary.md | implemented | reject drive/backslash forms before joining | focused authoring tests | pending | pending | low |
 | U002 | 20260710t122133z-pr-repair-batch | F002 | R003,R004 | P1 | yes | fix-now | 20260710t122142z-01-disc-pr-repair-unit-prompt-pack-output-boundary.md | implemented | close symlink and exact-root guard gaps | focused authoring tests | pending | pending | low |
 | U003 | 20260710t122133z-pr-repair-batch | F003 | R005 | required-ci | yes | fix-now | 20260710t122142z-02-disc-pr-repair-unit-planning-skill-contract.md | implemented | remove stale test expectation | wrapper test and full provider suite | pending | pending | none |
+| U004 | 20260710t122133z-pr-repair-batch | F004 | R006 | P1 | yes | fix-now | 20260710t142702z-disc-pr-repair-unit-runtime-self-dirtiness.md | implemented | suppress bytecode before local runtime import | fresh consumer preflight passed | pending | pending | low |
+| U005 | 20260710t122133z-pr-repair-batch | F002 | R007 | P1 | yes | fix-now | 20260710t142702z-01-disc-pr-repair-unit-lexical-symlink-ancestors.md | implemented | inspect every lexical component below trusted root alias | symlink ancestor regression passed | pending | pending | low |
 
 ## Non-Blocking Follow-up Register
 
@@ -214,7 +263,8 @@ instead.
 
 | followup_id | family_id | related_items | priority | rationale_for_no_action | residual_risk | suggested_followup_target |
 | --- | --- | --- | --- | --- | --- | --- |
-| NBXXX | FXXX | RXXX | P2 / P3 |  |  |  |
+| NB001 | F005 | R008 | P2 | non-blocking read-side gap; not unavoidable for P1 write fix | symlinked prompt-pack ancestor may pass validation | future authoring path-boundary hardening |
+| NB002 | F006 | R009 | P2 | non-blocking tree fallback gap; not unavoidable for P1 write fix | symlinked tree ancestor may pass review | future authoring path-boundary hardening |
 
 ## Quality Gate Plan
 
@@ -228,10 +278,16 @@ Define family-level gates, not comment-level checks.
 | G004 | all | uv run pytest | 2272 passed, 75 skipped | R001-R005 | yes |
 | G005 | all | ./scripts/static_analysis/run.sh | ruff, format, mypy pass | R001-R005 | yes |
 | G006 | all | ./spec-dock/scripts/spec-dock validate | ok, nodes=203 | R001-R005 | yes |
+| G007 | F004 | fresh consumer preflight without PYTHONDONTWRITEBYTECODE | pass, no bytecode, clean git status: pass | R006 | yes |
+| G008 | F002 | existing output below symlinked parent | rejected with no generated files: pass | R007 | yes |
+| G009 | F002,F004 | uv run pytest | 2274 passed, 75 skipped | R006,R007 | yes |
+| G010 | F002,F004 | ./scripts/static_analysis/run.sh | ruff, format, mypy pass | R006,R007 | yes |
+| G011 | F002,F004 | provider/dogfooding cmp | exact match | R006,R007 | yes |
+| G012 | all | ./spec-dock/scripts/spec-dock validate | ok, nodes=203 | R001-R009 | yes |
 
 ## Re-observation Plan
 
-- Latest head before repair: 8c66118743ab55b3032d95eccd6eebf999fb06c2
+- Latest head before repair: 8046bc3e7f2d8817f9c6680f355e271707039172
 - Expected head after repair:
 - Re-observation command: wait_pr_observation.sh with the repaired head SHA
 - Trigger mode: post-once
@@ -246,6 +302,25 @@ Define family-level gates, not comment-level checks.
 | iteration | head_sha | observation_status | family_id | action_taken | fix_commit | reappeared_after_fix | next_action |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 8c66118743ab55b3032d95eccd6eebf999fb06c2 | human_gate | F001-F003 | repair implemented and validated | pending | no | commit, push, re-observe |
+| 2 | 8046bc3e7f2d8817f9c6680f355e271707039172 | human_gate | F002,F004 | human approved invariant-based second strategy; Deep Consultant analysis adopted; implementation validated | pending | F002=yes | commit, push, re-observe |
+
+## Deep Consultant Synthesis
+
+- Role: `deep-consultant`, read-only, GPT-5.6 Sol max reasoning.
+- Adopted analysis:
+  - treat bytecode dirtiness as observer side effect, not a git-status parsing problem;
+  - suppress bytecode in the installed launcher before local imports;
+  - replace existence-gated output traversal with a complete lexical component check;
+  - keep P2 read-side gaps outside this P1 repair and record them as follow-up;
+  - no additional deterministic write-escape P1 was found in the changed surface.
+- Validation refinement:
+  - the first implementation exposed macOS `/var -> /private/var` as a system-level alias;
+  - root-level symlinks require administrative control and are trusted, matching the existing backend output guard;
+  - every component below that root-level boundary remains fail-closed and is never skipped because it exists.
+- Rejected / deferred:
+  - gitignore and status filtering hide rather than eliminate the observer side effect;
+  - broad shared-helper rollout would unnecessarily turn P2 findings into current repair scope.
+- Residual audit targets: candidate/adoption input ancestors, legacy helpers, TOCTOU swaps, hardlinks, Windows junctions/reparse points.
 
 Stop at a human gate when the same `root_cause_family` reappears after a repair
 commit, unless a human explicitly approves a new strategy.
