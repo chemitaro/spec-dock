@@ -196,11 +196,7 @@ def _review_gate(
 ) -> tuple[DraftAdoptionResult, str | None, str | None]:
     evidence = read_review_report_evidence(review_report, context_path=input_path)
     if evidence.status != "pass":
-        result_factory = (
-            failed_result
-            if evidence.status == "malformed"
-            else blocked_result
-        )
+        result_factory = failed_result if evidence.status == "malformed" else blocked_result
         result = result_factory(
             input_path=input_path,
             validation_kind=validation_kind,
@@ -222,49 +218,69 @@ def _review_gate(
     if status == "pass":
         authority_findings = evidence_authority_boundary_findings(payload, prefix="review_report")
         if authority_findings:
-            return DraftAdoptionResult(
-                status="rejected",
+            return (
+                DraftAdoptionResult(
+                    status="rejected",
+                    input_path=str(input_path),
+                    validation_kind=validation_kind,
+                    evidence_mode=evidence_mode,
+                    review_status="pass",
+                    review_gate_passed=False,
+                    findings=authority_findings,
+                ),
+                None,
+                evidence.content_sha256,
+            )
+        pack_digest = _review_digest(payload)
+        if pack_digest is None:
+            return (
+                blocked_result(
+                    input_path=input_path,
+                    validation_kind=validation_kind,
+                    evidence_mode=evidence_mode,
+                    review_status="pass",
+                    findings=("missing_review_digest",),
+                ),
+                None,
+                evidence.content_sha256,
+            )
+        return (
+            DraftAdoptionResult(
+                status="pass",
                 input_path=str(input_path),
                 validation_kind=validation_kind,
                 evidence_mode=evidence_mode,
                 review_status="pass",
-                review_gate_passed=False,
-                findings=authority_findings,
-            ), None, evidence.content_sha256
-        pack_digest = _review_digest(payload)
-        if pack_digest is None:
-            return blocked_result(
-                input_path=input_path,
+                review_gate_passed=True,
+            ),
+            pack_digest,
+            evidence.content_sha256,
+        )
+    if status in {"stale", "rejected", "fail", "blocked"}:
+        return (
+            DraftAdoptionResult(
+                status=status,  # type: ignore[arg-type]
+                input_path=str(input_path),
                 validation_kind=validation_kind,
                 evidence_mode=evidence_mode,
-                review_status="pass",
-                findings=("missing_review_digest",),
-            ), None, evidence.content_sha256
-        return DraftAdoptionResult(
-            status="pass",
-            input_path=str(input_path),
-            validation_kind=validation_kind,
-            evidence_mode=evidence_mode,
-            review_status="pass",
-            review_gate_passed=True,
-        ), pack_digest, evidence.content_sha256
-    if status in {"stale", "rejected", "fail", "blocked"}:
-        return DraftAdoptionResult(
-            status=status,  # type: ignore[arg-type]
-            input_path=str(input_path),
+                review_status=str(status),
+                review_gate_passed=False,
+                findings=(f"review_not_pass:{status}",),
+            ),
+            None,
+            evidence.content_sha256,
+        )
+    return (
+        blocked_result(
+            input_path=input_path,
             validation_kind=validation_kind,
             evidence_mode=evidence_mode,
             review_status=str(status),
-            review_gate_passed=False,
-            findings=(f"review_not_pass:{status}",),
-        ), None, evidence.content_sha256
-    return blocked_result(
-        input_path=input_path,
-        validation_kind=validation_kind,
-        evidence_mode=evidence_mode,
-        review_status=str(status),
-        findings=(f"unsupported_review_status:{status}",),
-    ), None, evidence.content_sha256
+            findings=(f"unsupported_review_status:{status}",),
+        ),
+        None,
+        evidence.content_sha256,
+    )
 
 
 def _review_digest(payload: dict[str, object]) -> str | None:

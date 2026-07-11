@@ -3866,10 +3866,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             repo = _create_synced_git_repo(Path(tmp))
             target = repo / "outside-default-source"
             target.mkdir()
-            default_path = (
-                repo
-                / "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack"
-            )
+            default_path = repo / "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack"
             default_path.parent.mkdir(parents=True, exist_ok=True)
             default_path.symlink_to(target, target_is_directory=True)
 

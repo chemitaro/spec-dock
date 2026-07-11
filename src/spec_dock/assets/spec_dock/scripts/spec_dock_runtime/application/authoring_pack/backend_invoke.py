@@ -120,7 +120,7 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
             resolution=resolution,
             pack=pack,
             blockers=("backend_timeout",),
-        remediation=("increase --timeout-seconds or inspect protected backend-native diagnostics",),
+            remediation=("increase --timeout-seconds or inspect protected backend-native diagnostics",),
             slug=slug,
             invocation_argv=invocation_argv,
             stdout=_decode_stream(error.stdout),
@@ -132,7 +132,9 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
     status = "pass" if completed.returncode == 0 else "blocked"
     blockers = () if completed.returncode == 0 else (f"backend_exit_code:{completed.returncode}",)
     remediation = (
-        () if completed.returncode == 0 else ("inspect protected backend-native diagnostics and rerun after fixing the error",)
+        ()
+        if completed.returncode == 0
+        else ("inspect protected backend-native diagnostics and rerun after fixing the error",)
     )
     result = _result(
         request,
