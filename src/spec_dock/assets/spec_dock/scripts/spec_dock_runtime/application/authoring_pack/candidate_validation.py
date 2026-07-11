@@ -77,9 +77,11 @@ def _review_gate(
 ) -> tuple[CandidateValidationResult, str | None]:
     evidence = read_review_report_evidence(review_report, context_path=input_path)
     if evidence.status != "pass":
-        status = "rejected" if evidence.status == "unsafe" else "fail" if evidence.status == "malformed" else "blocked"
+        failure_status = (
+            "rejected" if evidence.status == "unsafe" else "fail" if evidence.status == "malformed" else "blocked"
+        )
         return CandidateValidationResult(
-            status=status,  # type: ignore[arg-type]
+            status=failure_status,  # type: ignore[arg-type]
             input_path=str(input_path),
             candidate_kind=candidate_kind,
             evidence_mode=evidence_mode,
