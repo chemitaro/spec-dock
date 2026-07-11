@@ -549,6 +549,17 @@ commit, unless a human explicitly approves a new strategy.
 - ユーザー承認により修正回数上限を撤廃し、最新HEADがmerge-preparedになるまでDeep Consultant分析を伴う再観測ループを継続する。
 
 ## Terminal Non-Blocking Report Boundary
+## Sixth Repair Iteration (Deep Consultant)
+
+| id | reported_priority | failure_class | root_cause_family | disposition | status |
+|---|---|---|---|---|---|
+| R025 | CI | check_failure:provider-tests | provider-ci.final-static-gate-omission | fix-now | implemented |
+
+- Provider CIの`make lint`でruff format 3件とmypy 1件が失敗した。
+- Deep Consultantは環境差やflakeではなく、最終HEADへCI同等static gateを実行しなかったプロセス漏れと判定した。
+- U016で機械format、変数意味分離、provider/dogfood同期、`make lint`再検証を行う。
+
+## Terminal Non-Blocking Report Boundary
 
 When final re-observation contains only `P2`/`P3` findings:
 
