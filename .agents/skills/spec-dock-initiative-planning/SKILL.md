@@ -1,55 +1,93 @@
 ---
 name: spec-dock-initiative-planning
-description: Leaf skill for creating or updating Initiative-level requirement, design, plan, Epic decomposition, and reviewer-gated planning artifacts in SpecDock.
+description: ChatGPT-first Initiative planning entrypoint for creating or refreshing Initiative requirement, design, plan, and Epic decomposition artifacts in SpecDock.
 ---
 
 # Spec-Dock Initiative Planning
 
-Use this skill for Initiative planning: create/import an Initiative, update Initiative `requirement.md` / `design.md` / `plan.md`, or prepare bounded Epic decomposition. Prefer reusing an existing Initiative; create/import only when no current Initiative fits.
+Use this skill for non-trivial Initiative planning. This is the primary planning route and it is ChatGPT-first.
 
-This skill is an operational kernel. Keep detailed policy in docs and keep global invariants in `spec-dock-hub`.
+The old local/manual planning workflow is not the normal route. Use `spec-dock-initiative-planning-manual` only as a human-approved emergency backup after the ChatGPT-first route is hard-failed and unrecoverable.
 
-Contract anchor: create/import an initiative when no existing Initiative fits; capture scope-specific constraints and decisions before Epic decomposition; record Spec Authoring Gate evidence after fresh `spec-reviewer` pass.
+## Responsibility
+
+This skill orchestrates Initiative planning. It does not ask Codex to hand-author the whole Initiative through many local micro-steps unless the human explicitly approves the manual backup route.
+
+Codex owns:
+
+- selecting or creating the correct Initiative scope;
+- collecting repository, branch, artifact, ADR, and operator intent context;
+- invoking `spec-dock-chatgpt-authoring` for the main planning draft;
+- reviewing ChatGPT output as evidence;
+- adopting or rejecting claims in `report.md`;
+- rewriting canonical Initiative `requirement.md`, `design.md`, and `plan.md`;
+- obtaining fresh `spec-reviewer` pass after canonical changes;
+- preserving the human approval gate before Epic creation.
+
+ChatGPT may produce:
+
+- Initiative requirement/design/plan candidates;
+- Epic decomposition proposals;
+- Epic boundary and dependency notes;
+- risk, open-question, and reviewer-focus notes;
+- optional ZIP/tree artifacts.
+
+ChatGPT output is evidence only. It never grants canonical adoption, reviewer pass, readiness, Issue/Epic lifecycle completion, mergeability, or PR delivery.
 
 ## Read First
 
-- Current state: `./spec-dock/scripts/spec-dock active show`, existing Initiatives/Epics, active docs, `artifacts/`, legacy `discussions/` when present, related code/tests/templates/ADRs, and relevant user attachments.
-- Workflows and phase playbooks:
-  - `spec-dock/docs/workflow_initiative.md`
-  - `spec-dock/docs/workflow_spec_authoring.md`
-  - `spec-dock/docs/phase_requirement.md`
-  - `spec-dock/docs/phase_design.md`
-  - `spec-dock/docs/phase_plan.md`
-  - `spec-dock/docs/phase_plan_initiative.md`
-- Routing references:
-  - `spec-dock/docs/authoring/decision-routing.md`
-  - `spec-dock/docs/authoring/scope-layering.md`
-  - `spec-dock/docs/reference_github.md`
-  - `spec-dock/docs/reference_sync.md`
-  - `spec-dock/docs/reference_naming.md`
+- `spec-dock/docs/workflow_initiative.md`
+- `spec-dock/docs/workflow_spec_authoring.md`
+- `spec-dock/docs/authoring/chatgpt-pack.md`
+- `spec-dock/docs/authoring/decision-routing.md`
+- `spec-dock/docs/authoring/scope-layering.md`
+- active Initiative docs and `report.md`, when present
+- parent/product context, ADRs, artifacts, code, tests, and user-provided material relevant to the Initiative
 
 ## Operating Spine
 
-1. Establish Initiative fit.
-   - Inspect existing Initiatives before creating/importing.
-   - Keep new-Initiative rationale in `artifacts/`.
-2. Build source-grounded understanding before authoring.
-   - Answer what local sources can answer; ask the user only for blocking intent gaps.
-   - Use Japanese-first prose while preserving exact paths, commands, identifiers, role names, and SpecDock fixed terms.
-3. Route decisions before writing.
-   - Initiative owns cross-Epic product, investment, success metric, operating model, and roadmap boundary decisions.
-   - Route ADR-worthy decisions to ADR.
-   - Route missing source-of-truth or user-intent blockers to `spec-dock-clarification`.
-4. Author phases in order: requirement -> design -> plan -> Epic decomposition.
-   - Each phase needs a fresh `spec-reviewer` `review_status: pass` before the next phase starts.
-   - Record investigation, questions/answers, reviewer verdict, fixes, adoption decisions, and promotion decision in Initiative `report.md`.
-5. Decompose only bounded Epic scope.
-   - Do not pass down decision-only containers as execution-ready Epics.
-   - Keep remaining Initiative-level decisions or follow-ups at Initiative scope.
+1. Confirm the Initiative target.
+   - Reuse an existing Initiative when it fits.
+   - Create or import a new Initiative only when no existing Initiative fits.
+   - Record new-Initiative rationale in scope-local artifacts or `report.md`.
+2. Build a ChatGPT-first planning request.
+   - Include repository and branch.
+   - Prefer GitHub-synced context when the branch is pushed and visible.
+   - Include explicit lower-authority labeling for local-context runs.
+   - Include operator intent and development background as free-form context.
+   - Request Initiative `requirement.md`, `design.md`, `plan.md`, and Epic decomposition context.
+   - Allow `information_insufficient` when the input cannot support planning.
+3. Ask `spec-dock-chatgpt-authoring` for Initiative planning evidence.
+   - Wait, retry, or recover for capacity, timeout, stale sync, browser startup, or backend setup problems.
+   - Do not auto-switch to manual planning.
+4. Review the returned evidence.
+   - Check scope, non-scope, success criteria, Epic boundaries, dependencies, risks, and missing decisions.
+   - Reject unsupported claims, stale repository assumptions, and any forbidden authority claims.
+   - Record material adoption/rejection in `report.md`.
+5. Write canonical Initiative artifacts.
+   - Integrate only adopted claims into `requirement.md`, `design.md`, and `plan.md`.
+   - Keep raw ChatGPT output in artifacts, not as canonical authority.
+6. Run the authoring gate.
+   - Obtain fresh `spec-reviewer` pass after substantive canonical changes.
+   - Do not create Epic nodes until the Initiative planning gate and human approval point are satisfied.
+
+## Manual Backup
+
+Manual backup requires all of:
+
+- hard / unrecoverable ChatGPT, browser, backend, provider, or account-state failure;
+- reasonable wait / retry / recover attempts have failed;
+- explicit human approval to use `spec-dock-initiative-planning-manual`;
+- failure class, recovery attempts, approval evidence, and fallback decision recorded in `report.md`.
+
+Queued tabs, slow responses, retryable timeouts, stale sync, missing prompt context, or fixable setup are not manual fallback reasons.
 
 ## Stop Conditions
 
-- Existing Initiative fit is unresolved and creating a new Initiative would duplicate or fragment work.
-- A decision belongs to ADR or clarification rather than Initiative.
-- Requirement / design / plan candidate changed after review and lacks a fresh `spec-reviewer` pass.
-- Epic decomposition would pass unresolved Initiative decisions downstream as ready work.
+- Initiative placement is unclear and local sources cannot resolve it.
+- Repository/branch evidence required for ChatGPT-first planning is unavailable and no explicit local-context run was approved.
+- ChatGPT returns `information_insufficient`; ask the human for the missing information instead of fabricating artifacts.
+- ChatGPT output has not been adopted or rejected in `report.md`.
+- Canonical artifacts changed after review and lack fresh `spec-reviewer` pass.
+- Epic decomposition would pass unresolved Initiative decisions downstream.
+- Manual fallback is requested without explicit human approval.

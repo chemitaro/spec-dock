@@ -2,8 +2,8 @@ name = "researcher"
 description = "Read-only external and cross-source research agent for evidence-backed findings."
 
 # .codex/agents/researcher.toml
-model = "gpt-5.5"
-model_reasoning_effort = "low"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
 web_search = "live"
 # model_context_window = 400000
 # model_auto_compact_token_limit = 340000

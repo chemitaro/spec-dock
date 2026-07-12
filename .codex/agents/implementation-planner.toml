@@ -1,7 +1,7 @@
 name = "implementation-planner"
 description = "Scoped delegated implementation planning agent for spec-dock artifact authoring. Canonical docs stay main-orchestrator-only; artifact drafts require diff-guard adoption."
 
-model = "gpt-5.5"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 web_search = "disabled"
 # model_context_window = 400000

@@ -54,6 +54,7 @@ class TestCliRulesContract(CliRuntimeHarness):
             workflow_initiative = (target / "spec-dock" / "docs" / "workflow_initiative.md").read_text(encoding="utf-8")
             workflow_epic = (target / "spec-dock" / "docs" / "workflow_epic.md").read_text(encoding="utf-8")
             workflow_issue = (target / "spec-dock" / "docs" / "workflow_issue.md").read_text(encoding="utf-8")
+            docs_readme = (target / "spec-dock" / "docs" / "README.md").read_text(encoding="utf-8")
             reference_github = (target / "spec-dock" / "docs" / "reference_github.md").read_text(encoding="utf-8")
             initiative_epics_rules = (target / "spec-dock" / "docs" / "rules" / "initiative" / "epics.md").read_text(
                 encoding="utf-8"
@@ -86,6 +87,9 @@ class TestCliRulesContract(CliRuntimeHarness):
             issue_planning_skill = (target / ".agents" / "skills" / "spec-dock-issue-planning" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
+            chatgpt_authoring_skill = (
+                target / ".agents" / "skills" / "spec-dock-chatgpt-authoring" / "SKILL.md"
+            ).read_text(encoding="utf-8")
             codex_adapter_skill = (target / ".agents" / "skills" / "spec-dock-codex-adapter" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
@@ -126,9 +130,19 @@ class TestCliRulesContract(CliRuntimeHarness):
                 assert command in workflow_issue
             assert "spec-dock-issue-planning" in workflow_issue
             assert "spec-dock-issue-execution" in workflow_issue
+            assert "spec-dock-chatgpt-authoring" in docs_readme
+            assert "spec-dock-chatgpt-authoring" in hub_skill
             assert "workflow_spec_authoring.md" in issue_planning_skill
-            assert "workflow_clarification.md" in issue_planning_skill
             assert "workflow_issue.md" in issue_planning_skill
+            assert "name: spec-dock-chatgpt-authoring" in chatgpt_authoring_skill
+            assert "evidence-only" in chatgpt_authoring_skill
+            assert "github-synced" in chatgpt_authoring_skill
+            assert "local-context" in chatgpt_authoring_skill
+            assert "must not claim" in chatgpt_authoring_skill
+            assert "reviewer pass" in chatgpt_authoring_skill
+            assert "merge-ready" in chatgpt_authoring_skill
+            assert "/Users/" not in chatgpt_authoring_skill
+            assert "oracle-" + "chatgpt" not in chatgpt_authoring_skill
             assert "./spec " not in workflow_issue
             assert "issues/new-issue" not in workflow_issue
             assert (
@@ -180,7 +194,13 @@ class TestCliRulesContract(CliRuntimeHarness):
                 assert "Historical creation command examples are intentionally omitted" in text
                 assert "new doc " not in text
                 assert "./spec " not in text
-            for skill_text in (hub_skill, issue_skill, codex_adapter_skill, copilot_adapter_skill):
+            for skill_text in (
+                hub_skill,
+                issue_skill,
+                chatgpt_authoring_skill,
+                codex_adapter_skill,
+                copilot_adapter_skill,
+            ):
                 assert "./spec-dock/scripts/spec-dock" in skill_text
                 assert "./spec " not in skill_text
             assert "name: spec-dock-hub" in hub_skill
@@ -195,7 +215,7 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert "./spec-dock/scripts/spec-dock sync" in issue_skill
             assert "--no-github" in issue_skill
 
-            for skill_text in (hub_skill, codex_adapter_skill, copilot_adapter_skill):
+            for skill_text in (hub_skill, chatgpt_authoring_skill, codex_adapter_skill, copilot_adapter_skill):
                 assert "./spec-dock/scripts/spec-dock deps add --from <issue-id> --to <issue-id>" not in skill_text
                 assert "./spec-dock/scripts/spec-dock deps remove --from <issue-id> --to <issue-id>" not in skill_text
                 assert "./spec-dock/scripts/spec-dock deps check <target>" not in skill_text

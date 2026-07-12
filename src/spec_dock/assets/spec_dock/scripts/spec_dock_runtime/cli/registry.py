@@ -3,6 +3,7 @@ from __future__ import annotations
 from spec_dock_runtime.commands import (
     active as active_commands,
     assurance as assurance_commands,
+    authoring as authoring_commands,
     close as close_commands,
     delegated_authoring as delegated_authoring_commands,
     delete as delete_commands,
@@ -27,6 +28,7 @@ def build_registry() -> CommandRegistry:
     items.update(import_commands.command_specs())
     items.update(active_commands.command_specs())
     items.update(assurance_commands.command_specs())
+    items.update(authoring_commands.command_specs())
     items.update(workflow_commands.command_specs())
     items.update(delete_commands.command_specs())
     items.update(close_commands.command_specs())

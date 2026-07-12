@@ -18,6 +18,10 @@ Issue の `plan.md` を作成・更新するときに、`spec-dock-issue-plannin
 
 Issue templates（共通 `requirement.md` と profile 別 `design.md` / `plan.md`）の title 行、見出し、小見出しは日本語を優先する。日本語だけで正確性が落ちる場合だけ、日本語表現の後に括弧内英語名称を併記する。
 
+Option 3+ の Issue planning では、Epic planning から渡された draft requirement / draft design / draft plan を handoff-ready evidence として扱います。Issue planning は current repository state、prior completed Issues、dependency state、unresolved report ledger を確認し、Evidence Adoption Ledger に adopted / rejected / stale / blocked を記録してから canonical docs を正式化します。draft-only / validation-only / raw ChatGPT output は execution-ready ではありません。
+
+ChatGPT-first Issue planning route は非自明な Issue planning の primary evidence-production route です。Issue Planning は単一 workflow であり、`requirement-heavy`、`draft-heavy`、`context-heavy` は入力 context framing であって別 workflow mode ではありません。`spec-dock-issue-planning-manual` は human-approved emergency backup であり、hard / unrecoverable ChatGPT route failure と recovery attempts、explicit approval、fresh reviewer gate evidence がある場合だけ使います。
+
 ## この artifact の責務
 
 - reviewer-pass 済みの `requirement.md` と `design.md` を、実装可能な step、検証、review gate、commit候補 gate、最終品質ゲート（final quality gate）へ変換する。

@@ -1,10 +1,12 @@
 # ChatGPT 仕様作成パック準備ワークフロー
 
-This directory contains dogfood-only helpers for preparing and reviewing evidence-only prompt packs for ChatGPT Use.
+This directory contains compatibility / dogfood developer helpers for preparing and reviewing evidence-only prompt packs for ChatGPT Use.
 
 ## 位置づけ
 
 `scripts/authoring-pack/` 配下の helper は、SpecDock 自身の dogfood 用に置かれた手動運用スクリプトです。ここにある helper は SpecDock runtime command ではなく、`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/` へ shipped される契約でもありません。
+
+Provider-side source of truth for installed consumer assets is `src/spec_dock/assets/spec_dock/scripts/authoring-pack/`. This root directory remains a compatibility surface for this provider repository so existing manual tests and local dogfood commands keep working while the installed workflow is promoted through `epic-00295`.
 
 ChatGPT output、ZIP、展開済み tree、staged artifact、reviewer-focus はすべて adoption 前の evidence-only input です。canonical docs、`.assurance.json`、`authorized_profile`、fresh reviewer gate を置き換えません。
 
