@@ -72,7 +72,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert "--prompt-pack" in p.stdout
             assert "--output-dir" in p.stdout
             assert "--backend-command" in p.stdout
-            assert "--oracle {standard,personal}" in p.stdout
+            assert "--oracle" not in p.stdout
             assert "--evidence-mode" in p.stdout
             assert "--dry-run" in p.stdout
             assert "--force" not in p.stdout
@@ -6332,44 +6332,8 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert not (repo / "should-not-run").exists()
             assert captured_argv.count("--file") == 7
 
-    @pytest.mark.parametrize("oracle_implementation", ("standard", "personal"))
-    def test_authoring_backend_invoke_forwards_explicit_oracle_implementation_once(
-        self, oracle_implementation: str
-    ) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            repo = _create_synced_git_repo(Path(tmp))
-            pack = _write_valid_prompt_pack(repo / "pack")
-            captured = repo / "captured-argv.json"
-            backend = _write_fake_backend(repo / "backend.py", captured)
-
-            result = _run_authoring_capture(
-                self,
-                repo,
-                [
-                    "authoring",
-                    "backend",
-                    "invoke",
-                    "--prompt-pack",
-                    str(pack),
-                    "--output-dir",
-                    str(repo / "invoke-output"),
-                    "--backend-command",
-                    f"{sys.executable} {backend}",
-                    "--oracle",
-                    oracle_implementation,
-                    "--format",
-                    "json",
-                ],
-            )
-
-            payload = _json_stdout(result)
-            captured_argv = json.loads(captured.read_text(encoding="utf-8"))
-            assert result.returncode == 0, result.stdout + result.stderr
-            assert captured_argv[:2] == ["--oracle", oracle_implementation]
-            assert captured_argv.count("--oracle") == 1
-            assert payload["invocation_argv"].count("--oracle") == 1
-
-    def test_authoring_backend_invoke_rejects_invalid_oracle_implementation(self) -> None:
+    @pytest.mark.parametrize("retired_implementation", ("standard", "personal"))
+    def test_authoring_backend_invoke_rejects_retired_oracle_selector(self, retired_implementation: str) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
 
@@ -6384,12 +6348,12 @@ class TestAuthoringCli(CliRuntimeHarness):
                     "--output-dir",
                     str(repo / "invoke-output"),
                     "--oracle",
-                    "unknown",
+                    retired_implementation,
                 ],
             )
 
             assert result.returncode == 2
-            assert "invalid choice: 'unknown'" in result.stderr
+            assert f"unrecognized arguments: --oracle {retired_implementation}" in result.stderr
 
     def test_authoring_backend_invoke_redacts_summary_argv_and_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -7350,8 +7314,6 @@ class TestAuthoringCli(CliRuntimeHarness):
                     str(root / "invoke-output"),
                     "--backend-command",
                     f"{sys.executable} {backend}",
-                    "--oracle",
-                    "personal",
                     "--slug",
                     "compat-slug",
                     "--prompt",
@@ -7370,14 +7332,43 @@ class TestAuthoringCli(CliRuntimeHarness):
             captured_argv = json.loads(captured.read_text(encoding="utf-8"))
             assert p.returncode == 0, p.stdout + p.stderr
             assert payload["status"] == "pass"
-            assert captured_argv[:2] == ["--oracle", "personal"]
-            assert captured_argv.count("--oracle") == 1
+            assert captured_argv[:2] == ["--slug", "compat-slug"]
+            assert "--oracle" not in captured_argv
             assert "--slug" in captured_argv
             assert "compat-slug" in captured_argv
             assert "-p" in captured_argv
             assert "compat prompt" in captured_argv
             assert captured_argv.count("--file") == 7
             assert (root / "invoke-output" / "invocation-summary.json").is_file()
+
+    @pytest.mark.parametrize("retired_implementation", ("standard", "personal"))
+    def test_authoring_backend_invoke_compatibility_script_rejects_retired_oracle_selector(
+        self, retired_implementation: str
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = (
+            repo_root
+            / "src"
+            / "spec_dock"
+            / "assets"
+            / "spec_dock"
+            / "scripts"
+            / "authoring-pack"
+            / "invoke_chatgpt_backend.py"
+        )
+
+        p = self._run_wrapper_capture(
+            script,
+            ["--oracle", retired_implementation],
+            env={
+                "PATH": os.environ.get("PATH", ""),
+                "PYTHONDONTWRITEBYTECODE": "1",
+            },
+            cwd=repo_root,
+        )
+
+        assert p.returncode == 2
+        assert f"unrecognized arguments: --oracle {retired_implementation}" in p.stderr
 
     def test_authoring_backend_invoke_compatibility_script_legacy_file_mode(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
