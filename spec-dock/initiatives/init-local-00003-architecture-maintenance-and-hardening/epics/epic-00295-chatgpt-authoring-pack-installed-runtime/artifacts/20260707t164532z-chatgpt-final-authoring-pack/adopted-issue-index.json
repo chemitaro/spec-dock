@@ -1,0 +1,137 @@
+{
+  "epic_id": "epic-00295",
+  "created_issues": [
+    {
+      "issue_id": "iss-00296",
+      "title": "Authoring Pack Assets",
+      "slug": "promote-authoring-pack-assets",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00296-promote-authoring-pack-assets",
+      "draft_artifacts": {
+        "draft-requirement": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00296-promote-authoring-pack-assets/artifacts/20260707t171106z-draft-requirement-promote-authoring-pack-assets-draft-requirement.md",
+        "draft-design": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00296-promote-authoring-pack-assets/artifacts/20260707t171234z-draft-design-promote-authoring-pack-assets-draft-design.md",
+        "draft-plan": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00296-promote-authoring-pack-assets/artifacts/20260707t171235z-draft-plan-promote-authoring-pack-assets-draft-plan.md"
+      }
+    },
+    {
+      "issue_id": "iss-00297",
+      "title": "Authoring Command Skeleton",
+      "slug": "add-authoring-command-skeleton",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00297-add-authoring-command-skeleton",
+      "draft_artifacts": {
+        "draft-requirement": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00297-add-authoring-command-skeleton/artifacts/20260707t171238z-draft-requirement-add-authoring-command-skeleton-draft-requirement.md",
+        "draft-design": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00297-add-authoring-command-skeleton/artifacts/20260707t171239z-draft-design-add-authoring-command-skeleton-draft-design.md",
+        "draft-plan": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00297-add-authoring-command-skeleton/artifacts/20260707t171239z-01-draft-plan-add-authoring-command-skeleton-draft-plan.md"
+      }
+    },
+    {
+      "issue_id": "iss-00298",
+      "title": "GitHub Sync Preflight",
+      "slug": "implement-github-sync-preflight",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00298-implement-github-sync-preflight",
+      "draft_artifacts": {
+        "draft-requirement": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00298-implement-github-sync-preflight/artifacts/20260707t171243z-draft-requirement-implement-github-sync-preflight-draft-requirement.md",
+        "draft-design": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00298-implement-github-sync-preflight/artifacts/20260707t171243z-01-draft-design-implement-github-sync-preflight-draft-design.md",
+        "draft-plan": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00298-implement-github-sync-preflight/artifacts/20260707t171243z-02-draft-plan-implement-github-sync-preflight-draft-plan.md"
+      }
+    },
+    {
+      "issue_id": "iss-00299",
+      "title": "Prompt Pack Constraints",
+      "slug": "prepare-prompt-pack-and-safe-output-constraints",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00299-prepare-prompt-pack-and-safe-output-constraints",
+      "draft_artifacts": {
+        "draft-requirement": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00299-prepare-prompt-pack-and-safe-output-constraints/artifacts/20260707t171246z-draft-requirement-prepare-prompt-pack-and-safe-output-constraints-draft-requirement.md",
+        "draft-design": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00299-prepare-prompt-pack-and-safe-output-constraints/artifacts/20260707t171247z-draft-design-prepare-prompt-pack-and-safe-output-constraints-draft-design.md",
+        "draft-plan": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00299-prepare-prompt-pack-and-safe-output-constraints/artifacts/20260707t171247z-01-draft-plan-prepare-prompt-pack-and-safe-output-constraints-draft-plan.md"
+      }
+    },
+    {
+      "issue_id": "iss-00300",
+      "title": "Backend Invocation Adapter",
+      "slug": "implement-backend-invocation-adapter",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00300-implement-backend-invocation-adapter",
+      "draft_artifacts": {
+        "draft-requirement": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00300-implement-backend-invocation-adapter/artifacts/20260707t171251z-draft-requirement-implement-backend-invocation-adapter-draft-requirement.md",
+        "draft-design": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00300-implement-backend-invocation-adapter/artifacts/20260707t171251z-01-draft-design-implement-backend-invocation-adapter-draft-design.md",
+        "draft-plan": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00300-implement-backend-invocation-adapter/artifacts/20260707t171252z-draft-plan-implement-backend-invocation-adapter-draft-plan.md"
+      }
+    },
+    {
+      "issue_id": "iss-00301",
+      "title": "Zip Review Staging",
+      "slug": "promote-zip-review-and-staging",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00301-promote-zip-review-and-staging",
+      "draft_artifacts": {
+        "draft-requirement": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00301-promote-zip-review-and-staging/artifacts/20260707t171255z-draft-requirement-promote-zip-review-and-staging-draft-requirement.md",
+        "draft-design": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00301-promote-zip-review-and-staging/artifacts/20260707t171255z-01-draft-design-promote-zip-review-and-staging-draft-design.md",
+        "draft-plan": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00301-promote-zip-review-and-staging/artifacts/20260707t171256z-draft-plan-promote-zip-review-and-staging-draft-plan.md"
+      }
+    },
+    {
+      "issue_id": "iss-00302",
+      "title": "Initiative Epic Validation",
+      "slug": "validate-initiative-epic-and-epic-issue-candidates",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00302-validate-initiative-epic-and-epic-issue-candidates",
+      "draft_artifacts": {
+        "draft-requirement": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00302-validate-initiative-epic-and-epic-issue-candidates/artifacts/20260707t171259z-draft-requirement-validate-initiative-epic-and-epic-issue-candidates-draft-requirement.md",
+        "draft-design": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00302-validate-initiative-epic-and-epic-issue-candidates/artifacts/20260707t171300z-draft-design-validate-initiative-epic-and-epic-issue-candidates-draft-design.md",
+        "draft-plan": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00302-validate-initiative-epic-and-epic-issue-candidates/artifacts/20260707t171300z-01-draft-plan-validate-initiative-epic-and-epic-issue-candidates-draft-plan.md"
+      }
+    },
+    {
+      "issue_id": "iss-00303",
+      "title": "Issue Draft Adoption Validation",
+      "slug": "validate-issue-draft-adoption-and-selected-skeleton",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00303-validate-issue-draft-adoption-and-selected-skeleton",
+      "draft_artifacts": {
+        "draft-requirement": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00303-validate-issue-draft-adoption-and-selected-skeleton/artifacts/20260707t171303z-draft-requirement-validate-issue-draft-adoption-and-selected-skeleton-draft-requirement.md",
+        "draft-design": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00303-validate-issue-draft-adoption-and-selected-skeleton/artifacts/20260707t171304z-draft-design-validate-issue-draft-adoption-and-selected-skeleton-draft-design.md",
+        "draft-plan": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00303-validate-issue-draft-adoption-and-selected-skeleton/artifacts/20260707t171304z-01-draft-plan-validate-issue-draft-adoption-and-selected-skeleton-draft-plan.md"
+      }
+    },
+    {
+      "issue_id": "iss-00304",
+      "title": "ChatGPT Authoring Skill",
+      "slug": "add-chatgpt-authoring-skill-and-update-planning-skills",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00304-add-chatgpt-authoring-skill-and-update-planning-skills",
+      "draft_artifacts": {
+        "draft-requirement": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00304-add-chatgpt-authoring-skill-and-update-planning-skills/artifacts/20260707t171308z-draft-requirement-add-chatgpt-authoring-skill-and-update-planning-skills-draft-requirement.md",
+        "draft-design": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00304-add-chatgpt-authoring-skill-and-update-planning-skills/artifacts/20260707t171308z-01-draft-design-add-chatgpt-authoring-skill-and-update-planning-skills-draft-design.md",
+        "draft-plan": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00304-add-chatgpt-authoring-skill-and-update-planning-skills/artifacts/20260707t171309z-draft-plan-add-chatgpt-authoring-skill-and-update-planning-skills-draft-plan.md"
+      }
+    },
+    {
+      "issue_id": "iss-00305",
+      "title": "Approval Stop Gate Reports",
+      "slug": "implement-approval-check-and-stop-gate-reports",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00305-implement-approval-check-and-stop-gate-reports",
+      "draft_artifacts": {
+        "draft-requirement": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00305-implement-approval-check-and-stop-gate-reports/artifacts/20260707t171312z-draft-requirement-implement-approval-check-and-stop-gate-reports-draft-requirement.md",
+        "draft-design": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00305-implement-approval-check-and-stop-gate-reports/artifacts/20260707t171313z-draft-design-implement-approval-check-and-stop-gate-reports-draft-design.md",
+        "draft-plan": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00305-implement-approval-check-and-stop-gate-reports/artifacts/20260707t171313z-01-draft-plan-implement-approval-check-and-stop-gate-reports-draft-plan.md"
+      }
+    },
+    {
+      "issue_id": "iss-00306",
+      "title": "Runtime Workflow Guidance",
+      "slug": "update-runtime-docs-and-workflow-guidance",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00306-update-runtime-docs-and-workflow-guidance",
+      "draft_artifacts": {
+        "draft-requirement": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00306-update-runtime-docs-and-workflow-guidance/artifacts/20260707t171317z-draft-requirement-update-runtime-docs-and-workflow-guidance-draft-requirement.md",
+        "draft-design": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00306-update-runtime-docs-and-workflow-guidance/artifacts/20260707t171317z-01-draft-design-update-runtime-docs-and-workflow-guidance-draft-design.md",
+        "draft-plan": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00306-update-runtime-docs-and-workflow-guidance/artifacts/20260707t171317z-02-draft-plan-update-runtime-docs-and-workflow-guidance-draft-plan.md"
+      }
+    },
+    {
+      "issue_id": "iss-00307",
+      "title": "Final Quality Gate PR Delivery",
+      "slug": "final-quality-gate-and-mergeable-pr-delivery",
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00307-final-quality-gate-and-mergeable-pr-delivery",
+      "draft_artifacts": {
+        "draft-requirement": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00307-final-quality-gate-and-mergeable-pr-delivery/artifacts/20260707t171321z-draft-requirement-final-quality-gate-and-mergeable-pr-delivery-draft-requirement.md",
+        "draft-design": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00307-final-quality-gate-and-mergeable-pr-delivery/artifacts/20260707t171321z-01-draft-design-final-quality-gate-and-mergeable-pr-delivery-draft-design.md",
+        "draft-plan": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00307-final-quality-gate-and-mergeable-pr-delivery/artifacts/20260707t171322z-draft-plan-final-quality-gate-and-mergeable-pr-delivery-draft-plan.md"
+      }
+    }
+  ]
+}

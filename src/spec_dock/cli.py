@@ -38,6 +38,10 @@ _MANAGED_SKILL_NAMES = (
     "spec-dock-epic-execution",  # Docs README exposes Epic execution separately.
     "spec-dock-issue-planning",
     "spec-dock-issue-execution",
+    "spec-dock-chatgpt-authoring",
+    "spec-dock-initiative-planning-manual",
+    "spec-dock-epic-planning-manual",
+    "spec-dock-issue-planning-manual",
     "spec-dock-clarification",
     "spec-dock-adr-facilitation",
     "spec-dock-codex-adapter",

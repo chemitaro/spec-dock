@@ -31,6 +31,7 @@ detail / reference 入口:
 - Epic detail: [workflow_epic.md](workflow_epic.md)
 - Issue detail: [workflow_issue.md](workflow_issue.md)
 - ADR detail: [workflow_adr.md](workflow_adr.md)
+- ChatGPT authoring evidence lane: [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md), [reference_authoring_pack_backend.md](reference_authoring_pack_backend.md), [authoring/chatgpt-pack.md](authoring/chatgpt-pack.md)
 
 ## 基本概念
 
@@ -120,8 +121,10 @@ spec-dock/
 1. 既存ノードに収まるか確認し、必要なら `new` / `import` する
 2. Issue 実行では `issue start <target>` で作業対象を固定し、対象ブランチへ checkout する
 3. 仕様書作成は対応 planning skill を operational entrypoint にし、`workflow_spec_authoring.md` の phase promotion detail を参照する。未解決の曖昧さは `spec-dock-clarification` skill と `workflow_clarification.md` の bridge/reference で一問ずつ解消してから、対象 scope の `workflow_*.md`、requirement / design の shared playbook、`phase_plan.md` → `phase_plan_<scope>.md` の順で書く
-4. Initiative は Epic 分解、Epic は Issue 分割、Issue は agent-native / behavior-slice based execution contract を plan に落とす
-5. `validate` / `sync` で整合性と生成物を更新し、Issue lifecycle を閉じる場合は `issue finish` を使う
+4. ChatGPT / Oracle を使う場合は evidence lane として扱い、ZIP/tree/staged evidence や validation `pass` を canonical adoption、reviewer pass、execution-ready、PR-ready と混同しない
+5. Initiative は Epic 分解、Epic は Issue 分割、Issue は agent-native / behavior-slice based execution contract を plan に落とす
+6. reviewed Epic plan が final delivery Issue を明示している場合だけ、中間 Issue は relay-style に実装し、最後の delivery Issue で Epic 品質ゲートと mergeable PR をまとめる。それ以外は通常の PR Delivery / Merge Preparation Gate に従う
+7. `validate` / `sync` で整合性と生成物を更新し、Issue lifecycle を閉じる場合は `issue finish` を使う
 
 ## 代表コマンド（runtime script）
 
@@ -151,3 +154,4 @@ spec-dock/
 - 明確化 workflow: [workflow_clarification.md](workflow_clarification.md)
 - 作業対象別 workflow: [workflow_initiative.md](workflow_initiative.md), [workflow_epic.md](workflow_epic.md), [workflow_issue.md](workflow_issue.md)
 - 参照仕様: [reference_github.md](reference_github.md), [reference_naming.md](reference_naming.md), [reference_deps.md](reference_deps.md), [reference_sync.md](reference_sync.md)
+- ChatGPT authoring pack: [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md)

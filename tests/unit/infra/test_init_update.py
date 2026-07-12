@@ -414,7 +414,14 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/phase_plan_issue.md": ("src/spec_dock/assets/spec_dock/docs/phase_plan_issue.md"),
         "spec-dock/docs/workflow_spec_authoring.md": ("src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md"),
         "spec-dock/docs/workflow_clarification.md": ("src/spec_dock/assets/spec_dock/docs/workflow_clarification.md"),
+        "spec-dock/docs/workflow_chatgpt_authoring_pack.md": (
+            "src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md"
+        ),
+        "spec-dock/docs/reference_authoring_pack_backend.md": (
+            "src/spec_dock/assets/spec_dock/docs/reference_authoring_pack_backend.md"
+        ),
         "spec-dock/docs/authoring/issue-plan.md": ("src/spec_dock/assets/spec_dock/docs/authoring/issue-plan.md"),
+        "spec-dock/docs/authoring/chatgpt-pack.md": ("src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md"),
         "spec-dock/docs/authoring/decision-routing.md": (
             "src/spec_dock/assets/spec_dock/docs/authoring/decision-routing.md"
         ),
@@ -451,6 +458,9 @@ class TestInitUpdate(CliRuntimeHarness):
         ),
         ".agents/skills/spec-dock-issue-execution/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md"
+        ),
+        ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md": (
+            "src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md"
         ),
         ".agents/skills/spec-dock-clarification/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-clarification/SKILL.md"
@@ -733,6 +743,7 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-initiative-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-planning/SKILL.md",
         ".agents/skills/spec-dock-issue-execution/SKILL.md",
+        ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md",
         ".agents/skills/spec-dock-clarification/SKILL.md",
         ".agents/skills/spec-dock-codex-adapter/SKILL.md",
         ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
@@ -800,6 +811,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ".agents/skills/spec-dock-initiative-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-planning/SKILL.md",
             ".agents/skills/spec-dock-issue-execution/SKILL.md",
+            ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md",
             ".agents/skills/spec-dock-clarification/SKILL.md",
             ".agents/skills/spec-dock-codex-adapter/SKILL.md",
             ".agents/skills/spec-dock-copilot-adapter/SKILL.md",
@@ -891,6 +903,12 @@ class TestInitUpdate(CliRuntimeHarness):
             "search_globs": ("**/spec-dock-issue-execution/SKILL.md",),
             "allowed_provider_paths": (
                 "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-execution/SKILL.md",
+            ),
+        },
+        "spec-dock-chatgpt-authoring skill": {
+            "search_globs": ("**/spec-dock-chatgpt-authoring/SKILL.md",),
+            "allowed_provider_paths": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md",
             ),
         },
         "spec-dock-clarification skill": {
@@ -1218,6 +1236,20 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00291-document-authoring-pack-workflow-and-adoption-ledger-examples/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00296-promote-authoring-pack-assets/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00297-add-authoring-command-skeleton/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00298-implement-github-sync-preflight/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00299-prepare-prompt-pack-and-safe-output-constraints/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00300-implement-backend-invocation-adapter/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00301-promote-zip-review-and-staging/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00302-validate-initiative-epic-and-epic-issue-candidates/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00303-validate-issue-draft-adoption-and-selected-skeleton/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00304-add-chatgpt-authoring-skill-and-update-planning-skills/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00305-implement-approval-check-and-stop-gate-reports/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00306-update-runtime-docs-and-workflow-guidance/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00307-final-quality-gate-and-mergeable-pr-delivery/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1548,6 +1580,45 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00291-document-authoring-pack-workflow-and-adoption-ledger-examples/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00292-evaluate-dogfood-metrics-and-runtime-promotion-criteria/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00283-chatgpt-zip-authoring-pack-automation/issues/iss-00293-final-epic-quality-gate-and-mergeable-pr/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00296-promote-authoring-pack-assets/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00297-add-authoring-command-skeleton/.meta.json": [
+            "iss-00296",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00298-implement-github-sync-preflight/.meta.json": [
+            "iss-00297",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00299-prepare-prompt-pack-and-safe-output-constraints/.meta.json": [
+            "iss-00298",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00300-implement-backend-invocation-adapter/.meta.json": [
+            "iss-00299",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00301-promote-zip-review-and-staging/.meta.json": [
+            "iss-00300",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00302-validate-initiative-epic-and-epic-issue-candidates/.meta.json": [
+            "iss-00301",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00303-validate-issue-draft-adoption-and-selected-skeleton/.meta.json": [
+            "iss-00302",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00304-add-chatgpt-authoring-skill-and-update-planning-skills/.meta.json": [
+            "iss-00303",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00305-implement-approval-check-and-stop-gate-reports/.meta.json": [
+            "iss-00304",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00306-update-runtime-docs-and-workflow-guidance/.meta.json": [
+            "iss-00305",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00307-final-quality-gate-and-mergeable-pr-delivery/.meta.json": [
+            "iss-00306",
+            "iss-00309",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign/.meta.json": [
+            "iss-00306",
+        ],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -1596,6 +1667,18 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00274": ["iss-00273"],
         "iss-00275": ["iss-00274"],
         "iss-00276": ["iss-00275"],
+        "iss-00297": ["iss-00296"],
+        "iss-00298": ["iss-00297"],
+        "iss-00299": ["iss-00298"],
+        "iss-00300": ["iss-00299"],
+        "iss-00301": ["iss-00300"],
+        "iss-00302": ["iss-00301"],
+        "iss-00303": ["iss-00302"],
+        "iss-00304": ["iss-00303"],
+        "iss-00305": ["iss-00304"],
+        "iss-00306": ["iss-00305"],
+        "iss-00307": ["iss-00306", "iss-00309"],
+        "iss-00309": ["iss-00306"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -2136,14 +2219,14 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             assert fragment in text, f"{source} missing concise runtime command reminder: {fragment}"
 
-    def _assert_issue_skill_fixed_kernel_contract(
+    def _assert_issue_skill_contract(
         self,
         *,
         planning_text: str,
         execution_text: str,
         source: str,
     ) -> None:
-        common_fragments = (
+        execution_fragments = (
             "This skill is a fixed kernel",
             "state-specific generated Runbook text",
             "It is not canonical authority",
@@ -2155,21 +2238,33 @@ class TestInitUpdate(CliRuntimeHarness):
             "Do not read, edit, or manage them as handoff authority",
             "Stop if",
         )
-        for skill_name, text, command in (
-            ("planning", planning_text, "./spec-dock/scripts/spec-dock guidance issue-planning"),
-            ("execution", execution_text, "./spec-dock/scripts/spec-dock guidance issue-execution"),
-        ):
-            for fragment in common_fragments:
-                assert fragment in text, f"{source} {skill_name} skill missing fixed-kernel fragment: {fragment}"
-            assert command in text, f"{source} {skill_name} skill missing guidance handoff: {command}"
-            assert "workflow next" not in text, f"{source} {skill_name} skill still references workflow next"
+        for fragment in execution_fragments:
+            assert fragment in execution_text, f"{source} execution skill missing fixed-kernel fragment: {fragment}"
+        assert "./spec-dock/scripts/spec-dock guidance issue-execution" in execution_text
+        assert "workflow next" not in execution_text
 
-        assert "spec-dock/docs/workflow_issue.md" in planning_text
-        assert "spec-dock/docs/workflow_spec_authoring.md" in planning_text
-        assert "spec-dock/docs/workflow_clarification.md" in planning_text
-        assert "spec-dock/docs/phase_plan_issue.md" in planning_text
-        assert "spec-dock/docs/authoring/issue-plan.md" in planning_text
-        assert "spec-dock/docs/authoring/decision-routing.md" in planning_text
+        planning_fragments = (
+            "This is the primary planning route and it is ChatGPT-first.",
+            "does not split the workflow into separate planning modes",
+            "./spec-dock/scripts/spec-dock guidance issue-planning",
+            "spec-dock/docs/workflow_issue.md",
+            "spec-dock/docs/workflow_spec_authoring.md",
+            "spec-dock/docs/phase_plan_issue.md",
+            "spec-dock/docs/authoring/issue-plan.md",
+            "spec-dock/docs/authoring/decision-routing.md",
+            "Issue Planning has one workflow",
+            "requirement-heavy",
+            "draft-heavy",
+            "context-heavy",
+            "information_insufficient",
+            "spec-dock-chatgpt-authoring",
+            "Evidence Adoption Ledger",
+            "fresh `spec-reviewer` pass after canonical changes",
+            "ChatGPT output is evidence only",
+        )
+        for fragment in planning_fragments:
+            assert fragment in planning_text, f"{source} planning skill missing ChatGPT-first fragment: {fragment}"
+        assert "workflow next" not in planning_text
 
         assert "spec-dock/docs/workflow_issue.md" in execution_text
         assert "spec-dock/docs/workflow_clarification.md" in execution_text
@@ -2187,7 +2282,7 @@ class TestInitUpdate(CliRuntimeHarness):
         planning_text = (skills_root / "spec-dock-issue-planning" / "SKILL.md").read_text(encoding="utf-8")
         execution_text = (skills_root / "spec-dock-issue-execution" / "SKILL.md").read_text(encoding="utf-8")
 
-        self._assert_issue_skill_fixed_kernel_contract(
+        self._assert_issue_skill_contract(
             planning_text=planning_text,
             execution_text=execution_text,
             source="provider issue skills",
@@ -2409,7 +2504,7 @@ class TestInitUpdate(CliRuntimeHarness):
         assert not re.search(self._CODEX_NATIVE_SHIM_LEGACY_INSTRUCTIONS_PATTERN, text), (
             f"codex native shim still uses legacy instructions key ({shim_label})"
         )
-        assert 'model = "gpt-5.5"' in text, f"codex spec-manager missing model ({shim_label})"
+        assert 'model = "gpt-5.6-luna"' in text, f"codex spec-manager missing model ({shim_label})"
         assert 'model_reasoning_effort = "low"' in text, f"codex spec-manager missing reasoning effort ({shim_label})"
         assert 'approval_policy = "never"' in text, f"codex spec-manager missing approval policy ({shim_label})"
         assert 'sandbox_mode = "workspace-write"' in text, f"codex spec-manager missing sandbox mode ({shim_label})"
@@ -2419,7 +2514,7 @@ class TestInitUpdate(CliRuntimeHarness):
 
     def _assert_codex_doc_writer_contract(self, *, text: str, shim_label: str) -> None:
         assert 'name = "doc-writer"' in text, f"codex doc-writer missing name ({shim_label})"
-        assert 'model = "gpt-5.5"' in text, f"codex doc-writer missing model ({shim_label})"
+        assert 'model = "gpt-5.6-terra"' in text, f"codex doc-writer missing model ({shim_label})"
         assert 'model_reasoning_effort = "medium"' in text, f"codex doc-writer missing reasoning effort ({shim_label})"
         assert 'approval_policy = "never"' in text, f"codex doc-writer missing approval policy ({shim_label})"
         assert 'sandbox_mode = "workspace-write"' in text, f"codex doc-writer missing sandbox mode ({shim_label})"
@@ -2436,7 +2531,7 @@ class TestInitUpdate(CliRuntimeHarness):
     ) -> None:
         parsed = tomllib.loads(text)
         assert parsed.get("name") == agent_name
-        assert parsed.get("model") == "gpt-5.5"
+        assert parsed.get("model") == "gpt-5.6-sol"
         assert parsed.get("model_reasoning_effort") == "high"
         assert parsed.get("web_search") == "disabled"
         assert parsed.get("approval_policy") == "never"
@@ -2478,7 +2573,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "fresh `spec-reviewer` pass remains required",
         ):
             assert fragment in text, f"delegated author adapter missing boundary fragment ({shim_label}): {fragment}"
-        assert 'model = "gpt-5.5"' in text, f"delegated author adapter missing model ({shim_label})"
+        assert 'model = "gpt-5.6-sol"' in text, f"delegated author adapter missing model ({shim_label})"
         assert 'model_reasoning_effort = "high"' in text, (
             f"delegated author adapter missing reasoning effort ({shim_label})"
         )
@@ -2556,6 +2651,10 @@ class TestInitUpdate(CliRuntimeHarness):
             f"codex main config missing spec-manager routing guidance ({shim_label})"
         )
         parsed = tomllib.loads(text)
+        assert "model" not in parsed, f"codex main config must inherit the selected model ({shim_label})"
+        assert "model_reasoning_effort" not in parsed, (
+            f"codex main config must inherit the selected reasoning effort ({shim_label})"
+        )
         assert parsed.get("agents", {}).get("max_depth") == 2, (
             f"codex main config must set agents.max_depth = 2 ({shim_label})"
         )
@@ -3199,6 +3298,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "phase playbook（共通の作り方）" in guide_text
             assert "[workflow_clarification.md](workflow_clarification.md)" in guide_text
             assert "[workflow_spec_authoring.md](workflow_spec_authoring.md)" in guide_text
+
             assert "[phase_requirement.md](phase_requirement.md)" in guide_text
             assert "[phase_design.md](phase_design.md)" in guide_text
             assert "[phase_plan.md](phase_plan.md)" in guide_text
@@ -3559,7 +3659,7 @@ class TestInitUpdate(CliRuntimeHarness):
             issue_planning_skill_text = (skills_root / "spec-dock-issue-planning" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
-            self._assert_issue_skill_fixed_kernel_contract(
+            self._assert_issue_skill_contract(
                 planning_text=issue_planning_skill_text,
                 execution_text=issue_skill_text,
                 source="generated issue skills",
@@ -3569,6 +3669,37 @@ class TestInitUpdate(CliRuntimeHarness):
                 source="generated issue-execution skill",
             )
             assert not (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
+
+    def test_init_installs_authoring_pack_helper_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+
+            exit_code = main(["init", str(target)])
+            assert exit_code == 0
+
+            authoring_pack_dir = target / "spec-dock" / "scripts" / "authoring-pack"
+            expected_files = {
+                "README.md",
+                "authoring_pack_issue_candidates.py",
+                "authoring_pack_review.py",
+                "authoring_pack_selected_skeleton_fill.py",
+                "authoring_pack_stage.py",
+                "invoke_chatgpt_backend.py",
+                "prepare_chatgpt_authoring_pack.py",
+                "review_chatgpt_authoring_pack.py",
+                "stage_chatgpt_authoring_pack.py",
+                "validate_initiative_epic_candidates.py",
+                "validate_issue_candidates.py",
+                "validate_issue_draft_adoption.py",
+                "validate_selected_skeleton_fill.py",
+            }
+            observed_files = {path.name for path in authoring_pack_dir.iterdir() if path.is_file()}
+            assert observed_files == expected_files
+
+            readme = (authoring_pack_dir / "README.md").read_text(encoding="utf-8")
+            assert "provider-side source of truth" in readme
+            assert "installed asset" in readme
+            assert "compatibility and dogfood developer surface" in readme
 
     def test_issue_78_init_allows_install_when_legacy_hidden_workspace_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -10037,6 +10168,112 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 "missing bundled copilot native shim asset"
             )
 
+    def test_chatgpt_authoring_managed_skill_contract(self) -> None:
+        import spec_dock.cli as cli
+
+        with cli._assets_dir() as assets_dir:
+            skills_root = assets_dir / "install_root" / ".agents" / "skills"
+            authoring_path = skills_root / "spec-dock-chatgpt-authoring" / "SKILL.md"
+            initiative_planning_path = skills_root / "spec-dock-initiative-planning" / "SKILL.md"
+            epic_planning_path = skills_root / "spec-dock-epic-planning" / "SKILL.md"
+            issue_planning_path = skills_root / "spec-dock-issue-planning" / "SKILL.md"
+            initiative_manual_path = skills_root / "spec-dock-initiative-planning-manual" / "SKILL.md"
+            epic_manual_path = skills_root / "spec-dock-epic-planning-manual" / "SKILL.md"
+            issue_manual_path = skills_root / "spec-dock-issue-planning-manual" / "SKILL.md"
+            assert authoring_path.is_file()
+            authoring_text = authoring_path.read_text(encoding="utf-8")
+            initiative_planning_text = initiative_planning_path.read_text(encoding="utf-8")
+            epic_planning_text = epic_planning_path.read_text(encoding="utf-8")
+            issue_planning_text = issue_planning_path.read_text(encoding="utf-8")
+            initiative_manual_text = initiative_manual_path.read_text(encoding="utf-8")
+            epic_manual_text = epic_manual_path.read_text(encoding="utf-8")
+            issue_manual_text = issue_manual_path.read_text(encoding="utf-8")
+
+        managed_skill_names = cli._managed_skill_names()
+        assert managed_skill_names == _EXPECTED_MANAGED_SKILL_NAMES
+        assert managed_skill_names.index("spec-dock-issue-execution") < managed_skill_names.index(
+            "spec-dock-chatgpt-authoring"
+        )
+        assert managed_skill_names.index("spec-dock-chatgpt-authoring") < managed_skill_names.index(
+            "spec-dock-initiative-planning-manual"
+        )
+        assert authoring_text.startswith("---\nname: spec-dock-chatgpt-authoring\n")
+
+        for planning_text in (initiative_planning_text, epic_planning_text, issue_planning_text):
+            assert "This is the primary planning route and it is ChatGPT-first." in planning_text
+            assert "Wait, retry, or recover" in planning_text
+            assert "Manual Backup" in planning_text
+            assert "information_insufficient" in planning_text
+
+        assert "Issue Planning has one workflow" in issue_planning_text
+        for context_type in ("requirement-heavy", "draft-heavy", "context-heavy"):
+            assert context_type in issue_planning_text
+        for removed_mode_name in ("zero-base", "requirement-first"):
+            assert removed_mode_name not in issue_planning_text
+        assert "Do not create separate workflow modes" in issue_planning_text
+        assert "Evidence Adoption Ledger" in issue_planning_text
+        assert "fresh `spec-reviewer` pass after canonical changes" in issue_planning_text
+
+        assert "evidence-only" in authoring_text
+        assert "Failure Classification" in authoring_text
+        assert "hard-unrecoverable" in authoring_text
+        assert "--oracle" not in authoring_text
+        assert "single backend command" in authoring_text
+        forbidden_claims_section = self._issue_71_extract_markdown_section_by_heading_prefix(
+            markdown_text=authoring_text,
+            heading_prefix="Forbidden Claims",
+            source_label="spec-dock-chatgpt-authoring/SKILL.md",
+        )
+
+        for forbidden_claim in (
+            "canonical adoption completed",
+            "`.assurance.json` mutation",
+            "`authorized_profile` decision",
+            "reviewer pass",
+            "execution-ready",
+            "PR-ready",
+            "merge-ready",
+            "Issue finish",
+            "Epic completion",
+            "PR delivery",
+        ):
+            assert forbidden_claim in forbidden_claims_section
+
+        for manual_text in (initiative_manual_text, epic_manual_text, issue_manual_text):
+            assert "human-approved emergency backup" in manual_text
+            assert "hard / unrecoverable ChatGPT" in manual_text
+            assert "explicitly approves using the manual route" in manual_text
+            assert "does not grant degraded reviewer" in manual_text
+
+        repo_root = Path(__file__).resolve().parents[3]
+        epic_plan_template = (repo_root / "src/spec_dock/assets/spec_dock/templates/epic/plan.md").read_text(
+            encoding="utf-8"
+        )
+        for required_template_field in (
+            "final quality issue id",
+            "completion evidence",
+            "dependency-on-all-implementation-Issues",
+            "intermediate deferred PR delivery policy",
+            "final quality Issue cannot use deferred PR delivery gate",
+        ):
+            assert required_template_field in epic_plan_template
+
+        local_dependency_terms = (
+            "/Users/" + "iwasawayuuta",
+            ".codex/skills/" + "chatgpt-use",
+            "oracle-" + "chatgpt",
+        )
+        for text in (authoring_text, initiative_planning_text, epic_planning_text, issue_planning_text):
+            for term in local_dependency_terms:
+                assert term not in text
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            installed_path = target / ".agents" / "skills" / "spec-dock-chatgpt-authoring" / "SKILL.md"
+            assert installed_path.is_file()
+            assert installed_path.read_text(encoding="utf-8") == authoring_text
+
     def test_deleted_role_skill_assets_stay_absent_from_provider_and_dogfooding_mirror(self) -> None:
         import spec_dock.cli as cli
 
@@ -10182,20 +10419,60 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         import spec_dock.cli as cli
 
         read_only_specialists = (
+            "default",
             "researcher",
             "consultant",
             "deep-consultant",
+            "explorer",
             "repo-analyst",
             "code-reviewer",
             "qa-reviewer",
             "spec-reviewer",
             "spark-worker",
+            "worker",
         )
-        workspace_write_workers = ("dev-coder", "doc-writer", "utility-worker", "worker")
+        workspace_write_workers = ("dev-coder", "doc-writer", "utility-worker")
         scoped_delegated_authors = ("system-architect", "implementation-planner")
+        expected_runtime_profiles = {
+            "system-architect": ("gpt-5.6-sol", "high"),
+            "implementation-planner": ("gpt-5.6-sol", "high"),
+            "consultant": ("gpt-5.6-sol", "high"),
+            "deep-consultant": ("gpt-5.6-sol", "max"),
+            "dev-coder": ("gpt-5.6-terra", "medium"),
+            "repo-analyst": ("gpt-5.6-terra", "medium"),
+            "researcher": ("gpt-5.6-terra", "medium"),
+            "doc-writer": ("gpt-5.6-terra", "medium"),
+            "spec-reviewer": ("gpt-5.6-terra", "high"),
+            "qa-reviewer": ("gpt-5.6-terra", "high"),
+            "code-reviewer": ("gpt-5.6-sol", "high"),
+            "spec-manager": ("gpt-5.6-luna", "low"),
+            "utility-worker": ("gpt-5.6-luna", "low"),
+            "spark-worker": ("gpt-5.3-codex-spark", "medium"),
+            "default": ("gpt-5.6-luna", "low"),
+            "worker": ("gpt-5.6-luna", "low"),
+            "explorer": ("gpt-5.6-terra", "medium"),
+        }
 
         with cli._assets_dir() as assets_dir:
             agents_dir = assets_dir / "install_root" / ".codex" / "agents"
+            provider_config_path = assets_dir / "install_root" / ".codex" / "config.toml"
+            dogfooding_root = Path(__file__).resolve().parents[3]
+            dogfooding_config_path = dogfooding_root / ".codex" / "config.toml"
+            assert dogfooding_config_path.read_bytes() == provider_config_path.read_bytes()
+            self._assert_codex_main_config_routing_contract(
+                text=dogfooding_config_path.read_text(encoding="utf-8"),
+                shim_label="dogfooding codex main config",
+            )
+
+            for agent_name, (expected_model, expected_effort) in expected_runtime_profiles.items():
+                with _case(agent=agent_name, taxonomy="runtime-profile"):
+                    provider_path = agents_dir / f"{agent_name}.toml"
+                    dogfooding_path = dogfooding_root / ".codex" / "agents" / f"{agent_name}.toml"
+                    assert dogfooding_path.read_bytes() == provider_path.read_bytes()
+                    parsed = tomllib.loads(provider_path.read_text(encoding="utf-8"))
+                    assert parsed.get("model") == expected_model
+                    assert parsed.get("model_reasoning_effort") == expected_effort
+
             for agent_name in read_only_specialists:
                 with _case(agent=agent_name, taxonomy="read-only-specialist"):
                     text = (agents_dir / f"{agent_name}.toml").read_text(encoding="utf-8")
@@ -11170,14 +11447,17 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         for fragment in (
             "workflow_issue.md",
             "workflow_spec_authoring.md",
-            "workflow_clarification.md",
             "phase_plan_issue.md",
             "authoring/issue-plan.md",
-            "main-orchestrator-owned",
-            "system-architect",
-            "implementation-planner",
-            "fresh `spec-reviewer`",
-            "does not grant delegated canonical write authority",
+            "primary planning route and it is ChatGPT-first",
+            "Issue Planning has one workflow",
+            "requirement-heavy",
+            "draft-heavy",
+            "context-heavy",
+            "information_insufficient",
+            "Evidence Adoption Ledger",
+            "fresh `spec-reviewer` pass after canonical changes",
+            "ChatGPT output is evidence only",
         ):
             assert fragment in issue_planning_text
 
@@ -11257,10 +11537,14 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         ):
             assert fragment in implementation_planner_text
         for fragment in (
-            "Bounded depth=2 delegation",
-            "Depth=3 / grandchild delegation is forbidden",
-            "Leaf-only evidence producers must not edit canonical artifacts",
-            "final fresh reviewer pass remains independent",
+            "primary planning route and it is ChatGPT-first",
+            "spec-dock-chatgpt-authoring",
+            "Issue slice proposals",
+            "Issue-local draft requirement/design/plan artifacts",
+            "final quality / mergeable PR delivery Issue proposal or skip rationale",
+            "human approval before Issue node creation",
+            "fresh `spec-reviewer` pass after canonical changes",
+            "hard / unrecoverable ChatGPT",
         ):
             assert fragment in epic_text
         self._assert_issue_execution_runtime_command_reminders(
@@ -11280,38 +11564,44 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert "`spec-dock/docs/reference_deps.md`" in copilot_adapter_text
         assert "`spec-dock/docs/reference_sync.md`" in copilot_adapter_text
 
-        assert "`spec-dock/docs/workflow_initiative.md`" in initiative_text
-        assert "`spec-dock/docs/workflow_spec_authoring.md`" in initiative_text
-        assert "`spec-dock/docs/reference_github.md`" in initiative_text
-        assert "`spec-dock/docs/reference_sync.md`" in initiative_text
-        assert "`spec-dock/docs/reference_naming.md`" in initiative_text
-        assert "`spec-dock/docs/phase_requirement.md`" in initiative_text
-        assert "`spec-dock/docs/phase_design.md`" in initiative_text
-        assert "`spec-dock/docs/phase_plan.md`" in initiative_text
-        assert "create/import an initiative" in initiative_text
-        assert "scope-specific constraints and decisions" in initiative_text
-        assert "fresh `spec-reviewer`" in initiative_text
-        assert "Spec Authoring Gate" in initiative_text
-
-        assert "`spec-dock/docs/workflow_epic.md`" in epic_text
-        assert "`spec-dock/docs/workflow_spec_authoring.md`" in epic_text
-        assert "`spec-dock/docs/reference_github.md`" in epic_text
-        assert "`spec-dock/docs/reference_sync.md`" in epic_text
-        assert "`spec-dock/docs/reference_naming.md`" in epic_text
-        assert "`spec-dock/docs/phase_requirement.md`" in epic_text
-        assert "`spec-dock/docs/phase_design.md`" in epic_text
-        assert "`spec-dock/docs/phase_plan.md`" in epic_text
-        assert "create/import an epic" in epic_text
-        assert "scope-specific constraints and decisions" in epic_text
-        assert "fresh `spec-reviewer`" in epic_text
-        assert "Spec Authoring Gate" in epic_text
         for fragment in (
-            "Use this skill for issue planning work",
-            "create or update issue-level requirement/design/plan docs",
-            "main-orchestrator-owned",
-            "scope-local evidence only",
-            "fresh `spec-reviewer` returns `review_status: pass`",
-            "Spec Authoring Gate",
+            "spec-dock/docs/workflow_initiative.md",
+            "spec-dock/docs/workflow_spec_authoring.md",
+            "primary planning route and it is ChatGPT-first",
+            "spec-dock-chatgpt-authoring",
+            "Initiative requirement/design/plan candidates",
+            "Epic decomposition proposals",
+            "human approval gate before Epic creation",
+            "fresh `spec-reviewer` pass after canonical changes",
+            "information_insufficient",
+            "human-approved emergency backup",
+        ):
+            assert fragment in initiative_text
+
+        for fragment in (
+            "spec-dock/docs/workflow_epic.md",
+            "spec-dock/docs/workflow_spec_authoring.md",
+            "primary planning route and it is ChatGPT-first",
+            "spec-dock-chatgpt-authoring",
+            "Issue slice proposals",
+            "Issue-local draft requirement/design/plan artifacts",
+            "human approval before Issue node creation",
+            "fresh `spec-reviewer` pass after canonical changes",
+            "information_insufficient",
+            "human-approved emergency backup",
+        ):
+            assert fragment in epic_text
+        for fragment in (
+            "primary planning route and it is ChatGPT-first",
+            "Issue Planning has one workflow",
+            "canonical Issue `requirement.md`, `design.md`, and `plan.md`",
+            "requirement-heavy",
+            "draft-heavy",
+            "context-heavy",
+            "information_insufficient",
+            "Evidence Adoption Ledger",
+            "fresh `spec-reviewer` pass after canonical changes",
+            "human-approved emergency backup",
         ):
             assert fragment in issue_planning_text
         for fragment in (

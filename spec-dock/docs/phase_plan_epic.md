@@ -36,6 +36,8 @@ shared axiom は [phase_plan.md](phase_plan.md)、Epic の lifecycle / governanc
 - `ロールアウト / docs impact` を置く
 - `Issue readiness contract` を置く
 - Issue handoff readiness には、Issue-local `draft-design` / `draft-plan` の path index、または明示的な skip / fallback evidence を含める。これらは planning evidence であり、Canonical Issue `design.md` / `plan.md` は pre-start で本文化せず、[workflow_epic.md](workflow_epic.md) と [authoring/scope-layering.md](authoring/scope-layering.md) の boundary に従って downstream Issue planning へ渡す
+- Option 3+ では、Epic planning が Issue-local draft path index と dependency order を作成し、canonical Issue docs は各 Issue start 前後の Issue planning で current state を踏まえて正式化する。すべての Issue を Epic planning 中に execution-ready 化しない。
+- multi-Issue implementation Epic では final quality Issue required を明示し、final quality Issue を dependency-on-all-implementation-Issues の集約先にする。skip rationale は single-Issue、docs-only、no-op のいずれかで completion evidence がある場合だけ使える。それ以外の例外は Issue 作成前に別途 accepted decision を必要とする。
 - `final exit contract` を置く
 
 ## 図表 / trace 指針（diagram / trace guidance）

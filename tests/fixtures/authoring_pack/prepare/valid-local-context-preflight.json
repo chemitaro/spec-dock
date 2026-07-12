@@ -1,0 +1,30 @@
+{
+  "adoption_requires": "explicit_eal_disposition",
+  "authority": "evidence_only",
+  "blockers": [],
+  "bundle_generation_not_promotion": true,
+  "current_source_hash": "f3de7e94484f0ce7bda591782b970afea1cdbecce61d10d861121badf8b12c98",
+  "diff_summary": "fixture local diff summary",
+  "effective_ref": null,
+  "evidence_mode": "local-context",
+  "expected_source_hash": null,
+  "github_sync": "not_verified",
+  "local_head": null,
+  "provided_context_paths": [
+    "source.txt"
+  ],
+  "remediation": [],
+  "remote_head": null,
+  "requested_ref": null,
+  "source_hash_mismatch_checked": false,
+  "source_hashes": {
+    "source.txt": "fixture-local-source-hash"
+  },
+  "source_manifest_hash": "f3de7e94484f0ce7bda591782b970afea1cdbecce61d10d861121badf8b12c98",
+  "source_paths": [
+    "source.txt"
+  ],
+  "status": "pass",
+  "sync_state": "local_context",
+  "unsynced_reason": "fixture local context"
+}

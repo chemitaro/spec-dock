@@ -1,0 +1,32 @@
+{
+  "adoption_requires": "explicit_eal_disposition",
+  "authority": "evidence_only",
+  "blockers": [
+    "remote_branch_missing"
+  ],
+  "bundle_generation_not_promotion": true,
+  "current_source_hash": "fixture-blocked-source-manifest-hash",
+  "diff_summary": null,
+  "effective_ref": null,
+  "evidence_mode": "github-synced",
+  "expected_source_hash": null,
+  "github_sync": "failed",
+  "local_head": "0000000000000000000000000000000000000000",
+  "provided_context_paths": [],
+  "remediation": [
+    "push local commits before GitHub-synced authoring"
+  ],
+  "remote_head": null,
+  "requested_ref": "missing",
+  "source_hash_mismatch_checked": false,
+  "source_hashes": {
+    "source.txt": "fixture-source-hash"
+  },
+  "source_manifest_hash": "fixture-blocked-source-manifest-hash",
+  "source_paths": [
+    "source.txt"
+  ],
+  "status": "blocked",
+  "sync_state": "blocked",
+  "unsynced_reason": null
+}
