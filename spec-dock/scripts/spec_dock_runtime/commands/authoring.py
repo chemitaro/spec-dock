@@ -174,7 +174,6 @@ class AuthoringBackendInvokeArgs(CommandArgs):
     output_dir: Path
     output_format: str
     backend_command: str | None
-    oracle_implementation: str | None
     slug: str | None
     prompt: str | None
     evidence_mode: str
@@ -356,7 +355,6 @@ def _add_backend_invoke_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
     parser.add_argument("--backend-command")
-    parser.add_argument("--oracle", choices=("standard", "personal"), dest="oracle_implementation")
     parser.add_argument("--slug")
     parser.add_argument("--prompt")
     parser.add_argument("--evidence-mode", choices=("github-synced", "local-context"), default="github-synced")
@@ -415,7 +413,6 @@ def _backend_invoke_args(ns: argparse.Namespace) -> CommandArgs:
         output_dir=Path(ns.output_dir),
         output_format=ns.output_format,
         backend_command=ns.backend_command,
-        oracle_implementation=ns.oracle_implementation,
         slug=ns.slug,
         prompt=ns.prompt,
         evidence_mode=ns.evidence_mode,
@@ -619,7 +616,6 @@ def _run_backend_invoke(args: CommandArgs, use_cases: UseCases) -> CommandOutcom
             output_dir=backend_args.output_dir,
             output_format=backend_args.output_format,  # type: ignore[arg-type]
             backend_command=backend_args.backend_command,
-            oracle_implementation=backend_args.oracle_implementation,  # type: ignore[arg-type]
             slug=backend_args.slug,
             prompt=backend_args.prompt,
             evidence_mode=backend_args.evidence_mode,  # type: ignore[arg-type]

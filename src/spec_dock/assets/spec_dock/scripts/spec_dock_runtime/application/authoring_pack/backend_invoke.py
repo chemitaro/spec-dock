@@ -63,7 +63,6 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
         request.prompt_pack,
         slug=slug,
         prompt=prompt,
-        oracle_implementation=request.oracle_implementation,
     )
 
     if request.dry_run:
@@ -316,11 +315,8 @@ def _backend_invocation_argv(
     *,
     slug: str,
     prompt: str,
-    oracle_implementation: str | None,
 ) -> tuple[str, ...]:
     argv = [*backend_argv]
-    if oracle_implementation is not None:
-        argv.extend(["--oracle", oracle_implementation])
     argv.extend(["--slug", slug, "-p", prompt])
     for relative_path in _backend_attachment_files(prompt_pack):
         argv.extend(["--file", str((prompt_pack / relative_path).resolve())])

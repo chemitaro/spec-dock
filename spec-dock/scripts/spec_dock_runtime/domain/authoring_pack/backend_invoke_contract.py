@@ -11,7 +11,6 @@ FALLBACK_BACKEND_ENV = "ORACLE_CHATGPT_COMMAND"
 BackendInvokeStatus = Literal["pass", "blocked", "rejected"]
 BackendCommandSource = Literal["cli", "env:SPECDOCK_CHATGPT_COMMAND", "env:ORACLE_CHATGPT_COMMAND", "unset"]
 EvidenceMode = Literal["github-synced", "local-context"]
-OracleImplementation = Literal["standard", "personal"]
 
 DEFAULT_BACKEND_PROMPT = "Use the attached prompt pack files as the task brief. Produce the requested authoring output."
 
@@ -90,7 +89,6 @@ class BackendInvokeRequest:
     output_dir: Path
     output_format: Literal["text", "json"] = "text"
     backend_command: str | None = None
-    oracle_implementation: OracleImplementation | None = None
     slug: str | None = None
     prompt: str | None = None
     evidence_mode: EvidenceMode = "github-synced"
