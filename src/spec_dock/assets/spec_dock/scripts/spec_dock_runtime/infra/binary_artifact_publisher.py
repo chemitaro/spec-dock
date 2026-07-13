@@ -70,9 +70,7 @@ class FilesystemBinaryArtifactPublisher:
                 specdock_dir / ".workbench",
                 *(scope / ".workbench" for scope in scope_directories),
             )
-            matching_roots = [
-                root for root in approved_roots if _is_lexically_contained(root, source_path)
-            ]
+            matching_roots = [root for root in approved_roots if _is_lexically_contained(root, source_path)]
             if len(matching_roots) != 1:
                 raise _PublishFailure("source_ineligible")
             workbench_root = matching_roots[0]
@@ -161,10 +159,10 @@ class FilesystemBinaryArtifactPublisher:
 
             self._publish_no_replace(temp_fd, destination)
             warning_codes: list[BinaryArtifactPublishWarning] = []
+            if not self._fsync_directory(destination.parent):
+                warning_codes.append("directory_fsync_failed")
             try:
-                destination_sha256, destination_count = self._hash_published_destination(
-                    destination
-                )
+                destination_sha256, destination_count = self._hash_published_destination(destination)
             except _PublishFailure as exc:
                 if exc.code != "destination_read_failed":
                     raise
@@ -233,15 +231,21 @@ class FilesystemBinaryArtifactPublisher:
                 os.close(source_fd)
             raise _PublishFailure("source_changed") from None
         expected = (guarded.device, guarded.inode, guarded.mode)
-        if not stat.S_ISREG(status.st_mode) or (
-            status.st_dev,
-            status.st_ino,
-            status.st_mode,
-        ) != expected or (
-            path_status.st_dev,
-            path_status.st_ino,
-            path_status.st_mode,
-        ) != expected:
+        if (
+            not stat.S_ISREG(status.st_mode)
+            or (
+                status.st_dev,
+                status.st_ino,
+                status.st_mode,
+            )
+            != expected
+            or (
+                path_status.st_dev,
+                path_status.st_ino,
+                path_status.st_mode,
+            )
+            != expected
+        ):
             os.close(source_fd)
             raise _PublishFailure("source_changed")
         return source_fd, status
@@ -345,6 +349,7 @@ class FilesystemBinaryArtifactPublisher:
             flags |= os.O_NOFOLLOW
         descriptor: int | None = None
         try:
+            self._inject("post_confirmation")
             descriptor = os.open(destination, flags)
             return self._hash_descriptor(descriptor)
         except OSError:
@@ -352,6 +357,24 @@ class FilesystemBinaryArtifactPublisher:
         finally:
             if descriptor is not None:
                 os.close(descriptor)
+
+    def _fsync_directory(self, directory: Path) -> bool:
+        flags = os.O_RDONLY
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        if hasattr(os, "O_DIRECTORY"):
+            flags |= os.O_DIRECTORY
+        descriptor: int | None = None
+        try:
+            self._inject("directory_fsync")
+            descriptor = os.open(directory, flags)
+            os.fsync(descriptor)
+        except OSError:
+            return False
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+        return True
 
     def _cleanup_after_failure(
         self,

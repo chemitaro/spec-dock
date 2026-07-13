@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 import sys
 
+import pytest
+
 
 def _runtime_modules():
     runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
@@ -110,3 +112,82 @@ def test_artifact_import_failure_renderers_hide_raw_exception_and_paths() -> Non
         "committed": False,
         "cleanup_state": "not_created",
     }
+
+
+def test_tc317_s04_04_warning_tokens_are_stable_and_content_free() -> None:
+    (
+        _ArtifactImportError,
+        ArtifactImportResult,
+        _render_error_json,
+        _render_error_text,
+        render_json,
+        render_text,
+    ) = _runtime_modules()
+    warnings = (
+        "directory_fsync_failed",
+        "temp_cleanup_retained",
+        "destination_read_failed",
+        "create_lock_release_failed",
+    )
+    result = ArtifactImportResult(
+        import_kind="chatgpt-output",
+        storage_identity="blank",
+        artifact_id="20260714t010203z",
+        scope_id="iss-00317",
+        source_path=Path("spec-dock/.workbench/raw.md"),
+        destination_path=Path("spec-dock/scope/artifacts/result.md"),
+        sha256="b" * 64,
+        byte_count=19,
+        committed=True,
+        cleanup_state="retained",
+        warning_codes=warnings,
+    )
+
+    text = render_text(result)
+    json_text = render_json(result)
+    combined = "\n".join([*text.stdout_lines, *text.stderr_lines, *text.warnings, *json_text.stdout_lines])
+    payload = json.loads(json_text.stdout_lines[0])
+    assert payload["committed"] is True
+    assert payload["sha256"] == "b" * 64
+    assert payload["byte_count"] == 19
+    assert payload["warning_codes"] == list(warnings)
+    assert all(token in combined for token in warnings)
+    for forbidden in (
+        "raw secret fault",
+        "/private/tmp",
+        "OSError",
+        "canonical",
+        "adopted",
+        "reviewed",
+    ):
+        assert forbidden not in combined
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "artifact_allocation_failed",
+        "artifact_publication_retry_exhausted",
+    ],
+)
+def test_tc317_s04_02_terminal_collision_tokens_are_stable_and_content_free(code) -> None:
+    (
+        ArtifactImportError,
+        _ArtifactImportResult,
+        render_error_json,
+        render_error_text,
+        _render_json,
+        _render_text,
+    ) = _runtime_modules()
+    error = ArtifactImportError(code=code, cleanup_state="removed")
+
+    text = render_error_text(error)
+    json_text = render_error_json(error)
+    combined = "\n".join([*text.stdout_lines, *text.stderr_lines, *json_text.stdout_lines])
+    payload = json.loads(json_text.stdout_lines[0])
+    assert payload["code"] == code
+    assert payload["committed"] is False
+    assert payload["cleanup_state"] == "removed"
+    assert code in combined
+    for forbidden in ("raw secret fault", "/private/tmp", "OSError", "Traceback"):
+        assert forbidden not in combined

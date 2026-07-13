@@ -419,6 +419,8 @@ class WorkbenchFilesystemError(RuntimeError):
 
 BinaryArtifactCleanupState = Literal["not_created", "removed", "retained"]
 BinaryArtifactPublishWarning = Literal[
+    "create_lock_release_failed",
+    "directory_fsync_failed",
     "destination_mismatch",
     "destination_read_failed",
     "temp_cleanup_retained",
