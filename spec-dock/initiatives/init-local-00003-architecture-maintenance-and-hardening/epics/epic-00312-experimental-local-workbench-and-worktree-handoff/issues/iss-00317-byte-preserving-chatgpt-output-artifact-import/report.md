@@ -262,7 +262,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S02 | committed | Binary guard/publisher contracts + focused tests + observed report | `22006f5e2e4052bd9024e7180094e9a5b6996de8` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r4 pass、read-only post-push confirmation complete |
 | S03 | committed | Public import vertical slice + focused tests + observed report | `e2197cc85eff304d895919a18b1327aa8cd72db2` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 | S04 | committed | Collision/fault hardening + deterministic tests + observed report | `18be850a32e4ee1460fc3a7dd1b9b44d5dfae575` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
-| S05 | ready | Consumer characterization + dogfood runtime projection + manual evidence + report | pending commit | pending | N/A | N/A | N/A | fresh code-reviewer r1 pass |
+| S05 | committed | Consumer characterization + dogfood runtime projection + manual evidence + report | `bdc0d921598a14b1ecf59b7cdc00949be3b0de28` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -498,4 +498,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - Reviewer:
   - Fresh r1 findingsなし、pass、confidence 0.98。Consumer characterization、10/10 byte-equivalence、manual Artifact bytes、guard/scope分離を確認。
   - Reviewer read-only環境ではpytest temp作成制約により再実行不可。DevCoderの85 passとorchestrator manual CLI/hash/cmp/validate証跡をstatic inspectionで照合し、blocking findingなし。
+- Commit closure:
+  - Implementation/evidence/report commit: `bdc0d921598a14b1ecf59b7cdc00949be3b0de28` (`feat(artifact): dogfood環境へimport機能を反映`)。
+  - Push成功。Post-push tracked status clean、upstream `0 0`。Ignored Workbench sourceはmanual evidenceのsource survival証跡として残存。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
