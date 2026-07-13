@@ -266,7 +266,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S03 | committed | Public import vertical slice + focused tests + observed report | `e2197cc85eff304d895919a18b1327aa8cd72db2` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 | S04 | committed | Collision/fault hardening + deterministic tests + observed report | `18be850a32e4ee1460fc3a7dd1b9b44d5dfae575` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 | S05 | committed | Consumer characterization + dogfood runtime projection + manual evidence + report | `bdc0d921598a14b1ecf59b7cdc00949be3b0de28` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
-| S90 | approved-no-op | Docs impact inspection + explicit Issue318/319 defer + observed report | report-only commit candidate | pending report commit | Issue317 runtimeを正しく使うためのshipped text更新はW4/W5 ownershipに明示割当済み | README/reference docs/migration -> Issue319; workflow/skills -> Issue318 | 50-row path ledger、runtime provider 10/dogfood 10、S90-SPEC-r3 pass | fresh spec-reviewer r3 pass |
+| S90 | approved-no-op | Docs impact inspection + explicit Issue318/319 defer + observed report | `73bebc1a9754e02370501a1e0a59e9ec444de441` | `git status --short` clean、upstream `0 0` | Issue317 runtimeを正しく使うためのshipped text更新はW4/W5 ownershipに明示割当済み | README/reference docs/migration -> Issue319; workflow/skills -> Issue318 | 50-row path ledger、runtime provider 10/dogfood 10、S90-SPEC-r3 pass | fresh spec-reviewer r3 pass、read-only post-push confirmation complete |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -581,4 +581,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
   - Fresh r3: findingsなし、pass。Actionable owner欠落なし、N/Aはapproved-no-opだけ、W4/W5 relay/依存整合を確認。
 - Step Result Approval:
   - Issue317恒久docs変更はapproved-no-op。Issue318/319へのdeferはnon-blockingかつowner/dependency/evidence確定済み。Report-only commit後にS99へ進む。
+- Commit closure:
+  - Report-only commit: `73bebc1a9754e02370501a1e0a59e9ec444de441` (`docs(issue-317): S90文書影響を確定`)。
+  - Push成功。Post-push tracked status clean、upstream `0 0`。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
