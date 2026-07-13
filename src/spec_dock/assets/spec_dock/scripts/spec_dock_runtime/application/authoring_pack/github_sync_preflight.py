@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 import subprocess
 from typing import Literal
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 from spec_dock_runtime.application.authoring_pack.github_fetch_policy import (
     Sleeper,
@@ -137,7 +137,7 @@ def run_github_sync_preflight(
     if _git_stdout(repo_root, "remote", "get-url", "origin", check=False) is None:
         blockers.append("origin_missing")
         remediation.append("configure origin before GitHub-synced authoring preflight")
-    elif output_blocker is None:
+    elif not blockers:
         fetch_request = GitFetchExecutionRequest.for_repo(repo_root)
         executor = fetch_executor or execute_git_fetch
         if fetch_sleeper is None:
@@ -260,6 +260,7 @@ def run_github_sync_preflight(
             concurrent_change_check="changed" if concurrent_change else "stable",
             remote_head_disposition=snapshot.remote_head_disposition,
         ),
+        repository=snapshot,
     )
     return _finalize_publication(result, repo_root, request.output_dir, output_blocker)
 
@@ -444,6 +445,11 @@ def _normalized_origin(repo_root: Path) -> str | None:
             return raw.split("@", 1)[1]
         return raw
     parsed = urlsplit(raw)
+    if parsed.scheme.lower() == "file" and parsed.path.startswith("/"):
+        local_path = str(Path(unquote(parsed.path)).resolve(strict=False))
+        identity = f"{parsed.netloc}:{local_path}" if parsed.netloc not in ("", "localhost") else local_path
+        digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+        return f"local-path-sha256:{digest}"
     authority = parsed.netloc.rsplit("@", 1)[-1]
     return urlunsplit((parsed.scheme, authority, parsed.path, "", ""))
 

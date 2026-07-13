@@ -51,6 +51,21 @@ def render_preflight_text(result: PreflightResult) -> list[str]:
     lines.append(f"fetch_failure_class={_format_value(last_attempt.get('failure_class'))}")
     lines.append(f"fetch_classification_confidence={_format_value(last_attempt.get('confidence'))}")
     lines.append(f"fetch_timeout_seconds={_format_value(fetch['timeout_seconds'])}")
+    repository = payload["repository"]
+    if repository is not None:
+        for key in (
+            "normalized_origin",
+            "branch",
+            "local_head",
+            "upstream",
+            "effective_ref",
+            "remote_head",
+            "remote_head_disposition",
+            "snapshot_id",
+        ):
+            lines.append(f"repository_{key}={_format_value(repository[key])}")
+        for category in repository["worktree_state"]:
+            lines.append(f"repository_worktree_state={_format_value(category)}")
     publication = payload["publication"]
     lines.append(f"publication_status={_format_value(publication['status'])}")
     lines.append(f"receipt_filename={_format_value(publication['filename'])}")

@@ -4265,9 +4265,12 @@ class TestInitUpdate(CliRuntimeHarness):
     def test_issue_314_isolated_wheel_init_update_exposes_preflight_runtime_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         runtime_files = (
+            "application/authoring_pack/github_sync_preflight.py",
             "application/authoring_pack/github_fetch_policy.py",
+            "domain/authoring_pack/preflight_contract.py",
             "infra/authoring_pack/git_fetch.py",
             "infra/authoring_pack/preflight_receipt_writer.py",
+            "presentation/authoring_pack/diagnostics.py",
         )
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -4370,6 +4373,15 @@ class TestInitUpdate(CliRuntimeHarness):
                 assert pass_receipt["status"] == "pass"
                 assert pass_receipt["fetch"]["status"] == "success"
                 assert pass_receipt["freshness"]["concurrent_change_check"] == "stable"
+                assert pass_receipt["repository"]["branch"] == "main"
+                assert pass_receipt["repository"]["upstream"] == "origin/main"
+                assert pass_receipt["repository"]["local_head"] == pass_receipt["local_head"]
+                assert pass_receipt["repository"]["remote_head"] == pass_receipt["remote_head"]
+                assert pass_receipt["repository"]["source_manifest"] == {
+                    "source_manifest_hash": pass_receipt["source_manifest_hash"],
+                    "source_paths": pass_receipt["source_paths"],
+                    "source_hashes": pass_receipt["source_hashes"],
+                }
                 assert pass_receipt["publication"] == {
                     "requested": True,
                     "status": "published",
@@ -4411,6 +4423,8 @@ class TestInitUpdate(CliRuntimeHarness):
                 assert json.loads(blocked_result.stdout) == blocked_receipt
                 assert blocked_receipt["status"] == "blocked"
                 assert "origin_missing" in blocked_receipt["blockers"]
+                assert blocked_receipt["fetch"]["status"] == "not_started"
+                assert blocked_receipt["repository"]["normalized_origin"] is None
                 assert blocked_receipt["publication"]["filename"] == "github-sync-preflight.receipt.json"
                 assert blocked_receipt["publication"]["status"] == "published"
 
