@@ -10,6 +10,116 @@ PreflightStatus = Literal["pass", "blocked", "stale"]
 EvidenceMode = Literal["github-synced", "local-context"]
 SyncState = Literal["synced", "blocked", "stale", "local_context"]
 GitHubSync = Literal["verified", "not_verified", "failed"]
+FETCH_POLICY_ID = "origin-fetch-v1"
+MAX_FETCH_ATTEMPTS = 2
+FETCH_TIMEOUT_SECONDS = 60.0
+FETCH_BACKOFF_SECONDS = 0.25
+DIAGNOSTIC_EXCERPT_MAX_BYTES = 1024
+TerminationKind = Literal["exited", "timeout", "spawn_error", "cancelled"]
+FetchFailureClass = Literal[
+    "timeout",
+    "transient_transport",
+    "remote_throttled",
+    "local_ref_lock_contention",
+    "remote_access_denied_or_not_found",
+    "host_identity_failure",
+    "repository_configuration",
+    "execution_or_filesystem_denied",
+    "spawn_failure",
+    "cancelled",
+    "unknown",
+]
+ClassificationConfidence = Literal["certain", "probable", "unknown"]
+
+
+@dataclass(frozen=True)
+class FetchClassification:
+    failure_class: FetchFailureClass | None
+    confidence: ClassificationConfidence
+    retryable: bool
+    diagnostic_code: str | None
+
+
+@dataclass(frozen=True)
+class GitProcessOutcome:
+    return_code: int | None
+    termination: TerminationKind
+    stdout: bytes
+    stderr: bytes
+    duration_ms: int
+    os_error_kind: str | None = None
+
+
+@dataclass(frozen=True)
+class SafeDiagnostic:
+    code: str | None = None
+    excerpt: str | None = None
+    redacted_sha256: str | None = None
+    source_byte_count: int = 0
+    excerpt_byte_count: int = 0
+    truncated: bool = False
+    redaction_applied: bool = False
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "code": self.code,
+            "excerpt": self.excerpt,
+            "redacted_sha256": self.redacted_sha256,
+            "source_byte_count": self.source_byte_count,
+            "excerpt_byte_count": self.excerpt_byte_count,
+            "truncated": self.truncated,
+            "redaction_applied": self.redaction_applied,
+        }
+
+
+@dataclass(frozen=True)
+class FetchAttempt:
+    attempt_number: int
+    duration_ms: int
+    return_code: int | None
+    termination: TerminationKind
+    failure_class: FetchFailureClass | None
+    confidence: ClassificationConfidence
+    retryable: bool
+    diagnostic: SafeDiagnostic = field(default_factory=SafeDiagnostic)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "attempt_number": self.attempt_number,
+            "duration_ms": self.duration_ms,
+            "return_code": self.return_code,
+            "termination": self.termination,
+            "failure_class": self.failure_class,
+            "confidence": self.confidence,
+            "retryable": self.retryable,
+            "diagnostic": self.diagnostic.to_dict(),
+        }
+
+
+@dataclass(frozen=True)
+class FetchSummary:
+    status: Literal["success", "failed", "cancelled", "not_started", "not_applicable"]
+    policy_id: str = FETCH_POLICY_ID
+    executable: str = "git"
+    argv: tuple[str, ...] = ("fetch", "--prune", "origin")
+    remote: str = "origin"
+    timeout_seconds: float = FETCH_TIMEOUT_SECONDS
+    environment_policy_id: str = "git-fetch-noninteractive-v1"
+    execution_policy_context: Literal["unreported"] = "unreported"
+    attempts: tuple[FetchAttempt, ...] = ()
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "status": self.status,
+            "policy_id": self.policy_id,
+            "executable": self.executable,
+            "argv": list(self.argv),
+            "remote": self.remote,
+            "timeout_seconds": self.timeout_seconds,
+            "environment_policy_id": self.environment_policy_id,
+            "execution_policy_context": self.execution_policy_context,
+            "attempts": [attempt.to_dict() for attempt in self.attempts],
+        }
 
 
 @dataclass(frozen=True)
@@ -34,9 +144,12 @@ class PreflightResult:
     authority: str = "evidence_only"
     adoption_requires: str = "explicit_eal_disposition"
     bundle_generation_not_promotion: bool = True
+    fetch: FetchSummary = field(default_factory=lambda: FetchSummary(status="not_applicable"))
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
+            "schema_version": 1,
+            "receipt_kind": "spec-dock.authoring.github-sync-preflight",
             "status": self.status,
             "evidence_mode": self.evidence_mode,
             "sync_state": self.sync_state,
@@ -56,6 +169,7 @@ class PreflightResult:
             "bundle_generation_not_promotion": self.bundle_generation_not_promotion,
             "expected_source_hash": self.expected_source_hash,
             "current_source_hash": self.current_source_hash,
+            "fetch": self.fetch.to_dict(),
         }
         payload.update(self.source_manifest.to_dict())
         return payload

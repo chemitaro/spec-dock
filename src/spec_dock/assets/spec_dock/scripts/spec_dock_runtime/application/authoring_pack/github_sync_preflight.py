@@ -6,12 +6,18 @@ from pathlib import Path
 import subprocess
 from typing import Literal
 
-from spec_dock_runtime.domain.authoring_pack.preflight_contract import GitVisibleRef, PreflightResult
+from spec_dock_runtime.application.authoring_pack.github_fetch_policy import (
+    Sleeper,
+    run_origin_fetch_policy,
+    summarize_fetch_outcome,
+)
+from spec_dock_runtime.domain.authoring_pack.preflight_contract import FetchSummary, GitProcessOutcome, GitVisibleRef, PreflightResult
 from spec_dock_runtime.domain.authoring_pack.source_manifest import (
     build_source_manifest,
     expected_hash_from_manifest,
     source_path_blockers,
 )
+from spec_dock_runtime.infra.authoring_pack.git_fetch import GitFetchExecutionRequest, execute_git_fetch
 
 EvidenceMode = Literal["github-synced", "local-context"]
 
@@ -31,12 +37,15 @@ class GitHubSyncPreflightRequest:
 
 
 RemoteObserver = Callable[[Path, str | None, bool], GitVisibleRef]
+FetchExecutor = Callable[[GitFetchExecutionRequest], GitProcessOutcome]
 
 
 def run_github_sync_preflight(
     request: GitHubSyncPreflightRequest,
     *,
     remote_observer: RemoteObserver | None = None,
+    fetch_executor: FetchExecutor | None = None,
+    fetch_sleeper: Sleeper | None = None,
 ) -> PreflightResult:
     repo_root = _resolve_repo_root(request.repo_root)
     manifest_paths = request.source_paths
@@ -63,6 +72,7 @@ def run_github_sync_preflight(
     current_branch = None if branch in (None, "", "HEAD") else branch
     local_head = _git_stdout(repo_root, "rev-parse", "HEAD", check=False)
     requested_ref = request.ref or current_branch
+    fetch_summary = FetchSummary(status="not_started")
 
     if current_branch is None:
         blockers.append("detached_head")
@@ -72,8 +82,13 @@ def run_github_sync_preflight(
         blockers.append("origin_missing")
         remediation.append("configure origin before GitHub-synced authoring preflight")
     else:
-        fetch_error = _refresh_origin(repo_root)
-        if fetch_error is not None:
+        fetch_request = GitFetchExecutionRequest.for_repo(repo_root)
+        executor = fetch_executor or execute_git_fetch
+        if fetch_sleeper is None:
+            fetch_summary = run_origin_fetch_policy(fetch_request, executor=executor)
+        else:
+            fetch_summary = run_origin_fetch_policy(fetch_request, executor=executor, sleeper=fetch_sleeper)
+        if fetch_summary.status != "success":
             blockers.append("origin_fetch_failed")
             remediation.append("fetch origin before GitHub-synced authoring preflight")
 
@@ -143,6 +158,7 @@ def run_github_sync_preflight(
         remediation=tuple(dict.fromkeys(remediation)),
         expected_source_hash=expected_source_hash,
         current_source_hash=source_manifest.source_manifest_hash,
+        fetch=fetch_summary,
     )
 
 
@@ -298,17 +314,8 @@ def _observe_origin_ref(repo_root: Path, requested_ref: str | None, allow_fallba
     return GitVisibleRef("resolved", requested_ref, effective_ref, fallback_head)
 
 
-def _refresh_origin(repo_root: Path) -> str | None:
-    p = subprocess.run(
-        ["git", "fetch", "--prune", "origin"],
-        cwd=str(repo_root),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if p.returncode != 0:
-        return (p.stderr or p.stdout or "git fetch origin failed").strip()
-    return None
+def _fetch_summary(outcome: GitProcessOutcome) -> FetchSummary:
+    return summarize_fetch_outcome(outcome)
 
 
 def _ahead_behind(repo_root: Path, effective_ref: str | None) -> tuple[int, int]:

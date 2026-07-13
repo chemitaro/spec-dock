@@ -3860,6 +3860,139 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["source_hash_mismatch_checked"] is False
             assert payload["source_paths"] == ["source.txt"]
             assert "source.txt" in payload["source_hashes"]
+            assert payload["schema_version"] == 1
+            assert payload["receipt_kind"] == "spec-dock.authoring.github-sync-preflight"
+            assert payload["fetch"]["status"] == "success"
+            assert payload["fetch"]["policy_id"] == "origin-fetch-v1"
+            assert payload["fetch"]["executable"] == "git"
+            assert payload["fetch"]["argv"] == ["fetch", "--prune", "origin"]
+            assert payload["fetch"]["attempts"] == [
+                {
+                    "attempt_number": 1,
+                    "duration_ms": payload["fetch"]["attempts"][0]["duration_ms"],
+                    "return_code": 0,
+                    "termination": "exited",
+                    "failure_class": None,
+                    "confidence": "certain",
+                    "retryable": False,
+                    "diagnostic": {
+                        "code": None,
+                        "excerpt": None,
+                        "redacted_sha256": None,
+                        "source_byte_count": 0,
+                        "excerpt_byte_count": 0,
+                        "truncated": False,
+                        "redaction_applied": False,
+                    },
+                }
+            ]
+
+            text_result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--source-path",
+                    "source.txt",
+                ],
+            )
+            assert text_result.returncode == 0, text_result.stdout + text_result.stderr
+            assert "status=pass" in text_result.stdout
+            assert "evidence_mode=github-synced" in text_result.stdout
+            assert "sync_state=synced" in text_result.stdout
+            assert "github_sync=verified" in text_result.stdout
+            assert "receipt_schema_version=1" in text_result.stdout
+            assert "receipt_kind=spec-dock.authoring.github-sync-preflight" in text_result.stdout
+            assert "fetch_status=success" in text_result.stdout
+            assert "fetch_attempt_count=1" in text_result.stdout
+            assert "fetch_failure_class=null" in text_result.stdout
+            assert "fetch_classification_confidence=certain" in text_result.stdout
+            assert "fetch_timeout_seconds=60.0" in text_result.stdout
+
+    def test_authoring_preflight_injected_spawn_failure_is_typed_and_blocked(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+        from spec_dock_runtime.domain.authoring_pack.preflight_contract import GitProcessOutcome
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+
+            def spawn_failure(_request):
+                return GitProcessOutcome(
+                    return_code=None,
+                    termination="spawn_error",
+                    stdout=b"",
+                    stderr=b"raw traceback must remain private",
+                    duration_ms=3,
+                    os_error_kind="FileNotFoundError",
+                )
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=("source.txt",)),
+                fetch_executor=spawn_failure,
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "blocked"
+            assert payload["github_sync"] == "failed"
+            assert "origin_fetch_failed" in payload["blockers"]
+            assert payload["fetch"]["policy_id"] == "origin-fetch-v1"
+            assert payload["fetch"]["status"] == "failed"
+            assert payload["fetch"]["attempts"][0]["failure_class"] == "spawn_failure"
+            assert payload["fetch"]["attempts"][0]["return_code"] is None
+            assert "raw traceback" not in str(payload)
+
+    def test_authoring_preflight_retries_transient_fetch_with_same_shape_then_passes(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+        from spec_dock_runtime.domain.authoring_pack.preflight_contract import GitProcessOutcome
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            requests = []
+            outcomes = iter(
+                [
+                    GitProcessOutcome(1, "exited", b"", b"Connection reset by peer", 2),
+                    GitProcessOutcome(0, "exited", b"", b"", 3),
+                ]
+            )
+            sleeps = []
+
+            def fake_fetch(request):
+                requests.append(request)
+                return next(outcomes)
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=("source.txt",)),
+                fetch_executor=fake_fetch,
+                fetch_sleeper=sleeps.append,
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "pass"
+            assert payload["fetch"]["status"] == "success"
+            assert len(payload["fetch"]["attempts"]) == 2
+            assert payload["fetch"]["attempts"][0]["failure_class"] == "transient_transport"
+            assert payload["fetch"]["attempts"][0]["retryable"] is True
+            assert requests[0] is requests[1]
+            assert requests[0].argv == requests[1].argv == ("fetch", "--prune", "origin")
+            assert sleeps == [0.25]
 
     def test_authoring_preflight_github_sync_checks_default_source_path_symlinks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -4385,7 +4518,11 @@ class TestAuthoringCli(CliRuntimeHarness):
             ]
 
             for p in outputs:
-                output = (p.stdout + p.stderr).lower()
+                output = "\n".join(
+                    line
+                    for line in (p.stdout + p.stderr).lower().splitlines()
+                    if not line.startswith("fetch_status=")
+                )
                 for forbidden in _FORBIDDEN_AUTHORITY_CLAIMS:
                     assert forbidden not in output
 
