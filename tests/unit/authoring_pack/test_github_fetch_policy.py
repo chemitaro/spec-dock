@@ -7,9 +7,7 @@ import sys
 
 import pytest
 
-RUNTIME_SCRIPTS = (
-    Path(__file__).parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS = Path(__file__).parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
 from spec_dock_runtime.application.authoring_pack.github_fetch_policy import (  # noqa: E402
@@ -141,14 +139,44 @@ def test_timeout_capture_becomes_typed_bounded_fetch_evidence(monkeypatch) -> No
         ("exited", b"fatal: unable to access: Connection reset by peer", "transient_transport", "probable", True),
         ("exited", b"HTTP 503 Service Unavailable", "transient_transport", "probable", True),
         ("exited", b"HTTP 429: too many requests", "remote_throttled", "probable", True),
-        ("exited", b"cannot lock ref 'refs/remotes/origin/main': .lock exists", "local_ref_lock_contention", "probable", True),
+        (
+            "exited",
+            b"cannot lock ref 'refs/remotes/origin/main': .lock exists",
+            "local_ref_lock_contention",
+            "probable",
+            True,
+        ),
         ("exited", b"ERROR: Repository not found.", "remote_access_denied_or_not_found", "probable", False),
         ("exited", b"fatal: Authentication failed", "remote_access_denied_or_not_found", "probable", False),
-        ("exited", b"git@example.com: Permission denied (publickey).", "remote_access_denied_or_not_found", "probable", False),
+        (
+            "exited",
+            b"git@example.com: Permission denied (publickey).",
+            "remote_access_denied_or_not_found",
+            "probable",
+            False,
+        ),
         ("exited", b"Host key verification failed.", "host_identity_failure", "probable", False),
-        ("exited", b"SSL certificate problem: unable to get local issuer certificate", "host_identity_failure", "probable", False),
-        ("exited", b"fatal: 'origin' does not appear to be a git repository", "repository_configuration", "probable", False),
-        ("exited", b"fatal: could not write file: Operation not permitted", "execution_or_filesystem_denied", "probable", False),
+        (
+            "exited",
+            b"SSL certificate problem: unable to get local issuer certificate",
+            "host_identity_failure",
+            "probable",
+            False,
+        ),
+        (
+            "exited",
+            b"fatal: 'origin' does not appear to be a git repository",
+            "repository_configuration",
+            "probable",
+            False,
+        ),
+        (
+            "exited",
+            b"fatal: could not write file: Operation not permitted",
+            "execution_or_filesystem_denied",
+            "probable",
+            False,
+        ),
         ("spawn_error", b"", "spawn_failure", "certain", False),
         ("cancelled", b"", "cancelled", "certain", False),
         ("exited", b"unmatched provider error", "unknown", "unknown", False),
@@ -189,12 +217,10 @@ def test_conflicting_signals_fail_closed_as_unknown() -> None:
 def test_retry_uses_same_request_shape_and_bounded_fake_sleep() -> None:
     request = GitFetchExecutionRequest.for_repo(Path("/tmp/repo"))
     observed_requests = []
-    outcomes = iter(
-        [
-            GitProcessOutcome(1, "exited", b"", b"Connection reset by peer", 2),
-            GitProcessOutcome(0, "exited", b"", b"", 3),
-        ]
-    )
+    outcomes = iter([
+        GitProcessOutcome(1, "exited", b"", b"Connection reset by peer", 2),
+        GitProcessOutcome(0, "exited", b"", b"", 3),
+    ])
     sleeps: list[float] = []
 
     def executor(actual_request):
@@ -211,12 +237,10 @@ def test_retry_uses_same_request_shape_and_bounded_fake_sleep() -> None:
 
 
 def test_http_5xx_retries_once_then_succeeds() -> None:
-    outcomes = iter(
-        [
-            GitProcessOutcome(1, "exited", b"", b"HTTP 503 Service Unavailable", 2),
-            GitProcessOutcome(0, "exited", b"", b"", 3),
-        ]
-    )
+    outcomes = iter([
+        GitProcessOutcome(1, "exited", b"", b"HTTP 503 Service Unavailable", 2),
+        GitProcessOutcome(0, "exited", b"", b"", 3),
+    ])
     calls = []
     sleeps: list[float] = []
 
@@ -318,8 +342,7 @@ def test_safe_diagnostic_redacts_secrets_paths_non_utf8_and_truncates() -> None:
         b"Authorization: Bearer super-secret /Users/alice/private/repo "
         b"/private/tmp/receipt /var/folders/ab/cd/T/work password:colon-secret "
         b"-----BEGIN OPENSSH PRIVATE KEY-----\nprivate-key-body\n"
-        b"-----END OPENSSH PRIVATE KEY----- \xff "
-        + b"x" * 2000
+        b"-----END OPENSSH PRIVATE KEY----- \xff " + b"x" * 2000
     )
 
     diagnostic = safe_diagnostic(raw, code="transient_transport")
@@ -351,8 +374,6 @@ def test_safe_diagnostic_redacts_incomplete_private_key_block_to_eof(key_kind: s
     diagnostic = safe_diagnostic(raw, code="unknown")
 
     assert diagnostic.excerpt == "fatal context\n[REDACTED_PRIVATE_KEY]"
-    assert diagnostic.redacted_sha256 == hashlib.sha256(
-        b"fatal context\n[REDACTED_PRIVATE_KEY]"
-    ).hexdigest()
+    assert diagnostic.redacted_sha256 == hashlib.sha256(b"fatal context\n[REDACTED_PRIVATE_KEY]").hexdigest()
     assert "private-key-body" not in str(diagnostic.to_dict())
     assert diagnostic.redaction_applied is True

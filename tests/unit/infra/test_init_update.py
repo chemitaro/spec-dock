@@ -4319,7 +4319,9 @@ class TestInitUpdate(CliRuntimeHarness):
             )
             installed_runtime_root = target_repo / "spec-dock" / "scripts" / "spec_dock_runtime"
             for rel_path in runtime_files:
-                assert (installed_runtime_root / rel_path).read_bytes() == (provider_runtime_root / rel_path).read_bytes()
+                assert (installed_runtime_root / rel_path).read_bytes() == (
+                    provider_runtime_root / rel_path
+                ).read_bytes()
 
             runtime_script = target_repo / "spec-dock" / "scripts" / "spec-dock"
 
@@ -10520,9 +10522,9 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             installed_path = target / ".agents" / "skills" / "spec-dock-chatgpt-authoring" / "SKILL.md"
             assert installed_path.is_file()
             assert installed_path.read_text(encoding="utf-8") == authoring_text
-            assert (
-                target / "spec-dock" / "docs" / "workflow_chatgpt_authoring_pack.md"
-            ).read_text(encoding="utf-8") == workflow_text
+            assert (target / "spec-dock" / "docs" / "workflow_chatgpt_authoring_pack.md").read_text(
+                encoding="utf-8"
+            ) == workflow_text
             assert (target / "spec-dock" / "docs" / "authoring" / "chatgpt-pack.md").read_text(
                 encoding="utf-8"
             ) == pack_reference_text

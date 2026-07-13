@@ -4190,12 +4190,10 @@ class TestAuthoringCli(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
             requests = []
-            outcomes = iter(
-                [
-                    GitProcessOutcome(1, "exited", b"", b"Connection reset by peer", 2),
-                    GitProcessOutcome(0, "exited", b"", b"", 3),
-                ]
-            )
+            outcomes = iter([
+                GitProcessOutcome(1, "exited", b"", b"Connection reset by peer", 2),
+                GitProcessOutcome(0, "exited", b"", b"", 3),
+            ])
             sleeps: list[float] = []
 
             def fake_fetch(request):
@@ -4949,9 +4947,7 @@ class TestAuthoringCli(CliRuntimeHarness):
 
             for p in outputs:
                 output = "\n".join(
-                    line
-                    for line in (p.stdout + p.stderr).lower().splitlines()
-                    if not line.startswith("fetch_status=")
+                    line for line in (p.stdout + p.stderr).lower().splitlines() if not line.startswith("fetch_status=")
                 )
                 for forbidden in _FORBIDDEN_AUTHORITY_CLAIMS:
                     assert forbidden not in output
