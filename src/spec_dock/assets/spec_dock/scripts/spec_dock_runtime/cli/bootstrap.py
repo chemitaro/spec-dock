@@ -39,6 +39,7 @@ from spec_dock_runtime.application.set_active import (
 )
 from spec_dock_runtime.application.sync_state import sync as application_sync
 from spec_dock_runtime.application.validate_tree import validate_tree as application_validate_tree
+from spec_dock_runtime.application.workbench import workbench_copy as application_workbench_copy
 from spec_dock_runtime.application.workflow import (
     workflow_next as application_workflow_next,
     workflow_status as application_workflow_status,
@@ -276,6 +277,9 @@ class _FilesystemGateway:
     def remove_target(self, path: Path) -> None:
         infra_fs_cli.remove_target(path)
 
+    def copy_workbench(self, source: Path, destination: Path) -> None:
+        infra_fs_cli.copy_workbench(source, destination)
+
 
 @dataclass(frozen=True)
 class _EnvironmentGateway:
@@ -374,6 +378,7 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         worktree_list=lambda req: application_worktree_list(req, ports),
         worktree_show=lambda req: application_worktree_show(req, ports),
         worktree_remove=lambda req: application_worktree_remove(req, ports),
+        workbench_copy=lambda req: application_workbench_copy(req, ports),
         repo_root=ports.repo_root,
         specdock_dir=ports.specdock_dir,
     )
