@@ -4058,6 +4058,9 @@ class TestAuthoringCli(CliRuntimeHarness):
                     },
                 }
             ]
+            assert payload["freshness"]["remote_head_disposition"] == "fetched_remote_tracking_ref"
+            assert payload["freshness"]["concurrent_change_check"] == "stable"
+            assert payload["freshness"]["snapshot_id"] == payload["freshness"]["final_guard_snapshot_id"]
 
             text_result = _run_authoring_capture(
                 self,
@@ -4292,6 +4295,152 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == "stale"
             assert "behind_remote" in payload["blockers"]
             assert payload["local_head"] != payload["remote_head"]
+            assert payload["freshness"]["remote_head_disposition"] == "fetched_remote_tracking_ref"
+            assert payload["freshness"]["concurrent_change_check"] == "stable"
+
+    def test_authoring_preflight_blocks_source_change_during_post_fetch_snapshot(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            changed = False
+
+            def mutate_after_first_hash(phase: str, observed_repo: Path) -> None:
+                nonlocal changed
+                if phase == "source_file_hashed" and not changed:
+                    (observed_repo / "source.txt").write_text("changed during snapshot\n", encoding="utf-8")
+                    changed = True
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=("source.txt",)),
+                snapshot_hook=mutate_after_first_hash,
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "blocked"
+            assert payload["github_sync"] == "failed"
+            assert "concurrent_repo_change" in payload["blockers"]
+            assert payload["freshness"]["concurrent_change_check"] == "changed"
+            assert payload["freshness"]["snapshot_id"] != payload["freshness"]["final_guard_snapshot_id"]
+
+    def test_authoring_preflight_blocks_head_change_before_final_guard(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+
+            def commit_before_guard(phase: str, observed_repo: Path) -> None:
+                if phase == "before_final_guard":
+                    _git(observed_repo, "commit", "--allow-empty", "-m", "concurrent commit")
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=("source.txt",)),
+                snapshot_hook=commit_before_guard,
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "blocked"
+            assert "concurrent_repo_change" in payload["blockers"]
+            assert payload["freshness"]["concurrent_change_check"] == "changed"
+
+    def test_authoring_preflight_blocks_remote_tracking_ref_change_before_final_guard(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            tree = _git(repo, "rev-parse", "HEAD^{tree}").stdout.strip()
+            alternate = _git(repo, "commit-tree", tree, "-m", "concurrent remote ref").stdout.strip()
+
+            def move_remote_ref(phase: str, observed_repo: Path) -> None:
+                if phase == "before_final_guard":
+                    _git(observed_repo, "update-ref", "refs/remotes/origin/main", alternate)
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=("source.txt",)),
+                snapshot_hook=move_remote_ref,
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "blocked"
+            assert "concurrent_repo_change" in payload["blockers"]
+            assert payload["freshness"]["concurrent_change_check"] == "changed"
+
+    def test_authoring_preflight_marks_cached_remote_ref_unverified_after_fetch_failure(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+        from spec_dock_runtime.domain.authoring_pack.preflight_contract import GitProcessOutcome
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=("source.txt",)),
+                fetch_executor=lambda _request: GitProcessOutcome(
+                    128, "exited", b"", b"fatal: repository not found", 2
+                ),
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "blocked"
+            assert payload["github_sync"] == "failed"
+            assert payload["remote_head"]
+            assert payload["freshness"]["remote_head_disposition"] == "unverified_cache"
+            assert payload["freshness"]["concurrent_change_check"] == "stable"
+
+    def test_authoring_preflight_local_context_does_not_enter_fetch_or_snapshot_transaction(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+
+            def unexpected_fetch(_request):
+                raise AssertionError("local-context must not fetch")
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(
+                    repo_root=repo,
+                    evidence_mode="local-context",
+                    provided_context_paths=("source.txt",),
+                    unsynced_reason="offline fixture",
+                ),
+                fetch_executor=unexpected_fetch,
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "pass"
+            assert payload["github_sync"] == "not_verified"
+            assert payload["sync_state"] == "local_context"
+            assert payload["freshness"]["concurrent_change_check"] == "not_applicable"
+            assert payload["freshness"]["remote_head_disposition"] == "not_applicable"
 
     def test_authoring_preflight_github_sync_blocks_missing_explicit_source_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
