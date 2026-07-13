@@ -201,12 +201,12 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated | Shared runtime/create behaviorとtests | dev-coder | Plan S01のArtifact shared allocation subset | Reviewed requirement/design/plan、parent ADR | Plan S01 allowed paths | Import CLI/publisher、docs、Issue318/319、unrelated refactor | TC317-S01-01/02、focused tests、diff check | Public contract change、scope外変更、unexpected regression | Changed files、Red/Green、commands、risk、Ledger Note | pending pre-S01 assurance verify |
+| S01 | delegated | Shared runtime/create behaviorとtests | dev-coder | Plan S01のArtifact shared allocation subset | Reviewed requirement/design/plan、parent ADR | `create_artifact_doc.py`とfocused runtime tests | Import CLI/publisher、docs、Issue318/319、unrelated refactor | TC317-S01-01/02、focused tests、diff check | Public contract change、scope外変更、unexpected regression | Changed files、Red/Green、commands、risk、Ledger Note | passed |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder | pending delegation after assurance gate | pending | pending | pending | none known | pending |
+| S01 | dev-coder | Setup/duplicate scan/allocation/exact checkをexisting create lock内へ移し、race/exhaustion/release testsを追加 | `src/.../application/create_artifact_doc.py`; `tests/cli_runtime/test_runtime_new_doc_s09.py` | Red 1 failed、Green focused 32 passed、CLI new 19 passed、validation 8 passed/1 skipped、diff check pass | code-review r1 failed、r2 passed | External writer atomic publishはplanned S04、import wiringはS03 | accepted; no material plan deviation |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -234,11 +234,13 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | PLANNING-PLAN-r2 | plan executability | spec-reviewer | superseded | failed | no | command/gate correction then fresh re-review | P1: validate/sync/active showのunsupported `--format json`、pre-S01 assurance source binding gate欠落。`gpt-5.6-sol`/medium、confidence high |
 | PLANNING-PLAN-r3 | plan executability | spec-reviewer | fresh | passed | no | promote | findingsなし。r1/r2 fixes維持、assurance verify valid。Direct invocation `gpt-5.6-sol`/medium、confidence 0.96 |
 | PRE-S01-ASSURANCE | source binding and execution readiness | spec-manager | fresh | passed | no | execute approved plan | `assurance classify --stage requirement --issue iss-00317`後、`assurance verify --issue iss-00317 --format json`が`status=valid`。Guidanceは`state=ready`、`may_execute_approved_plan=true` |
+| IMPLEMENT-S01-r1 | S01 code and test sensitivity | code-reviewer | superseded | failed | no | add focused tests then fresh re-review | P2: inside-lock body failure後のlock releaseとbody/release exception precedenceのtest感度不足。`gpt-5.6-sol`/medium、confidence 0.97 |
+| IMPLEMENT-S01-r2 | S01 code and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。Targeted 3 tests、full focused file 32 tests、diff check pass。`gpt-5.6-sol`/medium、confidence 0.98 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | commit candidate | Runtime shared allocation + focused tests + observed report | pending commit | pending post-commit check | N/A | N/A | N/A | N/A |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -307,4 +309,33 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ## Step Evidence
 - Record Red, Green, and refactor evidence for each executed step.
 - Link each closure id to its observed verification result.
+
+### S01 Shared lock-internal Artifact allocation — 2026-07-13
+
+- Delegated worker: DevCoder、direct invocation `gpt-5.6-sol` / reasoning `medium`。
+- Scope: `create_artifact_doc.py`と`test_runtime_new_doc_s09.py`のみ。
+- Red evidence:
+  - `uv run pytest -q tests/cli_runtime/test_runtime_new_doc_s09.py::TestRuntimeNewDocS09::test_parallel_new_artifact_allocates_after_shared_create_lock`
+  - 旧実装で`1 failed`。後行operationがlock前candidateを保持し`Artifact already exists`となるraceを再現。
+- Green evidence:
+  - Race test: `1 passed`。
+  - S01 targeted tests: `3 passed, 29 deselected`。
+  - `tests/cli_runtime/test_runtime_new_doc_s09.py`: `32 passed`。
+  - `tests/cli_runtime/test_new.py -k new_artifact`: `19 passed, 29 deselected`。
+  - Artifact validation lane: `8 passed, 1 skipped, 36 deselected`。
+  - `git diff --check`: pass。
+- Refactor guardrail:
+  - Existing create lock/token release、template rendering、typed/blank grammar、text/JSON result、`01..99` exhaustionを維持。
+  - New lock、import CLI、binary publisher、docs変更なし。
+- Test contract closure:
+  - `TC317-S01-01` / `C317-04` / `C317-05` prerequisite: pass。
+  - `TC317-S01-02` / `C317-04`: pass。
+  - Review-discovered lock release/error precedence coverage: pass。Body errorがprimary、release errorが`__cause__`。
+- Reviewer:
+  - r1 P2 test-sensitivity findingを追加testsで修正。
+  - Fresh r2 findingsなし、pass、confidence 0.98。
+- Discovered tests / closure delta:
+  - Required closure expectationの変更なし。Review-discovered testsをS01既存guardrail evidenceとして追加し、plan amendment不要。
+- Ledger disposition:
+  - No material implementation decisions beyond the approved plan.
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
