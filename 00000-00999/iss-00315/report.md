@@ -180,58 +180,68 @@ uv run pytest -q \
 - Delete depth guardだけではWorkbench排除にならない。
 - S02: node graph、S03: independent resolvers、S04: authoring、S05: explicit deletion、S06: preservationへ計画どおり割り当てる。
 
-### セッションログ（2026-07-13 HH:MM - HH:MM）
+### セッションログ（2026-07-13 S01）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S01 Ignore asset and installer fallback
+- AC: AC-315-001
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` S01
+  - closure: C315-01
 
 #### 実施内容
-- ...
+- dev-coderへTDD実装を委譲。
+- Provider `.gitignore`とinstaller fallbackへexact `.workbench/` patternを追加。
+- Root/Initiative/Epic/Issue scope matrixと`.workbench-notes` negativeをtest化。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+uv run pytest tests/unit/infra/test_init_update.py -k 'workbench_directories' -q
+# Red: 2 failed -> Green: 2 passed
 
-<result>
+uv run pytest tests/unit/infra/test_init_update.py -k 'init_creates_expected_structure or workbench_directories' -q
+# 3 passed
+
+uv run pytest tests/cli_runtime/test_sync.py -k 'spec_dock_gitignore' -q
+# 2 passed
+
+git diff --check
+# pass
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | Red | red-required | assetではroot probe non-ignore、fallbackではpattern欠落 | focused pytest | pass | 2 expected failures |
+| S01 | Green | exact patternとscope/near-name matrix | focused 2、init regression 3、sync regression 2 passed | pytest commands above | pass | provider/fallback parity |
+| S01 | Refactor | no refactor needed | 3-file minimal diff、Ruff/diff-check pass | worker inspection / `git diff --check` | approved-no-op | runtime traversal未変更 |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | fallbackでもfull git-check-ignore matrixを追加すればさらに強い | code-reviewer | S01 nonblocking、S06 update/preservationとの重複を避け現testを採用 | C315-01 | no | `review_iss00315_s01` |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | C315-01 | supported scopesでexact directory ignored、near-name non-reserved、fallback parity | Red/Green、fresh reviewer再実行2 passed | pass | AC-315-001 closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| C315-01 | S01 | yes | red-required | 2 expected failures | focused pytest + init/sync regression | pass | exact/near-name matrix |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| C315-01 | S01 | worker tests + `review_iss00315_s01` rerun | pass | no P0/P1/blocker |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | C315-01 | workbench directory init tests | C315-01 | planどおり | no | no |
 
 #### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 `workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
@@ -250,13 +260,13 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S00 | delegated | recursive callsite inventory and baseline | repo-analyst | read-only runtime/installer/tests inventory | approved `plan.md` S00 | none | all file edits and S01+ implementation | focused baseline tests | baseline regression or scope-changing reachability | inventory、tests、risks、step mapping | pass |
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | shipped scaffold and installer fallback | dev-coder | ignore asset、fallback constant、focused tests | approved `plan.md` S01 | 3 scoped files | runtime traversal、Issue 316+、report | Red/Green、init/sync regression、Ruff/diff-check | scope expansion or regression | worker summary、changed files、verification、risks | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S00 | repo-analyst | recursive callsiteを3分類し、default discoveryのWorkbench到達点と後続stepを確定 | none | worker `10 passed in 23.65s`; reviewer rerun `10 passed in 21.79s`; status clean | passed（`review_iss00315_s00`） | none; legacy helperはS02でcallsite再確認 | accepted / approved-no-op |
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | exact ignore patternをprovider/fallbackへ追加しscope/near-name matrixをTDD化 | `.gitignore`, `src/spec_dock/cli.py`, `tests/unit/infra/test_init_update.py` | Red 2 failed; Green 2+3+2 passed; Ruff/diff-check pass | passed（`review_iss00315_s01`） | fallback full matrixはnonblocking | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -277,12 +287,13 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | planning-design | design promotion | spec-reviewer | fresh | passed | no | promote | `review_iss00315_design` |
 | planning-plan | plan promotion | spec-reviewer | fresh | passed | no | execute approved plan | `review_iss00315_plan`; static analysis gate追加後 |
 | S00 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s00`; approved-no-op、10 tests再実行pass |
+| S01 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s01`; focused 2 tests再実行pass、P0/P1なし |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S00 | approved-no-op | report evidence only | pending S00 report commit | pending | inventory/baseline stepでproduction変更不要 | plan S00、recursive callsites、focused 10 tests | `git status --short` -> clean before report integration | `review_iss00315_s00` passed |
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S01 | ready-to-commit | provider/fallback ignore + focused tests + report | pending | pending | N/A | C315-01 | `git diff --check` -> pass | `review_iss00315_s01` passed |
 
 #### 変更したファイル
 - `path/to/file1` - ...
