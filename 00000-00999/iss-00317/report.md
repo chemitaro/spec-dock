@@ -254,6 +254,9 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | IMPLEMENT-S03-r1 | S03 code and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。CLI vertical slice、byte preservation、blank grammar、content-free output、warning propagation、existing command非回帰を確認。Focused 13 pass、Ruff format/check、diff check pass。`gpt-5.6-sol`/medium、confidence 0.98 |
 | IMPLEMENT-S04-r1 | S04 collision/fault semantics and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。C317-05–09、TC317-S04-01–04、collision、fault、cleanup、例外優先順位、禁止事項を確認。Reviewer再実行25 pass、diff check pass。`gpt-5.6-sol`/medium、confidence 0.98 |
 | IMPLEMENT-S05-r1 | S05 consumer compatibility/projection/manual evidence | code-reviewer | fresh | passed | no | commit candidate | findingsなし。Consumer characterization、provider/dogfood 10/10 byte-equivalence、manual Artifact source一致、guard分離、scope境界を確認。Reviewer環境のtemp制約でtest再実行不可だがstatic/recorded evidenceに矛盾なし。`gpt-5.6-sol`/medium、confidence 0.98 |
+| S90-SPEC-r1 | Docs impact path ownership/closure | spec-reviewer | superseded | failed | no | expand path ledger then fresh re-review | P1: grouped surfaceでは実パス別disposition/owner/reason/dependency/blockingを検証不能。`gpt-5.6-sol`/medium、confidence 0.99 |
+| S90-SPEC-r2 | Docs impact path ownership/closure | spec-reviewer | superseded | failed | no | expand runtime paths then fresh re-review | P1: Runtime provider/dogfood 10-file surfaceだけgrouped pathが残存。`gpt-5.6-sol`/medium、confidence 0.99 |
+| S90-SPEC-r3 | Docs impact path ownership/closure | spec-reviewer | fresh | passed | no | approve no-op/defer and commit report | findingsなし。全50行、runtime provider 10/dogfood 10の独立実パス、owner/dependency/blocking、W4/W5 relayを確認。`gpt-5.6-sol`/medium、confidence 0.99 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -263,6 +266,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S03 | committed | Public import vertical slice + focused tests + observed report | `e2197cc85eff304d895919a18b1327aa8cd72db2` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 | S04 | committed | Collision/fault hardening + deterministic tests + observed report | `18be850a32e4ee1460fc3a7dd1b9b44d5dfae575` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 | S05 | committed | Consumer characterization + dogfood runtime projection + manual evidence + report | `bdc0d921598a14b1ecf59b7cdc00949be3b0de28` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
+| S90 | approved-no-op | Docs impact inspection + explicit Issue318/319 defer + observed report | report-only commit candidate | pending report commit | Issue317 runtimeを正しく使うためのshipped text更新はW4/W5 ownershipに明示割当済み | README/reference docs/migration -> Issue319; workflow/skills -> Issue318 | 50-row path ledger、runtime provider 10/dogfood 10、S90-SPEC-r3 pass | fresh spec-reviewer r3 pass |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -290,9 +294,58 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
-| 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
-|---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| 実パス（path） | 処置（disposition） | 担当（owner） | 理由 | 依存（dependency） | Issue317 blocking | 証跡（evidence） | 仕様レビュアー結果 |
+|---|---|---|---|---|---|---|---|
+| `README.md` | deferred update | Issue319 | Public CLI usage、evidence-only/byte-preserving contract、experimental statusを最終distributionと同時に記載 | W5 / iss-00319、W3/W4 complete | no; runtime/APIはS03–S05で検証済み | Current lines 102/154は`new artifact`のみ。Epic plan W5 deliverables | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/docs/README.md` | deferred update | Issue319 | Public docs indexへArtifact import/reference導線を追加 | W5 / iss-00319 | no | Provider public docs index、W5 docs ownership | pass (S90-SPEC-r3) |
+| `spec-dock/docs/README.md` | deferred projection | Issue319 | Provider docs index更新のdogfood parity | Provider docs update、W5 / iss-00319 | no | Dogfood mirrorはprovider authorityからfinal projection | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/docs/guide.md` | deferred update | Issue319 | Workbench→Artifact import、source survival、evidence authorityをguideへ追加 | W5 / iss-00319、W4 checkpoint terminology | no | Existing Workbench placement/authorityは記載済み、import usageは未記載 | pass (S90-SPEC-r3) |
+| `spec-dock/docs/guide.md` | deferred projection | Issue319 | Provider guide更新のdogfood parity | Provider guide update、W5 / iss-00319 | no | W5 provider/dogfood parity gate | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/docs/reference_naming.md` | deferred update | Issue319 | Blank filenameへ`chatgpt-output-<slug>`を付与するimport例とcoexistenceを記載 | W5 / iss-00319 | no | Current naming referenceは`new artifact`のみ。Runtime grammarはS01–S05 pass | pass (S90-SPEC-r3) |
+| `spec-dock/docs/reference_naming.md` | deferred projection | Issue319 | Provider naming reference更新のdogfood parity | Provider reference update、W5 / iss-00319 | no | W5 provider/dogfood parity gate | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` | deferred update | Issue318 | Canonical rewrite前preservation checkpointとEAL handoffを追加 | W4 / iss-00318、W3 complete | no; workflow integrationは次Issueの明示責務 | Epic design DS-004、plan W4 | pass (S90-SPEC-r3) |
+| `spec-dock/docs/workflow_spec_authoring.md` | deferred projection | Issue318/Issue319 | W4 provider workflow更新後のdogfood projection。Final installed parityはW5 | Provider W4 update、iss-00318→iss-00319 | no | W4/W5 dependency chain | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md` | deferred update | Issue318 | Standalone file/complete inline/incomplete inline/ZIP-tree branchを追加 | W4 / iss-00318 | no | Epic design lines 249–260、plan W4 | pass (S90-SPEC-r3) |
+| `spec-dock/docs/workflow_chatgpt_authoring_pack.md` | deferred projection | Issue318/Issue319 | W4 provider workflow更新後のdogfood/final installed parity | Provider W4 update、iss-00318→iss-00319 | no | W4/W5 dependency chain | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md` | deferred update | Issue318 | Standalone report laneを追加しZIP/tree laneを維持 | W4 / iss-00318 | no | Epic design DS-004 update target | pass (S90-SPEC-r3) |
+| `spec-dock/docs/authoring/chatgpt-pack.md` | deferred projection | Issue318/Issue319 | W4 provider authoring doc更新後のdogfood/final installed parity | Provider W4 update、iss-00318→iss-00319 | no | W4/W5 dependency chain | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md` | deferred update | Issue318 | Preservation branch/status/exception/EAL checkpointを共通化 | W4 / iss-00318 | no | Epic plan W4 named target | pass (S90-SPEC-r3) |
+| `.agents/skills/spec-dock-chatgpt-authoring/SKILL.md` | deferred projection | Issue318/Issue319 | Provider skill更新後のdogfood/final installed parity | Provider skill update、iss-00318→iss-00319 | no | W4/W5 dependency chain | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md` | deferred update | Issue318 | ChatGPT completed report preservation checkpointをplanningへ結線 | W4 / iss-00318 | no | Epic plan W4 planning skills | pass (S90-SPEC-r3) |
+| `.agents/skills/spec-dock-initiative-planning/SKILL.md` | deferred projection | Issue318/Issue319 | Provider skill更新後のdogfood/final installed parity | Provider skill update、iss-00318→iss-00319 | no | W4/W5 dependency chain | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` | deferred update | Issue318 | ChatGPT completed report preservation checkpointをplanningへ結線 | W4 / iss-00318 | no | Epic plan W4 planning skills | pass (S90-SPEC-r3) |
+| `.agents/skills/spec-dock-epic-planning/SKILL.md` | deferred projection | Issue318/Issue319 | Provider skill更新後のdogfood/final installed parity | Provider skill update、iss-00318→iss-00319 | no | W4/W5 dependency chain | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` | deferred update | Issue318 | ChatGPT completed report preservation checkpointをplanningへ結線 | W4 / iss-00318 | no | Epic plan W4 planning skills | pass (S90-SPEC-r3) |
+| `.agents/skills/spec-dock-issue-planning/SKILL.md` | deferred projection | Issue318/Issue319 | Provider skill更新後のdogfood/final installed parity | Provider skill update、iss-00318→iss-00319 | no | W4/W5 dependency chain | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md` | approved-no-op | N/A | Existing blank grammarを再利用。Typed `chatgpt-output` catalog/reservationを追加しない | Accepted coexistence contract | no | RQ-317-006、D-317-001、S01/S03 coexistence pass | pass (S90-SPEC-r3) |
+| `spec-dock/docs/rules/initiative/artifacts.md` | approved-no-op | N/A | Provider rule no-opと一致 | Provider no-op | no | Dogfood/provider existing rule unchanged | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/docs/rules/epic/artifacts.md` | approved-no-op | N/A | Existing blank grammarを再利用。Typed catalog/templateを追加しない | Accepted coexistence contract | no | RQ-317-006、D-317-001 | pass (S90-SPEC-r3) |
+| `spec-dock/docs/rules/epic/artifacts.md` | approved-no-op | N/A | Provider rule no-opと一致 | Provider no-op | no | Dogfood/provider existing rule unchanged | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/docs/rules/issue/artifacts.md` | approved-no-op | N/A | Existing blank grammarを再利用。Import provenance/frontmatterを要求しない | Accepted coexistence/opaque bytes contract | no | RQ-317-003/006、S03/S05 pass | pass (S90-SPEC-r3) |
+| `spec-dock/docs/rules/issue/artifacts.md` | approved-no-op | N/A | Provider rule no-opと一致 | Provider no-op | no | Dogfood/provider existing rule unchanged | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/templates/README.md` | approved-no-op | N/A | Importはtemplateを適用せずblank type catalogを変更しない | RQ-317-003/006 | no | S03 no-template test、manual Artifactにfrontmatterなし | pass (S90-SPEC-r3) |
+| `spec-dock/templates/README.md` | approved-no-op | N/A | Provider template contract no-opと一致 | Provider no-op | no | Dogfood/provider existing template README unchanged | pass (S90-SPEC-r3) |
+| `N/A: dedicated migration note file` | deferred creation/placement decision | Issue319 | 現在専用migration fileは存在しない。既存`.workbench` preserve/no canonical migrationをW5 public docsまたはrelease noteの適切な実パスへ記載 | W5 / iss-00319 | no; schema/data migrationなし | Epic design migration strategy、plan rollout/docs impact | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` | completed runtime contract | Issue317 | Import/publisher request/result/error/warning型 | S02–S04 | no | S02–S04 tests/reviews | pass (S90-SPEC-r3) |
+| `spec-dock/scripts/spec_dock_runtime/application/contracts.py` | completed projection | Issue317 | Provider contractのdogfood byte-equivalent mirror | Provider `application/contracts.py`、S05 | no | `cmp` pass、IMPLEMENT-S05-r1 | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_artifact_doc.py` | completed shared allocation | Issue317 | New/import共通のlock内blank allocation | S01 | no | TC317-S01-01/02、IMPLEMENT-S01-r2 | pass (S90-SPEC-r3) |
+| `spec-dock/scripts/spec_dock_runtime/application/create_artifact_doc.py` | completed projection | Issue317 | Provider shared allocatorのdogfood mirror | Provider `application/create_artifact_doc.py`、S05 | no | `cmp` pass、IMPLEMENT-S05-r1 | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_artifact.py` | completed import use case | Issue317 | Guard、allocation、bounded collision、committed classification | S01–S04 | no | TC317-S03/S04、IMPLEMENT-S03-r1/S04-r1 | pass (S90-SPEC-r3) |
+| `spec-dock/scripts/spec_dock_runtime/application/import_artifact.py` | completed projection | Issue317 | Provider import use caseのdogfood mirror | Provider `application/import_artifact.py`、S05 | no | `cmp` pass、manual import success | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` | completed runtime port | Issue317 | Workbench guard/binary publisher ports | S02 | no | Binary port tests、IMPLEMENT-S02-r4 | pass (S90-SPEC-r3) |
+| `spec-dock/scripts/spec_dock_runtime/application/ports.py` | completed projection | Issue317 | Provider portsのdogfood mirror | Provider `application/ports.py`、S05 | no | `cmp` pass、dogfood validate | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` | completed runtime wiring | Issue317 | Filesystem guard/publisher/use case wiring | S03 | no | CLI runtime tests、IMPLEMENT-S03-r1 | pass (S90-SPEC-r3) |
+| `spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py` | completed projection | Issue317 | Provider bootstrapのdogfood mirror | Provider `cli/bootstrap.py`、S05 | no | `cmp` pass、manual import success | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py` | completed CLI parser/help | Issue317 | `artifact import chatgpt-output` args/help | S03 | no | TC317-S03-01/04、manual help | pass (S90-SPEC-r3) |
+| `spec-dock/scripts/spec_dock_runtime/cli/parser.py` | completed projection | Issue317 | Provider parser/helpのdogfood mirror | Provider `cli/parser.py`、S05 | no | `cmp` pass、dogfood help | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py` | completed CLI registration | Issue317 | Import leaf handler登録 | S03 | no | Parser/registry tests、IMPLEMENT-S03-r1 | pass (S90-SPEC-r3) |
+| `spec-dock/scripts/spec_dock_runtime/cli/registry.py` | completed projection | Issue317 | Provider registryのdogfood mirror | Provider `cli/registry.py`、S05 | no | `cmp` pass、dogfood help | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/artifact_import.py` | completed command adapter | Issue317 | CLI request構築、text/JSON outcome | S03 | no | Command/presentation tests | pass (S90-SPEC-r3) |
+| `spec-dock/scripts/spec_dock_runtime/commands/artifact_import.py` | completed projection | Issue317 | Provider command adapterのdogfood mirror | Provider `commands/artifact_import.py`、S05 | no | `cmp` pass、manual JSON success | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py` | completed filesystem adapter | Issue317 | Opaque binary stage/hash/descriptor no-replace/durability/cleanup | S02/S04 | no | Focused publisher/fault tests、IMPLEMENT-S02-r4/S04-r1 | pass (S90-SPEC-r3) |
+| `spec-dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py` | completed projection | Issue317 | Provider publisherのdogfood mirror | Provider `infra/binary_artifact_publisher.py`、S05 | no | `cmp` pass、manual SHA/cmp success | pass (S90-SPEC-r3) |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` | completed text/JSON presentation | Issue317 | Content-free success/error/warning fields | S03/S04 | no | Presentation tests、IMPLEMENT-S03-r1/S04-r1 | pass (S90-SPEC-r3) |
+| `spec-dock/scripts/spec_dock_runtime/presentation/cli_text.py` | completed projection | Issue317 | Provider presentationのdogfood mirror | Provider `presentation/cli_text.py`、S05 | no | `cmp` pass、manual JSON/content-free output | pass (S90-SPEC-r3) |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
@@ -501,4 +554,31 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - Commit closure:
   - Implementation/evidence/report commit: `bdc0d921598a14b1ecf59b7cdc00949be3b0de28` (`feat(artifact): dogfood環境へimport機能を反映`)。
   - Push成功。Post-push tracked status clean、upstream `0 0`。Ignored Workbench sourceはmanual evidenceのsource survival証跡として残存。
+
+### S90 Docs impact resolution — 2026-07-14
+
+- Inspection scope: Root README、provider docs/templates、Artifact rules/naming、workflow spec/ChatGPT authoring docs、planning/ChatGPT skills、migration ownership、S01–S05 changed paths。
+- Observed impact:
+  - Current public docsは`new artifact`とWorkbenchから`artifacts/`への明示的昇格を説明するが、新しい`artifact import chatgpt-output`のpublic usage/authority checkpointは未記載。
+  - Runtimeを誤解なく公開するにはcommand reference、byte-preserving/evidence-only contract、migration/distribution説明が必要。ただしParent EpicはこれをIssue319 W5へ明示割当済み。
+  - ChatGPT Firstのcanonical rewrite前preservation checkpoint、standalone/inline/ZIP branch、EAL/exceptionはIssue318 W4の明示責務。
+  - Existing Artifact rule docs/templatesはblank grammarを正しく受理しており、Issue317でtyped catalog/templateを追加するとaccepted coexistence contractに反する。
+- Disposition:
+  - Issue317での恒久docs変更はapproved-no-op候補。
+  - Workflow/skillsはIssue318へdefer。README/reference/migration/fresh init/update/public distributionはIssue319へdefer。Owner/reason/dependencyは一意で、Issue317 runtime closureをblockしない。
+- Verification:
+  - `git diff --name-only`でS01–S05 changed surfaceを確認。
+  - `rg`でREADME/docs/templates/workflow/skillsの`artifact import` / `new artifact` / Workbench inventoryを確認。
+  - Parent Epic requirement/design/planのW4/W5 allocation、G5/G6、rollout/docs impactを照合。
+  - S90 r1 P1を受け、provider/dogfoodのREADME、guide、reference、workflow、authoring-pack、4 skills、3 scope rule、template、migration absence、runtime helpを実パス別にDocs Impact matrixへ展開し、disposition/owner/reason/dependency/blocking/evidenceを固定。
+  - S90 r2 P1を受け、最後に残ったruntime grouped surfaceもprovider/dogfood 10ファイルそれぞれの独立行へ展開。
+- Test contract closure:
+  - `TC317-S90-01` / `C317-11`: pass。全50 pathをIssue317 completed / Issue318 defer / Issue319 defer / approved-no-opへ分類。
+  - `TC317-S90-02` / `C317-11`: pass。r1/r2 findings修正後、fresh r3 findingsなし、confidence 0.99。
+- Reviewer:
+  - r1 P1: grouped docs surfaceを実パス別へ展開。
+  - r2 P1: grouped runtime surfaceをprovider 10/dogfood 10の独立実パスへ展開。
+  - Fresh r3: findingsなし、pass。Actionable owner欠落なし、N/Aはapproved-no-opだけ、W4/W5 relay/依存整合を確認。
+- Step Result Approval:
+  - Issue317恒久docs変更はapproved-no-op。Issue318/319へのdeferはnon-blockingかつowner/dependency/evidence確定済み。Report-only commit後にS99へ進む。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
