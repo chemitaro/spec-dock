@@ -4268,6 +4268,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "application/authoring_pack/github_sync_preflight.py",
             "application/authoring_pack/github_fetch_policy.py",
             "domain/authoring_pack/preflight_contract.py",
+            "domain/authoring_pack/source_manifest.py",
             "infra/authoring_pack/git_fetch.py",
             "infra/authoring_pack/preflight_receipt_writer.py",
             "presentation/authoring_pack/diagnostics.py",
