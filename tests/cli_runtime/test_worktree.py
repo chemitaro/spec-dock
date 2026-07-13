@@ -982,6 +982,44 @@ class TestCliWorktree(CliRuntimeHarness):
             assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
             assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
 
+    def test_worktree_remove_deletes_nonempty_workbench_without_special_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "sample-repo"
+            central_root = Path(tmp) / "central-worktrees"
+            target.mkdir()
+            self._prepare_git_repo(target)
+
+            created = self._run_runtime_capture(
+                target, ["worktree", "create", "workbench"], env=self._worktree_env(central_root)
+            )
+            assert created.returncode == 0, created.stderr
+            worktree_path = central_root / "sample-repo" / "sample-repo-workbench"
+            branch = self._run_git(
+                target, ["branch", "--list", "*-workbench", "--format=%(refname:short)"]
+            ).stdout.strip()
+            assert branch
+            workbench_file = worktree_path / "spec-dock" / ".workbench" / "nested" / "scratch.bin"
+            workbench_file.parent.mkdir(parents=True)
+            workbench_file.write_bytes(b"\x00workbench scratch\xff")
+
+            removed = self._run_runtime_capture(
+                target,
+                ["worktree", "remove", "workbench", "--json"],
+                env=self._worktree_env(central_root),
+            )
+
+            assert removed.returncode == 0, removed.stderr or removed.stdout
+            payload = json.loads(removed.stdout)
+            assert payload["status"] == "ok"
+            assert payload["removed_record"]
+            assert payload["removed_directory"]
+            assert payload["resolved_target"]["remove_blockers"] == []
+            assert not payload["branch_deleted"]
+            assert not worktree_path.exists()
+            assert not workbench_file.exists()
+            assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
+            assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
+
     def test_worktree_remove_tracked_modification_default_removes_directory_and_keeps_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "sample-repo"
