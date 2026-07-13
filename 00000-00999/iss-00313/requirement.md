@@ -3,7 +3,7 @@
 ID: "iss-00313"
 タイトル: "PR Merge Preparer の修復回数制限を廃止し、証拠駆動の継続判定へ置換する"
 関連GitHub: ["#313"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-13"
 親: ["epic-00158", "init-local-00003"]
@@ -336,7 +336,7 @@ ChatGPT consultationが利用不能な場合に、humanが対象invocation、許
 - GitHub Issueのライフサイクル変更。
 - 無関係な文書 / skillへのretry方針の展開。
 - 過去の成果物の一括移行。
-- `.assurance.json` の変更。
+- assuranceのprofile、authority、schema、classificationの手動変更（標準`assurance classify`によるcanonical `source_binding` SHA refreshは除く）。
 
 ### 7.3 変更禁止
 
@@ -496,6 +496,7 @@ ChatGPT consultationが利用不能な場合に、humanが対象invocation、許
   - デフォルトではブランチ変更を委任しない。
   - バッチに状態と理由を残す。
   - 人間ゲートへ進む。
+  - 鮮度切れの場合は先に相談の更新を試み、更新と定義済みの復旧経路がhard-unrecoverableとなった場合だけ手動フォールバックの対象にする。
   - 人間が1回の呼び出しに限定した手動フォールバックを明示承認した場合だけ、承認範囲内のローカル分析、オーケストレーターの採否判断、範囲を限定した検証を経て委任可否を再評価できる。
   - フォールバックの証拠には承認元、呼び出し識別子、許可範囲、理由、失効条件、手動分析、採否判断を含め、相談成功とは表示しない。
 - 関連: `BH-003`, `BH-007`
@@ -552,7 +553,8 @@ ChatGPT consultationが利用不能な場合に、humanが対象invocation、許
 
 - 操作: 差分を確認する。
 - 期待結果:
-  - 観測スクリプト、実行時コマンド、GitHub変更ロジック、assuranceメタデータに変更がない。
+  - 観測スクリプト、実行時コマンド、GitHub変更ロジックに変更がない。
+  - assuranceのprofile、authority、schema、classificationを手動変更しない。ただしcanonical docs変更後にSpecDockの標準`assurance classify`が行うissue-local `source_binding` SHA refreshは許可し、authority変更とは扱わない。
   - P2/P3だけの場合の変更ポリシーに変更がない。
 - 関連: `CON-004`, `CON-005`, `CON-009`
 
@@ -681,7 +683,7 @@ ChatGPTの出力と本パックは証拠限定である。正本への反映に�
 
 ### CON-002: 認可済みプロファイルを主張しない
 
-`strict` は推奨案である。`.assurance.json`、分類、承認済みプロファイルを変更または決定しない。
+`strict` は推奨案でありauthorityではない。assuranceのprofile、authority、schema、classificationを手動変更または決定しない。canonical docs変更後に標準`assurance classify`が行うissue-local `source_binding` SHA refreshはauthority変更として扱わない。
 
 ### CON-003: プロバイダーソース優先
 
@@ -697,7 +699,7 @@ ChatGPTの出力と本パックは証拠限定である。正本への反映に�
 
 ### CON-006: ブロッキングなブランチ変更には相談が必須
 
-ブロッキングな修復の委任には新鮮な相談証拠が必要である。失敗 / 利用不能 / 拒否 / 危険 / 鮮度切れの場合、デフォルトでは人間ゲートとする。唯一の例外は、人間が対象の呼び出しに限定して明示承認した1回の呼び出し限定の手動フォールバックであり、恒久的な免除または相談成功として扱わない。
+ブロッキングな修復の委任には新鮮な相談証拠が必要である。失敗 / 利用不能 / 拒否 / 危険 / 鮮度切れの場合、デフォルトでは人間ゲートとする。鮮度切れはrefresh-firstとし、更新と定義済みの復旧経路がhard-unrecoverableとなった場合だけフォールバック対象へ移る。唯一の例外は、人間が対象の呼び出しに限定して明示承認した1回の呼び出し限定の手動フォールバックであり、恒久的な免除または相談成功として扱わない。
 
 ### CON-007: 数値による停止権限を設けない
 

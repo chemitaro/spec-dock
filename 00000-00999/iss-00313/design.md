@@ -3,7 +3,7 @@
 ID: "iss-00313"
 タイトル: "PR Merge Preparer の証拠駆動型修復継続ポリシー"
 保証プロファイル: "standard"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-13"
 関連要件: ["requirement.md"]
@@ -163,7 +163,7 @@ repository-wide accepted rules / parent contracts
 
 ADR候補:
 
-- このIssueだけのスキルローカル契約としては新規ADR不要。
+- 固定回数から証拠駆動の継続判定へ authority を移す判断は、Issue-local ADR `artifacts/20260713t040923z-adr-evidence-gated-pr-repair-continuation.md` として採用する。
 - 3つ以上の無関係なスキルへ証拠ゲート付き再試行を展開する場合、スキル横断ADRを検討する。
 
 ## 6. 現在の状態と目標状態
@@ -676,6 +676,7 @@ orchestrator_disposition_summary
 | `tests/cli_runtime/test_new.py` | 生成されたpr-repair-batchが新マーカーを含み、旧制限を除外し、メタデータとパスを維持すること |
 | `tests/cli_runtime/test_runtime_new_doc_s09.py` | 文書・成果物種別の選択とテンプレート同等性が引き続き機能し、内容契約が更新されること |
 | `tests/cli_runtime/test_wrappers.py` | インストール済み・ドッグフーディング用スキルとテンプレートの投影がプロバイダーの意味と一致し、旧制限マーカーがないこと |
+| `tests/unit/infra/test_init_update.py` | 既存のIssue 105回帰契約を数値上限から証拠駆動継続へ更新し、維持対象のhard gateと禁止操作を引き続き固定すること |
 
 ### 13.3 生成物 / ドッグフーディングの検証対象
 
@@ -693,6 +694,8 @@ orchestrator_disposition_summary
 - 成果物投影と無関係なGitHubワークフローまたはアクションのコード
 - `.assurance.json`
 - このパック後にメインオーケストレーターが明示的に採用する場合を除く、無関係なIssue・Epic・Initiativeの正本文書
+
+`source_binding`例外: canonical requirement/design/plan変更後にSpecDock標準の`assurance classify`がissue-local `.assurance.json`のsource SHAだけを更新することは許可する。profile、authority、schema、classificationの手動変更は禁止する。
 
 ## 14. 互換性と移行
 
