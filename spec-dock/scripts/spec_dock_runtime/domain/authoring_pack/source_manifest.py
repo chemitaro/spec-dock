@@ -38,7 +38,7 @@ def build_source_manifest(repo_root: Path, source_paths: tuple[str, ...]) -> Sou
     selected_paths: list[str] = []
     for source_path in paths:
         raw = Path(source_path)
-        if _has_workbench_component(raw):
+        if _has_repo_relative_workbench_component(repo_root, raw):
             continue
         path = raw if raw.is_absolute() else repo_root / raw
         if not path.exists():
@@ -81,7 +81,7 @@ def source_path_blockers(repo_root: Path, source_paths: tuple[str, ...]) -> tupl
     root = repo_root.resolve()
     for source_path in effective_source_paths(source_paths):
         raw = Path(source_path)
-        if _has_workbench_component(raw):
+        if _has_repo_relative_workbench_component(repo_root, raw):
             blockers.append(f"unsafe_source_path:workbench:{source_path}")
             continue
         if not raw.is_absolute() and ".." in raw.parts:
@@ -145,6 +145,22 @@ def _is_ignored_manifest_path(path: Path) -> bool:
 
 def _has_workbench_component(path: Path) -> bool:
     return ".workbench" in path.parts
+
+
+def _has_repo_relative_workbench_component(repo_root: Path, path: Path) -> bool:
+    lexical_path = path if path.is_absolute() else repo_root / path
+    for root in (repo_root.absolute(), repo_root.resolve()):
+        try:
+            lexical_relative = lexical_path.absolute().relative_to(root)
+        except ValueError:
+            continue
+        if _has_workbench_component(lexical_relative):
+            return True
+    try:
+        relative = lexical_path.resolve(strict=False).relative_to(repo_root.resolve())
+    except ValueError:
+        return False
+    return _has_workbench_component(relative)
 
 
 def _has_repo_relative_symlink_component(repo_root: Path, path: Path) -> bool:
