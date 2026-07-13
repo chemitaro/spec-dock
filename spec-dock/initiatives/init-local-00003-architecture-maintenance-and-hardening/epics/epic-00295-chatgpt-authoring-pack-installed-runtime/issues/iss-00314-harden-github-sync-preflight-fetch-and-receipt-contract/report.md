@@ -242,6 +242,7 @@ Implementation and local quality gates are complete. External PR delivery remain
 - canonical planning changes: `98b2454def27f404e4039ea1198574eb7959668b`
 - implementation commits: C1 `a7a35f311871dc05cd3d4038774fda3d387c6984`; C2 `3b28c12badcbb74f4795d5e1b2e6610bbb762766`; C3 `84ab6ca015ccaa0c4b473d06720437687e15a85f`; C4 `f5a24a8aebe16004e9aca3cca70b5bf08a3a19da`; C5 `41bfbb24b237bd19beb7df2e35de191584931f0f`; repairs `90297109556c59e993834097013f5cc197c53223`, `7d912ff0102dd1b53aeb767c98d136d0099814ef`, `b5d8edeca7600cbe007dab47feb5e68fe7acc5fd`
 - PR repair U001: `411510b66abd3dcd137fbed598606065134457e5` (Ruff format only; fresh code review pass)
+- PR repair U002: `4429681577c46d891ac59fb6ad7e0968352077f6` (credential query redaction; fresh code review pass)
 
 ## Docs Impact
 
@@ -256,7 +257,7 @@ Implementation and local quality gates are complete. External PR delivery remain
 - issue-wide code reviewer: passed
 - final spec reviewer: passed
 - PR Delivery Gate: PR #321 created ready against `main`; initial head `a2bb97369031b24c892d21836559a238c938ce52`; `Closes #314`
-- Merge Preparation Gate: initial observation failed required Provider CI static-format gate; repair batch/U001 implemented and fresh-reviewed; re-observation pending
+- Merge Preparation Gate: U001 fixed required Provider CI format gate。second observation found one P1 credential-redaction blocker and six non-blocking P2 families; U002 implemented/fresh-reviewed; next-head observation pending
 - completion decision: local complete; external delivery incomplete
 
 ## Current blockers and next action
