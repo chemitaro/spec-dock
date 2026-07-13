@@ -132,9 +132,11 @@ Implementation has not started. The following ledgers are intentionally initiali
 | Step | Worker | State | Reason / next action |
 |---|---|---|---|
 | M0 | main orchestrator | passed | runtime guidance ready、explicit execution authorization、focused baseline 49 passed |
+| M1 / C1 | utility-worker | committed | `a7a35f311871dc05cd3d4038774fda3d387c6984`、focused `30 passed, 389 deselected`、post-commit clean |
 | S01 | dev-coder | passed | fresh code review failed once、bounded repair後のfresh re-review passed |
 | S02 | dev-coder | passed | fresh code review failed once、HTTP5xx/TLS identity fixtures修正後のfresh re-review passed |
-| S03-S06 | dev-coder | not_started | S03 is next after C1 commit |
+| S03 | dev-coder | passed | fresh code review failed once、symlink例外撤去とtarget境界test後のfresh re-review passed |
+| S04-S06 | dev-coder | not_started | S04 is next after C2 commit |
 | S90 | doc-writer | not_started | depends on stable implemented contract |
 | S99 | reviewers | not_started | depends on all prior step closures |
 
@@ -149,7 +151,10 @@ Implementation has not started. The following ledgers are intentionally initiali
 - S02 Red: policy module不在によりfocused collectionが`ModuleNotFoundError`。
 - S02 Green: conservative classifier、same-shape bounded retry、safe diagnosticを実装。initial expanded lane `30 passed, 384 deselected`。
 - S02 review repair: HTTP 5xxをbounded retry、TLS certificate/auth/publickeyをnon-retry分類へ固定。final focused unit `30 passed`、CLI `21 passed, 368 deselected`。
-- next action: M1 commit candidate C1
+- S03 Red: receipt writer module / `--output-dir`不在を確認。
+- S03 Green: external existing directory限定、fixed filename、atomic JSON publication、ownership/digest/publication evidenceを実装。focused writer/CLI `19 passed`、expanded authoring lane `436 passed, 1 skipped`。
+- S03 review repair: system symlink例外を撤去し、target symlink/directory/unsupported schema/oversizeのunchanged rejectionを追加。final writer `18 passed`、CLI `5 passed, 389 deselected`、Ruff/mypy pass。
+- next action: M2 commit candidate C2
 
 ### Step Contract Closure
 
@@ -157,6 +162,8 @@ Implementation has not started. The following ledgers are intentionally initiali
 - evidence: CLOS-001〜004とCLOS-008のS01部分、fresh code-reviewer re-review pass、`git diff --check` pass
 - S02: passed / Result Approval granted
 - evidence: CLOS-002、003、005、006、007、fresh code-reviewer re-review pass、same-shape 2 attempts/250ms、unknown fail-closed、redaction上限を確認
+- S03: passed / Result Approval granted
+- evidence: CLOS-009〜011、fresh code-reviewer re-review pass、external-only path policy、atomic replacement、old receipt preservation、publication failure separationを確認
 - required closure IDs: CLOS-001 through CLOS-021
 - evidence source: plan step closure contracts and future execution results
 
@@ -169,15 +176,15 @@ Implementation has not started. The following ledgers are intentionally initiali
 ### Closure Coverage / Delta
 
 - planned coverage: CLOS-001 through CLOS-021
-- observed coverage: S01〜S02 CLOS-001〜008（CLOS-008はlater stepとの統合確認を残す）
-- delta: S03以降 pending
+- observed coverage: S01〜S03 CLOS-001〜011（統合確認を残す）
+- delta: S04以降 pending
 
 ### Commit Evidence
 
 - planning scaffold commit: `fa98df44c28b0dc09e35d322c7186eacf904820e`
 - research artifact commit: `48a26046c185c9563d073543e66404c8c8c4178f`
 - canonical planning changes: `98b2454def27f404e4039ea1198574eb7959668b`
-- implementation commits: none
+- implementation commits: C1 `a7a35f311871dc05cd3d4038774fda3d387c6984`
 
 ## Docs Impact
 
