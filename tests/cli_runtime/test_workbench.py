@@ -9,6 +9,21 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 class TestCliWorkbench(CliRuntimeHarness):
+    @staticmethod
+    def _assert_content_free_error(payload: dict[str, object], *, code: str, side: str | None) -> None:
+        assert payload == {
+            "status": "error",
+            "command": "copy",
+            "code": code,
+            "side": side,
+            "mutation_started": False,
+            "experimental": True,
+            "canonical": False,
+            "disposable": True,
+            "one_shot": True,
+            "sync": False,
+        }
+
     def _prepare_linked_worktrees(self, root: Path) -> tuple[Path, Path, str, Path, Path]:
         if shutil.which("git") is None:
             pytest.skip("git not available")
@@ -55,6 +70,35 @@ class TestCliWorkbench(CliRuntimeHarness):
             assert "--to" in result.stdout
             assert "--json" in result.stdout
             assert "--from" not in result.stdout
+            assert "experimental" in result.stdout.lower()
+            assert "non-canonical" in result.stdout.lower()
+            assert "disposable" in result.stdout.lower()
+            assert "one-shot" in result.stdout.lower()
+            assert "does not synchronize" in result.stdout.lower()
+
+    @pytest.mark.parametrize("forbidden_option", ["--from", "--root", "--date", "--path"])
+    def test_workbench_copy_rejects_unpublished_source_and_scope_routes(self, forbidden_option: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "repo"
+            source.mkdir()
+            assert main(["init", str(source)]) == 0
+
+            result = self._run_runtime_capture(
+                source,
+                [
+                    "workbench",
+                    "copy",
+                    "--scope",
+                    "iss-00003",
+                    "--to",
+                    "target",
+                    forbidden_option,
+                    "must-not-be-accepted",
+                ],
+            )
+
+            assert result.returncode != 0
+            assert "unrecognized arguments" in result.stderr
 
     def test_workbench_copy_uses_target_scope_record_and_keeps_output_content_free(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -86,13 +130,53 @@ class TestCliWorkbench(CliRuntimeHarness):
 
             assert json_result.returncode == 0, json_result.stderr
             payload = json.loads(json_result.stdout)
-            assert payload["status"] == "ok"
-            assert payload["command"] == "copy"
-            assert payload["experimental"] is True
-            assert payload["canonical"] is False
-            assert payload["one_shot"] is True
-            assert payload["sync"] is False
+            assert payload == {
+                "status": "ok",
+                "command": "copy",
+                "scope": scope_id,
+                "source_worktree": payload["source_worktree"],
+                "target_worktree": payload["target_worktree"],
+                "target_workbench_path": str(target_scope.resolve() / ".workbench"),
+                "experimental": True,
+                "canonical": False,
+                "disposable": True,
+                "one_shot": True,
+                "sync": False,
+            }
             assert secret_body.strip() not in json_result.stdout
+
+    def test_workbench_copy_selector_failure_uses_content_free_workbench_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "repo"
+            source.mkdir()
+            assert main(["init", str(source)]) == 0
+            self._create_same_repo_linked_hierarchy(source)
+            secret_selector = "missing-secret-target-body"
+
+            result = self._run_runtime_capture(
+                source,
+                ["workbench", "copy", "--scope", "iss-00003", "--to", secret_selector, "--json"],
+            )
+
+            assert result.returncode == 1, result.stderr
+            payload = json.loads(result.stdout)
+            self._assert_content_free_error(payload, code="target_not_found", side="target")
+            assert secret_selector not in result.stdout + result.stderr
+
+    def test_workbench_copy_invalid_scope_uses_stable_content_free_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "repo"
+            source.mkdir()
+            assert main(["init", str(source)]) == 0
+            self._create_same_repo_linked_hierarchy(source)
+
+            result = self._run_runtime_capture(
+                source,
+                ["workbench", "copy", "--scope", "init-local-00003", "--to", "missing", "--json"],
+            )
+
+            assert result.returncode == 1, result.stderr
+            self._assert_content_free_error(json.loads(result.stdout), code="invalid_scope", side=None)
 
     def test_workbench_copy_reports_no_source_without_changing_existing_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -108,9 +192,7 @@ class TestCliWorkbench(CliRuntimeHarness):
 
             assert result.returncode == 1, result.stderr
             payload = json.loads(result.stdout)
-            assert payload["code"] == "no_source"
-            assert payload["side"] == "source"
-            assert payload["mutation_started"] is False
+            self._assert_content_free_error(payload, code="no_source", side="source")
             assert sentinel.read_text(encoding="utf-8") == "target-only\n"
 
     def test_workbench_copy_accepts_empty_source_workbench(self) -> None:
@@ -184,8 +266,36 @@ class TestCliWorkbench(CliRuntimeHarness):
 
             assert result.returncode == 1, result.stderr
             payload = json.loads(result.stdout)
-            assert payload["code"] == "unsafe_path"
-            assert payload["side"] == "target"
-            assert payload["mutation_started"] is False
+            self._assert_content_free_error(payload, code="unsafe_path", side="target")
             assert sentinel.read_text(encoding="utf-8") == "external sentinel\n"
             assert not any(external_specdock.rglob("source.txt"))
+
+    def test_copied_fake_metadata_adr_and_dependency_remain_opaque_to_runtime_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source, target, scope_id, source_scope, target_scope = self._prepare_linked_worktrees(Path(tmp))
+            source_workbench = source_scope / ".workbench"
+            opaque_payloads = {
+                "fake-node/.meta.json": b"not valid node metadata\n",
+                "decisions/adr-999.md": b"# fake ADR secret body\n",
+                "dependency.yml": b"depends_on: [iss-99999]\n",
+            }
+            for relative, body in opaque_payloads.items():
+                path = source_workbench / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(body)
+
+            copy_result = self._run_runtime_capture(
+                source,
+                ["workbench", "copy", "--scope", scope_id, "--to", target.name],
+            )
+
+            assert copy_result.returncode == 0, copy_result.stderr
+            assert {
+                relative: (target_scope / ".workbench" / relative).read_bytes() for relative in opaque_payloads
+            } == (opaque_payloads)
+            validate_result = self._run_runtime_capture(target, ["validate"])
+            sync_result = self._run_runtime_capture(target, ["sync"])
+            deps_result = self._run_runtime_capture(target, ["deps", "check", "--id", scope_id, "--no-github"])
+            assert validate_result.returncode == 0, validate_result.stderr
+            assert sync_result.returncode == 0, sync_result.stderr
+            assert deps_result.returncode == 0, deps_result.stderr

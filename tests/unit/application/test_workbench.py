@@ -175,6 +175,18 @@ def test_copy_resolves_same_scope_id_independently_when_slugs_differ(tmp_path):
     assert node_repo.calls == [ports.specdock_dir, tmp_path / "target" / "spec-dock"]
 
 
+def test_copy_normalizes_trimmed_uppercase_scope_id(tmp_path):
+    contracts, workbench, ports, filesystem, _, scope_id, source_scope, target_scope = _fixture(tmp_path)
+
+    result = workbench.workbench_copy(
+        contracts.WorkbenchCopyRequest(scope_id=f"  {scope_id.upper()}  ", target="target"),
+        ports,
+    )
+
+    assert result.scope_id == scope_id
+    assert filesystem.copy_calls == [(source_scope / ".workbench", target_scope / ".workbench")]
+
+
 @pytest.mark.parametrize("scope_id", ["init-local-00003", "task-00003", "3"])
 def test_invalid_scope_identifier_is_stable_and_precedes_inventory(tmp_path, scope_id):
     contracts, workbench, ports, filesystem, node_repo, _, _, _ = _fixture(tmp_path)

@@ -16,6 +16,7 @@ from spec_dock_runtime.commands import (
     uninstall as uninstall_commands,
     update as update_commands,
     validate as validate_commands,
+    workbench as workbench_commands,
     workflow as workflow_commands,
     worktree as worktree_commands,
 )
@@ -37,6 +38,7 @@ def build_registry() -> CommandRegistry:
     items.update(uninstall_commands.command_specs())
     items.update(issue_commands.command_specs())
     items.update(worktree_commands.command_specs())
+    items.update(workbench_commands.command_specs())
     items.update(sync_commands.command_specs())
     items.update(deps_commands.command_specs())
     items.update(validate_commands.command_specs())

@@ -232,6 +232,23 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "worktree_remove",
     )
 
+    p_workbench = sub.add_parser(
+        "workbench",
+        help="Run explicit experimental operations on non-canonical Workbench content",
+    )
+    workbench_sub = p_workbench.add_subparsers(dest="workbench_cmd", required=True)
+    _bind_leaf(
+        workbench_sub.add_parser(
+            "copy",
+            help=(
+                "Experimental one-shot copy of disposable, non-canonical scoped Workbench content "
+                "to another worktree without synchronization"
+            ),
+        ),
+        registry,
+        "workbench_copy",
+    )
+
     _bind_leaf(
         sub.add_parser("sync", help="Generate index.json/tree.json (optionally enrich from GitHub)"),
         registry,

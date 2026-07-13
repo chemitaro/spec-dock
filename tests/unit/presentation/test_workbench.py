@@ -36,7 +36,11 @@ def test_workbench_copy_failure_output_is_content_free_and_noncanonical() -> Non
     assert secret not in raw_json
     assert "copy_failed" in combined_text
     assert "mutation_started=true" in combined_text
-    assert "canonical" not in combined_text
+    assert "experimental=true" in combined_text
+    assert "canonical=false" in combined_text
+    assert "disposable=true" in combined_text
+    assert "one_shot=true" in combined_text
+    assert "sync=false" in combined_text
     assert "rollback" not in combined_text
     assert payload == {
         "status": "error",
@@ -46,6 +50,7 @@ def test_workbench_copy_failure_output_is_content_free_and_noncanonical() -> Non
         "mutation_started": True,
         "experimental": True,
         "canonical": False,
+        "disposable": True,
         "one_shot": True,
         "sync": False,
     }
