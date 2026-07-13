@@ -257,7 +257,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S01 | committed | Runtime shared allocation + focused tests + observed report | `7b1afe5e0824280611a0deae4665d2d680d1484f` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | read-only confirmation complete |
 | S02 | committed | Binary guard/publisher contracts + focused tests + observed report | `22006f5e2e4052bd9024e7180094e9a5b6996de8` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r4 pass、read-only post-push confirmation complete |
 | S03 | committed | Public import vertical slice + focused tests + observed report | `e2197cc85eff304d895919a18b1327aa8cd72db2` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
-| S04 | ready | Collision/fault hardening + deterministic tests + observed report | pending commit | pending | N/A | N/A | N/A | fresh code-reviewer r1 pass |
+| S04 | committed | Collision/fault hardening + deterministic tests + observed report | `18be850a32e4ee1460fc3a7dd1b9b44d5dfae575` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -456,4 +456,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
   - Retry boundをcurrent candidate spaceと同じ100回に具体化。Required closure expectationとstep orderは不変、plan amendment不要。
 - Ledger disposition:
   - D-317-004をapplied。将来suffix grammar変更時の同期見直しをfollow-up条件として記録。
+- Commit closure:
+  - Implementation/report commit: `18be850a32e4ee1460fc3a7dd1b9b44d5dfae575` (`feat(artifact): importの競合・障害境界を強化`)。
+  - Push成功。Post-push `git status --short` clean、upstream `0 0`。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
