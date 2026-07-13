@@ -3,7 +3,7 @@
 ID: "iss-00313"
 タイトル: "Remove PR Merge Preparer Repair Attempt Limits"
 関連GitHub: ["#313"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-13"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 解決済み（resolved） | 運用 / 範囲 / 互換性 | product owner + ChatGPT-Use consultation + orchestrator | 固定回数撤廃後の無限反復防止、mandatory consultation範囲、repair-batch authority、fallback、legacy template compatibilityを確定する必要がある | fixed count only; unlimited repair; progress-based integrated batch with ChatGPT body candidate | progress-based継続、stagnation human gate、blocking/uncertain時mandatory consultation、runtime identityを保持するbody-only adoption、batch内analysis/design/plan/result統合、明示waiver以外fail-closed、legacy template同期 | blocker-centric ADRを維持しつつ、mandatory external consultationとintegrated batch authorityをADR candidateとしてrouteする | design 昇格 / ADR 昇格 / plan 昇格（promoted_to_design / promoted_to_adr / promoted_to_plan） | `artifacts/20260713t013418z-disc-adopted-integrated-pr-repair-workflow-synthesis.md`; raw transcript SHA-256 `3ac6307f23c073eddb7608ac8878234596a27b0590b4b8003817e12dc96fe7ab` | requirement/design/plan authoring; ADR facilitation |
+| D-001 | 未解決（open） | 運用 / 範囲 / 互換性 | product owner + ChatGPT-Use consultation + orchestrator | 固定回数撤廃後の無限反復防止、mandatory consultation範囲、repair-batch authority、fallback、legacy template compatibilityを確定する必要がある | fixed count only; unlimited repair; progress-based integrated batch with ChatGPT body candidate | progress-based継続、stagnation human gate、blocking/uncertain時mandatory consultation、runtime identityを保持するbody-only adoption、batch内analysis/design/plan/result統合、明示waiver以外fail-closed、legacy template同期 | blocker-centric ADRを維持しつつ、mandatory external consultationとintegrated batch authorityをADR candidateとしてrouteする | 設計昇格準備中（design/ADR facilitation pending） | `requirement.md`; `artifacts/20260713t013418z-disc-adopted-integrated-pr-repair-workflow-synthesis.md`; raw transcript SHA-256 `3ac6307f23c073eddb7608ac8878234596a27b0590b4b8003817e12dc96fe7ab` | design/plan authoringと並行してADR facilitationし、Issue Execution前にresolvedへ更新 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -67,6 +67,11 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-002 | 採用（`adopted`） | product-owner raw proposal | requirement/design/plan | ChatGPT-Use consultationとintegrated repair-batchをprimary workflowにするowner intentを原文で保持した | `artifacts/20260713t005848z-user-proposal-chatgpt-assisted-integrated-pr-repair-batch.md` | canonical authoring |
 | EAL-003 | 採用（`adopted`） | ChatGPT-Use raw consultation / 調査（`research`） | requirement/design/plan/ADR candidate | Raw transcript全体と検証済みsynthesisを採用。ChatGPT outputはadvisory evidenceであり、runtime identityとcanonical adoptionはlocal orchestratorが所有する | `artifacts/20260713t012618z-chatgpt-raw-integrated-pr-repair-workflow-consultation.md`; `artifacts/20260713t011949z-research-chatgpt-consultation-integrated-pr-repair-workflow.md` | canonical authoring; ADR facilitation |
 | EAL-004 | 採用（`adopted`） | product-owner interview / 議論（`discussion`） | requirement/design/plan/ADR candidate | Raw分析レポート案の全面採用によりmandatory scope、fallback、legacy compatibilityを解決し、採用contractを一つのsynthesisへ統合した | `artifacts/20260713t012046z-interview-mandatory-chatgpt-consultation-scope.md`; `artifacts/20260713t013418z-disc-adopted-integrated-pr-repair-workflow-synthesis.md` | requirement phase authoring; ADR facilitation |
+| EAL-005 | 一部採用（`partially_adopted`） | ChatGPT 5.6 Pro Issue planning pack / local-context | requirement/design/plan | single-Issue境界、strict推奨、semantic continuation gate、integrated batch、consultation authority、provider-first変更面、test/rollback方針を採用した。candidate固有のauthority文言、未検証主張、採用前チェック状態は正本へ持ち込まずlocal evidenceに合わせて修正した | `artifacts/20260713t025134z-draft-requirement-chatgpt56-issue-requirement-candidate.md`; `artifacts/20260713t034500z-chatgpt-raw-chatgpt56-issue-planning-transcript.md` SHA-256 `ca44fdb2e6ef35f7fc49cb87455fbd153fb9ced8a03988c154c5f9af70525327`; source manifest SHA-256 `5a10d9f35e84419daf6e8bd37b2886a2bea7d4ee723693e7de1b59abe7af530d` | canonical requirement/design/plan integration; fresh spec review |
+| EAL-006 | 採用（`adopted`） | ChatGPT 5.6 Pro authoring transport / local mechanical reconstruction | planning evidence provenance | 初回ZIPはprovenance表現とscanner抵触語によりreject。同一ChatGPT conversationへ修正を依頼したが修正版attachment取得がtransport failureとなったため、指示された限定的metadata/語句修正とmanifest再計算のみを初回packへ機械適用した。再構築ZIPはpack review pass。ChatGPTが生成した取得不能ZIPとのbyte identityは主張しない | `artifacts/20260713t034501z-chatgpt-raw-chatgpt56-pack-repair-transcript.md` SHA-256 `1f06fdaff2e8c8d08698f69d82063cbdeacc92fc1843887815f8b7e400042295`; reconstructed ZIP SHA-256 `d9809657e544185d28ae84c73a0a913db1bc48e3515c1f6763d4605290fedab6`; tree digest `ca9f01ba6c70a284df3c925b8b97af4ce30f004d34735018389fcd0a6478df73` | transformed evidence provenance accepted; raw and canonical authority remain separate |
+| EAL-007 | 一部採用（`partially_adopted`） | ChatGPT 5.6 Pro design candidate + fresh spec-reviewer | design | responsibility architecture、continuation algorithm、consultation contract、template/file surface、compatibility/test strategyを採用。採用済みmanual fallback欠落、strict/candidate authority表現、stale policy矛盾はlocal integrationと反復reviewで修正した | `artifacts/20260713t030000z-draft-design-chatgpt56-issue-design-candidate.md`; canonical design SHA-256 `9beb093a291f104a194857b1ed7566b8e13060604d1708aa308e5fd213f2f7e6` | assurance binding refresh; plan authoring |
+| EAL-008 | 一部採用（`partially_adopted`） | ChatGPT 5.6 Pro plan candidate + fresh spec-reviewer | plan | S01→S05→S90→S95→S99、allowed/forbidden paths、Red/Green tests、CLOS-001..016、parity/rollback/security gatesを採用。candidate/strict authority表現、current state、DES-011 fallback/stale-refresh closureをcanonical stateへ修正した | `artifacts/20260713t033000z-draft-plan-chatgpt56-issue-plan-candidate.md`; fresh plan review `passed` | assurance binding refresh complete; planning complete |
+| EAL-009 | 採用（`adopted`） | product-owner language correction + fresh spec-reviewer | requirement/design/plan | ChatGPT由来の英語説明文を日本語へ統合し、パス、コマンド、コード、ID、schema field、列挙契約値、完全一致markerだけを原文維持した。翻訳中に生じた`partial-use`とstale相談fallbackの曖昧さも要件・DES-011へ整合させた | fresh Japanese-doc review `passed`; final SHA-256は更新済みassurance source bindingを参照 | 日本語正本としてplanning gate維持; 今後の再発防止はmemory update noteへ記録 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -74,7 +79,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | 固定回数による停止を廃止し、fresh evidence・material strategy delta・validationで継続を判定する | integrated repair batch、mandatory ChatGPT consultation、one-invocation manual fallback、template同期 | 中: consultation導入が主目的化しsemantic continuationが埋没する恐れ。AC-001/002/006をprimary gateとして固定 | 合格（passed） |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -82,13 +87,15 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | provider skill/templates、回答済みinterviews、adopted synthesis、ChatGPT 5.6 Pro local-context pack、親Epic docs | manual fallback契約は回答済み。追加質問なし | EAL-001..006に従い採用/部分採用。authority claimとstale candidate stateは棄却 | passed（初回failed後、conditional findingを機械修正） | no | assurance classify後にdesignへ昇格 |
+| design | canonical requirement、ChatGPT 5.6 design candidate、current provider/templates、assurance standard contract | manual fallback/stale refresh predicateはreviewで解決 | EAL-007として部分採用し、candidate authorityと不整合を修正 | passed（fresh spec-reviewer、SHA `9beb093a...`） | no | assurance binding refresh後にplan authoring |
+| plan | canonical requirement/design、ChatGPT 5.6 plan candidate、provider/test topology、assurance standard contract | none unresolved; ADRはexecution前gate | EAL-008として部分採用し、stale candidate/profile表現を修正 | passed（fresh spec-reviewer conditional findingはbookkeepingのみ、本行/EAL/委任証跡修正で充足） | no for planning; ADR remains execution blocker | planning complete; execution handoffはADR/source-binding/ownership確認後 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
-  - used / not used
+  - used（ChatGPT 5.6 Pro local-context authoring pack）
 - 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
+  - not applicable
 - lifecycle state（契約値）:
   - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
 - 昇格不可 state:
@@ -110,7 +117,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| ChatGPT 5.6 Pro | iss-00313 | `artifacts/20260713t025134z-draft-requirement-chatgpt56-issue-requirement-candidate.md`; `artifacts/20260713t030000z-draft-design-chatgpt56-issue-design-candidate.md`; `artifacts/20260713t033000z-draft-plan-chatgpt56-issue-plan-candidate.md` | source manifest `5a10d9f35e84419daf6e8bd37b2886a2bea7d4ee723693e7de1b59abe7af530d` | `requirement.md`, `design.md`, `plan.md` | `partially_integrated` | `requirement.md`, `design.md`, `plan.md` | pack review pass; local source reconciliation; fresh requirement/design/plan reviews | single-Issue境界、semantic continuation、integrated batch、authority/security/test/design/execution sequenceを統合 | candidate authority/self-status、未検証主張、manual fallback/stale predicate不整合、strict profile claim | none for planning | requirement/design/plan passed | planning promotion complete; ADR remains execution gate |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -294,3 +301,9 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 ## 省略/例外メモ (必須)
 - 該当なし
+
+<!-- spec-dock:managed-section begin id="report.step-evidence" -->
+## Step Evidence
+- Record Red, Green, and refactor evidence for each executed step.
+- Link each closure id to its observed verification result.
+<!-- spec-dock:managed-section end id="report.step-evidence" -->
