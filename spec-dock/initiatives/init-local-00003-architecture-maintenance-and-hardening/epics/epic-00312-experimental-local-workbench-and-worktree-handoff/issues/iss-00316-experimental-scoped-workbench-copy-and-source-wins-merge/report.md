@@ -354,6 +354,24 @@ git diff --check
 - Issue319 relay: package/fresh init/update、public reference docs、full suite/static、final inventory parity、Epic PRは未実施。
 - Ledger Note: S06 C316-01/02/09/10 closed。No new product semantics。
 
+### セッションログ（2026-07-13 S90 docs impact）
+
+#### 対象
+- Step: S90 Docs impact resolution。
+- Closure: C316-10 docs ownership。
+
+#### 委任と点検
+- Fresh doc-writerがprovider/dogfood `guide.md`、`README.md`、`reference_worktree.md`、implemented help/text/JSON、Epic W5 ownershipを点検した。
+- `workbench copy --help`がexperimental/noncanonical/disposable/one-shot/scoped/no sync/copy-back、引数を自己完結説明する。
+- README command listは非網羅、`reference_worktree.md`はworktree family限定であり、新command不存在を示す誤情報はない。
+
+#### 判断 / review
+- Approved no-op。Permanent docs変更なし。
+- Provider/dogfood `guide.md`/`reference_worktree.md` cmp一致、live help 3 surfaces、`git diff --check` pass。
+- Fresh spec-reviewer: pass、blockingなし。
+- Issue319 relay: Consolidated Workbench/Artifact import/reference docs、root manual-selection、source-wins/no-sync、placement/date/authority、migration/preservation。
+- Ledger Note: Partial docs updateはW5統合guideとの二重管理になるため、本Issueはcommand-local contractで閉じる。
+
 ### セッションログ（2026-07-13 HH:MM - HH:MM）
 
 #### 対象
@@ -429,6 +447,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S04 | delegated | Recursive merge/content opacity | dev-coder | filesystem adapter + focused infra/application/CLI tests | requirement/design/plan S04/C316-05/06 | `infra/fs_cli.py`、new infra tests、必要最小限のadapter test fixtures | S05 ancestor/mid-copy、classifier/manifest/counter/rollback、canonical docs | focused pytest、Ruff/format/mypy/diff | Whole replacement、data loss、symlink deref、silent skip | worker summary/changed files/Red-Green/tests/risks/Ledger Note | pass |
 | S05 | delegated | Security/path/failure boundary + two remediation batches | dev-coder | Workbench application/contracts/ports/fs/presentation + focused tests | requirement/design/plan S05/C316-07/08/09 | Current Workbench runtime/test files | Transaction/rollback/TOCTOU complete prevention、S06 docs/manual/dogfood | focused S03–S05、external observer/fault tests、Ruff/format/mypy/diff | External read/write、false mutation signal、raw error leak | worker summaries/findings/fixes/tests/risks/Ledger Notes | pass after r3 |
 | S06 | delegated | Public output/regression/manual relay | dev-coder | Provider output/tests + normal dogfood projection + managed temp manual | requirement/design/plan S06/C316-01/02/09/10 | Missing provider runtime/tests、generated dogfood runtime | Public reference docs、package/fresh update/full gate/PR、new semantics | focused suites、parity、manual scenario、Ruff/format/mypy/diff | Content leak、dogfood-only patch、W5 scope invasion | changed files/tests/manual/relay/Ledger Note | pass |
+| S90 | delegated | Docs impact inspection | doc-writer | Provider/dogfood public docs + live help + W5 boundary | requirement/design/plan S90/C316-10 | Docs only if misinformation; otherwise no-op | Issue317/318 semantics、final rollout/migration、code/tests | docs inspection/cmp/live help/spec review | Partial docs duplication、future semantics | changed files or no-op rationale/inspected paths/Ledger Note | approved-no-op |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -439,6 +458,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S04 | dev-coder | Dedicated recursive source-wins mergeとopaque bytes/type collision tests | `infra/fs_cli.py`; new infra test | Red1→focused36、reviewer28、Ruff/format/mypy/diff pass | fresh code-reviewer pass | S05 planned safety/failure closures | accepted |
 | S05 | dev-coder + two fresh remediation workers | Ancestry/inventory guard、symlink object、mutation tracking、content-free failures | Workbench application/contracts/ports/bootstrap/fs/presentation + unit/infra/CLI/presentation tests | Red9→52、fix1 87、fix2/r3 63、Ruff/format/mypy/diff pass | r1 fail P1x2、r2 fail P1x1、r3 pass | Future fs_repo discovery sync | accepted after remediation |
 | S06 | dev-coder | Help/output matrix、copy error sanitization、opacity regression、dogfood projection、manual handoff | provider parser/command/presentation/tests + generated dogfood runtime | automated71+34、reviewer71+30、parity/manual/static pass | fresh code-reviewer pass | Issue319 final distribution/docs/full gate | accepted |
+| S90 | doc-writer | Command-local help sufficient、public docsはnon-misleading、W5 ownership | none | inspected paths/live help/provider-dogfood cmp/diff pass | fresh spec-reviewer pass | Issue319 docs scaffold must be concretized later | approved-no-op |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -465,6 +485,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04 | step reviewer | code-reviewer | fresh | passed | no | proceed | P0/P1/blocking/nonblockingなし |
 | S05 | security/path reviewer | code-reviewer | fresh | passed | no | proceed | r1/r2 P1 remediation後r3 P0/P1=0 |
 | S06 | step reviewer | code-reviewer | fresh | passed | no | proceed | P0/P1/blocking/nonblockingなし |
+| S90 | docs impact reviewer | spec-reviewer | fresh | passed | no | proceed | approved-no-op、blockingなし |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -475,7 +496,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S03 | committed | Copy preflight/error contract + tests + report | `cd7e8759a92612eb61467bc24bc704ab07507da4` | clean/upstream `0 0` | not applicable | S03 contract | `git diff --check` pass | Fresh code-reviewer pass、focused28 pass |
 | S04 | committed | Recursive merge adapter + focused tests + report | `84659dc3a840ba026ff7b80b6478a81be46c5bb3` | clean/upstream `0 0` | not applicable | S04 contract | `git diff --check` pass | Fresh code-reviewer pass、focused36/28 pass |
 | S05 | committed | Symlink/containment/failure + remediation + report | `ffb54ebe24f6745ee5d503b1142234be76e87fc5` | clean/upstream `0 0` | not applicable | S05 contract | `git diff --check` pass | Security reviewer r3 pass、focused63 pass |
-| S06 | ready for commit | Output/regression/tests/dogfood projection/report | pending | pending | not applicable | S06 contract | `git diff --check` pass | Fresh code-reviewer pass、automated/manual/parity pass |
+| S06 | committed | Output/regression/tests/dogfood projection/report | `2ff1cc946d3afb7a04c2354aaf6fb03ae516f2dc` | clean/upstream `0 0` | not applicable | S06 contract | `git diff --check` pass | Fresh code-reviewer pass、automated/manual/parity pass |
+| S90 | approved-no-op; report ready for commit | No permanent docs; S90 evidence in report | pending | pending | Help self-contained、docs non-misleading、Issue319 consolidated owner | provider/dogfood guide/README/reference_worktree/help | `git diff --check` pass | Fresh spec-reviewer pass |
 
 #### 変更したファイル
 - `path/to/file1` - ...
