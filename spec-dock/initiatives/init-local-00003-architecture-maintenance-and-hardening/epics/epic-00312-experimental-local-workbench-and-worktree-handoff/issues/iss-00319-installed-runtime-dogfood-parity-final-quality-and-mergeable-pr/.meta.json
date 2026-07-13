@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00319",
+  "title": "Installed Runtime Dogfood Parity Final Quality And Mergeable PR",
+  "slug": "installed-runtime-dogfood-parity-final-quality-and-mergeable-pr",
+  "created_at": "2026-07-13T12:40:55+09:00",
+  "updated_at": "2026-07-13T12:41:20+09:00",
+  "parent_id": "epic-00312",
+  "initiative_id": "init-local-00003",
+  "epic_id": "epic-00312",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 319,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "depends_on": [
+    "iss-00315",
+    "iss-00316",
+    "iss-00317",
+    "iss-00318"
+  ]
+}
