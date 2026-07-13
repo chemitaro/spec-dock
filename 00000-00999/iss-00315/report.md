@@ -50,6 +50,8 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-315-001 | resolved | implementation | S00 repo-analyst / reviewer | `spec_dock_runtime/app.py::_scan_nodes` に旧recursive scan定義があるがhelper群のcallsiteはない | W1で変更; 未参照としてno-op; scope拡張 | `app.py` entry moduleは到達するがlegacy private helperは未参照のため変更しない。参照が判明した場合のみplan再レビュー | no_action | `rg -n "_scan_nodes|_iter_node_meta_paths|_find_legacy_meta_paths" src/spec_dock`; `review_iss00315_s00` | S02でcallsiteを再確認し、未参照ならIssue-local no-opを確定 |
+| D-315-002 | resolved | test-strategy | S06 worker / reviewer | full init/update laneの2 fixed snapshot constantsがEpic 00312 node/deps追加を未反映 | S06へ混在; S99でrefresh; 無視 | S06 preservationとは独立だがS99 full unit gateをblockするため、S99でcurrent canonical node/depsへmechanical refreshする | promoted_to_plan | failing selectors; commit `3acdd76c`; `review_iss00315_s06` | plan S99 full unit gate内で2 selectors→full suiteをpassさせる |
+| D-315-003 | resolved | operation | S06 worker / reviewer | `uvx --from .`がignored stale `build/lib` legacy skillによりmanifest overlap | productionで適応; stale build cleanup; clean isolated build検証 | current sourceの通常`uv run spec-dock update .`は成功し、stale ignored buildはproduct contractではない。S99でclean isolated build laneを使う | deferred | overlap error、`review_iss00315_s06` | S99 package gateでclean build/uvxを検証。tracked production変更不要 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -227,6 +229,9 @@ git diff --check
 | S05 | Alternative | characterization-first | 既存実装がnonempty Workbench delete/removeを満たす | code inspection + tests | approved-no-op | intentional Red不要 |
 | S05 | Green | explicit operations unchanged | worker 5、reviewer targeted 2/full 65 passed | pytest / fresh review | pass | production change none |
 | S05 | Refactor | not applicable | test-only two-file diff | `git diff --check` | approved-no-op | hermetic fixtures |
+| S06 | Alternative | characterization-first | existing installer preserved all four scope sentinels | focused update test | approved-no-op | production installer change none |
+| S06 | Green | preservation and provider/dogfood parity | 1+3+2 tests、7 files byte parity、normal update success | pytest/cmp/update | pass | dogfood projection refreshed |
+| S06 | Refactor | not applicable | one test + generated projection | Ruff / `git diff --check` | approved-no-op | snapshot drift routed S99 |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
@@ -241,6 +246,7 @@ git diff --check
 | S03 | C315-04 | independent resolvers exclude exact Workbench before selection/access | focused 7、surrounding 118、fresh reviewer pass | pass | AC-315-004 closed |
 | S04 | C315-05 | explicit reject and parent subtree prune before access/hash | focused 12、reviewer 40、fresh pass | pass | AC-315-005 closed |
 | S05 | C315-06 | scope/worktree explicit deletion remains unblocked | characterization + reviewer full 65 pass | approved-no-op | AC-315-006–007 closed |
+| S06 | C315-07 | update preserves opaque bytes and refreshes managed assets/dogfood | focused tests + 7-file parity + reviewer | pass | AC-315-008–009 closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -251,6 +257,7 @@ git diff --check
 | C315-04 | S03 | yes | red-required | 4 expected failures | installer/runtime resolver focused + regressions | pass | fallback/persisted/active/near-name |
 | C315-05 | S04 | yes | red-required | 10 expected failures | domain + preflight focused/regression | pass | file/dir/descendant/parent/near-name |
 | C315-06 | S05 | yes | characterization-first | existing dirty removal behavior | delete/worktree CLI suites | approved-no-op | no special blocker/backup/promotion |
+| C315-07 | S06 | yes | characterization-first | existing preservation behavior | init/update test + cmp/update parity | pass | four scope binary sentinels |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -263,6 +270,7 @@ git diff --check
 | C315-04 | S03 | focused 7 + reviewer 118 regression | pass | no P0/P1/blocker |
 | C315-05 | S04 | focused 12 + reviewer 40 regression | pass | no blocker or diagnostic leak |
 | C315-06 | S05 | targeted 2 + full 65 | pass | binary scratch、remote close、branch keep |
+| C315-07 | S06 | preservation 1、workbench 3、parity 2、7 cmp | pass | snapshot drift別closureでS99へ |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -291,6 +299,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S03 | delegated | independent recursive resolvers | dev-coder | assurance/installer/delete/delegated + focused tests | approved `plan.md` S03 | four callsites + two test files | S04+、generic framework、report | Red/Green、surrounding regression、Ruff | selection/error regression | worker summary、tests、risks | pass |
 | S04 | delegated | authoring source semantic boundary | dev-coder | source manifest、preflight、focused tests | approved `plan.md` S04 | domain/application + one test file | S05+、pack semantics、report | Red/Green、authoring regression、Ruff | existing preflight contract regression | worker summary、tests、risks | pass |
 | S05 | delegated | explicit delete/remove characterization | dev-coder | delete/worktree tests | approved `plan.md` S05 | two test files | production、S06+、report | characterization + full adjacent suites | unexpected blocker or destructive external operation | summary、tests、no-op rationale | pass |
+| S06 | delegated | update preservation and parity | dev-coder | init/update test + normal dogfood update | approved `plan.md` S06 | test + generated consumer projection | S90 docs、production change unless needed、report | byte equality、provider parity、related tests | data loss or parity failure | summary、tests、projection、risks | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -301,6 +310,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S03 | dev-coder | 4独立resolverをtop-down pruneしpersisted/active direct targetもreject | `cli.py`, `assurance_store.py`, `delete_node.py`, `delegated_authoring.py`, focused tests 2 | Red 4/7 failed; Green 7; reviewer 118 passed/29 skipped | passed（`review_iss00315_s03`） | combined hidden+valid fallback fixtureはnonblocking | accepted |
 | S04 | dev-coder | exact sourceをaccess前rejectしparent sourceのWorkbench subtreeをprune、preflightをshort-circuit | `source_manifest.py`, `github_sync_preflight.py`, focused test | Red 10/11 failed; Green 12; reviewer 40 passed | passed（`review_iss00315_s04`） | full authoring suiteはS99へ | accepted |
 | S05 | dev-coder | nonempty binary Workbenchをscope/worktreeと共に削除する既存契約をtest固定 | `test_delete.py`, `test_worktree.py` | worker 5; reviewer targeted 2/full 65 passed | passed（`review_iss00315_s05`） | none | accepted / production approved-no-op |
+| S06 | dev-coder | four-scope binary sentinel preservationをtest固定し通常updateでdogfood 7 filesをrefresh | `test_init_update.py`, dogfood `.gitignore` + runtime 6 | preservation 1、workbench 3、parity 2、7 cmp、normal update pass | passed（`review_iss00315_s06`） | fixed snapshot 2 failuresはS99、stale build uvxはclean laneへ | accepted / installer approved-no-op |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -326,6 +336,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S03 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s03`; 118 passed/29 skipped、P0/P1なし |
 | S04 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s04`; 40 passed、P0/P1なし |
 | S05 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s05`; approved-no-op、65 passed |
+| S06 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s06`; preservation/parity pass、snapshot drift S99へ |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -335,7 +346,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S02 | committed | fs_repo prune + focused tests + report | `0c694c76a2f1d56d9b44491fcc1c462774ab8715` | `git status --short` -> clean | N/A | C315-02, C315-03 | `git diff --check` -> pass | `review_iss00315_s02` passed |
 | S03 | committed | independent resolver prune + focused tests + report | `baf0307370aafc931c37f4eb72b4b3f6857fd59d` | `git status --short` -> clean | N/A | C315-04 | `git diff --check` -> pass | `review_iss00315_s03` passed |
 | S04 | committed | authoring reject/prune + focused tests + report | `54601de823f3bca5e3fdf7faab9f980bfe5f18a2` | `git status --short` -> clean | N/A | C315-05 | `git diff --check` -> pass | `review_iss00315_s04` passed |
-| S05 | ready-to-commit | delete/remove characterization tests + report | pending | pending | existing behavior already satisfies contract | C315-06 | `git diff --check` -> pass | `review_iss00315_s05` passed |
+| S05 | committed | delete/remove characterization tests + report | `0677335d39cbdb6232e8b8990efe7782594754d3` | `git status --short` -> clean | existing behavior already satisfies contract | C315-06 | `git diff --check` -> pass | `review_iss00315_s05` passed |
+| S06 | ready-to-commit | preservation test + dogfood projection + report | pending | pending | production installer already preserves Workbench | C315-07 | `git diff --check` -> pass | `review_iss00315_s06` passed |
 
 #### 変更したファイル
 - `path/to/file1` - ...
