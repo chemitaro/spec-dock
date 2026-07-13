@@ -13,9 +13,14 @@ created_at: "2026-07-13T02:34:39Z"
 created_by: "iwasawayuuta"
 status: "proposed"
 authority: "user-proposed"
-adoption_status: "unreviewed"
+adoption_status: "adopted"
 derived_from: []
-reflected_to: []
+reflected_to:
+  - "requirement.md"
+  - "design.md"
+  - "plan.md"
+  - "report.md"
+  - "artifacts/20260713t031808z-adr-template-free-artifact-import-and-blank-filename-coexistence.md"
 ---
 
 # ChatGPT Output Artifact Import Contract
