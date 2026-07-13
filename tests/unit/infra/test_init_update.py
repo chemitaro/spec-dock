@@ -12520,11 +12520,32 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         merge_preparer_phrases = (
             "github-pr-merge-preparer",
             "failure_class",
-            "Default autonomous repair limit is one repair attempt for `P0` family",
-            "Default autonomous repair limit is two repair attempts for the same `P1`",
-            "Default total autonomous repair limit is four repair attempts per PR",
-            "Stop at a human gate when the same",
-            "appears after a repair",
+            "## ChatGPT Consultation Gate",
+            "## Integrated Repair Strategy",
+            "## Iteration Ledger",
+            "strategy_delta",
+            "orchestrator_disposition",
+            "Repair iteration count is telemetry only.",
+            "must never authorize continuation or force a stop",
+            "same `root_cause_family` recurring after a repair commit triggers mandatory",
+            "Recurrence alone is neither automatic stop authority nor",
+            "automatic continuation authority.",
+            "`fresh`: bound to the current head, inventory, family grouping, material",
+            "`stale`: the head, inventory, grouping, evidence, or strategy changed",
+            "For `stale`, refresh first.",
+            "ChatGPT recommendations are advisory evidence only.",
+            "The main orchestrator must record `orchestrator_disposition`",
+            "bound_strategy_context",
+            "fallback_invocation_id",
+            "fallback_approved_by",
+            "fallback_approved_at",
+            "fallback_manual_analysis_ref",
+            "fallback_consumed_at",
+            "`fallback_approval_denied` is an unconditional stop.",
+            "An expired or consumed fallback approval is an unconditional stop.",
+            "A fallback approval is bound to exactly one `fallback_invocation_id` and must not be reused.",
+            "Only when refresh and the defined recovery paths are hard-unrecoverable",
+            "material `strategy_delta`",
             "Stop at a human gate when the blocker is `permission_or_auth`,",
             "`external_or_flaky`, `base_branch_conflict`, `unknown`, a requirement",
             "expansion, breaking change, migration, secret/deployment setting change",
@@ -12545,6 +12566,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         for phrase in merge_preparer_phrases:
             assert phrase in merge_preparer
+
+        removed_repair_limit_phrases = (
+            "Default autonomous repair limit is one repair attempt for `P0` family",
+            "Default autonomous repair limit is two repair attempts for the same `P1`",
+            "Default total autonomous repair limit is four repair attempts per PR",
+            "Stop at a human gate when the same `root_cause_family` appears after a repair",
+            "repair unit is incomplete or repeatedly fails",
+        )
+        for phrase in removed_repair_limit_phrases:
+            assert phrase not in merge_preparer
 
         workflow_phrases = (
             "github-pr-merge-preparer",

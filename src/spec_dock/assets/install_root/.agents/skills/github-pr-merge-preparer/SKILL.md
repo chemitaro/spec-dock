@@ -1,6 +1,6 @@
 ---
 name: github-pr-merge-preparer
-description: Coordinate pull request creation or discovery, fixed Codex review triggering, PR observation, severity-aware batch triage, bounded P0/P1 repair delegation, re-push confirmation, and re-monitoring until a PR is merge-prepared for human judgment. Use when a workflow must continue after PR creation and report whether the PR is ready for a human merge decision without merging it.
+description: Coordinate pull request creation or discovery, fixed Codex review triggering, PR observation, integrated blocking-batch triage, evidence-gated P0/P1 repair delegation, re-push confirmation, and re-monitoring until a PR is merge-prepared for human judgment. Use when a workflow must continue after PR creation and report whether the PR is ready for a human merge decision without merging it.
 ---
 
 # GitHub PR Merge Preparer
@@ -9,10 +9,26 @@ description: Coordinate pull request creation or discovery, fixed Codex review t
 
 Use this skill to coordinate the post-implementation PR delivery loop: create or
 find the PR, monitor the latest head SHA, observe GitHub Actions CI and Codex PR
-review feedback, triage the observation as one batch, delegate bounded repairs
-only for blocking findings, confirm commit/push evidence, re-monitor when the
-branch changes, and finally report either `merge-prepared` evidence or a human
-gate.
+review feedback, triage the observation as one integrated blocking batch,
+obtain fresh ChatGPT consultation evidence, record the main orchestrator's
+disposition, delegate a materially distinct bounded repair only for blocking
+findings, confirm commit/push evidence, re-monitor when the branch changes, and
+finally report either `merge-prepared` evidence or a semantic human gate.
+
+The required order for branch-mutating blocking repair is:
+
+```text
+observe latest head
+  -> triage integrated blocking batch
+  -> obtain fresh ChatGPT consultation evidence
+  -> record orchestrator disposition and strategy_delta
+  -> delegate bounded repair worker
+  -> push
+  -> re-observe latest head
+```
+
+Do not skip or reorder these gates. ChatGPT output is advisory evidence only;
+it is neither repair authorization nor a substitute for orchestrator judgment.
 
 This skill is a workflow coordinator. It reuses `github-pr-creator` for PR
 creation, invokes
@@ -124,7 +140,10 @@ contract, blocker fingerprint, or stalled-observation contract.
    - `wait_or_resume`
    - `unknown_human_gate`
 8. If blocking repair is required, create or update a repo-persistent PR repair
-   batch and perform family-based repair as described below.
+   batch and perform family-based repair as described below. Before any
+   branch-mutating repair delegation, complete triage, satisfy the ChatGPT
+   Consultation Gate, record the orchestrator disposition and a material
+   `strategy_delta`, and verify the semantic continuation gate.
 9. If the latest observation contains only `P2`/`P3` findings and no required CI
    failure, no merge conflict, no blocking observation limitation, and no `P0`/
    `P1` review blocker, do not mutate the branch. Report a terminal
@@ -188,6 +207,102 @@ For a blocking repair batch:
    record the coverage rationale.
 8. Triage every inventory item before repair delegation; no item may remain
    `untriaged` in a repo-persistent blocking repair batch.
+
+## ChatGPT Consultation Gate
+
+Before delegating any blocking repair that will mutate the PR branch, obtain a
+sanitized ChatGPT consultation for the current integrated blocking batch. The
+consultation must cover the complete triaged inventory, family and coupling
+analysis, current-head observation evidence, previous repair results, available
+validation, candidate strategies, open risks, and explicit out-of-scope
+boundaries.
+
+Record `consultation_status` using exactly one of these values:
+
+- `fresh`: bound to the current head, inventory, family grouping, material
+  evidence, and proposed strategy. This is the only passing consultation state.
+- `stale`: the head, inventory, grouping, evidence, or strategy changed
+  materially. Refresh the consultation first; stale evidence never authorizes
+  branch mutation.
+- `failed`: consultation or its defined recovery path failed.
+- `unavailable`: the consultation path is not available.
+- `consultation_denied`: the provider, account, policy, or human denied the
+  consultation.
+- `unsafe`: safe sanitization would remove evidence essential to consultation.
+  Never send unsafe material.
+
+Store only sanitized provenance, scope, freshness bindings, recommendations,
+risks, and concise summaries. Do not store or paste a verbatim model
+conversation record, secrets, credentials, tokens, private data, or host-local
+paths in the batch. ChatGPT recommendations are advisory evidence only. They do
+not approve a repair, satisfy a reviewer gate, or directly authorize a worker.
+
+The main orchestrator must record `orchestrator_disposition` for every material
+recommendation as `use`, `partial-use`, `reject`, `defer`, or `human-gate`, with
+rationale. Only the explicitly adopted portion of `use` or `partial-use` may
+enter a worker handoff.
+
+### Consultation failure and one-invocation fallback
+
+For `stale`, refresh first.
+Only when refresh and the defined recovery paths are hard-unrecoverable may a
+human be asked to approve a manual fallback. For
+`failed`, `unavailable`, `consultation_denied`, or `unsafe`, the default is a
+human gate unless the same explicit fallback requirements are met.
+
+The fallback must be all of the following:
+
+- explicitly approved by a human for one named PR-preparation invocation;
+- local-only and must not transmit unsafe material;
+- limited to a recorded repair scope and reason;
+- recorded with approver, approval time, and expiry condition; and
+- consumed once and never carried into a later invocation.
+
+Record the exact binding and audit fields `bound_strategy_context`,
+`fallback_invocation_id`, `fallback_approved_by`, `fallback_approved_at`,
+`fallback_manual_analysis_ref`, and `fallback_consumed_at`. The referenced
+manual analysis and the main orchestrator's disposition must be recorded before
+the fallback can authorize a bounded worker handoff.
+
+Record the fallback state as `approved_for_invocation`,
+`fallback_approval_denied`, or `expired`. A fallback is not consultation
+success, is not a permanent waiver, and does not make consultation evidence
+`fresh`. `fallback_approval_denied` is an unconditional stop.
+An expired or consumed fallback approval is an unconditional stop.
+A fallback approval is bound to exactly one `fallback_invocation_id` and must not be reused.
+
+## Integrated Repair Strategy
+
+After consultation and before worker delegation, the main orchestrator owns the
+continuation decision. Record a single integrated strategy across all blocking
+families, including coupling and ordering constraints, worker scope, validation
+plan, re-observation plan, residual risk, and `strategy_delta` from the previous
+repair iteration.
+
+Continue only when every semantic gate is satisfied:
+
+- observation evidence is for the latest head and the inventory is completely
+  triaged;
+- no existing hard human gate applies;
+- consultation is `fresh`, or the explicit one-invocation local-only fallback
+  is valid for this invocation and scope;
+- the orchestrator adopted a bounded, scope-safe strategy;
+- `strategy_delta` identifies a material change in diagnosis, implementation
+  approach, ordering, scope, or validation that can plausibly address the
+  current blocker; and
+- focused tests, validation, push confirmation, and latest-head re-observation
+  are feasible.
+
+Stop at a semantic human gate when there is no viable new strategy, the only
+available strategy is materially equivalent to an ineffective prior strategy,
+evidence is incomplete, stale, or unsafe, consultation/fallback requirements
+are not met, or the repair cannot be bounded and validated safely. Attempt and
+iteration counts do not override these semantic decisions.
+
+The same `root_cause_family` recurring after a repair commit triggers mandatory
+re-analysis of root cause, evidence, consultation freshness, coupling, and
+`strategy_delta`. Recurrence alone is neither automatic stop authority nor
+automatic continuation authority.
 
 ## Classification vocabulary
 
@@ -302,25 +417,31 @@ In that case, stop at a human gate:
 Do not perform code repair solely to satisfy platform conversation resolution
 for `P2`/`P3` findings.
 
-## Fix loop limits
+## Repair continuation and human-gate policy
 
-- Default autonomous repair limit is one repair attempt for `P0` family unless
-  the fix is trivial and fully local.
-- Default autonomous repair limit is two repair attempts for the same `P1`
-  `root_cause_family`.
-- Default total autonomous repair limit is four repair attempts per PR
-  preparation invocation.
-- Stop at a human gate when the same `root_cause_family` appears after a repair
-  commit.
+- Repair iteration count is telemetry only. It must be recorded for audit and
+  must never authorize continuation or force a stop.
+- Continue only through the ChatGPT Consultation Gate and Integrated Repair
+  Strategy semantic gates above. Do not impose a numeric P0, same-family P1, or
+  per-invocation repair cap.
+- Re-analyze same-family recurrence and require a material `strategy_delta`;
+  recurrence by itself does not determine continuation or a human gate.
 - Stop at a human gate when the blocker is `permission_or_auth`,
-  `external_or_flaky`, `base_branch_conflict`, `unknown`, a requirement
-  expansion, breaking change, migration, secret/deployment setting change,
+  `external_or_flaky`, `base_branch_conflict`, `unknown`, a requirement expansion,
+  scope expansion, breaking change, migration, secret/deployment setting change,
   ambiguous review intent, or platform-only conversation resolution.
 - Stop at a human gate when a repair would require a new unapproved review
   trigger, stale trigger boundary, unresolved observation limitation, or missing
   resume metadata for timeout/limit continuation.
-- Record each loop as `iteration_index`, `head_sha`, `observation_status`,
-  `root_cause_family`, `action_taken`, `fix_commit`, and `next_action`.
+
+## Iteration Ledger
+
+Record each loop as `iteration_index`, `iteration_count: telemetry only`,
+`head_sha`, `observation_status`, `root_cause_family`, `consultation_status`,
+`orchestrator_disposition`, `strategy_delta`, `action_taken`, `fix_commit`,
+validation evidence, re-observation result, and `next_action`. The ledger is an
+append-compatible audit record. Older batches that lack these fields remain
+valid and may add them on the next blocking repair; do not require migration.
 
 ## Merge-prepared predicate
 
@@ -410,7 +531,7 @@ When stopping for a human gate, report:
 - State the selected base branch and why.
 - State draft versus ready handling.
 - Include PR URL, PR number, head branch, and latest head SHA.
-- Summarize monitor results and fix-loop count.
+- Summarize monitor results and repair iteration count as telemetry only.
 - State whether a repo-persistent repair batch was required.
 - Include repair batch path when one exists.
 - Include classification summary grouped by `root_cause_family`.

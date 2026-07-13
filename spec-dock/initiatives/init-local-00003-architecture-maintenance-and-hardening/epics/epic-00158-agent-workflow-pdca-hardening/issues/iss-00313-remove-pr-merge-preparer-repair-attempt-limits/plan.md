@@ -3,7 +3,7 @@
 ID: "iss-00313"
 タイトル: "PR Merge Preparer 修復継続ポリシー実装計画"
 保証プロファイル: "standard"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-13"
 関連要件: ["requirement.md"]
@@ -59,8 +59,8 @@ ID: "iss-00313"
 - [x] 必須相談と手動フォールバックの範囲が採用済みの統合結果と一致している。
 - [x] メインオーケストレーターが正規の要件、設計、計画を作成している。
 - [x] 保証ワークフローが`standard`プロファイルを認可している。
-- [ ] 新鮮な仕様レビュー担当者が本計画を合格としている。
-- [ ] Issue実行前にADR進行支援の義務を解消している。
+- [x] 新鮮な仕様レビュー担当者が本計画を合格としている。
+- [x] Issue実行前にADR進行支援の義務を解消している。
 - [ ] 作業ツリーの所有権と許可パスを確認している。
 
 いずれかの項目を満たさない場合、この計画を暗黙に実行してはならない。正規仕様を更新するか、パックを古いものとして記録する。
@@ -119,6 +119,7 @@ src/spec_dock/assets/spec_dock/templates/discussions/pr-repair-batch.md
 tests/cli_runtime/test_new.py
 tests/cli_runtime/test_runtime_new_doc_s09.py
 tests/cli_runtime/test_wrappers.py
+tests/unit/infra/test_init_update.py
 ```
 
 ### 3.2 標準更新後に許可する生成物とドッグフーディングの変更
@@ -140,7 +141,7 @@ src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/**
 src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/**
 src/spec_dock/cli.py
 .github/**
-.assurance.json
+issue-local .assurance.json の手動変更（SpecDock標準`assurance classify`によるcanonical source_binding SHA refreshだけは許可）
 unrelated Issue/Epic/Initiative canonical docs
 ```
 
@@ -1119,6 +1120,20 @@ rg -n \
 | 過去のIssue成果物 | 書き換えない |
 | ドッグフーディングコピー | 生成によって更新し、一致させる |
 
+### S90 で発見した回帰テストの計画修正
+
+S90の旧マーカー監査で、`tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_105_pr_merge_preparer_content_regression_contract` が廃止対象のP0/P1/合計固定上限を肯定アサートしていることを発見した。このテストは履歴文書ではなく現在のprovider authorityを直接検証するため、旧文言を残す正当な履歴証拠ではない。
+
+- 許可変更: `tests/unit/infra/test_init_update.py` の当該テストだけ。
+- delegated role: `dev-coder`。
+- 変更内容: 数値上限と再発だけの停止アサーションを、新しい相談ゲート、strategy delta、telemetry-only、再分析、既存hard gate維持のアサーションへ置換する。
+- 禁止事項: 既存のpermission/auth、external/flaky、base conflict、scope/requirement expansion、migration、secret/deployment、ambiguous intent、platform-only、禁止GitHub操作のアサーションを弱めない。
+- Red: 現在の旧アサーションが新providerに対して失敗することを確認する。
+- Green: 当該node ID、`ruff format --check`、`ruff check`、`mypy`を実行する。
+- 証拠の記録先: `report.md`のS90影響表とClosure Delta。
+
+この追加は既存provider契約テストの追随であり、runtime、observation、GitHub、一般文書へスコープを拡大しない。
+
 ### S90 完了ゲート
 
 - 有効な古い固定制限の権限が残っていない。
@@ -1227,6 +1242,13 @@ uv run pytest -q \
 uv run pytest tests/cli_runtime
 ```
 
+加えてS90で発見したprovider回帰契約を実行する。
+
+```bash
+uv run pytest -q \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_105_pr_merge_preparer_content_regression_contract
+```
+
 検証済みの無関係な既存障害により完全なランタイムレーンを実行できない場合は、正確な失敗、ソース証拠、対象を絞った完了判定がなお有効な理由を記録する。リポジトリで承認された判断なしにゲート通過と呼んではならない。
 
 #### 4. Static checks
@@ -1235,17 +1257,20 @@ uv run pytest tests/cli_runtime
 uv run ruff format --check \
   tests/cli_runtime/test_new.py \
   tests/cli_runtime/test_runtime_new_doc_s09.py \
-  tests/cli_runtime/test_wrappers.py
+  tests/cli_runtime/test_wrappers.py \
+  tests/unit/infra/test_init_update.py
 
 uv run ruff check \
   tests/cli_runtime/test_new.py \
   tests/cli_runtime/test_runtime_new_doc_s09.py \
-  tests/cli_runtime/test_wrappers.py
+  tests/cli_runtime/test_wrappers.py \
+  tests/unit/infra/test_init_update.py
 
 uv run mypy \
   tests/cli_runtime/test_new.py \
   tests/cli_runtime/test_runtime_new_doc_s09.py \
-  tests/cli_runtime/test_wrappers.py
+  tests/cli_runtime/test_wrappers.py \
+  tests/unit/infra/test_init_update.py
 ```
 
 #### 5. Dogfooding gates

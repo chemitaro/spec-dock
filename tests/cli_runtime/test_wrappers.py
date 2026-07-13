@@ -8,6 +8,122 @@ from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
 class TestCliRulesContract(CliRuntimeHarness):
+    def test_scaffolded_pr_merge_preparer_uses_evidence_gated_repair_continuation_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            skill = (target / ".agents" / "skills" / "github-pr-merge-preparer" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            skill_template = (
+                target / ".agents" / "skills" / "github-pr-merge-preparer" / "templates" / "pr-repair-batch.md"
+            ).read_text(encoding="utf-8")
+            artifact_template = (target / "spec-dock" / "templates" / "artifacts" / "pr-repair-batch.md").read_text(
+                encoding="utf-8"
+            )
+            discussion_template = (target / "spec-dock" / "templates" / "discussions" / "pr-repair-batch.md").read_text(
+                encoding="utf-8"
+            )
+
+            installed_surfaces = (skill, skill_template, artifact_template, discussion_template)
+            template_surfaces = (skill_template, artifact_template, discussion_template)
+            normalized_surfaces = tuple(" ".join(text.split()) for text in installed_surfaces)
+            normalized_template_surfaces = tuple(" ".join(text.split()) for text in template_surfaces)
+            required_markers = (
+                "ChatGPT Consultation Gate",
+                "Integrated Repair Strategy",
+                "Iteration Ledger",
+                "strategy_delta",
+                "orchestrator_disposition",
+                "telemetry only",
+            )
+            missing_by_surface = {
+                index: [marker for marker in required_markers if marker not in normalized]
+                for index, normalized in enumerate(normalized_surfaces)
+                if any(marker not in normalized for marker in required_markers)
+            }
+            forbidden_markers = (
+                "Default autonomous repair limit is one repair attempt",
+                "Default autonomous repair limit is two repair attempts",
+                "Default total autonomous repair limit is four repair attempts",
+                "Loop limits for the same failure class or total repair attempts are reached.",
+                "Loop limits for the same root-cause family or total repair attempts are reached.",
+                "same `root_cause_family` appears after a repair commit",
+                "same `root_cause_family` reappears after a repair commit",
+            )
+            forbidden_by_surface = {
+                index: [marker for marker in forbidden_markers if marker in normalized]
+                for index, normalized in enumerate(normalized_surfaces)
+                if any(marker in normalized for marker in forbidden_markers)
+            }
+            assert not missing_by_surface and not forbidden_by_surface, (
+                f"missing evidence-gated markers by installed surface: {missing_by_surface}; "
+                f"legacy stop-authority markers by installed surface: {forbidden_by_surface}"
+            )
+
+            fallback_binding_markers = (
+                "bound_strategy_context",
+                "fallback_invocation_id",
+                "fallback_approved_by",
+                "fallback_approved_at",
+                "fallback_manual_analysis_ref",
+                "fallback_consumed_at",
+            )
+            missing_fallback_bindings = {
+                index: [marker for marker in fallback_binding_markers if marker not in normalized]
+                for index, normalized in enumerate(normalized_template_surfaces)
+                if any(marker not in normalized for marker in fallback_binding_markers)
+            }
+            assert not missing_fallback_bindings, (
+                f"missing one-invocation fallback bindings by installed template surface: {missing_fallback_bindings}"
+            )
+
+            for index, normalized in enumerate(normalized_template_surfaces):
+                for state in ("fresh", "stale", "failed", "unavailable", "consultation_denied", "unsafe"):
+                    assert state in normalized, f"missing consultation state {state!r} in template surface {index}"
+                assert "refresh" in normalized and "hard-unrecoverable" in normalized, (
+                    f"template surface {index} must require stale refresh-first and permit fallback only after "
+                    "hard-unrecoverable consultation/recovery"
+                )
+                for marker in (
+                    "`fallback_approval_denied` is an unconditional stop.",
+                    "An expired or consumed fallback approval is an unconditional stop.",
+                    "A fallback approval is bound to exactly one `fallback_invocation_id` and must not be reused.",
+                    "advisory evidence",
+                    "orchestrator",
+                    "material `strategy_delta`",
+                ):
+                    assert marker in normalized, (
+                        f"missing semantic fallback/authority marker {marker!r} in surface {index}"
+                    )
+                assert "repair unit is incomplete or repeatedly fails" not in normalized, (
+                    f"template surface {index} retains an unconditional failure-count stop"
+                )
+
+            # Existing hard human gates and non-blocking / forbidden-write boundaries remain intact.
+            for marker in (
+                "permission_or_auth",
+                "external_or_flaky",
+                "base_branch_conflict",
+                "requirement expansion",
+                "breaking change",
+                "migration",
+                "secret/deployment setting change",
+                "ambiguous review intent",
+                "Do not mutate the PR branch solely to record those findings.",
+                "PR merge.",
+                "Auto-merge enablement.",
+                "Branch deletion.",
+                "Review thread resolve.",
+            ):
+                assert marker in skill
+
+            assert artifact_template == discussion_template
+            artifact_help = self._run_runtime_capture(target, ["new", "artifact", "--help"]).stdout
+            assert "--consultation" not in artifact_help
+            assert "--strategy" not in artifact_help
+
     def test_new_nodes_create_rules_symlinks_and_no_wrappers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
