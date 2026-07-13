@@ -16,11 +16,11 @@ ID: "epic-00312"
 ## 進捗サマリー (必須)
 - 現在地（何が完了し、何が未完か）:
   - Epic scaffold、GitHub sync、6件のuser-answer interview、baseline research、clarification synthesis、ChatGPT 5.6 Pro GitHub-synced analysis、canonical requirement draftを完了した。
-  - Requirement、Design、Planは一度fresh `spec-reviewer`でpassしたが、新しいArtifact import decision evidenceとGPT-5.6 Pro分析によりstaleとなった。Issue node creationは未開始。
+  - Artifact import追加後のRequirement/Design/Planはfresh `spec-reviewer`でpassし、ADRはaccepted。5-Issue分割のhuman approval待ちでIssue node creationは未開始。
 - 次のマイルストーン:
-  - Artifact type互換判断をclarificationし、requirement→design→planを順に更新・fresh reviewして、改訂Issue分割をhuman approvalへ提示する。
+  - HumanがW1–W5のscope/dependency/W5 final quality ownershipを承認後、Issue nodes/dependency edges/draft handoffを作成する。
 - ブロッカー:
-  - `chatgpt-output` type追加により、従来blank Artifactで有効だった`chatgpt-output-*` slugを予約prefixへ変更してよいかhuman decision待ち。
+  - なし。Issue creationはhuman approval gateで停止中。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -44,7 +44,12 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-008 | 採用（`adopted`） | fresh plan re-review finding | `requirement.md` handoff seed / `design.md` DS and AC trace | Planで発見したownership gapを上流へ戻し、E-AC-003をW2へ、E-AC-009をW2 CLI/no-syncとW3 docsへ分担した。Product requirement/design mechanismは変更していない | requirement reviewer `ownership_rereview_epic_00312_requirement`: pass、design reviewer `ownership_rereview_epic_00312_design`: pass、2026-07-13 | stale解除。Fresh plan reviewerを再実行 |
 | EAL-009 | 採用（`adopted`） | fresh plan `spec-reviewer` finding | `report.md` observed state | Plan本体のownership/dependency/final quality/deferred PR/human approval/draft lifecycleは整合。Reportに上流re-passを記録してからfresh plan verdictを取得する | reviewer `third_review_epic_00312_plan`、2026-07-13、`review_status: fail` | report修正後にfresh plan reviewer |
 | EAL-010 | 採用（`adopted`） | fresh plan `spec-reviewer` | `plan.md` / plan promotion | W1/W2/W3 ownership、W1→W2、W3 depends on W1+W2、W3 final quality/PR、deferred PR、human approval、draft lifecycleがreviewed requirement/designと整合した | reviewer `fourth_review_epic_00312_plan`、2026-07-13、`review_status: pass` | planをpromoteしhuman Issue decomposition approval gateへ進む |
-| EAL-011 | blocked（`blocked`） | user-proposed decision + GPT-5.6 Pro GitHub-synced research | Epic 00312 requirement/design/plan revision | Byte-preserving `artifact import chatgpt-output`はWorkbench→durable evidence境界を閉じるため同一Epicへ統合する方向を支持。W3 import runtime、W4 workflow、W5 final qualityへの5-Issue再分割候補を採用検討する。一方typed token追加はblank prefix互換とaccepted Artifact ADRを変更するためhuman dispositionとsuperseding ADRが必要 | `artifacts/20260713t023439z-decision-candidate-chatgpt-output-artifact-import-contract.md`; `artifacts/20260713t031057z-research-chatgpt-5-6-pro-artifact-import-integration-analysis.md`; transcript SHA-256 `3729ae71031219be3eb2507cd2c7da84dc3306821ebb646b39c7144dd3a1e7d5` | one-question clarification後、EAL disposition、superseding ADR candidate、canonical phase refresh |
+| EAL-011 | 部分採用（`partially_adopted`） | user-proposed decision + GPT-5.6 Pro GitHub-synced research | Epic 00312 requirement/design/plan revision | Byte-preserving importを同一Epicへ統合しW3 runtime/W4 workflow/W5 final qualityへ再分割する提案を採用。Typed token/prefix reservation案はuser decisionにより棄却し、import kind + existing blank grammarへrefineした | `artifacts/20260713t023439z-decision-candidate-chatgpt-output-artifact-import-contract.md`; `artifacts/20260713t031057z-research-chatgpt-5-6-pro-artifact-import-integration-analysis.md`; transcript SHA-256 `3729ae71031219be3eb2507cd2c7da84dc3306821ebb646b39c7144dd3a1e7d5` | canonical phase refresh/fresh reviewer |
+| EAL-012 | 採用（`adopted`） | product-owner interview + ADR candidate | Artifact import identity/compatibility | `chatgpt-output-*` blank prefixを予約せず、template-created blankとimport resultの両方を許容する。`chatgpt-output`はimport kind、stored fileはexisting blank grammar、provenance/authorityはEALで管理する | `artifacts/20260713t031557z-interview-chatgpt-output-prefix-coexistence-without-reservation.md`; `artifacts/20260713t031808z-adr-template-free-artifact-import-and-blank-filename-coexistence.md` | requirement reviewerでADR/requirement整合を確認し、pass後ADR acceptedへ昇格 |
+| EAL-013 | 採用（`adopted`） | fresh requirement `spec-reviewer` finding | ADR/requirement byte-opacity alignment | ADR候補のUTF-8限定を削除し、single regular `.md`のopaque bytesをencoding/Markdown validationなしでcopyするrequirementへ統一した | reviewer `review_import_requirement_epic_00312`、2026-07-13、`review_status: fail` | fresh requirement reviewerを再実行 |
+| EAL-014 | 採用（`adopted`） | fresh requirement `spec-reviewer` | refreshed requirement + Artifact import ADR | E-RQ-019–024/E-AC-013–016、opaque bytes、blank coexistence、5-Issue seedが整合したためrequirementをpromoteしADRをacceptedへ昇格した | reviewer `rereview_import_requirement_epic_00312`、2026-07-13、`review_status: pass` | design refresh + fresh reviewer |
+| EAL-015 | 採用（`adopted`） | fresh design `spec-reviewer` | refreshed design | Import kind/blank grammar、independent use case、opaque binary publication、temp/hash/source stability/no-overwrite、workflow branch、W3/W4/W5 responsibilityがaccepted requirement/ADRと整合した | reviewer `review_import_design_epic_00312`、2026-07-13、`review_status: pass` | plan refresh + fresh reviewer |
+| EAL-016 | 採用（`adopted`） | fresh plan `spec-reviewer` | refreshed 5-Issue plan | W1 foundation、W2 scoped copy、W3 import runtime、W4 preservation workflow、W5 final quality/PRのownership、dependency、deferred PR、human approval/draft lifecycleが整合した | reviewer `review_import_plan_epic_00312`、2026-07-13、`review_status: pass`; validate nodes=204 | human 5-Issue approval gate |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -60,9 +65,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | Previous pass + new Artifact import decision/research | typed token/blank prefix互換のhuman answer待ち | new evidenceはunreviewed/blocked | stale-pass | yes | clarification後にcanonical refresh + fresh reviewer |
-| design | Previous pass + new Artifact import decision/research | requirement refresh待ち | new evidenceはunreviewed/blocked | stale-pass | yes | requirement pass後にrefresh + fresh reviewer |
-| plan | Previous 3-Issue pass + proposed 5-Issue split | requirement/design refresh待ち | new evidenceはunreviewed/blocked | stale-pass | yes | design pass後にrefresh + fresh reviewer + human approval |
+| requirement | Artifact import decision/research + prefix coexistence answer + ADR | product open questionなし。Import kind + blank grammar + opaque bytesをadopted | evidence/reviewer findingsをadopted/refined | passed（`rereview_import_requirement_epic_00312`） | no | promote。ADR accepted、design入力へ固定 |
+| design | Refreshed requirement、accepted Artifact import ADR、GPT-5.6 research、actual Artifact runtime contracts | product open questionなし。Import kind + blank grammar + opaque bytes + binary publisher/workflow slicesを反映 | evidence/refinementsをadopted | passed（`review_import_design_epic_00312`） | no | promote。Plan入力へ固定 |
+| plan | Passed refreshed requirement/design、accepted ADR、GPT-5.6 five-slice proposal | W1–W5 scope/dependency/final qualityを反映 | evidence/refinementsをadopted | passed（`review_import_plan_epic_00312`） | no | promote。Human 5-Issue decomposition approval gate |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
