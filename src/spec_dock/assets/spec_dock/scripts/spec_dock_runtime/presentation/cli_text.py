@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         PostMutationSyncOutcome,
         SyncCommandResult,
         ValidationResult,
+        WorkbenchCopyError,
         WorkbenchCopyResult,
         WorktreeCommandError,
         WorktreeCreateResult,
@@ -407,6 +408,33 @@ def render_workbench_copy_json(result: WorkbenchCopyResult) -> CliText:
         "disposable": result.disposable,
         "one_shot": result.one_shot,
         "sync": result.sync,
+    }
+    return CliText(stdout_lines=[json.dumps(payload, ensure_ascii=False, indent=2)], stderr_lines=[], warnings=[])
+
+
+def render_workbench_copy_error_text(error: WorkbenchCopyError) -> CliText:
+    side = f" side={error.side}" if error.side is not None else ""
+    return CliText(
+        stdout_lines=[],
+        stderr_lines=[
+            "spec-dock: error (workbench copy) "
+            f"code={error.code}{side} mutation_started={_bool_text(error.mutation_started)}"
+        ],
+        warnings=[],
+    )
+
+
+def render_workbench_copy_error_json(error: WorkbenchCopyError) -> CliText:
+    payload = {
+        "status": "error",
+        "command": "copy",
+        "code": error.code,
+        "side": error.side,
+        "mutation_started": error.mutation_started,
+        "experimental": True,
+        "canonical": False,
+        "one_shot": True,
+        "sync": False,
     }
     return CliText(stdout_lines=[json.dumps(payload, ensure_ascii=False, indent=2)], stderr_lines=[], warnings=[])
 

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.contracts import (
+    WorkbenchCopyError,
     WorkbenchCopyRequest,
     WorkbenchCopyResult,
     WorktreeListRequest,
@@ -25,9 +26,17 @@ def workbench_copy(req: WorkbenchCopyRequest, ports: Ports) -> WorkbenchCopyResu
     target = resolve_worktree_target(req.target, inventory, command="copy")
     source = next((record for record in inventory if record.current), None)
     if source is None:
-        raise RuntimeError("workbench copy requires the current worktree record")
+        raise WorkbenchCopyError(
+            code="source_unavailable",
+            message="workbench copy source is unavailable",
+            side="source",
+        )
     if target.current or "bare_worktree" in target.remove_blockers or not target.path_exists:
-        raise RuntimeError("workbench copy target is not eligible")
+        raise WorkbenchCopyError(
+            code="target_ineligible",
+            message="workbench copy target is not eligible",
+            side="target",
+        )
 
     assert ports.repo_root is not None
     assert ports.specdock_dir is not None
@@ -36,15 +45,41 @@ def workbench_copy(req: WorkbenchCopyRequest, ports: Ports) -> WorkbenchCopyResu
     try:
         specdock_relative = ports.specdock_dir.relative_to(ports.repo_root)
     except ValueError as exc:
-        raise RuntimeError("workbench copy requires spec-dock inside the current repository") from exc
+        raise WorkbenchCopyError(
+            code="unsafe_path",
+            message="workbench copy source layout is invalid",
+            side="source",
+        ) from exc
 
     source_specdock = ports.specdock_dir
     target_specdock = target.path / specdock_relative
-    source_scope = _resolve_scope(ports.node_repo.load_node_records(source_specdock), scope_id, side="source")
-    target_scope = _resolve_scope(ports.node_repo.load_node_records(target_specdock), scope_id, side="target")
+    source_scope = _load_scope(ports, source_specdock, scope_id, side="source")
+    target_scope = _load_scope(ports, target_specdock, scope_id, side="target")
 
     source_workbench = Path(source_scope.path) / ".workbench"
     target_workbench = Path(target_scope.path) / ".workbench"
+    _preflight_scope_root(ports, Path(source_scope.path), side="source")
+    _preflight_scope_root(ports, Path(target_scope.path), side="target")
+    source_kind = _path_kind(ports, source_workbench, side="source")
+    if source_kind == "missing":
+        raise WorkbenchCopyError(
+            code="no_source",
+            message="workbench copy source does not exist",
+            side="source",
+        )
+    if source_kind != "directory":
+        raise WorkbenchCopyError(
+            code="invalid_workbench_root",
+            message="workbench copy source root is invalid",
+            side="source",
+        )
+    target_kind = _path_kind(ports, target_workbench, side="target")
+    if target_kind not in {"missing", "directory"}:
+        raise WorkbenchCopyError(
+            code="invalid_workbench_root",
+            message="workbench copy target root is invalid",
+            side="target",
+        )
     ports.filesystem_gateway.copy_workbench(source_workbench, target_workbench)
     return WorkbenchCopyResult(
         scope_id=scope_id,
@@ -65,14 +100,61 @@ def _require_ports(ports: Ports) -> None:
 
 def _validate_scope_id(value: str) -> str:
     scope_id = value.strip().lower()
-    prefix, is_local, _ = parse_id(scope_id)
+    try:
+        prefix, is_local, _ = parse_id(scope_id)
+    except RuntimeError as exc:
+        raise WorkbenchCopyError(
+            code="invalid_scope",
+            message="workbench copy requires a full initiative, epic, or issue id",
+        ) from exc
     if prefix not in {"init", "epic", "iss"} or is_local:
-        raise RuntimeError("workbench copy requires a full initiative, epic, or issue id")
+        raise WorkbenchCopyError(
+            code="invalid_scope",
+            message="workbench copy requires a full initiative, epic, or issue id",
+        )
     return scope_id
+
+
+def _load_scope(ports: Ports, specdock_dir: Path, scope_id: str, *, side: str) -> StoredMetaRecord:
+    assert ports.node_repo is not None
+    try:
+        records = ports.node_repo.load_node_records(specdock_dir)
+    except RuntimeError as exc:
+        raise WorkbenchCopyError(
+            code="invalid_scope",
+            message=f"workbench copy {side} scope inventory is invalid",
+            side=side,
+        ) from exc
+    return _resolve_scope(records, scope_id, side=side)
 
 
 def _resolve_scope(records: list[StoredMetaRecord], scope_id: str, *, side: str) -> StoredMetaRecord:
     matches = [record for record in records if record.id == scope_id]
     if len(matches) != 1:
-        raise RuntimeError(f"workbench copy could not resolve {side} scope: {scope_id}")
+        raise WorkbenchCopyError(
+            code="invalid_scope",
+            message=f"workbench copy could not resolve {side} scope",
+            side=side,
+        )
     return matches[0]
+
+
+def _preflight_scope_root(ports: Ports, path: Path, *, side: str) -> None:
+    if _path_kind(ports, path, side=side) != "directory":
+        raise WorkbenchCopyError(
+            code="invalid_scope",
+            message=f"workbench copy {side} scope root is invalid",
+            side=side,
+        )
+
+
+def _path_kind(ports: Ports, path: Path, *, side: str) -> str:
+    assert ports.filesystem_gateway is not None
+    try:
+        return ports.filesystem_gateway.path_kind(path)
+    except RuntimeError as exc:
+        raise WorkbenchCopyError(
+            code="invalid_workbench_root",
+            message=f"workbench copy {side} path could not be inspected",
+            side=side,
+        ) from exc

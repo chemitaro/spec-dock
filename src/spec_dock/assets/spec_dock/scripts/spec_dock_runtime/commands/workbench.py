@@ -3,9 +3,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from spec_dock_runtime.application.contracts import UseCases, WorkbenchCopyRequest
+from spec_dock_runtime.application.contracts import (
+    UseCases,
+    WorkbenchCopyError,
+    WorkbenchCopyRequest,
+    WorktreeCommandError,
+)
 from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
-from spec_dock_runtime.presentation.cli_text import render_workbench_copy_json, render_workbench_copy_text
+from spec_dock_runtime.presentation.cli_text import (
+    render_workbench_copy_error_json,
+    render_workbench_copy_error_text,
+    render_workbench_copy_json,
+    render_workbench_copy_text,
+    render_worktree_error_json,
+    render_worktree_error_text,
+)
 
 if TYPE_CHECKING:
     import argparse
@@ -45,6 +57,13 @@ def _workbench_copy_args(ns: argparse.Namespace) -> CommandArgs:
 def _run_workbench_copy(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     if not isinstance(args, WorkbenchCopyArgs):
         raise RuntimeError("Invalid command args for workbench copy")
-    result = use_cases.workbench_copy(WorkbenchCopyRequest(scope_id=args.scope_id, target=args.target))
+    try:
+        result = use_cases.workbench_copy(WorkbenchCopyRequest(scope_id=args.scope_id, target=args.target))
+    except WorkbenchCopyError as error:
+        error_renderer = render_workbench_copy_error_json if args.json else render_workbench_copy_error_text
+        return CommandOutcome(exit_code=1, text=error_renderer(error))
+    except WorktreeCommandError as error:
+        error_renderer = render_worktree_error_json if args.json else render_worktree_error_text
+        return CommandOutcome(exit_code=1, text=error_renderer(error))
     renderer = render_workbench_copy_json if args.json else render_workbench_copy_text
     return CommandOutcome(exit_code=0, text=renderer(result))

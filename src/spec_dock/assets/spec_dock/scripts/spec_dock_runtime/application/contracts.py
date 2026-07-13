@@ -394,6 +394,21 @@ class WorkbenchCopyRequest:
     target: str
 
 
+class WorkbenchCopyError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        side: str | None = None,
+        mutation_started: bool = False,
+    ) -> None:
+        self.code = code
+        self.side = side
+        self.mutation_started = mutation_started
+        super().__init__(message)
+
+
 @dataclass(frozen=True)
 class WorkbenchCopyResult:
     scope_id: str
