@@ -33,6 +33,13 @@ FetchFailureClass = Literal[
 ]
 ClassificationConfidence = Literal["certain", "probable", "unknown"]
 PublicationStatus = Literal["not_requested", "published", "failed", "rejected"]
+RemoteHeadDisposition = Literal[
+    "fetched_remote_tracking_ref",
+    "unverified_cache",
+    "unavailable",
+    "not_applicable",
+]
+ConcurrentChangeCheck = Literal["stable", "changed", "not_run", "not_applicable"]
 RECEIPT_KIND = "spec-dock.authoring.github-sync-preflight"
 
 
@@ -143,6 +150,38 @@ class PublicationEvidence:
 
 
 @dataclass(frozen=True)
+class RepositorySnapshot:
+    normalized_origin: str | None
+    branch: str | None
+    local_head: str | None
+    upstream: str | None
+    effective_ref: str | None
+    remote_head: str | None
+    remote_head_disposition: RemoteHeadDisposition
+    worktree_state: tuple[str, ...]
+    source_manifest: SourceManifest
+    snapshot_id: str
+
+
+@dataclass(frozen=True)
+class FreshnessEvidence:
+    observed_at: str | None = None
+    snapshot_id: str | None = None
+    final_guard_snapshot_id: str | None = None
+    concurrent_change_check: ConcurrentChangeCheck = "not_applicable"
+    remote_head_disposition: RemoteHeadDisposition = "not_applicable"
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "observed_at": self.observed_at,
+            "snapshot_id": self.snapshot_id,
+            "final_guard_snapshot_id": self.final_guard_snapshot_id,
+            "concurrent_change_check": self.concurrent_change_check,
+            "remote_head_disposition": self.remote_head_disposition,
+        }
+
+
+@dataclass(frozen=True)
 class PreflightResult:
     status: PreflightStatus
     evidence_mode: EvidenceMode
@@ -165,6 +204,7 @@ class PreflightResult:
     adoption_requires: str = "explicit_eal_disposition"
     bundle_generation_not_promotion: bool = True
     fetch: FetchSummary = field(default_factory=lambda: FetchSummary(status="not_applicable"))
+    freshness: FreshnessEvidence = field(default_factory=FreshnessEvidence)
     publication: PublicationEvidence = field(default_factory=PublicationEvidence)
 
     def to_dict(self) -> dict[str, object]:
@@ -191,6 +231,7 @@ class PreflightResult:
             "expected_source_hash": self.expected_source_hash,
             "current_source_hash": self.current_source_hash,
             "fetch": self.fetch.to_dict(),
+            "freshness": self.freshness.to_dict(),
             "publication": self.publication.to_dict(),
         }
         payload.update(self.source_manifest.to_dict())

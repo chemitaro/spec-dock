@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
+import hashlib
+import json
 from pathlib import Path
 import subprocess
 from typing import Literal
+from urllib.parse import urlsplit, urlunsplit
 
 from spec_dock_runtime.application.authoring_pack.github_fetch_policy import (
     Sleeper,
@@ -13,10 +17,13 @@ from spec_dock_runtime.application.authoring_pack.github_fetch_policy import (
 )
 from spec_dock_runtime.domain.authoring_pack.preflight_contract import (
     FetchSummary,
+    FreshnessEvidence,
     GitProcessOutcome,
     GitVisibleRef,
     PreflightResult,
     PublicationEvidence,
+    RemoteHeadDisposition,
+    RepositorySnapshot,
 )
 from spec_dock_runtime.domain.authoring_pack.source_manifest import (
     build_source_manifest,
@@ -50,6 +57,38 @@ class GitHubSyncPreflightRequest:
 
 RemoteObserver = Callable[[Path, str | None, bool], GitVisibleRef]
 FetchExecutor = Callable[[GitFetchExecutionRequest], GitProcessOutcome]
+SnapshotHook = Callable[[str, Path], None]
+
+
+@dataclass(frozen=True)
+class _ObservedRepositorySnapshot:
+    repository: RepositorySnapshot
+    visible_ref: GitVisibleRef
+    internally_stable: bool
+
+
+@dataclass(frozen=True)
+class _RepositoryState:
+    normalized_origin: str | None
+    branch: str | None
+    local_head: str | None
+    upstream: str | None
+    effective_ref: str | None
+    remote_head: str | None
+    remote_head_disposition: RemoteHeadDisposition
+    worktree_state: tuple[str, ...]
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "normalized_origin": self.normalized_origin,
+            "branch": self.branch,
+            "local_head": self.local_head,
+            "upstream": self.upstream,
+            "effective_ref": self.effective_ref,
+            "remote_head": self.remote_head,
+            "remote_head_disposition": self.remote_head_disposition,
+            "worktree_state": list(self.worktree_state),
+        }
 
 
 def run_github_sync_preflight(
@@ -58,6 +97,7 @@ def run_github_sync_preflight(
     remote_observer: RemoteObserver | None = None,
     fetch_executor: FetchExecutor | None = None,
     fetch_sleeper: Sleeper | None = None,
+    snapshot_hook: SnapshotHook | None = None,
 ) -> PreflightResult:
     repo_root = _resolve_repo_root(request.repo_root)
     output_blocker = None
@@ -67,10 +107,9 @@ def run_github_sync_preflight(
     if request.evidence_mode == "local-context" and not manifest_paths:
         manifest_paths = request.provided_context_paths
     source_blockers = source_path_blockers(repo_root, manifest_paths)
-    source_manifest = build_source_manifest(repo_root, manifest_paths)
-
     expected_source_hash = _resolve_expected_hash(request)
     if request.evidence_mode == "local-context":
+        source_manifest = build_source_manifest(repo_root, manifest_paths)
         result = _local_context_result(request, repo_root, source_manifest, expected_source_hash, source_blockers)
         return _finalize_publication(result, repo_root, request.output_dir, output_blocker)
 
@@ -82,14 +121,12 @@ def run_github_sync_preflight(
     blockers.extend(source_blockers)
     if source_blockers:
         remediation.append("remove symlink, absolute-outside-repo, or parent-traversal source paths before preflight")
-    blockers.extend(_worktree_blockers(repo_root))
     missing_source_paths = _missing_explicit_source_paths(repo_root, manifest_paths)
     if missing_source_paths:
         blockers.extend(f"missing_source_path:{path}" for path in missing_source_paths)
         remediation.append("fix or remove missing explicit --source-path entries before authoring preflight")
     branch = _git_stdout(repo_root, "rev-parse", "--abbrev-ref", "HEAD", check=False)
     current_branch = None if branch in (None, "", "HEAD") else branch
-    local_head = _git_stdout(repo_root, "rev-parse", "HEAD", check=False)
     requested_ref = request.ref or current_branch
     fetch_summary = FetchSummary(status="not_started")
 
@@ -111,7 +148,31 @@ def run_github_sync_preflight(
             blockers.append("origin_fetch_failed")
             remediation.append("fetch origin before GitHub-synced authoring preflight")
 
-    upstream = _git_stdout(repo_root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}", check=False)
+    observer = remote_observer or _observe_origin_ref
+    first_observation = _capture_repository_snapshot(
+        repo_root,
+        manifest_paths,
+        requested_ref,
+        request.allow_default_branch_fallback,
+        observer,
+        fetch_summary,
+        snapshot_hook,
+    )
+    if snapshot_hook is not None:
+        snapshot_hook("before_final_guard", repo_root)
+    final_observation = _capture_repository_snapshot(
+        repo_root,
+        manifest_paths,
+        requested_ref,
+        request.allow_default_branch_fallback,
+        observer,
+        fetch_summary,
+        None,
+    )
+    snapshot = first_observation.repository
+    final_snapshot = final_observation.repository
+    source_manifest = snapshot.source_manifest
+    upstream = snapshot.upstream
     if upstream is None:
         blockers.append("remote_branch_missing")
         remediation.append("set an origin upstream branch or use explicit local-context evidence")
@@ -119,19 +180,28 @@ def run_github_sync_preflight(
         blockers.append("origin_mismatch")
         remediation.append("track an origin branch before repo-aware GitHub authoring")
 
-    observer = remote_observer or _observe_origin_ref
-    visible = observer(repo_root, requested_ref, request.allow_default_branch_fallback)
+    visible = first_observation.visible_ref
     blockers.extend(visible.blockers)
     remediation.extend(visible.remediation)
 
     if visible.state != "resolved":
         blockers.append(visible.state)
+    blockers.extend(snapshot.worktree_state)
+
+    concurrent_change = (
+        not first_observation.internally_stable
+        or not final_observation.internally_stable
+        or snapshot.snapshot_id != final_snapshot.snapshot_id
+    )
+    if concurrent_change:
+        blockers.append("concurrent_repo_change")
+        remediation.append("rerun preflight after repository and source state stop changing")
 
     status = "blocked" if blockers else "pass"
     sync_state = "blocked" if blockers else "synced"
     github_sync = "failed" if blockers else "verified"
-    if not blockers and local_head != visible.remote_head:
-        ahead, behind = _ahead_behind(repo_root, visible.effective_ref)
+    if not blockers and snapshot.local_head != snapshot.remote_head:
+        ahead, behind = _ahead_behind_heads(repo_root, snapshot.local_head, snapshot.remote_head)
         if ahead > 0 and behind > 0:
             blockers.append("diverged_from_remote")
             remediation.append("reconcile diverged local and origin branches")
@@ -162,15 +232,20 @@ def run_github_sync_preflight(
         sync_state = "stale"
         github_sync = "failed"
 
+    if concurrent_change:
+        status = "blocked"
+        sync_state = "blocked"
+        github_sync = "failed"
+
     result = PreflightResult(
         status=status,
         evidence_mode="github-synced",
         sync_state=sync_state,
         github_sync=github_sync,
         requested_ref=requested_ref,
-        effective_ref=visible.effective_ref,
-        local_head=local_head,
-        remote_head=visible.remote_head,
+        effective_ref=snapshot.effective_ref,
+        local_head=snapshot.local_head,
+        remote_head=snapshot.remote_head,
         source_manifest=source_manifest,
         source_hash_mismatch_checked=checked,
         blockers=tuple(dict.fromkeys(blockers)),
@@ -178,6 +253,13 @@ def run_github_sync_preflight(
         expected_source_hash=expected_source_hash,
         current_source_hash=source_manifest.source_manifest_hash,
         fetch=fetch_summary,
+        freshness=FreshnessEvidence(
+            observed_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            snapshot_id=snapshot.snapshot_id,
+            final_guard_snapshot_id=final_snapshot.snapshot_id,
+            concurrent_change_check="changed" if concurrent_change else "stable",
+            remote_head_disposition=snapshot.remote_head_disposition,
+        ),
     )
     return _finalize_publication(result, repo_root, request.output_dir, output_blocker)
 
@@ -277,6 +359,93 @@ def _local_context_result(
         unsynced_reason=request.unsynced_reason,
         current_source_hash=source_manifest.source_manifest_hash,
     )
+
+
+def _capture_repository_snapshot(
+    repo_root: Path,
+    source_paths: tuple[str, ...],
+    requested_ref: str | None,
+    allow_default_branch_fallback: bool,
+    observer: RemoteObserver,
+    fetch_summary: FetchSummary,
+    snapshot_hook: SnapshotHook | None,
+) -> _ObservedRepositorySnapshot:
+    before_visible = observer(repo_root, requested_ref, allow_default_branch_fallback)
+    before_state = _repository_state(repo_root, before_visible, fetch_summary)
+    source_manifest = build_source_manifest(
+        repo_root,
+        source_paths,
+        file_observer=(
+            None
+            if snapshot_hook is None
+            else lambda _source_path: snapshot_hook("source_file_hashed", repo_root)
+        ),
+    )
+    visible = observer(repo_root, requested_ref, allow_default_branch_fallback)
+    state = _repository_state(repo_root, visible, fetch_summary)
+    snapshot_payload = {
+        **state.to_payload(),
+        "source_manifest_hash": source_manifest.source_manifest_hash,
+    }
+    canonical = json.dumps(snapshot_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    repository = RepositorySnapshot(
+        normalized_origin=state.normalized_origin,
+        branch=state.branch,
+        local_head=state.local_head,
+        upstream=state.upstream,
+        effective_ref=state.effective_ref,
+        remote_head=state.remote_head,
+        remote_head_disposition=state.remote_head_disposition,
+        worktree_state=state.worktree_state,
+        source_manifest=source_manifest,
+        snapshot_id=hashlib.sha256(canonical).hexdigest(),
+    )
+    return _ObservedRepositorySnapshot(
+        repository=repository,
+        visible_ref=visible,
+        internally_stable=before_state == state,
+    )
+
+
+def _repository_state(
+    repo_root: Path,
+    visible: GitVisibleRef,
+    fetch_summary: FetchSummary,
+) -> _RepositoryState:
+    branch = _git_stdout(repo_root, "rev-parse", "--abbrev-ref", "HEAD", check=False)
+    current_branch = None if branch in (None, "", "HEAD") else branch
+    return _RepositoryState(
+        normalized_origin=_normalized_origin(repo_root),
+        branch=current_branch,
+        local_head=_git_stdout(repo_root, "rev-parse", "HEAD", check=False),
+        upstream=_git_stdout(repo_root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}", check=False),
+        effective_ref=visible.effective_ref,
+        remote_head=visible.remote_head,
+        remote_head_disposition=_remote_head_disposition(fetch_summary, visible.remote_head),
+        worktree_state=_worktree_blockers(repo_root),
+    )
+
+
+def _remote_head_disposition(fetch_summary: FetchSummary, remote_head: str | None) -> RemoteHeadDisposition:
+    if fetch_summary.status == "success":
+        return "fetched_remote_tracking_ref" if remote_head is not None else "unavailable"
+    return "unverified_cache" if remote_head is not None else "unavailable"
+
+
+def _normalized_origin(repo_root: Path) -> str | None:
+    raw = _git_stdout(repo_root, "remote", "get-url", "origin", check=False)
+    if raw is None:
+        return None
+    if "://" not in raw:
+        if raw.startswith(("/", "./", "../", "~")):
+            digest = hashlib.sha256(str(Path(raw).expanduser().resolve(strict=False)).encode("utf-8")).hexdigest()
+            return f"local-path-sha256:{digest}"
+        if "@" in raw and ":" in raw:
+            return raw.split("@", 1)[1]
+        return raw
+    parsed = urlsplit(raw)
+    authority = parsed.netloc.rsplit("@", 1)[-1]
+    return urlunsplit((parsed.scheme, authority, parsed.path, "", ""))
 
 
 def _resolve_repo_root(repo_root: Path | None) -> Path:
@@ -387,12 +556,10 @@ def _fetch_summary(outcome: GitProcessOutcome) -> FetchSummary:
     return summarize_fetch_outcome(outcome)
 
 
-def _ahead_behind(repo_root: Path, effective_ref: str | None) -> tuple[int, int]:
-    if not effective_ref:
+def _ahead_behind_heads(repo_root: Path, local_head: str | None, remote_head: str | None) -> tuple[int, int]:
+    if local_head is None or remote_head is None:
         return (0, 0)
-    output = _git_stdout(
-        repo_root, "rev-list", "--left-right", "--count", f"HEAD...refs/remotes/origin/{effective_ref}", check=False
-    )
+    output = _git_stdout(repo_root, "rev-list", "--left-right", "--count", f"{local_head}...{remote_head}", check=False)
     if output is None:
         return (0, 0)
     left, right = output.split()
