@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 import subprocess
 from typing import Literal
@@ -11,13 +11,24 @@ from spec_dock_runtime.application.authoring_pack.github_fetch_policy import (
     run_origin_fetch_policy,
     summarize_fetch_outcome,
 )
-from spec_dock_runtime.domain.authoring_pack.preflight_contract import FetchSummary, GitProcessOutcome, GitVisibleRef, PreflightResult
+from spec_dock_runtime.domain.authoring_pack.preflight_contract import (
+    FetchSummary,
+    GitProcessOutcome,
+    GitVisibleRef,
+    PreflightResult,
+    PublicationEvidence,
+)
 from spec_dock_runtime.domain.authoring_pack.source_manifest import (
     build_source_manifest,
     expected_hash_from_manifest,
     source_path_blockers,
 )
 from spec_dock_runtime.infra.authoring_pack.git_fetch import GitFetchExecutionRequest, execute_git_fetch
+from spec_dock_runtime.infra.authoring_pack.preflight_receipt_writer import (
+    RECEIPT_FILENAME,
+    publish_preflight_receipt,
+    validate_preflight_receipt_output,
+)
 
 EvidenceMode = Literal["github-synced", "local-context"]
 
@@ -34,6 +45,7 @@ class GitHubSyncPreflightRequest:
     provided_context_paths: tuple[str, ...] = ()
     diff_summary: str | None = None
     unsynced_reason: str | None = None
+    output_dir: Path | None = None
 
 
 RemoteObserver = Callable[[Path, str | None, bool], GitVisibleRef]
@@ -48,6 +60,9 @@ def run_github_sync_preflight(
     fetch_sleeper: Sleeper | None = None,
 ) -> PreflightResult:
     repo_root = _resolve_repo_root(request.repo_root)
+    output_blocker = None
+    if request.output_dir is not None:
+        output_blocker = validate_preflight_receipt_output(repo_root=repo_root, output_dir=request.output_dir)
     manifest_paths = request.source_paths
     if request.evidence_mode == "local-context" and not manifest_paths:
         manifest_paths = request.provided_context_paths
@@ -56,10 +71,14 @@ def run_github_sync_preflight(
 
     expected_source_hash = _resolve_expected_hash(request)
     if request.evidence_mode == "local-context":
-        return _local_context_result(request, repo_root, source_manifest, expected_source_hash, source_blockers)
+        result = _local_context_result(request, repo_root, source_manifest, expected_source_hash, source_blockers)
+        return _finalize_publication(result, repo_root, request.output_dir, output_blocker)
 
     blockers: list[str] = []
     remediation: list[str] = []
+    if output_blocker is not None:
+        blockers.append(output_blocker)
+        remediation.append("choose an existing external non-symlink directory with no non-owned receipt target")
     blockers.extend(source_blockers)
     if source_blockers:
         remediation.append("remove symlink, absolute-outside-repo, or parent-traversal source paths before preflight")
@@ -81,7 +100,7 @@ def run_github_sync_preflight(
     if _git_stdout(repo_root, "remote", "get-url", "origin", check=False) is None:
         blockers.append("origin_missing")
         remediation.append("configure origin before GitHub-synced authoring preflight")
-    else:
+    elif output_blocker is None:
         fetch_request = GitFetchExecutionRequest.for_repo(repo_root)
         executor = fetch_executor or execute_git_fetch
         if fetch_sleeper is None:
@@ -143,7 +162,7 @@ def run_github_sync_preflight(
         sync_state = "stale"
         github_sync = "failed"
 
-    return PreflightResult(
+    result = PreflightResult(
         status=status,
         evidence_mode="github-synced",
         sync_state=sync_state,
@@ -159,6 +178,56 @@ def run_github_sync_preflight(
         expected_source_hash=expected_source_hash,
         current_source_hash=source_manifest.source_manifest_hash,
         fetch=fetch_summary,
+    )
+    return _finalize_publication(result, repo_root, request.output_dir, output_blocker)
+
+
+def _finalize_publication(
+    result: PreflightResult,
+    repo_root: Path,
+    output_dir: Path | None,
+    preflight_blocker: str | None,
+) -> PreflightResult:
+    if output_dir is None:
+        return result
+    if preflight_blocker is not None:
+        return replace(
+            result,
+            status="blocked",
+            blockers=tuple(dict.fromkeys((*result.blockers, preflight_blocker))),
+            remediation=tuple(
+                dict.fromkeys(
+                    (*result.remediation, "choose an existing external non-symlink directory with no non-owned receipt target")
+                )
+            ),
+            publication=PublicationEvidence(
+                requested=True,
+                status="rejected",
+                filename=RECEIPT_FILENAME,
+                blocker=preflight_blocker,
+            ),
+        )
+
+    candidate = replace(
+        result,
+        publication=PublicationEvidence(requested=True, status="published", filename=RECEIPT_FILENAME),
+    )
+    publication = publish_preflight_receipt(
+        repo_root=repo_root,
+        output_dir=output_dir,
+        payload=candidate.to_dict(),
+    )
+    if publication.status == "published":
+        return candidate
+    blocker = publication.blocker or "receipt_publication_failed"
+    return replace(
+        result,
+        status="blocked",
+        blockers=tuple(dict.fromkeys((*result.blockers, blocker))),
+        remediation=tuple(
+            dict.fromkeys((*result.remediation, "preserve the existing receipt and choose a safe writable output directory"))
+        ),
+        publication=publication,
     )
 
 

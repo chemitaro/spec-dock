@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
+import json
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
@@ -30,6 +32,8 @@ FetchFailureClass = Literal[
     "unknown",
 ]
 ClassificationConfidence = Literal["certain", "probable", "unknown"]
+PublicationStatus = Literal["not_requested", "published", "failed", "rejected"]
+RECEIPT_KIND = "spec-dock.authoring.github-sync-preflight"
 
 
 @dataclass(frozen=True)
@@ -123,6 +127,22 @@ class FetchSummary:
 
 
 @dataclass(frozen=True)
+class PublicationEvidence:
+    requested: bool = False
+    status: PublicationStatus = "not_requested"
+    filename: str | None = None
+    blocker: str | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "requested": self.requested,
+            "status": self.status,
+            "filename": self.filename,
+            "blocker": self.blocker,
+        }
+
+
+@dataclass(frozen=True)
 class PreflightResult:
     status: PreflightStatus
     evidence_mode: EvidenceMode
@@ -145,11 +165,12 @@ class PreflightResult:
     adoption_requires: str = "explicit_eal_disposition"
     bundle_generation_not_promotion: bool = True
     fetch: FetchSummary = field(default_factory=lambda: FetchSummary(status="not_applicable"))
+    publication: PublicationEvidence = field(default_factory=PublicationEvidence)
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
             "schema_version": 1,
-            "receipt_kind": "spec-dock.authoring.github-sync-preflight",
+            "receipt_kind": RECEIPT_KIND,
             "status": self.status,
             "evidence_mode": self.evidence_mode,
             "sync_state": self.sync_state,
@@ -170,8 +191,14 @@ class PreflightResult:
             "expected_source_hash": self.expected_source_hash,
             "current_source_hash": self.current_source_hash,
             "fetch": self.fetch.to_dict(),
+            "publication": self.publication.to_dict(),
         }
         payload.update(self.source_manifest.to_dict())
+        canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        payload["receipt_digest"] = {
+            "algorithm": "sha256",
+            "value": hashlib.sha256(canonical).hexdigest(),
+        }
         return payload
 
 
