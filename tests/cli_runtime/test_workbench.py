@@ -93,3 +93,71 @@ class TestCliWorkbench(CliRuntimeHarness):
             assert payload["one_shot"] is True
             assert payload["sync"] is False
             assert secret_body.strip() not in json_result.stdout
+
+    def test_workbench_copy_reports_no_source_without_changing_existing_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source, target, scope_id, _, target_scope = self._prepare_linked_worktrees(Path(tmp))
+            sentinel = target_scope / ".workbench" / "sentinel.txt"
+            sentinel.parent.mkdir()
+            sentinel.write_text("target-only\n", encoding="utf-8")
+
+            result = self._run_runtime_capture(
+                source,
+                ["workbench", "copy", "--scope", scope_id, "--to", target.name, "--json"],
+            )
+
+            assert result.returncode == 1, result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["code"] == "no_source"
+            assert payload["side"] == "source"
+            assert payload["mutation_started"] is False
+            assert sentinel.read_text(encoding="utf-8") == "target-only\n"
+
+    def test_workbench_copy_accepts_empty_source_workbench(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source, target, scope_id, source_scope, target_scope = self._prepare_linked_worktrees(Path(tmp))
+            (source_scope / ".workbench").mkdir()
+
+            result = self._run_runtime_capture(
+                source,
+                ["workbench", "copy", "--scope", scope_id, "--to", target.name],
+            )
+
+            assert result.returncode == 0, result.stderr
+            assert (target_scope / ".workbench").is_dir()
+            assert list((target_scope / ".workbench").iterdir()) == []
+
+    @pytest.mark.parametrize(
+        ("side", "kind"), [("source", "file"), ("target", "file"), ("source", "symlink"), ("target", "symlink")]
+    )
+    def test_workbench_copy_rejects_malformed_roots_without_external_impact(self, side: str, kind: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, target, scope_id, source_scope, target_scope = self._prepare_linked_worktrees(root)
+            external = root / "external"
+            external.mkdir()
+            sentinel = external / "sentinel.txt"
+            sentinel.write_text("outside\n", encoding="utf-8")
+            malformed = (source_scope if side == "source" else target_scope) / ".workbench"
+            if kind == "symlink":
+                if not self._can_create_symlink(root):
+                    pytest.skip("symlink not available")
+                malformed.symlink_to(external, target_is_directory=True)
+            else:
+                malformed.write_text("not a directory\n", encoding="utf-8")
+            if side == "target":
+                source_workbench = source_scope / ".workbench"
+                source_workbench.mkdir()
+                (source_workbench / "analysis.txt").write_text("source\n", encoding="utf-8")
+
+            result = self._run_runtime_capture(
+                source,
+                ["workbench", "copy", "--scope", scope_id, "--to", target.name, "--json"],
+            )
+
+            assert result.returncode == 1, result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["code"] == "invalid_workbench_root"
+            assert payload["side"] == side
+            assert payload["mutation_started"] is False
+            assert sentinel.read_text(encoding="utf-8") == "outside\n"

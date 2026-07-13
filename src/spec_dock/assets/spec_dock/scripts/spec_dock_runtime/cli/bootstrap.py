@@ -277,6 +277,9 @@ class _FilesystemGateway:
     def remove_target(self, path: Path) -> None:
         infra_fs_cli.remove_target(path)
 
+    def path_kind(self, path: Path) -> str:
+        return infra_fs_cli.path_kind(path)
+
     def copy_workbench(self, source: Path, destination: Path) -> None:
         infra_fs_cli.copy_workbench(source, destination)
 

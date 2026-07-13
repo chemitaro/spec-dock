@@ -236,6 +236,32 @@ git diff --check
   - Destination root作成後のcopy failureはS05/S06で`mutation_started`相当を正直に表現する。
 - Ledger Note: Approved planどおりのdeferred obligationsでありplan amendmentなし。
 
+### セッションログ（2026-07-13 S03 independent scope/preflight）
+
+#### 対象
+- Step: S03 Independent scope、copy eligibility、pre-mutation failure。
+- Closure: C316-02、C316-03、C316-04。
+
+#### 委任と実施内容
+- Fresh dev-coderへcopy application eligibility、source/target side別scope解決、`no_source`、empty/malformed rootを委任した。
+- `WorkbenchCopyError(code, side, mutation_started)`とcontent-free rendererを追加し、same-current/bare/path-missing、missing/duplicate/invalid/unsupported scope、direct file/symlink Workbench rootをcopy前に拒否する。
+- `FilesystemGateway.path_kind`は`lstat`を使いbroken symlinkをdereferenceしない。Empty sourceだけはminimal adapterでtarget directory作成successとした。
+
+#### テスト駆動開発証跡
+| フェーズ | 観測証跡 | 結果 |
+|---|---|---|
+| Red | Error/preflight contract欠如 | 15 failed / 2 passed（fixture 1件修正） |
+| Green | Focused application + CLI | 28 passed、fresh reviewer再実行28 passed |
+| Regression | Related selector cases | 3 passed |
+| Refactor | Ruff/format/mypy/diff check | pass |
+
+#### Closure / review
+- Same ID/different slug、source/target side別missing/duplicate/invalid、invalid ID normalizationを確認。
+- Same-current/bare/path-missingはscope load/copy未呼出し、`no_source` absent/existing target sentinel不変、empty success、malformed roots external影響なし。
+- Fresh code-reviewer: pass、P0/P1/blockingなし。
+- Nonblocking: trim/lowercase positive regressionとbroken-symlink固有caseはS05/S06で必要性を再評価。Current `lstat` pathはreview確認済み。
+- Ledger Note: Observable contract変更、scope creep、plan amendmentなし。
+
 ### セッションログ（2026-07-13 HH:MM - HH:MM）
 
 #### 対象
@@ -307,12 +333,14 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | Shared selector boundary抽出とcharacterization | dev-coder | application worktree target resolver + focused tests | requirement/design/plan S01/C316-02 | `application/worktree.py`、new `application/worktree_target.py`、`test_worktree.py` | Copy command/eligibility/fs/presentation/dogfood/canonical docs | focused/full worktree pytest、Ruff、mypy、diff check | Public semantics変更、scope外refactor、baseline failure | worker summary/changed files/Red-Green/tests/risks/Ledger Note | pass |
 | S02 | delegated | Multi-layer minimal vertical behavior | dev-coder | parser→command→application→ports/infra→presentation + focused tests | requirement/design/plan S02/C316-01/03/05/09 | Provider runtime candidate filesとnew `test_workbench.py` | S03–S06 obligations、root/--from/sync/classifier、dogfood/canonical docs | focused/combined pytest、Ruff、mypy、format、diff check | Resolver複製、source path転写、body漏洩、scope外変更 | worker summary/changed files/Red-Green/tests/risks/Ledger Note | pass |
+| S03 | delegated | Independent scope/pre-mutation error matrix | dev-coder | copy application/contracts/path-kind/error rendering + focused tests | requirement/design/plan S03/C316-02/03/04 | Workbench application/contracts/ports/bootstrap/command/fs/presentation/tests | S04 recursive matrix、S05 ancestor/mid-copy、root/sync/classifier/canonical docs | focused app/CLI、selector regression、Ruff/format/mypy/diff | Mutation前target change、source path転写、raw error漏洩 | worker summary/changed files/Red-Green/tests/risks/Ledger Note | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder | Existing selectorをshared application boundaryへ意味論不変で抽出 | `application/worktree.py`; new `application/worktree_target.py`; `test_worktree.py` | focused4/full52 pass、Ruff/mypy/diff pass | fresh code-reviewer pass | none | accepted |
 | S02 | dev-coder | Minimal `workbench copy` vertical slice、independent scope resolution、authority markers | contracts/ports/new workbench command+app/parser/registry/bootstrap/fs/presentation/new tests | Red2→Green2、combined54、Ruff/mypy/format/diff pass | fresh code-reviewer pass | S03–S06 planned obligations | accepted |
+| S03 | dev-coder | Eligibility、side-specific scope errors、no_source/empty/malformed root、mutation probes | Workbench application/contracts/ports/bootstrap/command/fs/presentation、CLI+unit tests | Red15/2→Green28、selector3、Ruff/format/mypy/diff pass | fresh code-reviewer pass | Trim/lower positive and broken-link case nonblocking | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -335,14 +363,16 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | PLANNING | requirement/design/plan authoring | spec-reviewer | fresh | passed | no | execute approved plan | requirement r3、design r2、plan r2 pass |
 | S01 | step reviewer | code-reviewer | fresh | passed | no | proceed | P0/P1/blocking/nonblockingなし |
 | S02 | step reviewer | code-reviewer | fresh | passed | no | proceed | P0/P1/blockingなし、planned relay 3件 |
-| S03–S06 | step reviewer | code-reviewer | pending | pending | N/A | blocked until each pass | 各step後にfresh review |
+| S03 | step reviewer | code-reviewer | fresh | passed | no | proceed | P0/P1/blockingなし、nonblocking tests 2件 |
+| S04–S06 | step reviewer | code-reviewer | pending | pending | N/A | blocked until each pass | 各step後にfresh review |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | PLANNING/S00 | committed | Issue316 requirement/design/plan/report/assurance/GPT raw artifact | `aed3b3f429d713b347a4fe1ed401571608a7242a` | clean/upstream `0 0` | not applicable | planning artifacts | `git diff --check` pass | selector baseline 51 pass、validate/assurance/guidance ready |
 | S01 | committed | shared target resolver + characterization + report | `bf54c810ad9fe71196e231814b95286e6faf6001` | clean/upstream `0 0` | not applicable | S01 contract | `git diff --check` pass | Fresh code-reviewer pass、full worktree 52 pass |
-| S02 | ready for commit | Minimal workbench copy vertical slice + tests + report | pending | pending | not applicable | S02 contract | `git diff --check` pass | Fresh code-reviewer pass、combined54 pass |
+| S02 | committed | Minimal workbench copy vertical slice + tests + report | `fc0c77916dc4d9e4a094e5d403cd256cf1585f43` | clean/upstream `0 0` | not applicable | S02 contract | `git diff --check` pass | Fresh code-reviewer pass、combined54 pass |
+| S03 | ready for commit | Copy preflight/error contract + tests + report | pending | pending | not applicable | S03 contract | `git diff --check` pass | Fresh code-reviewer pass、focused28 pass |
 
 #### 変更したファイル
 - `path/to/file1` - ...
