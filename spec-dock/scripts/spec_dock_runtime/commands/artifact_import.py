@@ -82,8 +82,8 @@ def _run(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
         renderer = render_artifact_import_error_json if args.json else render_artifact_import_error_text
         return CommandOutcome(exit_code=1, text=renderer(error))
     except Exception:
-        error = ArtifactImportError(code="runtime_failed", cleanup_state="not_created")
+        runtime_error = ArtifactImportError(code="runtime_failed", cleanup_state="not_created")
         renderer = render_artifact_import_error_json if args.json else render_artifact_import_error_text
-        return CommandOutcome(exit_code=1, text=renderer(error))
+        return CommandOutcome(exit_code=1, text=renderer(runtime_error))
     renderer = render_artifact_import_json if args.json else render_artifact_import_text
     return CommandOutcome(exit_code=0, text=renderer(result))

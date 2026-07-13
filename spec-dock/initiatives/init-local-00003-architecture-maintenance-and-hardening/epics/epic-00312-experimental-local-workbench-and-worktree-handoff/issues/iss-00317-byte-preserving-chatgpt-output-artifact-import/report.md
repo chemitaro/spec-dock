@@ -90,9 +90,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
-  - used / not used
+  - used。ChatGPT 5.6 ProのGitHub-synced planning evidenceを取り込み、canonical requirement/design/planへ部分採用・再記述した。
 - 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
+  - N/A。委任ドラフトは`artifacts/20260713t124754z-research-chatgpt-5-6-pro-issue-planning-evidence.md`として保存し、EAL-317-001で採否を管理した。
 - lifecycle state（契約値）:
   - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
 - 昇格不可 state:
@@ -131,62 +131,12 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- `artifact import chatgpt-output`を独立CLI leafとして追加し、Workbench direct-childの単一Markdownをopaque bytesのままsourceを残してblank Artifactへno-overwrite copyする。
+- Shared allocation、source stability、descriptor-bound publish、collision/fault committed semantics、content-free output、consumer compatibility、provider/dogfood projectionをS01–S05で閉じた。ChatGPT First workflowはIssue318、public distribution/docs/final Epic PRはIssue319へ明示relayする。
 
 ## 実装記録（セッションログ） (必須)
-
-### セッションログ（2026-07-13 HH:MM - HH:MM）
-
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
-
-#### 実施内容
-- ...
-
-#### 実行コマンド / 結果
-```bash
-<command>
-
-<result>
-```
-
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
-
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+- S01–S05、S90、S99のobserved Red/Green/Refactor、closure delta、reviewer、commit証跡は本書の`Step Evidence` managed sectionへ時系列で統合した。
+- Required closure aliasは`TC317-*`から`C317-01–11`へ各stepで明示しており、plan amendmentを要するclosure expectation変更はない。
 
 #### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 `workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
@@ -209,6 +159,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S03 | delegated | Public CLI vertical sliceとcontent-free result contract | dev-coder | Plan S03 parser/application/presentation/CLI tests | Reviewed requirement/design/plan、S01/S02 commits | CLI parser/registry/bootstrap、new handler/use case/contracts、presentation、focused tests | Publisher semantics、typed reservation/template、workflow/docs、Issue318/319 | TC317-S03-01–04、focused tests、help inspection、diff check | Existing node import/global JSON change、body/path leak、scope外変更 | Changed files、Red/Green、help/output、risk、Ledger Note | passed |
 | S04 | delegated | Collision/fault/post-commit semantics hardening | dev-coder | Plan S04 import/shared helper/publisher/presentation/tests | Reviewed requirement/design/plan、S01–S03 commits | Import application/publisher/presentation、focused concurrency/fault tests、meaning-preserving S01 helper correction | New lock、unbounded retry、final rollback、docs/workflow/dogfood/Issue318/319 | TC317-S04-01–04、3 repeat runs、affected CLI tests、diff check | Flaky sleep test、retry ambiguity、existing bytes mutation、scope外変更 | Changed files、Red/Green、fault matrix/repeat logs、risk、Ledger Note | passed |
 | S05 | delegated | Existing consumer compatibilityとprovider/dogfood projection | dev-coder | Plan S05 runtime regression/projection subset | Reviewed requirement/design/plan、S01–S04 commits | Focused validation/sync/ADR/delegated-authoring tests、provider-generated dogfood runtime | Public docs/skills、Issue318/319、manual evidence interpretation、unrelated generated assets | TC317-S05-01/02、provider/dogfood diff、focused regressions、diff check | Consumer contract変更、provider/dogfood authority衝突、scope外generated diff | Changed files、characterization/Green、projection diff、risk、Ledger Note | passed |
+| S99-STATIC-REPAIR | delegated | Final static gateでIssue-local mypy/format failureを検出 | dev-coder | Issue317 changed source/testsの型/format修正だけ | Reviewed requirement/design/plan、S01–S90 commits、full unit/CLI pass | `commands/artifact_import.py` mypy最小修正、Issue317 changed testsのRuff format | Pre-existing `scripts/authoring-pack/*`、behavior変更、new feature、docs/workflow/Issue318/319 | `uv run mypy src`、targeted Ruff、affected tests、diff check | Behavior/contract変更、scope外format churn、test regression | Changed files、root cause、commands/results、no material decision | passed |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -218,6 +169,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S03 | dev-coder | `artifact import chatgpt-output` parser→application→publisher→presentationを結線し、blank naming/byte identity/content-free outputを公開 | `application/contracts.py`; new `application/import_artifact.py`; CLI parser/registry/bootstrap; new command; presentation; 3 focused test files | Red 9 failed、focused 13 passed、regression 178 items exit 0、prior 142 passed、manual help/Ruff format+check/diff check pass | fresh code-review r1 passed | S04 collision/fault hardening、Linux live primitive、dogfood projectionは未実施 | accepted; no material plan deviation |
 | S04 | dev-coder | Shared create lock内でcollisionを再scanし、100候補のbounded retry、pre/post-publish fault分類、committed warningを追加 | `application/contracts.py`; `application/import_artifact.py`; `infra/binary_artifact_publisher.py`; S04 CLI/presentation tests | Initial 8 failed/6 passed、focused 63 passed、deterministic 25 passedを3連続、S02/S03回帰58 pass、S01回帰32 pass、mypy/Ruff/diff check pass | fresh code-review r1 passed | Linux descriptor publication live検証はS02から継続。Suffix grammar変更時は100回上限も同期必要 | accepted; D-317-004 applied、plan closure変更なし |
 | S05 | dev-coder | Invalid UTF-8 raw import後のvalidate/sync/ADR mirror不変性をcharacterizeし、S01–S04 runtime 10ファイルをdogfoodへbyte-equivalent projection | 10 dogfood runtime files; `tests/cli_runtime/test_artifact_import_chatgpt_output.py` | Characterization時刻差分を意味保存で正規化後Green、focused 85 passed、dogfood validate pass、provider/dogfood cmp 10/10、Ruff/diff check pass | fresh code-review r1 passed | Manual captureはorchestrator実施済み。Public docs/workflow/package parityはIssue318/319 relay | accepted; no material implementation decision |
+| S99-STATIC-REPAIR | dev-coder | Mypy例外変数shadowを局所renameし、Issue317 test 3ファイルをRuff整形、dogfood commandをexact re-projection | Provider/dogfood `commands/artifact_import.py`; 3 focused test files | `mypy src` 147 pass、Issue changed 17 files Ruff check/format pass、affected 111 pass、projection follow-up 12 pass、cmp/diff check pass | final QA pass、final code-review pass | Full Ruffのpre-existing `scripts/authoring-pack/*` 2 filesはIssue319 full gateへrelay | accepted; behavior/API/contract変更なし |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -257,6 +209,9 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S90-SPEC-r1 | Docs impact path ownership/closure | spec-reviewer | superseded | failed | no | expand path ledger then fresh re-review | P1: grouped surfaceでは実パス別disposition/owner/reason/dependency/blockingを検証不能。`gpt-5.6-sol`/medium、confidence 0.99 |
 | S90-SPEC-r2 | Docs impact path ownership/closure | spec-reviewer | superseded | failed | no | expand runtime paths then fresh re-review | P1: Runtime provider/dogfood 10-file surfaceだけgrouped pathが残存。`gpt-5.6-sol`/medium、confidence 0.99 |
 | S90-SPEC-r3 | Docs impact path ownership/closure | spec-reviewer | fresh | passed | no | approve no-op/defer and commit report | findingsなし。全50行、runtime provider 10/dogfood 10の独立実パス、owner/dependency/blocking、W4/W5 relayを確認。`gpt-5.6-sol`/medium、confidence 0.99 |
+| S99-QA-r1 | Issue-wide test adequacy | qa-reviewer | fresh | passed | no | proceed to issue-wide code review | findingsなし。C317-01–11/全TC317のRed/negative/fault/concurrency/manual追跡、full unit/CLI、static repair再検証、Issue319 relayを確認。`gpt-5.6-sol`/medium、confidence 0.98 |
+| S99-CODE-r1 | Issue-wide integrated diff | code-reviewer | fresh | passed | no | proceed to final spec review | findingsなし。Provider/dogfood一致、focused 79 pass、Ruff/diff check、byte preservation/no-overwrite/lock/fault/consumer契約を確認。`gpt-5.6-sol`/medium、confidence 0.98 |
+| S99-SPEC-r1 | Final requirement/design/plan/implementation/report closure | spec-reviewer | fresh | passed | no | commit/push then issue finish | findingsなし。C317-01–11、EAL/decision ledger、Workbench/import契約、Issue318/319 relay、model unpin後の起動時指定を確認。`gpt-5.6-sol`/medium、confidence 0.97 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -267,29 +222,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04 | committed | Collision/fault hardening + deterministic tests + observed report | `18be850a32e4ee1460fc3a7dd1b9b44d5dfae575` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 | S05 | committed | Consumer characterization + dogfood runtime projection + manual evidence + report | `bdc0d921598a14b1ecf59b7cdc00949be3b0de28` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 | S90 | approved-no-op | Docs impact inspection + explicit Issue318/319 defer + observed report | `73bebc1a9754e02370501a1e0a59e9ec444de441` | `git status --short` clean、upstream `0 0` | Issue317 runtimeを正しく使うためのshipped text更新はW4/W5 ownershipに明示割当済み | README/reference docs/migration -> Issue319; workflow/skills -> Issue318 | 50-row path ledger、runtime provider 10/dogfood 10、S90-SPEC-r3 pass | fresh spec-reviewer r3 pass、read-only post-push confirmation complete |
-
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
-
-#### コミット
-- <hash> <message>
-
-#### メモ
-- ...
-
----
-
-### セッションログ（2026-07-13 HH:MM - HH:MM）
-
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
+| S99 | commit candidate | Static repair 5 files + final observed report | commit後にhash追記 | commit後に確認 | N/A | N/A | N/A | QA/CODE/SPEC fresh pass、commit可能 |
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
@@ -350,32 +283,36 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | already sufficient; additional Issue317 integration test not required | C317-01–11/全TC317、unit 1121、CLI 1162/75 skip、affected 111、projection 12、manual SHA/cmp/validate、Issue319 full gate relay | pass; findingsなし、confidence 0.98 |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff（`51c4f8f0`以降、未commit S99 static repairを含む） | findingsなし。Provider/dogfood一致、focused 79 pass、Ruff、diff check、byte preservation/no-overwrite/lock/fault/consumer契約を確認 | 0 | pass、confidence 0.98 |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | findingsなし。C317-01–11、EAL/decision ledger、byte-preserving/evidence-only/blank coexistence、Workbench/import境界、Issue318/319 relay、model運用を確認 | 0 | pass、confidence 0.97 |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S99 full baseline、static repair、QA/code/spec reviewer verdict、Issue318/319 relay、deferred full/global gateを記録 | S99 static repair 5ファイルと本reportをcommit/pushし、closure commitでhashを追記 | Issue317 finish evidence、Epic最終PR、最終ユーザー報告 | commit可能 |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: Final static gateで、Issue-localのmypy例外変数shadowとRuff format差分を検出した。
+  - 解決: DevCoderが意味を変えない局所renameと3 test fileのformatだけを行い、provider/dogfood exact projection、mypy、Ruff、affected tests、diff checkで再検証した。
+- 問題: Global RuffはIssue317外の`authoring-pack`既存差分でfailした。
+  - 解決: Issue317変更面のRuff passを確認し、全体修復とfull/global gateは依存順上のIssue319 W5へ明示relayした。
 
 ## 学んだこと (任意)
-- ...
+- Byte-preserving importでは、pathnameの再参照ではなく検証済みdescriptorへpublicationを結び付けることがTOCTOU境界の中核になる。
+- Post-publish faultはrollback不能であり、`committed=true`とcontent-free warningを返す契約が、再試行による重複作成を防ぐ。
 
 ## 今後の推奨事項 (任意)
-- ...
+- Issue318でChatGPT First authoring checkpointとEAL運用を結線し、Issue319でfresh init/update、public docs、Linux CI、full/global gate、Epic PRを完了する。
+- Suffix grammarまたはnative no-replace adapterを変更する場合は、100候補上限とverified-descriptor/no-overwrite観測契約を同時に再検証する。
 
 ## 省略/例外メモ (必須)
 - 該当なし
@@ -584,4 +521,34 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - Commit closure:
   - Report-only commit: `73bebc1a9754e02370501a1e0a59e9ec444de441` (`docs(issue-317): S90文書影響を確定`)。
   - Push成功。Post-push tracked status clean、upstream `0 0`。
+
+### S99 Final Issue quality gates — 2026-07-14
+
+- Baseline integration:
+  - `uv run pytest tests/unit`: `1121 passed in 351.64s`。
+  - `uv run pytest tests/cli_runtime`: `1162 passed, 75 skipped, 2 warnings in 1149.08s`。Warningsは既存duplicate ZIP fixtureの`UserWarning`。
+  - Full `uv run pytest`はunit/CLIを重複実行しintegration external boundaryも含むため、Issue319 W5のfull Epic gateへ明示relay。Issue317 affected/full unit/full CLIは省略していない。
+- Static repair:
+  - Initial `uv run mypy src`: Issue-local `commands/artifact_import.py`で例外変数再代入1件を検出。
+  - DevCoderがgeneric exception側だけ`runtime_error`へrenameしbehavior/API/contractを不変に修正。Provider→dogfood commandをexact re-projection。
+  - Issue317 changed test 3ファイルだけをRuff整形。Full Ruffで検出したpre-existing `scripts/authoring-pack/authoring_pack_review.py` / `invoke_chatgpt_backend.py` driftは変更せず、Issue319 full static gateへrelay。
+  - Post-repair: `uv run mypy src` = 147 source files issuesなし。Issue317 changed 17 Python filesのRuff check/format pass。Affected tests `111 passed`、projection follow-up `12 passed`、provider/dogfood `cmp` pass、`git diff --check` pass。
+- Lifecycle/evidence:
+  - `assurance verify --issue iss-00317 --format json`: `ok=true`, `status=valid`, standard/normal、source binding valid。
+  - `validate`: `spec-dock: ok (validate) nodes=209`。
+  - `sync`: approved-no-op。Issue317変更はruntime/tests/reportとblank evidence Artifactで、node status/dependency/ADR mirror projectionを変えない。S05 temp-repo sync characterization pass、blank ArtifactはADR mirror非対象、S90以降node metadata変更なし。
+  - `active show`: initiative `init-local-00003`、epic `epic-00312`、issue `iss-00317`一致。
+  - Pre-review branch: upstream `0 0`、final candidateはreport、provider/dogfood commandの同一rename、format-only test 3件。
+- Closure coverage:
+  - `C317-01–04`: S01/S03 public CLI、blank coexistence、opaque bytesでpass。
+  - `C317-05–09`: S02/S04 collision/source/fault/post-commit/content-free matrixでpass。
+  - `C317-10`: S05 validate/sync/ADR/delegated-authoring consumer characterizationでpass。
+  - `C317-11`: Manual import/EAL、Issue318/319 relay、S90 docs impact、deferred PR deliveryでpass candidate。
+- Deferred PR Delivery Gate:
+  - Target: `iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr`。
+  - Dependency: Epic planのIssue317→Issue318→Issue319 chain。
+  - Reason: One final Epic PRへworkflow integration、installed/fresh init/update parity、public docs、full regression/static repair、PR deliveryを集約するためper-Issue PRを作らない。
+  - Claim boundary: Issue319 PR Delivery/Merge Preparation完了までmerge-preparedを主張しない。
+  - Remaining gates: Issue318 workflow/skills、Issue319 package/fresh init/update/public docs/migration/full `pytest`/global Ruff pre-existing drift/QA-code-spec/PR observation。
+- Final reviewer result: fresh QA、issue-wide code、final specはいずれもfindingsなしでpass。Final report commit/push、clean/upstream確認後にspec-manager `issue finish`へ進む。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
