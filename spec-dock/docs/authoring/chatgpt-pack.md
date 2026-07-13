@@ -37,6 +37,20 @@ prompt pack には次を含めます。
 - evidence mode
 - failure handling expectation: wait / retry / recover before any manual route
 
+## GitHub 同期 receipt と pack binding
+
+`github-synced` の preflight receipt を保存する場合は、SpecDock entrypoint を direct argv で実行し、既存かつ repository 外の directory を `--output-dir` に指定します。shell wrapper、redirect、pipe、`tee`、heredoc、command substitution、inline environment assignment は使いません。
+
+```text
+./spec-dock/scripts/spec-dock authoring preflight github-sync --output-dir <existing-external-directory>
+```
+
+receipt は stdout format と独立した JSON で、file 名は `github-sync-preflight.receipt.json` に固定されます。安全な出力先なら blocked result も保存されます。fetch の nonzero は追加権限が必要であることの証跡ではなく、`require_escalated` や sandbox / permission mode の変更理由にはなりません。限定 retry は SpecDock が同じ実行形で行うため、agent-owned raw `git fetch` に置き換えません。blocked result の `blockers`、bounded diagnostics、`remediation` に従って原因を修正し、`local-context` や default branch へ暗黙に切り替えません。
+
+`authoring pack prepare --preflight <receipt>` は、versioned receipt の kind、schema、digest、pass / fetch / snapshot semantics を検証し、receipt digest、snapshot identity、`observed_at` を prompt pack provenance に binding します。これは preflight 観測時点の integrity と provenance の契約です。pack prepare は current repository / remote を再取得・再検証せず、`current_repository_revalidated` は false のままです。receipt publication 後や backend invocation 直前までの freshness を保証するものではありません。
+
+legacy unversioned receipt は既存 contract を満たす範囲で読み取れますが、new receipt digest、snapshot binding、current freshness を推測しません。receipt / pack validation は evidence-lane の検査であり、canonical adoption、reviewer pass、execution-ready、PR-ready、merge-ready を付与しません。
+
 ## 出力 ZIP / tree の扱い（ZIP / tree output）
 
 ZIP / tree output は長文の複数ファイルをまとめて受け取るための transport です。
