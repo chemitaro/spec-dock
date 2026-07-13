@@ -13,13 +13,13 @@ ID: "iss-00314"
 
 ## 現在の状態
 
-- lifecycle: planning
+- lifecycle: execution
 - canonical requirement: authored and fresh-reviewed
 - canonical design: authored and fresh-reviewed after one repair cycle
 - canonical plan: authored; initial fresh review failed、repair後のfresh re-review passed
 - authorized profile: standard
-- implementation: not started
-- execution-ready: false
+- implementation: started (M0 baseline complete)
+- execution-ready: true (`guidance issue-execution`: `state=ready`, `may_execute_approved_plan=true`)
 - PR-ready / merge-ready / complete: not claimed
 
 ## GitHub Issue移管
@@ -121,7 +121,7 @@ Neither delegated artifact claims canonical authority, reviewer pass, or impleme
 
 ## Workflow-Scoped Authorization
 
-The user explicitly requested `spec-dock-issue-planning`. This authorizes the SpecDock-defined planning roles and reviewers within this active Issue/worktree/session. It does not authorize implementation, destructive actions, external publication beyond the requested Issue relationship/close operation, or completion claims.
+The user explicitly requested implementation through PR merge preparation after the reviewed Issue planning. This authorizes the SpecDock-defined execution roles and reviewers within this active Issue/worktree/session and PR creation/push/observation required for delivery. It does not authorize PR merge, branch deletion, or completion claims without evidence.
 
 ## Execution ledgers
 
@@ -131,39 +131,52 @@ Implementation has not started. The following ledgers are intentionally initiali
 
 | Step | Worker | State | Reason / next action |
 |---|---|---|---|
-| S01-S06 | dev-coder | not_started | start only after fresh plan pass and explicit execution handoff |
+| M0 | main orchestrator | passed | runtime guidance ready、explicit execution authorization、focused baseline 49 passed |
+| S01 | dev-coder | passed | fresh code review failed once、bounded repair後のfresh re-review passed |
+| S02 | dev-coder | passed | fresh code review failed once、HTTP5xx/TLS identity fixtures修正後のfresh re-review passed |
+| S03-S06 | dev-coder | not_started | S03 is next after C1 commit |
 | S90 | doc-writer | not_started | depends on stable implemented contract |
 | S99 | reviewers | not_started | depends on all prior step closures |
 
 ### TDD / Red / Green / Refactor Evidence
 
-- state: not_started
+- state: baseline_complete
 - destination: this section, updated per plan step
-- next action: execution workflow after planning completion and user direction
+- M0 baseline: `uv run pytest -q tests/cli_runtime/test_authoring.py -k 'preflight or pack_prepare'` -> `49 passed, 338 deselected in 39.26s`
+- S01 Red: new adapter不在によりfocused testが`ModuleNotFoundError`で失敗。
+- S01 Green: typed fixed fetch tracer、schema v1 skeleton、spawn/timeout/exited outcomeを実装。`uv run pytest -q tests/unit/authoring_pack/test_github_fetch_policy.py tests/cli_runtime/test_authoring.py -k 'authoring_preflight'` -> `29 passed, 364 deselected`。
+- S01 review repair: `policy_id=origin-fetch-v1`、timeout sensitivity、application-level spawn failure、text additive assertionsを追加。
+- S02 Red: policy module不在によりfocused collectionが`ModuleNotFoundError`。
+- S02 Green: conservative classifier、same-shape bounded retry、safe diagnosticを実装。initial expanded lane `30 passed, 384 deselected`。
+- S02 review repair: HTTP 5xxをbounded retry、TLS certificate/auth/publickeyをnon-retry分類へ固定。final focused unit `30 passed`、CLI `21 passed, 368 deselected`。
+- next action: M1 commit candidate C1
 
 ### Step Contract Closure
 
-- state: not_started
+- S01: passed / Result Approval granted
+- evidence: CLOS-001〜004とCLOS-008のS01部分、fresh code-reviewer re-review pass、`git diff --check` pass
+- S02: passed / Result Approval granted
+- evidence: CLOS-002、003、005、006、007、fresh code-reviewer re-review pass、same-shape 2 attempts/250ms、unknown fail-closed、redaction上限を確認
 - required closure IDs: CLOS-001 through CLOS-021
 - evidence source: plan step closure contracts and future execution results
 
 ### Test Contract Closure
 
 - state: not_started
-- no test command has been claimed as executed during planning
+- baseline focused test passed: `49 passed, 338 deselected`
 - planned commands and test cards are in `plan.md`
 
 ### Closure Coverage / Delta
 
 - planned coverage: CLOS-001 through CLOS-021
-- observed coverage: none; implementation not started
-- delta: all closures pending by design
+- observed coverage: S01〜S02 CLOS-001〜008（CLOS-008はlater stepとの統合確認を残す）
+- delta: S03以降 pending
 
 ### Commit Evidence
 
 - planning scaffold commit: `fa98df44c28b0dc09e35d322c7186eacf904820e`
 - research artifact commit: `48a26046c185c9563d073543e66404c8c8c4178f`
-- canonical planning changes: uncommitted
+- canonical planning changes: `98b2454def27f404e4039ea1198574eb7959668b`
 - implementation commits: none
 
 ## Docs Impact
@@ -184,12 +197,11 @@ Implementation has not started. The following ledgers are intentionally initiali
 
 ## Current blockers and next action
 
-1. Baseline focused testsはimplementation start前に実行し、結果をこのreportへ記録する。
-2. Plan upfront approvalとimplementation authorizationは未取得である。
-3. ユーザーがexecutionを明示依頼するまで実装を開始しない。
+1. Blocking itemはない。S01をplanのdelegation contractに従って開始する。
+2. 各stepはfresh reviewer pass、report evidence、commit/no-op gateを満たしてから次へ進む。
 
 ## Omitted / exception notes
 
 - Manual planning fallback was not used.
 - ChatGPT/browser delay was treated as retryable waiting, not fallback justification.
-- No implementation, test execution, PR creation, merge preparation, or Issue completion is claimed.
+- Baseline test executionのみ完了。実装step、PR作成、merge preparation、Issue completionはまだclaimしない。
