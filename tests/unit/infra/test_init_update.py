@@ -3670,6 +3670,67 @@ class TestInitUpdate(CliRuntimeHarness):
             )
             assert not (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
 
+    def test_init_gitignore_ignores_exact_workbench_directories_at_supported_scopes(self) -> None:
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._run_git(target, ["init"])
+
+            scope_directories = (
+                target / "spec-dock",
+                target / "spec-dock" / "initiatives" / "init-00001-example",
+                target / "spec-dock" / "initiatives" / "init-00001-example" / "epics" / "epic-00001-example",
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-example"
+                / "epics"
+                / "epic-00001-example"
+                / "issues"
+                / "iss-00001-example",
+            )
+            for scope_directory in scope_directories:
+                workbench_probe = scope_directory / ".workbench" / "probe"
+                workbench_probe.parent.mkdir(parents=True, exist_ok=True)
+                workbench_probe.write_text("scratch\n", encoding="utf-8")
+                near_name_probe = scope_directory / ".workbench-notes" / "probe"
+                near_name_probe.parent.mkdir(parents=True, exist_ok=True)
+                near_name_probe.write_text("ordinary\n", encoding="utf-8")
+
+                workbench_result = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", workbench_probe.relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert workbench_result.returncode == 0, workbench_result.stdout + workbench_result.stderr
+
+                near_name_result = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", near_name_probe.relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert near_name_result.returncode == 1, near_name_result.stdout + near_name_result.stderr
+
+    def test_init_gitignore_fallback_ignores_exact_workbench_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+
+            def _remove_gitignore_asset(patched_assets_root: Path) -> None:
+                (patched_assets_root / "spec_dock" / ".gitignore").unlink()
+
+            code, stderr = self._run_command_with_assets_override(
+                "init",
+                target,
+                _remove_gitignore_asset,
+            )
+
+            assert code == 0, stderr
+            gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
+            assert ".workbench/" in gitignore.splitlines()
+
     def test_init_installs_authoring_pack_helper_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

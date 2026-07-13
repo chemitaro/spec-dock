@@ -62,6 +62,8 @@ _DEFAULT_SPEC_DOCK_GITIGNORE = (
     ".agent/\n"
     "# legacy v2 name (kept ignored for safe upgrades)\n"
     ".work/\n"
+    "# local disposable work areas (reserved exact directory name at any scope)\n"
+    ".workbench/\n"
     "active/\n"
 )
 _MANAGED_NATIVE_SHIM_PREFIXES = (".codex/agents/", ".github/agents/")
