@@ -161,3 +161,31 @@ class TestCliWorkbench(CliRuntimeHarness):
             assert payload["side"] == side
             assert payload["mutation_started"] is False
             assert sentinel.read_text(encoding="utf-8") == "outside\n"
+
+    def test_workbench_copy_rejects_symlinked_target_specdock_before_external_read_or_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, target, scope_id, source_scope, _ = self._prepare_linked_worktrees(root)
+            if not self._can_create_symlink(root):
+                pytest.skip("symlink creation is not available on this host")
+            source_workbench = source_scope / ".workbench"
+            source_workbench.mkdir()
+            (source_workbench / "source.txt").write_text("source body\n", encoding="utf-8")
+            external_specdock = root / "external-spec-dock"
+            (target / "spec-dock").rename(external_specdock)
+            sentinel = external_specdock / "external-sentinel.txt"
+            sentinel.write_text("external sentinel\n", encoding="utf-8")
+            (target / "spec-dock").symlink_to(external_specdock, target_is_directory=True)
+
+            result = self._run_runtime_capture(
+                source,
+                ["workbench", "copy", "--scope", scope_id, "--to", target.name, "--json"],
+            )
+
+            assert result.returncode == 1, result.stderr
+            payload = json.loads(result.stdout)
+            assert payload["code"] == "unsafe_path"
+            assert payload["side"] == "target"
+            assert payload["mutation_started"] is False
+            assert sentinel.read_text(encoding="utf-8") == "external sentinel\n"
+            assert not any(external_specdock.rglob("source.txt"))

@@ -7,6 +7,7 @@ from spec_dock_runtime.application.contracts import (
     WorkbenchCopyError,
     WorkbenchCopyRequest,
     WorkbenchCopyResult,
+    WorkbenchFilesystemError,
     WorktreeListRequest,
 )
 from spec_dock_runtime.application.worktree import worktree_list
@@ -53,11 +54,17 @@ def workbench_copy(req: WorkbenchCopyRequest, ports: Ports) -> WorkbenchCopyResu
 
     source_specdock = ports.specdock_dir
     target_specdock = target.path / specdock_relative
+    _guard_ancestry(ports, ports.repo_root, source_specdock, side="source")
+    _guard_ancestry(ports, target.path, target_specdock, side="target")
+    _guard_inventory(ports, source_specdock, side="source")
+    _guard_inventory(ports, target_specdock, side="target")
     source_scope = _load_scope(ports, source_specdock, scope_id, side="source")
     target_scope = _load_scope(ports, target_specdock, scope_id, side="target")
 
     source_workbench = Path(source_scope.path) / ".workbench"
     target_workbench = Path(target_scope.path) / ".workbench"
+    _guard_ancestry(ports, ports.repo_root, Path(source_scope.path), side="source")
+    _guard_ancestry(ports, target.path, Path(target_scope.path), side="target")
     _preflight_scope_root(ports, Path(source_scope.path), side="source")
     _preflight_scope_root(ports, Path(target_scope.path), side="target")
     source_kind = _path_kind(ports, source_workbench, side="source")
@@ -73,6 +80,7 @@ def workbench_copy(req: WorkbenchCopyRequest, ports: Ports) -> WorkbenchCopyResu
             message="workbench copy source root is invalid",
             side="source",
         )
+    _guard_ancestry(ports, ports.repo_root, source_workbench, side="source")
     target_kind = _path_kind(ports, target_workbench, side="target")
     if target_kind not in {"missing", "directory"}:
         raise WorkbenchCopyError(
@@ -80,7 +88,21 @@ def workbench_copy(req: WorkbenchCopyRequest, ports: Ports) -> WorkbenchCopyResu
             message="workbench copy target root is invalid",
             side="target",
         )
-    ports.filesystem_gateway.copy_workbench(source_workbench, target_workbench)
+    _guard_ancestry(
+        ports,
+        target.path,
+        target_workbench,
+        side="target",
+        allow_missing_leaf=target_kind == "missing",
+    )
+    try:
+        ports.filesystem_gateway.copy_workbench(source_workbench, target_workbench)
+    except WorkbenchFilesystemError as exc:
+        raise WorkbenchCopyError(
+            code="copy_failed",
+            message="workbench copy failed",
+            mutation_started=exc.mutation_started,
+        ) from exc
     return WorkbenchCopyResult(
         scope_id=scope_id,
         source_worktree=source,
@@ -157,4 +179,41 @@ def _path_kind(ports: Ports, path: Path, *, side: str) -> str:
             code="invalid_workbench_root",
             message=f"workbench copy {side} path could not be inspected",
             side=side,
+        ) from exc
+
+
+def _guard_ancestry(
+    ports: Ports,
+    root: Path,
+    endpoint: Path,
+    *,
+    side: str,
+    allow_missing_leaf: bool = False,
+) -> None:
+    assert ports.filesystem_gateway is not None
+    try:
+        ports.filesystem_gateway.guard_workbench_ancestry(
+            root,
+            endpoint,
+            allow_missing_leaf=allow_missing_leaf,
+        )
+    except WorkbenchFilesystemError as exc:
+        raise WorkbenchCopyError(
+            code="unsafe_path",
+            message=f"workbench copy {side} path is unsafe",
+            side=side,
+            mutation_started=exc.mutation_started,
+        ) from exc
+
+
+def _guard_inventory(ports: Ports, specdock_dir: Path, *, side: str) -> None:
+    assert ports.filesystem_gateway is not None
+    try:
+        ports.filesystem_gateway.guard_workbench_inventory(specdock_dir)
+    except WorkbenchFilesystemError as exc:
+        raise WorkbenchCopyError(
+            code="unsafe_path",
+            message=f"workbench copy {side} scope inventory is unsafe",
+            side=side,
+            mutation_started=exc.mutation_started,
         ) from exc

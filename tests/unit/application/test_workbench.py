@@ -48,8 +48,23 @@ class _NodeRepository:
 
 
 class _FilesystemGateway:
-    def __init__(self, kinds=None):
+    def __init__(
+        self,
+        kinds=None,
+        *,
+        guard_failure=None,
+        guard_failures_by_endpoint=None,
+        inventory_guard=None,
+        copy_failure=None,
+    ):
         self.kinds = kinds or {}
+        self.guard_failure = guard_failure
+        self.guard_failures_by_endpoint = guard_failures_by_endpoint or {}
+        self.inventory_guard = inventory_guard
+        self.copy_failure = copy_failure
+        self.guard_calls = []
+        self.inventory_guard_calls = []
+        self.kind_calls = []
         self.copy_calls = []
 
     def path_exists(self, path):
@@ -59,6 +74,7 @@ class _FilesystemGateway:
         raise AssertionError("not used")
 
     def path_kind(self, path):
+        self.kind_calls.append(path)
         if path in self.kinds:
             return self.kinds[path]
         if path.is_symlink():
@@ -69,8 +85,22 @@ class _FilesystemGateway:
             return "file"
         return "missing"
 
+    def guard_workbench_ancestry(self, root, endpoint, *, allow_missing_leaf=False):
+        self.guard_calls.append((root, endpoint, allow_missing_leaf))
+        if endpoint in self.guard_failures_by_endpoint:
+            raise self.guard_failures_by_endpoint[endpoint]
+        if self.guard_failure is not None:
+            raise self.guard_failure
+
+    def guard_workbench_inventory(self, specdock_dir):
+        self.inventory_guard_calls.append(specdock_dir)
+        if self.inventory_guard is not None:
+            self.inventory_guard(specdock_dir)
+
     def copy_workbench(self, source, destination):
         self.copy_calls.append((source, destination))
+        if self.copy_failure is not None:
+            raise self.copy_failure
 
 
 def _record(infra_contracts, *, scope_id, path, slug):
@@ -262,4 +292,126 @@ def test_malformed_workbench_root_fails_before_copy(tmp_path, side, kind):
     assert captured.value.code == "invalid_workbench_root"
     assert captured.value.side == side
     assert captured.value.mutation_started is False
+    assert filesystem.copy_calls == []
+
+
+def test_ancestry_guard_failure_is_unsafe_path_before_copy(tmp_path):
+    contracts, workbench, ports, filesystem, _, scope_id, _, _ = _fixture(tmp_path)
+    filesystem.guard_failure = contracts.WorkbenchFilesystemError(mutation_started=False)
+
+    with pytest.raises(contracts.WorkbenchCopyError) as captured:
+        workbench.workbench_copy(contracts.WorkbenchCopyRequest(scope_id=scope_id, target="target"), ports)
+
+    assert captured.value.code == "unsafe_path"
+    assert captured.value.mutation_started is False
+    assert filesystem.copy_calls == []
+    assert filesystem.guard_calls
+
+
+@pytest.mark.parametrize("linked_level", ["initiative", "epic", "issue"])
+def test_scope_ancestor_symlink_is_rejected_before_external_metadata_reader_runs(tmp_path, linked_level):
+    contracts, workbench, ports, filesystem, node_repo, scope_id, _, _ = _fixture(tmp_path)
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.infra import fs_cli
+    finally:
+        sys.path.pop(0)
+
+    initiatives = ports.specdock_dir / "initiatives"
+    initiatives.mkdir()
+    initiative = initiatives / "init-00001-scope"
+    epic = initiative / "epics" / "epic-00001-scope"
+    external = tmp_path / "external-metadata"
+    external.mkdir()
+    (external / ".meta.json").write_text('{"id":"iss-99999"}', encoding="utf-8")
+    try:
+        if linked_level == "initiative":
+            initiative.symlink_to(external, target_is_directory=True)
+        elif linked_level == "epic":
+            (initiative / "epics").mkdir(parents=True)
+            epic.symlink_to(external, target_is_directory=True)
+        else:
+            (epic / "issues").mkdir(parents=True)
+            (epic / "issues" / "iss-00003-scope").symlink_to(external, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlink creation is not available on this host")
+    filesystem.inventory_guard = fs_cli.guard_workbench_inventory
+
+    with pytest.raises(contracts.WorkbenchCopyError) as captured:
+        workbench.workbench_copy(contracts.WorkbenchCopyRequest(scope_id=scope_id, target="target"), ports)
+
+    assert captured.value.code == "unsafe_path"
+    assert captured.value.side == "source"
+    assert captured.value.mutation_started is False
+    assert node_repo.calls == []
+    assert filesystem.copy_calls == []
+
+
+@pytest.mark.parametrize("meta_parent", ["initiatives-root", "unexpected-directory"])
+def test_unexpected_metadata_symlink_is_rejected_before_external_reader_runs(tmp_path, meta_parent):
+    contracts, workbench, ports, filesystem, node_repo, scope_id, _, _ = _fixture(tmp_path)
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.infra import fs_cli
+    finally:
+        sys.path.pop(0)
+
+    initiatives = ports.specdock_dir / "initiatives"
+    initiatives.mkdir()
+    parent = initiatives if meta_parent == "initiatives-root" else initiatives / "misc"
+    parent.mkdir(exist_ok=True)
+    external = tmp_path / f"external-{meta_parent}.json"
+    external.write_bytes(b"external metadata must not be read or changed")
+    try:
+        (parent / ".meta.json").symlink_to(external)
+    except OSError:
+        pytest.skip("symlink creation is not available on this host")
+    filesystem.inventory_guard = fs_cli.guard_workbench_inventory
+
+    with pytest.raises(contracts.WorkbenchCopyError) as captured:
+        workbench.workbench_copy(contracts.WorkbenchCopyRequest(scope_id=scope_id, target="target"), ports)
+
+    assert captured.value.code == "unsafe_path"
+    assert captured.value.side == "source"
+    assert captured.value.mutation_started is False
+    assert external.read_bytes() == b"external metadata must not be read or changed"
+    assert node_repo.calls == []
+    assert filesystem.copy_calls == []
+
+
+@pytest.mark.parametrize("mutation_started", [False, True])
+def test_copy_failure_is_mapped_without_raw_error_or_success(tmp_path, mutation_started):
+    contracts, workbench, ports, filesystem, _, scope_id, _, _ = _fixture(tmp_path)
+    filesystem.copy_failure = contracts.WorkbenchFilesystemError(mutation_started=mutation_started)
+
+    with pytest.raises(contracts.WorkbenchCopyError) as captured:
+        workbench.workbench_copy(contracts.WorkbenchCopyRequest(scope_id=scope_id, target="target"), ports)
+
+    assert captured.value.code == "copy_failed"
+    assert captured.value.side is None
+    assert captured.value.mutation_started is mutation_started
+    assert "secret" not in str(captured.value)
+
+
+@pytest.mark.parametrize("side", ["source", "target"])
+def test_scope_outside_its_worktree_is_rejected_before_scope_path_inspection(tmp_path, side):
+    contracts, workbench, ports, filesystem, node_repo, scope_id, _, _ = _fixture(tmp_path)
+    outside_scope = tmp_path / f"outside-{side}"
+    outside_scope.mkdir()
+    _, _, _, infra_contracts = _runtime_modules()
+    replacement = _record(infra_contracts, scope_id=scope_id, path=outside_scope, slug="outside")
+    specdock_root = ports.specdock_dir if side == "source" else tmp_path / "target" / "spec-dock"
+    node_repo.records_by_root[specdock_root] = [replacement]
+    filesystem.guard_failures_by_endpoint[outside_scope] = contracts.WorkbenchFilesystemError(mutation_started=False)
+
+    with pytest.raises(contracts.WorkbenchCopyError) as captured:
+        workbench.workbench_copy(contracts.WorkbenchCopyRequest(scope_id=scope_id, target="target"), ports)
+
+    assert captured.value.code == "unsafe_path"
+    assert captured.value.side == side
+    assert captured.value.mutation_started is False
+    assert outside_scope not in filesystem.kind_calls
+    assert outside_scope / ".workbench" not in filesystem.kind_calls
     assert filesystem.copy_calls == []
