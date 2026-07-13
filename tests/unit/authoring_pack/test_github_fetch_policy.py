@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
@@ -314,7 +315,10 @@ def test_ref_lock_retry_never_removes_lock_file(tmp_path) -> None:
 def test_safe_diagnostic_redacts_secrets_paths_non_utf8_and_truncates() -> None:
     raw = (
         b"https://alice:secret@example.com/repo token=ghp_abcdefghijklmnopqrstuvwxyz123456 "
-        b"Authorization: Bearer super-secret /Users/alice/private/repo \xff "
+        b"Authorization: Bearer super-secret /Users/alice/private/repo "
+        b"/private/tmp/receipt /var/folders/ab/cd/T/work password:colon-secret "
+        b"-----BEGIN OPENSSH PRIVATE KEY-----\nprivate-key-body\n"
+        b"-----END OPENSSH PRIVATE KEY----- \xff "
         + b"x" * 2000
     )
 
@@ -327,5 +331,28 @@ def test_safe_diagnostic_redacts_secrets_paths_non_utf8_and_truncates() -> None:
     assert diagnostic.redaction_applied is True
     assert diagnostic.redacted_sha256
     serialized = str(payload)
-    for unsafe in ("alice:secret", "ghp_", "super-secret", "/Users/alice"):
+    for unsafe in (
+        "alice:secret",
+        "ghp_",
+        "super-secret",
+        "/Users/alice",
+        "/private/tmp",
+        "/var/folders",
+        "colon-secret",
+        "private-key-body",
+    ):
         assert unsafe not in serialized
+
+
+@pytest.mark.parametrize("key_kind", ("OPENSSH ", "ENCRYPTED ", ""))
+def test_safe_diagnostic_redacts_incomplete_private_key_block_to_eof(key_kind: str) -> None:
+    raw = f"fatal context\n-----BEGIN {key_kind}PRIVATE KEY-----\nprivate-key-body-without-end".encode()
+
+    diagnostic = safe_diagnostic(raw, code="unknown")
+
+    assert diagnostic.excerpt == "fatal context\n[REDACTED_PRIVATE_KEY]"
+    assert diagnostic.redacted_sha256 == hashlib.sha256(
+        b"fatal context\n[REDACTED_PRIVATE_KEY]"
+    ).hexdigest()
+    assert "private-key-body" not in str(diagnostic.to_dict())
+    assert diagnostic.redaction_applied is True

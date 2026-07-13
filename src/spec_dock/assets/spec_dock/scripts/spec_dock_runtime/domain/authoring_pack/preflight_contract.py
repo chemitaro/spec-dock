@@ -173,6 +173,20 @@ class RepositorySnapshot:
     source_manifest: SourceManifest
     snapshot_id: str
 
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "normalized_origin": self.normalized_origin,
+            "branch": self.branch,
+            "local_head": self.local_head,
+            "upstream": self.upstream,
+            "effective_ref": self.effective_ref,
+            "remote_head": self.remote_head,
+            "remote_head_disposition": self.remote_head_disposition,
+            "worktree_state": list(self.worktree_state),
+            "source_manifest": self.source_manifest.to_dict(),
+            "snapshot_id": self.snapshot_id,
+        }
+
 
 @dataclass(frozen=True)
 class FreshnessEvidence:
@@ -217,6 +231,7 @@ class PreflightResult:
     fetch: FetchSummary = field(default_factory=lambda: FetchSummary(status="not_applicable"))
     freshness: FreshnessEvidence = field(default_factory=FreshnessEvidence)
     publication: PublicationEvidence = field(default_factory=PublicationEvidence)
+    repository: RepositorySnapshot | None = None
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -244,6 +259,7 @@ class PreflightResult:
             "fetch": self.fetch.to_dict(),
             "freshness": self.freshness.to_dict(),
             "publication": self.publication.to_dict(),
+            "repository": None if self.repository is None else self.repository.to_dict(),
         }
         payload.update(self.source_manifest.to_dict())
         payload["receipt_digest"] = {

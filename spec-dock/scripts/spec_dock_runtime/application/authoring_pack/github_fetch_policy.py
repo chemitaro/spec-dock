@@ -89,11 +89,19 @@ _SIGNALS: tuple[tuple[FetchFailureClass, tuple[re.Pattern[str], ...]], ...] = (
 )
 
 _REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"-----BEGIN (?:OPENSSH |ENCRYPTED |RSA |DSA |EC )?PRIVATE KEY-----.*?"
+            r"(?:-----END (?:OPENSSH |ENCRYPTED |RSA |DSA |EC )?PRIVATE KEY-----|\Z)",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "[REDACTED_PRIVATE_KEY]",
+    ),
     (re.compile(r"(?i)(https?://)[^\s/@:]+:[^\s/@]+@"), r"\1[REDACTED]@"),
     (re.compile(r"(?i)(authorization\s*:\s*(?:bearer|basic)\s+)[^\s]+"), r"\1[REDACTED]"),
-    (re.compile(r"(?i)\b(token|password|passwd|secret)=\S+"), r"\1=[REDACTED]"),
+    (re.compile(r"(?i)\b(token|password|passwd|secret)\s*[:=]\s*\S+"), r"\1=[REDACTED]"),
     (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"), "[REDACTED_TOKEN]"),
-    (re.compile(r"/(?:Users|home)/[^\s/]+(?:/[^\s]*)?"), "[REDACTED_PATH]"),
+    (re.compile(r"/(?:Users|home|private/tmp|tmp|var/folders)/[^\s]*(?:/[^\s]*)?"), "[REDACTED_PATH]"),
 )
 
 

@@ -4061,6 +4061,24 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["freshness"]["remote_head_disposition"] == "fetched_remote_tracking_ref"
             assert payload["freshness"]["concurrent_change_check"] == "stable"
             assert payload["freshness"]["snapshot_id"] == payload["freshness"]["final_guard_snapshot_id"]
+            assert payload["repository"] == {
+                "normalized_origin": payload["repository"]["normalized_origin"],
+                "branch": "main",
+                "local_head": payload["local_head"],
+                "upstream": "origin/main",
+                "effective_ref": payload["effective_ref"],
+                "remote_head": payload["remote_head"],
+                "remote_head_disposition": "fetched_remote_tracking_ref",
+                "worktree_state": [],
+                "source_manifest": {
+                    "source_manifest_hash": payload["source_manifest_hash"],
+                    "source_paths": payload["source_paths"],
+                    "source_hashes": payload["source_hashes"],
+                },
+                "snapshot_id": payload["freshness"]["snapshot_id"],
+            }
+            assert payload["repository"]["normalized_origin"].startswith("local-path-sha256:")
+            assert str(repo.parent / "remote.git") not in str(payload)
 
             text_result = _run_authoring_capture(
                 self,
@@ -4087,6 +4105,9 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert "fetch_failure_class=null" in text_result.stdout
             assert "fetch_classification_confidence=certain" in text_result.stdout
             assert "fetch_timeout_seconds=60.0" in text_result.stdout
+            assert "repository_branch=main" in text_result.stdout
+            assert "repository_upstream=origin/main" in text_result.stdout
+            assert "repository_remote_head_disposition=fetched_remote_tracking_ref" in text_result.stdout
 
     def test_authoring_preflight_injected_spawn_failure_is_typed_and_blocked(self) -> None:
         runtime_root = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
@@ -4126,6 +4147,34 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["fetch"]["attempts"][0]["failure_class"] == "spawn_failure"
             assert payload["fetch"]["attempts"][0]["return_code"] is None
             assert "raw traceback" not in str(payload)
+
+    def test_authoring_preflight_redacts_file_url_origin_path_in_json_and_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            remote_path = (repo.parent / "remote.git").resolve()
+            _git(repo, "remote", "set-url", "origin", remote_path.as_uri())
+            expected_origin = f"local-path-sha256:{hashlib.sha256(str(remote_path).encode()).hexdigest()}"
+
+            payload = _run_preflight_json(self, repo)
+
+            assert payload["status"] == "pass"
+            assert payload["repository"]["normalized_origin"] == expected_origin
+            assert str(remote_path) not in str(payload)
+
+            text_result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                ],
+            )
+            assert text_result.returncode == 0, text_result.stdout + text_result.stderr
+            assert f"repository_normalized_origin={expected_origin}" in text_result.stdout
+            assert str(remote_path) not in text_result.stdout
 
     def test_authoring_preflight_retries_transient_fetch_with_same_shape_then_passes(self) -> None:
         runtime_root = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
@@ -4203,6 +4252,12 @@ class TestAuthoringCli(CliRuntimeHarness):
             script = repo / "spec-dock" / "scripts" / "spec-dock"
             env = self._runtime_env(repo, {"PATH": os.environ.get("PATH", "")})
             env.pop("PYTHONDONTWRITEBYTECODE", None)
+            runtime_root = repo / "spec-dock" / "scripts" / "spec_dock_runtime"
+            cache_before = {
+                path.relative_to(runtime_root)
+                for path in runtime_root.rglob("*")
+                if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}
+            }
 
             p = subprocess.run(
                 [
@@ -4229,9 +4284,12 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert p.returncode == 0, p.stdout + p.stderr
             assert payload["status"] == "pass"
             assert "untracked_files" not in payload["blockers"]
-            runtime_root = repo / "spec-dock" / "scripts" / "spec_dock_runtime"
-            assert not any(path.name == "__pycache__" for path in runtime_root.rglob("__pycache__"))
-            assert not any(path.suffix in {".pyc", ".pyo"} for path in runtime_root.rglob("*"))
+            cache_after = {
+                path.relative_to(runtime_root)
+                for path in runtime_root.rglob("*")
+                if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}
+            }
+            assert cache_after - cache_before == set()
             assert _git(repo, "status", "--porcelain=v1").stdout == ""
 
     @pytest.mark.parametrize(
@@ -4441,6 +4499,57 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["sync_state"] == "local_context"
             assert payload["freshness"]["concurrent_change_check"] == "not_applicable"
             assert payload["freshness"]["remote_head_disposition"] == "not_applicable"
+
+    @pytest.mark.parametrize(
+        ("guard_case", "expected_blocker"),
+        (
+            ("unsafe-source", "unsafe_source_path:absolute-outside-repo:"),
+            ("missing-source", "missing_source_path:missing.py"),
+            ("detached-head", "detached_head"),
+            ("origin-missing", "origin_missing"),
+        ),
+    )
+    def test_authoring_preflight_request_and_repository_guards_do_not_enter_fetch(
+        self, guard_case: str, expected_blocker: str
+    ) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = _create_synced_git_repo(root)
+            source_paths = ("source.txt",)
+            if guard_case == "unsafe-source":
+                outside = root / "outside.txt"
+                outside.write_text("outside\n", encoding="utf-8")
+                source_paths = (str(outside),)
+            elif guard_case == "missing-source":
+                source_paths = ("missing.py",)
+            elif guard_case == "detached-head":
+                _git(repo, "checkout", "--detach")
+            else:
+                _git(repo, "remote", "remove", "origin")
+
+            fetch_calls = []
+
+            def unexpected_fetch(request):
+                fetch_calls.append(request)
+                raise AssertionError("T0/T1 guard failure must not enter fetch")
+
+            payload = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=source_paths),
+                fetch_executor=unexpected_fetch,
+            ).to_dict()
+
+            assert payload["status"] == "blocked"
+            assert any(blocker.startswith(expected_blocker) for blocker in payload["blockers"])
+            assert payload["fetch"]["status"] == "not_started"
+            assert fetch_calls == []
 
     def test_authoring_preflight_github_sync_blocks_missing_explicit_source_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -4890,6 +4999,7 @@ class TestAuthoringCli(CliRuntimeHarness):
         ("case", "extra_args", "expected_status", "expected_returncode", "expected_blocker"),
         (
             ("pass", (), "pass", 0, None),
+            ("file-origin", (), "pass", 0, None),
             ("origin-missing", (), "blocked", 1, "origin_missing"),
             ("source-hash-mismatch", ("--expected-source-hash", "stale-hash"), "stale", 1, "source_hash_mismatch"),
         ),
@@ -4904,6 +5014,12 @@ class TestAuthoringCli(CliRuntimeHarness):
     ) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         dogfood_script = repo_root / "spec-dock" / "scripts" / "spec-dock"
+        runtime_root = repo_root / "spec-dock" / "scripts" / "spec_dock_runtime"
+        cache_before = {
+            path.relative_to(runtime_root)
+            for path in runtime_root.rglob("*")
+            if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}
+        }
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
@@ -4914,6 +5030,8 @@ class TestAuthoringCli(CliRuntimeHarness):
             dogfood_output.mkdir()
             if case == "origin-missing":
                 _git(repo, "remote", "remove", "origin")
+            elif case == "file-origin":
+                _git(repo, "remote", "set-url", "origin", (repo.parent / "remote.git").resolve().as_uri())
 
             command_args = [
                 "authoring",
@@ -4984,6 +5102,7 @@ class TestAuthoringCli(CliRuntimeHarness):
                 "blockers",
                 "remediation",
                 "publication",
+                "repository",
             ):
                 assert dogfood_payload[field] == provider_payload[field], field
             assert provider_payload["status"] == expected_status
@@ -4995,6 +5114,9 @@ class TestAuthoringCli(CliRuntimeHarness):
             }
             if expected_blocker is not None:
                 assert expected_blocker in provider_payload["blockers"]
+            if case == "file-origin":
+                assert provider_payload["repository"]["normalized_origin"].startswith("local-path-sha256:")
+                assert str((repo.parent / "remote.git").resolve()) not in str(provider_payload)
             for field in (
                 "snapshot_id",
                 "final_guard_snapshot_id",
@@ -5056,9 +5178,12 @@ class TestAuthoringCli(CliRuntimeHarness):
                     "current_repository_revalidated",
                 ):
                     assert dogfood_stale_if[field] == provider_stale_if[field], field
-            runtime_root = repo_root / "spec-dock" / "scripts" / "spec_dock_runtime"
-            assert not any(path.name == "__pycache__" for path in runtime_root.rglob("__pycache__"))
-            assert not any(path.suffix in {".pyc", ".pyo"} for path in runtime_root.rglob("*"))
+            cache_after = {
+                path.relative_to(runtime_root)
+                for path in runtime_root.rglob("*")
+                if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}
+            }
+            assert cache_after - cache_before == set()
 
     def test_authoring_pack_review_and_stage_dogfood_runtime_path(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
