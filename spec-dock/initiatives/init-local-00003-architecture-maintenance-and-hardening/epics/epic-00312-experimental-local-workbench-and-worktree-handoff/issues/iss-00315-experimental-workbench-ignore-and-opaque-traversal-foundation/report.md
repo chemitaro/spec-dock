@@ -3,7 +3,7 @@
 ID: "iss-00315"
 タイトル: "Experimental Workbench Ignore And Opaque Traversal Foundation"
 関連GitHub: ["#315"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-13"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -51,7 +51,7 @@ Disposition ごとの必須証跡:
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-315-001 | resolved | implementation | S00 repo-analyst / reviewer | `spec_dock_runtime/app.py::_scan_nodes` に旧recursive scan定義があるがhelper群のcallsiteはない | W1で変更; 未参照としてno-op; scope拡張 | `app.py` entry moduleは到達するがlegacy private helperは未参照のため変更しない。参照が判明した場合のみplan再レビュー | no_action | `rg -n "_scan_nodes|_iter_node_meta_paths|_find_legacy_meta_paths" src/spec_dock`; `review_iss00315_s00` | S02でcallsiteを再確認し、未参照ならIssue-local no-opを確定 |
 | D-315-002 | resolved | test-strategy | S06 worker / reviewer | full init/update laneの2 fixed snapshot constantsがEpic 00312 node/deps追加を未反映 | S06へ混在; S99でrefresh; 無視 | S06 preservationとは独立だがS99 full unit gateをblockするため、S99でcurrent canonical node/depsへmechanical refreshする | promoted_to_plan | failing selectors; commit `3acdd76c`; `review_iss00315_s06` | plan S99 full unit gate内で2 selectors→full suiteをpassさせる |
-| D-315-003 | resolved | operation | S06 worker / reviewer | `uvx --from .`がignored stale `build/lib` legacy skillによりmanifest overlap | productionで適応; stale build cleanup; clean isolated build検証 | current sourceの通常`uv run spec-dock update .`は成功し、stale ignored buildはproduct contractではない。S99でclean isolated build laneを使う | deferred | overlap error、`review_iss00315_s06` | S99 package gateでclean build/uvxを検証。tracked production変更不要 |
+| D-315-003 | resolved | operation | S06 worker / reviewer | `uvx --from .`がignored stale `build/lib` legacy skillによりmanifest overlap | productionで適応; stale build cleanup; clean isolated build検証 | stale ignored buildはproduct contractではない。clean wheelをmanaged tempへbuildし、そのwheel由来の`uvx init`/`update`成功をS99で確認したためtracked production変更は不要 | no_action | `uv build --wheel`成功、wheel由来`uvx --no-cache ... spec-dock init/update`成功、`review_iss00315_s06` | closed。再発時はcheckout-local ignored buildをproduct defectと混同せずclean wheelで再検証 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -128,7 +128,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- exact `.workbench` component を Git ignore 対象かつ default semantic discovery の opaque boundary とした。
+- node / graph / assurance / installer recovery / delete fallback / delegated authoring / authoring source traversal を境界前で除外し、明示 delete/remove と update byte preservation は既存契約のまま維持した。
+- provider authority、dogfood projection、guide、回帰テストを同期し、Issue 316–318 の機能は先行実装していない。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -254,6 +256,7 @@ git diff --check
 | S05 | C315-06 | scope/worktree explicit deletion remains unblocked | characterization + reviewer full 65 pass | approved-no-op | AC-315-006–007 closed |
 | S06 | C315-07 | update preserves opaque bytes and refreshes managed assets/dogfood | focused tests + 7-file parity + reviewer | pass | AC-315-008–009 closed |
 | S90 | C315-08 | W1 scope/docs boundary resolved | guide diff/parity + fresh spec review | pass | final scope closureはS99 |
+| S99 | C315-08 | whole-Issue scope、docs、non-scope、deferred delivery evidenceが整合 | final QA/code/spec review、validate/sync、branch push evidence | pass | W1 final scope closure |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -265,6 +268,7 @@ git diff --check
 | C315-05 | S04 | yes | red-required | 10 expected failures | domain + preflight focused/regression | pass | file/dir/descendant/parent/near-name |
 | C315-06 | S05 | yes | characterization-first | existing dirty removal behavior | delete/worktree CLI suites | approved-no-op | no special blocker/backup/promotion |
 | C315-07 | S06 | yes | characterization-first | existing preservation behavior | init/update test + cmp/update parity | pass | four scope binary sentinels |
+| C315-08 | S90/S99 | yes | review-required | S90 docs review pass | final QA/code/spec review + validate/sync + deferred delivery inspection | pass | scope/docs/non-scope closure |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -278,6 +282,7 @@ git diff --check
 | C315-05 | S04 | focused 12 + reviewer 40 regression | pass | no blocker or diagnostic leak |
 | C315-06 | S05 | targeted 2 + full 65 | pass | binary scratch、remote close、branch keep |
 | C315-07 | S06 | preservation 1、workbench 3、parity 2、7 cmp | pass | snapshot drift別closureでS99へ |
+| C315-08 | S90/S99 | docs parity、final QA/code/spec review、validate/sync、deferred delivery inspection | pass | W1 scope closed; W2–W4 not implemented |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -293,7 +298,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| ワークフロー利用依頼 / 明示承認 / なし（user request to use SpecDock workflow / explicit approval / none） | ... | iss-00315 | 現在セッション（current session） / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | 範囲: active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility。破壊的操作 / 外部公開 / credentialed external mutation / scope expansion / private external system use / out-of-workflow role は含めない | 完了 / セッション終了 / scope 変更 / host policy conflict / user revocation（issue complete / session end / scope change / host policy conflict / user revocation） | none / denied / unavailable / host conflict | 続行 / separate-confirmation exception は user に確認 / block gate / record waiver request |
+| ユーザーによる Epic Execution / Issue Planning / Issue Execution workflow 利用依頼 | `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/bcea/spec-dock` | iss-00315 | Work3移行後の現在セッション | spec-reviewer / code-reviewer / qa-reviewer / repo-analyst / dev-coder / doc-writer | active repo/worktree、active scope、current session、documented role responsibilityに限定 | issue完了、scope変更、session終了、host policy conflict、user revocation | none | workflow内を続行。境界外は別途確認 |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
@@ -324,9 +329,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S99-snapshot | dev-coder | Epic00312 + iss315-319のnode/depsを3 fixed constantsへmechanical refresh | `tests/unit/infra/test_init_update.py` | Red 2 failed; Green 2 + related 3 passed | passed（`review_iss00315_s99_snapshot`） | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+- なし。production code、tests、shipped docs、provider/dogfood projection の変更はすべて適切な worker へ委任した。
 
 #### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
@@ -350,6 +353,16 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S06 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s06`; preservation/parity pass、snapshot drift S99へ |
 | S90 | docs impact review | spec-reviewer | fresh | passed | no | promote | `review_iss00315_s90`; provider/dogfood parity、scope適合 |
 | S99-snapshot | remediation review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s99_snapshot`; canonical literal match |
+| S99-final-initial | final QA | qa-reviewer | fresh | passed | no | retain | 30 focused integrated tests、追加integration test不要 |
+| S99-final-initial | final integrated review | code-reviewer | fresh | failed | no | remediate | persisted/active fallbackのP1とabsolute source ancestorのP2 |
+| S99-final-initial | final alignment review | spec-reviewer | fresh | failed | no | remediate | report bookkeeping 3件のみ。implementation/spec driftなし |
+| S99-final-rereview-1 | final QA re-review | qa-reviewer | fresh | passed | no | retain | remediation回帰37 passed、追加integration test不要 |
+| S99-final-rereview-1 | final integrated re-review | code-reviewer | fresh | failed | no | remediate | resolve-before-guardのintermediate symlink P1 |
+| S99-final-rereview-1 | final alignment re-review | spec-reviewer | fresh | passed | no | retain | report bookkeepingと既存契約へのremediation整合を確認 |
+| S99-final-rereview-2 | final QA | qa-reviewer | fresh | passed | no | complete QA gate | focused 19、active/recovery 25 passed。追加integration test不要 |
+| S99-final-rereview-2 | final integrated review | code-reviewer | fresh | passed | no | complete code gate | focused 21、Workbench統合31 passed。P0/P1/P2なし |
+| S99-final-rereview-2 | final alignment review | spec-reviewer | fresh | failed | no | update final ledger then re-review | implementation/spec driftなし。code/QA pass未反映だけをblocker化 |
+| S99-final-close | final alignment close review | spec-reviewer | fresh | passed | no | complete spec gate | D-315-003 package evidenceを含む全台帳整合、blocking findingsなし |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -363,7 +376,9 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S06 | committed | preservation test + dogfood projection + report | `ed6a8a1eabc3a6655ac4b1e6b3b9dfcaec16fcc1` | `git status --short` -> clean | production installer already preserves Workbench | C315-07 | `git diff --check` -> pass | `review_iss00315_s06` passed |
 | S90 | committed | provider/dogfood guide + report | `c448f808affcd08295c05cc9eadd04eecd2d6706` | `git status --short` -> clean | N/A | C315-08 docs portion | `git diff --check` -> pass | `review_iss00315_s90` passed |
 | S99-snapshot | committed | snapshot constants + report | `a6826ac6379c5d799323807156624eb2229267ce` | `git status --short` -> clean | N/A | D-315-002 | `git diff --check` -> pass | `review_iss00315_s99_snapshot` passed |
-| S99-quality-checkpoint | commands-pass / final-review-pending | formatter + final command evidence + report | pending checkpoint commit | pending | N/A | C315-01–08 command evidence | unit/CLI/lint pass | final QA/code/spec reviewはworktree移行後 |
+| S99-quality-checkpoint | committed | formatter + final command evidence + migration checkpoint report | `65b8b5b8f27b2f4859dc09a34c78ccae5b75273e` | clean; originへpush済み | N/A | C315-01–08 command evidence | unit/CLI/lint pass | fresh final reviewをWork3で実施 |
+| S99-final-ledger | ready-to-commit | final reviewer verdicts、C315-08、deferred delivery、placeholder除去 | final report commit（この台帳確定後） | post-commit external evidenceとして記録 | N/A | full Issue contract | `git diff --check`、fresh final spec pass | final commit hashは自己参照せず外部送達証跡へ記録 |
+| S99-review-remediation | committed | resolver/source symlink guard + regression tests | `1ddedf1c` | reportのみunstaged、実装/test差分なし | N/A | C315-03–05 | focused 29、fresh code/QA pass | code/test remediation closure |
 
 #### 変更したファイル
 - Provider/runtime/docs/testsとdogfood projection: 各S01–S90 commitに記録。
@@ -391,7 +406,30 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - 初回`make lint`: Ruff check/mypy pass、format checkで新規test 3 filesを検出。
 - `uv run ruff format`を3 filesへ適用後、affected focused testsは`16 passed, 543 deselected`。
 - 再`make lint`: Ruff check、Ruff format check、mypyすべてpass。
-- Final QA/code/spec reviewers、Issue Finish、pushはworktree移行後の再開点。
+- Work3移行後に`./spec-dock/scripts/spec-dock validate`（nodes=209）と通常`sync`を再実行し、tracked差分なし。
+- checkpoint HEAD `65b8b5b8f27b2f4859dc09a34c78ccae5b75273e`をoriginへpush済み。
+
+### セッションログ（2026-07-13 S99 reviewer-fail remediation）
+
+- fresh code reviewが、`_resolve_manifest_target_dir`の拒否後に`_resolve_persisted_path_dir`と`_resolve_existing_active_entrypoint`が`.workbench` descendantを再採用できるP1を検出した。
+- dev-coderへS03/S04契約内のbounded remediationを委任し、両resolverへrepo-relative exact-component guardを追加した。
+- 同reviewで検出したP2は、absolute in-repo sourceのWorkbench判定をrepo-relative componentへ限定し、absolute-outside-repo blockerを維持する最小修正で閉じた。
+- Red: 新規3 testsが修正前に失敗。Green: workerでsource manifest 15、installer resolver 21 passed。親再検証でfocused 24 passed、Ruff check/format、`git diff --check` pass。
+- provider/dogfood `source_manifest.py` byte parityを維持。新しい仕様判断はなく、RQ-315-002/005、DES-315-004/005の実装欠落を補完した。
+- 初回spec reviewの3件は、frontmatter/scaffold除去、C315-08 closure、deferred delivery/push evidenceとして本台帳へ反映した。
+- 1回目のcode re-reviewで、`.resolve()`後にcomponentを判定するため`.workbench/link -> safe target`のintermediate symlinkで境界を迂回できるP1を検出した。
+- 同workerへ再委任し、installerのmanifest/persisted/existing-active 3 resolver、delegated active fallback、absolute authoring helperをresolve前lexical guardとresolve後physical guardの二段に統一した。
+- Active symlinkは`readlink()`した字句targetを先に検査し、invalid managed symlinkはtargetを削除せずpointerだけ除去してplaceholderへ復旧する。
+- Symlink fixtureのRed後、workerでsource/resolver 20、installer 21 passed。親再検証でWorkbench focused 29 passed、Ruff check/format、`git diff --check`、provider/dogfood parityがpassした。
+- remediation後の`uv run pytest tests/unit`は、変更関連を含む1001件pass、既存timeout境界test 1件のみ`polls=1`でfail。当該test単独再実行は`1 passed in 2.21s`で、変更非関連のtiming flakeと確認した。
+- managed `codex-tmp` sessionへ`uv build --wheel`し、生成wheelから`uvx --no-cache ... spec-dock init <consumer>`、同wheelで`spec-dock update <consumer>`が成功した。D-315-003のclean isolated package gateをcloseした。
+- reviewer-pass済みproduction/test remediationは`1ddedf1c`として独立commitし、最終report commitをself-referenceなしで分離する。
+
+## Deferred PR Delivery Gate
+
+| defer先 | dependency edge | per-Issue PRを作らない理由 | branch / pushed head | merge-prepared claim | final quality Issueに残るgate | remaining risk |
+|---|---|---|---|---|---|---|
+| `iss-00319` | `iss-00319 -> iss-00315`（`deps check` / Epic plan） | reviewed Epic planがW1–W4を順次統合し、W5でEpic-wide final qualityと単一PR送達を行うため | `iss-00315-experimental-workbench-ignore-and-opaque-traversal-foundation` / `65b8b5b8f27b2f4859dc09a34c78ccae5b75273e`、origin同期済み | W1では主張しない | `iss-00319`のPR Delivery Gate / Merge Preparation Gate | Windows delete harness skip可能性はnon-blocking。W2–W4との統合回帰はW5で再確認 |
 
 ---
 
@@ -405,35 +443,37 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | unit/CLI/lint commands pass。fresh QAはworktree移行後 | command evidence above | pending |
+| qa-reviewer | whole issue obligation coverage | 追加integration test不要 | 最終候補でfocused 19、active/recovery 25 passed。`git diff --check`、provider/dogfood parity pass。unit 997 / CLI 1118 pass 75 skip / lint checkpointと整合 | pass（fresh、P0/P1/P2なし） |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | step reviews pass。fresh final integrated reviewはworktree移行後 | 0 | pending |
+| code-reviewer | issue-wide integrated diff | 初回: persisted/active fallback P1 + absolute ancestor P2を修正。再review 1: intermediate symlinkのresolve-before-guard P1を5経路で修正。最終: lexical/physical二段guard、pointer-only cleanup、parityを確認 | 2 | pass（fresh、P0/P1/P2なし） |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | fresh final alignment reviewはworktree移行後 | 0 | pending |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | 初回fail: C315-08/deferred/scaffold。再review 1 pass。後続fail: code/QA台帳未反映、D-315-003 package evidence不足。全て解消後にfinal close review | 4 | pass（fresh、blocking findingsなし） |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| worktree migration checkpoint | formatter + report evidence | current response | ready-to-commit-checkpoint |
+| C315-01–08、三者final review、deferred delivery、validate/sync、package gate、push evidenceを確定する本台帳 | Issue 315 final report ledgerのみ | final response、origin branch、Issue Finish lifecycle evidence | ready-to-commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: linked worktree移行後、active scopeが未設定だった。
+  - 解決: `active set`ではなく正規lifecycleの`issue start iss-00315`で復元した。
+- 問題: 初回final spec reviewで移行前placeholder、C315-08未close、deferred delivery/push evidence不足を検出した。
+  - 解決: 実装を変更せず、本observed evidence ledgerを実状態へ更新してfresh re-reviewへ戻した。
 
 ## 学んだこと (任意)
-- ...
+- active scopeはworktree-local状態であり、linked worktreeへのコード移行とは別にlifecycle復元が必要。
 
 ## 今後の推奨事項 (任意)
-- ...
+- Issue 316以降もfinal report commitのhashは自己参照せず、commit後clean/push evidenceを外部送達証跡へ残す。
 
 ## 省略/例外メモ (必須)
-- ユーザーのmain checkoutからlinked worktreeへ移行する指示により、final reviewer群、Issue Finish、push、Issue 316開始をこのcheckpointでは実行しない。clean commit後に停止する。
+- per-Issue PR deliveryのみreviewed Epic planにより`iss-00319`へ延期する。Issue 315の実装・review・validate/sync・commit・push・Issue Finishは省略しない。
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
