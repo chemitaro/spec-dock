@@ -222,7 +222,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04 | committed | Collision/fault hardening + deterministic tests + observed report | `18be850a32e4ee1460fc3a7dd1b9b44d5dfae575` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 | S05 | committed | Consumer characterization + dogfood runtime projection + manual evidence + report | `bdc0d921598a14b1ecf59b7cdc00949be3b0de28` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 | S90 | approved-no-op | Docs impact inspection + explicit Issue318/319 defer + observed report | `73bebc1a9754e02370501a1e0a59e9ec444de441` | `git status --short` clean、upstream `0 0` | Issue317 runtimeを正しく使うためのshipped text更新はW4/W5 ownershipに明示割当済み | README/reference docs/migration -> Issue319; workflow/skills -> Issue318 | 50-row path ledger、runtime provider 10/dogfood 10、S90-SPEC-r3 pass | fresh spec-reviewer r3 pass、read-only post-push confirmation complete |
-| S99 | commit candidate | Static repair 5 files + final observed report | commit後にhash追記 | commit後に確認 | N/A | N/A | N/A | QA/CODE/SPEC fresh pass、commit可能 |
+| S99 | committed | Static repair 5 files + final observed report | `b7a8a8d6483a7d983287b754a82c9c72d109b540` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | QA/CODE/SPEC fresh pass、read-only post-push confirmation complete |
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
@@ -298,7 +298,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| S99 full baseline、static repair、QA/code/spec reviewer verdict、Issue318/319 relay、deferred full/global gateを記録 | S99 static repair 5ファイルと本reportをcommit/pushし、closure commitでhashを追記 | Issue317 finish evidence、Epic最終PR、最終ユーザー報告 | commit可能 |
+| S99 full baseline、static repair、QA/code/spec reviewer verdict、Issue318/319 relay、deferred full/global gateを記録 | S99 static repair 5ファイルと本reportを`b7a8a8d6483a7d983287b754a82c9c72d109b540`でcommit/push。Closure report commitで本台帳を確定 | Issue317 finish evidence、Epic最終PR、最終ユーザー報告 | ready |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: Final static gateで、Issue-localのmypy例外変数shadowとRuff format差分を検出した。
@@ -551,4 +551,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
   - Claim boundary: Issue319 PR Delivery/Merge Preparation完了までmerge-preparedを主張しない。
   - Remaining gates: Issue318 workflow/skills、Issue319 package/fresh init/update/public docs/migration/full `pytest`/global Ruff pre-existing drift/QA-code-spec/PR observation。
 - Final reviewer result: fresh QA、issue-wide code、final specはいずれもfindingsなしでpass。Final report commit/push、clean/upstream確認後にspec-manager `issue finish`へ進む。
+- Commit closure:
+  - S99 implementation/report commit: `b7a8a8d6483a7d983287b754a82c9c72d109b540` (`fix(artifact): ChatGPT出力Artifact取り込みの品質を確定`)。
+  - 対象6ファイルのみをstage/commitしpush成功。Post-push `git status --short` clean、upstream `0 0`、`git diff --check`とprovider/dogfood command `cmp` pass。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
