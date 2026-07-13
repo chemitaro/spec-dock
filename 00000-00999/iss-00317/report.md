@@ -51,6 +51,7 @@ Disposition ごとの必須証跡:
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-317-001 | resolved | interpretation | user / accepted ADR / orchestrator | `chatgpt-output`をtyped tokenまたはreserved prefixにするか | typed token+reservation; import kind+blank storage; sidecar provenance | Import kindとして扱い、existing blank grammarとtemplate-created blankを共存させる | User decisionとaccepted ADRによりparent contractが確定済み | applied | Epic ADR、requirement RQ-317-006/AC-317-004 | Design/implementationで再オープンしない |
 | D-317-002 | resolved | scope | ChatGPT 5.6 Pro / repo-analyst | Planning候補の過剰なconsumer/alias保証 | 全Artifact inode alias scan; source non-destructive boundary; universal consumer compatibility; verified consumers限定 | Existing formal Artifact全件のinode alias scanは採用せず、sourceをrename/hard-linkしない。Consumer保証はvalidate/sync/ADR mirrorへ限定しdelegated-authoring laneをIssue318へrelay | 親contractを満たす最小実装とcurrent consumer inventoryに整合 | promoted_to_design | Raw evidence SHA、repo analysis、requirement RQ-317-004/012、design DES-317-003/006/008 | Design fresh review。Pass後planへ反映 |
+| D-317-003 | resolved | implementation | dev-coder / code-reviewer | 検証済みtemp descriptorではなくtemp pathnameをpublishすると、検証後path replacementで未検証/source inodeを公開できる | Pathname hard-link; Darwin descriptor clone; Linux descriptor-backed link; unsupported host fail-closed | Darwinは`fclonefileat(staged_fd, ...)`、Linuxは`/proc/self/fd/<fd>` follow-linkを使い、他host/filesystemは`publication_unsupported`。Cleanupはtemp path inodeがstaged fdと一致する場合だけunlink | DES-317-006が許容するnative no-replace adapterのissue-local具体化。Verified descriptor binding、atomic no-replace、source inode independenceを最小境界で満たす | applied | Darwin live probe、pathname replacement/source-alias Red、focused 42 pass、IMPLEMENT-S02-r4 pass | Linux実動は後続CI/final gateで確認。Adapter置換時は同じ観測契約を維持 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -202,11 +203,13 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | Shared runtime/create behaviorとtests | dev-coder | Plan S01のArtifact shared allocation subset | Reviewed requirement/design/plan、parent ADR | `create_artifact_doc.py`とfocused runtime tests | Import CLI/publisher、docs、Issue318/319、unrelated refactor | TC317-S01-01/02、focused tests、diff check | Public contract change、scope外変更、unexpected regression | Changed files、Red/Green、commands、risk、Ledger Note | passed |
+| S02 | delegated | Filesystem safety、opaque staging、source stability、no-replace boundary | dev-coder | Plan S02 guard/port/adapter/tests | Reviewed requirement/design/plan、S01 commits | Narrow application contracts/port、infra guard/publisher、focused tests | CLI wiring、presentation、workflow/docs、Issue318/319、unsafe fallback | TC317-S02-01–04、focused tests、diff check | Safe no-replace unavailable、boundary ambiguity、scope外変更 | Changed files、Red/Green、fault matrix、risk、Ledger Note | passed |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder | Setup/duplicate scan/allocation/exact checkをexisting create lock内へ移し、race/exhaustion/release testsを追加 | `src/.../application/create_artifact_doc.py`; `tests/cli_runtime/test_runtime_new_doc_s09.py` | Red 1 failed、Green focused 32 passed、CLI new 19 passed、validation 8 passed/1 skipped、diff check pass | code-review r1 failed、r2 passed | External writer atomic publishはplanned S04、import wiringはS03 | accepted; no material plan deviation |
+| S02 | dev-coder | Workbench guard、opaque stage/rehash、descriptor-bound no-replace publish、committed warning、inode-aware cleanupを追加 | `application/contracts.py`; `application/ports.py`; `infra/binary_artifact_publisher.py`; focused application/infra tests | Initial Red 34 failed、Green 42 passed。Relevant regressions 81 passed/5 skipped、wide infra 236 passed後dogfood mirror gap 1件。Ruff/diff check pass | code-review r1/r2/r3 failed、fresh r4 passed | Linux descriptor-backed primitiveはDarwin上で未実動。Dogfood mirrorはS05/Issue319 delivery対象 | accepted; D-317-003をissue-local implementation decisionとして適用、plan closure変更なし |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -236,11 +239,16 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | PRE-S01-ASSURANCE | source binding and execution readiness | spec-manager | fresh | passed | no | execute approved plan | `assurance classify --stage requirement --issue iss-00317`後、`assurance verify --issue iss-00317 --format json`が`status=valid`。Guidanceは`state=ready`、`may_execute_approved_plan=true` |
 | IMPLEMENT-S01-r1 | S01 code and test sensitivity | code-reviewer | superseded | failed | no | add focused tests then fresh re-review | P2: inside-lock body failure後のlock releaseとbody/release exception precedenceのtest感度不足。`gpt-5.6-sol`/medium、confidence 0.97 |
 | IMPLEMENT-S01-r2 | S01 code and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。Targeted 3 tests、full focused file 32 tests、diff check pass。`gpt-5.6-sol`/medium、confidence 0.98 |
+| IMPLEMENT-S02-r1 | S02 publisher integrity | code-reviewer | superseded | failed | no | destination reread then fresh re-review | P1: formal destinationを再読せずstaged hash/countを転記。`gpt-5.6-sol`/medium、confidence 0.98 |
+| IMPLEMENT-S02-r2 | S02 committed boundary | code-reviewer | superseded | failed | no | committed warning result then fresh re-review | P1: post-link mismatch/read failureをordinary successまたは`committed=false`へ誤分類。`gpt-5.6-sol`/medium、confidence 0.99 |
+| IMPLEMENT-S02-r3 | S02 verified publication target | code-reviewer | superseded | failed | no | descriptor-bound publication then fresh re-review | P1: verified descriptorではなくreplace可能なtemp pathnameをhard-linkし、未検証/source inode公開が可能。`gpt-5.6-sol`/medium、confidence 0.98 |
+| IMPLEMENT-S02-r4 | S02 code and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。Descriptor-bound Darwin/Linux no-replace、fail-closed、inode-aware cleanup、warning contractを確認。Focused 42 pass、Ruff/diff check pass。`gpt-5.6-sol`/medium、confidence 0.97 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | Runtime shared allocation + focused tests + observed report | `7b1afe5e0824280611a0deae4665d2d680d1484f` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | read-only confirmation complete |
+| S02 | ready | Binary guard/publisher contracts + focused tests + observed report | pending commit | pending post-commit check | N/A | N/A | N/A | fresh code-reviewer r4 pass |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -338,4 +346,38 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
   - Required closure expectationの変更なし。Review-discovered testsをS01既存guardrail evidenceとして追加し、plan amendment不要。
 - Ledger disposition:
   - No material implementation decisions beyond the approved plan.
+
+### S02 Workbench source guard and binary publisher — 2026-07-13
+
+- Delegated worker: DevCoder、すべてdirect invocation `gpt-5.6-sol` / reasoning `medium`。
+- Scope: Narrow application contracts/ports、provider-side infra publisher、focused application/infra tests。CLI/presentation/dogfood mirrorは未変更。
+- Red evidence:
+  - Initial ports/adapter absence: `34 failed`。
+  - Destination reread: staged値再利用で`1 failed`。
+  - Committed warning boundary: mismatch/read failure/cleanup retentionで`3 failed`。
+  - Verified publication target: temp pathnameを別bytesまたはsource hard-linkへ差し替える2ケースで、未検証/source inode公開を再現。
+- Green evidence:
+  - S02 focused ports/publisher: `42 passed`。
+  - Relevant Artifact/new regressions: `81 passed, 5 skipped`。
+  - Wide infra lane: `236 passed`後、provider-only新moduleのdogfood mirror欠落1件を検出。S05/Issue319 projection責務としてdeferred。
+  - `ruff check`: pass。`git diff --check`: pass。
+- Implementation evidence:
+  - Root/scoped Workbenchのrelative/absolute lowercase `.md` regular fileだけを許可し、outside/missing/.MD/directory/symlink ancestor/special fileをread/publish前に拒否。
+  - LF/CRLF/BOM/no-final/Japanese/NUL/invalid UTF-8/zero-byteをbinary chunkで保持し、source/stream/staged/final hashとbyte countを観測。
+  - Mandatory source reread、descriptor `fstat`、path `lstat`でsame-size mutation/replacement/unlinkをpre-publish failure化。
+  - Darwin `fclonefileat(staged_fd, ...)`、Linux descriptor-backed follow-link、other/unsupported filesystem fail-closed。Source inodeを直接publishしない。
+  - Post-link mismatch/read failure/temp retentionはstable content-free warning、`committed=true`、best verified hash/bytesを返し、automatic retry/rollbackを誘発しない。
+  - Cleanupはtemp pathname inodeがstaged fdと一致する場合だけunlinkし、replacementをowned tempとして削除しない。
+- Reviewer:
+  - r1/r2/r3の各P1を同stepのbounded follow-upで修正。
+  - Fresh r4 findingsなし、pass、confidence 0.97。
+- Test contract closure:
+  - `TC317-S02-01` / `C317-02`: pass。
+  - `TC317-S02-02` / `C317-03`: publisher primitive pass。Public CLI closureはS03。
+  - `TC317-S02-03` / `C317-06`: pass。
+  - `TC317-S02-04` / `C317-07`: adapter pre-publish/fail-closed portion pass。Full orchestration matrixはS04。
+- Discovered tests / closure delta:
+  - Descriptor-binding、post-link confirmation、inode-aware cleanup testsを追加。Required closure expectationとstep orderは不変、plan amendment不要。
+- Ledger disposition:
+  - D-317-003をapplied。Exact native primitiveはdesignで明示されたIssue-local implementation delta内で、durable public contract変更なし。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
