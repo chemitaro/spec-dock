@@ -135,12 +135,14 @@ Implementation has not started. The following ledgers are intentionally initiali
 | M1 / C1 | utility-worker | committed | `a7a35f311871dc05cd3d4038774fda3d387c6984`、focused `30 passed, 389 deselected`、post-commit clean |
 | M2 / C2 | utility-worker | committed | `3b28c12badcbb74f4795d5e1b2e6610bbb762766`、writer/CLI/Ruff/mypy pass、post-commit clean |
 | M3 / C3 | utility-worker | committed | `84ab6ca015ccaa0c4b473d06720437687e15a85f`、preflight/Ruff/mypy pass、post-commit clean |
+| M4 / C4 | utility-worker | committed | `f5a24a8aebe16004e9aca3cca70b5bf08a3a19da`、pack/parity/Ruff/mypy pass、post-commit clean |
 | S01 | dev-coder | passed | fresh code review failed once、bounded repair後のfresh re-review passed |
 | S02 | dev-coder | passed | fresh code review failed once、HTTP5xx/TLS identity fixtures修正後のfresh re-review passed |
 | S03 | dev-coder | passed | fresh code review failed once、symlink例外撤去とtarget境界test後のfresh re-review passed |
 | S04 | dev-coder | passed | first fresh code review passed |
 | S05 | dev-coder | passed | first fresh code review passed |
 | S06 | dev-coder | passed | fresh code review failed on matrix evidence、expanded parity/install execution後fresh re-review passed |
+| S90 | doc-writer | passed | first fresh spec-review passed |
 | S90 | doc-writer | not_started | depends on stable implemented contract |
 | S99 | reviewers | not_started | depends on all prior step closures |
 
@@ -164,7 +166,8 @@ Implementation has not started. The following ledgers are intentionally initiali
 - S05 Green: v1 kind/schema/digest/pass invariant、pack provenance/stale-if binding、legacy marker、`current_repository_revalidated=false`を実装。focused `10 passed`、authoring CLI `406 passed, 1 skipped`、Ruff/mypy pass。
 - S06 Red: checked-in dogfood mirrorにprovider-only 3 modules欠落。
 - S06 Green: provider projection、fresh wheel init/update、module inclusion/help/no-bytecodeを追加。reviewでblocked/stale/pack binding/installed execution matrix不足を検出後、provider/dogfood pass-blocked-staleとpack binding、init/update後pass-blocked publicationを追加。final focused matrix `13 passed, 944 deselected`、Ruff/diff/parity pass。
-- next action: M4 commit candidate C4
+- S90 docs: provider skill/workflow/pack referenceとdogfood projectionを更新。direct argv/no-shell/no-escalation、SpecDock-owned retry、receipt/freshness/operator remediationを明文化。focused install/parity assertions `2 passed`、fresh spec-review pass。
+- next action: M90 commit candidate C5 then S99
 
 ### Step Contract Closure
 
@@ -180,6 +183,8 @@ Implementation has not started. The following ledgers are intentionally initiali
 - evidence: CLOS-015〜016、first fresh code-reviewer pass、tamper/downgrade/inconsistent pass fail-closed、legacy/additive compatibility、truthful freshness boundaryを確認
 - S06: passed / Result Approval granted
 - evidence: CLOS-018、CLOS-017統合、fresh code-reviewer re-review pass、provider/dogfood/fresh init/update三surface parity、package inclusion、no-bytecodeを確認
+- S90: passed / Result Approval granted
+- evidence: CLOS-019〜020、fresh spec-reviewer pass、provider/dogfood/install docs parity、live help/schema alignmentを確認
 - required closure IDs: CLOS-001 through CLOS-021
 - evidence source: plan step closure contracts and future execution results
 
@@ -192,22 +197,22 @@ Implementation has not started. The following ledgers are intentionally initiali
 ### Closure Coverage / Delta
 
 - planned coverage: CLOS-001 through CLOS-021
-- observed coverage: S01〜S06 CLOS-001〜018
-- delta: S90/S99 closure pending
+- observed coverage: S01〜S06/S90 CLOS-001〜020
+- delta: S99 CLOS-021 pending
 
 ### Commit Evidence
 
 - planning scaffold commit: `fa98df44c28b0dc09e35d322c7186eacf904820e`
 - research artifact commit: `48a26046c185c9563d073543e66404c8c8c4178f`
 - canonical planning changes: `98b2454def27f404e4039ea1198574eb7959668b`
-- implementation commits: C1 `a7a35f311871dc05cd3d4038774fda3d387c6984`; C2 `3b28c12badcbb74f4795d5e1b2e6610bbb762766`; C3 `84ab6ca015ccaa0c4b473d06720437687e15a85f`
+- implementation commits: C1 `a7a35f311871dc05cd3d4038774fda3d387c6984`; C2 `3b28c12badcbb74f4795d5e1b2e6610bbb762766`; C3 `84ab6ca015ccaa0c4b473d06720437687e15a85f`; C4 `f5a24a8aebe16004e9aca3cca70b5bf08a3a19da`
 
 ## Docs Impact
 
 - required: yes
 - planned owner: doc-writer
 - planned paths: installed `spec-dock-chatgpt-authoring` skill and ChatGPT authoring workflow docs, with provider/dogfood/install parity
-- actual updates: not started
+- actual updates: provider installed skill、workflow、pack referenceとdogfood projectionを更新。direct argv/no-shell/no-escalation、receipt、freshness boundaryを反映。
 
 ## Final Quality Gate
 
