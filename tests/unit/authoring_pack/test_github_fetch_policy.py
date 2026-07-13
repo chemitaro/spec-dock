@@ -194,7 +194,7 @@ def test_retry_uses_same_request_shape_and_bounded_fake_sleep() -> None:
             GitProcessOutcome(0, "exited", b"", b"", 3),
         ]
     )
-    sleeps = []
+    sleeps: list[float] = []
 
     def executor(actual_request):
         observed_requests.append(actual_request)
@@ -217,7 +217,7 @@ def test_http_5xx_retries_once_then_succeeds() -> None:
         ]
     )
     calls = []
-    sleeps = []
+    sleeps: list[float] = []
 
     def executor(request):
         calls.append(request)
@@ -240,7 +240,7 @@ def test_http_5xx_retries_once_then_succeeds() -> None:
 def test_timeout_retries_only_to_total_attempt_budget_without_real_sleep() -> None:
     request = GitFetchExecutionRequest.for_repo(Path("/tmp/repo"))
     calls = []
-    sleeps = []
+    sleeps: list[float] = []
 
     def executor(actual_request):
         calls.append(actual_request)
