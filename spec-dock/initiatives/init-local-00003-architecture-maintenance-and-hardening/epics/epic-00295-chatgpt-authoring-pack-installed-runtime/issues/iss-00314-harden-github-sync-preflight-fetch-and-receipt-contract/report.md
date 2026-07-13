@@ -134,11 +134,13 @@ Implementation has not started. The following ledgers are intentionally initiali
 | M0 | main orchestrator | passed | runtime guidance ready、explicit execution authorization、focused baseline 49 passed |
 | M1 / C1 | utility-worker | committed | `a7a35f311871dc05cd3d4038774fda3d387c6984`、focused `30 passed, 389 deselected`、post-commit clean |
 | M2 / C2 | utility-worker | committed | `3b28c12badcbb74f4795d5e1b2e6610bbb762766`、writer/CLI/Ruff/mypy pass、post-commit clean |
+| M3 / C3 | utility-worker | committed | `84ab6ca015ccaa0c4b473d06720437687e15a85f`、preflight/Ruff/mypy pass、post-commit clean |
 | S01 | dev-coder | passed | fresh code review failed once、bounded repair後のfresh re-review passed |
 | S02 | dev-coder | passed | fresh code review failed once、HTTP5xx/TLS identity fixtures修正後のfresh re-review passed |
 | S03 | dev-coder | passed | fresh code review failed once、symlink例外撤去とtarget境界test後のfresh re-review passed |
 | S04 | dev-coder | passed | first fresh code review passed |
-| S05-S06 | dev-coder | not_started | S05 is next after C3 commit |
+| S05 | dev-coder | passed | first fresh code review passed |
+| S06 | dev-coder | passed | fresh code review failed on matrix evidence、expanded parity/install execution後fresh re-review passed |
 | S90 | doc-writer | not_started | depends on stable implemented contract |
 | S99 | reviewers | not_started | depends on all prior step closures |
 
@@ -158,7 +160,11 @@ Implementation has not started. The following ledgers are intentionally initiali
 - S03 review repair: system symlink例外を撤去し、target symlink/directory/unsupported schema/oversizeのunchanged rejectionを追加。final writer `18 passed`、CLI `5 passed, 389 deselected`、Ruff/mypy pass。
 - S04 Red: mixed-order observationがconcurrent source/HEAD/remote-ref mutationをstableとして扱い得るfixtureを追加。
 - S04 Green: mandatory fetch後のstable snapshot、intra-capture/final guard、immutable SHA comparison、`unverified_cache` dispositionを実装。focused preflight `40 passed, 359 deselected`、full authoring `398 passed, 1 skipped`、Ruff/mypy pass。
-- next action: M3 commit candidate C3
+- S05 Red: v1 integrity/binding matrixがdigest・semantic inconsistencyを未検出。
+- S05 Green: v1 kind/schema/digest/pass invariant、pack provenance/stale-if binding、legacy marker、`current_repository_revalidated=false`を実装。focused `10 passed`、authoring CLI `406 passed, 1 skipped`、Ruff/mypy pass。
+- S06 Red: checked-in dogfood mirrorにprovider-only 3 modules欠落。
+- S06 Green: provider projection、fresh wheel init/update、module inclusion/help/no-bytecodeを追加。reviewでblocked/stale/pack binding/installed execution matrix不足を検出後、provider/dogfood pass-blocked-staleとpack binding、init/update後pass-blocked publicationを追加。final focused matrix `13 passed, 944 deselected`、Ruff/diff/parity pass。
+- next action: M4 commit candidate C4
 
 ### Step Contract Closure
 
@@ -170,6 +176,10 @@ Implementation has not started. The following ledgers are intentionally initiali
 - evidence: CLOS-009〜011、fresh code-reviewer re-review pass、external-only path policy、atomic replacement、old receipt preservation、publication failure separationを確認
 - S04: passed / Result Approval granted
 - evidence: CLOS-012〜014、CLOS-017 S04部分、first fresh code-reviewer pass、post-fetch snapshot/final guard/cache disposition/local-context regressionを確認
+- S05: passed / Result Approval granted
+- evidence: CLOS-015〜016、first fresh code-reviewer pass、tamper/downgrade/inconsistent pass fail-closed、legacy/additive compatibility、truthful freshness boundaryを確認
+- S06: passed / Result Approval granted
+- evidence: CLOS-018、CLOS-017統合、fresh code-reviewer re-review pass、provider/dogfood/fresh init/update三surface parity、package inclusion、no-bytecodeを確認
 - required closure IDs: CLOS-001 through CLOS-021
 - evidence source: plan step closure contracts and future execution results
 
@@ -182,15 +192,15 @@ Implementation has not started. The following ledgers are intentionally initiali
 ### Closure Coverage / Delta
 
 - planned coverage: CLOS-001 through CLOS-021
-- observed coverage: S01〜S04 CLOS-001〜014、CLOS-017 partial
-- delta: S05以降 pending
+- observed coverage: S01〜S06 CLOS-001〜018
+- delta: S90/S99 closure pending
 
 ### Commit Evidence
 
 - planning scaffold commit: `fa98df44c28b0dc09e35d322c7186eacf904820e`
 - research artifact commit: `48a26046c185c9563d073543e66404c8c8c4178f`
 - canonical planning changes: `98b2454def27f404e4039ea1198574eb7959668b`
-- implementation commits: C1 `a7a35f311871dc05cd3d4038774fda3d387c6984`; C2 `3b28c12badcbb74f4795d5e1b2e6610bbb762766`
+- implementation commits: C1 `a7a35f311871dc05cd3d4038774fda3d387c6984`; C2 `3b28c12badcbb74f4795d5e1b2e6610bbb762766`; C3 `84ab6ca015ccaa0c4b473d06720437687e15a85f`
 
 ## Docs Impact
 

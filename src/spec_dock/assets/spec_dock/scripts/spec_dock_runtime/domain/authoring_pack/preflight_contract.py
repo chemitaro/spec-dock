@@ -43,6 +43,17 @@ ConcurrentChangeCheck = Literal["stable", "changed", "not_run", "not_applicable"
 RECEIPT_KIND = "spec-dock.authoring.github-sync-preflight"
 
 
+def receipt_digest_value(payload: dict[str, object]) -> str:
+    digest_payload = {key: value for key, value in payload.items() if key != "receipt_digest"}
+    canonical = json.dumps(
+        digest_payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 @dataclass(frozen=True)
 class FetchClassification:
     failure_class: FetchFailureClass | None
@@ -235,10 +246,9 @@ class PreflightResult:
             "publication": self.publication.to_dict(),
         }
         payload.update(self.source_manifest.to_dict())
-        canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
         payload["receipt_digest"] = {
             "algorithm": "sha256",
-            "value": hashlib.sha256(canonical).hexdigest(),
+            "value": receipt_digest_value(payload),
         }
         return payload
 
