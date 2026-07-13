@@ -2093,9 +2093,7 @@ class TestCliWorktree(CliRuntimeHarness):
         inventory = [managed, external]
         for selector in (managed.id, str(managed.path), managed.basename):
             assert app_worktree_target.resolve_worktree_target(selector, inventory, command="copy") is managed
-        assert (
-            app_worktree_target.resolve_worktree_target(external.basename, inventory, command="copy") is external
-        )
+        assert app_worktree_target.resolve_worktree_target(external.basename, inventory, command="copy") is external
 
         with pytest.raises(app_contracts.WorktreeCommandError) as ambiguous:
             app_worktree_target.resolve_worktree_target(

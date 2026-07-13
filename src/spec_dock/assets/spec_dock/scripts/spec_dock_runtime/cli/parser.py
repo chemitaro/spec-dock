@@ -240,7 +240,10 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
     _bind_leaf(
         workbench_sub.add_parser(
             "copy",
-            help="One-shot copy a scoped Workbench to another worktree without synchronization",
+            help=(
+                "Experimental one-shot copy of disposable, non-canonical scoped Workbench content "
+                "to another worktree without synchronization"
+            ),
         ),
         registry,
         "workbench_copy",

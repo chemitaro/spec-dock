@@ -418,7 +418,8 @@ def render_workbench_copy_error_text(error: WorkbenchCopyError) -> CliText:
         stdout_lines=[],
         stderr_lines=[
             "spec-dock: error (workbench copy) "
-            f"code={error.code}{side} mutation_started={_bool_text(error.mutation_started)}"
+            f"code={error.code}{side} mutation_started={_bool_text(error.mutation_started)} "
+            "experimental=true canonical=false disposable=true one_shot=true sync=false"
         ],
         warnings=[],
     )
@@ -433,6 +434,7 @@ def render_workbench_copy_error_json(error: WorkbenchCopyError) -> CliText:
         "mutation_started": error.mutation_started,
         "experimental": True,
         "canonical": False,
+        "disposable": True,
         "one_shot": True,
         "sync": False,
     }

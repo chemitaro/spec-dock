@@ -389,6 +389,48 @@ class WorktreeCommandError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class WorkbenchCopyRequest:
+    scope_id: str
+    target: str
+
+
+class WorkbenchCopyError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        side: str | None = None,
+        mutation_started: bool = False,
+    ) -> None:
+        self.code = code
+        self.side = side
+        self.mutation_started = mutation_started
+        super().__init__(message)
+
+
+class WorkbenchFilesystemError(RuntimeError):
+    """Content-free filesystem failure with honest mutation-boundary state."""
+
+    def __init__(self, *, mutation_started: bool) -> None:
+        self.mutation_started = mutation_started
+        super().__init__("workbench filesystem operation failed")
+
+
+@dataclass(frozen=True)
+class WorkbenchCopyResult:
+    scope_id: str
+    source_worktree: WorktreeRecordView
+    target_worktree: WorktreeRecordView
+    target_workbench_path: Path
+    experimental: bool = True
+    canonical: bool = False
+    disposable: bool = True
+    one_shot: bool = True
+    sync: bool = False
+
+
+@dataclass(frozen=True)
 class TargetRef:
     kind: str
     node_id: str | None
@@ -912,6 +954,9 @@ class UseCases:
     )
     worktree_remove: Callable[[WorktreeRemoveRequest], WorktreeRemoveResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("worktree_remove is not configured")
+    )
+    workbench_copy: Callable[[WorkbenchCopyRequest], WorkbenchCopyResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("workbench_copy is not configured")
     )
     repo_root: Path | None = None
     specdock_dir: Path | None = None
