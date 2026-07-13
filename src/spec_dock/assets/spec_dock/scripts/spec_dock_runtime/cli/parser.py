@@ -44,6 +44,19 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "new_artifact",
     )
 
+    p_artifact = sub.add_parser("artifact", help="Manage scope-local artifacts")
+    artifact_sub = p_artifact.add_subparsers(dest="artifact_cmd", required=True)
+    artifact_import = artifact_sub.add_parser("import", help="Import an existing file as an artifact")
+    artifact_import_sub = artifact_import.add_subparsers(dest="artifact_import_kind", required=True)
+    _bind_leaf(
+        artifact_import_sub.add_parser(
+            "chatgpt-output",
+            help="Import opaque Markdown bytes from an approved Workbench",
+        ),
+        registry,
+        "artifact_import_chatgpt_output",
+    )
+
     p_active = sub.add_parser("active", help="Manage the active pointers")
     active_sub = p_active.add_subparsers(dest="active_cmd", required=True)
     _bind_leaf(active_sub.add_parser("set", help="Set active pointers (initiative/epic/issue)"), registry, "active_set")
