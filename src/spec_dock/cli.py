@@ -308,7 +308,7 @@ def _resolve_manifest_target_dir(
 
     # Fallback: persisted path can be missing/corrupt; recover by id if possible.
     initiatives_root = specdock_dir / "initiatives"
-    for meta_path in sorted(initiatives_root.rglob(".meta.json"), key=lambda p: p.as_posix()):
+    for meta_path in _iter_manifest_meta_paths(initiatives_root):
         try:
             loaded = json.loads(meta_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -323,8 +323,10 @@ def _resolve_manifest_target_dir(
     for candidate in candidates:
         resolved = candidate.resolve()
         try:
-            resolved.relative_to(repo_root)
+            relative = resolved.relative_to(repo_root)
         except ValueError:
+            continue
+        if ".workbench" in relative.parts:
             continue
         if not resolved.is_dir():
             continue
@@ -343,6 +345,15 @@ def _resolve_manifest_target_dir(
             continue
         return resolved
     return None
+
+
+def _iter_manifest_meta_paths(initiatives_root: Path) -> list[Path]:
+    matches: list[Path] = []
+    for current_root, child_dirnames, filenames in os.walk(initiatives_root, topdown=True):
+        child_dirnames[:] = sorted(name for name in child_dirnames if name != ".workbench")
+        if ".meta.json" in filenames:
+            matches.append(Path(current_root) / ".meta.json")
+    return sorted(matches, key=lambda path: path.as_posix())
 
 
 def _resolve_persisted_path_dir(
