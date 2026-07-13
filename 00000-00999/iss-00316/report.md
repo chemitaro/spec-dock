@@ -51,6 +51,8 @@ Disposition ごとの必須証跡:
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-316-001 | resolved | scope | user / Epic planning / GPT-5.6 Pro | Root Workbenchをcopy commandへ含めるか | 一括copy; manual selective copy; root selector追加 | Root Workbenchはgarbage-proneなscope外scratchであり、一括copy commandへ含めず、必要fileだけagentが手動選択する | 親Epicのroot exclusionと明示された運用判断を保ち、scope内handoffを単純化する | applied | Epic E-RQ-007/E-RQ-014; requirement RQ-316-001 | Issue-local command contractへ適用。追加follow-upなし |
 | D-316-002 | resolved | implementation | GPT-5.6 Pro / repo inventory | Source-winsとdestination-only保持におけるdirectory/leaf型衝突 | destructive replacement; skip; fail | Same-type directory mergeとordinary leaf replacementだけを許し、directory/non-directory衝突はdestination subtreeを削除せずfailする | Destination-only data lossを避け、content classifierなしの単純なfilesystem error境界を保つ | promoted_to_design | `design.md` DES-316-005 entry matrix、fresh design reviewer r2 pass | Design promotion確定。Implementationでfresh code review |
+| D-316-003 | resolved | implementation | S05 security reviewer r1/r2 | NodeRepositoryがguard前にbelow-specdock symlink metadataを読める | Schema-shaped guard; general repo change; Workbench-specific full discovery guard | Workbench operation専用で`initiatives`以下のactual metadata discovery surfaceをtop-down `lstat`し、exact `.workbench` prune、全dir symlinkと`.meta.json` symlink/nonregularをreader前に拒否 | General NodeRepository semanticsを変えずexplicit copyだけをfail-closedにし、Issue315のresolve-before-guard回帰を防ぐ | applied | Security review r1/r2 fail→r3 pass、external metadata observer/node_repo未呼出しtests、focused63 pass | `fs_repo` discovery変更時にguard/test同期 |
+| D-316-004 | resolved | implementation | S05 security reviewer r1 | `mutation_started`をatomic primitive前に立てfalse positive | 常にpre-mark; post-success; unknown tri-state | `mkdir`/`unlink`/symlink creationは成功後、partial mutationし得る`copy2`だけ呼出前にmark | Public booleanを維持しつつ観測可能な部分変更を最も正直に表す | applied | Injected mkdir/unlink/symlink failure=false、unlink成功後/copy2 fault=true、r3 pass | TOCTOU/transactionはnon-goal |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -288,6 +290,36 @@ git diff --check
 - S05へsource descendant symlink object、injected I/O、TOCTOU/ancestor containment、`mutation_started`をrelay。
 - Ledger Note: No material implementation decisions beyond approved DES-316-005 entry matrix。
 
+### セッションログ（2026-07-13 S05 symlink/containment/failure）
+
+#### 対象
+- Step: S05 Security/path and partial-failure boundary。
+- Closure: C316-07、C316-08、C316-09。
+
+#### 委任と実施内容
+- Fresh dev-coderへcomponent-wise ancestry guard、source descendant symlink object、destination traversal guard、fault mappingを委任した。
+- Fresh security review r1で2 P1、r2で1 P1を検出し、各remediationを別fresh dev-coderへ委任した。
+- Final r3でP0/P1/blockingなしを確認した。
+
+#### テスト駆動・修正証跡
+| Phase | Evidence | Result |
+|---|---|---|
+| Initial Red | Symlink/containment/fault contract | 9 failed / 29 passed |
+| Initial Green | S03–S05 focused | 52 passed |
+| Review r1 | Guard-before-reader gap、mutation false-positive | fail: P1 x2 |
+| Remediation 1 | Schema ancestry pre-read guard、atomic primitive mark timing | focused87 pass |
+| Review r2 | Unexpected directory/root `.meta.json` surface gap | fail: P1 x1、reviewer57 pass |
+| Remediation 2 | Full initiatives discovery mirror、exact Workbench prune | focused63 pass |
+| Review r3 | Security/path final | pass、63 passed、P0/P1=0 |
+| Static | Ruff/format/mypy/diff check | pass |
+
+#### Closure / review
+- Repo/specdock/scope/Workbench ancestorをresolve-before-guardせずcomponent-wise検査し、NodeRepositoryの全metadata discovery surfaceをread前にguardする。
+- Source descendant broken/external symlinkはlink text object、destination ancestryはexternal sentinel不変、leaf link自身だけ置換。
+- Pre-mutation mkdir/unlink/symlink failureは`mutation_started=false`、successful removal後/partial copy2はtrue。Raw OSError/body/canonical claimなし。
+- Fresh security reviewer r3: pass。Nonblockingはfuture `fs_repo` discovery変更時のguard/test同期のみ。
+- Ledger Note: D-316-003/004へresolved/appliedとして統合。Plan amendment不要。
+
 ### セッションログ（2026-07-13 HH:MM - HH:MM）
 
 #### 対象
@@ -361,6 +393,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S02 | delegated | Multi-layer minimal vertical behavior | dev-coder | parser→command→application→ports/infra→presentation + focused tests | requirement/design/plan S02/C316-01/03/05/09 | Provider runtime candidate filesとnew `test_workbench.py` | S03–S06 obligations、root/--from/sync/classifier、dogfood/canonical docs | focused/combined pytest、Ruff、mypy、format、diff check | Resolver複製、source path転写、body漏洩、scope外変更 | worker summary/changed files/Red-Green/tests/risks/Ledger Note | pass |
 | S03 | delegated | Independent scope/pre-mutation error matrix | dev-coder | copy application/contracts/path-kind/error rendering + focused tests | requirement/design/plan S03/C316-02/03/04 | Workbench application/contracts/ports/bootstrap/command/fs/presentation/tests | S04 recursive matrix、S05 ancestor/mid-copy、root/sync/classifier/canonical docs | focused app/CLI、selector regression、Ruff/format/mypy/diff | Mutation前target change、source path転写、raw error漏洩 | worker summary/changed files/Red-Green/tests/risks/Ledger Note | pass |
 | S04 | delegated | Recursive merge/content opacity | dev-coder | filesystem adapter + focused infra/application/CLI tests | requirement/design/plan S04/C316-05/06 | `infra/fs_cli.py`、new infra tests、必要最小限のadapter test fixtures | S05 ancestor/mid-copy、classifier/manifest/counter/rollback、canonical docs | focused pytest、Ruff/format/mypy/diff | Whole replacement、data loss、symlink deref、silent skip | worker summary/changed files/Red-Green/tests/risks/Ledger Note | pass |
+| S05 | delegated | Security/path/failure boundary + two remediation batches | dev-coder | Workbench application/contracts/ports/fs/presentation + focused tests | requirement/design/plan S05/C316-07/08/09 | Current Workbench runtime/test files | Transaction/rollback/TOCTOU complete prevention、S06 docs/manual/dogfood | focused S03–S05、external observer/fault tests、Ruff/format/mypy/diff | External read/write、false mutation signal、raw error leak | worker summaries/findings/fixes/tests/risks/Ledger Notes | pass after r3 |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -369,6 +402,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S02 | dev-coder | Minimal `workbench copy` vertical slice、independent scope resolution、authority markers | contracts/ports/new workbench command+app/parser/registry/bootstrap/fs/presentation/new tests | Red2→Green2、combined54、Ruff/mypy/format/diff pass | fresh code-reviewer pass | S03–S06 planned obligations | accepted |
 | S03 | dev-coder | Eligibility、side-specific scope errors、no_source/empty/malformed root、mutation probes | Workbench application/contracts/ports/bootstrap/command/fs/presentation、CLI+unit tests | Red15/2→Green28、selector3、Ruff/format/mypy/diff pass | fresh code-reviewer pass | Trim/lower positive and broken-link case nonblocking | accepted |
 | S04 | dev-coder | Dedicated recursive source-wins mergeとopaque bytes/type collision tests | `infra/fs_cli.py`; new infra test | Red1→focused36、reviewer28、Ruff/format/mypy/diff pass | fresh code-reviewer pass | S05 planned safety/failure closures | accepted |
+| S05 | dev-coder + two fresh remediation workers | Ancestry/inventory guard、symlink object、mutation tracking、content-free failures | Workbench application/contracts/ports/bootstrap/fs/presentation + unit/infra/CLI/presentation tests | Red9→52、fix1 87、fix2/r3 63、Ruff/format/mypy/diff pass | r1 fail P1x2、r2 fail P1x1、r3 pass | Future fs_repo discovery sync | accepted after remediation |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -393,7 +427,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S02 | step reviewer | code-reviewer | fresh | passed | no | proceed | P0/P1/blockingなし、planned relay 3件 |
 | S03 | step reviewer | code-reviewer | fresh | passed | no | proceed | P0/P1/blockingなし、nonblocking tests 2件 |
 | S04 | step reviewer | code-reviewer | fresh | passed | no | proceed | P0/P1/blocking/nonblockingなし |
-| S05–S06 | step reviewer | code-reviewer | pending | pending | N/A | blocked until each pass | 各step後にfresh review |
+| S05 | security/path reviewer | code-reviewer | fresh | passed | no | proceed | r1/r2 P1 remediation後r3 P0/P1=0 |
+| S06 | step reviewer | code-reviewer | pending | pending | N/A | blocked until pass | Public/regression/manual relay |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -402,7 +437,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S01 | committed | shared target resolver + characterization + report | `bf54c810ad9fe71196e231814b95286e6faf6001` | clean/upstream `0 0` | not applicable | S01 contract | `git diff --check` pass | Fresh code-reviewer pass、full worktree 52 pass |
 | S02 | committed | Minimal workbench copy vertical slice + tests + report | `fc0c77916dc4d9e4a094e5d403cd256cf1585f43` | clean/upstream `0 0` | not applicable | S02 contract | `git diff --check` pass | Fresh code-reviewer pass、combined54 pass |
 | S03 | committed | Copy preflight/error contract + tests + report | `cd7e8759a92612eb61467bc24bc704ab07507da4` | clean/upstream `0 0` | not applicable | S03 contract | `git diff --check` pass | Fresh code-reviewer pass、focused28 pass |
-| S04 | ready for commit | Recursive merge adapter + focused tests + report | pending | pending | not applicable | S04 contract | `git diff --check` pass | Fresh code-reviewer pass、focused36/28 pass |
+| S04 | committed | Recursive merge adapter + focused tests + report | `84659dc3a840ba026ff7b80b6478a81be46c5bb3` | clean/upstream `0 0` | not applicable | S04 contract | `git diff --check` pass | Fresh code-reviewer pass、focused36/28 pass |
+| S05 | ready for commit | Symlink/containment/failure + remediation + report | pending | pending | not applicable | S05 contract | `git diff --check` pass | Security reviewer r3 pass、focused63 pass |
 
 #### 変更したファイル
 - `path/to/file1` - ...
