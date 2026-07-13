@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-315-001 | resolved | implementation | S00 repo-analyst / reviewer | `spec_dock_runtime/app.py::_scan_nodes` に旧recursive scan定義があるがhelper群のcallsiteはない | W1で変更; 未参照としてno-op; scope拡張 | `app.py` entry moduleは到達するがlegacy private helperは未参照のため変更しない。参照が判明した場合のみplan再レビュー | no_action | `rg -n "_scan_nodes|_iter_node_meta_paths|_find_legacy_meta_paths" src/spec_dock`; `review_iss00315_s00` | S02でcallsiteを再確認し、未参照ならIssue-local no-opを確定 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -130,6 +130,56 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装記録（セッションログ） (必須)
 
+### セッションログ（2026-07-13 S00）
+
+#### 対象
+- Step: S00 Inventory, assurance, baseline
+- Closure: 実装開始条件。C315-01–08のcallsite mapping
+
+#### 委任と実施内容
+- repo-analyst workerへread-only inventoryとfocused baselineを委譲した。
+- production/reportのworker編集はなく、親が検証済み結果を本台帳へ統合した。
+- recursive callsiteを次のとおり分類した。
+
+| 分類 | Callsite | Workbench到達 | 後続step |
+|---|---|---|---|
+| default-semantic-discovery | `infra/fs_repo.py` current/legacy metadata scan | あり | S02 top-down prune |
+| default-semantic-discovery | `infra/assurance_store.py::_issue_records` | あり | S03 |
+| default-semantic-discovery | `src/spec_dock/cli.py::_resolve_manifest_target_dir` fallback/persisted candidate | あり | S03 |
+| default-semantic-discovery | `application/delete_node.py::_matching_target_directories` | あり | S03 |
+| default-semantic-discovery | `application/delegated_authoring.py::_resolve_scope_dir` | あり | S03 |
+| default-semantic-discovery | `domain/authoring_pack/source_manifest.py` blocker/manifest traversal | あり | S04 |
+| default-semantic-discovery（legacy helper未参照） | `spec_dock_runtime/app.py::_scan_nodes` | entry moduleは到達するがhelper callsiteなし | S02 reachability再確認/no-op |
+| explicit-user-operation | `delegated_authoring.py::_directory_state` diff guard | 明示対象を意図的にhash | 変更しない |
+| explicit-user-operation | scope delete/worktree remove、authoring pack review/stage/digest | 明示対象 | S05 characterizationまたは変更なし |
+| generated-known-tree | installer/template/scaffold/install-root traversal | 既知tree | 変更しない |
+
+#### Baseline evidence
+- installer active recovery、current/legacy metadata validation、assurance、delete、delegated authoring、authoring source manifestのfocused 10 testsを実行。
+- Worker結果: `10 passed in 23.65s`。fresh reviewer再実行: `10 passed in 21.79s`。
+- 最初のselectorはauthoring class名を誤記してcollection error/no testsとなり、`TestAuthoringCli`へ修正したrunをbaseline authorityとした。
+- `git status --short`: clean。
+
+```sh
+uv run pytest -q \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_recovers_active_entrypoints_from_id_when_persisted_paths_are_broken \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken \
+  tests/cli_runtime/test_validate.py::TestCliValidate::test_validate_rejects_missing_or_invalid_required_meta_identity_fields \
+  tests/cli_runtime/test_validate.py::TestCliValidate::test_validate_and_sync_fail_fast_on_legacy_meta_json \
+  tests/cli_runtime/test_assurance.py::TestCliAssurance::test_assurance_explicit_target_takes_precedence_over_active \
+  tests/cli_runtime/test_delete.py::TestCliDelete::test_delete_issue_target_invalid_metadata_returns_structured_json \
+  tests/cli_runtime/test_delegated_authoring.py::TestDelegatedAuthoringCli::test_baseline_status_writes_content_hash_snapshot \
+  tests/cli_runtime/test_delegated_authoring.py::TestDelegatedAuthoringCli::test_diff_guard_active_issue_fallback_requires_exact_meta_id \
+  tests/cli_runtime/test_authoring.py::TestAuthoringCli::test_authoring_preflight_source_manifest_ignores_python_cache_files \
+  tests/cli_runtime/test_authoring.py::TestAuthoringCli::test_authoring_preflight_rejects_symlinked_source_manifest_inputs
+```
+
+#### Risk / step mapping
+- filter-after-rglobは禁止。S02/S03/S04はdescendant access前にtop-down pruneまたはcanonical structure walkを用いる。
+- Installer S03はfallback scanとpersisted Workbench descendantの双方を検証する。
+- Delete depth guardだけではWorkbench排除にならない。
+- S02: node graph、S03: independent resolvers、S04: authoring、S05: explicit deletion、S06: preservationへ計画どおり割り当てる。
+
 ### セッションログ（2026-07-13 HH:MM - HH:MM）
 
 #### 対象
@@ -199,11 +249,13 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| S00 | delegated | recursive callsite inventory and baseline | repo-analyst | read-only runtime/installer/tests inventory | approved `plan.md` S00 | none | all file edits and S01+ implementation | focused baseline tests | baseline regression or scope-changing reachability | inventory、tests、risks、step mapping | pass |
 | S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
+| S00 | repo-analyst | recursive callsiteを3分類し、default discoveryのWorkbench到達点と後続stepを確定 | none | worker `10 passed in 23.65s`; reviewer rerun `10 passed in 21.79s`; status clean | passed（`review_iss00315_s00`） | none; legacy helperはS02でcallsite再確認 | accepted / approved-no-op |
 | S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
 
 #### 親実装例外（Parent Implementation Exception）
@@ -224,10 +276,12 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | planning-requirement | requirement promotion | spec-reviewer | fresh | passed | no | promote | `review_iss00315_requirement` |
 | planning-design | design promotion | spec-reviewer | fresh | passed | no | promote | `review_iss00315_design` |
 | planning-plan | plan promotion | spec-reviewer | fresh | passed | no | execute approved plan | `review_iss00315_plan`; static analysis gate追加後 |
+| S00 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s00`; approved-no-op、10 tests再実行pass |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
+| S00 | approved-no-op | report evidence only | pending S00 report commit | pending | inventory/baseline stepでproduction変更不要 | plan S00、recursive callsites、focused 10 tests | `git status --short` -> clean before report integration | `review_iss00315_s00` passed |
 | S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
 
 #### 変更したファイル
