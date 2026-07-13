@@ -68,6 +68,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 |---|---|---|---|---|---|---|
 | EAL-317-001 | partially_adopted | ChatGPT 5.6 Pro GitHub-synced planning evidence | requirement/design/plan | Parent trace、blank coexistence、opaque bytes、verified publish、failure matrix、Issue318/319 relay、step/closure seedを採用。Exact module/field/error、4-pass hash、universal consumer claim、hard-link inventoryはauthority化しない。Post-commit semanticsとadapter候補はcurrent contractへ書き直した | `artifacts/20260713t124754z-research-chatgpt-5-6-pro-issue-planning-evidence.md`; SHA-256 `8f05a598ea90385f1f0870973c8090555816af816d22dd7474e4c6501435f105` | Requirement/design/planへ統合済み。Plan fresh review |
 | EAL-317-002 | adopted | current repo/parent inventory + read-only repo-analyst | requirement/design | Source placement、blank parser/allocator、lock-before-allocation gap、validator/sync/ADR behavior、delegated-authoring incompatibilityをcurrent sourceで確認しDES-317-003/004/008へ反映 | Parent Epic/ADR、`domain/artifacts.py`、`application/create_artifact_doc.py`、validation/sync/delegated-authoring callsites | Design fresh review。Pass後plan closureへ反映 |
+| EAL-317-003 | adopted | S05 dogfood `artifact import chatgpt-output` manual capture | implementation/report evidence | Current Workbenchのsafe non-secret Markdownをdogfood runtimeでactive Issueへimportし、source/final SHA-256・125 bytes一致、source残存、blank filename、validate passを実測。Artifactはevidence-onlyでcanonical authority/provenanceを自己主張しない | `artifacts/20260713t161729z-chatgpt-output-issue-317-s05-manual-dogfood.md`; SHA-256 `0231085b3f8006f8fee551d3fe71a6398e1924dbd6170c6ae9d1e3acb206af30`; CLI JSON、`cmp`、`validate` | Issue318へworkflow relay、Issue319へdistribution/public docs/full gate/PR relay。S90/S99 fresh spec reviewで追跡性を確認 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -207,6 +208,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S02 | delegated | Filesystem safety、opaque staging、source stability、no-replace boundary | dev-coder | Plan S02 guard/port/adapter/tests | Reviewed requirement/design/plan、S01 commits | Narrow application contracts/port、infra guard/publisher、focused tests | CLI wiring、presentation、workflow/docs、Issue318/319、unsafe fallback | TC317-S02-01–04、focused tests、diff check | Safe no-replace unavailable、boundary ambiguity、scope外変更 | Changed files、Red/Green、fault matrix、risk、Ledger Note | passed |
 | S03 | delegated | Public CLI vertical sliceとcontent-free result contract | dev-coder | Plan S03 parser/application/presentation/CLI tests | Reviewed requirement/design/plan、S01/S02 commits | CLI parser/registry/bootstrap、new handler/use case/contracts、presentation、focused tests | Publisher semantics、typed reservation/template、workflow/docs、Issue318/319 | TC317-S03-01–04、focused tests、help inspection、diff check | Existing node import/global JSON change、body/path leak、scope外変更 | Changed files、Red/Green、help/output、risk、Ledger Note | passed |
 | S04 | delegated | Collision/fault/post-commit semantics hardening | dev-coder | Plan S04 import/shared helper/publisher/presentation/tests | Reviewed requirement/design/plan、S01–S03 commits | Import application/publisher/presentation、focused concurrency/fault tests、meaning-preserving S01 helper correction | New lock、unbounded retry、final rollback、docs/workflow/dogfood/Issue318/319 | TC317-S04-01–04、3 repeat runs、affected CLI tests、diff check | Flaky sleep test、retry ambiguity、existing bytes mutation、scope外変更 | Changed files、Red/Green、fault matrix/repeat logs、risk、Ledger Note | passed |
+| S05 | delegated | Existing consumer compatibilityとprovider/dogfood projection | dev-coder | Plan S05 runtime regression/projection subset | Reviewed requirement/design/plan、S01–S04 commits | Focused validation/sync/ADR/delegated-authoring tests、provider-generated dogfood runtime | Public docs/skills、Issue318/319、manual evidence interpretation、unrelated generated assets | TC317-S05-01/02、provider/dogfood diff、focused regressions、diff check | Consumer contract変更、provider/dogfood authority衝突、scope外generated diff | Changed files、characterization/Green、projection diff、risk、Ledger Note | passed |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -215,6 +217,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S02 | dev-coder | Workbench guard、opaque stage/rehash、descriptor-bound no-replace publish、committed warning、inode-aware cleanupを追加 | `application/contracts.py`; `application/ports.py`; `infra/binary_artifact_publisher.py`; focused application/infra tests | Initial Red 34 failed、Green 42 passed。Relevant regressions 81 passed/5 skipped、wide infra 236 passed後dogfood mirror gap 1件。Ruff/diff check pass | code-review r1/r2/r3 failed、fresh r4 passed | Linux descriptor-backed primitiveはDarwin上で未実動。Dogfood mirrorはS05/Issue319 delivery対象 | accepted; D-317-003をissue-local implementation decisionとして適用、plan closure変更なし |
 | S03 | dev-coder | `artifact import chatgpt-output` parser→application→publisher→presentationを結線し、blank naming/byte identity/content-free outputを公開 | `application/contracts.py`; new `application/import_artifact.py`; CLI parser/registry/bootstrap; new command; presentation; 3 focused test files | Red 9 failed、focused 13 passed、regression 178 items exit 0、prior 142 passed、manual help/Ruff format+check/diff check pass | fresh code-review r1 passed | S04 collision/fault hardening、Linux live primitive、dogfood projectionは未実施 | accepted; no material plan deviation |
 | S04 | dev-coder | Shared create lock内でcollisionを再scanし、100候補のbounded retry、pre/post-publish fault分類、committed warningを追加 | `application/contracts.py`; `application/import_artifact.py`; `infra/binary_artifact_publisher.py`; S04 CLI/presentation tests | Initial 8 failed/6 passed、focused 63 passed、deterministic 25 passedを3連続、S02/S03回帰58 pass、S01回帰32 pass、mypy/Ruff/diff check pass | fresh code-review r1 passed | Linux descriptor publication live検証はS02から継続。Suffix grammar変更時は100回上限も同期必要 | accepted; D-317-004 applied、plan closure変更なし |
+| S05 | dev-coder | Invalid UTF-8 raw import後のvalidate/sync/ADR mirror不変性をcharacterizeし、S01–S04 runtime 10ファイルをdogfoodへbyte-equivalent projection | 10 dogfood runtime files; `tests/cli_runtime/test_artifact_import_chatgpt_output.py` | Characterization時刻差分を意味保存で正規化後Green、focused 85 passed、dogfood validate pass、provider/dogfood cmp 10/10、Ruff/diff check pass | fresh code-review r1 passed | Manual captureはorchestrator実施済み。Public docs/workflow/package parityはIssue318/319 relay | accepted; no material implementation decision |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -250,6 +253,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | IMPLEMENT-S02-r4 | S02 code and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。Descriptor-bound Darwin/Linux no-replace、fail-closed、inode-aware cleanup、warning contractを確認。Focused 42 pass、Ruff/diff check pass。`gpt-5.6-sol`/medium、confidence 0.97 |
 | IMPLEMENT-S03-r1 | S03 code and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。CLI vertical slice、byte preservation、blank grammar、content-free output、warning propagation、existing command非回帰を確認。Focused 13 pass、Ruff format/check、diff check pass。`gpt-5.6-sol`/medium、confidence 0.98 |
 | IMPLEMENT-S04-r1 | S04 collision/fault semantics and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。C317-05–09、TC317-S04-01–04、collision、fault、cleanup、例外優先順位、禁止事項を確認。Reviewer再実行25 pass、diff check pass。`gpt-5.6-sol`/medium、confidence 0.98 |
+| IMPLEMENT-S05-r1 | S05 consumer compatibility/projection/manual evidence | code-reviewer | fresh | passed | no | commit candidate | findingsなし。Consumer characterization、provider/dogfood 10/10 byte-equivalence、manual Artifact source一致、guard分離、scope境界を確認。Reviewer環境のtemp制約でtest再実行不可だがstatic/recorded evidenceに矛盾なし。`gpt-5.6-sol`/medium、confidence 0.98 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -258,6 +262,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S02 | committed | Binary guard/publisher contracts + focused tests + observed report | `22006f5e2e4052bd9024e7180094e9a5b6996de8` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r4 pass、read-only post-push confirmation complete |
 | S03 | committed | Public import vertical slice + focused tests + observed report | `e2197cc85eff304d895919a18b1327aa8cd72db2` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 | S04 | committed | Collision/fault hardening + deterministic tests + observed report | `18be850a32e4ee1460fc3a7dd1b9b44d5dfae575` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
+| S05 | ready | Consumer characterization + dogfood runtime projection + manual evidence + report | pending commit | pending | N/A | N/A | N/A | fresh code-reviewer r1 pass |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -459,4 +464,38 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - Commit closure:
   - Implementation/report commit: `18be850a32e4ee1460fc3a7dd1b9b44d5dfae575` (`feat(artifact): importの競合・障害境界を強化`)。
   - Push成功。Post-push `git status --short` clean、upstream `0 0`。
+
+### S05 Consumer compatibility and manual dogfood evidence — 2026-07-14
+
+- Delegated worker: DevCoder、direct invocation `gpt-5.6-sol` / reasoning `medium`。Manual capture/EAL/relay統合はorchestrator。
+- Scope: Focused consumer characterization、S01–S04 provider runtime 10ファイルのdogfood projection、active Issueへの1件のmanual evidence import。
+- Characterization evidence:
+  - Invalid UTF-8 raw import後のvalidate、sync projection、typed ADR mirrorを一体で確認するtestを追加。
+  - 初回はconsumer defectではなくsyncの実行時`generated_at`差で失敗。現在実行時刻と同値の派生値だけを正規化し、意味内容比較へ修正。Consumer実装変更なし。
+  - Raw import callsiteはdelegated-authoring UTF-8/frontmatter guardを参照せず、既存delegated non-UTF-8 rejectionを維持。
+- Green evidence:
+  - Focused import/fault/concurrency/validate/sync/ADR/new-artifact/delegated-authoring lane: `85 passed in 33.35s`。
+  - Dogfood `artifact import --help`で`chatgpt-output` leaf確認。Dogfood `validate`: `spec-dock: ok (validate) nodes=209`。
+  - `ruff check` / `ruff format --check` / `git diff --check`: pass。
+  - Provider/dogfood runtime 10ファイル: `cmp` 10/10 byte-equivalent。Scope外`spec-dock update .` churnなし。
+- Manual dogfood evidence:
+  - Source: ignored Workbench direct child `spec-dock/.workbench/issue-317-s05-manual.md`、safe non-secret Markdown、125 bytes。
+  - Destination: `artifacts/20260713t161729z-chatgpt-output-issue-317-s05-manual-dogfood.md`。Blank storage identity、frontmatter/template追加なし。
+  - Source/final SHA-256: `0231085b3f8006f8fee551d3fe71a6398e1924dbd6170c6ae9d1e3acb206af30`。`cmp` exit 0、双方125 bytes、source残存、warningなし、`committed=true`。
+  - Post-import `./spec-dock/scripts/spec-dock validate`: pass、nodes=209。
+- Relay:
+  - Issue318: ChatGPT First workflow/skillが有用な完成レポートをcanonical再記述前に`chatgpt-output`としてimportし、EALで採否を管理する運用を結線する。
+  - Issue319: installed runtime/fresh init/update parity、public docs/migration、full test、final Epic PR deliveryを担当する。Issue317はmerge-preparedを主張しない。
+- Test contract closure:
+  - `TC317-S05-01` / `C317-10`: pass。
+  - `TC317-S05-02` / `C317-10`: pass。
+  - `TC317-S05-03` / `C317-11`: pass。
+  - `TC317-S05-04` / `C317-11`: pass。EAL-317-003とIssue318/319 relayへ統合。
+- Discovered tests / closure delta:
+  - Syncの非決定時刻だけを正規化するcharacterizationを追加。Required closure expectation、consumer contract、step orderは不変、plan amendment不要。
+- Ledger disposition:
+  - No material implementation decisions beyond the approved plan. Manual Artifactはevidence-onlyで、canonical authorityではない。
+- Reviewer:
+  - Fresh r1 findingsなし、pass、confidence 0.98。Consumer characterization、10/10 byte-equivalence、manual Artifact bytes、guard/scope分離を確認。
+  - Reviewer read-only環境ではpytest temp作成制約により再実行不可。DevCoderの85 passとorchestrator manual CLI/hash/cmp/validate証跡をstatic inspectionで照合し、blocking findingなし。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->

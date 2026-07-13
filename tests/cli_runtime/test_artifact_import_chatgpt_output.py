@@ -202,3 +202,101 @@ class TestArtifactImportChatGptOutput(CliRuntimeHarness):
             assert same_second_pair is not None
             assert len({path.name for path in same_second_pair}) == 2
             assert any(re.match(r"[0-9]{8}t[0-9]{6}z-[0-9]{2}-", path.name) for path in same_second_pair)
+
+    def test_invalid_utf8_import_preserves_consumer_projections_and_typed_adr_mirror(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            issue_dir = self._prepare_target(target)
+            artifacts_dir = issue_dir / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            typed_adr = artifacts_dir / "20260714t010101z-adr-baseline.md"
+            typed_adr.write_text(
+                "\n".join([
+                    "---",
+                    "種別: ADR（Architecture Decision Record）",
+                    'ID: "20260714t010101z-adr"',
+                    'タイトル: "Baseline"',
+                    '状態: "accepted"',
+                    '作成者: "Tester"',
+                    '最終更新: "2026-07-14"',
+                    '親: ["iss-00317"]',
+                    'authority: "accepted"',
+                    "mirror_eligible: true",
+                    "---",
+                    "",
+                    "# Baseline",
+                    "",
+                ]),
+                encoding="utf-8",
+            )
+
+            self._run_runtime(target, ["sync", "--no-github"])
+            generated_paths = (
+                "spec-dock/.agent/index-all.json",
+                "spec-dock/.agent/index.json",
+                "spec-dock/.agent/tree-all.json",
+                "spec-dock/.agent/tree.json",
+                "spec-dock/tree-all.puml",
+                "spec-dock/tree.puml",
+                "spec-dock/.agent/deps-issues.json",
+                "spec-dock/deps-issues.puml",
+                "spec-dock/dashboard.md",
+            )
+
+            def normalized_projection(path: str) -> object:
+                projection_path = target / path
+                if projection_path.suffix != ".json":
+                    return projection_path.read_bytes()
+                payload = json.loads(projection_path.read_text(encoding="utf-8"))
+                generated_at = payload.pop("generated_at", None)
+
+                def normalize_generated_at(value: object) -> object:
+                    if generated_at is not None and value == generated_at:
+                        return "<generated-at>"
+                    if isinstance(value, dict):
+                        return {key: normalize_generated_at(item) for key, item in value.items()}
+                    if isinstance(value, list):
+                        return [normalize_generated_at(item) for item in value]
+                    return value
+
+                return normalize_generated_at(payload)
+
+            projection_baseline = {path: normalized_projection(path) for path in generated_paths}
+            adr_mirror = target / "spec-dock" / "adrs" / typed_adr.name
+            assert adr_mirror.is_symlink()
+            assert adr_mirror.resolve() == typed_adr.resolve()
+
+            workbench = target / "spec-dock" / ".workbench"
+            workbench.mkdir(parents=True, exist_ok=True)
+            source = workbench / "invalid.md"
+            source.write_bytes(b"raw invalid utf-8: \xff\xfe\n")
+            imported = self._run_runtime_capture(
+                target,
+                [
+                    "artifact",
+                    "import",
+                    "chatgpt-output",
+                    "--issue",
+                    "317",
+                    "--file",
+                    source.relative_to(target).as_posix(),
+                    "--title",
+                    "Invalid UTF-8",
+                    "--slug",
+                    "invalid-utf8",
+                    "--json",
+                ],
+            )
+            assert imported.returncode == 0, imported.stdout + imported.stderr
+            imported_path = target / json.loads(imported.stdout)["destination"]
+            assert imported_path.read_bytes() == source.read_bytes()
+
+            validated = self._run_runtime_capture(target, ["validate"])
+            assert validated.returncode == 0, validated.stdout + validated.stderr
+            assert "spec-dock: ok" in validated.stdout
+
+            self._run_runtime(target, ["sync", "--no-github"])
+            assert {path: normalized_projection(path) for path in generated_paths} == projection_baseline
+            assert sorted(path.name for path in (target / "spec-dock" / "adrs").iterdir()) == [typed_adr.name]
+            assert adr_mirror.is_symlink()
+            assert adr_mirror.resolve() == typed_adr.resolve()
