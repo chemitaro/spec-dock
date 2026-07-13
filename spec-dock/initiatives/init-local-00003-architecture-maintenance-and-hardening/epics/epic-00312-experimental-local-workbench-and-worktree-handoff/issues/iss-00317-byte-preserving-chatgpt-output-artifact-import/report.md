@@ -52,6 +52,7 @@ Disposition ごとの必須証跡:
 | D-317-001 | resolved | interpretation | user / accepted ADR / orchestrator | `chatgpt-output`をtyped tokenまたはreserved prefixにするか | typed token+reservation; import kind+blank storage; sidecar provenance | Import kindとして扱い、existing blank grammarとtemplate-created blankを共存させる | User decisionとaccepted ADRによりparent contractが確定済み | applied | Epic ADR、requirement RQ-317-006/AC-317-004 | Design/implementationで再オープンしない |
 | D-317-002 | resolved | scope | ChatGPT 5.6 Pro / repo-analyst | Planning候補の過剰なconsumer/alias保証 | 全Artifact inode alias scan; source non-destructive boundary; universal consumer compatibility; verified consumers限定 | Existing formal Artifact全件のinode alias scanは採用せず、sourceをrename/hard-linkしない。Consumer保証はvalidate/sync/ADR mirrorへ限定しdelegated-authoring laneをIssue318へrelay | 親contractを満たす最小実装とcurrent consumer inventoryに整合 | promoted_to_design | Raw evidence SHA、repo analysis、requirement RQ-317-004/012、design DES-317-003/006/008 | Design fresh review。Pass後planへ反映 |
 | D-317-003 | resolved | implementation | dev-coder / code-reviewer | 検証済みtemp descriptorではなくtemp pathnameをpublishすると、検証後path replacementで未検証/source inodeを公開できる | Pathname hard-link; Darwin descriptor clone; Linux descriptor-backed link; unsupported host fail-closed | Darwinは`fclonefileat(staged_fd, ...)`、Linuxは`/proc/self/fd/<fd>` follow-linkを使い、他host/filesystemは`publication_unsupported`。Cleanupはtemp path inodeがstaged fdと一致する場合だけunlink | DES-317-006が許容するnative no-replace adapterのissue-local具体化。Verified descriptor binding、atomic no-replace、source inode independenceを最小境界で満たす | applied | Darwin live probe、pathname replacement/source-alias Red、focused 42 pass、IMPLEMENT-S02-r4 pass | Linux実動は後続CI/final gateで確認。Adapter置換時は同じ観測契約を維持 |
+| D-317-004 | resolved | implementation | dev-coder | `destination_exists`を返すadapterがcandidateを作らない異常時は、rescanだけでは同じcandidateを無限に再試行し得る | Allocator exhaustionだけに依存; 任意の小さい上限; current candidate spaceと同じ100回上限 | Publication attemptをbase + `01..99`に一致する100回へ制限し、超過時は`artifact_publication_retry_exhausted`でfail closed | Current suffix grammarと一対一で、外部writer競合を吸収しつつ異常adapterでも有限停止する。将来grammar変更時の同期見直しを明示する | applied | `import_artifact.py`、TC317-S04-02 retry/suffix exhaustion、deterministic suite 3連続pass、IMPLEMENT-S04-r1 pass | Suffix grammarを拡張する場合はretry boundも同時更新 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -205,6 +206,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S01 | delegated | Shared runtime/create behaviorとtests | dev-coder | Plan S01のArtifact shared allocation subset | Reviewed requirement/design/plan、parent ADR | `create_artifact_doc.py`とfocused runtime tests | Import CLI/publisher、docs、Issue318/319、unrelated refactor | TC317-S01-01/02、focused tests、diff check | Public contract change、scope外変更、unexpected regression | Changed files、Red/Green、commands、risk、Ledger Note | passed |
 | S02 | delegated | Filesystem safety、opaque staging、source stability、no-replace boundary | dev-coder | Plan S02 guard/port/adapter/tests | Reviewed requirement/design/plan、S01 commits | Narrow application contracts/port、infra guard/publisher、focused tests | CLI wiring、presentation、workflow/docs、Issue318/319、unsafe fallback | TC317-S02-01–04、focused tests、diff check | Safe no-replace unavailable、boundary ambiguity、scope外変更 | Changed files、Red/Green、fault matrix、risk、Ledger Note | passed |
 | S03 | delegated | Public CLI vertical sliceとcontent-free result contract | dev-coder | Plan S03 parser/application/presentation/CLI tests | Reviewed requirement/design/plan、S01/S02 commits | CLI parser/registry/bootstrap、new handler/use case/contracts、presentation、focused tests | Publisher semantics、typed reservation/template、workflow/docs、Issue318/319 | TC317-S03-01–04、focused tests、help inspection、diff check | Existing node import/global JSON change、body/path leak、scope外変更 | Changed files、Red/Green、help/output、risk、Ledger Note | passed |
+| S04 | delegated | Collision/fault/post-commit semantics hardening | dev-coder | Plan S04 import/shared helper/publisher/presentation/tests | Reviewed requirement/design/plan、S01–S03 commits | Import application/publisher/presentation、focused concurrency/fault tests、meaning-preserving S01 helper correction | New lock、unbounded retry、final rollback、docs/workflow/dogfood/Issue318/319 | TC317-S04-01–04、3 repeat runs、affected CLI tests、diff check | Flaky sleep test、retry ambiguity、existing bytes mutation、scope外変更 | Changed files、Red/Green、fault matrix/repeat logs、risk、Ledger Note | passed |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -212,6 +214,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S01 | dev-coder | Setup/duplicate scan/allocation/exact checkをexisting create lock内へ移し、race/exhaustion/release testsを追加 | `src/.../application/create_artifact_doc.py`; `tests/cli_runtime/test_runtime_new_doc_s09.py` | Red 1 failed、Green focused 32 passed、CLI new 19 passed、validation 8 passed/1 skipped、diff check pass | code-review r1 failed、r2 passed | External writer atomic publishはplanned S04、import wiringはS03 | accepted; no material plan deviation |
 | S02 | dev-coder | Workbench guard、opaque stage/rehash、descriptor-bound no-replace publish、committed warning、inode-aware cleanupを追加 | `application/contracts.py`; `application/ports.py`; `infra/binary_artifact_publisher.py`; focused application/infra tests | Initial Red 34 failed、Green 42 passed。Relevant regressions 81 passed/5 skipped、wide infra 236 passed後dogfood mirror gap 1件。Ruff/diff check pass | code-review r1/r2/r3 failed、fresh r4 passed | Linux descriptor-backed primitiveはDarwin上で未実動。Dogfood mirrorはS05/Issue319 delivery対象 | accepted; D-317-003をissue-local implementation decisionとして適用、plan closure変更なし |
 | S03 | dev-coder | `artifact import chatgpt-output` parser→application→publisher→presentationを結線し、blank naming/byte identity/content-free outputを公開 | `application/contracts.py`; new `application/import_artifact.py`; CLI parser/registry/bootstrap; new command; presentation; 3 focused test files | Red 9 failed、focused 13 passed、regression 178 items exit 0、prior 142 passed、manual help/Ruff format+check/diff check pass | fresh code-review r1 passed | S04 collision/fault hardening、Linux live primitive、dogfood projectionは未実施 | accepted; no material plan deviation |
+| S04 | dev-coder | Shared create lock内でcollisionを再scanし、100候補のbounded retry、pre/post-publish fault分類、committed warningを追加 | `application/contracts.py`; `application/import_artifact.py`; `infra/binary_artifact_publisher.py`; S04 CLI/presentation tests | Initial 8 failed/6 passed、focused 63 passed、deterministic 25 passedを3連続、S02/S03回帰58 pass、S01回帰32 pass、mypy/Ruff/diff check pass | fresh code-review r1 passed | Linux descriptor publication live検証はS02から継続。Suffix grammar変更時は100回上限も同期必要 | accepted; D-317-004 applied、plan closure変更なし |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -246,6 +249,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | IMPLEMENT-S02-r3 | S02 verified publication target | code-reviewer | superseded | failed | no | descriptor-bound publication then fresh re-review | P1: verified descriptorではなくreplace可能なtemp pathnameをhard-linkし、未検証/source inode公開が可能。`gpt-5.6-sol`/medium、confidence 0.98 |
 | IMPLEMENT-S02-r4 | S02 code and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。Descriptor-bound Darwin/Linux no-replace、fail-closed、inode-aware cleanup、warning contractを確認。Focused 42 pass、Ruff/diff check pass。`gpt-5.6-sol`/medium、confidence 0.97 |
 | IMPLEMENT-S03-r1 | S03 code and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。CLI vertical slice、byte preservation、blank grammar、content-free output、warning propagation、existing command非回帰を確認。Focused 13 pass、Ruff format/check、diff check pass。`gpt-5.6-sol`/medium、confidence 0.98 |
+| IMPLEMENT-S04-r1 | S04 collision/fault semantics and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。C317-05–09、TC317-S04-01–04、collision、fault、cleanup、例外優先順位、禁止事項を確認。Reviewer再実行25 pass、diff check pass。`gpt-5.6-sol`/medium、confidence 0.98 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -253,6 +257,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S01 | committed | Runtime shared allocation + focused tests + observed report | `7b1afe5e0824280611a0deae4665d2d680d1484f` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | read-only confirmation complete |
 | S02 | committed | Binary guard/publisher contracts + focused tests + observed report | `22006f5e2e4052bd9024e7180094e9a5b6996de8` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r4 pass、read-only post-push confirmation complete |
 | S03 | committed | Public import vertical slice + focused tests + observed report | `e2197cc85eff304d895919a18b1327aa8cd72db2` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
+| S04 | ready | Collision/fault hardening + deterministic tests + observed report | pending commit | pending | N/A | N/A | N/A | fresh code-reviewer r1 pass |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -422,4 +427,33 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - Commit closure:
   - Implementation/report commit: `e2197cc85eff304d895919a18b1327aa8cd72db2` (`feat(artifact): ChatGPT出力import CLIを追加`)。
   - Push成功。Post-push `git status --short` clean、upstream `0 0`。
+
+### S04 Collision and fault semantics hardening — 2026-07-14
+
+- Delegated worker: DevCoder、direct invocation `gpt-5.6-sol` / reasoning `medium`。
+- Scope: Import application、binary publisher、contracts、focused concurrency/fault/presentation tests。Docs/workflow/dogfood projectionは未変更。
+- Red evidence:
+  - Initial S04 suite: `8 failed, 6 passed`。
+  - Exact-path `EEXIST`がterminal failure、bounded publication retry不在、publish後lock-release faultがcommitted resultとして保持されない欠陥を再現。
+- Green evidence:
+  - Focused S04/publisher/presentation: `63 passed`。
+  - Deterministic S04 suite: `25 passed`を3連続（25.70s、24.07s、23.36s）。
+  - S02/S03関連回帰: `58 passed`。S01 shared allocation回帰: `32 passed`。
+  - `mypy`: 2 source files、issuesなし。`ruff format --check` / `ruff check` / `git diff --check`: pass。
+- Collision/fault evidence:
+  - import/importとimport/newはshared create lock内でbase/`-01`へ分離し、双方commit、既存sentinel不変、deadlockなし。
+  - External exact-path `EEXIST`は既存bytesを変えずrescan後の次slotへcommit。Base + `01..99`を100回上限とし、retry/suffix exhaustionはformal mutationなしで停止。
+  - Source mutation/replacement/unlink、temp create/copy/hash/file-fsync/unsupported/prepublish cleanup faultは`committed=false`、source/formal不変、owned temp stateを正確に返す。
+  - Directory fsync、temp cleanup、post-confirmation、create-lock release faultはfinal/sourceを保持し、`committed=true`とstable content-free warningを返す。Retry/rollbackなし。
+- Reviewer:
+  - Fresh r1 findingsなし、pass、confidence 0.98。Reviewer自身のfocused deterministic suite `25 passed`、`git diff --check` pass。
+- Test contract closure:
+  - `TC317-S04-01` / `C317-05`: pass。
+  - `TC317-S04-02` / `C317-05/C317-07`: pass。
+  - `TC317-S04-03` / `C317-06/C317-07`: pass。
+  - `TC317-S04-04` / `C317-08/C317-09`: pass。
+- Discovered tests / closure delta:
+  - Retry boundをcurrent candidate spaceと同じ100回に具体化。Required closure expectationとstep orderは不変、plan amendment不要。
+- Ledger disposition:
+  - D-317-004をapplied。将来suffix grammar変更時の同期見直しをfollow-up条件として記録。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->

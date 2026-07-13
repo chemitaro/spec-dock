@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -26,6 +27,9 @@ from spec_dock_runtime.domain.ids import slugify, validate_input_slug_kebab
 
 if TYPE_CHECKING:
     from spec_dock_runtime.application.ports import Ports
+
+
+_MAX_PUBLICATION_ATTEMPTS = 100
 
 
 def import_artifact(req: ArtifactImportRequest, ports: Ports) -> ArtifactImportResult:
@@ -66,30 +70,61 @@ def import_artifact(req: ArtifactImportRequest, ports: Ports) -> ArtifactImportR
 
     result: ArtifactImportResult | None = None
     body_error: ArtifactImportError | None = None
+    retry_cleanup_state = "not_created"
     try:
-        try:
-            destination_path, artifact_id = _allocate_artifact_destination_under_create_lock(
-                scope=scope,
-                specdock_dir=specdock_dir,
-                artifacts_dir=artifacts_dir,
-                timestamp=timestamp,
-                artifact_type="blank",
-                slug=f"chatgpt-output-{slug}",
+        published = None
+        destination_path = None
+        artifact_id = None
+        for _attempt in range(_MAX_PUBLICATION_ATTEMPTS):
+            try:
+                destination_path, artifact_id = _allocate_artifact_destination_under_create_lock(
+                    scope=scope,
+                    specdock_dir=specdock_dir,
+                    artifacts_dir=artifacts_dir,
+                    timestamp=timestamp,
+                    artifact_type="blank",
+                    slug=f"chatgpt-output-{slug}",
+                )
+            except RuntimeError:
+                raise ArtifactImportError(
+                    code="artifact_allocation_failed",
+                    cleanup_state=retry_cleanup_state,
+                ) from None
+            try:
+                published = publisher.publish(
+                    BinaryArtifactPublishRequest(
+                        source=source_request,
+                        destination_path=destination_path,
+                    )
+                )
+            except BinaryArtifactPublishError as error:
+                retry_cleanup_state = _merge_cleanup_state(retry_cleanup_state, error.cleanup_state)
+                if error.code == "destination_exists":
+                    continue
+                raise ArtifactImportError(
+                    code=error.code,
+                    cleanup_state=retry_cleanup_state,
+                ) from None
+            break
+        else:
+            raise ArtifactImportError(
+                code="artifact_publication_retry_exhausted",
+                cleanup_state=retry_cleanup_state,
             )
-        except RuntimeError:
-            raise ArtifactImportError(code="artifact_allocation_failed", cleanup_state="not_created") from None
-        try:
-            published = publisher.publish(
-                BinaryArtifactPublishRequest(source=source_request, destination_path=destination_path)
-            )
-        except BinaryArtifactPublishError as error:
-            raise ArtifactImportError(code=error.code, cleanup_state=error.cleanup_state) from None
+
+        assert published is not None
+        assert destination_path is not None
+        assert artifact_id is not None
 
         try:
             source_relative = published.source_path.relative_to(repo_root)
             destination_relative = published.destination_path.relative_to(repo_root)
         except ValueError:
             raise ArtifactImportError(code="result_path_invalid", cleanup_state=published.cleanup_state) from None
+        cleanup_state = _merge_cleanup_state(retry_cleanup_state, published.cleanup_state)
+        warning_codes = list(published.warning_codes)
+        if cleanup_state == "retained" and "temp_cleanup_retained" not in warning_codes:
+            warning_codes.append("temp_cleanup_retained")
         result = ArtifactImportResult(
             import_kind="chatgpt-output",
             storage_identity="blank",
@@ -100,8 +135,8 @@ def import_artifact(req: ArtifactImportRequest, ports: Ports) -> ArtifactImportR
             sha256=published.destination_sha256,
             byte_count=published.destination_byte_count,
             committed=published.committed,
-            cleanup_state=published.cleanup_state,
-            warning_codes=published.warning_codes,
+            cleanup_state=cleanup_state,
+            warning_codes=tuple(warning_codes),
         )
     except ArtifactImportError as error:
         body_error = error
@@ -109,9 +144,15 @@ def import_artifact(req: ArtifactImportRequest, ports: Ports) -> ArtifactImportR
         try:
             _release_create_lock(lock_path, lock_token, specdock_dir=specdock_dir)
         except Exception as release_error:
-            if body_error is None:
+            if body_error is None and result is not None:
+                result = replace(
+                    result,
+                    warning_codes=(*result.warning_codes, "create_lock_release_failed"),
+                )
+            elif body_error is None:
                 raise ArtifactImportError(code="create_lock_release_failed", cleanup_state="not_created") from None
-            raise body_error from release_error
+            else:
+                raise body_error from release_error
     if body_error is not None:
         raise body_error
     assert result is not None
@@ -135,3 +176,11 @@ def _absolute_path(path: Path | None) -> Path | None:
     if path is None:
         return None
     return path if path.is_absolute() else Path.cwd() / path
+
+
+def _merge_cleanup_state(first: str, second: str) -> str:
+    if "retained" in (first, second):
+        return "retained"
+    if "removed" in (first, second):
+        return "removed"
+    return "not_created"
