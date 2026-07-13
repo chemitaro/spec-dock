@@ -42,6 +42,18 @@ def render_preflight_text(result: PreflightResult) -> list[str]:
         lines.append(f"blocker={blocker}")
     for hint in payload["remediation"]:
         lines.append(f"remediation={hint}")
+    fetch = payload["fetch"]
+    lines.append(f"receipt_schema_version={_format_value(payload['schema_version'])}")
+    lines.append(f"receipt_kind={_format_value(payload['receipt_kind'])}")
+    lines.append(f"fetch_status={_format_value(fetch['status'])}")
+    lines.append(f"fetch_attempt_count={len(fetch['attempts'])}")
+    last_attempt = fetch["attempts"][-1] if fetch["attempts"] else {}
+    lines.append(f"fetch_failure_class={_format_value(last_attempt.get('failure_class'))}")
+    lines.append(f"fetch_classification_confidence={_format_value(last_attempt.get('confidence'))}")
+    lines.append(f"fetch_timeout_seconds={_format_value(fetch['timeout_seconds'])}")
+    publication = payload["publication"]
+    lines.append(f"publication_status={_format_value(publication['status'])}")
+    lines.append(f"receipt_filename={_format_value(publication['filename'])}")
     return lines
 
 
