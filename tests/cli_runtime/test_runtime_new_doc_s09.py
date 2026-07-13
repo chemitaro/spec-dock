@@ -63,19 +63,10 @@ def _runtime_modules():
 
 
 def _artifact_runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
-        app_create_artifact_doc = importlib.import_module(
-            "spec_dock_runtime.application.create_artifact_doc"
-        )
+        app_create_artifact_doc = importlib.import_module("spec_dock_runtime.application.create_artifact_doc")
         from spec_dock_runtime.application import contracts as app_contracts, ports as app_ports
         from spec_dock_runtime.infra import contracts as infra_contracts
     finally:

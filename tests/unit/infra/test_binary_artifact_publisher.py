@@ -9,14 +9,7 @@ import pytest
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.application import contracts
@@ -57,9 +50,7 @@ def _publish_request(contracts, repo_root, specdock_dir, scopes, source_path, de
 
 @pytest.mark.parametrize("root_index", [0, 1, 2, 3])
 @pytest.mark.parametrize("path_kind", ["relative", "absolute"])
-def test_tc317_s02_01_accepts_root_and_resolved_scope_direct_child_workbench_sources(
-    tmp_path, root_index, path_kind
-):
+def test_tc317_s02_01_accepts_root_and_resolved_scope_direct_child_workbench_sources(tmp_path, root_index, path_kind):
     contracts, publisher_module = _runtime_modules()
     repo_root, specdock_dir, scopes, artifacts_dir = _layout(tmp_path)
     roots = (specdock_dir, *scopes)
@@ -68,9 +59,7 @@ def test_tc317_s02_01_accepts_root_and_resolved_scope_direct_child_workbench_sou
     selected = source.relative_to(repo_root) if path_kind == "relative" else source
     publisher = publisher_module.FilesystemBinaryArtifactPublisher()
 
-    guarded = publisher.guard_source(
-        _source_request(contracts, repo_root, specdock_dir, scopes, selected)
-    )
+    guarded = publisher.guard_source(_source_request(contracts, repo_root, specdock_dir, scopes, selected))
 
     assert guarded.source_path == source
     assert guarded.workbench_root == source.parent
@@ -82,9 +71,7 @@ def test_tc317_s02_01_accepts_root_and_resolved_scope_direct_child_workbench_sou
     "source_case",
     ["missing", "outside", "uppercase", "directory", "source_symlink", "ancestor_symlink", "fifo"],
 )
-def test_tc317_s02_01_rejects_ineligible_sources_before_read_or_publish(
-    tmp_path, monkeypatch, source_case
-):
+def test_tc317_s02_01_rejects_ineligible_sources_before_read_or_publish(tmp_path, monkeypatch, source_case):
     contracts, publisher_module = _runtime_modules()
     repo_root, specdock_dir, scopes, artifacts_dir = _layout(tmp_path)
     workbench = specdock_dir / ".workbench"
@@ -219,9 +206,7 @@ def test_tc317_s02_03_barrier_detects_source_mutation_replacement_and_unlink(tmp
     publisher = publisher_module.FilesystemBinaryArtifactPublisher(stage_barrier=mutate_after_stage)
 
     with pytest.raises(contracts.BinaryArtifactPublishError) as captured:
-        publisher.publish(
-            _publish_request(contracts, repo_root, specdock_dir, scopes, source, destination)
-        )
+        publisher.publish(_publish_request(contracts, repo_root, specdock_dir, scopes, source, destination))
 
     assert captured.value.code == "source_changed"
     assert captured.value.committed is False
@@ -261,9 +246,7 @@ def test_tc317_s02_04_prepublish_faults_preserve_source_and_formal_state(
 
     publisher = publisher_module.FilesystemBinaryArtifactPublisher(fault_injector=inject)
     with pytest.raises(contracts.BinaryArtifactPublishError) as captured:
-        publisher.publish(
-            _publish_request(contracts, repo_root, specdock_dir, scopes, source, destination)
-        )
+        publisher.publish(_publish_request(contracts, repo_root, specdock_dir, scopes, source, destination))
 
     error = captured.value
     assert error.code == expected_code
@@ -301,9 +284,7 @@ def test_tc317_s02_04_staged_hash_mismatch_is_prepublish_failure(tmp_path, monke
     monkeypatch.setattr(publisher, "_hash_descriptor", mismatched_staged_hash)
 
     with pytest.raises(contracts.BinaryArtifactPublishError) as captured:
-        publisher.publish(
-            _publish_request(contracts, repo_root, specdock_dir, scopes, source, destination)
-        )
+        publisher.publish(_publish_request(contracts, repo_root, specdock_dir, scopes, source, destination))
 
     assert captured.value.code == "hash_mismatch"
     assert captured.value.cleanup_state == "removed"
@@ -333,9 +314,7 @@ def test_no_replace_primitive_preserves_existing_destination(tmp_path):
 
 
 @pytest.mark.parametrize("unavailable_primitive", [False, True])
-def test_unsupported_descriptor_publication_fails_closed(
-    tmp_path, monkeypatch, unavailable_primitive
-):
+def test_unsupported_descriptor_publication_fails_closed(tmp_path, monkeypatch, unavailable_primitive):
     contracts, publisher_module = _runtime_modules()
     repo_root, specdock_dir, scopes, artifacts_dir = _layout(tmp_path)
     source = specdock_dir / ".workbench" / "source.md"
@@ -364,9 +343,7 @@ def test_unsupported_descriptor_publication_fails_closed(
 
 
 @pytest.mark.parametrize("replacement_kind", ["different_bytes", "source_inode"])
-def test_publication_is_bound_to_verified_staged_descriptor_after_path_replacement(
-    tmp_path, replacement_kind
-):
+def test_publication_is_bound_to_verified_staged_descriptor_after_path_replacement(tmp_path, replacement_kind):
     contracts, publisher_module = _runtime_modules()
     repo_root, specdock_dir, scopes, artifacts_dir = _layout(tmp_path)
     source = specdock_dir / ".workbench" / "source.md"
@@ -389,9 +366,7 @@ def test_publication_is_bound_to_verified_staged_descriptor_after_path_replaceme
 
     result = publisher_module.FilesystemBinaryArtifactPublisher(
         fault_injector=replace_staged_path_after_verification
-    ).publish(
-        _publish_request(contracts, repo_root, specdock_dir, scopes, source, destination)
-    )
+    ).publish(_publish_request(contracts, repo_root, specdock_dir, scopes, source, destination))
 
     assert result.committed is True
     assert destination.read_bytes() == verified_body
@@ -404,9 +379,7 @@ def test_publication_is_bound_to_verified_staged_descriptor_after_path_replaceme
     assert result.warning_codes == ("temp_cleanup_retained",)
 
 
-def test_tc317_s02_03_destination_mismatch_after_publication_is_committed_warning(
-    tmp_path, monkeypatch
-):
+def test_tc317_s02_03_destination_mismatch_after_publication_is_committed_warning(tmp_path, monkeypatch):
     contracts, publisher_module = _runtime_modules()
     repo_root, specdock_dir, scopes, artifacts_dir = _layout(tmp_path)
     source = specdock_dir / ".workbench" / "source.md"
@@ -422,9 +395,7 @@ def test_tc317_s02_03_destination_mismatch_after_publication_is_committed_warnin
         destination_path.write_bytes(mutated_body)
 
     monkeypatch.setattr(publisher, "_publish_no_replace", publish_then_mutate)
-    result = publisher.publish(
-        _publish_request(contracts, repo_root, specdock_dir, scopes, source, destination)
-    )
+    result = publisher.publish(_publish_request(contracts, repo_root, specdock_dir, scopes, source, destination))
 
     assert result.committed is True
     assert result.warning_codes == ("destination_mismatch",)
@@ -435,9 +406,7 @@ def test_tc317_s02_03_destination_mismatch_after_publication_is_committed_warnin
     assert destination.read_bytes() == mutated_body
 
 
-def test_tc317_s02_03_destination_confirmation_read_failure_is_committed_warning(
-    tmp_path, monkeypatch
-):
+def test_tc317_s02_03_destination_confirmation_read_failure_is_committed_warning(tmp_path, monkeypatch):
     contracts, publisher_module = _runtime_modules()
     repo_root, specdock_dir, scopes, artifacts_dir = _layout(tmp_path)
     source = specdock_dir / ".workbench" / "source.md"
@@ -478,9 +447,7 @@ def test_tc317_s02_04_post_publish_temp_retention_is_committed_warning(tmp_path)
         if point == "cleanup":
             raise OSError("secret cleanup detail")
 
-    result = publisher_module.FilesystemBinaryArtifactPublisher(
-        fault_injector=retain_temp_after_publish
-    ).publish(
+    result = publisher_module.FilesystemBinaryArtifactPublisher(fault_injector=retain_temp_after_publish).publish(
         _publish_request(contracts, repo_root, specdock_dir, scopes, source, destination)
     )
 

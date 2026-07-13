@@ -3,14 +3,7 @@ import sys
 
 
 def _runtime_modules():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.application import contracts, ports
@@ -49,4 +42,3 @@ def test_binary_artifact_publisher_adapter_satisfies_narrow_application_ports(tm
     assert publish_request.source is source_request
     assert wired.workbench_source_guard is publisher
     assert wired.binary_artifact_publisher is publisher
-
