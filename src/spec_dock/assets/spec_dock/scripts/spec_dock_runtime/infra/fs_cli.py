@@ -62,39 +62,42 @@ def path_kind(path: Path) -> str:
 
 
 def copy_workbench(source: Path, destination: Path) -> None:
-    """Copy the S02 single-file Workbench slice; broader merge semantics follow in S04."""
+    """Merge an opaque Workbench tree without following symlinks."""
     try:
         if not stat.S_ISDIR(source.lstat().st_mode):
             raise RuntimeError("workbench copy source is not a directory")
-        entries = list(source.iterdir())
-    except OSError as exc:
-        raise RuntimeError("workbench copy source is unavailable") from exc
-    if not entries:
-        try:
-            destination.mkdir(parents=False, exist_ok=True)
-        except OSError as exc:
-            raise RuntimeError("workbench copy failed") from exc
-        return
-    if len(entries) != 1 or not stat.S_ISREG(entries[0].lstat().st_mode):
-        raise RuntimeError("workbench copy source is outside the current single-file slice")
-
-    source_file = entries[0]
-    try:
-        try:
-            destination_mode = destination.lstat().st_mode
-        except FileNotFoundError:
+        destination_kind = path_kind(destination)
+        if destination_kind == "missing":
             destination.mkdir(parents=False)
-        else:
-            if not stat.S_ISDIR(destination_mode):
-                raise RuntimeError("workbench copy destination is not a directory")
-        destination_file = destination / source_file.name
-        try:
-            destination_file_mode = destination_file.lstat().st_mode
-        except FileNotFoundError:
-            pass
-        else:
-            if not stat.S_ISREG(destination_file_mode):
-                raise RuntimeError("workbench copy destination entry has an unsupported type")
-        shutil.copy2(source_file, destination_file)
+        elif destination_kind != "directory":
+            raise RuntimeError("workbench copy destination is not a directory")
+        for source_entry in sorted(source.iterdir(), key=lambda entry: entry.name):
+            _merge_workbench_entry(source_entry, destination / source_entry.name)
     except OSError as exc:
         raise RuntimeError("workbench copy failed") from exc
+
+
+def _merge_workbench_entry(source: Path, destination: Path) -> None:
+    source_kind = path_kind(source)
+    destination_kind = path_kind(destination)
+
+    if source_kind == "directory":
+        if destination_kind == "missing":
+            destination.mkdir()
+        elif destination_kind != "directory":
+            raise RuntimeError("workbench copy entry type collision")
+        for child in sorted(source.iterdir(), key=lambda entry: entry.name):
+            _merge_workbench_entry(child, destination / child.name)
+        return
+
+    if source_kind not in {"file", "symlink"}:
+        raise RuntimeError("workbench copy source entry type is unsupported")
+    if destination_kind == "directory" or destination_kind == "other":
+        raise RuntimeError("workbench copy entry type collision")
+    if destination_kind in {"file", "symlink"}:
+        destination.unlink()
+
+    if source_kind == "file":
+        shutil.copy2(source, destination, follow_symlinks=False)
+    else:
+        destination.symlink_to(source.readlink())
