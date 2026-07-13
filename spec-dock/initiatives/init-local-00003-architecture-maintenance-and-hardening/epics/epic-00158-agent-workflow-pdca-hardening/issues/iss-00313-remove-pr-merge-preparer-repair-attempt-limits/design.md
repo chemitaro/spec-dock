@@ -848,6 +848,25 @@ orchestrator_disposition_summary
 
 Issue境界が安全でないことを示す未解決項目はない。これらは採用確認項目であり、`information_insufficient`とする理由ではない。
 
+## 21. 追加設計: agent runtime profileの選択権を呼び出し側へ戻す
+
+- `[N] DES-012`: 対象4ロールの恒久設定からモデルとreasoningの固定値を除き、呼び出し側の実行時profileを権威とする。
+- provider正本は`src/spec_dock/assets/install_root/.codex/agents/`および`src/spec_dock/assets/install_root/.github/agents/`とする。
+- 対象は`dev-coder`、`code-reviewer`、`spec-reviewer`、`qa-reviewer`の4ロールだけとする。
+- Codex TOMLから`model`と`model_reasoning_effort`を削除し、GitHub agentからfrontmatterの`model`と本文の`Reasoning profile` / `Target depth`を削除する。
+- `.codex/agents/`と`.github/agents/`はproviderから同期し、byte parityを検証する。
+- runtime profile契約テストは、対象4ロールではCodex両キーとGitHub固定profileが存在しないことを検証し、他ロールの既存profile期待値を維持する。
+- agent設定の変更は、`dev-coder`のHard ruleと競合しない`utility-worker`へ委任する。`dev-coder`は回帰テストだけを変更する。
+- 今回の4ロールの委任は、`codex exec -m gpt-5.6-sol -c 'model_reasoning_effort="medium"' -s <parent-sandbox> -C <repo> <orchestrator-prompt>`で親sessionを起動し、そのsessionから`spawn_agent(agent_type="<named-role>")`を呼ぶ。named role TOMLの適用後に親runtime overrideがchildへ再適用される経路を使う。
+- 起動ログの`model`と`reasoning effort`、spawn時の`agent_type`、childがrole固有の出力契約を満たすことを適用証拠とする。利用不能時は`report.md`の追加要求実行台帳へ停止理由を記録する。
+
+### 21.1 追加トレーサビリティ
+
+| Requirement | Design | Verification |
+|---|---|---|
+| AC-015 | DES-012 | CLOS-017: 対象4ロールの固定値不在、非対象ロール不変、provider/dogfooding parity |
+| AC-016 | DES-012 | CLOS-018: 親runtime override、named `agent_type` spawn、role固有child outputを確認 |
+
 ## 20. 計画への引き渡し契約
 
 認可された標準計画は、次を満たさなければならない（ChatGPTの厳格な候補が示した追加の品質観点も採用する）。
