@@ -1252,6 +1252,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00306-update-runtime-docs-and-workflow-guidance/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00307-final-quality-gate-and-mergeable-pr-delivery/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00314-harden-github-sync-preflight-fetch-and-receipt-contract/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00315-experimental-workbench-ignore-and-opaque-traversal-foundation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00316-experimental-scoped-workbench-copy-and-source-wins-merge/.meta.json",
@@ -1629,6 +1630,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign/.meta.json": [
             "iss-00306",
         ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00314-harden-github-sync-preflight-fetch-and-receipt-contract/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00315-experimental-workbench-ignore-and-opaque-traversal-foundation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00316-experimental-scoped-workbench-copy-and-source-wins-merge/.meta.json": [
@@ -4288,6 +4290,202 @@ class TestInitUpdate(CliRuntimeHarness):
                 snapshot=snapshot,
                 repo_root=repo_root,
             )
+
+    def test_issue_314_isolated_wheel_init_update_exposes_preflight_runtime_contract(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        runtime_files = (
+            "application/authoring_pack/github_sync_preflight.py",
+            "application/authoring_pack/github_fetch_policy.py",
+            "domain/authoring_pack/preflight_contract.py",
+            "domain/authoring_pack/source_manifest.py",
+            "infra/authoring_pack/git_fetch.py",
+            "infra/authoring_pack/preflight_receipt_writer.py",
+            "presentation/authoring_pack/diagnostics.py",
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp).resolve()
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir(parents=True, exist_ok=True)
+            target_repo = temp_root / "consumer-repo"
+            target_repo.mkdir(parents=True, exist_ok=True)
+            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
+                repo_root=repo_root,
+                temp_root=temp_root,
+            )
+            spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
+            runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
+
+            init_result = self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "init", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+            assert init_result.returncode == 0, init_result.stdout + init_result.stderr
+
+            git_executable = shutil.which("git")
+            assert git_executable is not None
+            remote = temp_root / "remote.git"
+            self._issue_69_run_subprocess_capture([git_executable, "init", "--bare", str(remote)])
+            for args in (
+                ("init",),
+                ("config", "user.name", "Test User"),
+                ("config", "user.email", "test@example.com"),
+            ):
+                self._issue_69_run_subprocess_capture([git_executable, *args], cwd=target_repo)
+            (target_repo / "source.txt").write_text("source\n", encoding="utf-8")
+            for args in (
+                ("add", "."),
+                ("commit", "-m", "initial"),
+                ("branch", "-M", "main"),
+                ("remote", "add", "origin", str(remote)),
+                ("push", "-u", "origin", "main"),
+                ("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"),
+            ):
+                self._issue_69_run_subprocess_capture([git_executable, *args], cwd=target_repo)
+
+            provider_runtime_root = (
+                repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "spec_dock_runtime"
+            )
+            installed_runtime_root = target_repo / "spec-dock" / "scripts" / "spec_dock_runtime"
+            for rel_path in runtime_files:
+                assert (installed_runtime_root / rel_path).read_bytes() == (
+                    provider_runtime_root / rel_path
+                ).read_bytes()
+
+            runtime_script = target_repo / "spec-dock" / "scripts" / "spec-dock"
+
+            def assert_installed_preflight_contract(phase: str) -> None:
+                help_result = subprocess.run(
+                    [
+                        str(venv_python),
+                        str(runtime_script),
+                        "authoring",
+                        "preflight",
+                        "github-sync",
+                        "--help",
+                    ],
+                    cwd=str(target_repo),
+                    env=runtime_env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                assert help_result.returncode == 0, help_result.stdout + help_result.stderr
+                assert "--output-dir" in help_result.stdout
+
+                pass_output = temp_root / f"{phase}-pass-evidence"
+                pass_output.mkdir()
+                pass_result = subprocess.run(
+                    [
+                        str(venv_python),
+                        str(runtime_script),
+                        "authoring",
+                        "preflight",
+                        "github-sync",
+                        "--repo-root",
+                        str(target_repo),
+                        "--source-path",
+                        "source.txt",
+                        "--output-dir",
+                        str(pass_output),
+                        "--format",
+                        "json",
+                    ],
+                    cwd=str(target_repo),
+                    env=runtime_env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                pass_receipt_path = pass_output / "github-sync-preflight.receipt.json"
+                assert pass_result.returncode == 0, pass_result.stdout + pass_result.stderr
+                pass_receipt = json.loads(pass_receipt_path.read_text(encoding="utf-8"))
+                assert json.loads(pass_result.stdout) == pass_receipt
+                assert pass_receipt["status"] == "pass"
+                assert pass_receipt["fetch"]["status"] == "success"
+                assert pass_receipt["freshness"]["concurrent_change_check"] == "stable"
+                assert pass_receipt["repository"]["branch"] == "main"
+                assert pass_receipt["repository"]["upstream"] == "origin/main"
+                assert pass_receipt["repository"]["local_head"] == pass_receipt["local_head"]
+                assert pass_receipt["repository"]["remote_head"] == pass_receipt["remote_head"]
+                assert pass_receipt["repository"]["source_manifest"] == {
+                    "source_manifest_hash": pass_receipt["source_manifest_hash"],
+                    "source_paths": pass_receipt["source_paths"],
+                    "source_hashes": pass_receipt["source_hashes"],
+                }
+                assert pass_receipt["publication"] == {
+                    "requested": True,
+                    "status": "published",
+                    "filename": "github-sync-preflight.receipt.json",
+                    "blocker": None,
+                }
+
+                self._issue_69_run_subprocess_capture(
+                    [git_executable, "remote", "remove", "origin"],
+                    cwd=target_repo,
+                )
+                blocked_output = temp_root / f"{phase}-blocked-evidence"
+                blocked_output.mkdir()
+                blocked_result = subprocess.run(
+                    [
+                        str(venv_python),
+                        str(runtime_script),
+                        "authoring",
+                        "preflight",
+                        "github-sync",
+                        "--repo-root",
+                        str(target_repo),
+                        "--source-path",
+                        "source.txt",
+                        "--output-dir",
+                        str(blocked_output),
+                        "--format",
+                        "json",
+                    ],
+                    cwd=str(target_repo),
+                    env=runtime_env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                blocked_receipt_path = blocked_output / "github-sync-preflight.receipt.json"
+                assert blocked_result.returncode == 1, blocked_result.stdout + blocked_result.stderr
+                blocked_receipt = json.loads(blocked_receipt_path.read_text(encoding="utf-8"))
+                assert json.loads(blocked_result.stdout) == blocked_receipt
+                assert blocked_receipt["status"] == "blocked"
+                assert "origin_missing" in blocked_receipt["blockers"]
+                assert blocked_receipt["fetch"]["status"] == "not_started"
+                assert blocked_receipt["repository"]["normalized_origin"] is None
+                assert blocked_receipt["publication"]["filename"] == "github-sync-preflight.receipt.json"
+                assert blocked_receipt["publication"]["status"] == "published"
+
+                for args in (
+                    ("remote", "add", "origin", str(remote)),
+                    ("fetch", "origin"),
+                    ("branch", "--set-upstream-to=origin/main", "main"),
+                    ("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"),
+                ):
+                    self._issue_69_run_subprocess_capture([git_executable, *args], cwd=target_repo)
+                self._assert_no_generated_python_caches(target_repo)
+                status_result = self._issue_69_run_subprocess_capture(
+                    [git_executable, "status", "--porcelain=v1"],
+                    cwd=target_repo,
+                )
+                assert status_result.stdout == ""
+
+            assert_installed_preflight_contract("init")
+
+            stale_module = installed_runtime_root / runtime_files[0]
+            stale_module.write_text("# stale issue-314 runtime module\n", encoding="utf-8")
+            update_result = self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "update", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+            assert update_result.returncode == 0, update_result.stdout + update_result.stderr
+            assert stale_module.read_bytes() == (provider_runtime_root / runtime_files[0]).read_bytes()
+            assert_installed_preflight_contract("update")
 
     def test_issue_69_windows_helper_prefers_existing_exe_launcher(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -10250,6 +10448,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert "hard-unrecoverable" in authoring_text
         assert "--oracle" not in authoring_text
         assert "single backend command" in authoring_text
+        for preflight_contract in (
+            "Run the SpecDock entrypoint as direct argv.",
+            "shell wrappers, redirects, pipes, tee, heredocs",
+            "command substitution, or inline environment assignment",
+            "A nonzero fetch result is not evidence that additional permissions are required.",
+            "Never add require_escalated or change sandbox/permission mode",
+            "Use --output-dir to persist the preflight receipt.",
+            "Retry is owned by SpecDock and preserves the same execution shape.",
+            "Do not replace preflight with agent-owned raw git fetch.",
+            "Do not silently switch to local-context or default branch.",
+            "github-sync-preflight.receipt.json",
+            "repository や remote を再取得・再検証しません",
+        ):
+            assert preflight_contract in authoring_text
         forbidden_claims_section = self._issue_71_extract_markdown_section_by_heading_prefix(
             markdown_text=authoring_text,
             heading_prefix="Forbidden Claims",
@@ -10277,6 +10489,42 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert "does not grant degraded reviewer" in manual_text
 
         repo_root = Path(__file__).resolve().parents[3]
+        workflow_asset_path = repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md"
+        pack_reference_asset_path = repo_root / "src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md"
+        workflow_text = workflow_asset_path.read_text(encoding="utf-8")
+        pack_reference_text = pack_reference_asset_path.read_text(encoding="utf-8")
+        for docs_contract in (
+            "direct argv",
+            "shell wrapper",
+            "require_escalated",
+            "github-sync-preflight.receipt.json",
+            "blocked result",
+            "operator remediation",
+            "暗黙に切り替えません",
+            "再取得・再検証しません",
+        ):
+            assert docs_contract in workflow_text
+        for pack_contract in (
+            "--output-dir",
+            "github-sync-preflight.receipt.json",
+            "current_repository_revalidated",
+            "観測時点",
+            "canonical adoption",
+            "reviewer pass",
+            "PR-ready",
+        ):
+            assert pack_contract in pack_reference_text
+
+        assert (repo_root / ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md").read_bytes() == (
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md"
+        ).read_bytes()
+        assert (repo_root / "spec-dock/docs/workflow_chatgpt_authoring_pack.md").read_bytes() == (
+            workflow_asset_path.read_bytes()
+        )
+        assert (repo_root / "spec-dock/docs/authoring/chatgpt-pack.md").read_bytes() == (
+            pack_reference_asset_path.read_bytes()
+        )
+
         epic_plan_template = (repo_root / "src/spec_dock/assets/spec_dock/templates/epic/plan.md").read_text(
             encoding="utf-8"
         )
@@ -10304,6 +10552,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             installed_path = target / ".agents" / "skills" / "spec-dock-chatgpt-authoring" / "SKILL.md"
             assert installed_path.is_file()
             assert installed_path.read_text(encoding="utf-8") == authoring_text
+            assert (target / "spec-dock" / "docs" / "workflow_chatgpt_authoring_pack.md").read_text(
+                encoding="utf-8"
+            ) == workflow_text
+            assert (target / "spec-dock" / "docs" / "authoring" / "chatgpt-pack.md").read_text(
+                encoding="utf-8"
+            ) == pack_reference_text
 
     def test_deleted_role_skill_assets_stay_absent_from_provider_and_dogfooding_mirror(self) -> None:
         import spec_dock.cli as cli
