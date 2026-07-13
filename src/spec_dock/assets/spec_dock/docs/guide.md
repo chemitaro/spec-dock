@@ -40,6 +40,9 @@ detail / reference 入口:
 - Issue: 実装の最小単位。active issue を起点に behavior-slice based execution contract で完了する
 - ADR: 後続へ残る意思決定。initiative / epic / issue の任意 scope に紐づく
 - artifact docs: 思考、知識、未確定情報を外部化する補助 artifact。文書そのものを正本へ昇格させず、必要な文脈だけを `adr` / `requirement.md` / `design.md` / `plan.md` へ反映する
+- Workbench（experimental）: `spec-dock/.workbench/` または Initiative / Epic / Issue 直下の `.workbench/`。Git 管理外の disposable な一時作業場であり、canonical docs、durable evidence、node metadata の置き場ではない
+
+Workbench は exact path component `.workbench` を reserved boundary とし、default semantic discovery はその内部を探索・解釈しません。内容の保存、昇格、バックアップは自動化されず、scope や worktree の削除時には一緒に失われてよい前提です。永続化が必要な記録は `artifacts/` または canonical docs へ明示的に反映してください。`.workbench-notes` や `my.workbench` のような near-name は reserved boundary ではありません。
 
 親子関係:
 
