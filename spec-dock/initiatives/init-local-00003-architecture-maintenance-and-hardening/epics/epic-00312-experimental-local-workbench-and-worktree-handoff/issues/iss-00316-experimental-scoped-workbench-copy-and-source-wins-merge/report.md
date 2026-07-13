@@ -77,7 +77,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-316-001 | 明示one-shot scoped Workbench handoff、destination-only保持、source wins | Selector parity、containment、output secrecy、focused regressionとIssue 319へのdistribution relay | 完全transactionへ拡張せず、changed-premiseをfail-closedにする境界を維持する | D-316-005 remediation、final QA、issue-wide code review、fresh final spec review pass。Commitとpush/clean確認まではIssue Finish不可 |
+| OAL-316-001 | 明示one-shot scoped Workbench handoff、destination-only保持、source wins | Selector parity、containment、output secrecy、focused regressionとIssue 319へのdistribution relay | 完全transactionへ拡張せず、changed-premiseをfail-closedにする境界を維持する | D-316-005 remediation、final QA、issue-wide code review、fresh final spec review、commit、push/clean確認済み。Issue Finishへ進む |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -134,7 +134,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ## 実装サマリー (任意)
 - S01–S06のruntime/CLI/test実装とS90 docs impact判定を完了し、各step commitをpush済み。
 - Final reviewで発見したcopy-time identity/missing-premise P1はD-316-005 r3で解決し、fresh bounded code-reviewがpassした。
-- User指示により4 execution roleのmodel/reasoning固定を解除し、provider/dogfood parityとtaxonomy回帰を追加した。Fresh final QA、issue-wide code review、fresh final spec reviewはpass済みで、残るblocking actionはcommit、push/clean確認、Issue Finishである。
+- User指示により4 execution roleのmodel/reasoning固定を解除し、provider/dogfood parityとtaxonomy回帰を追加した。Fresh final QA、issue-wide code review、fresh final spec review、implementation commit `5fbd0af0`のpush/clean確認まで完了し、残るactionはreport-only closure commitとIssue Finishである。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -392,7 +392,7 @@ git diff --check
 - Config: taxonomy focused 1 pass、対象4 roleの4/4 byte parity、他13 role fixed-key audit、対象diff check pass。
 - Fresh `gpt-5.6-sol` / medium code-reviewer: Workbench remediation pass（P0-P3なし）。Full dirfd transaction、atomicity、rollback、最後の検査からprimitiveまでの極小TOCTOUはEC-316-005のscope外。
 - Fresh `gpt-5.6-sol` / medium code-reviewer: role unpin pass（P0-P3なし）。Invocation-time一般smokeはscope外だが、各reviewer起動バナーでmodel/effortを確認した。
-- Ledger Note: D-316-005/D-316-006 resolved/applied。Fresh final QA、issue-wide code review、fresh final spec reviewはpass済み。Issue Finishはcommit、push/clean確認まで不可。
+- Ledger Note: D-316-005/D-316-006 resolved/applied。Fresh final QA、issue-wide code review、fresh final spec reviewはpass済み。Implementation commit `5fbd0af0`をpushし、clean/upstream `0 0`を確認した。
 
 ### 実装横断ゲート
 
@@ -480,7 +480,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S05 | committed | Symlink/containment/failure + remediation + report | `ffb54ebe24f6745ee5d503b1142234be76e87fc5` | clean/upstream `0 0` | not applicable | S05 contract | `git diff --check` pass | Security reviewer r3 pass、focused63 pass |
 | S06 | committed | Output/regression/tests/dogfood projection/report | `2ff1cc946d3afb7a04c2354aaf6fb03ae516f2dc` | clean/upstream `0 0` | not applicable | S06 contract | `git diff --check` pass | Fresh code-reviewer pass、automated/manual/parity pass |
 | S90 | committed approved-no-op evidence | No permanent docs; S90 evidence in report | `8ac45d18638d1d2e8ae5398d711a262e770b86f9` | clean/upstream `0 0` | Help self-contained、docs non-misleading、Issue319 consolidated owner | provider/dogfood guide/README/reference_worktree/help | `git diff --check` pass | Fresh spec-reviewer pass |
-| S99 | final gates passed; commit pending | D-316-005 remediation + role profile unpin + tests + final ledger | pending | pending | not applicable | Workbench race guards、4 role TOML、focused regressions | current scoped `git diff --check` pass | Final QA/code/spec pass、P0-P3なし |
+| S99 | committed | D-316-005 remediation + role profile unpin + tests + final ledger | `5fbd0af0b8c23bf779212543e6ab3a64dd660a65` | pushed、clean/upstream `0 0` | not applicable | Workbench race guards、4 role TOML、focused regressions | `git diff --cached --check` pass、commit hook pass | Final QA/code/spec pass、P0-P3なし |
 
 ### 要件・受け入れ条件・例外条件の最終closure状態
 
@@ -518,7 +518,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### Issue319へのdeferred delivery relay
 
 - Dependency evidence: `deps check iss-00319`は`iss-00316`、`iss-00317`、`iss-00318`をblockerとして列挙する。Issue319はIssue316完了後も全先行Issueを待つfinal quality ownerである。
-- Current pushed head at pre-remediation audit: `8ac45d18638d1d2e8ae5398d711a262e770b86f9`。Issue316 milestone commit一覧は直前のMilestone / Commit Candidate Gateを正本とする。
+- Current pushed implementation head: `5fbd0af0b8c23bf779212543e6ab3a64dd660a65`、clean/upstream `0 0`。Issue316 milestone commit一覧は直前のMilestone / Commit Candidate Gateを正本とする。
 - Per-Issue PRを作らない理由: 親Epic planはIssue319にpackage/fresh init/update、consolidated docs、full suite/static、inventory parity、単一Epic PR deliveryを集約しており、中間Issue PRは同一feature branch chainを重複deliveryするため。
 - Remaining W5 gates: Issue317 Artifact import、Issue318 placement/ignore rules、Issue319 package/fresh init/update、public docs/migration、full suite/static、final provider/dogfood/inventory parity、Epic PR observation。
 - Issue316ではPR作成・PR監視・`merge-prepared`を実施または主張しない。Issue319のfinal gateまでdeferredである。
@@ -554,7 +554,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| D-316-005とrole-unpinの実装、final QA、issue-wide code review、fresh final spec review証跡を統合済み | D-316-005 remediation + role-unpin + final ledger | Issue319 final delivery / Epic PR | commit、push/clean確認待ち |
+| D-316-005とrole-unpinの実装、final QA、issue-wide code review、fresh final spec review証跡を統合済み | D-316-005 remediation + role-unpin + final ledger | Issue319 final delivery / Epic PR | implementation commit `5fbd0af0` pushed、clean/upstream `0 0`。Report-only closure commit後にIssue Finish |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: Step-local security reviewを通過後、issue-wide final code reviewでpost-preflight directory identity swapのP1を発見した。
@@ -576,5 +576,5 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
 - S00–S90のRed / Green / Refactor、manual、review、commit証跡は「実装記録（セッションログ）」に記録した。
-- C316-01–10とRQ/AC/ECの観測結果は「要件・受け入れ条件・例外条件の最終closure状態」と「Spec-Locked Closure Index 状態」に集約した。D-316-005 r3によりC316-07/08はpassし、final QA/code/specもpass済み。Commit、push/clean確認のみpendingである。
+- C316-01–10とRQ/AC/ECの観測結果は「要件・受け入れ条件・例外条件の最終closure状態」と「Spec-Locked Closure Index 状態」に集約した。D-316-005 r3によりC316-07/08はpassし、final QA/code/spec、implementation commitのpush/clean確認も完了した。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
