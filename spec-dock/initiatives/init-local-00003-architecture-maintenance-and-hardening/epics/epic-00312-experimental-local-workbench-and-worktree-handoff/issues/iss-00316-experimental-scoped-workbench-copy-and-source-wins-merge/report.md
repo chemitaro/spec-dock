@@ -164,7 +164,48 @@ git diff --check
 #### S00 closure
 - Planning evidenceはEAL/Delegated Draft/Spec Authoring/Grade Specialist/Reviewer Gateへ記録済み。
 - Product open question、unresolved stale/blocked EAL、assurance staleなし。
-- Planning commit/push/clean evidenceはcommit後にMilestone gateへ追記する。
+- Planning commit `aed3b3f429d713b347a4fe1ed401571608a7242a`をpushし、upstream差`0 0`、cleanを確認した。
+
+### セッションログ（2026-07-13 S01 shared target resolver）
+
+#### 対象
+- Step: S01 Existing target selectorの最小共有化。
+- Closure: C316-02。
+
+#### 委任と実施内容
+- Fresh dev-coderへtarget-record selector boundaryの抽出とcharacterizationだけを委任した。
+- `_resolve_target`をnew `application/worktree_target.py::resolve_worktree_target`へ意味論不変で移動し、existing show/remove/re-resolveが共有boundaryを利用する。
+- Copy command、copy eligibility、ports/filesystem/presentation、dogfood projectionは未変更。
+
+#### テスト駆動開発証跡
+| フェーズ | 観測証跡 | 結果 |
+|---|---|---|
+| Baseline/Alternative | Existing CLI selector 3 cases | 3 passed |
+| Red | Shared `resolve_worktree_target`未提供 | expected `AttributeError` |
+| Green | New boundary focused 4、full worktree suite | 4 passed / 52 passed |
+| Refactor | Ruff、mypy 3 source files、diff check | pass |
+
+#### 具体的な検証
+```bash
+uv run pytest -q tests/cli_runtime/test_worktree.py
+# 52 passed（worker）、fresh reviewer独立再実行pass
+
+uv run ruff check <affected files>
+# All checks passed
+
+uv run mypy <3 source files>
+# Success: no issues found
+
+git diff --check
+# pass
+```
+
+#### Closure / review
+- `tc-s01-001`: ID/absolute path/unique basename/external linked target parity pass。
+- `tc-s01-002`: Ambiguous basename/branch-only stable failure pass。
+- Same-current/bare/path-missingはdesignどおりS03 copy eligibilityへ残した。
+- Fresh code-reviewer: pass、P0/P1/blocking/nonblockingなし。
+- Ledger Note: Material implementation decision/plan deviationなし。
 
 ### セッションログ（2026-07-13 HH:MM - HH:MM）
 
@@ -235,12 +276,12 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S01 | delegated | Shared selector boundary抽出とcharacterization | dev-coder | application worktree target resolver + focused tests | requirement/design/plan S01/C316-02 | `application/worktree.py`、new `application/worktree_target.py`、`test_worktree.py` | Copy command/eligibility/fs/presentation/dogfood/canonical docs | focused/full worktree pytest、Ruff、mypy、diff check | Public semantics変更、scope外refactor、baseline failure | worker summary/changed files/Red-Green/tests/risks/Ledger Note | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S01 | dev-coder | Existing selectorをshared application boundaryへ意味論不変で抽出 | `application/worktree.py`; new `application/worktree_target.py`; `test_worktree.py` | focused4/full52 pass、Ruff/mypy/diff pass | fresh code-reviewer pass | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -261,12 +302,14 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | PLANNING | requirement/design/plan authoring | spec-reviewer | fresh | passed | no | execute approved plan | requirement r3、design r2、plan r2 pass |
-| S01–S06 | step reviewer | code-reviewer | pending | pending | N/A | blocked until each pass | 各step後にfresh review |
+| S01 | step reviewer | code-reviewer | fresh | passed | no | proceed | P0/P1/blocking/nonblockingなし |
+| S02–S06 | step reviewer | code-reviewer | pending | pending | N/A | blocked until each pass | 各step後にfresh review |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| PLANNING/S00 | ready for commit | Issue316 requirement/design/plan/report/assurance/GPT raw artifact | pending | pending | not applicable | planning artifacts | `git diff --check` pass | selector baseline 51 pass、validate/assurance/guidance ready |
+| PLANNING/S00 | committed | Issue316 requirement/design/plan/report/assurance/GPT raw artifact | `aed3b3f429d713b347a4fe1ed401571608a7242a` | clean/upstream `0 0` | not applicable | planning artifacts | `git diff --check` pass | selector baseline 51 pass、validate/assurance/guidance ready |
+| S01 | ready for commit | shared target resolver + characterization + report | pending | pending | not applicable | S01 contract | `git diff --check` pass | Fresh code-reviewer pass、full worktree 52 pass |
 
 #### 変更したファイル
 - `path/to/file1` - ...
