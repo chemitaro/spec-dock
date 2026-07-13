@@ -10464,18 +10464,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         workspace_write_workers = ("dev-coder", "doc-writer", "utility-worker")
         scoped_delegated_authors = ("system-architect", "implementation-planner")
+        inherited_runtime_profile_roles = (
+            "dev-coder",
+            "code-reviewer",
+            "spec-reviewer",
+            "qa-reviewer",
+        )
         expected_runtime_profiles = {
             "system-architect": ("gpt-5.6-sol", "high"),
             "implementation-planner": ("gpt-5.6-sol", "high"),
             "consultant": ("gpt-5.6-sol", "high"),
             "deep-consultant": ("gpt-5.6-sol", "max"),
-            "dev-coder": ("gpt-5.6-terra", "medium"),
             "repo-analyst": ("gpt-5.6-terra", "medium"),
             "researcher": ("gpt-5.6-terra", "medium"),
             "doc-writer": ("gpt-5.6-terra", "medium"),
-            "spec-reviewer": ("gpt-5.6-terra", "high"),
-            "qa-reviewer": ("gpt-5.6-terra", "high"),
-            "code-reviewer": ("gpt-5.6-sol", "high"),
             "spec-manager": ("gpt-5.6-luna", "low"),
             "utility-worker": ("gpt-5.6-luna", "low"),
             "spark-worker": ("gpt-5.3-codex-spark", "medium"),
@@ -10483,6 +10485,51 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "worker": ("gpt-5.6-luna", "low"),
             "explorer": ("gpt-5.6-terra", "medium"),
         }
+        expected_github_runtime_profiles = {
+            "consultant": ("gpt-5.4", "xhigh"),
+            "doc-writer": ("gpt-5.4", "high"),
+            "orchestrator": ("gpt-5.4", "high"),
+            "repo-analyst": ("gpt-5.4", "high"),
+            "researcher": ("gpt-5.4", "medium"),
+            "spec-manager": (
+                "gpt-5.4-mini",
+                "high enough for safe command execution, not for broad design authorship",
+            ),
+            "utility-worker": ("gpt-5.4", "medium"),
+        }
+
+        def parse_github_runtime_profile(text: str) -> tuple[str, str]:
+            lines = text.splitlines()
+            assert lines[0] == "---"
+            frontmatter_end_indexes = [index for index, line in enumerate(lines[1:], start=1) if line == "---"]
+            assert frontmatter_end_indexes
+            frontmatter_end = frontmatter_end_indexes[0]
+
+            model_values = []
+            for line in lines[1:frontmatter_end]:
+                match = re.fullmatch(r"model:[ \t]*(\S+)[ \t]*", line)
+                if match:
+                    model_values.append(match.group(1))
+            assert len(model_values) == 1
+
+            reasoning_heading_indexes = [
+                index
+                for index, line in enumerate(lines[frontmatter_end + 1 :], start=frontmatter_end + 1)
+                if line == "Reasoning profile:"
+            ]
+            assert len(reasoning_heading_indexes) == 1
+            reasoning_start = reasoning_heading_indexes[0] + 1
+            reasoning_end = next(
+                (index for index, line in enumerate(lines[reasoning_start:], start=reasoning_start) if not line),
+                len(lines),
+            )
+            target_depth_values = []
+            for line in lines[reasoning_start:reasoning_end]:
+                match = re.fullmatch(r"- Target depth:[ \t]+(.+?)\.[ \t]*", line)
+                if match:
+                    target_depth_values.append(match.group(1))
+            assert len(target_depth_values) == 1
+            return model_values[0], target_depth_values[0]
 
         with cli._assets_dir() as assets_dir:
             agents_dir = assets_dir / "install_root" / ".codex" / "agents"
@@ -10503,6 +10550,42 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     parsed = tomllib.loads(provider_path.read_text(encoding="utf-8"))
                     assert parsed.get("model") == expected_model
                     assert parsed.get("model_reasoning_effort") == expected_effort
+
+            for agent_name in inherited_runtime_profile_roles:
+                codex_provider_path = agents_dir / f"{agent_name}.toml"
+                codex_dogfooding_path = dogfooding_root / ".codex" / "agents" / f"{agent_name}.toml"
+                github_provider_path = assets_dir / "install_root" / ".github" / "agents" / f"{agent_name}.agent.md"
+                github_dogfooding_path = dogfooding_root / ".github" / "agents" / f"{agent_name}.agent.md"
+
+                assert codex_dogfooding_path.read_bytes() == codex_provider_path.read_bytes()
+                assert github_dogfooding_path.read_bytes() == github_provider_path.read_bytes()
+
+                for surface, path in (
+                    ("provider", codex_provider_path),
+                    ("dogfooding", codex_dogfooding_path),
+                ):
+                    with _case(agent=agent_name, surface=surface, taxonomy="inherited-runtime-profile"):
+                        parsed = tomllib.loads(path.read_text(encoding="utf-8"))
+                        assert "model" not in parsed
+                        assert "model_reasoning_effort" not in parsed
+
+                for surface, path in (
+                    ("provider", github_provider_path),
+                    ("dogfooding", github_dogfooding_path),
+                ):
+                    with _case(agent=agent_name, surface=surface, taxonomy="inherited-runtime-profile"):
+                        text = path.read_text(encoding="utf-8")
+                        frontmatter = text.split("---", 2)[1]
+                        assert not re.search(r"(?m)^model\s*:", frontmatter)
+                        assert "Reasoning profile" not in text
+                        assert "Target depth" not in text
+
+            for agent_name, expected_profile in expected_github_runtime_profiles.items():
+                with _case(agent=agent_name, taxonomy="github-runtime-profile"):
+                    provider_path = assets_dir / "install_root" / ".github" / "agents" / f"{agent_name}.agent.md"
+                    dogfooding_path = dogfooding_root / ".github" / "agents" / f"{agent_name}.agent.md"
+                    assert dogfooding_path.read_bytes() == provider_path.read_bytes()
+                    assert parse_github_runtime_profile(provider_path.read_text(encoding="utf-8")) == expected_profile
 
             for agent_name in read_only_specialists:
                 with _case(agent=agent_name, taxonomy="read-only-specialist"):
