@@ -10398,6 +10398,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert "hard-unrecoverable" in authoring_text
         assert "--oracle" not in authoring_text
         assert "single backend command" in authoring_text
+        for preflight_contract in (
+            "Run the SpecDock entrypoint as direct argv.",
+            "shell wrappers, redirects, pipes, tee, heredocs",
+            "command substitution, or inline environment assignment",
+            "A nonzero fetch result is not evidence that additional permissions are required.",
+            "Never add require_escalated or change sandbox/permission mode",
+            "Use --output-dir to persist the preflight receipt.",
+            "Retry is owned by SpecDock and preserves the same execution shape.",
+            "Do not replace preflight with agent-owned raw git fetch.",
+            "Do not silently switch to local-context or default branch.",
+            "github-sync-preflight.receipt.json",
+            "repository や remote を再取得・再検証しません",
+        ):
+            assert preflight_contract in authoring_text
         forbidden_claims_section = self._issue_71_extract_markdown_section_by_heading_prefix(
             markdown_text=authoring_text,
             heading_prefix="Forbidden Claims",
@@ -10425,6 +10439,42 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert "does not grant degraded reviewer" in manual_text
 
         repo_root = Path(__file__).resolve().parents[3]
+        workflow_asset_path = repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md"
+        pack_reference_asset_path = repo_root / "src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md"
+        workflow_text = workflow_asset_path.read_text(encoding="utf-8")
+        pack_reference_text = pack_reference_asset_path.read_text(encoding="utf-8")
+        for docs_contract in (
+            "direct argv",
+            "shell wrapper",
+            "require_escalated",
+            "github-sync-preflight.receipt.json",
+            "blocked result",
+            "operator remediation",
+            "暗黙に切り替えません",
+            "再取得・再検証しません",
+        ):
+            assert docs_contract in workflow_text
+        for pack_contract in (
+            "--output-dir",
+            "github-sync-preflight.receipt.json",
+            "current_repository_revalidated",
+            "観測時点",
+            "canonical adoption",
+            "reviewer pass",
+            "PR-ready",
+        ):
+            assert pack_contract in pack_reference_text
+
+        assert (repo_root / ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md").read_bytes() == (
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md"
+        ).read_bytes()
+        assert (repo_root / "spec-dock/docs/workflow_chatgpt_authoring_pack.md").read_bytes() == (
+            workflow_asset_path.read_bytes()
+        )
+        assert (repo_root / "spec-dock/docs/authoring/chatgpt-pack.md").read_bytes() == (
+            pack_reference_asset_path.read_bytes()
+        )
+
         epic_plan_template = (repo_root / "src/spec_dock/assets/spec_dock/templates/epic/plan.md").read_text(
             encoding="utf-8"
         )
@@ -10452,6 +10502,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             installed_path = target / ".agents" / "skills" / "spec-dock-chatgpt-authoring" / "SKILL.md"
             assert installed_path.is_file()
             assert installed_path.read_text(encoding="utf-8") == authoring_text
+            assert (
+                target / "spec-dock" / "docs" / "workflow_chatgpt_authoring_pack.md"
+            ).read_text(encoding="utf-8") == workflow_text
+            assert (target / "spec-dock" / "docs" / "authoring" / "chatgpt-pack.md").read_text(
+                encoding="utf-8"
+            ) == pack_reference_text
 
     def test_deleted_role_skill_assets_stay_absent_from_provider_and_dogfooding_mirror(self) -> None:
         import spec_dock.cli as cli

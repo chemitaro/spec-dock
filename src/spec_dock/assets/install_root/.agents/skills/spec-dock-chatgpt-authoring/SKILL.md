@@ -30,6 +30,38 @@ Contract anchor: ChatGPT / Oracle output is evidence-only until the main orchest
 - `github-synced`: use when the branch and relevant commits are pushed and visible to GitHub-backed tools. Record the sync evidence used for the prompt pack.
 - `local-context`: use when GitHub sync is intentionally unavailable or not required. Attach local docs, diffs, tree snapshots, or artifacts directly, label output as lower-confidence local-context evidence, and do not claim GitHub-synced coverage.
 
+## GitHub 同期 preflight の実行契約
+
+`github-synced` を選ぶ場合は、SpecDock の entrypoint を direct argv で実行します。shell wrapper、redirect、pipe、`tee`、heredoc、command substitution、inline environment assignment を追加してはいけません。
+
+```text
+Run the SpecDock entrypoint as direct argv.
+Do not add shell wrappers, redirects, pipes, tee, heredocs,
+command substitution, or inline environment assignment.
+```
+
+receipt を file として残す場合は、既存の repository 外 directory を `--output-dir` に指定します。file 名は `github-sync-preflight.receipt.json` で固定され、stdout の `--format` にかかわらず JSON です。安全な出力先なら、pass だけでなく blocked result も同じ固定名へ保存されます。
+
+```text
+./spec-dock/scripts/spec-dock authoring preflight github-sync --output-dir <existing-external-directory>
+```
+
+fetch の nonzero は failure の証跡ですが、追加権限が必要であることの証跡ではありません。fetch result を理由に `require_escalated` を追加したり、sandbox / permission mode を変更したりしてはいけません。retry は SpecDock が同じ実行形を保ったまま限定的に行います。agent-owned raw `git fetch` で preflight を置き換えてはいけません。
+
+```text
+A nonzero fetch result is not evidence that additional permissions are required.
+Never add require_escalated or change sandbox/permission mode in response to a fetch result.
+
+Use --output-dir to persist the preflight receipt.
+Retry is owned by SpecDock and preserves the same execution shape.
+Do not replace preflight with agent-owned raw git fetch.
+Do not silently switch to local-context or default branch.
+```
+
+blocked result では `blockers`、bounded diagnostics、`remediation` を読み、remote configuration、authentication、rate limit、repository state、safe output directory など、示された operator remediation を直します。`local-context` や default branch へ暗黙に切り替えません。mode または fallback の変更が必要なら、planning workflow の authority と evidence 制約に照らして明示的に判断・記録します。
+
+persisted receipt は preflight 観測時点の evidence です。`authoring pack prepare` は versioned receipt の kind、schema、digest、fetch / snapshot semantics を検証して prompt pack へ binding しますが、pack prepare 時点の repository や remote を再取得・再検証しません。backend invocation 直前までの freshness や reviewer / execution / PR authority を receipt から推測してはいけません。
+
 ## Operating Spine
 
 1. Resolve the active scope and target planning workflow.
