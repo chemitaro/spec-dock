@@ -21,16 +21,16 @@ reflected_to: ["report.md"]
 - Repository: chemitaro/spec-dock
 - Base branch: main
 - Head branch: iss-00314-harden-github-sync-preflight-fetch-and-receipt-contract
-- Latest head SHA: 53a965d32d337df78de8eefdfacca372ae089c8c
+- Latest head SHA: 66c94a6fb3ca55e511cd8331927713a70ad8bafb
 - Observation command: `wait_pr_observation.sh --repo chemitaro/spec-dock --pr 321 --head-sha a2bb97369031b24c892d21836559a238c938ce52`
-- Observation status: timeout; CI running; current review contains one P1 and three P2; four carryover P2 remain unresolved
-- Trigger comment id: 4955352817
-- Trigger created_at: 2026-07-13T07:10:00Z
-- Trigger boundary: current head 53a965d32d337df78de8eefdfacca372ae089c8c
+- Observation status: timeout; CI running; current review contains one P1 and two P2; seven carryover P2 remain unresolved
+- Trigger comment id: 4955674020
+- Trigger created_at: 2026-07-13T07:52:28Z
+- Trigger boundary: current head 66c94a6fb3ca55e511cd8331927713a70ad8bafb
 - Resume metadata: available for same head, but branch mutation is required by P1
 - New trigger approved: default post-once for new head only
 - Observation limitation: none
-- Batch status: second_blocking_repair_validated_pending_push
+- Batch status: third_blocking_repair_validated_pending_push
 
 ## Observation Batch Summary
 
@@ -63,6 +63,9 @@ reflected_to: ["report.md"]
 | R008 | carryover review | comment 3568618499 | P2 | pass receipt validation does not require attempt evidence | malformed-input-follow-up | 53a965d32d337df78de8eefdfacca372ae089c8c | F006 | triaged |
 | R009 | carryover review | comment 3568618503 | P2 | curl-style `returned error: 503` is not transient | edge-case-review | 53a965d32d337df78de8eefdfacca372ae089c8c | F007 | triaged |
 | R010 | carryover review | comment 3568618507 | P2 | relative local origin resolution depends on process cwd | provenance-follow-up | 53a965d32d337df78de8eefdfacca372ae089c8c | F008 | triaged |
+| R011 | review | comment 3568987959 | P1 | default source manifest omits fetch/receipt infra modules used by the default path | deterministic-manifest-probe | 66c94a6fb3ca55e511cd8331927713a70ad8bafb | F003 | triaged |
+| R012 | review | comment 3568987966 | P2 | Windows lacks os.fchmod and can raise before typed publication result | platform-follow-up | 66c94a6fb3ca55e511cd8331927713a70ad8bafb | F009 | triaged |
+| R013 | review | comment 3568987971 | P2 | Windows drive/UNC origins can expose local paths | edge-case-review | 66c94a6fb3ca55e511cd8331927713a70ad8bafb | F005 | duplicate |
 
 ## Concern Family Catalog
 
@@ -70,12 +73,13 @@ reflected_to: ["report.md"]
 |---|---|---|---|---|---|---|---|---|---|
 | F001 | static-analysis.format-contract | Changed Python files are not canonical Ruff format | Provider CI required static-analysis gate | R001,R002 | required-ci | yes | fix-now | U001 | unit-created |
 | F002 | fetch-diagnostic-redaction | Credential query parameter redaction | durable diagnostic secrecy | R003 | P1 | yes | fix-now | U002 | unit-created |
-| F003 | source-manifest-coverage | Default manifest excludes infra | default provenance completeness | R004,R007 | P2 | no | follow-up | N/A | triaged |
+| F003 | source-manifest-coverage | Default manifest excludes infra | default provenance completeness | R004,R007,R011 | P1 | yes | fix-now | U003 | unit-created |
 | F004 | fetch-classification-auth-denial | Multi-method SSH denial classification | remediation accuracy | R005 | P2 | no | follow-up | N/A | triaged |
 | F005 | normalized-origin-local-path-privacy | Windows local origin privacy | cross-platform path privacy | R006 | P2 | no | follow-up | N/A | triaged |
 | F006 | receipt-pass-semantic-validation | Attempt evidence validation | malformed receipt defense | R008 | P2 | no | follow-up | N/A | triaged |
 | F007 | fetch-transient-classification | Curl-style 5xx classification | edge-case retry coverage | R009 | P2 | no | follow-up | N/A | triaged |
 | F008 | relative-origin-normalization | Relative origin resolution | provenance determinism | R010 | P2 | no | follow-up | N/A | triaged |
+| F009 | platform-receipt-publication | Windows chmod availability | cross-platform publication | R012 | P2 | no | follow-up | N/A | triaged |
 
 ## F001 static-analysis.format-contract
 
@@ -95,17 +99,19 @@ reflected_to: ["report.md"]
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | U001 | 20260713t064556z-pr-repair-batch | F001 | R001,R002 | required-ci | yes | fix-now | 20260713t064629z-disc-pr-repair-unit-static-format-gate.md | implemented | Ruff-format only CI-reported files and synchronize required mirrors | format/lint/mypy/focused 1013/parity pass | `411510b66abd3dcd137fbed598606065134457e5` | pending | low |
 | U002 | 20260713t064556z-pr-repair-batch | F002 | R003 | P1 | yes | fix-now | 20260713t074058z-disc-pr-repair-unit-diagnostic-token-redaction.md | implemented | redact credential-like query keys before excerpt/digest | focused security/lint/mypy/parity pass | `4429681577c46d891ac59fb6ad7e0968352077f6` | pending | low |
+| U003 | 20260713t064556z-pr-repair-batch | F003 | R004,R007,R011 | P1 | yes | fix-now | 20260713t082242z-disc-pr-repair-unit-default-manifest-infra-coverage.md | implemented | add exact default infra source paths and parity tests | manifest/focused/install/parity pass | `ca341959a1cbac04ebc1f33247ba2431bbde4d93` | pending | low |
 
 ## Non-Blocking Follow-up Register
 
 | followup_id | family_id | related_items | priority | rationale_for_no_action | residual_risk | suggested_followup_target |
 |---|---|---|---|---|---|---|
-| NB001 | F003 | R004,R007 | P2 | explicitly non-blocking; not unavoidable within P1 redaction repair | default manifest can omit infra changes | follow-up Issue |
+| NB001 | F003 | R004,R007,R011 | P1 | superseded: latest review deterministically establishes merge-blocking default provenance gap | moved to U003 | current PR |
 | NB002 | F004 | R005 | P2 | safe block remains; remediation classification only | operator may receive less accurate hint | follow-up Issue |
 | NB003 | F005 | R006 | P2 | non-default Windows local origin edge | Windows receipt may expose local path | follow-up Issue |
 | NB004 | F006 | R008 | P2 | malformed hand-edited receipt edge; current generated receipt is valid | weaker semantic validation | follow-up Issue |
 | NB005 | F007 | R009 | P2 | unknown fails closed; bounded retry opportunity only | curl-style 5xx misses retry | follow-up Issue |
 | NB006 | F008 | R010 | P2 | relative local origin edge; no safety false pass | provenance hash may depend on cwd | follow-up Issue |
+| NB007 | F009 | R012 | P2 | explicitly non-blocking platform edge, not unavoidable within manifest repair | Windows publication can raise instead of typed failure | follow-up Issue |
 
 ## Re-observation Plan
 
@@ -121,3 +127,4 @@ reflected_to: ["report.md"]
 |---|---|---|---|---|---|---|---|
 | 1 | a2bb97369031b24c892d21836559a238c938ce52 | failed | F001 | U001 implemented and fresh-reviewed | `411510b66abd3dcd137fbed598606065134457e5` | no | commit evidence docs、push and re-observe |
 | 2 | 53a965d32d337df78de8eefdfacca372ae089c8c | timeout / blocker_present | F002 | U002 implemented/fresh-reviewed; P2 families triaged follow-up | `4429681577c46d891ac59fb6ad7e0968352077f6` | no | commit evidence docs、push and re-observe |
+| 3 | 66c94a6fb3ca55e511cd8331927713a70ad8bafb | timeout / blocker_present | F003 | U003 implemented/fresh-reviewed; new platform P2 triaged follow-up | `ca341959a1cbac04ebc1f33247ba2431bbde4d93` | no | commit evidence docs、push and re-observe |
