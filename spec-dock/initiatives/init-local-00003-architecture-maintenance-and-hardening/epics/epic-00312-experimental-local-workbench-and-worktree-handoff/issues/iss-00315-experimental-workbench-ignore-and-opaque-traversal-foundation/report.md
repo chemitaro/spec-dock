@@ -63,7 +63,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | partially_adopted | GPT-5.6 Pro GitHub-synced Issue planning | canonical requirement/design/plan candidates | Callsite inventory、exact-component opacity、step slicing、deferred PR boundaryを採用。候補module/error/test名、GitHub上のempty test file claim、未実行test/pass claimはauthority化しない | `artifacts/20260713t044108z-research-chatgpt-5-6-pro-issue-planning-evidence.md`; SHA-256 `6080fe2c3e75060eb3a31f9b5014bf5fdd96d9bdd8a68352e5cf2f6b71ddbac7` | canonical requirement/design/planへ統合し、各fresh review pass済み |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +71,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | Default semantic discoveryがWorkbench内部へ入らないfoundation | Explicit operations regression、update preservation、provider/dogfood parity | 低。全rglob置換を禁止しcallsite分類を要件化 | pass。`review_iss00315_requirement` |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +79,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | Parent Epic W1、actual runtime/docs/tests、GPT-5.6 planning evidence | product open questionなし | partially_adopted/re-written | passed | no | promote |
+| design | Runtime/installer/authoring callsiteとGPT-5.6 planning evidence | exact helper/error名は実装自由度 | partially_adopted/re-written | passed | no | promote |
+| plan | reviewed design、GPT-5.6 step proposal、standard profile obligations | product open questionなし | partially_adopted/re-written | passed | no | execute approved plan |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +109,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| ChatGPT 5.6 Pro evidence producer | iss-00315 | `artifacts/20260713t044108z-research-chatgpt-5-6-pro-issue-planning-evidence.md` | GitHub current branch、parent Epic、runtime/docs/tests | requirement/design/plan candidates | partially_adopted | `requirement.md`、`design.md`、`plan.md` | pass: Issue scope only | canonical artifactsへ検証・再記述 | candidate file download、exact symbol/test/pass claims、strict候補（actual classificationはstandard） | none | passed | execute approved plan |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -214,15 +216,14 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
-| `lite` | `not applicable` | `not applicable` | ライト該当なし理由（lite not applicable reason） | `pass / fail / blocked` | `ready / blocked` |
-| `standard` | `system-architect / implementation-planner / manual fallback` | `used / skipped / unavailable / denied` | `artifacts/...` / manual evidence / skip reason: ... | `pass / fail / blocked` | `ready / blocked` |
-| `strict` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / manual fallback evidence | `pass / fail / blocked` | `ready / blocked` |
-| `critical` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / explicit approval and risk acceptance | `pass / fail / blocked` | `ready / blocked` |
+| `standard` | `system-architect / implementation-planner` | `used` | GPT-5.6 Pro planning evidence `artifacts/20260713t044108z-research-chatgpt-5-6-pro-issue-planning-evidence.md` をcanonical docsへ部分採用 | passed | ready |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| planning-requirement | requirement promotion | spec-reviewer | fresh | passed | no | promote | `review_iss00315_requirement` |
+| planning-design | design promotion | spec-reviewer | fresh | passed | no | promote | `review_iss00315_design` |
+| planning-plan | plan promotion | spec-reviewer | fresh | passed | no | execute approved plan | `review_iss00315_plan`; static analysis gate追加後 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -291,3 +292,9 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 ## 省略/例外メモ (必須)
 - 該当なし
+
+<!-- spec-dock:managed-section begin id="report.step-evidence" -->
+## Step Evidence
+- Record Red, Green, and refactor evidence for each executed step.
+- Link each closure id to its observed verification result.
+<!-- spec-dock:managed-section end id="report.step-evidence" -->
