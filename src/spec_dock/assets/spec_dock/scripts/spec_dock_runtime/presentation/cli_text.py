@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         PostMutationSyncOutcome,
         SyncCommandResult,
         ValidationResult,
+        WorkbenchCopyResult,
         WorktreeCommandError,
         WorktreeCreateResult,
         WorktreeListResult,
@@ -377,6 +378,37 @@ def render_worktree_create_text(result: WorktreeCreateResult) -> CliText:
         (f"spec-dock: worktree bootstrap status={result.bootstrap_status} command={result.bootstrap_command or '-'}"),
     ]
     return CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=list(result.warnings))
+
+
+def render_workbench_copy_text(result: WorkbenchCopyResult) -> CliText:
+    return CliText(
+        stdout_lines=[
+            (
+                "spec-dock: ok (workbench copy) "
+                f"scope={result.scope_id} source={result.source_worktree.id} target={result.target_worktree.id} "
+                "experimental=true canonical=false disposable=true one_shot=true sync=false"
+            )
+        ],
+        stderr_lines=[],
+        warnings=[],
+    )
+
+
+def render_workbench_copy_json(result: WorkbenchCopyResult) -> CliText:
+    payload = {
+        "status": "ok",
+        "command": "copy",
+        "scope": result.scope_id,
+        "source_worktree": result.source_worktree.id,
+        "target_worktree": result.target_worktree.id,
+        "target_workbench_path": str(result.target_workbench_path),
+        "experimental": result.experimental,
+        "canonical": result.canonical,
+        "disposable": result.disposable,
+        "one_shot": result.one_shot,
+        "sync": result.sync,
+    }
+    return CliText(stdout_lines=[json.dumps(payload, ensure_ascii=False, indent=2)], stderr_lines=[], warnings=[])
 
 
 def render_worktree_list_text(result: WorktreeListResult) -> CliText:

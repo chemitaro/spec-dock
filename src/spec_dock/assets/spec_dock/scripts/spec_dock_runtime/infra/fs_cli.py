@@ -43,3 +43,36 @@ def remove_target(path: Path) -> None:
         return
 
     raise RuntimeError(f"unsupported target path type: path={path}")
+
+
+def copy_workbench(source: Path, destination: Path) -> None:
+    """Copy the S02 single-file Workbench slice; broader merge semantics follow in S04."""
+    try:
+        if not stat.S_ISDIR(source.lstat().st_mode):
+            raise RuntimeError("workbench copy source is not a directory")
+        entries = list(source.iterdir())
+    except OSError as exc:
+        raise RuntimeError("workbench copy source is unavailable") from exc
+    if len(entries) != 1 or not stat.S_ISREG(entries[0].lstat().st_mode):
+        raise RuntimeError("workbench copy source is outside the current single-file slice")
+
+    source_file = entries[0]
+    try:
+        try:
+            destination_mode = destination.lstat().st_mode
+        except FileNotFoundError:
+            destination.mkdir(parents=False)
+        else:
+            if not stat.S_ISDIR(destination_mode):
+                raise RuntimeError("workbench copy destination is not a directory")
+        destination_file = destination / source_file.name
+        try:
+            destination_file_mode = destination_file.lstat().st_mode
+        except FileNotFoundError:
+            pass
+        else:
+            if not stat.S_ISREG(destination_file_mode):
+                raise RuntimeError("workbench copy destination entry has an unsupported type")
+        shutil.copy2(source_file, destination_file)
+    except OSError as exc:
+        raise RuntimeError("workbench copy failed") from exc
