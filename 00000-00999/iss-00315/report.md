@@ -224,6 +224,9 @@ git diff --check
 | S04 | Red | red-required | 11件中10 failed（lstat/stat、parent prune、preflight short-circuit欠落） | focused pytest | pass | near-nameのみexisting pass |
 | S04 | Green | authoring reject/prune | worker focused 12、existing 11、reviewer 40 passed | pytest / fresh review | pass | blocker before manifest/observer |
 | S04 | Refactor | domain/application boundary | empty manifest helperとtop-down walkに限定 | Ruff / `git diff --check` | pass | body/deep descendant非漏洩 |
+| S05 | Alternative | characterization-first | 既存実装がnonempty Workbench delete/removeを満たす | code inspection + tests | approved-no-op | intentional Red不要 |
+| S05 | Green | explicit operations unchanged | worker 5、reviewer targeted 2/full 65 passed | pytest / fresh review | pass | production change none |
+| S05 | Refactor | not applicable | test-only two-file diff | `git diff --check` | approved-no-op | hermetic fixtures |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
@@ -237,6 +240,7 @@ git diff --check
 | S02 | C315-02, C315-03 | node/graph opacity and no descendant access | focused 6、downstream 125、fresh reviewer pass | pass | AC-315-002–003 closed |
 | S03 | C315-04 | independent resolvers exclude exact Workbench before selection/access | focused 7、surrounding 118、fresh reviewer pass | pass | AC-315-004 closed |
 | S04 | C315-05 | explicit reject and parent subtree prune before access/hash | focused 12、reviewer 40、fresh pass | pass | AC-315-005 closed |
+| S05 | C315-06 | scope/worktree explicit deletion remains unblocked | characterization + reviewer full 65 pass | approved-no-op | AC-315-006–007 closed |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -246,6 +250,7 @@ git diff --check
 | C315-03 | S02 | yes | red-required | prune sentinel failure | monkeypatched top-down walk sentinel | pass | descendant access prevented |
 | C315-04 | S03 | yes | red-required | 4 expected failures | installer/runtime resolver focused + regressions | pass | fallback/persisted/active/near-name |
 | C315-05 | S04 | yes | red-required | 10 expected failures | domain + preflight focused/regression | pass | file/dir/descendant/parent/near-name |
+| C315-06 | S05 | yes | characterization-first | existing dirty removal behavior | delete/worktree CLI suites | approved-no-op | no special blocker/backup/promotion |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -257,6 +262,7 @@ git diff --check
 | C315-03 | S02 | focused sentinel + code inspection | pass | prune before descent |
 | C315-04 | S03 | focused 7 + reviewer 118 regression | pass | no P0/P1/blocker |
 | C315-05 | S04 | focused 12 + reviewer 40 regression | pass | no blocker or diagnostic leak |
+| C315-06 | S05 | targeted 2 + full 65 | pass | binary scratch、remote close、branch keep |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -284,6 +290,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S02 | delegated | runtime metadata discovery | dev-coder | `infra/fs_repo.py` and focused tests | approved `plan.md` S02 | node discovery + tests | S03+、legacy dead helper、report | Red/Green、validate/deps/sync regression | error semantic drift or scope expansion | worker summary、tests、app.py decision | pass |
 | S03 | delegated | independent recursive resolvers | dev-coder | assurance/installer/delete/delegated + focused tests | approved `plan.md` S03 | four callsites + two test files | S04+、generic framework、report | Red/Green、surrounding regression、Ruff | selection/error regression | worker summary、tests、risks | pass |
 | S04 | delegated | authoring source semantic boundary | dev-coder | source manifest、preflight、focused tests | approved `plan.md` S04 | domain/application + one test file | S05+、pack semantics、report | Red/Green、authoring regression、Ruff | existing preflight contract regression | worker summary、tests、risks | pass |
+| S05 | delegated | explicit delete/remove characterization | dev-coder | delete/worktree tests | approved `plan.md` S05 | two test files | production、S06+、report | characterization + full adjacent suites | unexpected blocker or destructive external operation | summary、tests、no-op rationale | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -293,6 +300,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S02 | dev-coder | current/legacy metadata discoveryをtop-down exact boundary pruneへ変更 | `infra/fs_repo.py`, `test_runtime_fs_repo_workbench_opacity.py` | Red 3 failed/3 passed; Green 6; worker 97; reviewer 125 passed | passed（`review_iss00315_s02`） | os.walk error handling差は既存回帰で許容 | accepted |
 | S03 | dev-coder | 4独立resolverをtop-down pruneしpersisted/active direct targetもreject | `cli.py`, `assurance_store.py`, `delete_node.py`, `delegated_authoring.py`, focused tests 2 | Red 4/7 failed; Green 7; reviewer 118 passed/29 skipped | passed（`review_iss00315_s03`） | combined hidden+valid fallback fixtureはnonblocking | accepted |
 | S04 | dev-coder | exact sourceをaccess前rejectしparent sourceのWorkbench subtreeをprune、preflightをshort-circuit | `source_manifest.py`, `github_sync_preflight.py`, focused test | Red 10/11 failed; Green 12; reviewer 40 passed | passed（`review_iss00315_s04`） | full authoring suiteはS99へ | accepted |
+| S05 | dev-coder | nonempty binary Workbenchをscope/worktreeと共に削除する既存契約をtest固定 | `test_delete.py`, `test_worktree.py` | worker 5; reviewer targeted 2/full 65 passed | passed（`review_iss00315_s05`） | none | accepted / production approved-no-op |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -317,6 +325,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S02 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s02`; 125 passed、P0/P1なし |
 | S03 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s03`; 118 passed/29 skipped、P0/P1なし |
 | S04 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s04`; 40 passed、P0/P1なし |
+| S05 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s05`; approved-no-op、65 passed |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -325,7 +334,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S01 | committed | provider/fallback ignore + focused tests + report | `914abdf79976b4e3b58a696493155722dbd7062f` | `git status --short` -> clean | N/A | C315-01 | `git diff --check` -> pass | `review_iss00315_s01` passed |
 | S02 | committed | fs_repo prune + focused tests + report | `0c694c76a2f1d56d9b44491fcc1c462774ab8715` | `git status --short` -> clean | N/A | C315-02, C315-03 | `git diff --check` -> pass | `review_iss00315_s02` passed |
 | S03 | committed | independent resolver prune + focused tests + report | `baf0307370aafc931c37f4eb72b4b3f6857fd59d` | `git status --short` -> clean | N/A | C315-04 | `git diff --check` -> pass | `review_iss00315_s03` passed |
-| S04 | ready-to-commit | authoring reject/prune + focused tests + report | pending | pending | N/A | C315-05 | `git diff --check` -> pass | `review_iss00315_s04` passed |
+| S04 | committed | authoring reject/prune + focused tests + report | `54601de823f3bca5e3fdf7faab9f980bfe5f18a2` | `git status --short` -> clean | N/A | C315-05 | `git diff --check` -> pass | `review_iss00315_s04` passed |
+| S05 | ready-to-commit | delete/remove characterization tests + report | pending | pending | existing behavior already satisfies contract | C315-06 | `git diff --check` -> pass | `review_iss00315_s05` passed |
 
 #### 変更したファイル
 - `path/to/file1` - ...
