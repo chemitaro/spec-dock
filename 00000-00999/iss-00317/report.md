@@ -204,12 +204,14 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | Shared runtime/create behaviorとtests | dev-coder | Plan S01のArtifact shared allocation subset | Reviewed requirement/design/plan、parent ADR | `create_artifact_doc.py`とfocused runtime tests | Import CLI/publisher、docs、Issue318/319、unrelated refactor | TC317-S01-01/02、focused tests、diff check | Public contract change、scope外変更、unexpected regression | Changed files、Red/Green、commands、risk、Ledger Note | passed |
 | S02 | delegated | Filesystem safety、opaque staging、source stability、no-replace boundary | dev-coder | Plan S02 guard/port/adapter/tests | Reviewed requirement/design/plan、S01 commits | Narrow application contracts/port、infra guard/publisher、focused tests | CLI wiring、presentation、workflow/docs、Issue318/319、unsafe fallback | TC317-S02-01–04、focused tests、diff check | Safe no-replace unavailable、boundary ambiguity、scope外変更 | Changed files、Red/Green、fault matrix、risk、Ledger Note | passed |
+| S03 | delegated | Public CLI vertical sliceとcontent-free result contract | dev-coder | Plan S03 parser/application/presentation/CLI tests | Reviewed requirement/design/plan、S01/S02 commits | CLI parser/registry/bootstrap、new handler/use case/contracts、presentation、focused tests | Publisher semantics、typed reservation/template、workflow/docs、Issue318/319 | TC317-S03-01–04、focused tests、help inspection、diff check | Existing node import/global JSON change、body/path leak、scope外変更 | Changed files、Red/Green、help/output、risk、Ledger Note | passed |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder | Setup/duplicate scan/allocation/exact checkをexisting create lock内へ移し、race/exhaustion/release testsを追加 | `src/.../application/create_artifact_doc.py`; `tests/cli_runtime/test_runtime_new_doc_s09.py` | Red 1 failed、Green focused 32 passed、CLI new 19 passed、validation 8 passed/1 skipped、diff check pass | code-review r1 failed、r2 passed | External writer atomic publishはplanned S04、import wiringはS03 | accepted; no material plan deviation |
 | S02 | dev-coder | Workbench guard、opaque stage/rehash、descriptor-bound no-replace publish、committed warning、inode-aware cleanupを追加 | `application/contracts.py`; `application/ports.py`; `infra/binary_artifact_publisher.py`; focused application/infra tests | Initial Red 34 failed、Green 42 passed。Relevant regressions 81 passed/5 skipped、wide infra 236 passed後dogfood mirror gap 1件。Ruff/diff check pass | code-review r1/r2/r3 failed、fresh r4 passed | Linux descriptor-backed primitiveはDarwin上で未実動。Dogfood mirrorはS05/Issue319 delivery対象 | accepted; D-317-003をissue-local implementation decisionとして適用、plan closure変更なし |
+| S03 | dev-coder | `artifact import chatgpt-output` parser→application→publisher→presentationを結線し、blank naming/byte identity/content-free outputを公開 | `application/contracts.py`; new `application/import_artifact.py`; CLI parser/registry/bootstrap; new command; presentation; 3 focused test files | Red 9 failed、focused 13 passed、regression 178 items exit 0、prior 142 passed、manual help/Ruff format+check/diff check pass | fresh code-review r1 passed | S04 collision/fault hardening、Linux live primitive、dogfood projectionは未実施 | accepted; no material plan deviation |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -243,12 +245,14 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | IMPLEMENT-S02-r2 | S02 committed boundary | code-reviewer | superseded | failed | no | committed warning result then fresh re-review | P1: post-link mismatch/read failureをordinary successまたは`committed=false`へ誤分類。`gpt-5.6-sol`/medium、confidence 0.99 |
 | IMPLEMENT-S02-r3 | S02 verified publication target | code-reviewer | superseded | failed | no | descriptor-bound publication then fresh re-review | P1: verified descriptorではなくreplace可能なtemp pathnameをhard-linkし、未検証/source inode公開が可能。`gpt-5.6-sol`/medium、confidence 0.98 |
 | IMPLEMENT-S02-r4 | S02 code and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。Descriptor-bound Darwin/Linux no-replace、fail-closed、inode-aware cleanup、warning contractを確認。Focused 42 pass、Ruff/diff check pass。`gpt-5.6-sol`/medium、confidence 0.97 |
+| IMPLEMENT-S03-r1 | S03 code and test sensitivity | code-reviewer | fresh | passed | no | commit candidate | findingsなし。CLI vertical slice、byte preservation、blank grammar、content-free output、warning propagation、existing command非回帰を確認。Focused 13 pass、Ruff format/check、diff check pass。`gpt-5.6-sol`/medium、confidence 0.98 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | Runtime shared allocation + focused tests + observed report | `7b1afe5e0824280611a0deae4665d2d680d1484f` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | read-only confirmation complete |
 | S02 | committed | Binary guard/publisher contracts + focused tests + observed report | `22006f5e2e4052bd9024e7180094e9a5b6996de8` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r4 pass、read-only post-push confirmation complete |
+| S03 | ready | Public import vertical slice + focused tests + observed report | pending commit | pending post-commit check | N/A | N/A | N/A | fresh code-reviewer r1 pass |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -383,4 +387,36 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - Commit closure:
   - Implementation/report commit: `22006f5e2e4052bd9024e7180094e9a5b6996de8` (`feat(artifact): バイナリ公開境界を追加`)。
   - Push成功。Post-push `git status --short` clean、`git rev-list --left-right --count '@{upstream}...HEAD'` = `0 0`。
+
+### S03 `artifact import chatgpt-output` vertical slice — 2026-07-14
+
+- Delegated worker: DevCoder、direct invocation `gpt-5.6-sol` / reasoning `medium`。
+- Scope: Provider application/CLI/command/presentationとfocused tests。Publisher semantics、dogfood mirror、docs/workflowsは未変更。
+- Red evidence:
+  - New leaf、application contracts、renderers不在でfocused suite `9 failed`。
+- Green evidence:
+  - Focused command/presentation/CLI runtime: `13 passed`。
+  - S01/S02、new artifact、node import、presentation regressions: `178 items`、exit 0。先行regression run `142 passed`。
+  - Manual `artifact import --help` / leaf help inspection: exit 0。
+  - `ruff check` / `ruff format --check` / `git diff --check`: pass。
+- Public contract:
+  - Leaf: `artifact import chatgpt-output`。
+  - Required: exactly one of `--initiative|--epic|--issue`、`--file`、`--title`。Optional: `--slug`、`--json`。
+  - `--destination|--encoding|--template|--frontmatter|--move|--overwrite`は非公開。
+  - Success fields: import kind、blank storage identity、Artifact/scope ID、repo-relative source/destination、SHA-256、byte count、committed/cleanup/warning state。
+  - Failure: stable content-free code、`committed=false`、cleanup state。Body/secret/absolute path/raw exception/canonical-adopted-reviewed claimなし。
+- Fixture evidence:
+  - LF/CRLF/BOM/no-final/Japanese/NUL/invalid UTF-8/zero-byte/secret-like bytesのsource/final SHA+bytes一致、source survival。
+  - Existing blank grammar、same-second suffix、`new artifact blank --slug chatgpt-output-*`共存、top-level node `import`非回帰。
+- Reviewer:
+  - Fresh r1 findingsなし、pass、confidence 0.98。
+- Test contract closure:
+  - `TC317-S03-01` / `C317-01`: pass。
+  - `TC317-S03-02` / `C317-03/C317-04`: pass。
+  - `TC317-S03-03` / `C317-09`: pass。
+  - `TC317-S03-04` / `C317-01/C317-04`: pass。
+- Discovered tests / closure delta:
+  - Required closure expectation不変。S04のrace/fault/retry hardeningを先取りせず、plan amendment不要。
+- Ledger disposition:
+  - No material implementation decisions beyond the approved plan.
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
