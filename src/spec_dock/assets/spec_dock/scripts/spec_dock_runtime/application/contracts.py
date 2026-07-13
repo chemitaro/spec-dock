@@ -417,6 +417,66 @@ class WorkbenchFilesystemError(RuntimeError):
         super().__init__("workbench filesystem operation failed")
 
 
+BinaryArtifactCleanupState = Literal["not_created", "removed", "retained"]
+BinaryArtifactPublishWarning = Literal[
+    "destination_mismatch",
+    "destination_read_failed",
+    "temp_cleanup_retained",
+]
+
+
+@dataclass(frozen=True)
+class WorkbenchSourceGuardRequest:
+    repo_root: Path
+    specdock_dir: Path
+    scope_directories: tuple[Path, ...]
+    source_path: Path
+
+
+@dataclass(frozen=True)
+class GuardedWorkbenchSource:
+    source_path: Path
+    workbench_root: Path
+    device: int
+    inode: int
+    mode: int
+
+
+@dataclass(frozen=True)
+class BinaryArtifactPublishRequest:
+    source: WorkbenchSourceGuardRequest
+    destination_path: Path
+
+
+@dataclass(frozen=True)
+class BinaryArtifactPublishResult:
+    source_path: Path
+    destination_path: Path
+    source_sha256: str
+    stream_sha256: str
+    staged_sha256: str
+    destination_sha256: str
+    source_byte_count: int
+    stream_byte_count: int
+    staged_byte_count: int
+    destination_byte_count: int
+    source_inode: int
+    staged_inode: int
+    cleanup_state: BinaryArtifactCleanupState
+    warning_codes: tuple[BinaryArtifactPublishWarning, ...] = ()
+    committed: bool = True
+
+
+class BinaryArtifactPublishError(RuntimeError):
+    """Stable content-free failure raised before formal publication."""
+
+    def __init__(self, *, code: str, cleanup_state: BinaryArtifactCleanupState) -> None:
+        self.code = code
+        self.cleanup_state = cleanup_state
+        self.committed = False
+        super().__init__(f"binary artifact publication failed: {code}")
+
+
 @dataclass(frozen=True)
 class WorkbenchCopyResult:
     scope_id: str
