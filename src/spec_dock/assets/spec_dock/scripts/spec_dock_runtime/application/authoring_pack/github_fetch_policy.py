@@ -99,7 +99,16 @@ _REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
     ),
     (re.compile(r"(?i)(https?://)[^\s/@:]+:[^\s/@]+@"), r"\1[REDACTED]@"),
     (re.compile(r"(?i)(authorization\s*:\s*(?:bearer|basic)\s+)[^\s]+"), r"\1[REDACTED]"),
-    (re.compile(r"(?i)\b(token|password|passwd|secret)\s*[:=]\s*\S+"), r"\1=[REDACTED]"),
+    (
+        re.compile(
+            r"(?i)(?<![A-Za-z0-9_])"
+            r"((?:access_token|oauth_token|id_token|refresh_token|auth_token|api_token|private_token|"
+            r"api_key|api-key|apikey|client_secret|secret_key|aws_secret_access_key|credential|credentials|"
+            r"token|password|passwd|secret)\s*[:=]\s*)"
+            r"[^\s&#]+"
+        ),
+        r"\1[REDACTED]",
+    ),
     (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"), "[REDACTED_TOKEN]"),
     (re.compile(r"/(?:Users|home|private/tmp|tmp|var/folders)/[^\s]*(?:/[^\s]*)?"), "[REDACTED_PATH]"),
 )
