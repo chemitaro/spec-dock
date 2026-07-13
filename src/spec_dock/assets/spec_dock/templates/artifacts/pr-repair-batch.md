@@ -144,6 +144,81 @@ Create one subsection per real family.
 - Residual risk:
 - Follow-up handling:
 
+## Root-Cause Family and Coupling Analysis
+
+| family_id | root_cause_family | related_items | recurrence_class | coupling | evidence_ref | analysis_result |
+| --- | --- | --- | --- | --- | --- | --- |
+
+When a `root_cause_family` recurs, re-analyze the current evidence, root-cause
+hypothesis, coupling, and prior result. Recurrence alone is not a stop reason.
+
+## Integrated Repair Strategy
+
+- strategy_id:
+- covered_family_ids:
+- prior_strategy_id:
+- strategy_delta:
+- bounded_scope:
+- validation_plan:
+- rollback_plan:
+- re_observation_plan:
+- residual_risk:
+
+The strategy must be bounded, in scope, supported by current evidence, and
+materially different from an ineffective prior strategy. Renaming or repeating
+the same strategy is not a strategy delta.
+
+## ChatGPT Consultation Gate
+
+- consultation_required: yes / no
+- consultation_required_reason:
+- consultation_status: fresh / stale / failed / unavailable / consultation_denied / unsafe
+- consultation_id:
+- consulted_at:
+- bound_head_sha:
+- bound_observation_status:
+- bound_family_ids:
+- bound_strategy_context:
+- input_summary_ref:
+- recommendation_summary_ref:
+- freshness_invalidators:
+- open_risks:
+- fallback_approval_status: not_requested / approved_for_invocation / fallback_approval_denied / expired
+- fallback_invocation_id:
+- fallback_approved_by:
+- fallback_approved_at:
+- fallback_invocation_scope:
+- fallback_reason:
+- fallback_expires_when:
+- fallback_manual_analysis_ref:
+- fallback_consumed_at:
+- orchestrator_disposition_summary:
+
+Use only sanitized, repository-relative evidence references.
+Do not paste raw model conversation, secrets, tokens, or absolute host paths. ChatGPT output is
+advisory evidence and never authorizes branch mutation or a repair strategy.
+
+A stale consultation must be refreshed first. Only when consultation and its
+defined recovery are hard-unrecoverable may an explicit human approval permit
+a one-invocation, local-only fallback. Record its scope, reason, and expiry; do
+not represent fallback use as consultation success. A denied, missing, expired,
+out-of-scope, or reused fallback approval requires a human gate.
+
+`fallback_approval_denied` is an unconditional stop. An expired or consumed
+fallback approval is an unconditional stop. A fallback approval is bound to
+exactly one `fallback_invocation_id` and must not be reused. Record the manual
+analysis in `fallback_manual_analysis_ref` and the orchestrator disposition
+before any bounded worker handoff.
+
+## Orchestrator Disposition
+
+| recommendation_id | orchestrator_disposition | rationale | evidence_refs | scope_effect | resulting_strategy_id | residual_risk |
+| --- | --- | --- | --- | --- | --- | --- |
+
+Allowed dispositions are `use`, `partial-use`, `reject`, `defer`, and
+`human-gate`. Only the orchestrator may turn dispositioned recommendations into
+a bounded worker handoff.
+
 ## Blocking Repair Queue
 
 Create repair units only for `P0`/`P1` families, required CI failures, or
@@ -188,14 +263,14 @@ Define family-level gates, not comment-level checks.
 - Re-observation required because:
 - Re-observation skipped because:
 
-## Loop Control
+## Iteration Ledger
 
-| iteration | head_sha | observation_status | family_id | action_taken | fix_commit | reappeared_after_fix | next_action |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 |  |  | FXXX |  |  | yes / no |  |
+| iteration_index | head_sha | observation_status | family_ids | recurrence_class | prior_strategy_id | proposed_strategy_id | strategy_delta | consultation_id/status | orchestrator_disposition | action_taken | fix_commit | re_observation_result | continuation_decision | stop_reason |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-Stop at a human gate when the same `root_cause_family` reappears after a repair
-commit, unless a human explicitly approves a new strategy.
+`iteration_index` is telemetry only; it does not authorize continuation or
+stopping. Each row records the evidence-driven semantic decision for that
+iteration.
 
 ## Terminal Non-Blocking Report Boundary
 
@@ -210,14 +285,14 @@ When final re-observation contains only `P2`/`P3` findings:
 - State `review-clean: no`.
 - State `merge-prepared: yes` if all blocking predicates are satisfied.
 
-## Stop Conditions
+## Semantic Stop / Human-Gate Conditions
 
 Stop at a human gate when any condition applies:
 
 - Any blocking inventory item remains `untriaged`.
 - Any unresolved blocking `needs-human` item remains.
-- A `P0`/`P1` `fix-now` repair unit is incomplete or repeatedly fails.
-- The same `root_cause_family` reappears after a repair commit.
+- A blocking repair unit has no bounded material `strategy_delta`, or only the
+  same ineffective strategy remains.
 - Observation output is not for the latest head SHA.
 - Timeout or observation limitation lacks resume metadata.
 - Resume would cross the recorded trigger boundary.
@@ -225,10 +300,21 @@ Stop at a human gate when any condition applies:
 - Scope expansion, requirement expansion, breaking change, migration, secret,
   deployment setting, permission/auth, external/flaky, or ambiguous review
   intent is involved.
-- Loop limits for the same root-cause family or total repair attempts are
-  reached.
+- Current evidence is stale or incomplete and cannot be safely refreshed.
+- No bounded, materially different strategy is supported by current evidence.
+- The proposed strategy repeats an ineffective strategy without a material
+  `strategy_delta`.
+- Consultation is not fresh, unless a valid one-invocation, local-only fallback
+  approval applies.
+- Consultation or recovery is hard-unrecoverable and no valid fallback approval
+  applies.
+- The orchestrator cannot disposition a safe in-scope strategy.
 - GitHub branch protection requires conversation resolution for unresolved
   `P2`/`P3` threads; this is a platform human gate, not a code repair target.
+
+Continue repair only when current evidence is fresh, no hard stop applies, a
+bounded material `strategy_delta` exists, consultation is fresh or the explicit
+fallback applies, and validation plus re-observation can be completed safely.
 
 ## Merge-Prepared Gate
 
