@@ -1189,6 +1189,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00218-codex-review-fallback-signal-semantics/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00219-carryover-unresolved-threads-stop-observation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00222-forbid-checks-api-pr-observation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00313-remove-pr-merge-preparer-repair-attempt-limits/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00226-record-adaptive-workflow-authority-adrs/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00227-introduce-assurance-contract-and-classification-runtime/.meta.json",
@@ -1478,6 +1479,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00218-codex-review-fallback-signal-semantics/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00219-carryover-unresolved-threads-stop-observation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00222-forbid-checks-api-pr-observation/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00313-remove-pr-merge-preparer-repair-attempt-limits/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00226-record-adaptive-workflow-authority-adrs/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00227-introduce-assurance-contract-and-classification-runtime/.meta.json": [],
@@ -10716,18 +10718,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         workspace_write_workers = ("dev-coder", "doc-writer", "utility-worker")
         scoped_delegated_authors = ("system-architect", "implementation-planner")
+        inherited_runtime_profile_roles = (
+            "dev-coder",
+            "code-reviewer",
+            "spec-reviewer",
+            "qa-reviewer",
+        )
         expected_runtime_profiles = {
             "system-architect": ("gpt-5.6-sol", "high"),
             "implementation-planner": ("gpt-5.6-sol", "high"),
             "consultant": ("gpt-5.6-sol", "high"),
             "deep-consultant": ("gpt-5.6-sol", "max"),
-            "dev-coder": ("gpt-5.6-terra", "medium"),
             "repo-analyst": ("gpt-5.6-terra", "medium"),
             "researcher": ("gpt-5.6-terra", "medium"),
             "doc-writer": ("gpt-5.6-terra", "medium"),
-            "spec-reviewer": ("gpt-5.6-terra", "high"),
-            "qa-reviewer": ("gpt-5.6-terra", "high"),
-            "code-reviewer": ("gpt-5.6-sol", "high"),
             "spec-manager": ("gpt-5.6-luna", "low"),
             "utility-worker": ("gpt-5.6-luna", "low"),
             "spark-worker": ("gpt-5.3-codex-spark", "medium"),
@@ -10735,6 +10739,51 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "worker": ("gpt-5.6-luna", "low"),
             "explorer": ("gpt-5.6-terra", "medium"),
         }
+        expected_github_runtime_profiles = {
+            "consultant": ("gpt-5.4", "xhigh"),
+            "doc-writer": ("gpt-5.4", "high"),
+            "orchestrator": ("gpt-5.4", "high"),
+            "repo-analyst": ("gpt-5.4", "high"),
+            "researcher": ("gpt-5.4", "medium"),
+            "spec-manager": (
+                "gpt-5.4-mini",
+                "high enough for safe command execution, not for broad design authorship",
+            ),
+            "utility-worker": ("gpt-5.4", "medium"),
+        }
+
+        def parse_github_runtime_profile(text: str) -> tuple[str, str]:
+            lines = text.splitlines()
+            assert lines[0] == "---"
+            frontmatter_end_indexes = [index for index, line in enumerate(lines[1:], start=1) if line == "---"]
+            assert frontmatter_end_indexes
+            frontmatter_end = frontmatter_end_indexes[0]
+
+            model_values = []
+            for line in lines[1:frontmatter_end]:
+                match = re.fullmatch(r"model:[ \t]*(\S+)[ \t]*", line)
+                if match:
+                    model_values.append(match.group(1))
+            assert len(model_values) == 1
+
+            reasoning_heading_indexes = [
+                index
+                for index, line in enumerate(lines[frontmatter_end + 1 :], start=frontmatter_end + 1)
+                if line == "Reasoning profile:"
+            ]
+            assert len(reasoning_heading_indexes) == 1
+            reasoning_start = reasoning_heading_indexes[0] + 1
+            reasoning_end = next(
+                (index for index, line in enumerate(lines[reasoning_start:], start=reasoning_start) if not line),
+                len(lines),
+            )
+            target_depth_values = []
+            for line in lines[reasoning_start:reasoning_end]:
+                match = re.fullmatch(r"- Target depth:[ \t]+(.+?)\.[ \t]*", line)
+                if match:
+                    target_depth_values.append(match.group(1))
+            assert len(target_depth_values) == 1
+            return model_values[0], target_depth_values[0]
 
         with cli._assets_dir() as assets_dir:
             agents_dir = assets_dir / "install_root" / ".codex" / "agents"
@@ -10755,6 +10804,42 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     parsed = tomllib.loads(provider_path.read_text(encoding="utf-8"))
                     assert parsed.get("model") == expected_model
                     assert parsed.get("model_reasoning_effort") == expected_effort
+
+            for agent_name in inherited_runtime_profile_roles:
+                codex_provider_path = agents_dir / f"{agent_name}.toml"
+                codex_dogfooding_path = dogfooding_root / ".codex" / "agents" / f"{agent_name}.toml"
+                github_provider_path = assets_dir / "install_root" / ".github" / "agents" / f"{agent_name}.agent.md"
+                github_dogfooding_path = dogfooding_root / ".github" / "agents" / f"{agent_name}.agent.md"
+
+                assert codex_dogfooding_path.read_bytes() == codex_provider_path.read_bytes()
+                assert github_dogfooding_path.read_bytes() == github_provider_path.read_bytes()
+
+                for surface, path in (
+                    ("provider", codex_provider_path),
+                    ("dogfooding", codex_dogfooding_path),
+                ):
+                    with _case(agent=agent_name, surface=surface, taxonomy="inherited-runtime-profile"):
+                        parsed = tomllib.loads(path.read_text(encoding="utf-8"))
+                        assert "model" not in parsed
+                        assert "model_reasoning_effort" not in parsed
+
+                for surface, path in (
+                    ("provider", github_provider_path),
+                    ("dogfooding", github_dogfooding_path),
+                ):
+                    with _case(agent=agent_name, surface=surface, taxonomy="inherited-runtime-profile"):
+                        text = path.read_text(encoding="utf-8")
+                        frontmatter = text.split("---", 2)[1]
+                        assert not re.search(r"(?m)^model\s*:", frontmatter)
+                        assert "Reasoning profile" not in text
+                        assert "Target depth" not in text
+
+            for agent_name, expected_profile in expected_github_runtime_profiles.items():
+                with _case(agent=agent_name, taxonomy="github-runtime-profile"):
+                    provider_path = assets_dir / "install_root" / ".github" / "agents" / f"{agent_name}.agent.md"
+                    dogfooding_path = dogfooding_root / ".github" / "agents" / f"{agent_name}.agent.md"
+                    assert dogfooding_path.read_bytes() == provider_path.read_bytes()
+                    assert parse_github_runtime_profile(provider_path.read_text(encoding="utf-8")) == expected_profile
 
             for agent_name in read_only_specialists:
                 with _case(agent=agent_name, taxonomy="read-only-specialist"):
@@ -12803,11 +12888,32 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         merge_preparer_phrases = (
             "github-pr-merge-preparer",
             "failure_class",
-            "Default autonomous repair limit is one repair attempt for `P0` family",
-            "Default autonomous repair limit is two repair attempts for the same `P1`",
-            "Default total autonomous repair limit is four repair attempts per PR",
-            "Stop at a human gate when the same",
-            "appears after a repair",
+            "## ChatGPT Consultation Gate",
+            "## Integrated Repair Strategy",
+            "## Iteration Ledger",
+            "strategy_delta",
+            "orchestrator_disposition",
+            "Repair iteration count is telemetry only.",
+            "must never authorize continuation or force a stop",
+            "same `root_cause_family` recurring after a repair commit triggers mandatory",
+            "Recurrence alone is neither automatic stop authority nor",
+            "automatic continuation authority.",
+            "`fresh`: bound to the current head, inventory, family grouping, material",
+            "`stale`: the head, inventory, grouping, evidence, or strategy changed",
+            "For `stale`, refresh first.",
+            "ChatGPT recommendations are advisory evidence only.",
+            "The main orchestrator must record `orchestrator_disposition`",
+            "bound_strategy_context",
+            "fallback_invocation_id",
+            "fallback_approved_by",
+            "fallback_approved_at",
+            "fallback_manual_analysis_ref",
+            "fallback_consumed_at",
+            "`fallback_approval_denied` is an unconditional stop.",
+            "An expired or consumed fallback approval is an unconditional stop.",
+            "A fallback approval is bound to exactly one `fallback_invocation_id` and must not be reused.",
+            "Only when refresh and the defined recovery paths are hard-unrecoverable",
+            "material `strategy_delta`",
             "Stop at a human gate when the blocker is `permission_or_auth`,",
             "`external_or_flaky`, `base_branch_conflict`, `unknown`, a requirement",
             "expansion, breaking change, migration, secret/deployment setting change",
@@ -12828,6 +12934,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         for phrase in merge_preparer_phrases:
             assert phrase in merge_preparer
+
+        removed_repair_limit_phrases = (
+            "Default autonomous repair limit is one repair attempt for `P0` family",
+            "Default autonomous repair limit is two repair attempts for the same `P1`",
+            "Default total autonomous repair limit is four repair attempts per PR",
+            "Stop at a human gate when the same `root_cause_family` appears after a repair",
+            "repair unit is incomplete or repeatedly fails",
+        )
+        for phrase in removed_repair_limit_phrases:
+            assert phrase not in merge_preparer
 
         workflow_phrases = (
             "github-pr-merge-preparer",
