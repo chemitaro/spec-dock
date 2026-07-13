@@ -26,6 +26,7 @@ ID: "epic-00312"
   - `domain`またはapplication-local contract: placement/merge invariant。新しいpersistent modelは作らない。
   - `infra/`: Git worktree records、filesystem copy/merge、effective-ignore確認。
   - `presentation/`: experimental/non-canonical/one-shot表示とerror/result schema。
+- Artifact importはWorkbench tree copyと別use caseにし、CLI/application/binary publisher/workflow checkpointを分離する。
 
 ## 課題横断境界（cross-Issue boundary）
 - Epicが固定する判断:
@@ -44,6 +45,8 @@ ID: "epic-00312"
 - cross-Issue invariant:
   - scanner isolationがcopy implementationより先に完成する。
   - final quality Issueがprovider/dogfood parity、docs、full validation、Epic PRを所有する。
+  - `chatgpt-output`はimport kindであり、typed filename tokenやblank reserved prefixではない。
+  - Import runtimeは本文/EAL/canonical docsを編集せず、orchestratorがoperation resultをEALへ採用する。
 
 ## 設計スライス一覧（design slice catalog）
 - DS-001 Ignore and opaque traversal foundation:
@@ -54,9 +57,17 @@ ID: "epic-00312"
   - closes: E-RQ-006–012、E-RQ-014、E-RQ-016のCLI surface / E-AC-003–009のCLI/copy部分。
   - owning Issue candidate: W2。
   - contract impact: CLI/application/infra/presentation。
-- DS-003 Distribution and final quality:
-  - closes: 全E-RQ/E-ACのconsumer確認とE-AC-012。
-  - owning Issue candidate: W3 final quality/PR。
+- DS-003 Byte-preserving Artifact import runtime:
+  - closes: E-RQ-019–023 / E-AC-013–015。
+  - owning Issue candidate: W3 Artifact Import。
+  - contract impact: artifact CLI/application/blank allocation/binary publisher/presentation/validation regression。
+- DS-004 ChatGPT-first preservation workflow:
+  - closes: E-RQ-024 / E-AC-016。
+  - owning Issue candidate: W4 Workflow/Skills。
+  - contract impact: spec authoring workflow、ChatGPT pack docs/skill、planning skills、EAL guidance。
+- DS-005 Distribution and final quality:
+  - closes: 全E-RQ/E-ACのconsumer確認とE-AC-011–016 final closure。
+  - owning Issue candidate: W5 final quality/PR。
   - contract impact: package assets、dogfood mirror、docs、full regression、PR。
 
 ## コンポーネント / モジュール構成
@@ -121,6 +132,14 @@ package "Consumer repository" {
   - source relative directory名をtargetへ転写しない。branch間rename/slug差を許容する。
   - sourceまたはtarget scopeがmissing/ambiguousならnodeを自動作成せずerrorとする。
 
+### Artifact import CLI
+- `spec-dock artifact import chatgpt-output --file <path> --title <title> [--slug <slug>] (--initiative|--epic|--issue <id>)`をcandidate surfaceとする。
+- `chatgpt-output`はMVP import kindであり、`new artifact` type/catalogへ追加しない。
+- Scopeはexactly one。Sourceはcurrent worktreeのroot/scoped `.workbench/`配下にあるsingle regular `.md` file。
+- Destination basenameはcallerに指定させず、title/slugからblank slug `chatgpt-output-<slug>`を作る。
+- Move/overwrite/template/body/frontmatter/encoding optionsは提供しない。
+- Workbench外path、directory、symlink source、multiple filesはcopy開始前にrejectする。
+
 ## Copy / merge設計
 - Content classification:
   - allowlist、denylist、extension table、language registry、MIME判定、secret scan、archive inspection、special-entry inventoryを実装しない。
@@ -151,6 +170,31 @@ package "Consumer repository" {
   - source/targetごとに`NodeRepository(specdock_dir=...)`相当を利用。
   - filesystem copyは専用gatewayまたは既存`FilesystemGateway`の小さな拡張。command handlerへ再帰処理を置かない。
 - Adapter errorはapplication failureへ変換し、presentationがtext/JSON contractを描画する。file contentsをexception message/outputへ含めない。
+
+### Artifact import use case / domain boundary
+- Existing template-oriented `CreateArtifactDocRequest`へmode/source flagを追加せず、independent `ImportArtifactRequest` / `ImportArtifactResult` use caseを置く。
+- Applicationはimport kind/scope/title/slug/source containmentを検証し、scope `artifacts/`を解決し、existing artifact create lockを`new artifact`と共有する。
+- Destinationはexisting blank timestamp/collision allocatorで割り当て、new typed token/catalog/parser branchを追加しない。
+- Resultはscope ID、repo-relative source/destination、blank artifact ID、import kind、SHA-256、byte count、commit/durability/cleanup statusを返す。EAL/report/canonical docsは編集しない。
+- Binary copy/hash/path containment/fsync/no-overwriteはinfra port/adapter、import eligibility/orchestrationはapplication、blank naming/allocationはexisting domain contract、text/JSONはpresentationに置く。
+
+## Byte-preserving publication設計
+- Source preflight:
+  - `lstat`でsingle regular `.md`、non-symlink、Workbench containment、non-symlink ancestorを確認する。
+  - File content、encoding、Markdown structure、frontmatterをparseしない。Bytesはopaqueとして扱う。
+- Snapshot/copy:
+  - Sourceをbinary readし、device/inode/size/mtimeとSHA-256/byte countを記録する。
+  - Final `artifacts/`と同一directoryにexclusive temporary fileを作り、binary stream copyとhashを行う。
+  - Temporary fileをflush/fsyncし、再読hash/byte countをsource pre-hashと比較する。Publish前にsource identity/statの不変を確認する。
+- Publication:
+  - Existing create lock内でblank timestamp/suffixをallocationする。
+  - Overwrite可能な`replace`を使わず、existing final pathを置換しないatomic no-replace contractをinfraへ要求する。POSIX候補はsame-filesystem hard-link publicationとし、API細部はadapter-local deltaとする。
+  - `EEXIST`はstateをrescanしてbounded reallocationし、existing fileを変更しない。Existing `01..99` exhaustion contractを維持する。
+- Cleanup/durability:
+  - Publish前failureはowned tempを削除しformal destinationを残さない。Sourceは常に残す。
+  - Publish後temp cleanup/directory fsync failureはfinalをrollbackせず、committed path付きwarningを返す。
+  - File fsync/no-overwrite visibilityはMVP必須。Power-loss完全保証、journal、background orphan GCはnon-goal。
+  - Tempは`.md` suffixを持たずArtifact scan対象外とし、manual cleanup guidanceのみ置く。
 
 ## 主要フロー
 
@@ -199,6 +243,21 @@ CLI --> User : experimental/non-canonical/one-shot text or JSON
 - 失敗時はstable error code候補、scope/target identity、再実行可能な原因を表示する。
 - `non-canonical`、`one-shot`、`no sync/copy-back`、root Workbench非対応をhelp/docsで明示する。
 - File content、secret-like value、全entry listは表示しない。
+- Artifact importはscope、repo-relative source/destination、SHA-256、bytes、commit/warning statusを返し、absolute host path/bodyを表示しない。
+- Import successはEAL adoption/canonical promotionを意味しない旨をhelp/text/JSON/docsへ表示する。
+
+## ChatGPT-first preservation workflow設計
+- Output formを4 branchへ分類する。
+  - Standalone complete Markdown file: Workbenchへ置いて`imported_byte_exact`。
+  - Complete inline text: 受信textを編集せずWorkbench `.md`へcapture/importし、`captured_received_text`。Provider original bytesとの同一性は主張しない。
+  - Incomplete/unavailable inline: `skipped_inline_unavailable` exceptionをreport/EALへ記録し、verbatim preservedを主張しない。
+  - ZIP/tree authoring pack: existing review/quarantine/stage laneを維持しsingle-file importへ流さない。
+- Complete file/inlineが利用可能ならcanonical rewrite前にpreservation checkpointを通し、path/hash/capture boundaryをEALへ記録してから採否・rewrite・fresh reviewerへ進む。
+- Imported body内のauthority claimを信頼せず、commandはEALを自動編集しない。
+- 更新対象:
+  - `workflow_spec_authoring.md`: template creationとexternal evidence importを分離。
+  - `workflow_chatgpt_authoring_pack.md` / `authoring/chatgpt-pack.md`: standalone report laneを追加しZIP/tree laneは不変。
+  - `spec-dock-chatgpt-authoring`とInitiative/Epic/Issue planning skills: checkpoint/status/exception/EAL handoffを共通化。
 
 ## Delete / update設計
 - Scope deleteとworktree removeの既存contractを変更してWorkbench blockerを追加しない。
@@ -227,31 +286,47 @@ CLI --> User : experimental/non-canonical/one-shot text or JSON
   - source symlinkをdereferenceせず複製し、destination ancestry経由のscope外writeを拒否する。
   - standard copy I/O failureをsuccessにせず、contentをoutputしない。
   - help、成功/失敗text、JSONのexperimental marker。
-- W3 distribution/final:
+- W3 Artifact import:
+  - Existing blank parser/allocator/create lock再利用と`new artifact` regression。
+  - LF/CRLF/BOM/final newline/multibyte/opaque bytesのsource=temp=final hash equality。
+  - Source survival、outside/symlink/directory source、source mutation、same-second/import-vs-new/concurrent collision、suffix exhaustion。
+  - Atomic no-replace、hash/fsync/publish/cleanup fault injection。
+  - No frontmatter/template/sidecar/EAL/canonical mutation、generic validate pass、ADR mirror非対象。
+- W4 Workflow/skills:
+  - Standalone/complete-inline/incomplete-inline/ZIP-treeの4 branch。
+  - Preservation status/EAL fields、canonical rewrite前checkpoint、exception時claim restriction。
+  - Provider/dogfood docs/skills parityとdogfood import scenario。
+- W5 distribution/final:
   - fresh init、existing update、package-data、provider/dogfood inventory。
-  - focused suites、`uv run pytest`、static analysis、manual two-worktree handoff。
+  - focused suites、`uv run pytest`、static analysis、manual two-worktree handoff/import/EAL scenario。
   - docs/spec alignment、final `qa-reviewer` / `code-reviewer` / `spec-reviewer`。
 - E-AC trace:
   - E-AC-001–002 -> W1 ignore/opaque traversal。
   - E-AC-003–008 -> W2 root exclusion/copy/application/presentation。
-  - E-AC-009 -> W2 CLI/no-sync behavior + W3 reference docs alignment。
-  - E-AC-010–011 -> W1 delete/update + W3 parity。
-  - E-AC-012 -> W3 final quality/PR。
+  - E-AC-009 -> W2 CLI/no-sync behavior + W5 reference docs alignment。
+  - E-AC-010–011 -> W1 delete/update + W5 parity。
+  - E-AC-012 -> W5 final quality/PR。
+  - E-AC-013–015 -> W3 Artifact import。
+  - E-AC-016 -> W4 Workflow/skills + W5 final alignment。
 
 ## 証跡採用（artifact adoption）
 - Adopted:
   - 6件のuser-answer interviewとclarification synthesis。
   - ChatGPT 5.6 Proのlayering、scanner inventory、3-Issue構成、target/scope独立解決、provider parity提案。
+  - Artifact importをsame Epicへ統合し、runtime/workflow/final qualityを独立sliceにする提案。
+  - Product ownerのblank prefix coexistence判断とaccepted Artifact import ADR。
 - Refined:
   - ChatGPTのspecial-entry preflight/classificationは不採用。標準copy failureへ単純化。
   - 全tree collision preflight、symlink policy、詳細partial fieldsは必須product contractにせず、標準primitiveとminimal adapterへ委譲。
+  - GPT提案のtyped `chatgpt-output` token、prefix reservation、UTF-8 validationを棄却し、import kind + existing blank grammar + opaque bytesへrefine。
 - Rejected:
   - root bulk copy、automatic copy、content scanner、catalog/manifest/TTL、sync/copy-back、dogfood-only implementation。
 - Accepted ADR:
-  - なし。Experimentalで非永続・可逆なboundaryであり、新しいauthority/storage modelを導入しない。
+  - `artifacts/20260713t031808z-adr-template-free-artifact-import-and-blank-filename-coexistence.md`。
 
 ## 未確定事項
 - Product decisionを妨げる未確定事項はない。
 - Issue-local delta:
   - exact CLI spelling / error codes / result fields。
   - standard library primitiveの細部とcross-platform test範囲。
+  - Atomic no-replace/directory fsyncのplatform adapter detailsとwarning field names。

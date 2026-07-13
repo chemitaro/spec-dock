@@ -13,8 +13,8 @@ ID: "epic-00312"
 # epic-00312 Experimental Local Workbench And Worktree Handoff — 計画（Issue と実施順序）
 
 ## この計画で閉じる E-RQ / E-AC
-- 全E-RQ-001–018とE-AC-001–012を3 Issue候補で閉じる。
-- W1はignore/opaque boundary/delete/update foundation、W2はscoped copy、W3はdistribution/docs/full quality/Epic PRを所有する。
+- 全E-RQ-001–024とE-AC-001–016を5 Issue候補で閉じる。
+- W1 foundation、W2 scoped copy、W3 Artifact import runtime、W4 ChatGPT-first workflow、W5 distribution/docs/final quality/Epic PRとする。
 
 ## 課題分割方針（Issue slicing policy）
 - 分割原則:
@@ -24,12 +24,12 @@ ID: "epic-00312"
 - Epic classification: `multi-issue implementation`
 - final quality Issue policy:
   - required: yes
-  - final quality issue id: Issue node作成後に確定するW3。
-  - dependency-on-all-implementation-Issues: W3 depends on W1 and W2。
+  - final quality issue id: Issue node作成後に確定するW5。
+  - dependency-on-all-implementation-Issues: W5 depends on W1、W2、W3、W4。
   - intermediate deferred PR delivery policy:
-    - W1/W2はreviewed Epic planに基づきper-Issue PRを作らず、W3へPR deliveryをrelayできる。
-    - W1/W2 reportにはW3 ID、dependency edge、no-per-Issue-PR理由、merge-prepared未主張、remaining final PR gateを記録する。
-    - W3はdeferred PR deliveryを使えず、Epic-level quality/repair/manual test/push/mergeable PRを所有する。
+    - W1–W4はreviewed Epic planに基づきper-Issue PRを作らず、W5へPR deliveryをrelayできる。
+    - W1–W4 reportにはW5 ID、dependency edge、no-per-Issue-PR理由、merge-prepared未主張、remaining final PR gateを記録する。
+    - W5はdeferred PR deliveryを使えず、Epic-level quality/repair/manual test/push/mergeable PRを所有する。
 
 ## 共通Issue handoff package
 - parent trace:
@@ -43,7 +43,7 @@ ID: "epic-00312"
   - `.workbench/`はnon-canonical/disposableで、evidence/readinessに使わない。
   - standard filesystem copyを単純に使い、extension/language/content/special-entry classifierを作らない。
 - draft lifecycle:
-  - ChatGPT 5.6 Pro transcript内のW1/W2/W3 draft requirementはevidence-only。
+  - ChatGPT 5.6 Pro transcript内のW1–W5 draft proposalはevidence-only。
   - HumanがIssue分割を承認後にIssue nodeを作成し、各Issue planningが最新repository stateとprior Issue resultを基にcanonical requirement/design/planへ採否・再記述する。
   - Issue node作成だけではexecution-readyにならない。Fresh Issue-level `spec-reviewer` passが必要。
 - relevant evidence:
@@ -67,7 +67,7 @@ ID: "epic-00312"
   - E-AC-001–002、010、E-AC-011のupdate-preservation foundation。
 - dependencies: none（Epic requirement/design passのみ）。
 - deliverables:
-  - Provider ignore/traversal changes、inventory artifact、focused tests、W1 report、W3へのdeferred PR evidence。
+  - Provider ignore/traversal changes、inventory artifact、focused tests、W1 report、W5へのdeferred PR evidence。
 - acceptance:
   - 4 placementがGit ignored。
   - Fake metadata/ADR/dependency/source contentをdefault discoveryが読まない。
@@ -96,7 +96,7 @@ ID: "epic-00312"
   - E-AC-003–008、E-AC-009のCLI help/text/JSON / no-sync behavior。
 - dependencies: W1 complete。
 - deliverables:
-  - Provider-side layered runtime、focused tests、manual two-worktree fixture/result、W2 report、W3へのdeferred PR evidence。
+  - Provider-side layered runtime、focused tests、manual two-worktree fixture/result、W2 report、W5へのdeferred PR evidence。
 - acceptance:
   - Source=current、one scope ID、one target。
   - Root選択不可、missing/ambiguous/stale/same-worktree/scope missing/no_sourceはcopy開始前error。
@@ -110,9 +110,59 @@ ID: "epic-00312"
   - New focused application/CLI/infra tests、existing worktree/validate regression、manual linked-worktree handoff、static analysis。
 - suggested grade: M / Standard。
 
-## W3候補 — Installed Runtime, Dogfood Parity, Final Quality And Mergeable PR
+## W3候補 — Byte Preserving ChatGPT Output Artifact Import
 - 目的:
-  - W1/W2をinstalled consumer/dogfoodへ配布し、docs、full quality、Epic closure、mergeable PRを完成する。
+  - Workbenchのsingle `.md` fileを、本文bytes不変・source保持・hash検証・no-overwriteでscope-local Artifactへimportする。
+- scope:
+  - Accepted Artifact import ADR、`artifact import chatgpt-output` CLI/registry/parser/presentation。
+  - Independent application use case、existing blank allocator/create lock、binary publisher port/adapter。
+  - Workbench containment、regular non-symlink `.md`、temporary binary copy、SHA-256/byte count、source stability、atomic no-replace、cleanup/warning。
+  - Generic validator/new artifact/ADR mirror regression。
+- non-scope:
+  - Typed `chatgpt-output` token、blank prefix reservation、frontmatter/template/sidecar/EAL自動編集、PDF/image/ZIP/directory/bundle/raw transcript、content/encoding classifier。
+- closes:
+  - E-RQ-019–023、E-AC-013–015。
+- dependencies: W1 complete。
+- deliverables:
+  - Provider-side import runtime、focused domain/application/infra/CLI tests、manual Workbench→Artifact result、W3 report、W5 deferred PR evidence。
+- acceptance:
+  - Existing blank grammar/collision allocationを使い、`new artifact blank --slug chatgpt-output-*`と共存する。
+  - Source/temp/final bytes/hash/count一致、source survival、no frontmatter/template/normalization。
+  - Outside/symlink/directory/multiple sourceとsource mutationをpublish前にfail。
+  - Existing destinationをoverwriteせず、concurrent import/new artifact collisionを安全にallocateする。
+  - Publish前failureはformal fileなし、publish後warningはcommitted pathを返す。
+  - Import resultがEAL/canonical authorityをself-claimしない。
+- Issue-local design seed:
+  - Ancestor symlink検査はresolved repo rootからsourceまで。
+  - `artifacts/` setupとsame-directory temp/create lock順序を明示する。
+  - Same-size/copy途中mutationをsource stability testsへ含める。
+- suggested grade: M / Standard。
+
+## W4候補 — ChatGPT First Preservation Workflow And Skill Integration
+- 目的:
+  - 有用な完成ChatGPT reportをcanonical rewrite前に原文保存し、inline/ZIP例外を不可能なhard gateにしないworkflowを実装する。
+- scope:
+  - `workflow_spec_authoring.md`、`workflow_chatgpt_authoring_pack.md`、`authoring/chatgpt-pack.md`。
+  - `spec-dock-chatgpt-authoring`とInitiative/Epic/Issue planning skills。
+  - Standalone file / complete inline / incomplete inline / ZIP-tree decision matrix。
+  - Preservation status、EAL provenance fields、exception/claim boundary、dogfood scenario。
+- non-scope:
+  - Runtime import implementation、ZIP safety contract変更、raw transcript privacy、automatic EAL/canonical mutation。
+- closes:
+  - E-RQ-024、E-AC-016。
+- dependencies: W3 complete。
+- deliverables:
+  - Provider-side docs/skills/assets、parity tests、dogfood preservation evidence、W4 report、W5 deferred PR evidence。
+- acceptance:
+  - Complete fileは`imported_byte_exact`、complete inlineは`captured_received_text`、incompleteはexception、ZIP/treeはexisting lane。
+  - Complete sourceが利用可能ならcanonical rewrite前にcheckpointを通る。
+  - Exception時にverbatim/byte-exact claimをしない。
+  - Path/hash/capture boundary/adoptionはEALへorchestratorが記録し、command/skillがauthorityをself-claimしない。
+- suggested grade: M / Standard。
+
+## W5候補 — Installed Runtime, Dogfood Parity, Final Quality And Mergeable PR
+- 目的:
+  - W1–W4をinstalled consumer/dogfoodへ配布し、docs、full quality、Epic closure、mergeable PRを完成する。
 - scope:
   - Provider/dogfood synchronization、package-data/fresh init/existing update smoke。
   - Existing root/scoped Workbench preservation。
@@ -122,15 +172,15 @@ ID: "epic-00312"
 - non-scope:
   - 新product semantics、copy redesign、root helper、secret scan、general installer/scanner refactor。
 - closes:
-  - E-RQ-016のreference docs surface、E-AC-009のreference docs alignment。
-  - E-AC-011のdistribution/parity closure、E-AC-012、全E-RQ/E-ACの最終再検証。
-- dependencies: W1 and W2 complete。
+  - E-RQ-016/024のreference docs/workflow final alignment。
+  - E-AC-009、011–016のdistribution/parity closure、全E-RQ/E-ACの最終再検証。
+- dependencies: W1、W2、W3、W4 complete。
 - deliverables:
   - Installed runtime/assets、dogfood mirror、docs、package/init/update evidence、full quality evidence、final reports/ledgers、mergeable Epic PR。
 - acceptance:
   - Fresh installとexisting updateでcapability利用可能、Workbench bytes保持。
   - Provider/dogfood inventory一致（generated cache等のdocumented exceptionを除く）。
-  - Full pytest/static analysis/manual handoff成功。
+  - Full pytest/static analysis/manual Workbench handoff + Artifact import + EAL + canonical rewrite scenario成功。
   - Docs/help/outputがexperimental/root manual/no sync/no canonical authorityを説明。
   - Final `qa-reviewer`、issue-wide `code-reviewer`、`spec-reviewer`にblocking findingなし。
   - Epic AC coverageがreportへtraceされ、mergeable PRが用意される。
@@ -141,25 +191,32 @@ ID: "epic-00312"
 ```text
 W1 Ignore/Opaque Foundation
   -> W2 Scoped Copy
-       -> W3 Distribution/Docs/Final Quality/Epic PR
+  -> W3 Artifact Import
+       -> W4 ChatGPT-First Workflow
 
-W1 -------------------------------------------> W3
+W1 + W2 + W3 + W4
+  -> W5 Distribution/Docs/Final Quality/Epic PR
 ```
 
 - parallelizable lanes:
-  - Implementationは原則直列。W1のinventory中にW3 docs outlineを作ることは可能だが、canonical docs更新はW2 contract確定後に行う。
+  - W1完了後、W2とW3は並行可能。W4はW3に依存し、W5はW1–W4全てに依存する。
 - blocker/gate:
   - W1 passなしでW2開始不可。
-  - W1/W2 closureとdependency evidenceなしでW3 final verification不可。
+  - W1 passなしでW3開始不可。W3 passなしでW4開始不可。
+  - W1–W4 closureとdependency evidenceなしでW5 final verification不可。
 
 ## 統合チェックポイント
 - G1 分解レビュー:
-  - HumanがW1/W2/W3のscope、順序、final quality ownershipを明示承認するまでIssue nodeを作らない。
+  - HumanがW1–W5のscope、依存、W5 final quality ownershipを明示承認するまでIssue nodeを作らない。
 - G2 W1 foundation:
   - Scanner inventory、opaque traversal、ignore/delete/update tests、fresh Issue reviewer pass。
 - G3 W2 copy:
   - Layered runtime、unfiltered copy、containment、text/JSON、manual handoff、fresh Issue reviewer pass。
-- G4 W3 rollout/docs:
+- G4 W3 Artifact import:
+  - Blank grammar coexistence、binary/hash/no-overwrite/source survival、fresh Issue reviewer pass。
+- G5 W4 workflow:
+  - Preservation branch/checkpoint/EAL exception、docs/skills parity、fresh Issue reviewer pass。
+- G6 W5 rollout/docs:
   - Provider/dogfood/package parity、docs impact closure、full regression。
 - G9 Final Epic review:
   - QA/code/spec reviewer repair loop、Epic AC/EAL/OAL closure、PR delivery/merge preparation。
@@ -168,12 +225,12 @@ W1 -------------------------------------------> W3
 - Narrow checks first, then full suite。
 - Runtime/code/test/scaffold stepはper-step `code-reviewer` pass。
 - Docs-only stepは`spec-reviewer` docs/spec alignment pass。
-- W1/W2はreviewed relay policyによりPRをdeferできるが、commit/evidence/clean-tree gateは省略しない。
-- W3はfull `qa-reviewer` / issue-wide `code-reviewer` / `spec-reviewer` passを必須とし、deferred PRを使用しない。
+- W1–W4はreviewed relay policyによりPRをdeferできるが、commit/evidence/clean-tree gateは省略しない。
+- W5はfull `qa-reviewer` / issue-wide `code-reviewer` / `spec-reviewer` passを必須とし、deferred PRを使用しない。
 
 ## ロールアウト / ドキュメント影響
 - Provider asset/runtimeを実装authorityとし、local dogfood `spec-dock update .`相当でconsumer projectionをrefreshする。
-- Reference docsにplacement、root date convention/manual selection、scoped copy、source-wins、no sync、disposable/evidence authority、experimental statusを記載する。
+- Reference docsにplacement、root date convention/manual selection、scoped copy、source-wins、Artifact import、preservation checkpoint、no sync、disposable/evidence authority、experimental statusを記載する。
 - Migration noteは既存`.workbench` contentをpreserveし、canonical migrationを行わないことを明示する。
 
 ## 課題準備完了条件（Issue readiness criteria）
@@ -184,12 +241,12 @@ W1 -------------------------------------------> W3
 - Handoff-readyとexecution-readyを混同しない。
 
 ## 最終完了条件
-- E-AC-001–012がobserved evidenceでPass。
+- E-AC-001–016がobserved evidenceでPass。
 - Provider/dogfood/installed consumer parityとupdate preservationがPass。
 - Docs impact resolved。
-- W3 final QA/code/spec review、PR delivery、merge preparationがPass。
+- W5 final QA/code/spec review、PR delivery、merge preparationがPass。
 - Epic reportのEAL/OAL/AC、Issue/PR links、follow-upが閉じ、unresolved blocked/stale entryがない。
 
 ## 未確定事項
 - Product/architecture/Issue slicingを妨げる未確定事項はない。
-- Issue IDはHumanが本planの3-Issue分割を承認した後に作成して確定する。
+- Issue IDはHumanが本planの5-Issue分割を承認した後に作成して確定する。
