@@ -409,6 +409,14 @@ class WorkbenchCopyError(RuntimeError):
         super().__init__(message)
 
 
+class WorkbenchFilesystemError(RuntimeError):
+    """Content-free filesystem failure with honest mutation-boundary state."""
+
+    def __init__(self, *, mutation_started: bool) -> None:
+        self.mutation_started = mutation_started
+        super().__init__("workbench filesystem operation failed")
+
+
 @dataclass(frozen=True)
 class WorkbenchCopyResult:
     scope_id: str

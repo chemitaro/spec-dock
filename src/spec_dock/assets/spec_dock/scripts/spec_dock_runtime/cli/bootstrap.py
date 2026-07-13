@@ -280,6 +280,12 @@ class _FilesystemGateway:
     def path_kind(self, path: Path) -> str:
         return infra_fs_cli.path_kind(path)
 
+    def guard_workbench_ancestry(self, root: Path, endpoint: Path, *, allow_missing_leaf: bool = False) -> None:
+        infra_fs_cli.guard_workbench_ancestry(root, endpoint, allow_missing_leaf=allow_missing_leaf)
+
+    def guard_workbench_inventory(self, specdock_dir: Path) -> None:
+        infra_fs_cli.guard_workbench_inventory(specdock_dir)
+
     def copy_workbench(self, source: Path, destination: Path) -> None:
         infra_fs_cli.copy_workbench(source, destination)
 
