@@ -3766,12 +3766,7 @@ class TestInitUpdate(CliRuntimeHarness):
             scope_directories = (
                 target / "spec-dock",
                 target / "spec-dock" / "initiatives" / "init-00001-example",
-                target
-                / "spec-dock"
-                / "initiatives"
-                / "init-00001-example"
-                / "epics"
-                / "epic-00001-example",
+                target / "spec-dock" / "initiatives" / "init-00001-example" / "epics" / "epic-00001-example",
                 target
                 / "spec-dock"
                 / "initiatives"

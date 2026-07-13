@@ -354,7 +354,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S00 | approved-no-op | report evidence only | pending S00 report commit | pending | inventory/baseline stepでproduction変更不要 | plan S00、recursive callsites、focused 10 tests | `git status --short` -> clean before report integration | `review_iss00315_s00` passed |
+| S00 | approved-no-op | report evidence only | `7def2c10e29078e82c6a30441e79fe7cee3b1883` | `git status --short` -> clean | inventory/baseline stepでproduction変更不要 | plan S00、recursive callsites、focused 10 tests | `git status --short` -> clean | `review_iss00315_s00` passed |
 | S01 | committed | provider/fallback ignore + focused tests + report | `914abdf79976b4e3b58a696493155722dbd7062f` | `git status --short` -> clean | N/A | C315-01 | `git diff --check` -> pass | `review_iss00315_s01` passed |
 | S02 | committed | fs_repo prune + focused tests + report | `0c694c76a2f1d56d9b44491fcc1c462774ab8715` | `git status --short` -> clean | N/A | C315-02, C315-03 | `git diff --check` -> pass | `review_iss00315_s02` passed |
 | S03 | committed | independent resolver prune + focused tests + report | `baf0307370aafc931c37f4eb72b4b3f6857fd59d` | `git status --short` -> clean | N/A | C315-04 | `git diff --check` -> pass | `review_iss00315_s03` passed |
@@ -362,28 +362,36 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S05 | committed | delete/remove characterization tests + report | `0677335d39cbdb6232e8b8990efe7782594754d3` | `git status --short` -> clean | existing behavior already satisfies contract | C315-06 | `git diff --check` -> pass | `review_iss00315_s05` passed |
 | S06 | committed | preservation test + dogfood projection + report | `ed6a8a1eabc3a6655ac4b1e6b3b9dfcaec16fcc1` | `git status --short` -> clean | production installer already preserves Workbench | C315-07 | `git diff --check` -> pass | `review_iss00315_s06` passed |
 | S90 | committed | provider/dogfood guide + report | `c448f808affcd08295c05cc9eadd04eecd2d6706` | `git status --short` -> clean | N/A | C315-08 docs portion | `git diff --check` -> pass | `review_iss00315_s90` passed |
-| S99-snapshot | ready-to-commit | snapshot constants + report | pending | pending | N/A | D-315-002 | `git diff --check` -> pass | `review_iss00315_s99_snapshot` passed |
+| S99-snapshot | committed | snapshot constants + report | `a6826ac6379c5d799323807156624eb2229267ce` | `git status --short` -> clean | N/A | D-315-002 | `git diff --check` -> pass | `review_iss00315_s99_snapshot` passed |
+| S99-quality-checkpoint | commands-pass / final-review-pending | formatter + final command evidence + report | pending checkpoint commit | pending | N/A | C315-01–08 command evidence | unit/CLI/lint pass | final QA/code/spec reviewはworktree移行後 |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- Provider/runtime/docs/testsとdogfood projection: 各S01–S90 commitに記録。
+- Checkpoint差分: formatter適用済みtest 3 filesと本report。
 
 #### コミット
-- <hash> <message>
+- Planning: `1fb5fa0106b19f74aedce10480fb7381e88fb09b`
+- S00–S90: `7def2c10`、`914abdf7`、`0c694c76`、`baf03073`、`54601de8`、`0677335d`、`ed6a8a1e`、`c448f808`
+- S99 snapshot: `a6826ac6379c5d799323807156624eb2229267ce`
 
 #### メモ
-- ...
+- ユーザー指示により、clean checkpoint後に現在のmain checkoutからlinked worktreeへ移行する。Issue Finishと次Issue開始は移行後。
 
 ---
 
-### セッションログ（2026-07-13 HH:MM - HH:MM）
+### セッションログ（2026-07-13 S99 quality checkpoint）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S99 final command gate / worktree migration checkpoint
+- AC: AC-315-001–009
 
 #### 実施内容
-- ...
+- `uv run pytest tests/unit`: `997 passed in 366.93s`。
+- `uv run pytest tests/cli_runtime`: `1118 passed, 75 skipped, 2 warnings in 1184.14s`。warningsはduplicate ZIP fixtureの既知`UserWarning`。
+- 初回`make lint`: Ruff check/mypy pass、format checkで新規test 3 filesを検出。
+- `uv run ruff format`を3 filesへ適用後、affected focused testsは`16 passed, 543 deselected`。
+- 再`make lint`: Ruff check、Ruff format check、mypyすべてpass。
+- Final QA/code/spec reviewers、Issue Finish、pushはworktree移行後の再開点。
 
 ---
 
@@ -392,27 +400,27 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| `docs/guide.md`のみ更新。templates/README/workflow/skill/migrationはno-op | yes | doc-writer | provider/dogfood byte parity、focused tests | pass（`review_iss00315_s90`） |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | unit/CLI/lint commands pass。fresh QAはworktree移行後 | command evidence above | pending |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | step reviews pass。fresh final integrated reviewはworktree移行後 | 0 | pending |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | fresh final alignment reviewはworktree移行後 | 0 | pending |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| worktree migration checkpoint | formatter + report evidence | current response | ready-to-commit-checkpoint |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
@@ -425,7 +433,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - ...
 
 ## 省略/例外メモ (必須)
-- 該当なし
+- ユーザーのmain checkoutからlinked worktreeへ移行する指示により、final reviewer群、Issue Finish、push、Issue 316開始をこのcheckpointでは実行しない。clean commit後に停止する。
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence

@@ -6,14 +6,7 @@ import pytest
 
 
 def _runtime_fs_repo():
-    runtime_scripts_dir = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "spec_dock"
-        / "assets"
-        / "spec_dock"
-        / "scripts"
-    )
+    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
     try:
         from spec_dock_runtime.infra import fs_repo
@@ -25,14 +18,12 @@ def _runtime_fs_repo():
 def _write_meta(path: Path, *, node_id: str = "init-00001") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(
-            {
-                "type": "initiative",
-                "id": node_id,
-                "title": "Platform",
-                "slug": "platform",
-            }
-        )
+        json.dumps({
+            "type": "initiative",
+            "id": node_id,
+            "title": "Platform",
+            "slug": "platform",
+        })
         + "\n",
         encoding="utf-8",
     )
@@ -55,9 +46,7 @@ def test_node_metadata_discovery_ignores_all_metadata_below_exact_workbench(tmp_
 
 
 @pytest.mark.parametrize("metadata_name", [".meta.json", "meta.json"])
-def test_node_metadata_discovery_preserves_near_name_behavior(
-    tmp_path: Path, metadata_name: str
-) -> None:
+def test_node_metadata_discovery_preserves_near_name_behavior(tmp_path: Path, metadata_name: str) -> None:
     fs_repo = _runtime_fs_repo()
     specdock_dir = tmp_path / "spec-dock"
     initiative_dir = specdock_dir / "initiatives" / "init-00001-platform"
