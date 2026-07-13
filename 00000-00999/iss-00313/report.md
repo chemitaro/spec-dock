@@ -76,6 +76,11 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-010 | `adopted` | ADR facilitation + fresh spec-reviewer | requirement/design/plan/accepted ADR | 回数ではなく証拠へ継続authorityを移す長期運用判断をIssue-local ADRへ昇格し、stale相談のrefresh-first契約を全正本で統一した | `artifacts/20260713t040923z-adr-evidence-gated-pr-repair-continuation.md`; fresh ADR review `passed` | accepted ADRを実装契約としてS01へ進む |
 | EAL-011 | `adopted` | S90 impact audit + fresh spec-reviewer | design/plan/tests | 現行providerを検証するIssue 105回帰テストの旧固定上限肯定assertを追随対象とし、当該1ファイルだけを許可パス・S90/S99検証へ追加した | fresh S90 amendment review `passed`; target Red `1 failed`; updated target Green `1 passed` | S95 independent reviewsへ進む |
 | EAL-012 | `adopted` | S95 spec/code/QA findings | provider skill/templates/tests/report | fallback invocation監査field、絶対停止・再利用禁止、semantic stop、test感度、report観測台帳の不足を共通P1 root causeとして採用し、Red強化後に修正した | initial reviews `failed`; strengthened Red `3 failed`; provider Green `3 passed`; projected integration `4 passed` | fresh S95 re-review |
+| EAL-013 | `adopted` | additional planning spec review 1 | requirement/design/plan | P1 4件を採用。config変更をutility-workerへ分離し、GitHub reasoning本文も削除対象化し、runtime override証拠とDES/CLOS/具体的testを追加した | planning spec review 1 `failed`; canonical AC-015/016、DES-012、S100-S102、CLOS-017/018 | fresh planning re-review |
+| EAL-014 | `adopted` | additional planning spec review 2 | design/plan/report | named roleを選ばないCLI直呼びではrole適用証拠にならないP1を採用。親runtime override付きsessionからnamed `agent_type`をspawnする契約へ置換した。P2のEAL記録不足も本entryで解消した | planning spec review 2 `failed`; local role-spawn/runtime-override contract inspection | named-role経路でfresh planning re-review |
+| EAL-015 | `adopted` | additional planning spec review 3 | requirement/design/plan/report | 親runtime override付きsessionからnamed `spec-reviewer`をspawnし、前回P1/P2の解消とCLOS-018起動経路を実証した | parent log `gpt-5.6-sol` / `medium`; named `spec-reviewer`; role固有JSON `review_status: pass`, findings 0 | assurance source binding refresh後にS100-Tを再委任 |
+| EAL-016 | `adopted` | S101 initial code/spec/QA reviews | requirement/report/tests | code/specのP2とQAのP1を共通のtest感度不足として採用。非対象GitHub roleの既存model/reasoning値も厳密に保護するtestへ修正し、古いrequirement状態文とADD-001台帳状態を観測事実へ同期する | parent logs `gpt-5.6-sol` / `medium`; named code/spec/QA role JSON; code/spec pass、QA fail | assurance refresh、fresh dev-coder修正、3者fresh re-review |
+| EAL-017 | `adopted` | S101 fresh code/spec/QA re-reviews | report/tests | QA repair後の対象4ロール固定profile不在、非対象Codex/GitHub profile値維持、provider/dogfooding parity、正本文書とのtraceabilityを3者で再確認した | parent logs `gpt-5.6-sol` / `medium`; named code/spec/QA role JSON; 3者ともfindings 0 / pass; QA観測で`test_init_update.py`全体`546 passed` | S102品質ゲートへ進む |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -417,3 +422,54 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - Red、Green、Refactorの観測結果は「TDD / Red・Green・Refactor証跡」に記録済み。
 - CLOS-001..016は「Closure Coverage」に対応付け、S95 repairとS99の結果を反映済み。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
+
+## 追加要求の実行台帳
+
+| ID | 要求 | 状態 | 証拠 |
+|---|---|---|---|
+| ADD-001 | 4ロールの固定model/reasoning設定を削除 | complete | S100 marker 0件、provider/dogfooding 8組cmp、focused test Green |
+| ADD-002 | 今回のworker/reviewerを`gpt-5.6-sol` / `medium`で実行 | complete | planning、S100-T、QA repair、S101の各親起動ログでruntime profileを確認し、named role spawnとrole固有outputを記録 |
+
+この追加要求はユーザーの明示指示によるscope追加である。既存PRの完了判定を再度開き、実装、fresh reviews、全品質ゲート、commit/push、remote observationをやり直す。
+
+### 追加要求レビュー履歴
+
+| Gate | Runtime profile | Verdict | Disposition |
+|---|---|---|---|
+| planning spec review 1 | `gpt-5.6-sol` / `medium`（起動ログ確認） | fail | P1 4件: dev-coder権限衝突、GitHub reasoning固定値、override証拠、traceability/closure不足を要件・設計・計画へ反映 |
+| planning spec review 2 | `gpt-5.6-sol` / `medium`（起動ログ確認） | fail | P1: CLI直呼びはnamed role適用を証明しない。親override付きsessionからnamed role spawnする契約へ修正。P2 EAL不足もEAL-013/014で解消 |
+| planning spec review 3 | parent `gpt-5.6-sol` / `medium` + named `spec-reviewer` | pass | findings 0。P1 named-role経路とP2 EAL不足を解消し、CLOS-018の起動経路を実証 |
+| S101 code review 1 | parent `gpt-5.6-sol` / `medium` + named `code-reviewer` | pass | P2: 非対象GitHub profile期待値の回帰保護を推奨。QA P1と統合して修正 |
+| S101 spec review 1 | parent `gpt-5.6-sol` / `medium` + named `spec-reviewer` | pass | P2: 古いdraft状態文とADD-001状態を修正 |
+| S101 QA review 1 | parent `gpt-5.6-sol` / `medium` + named `qa-reviewer` | fail | P1: 非対象GitHub profileを値まで検証しておらず、provider/dogfoodingの同一誤変更を検出できない |
+| S101 code re-review | parent `gpt-5.6-sol` / `medium` + named `code-reviewer` | pass | findings 0。非対象GitHub profileの具体値保護を含め、前回P2の解消を確認 |
+| S101 spec re-review | parent `gpt-5.6-sol` / `medium` + named `spec-reviewer` | pass | findings 0。古いdraft状態文、ADD-001、traceabilityの整合を確認 |
+| S101 QA re-review | parent `gpt-5.6-sol` / `medium` + named `qa-reviewer` | pass | findings 0。前回P1の解消を確認し、focused 2件と`test_init_update.py`全体`546 passed`を観測 |
+| S102 final spec review | parent `gpt-5.6-sol` / `medium` + named `spec-reviewer` | pass | findings 0。AC-015/016、DES-012、S100-S102、CLOS-017/018、対象16設定、回帰テスト、最終品質証拠の整合を確認 |
+
+### S100 / S100-T進行記録
+
+- S100: `utility-worker`が対象16設定ファイルから固定値を削除。marker 0件、provider/dogfooding 8組cmp、`git diff --check`がpass。
+- S100-T initial delegation: named `dev-coder`をparent `gpt-5.6-sol` / `medium`からspawnしたが、`guidance issue-execution`が`classification-required` / `authority-invalid` / `may_execute_approved_plan: false`を返したため変更なしで停止。これは正しいstop-condition適用であり、assurance再分類後にfresh workerへ再委任する。
+- assurance refresh: named `spec-manager`が正規コマンドを実行し、classify / verifyとも`ok=true` / `status=valid`。最終guidanceは`state: ready`、`reason_code: assurance-valid`、`may_execute_approved_plan: true`、`authorized_profile: standard`。profile / authority / schemaは不変。
+- S100-T fresh delegation: parent `gpt-5.6-sol` / `medium`からnamed `dev-coder`をspawn。`tests/unit/infra/test_init_update.py`だけを変更し、旧固定profile期待のRed 1件から、対象4ロールのCodex/GitHub固定値不在・非対象profile維持・parityを検証するGreenへ更新。focused 2 nodeは`2 passed`、Ruff format/checkと`git diff --check`もpass。
+- S101 QA repair: initial code/spec/QA reviewの共通所見を受け、parent `gpt-5.6-sol` / `medium`からfresh named `dev-coder`をspawn。非対象GitHub roleの既存`model`と`Target depth`も期待表で厳密に保護し、provider/dogfooding同一誤変更を検出可能にした。変更は`tests/unit/infra/test_init_update.py`だけ。focused 2 nodeは`2 passed`、Ruff format/checkと`git diff --check`もpass。
+
+### S102 再検証結果
+
+| Gate | コマンド / 対象 | 観測結果 |
+|---|---|---|
+| Related module | `uv run pytest -q tests/unit/infra/test_init_update.py` | `546 passed in 368.36s` |
+| Static | `make lint` | Ruff check、Ruff format、mypyがすべてpass |
+| Full suite | `uv run pytest` | `2306 passed, 75 skipped, 2 warnings in 1628.33s` |
+| Dogfooding validate | `./spec-dock/scripts/spec-dock validate` | `ok`, `nodes=211` |
+| Dogfooding sync | `./spec-dock/scripts/spec-dock sync` | `active unchanged`, projection 10ファイルを正常更新 |
+| Assurance | `./spec-dock/scripts/spec-dock assurance verify --issue iss-00313` | `ok`, `standard` / `normal` |
+| Absence | 対象16設定の固定profile marker走査 | 0件 |
+| Parity | 対象8組のprovider↔dogfooding `cmp` | すべてbyte-identical |
+| Diff hygiene | `git diff --check`、`git status --short` | pass、変更は追加要求の設定16ファイル、test、Issue正本・assuranceに限定 |
+
+full suiteのwarning 2件はduplicate ZIP entryを拒否する既存テストが意図的に発生させる`UserWarning: Duplicate name`であり、失敗ではない。skip 75件も既存の条件付きlaneである。
+
+- CLOS-017: pass。対象4ロールの固定profile不在、非対象profile期待値、provider/dogfooding parityを自動・手動の両方で確認した。
+- CLOS-018: pass。今回起動したworker/reviewerは親sessionの`gpt-5.6-sol` / `medium`ログ、named `agent_type`、role固有child outputの3点で確認した。

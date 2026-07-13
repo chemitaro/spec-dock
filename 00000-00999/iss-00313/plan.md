@@ -1578,10 +1578,54 @@ git diff --name-only
 
 ### このパック外の実行準備ゲート
 
-- [ ] ソースの結び付けが最新である。
-- [ ] 作業ツリーの所有権が明確である。
-- [ ] 手順のコマンドを実際のテストノード名に解決している。
-- [ ] レポートの証拠欄を用意している。
-- [ ] ブロッカーや古い入力がない。
+- [x] ソースの結び付けが最新である（assurance classify / verify `valid`）。
+- [x] 作業ツリーの所有権が明確である。
+- [x] 手順のコマンドを実際のテストノード名に解決している。
+- [x] レポートの証拠欄を用意している。
+- [x] ブロッカーや古い入力がない。
 
-新鮮な計画レビューと実行準備ゲートを通過するまでは、これは正規のドラフトであり、実行してはならない。
+追加要求はfresh named `spec-reviewer` passとassurance `valid`を得ており、S100-T以降を実行できる。
+
+## 19. 追加実装ステップ: agent runtime profile固定値の除去
+
+### S100 provider契約・投影
+
+- 担当: `utility-worker`。`dev-coder`のHard ruleによりagent configは担当させない。
+- 変更対象: 4ロールのprovider Codex/GitHub agent設定と対応するdogfooding投影。
+- 代替証拠: 現行固定値の存在を`rg`でcharacterizationし、変更後は同じ走査が対象4ロールで0件になることを確認する。
+- 完了条件: Codexの`model` / `model_reasoning_effort`、GitHubの`model` / `Reasoning profile` / `Target depth`が消え、provider↔dogfoodingがbyte-identicalになる。
+- Closure: CLOS-017。
+- Report destination: `追加要求の実行台帳`。
+
+### S100-T 回帰テスト更新
+
+- 担当: `dev-coder`。
+- 実行時起動: `codex exec -m gpt-5.6-sol -c 'model_reasoning_effort="medium"' -s workspace-write -C <repo> <orchestrator-prompt>`で親sessionを起動し、親から`spawn_agent(agent_type="dev-coder")`を呼ぶ。
+- 変更対象: `tests/unit/infra/test_init_update.py`だけ。
+- Red: 対象4ロールを固定profile期待値から除外し、不在契約を追加する前に、変更済みproviderに対して旧期待値がfailすることを確認する。
+- Green: `uv run pytest -q tests/unit/infra/test_init_update.py::TestInitUpdate::test_s04_codex_agent_permission_taxonomy_contract tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets`。
+- 完了条件: 対象4ロールの固定値不在と非対象profile維持を同じtestで検証し、parity testがpassする。
+- Closure: CLOS-017、CLOS-018（実行時profile証拠）。
+- Report destination: `追加要求の実行台帳`。
+
+### S101 追加変更のレビュー
+
+- `code-reviewer`: 設定・テスト差分と回帰リスクを確認する。
+- `spec-reviewer`: AC-015/016、設計、実装、投影の一致を確認する。
+- `qa-reviewer`: absence assertion、非対象ロール保護、parity検証の十分性を確認する。
+- 各reviewerは実行時に`gpt-5.6-sol`、`medium`を指定し、failなら修正後にfresh reviewを行う。
+- reviewer起動は`codex exec -m gpt-5.6-sol -c 'model_reasoning_effort="medium"' -s read-only -C <repo> <orchestrator-prompt>`を使い、親sessionから`spawn_agent(agent_type="code-reviewer"|"spec-reviewer"|"qa-reviewer")`を呼ぶ。親起動ログ、spawnした`agent_type`、role固有JSON outputをCLOS-018の証拠とする。
+
+### S102 再検証・送達
+
+- focused test、関連module、lint、full test、validate/sync、parity、diff hygieneを再実行する。
+- 結果を`report.md`へ記録し、コミット・push後にPR #320のchecksとCodex reviewを再観測する。
+
+### 追加Closure
+
+| ID | Requirements | Design | Steps | Verification | Report evidence |
+|---|---|---|---|---|---|
+| CLOS-017 | AC-015 | DES-012 | S100, S100-T, S102 | absence assertions、非対象profile期待値、provider/dogfooding parity | 追加要求の実行台帳 |
+| CLOS-018 | AC-016 | DES-012 | planning review, S100-T, S101 | 親起動ログのmodel/reasoning、named `agent_type`、role固有child output | 追加要求の実行台帳 |
+
+Amendment trigger: 対象4ロール以外の固定値削除、permission/prompt contract変更、named role spawnまたは親runtime overrideのchild再適用を確認できない事実、またはfocused node名の不一致を観測した場合は停止して本計画を更新する。

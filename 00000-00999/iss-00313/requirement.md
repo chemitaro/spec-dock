@@ -826,7 +826,22 @@ Repair batchにはraw model conversationを埋め込まず、sanitized summary /
 - [x] EALにChatGPT evidenceの採否と変換来歴を記録する。
 - [x] adopted synthesisとの一致を確認した。
 - [x] canonical requirementへmain orchestratorが反映した。
-- [ ] fresh spec reviewを通した。
-- [ ] assurance/profile workflowを別途完了した。
+- [x] fresh spec reviewを通した（追加要求を含むnamed `spec-reviewer` review 3でpass）。
+- [x] assurance/profile workflowを再実行し、`standard` / `valid`を確認した。
 
-未完了項目は後続planning phaseのゲートであり、本要件はfresh spec review前のcanonical draftである。
+追加要求を含む本要件はfresh named `spec-reviewer` reviewとassurance再検証を通過し、承認済みcanonical requirementとしてS100以降の実行根拠になる。
+
+## 17. 追加要求: 実装・レビューロールの実行時モデル選択
+
+### AC-015: 固定モデル設定を持たない
+
+- `dev-coder`、`code-reviewer`、`spec-reviewer`、`qa-reviewer` のCodex agent設定は、`model`および`model_reasoning_effort`を固定しない。
+- 同じ4ロールのGitHub agent設定は、`model`および`Reasoning profile` / `Target depth`を固定しない。
+- provider正本とdogfooding投影は同一内容にする。
+- 上記以外のagent role、permission、tools、prompt contractは変更しない。
+
+### AC-016: 今回の追加作業に限定した実行時指定
+
+- この追加作業の`dev-coder`、`code-reviewer`、`spec-reviewer`、`qa-reviewer`は、設定ファイルへ固定値を書き戻さず、実行時に`gpt-5.6-sol`と`medium`を指定する。
+- 実行時指定を利用できない場合は、別モデルで代替せず停止して理由を記録する。
+- 適用証拠として、各委任の起動ログに表示される`model: gpt-5.6-sol`と`reasoning effort: medium`を確認する。
