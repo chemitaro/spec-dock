@@ -50,6 +50,22 @@ GitHub に push 済みの branch / commit / source manifest を ChatGPT が参�
 
 この mode でも ChatGPT output は正本ではありません。GitHub 上に存在する状態を参照した evidence として扱い、canonical adoption には EAL、canonical rewrite、fresh reviewer gate が必要です。
 
+#### GitHub 同期 preflight の安全な実行
+
+preflight は shell を介さず、SpecDock entrypoint を direct argv で実行します。shell wrapper、redirect、pipe、`tee`、heredoc、command substitution、inline environment assignment を追加しません。
+
+```text
+./spec-dock/scripts/spec-dock authoring preflight github-sync --output-dir <existing-external-directory>
+```
+
+`--output-dir` は任意です。receipt を保存する場合は、既存かつ repository 外の non-symlink directory を指定します。receipt は stdout の `--format` と独立した JSON で、file 名は `github-sync-preflight.receipt.json` に固定されます。安全な出力先では pass result と blocked result のどちらも保存されるため、shell redirect は不要です。
+
+fetch と限定 retry は SpecDock が所有し、retry 時も同じ command / environment policy を保ちます。fetch の nonzero は追加権限が必要であることの証跡ではありません。nonzero を理由に `require_escalated` を追加したり、sandbox / permission mode を変更したり、agent-owned raw `git fetch` で preflight を置き換えたりしません。
+
+blocked result では `blockers`、bounded diagnostics、`remediation` を確認し、remote 設定、authentication、rate limit、repository state、安全な出力先など、示された operator remediation を修正して同じ preflight を再実行します。`local-context` または default branch へ暗黙に切り替えません。evidence mode や fallback を変更する場合は、その変更を明示し、planning workflow の authority と `report.md` の記録要件に従います。
+
+receipt が示す freshness は preflight の `observed_at` / snapshot 観測時点に限られます。`authoring pack prepare` は versioned receipt の kind、schema、digest、fetch / snapshot semantics を検証して prompt pack provenance に binding しますが、pack prepare 時点の current repository / remote を再取得・再検証しません。したがって receipt を backend invocation 直前まで fresh である証明として扱いません。
+
 ### `local-context`
 
 `local-context` は、GitHub sync を使えない、または使わない理由がある場合に明示的に選ぶ lower-authority evidence mode です。
@@ -67,7 +83,7 @@ Epic candidate は提案であり、Epic node creation の前に human approval 
 推奨 flow:
 
 1. Initiative requirement を人間と main orchestrator で固定する。必要なら ChatGPT evidence を使ってもよい。
-2. `authoring preflight github-sync` で GitHub 同期状態を確認する。
+2. `authoring preflight github-sync` を direct argv で実行して GitHub 同期状態を確認する。receipt が必要なら `--output-dir <existing-external-directory>` を指定する。
 3. `authoring pack prepare --mode initiative` で prompt pack を作る。
 4. `authoring backend invoke` で backend command を使って ChatGPT / Oracle を呼び出す。
 5. `authoring pack review` と `authoring pack stage` で ZIP / tree output を evidence として点検・配置する。
@@ -104,6 +120,7 @@ main orchestrator が採用部分を canonical docs に再記述し、fresh `spe
 
 ```bash
 ./spec-dock/scripts/spec-dock authoring preflight github-sync
+./spec-dock/scripts/spec-dock authoring preflight github-sync --output-dir <existing-external-directory>
 ./spec-dock/scripts/spec-dock authoring pack prepare
 ./spec-dock/scripts/spec-dock authoring backend invoke
 ./spec-dock/scripts/spec-dock authoring pack review

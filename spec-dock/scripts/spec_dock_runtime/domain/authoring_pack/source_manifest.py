@@ -4,15 +4,23 @@ from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 DEFAULT_SOURCE_PATHS: tuple[str, ...] = (
     "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/authoring.py",
     "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack",
     "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack",
+    "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/authoring_pack/git_fetch.py",
+    "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/authoring_pack/preflight_receipt_writer.py",
     "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/authoring_pack",
     "spec-dock/scripts/spec_dock_runtime/commands/authoring.py",
     "spec-dock/scripts/spec_dock_runtime/application/authoring_pack",
     "spec-dock/scripts/spec_dock_runtime/domain/authoring_pack",
+    "spec-dock/scripts/spec_dock_runtime/infra/authoring_pack/git_fetch.py",
+    "spec-dock/scripts/spec_dock_runtime/infra/authoring_pack/preflight_receipt_writer.py",
     "spec-dock/scripts/spec_dock_runtime/presentation/authoring_pack",
 )
 
@@ -31,7 +39,12 @@ class SourceManifest:
         }
 
 
-def build_source_manifest(repo_root: Path, source_paths: tuple[str, ...]) -> SourceManifest:
+def build_source_manifest(
+    repo_root: Path,
+    source_paths: tuple[str, ...],
+    *,
+    file_observer: Callable[[str], None] | None = None,
+) -> SourceManifest:
     paths = effective_source_paths(source_paths)
     source_hashes: dict[str, str] = {}
     selected_paths: list[str] = []
@@ -47,6 +60,8 @@ def build_source_manifest(repo_root: Path, source_paths: tuple[str, ...]) -> Sou
         if path.is_file():
             rel_path = _repo_relative(repo_root, path)
             source_hashes[rel_path] = _hash_file(path)
+            if file_observer is not None:
+                file_observer(rel_path)
             continue
         for child in sorted(
             item
@@ -55,6 +70,8 @@ def build_source_manifest(repo_root: Path, source_paths: tuple[str, ...]) -> Sou
         ):
             rel_path = _repo_relative(repo_root, child)
             source_hashes[rel_path] = _hash_file(child)
+            if file_observer is not None:
+                file_observer(rel_path)
     manifest_payload = json.dumps(source_hashes, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return SourceManifest(
         source_paths=tuple(selected_paths),
