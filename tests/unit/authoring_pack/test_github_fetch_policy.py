@@ -367,6 +367,58 @@ def test_safe_diagnostic_redacts_secrets_paths_non_utf8_and_truncates() -> None:
         assert unsafe not in serialized
 
 
+@pytest.mark.parametrize(
+    ("diagnostic_text", "secret", "expected_excerpt"),
+    (
+        (
+            "fatal: https://example.test/repo?access_token=query-secret&scope=repo",
+            "query-secret",
+            "fatal: https://example.test/repo?access_token=[REDACTED]&scope=repo",
+        ),
+        (
+            "fatal: https://example.test/repo?scope=repo&oauth_token=oauth-secret",
+            "oauth-secret",
+            "fatal: https://example.test/repo?scope=repo&oauth_token=[REDACTED]",
+        ),
+        (
+            "ID_TOKEN=id-secret REFRESH_TOKEN:refresh-secret api_key=api-secret",
+            "id-secret",
+            "ID_TOKEN=[REDACTED] REFRESH_TOKEN:[REDACTED] api_key=[REDACTED]",
+        ),
+        (
+            "client_secret=client-secret private_token=private-secret api-key=hyphen-secret",
+            "client-secret",
+            "client_secret=[REDACTED] private_token=[REDACTED] api-key=[REDACTED]",
+        ),
+    ),
+)
+def test_safe_diagnostic_redacts_credential_parameter_values_before_excerpt_and_digest(
+    diagnostic_text: str,
+    secret: str,
+    expected_excerpt: str,
+) -> None:
+    diagnostic = safe_diagnostic(diagnostic_text.encode(), code="unknown")
+
+    assert diagnostic.excerpt == expected_excerpt
+    assert diagnostic.redacted_sha256 == hashlib.sha256(expected_excerpt.encode()).hexdigest()
+    assert diagnostic.redaction_applied is True
+    assert secret not in str(diagnostic.to_dict())
+
+
+def test_safe_diagnostic_redacts_query_secret_before_non_utf8_replacement_and_bounding() -> None:
+    secret = b"non-utf8-secret"
+    raw = b"fatal: ?access_token=" + secret + b"&detail=" + b"x" * 2000 + b"\xff"
+
+    diagnostic = safe_diagnostic(raw, code="unknown")
+    serialized = str(diagnostic.to_dict())
+
+    assert secret.decode() not in serialized
+    assert diagnostic.excerpt.startswith("fatal: ?access_token=[REDACTED]&detail=")
+    assert diagnostic.excerpt_byte_count <= DIAGNOSTIC_EXCERPT_MAX_BYTES
+    assert diagnostic.truncated is True
+    assert diagnostic.redaction_applied is True
+
+
 @pytest.mark.parametrize("key_kind", ("OPENSSH ", "ENCRYPTED ", ""))
 def test_safe_diagnostic_redacts_incomplete_private_key_block_to_eof(key_kind: str) -> None:
     raw = f"fatal context\n-----BEGIN {key_kind}PRIVATE KEY-----\nprivate-key-body-without-end".encode()
