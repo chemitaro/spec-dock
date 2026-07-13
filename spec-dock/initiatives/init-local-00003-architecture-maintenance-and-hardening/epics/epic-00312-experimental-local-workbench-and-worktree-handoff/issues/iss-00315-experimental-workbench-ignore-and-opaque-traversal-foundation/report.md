@@ -235,6 +235,9 @@ git diff --check
 | S90 | Alternative | docs inspection | public first-read guideへのW1 boundary記載が必要 | provider docs inventory | pass | templates/workflow/README no-op |
 | S90 | Green | provider/dogfood guide parity | focused 3、reviewer 2、byte parity | pytest/cmp/update | pass | Issue316–318未先行 |
 | S90 | Refactor | no further docs expansion | two identical guide files | `git diff --check` | approved-no-op | experimental minimal text |
+| S99-snapshot | Red | discovered regression | checked-in cutover snapshot 2 selectors failed | focused pytest | pass | Epic00312 nodes/deps missing |
+| S99-snapshot | Green | mechanical current snapshot refresh | 2 selectors + related 3 passed | pytest / fresh review | pass | production behavior unchanged |
+| S99-snapshot | Refactor | not applicable | one test file、3 constants only | `git diff --check` | approved-no-op | current canonical data matched |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
@@ -305,6 +308,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S05 | delegated | explicit delete/remove characterization | dev-coder | delete/worktree tests | approved `plan.md` S05 | two test files | production、S06+、report | characterization + full adjacent suites | unexpected blocker or destructive external operation | summary、tests、no-op rationale | pass |
 | S06 | delegated | update preservation and parity | dev-coder | init/update test + normal dogfood update | approved `plan.md` S06 | test + generated consumer projection | S90 docs、production change unless needed、report | byte equality、provider parity、related tests | data loss or parity failure | summary、tests、projection、risks | pass |
 | S90 | delegated | docs impact resolution | doc-writer | provider docs inventory + guide update/parity | approved `plan.md` S90 | provider guide + generated dogfood guide | Issue316–318 commands/workflow、report | docs diff、focused installer tests、parity | contract overclaim or scope leakage | changed files、rationale、verification | pass |
+| S99-snapshot | delegated | final gate discovered snapshot drift | dev-coder | three checked-in dogfood constants | plan S99 + D-315-002 | one test file | production/runtime/report | failing selectors then Green | canonical mismatch | diff、Red/Green、risks | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -317,6 +321,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S05 | dev-coder | nonempty binary Workbenchをscope/worktreeと共に削除する既存契約をtest固定 | `test_delete.py`, `test_worktree.py` | worker 5; reviewer targeted 2/full 65 passed | passed（`review_iss00315_s05`） | none | accepted / production approved-no-op |
 | S06 | dev-coder | four-scope binary sentinel preservationをtest固定し通常updateでdogfood 7 filesをrefresh | `test_init_update.py`, dogfood `.gitignore` + runtime 6 | preservation 1、workbench 3、parity 2、7 cmp、normal update pass | passed（`review_iss00315_s06`） | fixed snapshot 2 failuresはS99、stale build uvxはclean laneへ | accepted / installer approved-no-op |
 | S90 | doc-writer | guideへexperimental ignore/opaque/disposable boundaryだけを追加 | provider/dogfood `docs/guide.md` | writer 3、reviewer 2、byte parity、diff-check | passed（`review_iss00315_s90`） | explicit operation clarityはnonblocking | accepted |
+| S99-snapshot | dev-coder | Epic00312 + iss315-319のnode/depsを3 fixed constantsへmechanical refresh | `tests/unit/infra/test_init_update.py` | Red 2 failed; Green 2 + related 3 passed | passed（`review_iss00315_s99_snapshot`） | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -344,6 +349,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S05 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s05`; approved-no-op、65 passed |
 | S06 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s06`; preservation/parity pass、snapshot drift S99へ |
 | S90 | docs impact review | spec-reviewer | fresh | passed | no | promote | `review_iss00315_s90`; provider/dogfood parity、scope適合 |
+| S99-snapshot | remediation review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s99_snapshot`; canonical literal match |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -355,7 +361,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04 | committed | authoring reject/prune + focused tests + report | `54601de823f3bca5e3fdf7faab9f980bfe5f18a2` | `git status --short` -> clean | N/A | C315-05 | `git diff --check` -> pass | `review_iss00315_s04` passed |
 | S05 | committed | delete/remove characterization tests + report | `0677335d39cbdb6232e8b8990efe7782594754d3` | `git status --short` -> clean | existing behavior already satisfies contract | C315-06 | `git diff --check` -> pass | `review_iss00315_s05` passed |
 | S06 | committed | preservation test + dogfood projection + report | `ed6a8a1eabc3a6655ac4b1e6b3b9dfcaec16fcc1` | `git status --short` -> clean | production installer already preserves Workbench | C315-07 | `git diff --check` -> pass | `review_iss00315_s06` passed |
-| S90 | ready-to-commit | provider/dogfood guide + report | pending | pending | N/A | C315-08 docs portion | `git diff --check` -> pass | `review_iss00315_s90` passed |
+| S90 | committed | provider/dogfood guide + report | `c448f808affcd08295c05cc9eadd04eecd2d6706` | `git status --short` -> clean | N/A | C315-08 docs portion | `git diff --check` -> pass | `review_iss00315_s90` passed |
+| S99-snapshot | ready-to-commit | snapshot constants + report | pending | pending | N/A | D-315-002 | `git diff --check` -> pass | `review_iss00315_s99_snapshot` passed |
 
 #### 変更したファイル
 - `path/to/file1` - ...
