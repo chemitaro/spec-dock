@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from spec_dock_runtime.commands import (
     active as active_commands,
+    artifact_import as artifact_import_commands,
     assurance as assurance_commands,
     authoring as authoring_commands,
     close as close_commands,
@@ -26,6 +27,7 @@ from spec_dock_runtime.commands.contracts import CommandRegistry, CommandSpec
 def build_registry() -> CommandRegistry:
     items: dict[str, CommandSpec] = {}
     items.update(new_commands.command_specs())
+    items.update(artifact_import_commands.command_specs())
     items.update(import_commands.command_specs())
     items.update(active_commands.command_specs())
     items.update(assurance_commands.command_specs())

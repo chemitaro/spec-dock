@@ -477,6 +477,45 @@ class BinaryArtifactPublishError(RuntimeError):
         super().__init__(f"binary artifact publication failed: {code}")
 
 
+ArtifactImportKind = Literal["chatgpt-output"]
+ArtifactStorageIdentity = Literal["blank"]
+
+
+@dataclass(frozen=True)
+class ArtifactImportRequest:
+    import_kind: ArtifactImportKind
+    scope_node_id: str
+    scope_kind: Literal["initiative", "epic", "issue"]
+    source_path: Path
+    title: str
+    slug: str | None
+
+
+@dataclass(frozen=True)
+class ArtifactImportResult:
+    import_kind: ArtifactImportKind
+    storage_identity: ArtifactStorageIdentity
+    artifact_id: str
+    scope_id: str
+    source_path: Path
+    destination_path: Path
+    sha256: str
+    byte_count: int
+    committed: bool
+    cleanup_state: BinaryArtifactCleanupState
+    warning_codes: tuple[BinaryArtifactPublishWarning, ...] = ()
+
+
+class ArtifactImportError(RuntimeError):
+    """Stable content-free failure for the public artifact import command."""
+
+    def __init__(self, *, code: str, cleanup_state: BinaryArtifactCleanupState) -> None:
+        self.code = code
+        self.cleanup_state = cleanup_state
+        self.committed = False
+        super().__init__(f"artifact import failed: {code}")
+
+
 @dataclass(frozen=True)
 class WorkbenchCopyResult:
     scope_id: str
@@ -967,6 +1006,9 @@ class UseCases:
     sync: Callable[[SyncRequest], SyncCommandResult]
     check_deps: Callable[[CheckDepsRequest], DepsCheckResult]
     validate_tree: Callable[[ValidateTreeRequest], ValidationResult]
+    import_artifact: Callable[[ArtifactImportRequest], ArtifactImportResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("import_artifact is not configured")
+    )
     show_assurance: Callable[[ShowAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("show_assurance is not configured")
     )
