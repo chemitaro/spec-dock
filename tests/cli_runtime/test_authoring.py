@@ -47,6 +47,178 @@ class TestAuthoringCli(CliRuntimeHarness):
             for _args, command, _next_issue in _DEFERRED_COMMANDS:
                 assert command in p.stdout
 
+    def test_authoring_preflight_help_exposes_optional_output_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            p = self._run_runtime_capture(target, ["authoring", "preflight", "github-sync", "--help"])
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "--output-dir" in p.stdout
+            assert "--report-path" not in p.stdout
+
+    def test_authoring_preflight_publishes_pass_receipt_to_fixed_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo = _create_synced_git_repo(root)
+            output = root / "evidence"
+            output.mkdir()
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--source-path",
+                    "source.txt",
+                    "--output-dir",
+                    str(output),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            receipt = json.loads((output / "github-sync-preflight.receipt.json").read_text(encoding="utf-8"))
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload == receipt
+            assert receipt["status"] == "pass"
+            assert receipt["publication"] == {
+                "requested": True,
+                "status": "published",
+                "filename": "github-sync-preflight.receipt.json",
+                "blocker": None,
+            }
+            assert receipt["receipt_digest"]["algorithm"] == "sha256"
+            digest = receipt.pop("receipt_digest")
+            canonical = json.dumps(
+                receipt,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            assert digest["value"] == hashlib.sha256(canonical).hexdigest()
+
+    def test_authoring_preflight_publishes_blocked_receipt_and_text_stdout_stays_human_readable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo = _create_synced_git_repo(root)
+            output = root / "evidence"
+            output.mkdir()
+            _git(repo, "remote", "remove", "origin")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--source-path",
+                    "source.txt",
+                    "--output-dir",
+                    str(output),
+                ],
+            )
+
+            receipt = json.loads((output / "github-sync-preflight.receipt.json").read_text(encoding="utf-8"))
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert p.stdout.startswith("spec-dock: authoring preflight github-sync\n")
+            assert "status=blocked" in p.stdout
+            assert "publication_status=published" in p.stdout
+            assert receipt["status"] == "blocked"
+            assert "origin_missing" in receipt["blockers"]
+
+    def test_authoring_preflight_publishes_stale_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo = _create_synced_git_repo(root)
+            output = root / "evidence"
+            output.mkdir()
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--expected-source-hash",
+                    "stale-hash",
+                    "--output-dir",
+                    str(output),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            receipt = json.loads((output / "github-sync-preflight.receipt.json").read_text(encoding="utf-8"))
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert receipt["status"] == "stale"
+            assert receipt["publication"]["status"] == "published"
+            assert "source_hash_mismatch" in receipt["blockers"]
+
+    def test_authoring_preflight_rejects_repo_local_and_non_owned_receipt_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo = _create_synced_git_repo(root)
+            repo_output = repo / "evidence"
+            repo_output.mkdir()
+            outside = root / "outside"
+            outside.mkdir()
+            target = outside / "github-sync-preflight.receipt.json"
+            target.write_text("user-owned\n", encoding="utf-8")
+
+            repo_local = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--output-dir",
+                    str(repo_output),
+                    "--format",
+                    "json",
+                ],
+            )
+            non_owned = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--output-dir",
+                    str(outside),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            repo_payload = _json_stdout(repo_local)
+            non_owned_payload = _json_stdout(non_owned)
+            assert repo_local.returncode == 1
+            assert repo_payload["publication"]["status"] == "rejected"
+            assert repo_payload["publication"]["blocker"] == "receipt_output_inside_repository"
+            assert not (repo_output / "github-sync-preflight.receipt.json").exists()
+            assert non_owned.returncode == 1
+            assert non_owned_payload["publication"]["blocker"] == "non_owned_existing_receipt_target"
+            assert target.read_text(encoding="utf-8") == "user-owned\n"
+
     def test_authoring_pack_prepare_help_exposes_inputs_without_force(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

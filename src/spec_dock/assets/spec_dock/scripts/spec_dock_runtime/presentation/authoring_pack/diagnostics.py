@@ -51,6 +51,9 @@ def render_preflight_text(result: PreflightResult) -> list[str]:
     lines.append(f"fetch_failure_class={_format_value(last_attempt.get('failure_class'))}")
     lines.append(f"fetch_classification_confidence={_format_value(last_attempt.get('confidence'))}")
     lines.append(f"fetch_timeout_seconds={_format_value(fetch['timeout_seconds'])}")
+    publication = payload["publication"]
+    lines.append(f"publication_status={_format_value(publication['status'])}")
+    lines.append(f"receipt_filename={_format_value(publication['filename'])}")
     return lines
 
 
