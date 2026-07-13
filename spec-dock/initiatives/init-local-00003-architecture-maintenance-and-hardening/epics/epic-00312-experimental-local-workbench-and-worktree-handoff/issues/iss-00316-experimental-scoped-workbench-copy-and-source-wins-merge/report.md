@@ -3,7 +3,7 @@
 ID: "iss-00316"
 タイトル: "Experimental Scoped Workbench Copy And Source Wins Merge"
 関連GitHub: ["#316"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-13"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -53,6 +53,8 @@ Disposition ごとの必須証跡:
 | D-316-002 | resolved | implementation | GPT-5.6 Pro / repo inventory | Source-winsとdestination-only保持におけるdirectory/leaf型衝突 | destructive replacement; skip; fail | Same-type directory mergeとordinary leaf replacementだけを許し、directory/non-directory衝突はdestination subtreeを削除せずfailする | Destination-only data lossを避け、content classifierなしの単純なfilesystem error境界を保つ | promoted_to_design | `design.md` DES-316-005 entry matrix、fresh design reviewer r2 pass | Design promotion確定。Implementationでfresh code review |
 | D-316-003 | resolved | implementation | S05 security reviewer r1/r2 | NodeRepositoryがguard前にbelow-specdock symlink metadataを読める | Schema-shaped guard; general repo change; Workbench-specific full discovery guard | Workbench operation専用で`initiatives`以下のactual metadata discovery surfaceをtop-down `lstat`し、exact `.workbench` prune、全dir symlinkと`.meta.json` symlink/nonregularをreader前に拒否 | General NodeRepository semanticsを変えずexplicit copyだけをfail-closedにし、Issue315のresolve-before-guard回帰を防ぐ | applied | Security review r1/r2 fail→r3 pass、external metadata observer/node_repo未呼出しtests、focused63 pass | `fs_repo` discovery変更時にguard/test同期 |
 | D-316-004 | resolved | implementation | S05 security reviewer r1 | `mutation_started`をatomic primitive前に立てfalse positive | 常にpre-mark; post-success; unknown tri-state | `mkdir`/`unlink`/symlink creationは成功後、partial mutationし得る`copy2`だけ呼出前にmark | Public booleanを維持しつつ観測可能な部分変更を最も正直に表す | applied | Injected mkdir/unlink/symlink failure=false、unlink成功後/copy2 fault=true、r3 pass | TOCTOU/transactionはnon-goal |
+| D-316-005 | resolved | implementation | final code-reviewer / remediation r1-r3 reviewers | Preflight後のsource/destination directory・leaf差し替えで検査済みidentity/missing premiseとcopy時pathnameが乖離し得る | 完全なdirfd実装; boundaryごとのidentity/missing再検証; 対応なし | EC-316-005の範囲で、各directory boundaryとmutation直前にidentityを再検証し、missing destination作成・leaf write時は親identityとleaf missing premiseも検証する。前提変化はcontent-free failureとする | 完全なtransaction/TOCTOU排除へscope拡張せず、RQ-316-007/008の境界外read/write防止を満たす | applied | r3でinitially-missing/post-unlink leafを`copy2`/`symlink_to`直前に再検証。Source/destination root、missing parent、nested leaf、symlink read後parentのdeterministic swap testsを含むfocused32 pass、Workbench関連109 pass、lint pass、provider/dogfood parity pass。Fresh `gpt-5.6-sol` medium code-reviewer pass、P0-P3なし | 最後の`lstat`からprimitiveまでの極小TOCTOU、full dirfd transaction/rollbackはEC-316-005の明示的scope外 |
+| D-316-006 | resolved | execution infrastructure | user during Issue execution | DevCoderとcode/QA/spec reviewerの固定model/reasoning設定がtask-specificな実行時選択を妨げる | 固定値維持; 全role unpin; 指定4roleだけunpin | `dev-coder`、`code-reviewer`、`qa-reviewer`、`spec-reviewer`だけprovider authorityとdogfood mirrorから`model`/`model_reasoning_effort`を削除し、今回の残作業は起動時に`gpt-5.6-sol` / `medium`を明示する | Userの明示指示を最小差分で適用し、他13 roleのfixed profileを維持する。Workbench product semanticsは変更しない | applied | 対象8 TOMLは各2行削除のみ、4/4 byte parity、taxonomy test 1 pass、other-role audit pass、fresh `gpt-5.6-sol` medium code-reviewer pass、P0-P3なし | Invocation-time model指定の一般smokeはIssue scope外。以後の本Issue DevCoder/reviewer起動バナーで個別確認 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -75,7 +77,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-316-001 | 明示one-shot scoped Workbench handoff、destination-only保持、source wins | Selector parity、containment、output secrecy、focused regressionとIssue 319へのdistribution relay | 低。安全対策をcontent classifierやtransactionへ拡張せず、final distributionをIssue 319へ戻した | pass: fresh requirement reviewer r3 |
+| OAL-316-001 | 明示one-shot scoped Workbench handoff、destination-only保持、source wins | Selector parity、containment、output secrecy、focused regressionとIssue 319へのdistribution relay | 完全transactionへ拡張せず、changed-premiseをfail-closedにする境界を維持する | D-316-005 remediation、final QA、issue-wide code review、fresh final spec review pass。Commitとpush/clean確認まではIssue Finish不可 |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -130,7 +132,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- Planning中。実装は未開始。
+- S01–S06のruntime/CLI/test実装とS90 docs impact判定を完了し、各step commitをpush済み。
+- Final reviewで発見したcopy-time identity/missing-premise P1はD-316-005 r3で解決し、fresh bounded code-reviewがpassした。
+- User指示により4 execution roleのmodel/reasoning固定を解除し、provider/dogfood parityとtaxonomy回帰を追加した。Fresh final QA、issue-wide code review、fresh final spec reviewはpass済みで、残るblocking actionはcommit、push/clean確認、Issue Finishである。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -372,58 +376,25 @@ git diff --check
 - Issue319 relay: Consolidated Workbench/Artifact import/reference docs、root manual-selection、source-wins/no-sync、placement/date/authority、migration/preservation。
 - Ledger Note: Partial docs updateはW5統合guideとの二重管理になるため、本Issueはcommand-local contractで閉じる。
 
-### セッションログ（2026-07-13 HH:MM - HH:MM）
+### セッションログ（2026-07-13 S99 remediation r3 / execution-role unpin）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+- D-316-005: copy-time directory/leaf identity差し替えのfail-closed remediation。
+- D-316-006: user指示によるDevCoderとcode/QA/spec reviewerのmodel/reasoning固定解除。
 
 #### 実施内容
-- ...
+- DevCoderを`gpt-5.6-sol` / reasoning `medium`で起動し、source/destination directory identity、destination parent identity、existing/missing leaf premiseを各read/mutation boundaryで再検証した。
+- Initially-missing leaf出現とpost-unlink leaf再出現をordinary file/symlinkの双方でdeterministicに注入し、外部sentinel不変、link object保持、`mutation_started`の前後整合を検証した。
+- Provider authorityとdogfood mirrorの4 role TOMLから固定2 keyだけを削除し、他roleのfixed profileとpermission/prompt属性を維持するtaxonomy regressionを追加した。
 
-#### 実行コマンド / 結果
-```bash
-<command>
+#### 検証 / review
+- Workbench: focused infra 32 pass、Workbench関連109 pass、`make lint` pass（mypy 231 filesを含む）、`git diff --check` pass、provider/dogfood `fs_cli.py` parity pass。
+- Config: taxonomy focused 1 pass、対象4 roleの4/4 byte parity、他13 role fixed-key audit、対象diff check pass。
+- Fresh `gpt-5.6-sol` / medium code-reviewer: Workbench remediation pass（P0-P3なし）。Full dirfd transaction、atomicity、rollback、最後の検査からprimitiveまでの極小TOCTOUはEC-316-005のscope外。
+- Fresh `gpt-5.6-sol` / medium code-reviewer: role unpin pass（P0-P3なし）。Invocation-time一般smokeはscope外だが、各reviewer起動バナーでmodel/effortを確認した。
+- Ledger Note: D-316-005/D-316-006 resolved/applied。Fresh final QA、issue-wide code review、fresh final spec reviewはpass済み。Issue Finishはcommit、push/clean確認まで不可。
 
-<result>
-```
-
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
-
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+### 実装横断ゲート
 
 #### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 `workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
@@ -463,7 +434,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| N/A | Parentによるsource/test直接実装なし。全stepをnamed workerへ委任 | N/A | N/A | reportのorchestrator統合のみ | N/A | fresh reviewer gates | code/spec/QA reviewer | unavailable/waiverなし |
 
 #### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
@@ -485,7 +456,18 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04 | step reviewer | code-reviewer | fresh | passed | no | proceed | P0/P1/blocking/nonblockingなし |
 | S05 | security/path reviewer | code-reviewer | fresh | passed | no | proceed | r1/r2 P1 remediation後r3 P0/P1=0 |
 | S06 | step reviewer | code-reviewer | fresh | passed | no | proceed | P0/P1/blocking/nonblockingなし |
-| S90 | docs impact reviewer | spec-reviewer | fresh | passed | no | proceed | approved-no-op、blockingなし |
+| S90 | docs impact reviewer | spec-reviewer-history | fresh | passed | no | proceed | approved-no-op、blockingなし |
+| S99-pre-remediation | final integrated code review | code-reviewer | fresh | failed | no | block Issue Finish | P1: copy-time source/destination directory identity差し替えで境界外read/writeの可能性。D-316-005 |
+| S99-report-audit | final integrated spec review | spec-reviewer-history | fresh | conditional_pass | no | report修正後に再review | 実装整合はpass-quality。report placeholder、closure/QA/relay evidence不足を修正する |
+| S99-report-recovery | report-only recovery review r2 | spec-reviewer | fresh | passed | no | execute approved plan: D-316-005 bounded remediationのみ | Managed Step Evidenceを実証跡参照へ置換。P1/closure/final gatesは未解決のまま正確。Issue Finish不可 |
+| S99-remediation-r1 | D-316-005 remediation review | code-reviewer | fresh | failed | no | remediation r2 | Missing destination parent identity未検証、nested/actual mutation tests不足、symlink write直前gap。P1 x1 root-cause family |
+| S99-remediation-r2 | D-316-005 remediation review | code-reviewer | fresh | failed | no | bounded remediation r3 | Destination leaf missing premiseをcopy2/symlink_to直前に未検証。反証でexternal sentinel上書き。P1 x1同一family。要求が明確な局所修正のためscope拡張なしで継続 |
+| S99-remediation-r3 | D-316-005 remediation review | code-reviewer | fresh | passed | no | proceed to final gates | Directory/parent/leaf identity・missing premiseをboundaryで再検証。Deterministic race tests、external sentinel不変、focused32 pass。P0-P3なし |
+| S99-role-unpin | user-injected execution infrastructure review | code-reviewer | fresh | passed | no | include in final gates | 4 roleだけ固定key削除、他13 role維持、provider/dogfood parity、taxonomy test pass。P0-P3なし |
+| S99-final-qa | final issue obligation coverage | qa-reviewer | fresh | passed | no | proceed to issue-wide code review | Focused36、unit1066、CLI1135 pass/75 skip、lint/assurance/validate/parity/diff pass。Integration不要。P0-P3なし |
+| S99-final-code | final issue-wide integrated code review | code-reviewer | fresh | passed | no | proceed to final spec review | Planning後全implementation commits + current remediation/config/report。Workbench80、role taxonomy含む33、assurance/validate/parity/diff pass。P0-P3なし、confidence 0.97 |
+| S99-final-spec-r1 | final specification alignment | spec-reviewer | fresh | failed | no | report-only correction then fresh re-review | 実装/spec/parent/relayは整合。Final QA/codeをpendingとするstale report claim 3箇所がP2。Issue Finish不可 |
+| S99-final-spec-r2 | final specification alignment | spec-reviewer | fresh | passed | no | proceed to commit and push/clean verification | r1 stale claim解消、requirement/design/plan/report/implementation/tests/parent/Issue319 relay整合。P0-P3なし、confidence 0.99 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -497,73 +479,102 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04 | committed | Recursive merge adapter + focused tests + report | `84659dc3a840ba026ff7b80b6478a81be46c5bb3` | clean/upstream `0 0` | not applicable | S04 contract | `git diff --check` pass | Fresh code-reviewer pass、focused36/28 pass |
 | S05 | committed | Symlink/containment/failure + remediation + report | `ffb54ebe24f6745ee5d503b1142234be76e87fc5` | clean/upstream `0 0` | not applicable | S05 contract | `git diff --check` pass | Security reviewer r3 pass、focused63 pass |
 | S06 | committed | Output/regression/tests/dogfood projection/report | `2ff1cc946d3afb7a04c2354aaf6fb03ae516f2dc` | clean/upstream `0 0` | not applicable | S06 contract | `git diff --check` pass | Fresh code-reviewer pass、automated/manual/parity pass |
-| S90 | approved-no-op; report ready for commit | No permanent docs; S90 evidence in report | pending | pending | Help self-contained、docs non-misleading、Issue319 consolidated owner | provider/dogfood guide/README/reference_worktree/help | `git diff --check` pass | Fresh spec-reviewer pass |
+| S90 | committed approved-no-op evidence | No permanent docs; S90 evidence in report | `8ac45d18638d1d2e8ae5398d711a262e770b86f9` | clean/upstream `0 0` | Help self-contained、docs non-misleading、Issue319 consolidated owner | provider/dogfood guide/README/reference_worktree/help | `git diff --check` pass | Fresh spec-reviewer pass |
+| S99 | final gates passed; commit pending | D-316-005 remediation + role profile unpin + tests + final ledger | pending | pending | not applicable | Workbench race guards、4 role TOML、focused regressions | current scoped `git diff --check` pass | Final QA/code/spec pass、P0-P3なし |
 
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+### 要件・受け入れ条件・例外条件の最終closure状態
 
-#### コミット
-- <hash> <message>
+| 契約ID | 状態 | 観測証跡 / blocker |
+|---|---|---|
+| RQ-316-001 / AC-316-001 | pass | CLI/help/invalid args、no `--from`、root対象外。S02/S06 tests |
+| RQ-316-002 / AC-316-002 | pass | Existing selector parity、same-current/bare/path-missing preflight。S01/S03/S06 tests |
+| RQ-316-003 / AC-316-003 | pass | Source/target独立scope解決、same ID/different slug manual。S03/S06 |
+| RQ-316-004 / AC-316-004 | pass | `no_source`、empty success、non-directory root failure、pre-mutation sentinel。S03/S06 |
+| RQ-316-005 / AC-316-005 | pass | Recursive destination-only保持、source-wins、idempotency、type conflict保全。S04/S06 |
+| RQ-316-006 / AC-316-006 | pass | Binary/archive/`.env`/Python/config/nested `.git` opaque byte copy。S04/S06 |
+| RQ-316-007 / AC-316-007 | pass | Existing symlink/containmentに加え、source/destination root、missing parent、nested leaf、symlink read後parentのidentity swapをfail-closed化。External sentinel不変、D-316-005 r3 |
+| RQ-316-008 / AC-316-008 | pass | Changed-premiseをcontent-free failureにし、mutation前=false、unlink後=trueをdeterministic testsで確認。D-316-005 r3 |
+| RQ-316-009 / AC-316-009 | pass | Text/JSON authority markers、body/path/selector非露出。S02/S03/S05/S06 |
+| RQ-316-010 / AC-316-010 | pass-with-final-relay-pending | Provider/dogfood parity、manual linked worktree、regression、S90 no-op。Issue319 final distributionは未実施 |
+| EC-316-001–004 | pass | Empty source、broken/external symlink object、leaf replacement、directory/leaf conflict tests |
+| EC-316-005 | pass | 検査前提崩壊をdeterministic swap testsでfailure化。最後の検査からprimitiveまでの極小TOCTOU、full dirfd transaction/rollbackは明示的非保証 |
+| EC-316-006–009 | pass | Detached/locked classification parity、portable guard、malformed Workbench root tests |
 
-#### メモ
-- ...
+### Spec-Locked Closure Index 状態
 
----
+| Closure | 状態 | 証跡 / blocker |
+|---|---|---|
+| C316-01 | pass | S02/S06 CLI help・invalid argument contract |
+| C316-02 | pass | S01 shared selector + S03 eligibility + S06 manual selector |
+| C316-03 | pass | S03 independent resolution + S06 renamed target slug |
+| C316-04 | pass | S03 missing/empty/malformed Workbench tests |
+| C316-05 | pass | S04 recursive source-wins/destination-only/idempotency tests |
+| C316-06 | pass | S04 opaque mixed bytes tests |
+| C316-07 | pass | Existing symlink tests + directory/parent/leaf identity swap tests。Boundary外sentinel不変、fresh remediation review pass |
+| C316-08 | pass | Injected I/O + initially-missing/post-unlink leaf appearance tests。Stable failure/mutation signal、fresh remediation review pass |
+| C316-09 | pass | S02/S03/S05/S06 text/JSON and mutation signal tests |
+| C316-10 | pass-with-Issue319-relay | S06 parity/manual/regression、S90 no-op。Epic W5はIssue319 owner |
 
-### セッションログ（2026-07-13 HH:MM - HH:MM）
+### Issue319へのdeferred delivery relay
 
-#### 対象
-- Step: ...
-- AC/EC: ...
-
-#### 実施内容
-- ...
-
----
+- Dependency evidence: `deps check iss-00319`は`iss-00316`、`iss-00317`、`iss-00318`をblockerとして列挙する。Issue319はIssue316完了後も全先行Issueを待つfinal quality ownerである。
+- Current pushed head at pre-remediation audit: `8ac45d18638d1d2e8ae5398d711a262e770b86f9`。Issue316 milestone commit一覧は直前のMilestone / Commit Candidate Gateを正本とする。
+- Per-Issue PRを作らない理由: 親Epic planはIssue319にpackage/fresh init/update、consolidated docs、full suite/static、inventory parity、単一Epic PR deliveryを集約しており、中間Issue PRは同一feature branch chainを重複deliveryするため。
+- Remaining W5 gates: Issue317 Artifact import、Issue318 placement/ignore rules、Issue319 package/fresh init/update、public docs/migration、full suite/static、final provider/dogfood/inventory parity、Epic PR observation。
+- Issue316ではPR作成・PR監視・`merge-prepared`を実施または主張しない。Issue319のfinal gateまでdeferredである。
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| docs / templates / README / workflow / skill / migration notes | no（approved-no-op） | doc-writer | Command-local helpが自己完結し、既存docsは非網羅かつ非誤認。commit `8ac45d18` | pass |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | pre-remediation whole issue obligation coverage | focused/manualで十分、integration suite不要 | unit 1056 pass + unrelated timing 1 fail/single rerun pass、CLI 1135 pass/75 skipped、focused73 pass、`make lint` pass、assurance/validate/parity pass | passed before P1 discovery; remediation後fresh gate required |
+| qa-reviewer final | D-316-005 remediation + role unpinを含むwhole issue obligation coverage | `tests/integration`不要。Deterministic infra raceと静的agent設定はunit/CLI/full regressionで十分。Package/fresh init/updateはIssue319 owner | Focused36、taxonomy単独1、unit1066、CLI1135 pass/75 skip、`make lint`、assurance、validate、provider/dogfood parity、current diff pass | passed; P0-P3なし |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | P1: post-preflight directory swapでsource read / destination mutationがWorkbench境界外へ逃げ得る。deterministic source/target swap testsとidentity revalidationが必要 | 0 | fail / blocked |
+| code-reviewer remediation | D-316-005 r3 + role-unpinを別々にbounded review | Workbench/configともP0-P3なし。極小TOCTOUはEC-316-005 scope外 | 3 remediation passes + 1 config pass | passed for bounded scope; issue-wide reviewは後続final rowでpass |
+| code-reviewer final | planning後の全implementation commits + current remediation/config/report | P0-P3なし。D-316-005、mutation semantics、output secrecy、4 role限定unpin、mirror parity、Issue319 deferred boundary整合 | pre-remediation fail後のfresh issue-wide re-review 1 | passed; confidence 0.97 |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | 実装/spec整合はpass-quality。report placeholder、closure表、QA/code/spec/final commit、Issue319 relayの不足を指摘 | 0 | conditional_pass; report再review required |
+| spec-reviewer r2 | report-only recovery | 全placeholderを除去し、D-316-005と関連closure/final gateを未解決として保持。実装再開可、Issue Finish不可 | 1 | passed |
+| spec-reviewer final r1 | requirement / design / plan / report / final diff alignment | 実装/spec/parent/Issue319 relayは整合。Final QA/codeをpendingとするstale report claimをP2 1 root-causeとして指摘 | 2 | fail; report-only correction後fresh re-review |
+| spec-reviewer final r2 | corrected report + requirement/design/plan/implementation/tests/parent/Issue319 relay alignment | r1 stale claim解消。P0-P3なし、confidence 0.99 | 3 | passed |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| D-316-005とrole-unpinの実装、final QA、issue-wide code review、fresh final spec review証跡を統合済み | D-316-005 remediation + role-unpin + final ledger | Issue319 final delivery / Epic PR | commit、push/clean確認待ち |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: Step-local security reviewを通過後、issue-wide final code reviewでpost-preflight directory identity swapのP1を発見した。
+  - 解決: D-316-005 r3でdirectory/parent/leaf premiseをmutation/read boundaryで再検証し、deterministic regressionとfresh bounded code-reviewをpassした。
+- 問題: DevCoderとreviewerのrepo設定がmodel/reasoningを固定し、今回の`gpt-5.6-sol` / `medium`指定をroleごとに自由に適用できなかった。
+  - 解決: User指示により4 roleだけ固定keyをprovider/dogfood双方から削除し、taxonomy regressionとfresh code-reviewをpassした。今回の残作業では起動時にmodel/effortを明示する。
+- 問題: `git diff --check 198fb155..HEAD`がraw GPT evidence artifact line 5のtrailing whitespaceを検出する。
+  - 解決状況: SHA-256固定済みraw evidenceの内容不変契約を優先する明示exemptionとし、artifactを整形しない。実装・canonical docsのcurrent diff checkはcleanを要求する。
 
 ## 学んだこと (任意)
-- ...
+- Preflightのpathname検査だけではcopy-time changed-premiseを閉じられない。EC-316-005のfail-closed契約にはdirectory identity境界のdeterministic regressionが必要である。
 
 ## 今後の推奨事項 (任意)
-- ...
+- Issue319はIssue316へのdependency edge、Issue316 pushed head/commit列、per-Issue PRを作らない理由、残存Epic W5 gateを引き継ぐ。Issue316単独では`merge-prepared`を主張しない。
 
 ## 省略/例外メモ (必須)
 - 該当なし
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
-- Record Red, Green, and refactor evidence for each executed step.
-- Link each closure id to its observed verification result.
+- S00–S90のRed / Green / Refactor、manual、review、commit証跡は「実装記録（セッションログ）」に記録した。
+- C316-01–10とRQ/AC/ECの観測結果は「要件・受け入れ条件・例外条件の最終closure状態」と「Spec-Locked Closure Index 状態」に集約した。D-316-005 r3によりC316-07/08はpassし、final QA/code/specもpass済み。Commit、push/clean確認のみpendingである。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->

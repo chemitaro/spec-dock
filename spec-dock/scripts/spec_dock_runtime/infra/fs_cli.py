@@ -10,6 +10,10 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+DirectoryIdentity = tuple[int, int, int]
+PathIdentity = tuple[int, int, int]
+
+
 def path_exists(path: Path) -> bool:
     try:
         path.lstat()
@@ -136,52 +140,168 @@ def _optional_directory(path: Path) -> bool:
     return True
 
 
+def _capture_directory_identity(path: Path) -> DirectoryIdentity:
+    status = path.lstat()
+    if not stat.S_ISDIR(status.st_mode):
+        raise RuntimeError("workbench copy path is not a directory")
+    return status.st_dev, status.st_ino, status.st_mode
+
+
+def _assert_directory_identity(path: Path, expected: DirectoryIdentity) -> None:
+    if _capture_directory_identity(path) != expected:
+        raise RuntimeError("workbench copy directory identity changed")
+
+
+def _inspect_path(path: Path) -> tuple[str, PathIdentity | None]:
+    try:
+        status = path.lstat()
+    except FileNotFoundError:
+        return "missing", None
+    identity = status.st_dev, status.st_ino, status.st_mode
+    if stat.S_ISDIR(status.st_mode):
+        return "directory", identity
+    if stat.S_ISREG(status.st_mode):
+        return "file", identity
+    if stat.S_ISLNK(status.st_mode):
+        return "symlink", identity
+    return "other", identity
+
+
+def _assert_path_identity(path: Path, expected: PathIdentity) -> None:
+    _, actual = _inspect_path(path)
+    if actual != expected:
+        raise RuntimeError("workbench copy path identity changed")
+
+
+def _assert_path_missing(path: Path) -> None:
+    kind, _ = _inspect_path(path)
+    if kind != "missing":
+        raise RuntimeError("workbench copy destination path appeared")
+
+
 def copy_workbench(source: Path, destination: Path) -> None:
     """Merge an opaque Workbench tree without following symlinks."""
     mutation_started = [False]
     try:
-        if not stat.S_ISDIR(source.lstat().st_mode):
-            raise RuntimeError("workbench copy source is not a directory")
-        destination_kind = path_kind(destination)
+        source_identity = _capture_directory_identity(source)
+        destination_kind, destination_identity = _inspect_path(destination)
         if destination_kind == "missing":
+            destination_parent_identity = _capture_directory_identity(destination.parent)
+            _assert_directory_identity(source, source_identity)
+            _assert_directory_identity(destination.parent, destination_parent_identity)
             destination.mkdir(parents=False)
             mutation_started[0] = True
+            _assert_directory_identity(destination.parent, destination_parent_identity)
+            destination_identity = _capture_directory_identity(destination)
         elif destination_kind != "directory":
             raise RuntimeError("workbench copy destination is not a directory")
-        for source_entry in sorted(source.iterdir(), key=lambda entry: entry.name):
-            _merge_workbench_entry(source_entry, destination / source_entry.name, mutation_started)
+        if destination_identity is None:
+            raise RuntimeError("workbench copy destination identity is missing")
+        _merge_workbench_directory(
+            source,
+            destination,
+            source_identity,
+            destination_identity,
+            mutation_started,
+        )
     except WorkbenchFilesystemError:
         raise
     except (OSError, RuntimeError) as exc:
         raise WorkbenchFilesystemError(mutation_started=mutation_started[0]) from exc
 
 
-def _merge_workbench_entry(source: Path, destination: Path, mutation_started: list[bool]) -> None:
-    source_kind = path_kind(source)
-    destination_kind = path_kind(destination)
+def _merge_workbench_directory(
+    source: Path,
+    destination: Path,
+    source_identity: DirectoryIdentity,
+    destination_identity: DirectoryIdentity,
+    mutation_started: list[bool],
+) -> None:
+    _assert_directory_identity(source, source_identity)
+    _assert_directory_identity(destination, destination_identity)
+    source_entries = sorted(source.iterdir(), key=lambda entry: entry.name)
+    _assert_directory_identity(source, source_identity)
+    _assert_directory_identity(destination, destination_identity)
+    for source_entry in source_entries:
+        _assert_directory_identity(source, source_identity)
+        _assert_directory_identity(destination, destination_identity)
+        _merge_workbench_entry(
+            source_entry,
+            destination / source_entry.name,
+            source,
+            destination,
+            source_identity,
+            destination_identity,
+            mutation_started,
+        )
+
+
+def _merge_workbench_entry(
+    source: Path,
+    destination: Path,
+    source_parent: Path,
+    destination_parent: Path,
+    source_parent_identity: DirectoryIdentity,
+    destination_parent_identity: DirectoryIdentity,
+    mutation_started: list[bool],
+) -> None:
+    _assert_directory_identity(source_parent, source_parent_identity)
+    _assert_directory_identity(destination_parent, destination_parent_identity)
+    source_kind, source_identity = _inspect_path(source)
+    destination_kind, destination_identity = _inspect_path(destination)
 
     if source_kind == "directory":
+        _assert_directory_identity(source_parent, source_parent_identity)
+        if source_identity is None:
+            raise RuntimeError("workbench copy source identity is missing")
+        _assert_path_identity(source, source_identity)
         if destination_kind == "missing":
+            _assert_directory_identity(destination_parent, destination_parent_identity)
             destination.mkdir()
             mutation_started[0] = True
+            _assert_directory_identity(destination_parent, destination_parent_identity)
+            destination_identity = _capture_directory_identity(destination)
         elif destination_kind != "directory":
             raise RuntimeError("workbench copy entry type collision")
-        for child in sorted(source.iterdir(), key=lambda entry: entry.name):
-            _merge_workbench_entry(child, destination / child.name, mutation_started)
+        elif destination_identity is None:
+            raise RuntimeError("workbench copy destination identity is missing")
+        _assert_path_identity(destination, destination_identity)
+        _merge_workbench_directory(
+            source,
+            destination,
+            source_identity,
+            destination_identity,
+            mutation_started,
+        )
         return
 
     if source_kind not in {"file", "symlink"}:
         raise RuntimeError("workbench copy source entry type is unsupported")
+    if source_identity is None:
+        raise RuntimeError("workbench copy source identity is missing")
     if destination_kind == "directory" or destination_kind == "other":
         raise RuntimeError("workbench copy entry type collision")
     if destination_kind in {"file", "symlink"}:
+        if destination_identity is None:
+            raise RuntimeError("workbench copy destination identity is missing")
+        _assert_directory_identity(destination_parent, destination_parent_identity)
+        _assert_path_identity(destination, destination_identity)
         destination.unlink()
         mutation_started[0] = True
 
+    _assert_directory_identity(source_parent, source_parent_identity)
+    _assert_path_identity(source, source_identity)
+    _assert_directory_identity(destination_parent, destination_parent_identity)
     if source_kind == "file":
+        _assert_path_missing(destination)
         # copy2 may have created or truncated the destination before raising.
         mutation_started[0] = True
         shutil.copy2(source, destination, follow_symlinks=False)
     else:
-        destination.symlink_to(source.readlink())
+        link_target = source.readlink()
+        _assert_directory_identity(source_parent, source_parent_identity)
+        _assert_path_identity(source, source_identity)
+        _assert_directory_identity(destination_parent, destination_parent_identity)
+        _assert_path_missing(destination)
+        destination.symlink_to(link_target)
         mutation_started[0] = True
