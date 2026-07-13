@@ -279,9 +279,10 @@ def _finalize_publication(
             status="blocked",
             blockers=tuple(dict.fromkeys((*result.blockers, preflight_blocker))),
             remediation=tuple(
-                dict.fromkeys(
-                    (*result.remediation, "choose an existing external non-symlink directory with no non-owned receipt target")
-                )
+                dict.fromkeys((
+                    *result.remediation,
+                    "choose an existing external non-symlink directory with no non-owned receipt target",
+                ))
             ),
             publication=PublicationEvidence(
                 requested=True,
@@ -308,7 +309,10 @@ def _finalize_publication(
         status="blocked",
         blockers=tuple(dict.fromkeys((*result.blockers, blocker))),
         remediation=tuple(
-            dict.fromkeys((*result.remediation, "preserve the existing receipt and choose a safe writable output directory"))
+            dict.fromkeys((
+                *result.remediation,
+                "preserve the existing receipt and choose a safe writable output directory",
+            ))
         ),
         publication=publication,
     )
@@ -377,9 +381,7 @@ def _capture_repository_snapshot(
         repo_root,
         source_paths,
         file_observer=(
-            None
-            if snapshot_hook is None
-            else lambda _source_path: snapshot_hook("source_file_hashed", repo_root)
+            None if snapshot_hook is None else lambda _source_path: snapshot_hook("source_file_hashed", repo_root)
         ),
     )
     visible = observer(repo_root, requested_ref, allow_default_branch_fallback)

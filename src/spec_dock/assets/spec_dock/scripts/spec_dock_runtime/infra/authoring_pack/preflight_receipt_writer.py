@@ -44,9 +44,7 @@ def validate_preflight_receipt_output(*, repo_root: Path, output_dir: Path) -> s
     return _existing_target_blocker(candidate / RECEIPT_FILENAME)
 
 
-def publish_preflight_receipt(
-    *, repo_root: Path, output_dir: Path, payload: dict[str, object]
-) -> PublicationEvidence:
+def publish_preflight_receipt(*, repo_root: Path, output_dir: Path, payload: dict[str, object]) -> PublicationEvidence:
     blocker = validate_preflight_receipt_output(repo_root=repo_root, output_dir=output_dir)
     if blocker is not None:
         return PublicationEvidence(requested=True, status="rejected", filename=RECEIPT_FILENAME, blocker=blocker)

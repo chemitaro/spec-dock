@@ -116,7 +116,9 @@ def classify_fetch_outcome(outcome: GitProcessOutcome) -> FetchClassification:
         return FetchClassification(None, "certain", False, None)
 
     diagnostic_text = _diagnostic_bytes(outcome).decode("utf-8", errors="replace")
-    matches = [failure_class for failure_class, patterns in _SIGNALS if any(p.search(diagnostic_text) for p in patterns)]
+    matches = [
+        failure_class for failure_class, patterns in _SIGNALS if any(p.search(diagnostic_text) for p in patterns)
+    ]
     if len(matches) != 1:
         return FetchClassification("unknown", "unknown", False, "unknown")
     failure_class = matches[0]

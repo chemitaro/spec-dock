@@ -92,12 +92,10 @@ def test_writer_rejects_parent_traversal_and_symlink_ancestor(tmp_path: Path) ->
     assert validate_preflight_receipt_output(repo_root=repo, output_dir=Path("../evidence")) == (
         "receipt_output_parent_traversal"
     )
-    assert validate_preflight_receipt_output(repo_root=repo, output_dir=link / "child") == (
-        "receipt_output_symlink"
-    )
+    assert validate_preflight_receipt_output(repo_root=repo, output_dir=link / "child") == ("receipt_output_symlink")
 
 
-@pytest.mark.parametrize("contents", (b"user data", b"{bad json", b'{}'))
+@pytest.mark.parametrize("contents", (b"user data", b"{bad json", b"{}"))
 def test_writer_preserves_non_owned_existing_target(tmp_path: Path, contents: bytes) -> None:
     tmp_path = tmp_path.resolve()
     repo = tmp_path / "repo"
@@ -151,13 +149,11 @@ def test_writer_rejects_unowned_receipt_boundary_cases(tmp_path: Path, target_ki
     output.mkdir()
     target = output / RECEIPT_FILENAME
     if target_kind == "unsupported_schema":
-        original = json.dumps(
-            {
-                "schema_version": 2,
-                "receipt_kind": "spec-dock.authoring.github-sync-preflight",
-                "status": "pass",
-            }
-        ).encode()
+        original = json.dumps({
+            "schema_version": 2,
+            "receipt_kind": "spec-dock.authoring.github-sync-preflight",
+            "status": "pass",
+        }).encode()
     else:
         original = b"x" * (1024 * 1024 + 1)
     target.write_bytes(original)
