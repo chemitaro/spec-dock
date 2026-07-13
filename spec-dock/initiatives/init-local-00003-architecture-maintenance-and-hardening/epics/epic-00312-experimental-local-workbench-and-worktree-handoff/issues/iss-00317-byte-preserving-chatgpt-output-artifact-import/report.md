@@ -252,7 +252,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | Runtime shared allocation + focused tests + observed report | `7b1afe5e0824280611a0deae4665d2d680d1484f` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | read-only confirmation complete |
 | S02 | committed | Binary guard/publisher contracts + focused tests + observed report | `22006f5e2e4052bd9024e7180094e9a5b6996de8` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r4 pass、read-only post-push confirmation complete |
-| S03 | ready | Public import vertical slice + focused tests + observed report | pending commit | pending post-commit check | N/A | N/A | N/A | fresh code-reviewer r1 pass |
+| S03 | committed | Public import vertical slice + focused tests + observed report | `e2197cc85eff304d895919a18b1327aa8cd72db2` | `git status --short` clean、upstream `0 0` | N/A | N/A | N/A | fresh code-reviewer r1 pass、read-only post-push confirmation complete |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -419,4 +419,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
   - Required closure expectation不変。S04のrace/fault/retry hardeningを先取りせず、plan amendment不要。
 - Ledger disposition:
   - No material implementation decisions beyond the approved plan.
+- Commit closure:
+  - Implementation/report commit: `e2197cc85eff304d895919a18b1327aa8cd72db2` (`feat(artifact): ChatGPT出力import CLIを追加`)。
+  - Push成功。Post-push `git status --short` clean、upstream `0 0`。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
