@@ -3731,6 +3731,52 @@ class TestInitUpdate(CliRuntimeHarness):
             gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
             assert ".workbench/" in gitignore.splitlines()
 
+    def test_update_preserves_opaque_workbenches_while_refreshing_managed_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            scope_directories = (
+                target / "spec-dock",
+                target / "spec-dock" / "initiatives" / "init-00001-example",
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-example"
+                / "epics"
+                / "epic-00001-example",
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-example"
+                / "epics"
+                / "epic-00001-example"
+                / "issues"
+                / "iss-00001-example",
+            )
+            sentinels: dict[Path, bytes] = {}
+            for index, scope_directory in enumerate(scope_directories):
+                sentinel = scope_directory / ".workbench" / "nested" / f"sentinel-{index}.bin"
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                payload = bytes((0, 255, index, 10, 13, 0)) + f"scope-{index}".encode()
+                sentinel.write_bytes(payload)
+                sentinels[sentinel] = payload
+
+            installed_gitignore = target / "spec-dock" / ".gitignore"
+            installed_runtime = target / "spec-dock" / "scripts" / "spec-dock"
+            installed_gitignore.write_text("stale gitignore\n", encoding="utf-8")
+            installed_runtime.write_text("stale runtime\n", encoding="utf-8")
+
+            assert main(["update", str(target)]) == 0
+
+            for sentinel, expected_payload in sentinels.items():
+                assert sentinel.read_bytes() == expected_payload
+
+            repo_root = Path(__file__).resolve().parents[3]
+            provider_root = repo_root / "src" / "spec_dock" / "assets" / "spec_dock"
+            assert installed_gitignore.read_bytes() == (provider_root / ".gitignore").read_bytes()
+            assert installed_runtime.read_bytes() == (provider_root / "scripts" / "spec-dock").read_bytes()
+
     def test_init_installs_authoring_pack_helper_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
