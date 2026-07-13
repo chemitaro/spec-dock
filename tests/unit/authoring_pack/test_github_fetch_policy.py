@@ -11,19 +11,23 @@ RUNTIME_SCRIPTS = (
 )
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
-from spec_dock_runtime.infra.authoring_pack.git_fetch import (
-    GitFetchExecutionRequest,
-    execute_git_fetch,
-)
-from spec_dock_runtime.application.authoring_pack.github_sync_preflight import _fetch_summary
-from spec_dock_runtime.domain.authoring_pack.preflight_contract import GitProcessOutcome
-from spec_dock_runtime.application.authoring_pack.github_fetch_policy import (
+from spec_dock_runtime.application.authoring_pack.github_fetch_policy import (  # noqa: E402
     BACKOFF_SECONDS,
     DIAGNOSTIC_EXCERPT_MAX_BYTES,
     MAX_ATTEMPTS,
     classify_fetch_outcome,
     run_origin_fetch_policy,
     safe_diagnostic,
+)
+from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (  # noqa: E402
+    _fetch_summary,
+)
+from spec_dock_runtime.domain.authoring_pack.preflight_contract import (  # noqa: E402
+    GitProcessOutcome,
+)
+from spec_dock_runtime.infra.authoring_pack.git_fetch import (  # noqa: E402
+    GitFetchExecutionRequest,
+    execute_git_fetch,
 )
 
 
@@ -38,7 +42,7 @@ def test_git_fetch_execution_request_has_fixed_policy() -> None:
 
     assert request.executable == "git"
     assert request.argv == ("fetch", "--prune", "origin")
-    assert request.timeout_seconds == 60.0
+    assert request.timeout_seconds == pytest.approx(60.0)
     assert request.environment_policy_id == "git-fetch-noninteractive-v1"
 
 
@@ -76,7 +80,7 @@ def test_execute_git_fetch_uses_fixed_argv_cwd_and_noninteractive_environment(mo
     assert captured["argv"] == ["git", "fetch", "--prune", "origin"]
     assert captured["cwd"] == "/tmp/repo"
     assert captured["shell"] is False
-    assert captured["timeout"] == 60.0
+    assert captured["timeout"] == pytest.approx(60.0)
     assert captured["env"]["GIT_TERMINAL_PROMPT"] == "0"
     assert captured["env"]["LC_ALL"] == "C"
     assert captured["env"]["LANG"] == "C"
