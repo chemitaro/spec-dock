@@ -3,7 +3,7 @@
 ID: "iss-00314"
 タイトル: "Harden GitHub Sync Preflight Fetch And Receipt Contract"
 関連GitHub: ["#314"]
-状態: "planning"
+状態: "delivery"
 作成者: "main orchestrator"
 最終更新: "2026-07-13"
 親: ["epic-00295", "init-local-00003"]
@@ -18,9 +18,11 @@ ID: "iss-00314"
 - canonical design: authored and fresh-reviewed after one repair cycle
 - canonical plan: authored; initial fresh review failed、repair後のfresh re-review passed
 - authorized profile: standard
-- implementation: started (M0 baseline complete)
+- implementation: complete through S01-S06/S90/S99 local gates
 - execution-ready: true (`guidance issue-execution`: `state=ready`, `may_execute_approved_plan=true`)
-- PR-ready / merge-ready / complete: not claimed
+- local review gates: QA / issue-wide code / final spec passed
+- PR-ready: yes; PR not created yet
+- merge-ready / complete: not claimed until PR CI/observation closes `CLOS-021`
 
 ## GitHub Issue移管
 
@@ -58,7 +60,7 @@ ID: "iss-00314"
 
 | ID | Primary objective | Secondary requirements | Inversion risk | Current verdict |
 |---|---|---|---|---|
-| OAL-314-001 | fetch failureを権限・shell shape変更なしで安全にretry/blockしdurable receiptへ残す | TOCTOU、pack binding、docs、projection parity | follow-up hardeningがcore fixを圧迫するriskをMUST/SHOULD/LATERで抑制 | pass for planning |
+| OAL-314-001 | fetch failureを権限・shell shape変更なしで安全にretry/blockしdurable receiptへ残す | TOCTOU、pack binding、docs、projection parity | follow-up hardeningがcore fixを圧迫するriskをMUST/SHOULD/LATERで抑制 | pass after implementation; delivery evidence pending |
 
 ## ChatGPT-first evidence
 
@@ -104,8 +106,10 @@ Neither delegated artifact claims canonical authority, reviewer pass, or impleme
 | design re-review | spec-reviewer | current after repair | passed | O-001〜O-008、layering、TOCTOU、compatibility確認 |
 | plan initial | spec-reviewer | superseded by repair | failed | new file明示、stale requirement context、blocking EAL定義、assurance refreshを要求 |
 | plan re-review | spec-reviewer | current repaired canonical set | passed | CLOS-001〜021、S01〜S06/S90/S99、delegation/test/report gatesを確認 |
-| implementation steps | code-reviewer/spec-reviewer | not started | pending | execution phase |
-| final QA/code/spec | qa-reviewer/code-reviewer/spec-reviewer | not started | pending | S99 |
+| implementation steps | code-reviewer/spec-reviewer | per-step fresh | passed | S01-S06/S90; repair/re-review loops recorded below |
+| final QA | qa-reviewer | current implementation | passed | CLI 76、unit 48、install/docs 2、Ruff/mypy/diff pass |
+| final code | code-reviewer | commit `b5d8edeca7600cbe007dab47feb5e68fe7acc5fd` | passed | no remaining blocking/non-blocking finding |
+| final spec | spec-reviewer | commit `b5d8edeca7600cbe007dab47feb5e68fe7acc5fd` | passed | CLOS-001〜020 pass; CLOS-021 delivery evidence pending |
 
 | scope | gate name | reviewer role | freshness | state | risk acceptance | promotion / completion decision | notes |
 |---|---|---|---|---|---|---|---|
@@ -125,7 +129,7 @@ The user explicitly requested implementation through PR merge preparation after 
 
 ## Execution ledgers
 
-Implementation has not started. The following ledgers are intentionally initialized rather than filled with template placeholders.
+Implementation and local quality gates are complete. External PR delivery remains open.
 
 ### Implementation Delegation Gate
 
@@ -136,6 +140,10 @@ Implementation has not started. The following ledgers are intentionally initiali
 | M2 / C2 | utility-worker | committed | `3b28c12badcbb74f4795d5e1b2e6610bbb762766`、writer/CLI/Ruff/mypy pass、post-commit clean |
 | M3 / C3 | utility-worker | committed | `84ab6ca015ccaa0c4b473d06720437687e15a85f`、preflight/Ruff/mypy pass、post-commit clean |
 | M4 / C4 | utility-worker | committed | `f5a24a8aebe16004e9aca3cca70b5bf08a3a19da`、pack/parity/Ruff/mypy pass、post-commit clean |
+| M90 / C5 | utility-worker | committed | `41bfbb24b237bd19beb7df2e35de191584931f0f`、docs/install/parity pass、post-commit clean |
+| S99 repair C5.1 | dev-coder / code-reviewer | committed | `90297109556c59e993834097013f5cc197c53223`、test lint repair、Ruff/mypy(src) pass |
+| S99 repair C5.2 | dev-coder / code-reviewer | committed | `7d912ff0102dd1b53aeb767c98d136d0099814ef`、mypy(test)とdogfood metadata snapshot修正 |
+| S99 contract repair C5.3 | dev-coder / QA / code-reviewer / spec-reviewer | committed | `b5d8edeca7600cbe007dab47feb5e68fe7acc5fd`、T0/T1 guard、redaction、repository evidence、cache hermeticity、security edge修正 |
 | S01 | dev-coder | passed | fresh code review failed once、bounded repair後のfresh re-review passed |
 | S02 | dev-coder | passed | fresh code review failed once、HTTP5xx/TLS identity fixtures修正後のfresh re-review passed |
 | S03 | dev-coder | passed | fresh code review failed once、symlink例外撤去とtarget境界test後のfresh re-review passed |
@@ -143,12 +151,11 @@ Implementation has not started. The following ledgers are intentionally initiali
 | S05 | dev-coder | passed | first fresh code review passed |
 | S06 | dev-coder | passed | fresh code review failed on matrix evidence、expanded parity/install execution後fresh re-review passed |
 | S90 | doc-writer | passed | first fresh spec-review passed |
-| S90 | doc-writer | not_started | depends on stable implemented contract |
-| S99 | reviewers | not_started | depends on all prior step closures |
+| S99 | qa/code/spec reviewers | local_pass | QA、issue-wide code、final spec fresh pass。CI/PR deliveryは別gate |
 
 ### TDD / Red / Green / Refactor Evidence
 
-- state: baseline_complete
+- state: local_quality_gate_passed
 - destination: this section, updated per plan step
 - M0 baseline: `uv run pytest -q tests/cli_runtime/test_authoring.py -k 'preflight or pack_prepare'` -> `49 passed, 338 deselected in 39.26s`
 - S01 Red: new adapter不在によりfocused testが`ModuleNotFoundError`で失敗。
@@ -167,7 +174,13 @@ Implementation has not started. The following ledgers are intentionally initiali
 - S06 Red: checked-in dogfood mirrorにprovider-only 3 modules欠落。
 - S06 Green: provider projection、fresh wheel init/update、module inclusion/help/no-bytecodeを追加。reviewでblocked/stale/pack binding/installed execution matrix不足を検出後、provider/dogfood pass-blocked-staleとpack binding、init/update後pass-blocked publicationを追加。final focused matrix `13 passed, 944 deselected`、Ruff/diff/parity pass。
 - S90 docs: provider skill/workflow/pack referenceとdogfood projectionを更新。direct argv/no-shell/no-escalation、SpecDock-owned retry、receipt/freshness/operator remediationを明文化。focused install/parity assertions `2 passed`、fresh spec-review pass。
-- next action: M90 commit candidate C5 then S99
+- S99 initial gate: `ruff check src tests` がnew testのimport/float比較7件、`mypy src tests`がsleep collector型注釈3件、dogfood metadata snapshotがiss-00314/epic-00312未反映でfail。bounded test-only repairs C5.1/C5.2後、Ruff pass、mypy 225 files pass、focused fetch 30 passed、snapshot 1 passed。
+- S99 focused command matrix: preflight/pack/writer `96 passed, 916 deselected`; wrappers `7 passed`; `spec-dock validate` nodes=205。
+- S99 full init/update attempt: snapshot repair前のfailureを修正。再実行中にunrelated timing-sensitive legacy PR observation testが`timeout`となったがstandalone再実行は`1 passed in 1.40s`。full lane passはGitHub CI evidenceで再確認する。
+- S99 direct argv: shell/redirect/pipeなしでcurrent repo preflightを実行。fetch success、stable snapshot、external fixed receipt publicationを確認し、active symlink source pathによりexpected blockedとなった。
+- S99 reviewer repair: unsafe requestでfetch実行、private-path/key redaction、nested repository欠落、cache test順序依存を修正。追加でtruncated keyと`file://` local origin漏洩をfail-safe化。
+- S99 final reviewer evidence: QA pass、issue-wide code pass、final spec pass。current implementation commit `b5d8edeca7600cbe007dab47feb5e68fe7acc5fd`。
+- next action: C6 report-only commit、push、PR delivery/observation
 
 ### Step Contract Closure
 
@@ -185,27 +198,49 @@ Implementation has not started. The following ledgers are intentionally initiali
 - evidence: CLOS-018、CLOS-017統合、fresh code-reviewer re-review pass、provider/dogfood/fresh init/update三surface parity、package inclusion、no-bytecodeを確認
 - S90: passed / Result Approval granted
 - evidence: CLOS-019〜020、fresh spec-reviewer pass、provider/dogfood/install docs parity、live help/schema alignmentを確認
+- S99 local: passed / Result Approval granted for local scope
+- evidence: fresh QA/code/spec pass、Ruff/mypy/validate/focused/full-authoring/install evidence。CLOS-021のCI/PR portionはpending
 - required closure IDs: CLOS-001 through CLOS-021
-- evidence source: plan step closure contracts and future execution results
+- evidence source: plan step closure contracts、commits C1-C5.3、reviewer verdicts、command evidence
 
 ### Test Contract Closure
 
-- state: not_started
-- baseline focused test passed: `49 passed, 338 deselected`
-- planned commands and test cards are in `plan.md`
+- state: local_pass / CI_pending
+- baseline: `49 passed, 338 deselected`
+- final authoring CLI: `415 passed, 1 skipped`
+- independent QA preflight/pack: `76 passed, 338 deselected`
+- fetch policy + receipt writer: `51 passed`
+- wrappers: `7 passed`
+- isolated wheel Issue 314: `1 passed`
+- Ruff `src tests`: pass
+- mypy `src tests`: 225 files pass
+- `spec-dock validate`: nodes=205
+- full repository pytest: local run not completed; clean GitHub CI is required for final `CLOS-021` evidence
 
 ### Closure Coverage / Delta
 
 - planned coverage: CLOS-001 through CLOS-021
-- observed coverage: S01〜S06/S90 CLOS-001〜020
-- delta: S99 CLOS-021 pending
+- observed coverage: CLOS-001〜020 pass; CLOS-021 local reviewer/check portion pass
+- delta: CLOS-021 GitHub CI/PR observation pending
+
+| Closure | State | Evidence |
+|---|---|---|
+| CLOS-001〜006 | pass | fixed fetch、typed outcome、bounded retry、fail-closed classification、T0/T1 no-fetch guard |
+| CLOS-007 | pass | private paths、password、complete/truncated private key redaction and safe digest |
+| CLOS-008 | pass | additive schema、nested repository、legacy top-level compatibility、JSON/text/install parity |
+| CLOS-009〜011 | pass | external fixed receipt、blocked persistence、atomic safe writer/ownership |
+| CLOS-012〜014 | pass | post-fetch snapshot、concurrent guard、unverified cache disposition |
+| CLOS-015〜016 | pass | pack digest/semantic binding、legacy compatibility、no current revalidation claim |
+| CLOS-017〜018 | pass | local-context regression、provider/dogfood/fresh init/update/no-bytecode parity |
+| CLOS-019〜020 | pass | installed no-shell/no-escalation/receipt/freshness docs and authority boundary |
+| CLOS-021 | pending_external | local QA/code/spec and checks pass; GitHub CI/PR observation pending |
 
 ### Commit Evidence
 
 - planning scaffold commit: `fa98df44c28b0dc09e35d322c7186eacf904820e`
 - research artifact commit: `48a26046c185c9563d073543e66404c8c8c4178f`
 - canonical planning changes: `98b2454def27f404e4039ea1198574eb7959668b`
-- implementation commits: C1 `a7a35f311871dc05cd3d4038774fda3d387c6984`; C2 `3b28c12badcbb74f4795d5e1b2e6610bbb762766`; C3 `84ab6ca015ccaa0c4b473d06720437687e15a85f`; C4 `f5a24a8aebe16004e9aca3cca70b5bf08a3a19da`
+- implementation commits: C1 `a7a35f311871dc05cd3d4038774fda3d387c6984`; C2 `3b28c12badcbb74f4795d5e1b2e6610bbb762766`; C3 `84ab6ca015ccaa0c4b473d06720437687e15a85f`; C4 `f5a24a8aebe16004e9aca3cca70b5bf08a3a19da`; C5 `41bfbb24b237bd19beb7df2e35de191584931f0f`; repairs `90297109556c59e993834097013f5cc197c53223`, `7d912ff0102dd1b53aeb767c98d136d0099814ef`, `b5d8edeca7600cbe007dab47feb5e68fe7acc5fd`
 
 ## Docs Impact
 
@@ -216,20 +251,20 @@ Implementation has not started. The following ledgers are intentionally initiali
 
 ## Final Quality Gate
 
-- QA reviewer: not started
-- issue-wide code reviewer: not started
-- final spec reviewer: not started
+- QA reviewer: passed
+- issue-wide code reviewer: passed
+- final spec reviewer: passed
 - PR Delivery Gate: not started
 - Merge Preparation Gate: not started
-- completion decision: incomplete by design
+- completion decision: local complete; external delivery incomplete
 
 ## Current blockers and next action
 
-1. Blocking itemはない。S01をplanのdelegation contractに従って開始する。
-2. 各stepはfresh reviewer pass、report evidence、commit/no-op gateを満たしてから次へ進む。
+1. Local blocking itemはない。C6 report-only commit後にpush/PR作成へ進む。
+2. GitHub CIとCodex review observationがlatest headで完了するまでCLOS-021、merge-prepared、completeをclaimしない。
 
 ## Omitted / exception notes
 
 - Manual planning fallback was not used.
 - ChatGPT/browser delay was treated as retryable waiting, not fallback justification.
-- Baseline test executionのみ完了。実装step、PR作成、merge preparation、Issue completionはまだclaimしない。
+- Implementation/local reviewは完了。PR作成、merge preparation、Issue completionはまだclaimしない。
