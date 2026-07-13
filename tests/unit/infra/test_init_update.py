@@ -38413,6 +38413,91 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "epic-local-00001" in self._read_active_pointer_text(target, "epic", "requirement.md")
             assert "iss-local-00001" in self._read_active_pointer_text(target, "issue", "requirement.md")
 
+    def test_update_rejects_workbench_symlink_from_persisted_manifest_and_active_entrypoint(self) -> None:
+        import spec_dock.cli as cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            specdock_dir = target / "spec-dock"
+            active_dir = specdock_dir / "active"
+            real_issue = specdock_dir / "scratch-targets" / "iss-local-00999-scratch"
+            real_issue.mkdir(parents=True)
+            self._write_json_force(
+                real_issue / ".meta.json",
+                {
+                    "schema_version": 1,
+                    "type": "issue",
+                    "id": "iss-local-00999",
+                    "title": "Scratch issue",
+                    "slug": "scratch",
+                },
+            )
+            (real_issue / "requirement.md").write_text("scratch requirement\n", encoding="utf-8")
+            workbench_link = specdock_dir / ".workbench" / "issue-link"
+            workbench_link.parent.mkdir()
+            workbench_link.symlink_to(real_issue, target_is_directory=True)
+
+            issue_link = active_dir / "issue"
+            if issue_link.is_symlink() or issue_link.is_file():
+                issue_link.unlink(missing_ok=True)
+            elif issue_link.is_dir():
+                shutil.rmtree(issue_link)
+            issue_link.symlink_to(os.path.relpath(workbench_link, start=active_dir), target_is_directory=True)
+
+            persisted_path = workbench_link.relative_to(target).as_posix()
+            self._write_json_force(
+                specdock_dir / ".agent" / "active.json",
+                {
+                    "schema_version": 2,
+                    "initiative": None,
+                    "epic": None,
+                    "issue": {"id": "iss-local-00999", "path": persisted_path},
+                },
+            )
+
+            assert (
+                cli._resolve_manifest_target_dir(
+                    specdock_dir,
+                    "issue",
+                    expected_id="iss-local-00999",
+                    persisted_path=persisted_path,
+                )
+                is None
+            )
+            assert (
+                cli._resolve_persisted_path_dir(
+                    specdock_dir,
+                    layer="issue",
+                    expected_id="iss-local-00999",
+                    persisted_path=persisted_path,
+                )
+                is None
+            )
+            assert (
+                cli._resolve_existing_active_entrypoint(
+                    specdock_dir,
+                    active_dir=active_dir,
+                    layer="issue",
+                )
+                is None
+            )
+            assert main(["update", str(target)]) == 0
+
+            placeholder = specdock_dir / "system" / "active-none" / "issue"
+            resolved = cli._resolve_existing_active_entrypoint(
+                specdock_dir,
+                active_dir=active_dir,
+                layer="issue",
+            )
+            assert resolved == (placeholder.resolve(), None)
+            assert self._read_active_pointer_text(target, "issue", "README.md") == (
+                placeholder / "README.md"
+            ).read_text(encoding="utf-8")
+            context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
+            assert "- issue: (none)" in context_pack_text
+            assert "iss-local-00999" not in context_pack_text
+
     def test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

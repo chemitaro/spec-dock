@@ -110,14 +110,17 @@ def test_delegated_scope_scan_prunes_workbench_and_preserves_near_name(
     assert resolved == valid_dir
 
 
-def test_delegated_scope_active_fallback_rejects_workbench_target(tmp_path: Path) -> None:
+def test_delegated_scope_active_fallback_rejects_workbench_intermediate_symlink(tmp_path: Path) -> None:
     _, _, delegated_authoring = _runtime_modules()
     specdock_dir = tmp_path / "spec-dock"
-    hidden_dir = specdock_dir / "initiatives" / "init-00001-parent" / ".workbench" / "iss-00001-hidden"
-    _write_meta(hidden_dir / ".meta.json", node_id="iss-00001")
+    real_dir = specdock_dir / "scratch-targets" / "iss-00001-hidden"
+    _write_meta(real_dir / ".meta.json", node_id="iss-00001")
+    workbench_link = specdock_dir / ".workbench" / "issue-link"
+    workbench_link.parent.mkdir()
+    workbench_link.symlink_to(real_dir, target_is_directory=True)
     active_issue = specdock_dir / "active" / "issue"
     active_issue.parent.mkdir(parents=True)
-    active_issue.symlink_to(hidden_dir, target_is_directory=True)
+    active_issue.symlink_to(workbench_link, target_is_directory=True)
 
     resolved = delegated_authoring._resolve_scope_dir(specdock_dir, "iss-00001")
 

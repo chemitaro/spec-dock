@@ -161,6 +161,66 @@ def test_source_manifest_preserves_near_workbench_names(tmp_path: Path) -> None:
     assert set(manifest.source_hashes) == {".workbench-notes/report.md"}
 
 
+def test_source_manifest_allows_absolute_in_repo_source_when_only_repo_ancestor_is_workbench(tmp_path: Path) -> None:
+    source_manifest, _preflight = _runtime_modules()
+    repo_root = tmp_path / ".workbench" / "repo"
+    source = repo_root / "package"
+    source.mkdir(parents=True)
+    (source / "safe.py").write_bytes(b"safe\n")
+
+    blockers = source_manifest.source_path_blockers(repo_root, (str(source),))
+    manifest = source_manifest.build_source_manifest(repo_root, (str(source),))
+
+    assert blockers == ()
+    assert manifest.source_paths == ("package",)
+    assert set(manifest.source_hashes) == {"package/safe.py"}
+
+
+def test_source_manifest_rejects_absolute_workbench_source_relative_to_repo(tmp_path: Path) -> None:
+    source_manifest, _preflight = _runtime_modules()
+    source = tmp_path / ".workbench" / "report.md"
+    source.parent.mkdir()
+    source.write_bytes(b"scratch\n")
+
+    blockers = source_manifest.source_path_blockers(tmp_path, (str(source),))
+    manifest = source_manifest.build_source_manifest(tmp_path, (str(source),))
+
+    assert blockers == (f"unsafe_source_path:workbench:{source}",)
+    assert manifest.source_paths == ()
+    assert manifest.source_hashes == {}
+
+
+def test_source_manifest_rejects_absolute_source_through_workbench_intermediate_symlink(tmp_path: Path) -> None:
+    source_manifest, _preflight = _runtime_modules()
+    safe_dir = tmp_path / "safe"
+    safe_dir.mkdir()
+    (safe_dir / "report.md").write_bytes(b"safe\n")
+    workbench_link = tmp_path / ".workbench" / "link"
+    workbench_link.parent.mkdir()
+    workbench_link.symlink_to(safe_dir, target_is_directory=True)
+    source = workbench_link / "report.md"
+
+    blockers = source_manifest.source_path_blockers(tmp_path, (str(source),))
+    manifest = source_manifest.build_source_manifest(tmp_path, (str(source),))
+
+    assert blockers == (f"unsafe_source_path:workbench:{source}",)
+    assert manifest.source_paths == ()
+    assert manifest.source_hashes == {}
+
+
+def test_source_manifest_keeps_absolute_outside_blocker_for_workbench_ancestor(tmp_path: Path) -> None:
+    source_manifest, _preflight = _runtime_modules()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    outside_source = tmp_path / ".workbench" / "outside" / "report.md"
+    outside_source.parent.mkdir(parents=True)
+    outside_source.write_bytes(b"outside\n")
+
+    blockers = source_manifest.source_path_blockers(repo_root, (str(outside_source),))
+
+    assert blockers == (f"unsafe_source_path:absolute-outside-repo:{outside_source}",)
+
+
 def test_preflight_stops_before_manifest_and_remote_observer_for_workbench_source(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
