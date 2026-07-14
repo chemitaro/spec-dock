@@ -240,6 +240,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S00-BASELINE-r2 | live baseline and exact inventory | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。GitHub/branch/pre-feature ref、37 exact pairs、14 generated rows、wheel/test/platform inventory、C319-01とS01 preconditionを承認 |
 | S01-CODE-r1 | latest main integration | code-reviewer | fresh | passed | no | promote | findingsなし。Issue314 preflight/receiptとIssue315〜318 Workbench contract、provider/dogfood parity、test inventoryを承認 |
 | S01-SPEC-r1 | latest main integration | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Non-destructive merge、C319-02、accepted contracts、known raw Artifact exceptionを承認 |
+| S02-CODE-r1 | package/fresh/update | code-reviewer | fresh | passed | no | promote | findingsなし。Cache exclusion/wheel/sdist/test sensitivity/cross-platform path、sdist→wheel再buildを承認 |
+| S02-SPEC-r1 | package/fresh/update | spec-reviewer | fresh | passed | no | promote | P0〜P2なし、confidence 0.99。C319-03〜05、4 scope path/type/bytes/SHA保持、nonblocking metadata観察を承認 |
 
 #### レビュー修復履歴（Review Remediation History）
 | ステップ（step） | 対象 | 検出事項 | 修復結果 |
@@ -254,13 +256,18 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 |---|---|---|---|---|---|---|---|---|
 | S00 planning | committed | Issue319 Requirement/Design/Plan/Artifact/assurance/report | `7a3793de` | clean / upstream `0 0` | N/A | C319-01 planning/preservation/assurance | `git diff --check` passed | PLANNING-FINAL-r1 passed |
 | S00 baseline | committed | Issue319 report live baseline only | `eb154791` | clean / upstream `0 0` | N/A | Exact GitHub/git/pair/exception/wheel/test/platform inventory | `git diff --check` passed | S00-BASELINE-r2 passed |
-| S01 | commit candidate | `origin/main` merge + five conflict resolutions + report evidence | 2026-07-14 S01 session ledger | verify after commit | N/A | Issue314/315〜318 accepted contracts、provider/dogfood conflict pairs | Conflict paths clean。Whole mergeはbyte-preserved raw Artifactの既知13行だけ例外 | S01-CODE-r1 / S01-SPEC-r1 passed |
+| S01 | committed | `origin/main` merge + five conflict resolutions + report evidence | `1230c456` | clean / upstream `0 0`、origin/main left 0 | N/A | Issue314/315〜318 accepted contracts、provider/dogfood conflict pairs | Conflict paths clean。Whole mergeはbyte-preserved raw Artifactの既知13行だけ例外 | S01-CODE-r1 / S01-SPEC-r1 passed |
+| S02 | commit candidate | Python cache packaging repair + wheel/fresh/update evidence + report | 2026-07-14 S02 session ledger | verify after commit | N/A | C319-03〜05、tc319-s02-01〜03 | `git diff --check` passed | S02-CODE-r1 / S02-SPEC-r1 passed |
 
 #### 変更したファイル
 - S00 planning: `requirement.md`, `design.md`, `plan.md`, `report.md`, `.assurance.json`, imported ChatGPT Artifact。
+- S01 integration: `origin/main` merge、conflict resolution 5 files、`report.md`。
+- S02 candidate: `pyproject.toml`, `setup.py`, `tests/unit/infra/test_init_update.py`, `report.md`。
 
 #### コミット
 - `7a3793de` `docs(issue-319): ChatGPT原文保存と最終品質計画を確定`
+- `eb154791` `docs(issue-319): S00ベースラインと配布在庫を記録`
+- `1230c456` `chore(integration): origin/mainの先行Issue変更を最終品質ブランチへ統合`
 
 #### メモ
 - S00 live baselineの追加記録はplanning authorityを変更せず、report evidenceだけを更新する。
@@ -379,6 +386,24 @@ Issue315〜318導入差分から抽出したexact pairはS00時点ですべてby
 - Focused verificationはDevCoder 92 passed（unit 79 + CLI 13）。Code reviewer追加確認はisolated wheel 1 passed、concurrent snapshot 3 passed。Spec reviewer確認はfocused 28 passed、assurance valid、validate `nodes=212`。
 - Whole staged `git diff --check`の13件はすべて`origin/main`由来Issue313 byte-preserved raw ChatGPT Artifact 1件の既存trailing whitespace。原文不変契約のため修正せず、競合解消差分の`diff --check` passと分離して既知例外化した。
 - Fresh code reviewer passed後、fresh spec reviewerが`passed / promote`、confidence 0.99。Blocking findingsなし。
+
+---
+
+### セッションログ（2026-07-14 S02 candidate wheel / fresh init / existing update）
+
+#### 対象
+- Step: S02
+- AC/EC: C319-03〜05 / AC-319-004〜006
+
+#### 実施内容
+- `codex-tmp` managed sessionで`uv build`した初回wheelにgenerated Python cache 133件を検出。Workbench memberは0件。既存Issue69 build testがsource copy時にcacheを除外していたため、実source buildへの感度がなかった。
+- DevCoder `gpt-5.6-sol` / mediumが、`pyproject.toml` package-data exclusion、`setup.py` wheel staging prune + sdist release-tree filter、cacheを含むsource contextからのwheel/sdist全inventory回帰を最小追加。Version/`uv.lock`は変更なし。
+- 修復後のcandidate wheelは`spec_dock-0.2.3-py3-none-any.whl`、SHA-256 `cb3049daddd35bbf162e5c9d1d1ebdc1a703530508bd3506b4e48bb76513d628`。Wheel/sdistの`__pycache__`/`.pyc`/`.pyo`は0、Workbench memberは0、S00 expected feature entriesは存在しforbidden seeded entriesは不在。
+- Absolute candidate wheelを`uvx --no-cache --from`へ渡したfresh initが成功。Installed `workbench copy` / `artifact import chatgpt-output` help、ChatGPT/Issue planning skills、unpinned DevCoder/reviewer configs、4 placement ignore、installed cache 0件を確認。
+- Pre-feature ref `7def2c10e29078e82c6a30441e79fe7cee3b1883`を`git archive`し、そのabsolute wheelからexisting consumerをinit。Root/Initiative/Epic/Issue Workbenchへtext/Python/TOML/Markdown/binary/nested sentinelを配置後、candidate wheelでupdateした。
+- Update前後の4 placementは`diff -qr`すべてexit 0。File countsはroot 1 / initiative 1 / epic 1 / issue 2、bytesは24 / 29 / 26 / 899758で一致。Scope prefixへ正規化した全5 regular fileのbefore/after SHA-256 manifestも`diff=0`、symlink countは双方0で、relative path / entry type / bytes / SHA-256を確認した。Installed managed copy/import/skill assetsは更新され、本文はreportへ記録していない。
+- Verification: focused packaging 4 passed、Ruff pass、mypy pass、`tests/unit/infra` 680 passed、copy/import CLI 20 passed、`git diff --check` pass。Setuptools license TOML deprecation warningは既存でscope外。
+- Non-blocking observation: sdist内`src/spec_dock.egg-info/SOURCES.txt`にはrelease-tree filter前のcache path文字列が残るが、cache file memberは0。当該sdistからwheel再buildも成功し、再build wheelのcache memberは0であるため配布実体/consumer behaviorへ影響しない。
 
 ---
 
