@@ -3,7 +3,7 @@
 ID: "iss-00318"
 タイトル: "ChatGPT First Preservation Workflow And Skill Integration"
 関連GitHub: ["#318"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-14"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -156,6 +156,10 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | EXEC-S04-SPEC-r1 | S04 specification alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。7/7 byte exact projection、single owner、lane/authority semantics不変を承認。独立4-suite実行619 passed |
 | EXEC-S05-SPEC-r1 | S05 manual branch evidence | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。二receipt、unavailable field、ZIP safe lane、failure block、canonical non-mutation、ignored Workbench境界を承認 |
 | EXEC-S90-SPEC-r2 | S90 exact impact and Issue319 relay | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Actual 24/24 path集合差0、台帳90実在path重複なし、runtime/public/package先行差分0、tc318-s90-02 relayを承認 |
+| EXEC-S99-QA-r1 | S99 final QA | qa-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.98。C318-01–11、manual branches、relayを確認し追加Issue318 integration test不要と判定 |
+| EXEC-S99-META-SPEC-r1 | Requirement metadata remediation | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Requirement state approvedとassurance requirement SHA再bindを承認 |
+| EXEC-S99-CODE-r2 | S99 issue-wide code | code-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。r1 metadata finding修復後、current remediation込み619 pass、7/7 parity、runtime/public/package非変更を承認 |
+| EXEC-S99-SPEC-r1 | S99 final specification alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。C318-01–11、ordered final gates、assurance binding、EAL/authority、7/7 parity、Issue319 relayを承認 |
 
 ## Review Remediation History
 
@@ -170,6 +174,7 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | EXEC-S01-r1 | S01 | Planning skillとMain orchestratorの責任が基本原則/図で矛盾 | Planningはcheckpoint呼出し/scope handoff、Mainは保存/EAL/rewriteへ統一 | r2 passed |
 | EXEC-S04-code-r1–r2 | S04 | r1でbranch/result assertion感度不足、r2でprovider修復混在、thin-caller禁止token、exact four-branch、ZIP行表現依存を指摘 | Branch section exact set、result別token、matrix複製禁止token、表現非依存ZIP row検査へ強化。S01 provider日本語主表記修復はcommit `be841c2a`へ分離し意味不変を確認 | EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed |
 | EXEC-S90-SPEC-r1 | S90 | Grouped surfaceだけで24 actual/considered pathを閉じ、planの実path単位契約を満たさない。`tc318-s90-02` relay test closureも欠落 | Actual 24/24 paths、no-op/defer実在pathsを個別rowへ展開し、Issue319 gate inventoryと`tc318-s90-02`を追加 | EXEC-S90-SPEC-r2 passed |
+| EXEC-S99-CODE-r1 | S99 | Requirement本文/レビュー証跡はapprovedだがfrontmatterが`draft`でcanonical metadataと実行前提が矛盾 | Requirement stateを`approved`へ修復し、assurance classifyでSHA `36033970...e02d`へ再bind。Fresh metadata spec review後にcode reviewerを再実行 | EXEC-S99-META-SPEC-r1 / EXEC-S99-CODE-r2 passed |
 
 ## Planning evidence log
 
@@ -266,6 +271,20 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 - Risk: Issue318をblockするmaterial unresolved riskなし。Issue319 nodeがplaceholderであることはnon-blocking handoff conditionで、Parent DS-005/W5がowner/dependencyを固定済み。
 - Claim boundary: Issue318ではPRを作成せず、PR-ready / merge-ready / merge-preparedを主張しない。
 - Ledger Note: Approved ownership relayを実パス/gateへ具体化したread-only inventoryのみ。New product semantics、runtime変更、material implementation decision、plan amendmentなし。
+
+### S99 Final Issue quality gates
+
+- Focused regression: `uv run pytest tests/cli_runtime/test_wrappers.py tests/unit/infra/test_init_update.py tests/cli_runtime/test_artifact_import_chatgpt_output.py tests/manual_tests/test_review_chatgpt_authoring_pack.py`は619 passed in 372.58s。Metadata remediation後のfresh code-reviewer独立再実行も619 passed in 362.19s。
+- Repository checks: `git diff --check` pass。Seven provider/dogfood pairsはbyte exact。Issue317 baselineからruntime/import/ZIP/delegated、root/public/package source diffなし。
+- Runtime authority: `assurance verify --issue iss-00318 --format json`は`ok=true` / `status=valid` / `authorized_profile=standard`。`validate`はnodes=209、`active show`はiss-00318一致。
+- Git baseline: S90 commit後worktree clean、upstream `0 0`。S99ではrequirement metadata、再bindされた`.assurance.json`、本reportだけをfinal candidateにする。
+- Metadata remediation: Code r1がrequirement frontmatter `draft`矛盾を検出。`approved`へ修復し、assurance classifyでrequirement SHA `36033970919d37da727ae24fb30728a6f84d10c2b5af0b29b69d6ab93ac7e02d`へ再bind。EXEC-S99-META-SPEC-r1 passed。
+- QA gate: EXEC-S99-QA-r1 findingsなし、confidence 0.98、integration coverage sufficient、`promote`。
+- Code gate: EXEC-S99-CODE-r2 findingsなし、confidence 0.99、`promote`。r1 findingはmaterial product/design changeではなくmetadata整合修復として閉じた。
+- Spec gate: EXEC-S99-SPEC-r1 findingsなし、confidence 0.99、`promote`。C318-01–11とordered gate、assurance/EAL/authority、Issue319 relayを最終承認。
+- Sync: approved-no-op。S99変更はcanonical metadata/assurance/reportだけでnode status/dependency/ADR mirror projectionを変えず、validate/active/GitHub-linked branch evidenceはcurrent。
+- Deferred global gate: Full repository pytest、global mypy/Ruff、package/fresh consumer、final Epic QA/code/spec/PRはIssue319 ownerのまま。Issue318ではPR-ready / merge-ready / merge-preparedを主張しない。
+- Ledger Note: Approved requirementのmetadata整合修復とfinal evidence記録だけ。Runtime/contract semantics、scope、Issue319 ownershipにmaterial decisionなし。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
 
 ## ドキュメント影響の解消（Docs Impact Resolution）
@@ -388,6 +407,7 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | S04 | C318-04、C318-06、C318-08–10 projection/tests | 7/7 exact projection、contract-sensitive installed tests、ZIP/import非回帰、runtime/provider非変更 | Step Evidence S04、tc318-s04-01–03、EXEC-S04-CODE-r3、EXEC-S04-SPEC-r1 | passed |
 | S05 | C318-01–05、C318-07、C318-11 manual observation | Success二件のbyte/capture boundary、unavailable field、ZIP lane、failure block、canonical non-mutation | Step Evidence S05、EPE-318-002–004、tc318-s05-01–03、EXEC-S05-SPEC-r1 | passed |
 | S90 | C318-10–11 impact/relay | 24/24 path disposition、runtime/no-op boundary、Issue319 owner/dependency/blocking、no merge-ready self-claim | Step Evidence S90、Docs Impact Resolution、tc318-s90-01–02、D-318-004、EXEC-S90-SPEC-r2 | passed |
+| S99 | C318-01–11 final quality | 619 tests、assurance/validate/active、QA→code→spec、metadata consistency、finish order | Step Evidence S99、tc318-s99-01–02、Final QA/Code/Spec Review Gate | passed |
 
 ## Test Contract Closure
 
@@ -409,6 +429,8 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | tc318-s05-03 | C318-04 | covered-existing + inventory | Existing safe ZIP fixtures | 57 passed、S05 Artifact inventoryにZIP single-file destinationなし、EXEC-S05-SPEC-r1 | passed |
 | tc318-s90-01 | C318-10–11 | inspect-only | Issue317 final commit、Issue318 actual diff、parent W5/DS-005、Issue319 placeholder | 24/24 classification、runtime/deferred diff checks、exact path existence、upstream 0/0、EXEC-S90-SPEC-r2 | passed |
 | tc318-s90-02 | C318-11 | inspect-only | Parent DS-005/W5、Issue317 relay、Issue319 placeholder | Deferred path/gate、remaining work、owner/dependency/blocking/revisit、no per-Issue PR/readiness claimをcross-document照合、EXEC-S90-SPEC-r2 | passed |
+| tc318-s99-01 | C318-01–11 | final regression | S00–S90 reviewed/committed | 619 passed、diff check、assurance valid standard、validate 209、active iss-00318、7/7 parity、runtime non-diff | passed |
+| tc318-s99-02 | C318-01–11 | ordered final review/lifecycle | S99 checks pass | QA r1 passed → code r1 finding → metadata spec r1 passed → code r2 passed → final spec r1 passed。Finish/commitはレビュー完了まで未先行 | passed |
 
 ## Closure Coverage
 
@@ -420,6 +442,7 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | C318-09 | S04 7/7 byte exact projection | passed | S99 inventory |
 | C318-04、C318-10 | S04 import/ZIP 61 pass、independent aggregate 619 pass、runtime diff none | passed | S05/S99 |
 | C318-11 | S90 exact Issue319 relay、Deferred PR Delivery Gate、EXEC-S90-SPEC-r2 | passed | S99 final alignment |
+| C318-01–11 final | S99 regression/QA/code/spec、metadata remediation、Issue319 relay | passed; blocked/stale findingなし | Issue319 |
 
 ## Closure Delta
 
@@ -433,6 +456,7 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | S04 | none | none | Test sensitivityをreview findingsに従い強化。Provider semantics/runtime変更なし | S05–S99 obligations remain | EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed; plan amendment不要 |
 | S05 | none | none | none | S90–S99 obligations remain | EXEC-S05-SPEC-r1 passed; plan amendment不要 |
 | S90 | none | none | Deferred owner/path/gateを実在inventoryへ具体化 | S99 obligations remain | EXEC-S90-SPEC-r2 passed; plan amendment不要 |
+| S99 | none | none | Requirement state metadataとassurance bindingを修復 | Commit/finish remain | QA/code/spec passed; product/design amendment不要 |
 
 ## Implementation Delegation Gate
 
@@ -445,6 +469,7 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | S04 | delegated | dev-coder `gpt-5.6-sol` / medium | Approved plan S04、reviewed provider assets、matching dogfood七files、existing tests | Dogfood七files、`test_wrappers.py`、`test_init_update.py` | Provider/runtime/public/package/new test file | Exact branch/result/thin caller/ZIP assertions、7/7 compare、focused/full regression、fresh code/spec review | completed; EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed |
 | S05 | approved-local-execution | main orchestrator | Approved plan S05 safe synthetic manual dogfood | Exact Workbench二files、最大二Artifact、report.md | Runtime/skills/provider/dogfood/tests/canonical docs、real/private content | Receipt/hash/byte/cmp/source survival、exception fields、ZIP tests/inventory、failure/canonical hash、fresh spec review | completed; EXEC-S05-SPEC-r1 passed |
 | S90 | delegated-read-only | repo-analyst `gpt-5.6-sol` / medium | Approved plan S90、Issue317/318/319、parent Epic、actual diff | Read-only inventory、report handoff | Source/docs/tests/Issue319 edits、PR/readiness claim | 24/24 path classification、runtime/deferred diff、fresh spec review | completed; EXEC-S90-SPEC-r2 passed |
+| S99 | delegated review/lifecycle | qa-reviewer → code-reviewer → spec-reviewer, all `gpt-5.6-sol` / medium | Approved plan S99、completed S00–S90、current verification | Read-only review、metadata owning-phase remediation、report/assurance/lifecycle | New implementation、Issue319/public/package/runtime、per-Issue PR | 619 tests、assurance/validate/active、ordered fresh reviews、commit/push/finish | QA/code/spec passed; commit/finish pending |
 
 ## Milestone / Commit Candidate Gate
 
@@ -458,19 +483,22 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | S04 | EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed | `test(chatgpt-first): preservation契約と投影を検証`; dogfood七files + existing tests二files + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit clean/upstream check必須 |
 | S05 | EXEC-S05-SPEC-r1 passed | `docs(issue-318): preservation分岐のdogfood証跡を記録`; safe Artifact二件 + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Workbench sourceをstageしない。Post-commit clean/upstream check必須 |
 | S90 | EXEC-S90-SPEC-r2 passed | `docs(issue-318): Issue319への引継ぎ境界を確定`; report.md only | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit clean/upstream check必須 |
+| S99 | QA r1 / code r2 / spec r1 passed | `docs(issue-318): 最終品質ゲートを確定`; requirement.md + `.assurance.json` + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit clean/upstream 0 0後だけissue finish |
 
 ## Final QA Gate
 
-- S99でqa-reviewer verdict、test sufficiency、integration test要否を記録する。
+- EXEC-S99-QA-r1: passed、findingsなし、confidence 0.98。C318-01–11とmanual branch/relay coverageはsufficientで、追加Issue318 integration test不要。
 
 ## Final Code Review Gate
 
-- S99でissue-wide code-reviewer verdict、integrated diff、修正/re-reviewを記録する。
+- EXEC-S99-CODE-r1: failed。Requirement state metadata矛盾を検出しpromotionを停止。
+- Remediation: Requirementをapprovedへ修復、assuranceを新SHAへ再bind、EXEC-S99-META-SPEC-r1 passed。
+- EXEC-S99-CODE-r2: passed、findingsなし、confidence 0.99。Current remediation込み619 passとintegrated diffを承認。
 
 ## Final Spec Review Gate
 
-- S99でspec-reviewer verdictとrequirement/design/plan/report/docs alignmentを記録する。
+- EXEC-S99-SPEC-r1: passed、findingsなし、confidence 0.99、`promote`。C318-01–11、ordered final gates、assurance binding、EAL/authority/secrecy、7/7 parity、Issue319 relayを承認。
 
 ## Final Commit
 
-- Final report ledger、final commit scope、post-commit external evidence destinationを記録する。
+- Review gates complete。Candidate scopeはrequirement.md、`.assurance.json`、report.mdだけ。Commit/push後にclean/upstream 0 0を確認してから`issue finish`する。
