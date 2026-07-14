@@ -139,7 +139,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装サマリー (任意)
 - Issue315〜318のaccepted Workbench / scoped copy / Artifact import / ChatGPT-first preservation capabilityをlatest mainへ統合し、candidate wheel、fresh/existing consumer、dogfood、public docs、full/static/manual scenarioで検証した。
-- S00〜S90はcommit/push済み。S99 final QA/code/spec r2は`HEAD 672cb23e`へbindしてpassed/promote、findings 0、spec confidence 0.99となった。S99 ledgerはcommit candidateで、S100 PR/Ubuntu/check/review/mergeability/finishは未完了である。
+- S00〜S99はcommit/push済み。S100 Phase AでPR [#323](https://github.com/chemitaro/spec-dock/pull/323)をready/open/unmergedとして作成した。観測開始前HEADは`5eee0da4`であり、次のreport commitを最終観測HEADとしてからUbuntu/check/review/mergeability/base driftを観測する。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -164,6 +164,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S05 | synthetic linked-worktree copy/import/EAL/rewrite、sync/secrecy inspection | Installed manual flow、authority separation、content-free evidence pass |
 | S90 | report audit、`git diff --check`、`spec-dock validate` | Diff check pass、nodes=212、S90-SPEC-r3 passed |
 | S99 | final QA/code/spec review、mirror/parity/static inspection | `HEAD 672cb23e` bind、QA/code/spec r2 passed。P0〜P3 0、spec findings 0 / confidence 0.99 |
+| S100 Phase A | PR creation and observation setup | PR #323 ready/open/unmerged。Pre-observation HEAD `5eee0da4`。Ubuntu provider-tests、Codex fixed review、required checks、review threads、mergeability/base driftは未観測 |
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 
@@ -187,6 +188,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S05 | Preservation成功とadoptionの混同 | Pre-adoption spec checkpointとfixture EALを追加 | C319-10/15 pass candidate |
 | S90 | PR/Ubuntu/check/review未観測 | EAL-022とS99/S100 pendingへ限定 | C319-12〜14 pending |
 | S99 | Final spec台帳がQA/code実績を未反映 | Report-only修復後のfresh r2でpassed/promote | C319-12 full pass。C319-09/13/14とterminal C319-15/16、Ubuntu/S100は継続pending |
+| S100 Phase A | PR作成後のreport commitで観測対象HEADが変わる | 次のreport commitをpushし、そのHEADへ全external observationをbindする | PR作成だけ完了。未観測項目はpassにしない |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 
@@ -199,7 +201,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S05 | C319-10 | Complete installed copy→import→EAL→rewrite flow | Synthetic fixture、source/Artifact invariants、sync/secrecy、`68c411cd` | current pass candidate | Approved local execution、live mutationなし |
 | S90 | C319-11 | All E-RQ/E-AC mapped; EAL/OAL/docs/risk/links complete | Four report closure、40 ID mapping、EAL-022 deferred、validate nodes=212、S90-SPEC-r3、commit `672cb23e` | passed | committed/pushed、clean/upstream `0 0` |
 | S99 | C319-12 | Ordered final QA→code→spec | QA/code r1 passed on `HEAD 672cb23e`; spec r1 report-only P2 repaired; S99-SPEC-r2 passed/promote | passed | Findings 0、confidence 0.99。Commit/push/clean後S100 promotion可 |
-| S100 | C319-13、C319-14 | Single PR observation、terminal lifecycle | Not yet executed。PR 0、no merge | pending | S100 owner |
+| S100 Phase A | C319-13、C319-14 | Single PR observation、terminal lifecycle | PR #323 ready/open/unmergedを作成。観測開始前HEAD `5eee0da4` | Phase A complete; observation pending | 次のreport commitを最終観測HEADにする。No merge |
 | S00〜S99 | C319-15、C319-16 | Content-free evidence and minimal/non-goal scope maintained | Secrecy scans、scoped diffs、verified no-op/non-goal ledger | pass-through-S99; terminal pending | Final headで再確認 |
 
 #### テスト契約の完了証跡（Test Contract Closure）
@@ -228,7 +230,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | C319-10 | S05 | Installed synthetic flow | current pass candidate | Authority/secrecy verified |
 | C319-11 | S90 | 40-ID mapping、EAL/OAL/docs/risk/links、S90-SPEC-r3、commit `672cb23e` | passed | committed/pushed、clean/upstream `0 0` |
 | C319-12 | S99 | QA/code r1 passed on `HEAD 672cb23e`、spec r1 P2 repaired、S99-SPEC-r2 findings 0 / confidence 0.99 | passed | Ordered final review complete。Commit/push/clean後S100 |
-| C319-13、C319-14 | S100 | PR/check/review/mergeability/lifecycle | not executed | pending、no merge |
+| C319-13、C319-14 | S100 | PR #323 ready/open/unmerged。Ubuntu provider-tests / Codex fixed review / required checks / review threads / mergeability / base driftは未観測 | Phase A complete; terminal pending | 次のreport commitへ観測をbind。No merge |
 | C319-15、C319-16 | S00〜S100 | Secrecy/minimal-diff/non-goal evidence through S99 | pass-through-S99 | Terminal head recheck pending |
 
 #### クロージャ差分（Closure Delta）
@@ -326,7 +328,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04 | committed | Static/test repair 6 files + report evidence | `149771db` | clean / upstream `0 0` | N/A | C319-08、C319-09 local/config、tc319-s04-01〜04 | `git diff --check` / focused/full/static passed | S04-CODE-r1 / S04-QA-r3 passed |
 | S05 | committed | Installed integrated manual scenario report evidence only | `68c411cd` | clean / upstream `0 0` | N/A | C319-10、C319-15、tc319-s05-01〜03 | `git diff --check` passed | S05-SPEC-PREADOPT-r1 / S05-SPEC-FINAL-r1 / S05-QA-r1 passed |
 | S90 | committed | Epic/Issue report closure evidence only | `672cb23e` | clean / upstream `0 0` | N/A | C319-11、C319-15〜16 | `git diff --check` passed / `spec-dock validate` nodes=212 | S90-SPEC-r3 passed/promote、confidence 0.99、findings 0 |
-| S99 | commit candidate | Final QA/code/spec evidence + report-only spec remediation | S99 final ledger candidate | verify after commit | N/A | C319-12、C319-15〜16 | 124 focused tests、mirror 33 mismatch 0、`make lint` passed | S99-QA-r1 / S99-CODE-r1 / S99-SPEC-r2 passed/promote、findings 0、confidence 0.99 |
+| S99 | committed | Final QA/code/spec evidence + report-only spec remediation | `5eee0da4` | clean / upstream `0 0` | N/A | C319-12、C319-15〜16 | 124 focused tests、mirror 33 mismatch 0、`make lint` passed | S99-QA-r1 / S99-CODE-r1 / S99-SPEC-r2 passed/promote、findings 0、confidence 0.99 |
+| S100 Phase A | report commit candidate | PR creation and observation setup | Next report commit becomes final observation HEAD | verify after commit/push | N/A | C319-09、C319-13〜16 | PR #323 ready/open/unmergedを確認 | External checks/reviews/mergeability/base driftは未観測。No merge |
 
 #### 変更したファイル
 - S00 planning: `requirement.md`, `design.md`, `plan.md`, `report.md`, `.assurance.json`, imported ChatGPT Artifact。
@@ -351,7 +354,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - `149771db` `chore(quality): 静的解析ゲート違反を最小差分で解消`
 - `68c411cd` `docs(issue-319): installed手動統合シナリオの証跡を記録`
 - `672cb23e` `docs(epic-312): 実装済み契約と最終送達待ちを整理`
-- S99 candidate: final QA/code/spec r2 verdictとspec r1 report-only remediation ledger
+- `5eee0da4` `docs(issue-319): S99最終レビューの完了証跡を記録`
+- S100 Phase A candidate: PR #323作成とfinal observation HEAD準備のreport-only台帳
 
 #### メモ
 - S00 live baselineの追加記録はplanning authorityを変更せず、report evidenceだけを更新する。
@@ -578,7 +582,7 @@ Issue315〜318導入差分から抽出したexact pairはS00時点ですべてby
 - C319-11: pass — Epic全40 requirement/AC ID、EAL/OAL、docs/risk/Issue links/follow-up、exact completion schema、S90-SPEC-r3 passed/promote。
 - C319-15〜16: pass-through-S90 — Report-only、content-free、minimal diff。Artifact本文、secret、absolute host pathなし。Terminal headで再確認する。
 - S99: QA/code/spec r2は`HEAD 672cb23e`へbindしてpassed/promote。C319-12 full pass。S99 ledgerのcommit/push/clean後にS100 promotion可。
-- S100: pending — PR作成、Ubuntu/required checks、review threads、mergeability/base drift、Issue Finishをfinal headで観測する。PR mergeは行わない。
+- S100: Phase A complete — PR #323をready/open/unmergedで作成。次のreport commitをfinal observation HEADとしてpush後、Ubuntu provider-tests、Codex fixed review、required checks、review threads、mergeability/base drift、Issue Finishを観測する。PR mergeは行わない。
 
 ### セッションログ（2026-07-15 S99 ordered final review）
 - Step: S99
@@ -588,7 +592,15 @@ Issue315〜318導入差分から抽出したexact pairはS00時点ですべてby
 - Final Spec: S99-SPEC-r1のreport-only P2修復後、S99-SPEC-r2 passed/promote。Findings 0、confidence 0.99。
 - C319-12: QA/code/spec ordered final reviewによりfull pass。
 - C319-15〜16: pass-through-S99、terminal head recheck pending。
-- Delivery: PR 0、no merge。Ubuntu actual run、required checks、review threads、mergeability/base drift、S100 lifecycleはpending。
+- Delivery: PR #323 ready/open/unmerged、no merge。Ubuntu actual run、Codex fixed review、required checks、review threads、mergeability/base drift、S100 terminal lifecycleはpending。
+
+### セッションログ（2026-07-15 S100 Phase A）
+- PR: [#323](https://github.com/chemitaro/spec-dock/pull/323)、ready/open/unmerged。
+- Pre-observation HEAD: `5eee0da4`。
+- Phase A: complete。PR作成と観測対象準備までを記録した。
+- Final observation HEAD: このreport-only更新を次のcommitとしてpushし、そのHEADへ全external observationをbindする。
+- Pending: Ubuntu `provider-tests`、Codex fixed review、required checks、review threads、mergeability、base drift、C319-09/13/14、terminal C319-15/16、Issue/Epic finish。
+- No-merge: 観測中および本workflowではPRをmergeしない。
 
 ---
 
@@ -618,7 +630,7 @@ Issue315〜318導入差分から抽出したexact pairはS00時点ですべてby
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| S99 commit candidate。QA/code/spec r2 passed、S100未完了 | Issue319/Epic312 report-only remediation。Terminal final ledgerはS100 final headにbind | final response / PR / GitHub Issue | S99 commit/push/clean pending; PR 0、no merge |
+| S100 Phase A report commit candidate。PR #323 ready/open/unmerged | Issue319/Epic312 report-only observation setup。次のreport commitをfinal observation HEADにする | PR #323 / final response / GitHub Issue | Phase A complete。External observation pending、no merge |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
