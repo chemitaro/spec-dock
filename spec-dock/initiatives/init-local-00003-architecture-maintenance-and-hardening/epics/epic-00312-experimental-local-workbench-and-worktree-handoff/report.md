@@ -18,9 +18,9 @@ ID: "epic-00312"
   - Human承認済み5-Issue分割を実行し、GitHub #315〜#318はclosed、#319/#312はopen。Issue319 S00〜S05はcommit/push済みで、local distribution/docs/full/static/manual gatesはpassした。
   - Workbench ignore/opacity、explicit scoped copy、byte-preserving Artifact import、ChatGPT-first preservation、installed consumer/manual integrationまで実装済み。S90 closureはfresh spec reviewでpassed/promote、confidence 0.99、findings 0となった。
 - 次のマイルストーン:
-  - S90 commit/push/clean確認 → Issue319 S99 QA/code/spec ordered final review → S100 PR作成・Ubuntu/required checks・review threads・mergeability/base drift観測・Issue Finish。
+  - S90は`672cb23e`でcommit/push済み、clean/upstream `0 0`。Issue319 S99 QA/code/spec r2はordered full pass、findings 0、spec confidence 0.99。次はS99 ledger commit/push/clean → S100 PR作成・Ubuntu/required checks・review threads・mergeability/base drift観測・Issue Finish。
 - ブロッカー:
-  - S99開始を止めるblocked/stale evidenceはない。S90 commit/push/cleanがentry condition。PR merge-prepared claimとIssue/Epic finishはS100 actual observationまで不可。
+  - C319-12はfull pass。C319-09/13/14とterminal C319-15/16はS100までpendingであり、PR merge-prepared claimとIssue/Epic finishはactual observationまで不可。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -54,7 +54,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-018 | 採用（`adopted`） | Issue316 final report / GitHub #316 | E-RQ-006〜012、014、016 scoped copy | Explicit same-repo linked-worktree copy、independent scope resolution、source-wins/destination-only、symlink/containment/failure transparencyを実装・review・commit/pushしIssue closed | Issue316 C316-01〜10、final QA/code/spec gates | Issue319 installed scenarioへ採用済み |
 | EAL-019 | 採用（`adopted`） | Issue317 final report / GitHub #317 | E-RQ-019〜023、E-AC-013〜015 Artifact import | Single Markdown、opaque bytes、blank coexistence、collision/no-overwrite、source survival/publication safetyを実装・review・commit/pushしIssue closed | Issue317 C317-01〜11、final QA/code/spec gates | Issue319 package/manual/full evidenceへ採用済み |
 | EAL-020 | 採用（`adopted`） | Issue318 final report / GitHub #318 | E-RQ-024、E-AC-016 preservation workflow | Preservation-before-adoption、EAL/canonical rewrite/fresh review、external/delegated/ZIP lane分離を実装・review・commit/pushしIssue closed | Issue318 C318-01〜11、final QA/code/spec gates | Issue319 planning/manual flowへ採用済み |
-| EAL-021 | 採用（`adopted`） | Issue319 S00〜S90 reports / current repo audit | Distribution/docs/full/static/manual/Epic closure | Latest main、candidate wheel、fresh/existing consumer、dogfood parity、public docs、full/static、installed copy→import→EAL→rewrite、40-ID closureをcurrent headで実証 | Commits `7a3793de`〜`68c411cd`; Issue319 C319-01〜11、15/16 pass-through; S90-SPEC-r3 passed | S90 commit/push/clean後S99へ進む |
+| EAL-021 | 採用（`adopted`） | Issue319 S00〜S99 reports / current repo audit | Distribution/docs/full/static/manual/Epic closure | Latest main、candidate wheel、fresh/existing consumer、dogfood parity、public docs、full/static、installed copy→import→EAL→rewrite、40-ID closureをcurrent headで実証 | Commits `7a3793de`〜`672cb23e`; S90 committed/clean; S99-QA-r1 / S99-CODE-r1 / S99-SPEC-r2 passed on `HEAD 672cb23e`; findings 0、spec confidence 0.99 | C319-12 full pass。S99 ledger commit/push/clean後S100へ進む |
 | EAL-022 | 延期（`deferred`） | Issue319 S100 live GitHub gate | PR URL、Ubuntu actual run、required checks、review threads、mergeability/base drift、Issue/Epic finish | PR未作成のため推測しない。S90/S99にはnon-blockingだがmerge-prepared/finishにはblocking | Current GitHub #319/#312 open、PR URLなし | S100でactual observationし、terminal evidenceへ更新する |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
@@ -64,7 +64,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
 | OAL-001 | Git-ignored、non-canonical、disposableな低摩擦scratchを、分類/管理systemなしで提供する | scoped copyの境界安全、failure transparency、provider/dogfood parity | 低。独自classifier/preflightをrequirementから除外し、標準copy boundaryを維持した | pass。6回目fresh requirement reviewer |
-| OAL-002 | Root manual selectionとscope-local one-shot handoff、ChatGPT原文のbyte-preserving evidence保存を実consumerで成立させる | Package/update/docs/full/static/PR quality gate | 低。Version/release/migrationやroot bulk/sync/classifier/typed tokenへ拡張しない | S00〜S90 pass。S99/S100 terminal gate pending |
+| OAL-002 | Root manual selectionとscope-local one-shot handoff、ChatGPT原文のbyte-preserving evidence保存を実consumerで成立させる | Package/update/docs/full/static/PR quality gate | 低。Version/release/migrationやroot bulk/sync/classifier/typed tokenへ拡張しない | S00〜S99 ordered full pass。S100 terminal gate pending |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -126,7 +126,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - `iss-00316` / GitHub #316: closed。Explicit scoped Workbench copy/source-wins handoff。
 - `iss-00317` / GitHub #317: closed。Byte-preserving `chatgpt-output` Artifact import。
 - `iss-00318` / GitHub #318: closed。ChatGPT-first preservation/EAL/canonical rewrite workflow。
-- `iss-00319` / GitHub #319: open。S00〜S05 committed/pushed、S90 reviewed/passでcommit pending、S99/S100 pending。
+- `iss-00319` / GitHub #319: open。S00〜S90 committed/pushed、S99 QA/code/spec r2 ordered full pass。S99 ledger commit candidate、S100 pending。
 - Epic GitHub #312: open。Issue319 terminal delivery後にclose判断する。
 - PR: 未作成。URL、checks、review、mergeabilityはS100でactual stateを記録し、推測しない。
 
@@ -140,7 +140,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | E-RQ-019, E-RQ-020, E-RQ-021, E-RQ-022, E-RQ-023, E-RQ-024 | implemented / locally verified | Issue317/318 closure、S05 two imports/EAL/rewrite。Explicit import、approved source、byte identity、blank collision/no-overwrite、publication safety、authority checkpoint |
 | E-AC-001, E-AC-002, E-AC-003, E-AC-004 | local pass | Issue315/316 focused closure、S02/S05 installed evidence。Ignore matrix、opaque traversal、root separation、explicit handoff |
 | E-AC-005, E-AC-006, E-AC-007, E-AC-008 | local pass | Issue316 final testsとS05。Target/scope resolution、merge contract、content opacity、failure transparency |
-| E-AC-009, E-AC-010, E-AC-011, E-AC-012 | local pass; terminal gate pending for E-AC-012 | No lifecycle/sync、delete、update/parityはIssue315/316/S02/S03でpass。Final local full/static/manualはS04/S05 pass、S99/S100 pending |
+| E-AC-009, E-AC-010, E-AC-011, E-AC-012 | local final gate passed; S100 terminal delivery pending for E-AC-012 | No lifecycle/sync、delete、update/parityはIssue315/316/S02/S03でpass。Final local full/static/manualはS04/S05 pass。S99 QA/code/spec r2 ordered full pass |
 | E-AC-013, E-AC-014, E-AC-015, E-AC-016 | local pass; S100 delivery observation pending | Issue317/318 final closure、S05 source/hash/no-overwrite/EAL/rewrite。PR Ubuntu actual runとterminal authority claimだけS100 pending |
 
 ## ドキュメント影響（Docs Impact）
@@ -169,9 +169,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
   - なし。PR/CI external observationは未実施。
 
 ## フォローアップ（別Issue化） (必須)
-- 新規follow-up Issueなし。残作業は既存`iss-00319`のS90 commit/push/clean、S99 ordered final review、S100 PR/CI/review/mergeability/finishである。
+- 新規follow-up Issueなし。残作業は既存`iss-00319`のS99 ledger commit/push/clean、S100 PR/CI/review/mergeability/finishである。
 - PR mergeはuser明示指示なしに行わない。
 
 ## 省略/例外メモ (必須)
-- S90はfresh spec-reviewer passed/promote。S99/S100は未完了であり、Epic completionをself-passしない。
-- EAL-022だけがdeferred。Blocked/stale entryはない。
+- S90はfresh spec-reviewer passed/promote後、`672cb23e`でcommit/push/clean済み。S99 QA/code/spec r2もpassed/promoteし、C319-12はfull pass。S100前のterminal項目とEpic completionはself-passしない。
+- EAL-022だけがdeferred。S100は未完了である。
