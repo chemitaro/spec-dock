@@ -179,6 +179,12 @@ validation / allocation の扱い:
 - malformed discussion filename candidate は fail-closed で reject します
 - grandfathered なのは既存 legacy sequential docs だけであり、legacy contract 全体の forced compatibility を意味しません
 
+### 4.5 `artifact import chatgpt-output` の命名境界
+
+`artifact import chatgpt-output` は、approved Workbenchにある単一 `.md` fileのbytesをblank Artifact identityで保存します。`chatgpt-output`はimport kindであり、この節のtyped Artifact `type` tokenには追加しません。Blank Artifactのtitle/slugに`chatgpt-output`を使うことは予約・禁止せず、`new artifact`のcatalogとimport commandは独立して共存します。
+
+Import先basenameはblank grammarと既存collision allocationを使い、slugだけに`chatgpt-output-` prefixを含めます。Source本文、encoding、改行、frontmatterは変更せず、source fileも削除しません。FilenameがArtifact規則へ適合することと、imported bodyがcanonical authorityを持つことは別です。
+
 ---
 
 ## 5. `issue start` / `active set --checkout` のブランチ命名（日本語ブランチを避ける）

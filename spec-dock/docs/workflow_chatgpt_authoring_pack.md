@@ -58,6 +58,8 @@ ChatGPT output は次のいずれかへ事前分類します。File の存在、
 
 External preserved evidence、delegated draft evidence、ZIP/tree staged evidence は独立した lane です。External preserved evidence の本文へ delegated draft 用 frontmatter や diff guard を追加せず、既存 delegated / ZIP safety contractも変更しません。詳細なstatus、failure、EAL fieldは [authoring/chatgpt-pack.md](authoring/chatgpt-pack.md) を参照します。
 
+Standalone importは単一`.md` fileだけを対象にし、sourceを残してbytesを変更しないblank Artifact copyとして実行します。言語、拡張子、MIME、内容のclassifierやautomatic importはありません。`chatgpt-output`はimport kindであってtyped Artifact tokenではなく、template-based `new artifact`と独立して共存します。
+
 ## 証跡モード（Evidence mode）
 
 ### `github-synced`
