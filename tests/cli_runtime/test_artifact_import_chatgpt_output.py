@@ -23,6 +23,17 @@ class TestArtifactImportChatGptOutput(CliRuntimeHarness):
         assert len(issue_dirs) == 1
         return issue_dirs[0]
 
+    def _write_runtime_clock(self, target: Path, *, now_iso: str, today: str) -> None:
+        runtime_clock = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "clock.py"
+        runtime_clock.write_text(
+            (
+                "from __future__ import annotations\n\n"
+                f"def now_iso() -> str:\n    return {now_iso!r}\n\n"
+                f"def today() -> str:\n    return {today!r}\n"
+            ),
+            encoding="utf-8",
+        )
+
     def test_binary_fixture_matrix_is_byte_preserving_and_content_free(self) -> None:
         fixtures = {
             "lf": b"line one\nline two\n",
@@ -153,57 +164,69 @@ class TestArtifactImportChatGptOutput(CliRuntimeHarness):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             issue_dir = self._prepare_target(target)
+            self._write_runtime_clock(
+                target,
+                now_iso="2026-07-14T12:00:00+00:00",
+                today="2026-07-14",
+            )
             workbench = target / "spec-dock" / ".workbench"
             workbench.mkdir(parents=True, exist_ok=True)
-            same_second_pair = None
-            for attempt in range(5):
-                slug = f"coexist-{attempt}"
-                source = workbench / f"{slug}.md"
-                source.write_bytes(b"raw\n")
-                self._run_runtime(
-                    target,
-                    [
-                        "new",
-                        "artifact",
-                        "blank",
-                        "--issue",
-                        "317",
-                        "--title",
-                        "Existing blank",
-                        "--slug",
-                        f"chatgpt-output-{slug}",
-                    ],
-                )
-                imported = self._run_runtime_capture(
-                    target,
-                    [
-                        "artifact",
-                        "import",
-                        "chatgpt-output",
-                        "--issue",
-                        "317",
-                        "--file",
-                        source.relative_to(target).as_posix(),
-                        "--title",
-                        "Imported blank",
-                        "--slug",
-                        slug,
-                        "--json",
-                    ],
-                )
-                assert imported.returncode == 0, imported.stdout + imported.stderr
-                artifacts = sorted((issue_dir / "artifacts").glob(f"*-chatgpt-output-{slug}.md"))
-                assert len(artifacts) == 2
-                timestamp_matches = [re.match(r"([0-9]{8}t[0-9]{6}z)", path.name) for path in artifacts]
-                assert all(match is not None for match in timestamp_matches)
-                timestamps = [match.group(1) for match in timestamp_matches if match is not None]
-                if len(set(timestamps)) == 1:
-                    same_second_pair = artifacts
-                    break
+            source = workbench / "coexist.md"
+            source_body = b"raw\n"
+            source.write_bytes(source_body)
 
-            assert same_second_pair is not None
-            assert len({path.name for path in same_second_pair}) == 2
-            assert any(re.match(r"[0-9]{8}t[0-9]{6}z-[0-9]{2}-", path.name) for path in same_second_pair)
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "artifact",
+                    "blank",
+                    "--issue",
+                    "317",
+                    "--title",
+                    "Existing blank",
+                    "--slug",
+                    "chatgpt-output-coexist",
+                ],
+            )
+            imported = self._run_runtime_capture(
+                target,
+                [
+                    "artifact",
+                    "import",
+                    "chatgpt-output",
+                    "--issue",
+                    "317",
+                    "--file",
+                    source.relative_to(target).as_posix(),
+                    "--title",
+                    "Imported blank",
+                    "--slug",
+                    "coexist",
+                    "--json",
+                ],
+            )
+
+            assert imported.returncode == 0, imported.stdout + imported.stderr
+            existing = issue_dir / "artifacts" / "20260714t120000z-chatgpt-output-coexist.md"
+            destination = issue_dir / "artifacts" / "20260714t120000z-01-chatgpt-output-coexist.md"
+            assert existing.is_file()
+            assert destination.read_bytes() == source_body
+            assert json.loads(imported.stdout) == {
+                "status": "ok",
+                "import_kind": "chatgpt-output",
+                "storage_identity": "blank",
+                "artifact_id": "20260714t120000z-01",
+                "scope_id": "iss-00317",
+                "source": source.relative_to(target).as_posix(),
+                "destination": destination.relative_to(target).as_posix(),
+                "sha256": hashlib.sha256(source_body).hexdigest(),
+                "byte_count": len(source_body),
+                "committed": True,
+                "cleanup_state": "removed",
+                "warning_codes": [],
+            }
+            assert source.read_bytes() == source_body
 
     def test_invalid_utf8_import_preserves_consumer_projections_and_typed_adr_mirror(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
