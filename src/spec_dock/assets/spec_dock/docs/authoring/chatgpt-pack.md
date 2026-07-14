@@ -1,6 +1,6 @@
 # プロンプトパックとZIP証跡のリファレンス（ChatGPT prompt pack / ZIP / staged evidence）
 
-この文書は ChatGPT authoring pack の生成物を、SpecDock の evidence として安全に扱うための reference です。
+この文書は ChatGPT output と authoring pack の生成物を、SpecDock の evidence として安全に扱うための reference です。
 
 ## 生成物の関係
 
@@ -8,10 +8,11 @@
 preflight evidence
   -> prompt pack
   -> backend invocation
-  -> ZIP / tree output
-  -> pack review report
-  -> staged evidence
-  -> candidate / draft adoption validation
+  -> output received
+  -> preservation checkpoint
+     -> standalone / inline import evidence
+     -> ZIP / tree pack review -> staged evidence -> candidate / draft validation
+     -> unavailable exception
   -> EAL adoption decision
   -> canonical rewrite
   -> fresh reviewer gate
@@ -20,6 +21,38 @@ preflight evidence
 どの段階でも、ChatGPT output は正本ではありません。
 review / stage / validate の `pass` は、その command が担当する構造や安全性の確認結果です。
 ChatGPT-first planning route は非自明な Initiative / Epic / Issue planning の正規 evidence-production route ですが、canonical adoption、fresh reviewer pass、execution-ready、PR-ready、merge-ready は各 planning / execution workflow が所有します。manual planning skill は hard / unrecoverable ChatGPT route failure と human-approved emergency backup evidence がある場合だけ使います。
+
+## Evidence laneとpreservation checkpoint
+
+ChatGPT evidence は次の三laneを混同せず扱います。
+
+1. External preserved evidence: standalone Markdownまたは完全に受信したinline answerをWorkbenchからArtifactへ保存した原文evidence。
+2. Delegated draft evidence: delegated authoring roleがtask-local authorizationの下で作成するdraft。既存のfrontmatter、provenance、diff guard、authority restrictionに従う。
+3. ZIP/tree staged evidence: existing authoring packのreview、quarantine、stage、validationを経た複数file evidence。
+
+Main orchestratorはoutput受領後、adoptionやcanonical rewriteより先にsemantic completenessとoutput formを確認し、次の一分岐だけを選びます。未分類の間はpreservation statusを付けず、import、EAL disposition、canonical rewriteをblockします。
+
+| 分類 | Main orchestratorの操作 | preservation status / 証跡 | 禁止 |
+|---|---|---|---|
+| 完成standalone Markdown | Workbench sourceを`artifact import chatgpt-output`で明示importし、receiptを検証する | `imported_byte_exact`。同一性境界はWorkbench sourceからimported Artifactまで | Delegated frontmatter追加、source削除、automatic import |
+| 完全に受信したinline answer | Answer本文の開始・終了を確認し、文字の追加・削除・整形なしでWorkbench `.md`へcaptureして明示importする | `captured_received_text`。同一性境界は受信textからimported Artifactまで | Prompt/wrapper metadataを含むraw transcript全体のdurable import、provider-original bytes claim |
+| 本当に不完全または取得不能なinline output | Reason、decision owner、nonblocking根拠、next action / revisit conditionを記録する | `skipped_inline_unavailable`。Source/destination path、hash、byte countは記録しない | Complete sourceの保存失敗、receipt欠落、eligibility failureをunavailableへ再分類 |
+| ZIP / tree | Existing pack review、quarantine、stage、validation laneへrouteする | Existing review/stage evidence | Single-file importへの変換、ZIP safety contractの緩和 |
+
+Fileの存在、拡張子、size、encodingだけでsemantic completenessを自動判定しません。Main orchestratorが内容を確認するかcomplete sourceを取得してから分類します。
+
+### Import result
+
+- `committed=true`、`import_kind=chatgpt-output`、`storage_identity=blank`、final repo-relative path、SHA-256、byte countが揃う場合は保存済みとする。
+- `committed=true`でwarningがある場合も保存済みである。Warningを記録し、自動retryや重複importを行わない。
+- `committed=false`、receipt欠落、eligibility failure、またはsemantic completeness未分類はblockである。Complete sourceを`skipped_inline_unavailable`へ読み替えない。
+- Import途中で失敗してもWorkbench sourceを削除しない。
+
+### Content-free EAL
+
+保存成功recordは標準EAL field（ID、source、source role、claim、target artifact / section、rationale、evidence strength / path、adopter、reviewer、blocking、next action）に加え、output form、preservation status、capture boundary、`import_kind=chatgpt-output`、`storage_identity=blank`、repo-relative source/destination、SHA-256、byte count、committed/warning、adoption statusを記録します。本文、secret-like value、absolute host pathは記録しません。
+
+Preservation statusとadoption statusは別fieldです。保存成功後のadoption statusは`adopted`、`partially_adopted`、`rejected`、`deferred`のいずれかをexact tokenで記録し、evidenceを保存したこと自体をcanonical採用とみなしません。Imported bodyはevidence-onlyであり、import commandやshared/planning skillはEAL、canonical docs、ADR、assurance stateを変更せず、reviewer pass、readiness、finish、PR deliveryを自己主張しません。
 
 ## プロンプトパックの役割（Prompt pack）
 
@@ -49,6 +82,8 @@ ZIP / tree output は長文の複数ファイルをまとめて受け取るた�
 - manifest にない unexpected file を警告または拒否する。
 - canonical docs、`.assurance.json`、runtime state、GitHub state を直接変更しない。
 - output metadata に `authority: evidence_only` を持たせる。
+
+ZIP/treeは上記preservation checkpointの独立branchです。Standalone/inline用のsingle-file importへ流さず、この安全laneを維持します。
 
 ## 配置済み証跡の扱い（staged evidence）
 

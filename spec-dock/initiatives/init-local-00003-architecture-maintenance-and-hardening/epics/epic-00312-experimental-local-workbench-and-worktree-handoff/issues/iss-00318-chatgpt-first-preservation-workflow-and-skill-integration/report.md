@@ -99,6 +99,7 @@ ID: "iss-00318"
 | PLANNING-PLAN-r3 | plan executability/alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。PlanからIssue executionへのpromotionを承認 |
 | PLANNING-PLAN-r4 | final plan/report runtime alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Runtime-recognized report schemaとready guidanceを含む最終planning setを承認 |
 | EXEC-S00-r1 | S00 baseline evidence | spec-reviewer | fresh | passed | no | promote | findingsなし。Gap/7 pair/61 tests/runtime non-diffをbaseline evidenceとして承認 |
+| EXEC-S01-r2 | S01 provider docs contract | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Main authorityを含む三lane/四分岐/lifecycle docs contractを承認 |
 
 ## Review Remediation History
 
@@ -110,6 +111,7 @@ ID: "iss-00318"
 | PLANNING-DES-r1–r2 | design | Completeness/dependency/tree/UML、保存実行主体 | 構造図・guard・Main orchestrator実行へ修正 | r3 passed |
 | PLANNING-PLAN-r1 | plan | Step schema/test/pathとglobal mypy boundary | 全step contract/case/pathを具体化しglobal gateをIssue319へrelay | r3 passed |
 | PLANNING-PLAN-r2 | plan | 標準report ledger接続、S90/S99 commit境界 | 全台帳へ接続しS90/S99を独立commit化 | r3 passed |
+| EXEC-S01-r1 | S01 | Planning skillとMain orchestratorの責任が基本原則/図で矛盾 | Planningはcheckpoint呼出し/scope handoff、Mainは保存/EAL/rewriteへ統一 | r2 passed |
 
 ## Planning evidence log
 
@@ -138,6 +140,16 @@ ID: "iss-00318"
 - Runtime/ZIP baseline: `uv run pytest tests/cli_runtime/test_artifact_import_chatgpt_output.py tests/manual_tests/test_review_chatgpt_authoring_pack.py`は61 passed in 11.27s。
 - Runtime/source guard: S00開始時と観測後のworktreeはclean。Runtime sourceと上記2 test filesに未コミットdiffなし。
 - Red alternative: Docs/skillは`inspect-only`、runtimeは`covered-existing`。Unexpected regressionなし。
+
+### S01 Provider workflow / reference preservation contract
+
+- Delegation: `doc-writer`がapproved S01 contractをprovider三docsだけへ実装。Skills、dogfood、tests、runtime、public/package docsは未変更。
+- `workflow_spec_authoring.md`: 三lane分離、preservation-before-adoption/rewrite、complete-source failure block、external/delegated guard境界、共通lifecycleを追加。
+- `workflow_chatgpt_authoring_pack.md`: Pre-classification/四branchの利用者向けroute、planning/Main authority、Mainを含むsequenceを追加。
+- `authoring/chatgpt-pack.md`: 四branch/status/capture boundary、import result、content-free EALのreference contractを集約。
+- Inspect-only verification: Exact status/lifecycle/authority/forbidden termsを`rg`、`git diff --check` pass。Docs-onlyのためpytest未実施。
+- Reviewer: EXEC-S01-r1は責任図の矛盾を指摘し修正。Fresh EXEC-S01-r2はfindingsなし、confidence 0.99、`promote`。
+- Ledger Note: Approved planを具体化しただけでmaterial implementation decisionなし。S02–S04のskill/projection/test責務は未変更。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
 
 ## Step Contract Closure
@@ -145,6 +157,7 @@ ID: "iss-00318"
 | step | closure ids | close condition | evidence | result |
 |---|---|---|---|---|
 | S00 | C318-01–10 baseline | Gap、7 pair、import/ZIP tests、runtime non-diffを変更前に固定 | Step Evidence S00、Test Contract Closure、EXEC-S00-r1 | passed |
+| S01 | C318-01–07 docs semantics | 三lane、四branch、lifecycle、authority/secrecy、existing guard維持をprovider docsへ固定 | Step Evidence S01、EXEC-S01-r2 | passed |
 
 ## Test Contract Closure
 
@@ -152,12 +165,15 @@ ID: "iss-00318"
 |---|---|---|---|---|---|
 | tc318-s00-01 | C318-01–08 | inspect-only | 四分岐/status/checkpointの対象7 provider files match 0 | `rg` exact-term inventory | passed baseline gap |
 | tc318-s00-02 | C318-04、C318-09–10 | covered-existing | 7/7 provider/dogfood MATCH、focused import/ZIP 61 passed | `cmp -s` pair list、focused pytest、runtime diff inspection | passed baseline |
+| tc318-s01-01 | C318-01–05 | inspect-only | S00 exact terms match 0 | Three-doc lifecycle/branch inspection、EXEC-S01-r2 | passed |
+| tc318-s01-02 | C318-06–07 | inspect-only | Existing delegated/ZIP contracts present | Lane/authority/secrecy forbidden-term inspection、EXEC-S01-r2 | passed |
 
 ## Closure Coverage
 
 | closure ids | current evidence | state | next owner |
 |---|---|---|---|
-| C318-01–08 | S00 exact-term gap inventory | baseline fixed | S01–S03 |
+| C318-01–07 | S01 provider docs semantics、EXEC-S01-r2 | docs contract passed; shared/manual evidence pending | S02/S05 |
+| C318-08 | S00 exact-term gap inventory | baseline fixed | S02–S04 |
 | C318-09 | S00 7/7 pair equality | baseline fixed | S04 |
 | C318-04、C318-10 | S00 import/ZIP 61 pass、runtime diff none | baseline fixed | S04/S99 |
 | C318-11 | Planning Deferred PR Delivery Gate | planned | S90/S99 |
@@ -167,18 +183,21 @@ ID: "iss-00318"
 | step | added | removed | changed | unimplemented | re-review |
 |---|---|---|---|---|---|
 | S00 | none | none | none | S01–S99 obligations remain | EXEC-S00-r1 passed; amendment不要 |
+| S01 | none | none | Main/Planning責任図をr1 findingで明確化 | S02–S99 obligations remain | EXEC-S01-r2 passed; plan amendment不要 |
 
 ## Implementation Delegation Gate
 
 | step | decision | role | scope/source | allowed | forbidden | verification/stop/output | result |
 |---|---|---|---|---|---|---|---|
 | S00 | approved-local-execution | main orchestrator | Approved plan S00 read-only baseline | report.md update、target inventory/test read | provider/dogfood/test/runtime/assurance edits | Stop on regression/drift; output exact command/result/ledger note | completed; EXEC-S00-r1 passed |
+| S01 | delegated | doc-writer | Approved plan S01、provider三docs | provider三docsだけ | skills/dogfood/tests/runtime/public/package/report | Docs inspection、diff-check、stop on scope expansion、worker summary/Ledger Note | completed; EXEC-S01-r2 passed |
 
 ## Milestone / Commit Candidate Gate
 
 | step | reviewer verdict | commit candidate/scope | closure state | commit evidence | post-commit clean |
 |---|---|---|---|---|---|
 | S00 | EXEC-S00-r1 passed | `docs(issue-318): Preservation契約のベースラインを記録`; report.md only | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit external clean/upstream check必須 |
+| S01 | EXEC-S01-r2 passed | `docs(chatgpt-first): 原文保存ワークフロー契約を追加`; provider三docs + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit external clean/upstream check必須 |
 
 ## Final QA Gate
 
