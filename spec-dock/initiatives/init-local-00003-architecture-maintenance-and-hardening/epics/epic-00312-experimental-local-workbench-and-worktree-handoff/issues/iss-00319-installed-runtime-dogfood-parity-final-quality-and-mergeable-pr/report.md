@@ -66,7 +66,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | EAL-319-001 | partially_adopted | `artifacts/20260714t110631z-chatgpt-output-issue-319-chatgpt-5-6-pro-bundled-planning-report.md` | external ChatGPT 5.6 Pro bundled draft | Requirement/Design/Plan、distribution topology、main integration、full/manual/review/PR順序候補 | requirement.md; design.md; plan.md | Requirement §§1–9 | Parent W5、Issue315–318 relay、local現物と一致する候補だけを採用。Current pass claimや未検証exact gateは不採用 | advisory + byte-preserved complete answer | EPE-319-001 | main orchestrator | Requirement r3 / Design r1 / Plan r2 passed | no | Execute approved plan |
 | EAL-319-002 | adopted | Parent Epic W5/DS-005 and Issue315–318 relay | canonical parent/prior Issue evidence | Final distribution/docs/full quality/manual/Epic closure/PR ownership | requirement.md | §§2–7 | Reviewed canonical authorityでIssue319の責務とdependencyを固定する | canonical source-grounded | Parent Epic requirement/design/plan/report; Issue315–318 reports | main orchestrator | PLANNING-REQ-r3 passed | no | Execute approved plan |
-| EAL-319-003 | deferred | ChatGPT bundled planning | external analysis | Version bump、`uv.lock`変更、dedicated migration file、exact Linux runner/required PR checks | future design.md/plan.md if proven | Requirement §§8–9 | Repository policy/runner/PR live stateを未検証で、Issue scope内の必要性がまだ確定しない | advisory unverified | EAL-319-001 Artifact | main orchestrator | PLANNING-REQ-r3 passed | no; revisit条件あり | S00/S01で現物確認し必要時だけ採用 |
+| EAL-319-003 | partially_adopted | ChatGPT bundled planning + current repository/CI audit | external analysis + repo evidence | Version bump、`uv.lock`変更、dedicated migration file、Linux runner/required PR checks | report.md / S04・S100 gates | S90 closure / final delivery | Version、lock、migrationは現物確認によりverified-no-op。Current Ubuntu CI configurationは採用済みで、PR headのactual runだけをS100へ残す | advisory candidate verified against current repo | EAL-319-001 Artifact; S00 inventory; S04 local/config evidence | main orchestrator | S04 code/QA passed; S90-SPEC-r3 passed | no for S90/S99; merge-prepared/finish blocking at S100 | S100でPR Ubuntu actual runとrequired checksを観測する |
 | EAL-319-004 | rejected | ChatGPT alternative expansion | external analysis | Root bulk copy、automatic sync、classifier、typed `chatgpt-output`、blank reservation、ChatGPT pass self-claim | none | none | Parent/accepted ADR/Issue315–318 contractに反する | canonical conflict | EAL-319-001 Artifact; accepted ADR | main orchestrator | PLANNING-REQ-r3 passed | no | no_action; downstreamへ持ち込まない |
 | EAL-319-005 | adopted | fresh system architecture review | system-architect `gpt-5.6-sol` / medium | Workbench root/ignore authority修正、final-head PR observation、exact parity exception、Ubuntu/static relay | design.md | §§4–11 | Parent/current filesと一致し、head-changing report commitによるstale evidenceを防ぐ | fresh specialist source-grounded review | Current parent/Issue315–318/provider CI/design diff | main orchestrator | PLANNING-DES-r1 passed | no after remediation | Execute approved plan |
 | EAL-319-006 | adopted | fresh implementation planning review | implementation-planner `gpt-5.6-sol` / medium | Uncommitted main integration、managed wheel-only consumers、hermetic GitHub-linked fixture、issue-finish fail-safe、exact inventory | plan.md | S00–S100 | Approved designを実在command/fixture/review/commit順序へ落とし、4 blocking findingsを修復後pass | fresh specialist source-grounded review | Current runtime/help/tests/Issue315–318 relay/plan diff | main orchestrator | PLANNING-PLAN-r2 passed | no after remediation | Execute approved plan |
@@ -138,62 +138,10 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- Issue315〜318のaccepted Workbench / scoped copy / Artifact import / ChatGPT-first preservation capabilityをlatest mainへ統合し、candidate wheel、fresh/existing consumer、dogfood、public docs、full/static/manual scenarioで検証した。
+- S00〜S05はcommit/push済み。S90 closureはfresh spec reviewでpassed/promoteとなり、S99 ordered final reviewsとS100 PR/Ubuntu/check/review/mergeability/finishは未完了である。
 
 ## 実装記録（セッションログ） (必須)
-
-### セッションログ（2026-07-13 HH:MM - HH:MM）
-
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
-
-#### 実施内容
-- ...
-
-#### 実行コマンド / 結果
-```bash
-<command>
-
-<result>
-```
-
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
-
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
 
 #### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 `workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
@@ -206,22 +154,114 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 |---|---|---|---|---|---|---|---|---|
 | User request to use Epic/Issue planning/execution and ChatGPT | current Work3 checkout | iss-00319 | current session | spec-manager、repo-analyst、system-architect、implementation-planner、doc-writer、dev-coder、spec/code/qa-reviewer | Active repo/worktree/scope/current session/documented responsibility。Scope expansion/destructive/private external/out-of-workflow roleを含まない | Issue complete/session end/scope change/user revocation/host conflict | none | Continue workflow without per-role reapproval |
 
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
+#### 実行コマンド / 結果
 
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
+| Step | Command / inspection family | Content-free result |
+|---|---|---|
+| S00〜S01 | active/assurance/validate、Git fetch/divergence、non-destructive merge、affected regression | Planning/baseline valid、latest main integrated、C319-01〜02 pass candidate |
+| S02〜S03 | candidate wheel build/inventory、wheel-only init/update、provider/dogfood cmp、docs contract tests | Distribution/update/parity/docs pass。Commits `09e84df2` / `da59f73c` |
+| S04 | W1〜W4 focused、unit/CLI/integration/full、`make lint`、global Ruff | Local quality pass。C319-09はlocal/configのみ、PR Ubuntu actual runはS100 pending |
+| S05 | synthetic linked-worktree copy/import/EAL/rewrite、sync/secrecy inspection | Installed manual flow、authority separation、content-free evidence pass |
+| S90 | report audit、`git diff --check`、`spec-dock validate` | Diff check pass、nodes=212、S90-SPEC-r3 passed |
+
+#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
+
+| Step | Evidence mode | Red / precondition | Green / observed evidence | Refactor / guardrail | Result |
+|---|---|---|---|---|---|
+| S00〜S01 | inspect/integration | Main divergenceとexact inventoryを観測 | Accepted contractを保ったmerge、affected regression pass | Unrelated refactorなし | pass candidate |
+| S02 | red-required + installed | Initial wheelにcache member 133件 | Package repair後cache member 0、fresh/update pass | Version/lock変更なし | pass candidate |
+| S03 | projection red/green | Provider-only時にexpected parity 3 fail | Candidate-wheel projection後561 pass、7 docs pairs equal | Dogfood-only editなし | pass candidate |
+| S04 | static red/green | Ruff/format/mypy failures | 6-file static/test repair後full/static pass | Runtime semantics変更なし | pass candidate |
+| S05 | manual-required | Adoption pending checkpoint | Copy→import→EAL→rewrite、source/Artifact不変 | Body/secret/absolute path非記録 | pass candidate |
+| S90 | inspect-only | Historical stale report stateを検出 | Four report closure + path redaction、exact schema remediation | Fresh spec reviewでfindings 0 | passed/promote |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+
+| Step | Test / risk | Response | Closure impact |
+|---|---|---|---|
+| S01 | Main integration conflictとraw Artifact whitespace | Owner別merge/regression。Byte-preserved Artifactは既知例外 | C319-02 pass candidate |
+| S02 | Wheel/sdist cache inclusion | Source-sensitive package testsとstaging/filter repair | C319-03〜05 pass candidate |
+| S04 | Static repairのtype ignore / runtime annotation regression | Fresh QA findingsをignoreなしで修復しaffected/full/static rerun | C319-08 pass、C319-09 local/config only |
+| S05 | Preservation成功とadoptionの混同 | Pre-adoption spec checkpointとfixture EALを追加 | C319-10/15 pass candidate |
+| S90 | PR/Ubuntu/check/review未観測 | EAL-022とS99/S100 pendingへ限定 | C319-12〜14 pending |
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+
+| step | closure ids | plan close condition | observed evidence | result | notes |
+|---|---|---|---|---|---|
+| S00〜S01 | C319-01、C319-02 | Planning/preservation/assurance valid、latest main integrated without history rewrite | Planning Artifact/EAL/assurance/baseline、non-destructive merge、affected regression、commits through `1230c456` | current pass candidate | S90-SPEC-r3 passed。Terminal S99/S100は未実施 |
+| S02 | C319-03、C319-04、C319-05 | Expected wheel inventory、wheel-only fresh surface、existing four-placement bytes unchanged | Candidate wheel cache 0、fresh init/help/assets、update path/type/bytes/SHA一致、`09e84df2` | current pass candidate | Version/lock/migration no-op |
+| S03 | C319-06、C319-07 | Exact provider/dogfood parity and complete public semantics | Seven docs pairs equal、561 passed、root README review、`da59f73c` | current pass candidate | Dogfood-only editなし |
+| S04 | C319-08、C319-09 | Focused/full/static pass、Linux publication path included and PR Ubuntu run required | W1〜W4/full/static pass、Ubuntu workflow local/config inspection、`149771db` | C319-08 current pass candidate; C319-09 local/config pass only | PR Ubuntu actual runはS100 pending |
+| S05 | C319-10 | Complete installed copy→import→EAL→rewrite flow | Synthetic fixture、source/Artifact invariants、sync/secrecy、`68c411cd` | current pass candidate | Approved local execution、live mutationなし |
+| S90 | C319-11 | All E-RQ/E-AC mapped; EAL/OAL/docs/risk/links complete | Four report closure、40 ID mapping、EAL-022 deferred、validate nodes=212、S90-SPEC-r3 | passed | S99 promotion可。Commit/push/clean後にS99開始 |
+| S99〜S100 | C319-12、C319-13、C319-14 | Ordered final reviews、single PR observation、terminal lifecycle | Not yet executed | pending | S99/S100 owner |
+| S00〜S90 | C319-15、C319-16 | Content-free evidence and minimal/non-goal scope maintained | Secrecy scans、scoped diffs、verified no-op/non-goal ledger | pass-through-S90; terminal pending | Final headで再確認 |
+
+#### テスト契約の完了証跡（Test Contract Closure）
+
+| closure/test id | step | required | evidence level | pre-implementation evidence | verification command-or-alternative path | observed result | notes |
+|---|---|---|---|---|---|---|---|
+| tc319-s00-01、tc319-s00-02、tc319-s00-03 | S00 | yes | inspect-only | Approved planning、diverged main、target inventory | active/assurance/validate、git divergence/merge-base、exact inventory inspection | pass candidate | Baseline commit/reviewer evidenceあり |
+| tc319-s01-01、tc319-s01-02 | S01 | yes | integration / affected regression | Main left 31、accepted Issue315〜318 contracts | non-destructive merge、conflict-owner focused tests、assurance/validate | pass candidate | Merge commit `1230c456` |
+| tc319-s02-01、tc319-s02-02、tc319-s02-03 | S02 | yes | package / installed / byte comparison | Initial wheel cache member 133、pre-feature consumer baseline | wheel inventory、absolute-wheel init/update、four-placement manifest comparison | pass candidate | Repair commit `09e84df2` |
+| tc319-s03-01、tc319-s03-02、tc319-s03-03 | S03 | yes | structural parity / docs / installer projection | Provider-only parity red 3 | candidate update、exact cmp、wrappers/init-update tests、docs search | pass candidate | Commit `da59f73c` |
+| tc319-s04-01、tc319-s04-02、tc319-s04-03 | S04 | yes | focused / full / static | Focused contract inventory、initial lint failures | W1〜W4、unit/CLI/integration/full、`make lint`、global Ruff | pass candidate | Full 2598 pass、static all pass |
+| tc319-s04-04 | S04/S100 | yes | Linux CI | Ubuntu workflow/config and publication tests present | Local/config inspection complete; PR Ubuntu check is S100 alternative path | local/config pass; actual run pending | Pending half blocks merge-prepared/finish only |
+| tc319-s05-01、tc319-s05-02、tc319-s05-03 | S05 | yes | direct manual / authority / secrecy | Candidate wheel fixed、adoption pending checkpoint | Synthetic copy/import/EAL/rewrite、sync/secrecy inspection | pass candidate | Content-free report、no live mutation |
+| tc319-s90-01、tc319-s90-02、tc319-s90-03 | S90 | yes | trace / ledger / scope inspection | Repo-analyst audit and historical report state | Four report diff、40-ID/EAL/OAL/docs/risk inspection、diff check、validate、fresh spec review | passed | No alias。S99 promotion可 after commit/push/clean |
+
+#### クロージャ網羅（Closure Coverage）
+
+| closure id(s) | step | verification evidence | observed result | notes |
+|---|---|---|---|---|
+| C319-01、C319-02 | S00〜S01 | Planning/preservation/assurance、latest main merge、affected tests | current pass candidate | S90 review前 |
+| C319-03、C319-04、C319-05 | S02 | Wheel inventory、fresh init、existing update manifests | current pass candidate | Distribution verified |
+| C319-06、C319-07 | S03 | Exact parity、docs/projection tests | current pass candidate | Public semantics verified |
+| C319-08 | S04 | Focused/full/static gates | current pass candidate | Local final quality verified |
+| C319-09 | S04/S100 | Local publication tests + Ubuntu workflow config | local/config pass | PR Ubuntu actual run pending |
+| C319-10 | S05 | Installed synthetic flow | current pass candidate | Authority/secrecy verified |
+| C319-11 | S90 | 40-ID mapping、EAL/OAL/docs/risk/links、S90-SPEC-r3 | passed | Commit/push/clean後にS99 |
+| C319-12 | S99 | Ordered QA→code→spec | not executed | pending |
+| C319-13、C319-14 | S100 | PR/check/review/mergeability/lifecycle | not executed | pending、no merge |
+| C319-15、C319-16 | S00〜S100 | Secrecy/minimal-diff/non-goal evidence through S90 | pass-through-S90 | Terminal head recheck pending |
+
+#### クロージャ差分（Closure Delta）
+
+| Change | Closure / test IDs | Reason | Plan amendment | Re-review |
+|---|---|---|---|---|
+| none | C319-01〜16 / tc319-s00-01〜tc319-s90-03 | Plan IDをaliasなしで使用。C319-09/12〜16のterminal boundaryもplanどおり | no | S90/S99/S100 planned reviews only |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+
+| step | decision | required reason | delegated role | delegated scope | source of truth | allowed changes | forbidden changes | required verification | stop conditions | required output | observed result |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S00 | delegated | Large current-state inventory | repo-analyst | Git/GitHub/provider/dogfood/test inventory | Approved plan/current repo | Report evidence | Product/spec/code mutation | Exact inventory、assurance、validate、fresh spec review | Missing authority/evidence | Content-free baseline/risks | committed/reviewed |
+| S01 | delegated | Semantic conflict repair | DevCoder | Exact merge conflicts only | Main + Issue315〜318 accepted contracts | Conflict paths/report | Unrelated redesign/history rewrite | Affected tests、code then spec review | Contract loss/unresolved conflict | Diff/tests/risks | committed/reviewed |
+| S02 | delegated | Package/installer multi-file repair | DevCoder | Wheel/sdist/cache tests and exact repair | Approved plan/provider package authority | Package/tests/report | Version/lock/general refactor | Wheel/fresh/update/code then spec review | Consumer/source dependency or bytes drift | Repair/test evidence | committed/reviewed |
+| S03 | delegated | Public documentation/projection | doc-writer | Root/provider docs only; projection by approved path | Provider docs + accepted contracts | Docs/report | Dogfood-only/product semantics | Docs search、cmp、fresh spec review | Parity/semantic mismatch | Changed files/docs evidence | committed/reviewed |
+| S04 | delegated | Static/test repair and broad verification | DevCoder | Six exact static/test files | Configured gates + approved plan | Failing static/test paths/report | Skip/disable/exclude/runtime redesign | Affected/full/static、code and QA reviews | Gate disable/new semantics | Repair/full evidence | committed/reviewed |
+| S05 | approved-local-execution | Plan assigns manual synthetic operation to orchestrator | orchestrator | Managed nonversioned fixture and report-only evidence | Approved S05 plan/candidate wheel | Fixture operations and report | Live mutation、product files、body/path exposure | Spec pre-adoption/final + QA review | Live call/source loss/authority conflation | Content-free manual ledger | committed/reviewed |
+| S90 | delegated | Cross-report audit/synthesis | repo-analyst + doc-writer | Epic312 + Issue315/316/319 reports | Canonical specs/reports/current repo audit | Exact four reports | Code/docs/spec-body mutation/S99 self-pass | Diff check、validate、fresh spec review | Missing mapping/schema/path leak | Four-report closure | passed/promote; commit/push/clean pending |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
+
+| step | delegated role | worker summary | changed files | tests or docs-only verification | reviewer verdict | unresolved risks | parent integration decision |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S00 | repo-analyst | Exact baseline/inventory | Issue319 report | assurance/validate/git/GitHub inspection | S00 spec passed | none for S01 entry | accepted/committed |
+| S01 | DevCoder | Conflict-owner merge repair | Merge conflict paths + report | Affected regression/assurance/validate | Code/spec passed | Raw Artifact whitespace known | accepted/committed |
+| S02 | DevCoder | Cache-sensitive package repair | Package/tests/report exact milestone paths | Wheel/fresh/update/full infra | Code/spec passed | sdist metadata string nonblocking | accepted/committed |
+| S03 | doc-writer | Public Workbench/import contract | Root/provider/dogfood docs + report | Docs search/cmp/561 tests | Spec passed | none | accepted/committed |
+| S04 | DevCoder | Static/test repair | Six exact files + report | Affected/full/static | Code r1 / QA r3 passed | PR Ubuntu actual pending | accepted/committed |
+| S05 | orchestrator | Synthetic installed manual operation | Report only; fixture nonversioned | Copy/import/EAL/rewrite/sync/secrecy | Pre-adoption spec/final spec/QA passed | none | accepted/committed |
+| S90 | repo-analyst + doc-writer | Final audit/content-free report synthesis | Epic312 + Issue315/316/319 reports | Diff check/validate/schema/path scan | S90-SPEC-r3 passed/promote、confidence 0.99 | S99/S100 terminal gates | accepted; commit/push/clean後S99 |
 
 #### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
+
+| step | unavailable-impossible reason | user approval-risk acceptance | allowed files | allowed operation | rollback plan | post-change verification | reviewer gate | unavailable-denied-host-conflict-waiver handling |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| S00〜S04、S90 | N/A; named workers available | N/A; no exception/risk acceptance | N/A | Canonical integration only | Revert exact report integration if rejected | Required step checks | Required reviewers used | Waiver/degraded modeなし |
+| S05 | Named worker unavailableではなく、approved planがorchestratorをmanual synthetic operation ownerに指定 | User workflow request; risk acceptance不要 | Managed nonversioned fixture + Issue319 report only | No-live-mutation copy/import/EAL/rewrite observation | Discard fixture; revert report entry | Source/hash/cmp/no-overwrite/sync/secrecy checks | Pre-adoption spec + final spec + QA passed | Unavailable/denied/host conflictなし、waiverなし |
 
 #### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
@@ -248,6 +288,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S05-SPEC-PREADOPT-r1 | pre-adoption checkpoint | spec-reviewer | fresh | passed | no | promote | findingsなし。Import bytes/source survivalを確認し、adoption pendingのままpreservationとadoptionを分離してEAL/rewriteへ進む境界を承認 |
 | S05-SPEC-FINAL-r1 | installed integrated scenario | spec-reviewer | fresh | passed | no | promote | findings 0、confidence 0.99。Copy/import/EAL/rewrite順序、authority、opacity、secrecy、C319-10/15を承認 |
 | S05-QA-r1 | installed integrated scenario | qa-reviewer | fresh | passed | no | promote | findings 0。Synthetic fixture、fake gh fail-closed、copy/import invariants、sync opacity、content-free evidenceを承認 |
+| S90-SPEC-r3 | Epic closure alignment | spec-reviewer | fresh | passed | no | promote | Findings 0、confidence 0.99。Exact completion schema、four-report closure/path redaction、C319-11 pass、C319-15/16 pass-through、EAL-022/S99/S100 pending境界を承認 |
 
 #### レビュー修復履歴（Review Remediation History）
 | ステップ（step） | 対象 | 検出事項 | 修復結果 |
@@ -259,6 +300,9 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04-STATIC-r1 | repository-wide static gate | Initial `make lint`でRuff/format/mypy violationsを検出 | 6 filesへformatとtest typingの最小修復を限定し、affected/full/staticを再実行 |
 | S04-QA-r1 | static repair QA | Test double 2箇所のtype ignoreがplanのno skip/disable/exclude gateに抵触 | Source guard delegationへ置換し、type ignoreを削除して再検証 |
 | S04-QA-r2 | runtime safety QA | Annotation/import修復がruntime `get_type_hints`利用時にP2 regressionを生む可能性を検出 | Runtime-resolvable collection imports/annotationsへ修復し、affected 652、relay 10+46、fresh r3 reviewでpassed |
+| S90-SPEC-r1 | Epic closure alignment | Mandatory completion sectionsを削除し、Epic配下reportsにabsolute host pathsが残存 | Completion headingsをcontent-free evidenceで復元し、4 host pathsをlogical labelへredact |
+| S90-SPEC-r2 | Epic closure alignment | Exact field schema不足、S05 exception境界不足、four-report記述/changed-file inventoryのstale | Six tablesをexact columnsへ再構成し、S05 approved-local-execution、exact four reports/redaction countsを記録 |
+| S90-SPEC-r3 | Epic closure alignment | r1/r2 remediation後のfresh review | Findings 0、confidence 0.99、passed/promote。C319-11 pass、C319-15/16 pass-through |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -269,7 +313,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S02 | committed | Python cache packaging repair + wheel/fresh/update evidence + report | `09e84df2` | clean / upstream `0 0` | N/A | C319-03〜05、tc319-s02-01〜03 | `git diff --check` passed | S02-CODE-r1 / S02-SPEC-r1 passed |
 | S03 | committed | Root/provider docs + candidate-wheel dogfood projection + report | `da59f73c` | clean / upstream `0 0` | N/A | C319-06〜07、tc319-s03-01〜03 | `git diff --check` passed | S03-SPEC-r1 passed / code-reviewer N/A (docs-only) |
 | S04 | committed | Static/test repair 6 files + report evidence | `149771db` | clean / upstream `0 0` | N/A | C319-08、C319-09 local/config、tc319-s04-01〜04 | `git diff --check` / focused/full/static passed | S04-CODE-r1 / S04-QA-r3 passed |
-| S05 | commit candidate | Installed integrated manual scenario report evidence only | 2026-07-14 S05 session ledger | verify after commit | N/A | C319-10、C319-15、tc319-s05-01〜03 | `git diff --check` passed | S05-SPEC-PREADOPT-r1 / S05-SPEC-FINAL-r1 / S05-QA-r1 passed |
+| S05 | committed | Installed integrated manual scenario report evidence only | `68c411cd` | clean / upstream `0 0` | N/A | C319-10、C319-15、tc319-s05-01〜03 | `git diff --check` passed | S05-SPEC-PREADOPT-r1 / S05-SPEC-FINAL-r1 / S05-QA-r1 passed |
+| S90 | commit candidate | Epic/Issue report closure evidence only | 2026-07-14 S90 session ledger | verify after commit | N/A | C319-11、C319-15〜16 | `git diff --check` passed / `spec-dock validate` nodes=212 | S90-SPEC-r3 passed/promote、confidence 0.99、findings 0 |
 
 #### 変更したファイル
 - S00 planning: `requirement.md`, `design.md`, `plan.md`, `report.md`, `.assurance.json`, imported ChatGPT Artifact。
@@ -277,7 +322,12 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - S02 candidate: `pyproject.toml`, `setup.py`, `tests/unit/infra/test_init_update.py`, `report.md`。
 - S03: `README.md`, provider/dogfood docs 7 exact pairs、`report.md`。
 - S04: `scripts/authoring-pack/authoring_pack_review.py`, `scripts/authoring-pack/invoke_chatgpt_backend.py`, `tests/cli_runtime/test_artifact_import_chatgpt_output.py`, `tests/cli_runtime/test_artifact_import_s04.py`, `tests/cli_runtime/test_wrappers.py`, `tests/unit/infra/test_init_update.py`, `report.md`。
-- S05 candidate: `report.md` only。
+- S05: `report.md` only。
+- S90 candidate exactly four reports:
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00315-experimental-workbench-ignore-and-opaque-traversal-foundation/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00316-experimental-scoped-workbench-copy-and-source-wins-merge/report.md`
+  - `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/report.md`
 
 #### コミット
 - `7a3793de` `docs(issue-319): ChatGPT原文保存と最終品質計画を確定`
@@ -286,7 +336,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - `09e84df2` `fix(packaging): wheelとsdistへのPythonキャッシュ混入を防止`
 - `da59f73c` `docs(workbench): WorkbenchとArtifact importの公開運用契約を整備`
 - `149771db` `chore(quality): 静的解析ゲート違反を最小差分で解消`
-- S05 candidate: `docs(issue-319): installed手動統合証跡を記録`
+- `68c411cd` `docs(issue-319): installed手動統合シナリオの証跡を記録`
+- S90 candidate: `docs(epic-312): 実装済み契約と最終送達待ちを整理`
 
 #### メモ
 - S00 live baselineの追加記録はplanning authorityを変更せず、report evidenceだけを更新する。
@@ -399,7 +450,7 @@ Issue315〜318導入差分から抽出したexact pairはS00時点ですべてby
 
 #### 実施内容
 - S00 clean/upstream `0 0`後に`git fetch origin`し、left 31 / right 55を確認。`git merge --no-commit --no-ff origin/main`で`MERGE_HEAD=0481b394`を未コミット統合した。
-- 最初のsandbox内mergeは`.agents/`置換権限で停止し、tracked rollbackと`MERGE_HEAD`不在を確認。mergeが生成した未追跡物だけを`/private/tmp/issue319-failed-merge-20260714`へ非破壊退避してから同一commandを権限付きで再実行した。
+- 最初のsandbox内mergeは`.agents/`置換権限で停止し、tracked rollbackと`MERGE_HEAD`不在を確認。mergeが生成した未追跡物だけをmanaged temporary failed-merge quarantineへ非破壊退避してから同一commandを権限付きで再実行した。
 - Content conflict 5件をowner分類: provider/dogfood `github_sync_preflight.py` 2件、provider/dogfood `source_manifest.py` 2件、`tests/unit/infra/test_init_update.py` 1件。
 - DevCoder `gpt-5.6-sol` / mediumが、Workbench source fail-fast + Issue314 receipt publication、`.workbench` traversal prune + `file_observer`、Issue314/315〜319 test inventory、Codex/GitHub両surfaceのunpinned profile contractを併合。Unresolved conflict/markerは0、conflict投影2組はbyte-equal。
 - Focused verificationはDevCoder 92 passed（unit 79 + CLI 13）。Code reviewer追加確認はisolated wheel 1 passed、concurrent snapshot 3 passed。Spec reviewer確認はfocused 28 passed、assurance valid、validate `nodes=212`。
@@ -496,32 +547,54 @@ Issue315〜318導入差分から抽出したexact pairはS00時点ですべてby
 
 ---
 
+### セッションログ（2026-07-14 S90 Epic closure audit）
+
+#### 対象
+- Step: S90
+- AC/EC: C319-11、C319-15〜16 / AC-319-012
+
+#### 実施内容
+- Repo-analyst final auditをcurrent canonical requirement/design/plan、Issue315〜319 reports、provider/dogfood/docs/tests/CI、GitHub stateと照合した。GitHub #315〜#318はclosed、#319/#312はopen。S00〜S05はcommit/push済みでclean/upstream `0 0`だった。
+- Epic E-RQ-001〜024 / E-AC-001〜016をIssue315〜318のaccepted closureとIssue319 S00〜S05のcurrent evidenceへ全件mappingした。Blocked/stale entryは残さず、PR Ubuntu actual run、S99 ordered final review、S100 PR observation/finishだけを明示的pendingとした。
+- Version/`uv.lock`/migration/rules/templates/new dependency/root bulk copy/automatic sync/classifier/typed tokenは、verified-no-opまたはaccepted non-goalである。PRは未作成で、URLやcheck resultを推測していない。
+- Issue316 report frontmatterのhistorical `draft`を、closed Issue/final gates/commit/push evidenceに合わせて`approved`へ補正した。Product semantics、canonical Requirement/Design/Plan、code/docs/testsは変更していない。
+- Host path redactionはIssue315 1箇所、Issue316 2箇所、Issue319 1箇所をlogical labelへ置換した。意味とlifecycle evidenceを保持し、Epic配下の対象reportsでabsolute host path hit 0を確認した。
+
+#### クロージャ
+- C319-11: pass — Epic全40 requirement/AC ID、EAL/OAL、docs/risk/Issue links/follow-up、exact completion schema、S90-SPEC-r3 passed/promote。
+- C319-15〜16: pass-through-S90 — Report-only、content-free、minimal diff。Artifact本文、secret、absolute host pathなし。Terminal headで再確認する。
+- S99: promotion可。S90 commit/push/clean確認後、final QA → code → specのordered reviewをlatest committed headへbindする。
+- S100: pending — PR作成、Ubuntu/required checks、review threads、mergeability/base drift、Issue Finishをfinal headで観測する。PR mergeは行わない。
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| Root/public/provider/dogfood docs | yes | doc-writer | S03 `da59f73c`、7 exact docs pairs、root README semantic review | S03-SPEC-r1 passed |
+| Templates/rules/migration/version/lock | no | N/A | Current contractsで必要性なし。S00/S02/S03/S90 auditでverified-no-op | S90-SPEC-r3 passed |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | S04/S05 coverageはsufficient。S99でlatest headをfresh review | Focused/full/manual/local CI evidenceはpass | pending S99; self-passしない |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | S04 repairはpass。S90 report closureを含むlatest headをS99でfresh review | 0 | pending S99; self-passしない |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | S90-SPEC-r3 passed/promote。S99 terminal spec reviewは未実施 | 2 remediation reviews | S90 passed、S99 pending; self-passしない |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S90 reviewed closure candidate。S99/S100未完了 | Four S90 reports only。Terminal final ledgerはS100 final headにbind | final response / PR / GitHub Issue | pending; PR未作成 |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
