@@ -5,602 +5,677 @@ ID: "iss-00318"
 関連GitHub: ["#318"]
 状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-13"
+最終更新: "2026-07-14"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00312", "init-local-00003"]
+authorized_profile: "standard"
 ---
-
 
 # iss-00318 ChatGPT First Preservation Workflow And Skill Integration — Issue 実装計画書（Standard / TDD）
 
-この文書は、承認済みの `requirement.md` と `design.md` を、TDDに沿って実行可能な **マイルストーン（Milestone）、振る舞いバックログ（Behavior Backlog）、TDD Cycle、Validation Gate、報告証跡（Report Evidence）** へ変換する。
-
-この文書は planned executable workflow contract である。実行中の観測結果、Red / Green / Refactor の実績、逸脱、追加判断、発見事項は `report.md` に記録する。
-
----
-
 ## 0. 文書の位置づけ
 
-### この文書が定義すること
+本書は、fresh reviewを通過した `requirement.md` と承認済み `design.md` を、順番に一つずつ実行・検証・review・commitできるstepへ変換する。ChatGPT 5.6 Proが一括生成したrequirement/design/plan候補とfresh implementation-plannerの分析はevidenceとして利用するが、runtime authority、親Epic、accepted ADR、Issue317と一致する内容だけを採用する。
 
-- このIssueをどの順序で実装・検証するか
-- どのマイルストーン（Milestone）で何が成立するか
-- どの振る舞いをTDDの対象にするか
-- どの単位でRed-Green-Refactorを回すか
-- 各振る舞いに必要な検証レベル
-- 実装中に守るべき変更範囲
-- 実装中に停止・再計画すべき条件
-- `report.md` に残すべき証拠の記録先
-- 最終完了条件
+実行中の観測結果、Red / Green / refactor guardrail、reviewer verdict、commit hash、逸脱は `report.md` に記録する。本書は観測済みpassを先取りせず、Issue319が所有するpublic rollout、full/global quality、最終PRを引き取らない。
 
-### この文書が定義しないこと
+## 1. 実行開始条件
 
-- 新しい要件
-- 新しい設計判断
-- 上位設計の再定義
-- 実装後の観測証拠そのもの
-- TDD中に発見されるprivateな内部構造
+- [x] `requirement.md` はPLANNING-REQ-r13でfresh `spec-reviewer` pass。
+- [x] `design.md` はPLANNING-DES-r3でfresh `spec-reviewer` pass、state approved。
+- [x] `.assurance.json` はruntimeが生成し、`authorized_profile=standard`、`assurance verify` valid。
+- [x] Product / designのblocking open questionはない。
+- [x] Issue317の`artifact import chatgpt-output` runtime、accepted ADR、Issue319 relayを確認済み。
+- [x] ChatGPT 5.6 Pro complete received answerはrewrite前にArtifactへ保存済み。
+- [x] 本planがPLANNING-PLAN-r3でfresh `spec-reviewer` passした。
+- [x] Approved planを再bindしたassuranceとexecution guidanceが`ready` / `execute-approved-plan`を返す。
 
----
+Plan reviewとassurance verificationが通るまでS00を開始しない。Profileは手編集・自己宣言せず、`.assurance.json`をauthorityとする。
 
-## 1. 計画開始条件（Plan Readiness）
-
-### 1.1 必須入力（Required Inputs）
-
-| 作業成果物（Artifact） | 状態 | 確認事項 |
-|---|---|---|
-| `requirement.md` | 下書き / 承認済み（draft / approved） | AC、BH、CON、等級（Grade）判定材料がある |
-| `design.md` | 下書き / 承認済み（draft / approved） | 固定設計契約（Fixed Design Contracts）、Behavior Seeds、検証への含意（検証（Verification） Implications）がある |
-| `report.md` | 存在 / 欠落（exists / missing） | 実行証拠の記録先がある |
-| 親Epic design | 確認済み / N/A（reviewed / N/A） | 継承すべき制約が確認済み |
-| 親Initiative design | 確認済み / N/A（reviewed / N/A） | 戦略的制約に矛盾しない |
-| ADR / architecture docs | 確認済み / N/A（reviewed / N/A） | 関連制約が確認済み |
-
-### 1.2 計画開始条件（Plan）
-
-- [ ] `requirement.md` が承認済み、または実装計画作成に十分な状態である
-- [ ] `design.md` が承認済み、または計画への引き渡し（Plan Handoff）が記載済みである
-- [ ] 未解決のBlocking Open Questionがない
-- [ ] Issue Gradeが `standard` として妥当である
-- [ ] `standard` の前提を破る既知リスクがない
-- [ ] 実装中に変更してよい設計仮説と、変更してはいけない設計契約が区別されている
-- [ ] `report.md` への証拠記録方針がある
-
----
-
-## 2. 実装戦略（Implementation Strategy）
-
-このIssueでは、原則として **TDDによる段階的な垂直スライス実装** を採用する。
+## 2. 実装戦略
 
 ```text
-Issue 受け入れ範囲（Acceptance Envelope）
-└── マイルストーン（Milestone）
-    └── 振る舞いバックログ（Behavior Backlog） Item
-        └── 実行中の TDD サイクル（Active TDD Cycle）
-            ├── Red
-            ├── Confirm Red
-            ├── Minimal Green
-            ├── Local Regression
-            ├── Refactor
-            └── 報告証跡（Report Evidence）
+Pre-S00 plan review / assurance
+  -> S00 baseline inventory
+  -> S01 provider workflow/reference contract
+  -> S02 shared preservation kernel
+  -> S03 thin planning-skill hooks
+  -> S04 dogfood projection and automated contract verification
+  -> S05 manual four-branch dogfood evidence
+  -> S90 docs impact / Issue319 relay closure
+  -> S99 final Issue quality gates and finish
 ```
 
-### 2.1 基本方針
+- Provider-first: 恒久変更はprovider authorityを先に編集し、dogfood counterpartへexact projectionする。
+- One step at a time: 各stepをreview・commitしてから次へ進む。複数stepを同時に実装しない。
+- Single semantic owner: 四分岐matrixはshared skillだけが所有し、planning skillsへ複製しない。
+- Contract-first TDD: 文書・skillのsemantic contractを先に固定し、S04でその契約を壊すと失敗するtestを追加する。
+- No runtime expansion: Issue317 runtime source、Artifact grammar、ZIP safety runtime、delegated-authoring runtimeを変更しない。
+- Report with step: reviewer evidenceと観測結果は対象変更と同じstep/commitでreportへ残す。
 
-- Issue 全体は広く理解する
-- マイルストーン（Milestone）単位で独立検証可能な中間成果を管理する
-- 振る舞いバックログ（Behavior Backlog）で実装対象の振る舞いを列挙する
-- TDD Cycleは実行直前に一つずつ具体化する
-- 一つのTDD Cycleでは、原則として一つの独立した振る舞い仮説だけを扱う
-- Redの失敗理由を確認してからproduction codeを変更する
-- RefactorはGreen状態でのみ行う
-- 観測証拠は `plan.md` ではなく `report.md` に残す
+## 3. 変更範囲
 
-### 2.2 TDD の Red 方針（TDD Red Policy）
+### 3.1 許可変更面
 
-| Red種別 | 許容数 | 扱い |
-|---|---:|---|
-| Intentional outer Red | 最大1 | マイルストーン（Milestone）のguiding testとして許容 |
-| Intentional inner Red | 最大1 | 現在の実行中の TDD サイクル（Active TDD Cycle）のみ |
-| Existing regression Red | 0 | 発生したら即停止 |
-| Unknown Red | 0 | 原因を確認するまで実装へ進まない |
+Provider docs:
 
-### 2.3 Red代替証跡（Red Alternative）
+- `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
+- `src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md`
+- `src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md`
 
-TDDのRedが適切でない場合は、理由を明示して代替証拠を固定する。
+Provider skills:
 
-| 対象 | Red分類 | 理由 | 代替証拠 |
-|---|---|---|---|
-| ... | red-required / covered-existing / characterization-first / 点検（inspect）-only / 手動（manual）-required / not-applicable | ... | ... |
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md`
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md`
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`
 
----
+Matching dogfood projection:
 
-## 3. 範囲と変更面（対象範囲（Scope） and Change Surface）
+- `spec-dock/docs/workflow_spec_authoring.md`
+- `spec-dock/docs/workflow_chatgpt_authoring_pack.md`
+- `spec-dock/docs/authoring/chatgpt-pack.md`
+- `.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`
+- `.agents/skills/spec-dock-initiative-planning/SKILL.md`
+- `.agents/skills/spec-dock-epic-planning/SKILL.md`
+- `.agents/skills/spec-dock-issue-planning/SKILL.md`
 
-### 3.1 許可変更面（Allowed Change Surface）
+Focused testsは既存の次のsurfaceを優先し、必要な最小fileだけを追加・変更する。
 
-| 種別 | パス・対象（Path / Target） | 許可する変更 | 関連設計識別子（Design ID） |
-|---|---|---|---|
-| コード（code） | ... | ... | `DES-...` |
-| テスト（tests） | ... | ... | `DES-...` |
-| 文書（docs） | ... | ... | `DES-...` |
-| テンプレート（templates） | ... | ... | `DES-...` |
-| スキル群（skills） | ... | ... | `DES-...` |
-| scripts | ... | ... | `DES-...` |
-| metadata | ... | ... | `DES-...` |
+- `tests/cli_runtime/test_wrappers.py`
+- `tests/unit/infra/test_init_update.py`
+- `tests/cli_runtime/test_artifact_import_chatgpt_output.py`
+- `tests/manual_tests/test_review_chatgpt_authoring_pack.py`
 
-### 3.2 禁止変更（Forbidden Changes）
+Issue318で変更可能なtest fileは上記4件に限定する。契約を上記へ安全に追加できない場合は新規test fileを作らず、plan amendmentとfresh reviewを行う。
 
-| 対象 | 禁止理由 | 必要になった場合の対応 |
-|---|---|---|
-| ... | ... | 停止して再計画 / escalate / 後続issue（後続（follow-up） issue） |
+Active Issueでは `.assurance.json`、`report.md`、必要なplanning amendment、safe synthetic Workbench/Artifact evidenceを更新できる。
 
-### 3.3 提供側・利用側反映（Provider / Consumer）
+### 3.2 禁止変更
 
-| 対象 | 変更要否 | 対応 |
-|---|---|---|
-| `src/spec_dock/assets/...` | はい / いいえ / 不明（yes / no / unknown） | ... |
-| ワークスペース（root `spec-dock/...`） | はい / いいえ / 不明（yes / no / unknown） | ... |
+- Issue317のparser、application、publisher、presentation、Artifact allocator。
+- Artifact rules/templates、typed catalog、frontmatter、sidecar、index。
+- ZIP/tree review/quarantine/stage runtimeとdelegated-authoring diff guard runtime。
+- Automatic capture/import、automatic EAL/canonical/assurance mutation。
+- Root `README.md`、public guide/reference naming、migration/release docs。
+- Package data、fresh init/updateの最終matrix、full/global regression repair。
+- Issue319 canonical node、per-Issue PR、final Epic PR。
+- EAL/reportへのbody、secret-like value、absolute host pathの記録。
 
----
+禁止面の変更が必要になった場合は実装を止め、plan amendmentとscope reviewを先に行う。
 
-## 4. 実行概要（Execution Overview）
+## 4. 仕様固定クロージャ索引
 
-### 4.1 マイルストーン要約（マイルストーン（Milestone） Summary）
-
-| マイルストーン（Milestone） 識別子（ID） | 成果 | 主なBehavior | 検証（Verification） ゲート（Gate） | 状態 |
-|---|---|---|---|---|
-| M1 | ... | `B-...` | ... | planned |
-| M2 | ... | `B-...` | ... | planned |
-| M3 | ... | `B-...` | ... | planned |
-| M90 | 文書・テンプレート（docs / template） / skill影響解決 | `B-...` | docs / diff / review | planned |
-| M99 | final quality gate | all | full verification | planned |
-
-### 4.2 マイルストーン依存（マイルストーン（Milestone） Dependency）
-
-```plantuml
-@startuml
-title Implementation マイルストーン依存（マイルストーン（Milestone） Dependency）
-start
-:M1 Minimal behavior path;
-:M2 Edge / failure behavior;
-:M3 Integration / artifact behavior;
-:M90 Docs and template impact;
-:M99 Final quality gate;
-stop
-@enduml
-```
-
-### 4.3 実装順序の理由
-
-- ...
-- ...
-
----
-
-## 5. 受け入れ範囲（Acceptance Envelope）
-
-### 5.1 受け入れ成果（Acceptance Outcomes）
-
-| 成果識別子（Outcome ID） | 内容 | 関連AC | 関連設計識別子（Design ID） | 完了証拠 |
-|---|---|---|---|---|
-| OUT-001 | ... | `AC-...` | `DES-...` | `EVD-...` |
-| OUT-002 | ... | `AC-...` | `DES-...` | `EVD-...` |
-
-### 5.2 起きてはいけないこと（Must Not Happen）
-
-| 識別子（ID） | 内容 | 検証方法 |
-|---|---|---|
-| MNH-001 | ... | ... |
-| MNH-002 | ... | ... |
-
----
-
-## 6. 仕様固定クロージャ一覧（Spec-Locked クロージャ（Closure） Index）
-
-| クロージャ識別子（Closure ID） | 要件識別子（Requirement ID） | 設計識別子（Design ID） | 閉じる内容 | 検証レベル（Verification Level） | 報告証跡（Report Evidence） |
+| ID | Spec | 固定期待 | 主な欠陥 | Evidence | Owner |
 |---|---|---|---|---|---|
-| CLOS-001 | AC-001 | DES-001 | ... | unit・CLI・テンプレート・文書 | `report.md#...` |
-| CLOS-002 | AC-002 | DES-002 | ... | unit / integration / 手動（manual） | `report.md#...` |
-| CLOS-003 | BH-001 | DES-003 | ... | unit / CLI | `report.md#...` |
-| CLOS-004 | CON-001 | DES-004 | ... | 点検・文書（点検（inspect）ion / docs） | `report.md#...` |
-| CLOS-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | DES-... | ... | ... | `report.md#...` |
+| C318-01 | AC-318-001 | Complete standalone fileをrewrite前に`imported_byte_exact`で保存 | 原文消失、late preservation | contract + manual | S01/S02/S05 |
+| C318-02 | AC-318-002 | Complete received inline textを無編集captureし`captured_received_text` | provider byte identityの誤主張 | contract + manual | S01/S02/S05 |
+| C318-03 | AC-318-003 | Genuine unavailableだけ`skipped_inline_unavailable`、path/hash/bytesなし | fabricated provenance、gate bypass | contract + manual | S01/S02/S05 |
+| C318-04 | AC-318-004 | ZIP/treeはexisting safe lane、single-file importへ流さない | unsafe ZIP bypass | characterization | S00/S01/S02/S04/S05 |
+| C318-05 | AC-318-005 | `committed=false`/receipt欠落/未分類はblock、committed warningは記録してretryなし | adoption before preservation、duplicate import | red-required + manual | S02/S04/S05 |
+| C318-06 | AC-318-006 | External evidenceとdelegated draftを分離しexisting guardを維持 | provenance conflation | contract + regression | S01/S04 |
+| C318-07 | AC-318-007 | EALはcontent-freeで全receipt/採否fieldを持ちself-claimしない | privacy/authority leak | red-required + inspection | S01–S05 |
+| C318-08 | AC-318-008 | Matrixはshared skill一箇所、三planning skillはthin hook | policy drift、重複 | structural contract | S02/S03/S04 |
+| C318-09 | AC-318-009 | 7 provider/dogfood pairのexact projectionとfocused installed contract | managed asset divergence | red-required | S04 |
+| C318-10 | AC-318-010 | Import/validate/sync/ADR/ZIP/delegated runtime非回帰、runtime source意味diffなし | runtime regression | characterization | S00/S04/S99 |
+| C318-11 | AC-318-011 | Issue319 relay、no per-Issue PR、merge-prepared未主張 | delivery ownership loss | inspection + manual | S90/S99 |
 
----
+全C318-01–11がreportのtest/review/manual evidenceへ追跡でき、unresolved `blocked` / `stale`を持たないことがIssue finish条件である。
 
-## 7. 振る舞いバックログ（Behavior Backlog）
+## 5. 共通委任契約
 
-Behaviorは、ファイル変更単位ではなく、観測可能な成果または保証として記述する。
+### 5.1 Source of truth
 
-| 振る舞い識別子（Behavior ID） | マイルストーン（Milestone） | 振る舞い / 保証 | 関連クロージャ（Closure） | 依存 | 優先度 | 状態 |
-|---|---|---|---|---|---|---|
-| B-001 | M1 | ... | `CLOS-...` | none | high | ready |
-| B-002 | M1 | ... | `CLOS-...` | B-001 | medium | planned |
-| B-003 | M2 | ... | `CLOS-...` | B-001 | high | planned |
-| B-004 | M3 | ... | `CLOS-...` | B-002 | medium | planned |
-| B-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | `CLOS-...` | ... | ... | planned |
+- Reviewed Issue requirement / design / plan。
+- Parent Epic requirement / design / planとaccepted ADR。
+- Issue317 approved requirement / design / reportとcurrent runtime。
+- Provider authorityは`src/spec_dock/assets/`、dogfoodはprojection確認面。
 
-状態: `planned` / `ready` / `active` / `complete` / `split` / `blocked` / `removed`
+### 5.2 Roleとmodel
 
-### 7.1 Behavior選択基準
+- 恒久docs/skills: `doc-writer`。
+- Source/tests/projection: `dev-coder`、`gpt-5.6-sol`、reasoning `medium`。
+- Spec review: fresh `spec-reviewer`、`gpt-5.6-sol`、reasoning `medium`。
+- Code review: fresh `code-reviewer`、`gpt-5.6-sol`、reasoning `medium`。
+- QA review: fresh `qa-reviewer`、`gpt-5.6-sol`、reasoning `medium`。
+- SpecDock command/lifecycle: `spec-manager`。
+- Commit/push: `utility-worker`。
+- Main orchestratorはEAL disposition、canonical Issue docs、manual checkpoint、role coordinationを所有する。
 
-- 依存する前提がGreenである
-- 一つの振る舞い仮説に分割できる
-- 期待されるRed理由を説明できる
-- focused verificationを短時間で実行できる
-- 既存の設計契約を変更しない
-- Issueの中心リスクを減らす
+### 5.3 全role共通禁止事項
 
-### 7.2 Behavior分割ルール
+- Closure expectation、親boundary、authorized profileの変更。
+- Scope外file、automatic behavior、new runtime/schemaの追加。
+- Body/secret/absolute pathのreport記載。
+- Canonical adoption、reviewer pass、execution/finish/PR readinessのself-claim。
+- 実行していないtestやreviewのpass記録。
 
-- 独立した事前条件が複数ある
-- 独立した事後条件が複数ある
-- 失敗理由が複数ある
-- 異なるverification levelが必要
-- 異なる責任主体を変更する
-- 異なるcontractを変更する
-- 原子性、冪等性、互換性など複数の保証を同時に含む
+### 5.4 必須出力と停止条件
 
----
+各実装roleはchanged files、Redまたは代替evidence、Green verification、diff/refactor guardrail、unresolved risk、report用Ledger Noteを返す。次の場合は即停止する。
 
-## 8. 実行中の振る舞い（Active Behavior）
+- Requirement/design/planのgapまたは相互矛盾。
+- Runtime source、ZIP safety、delegated runtime、automatic behaviorが必要。
+- Privacy/security classification、new storage grammar、Issue319 ownership変更が必要。
+- Existing regressionまたはunknown Red。
+- Scope外の変更なしにGreenへできない。
 
-実行中のBehaviorだけを詳細化する。完了したら、このセクションを次のBehaviorへ更新する。過去の実績は `report.md` に記録する。
+各stepはfresh reviewer pass後だけfocused commitし、commit後clean、push後upstream left/right `0 0`を確認する。
 
-- 振る舞い識別子（Behavior ID）:
-  - `B-...`
-- 関連マイルストーン（Milestone）:
-  - M...
-- 関連クロージャ（Closure）:
-  - `CLOS-...`
-- 関連設計識別子（Design ID）:
-  - `DES-...`
-- なぜ次に実行するか:
-  - ...
-- 依存関係:
-  - ...
-- 分割判断:
-  - one-cycle / split-required / unknown
+## 6. TDD / evidence方針
 
-### 振る舞い受け入れ条件（Behavior Acceptance）
+| Surface | Red分類 | Red / 代替証跡 | Green |
+|---|---|---|---|
+| S00 baseline | covered-existing | 現行contractとtestの観測 | baseline結果をreportへ固定 |
+| Provider docs | inspect-only | 現行文書に四分岐・三lane・checkpointがないこと | semantic checklistとfresh spec review |
+| Shared skill | inspect-only | 新status/branch/single-owner契約を構造点検 | structural inspection + fresh spec review。Automated assertionはS04 |
+| Planning hooks | inspect-only | shared checkpoint参照の欠落を構造点検 | three callersのthin hook inspection。Automated assertionはS04 |
+| Projection | red-required | provider変更後dogfood hash/byte mismatch | 7/7 byte equality |
+| Runtime compatibility | covered-existing | Issue317/ZIP/delegated existing tests | focused regression pass |
+| Four-branch dogfood | manual-required | safe synthetic scenarioの事前期待を記録 | receipt/exception/route/blockを観測 |
 
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
+Redを作らない文書編集では、実装前gap inventoryをRed代替証跡とする。Test追加時は、そのtestが対象実装前またはprojection前に意図した理由で失敗することを確認する。無関係な既存failureは修正せず停止・分類する。
 
-### 振る舞い範囲（Behavior Scope）
+## 7. Step計画
 
-| 項目 | 内容 |
-|---|---|
-| Allowed paths | ... |
-| Forbidden paths | ... |
-| Required tests / checks | ... |
-| Report証跡記録先（Report evidence destination） | ... |
-| Stop conditions | ... |
+### S00 — Baseline and contract inventory
 
----
+Goal: 現行docs/skills/test surface、7 provider/dogfood pair、Issue317 runtime境界を変更前に固定する。
 
-## 9. 実行中の TDD サイクル（Active TDD Cycle）
+Owner: Main orchestrator。必要ならread-only `repo-analyst`へ調査だけを委任する。
 
-現在のTDD Cycleだけを詳細化する。Standardでは、将来の全Cycleを完全固定しない。
+Delegation contract:
 
-### 9.1 サイクルメタデータ（Cycle Metadata）
+- Input docs: approved requirement/design、本plan、Issue317 report、対象7 provider/dogfood pair、4 focused tests。
+- Allowed paths: active Issue `report.md`だけ。Read-only調査対象は§3.1のprovider/dogfood/test paths。
+- Forbidden changes: provider/dogfood/tests/runtime/assurance、baseline failureの修正。
+- Acceptance: gap inventory、7 pair baseline、Issue317/ZIP baseline、runtime non-diffが観測済み。
+- Verification/reviewer focus: exact command/result/pathをinspectionし、report-only diffはfresh `spec-reviewer`がscopeと事実性を確認。
+- Output: command、exit status、pair結果、unexpected regression、Ledger Noteまたはno material decision。
+- Report destination: `report.md`の`Implementation Delegation Gate`、`Step Evidence / S00`、`Step Contract Closure`、`Test Contract Closure`、`Closure Coverage`、`Closure Delta`、`Reviewer Gate Status`、`Milestone / Commit Candidate Gate`。
+- Refactor guardrail: read-only結果を要約する以外の整理・renamingをしない。
+- Amendment trigger: Existing regression、対象path不在、provider/dogfood baselineの説明不能なdrift。
 
-- Cycle ID:
-  - TDD-...
-- Parent Behavior:
-  - `B-...`
-- Cycle type:
-  - red-green-refactor / characterization / 点検（inspect）-only / 手動（manual）-required
-- Related クロージャ（Closure）:
-  - `CLOS-...`
-- 関連設計識別子（Design ID）:
-  - `DES-...`
-- Status:
-  - 計画済み / red / green / refactored / 完了 / blocked（planned / red / green / refactored / complete / blocked）
+Actions:
 
-### 9.2 振る舞い仮説（Behavioral Hypothesis）
+1. 対象docs/skillsで`imported_byte_exact`、`captured_received_text`、`skipped_inline_unavailable`、preservation checkpointを検索する。
+2. 7 provider/dogfood pairのbaseline hash/byte equalityを記録する。
+3. `uv run pytest tests/cli_runtime/test_artifact_import_chatgpt_output.py`と`uv run pytest tests/manual_tests/test_review_chatgpt_authoring_pack.py`を実行し、Issue317/ZIP lane baselineを記録する。
+4. Runtime implementation surfaceにIssue318由来のmeaning diffがないことを確認する。
 
-```text
-...
+#### 具体テストケース一覧
+
+- `tc318-s00-01` gap inventory
+  - 前提: Current provider三docs/四skillsが存在する。
+  - 操作: 三status、四branch、checkpoint語を7filesへ`rg`する。
+  - 期待結果: 実装前gapと既存記述をfile単位で分類できる。
+  - 失敗検出: 既存実装を未実装と誤認する、または対象fileを漏らす。
+  - 検証方法: `rg`結果と7 path inventoryをreportへ記録。
+  - 関連closure: C318-01–08。
+- `tc318-s00-02` projection/runtime baseline
+  - 前提: 7 provider/dogfood pairとfocused import/ZIP testsが存在する。
+  - 操作: Pair byte比較と2 baseline pytest commandを実行する。
+  - 期待結果: 7 pairの一致/不一致と既存testのpass/failureを変更前に確定できる。
+  - 失敗検出: Pair漏れ、test未実行、既存failureのIssue318起因扱い。
+  - 検証方法: `cmp`/hash、pytest exit status、runtime source diff inspection。
+  - 関連closure: C318-04、C318-09–10。
+
+Step closure contract:
+
+- C318-01–10のbaseline gapとexisting pass/failureがreportにある。
+- Unexpected regressionがない。あればS01へ進まない。
+- No source diffならapproved-no-op evidenceを記録し、report-only review/commitを行う。
+
+### S01 — Provider workflow / reference preservation contract
+
+Goal: Provider三docsに三evidence lane、四分岐、checkpoint順序、authority/secrecy boundaryを定義する。
+
+Owner: `doc-writer`。
+
+Allowed: Provider三docsのみ。Skills、dogfood、runtime、public docsは禁止。
+
+Delegation contract:
+
+- Input docs: approved requirement/design/plan、parent DS-004、accepted ADR、Issue317 report、provider三docs。
+- Allowed paths: §3.1のProvider docs三件だけ。
+- Forbidden changes: skills、dogfood、tests、runtime、public/package docs、existing delegated/ZIP contractの緩和。
+- Acceptance: 三lane、四branch、lifecycle order、Main authority、content-free EALが矛盾なく分担される。
+- Verification/reviewer focus: semantic checklist、status exactness、cross-doc responsibility、fresh `spec-reviewer`。
+- Output: changed files、gap/Green inspection、unresolved risk、Ledger Note。
+- Report destination: `report.md`の`Implementation Delegation Gate`、`Step Evidence / S01`、`Step Contract Closure`、`Test Contract Closure`、`Closure Coverage`、`Closure Delta`、`Reviewer Gate Status`、`Milestone / Commit Candidate Gate`、必要時`Decision Ledger`。
+- Refactor guardrail: 対象契約周辺だけを編集し、既存authoring policyを再構成しない。
+- Amendment trigger: 三docsだけではmatrix owner/authorityを表現不能、またはpublic/runtime変更が必要。
+
+Implementation contract:
+
+- `workflow_spec_authoring.md`: output received → preservation checkpoint → EAL disposition → canonical rewrite → fresh reviewerのlifecycleを持つ。
+- `workflow_chatgpt_authoring_pack.md`: standalone MarkdownとZIP/treeのroute、complete inline/unavailable exceptionを区別する。
+- `authoring/chatgpt-pack.md`: 三lane、status/capture boundary、content-free EAL fieldとfailure semanticsをreference化する。
+- External preserved evidenceへdelegated frontmatter/diff guardを要求せず、existing delegated/ZIP contractを緩めない。
+- Main orchestratorがcapture/importと採否を実行し、shared skill/import commandはauthorityをself-claimしない。
+
+#### 具体テストケース一覧
+
+- `tc318-s01-01` lifecycle and four branches
+  - 前提: 三provider docsに現行ChatGPT authoring契約がある。
+  - 操作: Output受領からfresh reviewまでの順序と四branchを三docsの責任別に点検する。
+  - 期待結果: Preservationがadoption/rewrite前で、standalone/inline/unavailable/ZIPが一意にrouteされる。
+  - 失敗検出: Late preservation、ZIP single-file import、complete failureのunavailable迂回。
+  - 検証方法: Structural inspectionとfresh spec review。
+  - 関連closure: C318-01–05。
+- `tc318-s01-02` lane/authority/secrecy
+  - 前提: Existing delegated draftとZIP safety contractがある。
+  - 操作: External lane追加diffをdelegated/ZIP/authority/EAL契約と照合する。
+  - 期待結果: Existing guards不変、Mainだけが採否/rewrite、EALはcontent-free。
+  - 失敗検出: Frontmatter要求、self-claim、body/secret/absolute path記録。
+  - 検証方法: Forbidden-term inspection、`git diff --check`、fresh spec review。
+  - 関連closure: C318-06–07。
+
+Verification:
+
+- Terminology/status exact match、lifecycle order、lane separation、forbidden claimsをstructural inspection。
+- `git diff --check`。
+- Fresh `spec-reviewer`。Material findingはS01内で修正しfresh rerun。
+
+Step closure contract: C318-01–07のplanned observationsが揃い、fresh reviewer pass後にreportとfocused commit/pushする。
+
+### S02 — Shared ChatGPT preservation kernel
+
+Goal: `spec-dock-chatgpt-authoring`へoperational decision matrixを一箇所だけ実装する。
+
+Owner: `doc-writer`。
+
+Allowed: Provider shared skill一件。Planning skills、dogfood、runtimeは禁止。
+
+Delegation contract:
+
+- Input docs: approved requirement/design/plan、S01 reviewed provider docs、shared skill現行本文。
+- Allowed paths: `src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`だけ。
+- Forbidden changes: planning/manual skills、dogfood、tests、runtime、EAL/canonical実書込み。
+- Acceptance: Pre-classification、四branch、三status、import result matrix、stop/self-claim restrictionを一箇所で所有する。
+- Verification/reviewer focus: Exact token、branch completeness、Main実行主体、single owner、fresh `spec-reviewer`。
+- Output: changed file、inspection結果、S04へ渡すassertion seed、Ledger Note。
+- Report destination: `report.md`の`Implementation Delegation Gate`、`Step Evidence / S02`、`Step Contract Closure`、`Test Contract Closure`、`Closure Coverage`、`Closure Delta`、`Reviewer Gate Status`、`Milestone / Commit Candidate Gate`。
+- Refactor guardrail: Existing GitHub/local-context/ZIP workflowを移動・再構成せず、checkpointを最小追加する。
+- Amendment trigger: Runtime automation、新status/schema、planning skillへのmatrix複製が必要。
+
+Required branches:
+
+1. Complete standalone: Workbench source確認→explicit import→receipt検証→`imported_byte_exact`。
+2. Complete inline: complete received answerだけを無編集capture→explicit import→`captured_received_text`。Provider original bytes claim禁止。
+3. Genuine unavailable inline: `skipped_inline_unavailable`、reason/owner/nonblocking/next action、path/hash/bytesなし。
+4. ZIP/tree: existing review/quarantine/stage laneへrouteしsingle-file importを案内しない。
+
+Import result matrix:
+
+- `committed=true` + complete receipt + no warning: pass。
+- `committed=true` + complete receipt + warning: pass-with-warning、warning記録、自動retryなし。
+- `committed=false`、receipt欠落、eligibility failure、semantic completeness未分類: block。
+- Failureをunavailableへ読み替えない。
+
+Skillはcontractとevidence評価だけを提供し、import/EAL/canonical rewriteを代行しない。
+
+#### 具体テストケース一覧
+
+- `tc318-s02-01` complete source branches
+  - 前提: Complete standaloneまたはcomplete received inline textがある。
+  - 操作: Shared contractの分類、明示import、receipt評価、claim boundaryを追跡する。
+  - 期待結果: Standaloneは`imported_byte_exact`、inlineは`captured_received_text`となる。
+  - 失敗検出: Provider-original claim、capture整形、canonical rewrite先行。
+  - 検証方法: Skill structural inspectionとS04 assertion seed。
+  - 関連closure: C318-01–02、C318-07–08。
+- `tc318-s02-02` unavailable/ZIP/failure matrix
+  - 前提: Genuine unavailable、ZIP/tree、committed warning/failureの各入力がある。
+  - 操作: Branchとresult matrixを契約表に照合する。
+  - 期待結果: Unavailableだけexception、ZIPはexisting lane、warningは記録/no retry、failureはblock。
+  - 失敗検出: Failure迂回、receipt欠落pass、自動retry、ZIP import。
+  - 検証方法: Exact status/stop condition inspection、fresh spec review。
+  - 関連closure: C318-03–05、C318-08。
+
+Verification:
+
+- Status、branch、stop condition、content-free required output、forbidden self-claimをinspection。
+- 既存testへ最小のstructural assertionを先行追加できる場合はRed→Green。そうでなければS04でtest化する旨をreportへ記録。
+- `git diff --check`、fresh `spec-reviewer`。
+
+Step closure contract: C318-01–05、C318-07–08のshared-kernel obligationが揃い、fresh reviewer pass後にreportとfocused commit/pushする。
+
+### S03 — Thin planning-skill integration
+
+Goal: Initiative / Epic / Issue planning skillが同じshared checkpointを正しい時点で呼び、scope固有authorityを維持する。
+
+Owner: `doc-writer`。
+
+Allowed: Provider planning skills三件。Shared skill、manual skills、dogfood、runtimeは禁止。
+
+Delegation contract:
+
+- Input docs: approved requirement/design/plan、reviewed S02 shared skill、三planning skills。
+- Allowed paths: §3.1のProvider planning skills三件だけ。
+- Forbidden changes: shared/manual skills、dogfood、tests、runtime、matrix/status表のlocal copy。
+- Acceptance: 三callerが同じcheckpointをoutput受領後・adoption/rewrite前に呼び、scope authorityとblock propagationを維持する。
+- Verification/reviewer focus: Invocation placement、thinness、scope ownership、fresh `spec-reviewer`。
+- Output: changed files、three-caller comparison、duplicate scan、Ledger Note。
+- Report destination: `report.md`の`Implementation Delegation Gate`、`Step Evidence / S03`、`Step Contract Closure`、`Test Contract Closure`、`Closure Coverage`、`Closure Delta`、`Reviewer Gate Status`、`Milestone / Commit Candidate Gate`。
+- Refactor guardrail: 既存planning operating spineを移動せず、共通呼出しを最小追加する。
+- Amendment trigger: Shared skill contract不足、callerごとの異なるmatrixが必要、scope ownership変更が必要。
+
+Contract:
+
+- ChatGPT output受領後、claim review / EAL disposition / canonical rewrite前にshared preservation checkpointを呼ぶ。
+- Shared checkpointがblockedならcanonical rewriteへ進まない。
+- `skipped_inline_unavailable`はreason/owner/nonblocking/next actionの確認後だけ進める。
+- 四branch/status/result matrix本文をplanning skillsへ複製しない。
+- InitiativeはInitiative docsとEpic approval、EpicはEpic docsとIssue split/approval、IssueはIssue docsとexecution handoffを所有する既存境界を維持する。
+
+#### 具体テストケース一覧
+
+- `tc318-s03-01` invocation placement and block propagation
+  - 前提: 三planning skillsがChatGPT outputとcanonical rewriteを扱う。
+  - 操作: 各operating spineでshared checkpoint呼出し前後を比較する。
+  - 期待結果: Output受領後・adoption/rewrite前に呼び、blocked resultで停止する。
+  - 失敗検出: Late call、checkpoint bypass、unavailable理由なしの続行。
+  - 検証方法: Three-file structural comparison、fresh spec review。
+  - 関連closure: C318-03、C318-05、C318-08。
+- `tc318-s03-02` thin caller and scope authority
+  - 前提: Shared skillがmatrix authorityを持つ。
+  - 操作: 三callerのbranch/status語とscope-specific handoffを比較する。
+  - 期待結果: Matrix複製なしでInitiative/Epic/Issue固有authorityだけが残る。
+  - 失敗検出: Four-branch local table、scope approval/handoffの消失、self-claim。
+  - 検証方法: Duplicate scan、scope checklist、`git diff --check`。
+  - 関連closure: C318-07–08。
+
+Verification:
+
+- 三skillのinvocation placement、explicit shared reference、matrix non-duplication、scope ownership、stop propagationをinspection。
+- `git diff --check`、fresh `spec-reviewer`。
+
+Step closure contract: C318-03、C318-05、C318-07–08のcaller-integration obligationが揃い、fresh reviewer pass後にreportとfocused commit/pushする。
+
+### S04 — Dogfood projection and automated contract verification
+
+Goal: Providerの7変更をdogfoodへexact projectionし、installed/wrapper/compatibility contractを自動検証する。
+
+Owner: `dev-coder`（`gpt-5.6-sol` / medium）。
+
+Delegation contract:
+
+- Input docs: approved requirement/design/plan、reviewed S01–S03 provider assets、matching dogfood七files、4 focused tests。
+- Allowed paths: §3.1のmatching dogfood七filesと4 existing test filesだけ。
+- Forbidden changes: Provider semantics、Issue317/runtime source、Artifact/ZIP/delegated runtime、public/package docs、新規test file。
+- Acceptance: 7/7 exact projection、contract-sensitive assertions、focused import/ZIP non-regression、runtime source meaning non-diff。
+- Verification/reviewer focus: `code-reviewer`はtest sensitivity/projection/scope、`spec-reviewer`はtext alignment/single ownerを確認。
+- Output: changed files、Red/alternative、Green commands、7 pair compare、runtime non-diff、Ledger Note。
+- Report destination: `report.md`の`Implementation Delegation Gate`、`Step Evidence / S04`、`Step Contract Closure`、`Test Contract Closure`、`Closure Coverage`、`Closure Delta`、`Reviewer Gate Status`、`Milestone / Commit Candidate Gate`。
+- Refactor guardrail: Test helper追加は4files内の再利用が明白な最小範囲だけ。Provider textをtest都合で変更しない。
+- Amendment trigger: 4files外のtest、runtime/provider修正、new fixture/module、Issue319 surfaceが必要。
+
+TDD order:
+
+1. Existing test patternを読み、shared status/branch、checkpoint-before-rewrite、ZIP route、no self-claims、thin caller referenceを検出する最小assertionを追加する。
+2. 実装/projection前または意図的に壊したfixtureで、期待理由によるRedを確認する。困難ならS00 gap + provider/dogfood mismatchをRed代替証跡として明示する。
+3. Provider七filesをdogfood counterpartへ機械的に投影し、7/7 byte equalityを確認する。
+4. Focused testsをGreenにする。Testを通すためprovider contractを再設計しない。
+5. Runtime import source、ZIP/delegated runtimeにmeaning diffがないことを確認する。
+
+#### 具体テストケース一覧
+
+- `tc318-s04-01` installed preservation contract
+  - 前提: S01–S03 provider変更がありdogfoodは未投影またはtest assertionが未追加。
+  - 操作: Existing wrapper/init-update testへ三status、checkpoint-before-rewrite、ZIP route、no self-claim、thin caller assertionを追加する。
+  - 期待結果: 実装/projection欠落時は期待理由でRed、7files投影後はGreen。
+  - 失敗検出: 単なる語の一件存在だけでmatrix欠落やcaller duplicationを見逃す。
+  - 検証方法: `tests/cli_runtime/test_wrappers.py`と`tests/unit/infra/test_init_update.py`。
+  - 関連closure: C318-01–09。
+- `tc318-s04-02` provider/dogfood identity
+  - 前提: Provider七filesのreview済み変更がある。
+  - 操作: 対応dogfood七filesへ投影し各pairをbyte比較する。
+  - 期待結果: 7/7一致し、dogfood-only semantic editがない。
+  - 失敗検出: Pair漏れ、partial projection、dogfood側の独自修正。
+  - 検証方法: `cmp`またはSHA-256 pair list。
+  - 関連closure: C318-09。
+- `tc318-s04-03` runtime and ZIP non-regression
+  - 前提: Issue317 importとauthoring-pack testがbaseline passしている。
+  - 操作: Import/ZIP focused testsを再実行しruntime source diffを確認する。
+  - 期待結果: Byte preservation/blank coexistence/content-free receiptとZIP safetyがpassしruntime meaning diffなし。
+  - 失敗検出: Workflow変更によるruntime/ZIP回帰、scope外source edit。
+  - 検証方法: 残り2 pytest command、`git diff --name-only`/review。
+  - 関連closure: C318-04、C318-06、C318-10。
+
+Required checks:
+
+```bash
+uv run pytest tests/cli_runtime/test_wrappers.py
+uv run pytest tests/unit/infra/test_init_update.py
+uv run pytest tests/cli_runtime/test_artifact_import_chatgpt_output.py
+uv run pytest tests/manual_tests/test_review_chatgpt_authoring_pack.py
+git diff --check
 ```
 
-### 9.3 テスト・証跡計画（Test / Evidence Plan）
+Repository-wide `uv run mypy src`はIssue319のfull/global quality gateへrelayし、Issue318ではblocking checkにしない。必要なら観測だけを行い、failureをIssue318で修正しない。
 
-- Red分類:
-  - red-required / covered-existing / characterization-first / 点検（inspect）-only / 手動（manual）-required / not-applicable
-- 期待するRed理由:
-  - ...
-- Redが期待どおりでない場合の対応:
-  - stop / repair test / replan / escalate
-- 代替証拠:
-  - ...
+Review order:
 
-Concrete Test Seed:
+1. Fresh `code-reviewer`: test sensitivity、projection、runtime non-diff、scope。
+2. Fresh `spec-reviewer`: provider/dogfood textとrequirement/design alignment。
 
-- `tc-...`:
-  - 前提:
-    - ...
-  - 操作:
-    - ...
-  - 期待結果:
-    - ...
-  - 失敗検出:
-    - ...
-  - 検証方法:
-    - ...
-  - 関連クロージャ（Closure）:
-    - `CLOS-...`
-  - 関連Report destination:
-    - `report.md#...`
+Step closure contract: C318-04、C318-06、C318-08–10のprojection/test obligationが揃い、code/spec両review pass後にreportとfocused commit/pushする。
 
-### 9.4 最小 Green 境界（Minimal Green Boundary）
+### S05 — Manual four-branch dogfood evidence
 
-- Allowed implementation boundary:
-  - ...
-- Do not implement yet:
-  - ...
-- Do not refactor yet:
-  - ...
-- Must preserve:
-  - ...
+Goal: Safe synthetic outputで四branchとfailure gateを観測し、preservationの後にだけEAL/canonical adoptionへ進めることを確認する。
 
-### 9.5 集中検証（Focused 検証（Verification））
+Owner: Main orchestrator。Runtime/skill source変更なし。Synthetic Markdownにsecret/real user contentを含めない。
 
-| 種別 | コマンド（Command） / Evidence | 期待 |
-|---|---|---|
-| Focused test | `...` | ... |
-| Local regression | `...` | ... |
-| Static / lint | `...` | ... |
-| Manual / 点検（inspect） | ... | ... |
+Delegation contract:
 
-### 9.6 リファクタリング確認点（Refactor Checkpoint）
+- Input docs: approved requirement/design/plan、reviewed S01–S04 assets/tests、Issue317 import command contract。
+- Allowed paths: active Issue `.workbench/issue318-s05-standalone.md`、`.workbench/issue318-s05-inline.md`、`artifacts/<timestamp>[-<nn>]-chatgpt-output-issue-318-s05-{standalone,inline}.md`の最大2files、active Issue `report.md`。Workbenchはignored source。
+- Forbidden changes: Provider/dogfood/tests/runtime、既存Artifact、canonical requirement/design/plan、real/private output。
+- Acceptance: Standalone/inline/unavailable/ZIP/failureの5scenarioが期待どおり観測され、成功2件だけがsafe Artifactになる。
+- Verification/reviewer focus: Source survival/hash/cmp、exception field absence、ZIP route、failure block、content-free EALをfresh `spec-reviewer`が確認。
+- Output: Content-free receipt metadata、command/exit status、scenario result、Ledger Note。
+- Report destination: `report.md`の`Implementation Delegation Gate`、`Step Evidence / S05`、`External Preserved Evidence`、`Evidence Adoption Ledger`、`Step Contract Closure`、`Test Contract Closure`、`Closure Coverage`、`Closure Delta`、`Reviewer Gate Status`、`Milestone / Commit Candidate Gate`。
+- Refactor guardrail: Synthetic bodyをcanonicalへ採用せず、Workbench sourceをGit追加しない。Artifactは自動削除しない。
+- Amendment trigger: Safe synthetic inputだけでscenarioを作れない、runtime/source変更が必要、destination pattern外へ出力される。
 
-- Refactor必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Refactor対象候補:
-  - ...
-- Refactor guardrail:
-  - 振る舞いを変えない
-  - 公開契約（public contract）を変えない
-  - 設計書の正規契約（Normative Contract）を変えない
-  - ローカル回帰（local regression）を再実行する
+Scenarios:
 
----
+- Standalone: Issue Workbenchのcomplete `.md`をimportし、source survival、hash/bytes一致、`imported_byte_exact`を記録。
+- Inline: Safe complete inline stringを無編集capture/importし、capture fileとArtifactのbyte一致、`captured_received_text`、provider byte identity非主張を記録。
+- Unavailable: Complete sourceが存在しないsynthetic caseで、`skipped_inline_unavailable`、reason/owner/nonblocking/next actionを記録し、path/hash/bytesを記録しない。
+- ZIP/tree: Existing safe ZIP fixtureのreview/stage evidenceを確認し、single-file import destinationが作られていないことを記録。
+- Failure: Safe eligibility failureまたは既存fault-injected `committed=false` evidenceで、canonical target未変更とunavailable迂回禁止を確認。
 
-## 10. マイルストーン計画（マイルストーン（Milestone） Plans）
+#### 具体テストケース一覧
 
-### M1: 実装単位1（Implementation Unit 1）
-#### 成果
+- `tc318-s05-01` standalone and inline preservation
+  - 前提: 上記exact Workbench source二件にsafe complete Markdownを置く。
+  - 操作: 各sourceを明示importし、receipt/source/destinationを比較する。
+  - 期待結果: 最大2 Artifactが作られ、source survives、hash/bytes/cmp一致、status境界が正しい。
+  - 失敗検出: Move、byte差異、provider-original claim、unexpected destination。
+  - 検証方法: Import JSON、`sha256`、`wc -c`、`cmp`、repo-relative path inspection。
+  - 関連closure: C318-01–02、C318-07、C318-11。
+- `tc318-s05-02` unavailable and failure gate
+  - 前提: Complete sourceが存在しないsynthetic unavailable caseとsafe eligibility failure caseを定義する。
+  - 操作: Exception recordとfailed import outcomeを評価する。
+  - 期待結果: Unavailable recordはpath/hash/bytesなし、failureはrewrite/adoption blockで再分類なし。
+  - 失敗検出: Fabricated receipt、failureのskip化、canonical target mutation。
+  - 検証方法: Report field inspection、before/after canonical hash。
+  - 関連closure: C318-03、C318-05、C318-07。
+- `tc318-s05-03` ZIP existing lane
+  - 前提: Existing safe ZIP fixture/review commandがある。
+  - 操作: Existing review/stage evidenceを確認しsingle-file import destinationを探索する。
+  - 期待結果: ZIP safety laneだけが使われ、S05 import Artifactは作られない。
+  - 失敗検出: ZIP contentのsingle-file import、safety bypass。
+  - 検証方法: Existing command/test evidenceとArtifact inventory。
+  - 関連closure: C318-04。
 
-- ...
-- ...
+EAL成功recordはoutput form、preservation status、capture boundary、`import_kind=chatgpt-output`、`storage_identity=blank`、repo-relative source/destination、SHA-256、byte count、committed/warning、exact adoption status、rationale、adopter、reviewer status、blocking、next actionを持つ。Body/secret/absolute pathは持たない。
 
-#### 含まれるBehavior
+Verification: Receipt、`sha256`、`cmp`、source survival、exception fields、ZIP routeを直接確認し、fresh `spec-reviewer`を通す。
 
-| 振る舞い識別子（Behavior ID） | 内容 | クロージャ（Closure） | 状態 |
-|---|---|---|---|
-| B-001 | ... | `CLOS-...` | planned |
-| B-002 | ... | `CLOS-...` | planned |
+Step closure contract: C318-01–05、C318-07、C318-11のmanual observationが揃い、fresh reviewer pass後にsafe Artifact/reportだけをfocused commit/pushする。Ignored Workbench sourceはGit管理しない。
 
-#### マイルストーンゲート（マイルストーン（Milestone） Gate）
+### S90 — Docs impact and Issue319 ownership closure
 
-| ゲート（Gate） | コマンド（Command） / Evidence | 期待結果 | 報告先（Report Destination） |
-|---|---|---|---|
-| Focused suite | `...` | pass | `report.md#...` |
-| Local regression | `...` | pass | `report.md#...` |
-| Manual review | ... | 承認済み / N/A | `report.md#...` |
+Goal: 全影響pathをupdate / approved-no-op / deferへ分類し、Issue318と319の境界を閉じる。
 
-- commit:
-  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
-  - commit前確認:
-    - [ ] このマイルストーンの差分だけで意味が通る
-    - [ ] 必要な検証が完了している
-    - [ ] `report.md` に証跡がある
-    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+Owner: Main orchestrator。Path inventoryのread-only確認だけを`repo-analyst`へ委任できる。
 
-### M2: 実装単位2（Implementation Unit 2）
-#### 成果
+Delegation contract:
 
-- ...
-- ...
+- Input docs: approved requirement/design/plan、S00–S05 evidence、Issue317 report、parent W4/W5、Issue319 node。
+- Allowed paths: active Issue `report.md`だけ。Read-only inventoryは§3.1 paths、root/public/package/runtime paths。
+- Forbidden changes: Provider/dogfood/tests、Issue319 docs、public/package/runtime、planning docs。
+- Acceptance: 影響実pathごとにupdate/no-op/defer、owner、reason、dependency、blockingを持ち、Issue319 relayが閉じる。
+- Verification/reviewer focus: Grouped wildcard漏れ、scope移送、merge-ready self-claimをfresh `spec-reviewer`が確認。
+- Output: Exact path disposition、unresolved risk、Ledger Noteまたはno material decision。
+- Report destination: `report.md`の`Implementation Delegation Gate`、`Step Evidence / S90`、`Step Contract Closure`、`Test Contract Closure`、`Closure Coverage`、`Closure Delta`、`Deferred PR Delivery Gate`、`Decision Ledger`、`Reviewer Gate Status`、`Milestone / Commit Candidate Gate`。
+- Refactor guardrail: Inventory以外の文書再編やdeferred surfaceの先行編集をしない。
+- Amendment trigger: Issue318完了にIssue319-owned changeが必要、または新しいblocking impact pathを発見。
 
-#### 含まれるBehavior
-
-| 振る舞い識別子（Behavior ID） | 内容 | クロージャ（Closure） | 状態 |
-|---|---|---|---|
-| B-003 | ... | `CLOS-...` | planned |
-
-#### マイルストーンゲート（マイルストーン（Milestone） Gate）
-
-| ゲート（Gate） | コマンド（Command） / Evidence | 期待結果 | 報告先（Report Destination） |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-- commit:
-  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
-  - commit前確認:
-    - [ ] このマイルストーンの差分だけで意味が通る
-    - [ ] 必要な検証が完了している
-    - [ ] `report.md` に証跡がある
-    - [ ] 次のマイルストーンの未完了差分が混ざっていない
-
----
-
-## 11. 検証段階（検証（Verification） Ladder）
-
-| レベル（Level） | 名称 | 目的 | コマンド（Command） / Evidence |
-|---|---|---|---|
-| L1 | Active Cycle Focused | 現在のCycleだけを確認 | `...` |
-| L2 | Local Module / 作業成果物（Artifact） | 近接範囲の回帰確認 | `...` |
-| L3 | 対象範囲（Scope）回帰（範囲回帰（対象範囲（Scope） Regression）） | Issue 対象scope全体の確認 | `...` |
-| L4 | Contract / Template / CLI | contractやscaffold挙動確認 | `...` |
-| L5 | Static / Lint / Type | 静的検証 | `...` |
-| L6 | Docs / Skill Consistency | docs・template・skill整合性 | `...` |
-| L7 | Final ゲート（Gate） | Issue 最終確認 | `...` |
-
----
-
-## 12. 委任契約（Delegation Contract）
-
-Codexやsubagentへ委任する場合、各作業が判断なしに実行できるようにする。
-
-| ステップ・振る舞い（Step / Behavior） | 委任ロール（Delegated Role） | 許可パス（Allowed Paths） | レビュー観点（Reviewer Focus） | 報告先（Report Destination） |
-|---|---|---|---|---|
-| `B-...` | dev-coder / doc-writer / reviewer / none | ... | code / spec / docs | `report.md#...` |
-
----
-
-## 13. 報告証跡対応（報告証跡（Report Evidence） Mapping）
-
-| 証跡ID（Evidence ID） | 対象 | 報告節（Report Section） | 記録内容 |
-|---|---|---|---|
-| EVD-001 | Red / Alternative Evidence | `report.md#...` | ... |
-| EVD-002 | Green検証（Green Verification） | `report.md#...` | ... |
-| EVD-003 | Refactor証跡（Refactor Evidence） | `report.md#...` | ... |
-| EVD-004 | Regression Result | `report.md#...` | ... |
-| EVD-005 | 設計逸脱・判断（Design Deviation / Decision） | `report.md#...` | ... |
-| EVD-006 | 文書・テンプレート影響（Docs / Template 影響（Impact）） | `report.md#...` | ... |
-| EVD-007 | Final ゲート（Gate） | `report.md#...` | ... |
-
-Report記録ルール:
-
-- Red / Green / Refactorの実績はreport.mdに記録する
-- 期待と異なるRedはreport.mdに記録し、必要に応じてreplanする
-- 実装中に見つかった新しいテスト候補はreport.mdに記録する
-- plan.mdは観測実績の正本にしない
-
----
-
-## 14. 修正・停止ルール（Amendment and Stop Rules）
-
-### 即時停止条件（Immediate Stop Conditions）
-
-- [ ] 新しいテストがproduction change前から成功する
-- [ ] Red理由が想定と異なる
-- [ ] 既存Regressionが失敗した
-- [ ] 承認済みRequirementの期待値を変更したくなる
-- [ ] 承認済みDesignのNormative Contractを変更したくなる
-- [ ] 公開契約（public contract）変更が必要になる
-- [ ] 移行（migration）が必要になる
-- [ ] セキュリティ・プライバシー（security / privacy）影響が判明する
-- [ ] Forbidden changesが必要になる
-- [ ] Issue外の設計判断が必要になる
-- [ ] Standard gradeの前提を満たさなくなった
-
-### 停止後の対応（Stop）
-
-| 状況 | 対応 |
+| Surface | Disposition |
 |---|---|
-| テスト設計ミス | テストを修正し、Redを再確認 |
-| 要件曖昧 | 要件文書（requirement.md）へ戻す |
-| 設計契約変更が必要 | 設計書（design.md）を更新しreview |
-| 対象範囲外変更（対象範囲（Scope））が必要 | 後続issue（後続（follow-up） issue）またはreplan |
-| Grade escalationが必要 | 等級 strict / critical へ変更 |
-| 外部判断が必要 | 上位文書（Epic・Initiative・ADR）へ昇格 |
+| Provider workflow三docs | Issue318 update |
+| Provider四skills | Issue318 update |
+| Matching dogfood七files | Issue318 exact projection |
+| Focused wrapper/managed-asset tests | Issue318 update |
+| Artifact rules/templates | approved-no-op |
+| Runtime import source | approved-no-op |
+| ZIP/delegated runtime | approved-no-op |
+| Root README / guide / reference naming | defer Issue319 |
+| Migration / release docs | defer Issue319 |
+| Package/fresh init/update final matrix | defer Issue319 |
+| Full pytest/global static repair | defer Issue319 |
+| Final Epic PR/observation | defer Issue319 |
 
----
+#### 具体テストケース一覧
 
-## 15. 文書・テンプレート・スキル影響解消（Docs / Template / Skill 影響（Impact） Resolution）
+- `tc318-s90-01` exact impact disposition
+  - 前提: S00–S05のactual changed pathsと親W4/W5 ownershipがある。
+  - 操作: Changed/considered pathを実path単位でupdate/no-op/deferへ分類する。
+  - 期待結果: 全pathにowner/reason/dependency/blockingがあり、分類漏れがない。
+  - 失敗検出: Wildcardだけの分類、runtime/public/packageのIssue318取り込み、owner不明。
+  - 検証方法: `git diff --name-only`、planned inventory、fresh spec review。
+  - 関連closure: C318-10–11。
+- `tc318-s90-02` Issue319 relay boundary
+  - 前提: Issue319がpublic/package/full/global/final PRを所有する。
+  - 操作: Deferred PR Delivery Gateをparent planとIssue317 relayへ照合する。
+  - 期待結果: Remaining gates/revisit conditionが具体的で、Issue318はPR readinessを主張しない。
+  - 失敗検出: Relay漏れ、Issue319の重複実装、per-Issue PR claim。
+  - 検証方法: Cross-document inspectionとfresh spec review。
+  - 関連closure: C318-11。
 
-| 対象 | 影響 | 必要な対応 | 報告証跡（Report Evidence） |
-|---|---|---|---|
-| 文書（docs） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
-| テンプレート（templates） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
-| スキル群（skills） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
-| ワークフロー文書（workflow docs） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
-| 提供資産（provider assets） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
-| 検証workspace（dogfooding workspace） | はい / いいえ / 不明（yes / no / unknown） | ... | `report.md#...` |
+全実pathにowner、reason、dependency、blocking/nonblocking根拠をreportへ残す。Grouped wildcardだけで閉じない。Fresh `spec-reviewer`がIssue318/319境界を確認し、updateがあればreview/commit、no-op/deferは根拠付きで記録する。
 
-- commit:
-  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
-  - commit前確認:
-    - [ ] このマイルストーンの差分だけで意味が通る
-    - [ ] 必要な検証が完了している
-    - [ ] `report.md` に証跡がある
-    - [ ] 次のマイルストーンの未完了差分が混ざっていない
+Step closure contract: C318-10–11のexact dispositionとIssue319 relayがfresh reviewer passする。Report-only/approved-no-opの場合もS90専用commitを作成し、post-commit cleanとupstream 0/0を記録する。S90のResult Approvalとcommit完了前にS99へ進まない。
 
----
+### S99 — Final Issue quality gates and finish
 
-## 16. 最終品質ゲート（Final Quality Gate）
+Owner: Main orchestrator。Commands/lifecycleは`spec-manager`、reviewはfresh QA→code→spec、commit/pushは`utility-worker`へ委任する。
 
-| Check | コマンド（Command） / Evidence | 期待結果（Expected） | 報告先（Report Destination） |
-|---|---|---|---|
-| Requirement closure | 点検（inspect） closure index | all closed | `report.md#...` |
-| Design contract compliance | 点検（inspect） design IDs | 違反なし | `report.md#...` |
-| Focused tests | `...` | pass | `report.md#...` |
-| Local regression | `...` | pass | `report.md#...` |
-| Static checks | `...` | pass | `report.md#...` |
-| Docs / template checks | `...` | pass / N/A | `report.md#...` |
-| Manual review | ... | 承認済み / N/A | `report.md#...` |
+Delegation contract:
 
-- static analysis / lint:
-  - 実行対象: このリポジトリで設定されている静的解析、lint、format check
-  - pass条件: 既知の許容済み例外を除き成功する
-- tests:
-  - 実行対象: 単体テスト、およびこのIssueの影響範囲に必要な統合テスト / CLIテスト / regression test
-  - pass条件: すべて成功する
-  - 実行できない検証がある場合: 未実施理由と代替確認を `report.md` に記録する
-- report:
-  - [ ] 実行したコマンド、結果、未実施の理由を `report.md` に記録する
-  - [ ] PR 作成後の GitHub Actions を、基礎的な lint / test 失敗の初回検出場所にしていない
-- commit:
-  - commit候補: このマイルストーンの成果をレビュー可能な単位としてコミットする
-  - commit前確認:
-    - [ ] 静的解析 / lint が完了している
-    - [ ] 必要なテストが完了している
-    - [ ] `report.md` に証跡がある
-    - [ ] 未完了差分が混ざっていない
+- Input docs: approved requirement/design/plan、completed S00–S90 report、current diff/commits、assurance/lifecycle state。
+- Allowed paths: active Issue `report.md`、`.assurance.json`、review findingが要求する場合は元owner stepの明示allowed pathsだけ。Lifecycle/commit metadataは通常commandで更新する。
+- Forbidden changes: New implementation、scope外remediation、Issue319/public/package/runtime、per-Issue PR。Finding修正をS99へ直接混在させない。
+- Acceptance: Focused checks pass、C318-01–11 closed、QA→code→spec passed、assurance valid、finish/clean/upstream evidence完了。
+- Verification/reviewer focus: QAはcoverage、codeはtest/projection/runtime non-diff、specは全artifact/authority/boundary。
+- Output: Exact commands/results、three reviewer verdicts、closure table、commit/clean/upstream/lifecycle evidence。
+- Report destination: `report.md`の`Implementation Delegation Gate`、`Step Evidence / S99`、`Step Contract Closure`、`Test Contract Closure`、`Closure Coverage`、`Closure Delta`、`Reviewer Gate Status`、`Milestone / Commit Candidate Gate`、`Final QA Gate`、`Final Code Review Gate`、`Final Spec Review Gate`、`Final Commit`、`Deferred PR Delivery Gate`。
+- Refactor guardrail: Final gate中にcleanup/refactorしない。Findingはowning stepへ戻して修正・再review・commitする。
+- Amendment trigger: Missing integration obligation、unclosed closure、new scope/architecture decision、Issue319 boundary conflict。
 
-最終終了契約（Final Exit Contract）:
+Required verification:
 
-- [ ] すべてのクロージャ識別子（Closure ID）が完了している
-- [ ] すべてのマイルストーン（Milestone）が完了している
-- [ ] 振る舞いバックログ（Behavior Backlog）に未解決の必須項目が残っていない
-- [ ] 実行中の TDD サイクル（Active TDD Cycle）がcompleteである
-- [ ] 検証段階（検証（Verification） Ladder）の必要Levelが成功している
-- [ ] Docs / Template / Skill影響が解決済みである
-- [ ] Report evidenceが記録済みである
-- [ ] Standard gradeの前提を破っていない
-- [ ] 後続（follow-up）が必要な場合、明示されている
+```bash
+uv run pytest tests/cli_runtime/test_wrappers.py
+uv run pytest tests/unit/infra/test_init_update.py
+uv run pytest tests/cli_runtime/test_artifact_import_chatgpt_output.py
+uv run pytest tests/manual_tests/test_review_chatgpt_authoring_pack.py
+git diff --check
 
----
+./spec-dock/scripts/spec-dock assurance verify --issue iss-00318 --format json
+./spec-dock/scripts/spec-dock validate
+./spec-dock/scripts/spec-dock active show
+```
 
-## 17. フォローアップ候補（Follow-up Candidates）
+`sync`は必要性を判定し、実行した場合は結果、不要ならapproved-no-op根拠をreportへ残す。Issue319が所有するfull `uv run pytest`、repository-wide `uv run mypy src`、global repairを暗黙に引き取らず、owner/dependency/nonblocking relayを記録する。
 
-| 識別子（ID） | 内容 | 理由 | 推奨先 |
-|---|---|---|---|
-| FU-001 | ... | ... | Issue / Epic / ADR |
-| FU-002 | ... | ... | Issue / Epic / ADR |
+#### 具体テストケース一覧
 
----
+- `tc318-s99-01` focused regression and closure
+  - 前提: S00–S90がreview/commit済みでworktreeが既知状態。
+  - 操作: 4 pytest、diff check、assurance/validate/active commandを順に実行しC318 tableへ結び付ける。
+  - 期待結果: Blocking checks pass、C318-01–11にunresolved blocked/staleなし。
+  - 失敗検出: Command未実行、結果の先取り、closure evidence欠落、global gateのIssue318取り込み。
+  - 検証方法: Exit status/output、closure table、Issue319 relay inspection。
+  - 関連closure: C318-01–11。
+- `tc318-s99-02` final reviewer and lifecycle order
+  - 前提: Focused checks pass、final diff/reportが確定している。
+  - 操作: Fresh QA→code→specを順に実行し、全pass後だけcommit/push/issue finishする。
+  - 期待結果: Three gates passed、clean、upstream 0/0、#318/local lifecycle complete、PRなし。
+  - 失敗検出: Reviewer順序違反、failed finding未修正、finish先行、PR readiness claim。
+  - 検証方法: Reviewer records、git/lifecycle command evidence。
+  - 関連closure: C318-01–11。
 
-## 18. 計画承認チェックリスト（Plan Approval Checklist）
+Final reviewer order:
 
-- [ ] requirement.mdのAC / BH / CONがクロージャ（Closure） Indexへ対応している
-- [ ] design.mdの固定設計契約（Fixed Design Contracts）がPlanに反映されている
-- [ ] design.mdの検証への含意（検証（Verification） Implications）が検証段階（検証（Verification） Ladder）へ反映されている
-- [ ] マイルストーン（Milestone）が独立検証可能な成果として定義されている
-- [ ] 振る舞いバックログ（Behavior Backlog）が観測可能な振る舞い単位で書かれている
-- [ ] 実行中の TDD サイクル（Active TDD Cycle）が一つの振る舞い仮説に絞られている
-- [ ] Redまたは代替証拠の方針が明示されている
-- [ ] 最小 Green 境界（Minimal Green Boundary）が明示されている
-- [ ] Refactor Guardrailが明示されている
-- [ ] Allowed / Forbidden changesが明確である
-- [ ] Stop Conditionsが具体的である
-- [ ] Report evidence destinationが明示されている
+1. Fresh `qa-reviewer`: C318-01–11、manual four-branch、missing integration coverage。
+2. Fresh issue-wide `code-reviewer`: test sensitivity、managed projection、runtime non-diff。
+3. Fresh `spec-reviewer`: requirement/design/plan/report/docs/skills/tests、親/ADR/Issue317/Issue319境界、EAL/authority/secrecy。
 
----
+全reviewerは`gpt-5.6-sol` / mediumを使う。いずれかが`failed`、`unavailable`、`denied`、`waived`、`provisional`ならpass扱いせず、owner stepへ戻して修正後fresh rerunする。
 
-## 19. 変更履歴
+Step closure contract / Final gate:
 
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-07-13 | 初稿（Initial draft） | ... | ... |
+- C318-01–11にunresolved `blocked` / `stale`がない。
+- Material findingのdispositionが完了している。
+- Assurance valid、Issue report/closure evidenceが完備している。
+- Final reportをcommit/pushし、worktree clean、upstream left/right `0 0`。
+- Active Issueがiss-00318と一致する。
+- Per-Issue PR、PR-ready/merge-ready/merge-prepared claimを作らない。
+- Spec-managerが`issue finish`を実行し、GitHub #318/local lifecycleの完了を確認する。
+
+## 8. Deferred PR Delivery Gate
+
+- Target: `iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr`。
+- Dependency: `iss-00317 -> iss-00318 -> iss-00319`。
+- Reason: Package、fresh init/update、public docs、full regression、final Epic QA/code/spec、PR deliveryを一つの最終Epic PRへ集約する。
+- Claim boundary: Issue319のPR Delivery / Merge Preparation完了までPR-ready / merge-ready / merge-preparedを主張しない。
+- Remaining gates: package data、fresh init/update、README/reference/migration、full pytest/global static、provider/dogfood/installed inventory、final Epic QA/code/spec、PR creation/observation/merge preparation。
+
+## 9. Commit候補
+
+| Step | Commit intent |
+|---|---|
+| Plan gate | `docs(issue-318): ChatGPT First実装計画を確定` |
+| S00 | `docs(issue-318): Preservation契約のベースラインを記録` |
+| S01 | `docs(chatgpt-first): 原文保存ワークフロー契約を追加` |
+| S02 | `docs(chatgpt-first): 共有preservation checkpointを追加` |
+| S03 | `docs(planning): ChatGPT原文保存checkpointを連携` |
+| S04 | `test(chatgpt-first): preservation契約と投影を検証` |
+| S05 | `docs(issue-318): preservation分岐のdogfood証跡を記録` |
+| S90 | `docs(issue-318): Issue319への引継ぎ境界を確定` |
+| S99 | `docs(issue-318): 最終品質ゲートを確定` |
+
+実際のdiffが候補と異なる場合はcommit時に変更事実へ合わせる。複数stepを一つのcommitへ混在させない。
+
+## 10. Plan closure checklist
+
+- [x] Fresh plan `spec-reviewer` pass、promotion decision exact `promote`。
+- [x] Assurance valid、planning readiness blockerなし。
+- [ ] S00 baseline完了。
+- [ ] S01 provider docs、fresh spec review、commit/push完了。
+- [ ] S02 shared skill、fresh spec review、commit/push完了。
+- [ ] S03 planning hooks、fresh spec review、commit/push完了。
+- [ ] S04 projection/tests、fresh code/spec review、commit/push完了。
+- [ ] S05 four-branch manual evidence、fresh spec review、commit/push完了。
+- [ ] S90 impact/Issue319 relay、fresh spec review完了。
+- [ ] S99 focused checksとQA→code→spec review完了。
+- [ ] Report/assurance/lifecycle/clean/upstream evidence完了。
+
+## 11. 変更履歴
+
+- 2026-07-14: ChatGPT 5.6 Pro bundled planning evidence、fresh implementation-planner、approved requirement/designを統合し、Standard executable planとして作成。
