@@ -194,7 +194,9 @@ class TestArtifactImportChatGptOutput(CliRuntimeHarness):
                 assert imported.returncode == 0, imported.stdout + imported.stderr
                 artifacts = sorted((issue_dir / "artifacts").glob(f"*-chatgpt-output-{slug}.md"))
                 assert len(artifacts) == 2
-                timestamps = [re.match(r"([0-9]{8}t[0-9]{6}z)", path.name).group(1) for path in artifacts]
+                timestamp_matches = [re.match(r"([0-9]{8}t[0-9]{6}z)", path.name) for path in artifacts]
+                assert all(match is not None for match in timestamp_matches)
+                timestamps = [match.group(1) for match in timestamp_matches if match is not None]
                 if len(set(timestamps)) == 1:
                     same_second_pair = artifacts
                     break

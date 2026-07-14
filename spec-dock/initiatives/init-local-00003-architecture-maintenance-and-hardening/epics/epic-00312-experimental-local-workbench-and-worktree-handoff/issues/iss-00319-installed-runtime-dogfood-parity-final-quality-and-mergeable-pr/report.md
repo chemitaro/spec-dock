@@ -243,6 +243,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S02-CODE-r1 | package/fresh/update | code-reviewer | fresh | passed | no | promote | findingsなし。Cache exclusion/wheel/sdist/test sensitivity/cross-platform path、sdist→wheel再buildを承認 |
 | S02-SPEC-r1 | package/fresh/update | spec-reviewer | fresh | passed | no | promote | P0〜P2なし、confidence 0.99。C319-03〜05、4 scope path/type/bytes/SHA保持、nonblocking metadata観察を承認 |
 | S03-SPEC-r1 | public docs and dogfood parity | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。C319-06〜07、provider-first projection、7 docs pairs、semantic completeness、code-reviewer N/Aを承認 |
+| S04-CODE-r1 | focused/full/static quality and repair | code-reviewer | fresh | passed | no | promote | Blocking findingなし。6 filesのstatic/test repair、runtime semantics不変、affected/full/static evidence、C319-08 closureを承認 |
+| S04-QA-r3 | regression and platform quality | qa-reviewer | fresh | passed | no | promote | Blocking findingなし。Focused W1〜W4、affected/relay、unit/CLI/integration/full、static gateを確認。C319-09はlocal/config pass、PR Ubuntu実runをS100へ保持 |
 
 #### レビュー修復履歴（Review Remediation History）
 | ステップ（step） | 対象 | 検出事項 | 修復結果 |
@@ -251,6 +253,9 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | PLANNING-REQ-r2 | requirement alignment | r1修復後、Mandatory OAL placeholderをblocking findingとして検出 | OAL-319-001を具体化し、r3でpassed |
 | PLANNING-PLAN-r1 | plan executability/alignment | Configured static authorityが`make lint`ではなく個別mypy/RuffになっていたためC319-08をblock | S04へauthority/repair順序を修復し、r2でpassed |
 | S00-BASELINE-r1 | live baseline and exact inventory | Generated exceptionがdirectory/category levelでrefresh commandも曖昧 | Consumer canonical namespaceを分離し、14 exact generated entriesと実在refresh commandへ修復してr2でpassed |
+| S04-STATIC-r1 | repository-wide static gate | Initial `make lint`でRuff/format/mypy violationsを検出 | 6 filesへformatとtest typingの最小修復を限定し、affected/full/staticを再実行 |
+| S04-QA-r1 | static repair QA | Test double 2箇所のtype ignoreがplanのno skip/disable/exclude gateに抵触 | Source guard delegationへ置換し、type ignoreを削除して再検証 |
+| S04-QA-r2 | runtime safety QA | Annotation/import修復がruntime `get_type_hints`利用時にP2 regressionを生む可能性を検出 | Runtime-resolvable collection imports/annotationsへ修復し、affected 652、relay 10+46、fresh r3 reviewでpassed |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -259,19 +264,23 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S00 baseline | committed | Issue319 report live baseline only | `eb154791` | clean / upstream `0 0` | N/A | Exact GitHub/git/pair/exception/wheel/test/platform inventory | `git diff --check` passed | S00-BASELINE-r2 passed |
 | S01 | committed | `origin/main` merge + five conflict resolutions + report evidence | `1230c456` | clean / upstream `0 0`、origin/main left 0 | N/A | Issue314/315〜318 accepted contracts、provider/dogfood conflict pairs | Conflict paths clean。Whole mergeはbyte-preserved raw Artifactの既知13行だけ例外 | S01-CODE-r1 / S01-SPEC-r1 passed |
 | S02 | committed | Python cache packaging repair + wheel/fresh/update evidence + report | `09e84df2` | clean / upstream `0 0` | N/A | C319-03〜05、tc319-s02-01〜03 | `git diff --check` passed | S02-CODE-r1 / S02-SPEC-r1 passed |
-| S03 | commit candidate | Root/provider docs + candidate-wheel dogfood projection + report | 2026-07-14 S03 session ledger | verify after commit | N/A | C319-06〜07、tc319-s03-01〜03 | `git diff --check` passed | S03-SPEC-r1 passed / code-reviewer N/A (docs-only) |
+| S03 | committed | Root/provider docs + candidate-wheel dogfood projection + report | `da59f73c` | clean / upstream `0 0` | N/A | C319-06〜07、tc319-s03-01〜03 | `git diff --check` passed | S03-SPEC-r1 passed / code-reviewer N/A (docs-only) |
+| S04 | commit candidate | Static/test repair 6 files + report evidence | 2026-07-14 S04 session ledger | verify after commit | N/A | C319-08、C319-09 local/config、tc319-s04-01〜04 | `git diff --check` / focused/full/static passed | S04-CODE-r1 / S04-QA-r3 passed |
 
 #### 変更したファイル
 - S00 planning: `requirement.md`, `design.md`, `plan.md`, `report.md`, `.assurance.json`, imported ChatGPT Artifact。
 - S01 integration: `origin/main` merge、conflict resolution 5 files、`report.md`。
 - S02 candidate: `pyproject.toml`, `setup.py`, `tests/unit/infra/test_init_update.py`, `report.md`。
-- S03 candidate: `README.md`, provider/dogfood docs 7 exact pairs、`report.md`。
+- S03: `README.md`, provider/dogfood docs 7 exact pairs、`report.md`。
+- S04 candidate: `scripts/authoring-pack/authoring_pack_review.py`, `scripts/authoring-pack/invoke_chatgpt_backend.py`, `tests/cli_runtime/test_artifact_import_chatgpt_output.py`, `tests/cli_runtime/test_artifact_import_s04.py`, `tests/cli_runtime/test_wrappers.py`, `tests/unit/infra/test_init_update.py`, `report.md`。
 
 #### コミット
 - `7a3793de` `docs(issue-319): ChatGPT原文保存と最終品質計画を確定`
 - `eb154791` `docs(issue-319): S00ベースラインと配布在庫を記録`
 - `1230c456` `chore(integration): origin/mainの先行Issue変更を最終品質ブランチへ統合`
 - `09e84df2` `fix(packaging): wheelとsdistへのPythonキャッシュ混入を防止`
+- `da59f73c` `docs(workbench): WorkbenchとArtifact importの公開運用契約を整備`
+- S04 candidate: `chore(quality): 静的解析ゲートの違反を解消`
 
 #### メモ
 - S00 live baselineの追加記録はplanning authorityを変更せず、report evidenceだけを更新する。
@@ -423,6 +432,35 @@ Issue315〜318導入差分から抽出したexact pairはS00時点ですべてby
 - S02 packaging fixを含むcurrent sourceからcandidate wheelをbuild。SHA-256は`88804856d7d0d2524c065e58e2bffd1b72f59158447661f3c5ceb615a7e8e290`、Python cache member 0。Absolute wheelを`uvx --no-cache --from`へ渡し`spec-dock update`でdogfoodへ正規投影した。
 - Provider/dogfood docs 7 exact pairs、Issue315〜318関連runtime/skills/agent config exact pairsはbyte-equal。Root-only `README.md`はpublic landing authority、canonical Node/Evidenceとgenerated projectionsはS00 exception ledgerどおりで逆投影しない。Template/system/migration/version/lock変更は必要性がなくno-op。
 - Projection後verificationは`tests/cli_runtime/test_wrappers.py tests/unit/infra/test_init_update.py` 561 passed、docs contract search pass、`git diff --check` pass。
+
+---
+
+### セッションログ（2026-07-14 S04 focused / full / static / Linux quality）
+
+#### 対象
+- Step: S04
+- AC/EC: C319-08〜09 / AC-319-009〜010
+
+#### 実施内容
+- Issue315〜318のfocused contractをfinal S03 headから実行し、W1 99 passed、W2 132 passed、W3 112 passed、W4 10 passedを確認した。
+- Baseline laneはunit 1186 passed、CLI runtime 1194 passed / 75 skipped / 2 warnings、integration 3 passed。Initial `make lint`はRuff/format/mypy violationを検出し、DevCoder `gpt-5.6-sol` / mediumがproduction runtime semanticsを変えず、composition/import/future除去を含むstatic/test repairだけを6 filesへ限定した。Optional regex matchはinitial mypy repairでexplicit assertion/narrowingへ修復した。
+- Fresh QA r1はtest double 2箇所のtype ignoreがplanのno skip/disable/exclude gateに抵触するとfinding化し、r2はruntime `get_type_hints`互換性のP2を検出した。両方を修復後、affected 652 passed、QA affected 585 passed、relay 10 + 46 passed。Fresh code-reviewer r1とQA reviewer r3はいずれもblocking findingなしでpassedした。
+- Final full regressionは2598 passed / 75 skipped / 2 warnings、1672.23秒。Final `make lint`はRuff check/format check 375 files、mypy 246 source filesがall passし、追加global Ruff check/formatもpassした。
+- C319-08はfocused/full/static evidenceによりpass。C319-09はArtifact import publication testのlocal passと`.github/workflows/provider-ci.yml` Ubuntu collection/config確認までpassした。PR head上のUbuntu実runはS100 pendingであり、完了を自己主張しない。
+
+#### 変更したファイル
+- `scripts/authoring-pack/authoring_pack_review.py`
+- `scripts/authoring-pack/invoke_chatgpt_backend.py`
+- `tests/cli_runtime/test_artifact_import_chatgpt_output.py`
+- `tests/cli_runtime/test_artifact_import_s04.py`
+- `tests/cli_runtime/test_wrappers.py`
+- `tests/unit/infra/test_init_update.py`
+
+#### クロージャ
+- `tc319-s04-01`: pass — W1〜W4 focused regression。
+- `tc319-s04-02`: pass — unit / CLI runtime / integration / full regression。
+- `tc319-s04-03`: pass — authoritative `make lint`とglobal Ruff。
+- `tc319-s04-04`: local/config pass、S100 pending — Ubuntu workflowはPR head実run後にterminal closeする。
 
 ---
 
