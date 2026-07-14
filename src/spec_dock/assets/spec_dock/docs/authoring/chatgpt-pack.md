@@ -47,6 +47,9 @@ Fileの存在、拡張子、size、encodingだけでsemantic completenessを自�
 - `committed=true`でwarningがある場合も保存済みである。Warningを記録し、自動retryや重複importを行わない。
 - `committed=false`、receipt欠落、eligibility failure、またはsemantic completeness未分類はblockである。Complete sourceを`skipped_inline_unavailable`へ読み替えない。
 - Import途中で失敗してもWorkbench sourceを削除しない。
+- Standalone importのMVP対象は単一`.md` fileであり、source bytes、encoding、改行、frontmatterを変更しない。Directory、bundle、PDF、image、ZIPはこのcommandへ自動変換しない。
+- 言語、拡張子、MIME、内容からcopy/import可否を決めるclassifierは持たない。ただしpublic command contractとしてsourceは`.md`に限定する。
+- `chatgpt-output`はimport kindであってtyped Artifact tokenではない。Blank naming/collision grammarで保存し、template-based `new artifact`のcatalogや命名を予約・置換しない。
 
 ### 本文を含まないEAL（Content-free EAL）
 

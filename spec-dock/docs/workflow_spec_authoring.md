@@ -64,6 +64,8 @@ Sub-agent-created draft は最低限、`created_by_role`、`scope_id`、`source_
 
 Workbench から `artifact import chatgpt-output` で保存した external evidence は、delegated authoring role が作成した draft ではありません。Imported body は evidence-only のまま内容不変とし、delegated draft 用 frontmatter、provenance fields、diff guard を追加しません。この分離は existing delegated draft の frontmatter、provenance、diff guard、authority restriction を緩和するものではありません。
 
+このimportはapproved Workbenchの完成した単一Markdownをsource/bytes不変でcopyする明示操作です。`chatgpt-output` typed Artifact tokenを予約せず、templateから作る`new artifact`と共存します。File type/content classifier、automatic import、Workbench source削除は行いません。
+
 Sub-agent-created draft は `authority: accepted`、`adoption_status: adopted`、non-empty `reflected_to`、reviewer pass、phase completion、implementation readiness を自己主張してはなりません。`reflected_to` は実際に canonical artifact へ反映済みの対象だけを表し、予定先は `intended_targets` で表します。
 
 Accepted ADR は architecture decision authority を持ち得ますが、artifact draft / research / disc は evidence です。Implementation readiness、phase promotion、issue ready、issue finish、phase completion は、main orchestrator が evidence を canonical docs と `report.md` に再記述し、required reviewer gates が pass した後に成立します。
