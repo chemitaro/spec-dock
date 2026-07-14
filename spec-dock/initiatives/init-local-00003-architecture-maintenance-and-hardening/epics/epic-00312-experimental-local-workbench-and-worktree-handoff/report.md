@@ -15,12 +15,12 @@ ID: "epic-00312"
 
 ## 進捗サマリー (必須)
 - 現在地（何が完了し、何が未完か）:
-  - Epic scaffold、GitHub sync、6件のuser-answer interview、baseline research、clarification synthesis、ChatGPT 5.6 Pro GitHub-synced analysis、canonical requirement draftを完了した。
-  - Artifact import追加後のRequirement/Design/Planはfresh `spec-reviewer`でpassし、ADRはaccepted。5-Issue分割のhuman approval待ちでIssue node creationは未開始。
+  - Human承認済み5-Issue分割を実行し、GitHub #315〜#318はclosed、#319/#312はopen。Issue319 S00〜S05はcommit/push済みで、local distribution/docs/full/static/manual gatesはpassした。
+  - Workbench ignore/opacity、explicit scoped copy、byte-preserving Artifact import、ChatGPT-first preservation、installed consumer/manual integrationまで実装済み。S90 closureはfresh spec reviewでpassed/promote、confidence 0.99、findings 0となった。
 - 次のマイルストーン:
-  - HumanがW1–W5のscope/dependency/W5 final quality ownershipを承認後、Issue nodes/dependency edges/draft handoffを作成する。
+  - S90 commit/push/clean確認 → Issue319 S99 QA/code/spec ordered final review → S100 PR作成・Ubuntu/required checks・review threads・mergeability/base drift観測・Issue Finish。
 - ブロッカー:
-  - なし。Issue creationはhuman approval gateで停止中。
+  - S99開始を止めるblocked/stale evidenceはない。S90 commit/push/cleanがentry condition。PR merge-prepared claimとIssue/Epic finishはS100 actual observationまで不可。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -50,6 +50,12 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-014 | 採用（`adopted`） | fresh requirement `spec-reviewer` | refreshed requirement + Artifact import ADR | E-RQ-019–024/E-AC-013–016、opaque bytes、blank coexistence、5-Issue seedが整合したためrequirementをpromoteしADRをacceptedへ昇格した | reviewer `rereview_import_requirement_epic_00312`、2026-07-13、`review_status: pass` | design refresh + fresh reviewer |
 | EAL-015 | 採用（`adopted`） | fresh design `spec-reviewer` | refreshed design | Import kind/blank grammar、independent use case、opaque binary publication、temp/hash/source stability/no-overwrite、workflow branch、W3/W4/W5 responsibilityがaccepted requirement/ADRと整合した | reviewer `review_import_design_epic_00312`、2026-07-13、`review_status: pass` | plan refresh + fresh reviewer |
 | EAL-016 | 採用（`adopted`） | fresh plan `spec-reviewer` | refreshed 5-Issue plan | W1 foundation、W2 scoped copy、W3 import runtime、W4 preservation workflow、W5 final quality/PRのownership、dependency、deferred PR、human approval/draft lifecycleが整合した | reviewer `review_import_plan_epic_00312`、2026-07-13、`review_status: pass`; validate nodes=204 | human 5-Issue approval gate |
+| EAL-017 | 採用（`adopted`） | Issue315 final report / GitHub #315 | E-RQ-001〜005、013、015、017〜018 foundation | Ignore、semantic opacity、authority isolation、delete/update preservation、provider/dogfood parityを実装・review・commit/pushしIssue closed | Issue315 C315-01〜08、final QA/code/spec gates | Issue319 final distribution evidenceへ採用済み |
+| EAL-018 | 採用（`adopted`） | Issue316 final report / GitHub #316 | E-RQ-006〜012、014、016 scoped copy | Explicit same-repo linked-worktree copy、independent scope resolution、source-wins/destination-only、symlink/containment/failure transparencyを実装・review・commit/pushしIssue closed | Issue316 C316-01〜10、final QA/code/spec gates | Issue319 installed scenarioへ採用済み |
+| EAL-019 | 採用（`adopted`） | Issue317 final report / GitHub #317 | E-RQ-019〜023、E-AC-013〜015 Artifact import | Single Markdown、opaque bytes、blank coexistence、collision/no-overwrite、source survival/publication safetyを実装・review・commit/pushしIssue closed | Issue317 C317-01〜11、final QA/code/spec gates | Issue319 package/manual/full evidenceへ採用済み |
+| EAL-020 | 採用（`adopted`） | Issue318 final report / GitHub #318 | E-RQ-024、E-AC-016 preservation workflow | Preservation-before-adoption、EAL/canonical rewrite/fresh review、external/delegated/ZIP lane分離を実装・review・commit/pushしIssue closed | Issue318 C318-01〜11、final QA/code/spec gates | Issue319 planning/manual flowへ採用済み |
+| EAL-021 | 採用（`adopted`） | Issue319 S00〜S90 reports / current repo audit | Distribution/docs/full/static/manual/Epic closure | Latest main、candidate wheel、fresh/existing consumer、dogfood parity、public docs、full/static、installed copy→import→EAL→rewrite、40-ID closureをcurrent headで実証 | Commits `7a3793de`〜`68c411cd`; Issue319 C319-01〜11、15/16 pass-through; S90-SPEC-r3 passed | S90 commit/push/clean後S99へ進む |
+| EAL-022 | 延期（`deferred`） | Issue319 S100 live GitHub gate | PR URL、Ubuntu actual run、required checks、review threads、mergeability/base drift、Issue/Epic finish | PR未作成のため推測しない。S90/S99にはnon-blockingだがmerge-prepared/finishにはblocking | Current GitHub #319/#312 open、PR URLなし | S100でactual observationし、terminal evidenceへ更新する |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -58,6 +64,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
 | OAL-001 | Git-ignored、non-canonical、disposableな低摩擦scratchを、分類/管理systemなしで提供する | scoped copyの境界安全、failure transparency、provider/dogfood parity | 低。独自classifier/preflightをrequirementから除外し、標準copy boundaryを維持した | pass。6回目fresh requirement reviewer |
+| OAL-002 | Root manual selectionとscope-local one-shot handoff、ChatGPT原文のbyte-preserving evidence保存を実consumerで成立させる | Package/update/docs/full/static/PR quality gate | 低。Version/release/migrationやroot bulk/sync/classifier/typed tokenへ拡張しない | S00〜S90 pass。S99/S100 terminal gate pending |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -67,7 +74,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 |---|---|---|---|---|---|---|
 | requirement | Artifact import decision/research + prefix coexistence answer + ADR | product open questionなし。Import kind + blank grammar + opaque bytesをadopted | evidence/reviewer findingsをadopted/refined | passed（`rereview_import_requirement_epic_00312`） | no | promote。ADR accepted、design入力へ固定 |
 | design | Refreshed requirement、accepted Artifact import ADR、GPT-5.6 research、actual Artifact runtime contracts | product open questionなし。Import kind + blank grammar + opaque bytes + binary publisher/workflow slicesを反映 | evidence/refinementsをadopted | passed（`review_import_design_epic_00312`） | no | promote。Plan入力へ固定 |
-| plan | Passed refreshed requirement/design、accepted ADR、GPT-5.6 five-slice proposal | W1–W5 scope/dependency/final qualityを反映 | evidence/refinementsをadopted | passed（`review_import_plan_epic_00312`） | no | promote。Human 5-Issue decomposition approval gate |
+| plan | Passed refreshed requirement/design、accepted ADR、GPT-5.6 five-slice proposal | W1–W5 scope/dependency/final qualityを反映 | evidence/refinementsをadopted | passed（`review_import_plan_epic_00312`） | no | promoted。Human承認後に5 Issueを作成し、W1〜W4 closed、W5実行中 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -112,28 +119,59 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（reviewer gate evidence） | ineligible |
 
 ## 決定事項（ADRリンク） (必須)
-- adr-xxxx-...: <1行要約>
-- ...
+- `adr-20260713t031808z-template-free-artifact-import-and-blank-filename-coexistence`: `chatgpt-output`をimport kindとして扱い、template/frontmatterなしのblank naming/collision grammarと共存させるaccepted decision。
 
 ## 完了した Issue / PR / Release (必須)
-- iss-xxxx-...: Done（PR: ...）
-- ...
+- `iss-00315` / GitHub #315: closed。Workbench ignore/opacity/delete/update foundation。
+- `iss-00316` / GitHub #316: closed。Explicit scoped Workbench copy/source-wins handoff。
+- `iss-00317` / GitHub #317: closed。Byte-preserving `chatgpt-output` Artifact import。
+- `iss-00318` / GitHub #318: closed。ChatGPT-first preservation/EAL/canonical rewrite workflow。
+- `iss-00319` / GitHub #319: open。S00〜S05 committed/pushed、S90 reviewed/passでcommit pending、S99/S100 pending。
+- Epic GitHub #312: open。Issue319 terminal delivery後にclose判断する。
+- PR: 未作成。URL、checks、review、mergeabilityはS100でactual stateを記録し、推測しない。
 
-## 受け入れ条件（E-AC）の達成状況 (必須)
-- E-AC-001: Pass / Fail（証拠: ...）
-- E-AC-002: ...
+## Requirement / Acceptance content-free closure mapping（必須）
+
+| Explicit IDs | Current status | Content-free evidence / remaining gate |
+|---|---|---|
+| E-RQ-001, E-RQ-002, E-RQ-003, E-RQ-004, E-RQ-005 | implemented / locally verified | Issue315 final closure、Issue319 fresh/update/dogfood inventory。Git-ignored、root/scoped placement、semantic opacity、authority isolation |
+| E-RQ-006, E-RQ-007, E-RQ-008, E-RQ-009, E-RQ-010, E-RQ-011, E-RQ-012 | implemented / locally verified | Issue316 final closure、Issue319 S05。Explicit scoped copy、root exclusion、independent resolution、opaque complete content、source-wins、safety/content-free failure |
+| E-RQ-013, E-RQ-014, E-RQ-015, E-RQ-016, E-RQ-017, E-RQ-018 | implemented / locally verified | Issue315/316 closure、S02/S03 update/parity/docs。Minimal surface、no sync、disposable、experimental、provider-first、update preservation |
+| E-RQ-019, E-RQ-020, E-RQ-021, E-RQ-022, E-RQ-023, E-RQ-024 | implemented / locally verified | Issue317/318 closure、S05 two imports/EAL/rewrite。Explicit import、approved source、byte identity、blank collision/no-overwrite、publication safety、authority checkpoint |
+| E-AC-001, E-AC-002, E-AC-003, E-AC-004 | local pass | Issue315/316 focused closure、S02/S05 installed evidence。Ignore matrix、opaque traversal、root separation、explicit handoff |
+| E-AC-005, E-AC-006, E-AC-007, E-AC-008 | local pass | Issue316 final testsとS05。Target/scope resolution、merge contract、content opacity、failure transparency |
+| E-AC-009, E-AC-010, E-AC-011, E-AC-012 | local pass; terminal gate pending for E-AC-012 | No lifecycle/sync、delete、update/parityはIssue315/316/S02/S03でpass。Final local full/static/manualはS04/S05 pass、S99/S100 pending |
+| E-AC-013, E-AC-014, E-AC-015, E-AC-016 | local pass; S100 delivery observation pending | Issue317/318 final closure、S05 source/hash/no-overwrite/EAL/rewrite。PR Ubuntu actual runとterminal authority claimだけS100 pending |
+
+## ドキュメント影響（Docs Impact）
+
+| Surface | Disposition | Evidence |
+|---|---|---|
+| Root README / public provider and dogfood docs | updated | S03 `da59f73c`、provider-first candidate-wheel projection、7 exact pairs、fresh spec pass |
+| Runtime help / installed skills / agent config | updated and distributed | Issue315〜318 provider authority、S02 wheel-only fresh/update、provider/dogfood parity |
+| Rules/templates/migration/version/`uv.lock` | verified-no-op | Current contractで追加変更の必要性なし。S00/S02/S03/S90 audit |
+
+## リスク台帳（Risk Ledger）
+
+| Risk | State | Blocking boundary | Next action |
+|---|---|---|---|
+| PR Ubuntu actual run / required checks / review threads / mergeability / base drift未観測 | pending | S90/S99 nonblocking。Merge-prepared/Issue/Epic finish blocking | S100でPR作成後、final headを観測・repairする |
+| Byte-preserved raw Artifactの既存trailing whitespace | accepted nonblocking | 原文不変契約により修正しない。Product/runtime差分ではない | Terminal reviewで既知例外として維持 |
+| sdist `SOURCES.txt`にcache path文字列が残るがarchive memberは0 | accepted nonblocking | Candidate/sdist再build wheelにcache member 0。Consumer behavior影響なし | Packaging contract変更時に再評価 |
+| Scope expansion | closed by contract | Version/lock/migration/new deps/root bulk/sync/classifier/typed tokenはnon-goal | Material necessity発見時だけ新規decision/reviewへ戻す |
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
-  - ...
+  - Candidate wheelによるfresh init、pre-feature existing update、dogfood projection、installed manual scenarioまでlocal pass。
 - 監視値（エラー率/レイテンシなど）:
-  - ...
+  - Runtime service rolloutは対象外。Test/pass countsとcontent-free hashesはIssue319 reportが保持する。
 - 障害/アラート:
-  - ...
+  - なし。PR/CI external observationは未実施。
 
 ## フォローアップ（別Issue化） (必須)
-- iss-xxxx-...:
-  - ...
+- 新規follow-up Issueなし。残作業は既存`iss-00319`のS90 commit/push/clean、S99 ordered final review、S100 PR/CI/review/mergeability/finishである。
+- PR mergeはuser明示指示なしに行わない。
 
 ## 省略/例外メモ (必須)
-- 該当なし
+- S90はfresh spec-reviewer passed/promote。S99/S100は未完了であり、Epic completionをself-passしない。
+- EAL-022だけがdeferred。Blocked/stale entryはない。

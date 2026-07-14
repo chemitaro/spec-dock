@@ -3,7 +3,7 @@
 ID: "iss-00316"
 タイトル: "Experimental Scoped Workbench Copy And Source Wins Merge"
 関連GitHub: ["#316"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-13"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -346,7 +346,7 @@ git diff --check
 | Dogfood help smoke | pass |
 
 #### Manual linked-worktree evidence
-- Managed temp: `/private/tmp/codex-agent-work/501/session-20260713t094151z-issue316-manual-linked-worktrees-52798b66`。
+- Managed temp: managed temporary linked-worktree fixture。
 - Same `iss-00316`、target slug `iss-00316-manual-target-renamed`。Sourceに`.env`、binary、nested `.git/config`、source/same leaf、broken symlink、targetにsame/target-onlyを配置。
 - Basename `--to target`とscope `' ISS-00316 '`でsuccess。Target renamed slug使用、target-only保持、same source-wins、binary/.env/.git hashes一致、link text `../missing-target`。
 - Absolute path rerun後、6 ordinary file hash不変。Same-current=`target_ineligible`、no-source=`no_source`、双方`mutation_started=false`、target-only hash不変。
@@ -405,7 +405,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user request to use `spec-dock-epic-execution` / `spec-dock-issue-planning` / `spec-dock-issue-execution` | `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/bcea/spec-dock` | iss-00316 | current Work3 session | spec-manager / repo-analyst / ChatGPT evidence producer / spec-reviewer / dev-coder / code-reviewer / qa-reviewer / doc-writer | active repo/worktree、active scope、current session、SpecDock-defined role responsibility。破壊的操作、scope expansion、external publish/mergeは含めない | issue complete / session end / scope change / user revocation | none | workflowを継続し各fresh gateを記録 |
+| user request to use `spec-dock-epic-execution` / `spec-dock-issue-planning` / `spec-dock-issue-execution` | current Work3 checkout | iss-00316 | current Work3 session | spec-manager / repo-analyst / ChatGPT evidence producer / spec-reviewer / dev-coder / code-reviewer / qa-reviewer / doc-writer | active repo/worktree、active scope、current session、SpecDock-defined role responsibility。破壊的操作、scope expansion、external publish/mergeは含めない | issue complete / session end / scope change / user revocation | none | workflowを継続し各fresh gateを記録 |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
