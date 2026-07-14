@@ -3,7 +3,7 @@
 ID: "iss-00318"
 タイトル: "ChatGPT First Preservation Workflow And Skill Integration"
 関連GitHub: ["#318"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-14"
 親: ["epic-00312", "init-local-00003"]
