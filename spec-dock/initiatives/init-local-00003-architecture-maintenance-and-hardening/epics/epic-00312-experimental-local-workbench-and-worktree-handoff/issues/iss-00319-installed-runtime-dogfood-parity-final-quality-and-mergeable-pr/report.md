@@ -238,6 +238,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | PLANNING-PLAN-r2 | plan executability/alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。C319-01〜16、S00〜S100、main/wheel/fixture/static/final-head/lifecycle contractを承認 |
 | PLANNING-FINAL-r1 | planning closeout alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。ChatGPT原文保存、EAL/EPE/OAL、terminal review/specialist gate、assurance/readiness、Requirement/Design/Plan整合を承認 |
 | S00-BASELINE-r2 | live baseline and exact inventory | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。GitHub/branch/pre-feature ref、37 exact pairs、14 generated rows、wheel/test/platform inventory、C319-01とS01 preconditionを承認 |
+| S01-CODE-r1 | latest main integration | code-reviewer | fresh | passed | no | promote | findingsなし。Issue314 preflight/receiptとIssue315〜318 Workbench contract、provider/dogfood parity、test inventoryを承認 |
+| S01-SPEC-r1 | latest main integration | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Non-destructive merge、C319-02、accepted contracts、known raw Artifact exceptionを承認 |
 
 #### レビュー修復履歴（Review Remediation History）
 | ステップ（step） | 対象 | 検出事項 | 修復結果 |
@@ -251,8 +253,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S00 planning | committed | Issue319 Requirement/Design/Plan/Artifact/assurance/report | `7a3793de` | clean / upstream `0 0` | N/A | C319-01 planning/preservation/assurance | `git diff --check` passed | PLANNING-FINAL-r1 passed |
-| S00 baseline | commit candidate | Issue319 report live baseline only | 2026-07-14 S00 session ledger | verify after commit | N/A | Exact GitHub/git/pair/exception/wheel/test/platform inventory | `git diff --check` passed | S00-BASELINE-r2 passed |
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S00 baseline | committed | Issue319 report live baseline only | `eb154791` | clean / upstream `0 0` | N/A | Exact GitHub/git/pair/exception/wheel/test/platform inventory | `git diff --check` passed | S00-BASELINE-r2 passed |
+| S01 | commit candidate | `origin/main` merge + five conflict resolutions + report evidence | 2026-07-14 S01 session ledger | verify after commit | N/A | Issue314/315〜318 accepted contracts、provider/dogfood conflict pairs | Conflict paths clean。Whole mergeはbyte-preserved raw Artifactの既知13行だけ例外 | S01-CODE-r1 / S01-SPEC-r1 passed |
 
 #### 変更したファイル
 - S00 planning: `requirement.md`, `design.md`, `plan.md`, `report.md`, `.assurance.json`, imported ChatGPT Artifact。
@@ -360,6 +362,23 @@ Issue315〜318導入差分から抽出したexact pairはS00時点ですべてby
 - W3 focused: `tests/cli_runtime/test_artifact_import_chatgpt_output.py`, `tests/cli_runtime/test_artifact_import_s04.py`, `tests/unit/application/test_binary_artifact_import_ports.py`, `tests/unit/commands/test_artifact_import_chatgpt_output.py`, `tests/unit/infra/test_binary_artifact_publisher.py`, `tests/unit/presentation/test_artifact_import_chatgpt_output.py`, `tests/cli_runtime/test_runtime_new_doc_s09.py`。
 - W4 focused: `tests/cli_runtime/test_wrappers.py`, `tests/unit/infra/test_init_update.py`。
 - Full authorityは`uv run pytest`、static authorityは`make lint`。Ubuntu authorityは`.github/workflows/provider-ci.yml`の`provider-tests` / `ubuntu-latest`で、`uv run pytest`によりW3 testsを通常collectionする。
+
+---
+
+### セッションログ（2026-07-14 S01 latest main integration）
+
+#### 対象
+- Step: S01
+- AC/EC: C319-02 / AC-319-003
+
+#### 実施内容
+- S00 clean/upstream `0 0`後に`git fetch origin`し、left 31 / right 55を確認。`git merge --no-commit --no-ff origin/main`で`MERGE_HEAD=0481b394`を未コミット統合した。
+- 最初のsandbox内mergeは`.agents/`置換権限で停止し、tracked rollbackと`MERGE_HEAD`不在を確認。mergeが生成した未追跡物だけを`/private/tmp/issue319-failed-merge-20260714`へ非破壊退避してから同一commandを権限付きで再実行した。
+- Content conflict 5件をowner分類: provider/dogfood `github_sync_preflight.py` 2件、provider/dogfood `source_manifest.py` 2件、`tests/unit/infra/test_init_update.py` 1件。
+- DevCoder `gpt-5.6-sol` / mediumが、Workbench source fail-fast + Issue314 receipt publication、`.workbench` traversal prune + `file_observer`、Issue314/315〜319 test inventory、Codex/GitHub両surfaceのunpinned profile contractを併合。Unresolved conflict/markerは0、conflict投影2組はbyte-equal。
+- Focused verificationはDevCoder 92 passed（unit 79 + CLI 13）。Code reviewer追加確認はisolated wheel 1 passed、concurrent snapshot 3 passed。Spec reviewer確認はfocused 28 passed、assurance valid、validate `nodes=212`。
+- Whole staged `git diff --check`の13件はすべて`origin/main`由来Issue313 byte-preserved raw ChatGPT Artifact 1件の既存trailing whitespace。原文不変契約のため修正せず、競合解消差分の`diff --check` passと分離して既知例外化した。
+- Fresh code reviewer passed後、fresh spec reviewerが`passed / promote`、confidence 0.99。Blocking findingsなし。
 
 ---
 

@@ -140,6 +140,7 @@ class AuthoringPreflightGithubSyncArgs(CommandArgs):
     provided_context_paths: tuple[str, ...]
     diff_summary: str | None
     unsynced_reason: str | None
+    output_dir: Path | None
 
 
 @dataclass(frozen=True)
@@ -325,6 +326,7 @@ def _add_preflight_github_sync_arguments(parser: argparse.ArgumentParser) -> Non
     parser.add_argument("--provided-context-path", action="append")
     parser.add_argument("--diff-summary")
     parser.add_argument("--unsynced-reason")
+    parser.add_argument("--output-dir")
 
 
 def _add_pack_prepare_arguments(parser: argparse.ArgumentParser) -> None:
@@ -375,6 +377,7 @@ def _preflight_github_sync_args(ns: argparse.Namespace) -> CommandArgs:
         provided_context_paths=tuple(ns.provided_context_path or ()),
         diff_summary=ns.diff_summary,
         unsynced_reason=ns.unsynced_reason,
+        output_dir=Path(ns.output_dir) if ns.output_dir else None,
     )
 
 
@@ -527,6 +530,7 @@ def _run_preflight_github_sync(args: CommandArgs, use_cases: UseCases) -> Comman
                 provided_context_paths=preflight_args.provided_context_paths,
                 diff_summary=preflight_args.diff_summary,
                 unsynced_reason=preflight_args.unsynced_reason,
+                output_dir=preflight_args.output_dir,
             )
         )
     except ValueError as error:

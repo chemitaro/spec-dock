@@ -497,6 +497,72 @@ class TestRuntimeNewDocS09:
                 assert f"type={doc_type}" in content
                 assert f"id={expected_ids[doc_type]}" in content
 
+    def test_pr_repair_batch_continuation_fields_remain_markdown_only_and_runtime_opaque(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            template = specdock_dir / "templates" / "discussions" / "pr-repair-batch.md"
+            template.write_text(
+                (
+                    "type=pr-repair-batch\n"
+                    "id=<PR_REPAIR_BATCH_ID>\n"
+                    "title=<PR_REPAIR_BATCH_TITLE>\n"
+                    "scope=<SCOPE_ID>\n"
+                    "author=<YOUR_NAME>\n"
+                    "date=YYYY-MM-DD\n"
+                    "## ChatGPT Consultation Gate\n"
+                    "consultation_status: pending\n"
+                    "## Integrated Repair Strategy\n"
+                    "strategy_delta: pending\n"
+                    "orchestrator_disposition: pending\n"
+                    "## Iteration Ledger\n"
+                    "iteration_count: telemetry only\n"
+                ),
+                encoding="utf-8",
+            )
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            request = app_contracts.CreateDiscussionDocRequest(
+                doc_type="pr-repair-batch",
+                scope_node_id="iss-local-00001",
+                title="PR Repair Batch",
+                slug=None,
+            )
+            result = app_create_node.create_discussion_doc(request, ports)
+
+            assert result.doc_type == "pr-repair-batch"
+            assert result.doc_id == "20260312t010203z-pr-repair-batch"
+            assert result.path.name == "20260312t010203z-pr-repair-batch-pr-repair-batch.md"
+            content = result.path.read_text(encoding="utf-8")
+            for marker in (
+                "## ChatGPT Consultation Gate",
+                "consultation_status: pending",
+                "## Integrated Repair Strategy",
+                "strategy_delta: pending",
+                "orchestrator_disposition: pending",
+                "## Iteration Ledger",
+                "iteration_count: telemetry only",
+            ):
+                assert marker in content
+            assert request.__dict__ == {
+                "doc_type": "pr-repair-batch",
+                "scope_node_id": "iss-local-00001",
+                "title": "PR Repair Batch",
+                "slug": None,
+                "scope_kind": None,
+            }
+
     def test_report_and_reflection_are_not_creatable_discussion_doc_types(self) -> None:
         (
             _runtime_app,
