@@ -64,6 +64,9 @@ ChatGPT output is evidence only. It never grants canonical adoption, reviewer pa
 3. Ask `spec-dock-chatgpt-authoring` for Epic planning evidence.
    - Wait, retry, or recover for capacity, timeout, stale sync, browser startup, or backend setup problems.
    - Do not auto-switch to manual planning.
+   - Immediately after output is received, and before claim review, Evidence Adoption Ledger disposition, or canonical rewrite, invoke the shared `spec-dock-chatgpt-authoring` preservation checkpoint.
+   - If its handoff is blocking, stop and propagate the block. Continue from `skipped_inline_unavailable` only when reason, decision owner, nonblocking rationale, and next action or revisit condition are all present.
+   - Refer to the shared skill for branch, status, and import-result rules; do not copy that decision matrix here.
 4. Review the returned evidence.
    - Check Epic scope, non-scope, architecture boundary, Issue slicing, dependencies, and missing decisions.
    - Check that child Issue drafts are handoff-ready evidence, not canonical Issue docs.
