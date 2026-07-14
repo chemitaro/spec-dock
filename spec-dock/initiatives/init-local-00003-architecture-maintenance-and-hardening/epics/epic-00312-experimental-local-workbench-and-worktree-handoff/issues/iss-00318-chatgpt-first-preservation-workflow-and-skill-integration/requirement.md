@@ -3,830 +3,223 @@
 ID: "iss-00318"
 タイトル: "ChatGPT First Preservation Workflow And Skill Integration"
 関連GitHub: ["#318"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-13"
+最終更新: "2026-07-14"
 親: ["epic-00312", "init-local-00003"]
 ---
 
 # iss-00318 ChatGPT First Preservation Workflow And Skill Integration — Issue 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
+## 1. 目的と成果
 
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
+ChatGPT-first planningで得た人間向けの有用な完成出力を、main orchestratorが要約・選別・canonical rewriteする前に、出力形態に応じた明示的なpreservation checkpointへ通す。
 
----
+完了後は、Initiative / Epic / Issue planningの各workflowが同じ共有checkpointを利用し、完成sourceを失わずにevidence-onlyとして保存できる。一方、完全なsourceが取得不能な場合は不可能なhard gateを作らず、ZIP/treeの既存安全lane、delegated draftのprovenance/diff-guard、canonical single-writer、fresh reviewer gateを維持する。
 
-## 0. 文書の位置づけ
+観測できてはならないこと:
 
-### この文書が定義すること
+- Importやskillがcanonical adoption、reviewer pass、readiness、finish、PR deliveryを自己主張する。
+- Complete inline captureについてChatGPT provider内部のoriginal bytesと同一だと主張する。
+- Imported external evidenceへdelegated draft用frontmatterを追加し、原文を変更する。
+- ZIP/treeをsingle-file importへ流して既存quarantine/review/stage契約を弱める。
 
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
+## 2. 親traceと開始条件
 
-### この文書が定義しないこと
-
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
-
----
-
-## 1. 概要
-
-### 1.1 目的
-
-このIssueで達成したい目的を1〜3文で記述する。
-
-- 目的:
-  - ...
-
-### 1.2 観測可能な成果
-
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
-
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
-
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
-
-### 1.3 このIssueの種類
-
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
-
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
-
-### 3.3 このIssueで再定義してはいけないもの
+- Parent Epic: `epic-00312`
+- Parent requirement: `E-RQ-024`
+- Parent acceptance: `E-AC-016`
+- Parent design slice: `DS-004`
+- Parent plan slice: `W4` / `G5`
+- Dependency: `iss-00317` completed。`artifact import chatgpt-output` runtime、byte preservation、no-overwrite、content-free receiptは実装済み。
+- Downstream: `iss-00319`。Public docs、migration、package/fresh init/update、full/global quality、final Epic PRを所有する。
+- Accepted ADR: parent Epic `../../artifacts/20260713t031808z-adr-template-free-artifact-import-and-blank-filename-coexistence.md`
 
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
+親から継承し、このIssueで再定義しない契約:
 
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
+- `chatgpt-output`はimport kindでありtyped Artifact tokenではない。
+- 保存先はexisting blank Artifact filename grammarを使う。
+- Imported bodyへfrontmatter、template、sidecar、catalog/indexを追加しない。
+- Import commandはEAL、canonical docs、ADR、assurance stateを編集しない。
+- Runtime parser/application/publisher/presentation、ZIP safety runtime、sync/validate/ADR mirrorの意味論を変更しない。
 
----
+## 3. Actorと代表シナリオ
 
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
+| Actor | 責任 |
+|---|---|
+| Human / operator | ChatGPT-first workflowを開始し、利用可能なsourceを提示する |
+| Main orchestrator | Output form/completeness判定、保存、EAL disposition、canonical rewrite、reviewer handoffを所有する |
+| `spec-dock-chatgpt-authoring` | 四分岐checkpointの共有運用契約を提供する |
+| Initiative / Epic / Issue planning skill | 共有checkpointを呼び、各scopeのEAL/canonical/human/reviewer gateを所有する |
+| `artifact import chatgpt-output` | Workbench Markdownを既存runtime契約で保存しcontent-free receiptを返す |
+| Authoring-pack lane | ZIP/treeのreview、quarantine、stage、validationを既存どおり行う |
+| `spec-reviewer` | Main orchestratorが統合したcanonical artifactをfresh reviewする |
 
-### 4.1 主な関係者（Actor）
+### SC-318-001 完成standalone Markdown
 
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
+利用可能な完成Markdownをcanonical rewrite前にWorkbenchからimportする。Workbench sourceとArtifactのSHA-256/byte countが一致し、preservation statusは`imported_byte_exact`となる。その後に採否とcanonical rewriteへ進む。
 
-| 関係者（Actor） | 役割 | このIssueとの関係 |
-|---|---|---|
-| ... | ... | ... |
+### SC-318-002 完全に受信したinline text
 
-### 4.2 開始条件（Trigger）
+Codexが受信した完全なinline textを要約・整形せずWorkbench `.md`へcaptureし、importする。Statusは`captured_received_text`とし、同一性claimは「受信したtextからArtifactまで」に限定する。
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
+### SC-318-003 不完全または取得不能なinline output
 
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
+完全なsourceを現在のworkflowで本当に取得できない場合、`skipped_inline_unavailable`と理由をreport/EALへ記録する。Path/hash/byte count/verbatim claimを作らず、nonblocking根拠を残す。
 
-### 4.3 代表シナリオ
+### SC-318-004 ZIP/tree output
 
-#### シナリオ SC-001:
+既存authoring-packのreview/quarantine/stage laneを使用し、single-file importを実行しない。
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+### SC-318-005 完成sourceの保存失敗
 
-#### シナリオ SC-002:
+完成sourceが利用可能なのにimportが`committed=false`、receipt不明、またはeligibility failureなら、canonical rewriteとadoptionをblockする。Source unavailableへ再分類して迂回しない。
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
-
-#### シナリオ SC-XXX:
-
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 5. スコープ
-
-### 5.1 対象範囲（In 対象範囲（Scope））
-
-このIssueで必ず実現することを列挙する。
-
-- ...
-- ...
-
-### 5.2 対象外（Out of 対象範囲（Scope））
-
-このIssueでは実現しないことを列挙する。
-
-- ...
-- ...
-
-### 5.3 変更しないもの（Unchanged / Must Not Change）
-
-関連はあるが、このIssueで変更してはいけないものを列挙する。
-
-- ...
-- ...
-
-### 5.4 判断が必要な境界
-
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
-
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 6. 要求される振る舞い
-
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
-
-### 振る舞い BH-001:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-002:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-XXX:
-
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 7. 受け入れ条件
-
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
-
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-002:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-XXX:
-
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
-
-```text
-...
-```
-
-### 例 EX-002: 出力例
-
-```text
-...
-```
-
-### 例 EX-003: エラー例
-
-```text
-...
-```
-
-### 契約上の注意
-
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-
-### 10.2 移行性
-
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-
-### 10.3 可観測性
-
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
-
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
+## 4. 対象範囲
 
-### 13.3 リスク事実（Risk Facts）
+### 4.1 In scope
 
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
+- Provider authorityの次のdocs:
+  - `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md`
+  - `src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md`
+  - `src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md`
+- Provider authorityの次のskills:
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md`
+  - `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md`
+- 上記7 provider assetsのmatching dogfood projection。
+- Standalone file / complete inline / unavailable inline / ZIP-tree decision matrix。
+- Preservation status、EAL provenance、exception、claim boundary、blocking semantics。
+- Focused managed-asset/wrapper/skill contract testsとIssue 317 runtime regression。
+- Safe synthetic sourceによるdogfood preservation scenario。
 
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
+### 4.2 Non-scope
 
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
-
-#### `strict` 以上を検討する条件
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
+- Runtime import、Artifact grammar/catalog/template、ZIP safety runtimeの変更。
+- Automatic capture/import、background hook、automatic EAL/canonical/assurance mutation。
+- PDF、image、directory、bundle、multi-file import、RawCaptureBundle。
+- Raw transcriptのsecret/privacy classifier、retention policy、content classifier。
+- Prompt、wrapper metadata、conversation logを含むraw wrapper transcript全体のdurable Artifact import。完成した受信回答本文だけをcapture対象とする。
+- Imported evidenceへのfrontmatter/sidecar/receipt file追加。
+- Root README、guide、reference naming、migration/release note、package/fresh init/update、full/global regression、final Epic PR。これらはIssue319所有。
+- Manual planning skillsへのmatrix複製。
 
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
+## 5. 要件
 
-#### `lite` を検討できる条件
+### RQ-318-001 明示的checkpoint
 
-すべて満たす場合のみ `lite` を検討できる。
+ChatGPT-first Initiative / Epic / Issue planningは、ChatGPT output受領後、採否検討またはcanonical rewrite前にoutput formとcompletenessを判定する明示的checkpointを持つ。Automatic hookやimplicit promotionにはしない。
 
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
+### RQ-318-002 Standalone complete file
 
----
+完成standalone Markdownが利用可能ならWorkbench sourceを`artifact import chatgpt-output`で保存し、`imported_byte_exact`とする。Byte identityの直接境界はWorkbench sourceとimported Artifactである。
 
-## 14. 設計への引き渡し
+### RQ-318-003 Complete inline capture
 
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
+完全なinline textは受信した文字列を要約、整形、frontmatter追加、改行補正せずWorkbench Markdownへcaptureしてimportする。Statusは`captured_received_text`とし、provider-side original bytesとの同一性を主張しない。
 
-### 14.1 設計で必ず扱うべき論点
+### RQ-318-004 Unavailable exception
 
-- ...
-- ...
+完全なinline sourceが本当に利用不能または不完全な場合だけ`skipped_inline_unavailable`を使う。Exceptionはreason、decision owner、nonblocking根拠、next actionを持ち、source/destination path、hash、byte countを持たない。
 
-### 14.2 責任所有者が未確定のもの
+### RQ-318-005 ZIP/tree lane preservation
 
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+ZIP/treeは既存authoring-pack laneを使い、single-file importへ変換しない。Path traversal、symlink、unexpected file、manifest等の既存安全契約を弱めない。
 
-### 14.3 境界が未確定のもの
+### RQ-318-006 Blockingとcommitted semantics
 
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+- Complete applicable sourceが存在し、importが未完了、`committed=false`、receipt不明ならrewrite/adoptionをblockする。
+- `committed=true`でfinal path/hash/byte countが返るpost-publish warningは保存済みとしてwarningを記録し、自動retryしない。
+- Complete sourceのimport failureを`skipped_inline_unavailable`へ読み替えない。
 
-### 14.4 契約影響が未確定のもの
+### RQ-318-007 EAL provenanceとsecrecy
 
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+成功したfile/inline保存についてmain orchestratorは、output form、preservation status、capture boundary、import kind、storage identity、repo-relative source/destination、SHA-256、byte count、committed/warning、adoption status、rationale、adopter、reviewer status、blocking、next actionをEAL/reportへ記録する。Body、secret-like value、absolute host pathは記録しない。
 
-### 14.5 上位へ昇格すべき可能性がある判断
+Preservation statusとadoption statusは別fieldとする。原文を保存しても全claimをrejectできる。
 
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
+成功したpreservation recordの`adoption_status`は、`adopted`、`partially_adopted`、`rejected`、`deferred`のexact tokenだけを使う。一般EALで利用し得る`stale`または`blocked`は保存成功後の採否結果を表さないため、このrecordでは使用しない。後続工程でevidenceが陳腐化または阻害された場合は、元の成功recordを書き換えず別の追跡recordとして記録する。
 
----
+### RQ-318-008 External evidenceとdelegated draftの分離
 
-## 15. 実装計画への引き渡し
+Imported external ChatGPT outputはdelegated authoring roleが生成したdraftではないため、delegated draft用frontmatter/provenance/diff guardを要求しない。一方、existing delegated draft laneのfrontmatter、diff guard、authority restrictionは一切緩和しない。
 
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
+### RQ-318-009 Authority isolation
 
-### 15.1 計画で分解すべき成果
+ChatGPT、import command、shared skill、planning skillはcanonical adoption、accepted ADR、reviewer pass、assurance mutation、execution-ready、finish/completion、PR-ready/merge-ready、PR deliveryをself-claimしない。Main orchestratorだけがEAL dispositionとcanonical rewriteを行い、fresh reviewerは独立gateとする。
 
-- ...
-- ...
+### RQ-318-010 Shared ownership
 
-### 15.2 検証が必要な観測点
+四分岐matrix、status、failure、claim restrictionは`spec-dock-chatgpt-authoring`が一度だけ所有する。Initiative / Epic / Issue planning skillsは共有checkpointの呼出し時点、scope-specific EAL/canonical/human/reviewer/downstream handoffだけを持ち、matrixを複製しない。
 
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
+### RQ-318-011 Provider authorityとfocused parity
 
-### 15.3 TDDが必要な振る舞い候補
+Provider docs/skillsをauthorityとして更新し、matching dogfood surfaceへ投影する。Issue318ではfocused installed/wrapper contract、provider/dogfood exact parity、manual scenarioを確認する。Final package/fresh init/update/public inventory/full parityはIssue319へ残す。
 
-振る舞い変更がある場合のみ記述する。
+### RQ-318-012 Runtime compatibility
 
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
+Import runtime、blank grammar、Artifact rules/templates、authoring-pack runtime、delegated-authoring runtime、sync/validate/ADR mirrorを変更しない。新しいruntime defectを実証した場合はplan amendmentとscope reviewを先に行う。
 
-### 15.4 TDD不要または限定的でよい理由
+### RQ-318-013 Deferred delivery
 
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
+Issue318はper-Issue PRを作らずIssue319へdeliveryをrelayする。Reportにtarget Issue、dependency、no-per-Issue-PR理由、merge-prepared未主張、Issue319に残るgateを記録する。
 
-- ...
-- ...
+## 6. 受け入れ条件
 
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
+- AC-318-001 Standalone preservation:
+  - 完成standalone Markdownがcanonical rewrite前にcommitted importされ、source/destinationのhash/bytes一致と`imported_byte_exact`がEALへ記録される。
+- AC-318-002 Inline preservation:
+  - 完全な受信inline textが無編集でcapture/importされ、`captured_received_text`となり、provider original bytes claimがない。
+- AC-318-003 Unavailable exception:
+  - Complete source取得不能時に`skipped_inline_unavailable`、reason、decision owner、nonblocking根拠、next actionまたはrevisit conditionが記録され、source/destination path、hash、byte count、byte-exact claimがない。
+- AC-318-004 ZIP/tree compatibility:
+  - ZIP/treeはexisting pack laneを使い、single-file importを案内せず、既存ZIP safety contractが回帰しない。
+- AC-318-005 Failure gate:
+  - Complete sourceの`committed=false`、receipt不明、eligibility failure、またはsemantic completeness未分類でcanonical rewrite/adoptionへ進まない。`committed=true` warningは記録し自動retryしない。
+- AC-318-006 Evidence-lane separation:
+  - Imported raw evidenceはdelegated draft frontmatter/diff guardの対象外であり、existing delegated draft negative/provenance contractは不変。
+- AC-318-007 Authorityとsecrecy:
+  - 成功したfile/inline保存recordが、output form、preservation status、capture boundary、`import_kind=chatgpt-output`、`storage_identity=blank`、repo-relative source/destination、SHA-256、byte count、committed/warning、adoption status、rationale、adopter、reviewer status、blocking、next actionを持つ。
+  - Success/failure/skipの記録にbody、secret、absolute path、未承認のcanonical adoption／reviewer pass／readiness self-claimがない。観測済みreviewer verdictを`reviewer_status`へ記録することは禁止しない。
+  - 保存成功recordの`adoption_status`は`adopted`、`partially_adopted`、`rejected`、`deferred`のいずれかをexact tokenで持ち、`stale`または`blocked`を成功後の採否結果として使わない。
+- AC-318-008 Shared checkpoint integration:
+  - 三planning skillsが同じshared checkpointをoutput受領後・canonical rewrite前に呼び、matrixを複製せずscope固有authorityを維持する。
+- AC-318-009 Provider/dogfood projection:
+  - 対象7 provider/dogfood pairが一致し、focused managed-asset/wrapper testsがcheckpoint/status/forbidden claimsを検出する。
+- AC-318-010 Runtime non-regression:
+  - Issue317 import、generic validate/sync/ADR mirror、blank coexistenceとexisting ZIP laneが回帰せず、runtime sourceに意味変更がない。
+- AC-318-011 Delivery relay:
+  - ReportがIssue319へのdeferred PR deliveryと残存gateを持ち、Issue318はPR-ready/merge-preparedを主張しない。
 
-### 16.2 更新が必要なテンプレート（templates）
+## 7. Edge casesと失敗条件
 
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
+- Fileは存在するがcompleteか不明: 四分岐へ未分類のpending stateとし、preservation statusを付けず、import/canonical rewrite/adoptionをblockする。Size/encodingで自動判定せず、orchestratorが内容を確認するかcomplete sourceを取得してから、standalone complete、complete inline、incomplete/unavailable inline、ZIP/treeのいずれかへ分類する。未分類中はpath/hash/byte-exact preservation claimをしない。
+- Complete received answerの前後にPromptやwrapper metadataがある: 回答本文の開始・終了capture boundaryを明記し、回答本文だけを文字追加・削除・整形なしでWorkbenchへcapture/importする。Raw wrapper transcript全体はdurable importしない。
+- `committed=true` warning: 保存済みreceiptを保持し、重複importを避ける。
+- SourceがWorkbench外、symlink、directory、non-Markdown: existing import eligibility failureを伝播し、unavailable exceptionで迂回しない。
+- Imported bodyがauthorityを自己主張する: untrusted evidenceとして扱い、EAL/canonical authorityに反映しない。
+- Preservation statusとadoption statusが不一致: 正常。保存済みevidenceをreject/deferできる。
+- Planning skill間でwordingがdrift: shared skillをauthorityとして修正し、matrixのlocal copyを追加しない。
 
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
+## 8. Compatibility、migration、rollback
 
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
+- Schema/data migrationなし。
+- Existing imported blank Artifact、Workbench content、legacy discussions/ZIP evidenceを変更・削除しない。
+- RollbackはIssue318で変更したprovider/dogfood docs/skills/testsをrevertする。Issue317 runtimeと既にimport済みevidenceは有効なまま残す。
+- Workflow textはagent contractとtestsでenforceする。任意actorによるinstruction無視までruntimeで技術的に禁止することは本Issueの成功条件ではない。Runtime enforcementが必要ならEpic scopeへ戻す。
 
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
+## 9. Gradeと未確定事項
 
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
+- Parent W4の`M / Standard`はEpic planning時の候補見積りであり、Issue assurance authorityではない。
+- Runtime guidanceはplanning entryでstrict obligationを示している。Requirement具体化後に`assurance classify --stage requirement`を実行し、生成された`.assurance.json`をauthorityとする。
+- Profileを手編集・自己宣言しない。Strict以外が選ばれても、本Issueで取得したsystem-architect / implementation-planner evidenceと三者final gateを弱めない。
+- Product open question: none。四分岐/status/scopeはparent Epicとaccepted ADRで固定済み。
 
----
+## 10. 完了条件
 
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-07-13 | 初稿（Initial draft） | ... | ... |
+- AC-318-001–011がtest、inspection、manual evidence、reviewer evidenceへ追跡可能。
+- Requirement→fresh spec-reviewer pass→design→fresh spec-reviewer pass→plan→fresh spec-reviewer passの順序を守る。
+- EALにChatGPT 5.6 Pro complete received answer、repo analysis、specialist evidenceの採否が記録される。
+- Provider authorityとdogfood projection、focused contract tests、dogfood checkpoint scenarioが完了する。
+- S90/S99とdeferred PR delivery gateを通り、unresolved blocked/stale evidenceがない。
