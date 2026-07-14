@@ -237,6 +237,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | PLANNING-DES-r1 | design alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。System-architect remediation、distribution/update/parity/Linux/manual/PR final-head設計を承認 |
 | PLANNING-PLAN-r2 | plan executability/alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。C319-01〜16、S00〜S100、main/wheel/fixture/static/final-head/lifecycle contractを承認 |
 | PLANNING-FINAL-r1 | planning closeout alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。ChatGPT原文保存、EAL/EPE/OAL、terminal review/specialist gate、assurance/readiness、Requirement/Design/Plan整合を承認 |
+| S00-BASELINE-r2 | live baseline and exact inventory | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。GitHub/branch/pre-feature ref、37 exact pairs、14 generated rows、wheel/test/platform inventory、C319-01とS01 preconditionを承認 |
 
 #### レビュー修復履歴（Review Remediation History）
 | ステップ（step） | 対象 | 検出事項 | 修復結果 |
@@ -244,32 +245,121 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | PLANNING-REQ-r1 | requirement alignment | EPE receipt/EAL未記録をblocking findingとして検出。Canonical本文findingなし | Preservation receiptとEALを記録し、r2で確認 |
 | PLANNING-REQ-r2 | requirement alignment | r1修復後、Mandatory OAL placeholderをblocking findingとして検出 | OAL-319-001を具体化し、r3でpassed |
 | PLANNING-PLAN-r1 | plan executability/alignment | Configured static authorityが`make lint`ではなく個別mypy/RuffになっていたためC319-08をblock | S04へauthority/repair順序を修復し、r2でpassed |
+| S00-BASELINE-r1 | live baseline and exact inventory | Generated exceptionがdirectory/category levelでrefresh commandも曖昧 | Consumer canonical namespaceを分離し、14 exact generated entriesと実在refresh commandへ修復してr2でpassed |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
+| S00 planning | committed | Issue319 Requirement/Design/Plan/Artifact/assurance/report | `7a3793de` | clean / upstream `0 0` | N/A | C319-01 planning/preservation/assurance | `git diff --check` passed | PLANNING-FINAL-r1 passed |
+| S00 baseline | commit candidate | Issue319 report live baseline only | 2026-07-14 S00 session ledger | verify after commit | N/A | Exact GitHub/git/pair/exception/wheel/test/platform inventory | `git diff --check` passed | S00-BASELINE-r2 passed |
 | S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- S00 planning: `requirement.md`, `design.md`, `plan.md`, `report.md`, `.assurance.json`, imported ChatGPT Artifact。
 
 #### コミット
-- <hash> <message>
+- `7a3793de` `docs(issue-319): ChatGPT原文保存と最終品質計画を確定`
 
 #### メモ
-- ...
+- S00 live baselineの追加記録はplanning authorityを変更せず、report evidenceだけを更新する。
 
 ---
 
-### セッションログ（2026-07-13 HH:MM - HH:MM）
+### セッションログ（2026-07-14 20:29 - 20:45 JST）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S00 Planning and live baseline
+- AC/EC: C319-01、C319-02 precondition、C319-03〜10 target inventory
 
 #### 実施内容
-- ...
+- Active contextはInitiative `init-local-00003` / Epic `epic-00312` / Issue `iss-00319`。
+- GitHub #315〜#318はclosed、#312/#319はopen。Issue319 branchをheadに持つ既存PRは0件。
+- `git fetch origin`後の`origin/main...HEAD`はleft 31 / right 54、merge-baseは`3acdd76ccec00367c420fe967a7ee74da3342ed9`。S01はmerge必須。
+- Pre-feature existing-consumer baselineは`7def2c10e29078e82c6a30441e79fe7cee3b1883`。Workbench ignore導入`914abdf7`の直親で、当該assetに`.workbench/`がなく、既存init/update/package contractは存在するためfixture候補として採用。
+- Planning Artifact/sourceはSHA-256 `9352f5120661d61e65bc8591e466a4a69e0a55c6f871bf8d123199964b445641`、85219 bytes、`cmp`一致、source ignoredを再確認。
+
+#### Exact provider / dogfood inventory
+
+Issue315〜318導入差分から抽出したexact pairはS00時点ですべてbyte-equal。Projection directionはprovider → dogfood、rebuild commandは`spec-dock update .`。Templates/systemの変更pairは0件。
+
+| Provider authority | Dogfood projection | S00 |
+|---|---|---|
+| `src/spec_dock/assets/spec_dock/.gitignore` | `spec-dock/.gitignore` | equal |
+| `src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md` | `spec-dock/docs/authoring/chatgpt-pack.md` | equal |
+| `src/spec_dock/assets/spec_dock/docs/README.md` | `spec-dock/docs/README.md` | equal |
+| `src/spec_dock/assets/spec_dock/docs/guide.md` | `spec-dock/docs/guide.md` | equal |
+| `src/spec_dock/assets/spec_dock/docs/reference_naming.md` | `spec-dock/docs/reference_naming.md` | equal |
+| `src/spec_dock/assets/spec_dock/docs/reference_worktree.md` | `spec-dock/docs/reference_worktree.md` | equal |
+| `src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md` | `spec-dock/docs/workflow_chatgpt_authoring_pack.md` | equal |
+| `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` | `spec-dock/docs/workflow_spec_authoring.md` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack/github_sync_preflight.py` | `spec-dock/scripts/spec_dock_runtime/application/authoring_pack/github_sync_preflight.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` | `spec-dock/scripts/spec_dock_runtime/application/contracts.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_artifact_doc.py` | `spec-dock/scripts/spec_dock_runtime/application/create_artifact_doc.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delegated_authoring.py` | `spec-dock/scripts/spec_dock_runtime/application/delegated_authoring.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py` | `spec-dock/scripts/spec_dock_runtime/application/delete_node.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_artifact.py` | `spec-dock/scripts/spec_dock_runtime/application/import_artifact.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` | `spec-dock/scripts/spec_dock_runtime/application/ports.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workbench.py` | `spec-dock/scripts/spec_dock_runtime/application/workbench.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py` | `spec-dock/scripts/spec_dock_runtime/application/worktree.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree_target.py` | `spec-dock/scripts/spec_dock_runtime/application/worktree_target.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` | `spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py` | `spec-dock/scripts/spec_dock_runtime/cli/parser.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py` | `spec-dock/scripts/spec_dock_runtime/cli/registry.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/artifact_import.py` | `spec-dock/scripts/spec_dock_runtime/commands/artifact_import.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/workbench.py` | `spec-dock/scripts/spec_dock_runtime/commands/workbench.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack/source_manifest.py` | `spec-dock/scripts/spec_dock_runtime/domain/authoring_pack/source_manifest.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/assurance_store.py` | `spec-dock/scripts/spec_dock_runtime/infra/assurance_store.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py` | `spec-dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_cli.py` | `spec-dock/scripts/spec_dock_runtime/infra/fs_cli.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py` | `spec-dock/scripts/spec_dock_runtime/infra/fs_repo.py` | equal |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` | `spec-dock/scripts/spec_dock_runtime/presentation/cli_text.py` | equal |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md` | `.agents/skills/spec-dock-chatgpt-authoring/SKILL.md` | equal |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` | `.agents/skills/spec-dock-epic-planning/SKILL.md` | equal |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md` | `.agents/skills/spec-dock-initiative-planning/SKILL.md` | equal |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` | `.agents/skills/spec-dock-issue-planning/SKILL.md` | equal |
+| `src/spec_dock/assets/install_root/.codex/agents/code-reviewer.toml` | `.codex/agents/code-reviewer.toml` | equal |
+| `src/spec_dock/assets/install_root/.codex/agents/dev-coder.toml` | `.codex/agents/dev-coder.toml` | equal |
+| `src/spec_dock/assets/install_root/.codex/agents/qa-reviewer.toml` | `.codex/agents/qa-reviewer.toml` | equal |
+| `src/spec_dock/assets/install_root/.codex/agents/spec-reviewer.toml` | `.codex/agents/spec-reviewer.toml` | equal |
+
+#### Root-only / generated exceptions
+
+| Exact path | Owner | Reason / direction / rebuild |
+|---|---|---|
+| `README.md` | provider root docs | Package scaffold外のpublic landing。S03で意味整合をreviewし、byte parity対象外 |
+| `src/spec_dock/cli.py` | provider installer | Installed targetを生成する実装authorityでdogfood copyを持たない |
+| `pyproject.toml` | provider package | Wheel package-data authorityでdogfood copyを持たない |
+| `setup.py` | provider package | Build-time stale-asset pruning authorityでdogfood copyを持たない |
+| `Makefile` | static gate | `make lint` entrypoint。自動rebuildなし |
+| `scripts/static_analysis/run.sh` | static gate | Ruff/format/mypy orchestration。自動rebuildなし |
+| `.github/workflows/provider-ci.yml` | provider CI | Ubuntu publication gate。install-root assetではなくrepository CI authority |
+| `.github/workflows/ci.yml` | dogfood validation CI | sync/validate authority。push/PRで実行 |
+| `spec-dock/.agent/active.json` | active store | Consumer state projection。`./spec-dock/scripts/spec-dock active set --id iss-00319 --no-checkout --no-github`で再生成 |
+| `spec-dock/active/initiative` | active store | Initiative symlink projection。同じ`active set` commandで再生成 |
+| `spec-dock/active/epic` | active store | Epic symlink projection。同じ`active set` commandで再生成 |
+| `spec-dock/active/issue` | active store | Issue symlink projection。同じ`active set` commandで再生成 |
+| `spec-dock/active/context-pack.md` | active store | Active context projection。同じ`active set` commandで再生成 |
+| `spec-dock/.agent/deps-issues.json` | sync projection | Consumer dependency projection。`./spec-dock/scripts/spec-dock sync --no-github`で再生成 |
+| `spec-dock/.agent/index-all.json` | sync projection | Full node index。同じ`sync --no-github` commandで再生成 |
+| `spec-dock/.agent/index.json` | sync projection | Current node index。同じ`sync --no-github` commandで再生成 |
+| `spec-dock/.agent/tree-all.json` | sync projection | Full tree。同じ`sync --no-github` commandで再生成 |
+| `spec-dock/.agent/tree.json` | sync projection | Current tree。同じ`sync --no-github` commandで再生成 |
+| `spec-dock/.agent/runbooks/current-runbook.json` | guidance projection | Machine runbook。`./spec-dock/scripts/spec-dock guidance issue-execution`で再生成 |
+| `spec-dock/.agent/runbooks/current-runbook.md` | guidance projection | Human runbook。同じ`guidance issue-execution` commandで再生成 |
+| `spec-dock/active/current-runbook.json` | guidance projection | Active machine runbook copy。同じ`guidance issue-execution` commandで再生成 |
+| `spec-dock/active/current-runbook.md` | guidance projection | Active human runbook copy。同じ`guidance issue-execution` commandで再生成 |
+
+`spec-dock/initiatives/`以下のcanonical Node/Evidenceとimported Artifactはconsumer-owned dogfood dataであり、provider parity候補でもgenerated exceptionでもない。Providerへ逆投影しない。
+
+#### Package / test / platform inventory
+
+- `pyproject.toml`のpackage-data authorityは`assets/**/*`、`assets/**/.gitignore`、`assets/install_root/.agents/**`、`.codex/**`、`.github/**`。Expected feature membersは上表のprovider pathsを`spec_dock/assets/`以下へ写したexact entriesである。
+- Forbidden seeded entriesは`spec_dock/assets/spec_dock/scripts/spec-dock-close-smoke.sh`、`spec_dock/assets/github/workflows/spec-dock-close.yml`、`spec_dock/assets/spec_dock/templates/initiative/current/stale.md`、`spec_dock/assets/spec_dock/templates/initiative/completed/stale.md`、`spec_dock/assets/spec_dock/templates/adr.md`、`spec_dock/assets/spec_dock/templates/issue/discussions/rules.md`、`spec_dock/assets/spec_dock/templates/issue/discussions/_template.md`、`spec_dock/assets/spec_dock/templates/initiative/epics/new-epic`、`spec_dock/assets/spec_dock/templates/epic/issues/new-issue`、`spec_dock/assets/spec_dock/templates/issue/legacy/README.md`、`spec_dock/assets/spec_dock/templates/design.md`、`spec_dock/assets/spec_dock/templates/plan.md`、`spec_dock/assets/spec_dock/templates/report.md`、`spec_dock/assets/spec_dock/templates/requirement.md`。Workbench、dogfood canonical data、root mirror、tests、generated `.agent`もwheel memberに含めない。
+- W1 focused: `tests/cli_runtime/test_delete.py`, `tests/cli_runtime/test_worktree.py`, `tests/unit/domain/test_authoring_source_manifest_workbench.py`, `tests/unit/infra/test_installer_workbench_resolver_opacity.py`, `tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py`, `tests/unit/infra/test_runtime_resolver_workbench_opacity.py`, `tests/unit/infra/test_init_update.py`。
+- W2 focused: `tests/cli_runtime/test_workbench.py`, `tests/unit/application/test_workbench.py`, `tests/unit/infra/test_runtime_fs_cli_workbench.py`, `tests/unit/presentation/test_workbench.py`。
+- W3 focused: `tests/cli_runtime/test_artifact_import_chatgpt_output.py`, `tests/cli_runtime/test_artifact_import_s04.py`, `tests/unit/application/test_binary_artifact_import_ports.py`, `tests/unit/commands/test_artifact_import_chatgpt_output.py`, `tests/unit/infra/test_binary_artifact_publisher.py`, `tests/unit/presentation/test_artifact_import_chatgpt_output.py`, `tests/cli_runtime/test_runtime_new_doc_s09.py`。
+- W4 focused: `tests/cli_runtime/test_wrappers.py`, `tests/unit/infra/test_init_update.py`。
+- Full authorityは`uv run pytest`、static authorityは`make lint`。Ubuntu authorityは`.github/workflows/provider-ci.yml`の`provider-tests` / `ubuntu-latest`で、`uv run pytest`によりW3 testsを通常collectionする。
 
 ---
 
