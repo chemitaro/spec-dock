@@ -98,6 +98,7 @@ ID: "iss-00318"
 | PLANNING-DES-r3 | design alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Designからplanへのpromotionを承認 |
 | PLANNING-PLAN-r3 | plan executability/alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。PlanからIssue executionへのpromotionを承認 |
 | PLANNING-PLAN-r4 | final plan/report runtime alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Runtime-recognized report schemaとready guidanceを含む最終planning setを承認 |
+| EXEC-S00-r1 | S00 baseline evidence | spec-reviewer | fresh | passed | no | promote | findingsなし。Gap/7 pair/61 tests/runtime non-diffをbaseline evidenceとして承認 |
 
 ## Review Remediation History
 
@@ -129,33 +130,55 @@ ID: "iss-00318"
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
-- Record Red, Green, and refactor evidence for each executed step.
-- Link each closure id to its observed verification result.
+
+### S00 Baseline and contract inventory
+
+- Gap inventory: Provider三docs/四skillsへ`imported_byte_exact|captured_received_text|skipped_inline_unavailable|preservation checkpoint`を検索し、match 0、`rg` exit 1。S01–S03で追加するbaseline gapを確認。
+- Projection baseline: 7 provider/dogfood pairを`cmp -s`で確認し、7/7 `MATCH`。
+- Runtime/ZIP baseline: `uv run pytest tests/cli_runtime/test_artifact_import_chatgpt_output.py tests/manual_tests/test_review_chatgpt_authoring_pack.py`は61 passed in 11.27s。
+- Runtime/source guard: S00開始時と観測後のworktreeはclean。Runtime sourceと上記2 test filesに未コミットdiffなし。
+- Red alternative: Docs/skillは`inspect-only`、runtimeは`covered-existing`。Unexpected regressionなし。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
 
 ## Step Contract Closure
 
-- S00–S99のactual scope、delegation、review、commit、amendment outcomeをstep単位で記録する。
+| step | closure ids | close condition | evidence | result |
+|---|---|---|---|---|
+| S00 | C318-01–10 baseline | Gap、7 pair、import/ZIP tests、runtime non-diffを変更前に固定 | Step Evidence S00、Test Contract Closure、EXEC-S00-r1 | passed |
 
 ## Test Contract Closure
 
-- `tc318-*`とC318-01–11のactual Red/alternative、Green、manual observationを記録する。
+| test id | closure ids | evidence level | pre-implementation evidence | verification | result |
+|---|---|---|---|---|---|
+| tc318-s00-01 | C318-01–08 | inspect-only | 四分岐/status/checkpointの対象7 provider files match 0 | `rg` exact-term inventory | passed baseline gap |
+| tc318-s00-02 | C318-04、C318-09–10 | covered-existing | 7/7 provider/dogfood MATCH、focused import/ZIP 61 passed | `cmp -s` pair list、focused pytest、runtime diff inspection | passed baseline |
 
 ## Closure Coverage
 
-- C318-01–11とobserved verification evidenceの対応を記録する。
+| closure ids | current evidence | state | next owner |
+|---|---|---|---|
+| C318-01–08 | S00 exact-term gap inventory | baseline fixed | S01–S03 |
+| C318-09 | S00 7/7 pair equality | baseline fixed | S04 |
+| C318-04、C318-10 | S00 import/ZIP 61 pass、runtime diff none | baseline fixed | S04/S99 |
+| C318-11 | Planning Deferred PR Delivery Gate | planned | S90/S99 |
 
 ## Closure Delta
 
-- Planned closureからの追加・削除・変更・未実装とre-review要否を記録する。
+| step | added | removed | changed | unimplemented | re-review |
+|---|---|---|---|---|---|
+| S00 | none | none | none | S01–S99 obligations remain | EXEC-S00-r1 passed; amendment不要 |
 
 ## Implementation Delegation Gate
 
-- Step、decision、role、scope、source、allowed/forbidden、verification、stop、output、resultを記録する。
+| step | decision | role | scope/source | allowed | forbidden | verification/stop/output | result |
+|---|---|---|---|---|---|---|---|
+| S00 | approved-local-execution | main orchestrator | Approved plan S00 read-only baseline | report.md update、target inventory/test read | provider/dogfood/test/runtime/assurance edits | Stop on regression/drift; output exact command/result/ledger note | completed; EXEC-S00-r1 passed |
 
 ## Milestone / Commit Candidate Gate
 
-- Step、reviewer verdict、commit scope、closure state、commit/approved-no-op、post-commit cleanを記録する。
+| step | reviewer verdict | commit candidate/scope | closure state | commit evidence | post-commit clean |
+|---|---|---|---|---|---|
+| S00 | EXEC-S00-r1 passed | `docs(issue-318): Preservation契約のベースラインを記録`; report.md only | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit external clean/upstream check必須 |
 
 ## Final QA Gate
 
