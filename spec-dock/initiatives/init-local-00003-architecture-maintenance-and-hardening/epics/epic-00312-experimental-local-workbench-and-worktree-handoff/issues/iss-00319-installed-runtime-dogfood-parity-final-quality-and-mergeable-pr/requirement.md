@@ -3,830 +3,263 @@
 ID: "iss-00319"
 タイトル: "Installed Runtime Dogfood Parity Final Quality And Mergeable PR"
 関連GitHub: ["#319"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-13"
+最終更新: "2026-07-14"
 親: ["epic-00312", "init-local-00003"]
+依存: ["iss-00315", "iss-00316", "iss-00317", "iss-00318"]
 ---
 
 # iss-00319 Installed Runtime Dogfood Parity Final Quality And Mergeable PR — Issue 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
-
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
-
----
-
 ## 0. 文書の位置づけ
 
-### この文書が定義すること
+本書は、Epic 00312 の最終 distribution / quality / PR delivery Issue が満たすべき観測可能な成果、制約、受け入れ条件を定義する。具体的なファイル配置、テスト順序、repair手順は `design.md` と `plan.md` で定義する。
 
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
+Issue 315〜318 の仕様・実装を再設計するのではなく、それらを provider authority から package、fresh consumer、existing consumer、dogfoodへ一貫して配布し、Epic全体の品質と単一PRのmerge preparationを閉じる。
 
-### この文書が定義しないこと
-
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
-
----
-
-## 1. 概要
+## 1. 目的と観測可能な成果
 
 ### 1.1 目的
 
-このIssueで達成したい目的を1〜3文で記述する。
+- Issue 315〜318 が完成させた Workbench ignore/opacity、scoped copy、byte-preserving Artifact import、ChatGPT-first preservation workflowをinstalled consumerとdogfoodで利用可能にする。
+- Public docs、package/fresh init/existing update、full regression、static quality、manual integrated scenario、Epic closureをfinal headで実証する。
+- Latest `main` と整合した単一PRを作成し、checks・review・mergeabilityを観測してmerge可能な状態まで準備する。
 
-- 目的:
-  - ...
+### 1.2 完了後に観測できること
 
-### 1.2 観測可能な成果
+- Candidate wheelに必要なprovider runtime、docs、templates、ignore asset、installed agent-tooling assetsが含まれる。
+- Candidate wheelから初期化したfresh repositoryで、Workbench placement/opacity、`workbench copy`、`artifact import chatgpt-output`、ChatGPT-first planning skillsを利用できる。
+- Feature導入前のexisting consumerをcandidateでupdateしても、root / Initiative / Epic / Issueの既存Workbench bytesが保持される。
+- Provider authorityとdogfood projectionのinventory/bytesが、明示されたgenerated/local exceptionを除き一致する。
+- Root READMEとpublic reference docsがexperimental、non-canonical、root manual selection、scoped source-wins copy、no automatic sync/copy-back、byte-preserving import、blank coexistence、evidence-only authorityを説明する。
+- Issue 315〜318 のfocused contract、repository-wide regression/static、installed manual scenarioがfinal headでpassする。
+- Epic reportでE-RQ-001〜024、E-AC-001〜016、EAL/OAL、残存risk、Issue/PR linkが追跡される。
+- Fresh QA → code → spec reviewが順序どおりpassする。
+- `main`向けPRのrequired checks、review threads、mergeabilityを観測し、blocking findingが残らない。
 
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
+### 1.3 完了後に観測できてはいけないこと
 
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
+- Root Workbenchの一括copy command/helper、automatic sync、copy-back、promotion、retention管理。
+- Extension、language、MIME、content、secretの分類器。
+- `chatgpt-output` typed token、blank prefix予約、template/frontmatter/sidecarの自動追加。
+- Existing Workbenchの削除、rewrite、permission normalization。
+- Workbench/Artifact本文、secret-like value、absolute host pathのlog・report・PR bodyへの露出。
+- ChatGPTの推測、過去のtest count、worker self-claimだけによるpass/merge-prepared主張。
+- PR作成前、checks未確認、unresolved blocking reviewがある状態でのmerge可能主張。
 
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
+## 2. 背景と開始条件
 
-### 1.3 このIssueの種類
+### 2.1 完了済み依存
 
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
-
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
-
-### 3.3 このIssueで再定義してはいけないもの
-
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
-
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
-
----
-
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
-
-### 4.1 主な関係者（Actor）
-
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
-
-| 関係者（Actor） | 役割 | このIssueとの関係 |
+| Issue | 完了能力 | Issue 319へのrelay |
 |---|---|---|
-| ... | ... | ... |
+| iss-00315 | `.workbench/` ignore、default semantic discovery opacity | package/fresh/update、full quality、PR |
+| iss-00316 | explicit scoped copy、source-wins merge、safety/output | installed scenario、public docs、full quality、PR |
+| iss-00317 | byte-preserving `chatgpt-output` import | package/fresh/update、Linux publication、public docs、PR |
+| iss-00318 | preservation branch/checkpoint/EAL workflow | public docs、installed/manual alignment、final review、PR |
 
-### 4.2 開始条件（Trigger）
+GitHub Issue #315〜#318 はclosedで、Issue 319は全4 Issueへのdependencyを持つ。
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
+### 2.2 現在のgap
 
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
+- Issue 319のcanonical requirement/design/planは未具体化だった。
+- Provider/dogfoodの各Issue-local parity evidenceはあるが、candidate wheel由来のfresh/existing consumerをfinal headで未実証である。
+- Root/public docsとmigration/update guidanceの最終impact resolutionが未完了である。
+- Full repository tests、repository-wide static、manual integrated scenario、Epic-level closure、final reviewers、PR deliveryが未完了である。
+- 2026-07-14のlocal live stateで`origin/main...HEAD`はmain側31、Issue branch側53のdiverged状態であり、final quality evidence前にnon-destructive integrationが必要である。
 
-### 4.3 代表シナリオ
+## 3. 親スコープとtrace
 
-#### シナリオ SC-001:
+### 3.1 親Epic
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+- Epic: `epic-00312`
+- Final quality slice: W5 / DS-005
+- Dependencies: W1〜W4 = Issue 315〜318
+- PR policy: Issue 319はdeferred PR deliveryを再延期できない。
 
-#### シナリオ SC-002:
+### 3.2 Epic requirement / acceptance trace
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+| Issue 319責務 | 親契約 |
+|---|---|
+| Workbench ignore/opacity/delete/update再検証 | E-RQ-001〜005、013、015、017〜018 / E-AC-001〜002、010〜011 |
+| Scoped copy installed verification | E-RQ-006〜012、014、016 / E-AC-003〜009 |
+| Artifact import installed verification | E-RQ-019〜023 / E-AC-013〜015 |
+| Preservation workflow/authority alignment | E-RQ-024 / E-AC-016 |
+| Distribution、full quality、Epic closure、PR | E-AC-011〜016と全E-RQ/E-AC最終再検証 |
 
-#### シナリオ SC-XXX:
+### 3.3 再定義してはいけない境界
 
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+- Provider-side source of truthは`src/spec_dock/`、shipped scaffoldは`src/spec_dock/assets/`、installed agent-tooling authorityは`src/spec_dock/assets/install_root/`である。
+- `spec-dock/`、root `.agents/`、root `.codex/`はdogfood/installed projectionであり、primary implementation authorityにしない。
+- `.workbench/`はGit-ignored、non-canonical、disposableで、Node/ADR/dependency/context/review/readiness authorityではない。
+- Root Workbenchは必要ファイルのmanual selection/copyだけを許し、一括copy commandの対象にしない。
+- Scoped copyはcurrent source worktreeからsame-repository linked target worktreeの一scopeへone-shotで実行し、destination-only保持、source wins、no sync/copy-backを維持する。
+- Artifact importは既存blank grammar/collision allocationを用い、source bytes/source fileを保持し、canonical adoptionをself-claimしない。
+- Preservation statusとadoption statusを分離し、EAL採否はmain orchestratorが管理する。
 
----
+## 4. Actorと代表シナリオ
 
-## 5. スコープ
+| Actor | 役割 |
+|---|---|
+| spec-dock利用者 | fresh init / existing update / Workbench copy / Artifact importを実行する |
+| Main orchestrator | EAL、manual scenario、Epic closure、PR deliveryを統括する |
+| DevCoder | approved planの各stepを`gpt-5.6-sol` / reasoning `medium`で実装・repairする |
+| qa/code/spec reviewer | `gpt-5.6-sol` / reasoning `medium`でfresh read-only reviewを行う |
+| package/installer/runtime | provider assetsをconsumerへ配布・更新する |
+| GitHub | Issue/PR/check/review/mergeabilityのexternal stateを提供する |
 
-### 5.1 対象範囲（In 対象範囲（Scope））
+### SC-319-001 Fresh consumer
 
-このIssueで必ず実現することを列挙する。
+Candidate wheelからclean repositoryをinitし、Workbench配置、scoped copy、Artifact import、planning skill/docsが利用でき、package外のlocal sourceに依存しない。
 
-- ...
-- ...
+### SC-319-002 Existing consumer update
 
-### 5.2 対象外（Out of 対象範囲（Scope））
-
-このIssueでは実現しないことを列挙する。
+Feature導入前consumerのroot/scoped Workbenchへsentinel bytesを置き、candidate update後もbytes/inventoryが完全一致し、managed assetsだけが更新される。
 
-- ...
-- ...
+### SC-319-003 Integrated ChatGPT-first flow
 
-### 5.3 変更しないもの（Unchanged / Must Not Change）
+Fresh installed consumerでscope-local Workbenchをlinked worktreeへcopyし、完成Markdownを`chatgpt-output` Artifactへimportし、EALで採否を記録してからcanonical rewriteする。SourceとArtifact bytesは一致し、copy/import本文は出力されない。
 
-関連はあるが、このIssueで変更してはいけないものを列挙する。
+### SC-319-004 Final delivery
 
-- ...
-- ...
+Latest main統合後のfull qualityとfresh reviewsをpassし、単一PRをpush/create/observe/repairしてblocking findingなし・mergeableを確認する。
 
-### 5.4 判断が必要な境界
+## 5. Issue要件
 
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
+### RQ-319-001 Planning authority
 
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
+- ChatGPT 5.6 Proのcomplete bundled planning outputをcanonical rewrite前に`chatgpt-output` Artifactとして保存する。
+- ChatGPT outputはevidence-onlyとし、requirement → fresh spec review → assurance → design → fresh spec review → plan → fresh spec reviewの順序を守る。
 
----
+### RQ-319-002 Main integration
 
-## 6. 要求される振る舞い
+- Final distribution/quality evidence前にlocal/remote/latest main差分を再確認する。
+- Behind/divergedならrepository policyに従うnon-destructive integrationを行い、semantic conflictをowning contractへrouteする。
+- Force push、履歴破壊、未確認のconflict resolutionを行わない。
 
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
+### RQ-319-003 Package inventory
 
-### 振る舞い BH-001:
+- Clean managed temporary locationでcandidate wheelをbuildし、必要なruntime/docs/templates/ignore/install-root assetsの収録を検証する。
+- Generated caches、temporary files、Workbench内容、secretsをpackageへ含めない。
 
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
+### RQ-319-004 Fresh init distribution
 
-### 振る舞い BH-002:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-XXX:
-
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 7. 受け入れ条件
-
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
-
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-002:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-XXX:
-
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
-
-```text
-...
-```
-
-### 例 EX-002: 出力例
-
-```text
-...
-```
-
-### 例 EX-003: エラー例
-
-```text
-...
-```
-
-### 契約上の注意
-
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-
-### 10.2 移行性
-
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-
-### 10.3 可観測性
-
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
-
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
+- Candidate wheelだけを用いたfresh initでprovider assetsとcommand/workflow surfaceを利用できる。
+- Local checkoutへのimplicit dependencyを許さない。
 
-### 13.3 リスク事実（Risk Facts）
+### RQ-319-005 Existing update preservation
 
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
+- Pre-feature consumerへのcandidate updateでmanaged assetsを更新し、root/scoped Workbenchのpath/type/bytesを保持する。
+- Workbenchをmanaged/canonical dataへ移行・正規化しない。
 
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
+### RQ-319-006 Provider/dogfood parity
 
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
-
-#### `strict` 以上を検討する条件
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
+- Provider authorityからdogfoodへapproved refresh pathで投影し、対象inventory/bytesを比較する。
+- Dogfood-only修正を禁止し、差分はprovider ownerへ戻す。
 
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
+### RQ-319-007 Public documentation
 
-#### `lite` を検討できる条件
+- Root READMEとpublic docs/help/outputでplacement、root manual selection、scoped source-wins、no automatic sync、Artifact import、byte/source preservation、blank coexistence、experimental/non-canonical/evidence-only authorityを説明する。
+- Migration/update guidanceは既存Workbenchを保持しcanonical migrationを行わないことを説明する。
 
-すべて満たす場合のみ `lite` を検討できる。
+### RQ-319-008 Focused and full quality
 
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
+- Issue 315〜318のfocused contract suitesをfinal headで再実行する。
+- Unit、CLI runtime、integration、full pytest、repository-wide configured static/format gatesを実行する。
+- Failureをowning Issue/stepへrouteし、checkのskip/disableでgreen化しない。
 
----
+### RQ-319-009 Cross-platform publication
 
-## 14. 設計への引き渡し
+- Artifact importのno-overwrite/atomic publicationをsupported platformで検証し、Linux-specific pathは利用可能なCI/runnerで実証する。
+- Runner不在時は未検証をpass扱いせず、PR gate上のblocker/riskとして明示する。
 
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
+### RQ-319-010 Manual integrated scenario
 
-### 14.1 設計で必ず扱うべき論点
+- Safe synthetic dataだけでWorkbench handoff → Artifact import → EAL disposition → canonical rewriteをfresh installed consumer上で実行する。
+- Source survival、destination hash/bytes、no overwrite、authority boundary、body secrecyを観測する。
 
-- ...
-- ...
+### RQ-319-011 Epic ledgers and closure
 
-### 14.2 責任所有者が未確定のもの
+- Epic reportで全E-RQ/E-ACをcurrent evidenceへtraceし、EAL/OAL、Issue closure、docs impact、risk、PR linkを更新する。
+- Historical evidenceとIssue319 current evidenceを区別する。
 
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+### RQ-319-012 Ordered final review
 
-### 14.3 境界が未確定のもの
+- Final QA → fresh code → fresh spec reviewを順序どおり行う。
+- 全DevCoder/reviewerは`gpt-5.6-sol` / reasoning `medium`を用いる。
+- Finding修復後はaffected gateをfresh rerunし、latest headへevidenceをbindする。
 
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+### RQ-319-013 PR delivery and observation
 
-### 14.4 契約影響が未確定のもの
+- Issue branchをpushし、`main`向け単一PRを作成する。
+- Required checks、review submissions/threads、mergeability、base driftを観測し、blocking findingをrepairする。
+- Issue 319からPR deliveryを別Issueへ延期しない。
 
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+### RQ-319-014 Lifecycle and claim integrity
 
-### 14.5 上位へ昇格すべき可能性がある判断
+- Commit/push/PR/check/review evidenceが揃う前に`issue finish`しない。
+- Epic spec/quality closure、GitHub Epic issue close、PR mergeを区別する。
+- Userの明示指示なしにPRをmergeしない。
 
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
+### RQ-319-015 Data minimization
 
----
+- Test/manual/report/PR outputをcontent-freeに保ち、Workbench/Artifact本文、secret-like value、absolute host pathを記録しない。
+- Safe synthetic fixtureだけをversion controlへ入れる。
 
-## 15. 実装計画への引き渡し
+### RQ-319-016 Minimal change
 
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
+- Distribution/docs/quality/repairに必要な最小差分だけを許す。
+- Version bump、lock update、専用migration fileはcurrent contractで必要と確認された場合だけ採用する。
+- New product semantics、general refactor、root helperを追加しない。
 
-### 15.1 計画で分解すべき成果
+## 6. 受け入れ条件
 
-- ...
-- ...
+- AC-319-001: Issue315〜318 dependency、GitHub state、canonical relay、local main divergenceが開始時に観測される。
+- AC-319-002: Bundled ChatGPT outputがcanonical rewrite前にbyte-preserving Artifactとして保存され、EAL採否と分離される。
+- AC-319-003: Latest main integrationがfinal quality前に完了し、conflict/behind状態が解消される。
+- AC-319-004: Clean candidate wheelのinventoryに必要assetsがあり、不要/secret/Workbench contentがない。
+- AC-319-005: Fresh candidate initだけで全Workbench/copy/import/workflow surfaceが利用できる。
+- AC-319-006: Existing candidate update後にroot/scoped Workbenchのpath/type/bytesが不変である。
+- AC-319-007: Provider/dogfoodのmanaged inventory/bytesがdocumented exceptionを除き一致する。
+- AC-319-008: Public docs/help/outputがexperimental、manual root、scoped copy、no sync、byte import、authority boundaryを一貫して説明する。
+- AC-319-009: Issue315〜318 focused tests、unit/CLI/integration/full pytest、configured static/format gatesがlatest headでpassする。
+- AC-319-010: Supported cross-platform publication pathがpassし、未利用platformをpassと偽装しない。
+- AC-319-011: Fresh installed consumer manual scenarioでcopy/import/EAL/rewriteの順序とsource/hash/body secrecyが確認される。
+- AC-319-012: Epic reportの全E-RQ/E-AC、EAL/OAL、docs impact、riskにunresolved blocked/stale entryがない。
+- AC-319-013: Fresh QA、code、spec reviewersが順序どおりblocking findingなしでpassする。
+- AC-319-014: Single PRがpush/createされ、required checks、review threads、mergeability、base driftが観測される。
+- AC-319-015: PRにunresolved blocking finding/conflictがなく、merge可能と判断できる。
+- AC-319-016: `issue finish`はcommit/push/PR observation後に実行され、PR mergeは行わない。
 
-### 15.2 検証が必要な観測点
+## 7. Failure / rollback / risk signal
 
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
+| Signal | Required response |
+|---|---|
+| Main behind/diverged/conflict | final evidence採取を停止し、non-destructive integrationとowner確認 |
+| Wheel asset missing/extra | package-data/provider ownerへrouteし、fresh/update gate停止 |
+| Existing Workbench byte drift | release blocker。installer/update ownerへrouteし、consumerを保持してrepair |
+| Provider/dogfood mismatch | dogfood側で直接修正せずproviderへroute |
+| Full/static failure | owning contractへ分類し、focused repair後にfull rerun |
+| Linux publication未実証 | passにせずPR blocker/riskとして扱う |
+| Manual scenario content leak | 即停止し、evidenceを公開せずsafe fixtureで再実行 |
+| Reviewer finding | promotion停止、repair、fresh rerun |
+| PR check/review/base drift | merge-prepared claim停止、repair/integration後に再観測 |
 
-### 15.3 TDDが必要な振る舞い候補
+Rollbackは、Issue319で追加したdocs/tests/packaging repairをfocused commit単位でrevert可能に保つ。Issue315〜318のaccepted contractsをrollbackやredesignの対象にしない。Existing Workbenchを削除・再生成して回復しない。
 
-振る舞い変更がある場合のみ記述する。
+## 8. Evidenceと採用境界
 
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
+- Preserved evidence: `artifacts/20260714t110631z-chatgpt-output-issue-319-chatgpt-5-6-pro-bundled-planning-report.md`、SHA-256 `9352f5120661d61e65bc8591e466a4a69e0a55c6f871bf8d123199964b445641`、85,219 bytes。
+- Adopt candidate: Parent W5/DS-005、Issue315〜318 relay、distribution topology、latest-main-before-final-quality、public docs impact、full/static/manual/final review/PR ordering。
+- Partial: ChatGPTのGitHub connector observationとhistorical test countsはbaseline/risk evidenceだけに使い、current pass evidenceにしない。
+- Deferred until inspected: version bump、`uv.lock`、dedicated migration file、exact Linux runner、exact required PR checks。
+- Rejected: root bulk copy、automatic sync、classifier、typed `chatgpt-output`、blank reservation、ChatGPTによるpass/readiness self-claim。
 
-### 15.4 TDD不要または限定的でよい理由
+## 9. Grade / readiness
 
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
-
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-07-13 | 初稿（Initial draft） | ... | ... |
+- Suggested grade: M / Strict final delivery。
+- Security/privacy-sensitive content本文を扱わず、content-free evidenceを強制する。
+- Migration/persistence schema変更は要求しないが、existing consumer state preservationを高リスクgateとして扱う。
+- Requirement fresh spec-review passとassurance classify/compose前にdesign/planをcanonical化しない。
+- Blocking unknown: latest main conflict content、wheel inventory、pre-feature update baseline、Linux runner、current full/static state、PR required checks。いずれもplanで検証stepを持たせ、実行前pass claimをしない。
