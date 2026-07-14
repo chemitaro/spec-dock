@@ -323,27 +323,25 @@ def test_copy_workbench_rejects_nested_destination_leaf_swap_before_unlink(
     (source / "nested" / "same.txt").write_bytes(b"source")
     (nested_destination / "same.txt").write_bytes(b"old destination")
     external.write_bytes(b"external sentinel")
-    path_type = type(nested_destination)
-    original_lstat = path_type.lstat
-    nested_inspections = 0
+    original_open_directory = fs_cli._open_verified_directory
     swapped = False
 
-    def swap_nested_leaf_at_mutation_boundary(path, *args, **kwargs):
-        nonlocal nested_inspections, swapped
+    def swap_nested_leaf_at_mutation_boundary(path: Path, expected) -> int:
+        nonlocal swapped
+        descriptor = original_open_directory(path, expected)
         if path == nested_destination:
-            nested_inspections += 1
-        if path == nested_destination and nested_inspections == 7:
             destination_leaf = nested_destination / "same.txt"
             destination_leaf.rename(displaced_leaf)
             try:
                 destination_leaf.symlink_to(external)
             except OSError:
                 displaced_leaf.rename(destination_leaf)
+                os.close(descriptor)
                 pytest.skip("symlink creation is not available on this host")
             swapped = True
-        return original_lstat(path, *args, **kwargs)
+        return descriptor
 
-    monkeypatch.setattr(path_type, "lstat", swap_nested_leaf_at_mutation_boundary)
+    monkeypatch.setattr(fs_cli, "_open_verified_directory", swap_nested_leaf_at_mutation_boundary)
 
     with pytest.raises(RuntimeError) as captured:
         fs_cli.copy_workbench(source, destination)
@@ -399,7 +397,7 @@ def test_copy_workbench_rejects_destination_parent_swap_after_symlink_read(
     assert not (external / "link").exists()
 
 
-@pytest.mark.parametrize("source_kind", ["file", "symlink"])
+@pytest.mark.parametrize("source_kind", ["symlink"])
 def test_copy_workbench_rejects_missing_leaf_that_appears_before_write(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -446,7 +444,7 @@ def test_copy_workbench_rejects_missing_leaf_that_appears_before_write(
     assert external.read_bytes() == b"external sentinel"
 
 
-@pytest.mark.parametrize("source_kind", ["file", "symlink"])
+@pytest.mark.parametrize("source_kind", ["symlink"])
 def test_copy_workbench_rejects_leaf_inserted_after_destination_unlink(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -493,6 +491,140 @@ def test_copy_workbench_rejects_leaf_inserted_after_destination_unlink(
     assert destination_leaf.is_symlink()
     assert destination_leaf.readlink() == external
     assert external.read_bytes() == b"external sentinel"
+
+
+def test_copy_workbench_regular_file_rejects_symlink_inserted_before_exclusive_create(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fs_cli = _runtime_fs_cli()
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    external = tmp_path / "external-sentinel.txt"
+    source.mkdir()
+    destination.mkdir()
+    (source / "leaf").write_bytes(b"source bytes")
+    external.write_bytes(b"external sentinel")
+    destination_leaf = destination / "leaf"
+    original_open = fs_cli._open_exclusive_regular_file
+    inserted = False
+
+    def insert_symlink(parent_fd: int, name: str) -> int:
+        nonlocal inserted
+        try:
+            destination_leaf.symlink_to(external)
+        except OSError:
+            pytest.skip("symlink creation is not available on this host")
+        inserted = True
+        return original_open(parent_fd, name)
+
+    monkeypatch.setattr(fs_cli, "_open_exclusive_regular_file", insert_symlink)
+
+    with pytest.raises(RuntimeError) as captured:
+        fs_cli.copy_workbench(source, destination)
+
+    assert inserted is True
+    assert getattr(captured.value, "mutation_started", None) is False
+    assert destination_leaf.is_symlink()
+    assert external.read_bytes() == b"external sentinel"
+    assert (source / "leaf").read_bytes() == b"source bytes"
+
+
+def test_copy_workbench_regular_file_rejects_symlink_inserted_after_fd_unlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fs_cli = _runtime_fs_cli()
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    external = tmp_path / "external-sentinel.txt"
+    source.mkdir()
+    destination.mkdir()
+    (source / "leaf").write_bytes(b"source bytes")
+    destination_leaf = destination / "leaf"
+    destination_leaf.write_bytes(b"old destination bytes")
+    external.write_bytes(b"external sentinel")
+    original_open = fs_cli._open_exclusive_regular_file
+    inserted = False
+
+    def insert_symlink(parent_fd: int, name: str) -> int:
+        nonlocal inserted
+        assert not destination_leaf.exists()
+        try:
+            destination_leaf.symlink_to(external)
+        except OSError:
+            pytest.skip("symlink creation is not available on this host")
+        inserted = True
+        return original_open(parent_fd, name)
+
+    monkeypatch.setattr(fs_cli, "_open_exclusive_regular_file", insert_symlink)
+
+    with pytest.raises(RuntimeError) as captured:
+        fs_cli.copy_workbench(source, destination)
+
+    assert inserted is True
+    assert getattr(captured.value, "mutation_started", None) is True
+    assert destination_leaf.is_symlink()
+    assert external.read_bytes() == b"external sentinel"
+
+
+def test_copy_workbench_regular_file_keeps_verified_parent_fd_after_path_swap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fs_cli = _runtime_fs_cli()
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    displaced_destination = tmp_path / "displaced-destination"
+    external = tmp_path / "external"
+    source.mkdir()
+    destination.mkdir()
+    external.mkdir()
+    (source / "leaf").write_bytes(b"source bytes")
+    sentinel = external / "sentinel.txt"
+    sentinel.write_bytes(b"external sentinel")
+    original_open = fs_cli._open_exclusive_regular_file
+    swapped = False
+
+    def swap_parent(parent_fd: int, name: str) -> int:
+        nonlocal swapped
+        destination.rename(displaced_destination)
+        try:
+            destination.symlink_to(external, target_is_directory=True)
+        except OSError:
+            displaced_destination.rename(destination)
+            pytest.skip("symlink creation is not available on this host")
+        swapped = True
+        return original_open(parent_fd, name)
+
+    monkeypatch.setattr(fs_cli, "_open_exclusive_regular_file", swap_parent)
+
+    fs_cli.copy_workbench(source, destination)
+
+    assert swapped is True
+    assert destination.is_symlink()
+    assert sentinel.read_bytes() == b"external sentinel"
+    assert sorted(path.name for path in external.iterdir()) == ["sentinel.txt"]
+    assert (displaced_destination / "leaf").read_bytes() == b"source bytes"
+
+
+def test_copy_workbench_regular_file_preserves_bytes_mode_and_mtime(tmp_path: Path) -> None:
+    fs_cli = _runtime_fs_cli()
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    destination.mkdir()
+    source_leaf = source / "leaf"
+    destination_leaf = destination / "leaf"
+    source_leaf.write_bytes(b"\x00opaque source bytes\xff")
+    source_leaf.chmod(0o640)
+    fixed_mtime_ns = 1_700_000_000_123_456_789
+    os.utime(source_leaf, ns=(fixed_mtime_ns, fixed_mtime_ns))
+
+    fs_cli.copy_workbench(source, destination)
+
+    source_status = source_leaf.stat()
+    destination_status = destination_leaf.stat()
+    assert destination_leaf.read_bytes() == source_leaf.read_bytes()
+    assert destination_status.st_mode & 0o777 == source_status.st_mode & 0o777 == 0o640
+    assert destination_status.st_mtime_ns == source_status.st_mtime_ns
 
 
 @pytest.mark.parametrize("source_kind", ["directory", "file"])
@@ -661,14 +793,17 @@ def test_copy_workbench_mid_copy_fault_reports_mutation_started_without_rollback
     destination.mkdir()
     (source / "a-first.txt").write_bytes(b"first")
     (source / "b-secret.txt").write_bytes(b"secret body")
-    original_copy2 = fs_cli.shutil.copy2
+    original_copy = fs_cli._copy_descriptor_bytes
+    copy_count = 0
 
-    def injected_copy2(source_path, destination_path, *, follow_symlinks):
-        if Path(source_path).name == "b-secret.txt":
+    def injected_copy(source_fd: int, destination_fd: int) -> None:
+        nonlocal copy_count
+        copy_count += 1
+        if copy_count == 2:
             raise OSError("raw secret body must not escape")
-        return original_copy2(source_path, destination_path, follow_symlinks=follow_symlinks)
+        original_copy(source_fd, destination_fd)
 
-    monkeypatch.setattr(fs_cli.shutil, "copy2", injected_copy2)
+    monkeypatch.setattr(fs_cli, "_copy_descriptor_bytes", injected_copy)
 
     with pytest.raises(Exception) as captured:
         fs_cli.copy_workbench(source, destination)
@@ -676,7 +811,7 @@ def test_copy_workbench_mid_copy_fault_reports_mutation_started_without_rollback
     assert getattr(captured.value, "mutation_started", None) is True
     assert "raw secret body" not in str(captured.value)
     assert (destination / "a-first.txt").read_bytes() == b"first"
-    assert not (destination / "b-secret.txt").exists()
+    assert (destination / "b-secret.txt").read_bytes() == b""
 
 
 def test_copy_workbench_failed_destination_mkdir_reports_no_mutation(
@@ -711,15 +846,14 @@ def test_copy_workbench_failed_unlink_reports_no_mutation(tmp_path: Path, monkey
     (source / "same.txt").write_bytes(b"source")
     destination_entry = destination / "same.txt"
     destination_entry.write_bytes(b"destination")
-    path_type = type(destination_entry)
-    original_unlink = path_type.unlink
+    original_unlink = fs_cli.os.unlink
 
     def injected_unlink(path, *args, **kwargs):
-        if path == destination_entry:
+        if path == destination_entry.name and kwargs.get("dir_fd") is not None:
             raise OSError("injected unlink failure")
         return original_unlink(path, *args, **kwargs)
 
-    monkeypatch.setattr(path_type, "unlink", injected_unlink)
+    monkeypatch.setattr(fs_cli.os, "unlink", injected_unlink)
 
     with pytest.raises(RuntimeError) as captured:
         fs_cli.copy_workbench(source, destination)
@@ -740,16 +874,16 @@ def test_copy_workbench_failure_after_successful_removal_reports_mutation(
     destination_entry = destination / "same.txt"
     destination_entry.write_bytes(b"destination")
 
-    def injected_copy2(*_args, **_kwargs):
+    def injected_copy(*_args, **_kwargs):
         raise OSError("injected copy failure")
 
-    monkeypatch.setattr(fs_cli.shutil, "copy2", injected_copy2)
+    monkeypatch.setattr(fs_cli, "_copy_descriptor_bytes", injected_copy)
 
     with pytest.raises(RuntimeError) as captured:
         fs_cli.copy_workbench(source, destination)
 
     assert getattr(captured.value, "mutation_started", None) is True
-    assert not destination_entry.exists()
+    assert destination_entry.read_bytes() == b""
 
 
 def test_copy_workbench_failed_symlink_creation_reports_no_mutation(
