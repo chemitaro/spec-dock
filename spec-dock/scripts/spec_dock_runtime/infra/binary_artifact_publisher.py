@@ -325,11 +325,21 @@ class FilesystemBinaryArtifactPublisher:
             if sys.platform == "darwin":
                 _clone_macos_descriptor(temp_fd, destination)
             elif sys.platform.startswith("linux"):
-                os.link(
-                    f"/proc/self/fd/{temp_fd}",
-                    destination,
-                    follow_symlinks=True,
-                )
+                flags = os.O_RDONLY
+                if hasattr(os, "O_CLOEXEC"):
+                    flags |= os.O_CLOEXEC
+                if hasattr(os, "O_DIRECTORY"):
+                    flags |= os.O_DIRECTORY
+                directory_fd = os.open(destination.parent, flags)
+                try:
+                    os.link(
+                        f"/proc/self/fd/{temp_fd}",
+                        destination.name,
+                        dst_dir_fd=directory_fd,
+                        follow_symlinks=True,
+                    )
+                finally:
+                    os.close(directory_fd)
             else:
                 raise _PublishFailure("publication_unsupported")
         except FileExistsError:
