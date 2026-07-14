@@ -3,7 +3,7 @@
 ID: "iss-00319"
 タイトル: "Installed Runtime Dogfood Parity Final Quality And Mergeable PR"
 関連GitHub: ["#319"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-13"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -49,7 +49,8 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-319-001 | resolved | operation | main orchestrator | Root `.workbench/`はcurrent dogfood root `.gitignore`投影前で、Artifact import sourceとして不適格 | Rootから直接import; scope-localへ手動選択copy; preservation例外 | 完全回答一件だけをIssue319 scope-local `.workbench/`へbytes不変で手動copyし、そこからimportする | Root Workbenchを一括継承しない運用とruntime source eligibilityを同時に守る | applied | Root direct importは`source_ineligible` / `committed=false`。Scoped source importはEPE-319-001で`committed=true` | Root一時copyは削除済み。Scoped sourceはignoredのまま保持 |
+| D-319-002 | resolved | scope | ChatGPT 5.6 Pro / main orchestrator | Bundled候補にversion bump、migration file、Linux/PR exact gateなど未検証候補を含む | 全採用; 全棄却; canonical authorityで段階採否 | Parent/Issue relayとlocal現物に一致するdistribution/final-quality候補だけをRequirementへ部分採用し、未検証候補はdefer/rejectする | ChatGPT self-claimをauthority/pass evidenceにせず、Issue319で実測するため | applied | EAL-319-001〜004、Requirement §8 | Requirement fresh review後、Design/Planへ順次promotion |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -61,9 +62,20 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 - Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
 - Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
 
-| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
-|---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| ID | adoption_status | source | source_role | claim | target_artifact | target_section | rationale | evidence_strength | evidence_path | adopter | reviewer | blocking | next_action |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| EAL-319-001 | partially_adopted | `artifacts/20260714t110631z-chatgpt-output-issue-319-chatgpt-5-6-pro-bundled-planning-report.md` | external ChatGPT 5.6 Pro bundled draft | Requirement/Design/Plan、distribution topology、main integration、full/manual/review/PR順序候補 | requirement.md; design.md; plan.md | Requirement §§1–9 | Parent W5、Issue315–318 relay、local現物と一致する候補だけを採用。Current pass claimや未検証exact gateは不採用 | advisory + byte-preserved complete answer | EPE-319-001 | main orchestrator | Requirement r3 / Design r1 / Plan r2 passed | no | Execute approved plan |
+| EAL-319-002 | adopted | Parent Epic W5/DS-005 and Issue315–318 relay | canonical parent/prior Issue evidence | Final distribution/docs/full quality/manual/Epic closure/PR ownership | requirement.md | §§2–7 | Reviewed canonical authorityでIssue319の責務とdependencyを固定する | canonical source-grounded | Parent Epic requirement/design/plan/report; Issue315–318 reports | main orchestrator | PLANNING-REQ-r3 passed | no | Execute approved plan |
+| EAL-319-003 | deferred | ChatGPT bundled planning | external analysis | Version bump、`uv.lock`変更、dedicated migration file、exact Linux runner/required PR checks | future design.md/plan.md if proven | Requirement §§8–9 | Repository policy/runner/PR live stateを未検証で、Issue scope内の必要性がまだ確定しない | advisory unverified | EAL-319-001 Artifact | main orchestrator | PLANNING-REQ-r3 passed | no; revisit条件あり | S00/S01で現物確認し必要時だけ採用 |
+| EAL-319-004 | rejected | ChatGPT alternative expansion | external analysis | Root bulk copy、automatic sync、classifier、typed `chatgpt-output`、blank reservation、ChatGPT pass self-claim | none | none | Parent/accepted ADR/Issue315–318 contractに反する | canonical conflict | EAL-319-001 Artifact; accepted ADR | main orchestrator | PLANNING-REQ-r3 passed | no | no_action; downstreamへ持ち込まない |
+| EAL-319-005 | adopted | fresh system architecture review | system-architect `gpt-5.6-sol` / medium | Workbench root/ignore authority修正、final-head PR observation、exact parity exception、Ubuntu/static relay | design.md | §§4–11 | Parent/current filesと一致し、head-changing report commitによるstale evidenceを防ぐ | fresh specialist source-grounded review | Current parent/Issue315–318/provider CI/design diff | main orchestrator | PLANNING-DES-r1 passed | no after remediation | Execute approved plan |
+| EAL-319-006 | adopted | fresh implementation planning review | implementation-planner `gpt-5.6-sol` / medium | Uncommitted main integration、managed wheel-only consumers、hermetic GitHub-linked fixture、issue-finish fail-safe、exact inventory | plan.md | S00–S100 | Approved designを実在command/fixture/review/commit順序へ落とし、4 blocking findingsを修復後pass | fresh specialist source-grounded review | Current runtime/help/tests/Issue315–318 relay/plan diff | main orchestrator | PLANNING-PLAN-r2 passed | no after remediation | Execute approved plan |
+
+### External preservation handoff（content-free）
+
+| evidence id | preservation_status | import_kind | storage_identity | source | destination | sha256 | byte_count | committed | warning_codes | adoption boundary |
+|---|---|---|---|---|---|---|---|---|---|---|
+| EPE-319-001 | imported_byte_exact | chatgpt-output | blank | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/.workbench/issue319-chatgpt-5-6-pro-planning-report.md` | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/artifacts/20260714t110631z-chatgpt-output-issue-319-chatgpt-5-6-pro-bundled-planning-report.md` | `9352f5120661d61e65bc8591e466a4a69e0a55c6f871bf8d123199964b445641` | 85219 | true | none | Preservationはcanonical adoption/reviewer pass/readinessを意味しない。採否はEAL-319-001〜004で管理 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +83,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-319-001 | Issue315〜318のaccepted capabilityをproviderからpackage/fresh/existing/dogfoodへ配布し、全E-RQ/E-ACと単一PR deliveryを閉じる | Latest main integration、public docs、static repair、manual evidence、PR checks/review observation | medium。副次repair/release作業がnew semantics/general refactor/version-release拡張へ逸脱し得るため、Requirement RQ-319-016とowning-contract routingで禁止 | PLANNING-REQ-r3 passed |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,11 +91,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | Parent Epic、Issue315–318、accepted ADR、local git/package/docs/tests、EPE-319-001 | ChatGPT exact gates/version/migration/Linux/PR policyは実行時確認 | partial adoption; reject expansion; defer unverified | passed | no | promote |
+| design | Approved requirement、assurance standard、ChatGPT Artifact、fresh system-architect、parent/current CI/static relay | Exact plan/test/commit stepはPlanで定義 | Partial ChatGPT adoption + system-architect findings adopted | passed | no | promote |
+| plan | Approved requirement/design、ChatGPT Artifact、fresh implementation-planner、current command/test/runtime | PR terminal external evidenceは実行時観測 | Partial ChatGPT adoption + implementation-planner findings adopted | passed | no | promote |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
-  - used / not used
+  - used（ChatGPT 5.6 Pro bundled Requirement/Design/Plan candidate）
 - 未使用の場合:
   - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
 - lifecycle state（契約値）:
@@ -107,7 +121,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| ChatGPT 5.6 Pro | iss-00319 | `artifacts/20260714t110631z-chatgpt-output-issue-319-chatgpt-5-6-pro-bundled-planning-report.md` | Parent Epic、Issue315–318、accepted ADR、provider docs、package/tests | requirement.md、design.md、plan.md | partially_integrated | [requirement.md, design.md, plan.md] | passed: scoped import byte exact and canonical source cross-check passed | Bundled candidates integrated after parent/current-source correction | Unverified pass counts、exact gate invention、scope expansions | none | passed | promote |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -190,7 +204,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| ワークフロー利用依頼 / 明示承認 / なし（user request to use SpecDock workflow / explicit approval / none） | ... | iss-00319 | 現在セッション（current session） / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | 範囲: active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility。破壊的操作 / 外部公開 / credentialed external mutation / scope expansion / private external system use / out-of-workflow role は含めない | 完了 / セッション終了 / scope 変更 / host policy conflict / user revocation（issue complete / session end / scope change / host policy conflict / user revocation） | none / denied / unavailable / host conflict | 続行 / separate-confirmation exception は user に確認 / block gate / record waiver request |
+| User request to use Epic/Issue planning/execution and ChatGPT | current Work3 checkout | iss-00319 | current session | spec-manager、repo-analyst、system-architect、implementation-planner、doc-writer、dev-coder、spec/code/qa-reviewer | Active repo/worktree/scope/current session/documented responsibility。Scope expansion/destructive/private external/out-of-workflow roleを含まない | Issue complete/session end/scope change/user revocation/host conflict | none | Continue workflow without per-role reapproval |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
@@ -214,15 +228,22 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
-| `lite` | `not applicable` | `not applicable` | ライト該当なし理由（lite not applicable reason） | `pass / fail / blocked` | `ready / blocked` |
-| `standard` | `system-architect / implementation-planner / manual fallback` | `used / skipped / unavailable / denied` | `artifacts/...` / manual evidence / skip reason: ... | `pass / fail / blocked` | `ready / blocked` |
-| `strict` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / manual fallback evidence | `pass / fail / blocked` | `ready / blocked` |
-| `critical` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / explicit approval and risk acceptance | `pass / fail / blocked` | `ready / blocked` |
+| standard | system-architect and implementation-planner | used | Fresh system-architect and implementation-planner `gpt-5.6-sol` / medium。Architecture findings二件、planning findings四件+fixture follow-up一件を修復後に各specialist passed | passed | ready |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| PLANNING-REQ-r3 | requirement alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Preservation/EAL/OAL、親trace、testable AC、authority/secrecy、PR ownershipを承認 |
+| PLANNING-DES-r1 | design alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。System-architect remediation、distribution/update/parity/Linux/manual/PR final-head設計を承認 |
+| PLANNING-PLAN-r2 | plan executability/alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。C319-01〜16、S00〜S100、main/wheel/fixture/static/final-head/lifecycle contractを承認 |
+| PLANNING-FINAL-r1 | planning closeout alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。ChatGPT原文保存、EAL/EPE/OAL、terminal review/specialist gate、assurance/readiness、Requirement/Design/Plan整合を承認 |
+
+#### レビュー修復履歴（Review Remediation History）
+| ステップ（step） | 対象 | 検出事項 | 修復結果 |
+|---|---|---|---|
+| PLANNING-REQ-r1 | requirement alignment | EPE receipt/EAL未記録をblocking findingとして検出。Canonical本文findingなし | Preservation receiptとEALを記録し、r2で確認 |
+| PLANNING-REQ-r2 | requirement alignment | r1修復後、Mandatory OAL placeholderをblocking findingとして検出 | OAL-319-001を具体化し、r3でpassed |
+| PLANNING-PLAN-r1 | plan executability/alignment | Configured static authorityが`make lint`ではなく個別mypy/RuffになっていたためC319-08をblock | S04へauthority/repair順序を修復し、r2でpassed |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
