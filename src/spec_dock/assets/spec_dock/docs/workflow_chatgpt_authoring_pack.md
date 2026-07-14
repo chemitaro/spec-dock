@@ -47,7 +47,7 @@ FinalGate -> Human : mergeable PR evidence
 
 この図の `Planning Skill` はshared checkpointの呼出し時点とscope固有handoffを所有し、preservation実行、採用判断、canonical rewriteは行いません。`Main Orchestrator` がcapture/importまたはexception/ZIP route、EAL disposition、canonical rewriteを明示実行し、fresh reviewerへ渡します。`ChatGPT Authoring Evidence Lane` はreviewer passやexecution-readyを付与せず、Issue relayとfinal quality / PR deliveryも各downstream workflowのauthorityに残ります。
 
-## Preservation checkpoint
+## 保存チェックポイント（Preservation checkpoint）
 
 ChatGPT output は次のいずれかへ事前分類します。File の存在、拡張子、size、encoding だけで semantic completeness を自動判定しません。分類できない間は preservation status を付けず、import、EAL disposition、canonical rewrite を block します。
 
