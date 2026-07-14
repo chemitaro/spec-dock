@@ -245,6 +245,9 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S03-SPEC-r1 | public docs and dogfood parity | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。C319-06〜07、provider-first projection、7 docs pairs、semantic completeness、code-reviewer N/Aを承認 |
 | S04-CODE-r1 | focused/full/static quality and repair | code-reviewer | fresh | passed | no | promote | Blocking findingなし。6 filesのstatic/test repair、runtime semantics不変、affected/full/static evidence、C319-08 closureを承認 |
 | S04-QA-r3 | regression and platform quality | qa-reviewer | fresh | passed | no | promote | Blocking findingなし。Focused W1〜W4、affected/relay、unit/CLI/integration/full、static gateを確認。C319-09はlocal/config pass、PR Ubuntu実runをS100へ保持 |
+| S05-SPEC-PREADOPT-r1 | pre-adoption checkpoint | spec-reviewer | fresh | passed | no | promote | findingsなし。Import bytes/source survivalを確認し、adoption pendingのままpreservationとadoptionを分離してEAL/rewriteへ進む境界を承認 |
+| S05-SPEC-FINAL-r1 | installed integrated scenario | spec-reviewer | fresh | passed | no | promote | findings 0、confidence 0.99。Copy/import/EAL/rewrite順序、authority、opacity、secrecy、C319-10/15を承認 |
+| S05-QA-r1 | installed integrated scenario | qa-reviewer | fresh | passed | no | promote | findings 0。Synthetic fixture、fake gh fail-closed、copy/import invariants、sync opacity、content-free evidenceを承認 |
 
 #### レビュー修復履歴（Review Remediation History）
 | ステップ（step） | 対象 | 検出事項 | 修復結果 |
@@ -265,14 +268,16 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S01 | committed | `origin/main` merge + five conflict resolutions + report evidence | `1230c456` | clean / upstream `0 0`、origin/main left 0 | N/A | Issue314/315〜318 accepted contracts、provider/dogfood conflict pairs | Conflict paths clean。Whole mergeはbyte-preserved raw Artifactの既知13行だけ例外 | S01-CODE-r1 / S01-SPEC-r1 passed |
 | S02 | committed | Python cache packaging repair + wheel/fresh/update evidence + report | `09e84df2` | clean / upstream `0 0` | N/A | C319-03〜05、tc319-s02-01〜03 | `git diff --check` passed | S02-CODE-r1 / S02-SPEC-r1 passed |
 | S03 | committed | Root/provider docs + candidate-wheel dogfood projection + report | `da59f73c` | clean / upstream `0 0` | N/A | C319-06〜07、tc319-s03-01〜03 | `git diff --check` passed | S03-SPEC-r1 passed / code-reviewer N/A (docs-only) |
-| S04 | commit candidate | Static/test repair 6 files + report evidence | 2026-07-14 S04 session ledger | verify after commit | N/A | C319-08、C319-09 local/config、tc319-s04-01〜04 | `git diff --check` / focused/full/static passed | S04-CODE-r1 / S04-QA-r3 passed |
+| S04 | committed | Static/test repair 6 files + report evidence | `149771db` | clean / upstream `0 0` | N/A | C319-08、C319-09 local/config、tc319-s04-01〜04 | `git diff --check` / focused/full/static passed | S04-CODE-r1 / S04-QA-r3 passed |
+| S05 | commit candidate | Installed integrated manual scenario report evidence only | 2026-07-14 S05 session ledger | verify after commit | N/A | C319-10、C319-15、tc319-s05-01〜03 | `git diff --check` passed | S05-SPEC-PREADOPT-r1 / S05-SPEC-FINAL-r1 / S05-QA-r1 passed |
 
 #### 変更したファイル
 - S00 planning: `requirement.md`, `design.md`, `plan.md`, `report.md`, `.assurance.json`, imported ChatGPT Artifact。
 - S01 integration: `origin/main` merge、conflict resolution 5 files、`report.md`。
 - S02 candidate: `pyproject.toml`, `setup.py`, `tests/unit/infra/test_init_update.py`, `report.md`。
 - S03: `README.md`, provider/dogfood docs 7 exact pairs、`report.md`。
-- S04 candidate: `scripts/authoring-pack/authoring_pack_review.py`, `scripts/authoring-pack/invoke_chatgpt_backend.py`, `tests/cli_runtime/test_artifact_import_chatgpt_output.py`, `tests/cli_runtime/test_artifact_import_s04.py`, `tests/cli_runtime/test_wrappers.py`, `tests/unit/infra/test_init_update.py`, `report.md`。
+- S04: `scripts/authoring-pack/authoring_pack_review.py`, `scripts/authoring-pack/invoke_chatgpt_backend.py`, `tests/cli_runtime/test_artifact_import_chatgpt_output.py`, `tests/cli_runtime/test_artifact_import_s04.py`, `tests/cli_runtime/test_wrappers.py`, `tests/unit/infra/test_init_update.py`, `report.md`。
+- S05 candidate: `report.md` only。
 
 #### コミット
 - `7a3793de` `docs(issue-319): ChatGPT原文保存と最終品質計画を確定`
@@ -280,7 +285,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - `1230c456` `chore(integration): origin/mainの先行Issue変更を最終品質ブランチへ統合`
 - `09e84df2` `fix(packaging): wheelとsdistへのPythonキャッシュ混入を防止`
 - `da59f73c` `docs(workbench): WorkbenchとArtifact importの公開運用契約を整備`
-- S04 candidate: `chore(quality): 静的解析ゲートの違反を解消`
+- `149771db` `chore(quality): 静的解析ゲート違反を最小差分で解消`
+- S05 candidate: `docs(issue-319): installed手動統合証跡を記録`
 
 #### メモ
 - S00 live baselineの追加記録はplanning authorityを変更せず、report evidenceだけを更新する。
@@ -461,6 +467,32 @@ Issue315〜318導入差分から抽出したexact pairはS00時点ですべてby
 - `tc319-s04-02`: pass — unit / CLI runtime / integration / full regression。
 - `tc319-s04-03`: pass — authoritative `make lint`とglobal Ruff。
 - `tc319-s04-04`: local/config pass、S100 pending — Ubuntu workflowはPR head実run後にterminal closeする。
+
+---
+
+### セッションログ（2026-07-14 S05 fresh installed integrated manual scenario）
+
+#### 対象
+- Step: S05
+- AC/EC: C319-10、C319-15 / AC-319-011
+
+#### 実施内容
+- Candidateは`spec_dock-0.2.3-py3-none-any.whl`、version `0.2.3`、SHA-256 `876cc9c4ecb00c702cc46b4882106ece630f3931849c168dc898a6626c85b486`。Installed feature members 5件はcandidate wheel memberとbyte-equalだった。
+- Safe synthetic Git repositoryへGitHub-linked Initiative / Epic / Issue nodeを3件導入し、同一commitのlinked worktree 2件を用意した。Fixture-local fake `gh`のallowed callは3件、unknown / mutation / network callは0件だった。
+- Root Workbenchから必要file 1件だけをmanual selectionし、root bulk copyを行わなかった。Scoped sourceはregular 5 / symlink 1、targetはregular 7 / symlink 1。Shared regular 5件はbyte-equal、target-only 2件は保持された。Hidden `.git`、binary、config、symlink objectは内容を分類・解釈せずopaqueに扱った。
+- `workbench copy --json`はpassし、experimental / non-canonical / disposable / one-shot / no-sync contractをcontent-free outputで確認した。Absolute target pathとWorkbench本文は記録していない。
+- `artifact import chatgpt-output`を2回実行した。各Artifactは193 bytes、SHA-256 `7627940c724b1be0a0918acdd85fb270365b9b7102c6d48d6527305de7350d6b`、`committed=true`、`storage_identity=blank`、warning none。Sourceは両回とも残り、`cmp`一致、既存Artifactのno-overwriteを確認した。
+- Pre-adoption checkpointではpreservation成功後もadoptionをpendingのまま保持した。Fixture EALへpreservation statusとadoption statusを別fieldで記録し、採用判断後にcanonical rewriteを実施した。Rewrite後もsourceとimport済みArtifactはbyte-unchangedだった。
+- Sync output 9件でWorkbench filename hitは0件。Sensitive marker、full-body、absolute pathのsecrecy scan hitもすべて0件だった。
+
+#### クロージャ
+- `tc319-s05-01`: pass — Candidate-wheel-onlyのsynthetic copy → import → EAL → rewrite順序とauthority境界。
+- `tc319-s05-02`: pass — Source survival、shared bytes、destination-only保持、Artifact no-overwrite、post-rewrite不変。
+- `tc319-s05-03`: pass — Fake gh fail-closed、semantic discovery opacity、body/secret/absolute path非露出。
+- C319-10 / C319-15: pass。Fresh final spec reviewはfinding 0 / confidence 0.99、fresh QA reviewはfinding 0。
+
+#### 変更したファイル
+- `report.md` only。Fixture、Workbench、manual Artifactはrepository外またはGit-ignoredで、versioned product fileの変更なし。
 
 ---
 
