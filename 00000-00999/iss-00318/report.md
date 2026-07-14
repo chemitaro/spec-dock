@@ -102,6 +102,7 @@ ID: "iss-00318"
 | EXEC-S01-r2 | S01 provider docs contract | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Main authorityを含む三lane/四分岐/lifecycle docs contractを承認 |
 | EXEC-S02-r1 | S02 shared preservation kernel | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。四分岐、status/result matrix、Main/shared責任境界、既存ZIP safety維持を承認 |
 | EXEC-S03-r1 | S03 thin planning hooks | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。三callerの呼出し位置、block伝播、matrix非複製、scope authority維持を承認 |
+| EXEC-S01-REM-r1 | S01 provider docs Japanese-primary remediation | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。二provider docsの見出し・表ラベルだけを日本語主表記へ修復し、四分岐/status/EAL/ZIP/authority semantics不変を承認 |
 
 ## Review Remediation History
 
@@ -114,6 +115,7 @@ ID: "iss-00318"
 | PLANNING-PLAN-r1 | plan | Step schema/test/pathとglobal mypy boundary | 全step contract/case/pathを具体化しglobal gateをIssue319へrelay | r3 passed |
 | PLANNING-PLAN-r2 | plan | 標準report ledger接続、S90/S99 commit境界 | 全台帳へ接続しS90/S99を独立commit化 | r3 passed |
 | EXEC-S01-r1 | S01 | Planning skillとMain orchestratorの責任が基本原則/図で矛盾 | Planningはcheckpoint呼出し/scope handoff、Mainは保存/EAL/rewriteへ統一 | r2 passed |
+| EXEC-S04-code-r1–r2 | S04 | r1でbranch/result assertion感度不足、r2でprovider修復混在、thin-caller禁止token、exact four-branch、ZIP行表現依存を指摘 | r1指摘後にbranch/result assertionを強化。S01 provider日本語主表記修復をS04から独立させ、EXEC-S01-REM-r1で意味不変を確認。残るtest指摘はS04内で修復してfresh reviewへ戻す | pending fresh S04 code review |
 
 ## Planning evidence log
 
@@ -152,6 +154,7 @@ ID: "iss-00318"
 - Inspect-only verification: Exact status/lifecycle/authority/forbidden termsを`rg`、`git diff --check` pass。Docs-onlyのためpytest未実施。
 - Reviewer: EXEC-S01-r1は責任図の矛盾を指摘し修正。Fresh EXEC-S01-r2はfindingsなし、confidence 0.99、`promote`。
 - Ledger Note: Approved planを具体化しただけでmaterial implementation decisionなし。S02–S04のskill/projection/test責務は未変更。
+- Post-S01 remediation: S04 full installer testで既存の日本語主表記ガードが二provider docsの英語主heading/table labelを検出したため、意味を変えず日本語主＋英語anchorへ修復した。Fresh EXEC-S01-REM-r1はfindingsなし、confidence 0.99、`promote`。S04のprovider変更禁止境界から独立commitへ分離する。
 
 ### S02 Shared ChatGPT preservation kernel
 
@@ -215,6 +218,7 @@ ID: "iss-00318"
 | S01 | none | none | Main/Planning責任図をr1 findingで明確化 | S02–S99 obligations remain | EXEC-S01-r2 passed; plan amendment不要 |
 | S02 | none | none | none | S03–S99 obligations remain | EXEC-S02-r1 passed; plan amendment不要 |
 | S03 | none | none | none | S04–S99 obligations remain | EXEC-S03-r1 passed; plan amendment不要 |
+| S01 remediation | none | none | 二provider docsの見出し・表ラベルを日本語主表記へ修復。Preservation/authority semantics不変 | S04–S99 obligations remain | EXEC-S01-REM-r1 passed; material design changeなし |
 
 ## Implementation Delegation Gate
 
@@ -233,6 +237,7 @@ ID: "iss-00318"
 | S01 | EXEC-S01-r2 passed | `docs(chatgpt-first): 原文保存ワークフロー契約を追加`; provider三docs + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit external clean/upstream check必須 |
 | S02 | EXEC-S02-r1 passed | `docs(chatgpt-first): 共有preservation checkpointを追加`; provider shared skill + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit external clean/upstream check必須 |
 | S03 | EXEC-S03-r1 passed | `docs(chatgpt-first): planning skillへ保存checkpointを接続`; provider planning skills三件 + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit external clean/upstream check必須 |
+| S01 remediation | EXEC-S01-REM-r1 passed | `docs(chatgpt-first): 保存契約文書を日本語主表記へ修復`; provider二docs + report.md | passed | Focused remediation commit hashはpost-commit external evidenceで記録 | S04 working diffを残したままcommitし、provider変更がS04 staged scopeへ混在しないことを確認 |
 
 ## Final QA Gate
 
