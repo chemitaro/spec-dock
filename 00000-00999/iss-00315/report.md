@@ -298,7 +298,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| ユーザーによる Epic Execution / Issue Planning / Issue Execution workflow 利用依頼 | `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/bcea/spec-dock` | iss-00315 | Work3移行後の現在セッション | spec-reviewer / code-reviewer / qa-reviewer / repo-analyst / dev-coder / doc-writer | active repo/worktree、active scope、current session、documented role responsibilityに限定 | issue完了、scope変更、session終了、host policy conflict、user revocation | none | workflow内を続行。境界外は別途確認 |
+| ユーザーによる Epic Execution / Issue Planning / Issue Execution workflow 利用依頼 | current Work3 checkout | iss-00315 | Work3移行後の現在セッション | spec-reviewer / code-reviewer / qa-reviewer / repo-analyst / dev-coder / doc-writer | active repo/worktree、active scope、current session、documented role responsibilityに限定 | issue完了、scope変更、session終了、host policy conflict、user revocation | none | workflow内を続行。境界外は別途確認 |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
