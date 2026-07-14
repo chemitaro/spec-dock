@@ -206,9 +206,9 @@ class TestCliRulesContract(CliRuntimeHarness):
             initiative_planning_skill = (
                 target / ".agents" / "skills" / "spec-dock-initiative-planning" / "SKILL.md"
             ).read_text(encoding="utf-8")
-            epic_planning_skill = (
-                target / ".agents" / "skills" / "spec-dock-epic-planning" / "SKILL.md"
-            ).read_text(encoding="utf-8")
+            epic_planning_skill = (target / ".agents" / "skills" / "spec-dock-epic-planning" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
             chatgpt_authoring_skill = (
                 target / ".agents" / "skills" / "spec-dock-chatgpt-authoring" / "SKILL.md"
             ).read_text(encoding="utf-8")
@@ -268,10 +268,7 @@ class TestCliRulesContract(CliRuntimeHarness):
             )[0]
             branch_bullets = [line for line in branch_section.splitlines() if line.startswith("- ")]
             assert len(branch_bullets) == 4
-            preservation_bullets = {
-                line.removeprefix("- ").split(":", 1)[0]: line
-                for line in branch_bullets
-            }
+            preservation_bullets = {line.removeprefix("- ").split(":", 1)[0]: line for line in branch_bullets}
             expected_branch_headings = {
                 "Complete standalone Markdown",
                 "Complete received inline answer",

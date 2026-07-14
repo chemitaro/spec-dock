@@ -4930,15 +4930,10 @@ class TestInitUpdate(CliRuntimeHarness):
         shared_skill = (repo_root / pairs[".agents/skills/spec-dock-chatgpt-authoring/SKILL.md"]).read_text(
             encoding="utf-8"
         )
-        branch_section = shared_skill.split("Choose exactly one branch:", 1)[1].split(
-            "Evaluate an import result", 1
-        )[0]
+        branch_section = shared_skill.split("Choose exactly one branch:", 1)[1].split("Evaluate an import result", 1)[0]
         branch_bullets = [line for line in branch_section.splitlines() if line.startswith("- ")]
         assert len(branch_bullets) == 4
-        preservation_bullets = {
-            line.removeprefix("- ").split(":", 1)[0]: line
-            for line in branch_bullets
-        }
+        preservation_bullets = {line.removeprefix("- ").split(":", 1)[0]: line for line in branch_bullets}
         branch_contracts = {
             "Complete standalone Markdown": (
                 "Workbench",

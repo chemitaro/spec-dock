@@ -184,7 +184,7 @@ class TestArtifactImportS04(CliRuntimeHarness):
             source.parent.mkdir(parents=True, exist_ok=True)
             source_body = b"source bytes"
             source.write_bytes(source_body)
-            collisions = []
+            collisions: list[Path] = []
 
             def external_writer(point):
                 if point != "before_publication" or collisions:
@@ -261,8 +261,12 @@ class TestArtifactImportS04(CliRuntimeHarness):
             source_body = b"source bytes"
             source.write_bytes(source_body)
             attempts = 0
+            source_guard = Publisher()
 
-            class AlwaysCollidingPublisher(Publisher):
+            class AlwaysCollidingPublisher:
+                def guard_source(self, request):
+                    return source_guard.guard_source(request)
+
                 def publish(self, request):
                     nonlocal attempts
                     attempts += 1
@@ -306,8 +310,12 @@ class TestArtifactImportS04(CliRuntimeHarness):
                 body = f"occupied {suffix}".encode()
                 path.write_bytes(body)
                 occupied[path] = body
+            source_guard = Publisher()
 
-            class UnexpectedPublisher(Publisher):
+            class UnexpectedPublisher:
+                def guard_source(self, request):
+                    return source_guard.guard_source(request)
+
                 def publish(self, request):
                     raise AssertionError("publisher must not run after suffix exhaustion")
 
