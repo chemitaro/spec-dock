@@ -358,7 +358,8 @@ def test_publication_is_bound_to_verified_staged_descriptor_after_path_replaceme
         if point != "before_publication":
             return
         [replacement_path] = artifacts_dir.glob(".spec-dock-import-*")
-        replacement_path.unlink()
+        verified_path = replacement_path.with_name(replacement_path.name + ".verified")
+        replacement_path.rename(verified_path)
         if replacement_kind == "different_bytes":
             replacement_path.write_bytes(replacement_body)
         else:
