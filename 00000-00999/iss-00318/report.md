@@ -24,9 +24,9 @@ ID: "iss-00318"
 
 | ID | adoption_status | source | source_role | claim | target_artifact | target_section | rationale | evidence_strength | evidence_path | adopter | reviewer | blocking | next_action |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| EAL-318-001 | partially_adopted | ChatGPT 5.6 Pro GitHub-synced complete received answer | external ChatGPT 5.6 Pro | 四分岐、shared checkpoint、lane分離、failure/EAL/Issue319 relay候補 | requirement.md / report.md | RQ-318-001–013、AC-318-001–011、EPE-318-001 | 親/ADR/local sourceと一致する候補だけを採用し、exact test名、unverified pass claim、profile自己宣言は不採用 | advisory analysis + byte-verified preserved evidence | `artifacts/20260713t180812z-chatgpt-output-issue-318-chatgpt-5-6-pro-planning-report.md`; EPE-318-001 | main orchestrator | PLANNING-REQ-r13 passed | no, requirement gate passed | Design/plan intended targetへ段階統合 |
+| EAL-318-001 | partially_adopted | ChatGPT 5.6 Pro GitHub-synced complete received answer | external ChatGPT 5.6 Pro | 四分岐、shared checkpoint、lane分離、failure/EAL/Issue319 relay候補 | requirement.md / design.md / report.md | Requirement RQ/AC、Design DS-318-001–009・§4–14、EPE-318-001 | 親/ADR/local sourceと一致する候補だけを採用し、exact test名、unverified pass claim、profile自己宣言は不採用 | advisory analysis + byte-verified preserved evidence | `artifacts/20260713t180812z-chatgpt-output-issue-318-chatgpt-5-6-pro-planning-report.md`; EPE-318-001 | main orchestrator | requirement r13 passed; design r3 passed | no, design gate passed | Plan intended targetへ段階統合しfresh review |
 | EAL-318-002 | adopted | current-state analysis | repo-analyst | Exact 14 provider/dogfood paths、Issue317 drift、test surfaces、Issue319 ownership | requirement.md / report.md | Scope、RQ-318-010–013、Deferred PR Delivery Gate | Current checkoutのlocal sourceで直接確認済み | source-grounded read-only repository analysis | Active Epic/Issue317 docs、current provider assets/tests | main orchestrator | PLANNING-REQ-r13 passed | no, entry resolved | Requirement pass後、design/plan intended targetへ必要事項を段階統合 |
-| EAL-318-003 | partially_adopted | fresh architecture analysis | system-architect `gpt-5.6-sol`/medium | Shared kernel、parallel lane、authority/failure/rollback候補 | requirement.md / report.md | RQ-318-006–012、D-318-001–002 | Parent/ADRに整合する設計前提を採用し、runtime拡張案は不採用 | specialist advisory + local-source grounded | Fresh read-only specialist run | main orchestrator | PLANNING-REQ-r13 passed | no, adopted requirement claims resolved | Designはintended target。Requirement pass後に統合しfresh review |
+| EAL-318-003 | partially_adopted | fresh architecture analysis | system-architect `gpt-5.6-sol`/medium | Shared kernel、parallel lane、authority/failure/rollback候補 | requirement.md / design.md / report.md | RQ-318-006–012、D-318-001–002、DS-318-001–009 | Parent/ADRに整合する設計前提を採用し、runtime拡張案は不採用 | specialist advisory + local-source grounded | Fresh read-only specialist run | main orchestrator | requirement r13 passed; design r3 passed | no, design evidence integrated | Plan handoffで固定設計contractを維持 |
 | EAL-318-004 | partially_adopted | fresh implementation planning analysis | implementation-planner `gpt-5.6-sol`/medium | Step/closure/test/delegation seed | requirement.md / report.md | Scope、完了条件、Issue319 relay | Requirement段階ではscope・完了境界だけを採用し、Plan本文への採用は未実施 | specialist advisory + local-source grounded | Fresh read-only specialist run | main orchestrator | PLANNING-REQ-r13 passed | no, plan promotion not claimed | Planはintended target。Design pass後に統合しfresh review |
 | EAL-318-005 | rejected | implementation expansion candidates | external ChatGPT 5.6 Pro | Typed token、frontmatter/sidecar、自動EAL/canonical mutation、ZIP単一import、runtime status追加 | none | none | 親Epic、accepted ADR、Issue318 non-scopeに反する | advisory claim rejected by canonical authority | EAL-318-001 complete received answer、accepted ADR | main orchestrator | PLANNING-REQ-r13 passed | no | no_action; rejected claimを後続へ持ち込まない |
 | EAL-318-006 | deferred | S90 relay | Issue317 / Epic W5 | README/reference/migration/package/fresh init/update/full/global gate/final PR | iss-00319 | Issue319 requirement/design/plan | W5所有でありIssue318完了をblockしない。RevisitはIssue319開始時 | accepted parent/previous-Issue relay | Issue317 report S90、Epic plan W5 | main orchestrator | PLANNING-REQ-r13 passed | no, scope-owned deferral | Issue319開始時に再確認 |
@@ -66,6 +66,7 @@ ID: "iss-00318"
 | phase | investigated facts | open questions / answers | clarification evidence | workflow authorization evidence | reviewer unit / scope | verdict / reason | fixes | adoption decision | blocking | promotion / next_action |
 |---|---|---|---|---|---|---|---|---|---|---|
 | requirement | Parent E-RQ-024/E-AC-016/DS-004/W4、parent Epic accepted ADR、Issue317 runtime/report、GitHub-synced ChatGPT complete received answer、repo/specialist analysis | Product open questionなし。Grade authorityはassurance classifyへ委ねる | Prior user decisions are canonicalized in parent Epic/ADR。Source-grounded readとChatGPT evidence採否で解消し、新規formal interview/lightweight questionは不要と判断 | 「ワークフロー単位のnamed role許可」section。UserのEpic/Issue planning/execution依頼、current Work3、iss-00318、current session、named-role boundary | PLANNING-REQ-r1–r13は毎回fresh。Requirement/report/EPEをparent Epic、ADR、Issue317、workflow contractsと照合。Placeholder design/planは除外 | `passed`: r13 findingsなし、confidence 0.99 | r1–r12の全findingsを修正し、r13で独立確認 | partially_adopted/re-written | no | promote。Requirement phaseをcommit後、assurance classify/composeしてdesignへ進む |
+| design | Approved requirement、parent DS-004、accepted ADR、Issue317、ChatGPT一括候補、system-architect、provider/dogfood/test inventory | Product/design open questionなし。Exact assertion placementはplan/implementationで既存patternに合わせる | Requirementで確定したscope/authorityを維持し、追加質問不要。ChatGPT/system-architect候補はEALで部分採用 | 同authorization boundary | PLANNING-DES-r1–r3 fresh。Requirement/design/report/assurance/evidenceをparent/ADR/Issue317/provider contractsと照合。Plan templateは除外 | `passed`: r3 findingsなし、confidence 0.99 | r1 completeness/dependency/tree/UML、r2保存実行主体を修正し、r3で独立確認 | partially_adopted/re-written | no | promote。Designをapprovedとし、assurance refresh後planへ進む |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence）
 
@@ -82,7 +83,7 @@ ID: "iss-00318"
 
 | Grade | required specialist / fallback | usage | evidence | fresh spec-reviewer verdict | execution readiness |
 |---|---|---|---|---|---|
-| strict candidate | system-architect / implementation-planner | used | Both fresh read-only `gpt-5.6-sol` / reasoning `medium`; repo-grounded scope/design/plan evidence | requirement r13 passed | blocked until design/plan gates pass |
+| standard | system-architect / implementation-planner recommended | both used | Both fresh read-only `gpt-5.6-sol` / reasoning `medium`; repo-grounded scope/design/plan evidence。System-architectをdesignへ統合済み | requirement r13 passed; design r3 passed | blocked until plan gate passes |
 
 ## レビューゲート状態（Reviewer Gate Status）
 
@@ -101,6 +102,9 @@ ID: "iss-00318"
 | PLANNING-REQ-r11 | requirement alignment | spec-reviewer | fresh | failed | no | blocked | Reviewer Gate Statusの`fail`/`pending`が契約外と指摘。過去rowを`failed`へ正規化し、未実行rowを除去 |
 | PLANNING-REQ-r12 | requirement alignment | spec-reviewer | fresh | failed | no | blocked | Spec Authoring Gateの未実行design/plan rowが契約外複合verdictを使用と指摘。未実行rowを削除 |
 | PLANNING-REQ-r13 | requirement alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Requirementからdesignへのpromotionを承認 |
+| PLANNING-DES-r1 | design alignment | spec-reviewer | fresh | failed | no | blocked | Completeness guard、module dependency/file tree、UML metadataを指摘。修正済み |
+| PLANNING-DES-r2 | design alignment | spec-reviewer | fresh | failed | no | blocked | Shared checkpointが保存実行主体に見えるsequence矛盾を指摘。Main orchestrator実行へ修正済み |
+| PLANNING-DES-r3 | design alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Designからplanへのpromotionを承認 |
 
 ## Planning evidence log
 
@@ -116,3 +120,9 @@ ID: "iss-00318"
 - Reason: One final Epic PRへpackage、fresh init/update、public docs、full/global quality、final deliveryを集約する。
 - Claim boundary: Issue319のPR Delivery / Merge Preparation完了までPR-ready/merge-ready/merge-preparedを主張しない。
 - Remaining: Issue318 implementation、Issue319 package/docs/migration/full QA/code/spec/PR observation。
+
+<!-- spec-dock:managed-section begin id="report.step-evidence" -->
+## Step Evidence
+- Record Red, Green, and refactor evidence for each executed step.
+- Link each closure id to its observed verification result.
+<!-- spec-dock:managed-section end id="report.step-evidence" -->
