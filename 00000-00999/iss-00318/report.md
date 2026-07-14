@@ -30,6 +30,9 @@ ID: "iss-00318"
 | EAL-318-004 | adopted | fresh implementation planning analysis | implementation-planner `gpt-5.6-sol`/medium | Step/closure/test/delegation seed | plan.md / report.md | Plan §2–10、Grade Specialist Evidence Gate | Approved designを維持するS00–S99順序、C318 closure、role/test/review/commit gateへ統合し、r1–r2 findingsを具体化 | specialist advisory + local-source grounded | Fresh read-only specialist run | main orchestrator | requirement r13 passed; design r3 passed; plan r4 passed | no, planning adoption reviewed | S00からapproved planを順番に実行 |
 | EAL-318-005 | rejected | implementation expansion candidates | external ChatGPT 5.6 Pro | Typed token、frontmatter/sidecar、自動EAL/canonical mutation、ZIP単一import、runtime status追加 | none | none | 親Epic、accepted ADR、Issue318 non-scopeに反する | advisory claim rejected by canonical authority | EAL-318-001 complete received answer、accepted ADR | main orchestrator | PLANNING-REQ-r13 passed | no | no_action; rejected claimを後続へ持ち込まない |
 | EAL-318-006 | deferred | S90 relay | Issue317 / Epic W5 | README/reference/migration/package/fresh init/update/full/global gate/final PR | iss-00319 | Issue319 requirement/design/plan | W5所有でありIssue318完了をblockしない。RevisitはIssue319開始時 | accepted parent/previous-Issue relay | Issue317 report S90、Epic plan W5 | main orchestrator | PLANNING-REQ-r13 passed | no, scope-owned deferral | Issue319開始時に再確認 |
+| EAL-318-007 | adopted | S05 standalone synthetic Markdown | operational dogfood evidence | Complete standalone sourceがbyte exact importされsourceも残る | report.md | Step Evidence S05 / EPE-318-002 | Synthetic body自体はcanonical採用せず、preservation動作の検証claimだけを採用 | direct receipt + hash/byte/cmp | `artifacts/20260714t094952z-chatgpt-output-issue-318-s05-standalone.md`; EPE-318-002 | main orchestrator | EXEC-S05-SPEC-r1 passed | no, committed receipt verified | Safe Artifactとreportをfocused commit |
+| EAL-318-008 | adopted | S05 complete received synthetic inline answer | operational dogfood evidence | Complete received textが無編集capture/importされprovider-original byte claimをしない | report.md | Step Evidence S05 / EPE-318-003 | Synthetic body自体はcanonical採用せず、capture boundaryとpreservation動作の検証claimだけを採用 | direct receipt + hash/byte/cmp | `artifacts/20260714t094952z-01-chatgpt-output-issue-318-s05-inline.md`; EPE-318-003 | main orchestrator | EXEC-S05-SPEC-r1 passed | no, committed receipt verified | Safe Artifactとreportをfocused commit |
+| EAL-318-009 | adopted | S05 unavailable / ZIP / eligibility failure scenarios | operational dogfood evidence | Genuine unavailable exception field、existing ZIP lane、failed import blockを観測 | report.md | Step Evidence S05 / EPE-318-004 | 保存不能を成功扱いせず、synthetic validation claimだけを採用 | direct exception/exit/inventory/canonical-hash evidence | EPE-318-004、57 ZIP tests、`source_ineligible` receipt | main orchestrator | EXEC-S05-SPEC-r1 passed | no, failure correctly blocked | Safe Artifactとreportをfocused commit |
 
 ## 外部原文保存証跡（External Preserved Evidence）
 
@@ -54,6 +57,51 @@ ID: "iss-00318"
 | next_action | Assuranceをapproved planへ再bindし、S00から実行する |
 
 このrecordはexternal evidence laneであり、delegated draft lifecycle、frontmatter、diff guardを適用しない。Body、secret-like value、absolute host pathは記録しない。
+
+### EPE-318-002 — S05 standalone synthetic preservation
+
+| field | value |
+|---|---|
+| output_form | complete standalone Markdown |
+| preservation_status | `imported_byte_exact` |
+| capture_boundary | Issue Workbench sourceからimported Artifactまで。Synthetic bodyはcanonicalへ採用しない |
+| import_kind / storage_identity | `chatgpt-output` / `blank` |
+| source / destination | `.workbench/issue318-s05-standalone.md` / `artifacts/20260714t094952z-chatgpt-output-issue-318-s05-standalone.md`（Issue root相対） |
+| SHA-256 / byte_count | `cd231b9d3b26b5d55d1a9a9e78ca5fff5bdf78a4585a73d5147ad7569af96194` / `199` |
+| committed / warning | `true` / none。Source survives、hash/bytes/`cmp`一致、`cleanup_state=removed` |
+| adoption_status | `adopted` for operational validation claim only; synthetic body is evidence-only |
+| adopter / reviewer_status | main orchestrator / EXEC-S05-SPEC-r1 passed |
+| blocking / next_action | no / Fresh S05 review後にsafe Artifactとreportをcommit |
+
+### EPE-318-003 — S05 complete received inline preservation
+
+| field | value |
+|---|---|
+| output_form | complete received inline answer |
+| preservation_status | `captured_received_text` |
+| capture_boundary | Complete synthetic answer bodyを追加・削除・整形せずWorkbenchへcaptureし、imported Artifactまで同一bytes。Provider-original bytesは主張しない |
+| import_kind / storage_identity | `chatgpt-output` / `blank` |
+| source / destination | `.workbench/issue318-s05-inline.md` / `artifacts/20260714t094952z-01-chatgpt-output-issue-318-s05-inline.md`（Issue root相対） |
+| SHA-256 / byte_count | `91e54f4f45545cc39a9fef8c6a288548f7484e09df86b48198774ac71d65af5a` / `238` |
+| committed / warning | `true` / none。Source survives、hash/bytes/`cmp`一致、`cleanup_state=removed` |
+| adoption_status | `adopted` for operational validation claim only; synthetic body is evidence-only |
+| adopter / reviewer_status | main orchestrator / EXEC-S05-SPEC-r1 passed |
+| blocking / next_action | no / Fresh S05 review後にsafe Artifactとreportをcommit |
+
+### EPE-318-004 — S05 genuinely unavailable exception
+
+| field | value |
+|---|---|
+| output_form | genuinely incomplete or unavailable inline output |
+| preservation_status | `skipped_inline_unavailable` |
+| reason | Synthetic scenario intentionally has no complete source; import cannot be attempted honestly |
+| decision_owner | main orchestrator |
+| nonblocking_rationale | Complete sourceの保存失敗ではなく、製品contentを含まないmanual branch observation。Canonical docsは変更せず後続verificationを継続できる |
+| next_action / revisit_condition | Future real unavailable outputでも同じfield completenessを要求し、complete sourceが得られた場合はunavailableへ分類しない |
+| adoption_status | `adopted` for exception-contract validation only |
+| reviewer_status | EXEC-S05-SPEC-r1 passed |
+
+EPE-318-004にはsource/destination path、hash、byte count、byte-exact claimを記録しない。
 
 ## 目的整合台帳（Objective Alignment Ledger）
 
@@ -105,6 +153,7 @@ ID: "iss-00318"
 | EXEC-S01-REM-r1 | S01 provider docs Japanese-primary remediation | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。二provider docsの見出し・表ラベルだけを日本語主表記へ修復し、四分岐/status/EAL/ZIP/authority semantics不変を承認 |
 | EXEC-S04-CODE-r3 | S04 projection / contract tests | code-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Exact four branches、result matrix、thin caller、ZIP安定検査、7/7 parity、provider/runtime非変更を承認 |
 | EXEC-S04-SPEC-r1 | S04 specification alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。7/7 byte exact projection、single owner、lane/authority semantics不変を承認。独立4-suite実行619 passed |
+| EXEC-S05-SPEC-r1 | S05 manual branch evidence | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。二receipt、unavailable field、ZIP safe lane、failure block、canonical non-mutation、ignored Workbench境界を承認 |
 
 ## Review Remediation History
 
@@ -189,6 +238,17 @@ ID: "iss-00318"
 - Concurrency observation: Main側の同時全件実行は変更対象外のwait timing test一件だけ`polls=1`で550 passed / 1 failed、競合中の単独再実行も同じ。Reviewer側の独立619-test runでは同testを含め全件passしたため、S04起因の回帰ではなく並列負荷下の非再現timing observationとして記録し、test修正は行わない。
 - Review: EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1はfindingsなし、confidence 0.99、`promote`。Runtime import source、ZIP/delegated runtime、Issue317 surfaceにdiffなし。
 - Ledger Note: Approved S04 projection/test契約の実装のみ。日本語主表記修復はS01 remediation commitへ分離済みで、material design decisionやplan amendmentなし。
+
+### S05 Manual four-branch dogfood evidence
+
+- Standalone: Safe synthetic Workbench Markdownを明示import。Receiptは`committed=true`、warningなし、199 bytes、source survives、source/destination SHA-256と`cmp`一致。`imported_byte_exact`の境界をWorkbench sourceからArtifactまでに限定。
+- Inline: Safe complete synthetic answer bodyを無編集capture/import。Receiptは`committed=true`、warningなし、238 bytes、source survives、hash/bytes/`cmp`一致。`captured_received_text`を記録しprovider-original byte identityは非主張。
+- Unavailable: Complete sourceが存在しないsynthetic caseをEPE-318-004へ記録。Reason、decision owner、nonblocking rationale、next actionを持ち、path/hash/bytes/byte-exact claimを持たない。
+- ZIP/tree: Existing safe review/quarantine/stage laneのmanual regression 57 testsがpass。S05 Artifact inventoryはstandalone/inlineの二件だけで、ZIP用single-file import destinationは作成されていない。
+- Failure gate: Approved Workbench外のsafe canonical Markdownをsourceに指定しexit 1、`code=source_ineligible`、`committed=false`、`cleanup_state=not_created`を観測。Unavailableへ再分類せずadoption/rewriteをblockした。
+- Canonical non-mutation: Failure前後のrequirement/design/plan SHA-256はそれぞれ`08268a05...99de`、`bff9d2e4...3e5b`、`58cc90ba...ec18`で一致。Artifact inventoryも成功二件だけ。
+- Git boundary: Workbench二sourceはignoredかつuntrackedのまま保持し、commit対象はsafe Artifact二件とreportだけ。
+- Ledger Note: Approved S05 synthetic observationのみ。Runtime/skill/provider/dogfood/tests/canonical docsを変更せず、material implementation decisionやplan amendmentなし。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
 
 ## Step Contract Closure
@@ -200,6 +260,7 @@ ID: "iss-00318"
 | S02 | C318-01–05、C318-07–08 shared kernel | 四分岐、status/result matrix、content-free handoff、Main/shared責任境界をshared skill一箇所へ固定 | Step Evidence S02、tc318-s02-01–02、EXEC-S02-r1 | passed |
 | S03 | C318-03、C318-05、C318-07–08 caller integration | 三callerの正しい呼出し位置、block伝播、unavailable field、matrix非複製、scope authorityを固定 | Step Evidence S03、tc318-s03-01–02、EXEC-S03-r1 | passed |
 | S04 | C318-04、C318-06、C318-08–10 projection/tests | 7/7 exact projection、contract-sensitive installed tests、ZIP/import非回帰、runtime/provider非変更 | Step Evidence S04、tc318-s04-01–03、EXEC-S04-CODE-r3、EXEC-S04-SPEC-r1 | passed |
+| S05 | C318-01–05、C318-07、C318-11 manual observation | Success二件のbyte/capture boundary、unavailable field、ZIP lane、failure block、canonical non-mutation | Step Evidence S05、EPE-318-002–004、tc318-s05-01–03、EXEC-S05-SPEC-r1 | passed |
 
 ## Test Contract Closure
 
@@ -216,12 +277,15 @@ ID: "iss-00318"
 | tc318-s04-01 | C318-01–09 | red-required | Projection前parity Red、review r1/r2でassertion感度不足を検出 | Exact four branch/result/thin caller/ZIP assertions、focused 8 pass、fresh code/spec review | passed |
 | tc318-s04-02 | C318-09 | structural regression | S00 baseline 7/7 match | Seven `cmp -s` + SHA-256 pair evidence、provider/dogfood byte exact | passed |
 | tc318-s04-03 | C318-04、C318-06、C318-10 | covered-existing | S00 import/ZIP 61 pass | Current final diffでartifact import 4 + ZIP 57、reviewer independent aggregate 619 pass、runtime source diff none | passed |
+| tc318-s05-01 | C318-01–02、C318-07、C318-11 | direct manual | Safe complete Workbench sources二件 | Two committed receipts、source survives、hash/bytes/`cmp`一致、最大二Artifact、EXEC-S05-SPEC-r1 | passed |
+| tc318-s05-02 | C318-03、C318-05、C318-07 | direct manual | Genuine unavailable synthetic case + approved-Workbench外source | Exception field inspection、exit 1 `source_ineligible`/`committed=false`、canonical hashes不変、EXEC-S05-SPEC-r1 | passed |
+| tc318-s05-03 | C318-04 | covered-existing + inventory | Existing safe ZIP fixtures | 57 passed、S05 Artifact inventoryにZIP single-file destinationなし、EXEC-S05-SPEC-r1 | passed |
 
 ## Closure Coverage
 
 | closure ids | current evidence | state | next owner |
 |---|---|---|---|
-| C318-01–05、C318-07 | S01 provider docs、S02 shared kernel、S03 thin hooks、EXEC-S03-r1 | provider contract passed; manual evidence pending | S05 |
+| C318-01–05、C318-07 | S01–S04 contract/tests、S05 direct branch/failure evidence、EXEC-S05-SPEC-r1 | passed | S99 final alignment |
 | C318-06 | S01 external/delegated/ZIP lane separation、S04 regression | projection/test evidence passed | S99 |
 | C318-08 | S02 matrix single-owner、S03 three thin callers、S04 structural tests | projection/test evidence passed | S99 |
 | C318-09 | S04 7/7 byte exact projection | passed | S99 inventory |
@@ -238,6 +302,7 @@ ID: "iss-00318"
 | S03 | none | none | none | S04–S99 obligations remain | EXEC-S03-r1 passed; plan amendment不要 |
 | S01 remediation | none | none | 二provider docsの見出し・表ラベルを日本語主表記へ修復。Preservation/authority semantics不変 | S04–S99 obligations remain | EXEC-S01-REM-r1 passed; material design changeなし |
 | S04 | none | none | Test sensitivityをreview findingsに従い強化。Provider semantics/runtime変更なし | S05–S99 obligations remain | EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed; plan amendment不要 |
+| S05 | none | none | none | S90–S99 obligations remain | EXEC-S05-SPEC-r1 passed; plan amendment不要 |
 
 ## Implementation Delegation Gate
 
@@ -248,6 +313,7 @@ ID: "iss-00318"
 | S02 | delegated | doc-writer | Approved plan S02、provider shared skill | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`だけ | planning skills/dogfood/tests/runtime/report | Exact four branches/status/result/authority inspection、diff-check、stop on scope expansion、worker summary | completed; EXEC-S02-r1 passed |
 | S03 | delegated | doc-writer | Approved plan S03、provider planning skills三件 | Initiative/Epic/Issue planning `SKILL.md`三件だけ | shared/manual skills/dogfood/tests/runtime/report/matrix copy | Three-caller comparison、duplicate scan、scope checklist、diff-check、worker summary | completed; EXEC-S03-r1 passed |
 | S04 | delegated | dev-coder `gpt-5.6-sol` / medium | Approved plan S04、reviewed provider assets、matching dogfood七files、existing tests | Dogfood七files、`test_wrappers.py`、`test_init_update.py` | Provider/runtime/public/package/new test file | Exact branch/result/thin caller/ZIP assertions、7/7 compare、focused/full regression、fresh code/spec review | completed; EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed |
+| S05 | approved-local-execution | main orchestrator | Approved plan S05 safe synthetic manual dogfood | Exact Workbench二files、最大二Artifact、report.md | Runtime/skills/provider/dogfood/tests/canonical docs、real/private content | Receipt/hash/byte/cmp/source survival、exception fields、ZIP tests/inventory、failure/canonical hash、fresh spec review | completed; EXEC-S05-SPEC-r1 passed |
 
 ## Milestone / Commit Candidate Gate
 
@@ -259,6 +325,7 @@ ID: "iss-00318"
 | S03 | EXEC-S03-r1 passed | `docs(chatgpt-first): planning skillへ保存checkpointを接続`; provider planning skills三件 + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit external clean/upstream check必須 |
 | S01 remediation | EXEC-S01-REM-r1 passed | `docs(chatgpt-first): 保存契約文書を日本語主表記へ修復`; provider二docs + report.md | passed | Focused remediation commit hashはpost-commit external evidenceで記録 | S04 working diffを残したままcommitし、provider変更がS04 staged scopeへ混在しないことを確認 |
 | S04 | EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed | `test(chatgpt-first): preservation契約と投影を検証`; dogfood七files + existing tests二files + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit clean/upstream check必須 |
+| S05 | EXEC-S05-SPEC-r1 passed | `docs(issue-318): preservation分岐のdogfood証跡を記録`; safe Artifact二件 + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Workbench sourceをstageしない。Post-commit clean/upstream check必須 |
 
 ## Final QA Gate
 
