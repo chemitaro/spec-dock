@@ -2191,7 +2191,7 @@ class TestInitUpdate(CliRuntimeHarness):
             asset_path = repo_root / asset_rel_path
             assert mirror_path.is_file(), f"missing checked-in dogfooding mirror file: {mirror_path}"
             assert asset_path.is_file(), f"missing provider asset file: {asset_path}"
-            assert mirror_path.read_text(encoding="utf-8") == asset_path.read_text(encoding="utf-8"), (
+            assert mirror_path.read_bytes() == asset_path.read_bytes(), (
                 f"checked-in dogfooding mirror file diverged from provider asset: {mirror_rel_path}"
             )
 
@@ -4605,6 +4605,170 @@ class TestInitUpdate(CliRuntimeHarness):
     def test_checked_in_dogfooding_mirror_docs_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         self._assert_checked_in_dogfooding_mirror_docs_match_provider_assets(repo_root)
+
+    def test_chatgpt_preservation_contract_is_single_owned_and_projected(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        pairs = {
+            "spec-dock/docs/workflow_spec_authoring.md": (
+                "src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md"
+            ),
+            "spec-dock/docs/workflow_chatgpt_authoring_pack.md": (
+                "src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md"
+            ),
+            "spec-dock/docs/authoring/chatgpt-pack.md": (
+                "src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md"
+            ),
+            ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md"
+            ),
+            ".agents/skills/spec-dock-initiative-planning/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md"
+            ),
+            ".agents/skills/spec-dock-epic-planning/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md"
+            ),
+            ".agents/skills/spec-dock-issue-planning/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
+            ),
+        }
+        for dogfood_path, provider_path in pairs.items():
+            assert (repo_root / dogfood_path).read_bytes() == (repo_root / provider_path).read_bytes()
+
+        shared_skill = (repo_root / pairs[".agents/skills/spec-dock-chatgpt-authoring/SKILL.md"]).read_text(
+            encoding="utf-8"
+        )
+        branch_section = shared_skill.split("Choose exactly one branch:", 1)[1].split(
+            "Evaluate an import result", 1
+        )[0]
+        branch_bullets = [line for line in branch_section.splitlines() if line.startswith("- ")]
+        assert len(branch_bullets) == 4
+        preservation_bullets = {
+            line.removeprefix("- ").split(":", 1)[0]: line
+            for line in branch_bullets
+        }
+        branch_contracts = {
+            "Complete standalone Markdown": (
+                "Workbench",
+                "explicitly runs `artifact import chatgpt-output`",
+                "verifies the receipt",
+                "`imported_byte_exact`",
+                "only from the Workbench source to the imported Artifact",
+            ),
+            "Complete received inline answer": (
+                "captures only the complete answer text",
+                "without adding, removing, reformatting, or normalizing content",
+                "explicitly imports it",
+                "`captured_received_text`",
+                "never claim identity with provider-original bytes",
+                "wrapper transcript containing prompts or metadata",
+            ),
+            "Genuinely incomplete or unavailable inline output": (
+                "`skipped_inline_unavailable`",
+                "reason, decision owner, nonblocking rationale, and next action or revisit condition",
+                "Do not record source/destination paths, hashes, byte counts, or a byte-exact claim",
+            ),
+            "ZIP/tree output": (
+                "review, quarantine, stage, and validation lane",
+                "Do not convert it to single-file import",
+                "weaken existing ZIP safety checks",
+            ),
+        }
+        assert set(preservation_bullets) == set(branch_contracts)
+        for branch, tokens in branch_contracts.items():
+            branch_line = preservation_bullets[branch]
+            for token in tokens:
+                assert token in branch_line
+
+        import_result_bullets = [line for line in shared_skill.splitlines() if line.startswith("- `committed=")]
+        assert len(import_result_bullets) == 2
+        import_pass = next(line for line in import_result_bullets if "with no warning" in line)
+        for token in (
+            "`committed=true`",
+            "final repo-relative path",
+            "SHA-256",
+            "byte count",
+            "`import_kind=chatgpt-output`",
+            "`storage_identity=blank`",
+            "preservation result is `pass`",
+        ):
+            assert token in import_pass
+        import_warning = next(
+            line for line in shared_skill.splitlines() if line.startswith("- The same complete receipt")
+        )
+        for token in (
+            "complete receipt",
+            "`committed=true`",
+            "warning",
+            "`pass-with-warning`",
+            "retain the warning",
+            "do not retry automatically",
+            "duplicate import",
+        ):
+            assert token in import_warning
+        import_block = next(line for line in import_result_bullets if "`committed=false`" in line)
+        for token in (
+            "missing receipt field",
+            "eligibility failure",
+            "unresolved semantic completeness",
+            "block adoption and canonical rewrite",
+        ):
+            assert token in import_block
+        failed_import = next(
+            line
+            for line in shared_skill.splitlines()
+            if line.startswith("- Never reclassify a complete source whose import failed")
+        )
+        assert "`skipped_inline_unavailable`" in failed_import
+        assert "canonical adoption completed" in shared_skill
+        assert "reviewer pass, including fresh `spec-reviewer`, `code-reviewer`, or `qa-reviewer` pass" in shared_skill
+        assert "PR delivery" in shared_skill
+
+        for dogfood_path in (
+            ".agents/skills/spec-dock-initiative-planning/SKILL.md",
+            ".agents/skills/spec-dock-epic-planning/SKILL.md",
+            ".agents/skills/spec-dock-issue-planning/SKILL.md",
+        ):
+            caller = (repo_root / dogfood_path).read_text(encoding="utf-8")
+            assert (
+                "Immediately after output is received, and before claim review, Evidence Adoption Ledger "
+                "disposition, or canonical rewrite, invoke the shared `spec-dock-chatgpt-authoring` preservation "
+                "checkpoint."
+            ) in caller
+            assert "Refer to the shared skill for branch, status, and import-result rules" in caller
+            for forbidden_matrix_token in (
+                *(f"- {heading}:" for heading in branch_contracts),
+                "establishes `imported_byte_exact`",
+                "Record `captured_received_text`",
+                "record `skipped_inline_unavailable`",
+                "`committed=true`",
+                "`committed=false`",
+                "`pass-with-warning`",
+                "`import_kind=chatgpt-output`",
+                "`storage_identity=blank`",
+                "missing receipt field",
+                "duplicate import",
+                "review, quarantine, stage, and validation lane",
+                "single-file import",
+                "weaken existing ZIP safety checks",
+            ):
+                assert forbidden_matrix_token not in caller
+
+        workflow = (repo_root / "spec-dock/docs/workflow_spec_authoring.md").read_text(encoding="utf-8")
+        assert (
+            "output received -> preservation checkpoint -> EAL disposition -> canonical rewrite -> fresh reviewer"
+        ) in workflow
+        reference = (repo_root / "spec-dock/docs/authoring/chatgpt-pack.md").read_text(encoding="utf-8")
+        zip_rows = [line for line in reference.splitlines() if line.startswith("|") and "ZIP / tree" in line]
+        assert len(zip_rows) == 1
+        zip_row = zip_rows[0]
+        zip_cells = [cell.strip() for cell in zip_row.strip("|").split("|")]
+        assert len(zip_cells) == 4
+        assert "ZIP / tree" in zip_cells[0]
+        for token in ("review", "quarantine", "stage", "validation lane", "route"):
+            assert token in zip_cells[1]
+        assert "existing review/stage evidence" in zip_cells[2]
+        assert "single-file import conversion" in zip_cells[3]
+        assert "ZIP safety contract" in zip_cells[3]
 
     def test_checked_in_dogfooding_mirror_templates_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

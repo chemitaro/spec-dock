@@ -103,6 +103,8 @@ ID: "iss-00318"
 | EXEC-S02-r1 | S02 shared preservation kernel | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。四分岐、status/result matrix、Main/shared責任境界、既存ZIP safety維持を承認 |
 | EXEC-S03-r1 | S03 thin planning hooks | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。三callerの呼出し位置、block伝播、matrix非複製、scope authority維持を承認 |
 | EXEC-S01-REM-r1 | S01 provider docs Japanese-primary remediation | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。二provider docsの見出し・表ラベルだけを日本語主表記へ修復し、四分岐/status/EAL/ZIP/authority semantics不変を承認 |
+| EXEC-S04-CODE-r3 | S04 projection / contract tests | code-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Exact four branches、result matrix、thin caller、ZIP安定検査、7/7 parity、provider/runtime非変更を承認 |
+| EXEC-S04-SPEC-r1 | S04 specification alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。7/7 byte exact projection、single owner、lane/authority semantics不変を承認。独立4-suite実行619 passed |
 
 ## Review Remediation History
 
@@ -115,7 +117,7 @@ ID: "iss-00318"
 | PLANNING-PLAN-r1 | plan | Step schema/test/pathとglobal mypy boundary | 全step contract/case/pathを具体化しglobal gateをIssue319へrelay | r3 passed |
 | PLANNING-PLAN-r2 | plan | 標準report ledger接続、S90/S99 commit境界 | 全台帳へ接続しS90/S99を独立commit化 | r3 passed |
 | EXEC-S01-r1 | S01 | Planning skillとMain orchestratorの責任が基本原則/図で矛盾 | Planningはcheckpoint呼出し/scope handoff、Mainは保存/EAL/rewriteへ統一 | r2 passed |
-| EXEC-S04-code-r1–r2 | S04 | r1でbranch/result assertion感度不足、r2でprovider修復混在、thin-caller禁止token、exact four-branch、ZIP行表現依存を指摘 | r1指摘後にbranch/result assertionを強化。S01 provider日本語主表記修復をS04から独立させ、EXEC-S01-REM-r1で意味不変を確認。残るtest指摘はS04内で修復してfresh reviewへ戻す | pending fresh S04 code review |
+| EXEC-S04-code-r1–r2 | S04 | r1でbranch/result assertion感度不足、r2でprovider修復混在、thin-caller禁止token、exact four-branch、ZIP行表現依存を指摘 | Branch section exact set、result別token、matrix複製禁止token、表現非依存ZIP row検査へ強化。S01 provider日本語主表記修復はcommit `be841c2a`へ分離し意味不変を確認 | EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed |
 
 ## Planning evidence log
 
@@ -175,6 +177,18 @@ ID: "iss-00318"
 - Scope authority: InitiativeのEpic creation human approval、EpicのIssue slice/node explicit approval、Issueのfresh reviewer/execution handoffを維持。
 - Verification: Three-caller structural comparison、duplicate scan、scope checklist、`git diff --check` pass。Fresh EXEC-S03-r1はfindingsなし、confidence 0.99、`promote`。
 - Ledger Note: Approved S03 caller integrationの最小実装だけでmaterial implementation decisionなし。S04 projection/testsは未変更。
+
+### S04 Dogfood projection and automated contract verification
+
+- Delegation: `dev-coder`を`gpt-5.6-sol` / reasoning `medium`で使用し、matching dogfood七filesとexisting `tests/cli_runtime/test_wrappers.py` / `tests/unit/infra/test_init_update.py`を更新。Provider/runtime sourceはS04で変更していない。
+- Red evidence: Projection前のprovider/dogfood parity assertionは期待理由でRed。Initial code review r1/r2もbranch/result sensitivity、thin caller single-owner、ZIP表現依存、scope混在を検出した。
+- Projection: Provider三docs・四skillsをmatching dogfood七filesへ機械的に投影し、`cmp -s`とSHA-256で7/7 byte exactを確認。
+- Contract sensitivity: Shared checkpoint sectionをexact four branchへ限定し、各branch固有操作/status/禁止事項、`pass` / `pass-with-warning` / `block`、failed import再分類禁止を検査。三planning callerは正当なunavailable handoffを許しつつmatrix固有tokenの複製を拒否する。
+- ZIP stability: Reference tableを`ZIP / tree`を含む一意rowと4 cellsへ分解し、action/evidence/forbiddenの安定tokenを検査。日本語セル全文には依存しない。
+- Verification: Focused wrapper + preservation testは8 passed。Artifact importは4 passed、authoring-pack manual regressionは57 passed。Current final diffに対するfresh spec-reviewer独立4-suite実行は619 passed in 354.82s。
+- Concurrency observation: Main側の同時全件実行は変更対象外のwait timing test一件だけ`polls=1`で550 passed / 1 failed、競合中の単独再実行も同じ。Reviewer側の独立619-test runでは同testを含め全件passしたため、S04起因の回帰ではなく並列負荷下の非再現timing observationとして記録し、test修正は行わない。
+- Review: EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1はfindingsなし、confidence 0.99、`promote`。Runtime import source、ZIP/delegated runtime、Issue317 surfaceにdiffなし。
+- Ledger Note: Approved S04 projection/test契約の実装のみ。日本語主表記修復はS01 remediation commitへ分離済みで、material design decisionやplan amendmentなし。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
 
 ## Step Contract Closure
@@ -185,6 +199,7 @@ ID: "iss-00318"
 | S01 | C318-01–07 docs semantics | 三lane、四branch、lifecycle、authority/secrecy、existing guard維持をprovider docsへ固定 | Step Evidence S01、EXEC-S01-r2 | passed |
 | S02 | C318-01–05、C318-07–08 shared kernel | 四分岐、status/result matrix、content-free handoff、Main/shared責任境界をshared skill一箇所へ固定 | Step Evidence S02、tc318-s02-01–02、EXEC-S02-r1 | passed |
 | S03 | C318-03、C318-05、C318-07–08 caller integration | 三callerの正しい呼出し位置、block伝播、unavailable field、matrix非複製、scope authorityを固定 | Step Evidence S03、tc318-s03-01–02、EXEC-S03-r1 | passed |
+| S04 | C318-04、C318-06、C318-08–10 projection/tests | 7/7 exact projection、contract-sensitive installed tests、ZIP/import非回帰、runtime/provider非変更 | Step Evidence S04、tc318-s04-01–03、EXEC-S04-CODE-r3、EXEC-S04-SPEC-r1 | passed |
 
 ## Test Contract Closure
 
@@ -198,16 +213,19 @@ ID: "iss-00318"
 | tc318-s02-02 | C318-03–05、C318-08 | inspect-only | S01 unavailable/ZIP/failure semantics fixed | Unavailable exception、ZIP existing lane、warning/block/no-reclassification inspection、EXEC-S02-r1 | passed |
 | tc318-s03-01 | C318-03、C318-05、C318-08 | inspect-only | S02 shared checkpoint passed | Three-file invocation placement、blocking propagation、unavailable field completeness、EXEC-S03-r1 | passed |
 | tc318-s03-02 | C318-07–08 | inspect-only | S02 matrix authority passed | Duplicate scan、Initiative/Epic/Issue scope authority checklist、`git diff --check`、EXEC-S03-r1 | passed |
+| tc318-s04-01 | C318-01–09 | red-required | Projection前parity Red、review r1/r2でassertion感度不足を検出 | Exact four branch/result/thin caller/ZIP assertions、focused 8 pass、fresh code/spec review | passed |
+| tc318-s04-02 | C318-09 | structural regression | S00 baseline 7/7 match | Seven `cmp -s` + SHA-256 pair evidence、provider/dogfood byte exact | passed |
+| tc318-s04-03 | C318-04、C318-06、C318-10 | covered-existing | S00 import/ZIP 61 pass | Current final diffでartifact import 4 + ZIP 57、reviewer independent aggregate 619 pass、runtime source diff none | passed |
 
 ## Closure Coverage
 
 | closure ids | current evidence | state | next owner |
 |---|---|---|---|
 | C318-01–05、C318-07 | S01 provider docs、S02 shared kernel、S03 thin hooks、EXEC-S03-r1 | provider contract passed; manual evidence pending | S05 |
-| C318-06 | S01 external/delegated/ZIP lane separation | docs contract passed; projection/test evidence pending | S04 |
-| C318-08 | S02 matrix single-owner、S03 three thin callers | provider contract passed; projection/test evidence pending | S04 |
-| C318-09 | S00 7/7 pair equality | baseline fixed | S04 |
-| C318-04、C318-10 | S00 import/ZIP 61 pass、runtime diff none | baseline fixed | S04/S99 |
+| C318-06 | S01 external/delegated/ZIP lane separation、S04 regression | projection/test evidence passed | S99 |
+| C318-08 | S02 matrix single-owner、S03 three thin callers、S04 structural tests | projection/test evidence passed | S99 |
+| C318-09 | S04 7/7 byte exact projection | passed | S99 inventory |
+| C318-04、C318-10 | S04 import/ZIP 61 pass、independent aggregate 619 pass、runtime diff none | passed | S05/S99 |
 | C318-11 | Planning Deferred PR Delivery Gate | planned | S90/S99 |
 
 ## Closure Delta
@@ -219,6 +237,7 @@ ID: "iss-00318"
 | S02 | none | none | none | S03–S99 obligations remain | EXEC-S02-r1 passed; plan amendment不要 |
 | S03 | none | none | none | S04–S99 obligations remain | EXEC-S03-r1 passed; plan amendment不要 |
 | S01 remediation | none | none | 二provider docsの見出し・表ラベルを日本語主表記へ修復。Preservation/authority semantics不変 | S04–S99 obligations remain | EXEC-S01-REM-r1 passed; material design changeなし |
+| S04 | none | none | Test sensitivityをreview findingsに従い強化。Provider semantics/runtime変更なし | S05–S99 obligations remain | EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed; plan amendment不要 |
 
 ## Implementation Delegation Gate
 
@@ -228,6 +247,7 @@ ID: "iss-00318"
 | S01 | delegated | doc-writer | Approved plan S01、provider三docs | provider三docsだけ | skills/dogfood/tests/runtime/public/package/report | Docs inspection、diff-check、stop on scope expansion、worker summary/Ledger Note | completed; EXEC-S01-r2 passed |
 | S02 | delegated | doc-writer | Approved plan S02、provider shared skill | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`だけ | planning skills/dogfood/tests/runtime/report | Exact four branches/status/result/authority inspection、diff-check、stop on scope expansion、worker summary | completed; EXEC-S02-r1 passed |
 | S03 | delegated | doc-writer | Approved plan S03、provider planning skills三件 | Initiative/Epic/Issue planning `SKILL.md`三件だけ | shared/manual skills/dogfood/tests/runtime/report/matrix copy | Three-caller comparison、duplicate scan、scope checklist、diff-check、worker summary | completed; EXEC-S03-r1 passed |
+| S04 | delegated | dev-coder `gpt-5.6-sol` / medium | Approved plan S04、reviewed provider assets、matching dogfood七files、existing tests | Dogfood七files、`test_wrappers.py`、`test_init_update.py` | Provider/runtime/public/package/new test file | Exact branch/result/thin caller/ZIP assertions、7/7 compare、focused/full regression、fresh code/spec review | completed; EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed |
 
 ## Milestone / Commit Candidate Gate
 
@@ -238,6 +258,7 @@ ID: "iss-00318"
 | S02 | EXEC-S02-r1 passed | `docs(chatgpt-first): 共有preservation checkpointを追加`; provider shared skill + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit external clean/upstream check必須 |
 | S03 | EXEC-S03-r1 passed | `docs(chatgpt-first): planning skillへ保存checkpointを接続`; provider planning skills三件 + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit external clean/upstream check必須 |
 | S01 remediation | EXEC-S01-REM-r1 passed | `docs(chatgpt-first): 保存契約文書を日本語主表記へ修復`; provider二docs + report.md | passed | Focused remediation commit hashはpost-commit external evidenceで記録 | S04 working diffを残したままcommitし、provider変更がS04 staged scopeへ混在しないことを確認 |
+| S04 | EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed | `test(chatgpt-first): preservation契約と投影を検証`; dogfood七files + existing tests二files + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit clean/upstream check必須 |
 
 ## Final QA Gate
 
