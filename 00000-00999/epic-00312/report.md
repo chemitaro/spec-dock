@@ -18,7 +18,7 @@ ID: "epic-00312"
   - Human承認済み5-Issue分割を実行し、GitHub #315〜#318はclosed、#319/#312はopen。Issue319 S00〜S05はcommit/push済みで、local distribution/docs/full/static/manual gatesはpassした。
   - Workbench ignore/opacity、explicit scoped copy、byte-preserving Artifact import、ChatGPT-first preservation、installed consumer/manual integrationまで実装済み。S90 closureはfresh spec reviewでpassed/promote、confidence 0.99、findings 0となった。
 - 次のマイルストーン:
-  - S90は`672cb23e`でcommit/push済み、clean/upstream `0 0`。Issue319 S99 QA/code/spec r2はordered full pass、findings 0、spec confidence 0.99。次はS99 ledger commit/push/clean → S100 PR作成・Ubuntu/required checks・review threads・mergeability/base drift観測・Issue Finish。
+  - Issue319 S99は`5eee0da4`でcommit/push済み、clean/upstream `0 0`。S100 Phase AでPR [#323](https://github.com/chemitaro/spec-dock/pull/323)をready/open/unmergedとして作成した。次のreport commitをfinal observation HEADとしてからUbuntu/check/review/mergeability/base driftを観測する。
 - ブロッカー:
   - C319-12はfull pass。C319-09/13/14とterminal C319-15/16はS100までpendingであり、PR merge-prepared claimとIssue/Epic finishはactual observationまで不可。
 
@@ -55,7 +55,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-019 | 採用（`adopted`） | Issue317 final report / GitHub #317 | E-RQ-019〜023、E-AC-013〜015 Artifact import | Single Markdown、opaque bytes、blank coexistence、collision/no-overwrite、source survival/publication safetyを実装・review・commit/pushしIssue closed | Issue317 C317-01〜11、final QA/code/spec gates | Issue319 package/manual/full evidenceへ採用済み |
 | EAL-020 | 採用（`adopted`） | Issue318 final report / GitHub #318 | E-RQ-024、E-AC-016 preservation workflow | Preservation-before-adoption、EAL/canonical rewrite/fresh review、external/delegated/ZIP lane分離を実装・review・commit/pushしIssue closed | Issue318 C318-01〜11、final QA/code/spec gates | Issue319 planning/manual flowへ採用済み |
 | EAL-021 | 採用（`adopted`） | Issue319 S00〜S99 reports / current repo audit | Distribution/docs/full/static/manual/Epic closure | Latest main、candidate wheel、fresh/existing consumer、dogfood parity、public docs、full/static、installed copy→import→EAL→rewrite、40-ID closureをcurrent headで実証 | Commits `7a3793de`〜`672cb23e`; S90 committed/clean; S99-QA-r1 / S99-CODE-r1 / S99-SPEC-r2 passed on `HEAD 672cb23e`; findings 0、spec confidence 0.99 | C319-12 full pass。S99 ledger commit/push/clean後S100へ進む |
-| EAL-022 | 延期（`deferred`） | Issue319 S100 live GitHub gate | PR URL、Ubuntu actual run、required checks、review threads、mergeability/base drift、Issue/Epic finish | PR未作成のため推測しない。S90/S99にはnon-blockingだがmerge-prepared/finishにはblocking | Current GitHub #319/#312 open、PR URLなし | S100でactual observationし、terminal evidenceへ更新する |
+| EAL-022 | 延期（`deferred`） | Issue319 S100 live GitHub gate | PR URL、Ubuntu actual run、Codex fixed review、required checks、review threads、mergeability/base drift、Issue/Epic finish | PR #323はready/open/unmergedで作成済み。External observationは未実施のため推測しない | [PR #323](https://github.com/chemitaro/spec-dock/pull/323)、pre-observation HEAD `5eee0da4` | 次のreport commitをfinal observation HEADとしてpush後、actual stateを観測しterminal evidenceへ更新する |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -126,9 +126,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - `iss-00316` / GitHub #316: closed。Explicit scoped Workbench copy/source-wins handoff。
 - `iss-00317` / GitHub #317: closed。Byte-preserving `chatgpt-output` Artifact import。
 - `iss-00318` / GitHub #318: closed。ChatGPT-first preservation/EAL/canonical rewrite workflow。
-- `iss-00319` / GitHub #319: open。S00〜S90 committed/pushed、S99 QA/code/spec r2 ordered full pass。S99 ledger commit candidate、S100 pending。
+- `iss-00319` / GitHub #319: open。S00〜S99 committed/pushed。S100 Phase A complete、external observation pending。
 - Epic GitHub #312: open。Issue319 terminal delivery後にclose判断する。
-- PR: 未作成。URL、checks、review、mergeabilityはS100でactual stateを記録し、推測しない。
+- PR: [#323](https://github.com/chemitaro/spec-dock/pull/323) ready/open/unmerged。Ubuntu provider-tests、Codex fixed review、required checks、review threads、mergeability、base driftは未観測であり、推測しない。
 
 ## Requirement / Acceptance content-free closure mapping（必須）
 
@@ -155,7 +155,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | Risk | State | Blocking boundary | Next action |
 |---|---|---|---|
-| PR Ubuntu actual run / required checks / review threads / mergeability / base drift未観測 | pending | S90/S99 nonblocking。Merge-prepared/Issue/Epic finish blocking | S100でPR作成後、final headを観測・repairする |
+| PR Ubuntu actual run / Codex fixed review / required checks / review threads / mergeability / base drift未観測 | pending | PR作成は完了。Merge-prepared/Issue/Epic finish blocking | 次のreport commitをfinal observation HEADとしてpush後に観測・repairする |
 | Byte-preserved raw Artifactの既存trailing whitespace | accepted nonblocking | 原文不変契約により修正しない。Product/runtime差分ではない | Terminal reviewで既知例外として維持 |
 | sdist `SOURCES.txt`にcache path文字列が残るがarchive memberは0 | accepted nonblocking | Candidate/sdist再build wheelにcache member 0。Consumer behavior影響なし | Packaging contract変更時に再評価 |
 | Scope expansion | closed by contract | Version/lock/migration/new deps/root bulk/sync/classifier/typed tokenはnon-goal | Material necessity発見時だけ新規decision/reviewへ戻す |
@@ -169,9 +169,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
   - なし。PR/CI external observationは未実施。
 
 ## フォローアップ（別Issue化） (必須)
-- 新規follow-up Issueなし。残作業は既存`iss-00319`のS99 ledger commit/push/clean、S100 PR/CI/review/mergeability/finishである。
+- 新規follow-up Issueなし。残作業は既存`iss-00319`のS100 report commit/push、PR #323のUbuntu/CI/Codex review/thread/mergeability/base drift観測、finishである。
 - PR mergeはuser明示指示なしに行わない。
 
 ## 省略/例外メモ (必須)
 - S90はfresh spec-reviewer passed/promote後、`672cb23e`でcommit/push/clean済み。S99 QA/code/spec r2もpassed/promoteし、C319-12はfull pass。S100前のterminal項目とEpic completionはself-passしない。
-- EAL-022だけがdeferred。S100は未完了である。
+- EAL-022だけがdeferred。S100 Phase Aは完了したがexternal observationとterminal closureは未完了であり、no-merge契約を維持する。
