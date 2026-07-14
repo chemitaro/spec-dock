@@ -47,6 +47,178 @@ class TestAuthoringCli(CliRuntimeHarness):
             for _args, command, _next_issue in _DEFERRED_COMMANDS:
                 assert command in p.stdout
 
+    def test_authoring_preflight_help_exposes_optional_output_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            p = self._run_runtime_capture(target, ["authoring", "preflight", "github-sync", "--help"])
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert "--output-dir" in p.stdout
+            assert "--report-path" not in p.stdout
+
+    def test_authoring_preflight_publishes_pass_receipt_to_fixed_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo = _create_synced_git_repo(root)
+            output = root / "evidence"
+            output.mkdir()
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--source-path",
+                    "source.txt",
+                    "--output-dir",
+                    str(output),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(p)
+            receipt = json.loads((output / "github-sync-preflight.receipt.json").read_text(encoding="utf-8"))
+            assert p.returncode == 0, p.stdout + p.stderr
+            assert payload == receipt
+            assert receipt["status"] == "pass"
+            assert receipt["publication"] == {
+                "requested": True,
+                "status": "published",
+                "filename": "github-sync-preflight.receipt.json",
+                "blocker": None,
+            }
+            assert receipt["receipt_digest"]["algorithm"] == "sha256"
+            digest = receipt.pop("receipt_digest")
+            canonical = json.dumps(
+                receipt,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            assert digest["value"] == hashlib.sha256(canonical).hexdigest()
+
+    def test_authoring_preflight_publishes_blocked_receipt_and_text_stdout_stays_human_readable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo = _create_synced_git_repo(root)
+            output = root / "evidence"
+            output.mkdir()
+            _git(repo, "remote", "remove", "origin")
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--source-path",
+                    "source.txt",
+                    "--output-dir",
+                    str(output),
+                ],
+            )
+
+            receipt = json.loads((output / "github-sync-preflight.receipt.json").read_text(encoding="utf-8"))
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert p.stdout.startswith("spec-dock: authoring preflight github-sync\n")
+            assert "status=blocked" in p.stdout
+            assert "publication_status=published" in p.stdout
+            assert receipt["status"] == "blocked"
+            assert "origin_missing" in receipt["blockers"]
+
+    def test_authoring_preflight_publishes_stale_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo = _create_synced_git_repo(root)
+            output = root / "evidence"
+            output.mkdir()
+
+            p = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--expected-source-hash",
+                    "stale-hash",
+                    "--output-dir",
+                    str(output),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            receipt = json.loads((output / "github-sync-preflight.receipt.json").read_text(encoding="utf-8"))
+            assert p.returncode == 1, p.stdout + p.stderr
+            assert receipt["status"] == "stale"
+            assert receipt["publication"]["status"] == "published"
+            assert "source_hash_mismatch" in receipt["blockers"]
+
+    def test_authoring_preflight_rejects_repo_local_and_non_owned_receipt_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo = _create_synced_git_repo(root)
+            repo_output = repo / "evidence"
+            repo_output.mkdir()
+            outside = root / "outside"
+            outside.mkdir()
+            target = outside / "github-sync-preflight.receipt.json"
+            target.write_text("user-owned\n", encoding="utf-8")
+
+            repo_local = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--output-dir",
+                    str(repo_output),
+                    "--format",
+                    "json",
+                ],
+            )
+            non_owned = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--output-dir",
+                    str(outside),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            repo_payload = _json_stdout(repo_local)
+            non_owned_payload = _json_stdout(non_owned)
+            assert repo_local.returncode == 1
+            assert repo_payload["publication"]["status"] == "rejected"
+            assert repo_payload["publication"]["blocker"] == "receipt_output_inside_repository"
+            assert not (repo_output / "github-sync-preflight.receipt.json").exists()
+            assert non_owned.returncode == 1
+            assert non_owned_payload["publication"]["blocker"] == "non_owned_existing_receipt_target"
+            assert target.read_text(encoding="utf-8") == "user-owned\n"
+
     def test_authoring_pack_prepare_help_exposes_inputs_without_force(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -3860,6 +4032,189 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["source_hash_mismatch_checked"] is False
             assert payload["source_paths"] == ["source.txt"]
             assert "source.txt" in payload["source_hashes"]
+            assert payload["schema_version"] == 1
+            assert payload["receipt_kind"] == "spec-dock.authoring.github-sync-preflight"
+            assert payload["fetch"]["status"] == "success"
+            assert payload["fetch"]["policy_id"] == "origin-fetch-v1"
+            assert payload["fetch"]["executable"] == "git"
+            assert payload["fetch"]["argv"] == ["fetch", "--prune", "origin"]
+            assert payload["fetch"]["attempts"] == [
+                {
+                    "attempt_number": 1,
+                    "duration_ms": payload["fetch"]["attempts"][0]["duration_ms"],
+                    "return_code": 0,
+                    "termination": "exited",
+                    "failure_class": None,
+                    "confidence": "certain",
+                    "retryable": False,
+                    "diagnostic": {
+                        "code": None,
+                        "excerpt": None,
+                        "redacted_sha256": None,
+                        "source_byte_count": 0,
+                        "excerpt_byte_count": 0,
+                        "truncated": False,
+                        "redaction_applied": False,
+                    },
+                }
+            ]
+            assert payload["freshness"]["remote_head_disposition"] == "fetched_remote_tracking_ref"
+            assert payload["freshness"]["concurrent_change_check"] == "stable"
+            assert payload["freshness"]["snapshot_id"] == payload["freshness"]["final_guard_snapshot_id"]
+            assert payload["repository"] == {
+                "normalized_origin": payload["repository"]["normalized_origin"],
+                "branch": "main",
+                "local_head": payload["local_head"],
+                "upstream": "origin/main",
+                "effective_ref": payload["effective_ref"],
+                "remote_head": payload["remote_head"],
+                "remote_head_disposition": "fetched_remote_tracking_ref",
+                "worktree_state": [],
+                "source_manifest": {
+                    "source_manifest_hash": payload["source_manifest_hash"],
+                    "source_paths": payload["source_paths"],
+                    "source_hashes": payload["source_hashes"],
+                },
+                "snapshot_id": payload["freshness"]["snapshot_id"],
+            }
+            assert payload["repository"]["normalized_origin"].startswith("local-path-sha256:")
+            assert str(repo.parent / "remote.git") not in str(payload)
+
+            text_result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                    "--source-path",
+                    "source.txt",
+                ],
+            )
+            assert text_result.returncode == 0, text_result.stdout + text_result.stderr
+            assert "status=pass" in text_result.stdout
+            assert "evidence_mode=github-synced" in text_result.stdout
+            assert "sync_state=synced" in text_result.stdout
+            assert "github_sync=verified" in text_result.stdout
+            assert "receipt_schema_version=1" in text_result.stdout
+            assert "receipt_kind=spec-dock.authoring.github-sync-preflight" in text_result.stdout
+            assert "fetch_status=success" in text_result.stdout
+            assert "fetch_attempt_count=1" in text_result.stdout
+            assert "fetch_failure_class=null" in text_result.stdout
+            assert "fetch_classification_confidence=certain" in text_result.stdout
+            assert "fetch_timeout_seconds=60.0" in text_result.stdout
+            assert "repository_branch=main" in text_result.stdout
+            assert "repository_upstream=origin/main" in text_result.stdout
+            assert "repository_remote_head_disposition=fetched_remote_tracking_ref" in text_result.stdout
+
+    def test_authoring_preflight_injected_spawn_failure_is_typed_and_blocked(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+        from spec_dock_runtime.domain.authoring_pack.preflight_contract import GitProcessOutcome
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+
+            def spawn_failure(_request):
+                return GitProcessOutcome(
+                    return_code=None,
+                    termination="spawn_error",
+                    stdout=b"",
+                    stderr=b"raw traceback must remain private",
+                    duration_ms=3,
+                    os_error_kind="FileNotFoundError",
+                )
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=("source.txt",)),
+                fetch_executor=spawn_failure,
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "blocked"
+            assert payload["github_sync"] == "failed"
+            assert "origin_fetch_failed" in payload["blockers"]
+            assert payload["fetch"]["policy_id"] == "origin-fetch-v1"
+            assert payload["fetch"]["status"] == "failed"
+            assert payload["fetch"]["attempts"][0]["failure_class"] == "spawn_failure"
+            assert payload["fetch"]["attempts"][0]["return_code"] is None
+            assert "raw traceback" not in str(payload)
+
+    def test_authoring_preflight_redacts_file_url_origin_path_in_json_and_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            remote_path = (repo.parent / "remote.git").resolve()
+            _git(repo, "remote", "set-url", "origin", remote_path.as_uri())
+            expected_origin = f"local-path-sha256:{hashlib.sha256(str(remote_path).encode()).hexdigest()}"
+
+            payload = _run_preflight_json(self, repo)
+
+            assert payload["status"] == "pass"
+            assert payload["repository"]["normalized_origin"] == expected_origin
+            assert str(remote_path) not in str(payload)
+
+            text_result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "preflight",
+                    "github-sync",
+                    "--repo-root",
+                    str(repo),
+                ],
+            )
+            assert text_result.returncode == 0, text_result.stdout + text_result.stderr
+            assert f"repository_normalized_origin={expected_origin}" in text_result.stdout
+            assert str(remote_path) not in text_result.stdout
+
+    def test_authoring_preflight_retries_transient_fetch_with_same_shape_then_passes(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+        from spec_dock_runtime.domain.authoring_pack.preflight_contract import GitProcessOutcome
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            requests = []
+            outcomes = iter([
+                GitProcessOutcome(1, "exited", b"", b"Connection reset by peer", 2),
+                GitProcessOutcome(0, "exited", b"", b"", 3),
+            ])
+            sleeps: list[float] = []
+
+            def fake_fetch(request):
+                requests.append(request)
+                return next(outcomes)
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=("source.txt",)),
+                fetch_executor=fake_fetch,
+                fetch_sleeper=sleeps.append,
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "pass"
+            assert payload["fetch"]["status"] == "success"
+            assert len(payload["fetch"]["attempts"]) == 2
+            assert payload["fetch"]["attempts"][0]["failure_class"] == "transient_transport"
+            assert payload["fetch"]["attempts"][0]["retryable"] is True
+            assert requests[0] is requests[1]
+            assert requests[0].argv == requests[1].argv == ("fetch", "--prune", "origin")
+            assert sleeps == [0.25]
 
     def test_authoring_preflight_github_sync_checks_default_source_path_symlinks(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3895,6 +4250,12 @@ class TestAuthoringCli(CliRuntimeHarness):
             script = repo / "spec-dock" / "scripts" / "spec-dock"
             env = self._runtime_env(repo, {"PATH": os.environ.get("PATH", "")})
             env.pop("PYTHONDONTWRITEBYTECODE", None)
+            runtime_root = repo / "spec-dock" / "scripts" / "spec_dock_runtime"
+            cache_before = {
+                path.relative_to(runtime_root)
+                for path in runtime_root.rglob("*")
+                if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}
+            }
 
             p = subprocess.run(
                 [
@@ -3921,9 +4282,12 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert p.returncode == 0, p.stdout + p.stderr
             assert payload["status"] == "pass"
             assert "untracked_files" not in payload["blockers"]
-            runtime_root = repo / "spec-dock" / "scripts" / "spec_dock_runtime"
-            assert not any(path.name == "__pycache__" for path in runtime_root.rglob("__pycache__"))
-            assert not any(path.suffix in {".pyc", ".pyo"} for path in runtime_root.rglob("*"))
+            cache_after = {
+                path.relative_to(runtime_root)
+                for path in runtime_root.rglob("*")
+                if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}
+            }
+            assert cache_after - cache_before == set()
             assert _git(repo, "status", "--porcelain=v1").stdout == ""
 
     @pytest.mark.parametrize(
@@ -3987,6 +4351,203 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert payload["status"] == "stale"
             assert "behind_remote" in payload["blockers"]
             assert payload["local_head"] != payload["remote_head"]
+            assert payload["freshness"]["remote_head_disposition"] == "fetched_remote_tracking_ref"
+            assert payload["freshness"]["concurrent_change_check"] == "stable"
+
+    def test_authoring_preflight_blocks_source_change_during_post_fetch_snapshot(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            changed = False
+
+            def mutate_after_first_hash(phase: str, observed_repo: Path) -> None:
+                nonlocal changed
+                if phase == "source_file_hashed" and not changed:
+                    (observed_repo / "source.txt").write_text("changed during snapshot\n", encoding="utf-8")
+                    changed = True
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=("source.txt",)),
+                snapshot_hook=mutate_after_first_hash,
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "blocked"
+            assert payload["github_sync"] == "failed"
+            assert "concurrent_repo_change" in payload["blockers"]
+            assert payload["freshness"]["concurrent_change_check"] == "changed"
+            assert payload["freshness"]["snapshot_id"] != payload["freshness"]["final_guard_snapshot_id"]
+
+    def test_authoring_preflight_blocks_head_change_before_final_guard(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+
+            def commit_before_guard(phase: str, observed_repo: Path) -> None:
+                if phase == "before_final_guard":
+                    _git(observed_repo, "commit", "--allow-empty", "-m", "concurrent commit")
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=("source.txt",)),
+                snapshot_hook=commit_before_guard,
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "blocked"
+            assert "concurrent_repo_change" in payload["blockers"]
+            assert payload["freshness"]["concurrent_change_check"] == "changed"
+
+    def test_authoring_preflight_blocks_remote_tracking_ref_change_before_final_guard(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            tree = _git(repo, "rev-parse", "HEAD^{tree}").stdout.strip()
+            alternate = _git(repo, "commit-tree", tree, "-m", "concurrent remote ref").stdout.strip()
+
+            def move_remote_ref(phase: str, observed_repo: Path) -> None:
+                if phase == "before_final_guard":
+                    _git(observed_repo, "update-ref", "refs/remotes/origin/main", alternate)
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=("source.txt",)),
+                snapshot_hook=move_remote_ref,
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "blocked"
+            assert "concurrent_repo_change" in payload["blockers"]
+            assert payload["freshness"]["concurrent_change_check"] == "changed"
+
+    def test_authoring_preflight_marks_cached_remote_ref_unverified_after_fetch_failure(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+        from spec_dock_runtime.domain.authoring_pack.preflight_contract import GitProcessOutcome
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=("source.txt",)),
+                fetch_executor=lambda _request: GitProcessOutcome(
+                    128, "exited", b"", b"fatal: repository not found", 2
+                ),
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "blocked"
+            assert payload["github_sync"] == "failed"
+            assert payload["remote_head"]
+            assert payload["freshness"]["remote_head_disposition"] == "unverified_cache"
+            assert payload["freshness"]["concurrent_change_check"] == "stable"
+
+    def test_authoring_preflight_local_context_does_not_enter_fetch_or_snapshot_transaction(self) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+
+            def unexpected_fetch(_request):
+                raise AssertionError("local-context must not fetch")
+
+            result = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(
+                    repo_root=repo,
+                    evidence_mode="local-context",
+                    provided_context_paths=("source.txt",),
+                    unsynced_reason="offline fixture",
+                ),
+                fetch_executor=unexpected_fetch,
+            )
+            payload = result.to_dict()
+
+            assert payload["status"] == "pass"
+            assert payload["github_sync"] == "not_verified"
+            assert payload["sync_state"] == "local_context"
+            assert payload["freshness"]["concurrent_change_check"] == "not_applicable"
+            assert payload["freshness"]["remote_head_disposition"] == "not_applicable"
+
+    @pytest.mark.parametrize(
+        ("guard_case", "expected_blocker"),
+        (
+            ("unsafe-source", "unsafe_source_path:absolute-outside-repo:"),
+            ("missing-source", "missing_source_path:missing.py"),
+            ("detached-head", "detached_head"),
+            ("origin-missing", "origin_missing"),
+        ),
+    )
+    def test_authoring_preflight_request_and_repository_guards_do_not_enter_fetch(
+        self, guard_case: str, expected_blocker: str
+    ) -> None:
+        runtime_root = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+        if str(runtime_root) not in sys.path:
+            sys.path.insert(0, str(runtime_root))
+        from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
+            GitHubSyncPreflightRequest,
+            run_github_sync_preflight,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = _create_synced_git_repo(root)
+            source_paths = ("source.txt",)
+            if guard_case == "unsafe-source":
+                outside = root / "outside.txt"
+                outside.write_text("outside\n", encoding="utf-8")
+                source_paths = (str(outside),)
+            elif guard_case == "missing-source":
+                source_paths = ("missing.py",)
+            elif guard_case == "detached-head":
+                _git(repo, "checkout", "--detach")
+            else:
+                _git(repo, "remote", "remove", "origin")
+
+            fetch_calls = []
+
+            def unexpected_fetch(request):
+                fetch_calls.append(request)
+                raise AssertionError("T0/T1 guard failure must not enter fetch")
+
+            payload = run_github_sync_preflight(
+                GitHubSyncPreflightRequest(repo_root=repo, source_paths=source_paths),
+                fetch_executor=unexpected_fetch,
+            ).to_dict()
+
+            assert payload["status"] == "blocked"
+            assert any(blocker.startswith(expected_blocker) for blocker in payload["blockers"])
+            assert payload["fetch"]["status"] == "not_started"
+            assert fetch_calls == []
 
     def test_authoring_preflight_github_sync_blocks_missing_explicit_source_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -4385,7 +4946,9 @@ class TestAuthoringCli(CliRuntimeHarness):
             ]
 
             for p in outputs:
-                output = (p.stdout + p.stderr).lower()
+                output = "\n".join(
+                    line for line in (p.stdout + p.stderr).lower().splitlines() if not line.startswith("fetch_status=")
+                )
                 for forbidden in _FORBIDDEN_AUTHORITY_CLAIMS:
                     assert forbidden not in output
 
@@ -4427,6 +4990,196 @@ class TestAuthoringCli(CliRuntimeHarness):
         assert "spec-dock/scripts/spec_dock_runtime/commands/authoring.py" in payload["source_paths"]
         assert all("__pycache__" not in path for path in payload["source_hashes"])
         assert all(not path.endswith(".pyc") for path in payload["source_hashes"])
+
+    @pytest.mark.parametrize(
+        ("case", "extra_args", "expected_status", "expected_returncode", "expected_blocker"),
+        (
+            ("pass", (), "pass", 0, None),
+            ("file-origin", (), "pass", 0, None),
+            ("origin-missing", (), "blocked", 1, "origin_missing"),
+            ("source-hash-mismatch", ("--expected-source-hash", "stale-hash"), "stale", 1, "source_hash_mismatch"),
+        ),
+    )
+    def test_authoring_preflight_provider_and_dogfood_runtime_paths_publish_equivalent_receipts(
+        self,
+        case: str,
+        extra_args: tuple[str, ...],
+        expected_status: str,
+        expected_returncode: int,
+        expected_blocker: str | None,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        dogfood_script = repo_root / "spec-dock" / "scripts" / "spec-dock"
+        runtime_root = repo_root / "spec-dock" / "scripts" / "spec_dock_runtime"
+        cache_before = {
+            path.relative_to(runtime_root)
+            for path in runtime_root.rglob("*")
+            if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo = _create_synced_git_repo(root)
+            provider_output = root / "provider-evidence"
+            dogfood_output = root / "dogfood-evidence"
+            provider_output.mkdir()
+            dogfood_output.mkdir()
+            if case == "origin-missing":
+                _git(repo, "remote", "remove", "origin")
+            elif case == "file-origin":
+                _git(repo, "remote", "set-url", "origin", (repo.parent / "remote.git").resolve().as_uri())
+
+            command_args = [
+                "authoring",
+                "preflight",
+                "github-sync",
+                "--repo-root",
+                str(repo),
+                "--source-path",
+                "source.txt",
+                *extra_args,
+            ]
+
+            provider = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    *command_args,
+                    "--output-dir",
+                    str(provider_output),
+                    "--format",
+                    "json",
+                ],
+            )
+            dogfood = subprocess.run(
+                [
+                    sys.executable,
+                    str(dogfood_script),
+                    *command_args,
+                    "--output-dir",
+                    str(dogfood_output),
+                    "--format",
+                    "json",
+                ],
+                cwd=str(repo),
+                env={"PATH": os.environ.get("PATH", "")},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            provider_payload = _json_stdout(provider)
+            dogfood_payload = _json_stdout(dogfood)
+            provider_receipt = json.loads(
+                (provider_output / "github-sync-preflight.receipt.json").read_text(encoding="utf-8")
+            )
+            dogfood_receipt = json.loads(
+                (dogfood_output / "github-sync-preflight.receipt.json").read_text(encoding="utf-8")
+            )
+
+            assert provider.returncode == expected_returncode, provider.stdout + provider.stderr
+            assert dogfood.returncode == expected_returncode, dogfood.stdout + dogfood.stderr
+            assert provider_payload == provider_receipt
+            assert dogfood_payload == dogfood_receipt
+            for field in (
+                "schema_version",
+                "receipt_kind",
+                "status",
+                "evidence_mode",
+                "sync_state",
+                "authority",
+                "requested_ref",
+                "effective_ref",
+                "local_head",
+                "remote_head",
+                "source_manifest_hash",
+                "source_hashes",
+                "github_sync",
+                "blockers",
+                "remediation",
+                "publication",
+                "repository",
+            ):
+                assert dogfood_payload[field] == provider_payload[field], field
+            assert provider_payload["status"] == expected_status
+            assert provider_payload["publication"] == {
+                "requested": True,
+                "status": "published",
+                "filename": "github-sync-preflight.receipt.json",
+                "blocker": None,
+            }
+            if expected_blocker is not None:
+                assert expected_blocker in provider_payload["blockers"]
+            if case == "file-origin":
+                assert provider_payload["repository"]["normalized_origin"].startswith("local-path-sha256:")
+                assert str((repo.parent / "remote.git").resolve()) not in str(provider_payload)
+            for field in (
+                "snapshot_id",
+                "final_guard_snapshot_id",
+                "concurrent_change_check",
+                "remote_head_disposition",
+            ):
+                assert dogfood_payload["freshness"][field] == provider_payload["freshness"][field], field
+            assert dogfood_payload["fetch"]["status"] == provider_payload["fetch"]["status"]
+            assert len(dogfood_payload["fetch"]["attempts"]) == len(provider_payload["fetch"]["attempts"])
+
+            if case == "pass":
+                provider_pack = root / "provider-pack"
+                dogfood_pack = root / "dogfood-pack"
+                provider_prepare = _run_authoring_capture(
+                    self,
+                    repo,
+                    [
+                        "authoring",
+                        "pack",
+                        "prepare",
+                        "--preflight",
+                        str(provider_output / "github-sync-preflight.receipt.json"),
+                        "--output-dir",
+                        str(provider_pack),
+                        "--format",
+                        "json",
+                    ],
+                )
+                dogfood_prepare = subprocess.run(
+                    [
+                        sys.executable,
+                        str(dogfood_script),
+                        "authoring",
+                        "pack",
+                        "prepare",
+                        "--preflight",
+                        str(provider_output / "github-sync-preflight.receipt.json"),
+                        "--output-dir",
+                        str(dogfood_pack),
+                        "--format",
+                        "json",
+                    ],
+                    cwd=str(repo),
+                    env={"PATH": os.environ.get("PATH", "")},
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                assert provider_prepare.returncode == dogfood_prepare.returncode == 0
+                provider_provenance = json.loads((provider_pack / "provenance.json").read_text(encoding="utf-8"))
+                dogfood_provenance = json.loads((dogfood_pack / "provenance.json").read_text(encoding="utf-8"))
+                provider_stale_if = json.loads((provider_pack / "stale-if.json").read_text(encoding="utf-8"))
+                dogfood_stale_if = json.loads((dogfood_pack / "stale-if.json").read_text(encoding="utf-8"))
+                assert dogfood_provenance["preflight_receipt"] == provider_provenance["preflight_receipt"]
+                for field in (
+                    "preflight_receipt_digest_changes",
+                    "preflight_snapshot_id_changes",
+                    "preflight_observed_at",
+                    "current_repository_revalidated",
+                ):
+                    assert dogfood_stale_if[field] == provider_stale_if[field], field
+            cache_after = {
+                path.relative_to(runtime_root)
+                for path in runtime_root.rglob("*")
+                if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}
+            }
+            assert cache_after - cache_before == set()
 
     def test_authoring_pack_review_and_stage_dogfood_runtime_path(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
@@ -5408,6 +6161,193 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert "specdock-authoring-pack/" in prompt
             assert "Do not claim canonical adoption" in prompt
 
+    def test_authoring_pack_prepare_binds_valid_v1_receipt_observation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "preflight.json"
+            output_dir = repo / "pack"
+            receipt = _run_preflight_json(self, repo)
+            preflight.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            provenance = json.loads((output_dir / "provenance.json").read_text(encoding="utf-8"))
+            stale_if = json.loads((output_dir / "stale-if.json").read_text(encoding="utf-8"))
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert provenance["preflight_receipt"] == {
+                "format": "versioned",
+                "schema_version": 1,
+                "receipt_kind": "spec-dock.authoring.github-sync-preflight",
+                "receipt_digest": receipt["receipt_digest"],
+                "snapshot_id": receipt["freshness"]["snapshot_id"],
+                "observed_at": receipt["freshness"]["observed_at"],
+                "current_repository_revalidated": False,
+            }
+            assert stale_if["preflight_receipt_digest_changes"] == receipt["receipt_digest"]["value"]
+            assert stale_if["preflight_snapshot_id_changes"] == receipt["freshness"]["snapshot_id"]
+            assert stale_if["preflight_observed_at"] == receipt["freshness"]["observed_at"]
+            assert stale_if["current_repository_revalidated"] is False
+
+    def test_authoring_pack_prepare_rejects_tampered_v1_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "tampered-preflight.json"
+            output_dir = repo / "pack"
+            receipt = _run_preflight_json(self, repo)
+            receipt["remote_head"] = "tampered"
+            preflight.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "fail"
+            assert "preflight_receipt_digest_mismatch" in payload["blockers"]
+            assert not (output_dir / "manifest.json").exists()
+
+    @pytest.mark.parametrize(
+        ("mutate", "expected_blocker"),
+        [
+            (lambda receipt: receipt.update(schema_version=2), "preflight_receipt_schema_unsupported"),
+            (lambda receipt: receipt.update(receipt_kind="other"), "preflight_receipt_kind_mismatch"),
+            (lambda receipt: receipt.pop("schema_version"), "preflight_receipt_schema_missing"),
+        ],
+    )
+    def test_authoring_pack_prepare_rejects_invalid_or_downgraded_v1_receipt_contract(
+        self, mutate, expected_blocker: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "invalid-contract-preflight.json"
+            output_dir = repo / "pack"
+            receipt = _run_preflight_json(self, repo)
+            mutate(receipt)
+            _recompute_receipt_digest(receipt)
+            preflight.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "fail"
+            assert expected_blocker in payload["blockers"]
+            assert not (output_dir / "manifest.json").exists()
+
+    @pytest.mark.parametrize(
+        ("mutate", "expected_blocker"),
+        [
+            (lambda receipt: receipt["fetch"].update(status="failed"), "preflight_receipt_fetch_not_success"),
+            (
+                lambda receipt: receipt["freshness"].update(concurrent_change_check="changed"),
+                "preflight_receipt_concurrent_change_not_stable",
+            ),
+        ],
+    )
+    def test_authoring_pack_prepare_rejects_semantically_inconsistent_v1_pass_receipt(
+        self, mutate, expected_blocker: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "inconsistent-preflight.json"
+            output_dir = repo / "pack"
+            receipt = _run_preflight_json(self, repo)
+            mutate(receipt)
+            _recompute_receipt_digest(receipt)
+            preflight.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            payload = _json_stdout(result)
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert payload["status"] == "fail"
+            assert expected_blocker in payload["blockers"]
+            assert not (output_dir / "manifest.json").exists()
+
+    def test_authoring_pack_prepare_accepts_unknown_additive_v1_receipt_field(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _create_synced_git_repo(Path(tmp))
+            preflight = repo / "additive-preflight.json"
+            output_dir = repo / "pack"
+            receipt = _run_preflight_json(self, repo)
+            receipt["future_additive_field"] = {"value": True}
+            _recompute_receipt_digest(receipt)
+            preflight.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = _run_authoring_capture(
+                self,
+                repo,
+                [
+                    "authoring",
+                    "pack",
+                    "prepare",
+                    "--preflight",
+                    str(preflight),
+                    "--output-dir",
+                    str(output_dir),
+                    "--format",
+                    "json",
+                ],
+            )
+
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert _json_stdout(result)["status"] == "pass"
+
     def test_authoring_pack_prepare_preserves_local_context_lower_authority(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = _create_synced_git_repo(Path(tmp))
@@ -5668,6 +6608,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             repo = _create_synced_git_repo(Path(tmp))
             preflight_payload = _run_preflight_json(self, repo)
             preflight_payload["reviewer_pass"] = True
+            _recompute_receipt_digest(preflight_payload)
             preflight = repo / "preflight.json"
             preflight.write_text(json.dumps(preflight_payload, sort_keys=True) + "\n", encoding="utf-8")
             canonical_output = repo / "spec-dock" / "active" / "issue" / "artifacts" / "pack"
@@ -6059,7 +7000,20 @@ class TestAuthoringCli(CliRuntimeHarness):
             )
 
             prompt = (output_dir / "chatgpt-use-prompt.md").read_text(encoding="utf-8")
+            provenance = json.loads((output_dir / "provenance.json").read_text(encoding="utf-8"))
+            stale_if = json.loads((output_dir / "stale-if.json").read_text(encoding="utf-8"))
             assert result.returncode == 0, result.stdout + result.stderr
+            assert provenance["preflight_receipt"] == {
+                "format": "legacy_unversioned",
+                "current_repository_revalidated": False,
+            }
+            assert "receipt_digest" not in provenance["preflight_receipt"]
+            assert "snapshot_id" not in provenance["preflight_receipt"]
+            assert "observed_at" not in provenance["preflight_receipt"]
+            assert stale_if["preflight_receipt_format"] == "legacy_unversioned"
+            assert stale_if["current_repository_revalidated"] is False
+            assert "preflight_receipt_digest_changes" not in stale_if
+            assert "preflight_snapshot_id_changes" not in stale_if
             assert "sync_state: `local_context`" in prompt
             assert "github_sync: `not_verified`" in prompt
             assert "adoption_requires: `explicit_eal_disposition`" in prompt
@@ -8712,6 +9666,15 @@ def _write_fake_backend(path: Path, sentinel: Path) -> Path:
 def _manifest_hash(source_hashes: dict[str, object]) -> str:
     payload = json.dumps(source_hashes, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+def _recompute_receipt_digest(receipt: dict[str, object]) -> None:
+    receipt.pop("receipt_digest", None)
+    canonical = json.dumps(receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    receipt["receipt_digest"] = {
+        "algorithm": "sha256",
+        "value": hashlib.sha256(canonical).hexdigest(),
+    }
 
 
 def _create_synced_git_repo(root: Path) -> Path:
