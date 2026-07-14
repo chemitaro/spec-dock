@@ -100,6 +100,7 @@ ID: "iss-00318"
 | PLANNING-PLAN-r4 | final plan/report runtime alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Runtime-recognized report schemaとready guidanceを含む最終planning setを承認 |
 | EXEC-S00-r1 | S00 baseline evidence | spec-reviewer | fresh | passed | no | promote | findingsなし。Gap/7 pair/61 tests/runtime non-diffをbaseline evidenceとして承認 |
 | EXEC-S01-r2 | S01 provider docs contract | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Main authorityを含む三lane/四分岐/lifecycle docs contractを承認 |
+| EXEC-S02-r1 | S02 shared preservation kernel | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。四分岐、status/result matrix、Main/shared責任境界、既存ZIP safety維持を承認 |
 
 ## Review Remediation History
 
@@ -150,6 +151,16 @@ ID: "iss-00318"
 - Inspect-only verification: Exact status/lifecycle/authority/forbidden termsを`rg`、`git diff --check` pass。Docs-onlyのためpytest未実施。
 - Reviewer: EXEC-S01-r1は責任図の矛盾を指摘し修正。Fresh EXEC-S01-r2はfindingsなし、confidence 0.99、`promote`。
 - Ledger Note: Approved planを具体化しただけでmaterial implementation decisionなし。S02–S04のskill/projection/test責務は未変更。
+
+### S02 Shared ChatGPT preservation kernel
+
+- Delegation: `doc-writer`がapproved S02 contractをprovider shared skill一件だけへ実装。Planning skills、dogfood、tests、runtimeは未変更。
+- Shared checkpoint: Semantic completenessをfile属性から推測せず、complete standalone、complete received inline、genuinely unavailable、ZIP/treeのexact one branchへ分類する契約を追加。
+- Preservation/result semantics: `imported_byte_exact`、`captured_received_text`、`skipped_inline_unavailable`、`pass`、`pass-with-warning`、`block`を明示し、complete source failureからunavailableへの迂回を禁止。
+- Authority/secrecy: Shared skillはclassification contractとevidence evaluationだけを所有し、Main orchestratorがcapture/import/exception/EAL/adoption/rewriteを所有。Content-free handoffとrepo-relative receipt metadataだけを許可。
+- Compatibility: Existing GitHub-synced/local-context modesとZIP/tree review/quarantine/stage/validation laneを維持。Planning matrix、dogfood、tests、runtimeの変更なし。
+- Verification: `git diff --check` pass。Fresh EXEC-S02-r1はfindingsなし、confidence 0.99、`promote`。
+- Ledger Note: Approved shared-kernel contractの具体化だけでmaterial implementation decisionなし。S03 thin hookとS04 projection/testsは未変更。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
 
 ## Step Contract Closure
@@ -158,6 +169,7 @@ ID: "iss-00318"
 |---|---|---|---|---|
 | S00 | C318-01–10 baseline | Gap、7 pair、import/ZIP tests、runtime non-diffを変更前に固定 | Step Evidence S00、Test Contract Closure、EXEC-S00-r1 | passed |
 | S01 | C318-01–07 docs semantics | 三lane、四branch、lifecycle、authority/secrecy、existing guard維持をprovider docsへ固定 | Step Evidence S01、EXEC-S01-r2 | passed |
+| S02 | C318-01–05、C318-07–08 shared kernel | 四分岐、status/result matrix、content-free handoff、Main/shared責任境界をshared skill一箇所へ固定 | Step Evidence S02、tc318-s02-01–02、EXEC-S02-r1 | passed |
 
 ## Test Contract Closure
 
@@ -167,13 +179,16 @@ ID: "iss-00318"
 | tc318-s00-02 | C318-04、C318-09–10 | covered-existing | 7/7 provider/dogfood MATCH、focused import/ZIP 61 passed | `cmp -s` pair list、focused pytest、runtime diff inspection | passed baseline |
 | tc318-s01-01 | C318-01–05 | inspect-only | S00 exact terms match 0 | Three-doc lifecycle/branch inspection、EXEC-S01-r2 | passed |
 | tc318-s01-02 | C318-06–07 | inspect-only | Existing delegated/ZIP contracts present | Lane/authority/secrecy forbidden-term inspection、EXEC-S01-r2 | passed |
+| tc318-s02-01 | C318-01–02、C318-07–08 | inspect-only | S01 reference contract fixed | Complete standalone/inline branch、exact status、receipt/content-free authority inspection、EXEC-S02-r1 | passed |
+| tc318-s02-02 | C318-03–05、C318-08 | inspect-only | S01 unavailable/ZIP/failure semantics fixed | Unavailable exception、ZIP existing lane、warning/block/no-reclassification inspection、EXEC-S02-r1 | passed |
 
 ## Closure Coverage
 
 | closure ids | current evidence | state | next owner |
 |---|---|---|---|
-| C318-01–07 | S01 provider docs semantics、EXEC-S01-r2 | docs contract passed; shared/manual evidence pending | S02/S05 |
-| C318-08 | S00 exact-term gap inventory | baseline fixed | S02–S04 |
+| C318-01–05、C318-07 | S01 provider docs、S02 shared kernel、EXEC-S02-r1 | docs/shared contract passed; manual evidence pending | S05 |
+| C318-06 | S01 external/delegated/ZIP lane separation | docs contract passed; projection/test evidence pending | S04 |
+| C318-08 | S02 matrix single-owner shared kernel | shared contract passed; thin hooks/projection pending | S03–S04 |
 | C318-09 | S00 7/7 pair equality | baseline fixed | S04 |
 | C318-04、C318-10 | S00 import/ZIP 61 pass、runtime diff none | baseline fixed | S04/S99 |
 | C318-11 | Planning Deferred PR Delivery Gate | planned | S90/S99 |
@@ -184,6 +199,7 @@ ID: "iss-00318"
 |---|---|---|---|---|---|
 | S00 | none | none | none | S01–S99 obligations remain | EXEC-S00-r1 passed; amendment不要 |
 | S01 | none | none | Main/Planning責任図をr1 findingで明確化 | S02–S99 obligations remain | EXEC-S01-r2 passed; plan amendment不要 |
+| S02 | none | none | none | S03–S99 obligations remain | EXEC-S02-r1 passed; plan amendment不要 |
 
 ## Implementation Delegation Gate
 
@@ -191,6 +207,7 @@ ID: "iss-00318"
 |---|---|---|---|---|---|---|---|
 | S00 | approved-local-execution | main orchestrator | Approved plan S00 read-only baseline | report.md update、target inventory/test read | provider/dogfood/test/runtime/assurance edits | Stop on regression/drift; output exact command/result/ledger note | completed; EXEC-S00-r1 passed |
 | S01 | delegated | doc-writer | Approved plan S01、provider三docs | provider三docsだけ | skills/dogfood/tests/runtime/public/package/report | Docs inspection、diff-check、stop on scope expansion、worker summary/Ledger Note | completed; EXEC-S01-r2 passed |
+| S02 | delegated | doc-writer | Approved plan S02、provider shared skill | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`だけ | planning skills/dogfood/tests/runtime/report | Exact four branches/status/result/authority inspection、diff-check、stop on scope expansion、worker summary | completed; EXEC-S02-r1 passed |
 
 ## Milestone / Commit Candidate Gate
 
@@ -198,6 +215,7 @@ ID: "iss-00318"
 |---|---|---|---|---|---|
 | S00 | EXEC-S00-r1 passed | `docs(issue-318): Preservation契約のベースラインを記録`; report.md only | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit external clean/upstream check必須 |
 | S01 | EXEC-S01-r2 passed | `docs(chatgpt-first): 原文保存ワークフロー契約を追加`; provider三docs + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit external clean/upstream check必須 |
+| S02 | EXEC-S02-r1 passed | `docs(chatgpt-first): 共有preservation checkpointを追加`; provider shared skill + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit external clean/upstream check必須 |
 
 ## Final QA Gate
 
