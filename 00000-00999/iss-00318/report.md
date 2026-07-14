@@ -19,6 +19,7 @@ ID: "iss-00318"
 | D-318-001 | resolved | scope | ChatGPT 5.6 Pro / repo-analyst | External raw importとdelegated draft provenanceが衝突し得る | 同一lane; parallel lane; delegated guard緩和 | External imported evidenceとdelegated draftをparallel evidence laneとして分離し、existing delegated guardを維持 | Byte preservationとdelegated provenanceの両方を満たす最小境界 | applied | Parent DS-004、Issue317 S90 relay、ChatGPT complete received answer。Requirement RQ-318-007–008へ反映 | Requirement pass後、Designでauthority/validation flowを固定 |
 | D-318-002 | resolved | compatibility | system-architect | `committed=true` warningのcheckpoint扱い | block; pass-with-warning; retry | Final path/hash/bytesが確定する`committed=true`は保存済みwarningとして記録し、自動retryしない | Issue317 post-publish semanticsと重複回避に整合 | applied | Issue317 requirement/design/report、specialist evidence。Requirement RQ-318-006へ反映 | Requirement pass後、Design failure matrixへ反映 |
 | D-318-003 | resolved | scope | orchestrator | Parent Standard候補とruntime strict guidance | Standard固定; strict自己宣言; assurance authority | Epic候補gradeをauthorityにせずrequirement後のassurance classifyを正とする。取得済みstrict相当evidenceは維持 | Profile偽装を避け、runtime authorityに従う | applied | Parent W4、guidance issue-planning。Requirement Grade節へ反映 | Requirement passとAssurance後、planへ反映 |
+| D-318-004 | resolved | ownership | repo-analyst / orchestrator | Public/package/final quality/PR surfaceをIssue318で先行するかIssue319へrelayするか | Issue318へ拡張; no-op; W5へdefer | Root/public/migration/package/fresh init-update/full-global/final QA-code-spec/PR deliveryはIssue319へdeferし、Issue318はworkflow/skill integrationで閉じる | Parent DS-005/W5とapproved Issue318 non-scopeに一致し、one final Epic PR境界を維持 | applied | S90 24-path inventory、runtime/deferred surface diff確認 | Issue319 bundled planningでcanonical採用しfresh reviewする |
 
 ## 証跡採用台帳（Evidence Adoption Ledger）
 
@@ -154,6 +155,7 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | EXEC-S04-CODE-r3 | S04 projection / contract tests | code-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Exact four branches、result matrix、thin caller、ZIP安定検査、7/7 parity、provider/runtime非変更を承認 |
 | EXEC-S04-SPEC-r1 | S04 specification alignment | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。7/7 byte exact projection、single owner、lane/authority semantics不変を承認。独立4-suite実行619 passed |
 | EXEC-S05-SPEC-r1 | S05 manual branch evidence | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。二receipt、unavailable field、ZIP safe lane、failure block、canonical non-mutation、ignored Workbench境界を承認 |
+| EXEC-S90-SPEC-r2 | S90 exact impact and Issue319 relay | spec-reviewer | fresh | passed | no | promote | findingsなし、confidence 0.99。Actual 24/24 path集合差0、台帳90実在path重複なし、runtime/public/package先行差分0、tc318-s90-02 relayを承認 |
 
 ## Review Remediation History
 
@@ -167,6 +169,7 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | PLANNING-PLAN-r2 | plan | 標準report ledger接続、S90/S99 commit境界 | 全台帳へ接続しS90/S99を独立commit化 | r3 passed |
 | EXEC-S01-r1 | S01 | Planning skillとMain orchestratorの責任が基本原則/図で矛盾 | Planningはcheckpoint呼出し/scope handoff、Mainは保存/EAL/rewriteへ統一 | r2 passed |
 | EXEC-S04-code-r1–r2 | S04 | r1でbranch/result assertion感度不足、r2でprovider修復混在、thin-caller禁止token、exact four-branch、ZIP行表現依存を指摘 | Branch section exact set、result別token、matrix複製禁止token、表現非依存ZIP row検査へ強化。S01 provider日本語主表記修復はcommit `be841c2a`へ分離し意味不変を確認 | EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed |
+| EXEC-S90-SPEC-r1 | S90 | Grouped surfaceだけで24 actual/considered pathを閉じ、planの実path単位契約を満たさない。`tc318-s90-02` relay test closureも欠落 | Actual 24/24 paths、no-op/defer実在pathsを個別rowへ展開し、Issue319 gate inventoryと`tc318-s90-02`を追加 | EXEC-S90-SPEC-r2 passed |
 
 ## Planning evidence log
 
@@ -183,7 +186,9 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 - Dependency: `iss-00317 -> iss-00318 -> iss-00319`。
 - Reason: One final Epic PRへpackage、fresh init/update、public docs、full/global quality、final deliveryを集約する。
 - Claim boundary: Issue319のPR Delivery / Merge Preparation完了までPR-ready/merge-ready/merge-preparedを主張しない。
-- Remaining: Issue318 implementation、Issue319 package/docs/migration/full QA/code/spec/PR observation。
+- Remaining: Issue319 bundled planning、README/reference/migration、package/fresh init-update、full/global quality、final Epic QA/code/spec、PR creation/observation/repair。
+- Issue319 current state: Requirementは未具体化template、design/planは`awaiting-assurance-compose` placeholder。Parent DS-005/W5がowner/dependency authorityを保持し、Issue319 planningで本relayをcanonical化する。
+- Revisit: Issue319 planningでdeferred path/gateを採用できない場合、またはfresh consumer検証でIssue318 asset contractの欠落が実証された場合。
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
@@ -249,7 +254,128 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 - Canonical non-mutation: Failure前後のrequirement/design/plan SHA-256はそれぞれ`08268a05...99de`、`bff9d2e4...3e5b`、`58cc90ba...ec18`で一致。Artifact inventoryも成功二件だけ。
 - Git boundary: Workbench二sourceはignoredかつuntrackedのまま保持し、commit対象はsafe Artifact二件とreportだけ。
 - Ledger Note: Approved S05 synthetic observationのみ。Runtime/skill/provider/dogfood/tests/canonical docsを変更せず、material implementation decisionやplan amendmentなし。
+
+### S90 Docs impact and Issue319 ownership closure
+
+- Baseline: Issue317 final commit `7ed1985d`からIssue318 HEAD `6b6bd10d`までをIssue固有差分基準とした。`origin/main...HEAD`はIssue315–318累積のためinventory authorityに使用しない。
+- Coverage: Issue318 actual diffは24/24 pathsを分類済み。Provider authority七、dogfood projection七、focused tests二、Issue-local requirement/design/plan/report/assurance/artifacts八で未分類なし。
+- Update complete: Provider三docs・四skills、matching dogfood七files、`tests/cli_runtime/test_wrappers.py`、`tests/unit/infra/test_init_update.py`のIssue318 contract、Issue-local canonical docs/assurance/report/artifacts。
+- Approved no-op: Artifact rules三scopeとtemplates、Issue317 artifact import runtime、authoring-pack ZIP review/stage runtime、delegated-authoring runtime、root authoring helper。`git diff --quiet 7ed1985d..HEAD -- src/spec_dock/assets/spec_dock/scripts spec-dock/scripts`はexit 0。
+- Defer to Issue319: `README.md`、provider/dogfood `docs/README.md`・`guide.md`・`reference_naming.md`・`reference_worktree.md`、migration/release placement、`pyproject.toml`、`src/spec_dock/cli.py`、`src/spec_dock/__init__.py`、`uv.lock`、package/fresh init-update/smoke、full pytest/global static、final manual/Epic QA/code/spec、PR creation/observation/repair。
+- Diff evidence: Root/public/package候補にIssue318差分なし。Runtime/provider/dogfoodのimport・ZIP・delegated-authoring実在surfaceを列挙確認し、Issue318 semanticsの先行実装なし。
+- Risk: Issue318をblockするmaterial unresolved riskなし。Issue319 nodeがplaceholderであることはnon-blocking handoff conditionで、Parent DS-005/W5がowner/dependencyを固定済み。
+- Claim boundary: Issue318ではPRを作成せず、PR-ready / merge-ready / merge-preparedを主張しない。
+- Ledger Note: Approved ownership relayを実パス/gateへ具体化したread-only inventoryのみ。New product semantics、runtime変更、material implementation decision、plan amendmentなし。
 <!-- spec-dock:managed-section end id="report.step-evidence" -->
+
+## ドキュメント影響の解消（Docs Impact Resolution）
+
+| exact path | disposition | owner | reason | dependency | blocking | reviewer |
+|---|---|---|---|---|---|---|
+| `src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md` | update-complete | Issue318 | Preservation lifecycle provider authority | Issue317 runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md` | update-complete | Issue318 | Output-form routing provider authority | workflow spec authoring | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md` | update-complete | Issue318 | Four-branch/result/EAL reference | accepted ADR / Issue317 | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md` | update-complete | Issue318 | Shared matrix single owner | provider docs | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md` | update-complete | Issue318 | Initiative thin checkpoint hook | shared skill | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md` | update-complete | Issue318 | Epic thin checkpoint hook | shared skill | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` | update-complete | Issue318 | Issue thin checkpoint hook | shared skill | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/docs/workflow_spec_authoring.md` | update-complete | Issue318 | Exact dogfood projection | matching provider | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/docs/workflow_chatgpt_authoring_pack.md` | update-complete | Issue318 | Exact dogfood projection | matching provider | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/docs/authoring/chatgpt-pack.md` | update-complete | Issue318 | Exact dogfood projection | matching provider | no | EXEC-S90-SPEC-r2 passed |
+| `.agents/skills/spec-dock-chatgpt-authoring/SKILL.md` | update-complete | Issue318 | Exact dogfood projection | matching provider | no | EXEC-S90-SPEC-r2 passed |
+| `.agents/skills/spec-dock-initiative-planning/SKILL.md` | update-complete | Issue318 | Exact dogfood projection | matching provider | no | EXEC-S90-SPEC-r2 passed |
+| `.agents/skills/spec-dock-epic-planning/SKILL.md` | update-complete | Issue318 | Exact dogfood projection | matching provider | no | EXEC-S90-SPEC-r2 passed |
+| `.agents/skills/spec-dock-issue-planning/SKILL.md` | update-complete | Issue318 | Exact dogfood projection | matching provider | no | EXEC-S90-SPEC-r2 passed |
+| `tests/cli_runtime/test_wrappers.py` | update-complete | Issue318 | Installed shared/thin-caller contract | seven provider assets | no | EXEC-S90-SPEC-r2 passed |
+| `tests/unit/infra/test_init_update.py` | update-complete | Issue318 | Managed seven-asset projection contract | provider/dogfood parity | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00318-chatgpt-first-preservation-workflow-and-skill-integration/.assurance.json` | update-complete | Issue318 | Standard assurance authority | approved planning | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00318-chatgpt-first-preservation-workflow-and-skill-integration/artifacts/20260713t180812z-chatgpt-output-issue-318-chatgpt-5-6-pro-planning-report.md` | update-complete | Issue318 | Preserved bundled planning evidence | import runtime | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00318-chatgpt-first-preservation-workflow-and-skill-integration/artifacts/20260714t094952z-01-chatgpt-output-issue-318-s05-inline.md` | update-complete | Issue318 | Inline preservation dogfood evidence | S05 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00318-chatgpt-first-preservation-workflow-and-skill-integration/artifacts/20260714t094952z-chatgpt-output-issue-318-s05-standalone.md` | update-complete | Issue318 | Standalone preservation dogfood evidence | S05 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00318-chatgpt-first-preservation-workflow-and-skill-integration/requirement.md` | update-complete | Issue318 | Canonical accepted scope/AC | parent E-RQ-024 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00318-chatgpt-first-preservation-workflow-and-skill-integration/design.md` | update-complete | Issue318 | Canonical responsibility/runtime boundary | requirement | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00318-chatgpt-first-preservation-workflow-and-skill-integration/plan.md` | update-complete | Issue318 | Approved S00–S99 execution contract | design | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00318-chatgpt-first-preservation-workflow-and-skill-integration/report.md` | update-complete | Issue318 | Planning/execution/reviewer/relay evidence | S00–S90 | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md` | approved-no-op | Issue318 no-op check | Blank coexistence unchanged | accepted ADR | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/docs/rules/initiative/artifacts.md` | approved-no-op | Issue318 no-op check | Matching dogfood rule unchanged | provider rule | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/docs/rules/epic/artifacts.md` | approved-no-op | Issue318 no-op check | Blank coexistence unchanged | accepted ADR | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/docs/rules/epic/artifacts.md` | approved-no-op | Issue318 no-op check | Matching dogfood rule unchanged | provider rule | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/docs/rules/issue/artifacts.md` | approved-no-op | Issue318 no-op check | External evidenceへfrontmatterを強制しない | RQ-318-008 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/docs/rules/issue/artifacts.md` | approved-no-op | Issue318 no-op check | Matching dogfood rule unchanged | provider rule | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/templates/README.md` | approved-no-op | Issue318 no-op check | Import is template-free | Issue317 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/templates/README.md` | approved-no-op | Issue318 no-op check | Matching dogfood template index unchanged | provider template | no | EXEC-S90-SPEC-r2 passed |
+| `tests/cli_runtime/test_artifact_import_chatgpt_output.py` | approved-no-op | Issue317 | Import regression authority only | Issue317 runtime | no | EXEC-S90-SPEC-r2 passed |
+| `tests/manual_tests/test_review_chatgpt_authoring_pack.py` | approved-no-op | existing authoring lane | ZIP regression authority only | ZIP lane | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` | approved-no-op | Issue317 | Import application contract complete | Issue317 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/application/contracts.py` | approved-no-op | Issue317 projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_artifact_doc.py` | approved-no-op | Issue317 | Artifact creation coexistence complete | Issue317 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/application/create_artifact_doc.py` | approved-no-op | Issue317 projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_artifact.py` | approved-no-op | Issue317 | Import application semantics complete | Issue317 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/application/import_artifact.py` | approved-no-op | Issue317 projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` | approved-no-op | Issue317 | Import publisher port complete | Issue317 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/application/ports.py` | approved-no-op | Issue317 projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` | approved-no-op | Issue317 | Runtime dependency wiring complete | Issue317 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py` | approved-no-op | Issue317 projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py` | approved-no-op | Issue317 | Import parser contract complete | Issue317 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/cli/parser.py` | approved-no-op | Issue317 projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py` | approved-no-op | Issue317 | Import command registration complete | Issue317 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/cli/registry.py` | approved-no-op | Issue317 projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/artifact_import.py` | approved-no-op | Issue317 | Import command complete | Issue317 application | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/commands/artifact_import.py` | approved-no-op | Issue317 projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py` | approved-no-op | Issue317 | Byte publisher complete | Issue317 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py` | approved-no-op | Issue317 projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` | approved-no-op | Issue317 | Content-free receipt presentation complete | Issue317 | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/presentation/cli_text.py` | approved-no-op | Issue317 projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack/pack_review.py` | approved-no-op | existing authoring lane | ZIP review safety unchanged | ZIP contract | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/application/authoring_pack/pack_review.py` | approved-no-op | existing projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack/pack_stage.py` | approved-no-op | existing authoring lane | ZIP stage safety unchanged | ZIP review | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/application/authoring_pack/pack_stage.py` | approved-no-op | existing projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack/source_manifest.py` | approved-no-op | existing authoring lane | Workbench/ZIP source contract unchanged | authoring pack | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/domain/authoring_pack/source_manifest.py` | approved-no-op | existing projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack/zip_contract.py` | approved-no-op | existing authoring lane | ZIP safety contract unchanged | authoring pack | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/domain/authoring_pack/zip_contract.py` | approved-no-op | existing projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delegated_authoring.py` | approved-no-op | existing delegated lane | Delegated provenance/diff guard unchanged | delegated contract | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/application/delegated_authoring.py` | approved-no-op | existing projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/delegated_authoring.py` | approved-no-op | existing delegated lane | Delegated domain contract unchanged | delegated contract | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/domain/delegated_authoring.py` | approved-no-op | existing projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/delegated_authoring.py` | approved-no-op | existing delegated lane | Delegated command contract unchanged | delegated domain | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/commands/delegated_authoring.py` | approved-no-op | existing projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/authoring_pack/github_sync_preflight.py` | approved-no-op | existing authoring lane | GitHub-synced preflight unchanged | authoring pack | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/spec_dock_runtime/application/authoring_pack/github_sync_preflight.py` | approved-no-op | existing projection | Matching dogfood runtime unchanged | provider runtime | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/authoring-pack/authoring_pack_review.py` | approved-no-op | existing authoring lane | Shipped ZIP review wrapper unchanged | ZIP runtime | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/authoring-pack/authoring_pack_review.py` | approved-no-op | existing projection | Matching dogfood wrapper unchanged | provider wrapper | no | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/scripts/authoring-pack/invoke_chatgpt_backend.py` | approved-no-op | existing authoring lane | Shipped backend wrapper unchanged | authoring pack | no | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/scripts/authoring-pack/invoke_chatgpt_backend.py` | approved-no-op | existing projection | Matching dogfood wrapper unchanged | provider wrapper | no | EXEC-S90-SPEC-r2 passed |
+| `scripts/authoring-pack/authoring_pack_review.py` | approved-no-op | existing root tooling | Root ZIP review helper unchanged | authoring pack | no | EXEC-S90-SPEC-r2 passed |
+| `scripts/authoring-pack/invoke_chatgpt_backend.py` | approved-no-op | existing root tooling | Backend wrapper unchanged | authoring pack | no | EXEC-S90-SPEC-r2 passed |
+| `README.md` | defer-to-iss-00319 | Issue319 | Root usage/experimental/evidence-only rollout | Issue315–318 complete | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/docs/README.md` | defer-to-iss-00319 | Issue319 | Public docs index | W5 docs rollout | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/docs/README.md` | defer-to-iss-00319 | Issue319 | Matching dogfood public docs index | provider doc | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/docs/guide.md` | defer-to-iss-00319 | Issue319 | Workbench-to-Artifact public guide | Issue318 terminology | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/docs/guide.md` | defer-to-iss-00319 | Issue319 | Matching dogfood public guide | provider doc | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/docs/reference_naming.md` | defer-to-iss-00319 | Issue319 | Blank/chatgpt-output naming examples | Issue317 grammar | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/docs/reference_naming.md` | defer-to-iss-00319 | Issue319 | Matching dogfood naming reference | provider doc | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/assets/spec_dock/docs/reference_worktree.md` | defer-to-iss-00319 | Issue319 | Workbench handoff/no-sync public guidance | Issue316/318 | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `spec-dock/docs/reference_worktree.md` | defer-to-iss-00319 | Issue319 | Matching dogfood worktree reference | provider doc | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `pyproject.toml` | defer-to-iss-00319 | Issue319 | Package-data/build verification | all assets complete | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/cli.py` | defer-to-iss-00319 | Issue319 | Fresh init/update distribution verification | built package | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `src/spec_dock/__init__.py` | defer-to-iss-00319 | Issue319 | Version/release decision | release policy | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `uv.lock` | defer-to-iss-00319 | Issue319 | Final build/lock consistency | package verification | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+| `tests/unit/cli/test_cli_smoke.py` | defer-to-iss-00319 | Issue319 | Installed package smoke | built package | Issue318 no; Epic yes | EXEC-S90-SPEC-r2 passed |
+
+上表の先頭24行は`git diff --name-only 7ed1985d..6b6bd10d`の24/24実pathと一対一対応する。No-op/deferもwildcardを使用せず、確認した実在pathだけを列挙した。
+
+### Issue319 relay gate inventory
+
+| exact gate | disposition | owner | reason | dependency | blocking | revisit |
+|---|---|---|---|---|---|---|
+| Migration / release note placement | defer-to-iss-00319 | Issue319 | Dedicated pathは未存在。README/guideまたはW5が承認する新規pathへ配置 | Public docs review | Issue318 no; Epic yes | Issue319 planningでexact pathを決定 |
+| Package build and fresh init/update matrix | defer-to-iss-00319 | Issue319 | Wheel/installed consumer parityを最終確認 | Issue315–318 complete | Issue318 no; Epic yes | Distribution failure時にowning Issueへ戻す |
+| Full `uv run pytest` | defer-to-iss-00319 | Issue319 | Epic-wide regression gate | Full diff assembled | Issue318 no; Epic yes | Failureをowning stepへroute |
+| Repository-wide `uv run mypy src` and global Ruff/static repair | defer-to-iss-00319 | Issue319 | Issue-localでないglobal quality | Full diff assembled | Issue318 no; Epic yes | Existing/new failureを分類 |
+| Installed/fresh consumer manual scenario | defer-to-iss-00319 | Issue319 | Workbench handoff→import→EAL→canonical rewriteの統合確認 | Package/docs/runtime parity | Issue318 no; Epic yes | Missing contractをowning Issueへroute |
+| Final Epic `qa-reviewer` → `code-reviewer` → `spec-reviewer` | defer-to-iss-00319 | Issue319 | Epic AC/distribution/full qualityを順序付き判定 | All verification complete | Issue318 no; Epic yes | Finding修復後fresh rerun |
+| PR create / checks / Codex review / observation / repair | defer-to-iss-00319 | Issue319 | One final Epic PR ownership | Final reviewers pass | Issue318 no; Epic yes | Merge-preparedまでobserve/repair |
 
 ## Step Contract Closure
 
@@ -261,6 +387,7 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | S03 | C318-03、C318-05、C318-07–08 caller integration | 三callerの正しい呼出し位置、block伝播、unavailable field、matrix非複製、scope authorityを固定 | Step Evidence S03、tc318-s03-01–02、EXEC-S03-r1 | passed |
 | S04 | C318-04、C318-06、C318-08–10 projection/tests | 7/7 exact projection、contract-sensitive installed tests、ZIP/import非回帰、runtime/provider非変更 | Step Evidence S04、tc318-s04-01–03、EXEC-S04-CODE-r3、EXEC-S04-SPEC-r1 | passed |
 | S05 | C318-01–05、C318-07、C318-11 manual observation | Success二件のbyte/capture boundary、unavailable field、ZIP lane、failure block、canonical non-mutation | Step Evidence S05、EPE-318-002–004、tc318-s05-01–03、EXEC-S05-SPEC-r1 | passed |
+| S90 | C318-10–11 impact/relay | 24/24 path disposition、runtime/no-op boundary、Issue319 owner/dependency/blocking、no merge-ready self-claim | Step Evidence S90、Docs Impact Resolution、tc318-s90-01–02、D-318-004、EXEC-S90-SPEC-r2 | passed |
 
 ## Test Contract Closure
 
@@ -280,6 +407,8 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | tc318-s05-01 | C318-01–02、C318-07、C318-11 | direct manual | Safe complete Workbench sources二件 | Two committed receipts、source survives、hash/bytes/`cmp`一致、最大二Artifact、EXEC-S05-SPEC-r1 | passed |
 | tc318-s05-02 | C318-03、C318-05、C318-07 | direct manual | Genuine unavailable synthetic case + approved-Workbench外source | Exception field inspection、exit 1 `source_ineligible`/`committed=false`、canonical hashes不変、EXEC-S05-SPEC-r1 | passed |
 | tc318-s05-03 | C318-04 | covered-existing + inventory | Existing safe ZIP fixtures | 57 passed、S05 Artifact inventoryにZIP single-file destinationなし、EXEC-S05-SPEC-r1 | passed |
+| tc318-s90-01 | C318-10–11 | inspect-only | Issue317 final commit、Issue318 actual diff、parent W5/DS-005、Issue319 placeholder | 24/24 classification、runtime/deferred diff checks、exact path existence、upstream 0/0、EXEC-S90-SPEC-r2 | passed |
+| tc318-s90-02 | C318-11 | inspect-only | Parent DS-005/W5、Issue317 relay、Issue319 placeholder | Deferred path/gate、remaining work、owner/dependency/blocking/revisit、no per-Issue PR/readiness claimをcross-document照合、EXEC-S90-SPEC-r2 | passed |
 
 ## Closure Coverage
 
@@ -290,7 +419,7 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | C318-08 | S02 matrix single-owner、S03 three thin callers、S04 structural tests | projection/test evidence passed | S99 |
 | C318-09 | S04 7/7 byte exact projection | passed | S99 inventory |
 | C318-04、C318-10 | S04 import/ZIP 61 pass、independent aggregate 619 pass、runtime diff none | passed | S05/S99 |
-| C318-11 | Planning Deferred PR Delivery Gate | planned | S90/S99 |
+| C318-11 | S90 exact Issue319 relay、Deferred PR Delivery Gate、EXEC-S90-SPEC-r2 | passed | S99 final alignment |
 
 ## Closure Delta
 
@@ -303,6 +432,7 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | S01 remediation | none | none | 二provider docsの見出し・表ラベルを日本語主表記へ修復。Preservation/authority semantics不変 | S04–S99 obligations remain | EXEC-S01-REM-r1 passed; material design changeなし |
 | S04 | none | none | Test sensitivityをreview findingsに従い強化。Provider semantics/runtime変更なし | S05–S99 obligations remain | EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed; plan amendment不要 |
 | S05 | none | none | none | S90–S99 obligations remain | EXEC-S05-SPEC-r1 passed; plan amendment不要 |
+| S90 | none | none | Deferred owner/path/gateを実在inventoryへ具体化 | S99 obligations remain | EXEC-S90-SPEC-r2 passed; plan amendment不要 |
 
 ## Implementation Delegation Gate
 
@@ -314,6 +444,7 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | S03 | delegated | doc-writer | Approved plan S03、provider planning skills三件 | Initiative/Epic/Issue planning `SKILL.md`三件だけ | shared/manual skills/dogfood/tests/runtime/report/matrix copy | Three-caller comparison、duplicate scan、scope checklist、diff-check、worker summary | completed; EXEC-S03-r1 passed |
 | S04 | delegated | dev-coder `gpt-5.6-sol` / medium | Approved plan S04、reviewed provider assets、matching dogfood七files、existing tests | Dogfood七files、`test_wrappers.py`、`test_init_update.py` | Provider/runtime/public/package/new test file | Exact branch/result/thin caller/ZIP assertions、7/7 compare、focused/full regression、fresh code/spec review | completed; EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed |
 | S05 | approved-local-execution | main orchestrator | Approved plan S05 safe synthetic manual dogfood | Exact Workbench二files、最大二Artifact、report.md | Runtime/skills/provider/dogfood/tests/canonical docs、real/private content | Receipt/hash/byte/cmp/source survival、exception fields、ZIP tests/inventory、failure/canonical hash、fresh spec review | completed; EXEC-S05-SPEC-r1 passed |
+| S90 | delegated-read-only | repo-analyst `gpt-5.6-sol` / medium | Approved plan S90、Issue317/318/319、parent Epic、actual diff | Read-only inventory、report handoff | Source/docs/tests/Issue319 edits、PR/readiness claim | 24/24 path classification、runtime/deferred diff、fresh spec review | completed; EXEC-S90-SPEC-r2 passed |
 
 ## Milestone / Commit Candidate Gate
 
@@ -326,6 +457,7 @@ EPE-318-004にはsource/destination path、hash、byte count、byte-exact claim�
 | S01 remediation | EXEC-S01-REM-r1 passed | `docs(chatgpt-first): 保存契約文書を日本語主表記へ修復`; provider二docs + report.md | passed | Focused remediation commit hashはpost-commit external evidenceで記録 | S04 working diffを残したままcommitし、provider変更がS04 staged scopeへ混在しないことを確認 |
 | S04 | EXEC-S04-CODE-r3 / EXEC-S04-SPEC-r1 passed | `test(chatgpt-first): preservation契約と投影を検証`; dogfood七files + existing tests二files + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit clean/upstream check必須 |
 | S05 | EXEC-S05-SPEC-r1 passed | `docs(issue-318): preservation分岐のdogfood証跡を記録`; safe Artifact二件 + report.md | passed | Focused commit hashはpost-commit external evidenceで記録 | Workbench sourceをstageしない。Post-commit clean/upstream check必須 |
+| S90 | EXEC-S90-SPEC-r2 passed | `docs(issue-318): Issue319への引継ぎ境界を確定`; report.md only | passed | Focused commit hashはpost-commit external evidenceで記録 | Post-commit clean/upstream check必須 |
 
 ## Final QA Gate
 
