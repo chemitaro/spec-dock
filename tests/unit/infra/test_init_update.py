@@ -1028,6 +1028,21 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/spec_dock/templates/report.md",
         "spec_dock/assets/spec_dock/templates/requirement.md",
     )
+    _ISSUE_69_PYTHON_CACHE_EXCLUSION_PATTERNS = (
+        "**/__pycache__/**",
+        "**/*.pyc",
+        "**/*.pyo",
+    )
+    _ISSUE_69_SETUP_PYTHON_CACHE_EXCLUSION_PATTERNS = (
+        "spec_dock/**/__pycache__",
+        "spec_dock/**/__pycache__/**",
+        "spec_dock/**/*.pyc",
+        "spec_dock/**/*.pyo",
+    )
+    _ISSUE_69_PYTHON_CACHE_FIXTURE_ARTIFACT_RELATIVE_PATHS = (
+        "spec_dock/assets/spec_dock/scripts/spec_dock_runtime/__pycache__/fixture.cpython-312.pyc",
+        "spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/__pycache__/fixture.cpython-312.pyo",
+    )
     _ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS = (
         "spec_dock/assets/spec_dock/scripts/spec-dock-close-smoke.sh",
         "spec_dock/assets/github/workflows/spec-dock-close.yml",
@@ -3113,6 +3128,17 @@ class TestInitUpdate(CliRuntimeHarness):
                 present_seeded_fixtures.add(fixture_artifact_path)
         return present_seeded_fixtures
 
+    def _issue_69_seed_python_cache_fixtures_in_source_context(self, build_context: Path) -> set[str]:
+        source_root = build_context / "src"
+        present_seeded_fixtures: set[str] = set()
+        for fixture_artifact_path in self._ISSUE_69_PYTHON_CACHE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
+            fixture_source_path = source_root / fixture_artifact_path
+            fixture_source_path.parent.mkdir(parents=True, exist_ok=True)
+            fixture_source_path.write_bytes(b"issue-69 generated Python cache fixture\n")
+            if fixture_source_path.is_file():
+                present_seeded_fixtures.add(fixture_artifact_path)
+        return present_seeded_fixtures
+
     def _issue_69_collect_wheel_file_inventory(self, wheel_path: Path) -> set[str]:
         with zipfile.ZipFile(wheel_path) as wheel_zip:
             return {member for member in wheel_zip.namelist() if not member.endswith("/")}
@@ -3158,6 +3184,18 @@ class TestInitUpdate(CliRuntimeHarness):
                     return tuple(str(item) for item in extracted)
         pytest.fail("setup.py is missing _STALE_BUILD_OUTPUT_PATTERNS")
 
+    def _issue_69_extract_setup_python_cache_exclusion_patterns(self, setup_text: str) -> tuple[str, ...]:
+        parsed_module = ast.parse(setup_text, filename="setup.py")
+        for statement in parsed_module.body:
+            if not isinstance(statement, ast.Assign):
+                continue
+            for target in statement.targets:
+                if isinstance(target, ast.Name) and target.id == "_GENERATED_PYTHON_CACHE_PATTERNS":
+                    extracted = ast.literal_eval(statement.value)
+                    assert isinstance(extracted, tuple)
+                    return tuple(str(item) for item in extracted)
+        pytest.fail("setup.py is missing _GENERATED_PYTHON_CACHE_PATTERNS")
+
     def _issue_69_prepare_build_context(self, repo_root: Path, build_context: Path) -> None:
         build_context.mkdir(parents=True, exist_ok=True)
         for filename in ("pyproject.toml", "README.md", "setup.py"):
@@ -3165,7 +3203,6 @@ class TestInitUpdate(CliRuntimeHarness):
         shutil.copytree(
             repo_root / "src",
             build_context / "src",
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
         )
 
     def _issue_69_collect_source_install_root_inventory(self, repo_root: Path) -> set[str]:
@@ -4764,8 +4801,11 @@ class TestInitUpdate(CliRuntimeHarness):
 
         pyproject_patterns = self._issue_69_extract_pyproject_stale_exclusion_patterns(pyproject_text)
         setup_patterns = self._issue_69_extract_setup_stale_exclusion_patterns(setup_text)
+        setup_cache_patterns = self._issue_69_extract_setup_python_cache_exclusion_patterns(setup_text)
 
-        pyproject_normalized_patterns = {f"spec_dock/{pattern}" for pattern in pyproject_patterns}
+        pyproject_cache_patterns = set(pyproject_patterns) & set(self._ISSUE_69_PYTHON_CACHE_EXCLUSION_PATTERNS)
+        pyproject_stale_patterns = set(pyproject_patterns) - pyproject_cache_patterns
+        pyproject_normalized_patterns = {f"spec_dock/{pattern}" for pattern in pyproject_stale_patterns}
         setup_pattern_set = set(setup_patterns)
         expected_pattern_set = set(self._ISSUE_69_STALE_EXCLUSION_ARTIFACT_RELATIVE_PATTERNS)
 
@@ -4775,6 +4815,57 @@ class TestInitUpdate(CliRuntimeHarness):
         assert setup_pattern_set == expected_pattern_set, (
             "issue-69 stale exclusion patterns must stay aligned to the approved exact pattern set"
         )
+        assert pyproject_cache_patterns == set(self._ISSUE_69_PYTHON_CACHE_EXCLUSION_PATTERNS), (
+            "issue-69 pyproject Python cache exclusions must stay aligned to the approved exact pattern set"
+        )
+        assert set(setup_cache_patterns) == set(self._ISSUE_69_SETUP_PYTHON_CACHE_EXCLUSION_PATTERNS), (
+            "issue-69 setup Python cache exclusions must stay aligned to the approved exact pattern set"
+        )
+
+    def test_issue_69_wheel_and_sdist_exclude_python_cache_from_source_build_context(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+
+            self._issue_69_prepare_build_context(repo_root, build_context)
+            present_before_build = self._issue_69_seed_python_cache_fixtures_in_source_context(build_context)
+            expected_cache_fixtures = set(self._ISSUE_69_PYTHON_CACHE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
+            assert present_before_build == expected_cache_fixtures, (
+                "issue-69 Python cache fixture set must exist in source build context before build"
+            )
+
+            wheel_path, sdist_path, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+            )
+
+            wheel_inventory = self._issue_69_collect_wheel_file_inventory(wheel_path)
+            sdist_inventory = self._issue_69_collect_sdist_source_file_inventory(sdist_path)
+            wheel_cache_inventory = sorted(
+                path for path in wheel_inventory if self._is_generated_python_cache_path(Path(path))
+            )
+            sdist_cache_inventory = sorted(
+                path for path in sdist_inventory if self._is_generated_python_cache_path(Path(path))
+            )
+            assert wheel_cache_inventory == [], (
+                f"issue-69 wheel unexpectedly shipped generated Python caches: {wheel_cache_inventory[:10]}"
+            )
+            assert sdist_cache_inventory == [], (
+                f"issue-69 sdist unexpectedly shipped generated Python caches: {sdist_cache_inventory[:10]}"
+            )
+            for cache_artifact_path in expected_cache_fixtures:
+                assert cache_artifact_path not in wheel_inventory, (
+                    f"issue-69 wheel unexpectedly shipped generated Python cache: {cache_artifact_path}"
+                )
+                assert cache_artifact_path not in sdist_inventory, (
+                    f"issue-69 sdist unexpectedly shipped generated Python cache: {cache_artifact_path}"
+                )
 
     def test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
