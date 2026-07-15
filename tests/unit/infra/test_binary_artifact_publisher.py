@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import os
 from pathlib import Path
+import stat
 import sys
 
 import pytest
@@ -391,9 +392,13 @@ def test_tc317_s02_03_destination_mismatch_after_publication_is_committed_warnin
     publisher = publisher_module.FilesystemBinaryArtifactPublisher()
     original_publish = publisher._publish_no_replace
 
-    def publish_then_mutate(temp_fd, destination_path):
-        original_publish(temp_fd, destination_path)
-        destination_path.write_bytes(mutated_body)
+    def publish_then_mutate(temp_fd, destination_parent_fd, destination_name):
+        original_publish(temp_fd, destination_parent_fd, destination_name)
+        descriptor = os.open(destination_name, os.O_WRONLY | os.O_TRUNC, dir_fd=destination_parent_fd)
+        try:
+            os.write(descriptor, mutated_body)
+        finally:
+            os.close(descriptor)
 
     monkeypatch.setattr(publisher, "_publish_no_replace", publish_then_mutate)
     result = publisher.publish(_publish_request(contracts, repo_root, specdock_dir, scopes, source, destination))
@@ -417,7 +422,7 @@ def test_tc317_s02_03_destination_confirmation_read_failure_is_committed_warning
     original_open = publisher_module.os.open
 
     def fail_destination_confirmation(path, *args, **kwargs):
-        if Path(path) == destination:
+        if path == destination.name and kwargs.get("dir_fd") is not None:
             raise OSError("secret destination confirmation detail")
         return original_open(path, *args, **kwargs)
 
@@ -458,3 +463,315 @@ def test_tc317_s02_04_post_publish_temp_retention_is_committed_warning(tmp_path)
     assert result.destination_path == destination
     assert destination.read_bytes() == source_body
     assert len(list(artifacts_dir.glob(".spec-dock-import-*"))) == 1
+
+
+def _swap_directory_for_external_symlink(directory: Path, displaced: Path, external: Path) -> None:
+    directory.rename(displaced)
+    try:
+        directory.symlink_to(external, target_is_directory=True)
+    except OSError:
+        displaced.rename(directory)
+        pytest.skip("symlink creation is unavailable")
+
+
+def test_temp_create_hook_precedes_secure_parent_open_and_rejects_parent_swap(tmp_path, monkeypatch):
+    contracts, publisher_module = _runtime_modules()
+    repo_root, specdock_dir, scopes, artifacts_dir = _layout(tmp_path)
+    source = specdock_dir / ".workbench" / "source.md"
+    source.write_bytes(b"source bytes")
+    destination = artifacts_dir / "published.md"
+    displaced = artifacts_dir.with_name("artifacts-original")
+    external = tmp_path / "external"
+    external.mkdir()
+    sentinel = external / "sentinel"
+    sentinel.write_bytes(b"external sentinel")
+    calls = []
+    original_secure_open = publisher_module._open_secure_directory
+
+    def record_secure_open(*args, **kwargs):
+        calls.append("secure_parent_open")
+        return original_secure_open(*args, **kwargs)
+
+    def swap_before_secure_open(point):
+        calls.append(point)
+        if point == "temp_create":
+            _swap_directory_for_external_symlink(artifacts_dir, displaced, external)
+
+    monkeypatch.setattr(publisher_module, "_open_secure_directory", record_secure_open)
+
+    with pytest.raises(contracts.BinaryArtifactPublishError) as captured:
+        publisher_module.FilesystemBinaryArtifactPublisher(fault_injector=swap_before_secure_open).publish(
+            _publish_request(contracts, repo_root, specdock_dir, scopes, source, destination)
+        )
+
+    assert captured.value.code == "destination_ineligible"
+    assert captured.value.cleanup_state == "not_created"
+    assert captured.value.committed is False
+    assert calls[:2] == ["temp_create", "secure_parent_open"]
+    assert list(displaced.iterdir()) == []
+    assert list(external.iterdir()) == [sentinel]
+    assert sentinel.read_bytes() == b"external sentinel"
+
+
+def test_before_publication_parent_swap_is_rejected_and_temp_cleanup_uses_held_parent(tmp_path, monkeypatch):
+    contracts, publisher_module = _runtime_modules()
+    repo_root, specdock_dir, scopes, artifacts_dir = _layout(tmp_path)
+    source = specdock_dir / ".workbench" / "source.md"
+    source.write_bytes(b"source bytes")
+    destination = artifacts_dir / "published.md"
+    displaced = artifacts_dir.with_name("artifacts-original")
+    external = tmp_path / "external"
+    external.mkdir()
+    sentinel = external / "sentinel"
+    sentinel.write_bytes(b"external sentinel")
+    same_name_sentinel = None
+
+    def swap_before_publication(point):
+        nonlocal same_name_sentinel
+        if point == "before_publication":
+            [temp_path] = artifacts_dir.glob(".spec-dock-import-*")
+            same_name_sentinel = external / temp_path.name
+            same_name_sentinel.write_bytes(b"external same-name sentinel")
+            _swap_directory_for_external_symlink(artifacts_dir, displaced, external)
+
+    publisher = publisher_module.FilesystemBinaryArtifactPublisher(fault_injector=swap_before_publication)
+
+    def reject_publication(*args, **kwargs):
+        raise AssertionError("publication must not run after parent identity mismatch")
+
+    monkeypatch.setattr(publisher, "_publish_no_replace", reject_publication)
+
+    with pytest.raises(contracts.BinaryArtifactPublishError) as captured:
+        publisher.publish(_publish_request(contracts, repo_root, specdock_dir, scopes, source, destination))
+
+    assert captured.value.code == "destination_ineligible"
+    assert captured.value.cleanup_state == "removed"
+    assert captured.value.committed is False
+    assert list(displaced.iterdir()) == []
+    assert same_name_sentinel is not None
+    assert sorted(external.iterdir()) == sorted((sentinel, same_name_sentinel))
+    assert sentinel.read_bytes() == b"external sentinel"
+    assert same_name_sentinel.read_bytes() == b"external same-name sentinel"
+
+
+def test_publication_syscall_window_parent_swap_commits_to_held_parent_with_existing_warning(
+    tmp_path,
+    monkeypatch,
+):
+    if sys.platform != "darwin":
+        pytest.skip("actual fclonefileat race gate runs on macOS")
+    contracts, publisher_module = _runtime_modules()
+    repo_root, specdock_dir, scopes, artifacts_dir = _layout(tmp_path)
+    source = specdock_dir / ".workbench" / "source.md"
+    source_body = b"source bytes"
+    source.write_bytes(source_body)
+    destination = artifacts_dir / "published.md"
+    displaced = artifacts_dir.with_name("artifacts-original")
+    external = tmp_path / "external"
+    external.mkdir()
+    sentinel = external / "sentinel"
+    sentinel.write_bytes(b"external sentinel")
+    original_clone = publisher_module._clone_macos_descriptor
+
+    def swap_inside_clone(source_fd, destination_parent_fd, destination_name):
+        _swap_directory_for_external_symlink(artifacts_dir, displaced, external)
+        return original_clone(source_fd, destination_parent_fd, destination_name)
+
+    monkeypatch.setattr(publisher_module, "_clone_macos_descriptor", swap_inside_clone)
+
+    publisher = publisher_module.FilesystemBinaryArtifactPublisher()
+
+    def reject_confirmation(*args, **kwargs):
+        raise AssertionError("confirmation must not run after parent identity mismatch")
+
+    monkeypatch.setattr(publisher, "_hash_published_destination", reject_confirmation)
+
+    result = publisher.publish(_publish_request(contracts, repo_root, specdock_dir, scopes, source, destination))
+
+    expected_hash = hashlib.sha256(source_body).hexdigest()
+    assert result.committed is True
+    assert result.warning_codes == ("destination_read_failed",)
+    assert result.destination_sha256 == result.staged_sha256 == expected_hash
+    assert result.destination_byte_count == result.staged_byte_count == len(source_body)
+    assert result.cleanup_state == "removed"
+    assert (displaced / destination.name).read_bytes() == source_body
+    assert list(displaced.glob(".spec-dock-import-*")) == []
+    assert list(external.iterdir()) == [sentinel]
+    assert sentinel.read_bytes() == b"external sentinel"
+
+
+def test_linux_publication_uses_captured_parent_fd_without_late_parent_open(monkeypatch):
+    _, publisher_module = _runtime_modules()
+    publisher = publisher_module.FilesystemBinaryArtifactPublisher()
+    calls = []
+
+    def record_link(source, destination, **kwargs):
+        calls.append((source, destination, kwargs))
+
+    def reject_open(*args, **kwargs):
+        raise AssertionError("publication must not reopen destination parent")
+
+    monkeypatch.setattr(publisher_module.sys, "platform", "linux")
+    monkeypatch.setattr(publisher_module.os, "link", record_link)
+    monkeypatch.setattr(publisher_module.os, "open", reject_open)
+
+    publisher._publish_no_replace(41, 73, "published.md")
+
+    assert calls == [
+        (
+            "/proc/self/fd/41",
+            "published.md",
+            {"dst_dir_fd": 73, "follow_symlinks": True},
+        )
+    ]
+
+
+def test_linux_publication_syscall_window_parent_swap_commits_to_held_parent_with_existing_warning(
+    tmp_path,
+    monkeypatch,
+):
+    if not sys.platform.startswith("linux"):
+        pytest.skip("actual linkat race gate runs on Linux")
+    contracts, publisher_module = _runtime_modules()
+    repo_root, specdock_dir, scopes, artifacts_dir = _layout(tmp_path)
+    source = specdock_dir / ".workbench" / "source.md"
+    source_body = b"source bytes"
+    source.write_bytes(source_body)
+    destination = artifacts_dir / "published.md"
+    displaced = artifacts_dir.with_name("artifacts-original")
+    external = tmp_path / "external"
+    external.mkdir()
+    sentinel = external / "sentinel"
+    sentinel.write_bytes(b"external sentinel")
+    original_link = publisher_module.os.link
+
+    def swap_inside_link(source_path, destination_name, **kwargs):
+        _swap_directory_for_external_symlink(artifacts_dir, displaced, external)
+        return original_link(source_path, destination_name, **kwargs)
+
+    monkeypatch.setattr(publisher_module.os, "link", swap_inside_link)
+
+    publisher = publisher_module.FilesystemBinaryArtifactPublisher()
+
+    def reject_confirmation(*args, **kwargs):
+        raise AssertionError("confirmation must not run after parent identity mismatch")
+
+    monkeypatch.setattr(publisher, "_hash_published_destination", reject_confirmation)
+
+    result = publisher.publish(_publish_request(contracts, repo_root, specdock_dir, scopes, source, destination))
+
+    expected_hash = hashlib.sha256(source_body).hexdigest()
+    assert result.committed is True
+    assert result.warning_codes == ("destination_read_failed",)
+    assert result.destination_sha256 == result.staged_sha256 == expected_hash
+    assert result.destination_byte_count == result.staged_byte_count == len(source_body)
+    assert result.cleanup_state == "removed"
+    assert (displaced / destination.name).read_bytes() == source_body
+    assert list(displaced.glob(".spec-dock-import-*")) == []
+    assert list(external.iterdir()) == [sentinel]
+    assert sentinel.read_bytes() == b"external sentinel"
+
+
+def test_macos_publication_uses_captured_parent_fd_and_destination_basename(monkeypatch):
+    _, publisher_module = _runtime_modules()
+    publisher = publisher_module.FilesystemBinaryArtifactPublisher()
+    calls = []
+
+    def record_clone(source_fd, destination_parent_fd, destination_name):
+        calls.append((source_fd, destination_parent_fd, destination_name))
+
+    monkeypatch.setattr(publisher_module.sys, "platform", "darwin")
+    monkeypatch.setattr(publisher_module, "_clone_macos_descriptor", record_clone)
+
+    publisher._publish_no_replace(41, 73, "published.md")
+
+    assert calls == [(41, 73, "published.md")]
+
+
+def test_descriptor_lifecycle_order_uses_held_parent_through_cleanup(tmp_path, monkeypatch):
+    contracts, publisher_module = _runtime_modules()
+    repo_root, specdock_dir, scopes, artifacts_dir = _layout(tmp_path)
+    source = specdock_dir / ".workbench" / "source.md"
+    source.write_bytes(b"source bytes")
+    destination = artifacts_dir / "published.md"
+    publisher = publisher_module.FilesystemBinaryArtifactPublisher()
+    calls = []
+    held_parent_fd = None
+    temp_mode = None
+
+    def wrap_method(name):
+        original = getattr(publisher, name)
+
+        def wrapped(*args, **kwargs):
+            calls.append(name)
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(publisher, name, wrapped)
+
+    for name in (
+        "_create_temp",
+        "_copy_source_to_temp",
+        "_verify_source_stability",
+        "_publish_no_replace",
+        "_fsync_directory",
+        "_hash_published_destination",
+        "_cleanup_temp",
+    ):
+        wrap_method(name)
+
+    original_secure_open = publisher_module._open_secure_directory
+
+    def record_secure_open(*args, **kwargs):
+        nonlocal held_parent_fd
+        calls.append("secure_parent_open")
+        descriptor, identity = original_secure_open(*args, **kwargs)
+        if held_parent_fd is None:
+            held_parent_fd = descriptor
+        return descriptor, identity
+
+    original_close = publisher_module.os.close
+
+    def record_close(descriptor):
+        if descriptor == held_parent_fd:
+            calls.append("held_parent_close")
+        return original_close(descriptor)
+
+    def inject(point):
+        nonlocal temp_mode
+        calls.append(point)
+        if point == "before_publication":
+            [temp_path] = artifacts_dir.glob(".spec-dock-import-*")
+            temp_mode = stat.S_IMODE(temp_path.stat().st_mode)
+
+    monkeypatch.setattr(publisher_module, "_open_secure_directory", record_secure_open)
+    monkeypatch.setattr(publisher_module.os, "close", record_close)
+    publisher._fault_injector = inject
+
+    result = publisher.publish(_publish_request(contracts, repo_root, specdock_dir, scopes, source, destination))
+
+    assert result.committed is True
+    assert temp_mode == 0o600
+    expected_order = (
+        "temp_create",
+        "secure_parent_open",
+        "_create_temp",
+        "_copy_source_to_temp",
+        "file_fsync",
+        "hash",
+        "_verify_source_stability",
+        "before_publication",
+        "secure_parent_open",
+        "_publish_no_replace",
+        "publication_unsupported",
+        "_fsync_directory",
+        "directory_fsync",
+        "secure_parent_open",
+        "_hash_published_destination",
+        "post_confirmation",
+        "_cleanup_temp",
+        "cleanup",
+        "held_parent_close",
+    )
+    next_position = 0
+    for event in expected_order:
+        next_position = calls.index(event, next_position) + 1
