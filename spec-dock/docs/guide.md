@@ -40,6 +40,13 @@ detail / reference 入口:
 - Issue: 実装の最小単位。active issue を起点に behavior-slice based execution contract で完了する
 - ADR: 後続へ残る意思決定。initiative / epic / issue の任意 scope に紐づく
 - artifact docs: 思考、知識、未確定情報を外部化する補助 artifact。文書そのものを正本へ昇格させず、必要な文脈だけを `adr` / `requirement.md` / `design.md` / `plan.md` へ反映する
+- Workbench（experimental）: `spec-dock/.workbench/` または Initiative / Epic / Issue 直下の `.workbench/`。Git 管理外の disposable な一時作業場であり、canonical docs、durable evidence、node metadata の置き場ではない
+
+Workbench は exact path component `.workbench` を reserved boundary とし、default semantic discovery はその内部を探索・解釈しません。内容の保存、昇格、バックアップは自動化されず、scope や worktree の削除時には一緒に失われてよい前提です。永続化が必要な記録は `artifacts/` または canonical docs へ明示的に反映してください。`.workbench-notes` や `my.workbench` のような near-name は reserved boundary ではありません。
+
+Root `spec-dock/.workbench/` は `yyyymmdd` などの粗い日付bucketへ置き、必要なfileだけを人間またはモデルが手動選択します。Root Workbench全体を移すcommandはありません。Initiative / Epic / Issue直下のWorkbenchは、`workbench copy --scope <full-id> --to <linked-worktree>`で同一repositoryのlinked worktreeに明示的かつ一度だけcopyできます。Copyはsource-winsでdestination-only entryを保持し、自動sync、copy-back、継続同期を行いません。Directoryをそのままcopyし、言語、拡張子、MIME、内容による対象fileの分類は行いません。
+
+完成したChatGPTの単一Markdownは、`artifact import chatgpt-output --{initiative|epic|issue} <id> --file <workbench-file.md> --title "..."`でsourceを残したままbyte-identicalなblank Artifactへ保存できます。`chatgpt-output`はimport kindでありtyped Artifact tokenではないため、同名typeの予約はせず`new artifact`と共存します。Imported bodyはevidence-onlyです。Evidence Adoption Ledgerへ採否を記録し、採用した規範的内容だけをcanonical docsへ再記述してfresh reviewer gateを通してください。`update`は既存Workbenchを保持し、migration、normalize、delete、promotionしません。
 
 親子関係:
 

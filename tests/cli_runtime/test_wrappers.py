@@ -203,6 +203,12 @@ class TestCliRulesContract(CliRuntimeHarness):
             issue_planning_skill = (target / ".agents" / "skills" / "spec-dock-issue-planning" / "SKILL.md").read_text(
                 encoding="utf-8"
             )
+            initiative_planning_skill = (
+                target / ".agents" / "skills" / "spec-dock-initiative-planning" / "SKILL.md"
+            ).read_text(encoding="utf-8")
+            epic_planning_skill = (target / ".agents" / "skills" / "spec-dock-epic-planning" / "SKILL.md").read_text(
+                encoding="utf-8"
+            )
             chatgpt_authoring_skill = (
                 target / ".agents" / "skills" / "spec-dock-chatgpt-authoring" / "SKILL.md"
             ).read_text(encoding="utf-8")
@@ -257,6 +263,134 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert "must not claim" in chatgpt_authoring_skill
             assert "reviewer pass" in chatgpt_authoring_skill
             assert "merge-ready" in chatgpt_authoring_skill
+            branch_section = chatgpt_authoring_skill.split("Choose exactly one branch:", 1)[1].split(
+                "Evaluate an import result", 1
+            )[0]
+            branch_bullets = [line for line in branch_section.splitlines() if line.startswith("- ")]
+            assert len(branch_bullets) == 4
+            preservation_bullets = {line.removeprefix("- ").split(":", 1)[0]: line for line in branch_bullets}
+            expected_branch_headings = {
+                "Complete standalone Markdown",
+                "Complete received inline answer",
+                "Genuinely incomplete or unavailable inline output",
+                "ZIP/tree output",
+            }
+            assert set(preservation_bullets) == expected_branch_headings
+            standalone = preservation_bullets["Complete standalone Markdown"]
+            for token in (
+                "Workbench",
+                "explicitly runs `artifact import chatgpt-output`",
+                "verifies the receipt",
+                "`imported_byte_exact`",
+                "only from the Workbench source to the imported Artifact",
+            ):
+                assert token in standalone
+            inline = preservation_bullets["Complete received inline answer"]
+            for token in (
+                "captures only the complete answer text",
+                "without adding, removing, reformatting, or normalizing content",
+                "explicitly imports it",
+                "`captured_received_text`",
+                "never claim identity with provider-original bytes",
+                "wrapper transcript containing prompts or metadata",
+            ):
+                assert token in inline
+            unavailable = preservation_bullets["Genuinely incomplete or unavailable inline output"]
+            for token in (
+                "`skipped_inline_unavailable`",
+                "reason, decision owner, nonblocking rationale, and next action or revisit condition",
+                "Do not record source/destination paths, hashes, byte counts, or a byte-exact claim",
+            ):
+                assert token in unavailable
+            zip_tree = preservation_bullets["ZIP/tree output"]
+            for token in (
+                "review, quarantine, stage, and validation lane",
+                "Do not convert it to single-file import",
+                "weaken existing ZIP safety checks",
+            ):
+                assert token in zip_tree
+
+            import_result_bullets = [
+                line for line in chatgpt_authoring_skill.splitlines() if line.startswith("- `committed=")
+            ]
+            assert len(import_result_bullets) == 2
+            import_pass = next(line for line in import_result_bullets if "with no warning" in line)
+            for token in (
+                "`committed=true`",
+                "final repo-relative path",
+                "SHA-256",
+                "byte count",
+                "`import_kind=chatgpt-output`",
+                "`storage_identity=blank`",
+                "preservation result is `pass`",
+            ):
+                assert token in import_pass
+            import_warning = next(
+                line for line in chatgpt_authoring_skill.splitlines() if line.startswith("- The same complete receipt")
+            )
+            for token in (
+                "complete receipt",
+                "`committed=true`",
+                "warning",
+                "`pass-with-warning`",
+                "retain the warning",
+                "do not retry automatically",
+                "duplicate import",
+            ):
+                assert token in import_warning
+            import_block = next(line for line in import_result_bullets if "`committed=false`" in line)
+            for token in (
+                "missing receipt field",
+                "eligibility failure",
+                "unresolved semantic completeness",
+                "block adoption and canonical rewrite",
+            ):
+                assert token in import_block
+            failed_import = next(
+                line
+                for line in chatgpt_authoring_skill.splitlines()
+                if line.startswith("- Never reclassify a complete source whose import failed")
+            )
+            assert "`skipped_inline_unavailable`" in failed_import
+            for forbidden_claim in (
+                "canonical adoption completed",
+                "`.assurance.json` mutation",
+                "reviewer pass, including fresh `spec-reviewer`, `code-reviewer`, or `qa-reviewer` pass",
+                "execution-ready",
+                "PR-ready",
+                "merge-ready",
+                "Issue finish",
+                "Epic completion",
+                "PR delivery",
+            ):
+                assert forbidden_claim in chatgpt_authoring_skill
+            for planning_skill in (initiative_planning_skill, epic_planning_skill, issue_planning_skill):
+                assert (
+                    "Immediately after output is received, and before claim review, Evidence Adoption Ledger "
+                    "disposition, or canonical rewrite, invoke the shared `spec-dock-chatgpt-authoring` "
+                    "preservation checkpoint."
+                ) in planning_skill
+                assert (
+                    "Refer to the shared skill for branch, status, and import-result rules; do not copy that "
+                    "decision matrix here."
+                ) in planning_skill
+                for forbidden_matrix_token in (
+                    *(f"- {heading}:" for heading in expected_branch_headings),
+                    "establishes `imported_byte_exact`",
+                    "Record `captured_received_text`",
+                    "record `skipped_inline_unavailable`",
+                    "`committed=true`",
+                    "`committed=false`",
+                    "`pass-with-warning`",
+                    "`import_kind=chatgpt-output`",
+                    "`storage_identity=blank`",
+                    "missing receipt field",
+                    "duplicate import",
+                    "review, quarantine, stage, and validation lane",
+                    "single-file import",
+                    "weaken existing ZIP safety checks",
+                ):
+                    assert forbidden_matrix_token not in planning_skill
             assert "/Users/" not in chatgpt_authoring_skill
             assert "oracle-" + "chatgpt" not in chatgpt_authoring_skill
             assert "./spec " not in workflow_issue

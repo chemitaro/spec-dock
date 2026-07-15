@@ -3,7 +3,7 @@
 ID: "iss-00317"
 タイトル: "Byte Preserving ChatGPT Output Artifact Import"
 関連GitHub: ["#317"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-13"
 親: ["epic-00312", "init-local-00003"]
@@ -11,822 +11,137 @@ ID: "iss-00317"
 
 # iss-00317 Byte Preserving ChatGPT Output Artifact Import — Issue 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
-
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
-
----
-
-## 0. 文書の位置づけ
-
-### この文書が定義すること
-
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
-
-### この文書が定義しないこと
-
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
-
----
-
-## 1. 概要
-
-### 1.1 目的
-
-このIssueで達成したい目的を1〜3文で記述する。
-
-- 目的:
-  - ...
-
-### 1.2 観測可能な成果
-
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
-
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
-
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
-
-### 1.3 このIssueの種類
-
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
-
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
-
-### 3.3 このIssueで再定義してはいけないもの
-
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
-
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
-
----
-
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
-
-### 4.1 主な関係者（Actor）
-
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
-
-| 関係者（Actor） | 役割 | このIssueとの関係 |
-|---|---|---|
-| ... | ... | ... |
-
-### 4.2 開始条件（Trigger）
-
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
-
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
-
-### 4.3 代表シナリオ
-
-#### シナリオ SC-001:
-
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
-
-#### シナリオ SC-002:
-
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
-
-#### シナリオ SC-XXX:
-
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 5. スコープ
-
-### 5.1 対象範囲（In 対象範囲（Scope））
-
-このIssueで必ず実現することを列挙する。
-
-- ...
-- ...
-
-### 5.2 対象外（Out of 対象範囲（Scope））
-
-このIssueでは実現しないことを列挙する。
-
-- ...
-- ...
-
-### 5.3 変更しないもの（Unchanged / Must Not Change）
-
-関連はあるが、このIssueで変更してはいけないものを列挙する。
-
-- ...
-- ...
-
-### 5.4 判断が必要な境界
-
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
-
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 6. 要求される振る舞い
-
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
-
-### 振る舞い BH-001:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-002:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-XXX:
-
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 7. 受け入れ条件
-
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
-
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-002:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-XXX:
-
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
-
-```text
-...
-```
-
-### 例 EX-002: 出力例
-
-```text
-...
-```
-
-### 例 EX-003: エラー例
-
-```text
-...
-```
-
-### 契約上の注意
-
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-
-### 10.2 移行性
-
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-
-### 10.3 可観測性
-
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
-
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
-
-### 13.3 リスク事実（Risk Facts）
-
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
-
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
-
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
-
-#### `strict` 以上を検討する条件
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
-
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
-
-#### `lite` を検討できる条件
-
-すべて満たす場合のみ `lite` を検討できる。
-
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
-
----
-
-## 14. 設計への引き渡し
-
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
-
-### 14.1 設計で必ず扱うべき論点
-
-- ...
-- ...
-
-### 14.2 責任所有者が未確定のもの
-
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.3 境界が未確定のもの
-
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.4 契約影響が未確定のもの
-
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.5 上位へ昇格すべき可能性がある判断
-
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 15. 実装計画への引き渡し
-
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
-
-### 15.1 計画で分解すべき成果
-
-- ...
-- ...
-
-### 15.2 検証が必要な観測点
-
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
-
-### 15.3 TDDが必要な振る舞い候補
-
-振る舞い変更がある場合のみ記述する。
-
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
-
-### 15.4 TDD不要または限定的でよい理由
-
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
-
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-07-13 | 初稿（Initial draft） | ... | ... |
+## 目的
+- Current worktreeのrootまたはscoped `.workbench/`にあるsingle Markdown fileを、sourceを残したまま、本文bytesを変更せず指定scopeの`artifacts/`へ明示的にimportできるようにする。
+- Template-based `new artifact`と分離した保存経路により、完成済みChatGPT reportをCodexが要約・再構成する前のevidenceとして永続化する。
+
+## 親trace
+- Epic requirements: E-RQ-019–023。
+- Epic acceptance: E-AC-013–015。
+- Epic design: DS-003 Byte-preserving Artifact import、accepted ADR `adr-20260713t031808z-template-free-artifact-import-and-blank-filename-coexistence`。
+- 依存: Issue 315のWorkbench ignore/opaque traversal foundationが完了していること。Issue 316はformal dependencyではないが、current branch上のpath guardとfilesystem adapter patternを実装参考にできる。
+- 継承する不変条件:
+  - `chatgpt-output`はimport operation kindであり、新しいtyped Artifact tokenではない。
+  - Destinationはexisting blank Artifact grammarを使い、`new artifact blank --slug chatgpt-output-*`を許容し続ける。Filenameだけではcreation routeを区別しない。
+  - Provider authorityは`src/spec_dock/assets/spec_dock/**`。Dogfood `spec-dock/**`はinstalled verification surface。
+  - Imported outputはevidence-onlyであり、command success、filename、bodyからcanonical authority、accepted ADR、reviewer passを得ない。
+
+## 観測可能な成果
+- `artifact import chatgpt-output`が、exactly one destination scope、source `.md` file、title、任意slugを受け取る。
+- Sourceはcurrent worktreeのrootまたはInitiative/Epic/Issue direct-child scoped `.workbench/`配下に限定され、destination scopeとは独立して指定できる。
+- Destination basenameだけを`<timestamp>-chatgpt-output-<slug>.md`またはexisting collision suffix形で生成し、parser上はblank Artifactとして扱う。
+- Source、staged copy、published destinationのSHA-256とbyte countが一致し、sourceは成功・失敗の双方で残る。
+- Frontmatter、template、formatting、summary、encoding変換、newline正規化を行わず、bytesをopaqueとして扱う。
+- Publish前failureではformal Artifactを残さず、owned temporary fileをcleanupする。Publish後warningではcommitted pathを明示し、無条件retryを誘発しない。
+- Help、text、JSONはimport kind、blank storage identity、scope/source/destination、hash、byte count、commit/warning stateをcontent-freeに表現し、authorityをself-claimしない。
+- Generic validateはimported fileをexisting blank grammarとして受理し、ADR mirror、canonical docs、EAL、assurance stateをcommandが自動変更しない。
+
+## Issue要件
+- RQ-317-001 Separate explicit command:
+  - `artifact import chatgpt-output`を独立commandとして追加し、明示実行時だけ作動する。
+  - `new artifact`のmode/flag、automatic promotion、copy-on-rewrite、background importとして実装しない。
+- RQ-317-002 Minimal input contract:
+  - InputはMVP import kind `chatgpt-output`、exactly one Initiative/Epic/Issue selector、`--file`、`--title`、optional `--slug`、existing global JSON conventionに限定する。
+  - Move、overwrite、destination basename、encoding、template、frontmatter、multiple-file optionを設けない。
+- RQ-317-003 Source placement and eligibility:
+  - Sourceはcurrent worktreeの`spec-dock/.workbench/`またはresolved Initiative/Epic/Issue directory direct-child `.workbench/`配下のsingle regular non-symlink fileとする。
+  - Lowercase `.md` filename以外、directory、symlink source、Workbench外path、multiple files、special filesystem entryはcopy開始前にfailする。
+- RQ-317-004 Containment and source survival:
+  - Repo rootからapproved Workbench rootとsourceまでのlexical/physical containmentを確認し、symlinked ancestorやscope外readを拒否する。
+  - Commandはsourceをdelete、rename、truncate、rewrite、chmodせず、source inodeをdestinationとしてrename/hard-linkしない。
+- RQ-317-005 Opaque byte preservation:
+  - Binary streamとしてcopyし、encoding detection/validation/conversion、Markdown parse、frontmatter/template application、formatting、summary/restructure、newline/final-newline normalizationを行わない。
+  - UTF-8 BOM、LF/CRLF、final newline有無、日本語、NUL、invalid UTF-8、zero-byteをcontent理由で変換・拒否しない。
+- RQ-317-006 Blank naming coexistence:
+  - Titleまたはexplicit slugをexisting normalizationへ通し、blank slug `chatgpt-output-<normalized-slug>`を生成する。
+  - `chatgpt-output`を`SUPPORTED_ARTIFACT_TYPES`、template catalog、typed parser branch、reserved blank prefixへ追加しない。
+  - Existing `new artifact blank --slug chatgpt-output-*`とimportを同一blank grammar上で共存させる。
+- RQ-317-007 Shared allocation and no overwrite:
+  - Existing timestamp/collision suffix allocationとArtifact create serializationを共有し、same-second import/import、import/new-artifact concurrencyでも別slotを割り当てる。
+  - Existing Artifactを上書きせず、collision exhaustionはformal/source mutationなしでfailする。
+- RQ-317-008 Verified staging:
+  - Formal destinationと同じfilesystem上のowned temporary destinationへbinary copyする。
+  - Publish前にsource、copy stream、staged fileのSHA-256とbyte countを照合し、source replacement/mutationを検知した場合はfailする。
+- RQ-317-009 Atomic no-replace publication:
+  - 検証済みstaged fileだけを、existing destinationを置換しないprimitiveでformal pathへpublishする。
+  - Check-then-overwriteやoverwrite可能なreplaceを安全性根拠にせず、external writer raceでexisting bytesを変更しない。
+- RQ-317-010 Failure and cleanup boundary:
+  - Copy、hash、source mutation、file fsync、unsupported no-replace、bounded publish retry exhaustion等のpublish前failureではformal destinationを残さず、owned temp cleanup状態を返す。
+  - Transient publish `EEXIST`はexisting fileを変更せずstateを再scanして別slotへbounded reallocationする。Suffixまたはretry exhaustion時だけno-formal-write failureとする。
+  - Publish後のdirectory durability、cleanup、post-confirmation等のfailureはcommitted destinationをrollbackせず、committed pathを伴うwarningとして区別する。
+  - General transaction journal、rollback framework、orphan-temp catalog/GCを追加しない。
+- RQ-317-011 Output secrecy and authority isolation:
+  - Resultはimport kind、storage identity `blank`、Artifact ID、scope ID、repo-relative source/destination、SHA-256、byte count、commit/durability/cleanup stateに限定する。
+  - File body、secret-like value、absolute host path、raw OS exception、canonical/adopted/reviewed claimをtext/JSONへ含めない。
+  - Commandはcanonical docs、accepted ADR、EAL、assurance stateを編集しない。
+- RQ-317-012 Existing consumer compatibility:
+  - Generic Artifact validation/duplicate detectionではexisting blank Artifactとして扱い、body/frontmatter validityを要求しない。
+  - Typed `adr`ではないためADR mirror sourceにせず、sync projectionへ本文やimport provenance catalogを追加しない。
+  - UTF-8/frontmatterを要求するexisting delegated-authoring diff guardを緩和せず、command-owned raw importを別laneとして扱うworkflow統合をIssue 318へrelayする。
+  - Existing `new artifact` command/catalog/template、top-level node `import`、Issue 315 Workbench opacityを維持する。
+- RQ-317-013 Provider delivery boundary:
+  - Provider-side layered runtimeとfocused domain/application/infra/CLI/presentation testsを実装し、必要最小限のdogfood projection/manual importを確認する。
+  - Workflow/skill checkpointはIssue 318、package/fresh init/update、public reference docs、final provider/dogfood parity、full quality gate、Epic PRはIssue 319へrelayする。
+
+## 受け入れ条件
+- AC-317-001 CLI separation:
+  - Help/parseで`artifact import chatgpt-output`、exactly one scope、file、title、optional slugが確認でき、`new artifact` catalog/helpとnode `import` semanticsが不変である。
+- AC-317-002 Source boundary:
+  - Root/scoped Workbench内のrepo-relative/absolute sourceをdestination scopeから独立してimportできる。
+  - Missing、Workbench外、directory、`.MD`、source/ancestor symlink、special entryではcopy/publishを開始せず、source/external sentinel/formal artifactsが不変である。
+- AC-317-003 Byte identity and source survival:
+  - LF、CRLF、BOM、final newline有無、日本語、NUL、invalid UTF-8、zero-byte fixtureでsource/staged/finalのSHA-256とbyte countが一致する。
+  - Success後もsource path/bytesが残り、frontmatter/template/formattingが追加されない。
+- AC-317-004 Naming coexistence:
+  - Same-second importと`new artifact blank --slug chatgpt-output-*`がexisting blank grammar/collision suffixで共存し、validateされる。
+  - `chatgpt-output` typed token、template、reserved prefixが追加されない。
+- AC-317-005 No overwrite under collision:
+  - Import/import、import/new artifact、external exact-path writerのraceでexisting bytesを変更せず別slotへallocateし、suffix exhaustionはno-write failureとなる。
+- AC-317-006 Mutation and alias safety:
+  - Same-size content mutation、source replacement/unlinkをdeterministicに注入し、検査前提が崩れた場合はformal publish前にfailする。
+- AC-317-007 Pre-publish fault safety:
+  - Temp create/write、copy/hash mismatch、file fsync、unsupported publication、bounded retry/suffix exhaustion、pre-publish cleanup faultで新しいformal Artifactとsource lossがなく、owned temp cleanup stateが観測できる。
+  - Transient exact-path collisionはAC-317-005のreallocation成功経路として扱う。
+- AC-317-008 Post-publish warning:
+  - Publish後durability/cleanup/post-confirmation faultではfinal fileを保持し、committed path/hash/bytesとwarningを返して未commit failureと区別する。
+- AC-317-009 Output contract:
+  - Success/failure/warningのtext/JSONはcontent-freeで、body、absolute host path、raw OS error、canonical/reviewer/adoption claimを含まない。
+- AC-317-010 Generic consumer compatibility:
+  - Import後のvalidate/duplicate scan/sync projection/ADR mirror regressionでblank fileとして受理され、body/provenanceの新規projectionやADR mirrorが発生しない。
+  - Existing delegated-authoring diff guardをraw byte importへ流用せず、Issue 318向け互換性relayを残す。
+- AC-317-011 Distribution relay:
+  - Provider implementation、focused regression、manual Workbench→Artifact import、必要最小限のdogfood projection、Issue 319向けdeferred delivery evidenceが揃う。
+
+## 例外・境界条件
+- EC-317-001: Empty source fileはopaque bytesとして有効であり、byte count 0とempty SHA-256を検証する。
+- EC-317-002: Source pathがsymlinkまたはsymlinked ancestorを含む場合、targetがWorkbench内でも拒否する。
+- EC-317-003: Staged fileはsource inodeをrename/hard-linkしたものではなく、command-owned binary copyである。
+- EC-317-004: Same timestampのcollision suffixはexisting `01..99` contractに従い、exhaustion時はoverwriteしない。
+- EC-317-005: Concurrent mutation/TOCTOUの完全排除を一般保証せず、owned boundaryで前提変化を検知した場合はfailする。安全なno-replace publishを提供できないhost/filesystemではunsafe fallbackを使わずfailする。
+- EC-317-006: Publish成功後にdurability/cleanup warningが発生しても、source/finalを自動削除せずcommitted resultを返す。
+- EC-317-007: Crashで残るowned tempの永続GC/catalogはMVP外。Temporary basenameはgeneric Artifact scannerに見えない形とし、manual recoveryはIssue 319 docs impactで扱う。
+- EC-317-008: Import provenanceはfilenameから推定できない。Source/destination/hash/bytes/capture boundary/adoptionはorchestratorがreport EALへ記録する。
+
+## 非機能・安全性
+- New third-party dependency、database、schema、persistent manifest/catalog/sidecar、background processを追加しない。
+- File sizeに対してlinear streamingで処理し、whole-file memory bufferingを要求しない。
+- Existing layered architectureを維持し、binary publisherはtemplate/text writerやWorkbench recursive mergeと混同しない。
+- Source/final contentをlog、exception、text、JSONへ露出しない。
+
+## スコープ
+- 必須:
+  - Provider parser/registry/command/application/contracts/ports/domain/infra/presentation、focused tests、manual import、必要最小限のdogfood projection、Issue 319 relay。
+- 対象外:
+  - PDF/image/ZIP/directory/bundle/multiple-file/raw conversation import、RawCaptureBundle、content/encoding/MIME/secret classifier、frontmatter/sidecar/receipt、automatic import、EAL/canonical promotion、workflow/skill enforcement、public rollout/final Epic PR。
+  - DevCoder/reviewer model設定の追加変更。
+
+## Evidence / authority
+- Raw planning evidence:
+  - `artifacts/20260713t124754z-research-chatgpt-5-6-pro-issue-planning-evidence.md`（SHA-256 `8f05a598ea90385f1f0870973c8090555816af816d22dd7474e4c6501435f105`）。
+- Canonical authority:
+  - 本requirement、fresh review後のdesign/plan、parent Epic、accepted Artifact import ADR。
+- Evidenceの採否、GitHub-synced baseline、reviewer verdictは`report.md` EAL/Spec Authoring Gateへ記録する。
+
+## 未確定事項
+- Product/parent boundaryを変更する未確定事項はない。
+- Exact error/warning token、request/result field名、module allocation、cross-platform no-replace primitive、lock duration、post-publish exit semanticsは上記観測契約を変えないIssue-local design deltaとする。

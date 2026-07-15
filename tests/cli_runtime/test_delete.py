@@ -267,6 +267,24 @@ class TestCliDelete(CliRuntimeHarness):
         state = json.loads(state_path.read_text(encoding="utf-8"))
         assert state["state"] == "CLOSED"
 
+    def test_delete_issue_removes_nonempty_workbench_with_scope_without_special_handling(self) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")
+
+        target, issue_dir, state_path, env = self._setup_delete_target_repo(issue_number=56)
+        workbench_file = issue_dir / ".workbench" / "nested" / "scratch.bin"
+        workbench_file.parent.mkdir(parents=True)
+        workbench_file.write_bytes(b"\x00workbench scratch\xff")
+
+        result = self._run_runtime_capture(target, ["delete", "iss-00056", "--yes"], env=env)
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "spec-dock: ok (delete) target=iss-00056" in result.stdout
+        assert not issue_dir.exists()
+        assert not workbench_file.exists()
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        assert state["state"] == "CLOSED"
+
     def test_delete_issue_auto_syncs_index_dashboard_and_dependency_projection(self) -> None:
         if os.name == "nt":
             pytest.skip("This test uses a python gh stub with shebang; skip on Windows.")

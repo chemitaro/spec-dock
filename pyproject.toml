@@ -177,6 +177,10 @@ spec_dock = [
 # - Prevent legacy (v1) scaffolding artifacts from being packaged if they remain in build outputs.
 # - This protects `uvx --from <local path> ...` users who may have a stale `build/` directory.
 spec_dock = [
+  # Generated Python caches are never distributable package data.
+  "**/__pycache__/**",
+  "**/*.pyc",
+  "**/*.pyo",
   "assets/spec_dock/scripts/spec-dock-close*.sh",
   "assets/github/workflows/spec-dock-close.yml",
   "assets/spec_dock/templates/**/current/**",

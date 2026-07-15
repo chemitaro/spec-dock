@@ -24,6 +24,7 @@ Contract anchor: ChatGPT / Oracle output is evidence-only until the main orchest
   - `./spec-dock/scripts/spec-dock authoring preflight --help`
   - `./spec-dock/scripts/spec-dock authoring pack --help`
   - `./spec-dock/scripts/spec-dock authoring validate --help`
+- Preservation reference: `spec-dock/docs/authoring/chatgpt-pack.md`
 
 ## Evidence Modes
 
@@ -75,14 +76,38 @@ persisted receipt は preflight 観測時点の evidence です。`authoring pac
    - SpecDock does not select an Oracle implementation or version. The operator-owned backend wrapper resolves the single backend command and selects the current ChatGPT `Pro` model.
    - Treat tab capacity, queued browser sessions, and retryable backend timeouts as wait/retry conditions, not as reasons to use the manual route.
    - Treat browser/backend startup failure as recoverable when restart, session cleanup, or configuration repair is available.
-5. Review returned ZIP/tree output, candidate reports, draft docs, or summaries as evidence.
-   - Preserve raw output separately from adopted canonical text.
-6. Validate candidates or draft-adoption input when runtime support exists.
+5. Before adoption or canonical rewrite, apply the preservation checkpoint below to the received output.
+   - This skill classifies the output and evaluates the resulting evidence. The main orchestrator explicitly performs any capture, import, exception recording, or ZIP/tree routing.
+6. Review returned ZIP/tree output, candidate reports, draft docs, or summaries as evidence.
+   - Preserve eligible complete output separately from adopted canonical text.
+7. Validate candidates or draft-adoption input when runtime support exists.
    - Runtime validation can make evidence easier to review; it is not a reviewer pass.
-7. Route back to the relevant planning skill for canonical adoption.
+8. Route back to the relevant planning skill for canonical adoption.
    - Initiative planning owns Initiative docs and Epic decomposition approval.
    - Epic planning owns Epic docs, Issue slicing, and human approval before Issue node creation.
    - Issue planning owns Issue `requirement.md`, `design.md`, `plan.md`, Evidence Adoption Ledger entries, fresh `spec-reviewer`, and execution handoff.
+
+## Preservation Checkpoint
+
+Classify semantic completeness and output form before preservation, Evidence Adoption Ledger disposition, or canonical rewrite. Do not infer completeness from file presence, extension, size, or encoding. If classification is unresolved, return a blocking handoff without a preservation status.
+
+Choose exactly one branch:
+
+- Complete standalone Markdown: the main orchestrator places the source in Workbench, explicitly runs `artifact import chatgpt-output`, and verifies the receipt. A complete receipt establishes `imported_byte_exact` only from the Workbench source to the imported Artifact.
+- Complete received inline answer: the main orchestrator captures only the complete answer text, without adding, removing, reformatting, or normalizing content, then explicitly imports it. Record `captured_received_text`; never claim identity with provider-original bytes or durably import a wrapper transcript containing prompts or metadata.
+- Genuinely incomplete or unavailable inline output: record `skipped_inline_unavailable` with reason, decision owner, nonblocking rationale, and next action or revisit condition. Do not record source/destination paths, hashes, byte counts, or a byte-exact claim.
+- ZIP/tree output: route to the existing review, quarantine, stage, and validation lane. Do not convert it to single-file import or weaken existing ZIP safety checks.
+
+Evaluate an import result as follows:
+
+- `committed=true` with final repo-relative path, SHA-256, byte count, `import_kind=chatgpt-output`, and `storage_identity=blank`, and with no warning: preservation result is `pass`.
+- The same complete receipt with `committed=true` and a warning: preservation result is `pass-with-warning`; retain the warning and do not retry automatically or create a duplicate import.
+- `committed=false`, a missing receipt field, an eligibility failure, or unresolved semantic completeness: block adoption and canonical rewrite.
+- Never reclassify a complete source whose import failed as `skipped_inline_unavailable`.
+
+Return a content-free handoff containing the selected branch or unresolved classification, preservation status when applicable, receipt metadata or exception-field completeness, blocking decision, and next action. Receipt metadata is limited to repo-relative paths, hash, byte count, import/storage identity, committed state, and warning; do not include the evidence body, secret-like values, or absolute host paths.
+
+This skill owns only the shared classification contract and evidence evaluation. It does not execute capture or import, write the Evidence Adoption Ledger, adopt claims, rewrite canonical docs, mutate assurance state, or claim reviewer/readiness/finish/PR status. The main orchestrator owns preservation execution, adoption disposition, and canonical rewrite; the relevant planning workflow and fresh reviewers retain their existing gates.
 
 ## Evidence Contract
 

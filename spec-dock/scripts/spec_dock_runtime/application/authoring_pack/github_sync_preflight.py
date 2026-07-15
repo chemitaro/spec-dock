@@ -27,6 +27,7 @@ from spec_dock_runtime.domain.authoring_pack.preflight_contract import (
 )
 from spec_dock_runtime.domain.authoring_pack.source_manifest import (
     build_source_manifest,
+    empty_source_manifest,
     expected_hash_from_manifest,
     source_path_blockers,
 )
@@ -107,6 +108,9 @@ def run_github_sync_preflight(
     if request.evidence_mode == "local-context" and not manifest_paths:
         manifest_paths = request.provided_context_paths
     source_blockers = source_path_blockers(repo_root, manifest_paths)
+    if any(blocker.startswith("unsafe_source_path:workbench:") for blocker in source_blockers):
+        result = _workbench_source_blocked_result(request, source_blockers)
+        return _finalize_publication(result, repo_root, request.output_dir, output_blocker)
     expected_source_hash = _resolve_expected_hash(request)
     if request.evidence_mode == "local-context":
         source_manifest = build_source_manifest(repo_root, manifest_paths)
@@ -315,6 +319,33 @@ def _finalize_publication(
             ))
         ),
         publication=publication,
+    )
+
+
+def _workbench_source_blocked_result(
+    request: GitHubSyncPreflightRequest,
+    source_blockers: tuple[str, ...],
+) -> PreflightResult:
+    local_context = request.evidence_mode == "local-context"
+    source_manifest = empty_source_manifest()
+    return PreflightResult(
+        status="blocked",
+        evidence_mode=request.evidence_mode,
+        sync_state="local_context" if local_context else "blocked",
+        github_sync="not_verified" if local_context else "failed",
+        requested_ref=request.ref,
+        effective_ref=None,
+        local_head=None,
+        remote_head=None,
+        source_manifest=source_manifest,
+        source_hash_mismatch_checked=False,
+        blockers=source_blockers,
+        remediation=("remove Workbench paths from semantic authoring sources before preflight",),
+        expected_source_hash=None,
+        provided_context_paths=request.provided_context_paths,
+        diff_summary=request.diff_summary,
+        unsynced_reason=request.unsynced_reason,
+        current_source_hash=source_manifest.source_manifest_hash,
     )
 
 

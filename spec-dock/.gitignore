@@ -3,6 +3,8 @@
 .agent/
 # legacy v2 name (kept ignored for safe upgrades)
 .work/
+# local disposable work areas (reserved exact directory name at any scope)
+.workbench/
 active/
 /adrs/
 tree-all.puml

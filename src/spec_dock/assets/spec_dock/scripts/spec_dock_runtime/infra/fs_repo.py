@@ -16,6 +16,7 @@ from spec_dock_runtime.infra.contracts import StoredMetaRecord
 from spec_dock_runtime.infra.json_store import load_json, write_json
 
 _INITIATIVES_DIRNAME = "initiatives"
+_WORKBENCH_DIRNAME = ".workbench"
 _META_FILENAME = ".meta.json"
 _LEGACY_META_FILENAME = "meta.json"
 _NODE_DIRNAME_PATTERNS: dict[str, re.Pattern[str]] = {
@@ -151,11 +152,20 @@ def _initiatives_root(specdock_dir: Path) -> Path:
 
 
 def _iter_node_meta_paths(initiatives_root: Path) -> list[Path]:
-    return sorted(initiatives_root.rglob(_META_FILENAME), key=lambda p: p.as_posix())
+    return _find_metadata_paths(initiatives_root, filename=_META_FILENAME)
 
 
 def _find_legacy_meta_paths(initiatives_root: Path) -> list[Path]:
-    return sorted(initiatives_root.rglob(_LEGACY_META_FILENAME), key=lambda p: p.as_posix())
+    return _find_metadata_paths(initiatives_root, filename=_LEGACY_META_FILENAME)
+
+
+def _find_metadata_paths(root: Path, *, filename: str) -> list[Path]:
+    matches: list[Path] = []
+    for current_root, child_dirnames, filenames in os.walk(root, topdown=True):
+        child_dirnames[:] = sorted(name for name in child_dirnames if name != _WORKBENCH_DIRNAME)
+        if filename in filenames:
+            matches.append(Path(current_root) / filename)
+    return sorted(matches, key=lambda path: path.as_posix())
 
 
 def _sorted_child_dirs(path: Path) -> list[Path]:

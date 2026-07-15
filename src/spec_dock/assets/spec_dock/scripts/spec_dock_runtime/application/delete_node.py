@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -281,8 +282,10 @@ def _matching_target_directories(specdock_dir: Path, *, canonical_id: str, kind:
         return []
     matches: list[Path] = []
     expected_prefix = f"{canonical_id}-"
-    for path in initiatives_root.rglob("*"):
-        if not path.is_dir():
+    for current_root, child_dirnames, _filenames in os.walk(initiatives_root, topdown=True):
+        child_dirnames[:] = sorted(name for name in child_dirnames if name != ".workbench")
+        path = Path(current_root)
+        if path == initiatives_root:
             continue
         name = path.name.lower()
         if name != canonical_id and not name.startswith(expected_prefix):

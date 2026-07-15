@@ -76,30 +76,19 @@ def create_artifact_doc(
         artifact_store=artifact_store,
     )
     del template_path
-    _preflight_artifacts_dir(artifacts_dir)
-    _preflight_artifacts_rules(scope=scope, specdock_dir=specdock_dir, artifacts_dir=artifacts_dir)
-    duplicate_error, _artifact_ids = scan_artifact_duplicate_state(artifacts_dir)
-    if duplicate_error is not None:
-        raise RuntimeError(duplicate_error)
-    dest_path, artifact_id = allocate_artifact_filename_for_timestamp(
-        artifacts_dir,
-        timestamp=timestamp,
-        artifact_type=artifact_type,
-        slug=slug,
-    )
-    if os.path.lexists(dest_path):
-        raise RuntimeError(f"Artifact already exists: {dest_path}")
 
     lock_path, lock_token = _acquire_create_lock(specdock_dir)
     result: CreateArtifactDocResult | None = None
     body_error: Exception | None = None
     try:
-        duplicate_error, _artifact_ids = scan_artifact_duplicate_state(artifacts_dir)
-        if duplicate_error is not None:
-            raise RuntimeError(duplicate_error)
-        if os.path.lexists(dest_path):
-            raise RuntimeError(f"Artifact already exists: {dest_path}")
-        _ensure_artifacts_setup(scope=scope, specdock_dir=specdock_dir, artifacts_dir=artifacts_dir)
+        dest_path, artifact_id = _allocate_artifact_destination_under_create_lock(
+            scope=scope,
+            specdock_dir=specdock_dir,
+            artifacts_dir=artifacts_dir,
+            timestamp=timestamp,
+            artifact_type=artifact_type,
+            slug=slug,
+        )
         rendered_text = template_scaffolder.render_text(
             template_text,
             _artifact_replacements(
@@ -138,6 +127,30 @@ def create_artifact_doc(
         raise body_error
     assert result is not None
     return result
+
+
+def _allocate_artifact_destination_under_create_lock(
+    *,
+    scope: SpecNode,
+    specdock_dir: Path,
+    artifacts_dir: Path,
+    timestamp: str,
+    artifact_type: str,
+    slug: str,
+) -> tuple[Path, str]:
+    _ensure_artifacts_setup(scope=scope, specdock_dir=specdock_dir, artifacts_dir=artifacts_dir)
+    duplicate_error, _artifact_ids = scan_artifact_duplicate_state(artifacts_dir)
+    if duplicate_error is not None:
+        raise RuntimeError(duplicate_error)
+    dest_path, artifact_id = allocate_artifact_filename_for_timestamp(
+        artifacts_dir,
+        timestamp=timestamp,
+        artifact_type=artifact_type,
+        slug=slug,
+    )
+    if os.path.lexists(dest_path):
+        raise RuntimeError(f"Artifact already exists: {dest_path}")
+    return dest_path, artifact_id
 
 
 def _normalize_artifact_inputs(req: CreateArtifactDocRequest) -> tuple[str, str, str]:

@@ -982,6 +982,44 @@ class TestCliWorktree(CliRuntimeHarness):
             assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
             assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
 
+    def test_worktree_remove_deletes_nonempty_workbench_without_special_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "sample-repo"
+            central_root = Path(tmp) / "central-worktrees"
+            target.mkdir()
+            self._prepare_git_repo(target)
+
+            created = self._run_runtime_capture(
+                target, ["worktree", "create", "workbench"], env=self._worktree_env(central_root)
+            )
+            assert created.returncode == 0, created.stderr
+            worktree_path = central_root / "sample-repo" / "sample-repo-workbench"
+            branch = self._run_git(
+                target, ["branch", "--list", "*-workbench", "--format=%(refname:short)"]
+            ).stdout.strip()
+            assert branch
+            workbench_file = worktree_path / "spec-dock" / ".workbench" / "nested" / "scratch.bin"
+            workbench_file.parent.mkdir(parents=True)
+            workbench_file.write_bytes(b"\x00workbench scratch\xff")
+
+            removed = self._run_runtime_capture(
+                target,
+                ["worktree", "remove", "workbench", "--json"],
+                env=self._worktree_env(central_root),
+            )
+
+            assert removed.returncode == 0, removed.stderr or removed.stdout
+            payload = json.loads(removed.stdout)
+            assert payload["status"] == "ok"
+            assert payload["removed_record"]
+            assert payload["removed_directory"]
+            assert payload["resolved_target"]["remove_blockers"] == []
+            assert not payload["branch_deleted"]
+            assert not worktree_path.exists()
+            assert not workbench_file.exists()
+            assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
+            assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
+
     def test_worktree_remove_tracked_modification_default_removes_directory_and_keeps_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "sample-repo"
@@ -1988,6 +2026,87 @@ class TestCliWorktree(CliRuntimeHarness):
             assert raised.value.code == "ambiguous_target"
             assert len(raised.value.candidates) == 2
             assert git_gateway.remove_calls == []
+
+    def test_worktree_target_resolver_boundary_preserves_selector_semantics(self) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys_path_inserted = False
+
+        if str(runtime_scripts_dir) not in sys.path:
+            sys.path.insert(0, str(runtime_scripts_dir))
+            sys_path_inserted = True
+        try:
+            from spec_dock_runtime.application import (
+                contracts as app_contracts,
+                worktree_target as app_worktree_target,
+            )
+        finally:
+            if sys_path_inserted:
+                sys.path.pop(0)
+
+        managed = app_contracts.WorktreeRecordView(
+            id="alpha",
+            path=Path("/tmp/central/repo/repo-alpha"),
+            basename="repo-alpha",
+            branch="main-alpha",
+            head="abc",
+            managed=True,
+            main=False,
+            current=False,
+            path_exists=True,
+            record_exists=True,
+            removable=True,
+            remove_blockers=[],
+        )
+        external = app_contracts.WorktreeRecordView(
+            id="manual-worktree",
+            path=Path("/tmp/manual-worktree"),
+            basename="manual-worktree",
+            branch="manual-branch",
+            head="def",
+            managed=False,
+            main=False,
+            current=False,
+            path_exists=True,
+            record_exists=True,
+            removable=True,
+            remove_blockers=[],
+            origin="external",
+        )
+        duplicate_basename = app_contracts.WorktreeRecordView(
+            id="alpha~2",
+            path=Path("/tmp/manual/repo-alpha"),
+            basename="repo-alpha",
+            branch="other-alpha",
+            head="ghi",
+            managed=False,
+            main=False,
+            current=False,
+            path_exists=True,
+            record_exists=True,
+            removable=True,
+            remove_blockers=[],
+            origin="external",
+        )
+
+        inventory = [managed, external]
+        for selector in (managed.id, str(managed.path), managed.basename):
+            assert app_worktree_target.resolve_worktree_target(selector, inventory, command="copy") is managed
+        assert app_worktree_target.resolve_worktree_target(external.basename, inventory, command="copy") is external
+
+        with pytest.raises(app_contracts.WorktreeCommandError) as ambiguous:
+            app_worktree_target.resolve_worktree_target(
+                managed.basename,
+                [managed, duplicate_basename],
+                command="copy",
+            )
+        assert ambiguous.value.code == "ambiguous_target"
+        assert ambiguous.value.candidates == [managed, duplicate_basename]
+
+        with pytest.raises(app_contracts.WorktreeCommandError) as branch_only:
+            app_worktree_target.resolve_worktree_target(managed.branch, inventory, command="copy")
+        assert branch_only.value.code == "unsupported_branch_target"
 
     def test_worktree_remove_re_resolves_target_after_final_git_refresh(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

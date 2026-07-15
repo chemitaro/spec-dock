@@ -580,10 +580,9 @@ def _metadata_schema_errors(parsed_json: dict[str, dict[str, Any]], preflight: d
             errors.append("provenance.repository must include full_name and requested_ref")
         else:
             preflight_repository = preflight.get("repository", {})
-            if (
-                repository.get("full_name") != preflight_repository.get("full_name")
-                or repository.get("requested_ref") != preflight_repository.get("requested_ref")
-            ):
+            if repository.get("full_name") != preflight_repository.get("full_name") or repository.get(
+                "requested_ref"
+            ) != preflight_repository.get("requested_ref"):
                 errors.append("provenance.repository does not match preflight repository")
         if provenance.get("source") != "chatgpt_zip_authoring_pack":
             errors.append("provenance.source mismatch")
