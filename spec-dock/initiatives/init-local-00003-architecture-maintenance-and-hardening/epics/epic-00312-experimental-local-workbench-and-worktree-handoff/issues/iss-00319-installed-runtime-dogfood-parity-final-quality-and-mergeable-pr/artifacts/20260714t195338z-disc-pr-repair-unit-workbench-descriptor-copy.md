@@ -28,7 +28,7 @@ reflected_to: []
 - decided_priority: `P1`
 - merge_blocking: `yes`
 - disposition: `fix-now`
-- status: `implemented-and-local-gates-complete-awaiting-commit-push`
+- status: `committed-and-pushed-awaiting-combined-re-observation`
 - execution_order: `U3 before U4`; both units are required before PR re-observation
 
 ## Delegation Gate
@@ -92,8 +92,8 @@ git diff --check
 
 - Current macOS hostで少なくとも`tests/unit/infra/test_runtime_fs_cli_workbench.py`をactual focused executionする。
 - Actual Python 3.10 interpreterで`python3.10 -m pytest tests/unit/infra/test_runtime_fs_cli_workbench.py`をpre-push実行し、exact infra fileのpassを要求する。Python 3.10 interpreter unavailableはpassではなく、explicit gate/human conditionとして停止・報告する。
-- U3差分に対してfresh code reviewer、QA reviewer、spec reviewerを順に実行し、P0/P1=0を要求する。
-- Focused Python 3.10、related regression、new-node repetition、lint、parity、diff、fresh code/QA reviewsはPASS。Required full `uv run --python 3.12 pytest`もPASS（2600 passed / 75 skipped / 2 warnings, 1666.78s）。Commit/pushはpending。
+- U3差分に対するfresh code reviewer、QA reviewer、spec/pre-commit reviewerは完了し、blocking finding 0でPASS。
+- Focused Python 3.10、related regression、new-node repetition、lint、parity、diff、fresh code/QA reviewsはPASS。Required full `uv run --python 3.12 pytest`もPASS（2600 passed / 75 skipped / 2 warnings, 1666.78s）。Commit/pushはhead `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`で完了。
 - Exploratory/non-requiredのPython 3.10 full-suite attemptはU3 gateではない。Test execution前のcollectionでpre-existing `scripts/authoring-pack/prepare_chatgpt_authoring_pack.py`の`datetime.UTC` importにより失敗したため、U3 regression/gate failureとは扱わない。Actual Python 3.10のU3 required focused gateは34 passedでPASS済み。
 - U3 commit後もPR re-observationは行わず、U4完了後のlatest headで一度実行する。
 
@@ -127,10 +127,10 @@ git diff --check
 - GREEN actual Python 3.10: uv-provided Python 3.10.15、exact `tests/unit/infra/test_runtime_fs_cli_workbench.py` 34 passed。
 - reviewer PATH correction: Code-review PATH confusion is superseded by actual uv interpreter evidence。Python 3.10.15 version and focused execution are verified; PATH presentation alone is not treated as interpreter evidence。
 - related gates: Workbench application + CLI 47 passed。Four new nodes repeated 40/40。`make lint` PASS。Provider/dogfood `cmp` PASS。`git diff --check` PASS。
-- fresh reviews: Code review PASS P0-P3=0。QA review PASS P0-P3=0。
+- fresh reviews: Code review PASS P0-P3=0。QA review PASS P0-P3=0。Spec/pre-commit review PASS。
 - full pytest: Required `uv run --python 3.12 pytest` PASS。2600 passed / 75 skipped / 2 warnings in 1666.78s。
 - exploratory Python 3.10 full suite: U3 non-gate。Collection failed before test execution on pre-existing `datetime.UTC` import in `scripts/authoring-pack/prepare_chatgpt_authoring_pack.py`; not a U3 regression or U3 gate failure。
-- commit/push: `pending`
-- local closure: R8/F6 local implementation/quality/code+QA reviews complete。Only commit/push remains for U3 unit completion。
-- U4 dependency: Required U3 full gateは完了済み。U3 commit/pushが成功するまで引き続きblocked。
-- latest-head re-observation: `pending-after-U3-and-U4`
+- commit/push: `complete` at head `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`
+- local closure: R8/F6 implementation/quality/code+QA reviews/commit/push complete。
+- U4 dependency: Satisfied。U4 local implementation/test/staticは完了し、fresh code review PASS、QA conditional PASS。Final fresh spec/precommit、commit/push、Ubuntu CI/re-observationはpending。
+- latest-head re-observation: `intentionally-pending-after-U4-final-gates-and-push`; U3単独headでは実施しない。

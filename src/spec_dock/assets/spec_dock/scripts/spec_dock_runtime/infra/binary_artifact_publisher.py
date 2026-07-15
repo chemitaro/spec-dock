@@ -5,9 +5,9 @@ import errno
 import hashlib
 import os
 from pathlib import Path
+import secrets
 import stat
 import sys
-import tempfile
 from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.contracts import (
@@ -100,7 +100,6 @@ class FilesystemBinaryArtifactPublisher:
         repo_root = _absolute_lexical(request.source.repo_root)
         try:
             _require_contained(repo_root, destination)
-            _guard_directory_ancestry(repo_root, destination.parent)
         except (_PublishFailure, FileNotFoundError, OSError, ValueError):
             raise BinaryArtifactPublishError(
                 code="destination_ineligible",
@@ -108,18 +107,25 @@ class FilesystemBinaryArtifactPublisher:
             ) from None
 
         source_fd: int | None = None
+        destination_parent_fd: int | None = None
+        destination_parent_identity: tuple[int, int] | None = None
         temp_fd: int | None = None
-        temp_path: Path | None = None
+        temp_name: str | None = None
         try:
             source_fd, initial_status = self._open_guarded_source(guarded)
             try:
                 self._inject("temp_create")
-                temp_fd, raw_temp_path = tempfile.mkstemp(
-                    prefix=".spec-dock-import-",
-                    suffix=".tmp",
-                    dir=destination.parent,
+            except OSError:
+                raise _PublishFailure("temp_create_failed") from None
+            try:
+                destination_parent_fd, destination_parent_identity = _open_secure_directory(
+                    repo_root,
+                    destination.parent,
                 )
-                temp_path = Path(raw_temp_path)
+            except (_PublishFailure, FileNotFoundError, OSError, ValueError):
+                raise _PublishFailure("destination_ineligible") from None
+            try:
+                temp_fd, temp_name = self._create_temp(destination_parent_fd)
             except OSError:
                 raise _PublishFailure("temp_create_failed") from None
 
@@ -157,26 +163,48 @@ class FilesystemBinaryArtifactPublisher:
             if (source_sha256, source_count) != (stream_sha256, stream_count):
                 raise _PublishFailure("source_changed")
 
-            self._publish_no_replace(temp_fd, destination)
+            self._inject("before_publication")
+            if not _visible_directory_matches(
+                repo_root,
+                destination.parent,
+                destination_parent_identity,
+            ):
+                raise _PublishFailure("destination_ineligible")
+            self._publish_no_replace(
+                temp_fd,
+                destination_parent_fd,
+                destination.name,
+            )
             warning_codes: list[BinaryArtifactPublishWarning] = []
-            if not self._fsync_directory(destination.parent):
+            if not self._fsync_directory(destination_parent_fd):
                 warning_codes.append("directory_fsync_failed")
-            try:
-                destination_sha256, destination_count = self._hash_published_destination(destination)
-            except _PublishFailure as exc:
-                if exc.code != "destination_read_failed":
-                    raise
+            if not _visible_directory_matches(
+                repo_root,
+                destination.parent,
+                destination_parent_identity,
+            ):
                 destination_sha256, destination_count = staged_sha256, staged_count
                 warning_codes.append("destination_read_failed")
             else:
-                if (destination_sha256, destination_count) != (
-                    staged_sha256,
-                    staged_count,
-                ):
-                    warning_codes.append("destination_mismatch")
-            cleanup_state = self._cleanup_temp(temp_path, temp_fd)
+                try:
+                    destination_sha256, destination_count = self._hash_published_destination(
+                        destination_parent_fd,
+                        destination.name,
+                    )
+                except _PublishFailure as exc:
+                    if exc.code != "destination_read_failed":
+                        raise
+                    destination_sha256, destination_count = staged_sha256, staged_count
+                    warning_codes.append("destination_read_failed")
+                else:
+                    if (destination_sha256, destination_count) != (
+                        staged_sha256,
+                        staged_count,
+                    ):
+                        warning_codes.append("destination_mismatch")
+            cleanup_state = self._cleanup_temp(temp_name, temp_fd, destination_parent_fd)
             if cleanup_state == "removed":
-                temp_path = None
+                temp_name = None
             else:
                 warning_codes.append("temp_cleanup_retained")
             return BinaryArtifactPublishResult(
@@ -198,13 +226,21 @@ class FilesystemBinaryArtifactPublisher:
         except BinaryArtifactPublishError:
             raise
         except _PublishFailure as exc:
-            cleanup_state = self._cleanup_after_failure(temp_path, temp_fd)
+            cleanup_state = self._cleanup_after_failure(
+                temp_name,
+                temp_fd,
+                destination_parent_fd,
+            )
             raise BinaryArtifactPublishError(
                 code=exc.code,
                 cleanup_state=cleanup_state,
             ) from None
         except OSError:
-            cleanup_state = self._cleanup_after_failure(temp_path, temp_fd)
+            cleanup_state = self._cleanup_after_failure(
+                temp_name,
+                temp_fd,
+                destination_parent_fd,
+            )
             raise BinaryArtifactPublishError(
                 code="filesystem_failed",
                 cleanup_state=cleanup_state,
@@ -212,8 +248,23 @@ class FilesystemBinaryArtifactPublisher:
         finally:
             if temp_fd is not None:
                 os.close(temp_fd)
+            if destination_parent_fd is not None:
+                os.close(destination_parent_fd)
             if source_fd is not None:
                 os.close(source_fd)
+
+    def _create_temp(self, destination_parent_fd: int) -> tuple[int, str]:
+        flags = os.O_RDWR | os.O_CREAT | os.O_EXCL
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        while True:
+            temp_name = f".spec-dock-import-{secrets.token_hex(16)}.tmp"
+            try:
+                return os.open(temp_name, flags, 0o600, dir_fd=destination_parent_fd), temp_name
+            except FileExistsError:
+                continue
 
     def _open_guarded_source(self, guarded: GuardedWorkbenchSource) -> tuple[int, os.stat_result]:
         flags = os.O_RDONLY
@@ -315,31 +366,30 @@ class FilesystemBinaryArtifactPublisher:
             raise _PublishFailure("source_changed")
         return source_sha256, source_count
 
-    def _publish_no_replace(self, temp_fd: int, destination: Path) -> None:
-        self._inject("before_publication")
+    def _publish_no_replace(
+        self,
+        temp_fd: int,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> None:
         try:
             self._inject("publication_unsupported")
         except OSError:
             raise _PublishFailure("publication_unsupported") from None
         try:
             if sys.platform == "darwin":
-                _clone_macos_descriptor(temp_fd, destination)
+                _clone_macos_descriptor(
+                    temp_fd,
+                    destination_parent_fd,
+                    destination_name,
+                )
             elif sys.platform.startswith("linux"):
-                flags = os.O_RDONLY
-                if hasattr(os, "O_CLOEXEC"):
-                    flags |= os.O_CLOEXEC
-                if hasattr(os, "O_DIRECTORY"):
-                    flags |= os.O_DIRECTORY
-                directory_fd = os.open(destination.parent, flags)
-                try:
-                    os.link(
-                        f"/proc/self/fd/{temp_fd}",
-                        destination.name,
-                        dst_dir_fd=directory_fd,
-                        follow_symlinks=True,
-                    )
-                finally:
-                    os.close(directory_fd)
+                os.link(
+                    f"/proc/self/fd/{temp_fd}",
+                    destination_name,
+                    dst_dir_fd=destination_parent_fd,
+                    follow_symlinks=True,
+                )
             else:
                 raise _PublishFailure("publication_unsupported")
         except FileExistsError:
@@ -351,7 +401,11 @@ class FilesystemBinaryArtifactPublisher:
                 raise _PublishFailure("publication_unsupported") from None
             raise _PublishFailure("publication_failed") from None
 
-    def _hash_published_destination(self, destination: Path) -> tuple[str, int]:
+    def _hash_published_destination(
+        self,
+        destination_parent_fd: int,
+        destination_name: str,
+    ) -> tuple[str, int]:
         flags = os.O_RDONLY
         if hasattr(os, "O_CLOEXEC"):
             flags |= os.O_CLOEXEC
@@ -360,7 +414,11 @@ class FilesystemBinaryArtifactPublisher:
         descriptor: int | None = None
         try:
             self._inject("post_confirmation")
-            descriptor = os.open(destination, flags)
+            descriptor = os.open(
+                destination_name,
+                flags,
+                dir_fd=destination_parent_fd,
+            )
             return self._hash_descriptor(descriptor)
         except OSError:
             raise _PublishFailure("destination_read_failed") from None
@@ -368,42 +426,38 @@ class FilesystemBinaryArtifactPublisher:
             if descriptor is not None:
                 os.close(descriptor)
 
-    def _fsync_directory(self, directory: Path) -> bool:
-        flags = os.O_RDONLY
-        if hasattr(os, "O_CLOEXEC"):
-            flags |= os.O_CLOEXEC
-        if hasattr(os, "O_DIRECTORY"):
-            flags |= os.O_DIRECTORY
-        descriptor: int | None = None
+    def _fsync_directory(self, destination_parent_fd: int) -> bool:
         try:
             self._inject("directory_fsync")
-            descriptor = os.open(directory, flags)
-            os.fsync(descriptor)
+            os.fsync(destination_parent_fd)
         except OSError:
             return False
-        finally:
-            if descriptor is not None:
-                os.close(descriptor)
         return True
 
     def _cleanup_after_failure(
         self,
-        temp_path: Path | None,
+        temp_name: str | None,
         temp_fd: int | None,
+        destination_parent_fd: int | None,
     ) -> BinaryArtifactCleanupState:
-        if temp_path is None:
+        if temp_name is None:
             return "not_created"
-        return self._cleanup_temp(temp_path, temp_fd)
+        return self._cleanup_temp(temp_name, temp_fd, destination_parent_fd)
 
     def _cleanup_temp(
         self,
-        temp_path: Path,
+        temp_name: str,
         temp_fd: int | None,
+        destination_parent_fd: int | None,
     ) -> BinaryArtifactCleanupState:
-        if temp_fd is None:
+        if temp_fd is None or destination_parent_fd is None:
             return "retained"
         try:
-            path_status = temp_path.lstat()
+            path_status = os.stat(
+                temp_name,
+                dir_fd=destination_parent_fd,
+                follow_symlinks=False,
+            )
             descriptor_status = os.fstat(temp_fd)
         except FileNotFoundError:
             return "removed"
@@ -416,7 +470,7 @@ class FilesystemBinaryArtifactPublisher:
             return "retained"
         try:
             self._inject("cleanup")
-            temp_path.unlink()
+            os.unlink(temp_name, dir_fd=destination_parent_fd)
         except OSError:
             return "retained"
         return "removed"
@@ -461,6 +515,76 @@ def _guard_directory_ancestry(root: Path, endpoint: Path) -> None:
             raise _PublishFailure("source_ineligible")
 
 
+def _open_secure_directory(root: Path, endpoint: Path) -> tuple[int, tuple[int, int]]:
+    _require_contained(root, endpoint)
+    if not hasattr(os, "O_DIRECTORY") or not hasattr(os, "O_NOFOLLOW"):
+        raise _PublishFailure("destination_ineligible")
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+
+    descriptor: int | None = None
+    try:
+        root_before = root.lstat()
+        descriptor = os.open(root, flags)
+        root_opened = os.fstat(descriptor)
+        root_after = root.lstat()
+        if not _matching_directory_statuses(root_before, root_opened, root_after):
+            raise _PublishFailure("destination_ineligible")
+        for component in endpoint.relative_to(root).parts:
+            component_before = os.stat(
+                component,
+                dir_fd=descriptor,
+                follow_symlinks=False,
+            )
+            next_descriptor = os.open(component, flags, dir_fd=descriptor)
+            try:
+                component_opened = os.fstat(next_descriptor)
+                component_after = os.stat(
+                    component,
+                    dir_fd=descriptor,
+                    follow_symlinks=False,
+                )
+                if not _matching_directory_statuses(
+                    component_before,
+                    component_opened,
+                    component_after,
+                ):
+                    raise _PublishFailure("destination_ineligible")
+            except BaseException:
+                os.close(next_descriptor)
+                raise
+            os.close(descriptor)
+            descriptor = next_descriptor
+        status = os.fstat(descriptor)
+        return descriptor, (status.st_dev, status.st_ino)
+    except BaseException:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise
+
+
+def _matching_directory_statuses(*statuses: os.stat_result) -> bool:
+    identities = {(status.st_dev, status.st_ino, status.st_mode) for status in statuses}
+    return len(identities) == 1 and all(stat.S_ISDIR(status.st_mode) for status in statuses)
+
+
+def _visible_directory_matches(
+    root: Path,
+    endpoint: Path,
+    expected_identity: tuple[int, int],
+) -> bool:
+    descriptor: int | None = None
+    try:
+        descriptor, identity = _open_secure_directory(root, endpoint)
+        return identity == expected_identity
+    except (_PublishFailure, FileNotFoundError, OSError, ValueError):
+        return False
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
 def _write_all(descriptor: int, body: bytes) -> None:
     view = memoryview(body)
     while view:
@@ -470,7 +594,11 @@ def _write_all(descriptor: int, body: bytes) -> None:
         view = view[written:]
 
 
-def _clone_macos_descriptor(source_fd: int, destination: Path) -> None:
+def _clone_macos_descriptor(
+    source_fd: int,
+    destination_parent_fd: int,
+    destination_name: str,
+) -> None:
     libc = ctypes.CDLL(None, use_errno=True)
     try:
         fclonefileat = libc.fclonefileat
@@ -478,15 +606,6 @@ def _clone_macos_descriptor(source_fd: int, destination: Path) -> None:
         raise OSError(errno.ENOSYS, "fclonefileat unavailable") from None
     fclonefileat.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint32]
     fclonefileat.restype = ctypes.c_int
-    flags = os.O_RDONLY
-    if hasattr(os, "O_CLOEXEC"):
-        flags |= os.O_CLOEXEC
-    if hasattr(os, "O_DIRECTORY"):
-        flags |= os.O_DIRECTORY
-    directory_fd = os.open(destination.parent, flags)
-    try:
-        if fclonefileat(source_fd, directory_fd, os.fsencode(destination.name), 0) != 0:
-            error_number = ctypes.get_errno()
-            raise OSError(error_number, os.strerror(error_number))
-    finally:
-        os.close(directory_fd)
+    if fclonefileat(source_fd, destination_parent_fd, os.fsencode(destination_name), 0) != 0:
+        error_number = ctypes.get_errno()
+        raise OSError(error_number, os.strerror(error_number))

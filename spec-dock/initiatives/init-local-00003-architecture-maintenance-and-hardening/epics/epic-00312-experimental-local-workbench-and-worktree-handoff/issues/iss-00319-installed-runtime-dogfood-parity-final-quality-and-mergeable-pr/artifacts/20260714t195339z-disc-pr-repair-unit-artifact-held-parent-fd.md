@@ -28,12 +28,12 @@ reflected_to: []
 - decided_priority: `P1`
 - merge_blocking: `yes`
 - disposition: `fix-now`
-- status: `unit-created-pre-delegation-blocked-by-U3`
-- execution_order: Delegate only after U3 is implemented, reviewed, committed, and pushed; both units are required before re-observation
+- status: `implemented-local-tests-code-qa-complete-awaiting-final-spec-commit`
+- execution_order: U3 prerequisite completed at head `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`; U4 fresh pre-delegation gate passed before worker handoff; both implementations are locally complete, while U4 final fresh spec/precommit and remaining external gates are required before re-observation
 
 ## Delegation Gate
 
-- 本Artifactはworker delegation前に作成する。U3 completionまでU4 workerへhandoffしない。
+- 本Artifactはworker delegation前に作成済み。U3 prerequisiteはhead `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`で完了し、U4固有のfresh pre-delegation gateがpassした後にworkerへhandoffした。
 - Workerは`gpt-5.6-sol` / reasoning `medium`を使う。
 - allowed mutation files:
   - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py`
@@ -48,32 +48,36 @@ reflected_to: []
 - Destination parentをguard後にexternal directoryへのsymlinkへ差し替えると、stagingまたは後続mutationがrepository外へredirectされ得る。
 - Existing staged-path replacement testはverified temp descriptor bindingを覆うが、destination parent object bindingを覆わない。
 - Latest CI 4/4 passは当該raceを感知しないためP1 findingの反証にならない。
-- need_to_fix: `yes`。U4完了までArtifact importはmerge-prepared security contractを満たさない。
+- need_to_fix: `yes`。U4 local repairは完了したが、commit/push、latest-head Ubuntu actual `linkat` gate、CI/re-observation完了までmerge-prepared security contractのclosureは確定しない。
 
 ## Adopted Descriptor Lifecycle
 
-1. Destination parentをrepository rootからcomponent-by-componentに`O_DIRECTORY | O_NOFOLLOW`でopenし、directory identityをverifyする。
-2. Verified destination-parent fdをtemp create前からcleanup完了まで一度保持する。
-3. Temp fileはcryptographically adequate/random candidate basenameを生成し、same parent fd + basenameで`O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW`（availableなら`O_CLOEXEC`）、mode `0o600`として作る。`mkstemp(dir=pathname)`は使わない。
-4. Source copy、fsync、staged hashはexisting temp fd contractを維持する。
-5. Linux publicationはheld parent fdを`dst_dir_fd`としてverified temp descriptorをno-replace hard-linkする。Publication時にparent pathnameをopenし直さない。
-6. macOS publicationはheld parent fdとdestination basenameを`fclonefileat`へ渡し、helper内でparent pathnameをopenし直さない。
-7. Directory fsyncはheld parent fdへ実行する。
-8. Post-confirmationはdestination basename + held parent fd + no-follow openでhashする。
-9. Temp cleanup/identity inspection/unlinkはtemp basename + held parent fdで実施し、visible pathnameが差し替えられてもoriginal verified directory objectだけへ作用する。
-10. Parent fdは全cleanup path完了後に一度closeする。Error mapping、no-overwrite、source preservation、committed/cleanup semanticsは維持する。
+1. Existing lexical containment/source guardを完了し、source fdとinitial identityを取得する。
+2. `inject("temp_create")`をdestination parentのsecure component walk/openより前に一度実行する。このhookでvisible parentがexternal symlinkへswapされた場合、続くsecure walkがrejectし、exact `BinaryArtifactPublishError(code="destination_ineligible", cleanup_state="not_created", committed=False)`で終了する。Tempまたはformal destinationをoriginal/external parentのどちらにも作らない。
+3. Destination parentをrepository rootからcomponent-by-componentに`O_DIRECTORY | O_NOFOLLOW`でopen・identity verifyし、verified parent fdを取得する。このfdをtemp createからcleanup完了まで一度保持する。
+4. Temp fileはcryptographically adequate/random candidate basenameを生成し、same parent fd + basenameで`O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW`（availableなら`O_CLOEXEC`）、mode `0o600`として作る。`mkstemp(dir=pathname)`は使わない。
+5. Source copy、temp fsync、staged hash、stage barrier、source stability verificationをexisting descriptor contractで完了する。
+6. Source verification後かつformal publication前に`inject("before_publication")`を一度実行する。直後にvisible destination parentをrepository rootからsecure re-walkし、得たidentityをheld parent fdのidentityと比較する。Missing、symlink、identity mismatchはpublication helperを呼ばず、exact `BinaryArtifactPublishError(code="destination_ineligible", cleanup_state="removed", committed=False)`へmapする。Temp cleanupはheld original parent fdだけへ作用する。
+7. Pre-publication revalidationがpassした場合だけformal publicationへ進む。Linuxはheld parent fdを`dst_dir_fd`としてverified temp descriptorをno-replace hard-linkし、macOSは`fclonefileat(temp_fd, held_parent_fd, destination_basename, 0)`を使う。Helper内でparent pathnameをopenし直さない。Actual publication syscall windowでvisible parentがswapされてもsyscallはheld fd + basenameへboundする。
+8. Publication成功時点でcommittedとなる。Directory fsyncはheld parent fdへ実行する。
+9. Publication後、visible destination parentを再度secure re-walkし、held parent fd identityと比較する。Missing、symlink、identity mismatchならformal destinationのdescriptor confirmationを試みず、existing committed-warning contractへexactにmapする。Resultは`committed=True`、`warning_codes=("destination_read_failed",)`、`destination_sha256=staged_sha256`、`destination_byte_count=staged_byte_count`とし、新warning enumを追加しない。
+10. Post-publication parent identityが一致する場合だけ、destination basename + held parent fd + no-follow openでhash confirmationする。既存のdestination mismatch/read failure contractを維持する。
+11. Temp cleanup/identity inspection/unlinkはtemp basename + held parent fdで実施し、visible pathnameが差し替えられてもoriginal verified directory objectだけへ作用する。Parent fdは全cleanup path完了後に一度closeする。
 
 ## Post-Publication Visible Parent Change
 
-- Visible destination parent pathnameがpublication後に差し替わっても、actual publication/confirmation/cleanupはheld original parent fdへboundする。
-- Public resultは既存committed warning taxonomyを使う。必要ならexisting `destination_read_failed` contractへmapし、新しい`destination_parent_changed` warning enumやJSON fieldを追加しない。
+- Visible destination parent pathnameがpre-publication revalidation後からactual syscallまでのwindowで差し替わっても、actual publicationとcleanupはheld original parent fdへboundする。
+- Publication後のsecure visible-parent re-walk/identity comparisonがmismatchを検出した場合、public resultはexact existing `destination_read_failed` committed-warning contractを使う。Staged hash/countをdestination hash/countとして返し、新しい`destination_parent_changed` warning enumやJSON fieldを追加しない。
 - Diagnostic specificityよりpublic compatibilityを優先する。Existing taxonomyで安全な表現が不可能ならhuman gateへ戻す。
 
 ## Deterministic Test Contract
 
-- A-RACE-1: `temp_create` hookでdestination parent pathnameをexternal directory symlinkへswapする。External sentinel/inventory不変、outside temp/destinationなし、safe `destination_ineligible`またはdefined pre-publication failureをassertする。
-- A-RACE-2: Staging後/publication前にparent pathnameをswapする。Publicationはheld original parentへだけ作用し、external sentinel不変、cleanupもoriginal parent内tempへ作用する。
-- A-RACE-3: Linux/macOS publication syscall直前にparent pathnameをswapする。Callはheld fd + basenameを使い、outside writeなしをassertする。
+- A-ORDER-1: Call logで`inject("temp_create")`がdestination-parent secure component walk/openより前であること、secure walk/held-fd取得後にfd-relative temp createが続くことをassertする。
+- A-RACE-1: `inject("temp_create")`でdestination parent pathnameをexternal directory symlinkへswapする。Secure walkがswapをrejectし、exact `code="destination_ineligible"`、`cleanup_state="not_created"`、`committed=False`をassertする。External sentinel/inventory不変、original/externalの双方にtemp/formal destinationなしをassertする。
+- A-ORDER-2: Call logでsource copy → temp fsync → staged hash → source stability verification → `inject("before_publication")` → secure visible-parent re-walk/identity compare → publication helperの順序をassertする。
+- A-RACE-2: `inject("before_publication")`でparent pathnameをswapする。Re-walk mismatchがformal publicationを抑止し、exact `code="destination_ineligible"`、`cleanup_state="removed"`、`committed=False`をassertする。External sentinel/inventory不変、formal destinationなし、temp cleanupはheld original parent内だけに作用する。Publicationが進むという旧期待は採用しない。
+- A-RACE-3: Pre-publication revalidation後、Linux/macOS actual publication syscallのinside-window hook/monkeypatchでparent pathnameをswapする。Publication callがheld fd + basenameだけを使ってoriginal parentへcommitすること、external sentinel/inventory不変、outside temp/destinationなしをassertする。Publication後re-walk mismatchによりresultがexact `committed=True`、`warning_codes=("destination_read_failed",)`、destination hash/countがstaged hash/countと一致、cleanupがheld original parentだけへ作用することをassertする。
+- A-ORDER-3: Call logでpublication syscall → held-parent directory fsync → secure visible-parent re-walk/identity compare → identity一致時のみfd-relative destination confirmation → held-fd temp cleanup → held parent fd closeの順序をassertする。Mismatch時はconfirmationをskipしてexisting committed warningへmapする。
 - A-LINUX-1: Linux call-shape unit testはlate `os.open(destination.parent)`を許さず、captured held `dst_dir_fd`をassertする。
 - A-MACOS-1: `fclonefileat(temp_fd, held_parent_fd, destination_basename, 0)` shapeをassertする。Mockだけではactual macOS gateをcloseしない。
 - A-CLEANUP-1: Visible parentをdisplaceしてもtemp identity check/unlinkがheld original parentだけへ作用し、external same-name sentinelを保持する。
@@ -95,8 +99,13 @@ git diff --check
 
 - Current macOS hostで`tests/unit/infra/test_binary_artifact_publisher.py`をactual focused executionし、real `fclonefileat` publication pathを含むことをevidenceで確認する。Mock call-shapeだけではcloseしない。
 - Actual Python 3.10 interpreterで`python3.10 -m pytest tests/unit/infra/test_binary_artifact_publisher.py`をpre-push実行し、exact publisher infra fileのpassを要求する。Python 3.10 interpreter unavailableはpassではなく、explicit gate/human conditionとして停止・報告する。
-- U4差分に対してfresh code reviewer、QA reviewer、spec reviewerを順に実行し、P0/P1=0を要求する。
-- Focused gates、actual macOS gate、lint、full、parity、fresh reviews、commit/pushはpending。
+- U4 pre-delegation fresh rereviewはPASSし、worker handoffを許可した。実装後のfresh code reviewerはPASS（P0-P3=0）、QA reviewerはconditional PASS（code P0-P3=0）。
+- REDはisolated old HEADへnew adversarial/order nodesだけを適用し、6 failed / 1 Linux-only skippedを確認した。
+- GREEN current macOS focused publisherは47 passed / 1 Linux-only skipped。Actual uv CPython 3.10.15でも47 passed / 1 Linux-only skipped。Current macOSでreal `fclonefileat` syscall-window race nodeが実行済み。
+- Related Artifact import regressionは33 passed。Four adversarial/order nodesは10回ずつ、合計40/40 pass。
+- `make lint`、provider/dogfood exact `cmp`、`git diff --check`はPASS。
+- Required full `uv run --python 3.12 pytest`は2606 passed / 76 skipped / 2 warnings in 1757.50sでPASS。
+- Final fresh spec/precommit reviewはpending。Actual Linux `linkat` syscall-window raceはlocal macOSでは実行不能のため、commit/push後latest-head Ubuntu CIの必須gateとして残す。Commit/pushはpending。
 - U3/U4両方のpushed latest headでfresh fixed-endpoint PR observationを実行し、CI 4/4 passとP0/P1=0を要求する。
 
 ## Out of Scope
@@ -118,9 +127,22 @@ git diff --check
 
 ## Commit / Re-observation Evidence
 
-- U3 prerequisite: `pending`
-- implementation: `pending`
-- focused/current-macOS/full gates: `pending`
-- fresh reviews: `pending`
+- U3 prerequisite: `complete`。Focused/local/full/fresh reviews/commit/pushがhead `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`で完了。
+- U4 pre-delegation fresh gate: `complete`
+- implementation: `complete-locally`
+- exact changed code/test files:
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py`
+  - `spec-dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py`
+  - `tests/unit/infra/test_binary_artifact_publisher.py`
+- scope boundary: Exactly the three authorized files。Public warning enum/JSON、application/commands/CLI、common abstractionは変更なし。
+- RED isolated old HEAD/new nodes: 6 failed / 1 Linux-only skipped。
+- GREEN current macOS: Focused publisher 47 passed / 1 Linux-only skipped。Real `fclonefileat` syscall-window node executed。
+- GREEN actual Python 3.10: uv CPython 3.10.15、focused publisher 47 passed / 1 Linux-only skipped。
+- related/repeat gates: Artifact import related regression 33 passed。Four adversarial/order nodes 40/40。
+- static/parity/diff gates: `make lint` PASS、provider/dogfood exact `cmp` PASS、`git diff --check` PASS。
+- full pytest: `uv run --python 3.12 pytest` PASS。2606 passed / 76 skipped / 2 warnings in 1757.50s。
+- fresh reviews: Code review PASS P0-P3=0。QA conditional PASS、code P0-P3=0。Final fresh spec/precommit pending。
+- Linux actual gate: latest-head Ubuntu CIでactual `linkat` syscall-window race nodeの実行成功を要求する。Local macOSのskipはpass代替ではない。
 - commit/push: `pending`
-- latest-head CI/re-observation: `pending-after-U3-and-U4`
+- local closure: R9/F7 implementation、focused/related/repeat/current-macOS/Python 3.10/static/parity/full、fresh code review、QA conditional review evidence complete。Final fresh spec/precommit、commit/push、latest-head Ubuntu CI、fixed-endpoint re-observation pending。
+- latest-head CI/re-observation: `pending-after-U4-commit-push`
