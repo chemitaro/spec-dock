@@ -28,7 +28,7 @@ reflected_to: []
 - decided_priority: `P1`
 - merge_blocking: `yes`
 - disposition: `fix-now`
-- status: `committed-and-pushed-awaiting-combined-re-observation`
+- status: `committed-and-pushed-covered-by-u5-latest-head-observation-pending`
 - execution_order: `U3 before U4`; both units are required before PR re-observation
 
 ## Delegation Gate
@@ -132,5 +132,5 @@ git diff --check
 - exploratory Python 3.10 full suite: U3 non-gate。Collection failed before test execution on pre-existing `datetime.UTC` import in `scripts/authoring-pack/prepare_chatgpt_authoring_pack.py`; not a U3 regression or U3 gate failure。
 - commit/push: `complete` at head `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`
 - local closure: R8/F6 implementation/quality/code+QA reviews/commit/push complete。
-- U4 dependency: Satisfied。U4 local implementation/test/staticは完了し、fresh code review PASS、QA conditional PASS。Final fresh spec/precommit、commit/push、Ubuntu CI/re-observationはpending。
-- latest-head re-observation: `intentionally-pending-after-U4-final-gates-and-push`; U3単独headでは実施しない。
+- U4 dependency: Satisfied。U4 fresh code/QA/spec reviewsとcommit/push `82874bf35d2f4b4a3b360bb08d7c26ffe0935210`完了。Head `82874bf3` reviewでU3 regular-file leaf findingとU4 findingの再発なし。
+- latest-head re-observation: U5でseparate recursive directory/symlink F8を修復後、そのpushed latest headでU3〜U5 combined CI/Codex observationを行う。
