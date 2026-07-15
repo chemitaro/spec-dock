@@ -18,6 +18,7 @@ from spec_dock_runtime.application.contracts import (
     WorktreeShowRequest,
     WorktreeShowResult,
 )
+from spec_dock_runtime.application.worktree_target import resolve_worktree_target
 
 if TYPE_CHECKING:
     from spec_dock_runtime.application.ports import Ports
@@ -154,14 +155,14 @@ def worktree_list(req: WorktreeListRequest, ports: Ports) -> WorktreeListResult:
 def worktree_show(req: WorktreeShowRequest, ports: Ports) -> WorktreeShowResult:
     _require_repo_and_gateways(ports, command="worktree_show")
     inventory = _build_inventory(ports, command="show", target=req.target)
-    worktree = _resolve_target(req.target, inventory, command="show")
+    worktree = resolve_worktree_target(req.target, inventory, command="show")
     return WorktreeShowResult(target=req.target, worktree=worktree, warnings=[])
 
 
 def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveResult:
     _require_repo_and_gateways(ports, command="worktree_remove", filesystem_required=True)
     inventory = _build_inventory(ports, command="remove", target=req.target)
-    worktree = _resolve_target(req.target, inventory, command="remove")
+    worktree = resolve_worktree_target(req.target, inventory, command="remove")
     blockers = _non_bypassable_remove_blockers(worktree)
     if blockers:
         raise WorktreeCommandError(
@@ -183,7 +184,7 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
         target=req.target,
     )
     try:
-        refreshed_worktree = _resolve_target(req.target, refreshed_inventory, command="remove")
+        refreshed_worktree = resolve_worktree_target(req.target, refreshed_inventory, command="remove")
     except WorktreeCommandError as exc:
         if exc.code != "target_not_found":
             raise
@@ -536,46 +537,6 @@ def _non_bypassable_remove_blockers(worktree: WorktreeRecordView) -> list[str]:
         for blocker in worktree.remove_blockers
         if blocker in {"main_worktree", "current_worktree", "path_missing", "record_missing", "bare_worktree"}
     ]
-
-
-def _resolve_target(target: str, inventory: list[WorktreeRecordView], *, command: str) -> WorktreeRecordView:
-    target_path = Path(target).expanduser()
-    target_canonical = _canonical_path(target_path) if target_path.is_absolute() else None
-    id_matches = [worktree for worktree in inventory if worktree.id == target]
-    if len(id_matches) == 1:
-        return id_matches[0]
-    matches: list[WorktreeRecordView] = []
-    for worktree in inventory:
-        forms = {worktree.basename}
-        if target_canonical is not None and _canonical_path(worktree.path) == target_canonical:
-            forms.add(target)
-        if target in forms:
-            matches.append(worktree)
-    unique = {_canonical_path(item.path): item for item in matches}
-    matches = list(unique.values())
-    if len(matches) == 1:
-        return matches[0]
-    if len(matches) > 1:
-        raise WorktreeCommandError(
-            code="ambiguous_target",
-            message=f"ambiguous worktree target: {target}",
-            command=command,
-            target=target,
-            candidates=matches,
-        )
-    if any(record.branch == target for record in inventory):
-        raise WorktreeCommandError(
-            code="unsupported_branch_target",
-            message=f"worktree target must be id, absolute path, or basename, not branch: {target}",
-            command=command,
-            target=target,
-        )
-    raise WorktreeCommandError(
-        code="target_not_found",
-        message=f"worktree target not found: {target}",
-        command=command,
-        target=target,
-    )
 
 
 def _guard_remove_containment(

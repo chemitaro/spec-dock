@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """Invoke a configured ChatGPT backend command without hardcoded local paths."""
 
-from __future__ import annotations
-
 import argparse
+from collections.abc import Mapping, Sequence
 import json
 import os
 from pathlib import Path
 import shlex
 import subprocess
 import sys
-from typing import Mapping, Sequence
 
 STATUS_EXIT_CODES = {
     "pass": 0,
@@ -29,7 +27,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--slug", required=True, help="Conversation/session slug to pass to the backend.")
     parser.add_argument("-p", "--prompt", required=True, help="Prompt text to pass to the backend.")
     parser.add_argument("--file", action="append", default=[], help="Attachment path. May be repeated.")
-    parser.add_argument("--dry-run", action="store_true", help="Print resolved invocation JSON without running backend.")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print resolved invocation JSON without running backend."
+    )
     parser.add_argument(
         "--timeout-seconds",
         type=float,

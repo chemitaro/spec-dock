@@ -1028,6 +1028,21 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/spec_dock/templates/report.md",
         "spec_dock/assets/spec_dock/templates/requirement.md",
     )
+    _ISSUE_69_PYTHON_CACHE_EXCLUSION_PATTERNS = (
+        "**/__pycache__/**",
+        "**/*.pyc",
+        "**/*.pyo",
+    )
+    _ISSUE_69_SETUP_PYTHON_CACHE_EXCLUSION_PATTERNS = (
+        "spec_dock/**/__pycache__",
+        "spec_dock/**/__pycache__/**",
+        "spec_dock/**/*.pyc",
+        "spec_dock/**/*.pyo",
+    )
+    _ISSUE_69_PYTHON_CACHE_FIXTURE_ARTIFACT_RELATIVE_PATHS = (
+        "spec_dock/assets/spec_dock/scripts/spec_dock_runtime/__pycache__/fixture.cpython-312.pyc",
+        "spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/__pycache__/fixture.cpython-312.pyo",
+    )
     _ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS = (
         "spec_dock/assets/spec_dock/scripts/spec-dock-close-smoke.sh",
         "spec_dock/assets/github/workflows/spec-dock-close.yml",
@@ -2197,7 +2212,7 @@ class TestInitUpdate(CliRuntimeHarness):
             asset_path = repo_root / asset_rel_path
             assert mirror_path.is_file(), f"missing checked-in dogfooding mirror file: {mirror_path}"
             assert asset_path.is_file(), f"missing provider asset file: {asset_path}"
-            assert mirror_path.read_text(encoding="utf-8") == asset_path.read_text(encoding="utf-8"), (
+            assert mirror_path.read_bytes() == asset_path.read_bytes(), (
                 f"checked-in dogfooding mirror file diverged from provider asset: {mirror_rel_path}"
             )
 
@@ -3113,6 +3128,17 @@ class TestInitUpdate(CliRuntimeHarness):
                 present_seeded_fixtures.add(fixture_artifact_path)
         return present_seeded_fixtures
 
+    def _issue_69_seed_python_cache_fixtures_in_source_context(self, build_context: Path) -> set[str]:
+        source_root = build_context / "src"
+        present_seeded_fixtures: set[str] = set()
+        for fixture_artifact_path in self._ISSUE_69_PYTHON_CACHE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
+            fixture_source_path = source_root / fixture_artifact_path
+            fixture_source_path.parent.mkdir(parents=True, exist_ok=True)
+            fixture_source_path.write_bytes(b"issue-69 generated Python cache fixture\n")
+            if fixture_source_path.is_file():
+                present_seeded_fixtures.add(fixture_artifact_path)
+        return present_seeded_fixtures
+
     def _issue_69_collect_wheel_file_inventory(self, wheel_path: Path) -> set[str]:
         with zipfile.ZipFile(wheel_path) as wheel_zip:
             return {member for member in wheel_zip.namelist() if not member.endswith("/")}
@@ -3158,6 +3184,18 @@ class TestInitUpdate(CliRuntimeHarness):
                     return tuple(str(item) for item in extracted)
         pytest.fail("setup.py is missing _STALE_BUILD_OUTPUT_PATTERNS")
 
+    def _issue_69_extract_setup_python_cache_exclusion_patterns(self, setup_text: str) -> tuple[str, ...]:
+        parsed_module = ast.parse(setup_text, filename="setup.py")
+        for statement in parsed_module.body:
+            if not isinstance(statement, ast.Assign):
+                continue
+            for target in statement.targets:
+                if isinstance(target, ast.Name) and target.id == "_GENERATED_PYTHON_CACHE_PATTERNS":
+                    extracted = ast.literal_eval(statement.value)
+                    assert isinstance(extracted, tuple)
+                    return tuple(str(item) for item in extracted)
+        pytest.fail("setup.py is missing _GENERATED_PYTHON_CACHE_PATTERNS")
+
     def _issue_69_prepare_build_context(self, repo_root: Path, build_context: Path) -> None:
         build_context.mkdir(parents=True, exist_ok=True)
         for filename in ("pyproject.toml", "README.md", "setup.py"):
@@ -3165,7 +3203,6 @@ class TestInitUpdate(CliRuntimeHarness):
         shutil.copytree(
             repo_root / "src",
             build_context / "src",
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
         )
 
     def _issue_69_collect_source_install_root_inventory(self, repo_root: Path) -> set[str]:
@@ -3702,6 +3739,108 @@ class TestInitUpdate(CliRuntimeHarness):
                 source="generated issue-execution skill",
             )
             assert not (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
+
+    def test_init_gitignore_ignores_exact_workbench_directories_at_supported_scopes(self) -> None:
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._run_git(target, ["init"])
+
+            scope_directories = (
+                target / "spec-dock",
+                target / "spec-dock" / "initiatives" / "init-00001-example",
+                target / "spec-dock" / "initiatives" / "init-00001-example" / "epics" / "epic-00001-example",
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-example"
+                / "epics"
+                / "epic-00001-example"
+                / "issues"
+                / "iss-00001-example",
+            )
+            for scope_directory in scope_directories:
+                workbench_probe = scope_directory / ".workbench" / "probe"
+                workbench_probe.parent.mkdir(parents=True, exist_ok=True)
+                workbench_probe.write_text("scratch\n", encoding="utf-8")
+                near_name_probe = scope_directory / ".workbench-notes" / "probe"
+                near_name_probe.parent.mkdir(parents=True, exist_ok=True)
+                near_name_probe.write_text("ordinary\n", encoding="utf-8")
+
+                workbench_result = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", workbench_probe.relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert workbench_result.returncode == 0, workbench_result.stdout + workbench_result.stderr
+
+                near_name_result = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", near_name_probe.relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert near_name_result.returncode == 1, near_name_result.stdout + near_name_result.stderr
+
+    def test_init_gitignore_fallback_ignores_exact_workbench_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+
+            def _remove_gitignore_asset(patched_assets_root: Path) -> None:
+                (patched_assets_root / "spec_dock" / ".gitignore").unlink()
+
+            code, stderr = self._run_command_with_assets_override(
+                "init",
+                target,
+                _remove_gitignore_asset,
+            )
+
+            assert code == 0, stderr
+            gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
+            assert ".workbench/" in gitignore.splitlines()
+
+    def test_update_preserves_opaque_workbenches_while_refreshing_managed_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            scope_directories = (
+                target / "spec-dock",
+                target / "spec-dock" / "initiatives" / "init-00001-example",
+                target / "spec-dock" / "initiatives" / "init-00001-example" / "epics" / "epic-00001-example",
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-example"
+                / "epics"
+                / "epic-00001-example"
+                / "issues"
+                / "iss-00001-example",
+            )
+            sentinels: dict[Path, bytes] = {}
+            for index, scope_directory in enumerate(scope_directories):
+                sentinel = scope_directory / ".workbench" / "nested" / f"sentinel-{index}.bin"
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                payload = bytes((0, 255, index, 10, 13, 0)) + f"scope-{index}".encode()
+                sentinel.write_bytes(payload)
+                sentinels[sentinel] = payload
+
+            installed_gitignore = target / "spec-dock" / ".gitignore"
+            installed_runtime = target / "spec-dock" / "scripts" / "spec-dock"
+            installed_gitignore.write_text("stale gitignore\n", encoding="utf-8")
+            installed_runtime.write_text("stale runtime\n", encoding="utf-8")
+
+            assert main(["update", str(target)]) == 0
+
+            for sentinel, expected_payload in sentinels.items():
+                assert sentinel.read_bytes() == expected_payload
+
+            repo_root = Path(__file__).resolve().parents[3]
+            provider_root = repo_root / "src" / "spec_dock" / "assets" / "spec_dock"
+            assert installed_gitignore.read_bytes() == (provider_root / ".gitignore").read_bytes()
+            assert installed_runtime.read_bytes() == (provider_root / "scripts" / "spec-dock").read_bytes()
 
     def test_init_installs_authoring_pack_helper_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -4662,8 +4801,11 @@ class TestInitUpdate(CliRuntimeHarness):
 
         pyproject_patterns = self._issue_69_extract_pyproject_stale_exclusion_patterns(pyproject_text)
         setup_patterns = self._issue_69_extract_setup_stale_exclusion_patterns(setup_text)
+        setup_cache_patterns = self._issue_69_extract_setup_python_cache_exclusion_patterns(setup_text)
 
-        pyproject_normalized_patterns = {f"spec_dock/{pattern}" for pattern in pyproject_patterns}
+        pyproject_cache_patterns = set(pyproject_patterns) & set(self._ISSUE_69_PYTHON_CACHE_EXCLUSION_PATTERNS)
+        pyproject_stale_patterns = set(pyproject_patterns) - pyproject_cache_patterns
+        pyproject_normalized_patterns = {f"spec_dock/{pattern}" for pattern in pyproject_stale_patterns}
         setup_pattern_set = set(setup_patterns)
         expected_pattern_set = set(self._ISSUE_69_STALE_EXCLUSION_ARTIFACT_RELATIVE_PATTERNS)
 
@@ -4673,6 +4815,57 @@ class TestInitUpdate(CliRuntimeHarness):
         assert setup_pattern_set == expected_pattern_set, (
             "issue-69 stale exclusion patterns must stay aligned to the approved exact pattern set"
         )
+        assert pyproject_cache_patterns == set(self._ISSUE_69_PYTHON_CACHE_EXCLUSION_PATTERNS), (
+            "issue-69 pyproject Python cache exclusions must stay aligned to the approved exact pattern set"
+        )
+        assert set(setup_cache_patterns) == set(self._ISSUE_69_SETUP_PYTHON_CACHE_EXCLUSION_PATTERNS), (
+            "issue-69 setup Python cache exclusions must stay aligned to the approved exact pattern set"
+        )
+
+    def test_issue_69_wheel_and_sdist_exclude_python_cache_from_source_build_context(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+
+            self._issue_69_prepare_build_context(repo_root, build_context)
+            present_before_build = self._issue_69_seed_python_cache_fixtures_in_source_context(build_context)
+            expected_cache_fixtures = set(self._ISSUE_69_PYTHON_CACHE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
+            assert present_before_build == expected_cache_fixtures, (
+                "issue-69 Python cache fixture set must exist in source build context before build"
+            )
+
+            wheel_path, sdist_path, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+            )
+
+            wheel_inventory = self._issue_69_collect_wheel_file_inventory(wheel_path)
+            sdist_inventory = self._issue_69_collect_sdist_source_file_inventory(sdist_path)
+            wheel_cache_inventory = sorted(
+                path for path in wheel_inventory if self._is_generated_python_cache_path(Path(path))
+            )
+            sdist_cache_inventory = sorted(
+                path for path in sdist_inventory if self._is_generated_python_cache_path(Path(path))
+            )
+            assert wheel_cache_inventory == [], (
+                f"issue-69 wheel unexpectedly shipped generated Python caches: {wheel_cache_inventory[:10]}"
+            )
+            assert sdist_cache_inventory == [], (
+                f"issue-69 sdist unexpectedly shipped generated Python caches: {sdist_cache_inventory[:10]}"
+            )
+            for cache_artifact_path in expected_cache_fixtures:
+                assert cache_artifact_path not in wheel_inventory, (
+                    f"issue-69 wheel unexpectedly shipped generated Python cache: {cache_artifact_path}"
+                )
+                assert cache_artifact_path not in sdist_inventory, (
+                    f"issue-69 sdist unexpectedly shipped generated Python cache: {cache_artifact_path}"
+                )
 
     def test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -4705,6 +4898,165 @@ class TestInitUpdate(CliRuntimeHarness):
     def test_checked_in_dogfooding_mirror_docs_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         self._assert_checked_in_dogfooding_mirror_docs_match_provider_assets(repo_root)
+
+    def test_chatgpt_preservation_contract_is_single_owned_and_projected(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        pairs = {
+            "spec-dock/docs/workflow_spec_authoring.md": (
+                "src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md"
+            ),
+            "spec-dock/docs/workflow_chatgpt_authoring_pack.md": (
+                "src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md"
+            ),
+            "spec-dock/docs/authoring/chatgpt-pack.md": (
+                "src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md"
+            ),
+            ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md"
+            ),
+            ".agents/skills/spec-dock-initiative-planning/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md"
+            ),
+            ".agents/skills/spec-dock-epic-planning/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md"
+            ),
+            ".agents/skills/spec-dock-issue-planning/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
+            ),
+        }
+        for dogfood_path, provider_path in pairs.items():
+            assert (repo_root / dogfood_path).read_bytes() == (repo_root / provider_path).read_bytes()
+
+        shared_skill = (repo_root / pairs[".agents/skills/spec-dock-chatgpt-authoring/SKILL.md"]).read_text(
+            encoding="utf-8"
+        )
+        branch_section = shared_skill.split("Choose exactly one branch:", 1)[1].split("Evaluate an import result", 1)[0]
+        branch_bullets = [line for line in branch_section.splitlines() if line.startswith("- ")]
+        assert len(branch_bullets) == 4
+        preservation_bullets = {line.removeprefix("- ").split(":", 1)[0]: line for line in branch_bullets}
+        branch_contracts = {
+            "Complete standalone Markdown": (
+                "Workbench",
+                "explicitly runs `artifact import chatgpt-output`",
+                "verifies the receipt",
+                "`imported_byte_exact`",
+                "only from the Workbench source to the imported Artifact",
+            ),
+            "Complete received inline answer": (
+                "captures only the complete answer text",
+                "without adding, removing, reformatting, or normalizing content",
+                "explicitly imports it",
+                "`captured_received_text`",
+                "never claim identity with provider-original bytes",
+                "wrapper transcript containing prompts or metadata",
+            ),
+            "Genuinely incomplete or unavailable inline output": (
+                "`skipped_inline_unavailable`",
+                "reason, decision owner, nonblocking rationale, and next action or revisit condition",
+                "Do not record source/destination paths, hashes, byte counts, or a byte-exact claim",
+            ),
+            "ZIP/tree output": (
+                "review, quarantine, stage, and validation lane",
+                "Do not convert it to single-file import",
+                "weaken existing ZIP safety checks",
+            ),
+        }
+        assert set(preservation_bullets) == set(branch_contracts)
+        for branch, tokens in branch_contracts.items():
+            branch_line = preservation_bullets[branch]
+            for token in tokens:
+                assert token in branch_line
+
+        import_result_bullets = [line for line in shared_skill.splitlines() if line.startswith("- `committed=")]
+        assert len(import_result_bullets) == 2
+        import_pass = next(line for line in import_result_bullets if "with no warning" in line)
+        for token in (
+            "`committed=true`",
+            "final repo-relative path",
+            "SHA-256",
+            "byte count",
+            "`import_kind=chatgpt-output`",
+            "`storage_identity=blank`",
+            "preservation result is `pass`",
+        ):
+            assert token in import_pass
+        import_warning = next(
+            line for line in shared_skill.splitlines() if line.startswith("- The same complete receipt")
+        )
+        for token in (
+            "complete receipt",
+            "`committed=true`",
+            "warning",
+            "`pass-with-warning`",
+            "retain the warning",
+            "do not retry automatically",
+            "duplicate import",
+        ):
+            assert token in import_warning
+        import_block = next(line for line in import_result_bullets if "`committed=false`" in line)
+        for token in (
+            "missing receipt field",
+            "eligibility failure",
+            "unresolved semantic completeness",
+            "block adoption and canonical rewrite",
+        ):
+            assert token in import_block
+        failed_import = next(
+            line
+            for line in shared_skill.splitlines()
+            if line.startswith("- Never reclassify a complete source whose import failed")
+        )
+        assert "`skipped_inline_unavailable`" in failed_import
+        assert "canonical adoption completed" in shared_skill
+        assert "reviewer pass, including fresh `spec-reviewer`, `code-reviewer`, or `qa-reviewer` pass" in shared_skill
+        assert "PR delivery" in shared_skill
+
+        for dogfood_path in (
+            ".agents/skills/spec-dock-initiative-planning/SKILL.md",
+            ".agents/skills/spec-dock-epic-planning/SKILL.md",
+            ".agents/skills/spec-dock-issue-planning/SKILL.md",
+        ):
+            caller = (repo_root / dogfood_path).read_text(encoding="utf-8")
+            assert (
+                "Immediately after output is received, and before claim review, Evidence Adoption Ledger "
+                "disposition, or canonical rewrite, invoke the shared `spec-dock-chatgpt-authoring` preservation "
+                "checkpoint."
+            ) in caller
+            assert "Refer to the shared skill for branch, status, and import-result rules" in caller
+            for forbidden_matrix_token in (
+                *(f"- {heading}:" for heading in branch_contracts),
+                "establishes `imported_byte_exact`",
+                "Record `captured_received_text`",
+                "record `skipped_inline_unavailable`",
+                "`committed=true`",
+                "`committed=false`",
+                "`pass-with-warning`",
+                "`import_kind=chatgpt-output`",
+                "`storage_identity=blank`",
+                "missing receipt field",
+                "duplicate import",
+                "review, quarantine, stage, and validation lane",
+                "single-file import",
+                "weaken existing ZIP safety checks",
+            ):
+                assert forbidden_matrix_token not in caller
+
+        workflow = (repo_root / "spec-dock/docs/workflow_spec_authoring.md").read_text(encoding="utf-8")
+        assert (
+            "output received -> preservation checkpoint -> EAL disposition -> canonical rewrite -> fresh reviewer"
+        ) in workflow
+        reference = (repo_root / "spec-dock/docs/authoring/chatgpt-pack.md").read_text(encoding="utf-8")
+        zip_rows = [line for line in reference.splitlines() if line.startswith("|") and "ZIP / tree" in line]
+        assert len(zip_rows) == 1
+        zip_row = zip_rows[0]
+        zip_cells = [cell.strip() for cell in zip_row.strip("|").split("|")]
+        assert len(zip_cells) == 4
+        assert "ZIP / tree" in zip_cells[0]
+        for token in ("review", "quarantine", "stage", "validation lane", "route"):
+            assert token in zip_cells[1]
+        assert "existing review/stage evidence" in zip_cells[2]
+        assert "single-file import conversion" in zip_cells[3]
+        assert "ZIP safety contract" in zip_cells[3]
 
     def test_checked_in_dogfooding_mirror_templates_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -38682,6 +39034,91 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "init-local-00001" in self._read_active_pointer_text(target, "initiative", "requirement.md")
             assert "epic-local-00001" in self._read_active_pointer_text(target, "epic", "requirement.md")
             assert "iss-local-00001" in self._read_active_pointer_text(target, "issue", "requirement.md")
+
+    def test_update_rejects_workbench_symlink_from_persisted_manifest_and_active_entrypoint(self) -> None:
+        import spec_dock.cli as cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            specdock_dir = target / "spec-dock"
+            active_dir = specdock_dir / "active"
+            real_issue = specdock_dir / "scratch-targets" / "iss-local-00999-scratch"
+            real_issue.mkdir(parents=True)
+            self._write_json_force(
+                real_issue / ".meta.json",
+                {
+                    "schema_version": 1,
+                    "type": "issue",
+                    "id": "iss-local-00999",
+                    "title": "Scratch issue",
+                    "slug": "scratch",
+                },
+            )
+            (real_issue / "requirement.md").write_text("scratch requirement\n", encoding="utf-8")
+            workbench_link = specdock_dir / ".workbench" / "issue-link"
+            workbench_link.parent.mkdir()
+            workbench_link.symlink_to(real_issue, target_is_directory=True)
+
+            issue_link = active_dir / "issue"
+            if issue_link.is_symlink() or issue_link.is_file():
+                issue_link.unlink(missing_ok=True)
+            elif issue_link.is_dir():
+                shutil.rmtree(issue_link)
+            issue_link.symlink_to(os.path.relpath(workbench_link, start=active_dir), target_is_directory=True)
+
+            persisted_path = workbench_link.relative_to(target).as_posix()
+            self._write_json_force(
+                specdock_dir / ".agent" / "active.json",
+                {
+                    "schema_version": 2,
+                    "initiative": None,
+                    "epic": None,
+                    "issue": {"id": "iss-local-00999", "path": persisted_path},
+                },
+            )
+
+            assert (
+                cli._resolve_manifest_target_dir(
+                    specdock_dir,
+                    "issue",
+                    expected_id="iss-local-00999",
+                    persisted_path=persisted_path,
+                )
+                is None
+            )
+            assert (
+                cli._resolve_persisted_path_dir(
+                    specdock_dir,
+                    layer="issue",
+                    expected_id="iss-local-00999",
+                    persisted_path=persisted_path,
+                )
+                is None
+            )
+            assert (
+                cli._resolve_existing_active_entrypoint(
+                    specdock_dir,
+                    active_dir=active_dir,
+                    layer="issue",
+                )
+                is None
+            )
+            assert main(["update", str(target)]) == 0
+
+            placeholder = specdock_dir / "system" / "active-none" / "issue"
+            resolved = cli._resolve_existing_active_entrypoint(
+                specdock_dir,
+                active_dir=active_dir,
+                layer="issue",
+            )
+            assert resolved == (placeholder.resolve(), None)
+            assert self._read_active_pointer_text(target, "issue", "README.md") == (
+                placeholder / "README.md"
+            ).read_text(encoding="utf-8")
+            context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
+            assert "- issue: (none)" in context_pack_text
+            assert "iss-local-00999" not in context_pack_text
 
     def test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

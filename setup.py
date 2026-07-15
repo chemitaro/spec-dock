@@ -5,6 +5,7 @@ import shutil
 
 from setuptools import setup
 from setuptools.command.build_py import build_py as _build_py
+from setuptools.command.sdist import sdist as _sdist
 
 _STALE_BUILD_OUTPUT_PATTERNS = (
     "spec_dock/assets/spec_dock/scripts/spec-dock-close*.sh",
@@ -21,6 +22,13 @@ _STALE_BUILD_OUTPUT_PATTERNS = (
     "spec_dock/assets/spec_dock/templates/plan.md",
     "spec_dock/assets/spec_dock/templates/report.md",
     "spec_dock/assets/spec_dock/templates/requirement.md",
+)
+
+_GENERATED_PYTHON_CACHE_PATTERNS = (
+    "spec_dock/**/__pycache__",
+    "spec_dock/**/__pycache__/**",
+    "spec_dock/**/*.pyc",
+    "spec_dock/**/*.pyo",
 )
 
 _SEEDED_STALE_OUTPUT_FIXTURE_PATHS = (
@@ -43,8 +51,17 @@ _SEED_STALE_BUILD_OUTPUTS_ENV_VAR = "SPEC_DOCK_BUILD_PY_SEED_STALE_FIXTURES"
 _PRE_PRUNE_SNAPSHOT_ENV_VAR = "SPEC_DOCK_BUILD_PY_PRE_PRUNE_SNAPSHOT"
 
 
+def _is_generated_python_cache_path(path: str) -> bool:
+    candidate = Path(path)
+    return "__pycache__" in candidate.parts or candidate.suffix in {".pyc", ".pyo"}
+
+
 def _prune_stale_build_outputs(build_lib: Path) -> None:
-    stale_paths = {path for pattern in _STALE_BUILD_OUTPUT_PATTERNS for path in build_lib.glob(pattern)}
+    stale_paths = {
+        path
+        for pattern in (*_GENERATED_PYTHON_CACHE_PATTERNS, *_STALE_BUILD_OUTPUT_PATTERNS)
+        for path in build_lib.glob(pattern)
+    }
     for stale_path in sorted(stale_paths, key=lambda path: len(path.parts), reverse=True):
         if stale_path.is_dir():
             shutil.rmtree(stale_path, ignore_errors=True)
@@ -91,4 +108,10 @@ class build_py(_build_py):
         _prune_stale_build_outputs(build_lib)
 
 
-setup(cmdclass={"build_py": build_py})
+class sdist(_sdist):
+    def make_release_tree(self, base_dir: str, files: list[str]) -> None:
+        distributable_files = [path for path in files if not _is_generated_python_cache_path(path)]
+        super().make_release_tree(base_dir, distributable_files)
+
+
+setup(cmdclass={"build_py": build_py, "sdist": sdist})

@@ -101,6 +101,13 @@ After `init`, day-to-day operations are done via the runtime script installed in
 # Working artifacts such as ADR originals are created via runtime command.
 ./spec-dock/scripts/spec-dock new artifact adr --issue iss-00123 --title "Token rotation strategy"
 
+# Copy one Initiative/Epic/Issue Workbench to an existing linked worktree (experimental, one-shot).
+./spec-dock/scripts/spec-dock workbench copy --scope iss-00123 --to /path/to/linked-worktree
+
+# Preserve a completed ChatGPT Markdown report as byte-identical, evidence-only Artifact content.
+./spec-dock/scripts/spec-dock artifact import chatgpt-output \
+  --issue iss-00123 --file spec-dock/initiatives/.../.workbench/report.md --title "Planning report"
+
 # Import an existing GitHub issue into the spec tree (does not create/update the issue on GitHub)
 ./spec-dock/scripts/spec-dock import initiative 10 --title "Auth platform"                 # id=init-00010
 ./spec-dock/scripts/spec-dock import epic 11 --title "JWT auth" --initiative init-00010    # id=epic-00011
@@ -143,6 +150,19 @@ Notes:
   with `uvx --no-cache`; it does not expose arbitrary package source, cache, or `--force` options.
 - Runtime update refreshes managed files through installer update. It is not `init --force` and is
   not an automatic migration tool for legacy or incompatible workspaces.
+- Workbench is an experimental, Git-ignored, non-canonical, disposable work area. The root
+  `spec-dock/.workbench/` uses date buckets and manual file selection only; there is no root bulk-copy
+  command. Initiative/Epic/Issue Workbenches can be copied explicitly to the same scope in one linked
+  worktree. This is a source-wins, one-shot copy, not automatic synchronization or copy-back.
+- Workbench copy applies to the complete directory without language, extension, MIME, or content
+  classification. Keep material that must survive outside Workbench in an Artifact or canonical doc.
+- `artifact import chatgpt-output` accepts one Markdown file from an approved Workbench, preserves the
+  source and its bytes, and stores it with blank Artifact identity. `chatgpt-output` is an import kind,
+  not a reserved typed Artifact token; `new artifact` and import coexist. Imported content remains
+  evidence-only until its adoption is recorded in the Evidence Adoption Ledger and accepted claims are
+  rewritten into canonical docs.
+- `update` preserves existing Workbench directories as unmanaged local content. It does not migrate,
+  normalize, delete, or promote them.
 - For `new/import {initiative,epic,issue}`, `--title` is restricted to ASCII (alphanumerics + single spaces) and `--slug` is kebab-case.
 - Legacy sequential discussion docs are grandfathered only. New docs do not reuse legacy sequence names, and spec-dock does not auto-rename or auto-repair them to preserve forced backward compatibility.
 - Normal issue execution should use `issue start <target>` / `issue finish` as the primary path. Use `issue start <target> -f` / `--force` only to bypass the unfinished active issue guard; dependency readiness still applies.
@@ -169,7 +189,8 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
     - legacy `discussions/` content is preserved when present, but is not the default destination for new working artifacts
   - `active/` (generated pointers; gitignored)
   - `.agent/` (generated agent state; gitignored)
-  - `.gitignore` (ignores `active/` and `.agent/` (and legacy `.work/`))
+  - `.workbench/` (optional experimental root Workbench; date buckets/manual selection; gitignored)
+  - `.gitignore` (ignores `active/`, `.agent/`, `.workbench/` (and legacy `.work/`))
 - `.agents/skills/` (Codex-compatible multi-skill set)
   - `spec-dock-hub/` (hub; entry point)
   - `spec-dock-initiative-planning/` (leaf: initiative workflow)

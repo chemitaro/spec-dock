@@ -21,6 +21,7 @@ from spec_dock_runtime.application.create_node import (
 )
 from spec_dock_runtime.application.delete_node import delete_node as application_delete_node
 from spec_dock_runtime.application.doctor import doctor as application_doctor
+from spec_dock_runtime.application.import_artifact import import_artifact as application_import_artifact
 from spec_dock_runtime.application.import_node import (
     import_epic as application_import_epic,
     import_initiative as application_import_initiative,
@@ -39,6 +40,7 @@ from spec_dock_runtime.application.set_active import (
 )
 from spec_dock_runtime.application.sync_state import sync as application_sync
 from spec_dock_runtime.application.validate_tree import validate_tree as application_validate_tree
+from spec_dock_runtime.application.workbench import workbench_copy as application_workbench_copy
 from spec_dock_runtime.application.workflow import (
     workflow_next as application_workflow_next,
     workflow_status as application_workflow_status,
@@ -67,6 +69,7 @@ from spec_dock_runtime.infra import (
     runbook_store as infra_runbook_store,
     template_scaffolder as infra_template_scaffolder,
 )
+from spec_dock_runtime.infra.binary_artifact_publisher import FilesystemBinaryArtifactPublisher
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -276,6 +279,18 @@ class _FilesystemGateway:
     def remove_target(self, path: Path) -> None:
         infra_fs_cli.remove_target(path)
 
+    def path_kind(self, path: Path) -> str:
+        return infra_fs_cli.path_kind(path)
+
+    def guard_workbench_ancestry(self, root: Path, endpoint: Path, *, allow_missing_leaf: bool = False) -> None:
+        infra_fs_cli.guard_workbench_ancestry(root, endpoint, allow_missing_leaf=allow_missing_leaf)
+
+    def guard_workbench_inventory(self, specdock_dir: Path) -> None:
+        infra_fs_cli.guard_workbench_inventory(specdock_dir)
+
+    def copy_workbench(self, source: Path, destination: Path) -> None:
+        infra_fs_cli.copy_workbench(source, destination)
+
 
 @dataclass(frozen=True)
 class _EnvironmentGateway:
@@ -309,6 +324,7 @@ class _ArtifactWriter:
 
 def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> BootstrapContext:
     resolved_repo_root = repo_root if repo_root is not None else specdock_dir.parent
+    binary_artifact_publisher = FilesystemBinaryArtifactPublisher()
     ports = Ports(
         node_reader=_NodeReader(specdock_dir=specdock_dir),
         repo_root=resolved_repo_root,
@@ -327,6 +343,8 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         json_store=_JsonStore(),
         clock=_Clock(),
         artifact_writer=_ArtifactWriter(),
+        workbench_source_guard=binary_artifact_publisher,
+        binary_artifact_publisher=binary_artifact_publisher,
     )
     assurance_store = infra_assurance_store.AssuranceStore(resolved_repo_root)
     artifact_store = infra_artifact_store.ArtifactStore(resolved_repo_root)
@@ -344,6 +362,7 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         import_initiative=lambda req: application_import_initiative(req, ports),
         import_epic=lambda req: application_import_epic(req, ports),
         import_issue=lambda req: application_import_issue(req, ports),
+        import_artifact=lambda req: application_import_artifact(req, ports),
         set_active=lambda req: application_set_active(req, ports),
         show_active=lambda req: application_show_active(req, ports),
         clear_active=lambda req: application_clear_active(req, ports),
@@ -374,6 +393,7 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         worktree_list=lambda req: application_worktree_list(req, ports),
         worktree_show=lambda req: application_worktree_show(req, ports),
         worktree_remove=lambda req: application_worktree_remove(req, ports),
+        workbench_copy=lambda req: application_workbench_copy(req, ports),
         repo_root=ports.repo_root,
         specdock_dir=ports.specdock_dir,
     )
