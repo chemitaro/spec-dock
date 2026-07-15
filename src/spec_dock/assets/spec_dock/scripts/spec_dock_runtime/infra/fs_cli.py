@@ -13,6 +13,10 @@ if TYPE_CHECKING:
 
 DirectoryIdentity = tuple[int, int, int]
 PathIdentity = tuple[int, int, int]
+_WORKBENCH_DIR_FD_SUPPORTED = all(
+    function in os.supports_dir_fd for function in (os.open, os.stat, os.mkdir, os.unlink, os.readlink, os.symlink)
+)
+_WORKBENCH_FD_INSPECTION_SUPPORTED = os.stat in os.supports_follow_symlinks and os.scandir in os.supports_fd
 
 
 def path_exists(path: Path) -> bool:
@@ -148,11 +152,6 @@ def _capture_directory_identity(path: Path) -> DirectoryIdentity:
     return status.st_dev, status.st_ino, status.st_mode
 
 
-def _assert_directory_identity(path: Path, expected: DirectoryIdentity) -> None:
-    if _capture_directory_identity(path) != expected:
-        raise RuntimeError("workbench copy directory identity changed")
-
-
 def _inspect_path(path: Path) -> tuple[str, PathIdentity | None]:
     try:
         status = path.lstat()
@@ -168,28 +167,25 @@ def _inspect_path(path: Path) -> tuple[str, PathIdentity | None]:
     return "other", identity
 
 
-def _assert_path_identity(path: Path, expected: PathIdentity) -> None:
-    _, actual = _inspect_path(path)
-    if actual != expected:
-        raise RuntimeError("workbench copy path identity changed")
-
-
-def _assert_path_missing(path: Path) -> None:
-    kind, _ = _inspect_path(path)
-    if kind != "missing":
-        raise RuntimeError("workbench copy destination path appeared")
-
-
 def _descriptor_identity(status: os.stat_result) -> PathIdentity:
     return status.st_dev, status.st_ino, status.st_mode
 
 
-def _open_verified_regular_source(path: Path, expected: PathIdentity) -> int:
+def _require_workbench_descriptor_support() -> None:
+    if not _WORKBENCH_DIR_FD_SUPPORTED:
+        raise OSError("required descriptor-relative operation is unavailable")
+    if not _WORKBENCH_FD_INSPECTION_SUPPORTED:
+        raise OSError("required descriptor inspection is unavailable")
+    if getattr(os, "O_NOFOLLOW", None) is None or getattr(os, "O_DIRECTORY", None) is None:
+        raise OSError("required directory open flags are unavailable")
+
+
+def _open_verified_regular_source_at(parent_fd: int, name: str, expected: PathIdentity) -> int:
     no_follow = getattr(os, "O_NOFOLLOW", None)
     if no_follow is None:
         raise OSError("required no-follow open is unavailable")
     flags = os.O_RDONLY | no_follow | getattr(os, "O_CLOEXEC", 0)
-    descriptor = os.open(path, flags)
+    descriptor = os.open(name, flags, dir_fd=parent_fd)
     try:
         status = os.fstat(descriptor)
         if not stat.S_ISREG(status.st_mode) or _descriptor_identity(status) != expected:
@@ -214,6 +210,48 @@ def _open_verified_directory(path: Path, expected: DirectoryIdentity) -> int:
         os.close(descriptor)
         raise
     return descriptor
+
+
+def _inspect_entry_at(parent_fd: int, name: str) -> tuple[str, PathIdentity | None]:
+    try:
+        status = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return "missing", None
+    identity = _descriptor_identity(status)
+    if stat.S_ISDIR(status.st_mode):
+        return "directory", identity
+    if stat.S_ISREG(status.st_mode):
+        return "file", identity
+    if stat.S_ISLNK(status.st_mode):
+        return "symlink", identity
+    return "other", identity
+
+
+def _open_verified_directory_at(parent_fd: int, name: str, expected: DirectoryIdentity) -> int:
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    descriptor = os.open(name, flags, dir_fd=parent_fd)
+    try:
+        status = os.fstat(descriptor)
+        if not stat.S_ISDIR(status.st_mode) or _descriptor_identity(status) != expected:
+            raise RuntimeError("workbench copy directory identity changed")
+    except BaseException:
+        os.close(descriptor)
+        raise
+    return descriptor
+
+
+def _create_and_open_directory_at(
+    parent_fd: int,
+    name: str,
+    mutation_started: list[bool],
+) -> int:
+    _assert_fd_path_missing(parent_fd, name)
+    os.mkdir(name, 0o777, dir_fd=parent_fd)
+    mutation_started[0] = True
+    kind, identity = _inspect_entry_at(parent_fd, name)
+    if kind != "directory" or identity is None:
+        raise RuntimeError("workbench copy created directory identity changed")
+    return _open_verified_directory_at(parent_fd, name, identity)
 
 
 def _assert_fd_path_missing(parent_fd: int, name: str) -> None:
@@ -243,68 +281,88 @@ def _copy_descriptor_bytes(source_fd: int, destination_fd: int) -> None:
 
 
 def _copy_regular_file(
-    source: Path,
-    destination: Path,
+    source_parent_fd: int,
+    destination_parent_fd: int,
+    name: str,
     source_identity: PathIdentity,
     destination_identity: PathIdentity | None,
-    destination_parent: Path,
-    destination_parent_identity: DirectoryIdentity,
     mutation_started: list[bool],
 ) -> None:
-    source_fd = _open_verified_regular_source(source, source_identity)
+    source_fd = _open_verified_regular_source_at(source_parent_fd, name, source_identity)
     try:
         source_status = os.fstat(source_fd)
-        destination_parent_fd = _open_verified_directory(destination_parent, destination_parent_identity)
-        try:
-            if destination_identity is not None:
-                actual = os.stat(destination.name, dir_fd=destination_parent_fd, follow_symlinks=False)
-                if _descriptor_identity(actual) != destination_identity:
-                    raise RuntimeError("workbench copy path identity changed")
-                os.unlink(destination.name, dir_fd=destination_parent_fd)
-                mutation_started[0] = True
-            _assert_fd_path_missing(destination_parent_fd, destination.name)
-            destination_fd = _open_exclusive_regular_file(destination_parent_fd, destination.name)
+        if destination_identity is not None:
+            _unlink_verified_entry_at(destination_parent_fd, name, destination_identity)
             mutation_started[0] = True
-            try:
-                _copy_descriptor_bytes(source_fd, destination_fd)
-                os.fchmod(destination_fd, stat.S_IMODE(source_status.st_mode))
-                os.utime(
-                    destination_fd,
-                    ns=(source_status.st_atime_ns, source_status.st_mtime_ns),
-                )
-            finally:
-                os.close(destination_fd)
+        _assert_fd_path_missing(destination_parent_fd, name)
+        destination_fd = _open_exclusive_regular_file(destination_parent_fd, name)
+        mutation_started[0] = True
+        try:
+            _copy_descriptor_bytes(source_fd, destination_fd)
+            os.fchmod(destination_fd, stat.S_IMODE(source_status.st_mode))
+            os.utime(
+                destination_fd,
+                ns=(source_status.st_atime_ns, source_status.st_mtime_ns),
+            )
         finally:
-            os.close(destination_parent_fd)
+            os.close(destination_fd)
     finally:
         os.close(source_fd)
+
+
+def _unlink_verified_entry_at(parent_fd: int, name: str, expected: PathIdentity) -> None:
+    _, actual = _inspect_entry_at(parent_fd, name)
+    if actual != expected:
+        raise RuntimeError("workbench copy path identity changed")
+    os.unlink(name, dir_fd=parent_fd)
+
+
+def _read_verified_symlink_at(parent_fd: int, name: str, expected: PathIdentity) -> str:
+    kind, before = _inspect_entry_at(parent_fd, name)
+    if kind != "symlink" or before != expected:
+        raise RuntimeError("workbench copy source identity changed")
+    target = os.readlink(name, dir_fd=parent_fd)
+    kind, after = _inspect_entry_at(parent_fd, name)
+    if kind != "symlink" or after != expected:
+        raise RuntimeError("workbench copy source identity changed")
+    return target
 
 
 def copy_workbench(source: Path, destination: Path) -> None:
     """Merge an opaque Workbench tree without following symlinks."""
     mutation_started = [False]
     try:
+        _require_workbench_descriptor_support()
         source_identity = _capture_directory_identity(source)
-        destination_kind, destination_identity = _inspect_path(destination)
-        if destination_kind == "missing":
-            destination_parent_identity = _capture_directory_identity(destination.parent)
-            _assert_directory_identity(source, source_identity)
-            _assert_directory_identity(destination.parent, destination_parent_identity)
-            destination.mkdir(parents=False)
-            mutation_started[0] = True
-            _assert_directory_identity(destination.parent, destination_parent_identity)
-            destination_identity = _capture_directory_identity(destination)
-        elif destination_kind != "directory":
-            raise RuntimeError("workbench copy destination is not a directory")
-        if destination_identity is None:
-            raise RuntimeError("workbench copy destination identity is missing")
-        _merge_workbench_directory(
-            source,
-            destination,
-            source_identity,
-            destination_identity,
-            mutation_started,
-        )
+        source_fd = _open_verified_directory(source, source_identity)
+        destination_fd: int | None = None
+        try:
+            destination_kind, destination_identity = _inspect_path(destination)
+            if destination_kind == "missing":
+                destination_parent_identity = _capture_directory_identity(destination.parent)
+                destination_parent_fd = _open_verified_directory(
+                    destination.parent,
+                    destination_parent_identity,
+                )
+                try:
+                    destination_fd = _create_and_open_directory_at(
+                        destination_parent_fd,
+                        destination.name,
+                        mutation_started,
+                    )
+                finally:
+                    os.close(destination_parent_fd)
+            elif destination_kind == "directory":
+                if destination_identity is None:
+                    raise RuntimeError("workbench copy destination identity is missing")
+                destination_fd = _open_verified_directory(destination, destination_identity)
+            else:
+                raise RuntimeError("workbench copy destination is not a directory")
+            _merge_workbench_directory(source_fd, destination_fd, mutation_started)
+        finally:
+            if destination_fd is not None:
+                os.close(destination_fd)
+            os.close(source_fd)
     except WorkbenchFilesystemError:
         raise
     except (OSError, RuntimeError) as exc:
@@ -312,68 +370,52 @@ def copy_workbench(source: Path, destination: Path) -> None:
 
 
 def _merge_workbench_directory(
-    source: Path,
-    destination: Path,
-    source_identity: DirectoryIdentity,
-    destination_identity: DirectoryIdentity,
+    source_fd: int,
+    destination_fd: int,
     mutation_started: list[bool],
 ) -> None:
-    _assert_directory_identity(source, source_identity)
-    _assert_directory_identity(destination, destination_identity)
-    source_entries = sorted(source.iterdir(), key=lambda entry: entry.name)
-    _assert_directory_identity(source, source_identity)
-    _assert_directory_identity(destination, destination_identity)
-    for source_entry in source_entries:
-        _assert_directory_identity(source, source_identity)
-        _assert_directory_identity(destination, destination_identity)
-        _merge_workbench_entry(
-            source_entry,
-            destination / source_entry.name,
-            source,
-            destination,
-            source_identity,
-            destination_identity,
-            mutation_started,
-        )
+    with os.scandir(source_fd) as entries:
+        source_names = sorted(entry.name for entry in entries)
+    for name in source_names:
+        _merge_workbench_entry(source_fd, destination_fd, name, mutation_started)
 
 
 def _merge_workbench_entry(
-    source: Path,
-    destination: Path,
-    source_parent: Path,
-    destination_parent: Path,
-    source_parent_identity: DirectoryIdentity,
-    destination_parent_identity: DirectoryIdentity,
+    source_parent_fd: int,
+    destination_parent_fd: int,
+    name: str,
     mutation_started: list[bool],
 ) -> None:
-    _assert_directory_identity(source_parent, source_parent_identity)
-    _assert_directory_identity(destination_parent, destination_parent_identity)
-    source_kind, source_identity = _inspect_path(source)
-    destination_kind, destination_identity = _inspect_path(destination)
+    source_kind, source_identity = _inspect_entry_at(source_parent_fd, name)
+    destination_kind, destination_identity = _inspect_entry_at(destination_parent_fd, name)
 
     if source_kind == "directory":
-        _assert_directory_identity(source_parent, source_parent_identity)
         if source_identity is None:
             raise RuntimeError("workbench copy source identity is missing")
-        _assert_path_identity(source, source_identity)
-        if destination_kind == "missing":
-            _assert_directory_identity(destination_parent, destination_parent_identity)
-            destination.mkdir()
-            mutation_started[0] = True
-            _assert_directory_identity(destination_parent, destination_parent_identity)
-            destination_identity = _capture_directory_identity(destination)
-        elif destination_kind != "directory":
-            raise RuntimeError("workbench copy entry type collision")
-        elif destination_identity is None:
-            raise RuntimeError("workbench copy destination identity is missing")
-        _assert_path_identity(destination, destination_identity)
-        _merge_workbench_directory(
-            source,
-            destination,
-            source_identity,
-            destination_identity,
-            mutation_started,
-        )
+        source_child_fd = _open_verified_directory_at(source_parent_fd, name, source_identity)
+        try:
+            if destination_kind == "missing":
+                destination_child_fd = _create_and_open_directory_at(
+                    destination_parent_fd,
+                    name,
+                    mutation_started,
+                )
+            elif destination_kind == "directory":
+                if destination_identity is None:
+                    raise RuntimeError("workbench copy destination identity is missing")
+                destination_child_fd = _open_verified_directory_at(
+                    destination_parent_fd,
+                    name,
+                    destination_identity,
+                )
+            else:
+                raise RuntimeError("workbench copy entry type collision")
+            try:
+                _merge_workbench_directory(source_child_fd, destination_child_fd, mutation_started)
+            finally:
+                os.close(destination_child_fd)
+        finally:
+            os.close(source_child_fd)
         return
 
     if source_kind not in {"file", "symlink"}:
@@ -384,30 +426,20 @@ def _merge_workbench_entry(
         raise RuntimeError("workbench copy entry type collision")
     if source_kind == "file":
         _copy_regular_file(
-            source,
-            destination,
+            source_parent_fd,
+            destination_parent_fd,
+            name,
             source_identity,
             destination_identity,
-            destination_parent,
-            destination_parent_identity,
             mutation_started,
         )
         return
+    link_target = _read_verified_symlink_at(source_parent_fd, name, source_identity)
     if destination_kind in {"file", "symlink"}:
         if destination_identity is None:
             raise RuntimeError("workbench copy destination identity is missing")
-        _assert_directory_identity(destination_parent, destination_parent_identity)
-        _assert_path_identity(destination, destination_identity)
-        destination.unlink()
+        _unlink_verified_entry_at(destination_parent_fd, name, destination_identity)
         mutation_started[0] = True
-
-    _assert_directory_identity(source_parent, source_parent_identity)
-    _assert_path_identity(source, source_identity)
-    _assert_directory_identity(destination_parent, destination_parent_identity)
-    link_target = source.readlink()
-    _assert_directory_identity(source_parent, source_parent_identity)
-    _assert_path_identity(source, source_identity)
-    _assert_directory_identity(destination_parent, destination_parent_identity)
-    _assert_path_missing(destination)
-    destination.symlink_to(link_target)
+    _assert_fd_path_missing(destination_parent_fd, name)
+    os.symlink(link_target, name, dir_fd=destination_parent_fd)
     mutation_started[0] = True

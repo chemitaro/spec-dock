@@ -28,8 +28,8 @@ reflected_to: []
 - decided_priority: `P1`
 - merge_blocking: `yes`
 - disposition: `fix-now`
-- status: `implemented-local-tests-code-qa-complete-awaiting-final-spec-commit`
-- execution_order: U3 prerequisite completed at head `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`; U4 fresh pre-delegation gate passed before worker handoff; both implementations are locally complete, while U4 final fresh spec/precommit and remaining external gates are required before re-observation
+- status: `completed-and-pushed-latest-head-combined-observation-pending`
+- execution_order: U3 prerequisite completed at head `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`; U4 pre-delegation、code、QA、final spec gatesとcommit/push `82874bf35d2f4b4a3b360bb08d7c26ffe0935210`は完了。Separate U5後のlatest-head combined external gatesだけを残す
 
 ## Delegation Gate
 
@@ -48,7 +48,7 @@ reflected_to: []
 - Destination parentをguard後にexternal directoryへのsymlinkへ差し替えると、stagingまたは後続mutationがrepository外へredirectされ得る。
 - Existing staged-path replacement testはverified temp descriptor bindingを覆うが、destination parent object bindingを覆わない。
 - Latest CI 4/4 passは当該raceを感知しないためP1 findingの反証にならない。
-- need_to_fix: `yes`。U4 local repairは完了したが、commit/push、latest-head Ubuntu actual `linkat` gate、CI/re-observation完了までmerge-prepared security contractのclosureは確定しない。
+- need_to_fix: `completed locally and pushed`。Latest-head Ubuntu actual `linkat` gateとCI/re-observation完了までmerge-prepared security contract全体のclosureは確定しない。
 
 ## Adopted Descriptor Lifecycle
 
@@ -105,8 +105,8 @@ git diff --check
 - Related Artifact import regressionは33 passed。Four adversarial/order nodesは10回ずつ、合計40/40 pass。
 - `make lint`、provider/dogfood exact `cmp`、`git diff --check`はPASS。
 - Required full `uv run --python 3.12 pytest`は2606 passed / 76 skipped / 2 warnings in 1757.50sでPASS。
-- Final fresh spec/precommit reviewはpending。Actual Linux `linkat` syscall-window raceはlocal macOSでは実行不能のため、commit/push後latest-head Ubuntu CIの必須gateとして残す。Commit/pushはpending。
-- U3/U4両方のpushed latest headでfresh fixed-endpoint PR observationを実行し、CI 4/4 passとP0/P1=0を要求する。
+- Final fresh spec/precommit reviewはPASS。Commit/push `82874bf35d2f4b4a3b360bb08d7c26ffe0935210`完了。Actual Linux `linkat` syscall-window raceはlocal macOSでは実行不能のため、U5後latest-head Ubuntu CIの必須combined gateとして残す。
+- U3/U4/U5を含むpushed latest headでfresh fixed-endpoint PR observationを実行し、全required CI successとP0/P1=0を要求する。
 
 ## Out of Scope
 
@@ -141,8 +141,8 @@ git diff --check
 - related/repeat gates: Artifact import related regression 33 passed。Four adversarial/order nodes 40/40。
 - static/parity/diff gates: `make lint` PASS、provider/dogfood exact `cmp` PASS、`git diff --check` PASS。
 - full pytest: `uv run --python 3.12 pytest` PASS。2606 passed / 76 skipped / 2 warnings in 1757.50s。
-- fresh reviews: Code review PASS P0-P3=0。QA conditional PASS、code P0-P3=0。Final fresh spec/precommit pending。
+- fresh reviews: Code review PASS P0-P3=0。QA conditional PASS、code P0-P3=0。Final fresh spec/precommit PASS。
 - Linux actual gate: latest-head Ubuntu CIでactual `linkat` syscall-window race nodeの実行成功を要求する。Local macOSのskipはpass代替ではない。
-- commit/push: `pending`
-- local closure: R9/F7 implementation、focused/related/repeat/current-macOS/Python 3.10/static/parity/full、fresh code review、QA conditional review evidence complete。Final fresh spec/precommit、commit/push、latest-head Ubuntu CI、fixed-endpoint re-observation pending。
-- latest-head CI/re-observation: `pending-after-U4-commit-push`
+- commit/push: `complete` at `82874bf35d2f4b4a3b360bb08d7c26ffe0935210`
+- local closure: R9/F7 implementation、focused/related/repeat/current-macOS/Python 3.10/static/parity/full、fresh code/QA/spec reviews、commit/push complete。Head `82874bf3` current reviewでF7再発なし。
+- latest-head CI/re-observation: `pending-after-U5-commit-push`; Ubuntu actual `linkat`をcombined headで確認する
