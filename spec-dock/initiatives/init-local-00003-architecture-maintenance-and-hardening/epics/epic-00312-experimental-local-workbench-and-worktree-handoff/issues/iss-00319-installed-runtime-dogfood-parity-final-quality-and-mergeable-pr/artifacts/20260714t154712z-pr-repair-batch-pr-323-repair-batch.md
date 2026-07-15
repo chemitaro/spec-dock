@@ -21,21 +21,22 @@ reflected_to: []
 - Repository: chemitaro/spec-dock
 - Base branch: main
 - Head branch: iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr
-- Latest head SHA: 3dd94928d6d4b8a3810b9170b9fcb027572c64f2
+- Latest head SHA: 82874bf35d2f4b4a3b360bb08d7c26ffe0935210
 - Observation command: fixed-endpoint PR observation workflow
-- Observation final JSON / evidence: S100 iteration 2 observation result
-- Observation status: Latest-head CI 4/4 pass; latest Codex review reported two new P1 findings: Workbench destination symlink race and Artifact destination-parent symlink race
-- Trigger comment id: 4970835673
-- Trigger created_at: 2026-07-14T15:17:06Z
-- Trigger boundary: このtriggerのresume metadata範囲内
-- Resume metadata: available; initial timeoutから同一observationをresume可能
-- New trigger approved: no
-- Observation limitation: 初回timeout。Resumeによりreview completeとCI terminal failureを取得済みで、repair判断を妨げない
-- Batch status: Iteration 3 U3/U4 local implementation and test/static gates complete。U3はhead `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`へcommit/push済み。U4はexact three-file scopeで実装し、RED 6 failed / 1 skipped、GREEN current macOS 47 passed / 1 Linux-only skipped、actual uv CPython 3.10.15 47/1、related 33、adversarial/order nodes 40/40、lint/cmp/diff、fresh code review PASS、QA conditional PASS、full Python 3.12 pytest 2606 passed / 76 skipped / 2 warnings in 1757.50sを完了。Current macOS real `fclonefileat` syscall-window nodeも実行済み。U4 final fresh spec/precommit、commit/push、latest-head Ubuntu actual `linkat` gate、CI/re-observation pending。
+- Observation final JSON / evidence: S100 iteration 4 observation snapshot / review comment `3583742187`
+- Observation status: Latest-head CI was still running when fresh Codex review completed with one new P1: Workbench directory/symlink mutations remain pathname-bound
+- Trigger comment id: 4975617979
+- Trigger created_at: 2026-07-15T00:50:24Z
+- Trigger boundary: Head `82874bf35d2f4b4a3b360bb08d7c26ffe0935210`のiteration 4 current-boundary review
+- Resume metadata: not used; R10/F8 repairでhead変更予定のためold boundary observationは中断した
+- New trigger approved: yes, U5 commit/push後のnew latest headへpost-onceする
+- Observation limitation: CI terminal前にR10/F8 P1を取得してrepairへ移行したため、このboundaryはterminal merge-prepared evidenceとして使わない
+- Batch status: Iteration 3 U3/U4はquality gate、commit/pushまで完了し、head `82874bf35d2f4b4a3b360bb08d7c26ffe0935210`のfresh reviewでR10/F8を検出した。Iteration 4ではChatGPT 5.6 Pro consultationを原文importし、pre-delegation U5を作成、descriptor-bound recursive Workbench traversal/mutation、focused/related/repetition/lint/parity/full、fresh code/QAまで完了。Final fresh spec/precommit remediation中。Commit/push後に新しいlatest headでCI/Codex re-observationを行う。
 - Repair unit Artifact: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/artifacts/20260714t170412z-disc-pr-repair-unit-linux-descriptor-publication.md`
 - Late evidence status: Worker handoff originally used equivalent batch F1/U1/S100-R1 content, but the canonical unit Artifact pre-delegation gate was missed. Order compliance is not claimed; remediation enables audit and fresh review before commit.
 - U2 implementation evidence: exact focused node 20/20 pass、related regression 68 passed / 5 skipped、`make lint` PASS、`git diff --check` PASS、fresh code review PASS (P0-P3=0)、fresh QA conditional PASS (P0-P3=0)、full `uv run pytest` PASS (2598 passed / 75 skipped / 2 warnings, 1629.67s)。Head `90a7adf3`へcommit/push済みでlatest CI 4/4 pass。
 - Iteration 3 consultation evidence: `artifacts/20260714t195256z-chatgpt-output-pr-323-symlink-race-repair-design.md`（evidence-only、SHA-256 `92726c3966e78dfa3bdd5236093493966271f3a552fbc08b44de938c213799a1`、40156 bytes）。Canonical authorityではなく、orchestrator dispositionを経たbounded repair designとしてのみ利用する。
+- Iteration 4 consultation evidence: `artifacts/20260715t012925z-chatgpt-output-pr-323-workbench-parent-descriptor-repair-design.md`（evidence-only、SHA-256 `0a0bb7f0d1a924c59e48cd583e806ab77667d72ec05cb5adfcd31723dee8740a`、45909 bytes）。Adoption boundaryはU5 `20260715t012944z-disc`で固定した。
 
 ## Batch Purpose
 
@@ -75,23 +76,23 @@ separate follow-up tracking outside the current PR branch.
 
 | field | value |
 | --- | --- |
-| latest_head_sha | 3dd94928d6d4b8a3810b9170b9fcb027572c64f2 |
-| observation_status | U3/U4 local implementation and test/static gates complete; U4 code review PASS and QA conditional PASS; final spec/precommit, commit/push, and combined latest-head observation pending |
-| required_ci_status | Current pushed head CI 4/4 pass predates U4; latest-head Ubuntu actual `linkat` race gate remains required after U4 push |
-| review_status | Latest Codex review: two new P1 findings |
+| latest_head_sha | 82874bf35d2f4b4a3b360bb08d7c26ffe0935210 |
+| observation_status | U3/U4 pushed headのfresh reviewでR10/F8を検出し、CI terminal待機を中止してU5へ移行 |
+| required_ci_status | Head `82874bf3`のCIはreview P1検出時点でrunning。U5後のlatest headで全required CIを再実行する |
+| review_status | Latest Codex review: one current P1 R10/F8 |
 | p0_count | 0 |
-| p1_count | 2 current / 1 historical |
-| p2_count | 2 deferred |
+| p1_count | 1 current / 3 repaired historical |
+| p2_count | 2 historical deferred + 2 U5 QA non-blocking coverage residuals |
 | p3_count | 0 |
 | required_ci_failure_count | 0 current / 1 historical |
-| merge_blocker_count | 2 current P1 families |
-| blocking_family_count | 2 current |
+| merge_blocker_count | 0 current code blockers; final spec/precommit record gate remains |
+| blocking_family_count | 0 current implementation families |
 | non_blocking_family_count | 3 |
-| terminal_non_blocking_only | no; F6 and F7 are P1 merge-blocking |
+| terminal_non_blocking_only | no; commit/pushとlatest-head external gatesが未完了 |
 | branch_mutation_required | yes |
 | ci_rerun_expected | yes |
 | review_clean | no |
-| merge_prepared_candidate | no; U4 final fresh spec/precommit、commit/push、latest-head Ubuntu CI including actual `linkat` race、fixed-endpoint re-observation pending |
+| merge_prepared_candidate | no; U5 final spec/precommit、commit/push、latest-head CI/Codex re-observation pending |
 
 ## Raw Intake Inventory
 
@@ -110,6 +111,7 @@ priority separate from the final severity decision.
 | R7 | ci | Provider CI run 29352522159 | CI | deterministic collision-clock test | not recorded | Exactly one F4 test failed; 2597 passed / 75 skipped / 2 warnings。Duplicate same-head run 29352527033 succeeded, proving nondeterministic flake while failed required run remains blocking | failing-test / repro | a7a7c072 | F4 | triaged |
 | R8 | review | Latest Codex review thread: Workbench destination symlink race | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_cli.py` | regular-file destination create/write boundary | Path-missing validation and pathname `shutil.copy2` are not descriptor-bound; a symlink inserted in the gap can redirect truncate/write outside the verified destination parent | code-path / security contract | 90a7adf3 | F6 | triaged |
 | R9 | review | Latest Codex review thread: Artifact destination-parent symlink race | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py` | destination parent lifecycle | Ancestry validation is followed by repeated pathname re-resolution for staging, publication, fsync, confirmation, and cleanup; parent replacement can redirect mutation outside the repository | code-path / security contract | 90a7adf3 | F7 | triaged |
+| R10 | review | Codex comment 3583742187 / thread PRRT_kwDOQ99OK86Q8fC6 | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_cli.py` | recursive directory and symlink mutation | U3 bound regular-file leaf writes to a parent fd, but `Path.mkdir` / `unlink` / `readlink` / `symlink_to` and full-path recursive reopening can still be redirected through a swapped parent pathname | code-path / security contract | 82874bf35d2f4b4a3b360bb08d7c26ffe0935210 | F8 | triaged |
 
 Do not keep example rows as active inventory.
 
@@ -124,8 +126,9 @@ Group inventory items by shared root cause. Do not repair comments one-by-one.
 | F3 | artifact_publication.staged_replacement_race | Staged Artifact replacement race | no | Publication must remain bound to verified staged content | R3 | P2 | P2 | no | follow-up | N/A | triaged |
 | F4 | artifact_collision.wall_clock_flake | Wall-clock-dependent collision test | yes | Collision tests must be deterministic on required Provider CI | R4、R7 | P2 / CI | required-ci historical | no current | covered-by | U2 | completed; latest CI 4/4 pass at head 90a7adf3 |
 | F5 | pr_observation.initial_timeout | Resumable observation timeout | no | Observation limitation must preserve resume boundary and terminal evidence | R6 | unknown | platform | no | no-action | N/A | triaged |
-| F6 | workbench_copy.destination_symlink_race | Workbench regular-file destination is not descriptor-bound | yes | Verified source bytes must be copied only into the verified destination directory without following an inserted destination symlink | R8 | P1 | P1 | no current local blocker; latest-head re-observation pending after U4 | covered-by | U3 | completed locally and pushed at `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`; focused/static/parity/full/fresh code+QA+spec reviews pass |
-| F7 | artifact_import.destination_parent_symlink_race | Artifact destination parent is not held across publication lifecycle | yes | Staging, publication, fsync, confirmation, and cleanup must remain bound to one verified destination-parent descriptor | R9 | P1 | P1 | yes pending final gates | fix-now | U4 | local implementation/test/static complete; code PASS、QA conditional; final spec/precommit、commit/push、Ubuntu actual linkat CI、re-observation pending |
+| F6 | workbench_copy.destination_symlink_race | Workbench regular-file destination is not descriptor-bound | yes | Verified source bytes must be copied only into the verified destination directory without following an inserted destination symlink | R8 | P1 | P1 | no current | covered-by | U3 | committed/pushed at `3dd94928`; current review supersedes it only for recursive directory/symlink path |
+| F7 | artifact_import.destination_parent_symlink_race | Artifact destination parent is not held across publication lifecycle | yes | Staging, publication, fsync, confirmation, and cleanup must remain bound to one verified destination-parent descriptor | R9 | P1 | P1 | no current | covered-by | U4 | quality gates、commit/push `82874bf3` complete; Ubuntu gate will rerun with U5 latest head |
+| F8 | workbench_copy.pathname_toctou | Workbench recursive directory/symlink traversal and mutation are pathname-bound | yes | Every recursive frame must hold verified source/destination directory descriptors and perform descendant inspection/mutation with one basename plus `dir_fd` | R10 | P1 | P1 | no current code blocker; final record gate pending | fix-now | U5 | implementation/quality/code+QA reviews complete; final spec/precommit remediation pending |
 
 ## Classification Values
 
@@ -263,7 +266,7 @@ Create one subsection per real family.
 - Scope result: Exactly three code/test filesだけを変更した。Provider `fs_cli.py`、exact dogfood mirror、Workbench infra test。Symlink branch、U4、その他のfileへ拡張していない。
 - Reviewer environment correction: Initial PATH interpretationはactual interpreter evidenceで訂正済み。Focused GREENはuvが提供したPython 3.10.15で実行され、G19を満たす。PATH表示だけをinterpreter version evidenceとして扱わない。
 - Python 3.10 exploratory note: 必須U3 gateではないfull-suite探索実行は、test execution前のcollectionでpre-existing `scripts/authoring-pack/prepare_chatgpt_authoring_pack.py`の`datetime.UTC` importにより失敗した。これはU3 regressionまたはU3 gate failureとは扱わない。Actual Python 3.10の必須U3 focused gateは34 passedのままPASS。
-- Closure status: R8/F6はlocal implementation/quality/code+QA/spec review gates、commit/push head `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`まで完了。U4 local implementation/test/staticは完了し、fresh code review PASS、QA conditional PASS。Final fresh spec/precommit、commit/push、Ubuntu CI/re-observationはpending。
+- Closure status: R8/F6はlocal implementation/quality/code+QA/spec review gates、commit/push head `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`まで完了。U4もfresh spec/precommit、commit/push `82874bf3`まで完了。Current blockerはR10/F8/U5。
 - Residual risk: Recursive directories and symlink-branch hardening are excluded。Symlink-branch REDはautomatic expansionではなくstop conditionである。
 
 ### F7 artifact_import.destination_parent_symlink_race
@@ -285,8 +288,26 @@ Create one subsection per real family.
 - Deterministic tests: Call-order logをassertする。`temp_create` swapはexact `destination_ineligible/not_created`かつtempなし、`before_publication` swapはexact `destination_ineligible/removed`かつpublicationなし、actual syscall-window swapはheld-fd commit後exact `destination_read_failed` committed warning + staged hash/countとする。全caseでexternal sentinel/inventory不変、outside temp/destinationなし、cleanupがheld original parentだけへ作用することをassertし、Linux/macOS call shapeもheld fdを使うことをassertする。
 - Quality gates: Publisher infra focused、Artifact import application/commands/CLI regression（read-only validation）、`make lint`、full pytest、provider/dogfood parity、current macOS hostでactual focused publisher gate、fresh code/QA/spec reviews、commit/push後latest-head re-observation。
 - Local result: Exact three-file implementation。RED isolated old HEAD/new nodes 6 failed / 1 Linux-only skipped。GREEN current macOS focused 47 passed / 1 Linux-only skipped、actual uv CPython 3.10.15 47/1、related 33、four adversarial/order nodes 40/40。Current macOS real `fclonefileat` syscall-window node executed。`make lint`、provider/dogfood `cmp`、`git diff --check` PASS。Full Python 3.12 pytest 2606 passed / 76 skipped / 2 warnings in 1757.50s。Fresh code review PASS（P0-P3=0）、QA conditional PASS（code P0-P3=0）。
-- Closure status: R9/F7 local implementation、test/static、code review、QA conditional reviewは完了。Final fresh spec/precommit、commit/push、latest-head Ubuntu actual `linkat` CI、fixed-endpoint re-observationはpending。
+- Closure status: R9/F7 local implementation、test/static、code/QA/spec review、commit/push `82874bf35d2f4b4a3b360bb08d7c26ffe0935210`まで完了。Ubuntu actual `linkat` CIはU5後のlatest-head combined gateで再確認する。Current F7 code blockerなし。
 - Residual risk: Warning taxonomy refinement、general filesystem abstraction、`O_TMPFILE`/`AT_EMPTY_PATH` redesignはout of scope。
+
+### F8 workbench_copy.pathname_toctou
+
+- Related inventory IDs: R10
+- Reported priority: P1
+- Decided priority: P1
+- Merge-blocking: yes
+- Protected domain: Workbench copy destination containment and source non-follow traversal
+- Contract / invariant: Recursive frameごとにverified source/destination directory fdを保持し、descendant inspection/open/mkdir/unlink/readlink/symlink/createをheld fd + single basenameへbindする。
+- Root cause: U3はregular-file leafだけをdescriptor-bound化したが、directory creation、symlink replacement/create、source readlink、recursive child reopeningはvisible pathnameを再解決する。
+- Validity analysis: Review comment `3583742187`はcurrent head `82874bf3`へbindされ、external destinationへのparent pathname redirectが可能な実コードを指す。Valid P1。
+- Need-to-fix decision: yes
+- Recommended disposition: fix-now / U5。Private Workbench recursive coreだけをdescriptor-relativeへ変換し、public contractとgeneral filesystem layerは変更しない。
+- Consultation: ChatGPT 5.6 Pro session `pr323-workbench-parent-descriptor-repair`。Full transcriptはArtifact `20260715t012925z-chatgpt-output-pr-323-workbench-parent-descriptor-repair-design.md`へSHA-256一致でimport済み。
+- Repair scope: Provider `fs_cli.py`、exact dogfood mirror、Workbench infra test only。
+- Portable residual: Python stdlibの`mkdir -> stat/open` real-directory substitutionとsame-held-directory内のleaf ABAは残るが、parent redirectとsymlink target followを防ぐ。Transactional concurrencyは約束しない。
+- Quality gates: RED/GREEN adversarial tests、actual Python 3.10 focused、related application/CLI、new-node repetition、parity、lint、full Python 3.12、fresh code/QA/spec reviews、commit/push後latest-head CI/Codex observation。
+- Closure status: U5 implementation/quality/code+QA reviews complete。Final spec/precommit record remediation、commit/push、latest-head external gates pending。
 
 ## Root-Cause Family and Coupling Analysis
 
@@ -299,22 +320,23 @@ Create one subsection per real family.
 | F5 | pr_observation.initial_timeout | R6 | resolved limitation | Repair codeと非結合 | Trigger 4970835673 resume metadata | Terminal evidence取得によりresolved |
 | F6 | workbench_copy.destination_symlink_race | R8 | first observed | Workbench regular-file leafとdestination parent descriptorが直接結合。Artifact lifecycleとはcontractが異なる | Latest Codex review / evidence Artifact `20260714t195256z-chatgpt-output-pr-323-symlink-race-repair-design.md` | P1 blocker。U3を先に実施 |
 | F7 | artifact_import.destination_parent_symlink_race | R9 | first observed | Artifact staging/publication/confirmation/cleanupが同一parent fdへ結合。Workbenchとは独立unit | Latest Codex review / evidence Artifact `20260714t195256z-chatgpt-output-pr-323-symlink-race-repair-design.md` | P1 blocker。U3後にU4を実施 |
+| F8 | workbench_copy.pathname_toctou | R10 | refinement after U3 | U3 regular-file leaf修復の隣接surfaceだが、recursive frame全体のdescriptor topologyが必要 | Current Codex review / evidence Artifact `20260715t012925z-chatgpt-output-pr-323-workbench-parent-descriptor-repair-design.md` | P1 blocker。Separate U5としてprivate recursive coreを修復 |
 
 When a `root_cause_family` recurs, re-analyze the current evidence, root-cause
 hypothesis, coupling, and prior result. Recurrence alone is not a stop reason.
 
 ## Integrated Repair Strategy
 
-- strategy_id: S100-R3
-- covered_family_ids: F6、F7
-- prior_strategy_id: S100-R2
-- strategy_delta: S100-R2はwall-clock test determinismだけを修復した。R3はlatest reviewで新規検出された二つのdescriptor-binding P1を、Workbench U3とArtifact U4へ分離し、U3→U4の順でpathname check-to-use mutationをheld descriptor mutationへ変更する。
-- ordered_units: U3 then U4。両unit完了前にlatest-head re-observationへ進まない。
-- bounded_scope: U3はprovider `fs_cli.py`、exact dogfood mirror、Workbench infra test only。U4はprovider `binary_artifact_publisher.py`、exact dogfood mirror、publisher infra test only。共通filesystem abstraction、recursive directory fd rewrite、public warning enum追加は禁止。
-- validation_plan: Unitごとのdeterministic external-sentinel race tests、focused regression、provider/dogfood parity、`make lint`。両unit後にfull pytest、current macOS host actual focused publisher gate、fresh code/QA/spec reviews、commit/push、latest-head CI 4/4とCodex re-review。
-- rollback_plan: U3/U4を別々のfocused commitにし、各unitを独立revert可能にする。Evidence docsはhistorical traceとして保持する。
-- re_observation_plan: U3とU4の実装・review・commit/pushを両方完了後、PR #323 latest pushed headへfresh fixed-endpoint observationをbindする。
-- residual_risk: Workbench xattrs/ACL/BSD flags、recursive directory hardening、new parent-change warning taxonomyはout of scope。F2/F3 historical P2はterminal report対象。
+- strategy_id: S100-R4
+- covered_family_ids: F8
+- prior_strategy_id: S100-R3
+- strategy_delta: S100-R3はregular-file leafとArtifact publisher lifecycleをheld fdへ固定した。R4はcurrent reviewで残存が確認されたWorkbench recursive directory/symlink pathname surfaceを、per-frame source/destination held fdとbasename-only operationsへ変換する。
+- ordered_units: U5 only。U3/U4はhistorical completed repairとして保持する。
+- bounded_scope: Provider `fs_cli.py`、exact dogfood mirror、Workbench infra test only。Public contract、Artifact publisher、共通filesystem abstraction、pathname fallback、rollbackは禁止。
+- validation_plan: Deterministic root/nested parent swap、directory create、symlink unlink/create、source swap tests、focused/related/repetition/parity/lint/full、fresh code/QA/spec reviews、commit/push、latest-head CI/Codex review。
+- rollback_plan: U5を独立focused commitにし、U3/U4を維持したままrevert可能にする。Evidence docsはhistorical traceとして保持する。
+- re_observation_plan: U5 quality/review/commit/push後、新しいlatest headへfresh fixed-endpoint observationをbindする。Interrupted `82874bf3` observationはterminal evidenceとして使用しない。
+- residual_risk: Portable `mkdir -> open` real-directory substitution、same-directory leaf ABA、xattrs/ACL/BSD flagsはout of scope。F2/F3 historical P2はterminal report対象。
 
 The strategy must be bounded, in scope, supported by current evidence, and
 materially different from an ineffective prior strategy. Renaming or repeating
@@ -328,14 +350,18 @@ the same strategy is not a strategy delta.
 - consultation_id: pr323-symlink-race-repair-design
 - consulted_at: 2026-07-14 S100 iteration 3 triage
 - bound_head_sha: 90a7adf3
-- bound_observation_status: Latest head CI 4/4 pass; latest Codex review two P1 findings
-- bound_family_ids: F6、F7
-- bound_strategy_context: U1/U2はcompleted。New P1 families require descriptor-bound mutation without combining their distinct contracts。
-- input_summary_ref: Latest Codex review、current provider/dogfood source/tests、active Issue requirement/design/plan
-- recommendation_summary_ref: `artifacts/20260714t195256z-chatgpt-output-pr-323-symlink-race-repair-design.md`（SHA-256 `92726c3966e78dfa3bdd5236093493966271f3a552fbc08b44de938c213799a1`、40156 bytes、evidence-only）
-- recommendation_summary: U3 Workbench descriptor-bound exclusive regular-file copy、then U4 Artifact held destination-parent fd lifecycle。Use private helpers per module、deterministic external-sentinel tests、focused/full/Linux/macOS gates。
+- iteration_4_consultation_id: pr323-workbench-parent-descriptor-repair
+- iteration_4_consulted_at: 2026-07-15 S100 iteration 4 triage
+- iteration_4_bound_head_sha: 82874bf35d2f4b4a3b360bb08d7c26ffe0935210
+- iteration_4_result: Use descriptor-bound private recursive core、partial-use portable residual limits、reject obvious-line-only patch/general abstraction/pathname fallback。
+- bound_observation_status: Head `82874bf3` CI running; current Codex review one P1 R10/F8
+- bound_family_ids: F8
+- bound_strategy_context: U1〜U4 completed。U3 regular-file leaf boundaryをprivate recursive frame全体へ拡張するseparate U5が必要。
+- input_summary_ref: Current Codex R10、current provider/dogfood source/tests、active Issue requirement/design/plan
+- recommendation_summary_ref: `artifacts/20260715t012925z-chatgpt-output-pr-323-workbench-parent-descriptor-repair-design.md`（SHA-256 `0a0bb7f0d1a924c59e48cd583e806ab77667d72ec05cb5adfcd31723dee8740a`、45909 bytes、evidence-only）
+- recommendation_summary: Private Workbench recursive coreをper-frame held source/destination fd + basename-only operationsへ変換し、deterministic nested-frame testsとPython 3.10/macOS/Linux/full gatesで確認する。
 - freshness_invalidators: Head change、review finding change、platform contract change、scope expansion、different root-cause family。
-- open_risks: Actual implementation/API support on Python 3.10 and current macOS host、fresh latest-head CI/re-review。
+- open_risks: Portable mkdir→open real-directory substitution、same-held-directory leaf ABA、fresh latest-head Ubuntu CI/re-review。
 - fallback_approval_status: not_requested
 - fallback_invocation_id: N/A
 - fallback_approved_by: N/A
@@ -345,7 +371,7 @@ the same strategy is not a strategy delta.
 - fallback_expires_when: N/A
 - fallback_manual_analysis_ref: N/A
 - fallback_consumed_at: N/A
-- orchestrator_disposition_summary: use ordered U3/U4 split and held-descriptor boundaries。Metadata、warning、actual macOS gateはuser simplicity-first constraintsとcanonical requirementsに整合するorchestrator bounded decisionとして採用。U3はregular-file branchに限定し、symlink-branch REDではstop/amend/fresh spec gateとする。Reject common abstraction、pathname fallback、warning enum expansion、recursive rewrite。
+- orchestrator_disposition_summary: Use recursive descriptor core、source-before-mutation、basename-only operations、fail-closed capability gate。Portable residualはpartial-useとして明示し、obvious-line-only patch、generic abstraction、pathname fallback、rollback/transactionはreject。
 
 Use only sanitized, repository-relative evidence references.
 Do not paste raw model conversation, secrets, tokens, or absolute host paths. ChatGPT output is
@@ -391,10 +417,11 @@ they are directly and unavoidably covered by the same `P0`/`P1` root-cause fix.
 
 | unit_id | source_batch | family_id | covered_items | decided_priority | merge_blocking | disposition | repair_unit_disc | status | implementation_plan | quality_gate | commit_evidence | re_observation_result | residual_risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| U1 | 20260714t154712z-pr-repair-batch | F1 | R1、R5 | P1 historical | no current | covered-by | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/artifacts/20260714t170412z-disc-pr-repair-unit-linux-descriptor-publication.md` | completed by U1 / operationally passed | Historical repair: destination parent dirfd、exact dogfood mirror、publisher test | Local gates passed。Ubuntu normal publisher paths operational pass、Codex current-boundary new findings 0 | included since head `a7a7c072` | F1 operational pass | No additional F1 mutation。Current blockers are F6/F7 |
-| U2 | 20260714t154712z-pr-repair-batch | F4 | R4、R7 | required-ci historical | no current | covered-by | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/artifacts/20260714t175806z-disc-pr-repair-unit-deterministic-collision-clock.md` | completed | Deterministic copied-clock test-only repair | Focused/full/local reviews and latest-head CI 4/4 pass | included in head `90a7adf3` | passed for F4 | New blockers are F6/F7 only |
-| U3 | 20260714t154712z-pr-repair-batch | F6 | R8 | P1 | no current local blocker; re-observation pending after U4 | covered-by | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/artifacts/20260714t195338z-disc-pr-repair-unit-workbench-descriptor-copy.md` | committed-and-pushed-awaiting-combined-re-observation | Exact 3-file scope; descriptor-bound exclusive regular-file copy; metadata bytes/mode/mtime; regular-file branch only | RED 3 failed / 33 passed。GREEN Python 3.10.15 infra 34 passed、related 47 passed、new nodes 40/40、lint/cmp/diff/code+QA+spec reviews pass。Required full Python 3.12 pytest 2600 passed / 75 skipped / 2 warnings in 1666.78s | commit/push `3dd94928d6d4b8a3810b9170b9fcb027572c64f2` | intentionally pending until U4 latest head | Symlink branch unchanged。Exploratory non-gate Python 3.10 full collection failure is pre-existing `datetime.UTC` incompatibility。Latest-head re-observation only after U4 |
-| U4 | 20260714t154712z-pr-repair-batch | F7 | R9 | P1 | yes pending final gates | fix-now | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/artifacts/20260714t195339z-disc-pr-repair-unit-artifact-held-parent-fd.md` | implemented-local-tests-code-qa-complete-awaiting-final-spec-commit | Held destination-parent fd across staging/publication/fsync/confirmation/cleanup; exact hook-order/error/committed-warning contract; existing warning taxonomy; exact three-file scope | RED 6 failed / 1 skipped。GREEN macOS 47/1、uv CPython 3.10.15 47/1、related 33、four nodes 40/40、actual fclone、lint/cmp/diff/full 2606/76/2、fresh code PASS and QA conditional PASS。Final spec/precommit pending | pending final spec/precommit and commit/push | pending latest-head Ubuntu CI/re-observation | Linux actual `linkat` syscall-window race remains required CI gate。Public warning enum/general abstraction remain out of scope |
+| U1 | 20260714t154712z-pr-repair-batch | F1 | R1、R5 | P1 historical | no current | covered-by | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/artifacts/20260714t170412z-disc-pr-repair-unit-linux-descriptor-publication.md` | completed by U1 / operationally passed | Historical repair: destination parent dirfd、exact dogfood mirror、publisher test | Local gates passed。Ubuntu normal publisher paths operational pass、Codex current-boundary new findings 0 | included since head `a7a7c072` | F1 operational pass | No additional F1 mutation。Current blockerはF8/U5 |
+| U2 | 20260714t154712z-pr-repair-batch | F4 | R4、R7 | required-ci historical | no current | covered-by | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/artifacts/20260714t175806z-disc-pr-repair-unit-deterministic-collision-clock.md` | completed | Deterministic copied-clock test-only repair | Focused/full/local reviews and latest-head CI 4/4 pass | included in head `90a7adf3` | passed for F4 | Current blockerはF8/U5 |
+| U3 | 20260714t154712z-pr-repair-batch | F6 | R8 | P1 | no current | covered-by | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/artifacts/20260714t195338z-disc-pr-repair-unit-workbench-descriptor-copy.md` | committed-and-pushed | Exact 3-file scope; descriptor-bound exclusive regular-file copy; metadata bytes/mode/mtime; regular-file branch only | RED 3 failed / 33 passed。GREEN Python 3.10.15 infra 34 passed、related 47 passed、new nodes 40/40、lint/cmp/diff/code+QA+spec reviews pass。Required full Python 3.12 pytest 2600 passed / 75 skipped / 2 warnings in 1666.78s | commit/push `3dd94928d6d4b8a3810b9170b9fcb027572c64f2` | Head `82874bf3` reviewでregular-file leaf findingの再発なし | Recursive directory/symlink surfaceはseparate F8/U5で修復中 |
+| U4 | 20260714t154712z-pr-repair-batch | F7 | R9 | P1 | no current | covered-by | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/artifacts/20260714t195339z-disc-pr-repair-unit-artifact-held-parent-fd.md` | completed-and-pushed | Held destination-parent fd across staging/publication/fsync/confirmation/cleanup; exact hook-order/error/committed-warning contract; existing warning taxonomy; exact three-file scope | RED 6 failed / 1 skipped。GREEN macOS 47/1、uv CPython 3.10.15 47/1、related 33、four nodes 40/40、actual fclone、lint/cmp/diff/full 2606/76/2、fresh code/QA/spec PASS | commit/push `82874bf35d2f4b4a3b360bb08d7c26ffe0935210` | Head `82874bf3` reviewでF7再発なし。Latest Ubuntu combined CIはU5後に再実行 | Linux actual `linkat`はlatest-head CI必須。Public warning enum/general abstraction remain out of scope |
+| U5 | 20260714t154712z-pr-repair-batch | F8 | R10 | P1 | no current code blocker; final record gate pending | fix-now | `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/artifacts/20260715t012944z-disc-pr-repair-unit-workbench-descriptor-traversal.md` | implementation-quality-code-qa-complete-awaiting-final-spec-commit | Descriptor-bound private recursive Workbench core; per-frame source/destination fds; basename-only directory/symlink/file operations; exact three-file code scope | RED 4+2。GREEN 3.10/3.12 focused 48、related 47、repeat 120/120+20/20、lint/cmp/diff、full 2620/76/2、code PASS、QA conditional PASS P0/P1=0 | pending final spec/precommit and commit/push | pending latest-head CI/Codex review | Portable directory-create and same-directory leaf ABA limits documented; no transaction/general abstraction |
 
 ## Implementation Result
 
@@ -418,7 +445,8 @@ they are directly and unavoidably covered by the same `P0`/`P1` root-cause fix.
 - Re-observation result: F1 operationally passed on Ubuntu。Iteration 2 blockerはF4のみ。
 - U2 result: exact one-file test change completed; focused 20/20、related 68 passed / 5 skipped、lint/diff/full and fresh code/QA reviews passed。Included in head `90a7adf3`; latest CI 4/4 pass。
 - Iteration 3 U3 result: Exact three-file code scope（provider `fs_cli.py`、exact dogfood mirror、Workbench infra test）。RED 3 failed / 33 passed before implementation。GREEN actual uv Python 3.10.15 focused 34 passed、related application + CLI 47 passed、four new nodes 40/40。`make lint`、`cmp`、`git diff --check` PASS。Required full `uv run --python 3.12 pytest` PASS（2600 passed / 75 skipped / 2 warnings, 1666.78s）。Fresh code review PASS（P0-P3=0）、fresh QA PASS（P0-P3=0）、fresh spec/pre-commit review PASS。Exploratory/non-required Python 3.10 full-suite attemptはtest開始前のcollectionでpre-existing `datetime.UTC` importにより失敗したため、U3 regression/gate failureには数えない。R8/F6 local implementation/quality/reviews complete; commit/push `3dd94928d6d4b8a3810b9170b9fcb027572c64f2` complete。U3単独のre-observationは意図的に省略し、U4完了後のlatest headで実施する。U4 pre-delegation gateはpassし、U4 local implementation/gatesも完了済み。
-- Iteration 3 U4 result: Exact three-file scope（provider `binary_artifact_publisher.py`、exact dogfood mirror、publisher infra test）。Isolated old HEAD/new nodes RED 6 failed / 1 Linux-only skipped。GREEN current macOS focused 47 passed / 1 Linux-only skipped、actual uv CPython 3.10.15 47/1、related Artifact import 33 passed、four adversarial/order nodes 40/40。Current macOS real `fclonefileat` syscall-window node executed。`make lint`、`cmp`、`git diff --check` PASS。Required full `uv run --python 3.12 pytest` PASS（2606 passed / 76 skipped / 2 warnings, 1757.50s）。Fresh code review PASS（P0-P3=0）、QA conditional PASS（code P0-P3=0）。R9/F7 local implementation/test/static/code+QA evidence complete。Final fresh spec/precommit、U4 commit/push、latest-head Ubuntu actual `linkat` race gate、CI/re-observation pending。Both U3/U4 local implementations are complete; final gates are not complete。
+- Iteration 3 U4 result: Exact three-file scope（provider `binary_artifact_publisher.py`、exact dogfood mirror、publisher infra test）。Isolated old HEAD/new nodes RED 6 failed / 1 Linux-only skipped。GREEN current macOS focused 47 passed / 1 Linux-only skipped、actual uv CPython 3.10.15 47/1、related Artifact import 33 passed、four adversarial/order nodes 40/40。Current macOS real `fclonefileat` syscall-window node executed。`make lint`、`cmp`、`git diff --check` PASS。Required full `uv run --python 3.12 pytest` PASS（2606 passed / 76 skipped / 2 warnings, 1757.50s）。Fresh code/QA/spec reviews PASS。Commit/push `82874bf35d2f4b4a3b360bb08d7c26ffe0935210` complete。Fresh reviewでU4自体の新規findingはなく、separate Workbench F8が検出された。
+- Iteration 4 U5 result: ChatGPT consultationとpre-delegation unit作成後、exact three-file implementationを完了。Initial RED 4 failed、QA follow-up RED 2 failed。GREEN Python 3.10.15/3.12 focused各48 passed、related 47、initial 12 nodes x10=120/120、follow-up 2 nodes x10=20/20、lint/cmp/diff PASS。Fresh code reviewとdelta reviewはいずれもP0-P3=0。Initial QA P1 coverage gapはnested destination/source child fd取得後のvisible path差し替え2 testsで修復し、fresh QA rereviewはCONDITIONAL PASS P0/P1=0、P2=2 non-blocking、P3=0。Full Python 3.12 pytestは2620 passed / 76 skipped / 2 warnings in 1636.44sでPASS。Initial full attemptの93 failuresはstale Python 3.10 `.venv`に限定され、Python 3.12へ復元後、元failure代表82/82とfull terminal passでenvironment-onlyを確認。Final spec/precommit、commit/push、latest-head CI/re-observation pending。
 
 ## Non-Blocking Follow-up Register
 
@@ -457,22 +485,26 @@ Define family-level gates, not comment-level checks.
 | G14 | F7 | Artifact import application/commands/CLI focused regression + provider/dogfood `cmp` | Related regression 33 passed。Provider/dogfood exact `cmp` PASS | R9 | complete locally |
 | G15 | F6、F7 | Current macOS host actual focused infra execution | U3 Workbench exact infra passed 34 under uv Python 3.10.15。U4 focused publisher 47/1 and real macOS `fclonefileat` syscall-window race node executed | R8、R9 | complete locally |
 | G16 | F6、F7 | `make lint` + full pytest + `git diff --check` | U3 complete。U4 lint/diff PASS; required full Python 3.12 pytest 2606 passed / 76 skipped / 2 warnings in 1757.50s | R8、R9 | complete locally |
-| G17 | F6、F7 | Fresh code、QA、spec reviews | U3 reviews complete。U4 pre-delegation gate complete、fresh code PASS P0-P3=0、QA conditional PASS code P0-P3=0。Final fresh spec/precommit pending | R8、R9 | partial; pending final U4 spec/precommit |
-| G18 | F6、F7 | Latest-head Ubuntu CI 4/4 + fixed-endpoint Codex re-review | Ubuntuでactual Linux `linkat` syscall-window race nodeを含む全required checksがpassし、両P1 findingがpushed latest headでclosed | R8、R9 | required after U4 push |
+| G17 | F6、F7 | Fresh code、QA、spec reviews | U3/U4 reviews complete、P0/P1 0 | R8、R9 | complete locally |
+| G18 | F6、F7 | Latest-head Ubuntu CI + fixed-endpoint Codex re-review | Ubuntuでactual Linux `linkat` syscall-window race nodeを含む全required checksがpassし、両P1 findingがpushed latest headで再発しない | R8、R9 | required as combined gate after U5 push |
 | G19 | F6 | Actual Python 3.10 exact Workbench infra file | uv-provided Python 3.10.15 verified; exact file 34 passed。Initial reviewer PATH confusion corrected by actual interpreter evidence | R8 | complete locally |
 | G20 | F7 | Actual Python 3.10 exact publisher infra file | uv CPython 3.10.15で47 passed / 1 Linux-only skipped。Linux actual `linkat` race remains latest-head Ubuntu CI gate | R9 | local complete; Ubuntu required |
+| G21 | F8 | Descriptor-bound recursive Workbench adversarial focused tests | Initial RED 4 failed、follow-up RED 2 failed。Current Python 3.12 focused 48 passed。Nested destination/source frame held-fd testsを含む | R10 | complete locally |
+| G22 | F8 | Python 3.10 + related + repetition + parity/lint/full | Python 3.10.15 focused 48、related 47、initial 12 nodes x10=120/120、follow-up 2 nodes x10=20/20、cmp/lint/diff PASS。Full Python 3.12 2620 passed / 76 skipped / 2 warnings in 1636.44s | R10 | complete locally |
+| G23 | F8 | Fresh code、QA、spec reviews | Code review + delta review PASS P0-P3=0。Initial QA P1は追加2 testsで修復、rereview CONDITIONAL PASS P0/P1=0、P2=2 non-blocking、P3=0。Final spec pending | R10 | partial; final spec pending |
+| G24 | F1、F4、F6、F7、F8 | Latest-head GitHub Actions + fixed-endpoint Codex review | All required CI terminal success、current-boundary P0/P1 0 | R1、R4、R5、R7〜R10 | required after U5 push |
 
 ## Re-observation Plan
 
-- Latest observed head before U3 repair: 90a7adf3
-- Current pushed head after U3: 3dd94928d6d4b8a3810b9170b9fcb027572c64f2
-- Expected head after repair: U3 and U4 implementation/evidence commits SHA
+- Latest observed head before U5 repair: 82874bf35d2f4b4a3b360bb08d7c26ffe0935210
+- Current pushed head: 82874bf35d2f4b4a3b360bb08d7c26ffe0935210
+- Expected head after repair: U5 implementation/evidence commit SHA
 - Re-observation command: fixed-endpoint PR observation workflow for PR #323 latest pushed head
-- Trigger mode: resume when valid for the recorded boundary; otherwise workflow-approved post-once
-- Resume trigger comment id: 4970835673
-- Resume trigger created_at: 2026-07-14T15:17:06Z
-- New trigger approved: no
-- Re-observation required because: R8/R9 are new P1 merge-blocking findings and current CI does not exercise their race windows。
+- Trigger mode: U5 latest headへworkflow-approved post-once。Old boundaryをresumeしない。
+- Prior interrupted trigger comment id: 4975617979
+- Prior interrupted trigger created_at: 2026-07-15T00:50:24Z
+- New trigger approved: yes, after U5 push under PR merge-preparer workflow
+- Re-observation required because: R10/F8はcurrent P1 merge blockerであり、head `82874bf3`のobservationはrepair前boundaryかつCI running時に中止した。
 - Re-observation skipped because: N/A
 
 ## Iteration Ledger
@@ -482,6 +514,7 @@ Define family-level gates, not comment-level checks.
 | 1 | a57156265e55e87abf857aa673a9a419d717e8c6 | Initial timeout; resumed review complete / Provider CI terminal failure | F1〜F5 | first observed | initial test-only recommendation | S100-R1 | Test-onlyからLinux dirfd publication mechanism + adversarial fixture correctionへ変更 | pr323-linux-publicatio-repair-consultati-2 / fresh | F1 use、fixture partial-use、F2〜F4 defer、F5 no-action | U1 implemented; local gates pass; fresh code review pass; QA conditional pass; pre-commit spec P1でmissing canonical unit Artifactを検出しlate evidence remediationを作成 | pending | pending | Fresh spec rereview後にcommit/pushし、fresh Ubuntu Provider CIとlatest-head re-reviewへ進む | Pre-delegation order complianceは回復不能だが、audit/review evidenceをcommit前に補完。Fresh rereview pending |
 | 2 | a7a7c072 | Codex new findings 0 / threads 0; Provider CI 29352522159 failed one F4 test; duplicate same-head 29352527033 succeeded | F1〜F4 | F1 resolved operationally / F4 escalated required-ci | S100-R1 | S100-R2 | F1 production repairからF4 one-file deterministic copied-clock testへ変更 | pr323-f4-required-ci-consultati / fresh | F4 use、F1 no additional change、F2/F3 defer | R7 triaged; F4 reclassified required-ci; U2 implemented locally with focused/regression/lint/full/review gates pass | pending commit/push | pending new-head | Commit/push後にfresh Provider CIとlatest-head re-reviewへ進む | none; local implementation and pre-commit review evidence available |
 | 3 | 90a7adf3 | Latest-head CI 4/4 pass; latest Codex review two P1 findings | F6、F7 | first observed descriptor-binding races | S100-R2 | S100-R3 | Test determinism repairから、ordered U3 Workbench descriptor-bound exclusive copy + U4 Artifact held-parent-fd lifecycleへ変更 | pr323-symlink-race-repair-design / fresh | U3/U4 use、metadata/symlink/warning guidance partial-use、common abstraction/pathname fallback reject | R8/R9 triaged; two pre-delegation unit Artifacts created。U3 committed/pushed。U4 exact three-file implementation/test/static complete、fresh code PASS、QA conditional PASS | U3 `3dd94928d6d4b8a3810b9170b9fcb027572c64f2`; U4 final spec/precommit and commit/push pending | intentionally pending after U4 push | Run final U4 spec/precommit; commit/push U4; require latest-head Ubuntu actual `linkat` race + CI; fixed-endpoint re-observe combined head | none; both implementations locally complete but final U4 gates remain。U3-only re-observation intentionally deferred |
+| 4 | 82874bf35d2f4b4a3b360bb08d7c26ffe0935210 | CI running; Codex review completed with one new P1 R10/F8 | F8 | refinement after U3 regular-file leaf repair | S100-R3 | S100-R4 | Obvious leaf mutation repairから、private recursive frame全体のheld source/destination fd + basename-only traversal/mutationへ変更 | pr323-workbench-parent-descriptor-repair / fresh | Recursive descriptor core use、portable residual partial-use、obvious-line-only/general abstraction/path fallback reject | Raw output import、R10/F8 triage、pre-delegation U5、implementation、RED/GREEN、focused/full、code/QA reviews完了。Final spec record remediation中 | pending final spec/commit/push | old observation interrupted; new latest-head observation pending | Final spec pass後commit/pushし、fresh fixed-endpoint observation | none; current implementation blockerなし |
 
 `iteration_index` is telemetry only; it does not authorize continuation or
 stopping. Each row records the evidence-driven semantic decision for that
