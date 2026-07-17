@@ -1028,6 +1028,21 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/spec_dock/templates/report.md",
         "spec_dock/assets/spec_dock/templates/requirement.md",
     )
+    _ISSUE_69_PYTHON_CACHE_EXCLUSION_PATTERNS = (
+        "**/__pycache__/**",
+        "**/*.pyc",
+        "**/*.pyo",
+    )
+    _ISSUE_69_SETUP_PYTHON_CACHE_EXCLUSION_PATTERNS = (
+        "spec_dock/**/__pycache__",
+        "spec_dock/**/__pycache__/**",
+        "spec_dock/**/*.pyc",
+        "spec_dock/**/*.pyo",
+    )
+    _ISSUE_69_PYTHON_CACHE_FIXTURE_ARTIFACT_RELATIVE_PATHS = (
+        "spec_dock/assets/spec_dock/scripts/spec_dock_runtime/__pycache__/fixture.cpython-312.pyc",
+        "spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/__pycache__/fixture.cpython-312.pyo",
+    )
     _ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS = (
         "spec_dock/assets/spec_dock/scripts/spec-dock-close-smoke.sh",
         "spec_dock/assets/github/workflows/spec-dock-close.yml",
@@ -1055,6 +1070,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00149-issue-finish-synthetic-approval-closeout-bug/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00157-reduce-test-suite-runtime/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00160-reduce-test-runtime-followup/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json",
@@ -1188,6 +1204,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00218-codex-review-fallback-signal-semantics/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00219-carryover-unresolved-threads-stop-observation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00222-forbid-checks-api-pr-observation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00313-remove-pr-merge-preparer-repair-attempt-limits/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00226-record-adaptive-workflow-authority-adrs/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00227-introduce-assurance-contract-and-classification-runtime/.meta.json",
@@ -1250,6 +1267,13 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00306-update-runtime-docs-and-workflow-guidance/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00307-final-quality-gate-and-mergeable-pr-delivery/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00314-harden-github-sync-preflight-fetch-and-receipt-contract/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00315-experimental-workbench-ignore-and-opaque-traversal-foundation/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00316-experimental-scoped-workbench-copy-and-source-wins-merge/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00317-byte-preserving-chatgpt-output-artifact-import/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00318-chatgpt-first-preservation-workflow-and-skill-integration/.meta.json",
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/.meta.json",
     )
     _CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH: ClassVar[dict[str, object]] = {
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/.meta.json": [],
@@ -1260,6 +1284,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00149-issue-finish-synthetic-approval-closeout-bug/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00157-reduce-test-suite-runtime/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00160-reduce-test-runtime-followup/.meta.json": [],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json": [],
@@ -1469,6 +1494,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00218-codex-review-fallback-signal-semantics/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00219-carryover-unresolved-threads-stop-observation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00222-forbid-checks-api-pr-observation/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00158-agent-workflow-pdca-hardening/issues/iss-00313-remove-pr-merge-preparer-repair-attempt-limits/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00226-record-adaptive-workflow-authority-adrs/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00224-dynamic-workflow-resource-allocation/issues/iss-00227-introduce-assurance-contract-and-classification-runtime/.meta.json": [],
@@ -1619,6 +1645,24 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00309-chatgpt-first-planning-skills-and-fallback-route-redesign/.meta.json": [
             "iss-00306",
         ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00295-chatgpt-authoring-pack-installed-runtime/issues/iss-00314-harden-github-sync-preflight-fetch-and-receipt-contract/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00315-experimental-workbench-ignore-and-opaque-traversal-foundation/.meta.json": [],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00316-experimental-scoped-workbench-copy-and-source-wins-merge/.meta.json": [
+            "iss-00315",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00317-byte-preserving-chatgpt-output-artifact-import/.meta.json": [
+            "iss-00315",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00318-chatgpt-first-preservation-workflow-and-skill-integration/.meta.json": [
+            "iss-00317",
+        ],
+        "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/issues/iss-00319-installed-runtime-dogfood-parity-final-quality-and-mergeable-pr/.meta.json": [
+            "iss-00315",
+            "iss-00316",
+            "iss-00317",
+            "iss-00318",
+        ],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -1679,6 +1723,10 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00306": ["iss-00305"],
         "iss-00307": ["iss-00306", "iss-00309"],
         "iss-00309": ["iss-00306"],
+        "iss-00316": ["iss-00315"],
+        "iss-00317": ["iss-00315"],
+        "iss-00318": ["iss-00317"],
+        "iss-00319": ["iss-00315", "iss-00316", "iss-00317", "iss-00318"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -2164,7 +2212,7 @@ class TestInitUpdate(CliRuntimeHarness):
             asset_path = repo_root / asset_rel_path
             assert mirror_path.is_file(), f"missing checked-in dogfooding mirror file: {mirror_path}"
             assert asset_path.is_file(), f"missing provider asset file: {asset_path}"
-            assert mirror_path.read_text(encoding="utf-8") == asset_path.read_text(encoding="utf-8"), (
+            assert mirror_path.read_bytes() == asset_path.read_bytes(), (
                 f"checked-in dogfooding mirror file diverged from provider asset: {mirror_rel_path}"
             )
 
@@ -3080,6 +3128,17 @@ class TestInitUpdate(CliRuntimeHarness):
                 present_seeded_fixtures.add(fixture_artifact_path)
         return present_seeded_fixtures
 
+    def _issue_69_seed_python_cache_fixtures_in_source_context(self, build_context: Path) -> set[str]:
+        source_root = build_context / "src"
+        present_seeded_fixtures: set[str] = set()
+        for fixture_artifact_path in self._ISSUE_69_PYTHON_CACHE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
+            fixture_source_path = source_root / fixture_artifact_path
+            fixture_source_path.parent.mkdir(parents=True, exist_ok=True)
+            fixture_source_path.write_bytes(b"issue-69 generated Python cache fixture\n")
+            if fixture_source_path.is_file():
+                present_seeded_fixtures.add(fixture_artifact_path)
+        return present_seeded_fixtures
+
     def _issue_69_collect_wheel_file_inventory(self, wheel_path: Path) -> set[str]:
         with zipfile.ZipFile(wheel_path) as wheel_zip:
             return {member for member in wheel_zip.namelist() if not member.endswith("/")}
@@ -3125,6 +3184,18 @@ class TestInitUpdate(CliRuntimeHarness):
                     return tuple(str(item) for item in extracted)
         pytest.fail("setup.py is missing _STALE_BUILD_OUTPUT_PATTERNS")
 
+    def _issue_69_extract_setup_python_cache_exclusion_patterns(self, setup_text: str) -> tuple[str, ...]:
+        parsed_module = ast.parse(setup_text, filename="setup.py")
+        for statement in parsed_module.body:
+            if not isinstance(statement, ast.Assign):
+                continue
+            for target in statement.targets:
+                if isinstance(target, ast.Name) and target.id == "_GENERATED_PYTHON_CACHE_PATTERNS":
+                    extracted = ast.literal_eval(statement.value)
+                    assert isinstance(extracted, tuple)
+                    return tuple(str(item) for item in extracted)
+        pytest.fail("setup.py is missing _GENERATED_PYTHON_CACHE_PATTERNS")
+
     def _issue_69_prepare_build_context(self, repo_root: Path, build_context: Path) -> None:
         build_context.mkdir(parents=True, exist_ok=True)
         for filename in ("pyproject.toml", "README.md", "setup.py"):
@@ -3132,7 +3203,6 @@ class TestInitUpdate(CliRuntimeHarness):
         shutil.copytree(
             repo_root / "src",
             build_context / "src",
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
         )
 
     def _issue_69_collect_source_install_root_inventory(self, repo_root: Path) -> set[str]:
@@ -3669,6 +3739,108 @@ class TestInitUpdate(CliRuntimeHarness):
                 source="generated issue-execution skill",
             )
             assert not (target / ".github" / "workflows" / "spec-dock-close.yml").exists()
+
+    def test_init_gitignore_ignores_exact_workbench_directories_at_supported_scopes(self) -> None:
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._run_git(target, ["init"])
+
+            scope_directories = (
+                target / "spec-dock",
+                target / "spec-dock" / "initiatives" / "init-00001-example",
+                target / "spec-dock" / "initiatives" / "init-00001-example" / "epics" / "epic-00001-example",
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-example"
+                / "epics"
+                / "epic-00001-example"
+                / "issues"
+                / "iss-00001-example",
+            )
+            for scope_directory in scope_directories:
+                workbench_probe = scope_directory / ".workbench" / "probe"
+                workbench_probe.parent.mkdir(parents=True, exist_ok=True)
+                workbench_probe.write_text("scratch\n", encoding="utf-8")
+                near_name_probe = scope_directory / ".workbench-notes" / "probe"
+                near_name_probe.parent.mkdir(parents=True, exist_ok=True)
+                near_name_probe.write_text("ordinary\n", encoding="utf-8")
+
+                workbench_result = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", workbench_probe.relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert workbench_result.returncode == 0, workbench_result.stdout + workbench_result.stderr
+
+                near_name_result = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", near_name_probe.relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert near_name_result.returncode == 1, near_name_result.stdout + near_name_result.stderr
+
+    def test_init_gitignore_fallback_ignores_exact_workbench_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+
+            def _remove_gitignore_asset(patched_assets_root: Path) -> None:
+                (patched_assets_root / "spec_dock" / ".gitignore").unlink()
+
+            code, stderr = self._run_command_with_assets_override(
+                "init",
+                target,
+                _remove_gitignore_asset,
+            )
+
+            assert code == 0, stderr
+            gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
+            assert ".workbench/" in gitignore.splitlines()
+
+    def test_update_preserves_opaque_workbenches_while_refreshing_managed_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            scope_directories = (
+                target / "spec-dock",
+                target / "spec-dock" / "initiatives" / "init-00001-example",
+                target / "spec-dock" / "initiatives" / "init-00001-example" / "epics" / "epic-00001-example",
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-example"
+                / "epics"
+                / "epic-00001-example"
+                / "issues"
+                / "iss-00001-example",
+            )
+            sentinels: dict[Path, bytes] = {}
+            for index, scope_directory in enumerate(scope_directories):
+                sentinel = scope_directory / ".workbench" / "nested" / f"sentinel-{index}.bin"
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                payload = bytes((0, 255, index, 10, 13, 0)) + f"scope-{index}".encode()
+                sentinel.write_bytes(payload)
+                sentinels[sentinel] = payload
+
+            installed_gitignore = target / "spec-dock" / ".gitignore"
+            installed_runtime = target / "spec-dock" / "scripts" / "spec-dock"
+            installed_gitignore.write_text("stale gitignore\n", encoding="utf-8")
+            installed_runtime.write_text("stale runtime\n", encoding="utf-8")
+
+            assert main(["update", str(target)]) == 0
+
+            for sentinel, expected_payload in sentinels.items():
+                assert sentinel.read_bytes() == expected_payload
+
+            repo_root = Path(__file__).resolve().parents[3]
+            provider_root = repo_root / "src" / "spec_dock" / "assets" / "spec_dock"
+            assert installed_gitignore.read_bytes() == (provider_root / ".gitignore").read_bytes()
+            assert installed_runtime.read_bytes() == (provider_root / "scripts" / "spec-dock").read_bytes()
 
     def test_init_installs_authoring_pack_helper_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -4258,6 +4430,202 @@ class TestInitUpdate(CliRuntimeHarness):
                 repo_root=repo_root,
             )
 
+    def test_issue_314_isolated_wheel_init_update_exposes_preflight_runtime_contract(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        runtime_files = (
+            "application/authoring_pack/github_sync_preflight.py",
+            "application/authoring_pack/github_fetch_policy.py",
+            "domain/authoring_pack/preflight_contract.py",
+            "domain/authoring_pack/source_manifest.py",
+            "infra/authoring_pack/git_fetch.py",
+            "infra/authoring_pack/preflight_receipt_writer.py",
+            "presentation/authoring_pack/diagnostics.py",
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp).resolve()
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir(parents=True, exist_ok=True)
+            target_repo = temp_root / "consumer-repo"
+            target_repo.mkdir(parents=True, exist_ok=True)
+            venv_python = self._issue_69_prepare_isolated_installed_wheel_runtime(
+                repo_root=repo_root,
+                temp_root=temp_root,
+            )
+            spec_dock_command = self._issue_69_venv_spec_dock(venv_python)
+            runtime_env = self._issue_69_runtime_env_without_checkout_fallback()
+
+            init_result = self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "init", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+            assert init_result.returncode == 0, init_result.stdout + init_result.stderr
+
+            git_executable = shutil.which("git")
+            assert git_executable is not None
+            remote = temp_root / "remote.git"
+            self._issue_69_run_subprocess_capture([git_executable, "init", "--bare", str(remote)])
+            for args in (
+                ("init",),
+                ("config", "user.name", "Test User"),
+                ("config", "user.email", "test@example.com"),
+            ):
+                self._issue_69_run_subprocess_capture([git_executable, *args], cwd=target_repo)
+            (target_repo / "source.txt").write_text("source\n", encoding="utf-8")
+            for args in (
+                ("add", "."),
+                ("commit", "-m", "initial"),
+                ("branch", "-M", "main"),
+                ("remote", "add", "origin", str(remote)),
+                ("push", "-u", "origin", "main"),
+                ("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"),
+            ):
+                self._issue_69_run_subprocess_capture([git_executable, *args], cwd=target_repo)
+
+            provider_runtime_root = (
+                repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts" / "spec_dock_runtime"
+            )
+            installed_runtime_root = target_repo / "spec-dock" / "scripts" / "spec_dock_runtime"
+            for rel_path in runtime_files:
+                assert (installed_runtime_root / rel_path).read_bytes() == (
+                    provider_runtime_root / rel_path
+                ).read_bytes()
+
+            runtime_script = target_repo / "spec-dock" / "scripts" / "spec-dock"
+
+            def assert_installed_preflight_contract(phase: str) -> None:
+                help_result = subprocess.run(
+                    [
+                        str(venv_python),
+                        str(runtime_script),
+                        "authoring",
+                        "preflight",
+                        "github-sync",
+                        "--help",
+                    ],
+                    cwd=str(target_repo),
+                    env=runtime_env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                assert help_result.returncode == 0, help_result.stdout + help_result.stderr
+                assert "--output-dir" in help_result.stdout
+
+                pass_output = temp_root / f"{phase}-pass-evidence"
+                pass_output.mkdir()
+                pass_result = subprocess.run(
+                    [
+                        str(venv_python),
+                        str(runtime_script),
+                        "authoring",
+                        "preflight",
+                        "github-sync",
+                        "--repo-root",
+                        str(target_repo),
+                        "--source-path",
+                        "source.txt",
+                        "--output-dir",
+                        str(pass_output),
+                        "--format",
+                        "json",
+                    ],
+                    cwd=str(target_repo),
+                    env=runtime_env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                pass_receipt_path = pass_output / "github-sync-preflight.receipt.json"
+                assert pass_result.returncode == 0, pass_result.stdout + pass_result.stderr
+                pass_receipt = json.loads(pass_receipt_path.read_text(encoding="utf-8"))
+                assert json.loads(pass_result.stdout) == pass_receipt
+                assert pass_receipt["status"] == "pass"
+                assert pass_receipt["fetch"]["status"] == "success"
+                assert pass_receipt["freshness"]["concurrent_change_check"] == "stable"
+                assert pass_receipt["repository"]["branch"] == "main"
+                assert pass_receipt["repository"]["upstream"] == "origin/main"
+                assert pass_receipt["repository"]["local_head"] == pass_receipt["local_head"]
+                assert pass_receipt["repository"]["remote_head"] == pass_receipt["remote_head"]
+                assert pass_receipt["repository"]["source_manifest"] == {
+                    "source_manifest_hash": pass_receipt["source_manifest_hash"],
+                    "source_paths": pass_receipt["source_paths"],
+                    "source_hashes": pass_receipt["source_hashes"],
+                }
+                assert pass_receipt["publication"] == {
+                    "requested": True,
+                    "status": "published",
+                    "filename": "github-sync-preflight.receipt.json",
+                    "blocker": None,
+                }
+
+                self._issue_69_run_subprocess_capture(
+                    [git_executable, "remote", "remove", "origin"],
+                    cwd=target_repo,
+                )
+                blocked_output = temp_root / f"{phase}-blocked-evidence"
+                blocked_output.mkdir()
+                blocked_result = subprocess.run(
+                    [
+                        str(venv_python),
+                        str(runtime_script),
+                        "authoring",
+                        "preflight",
+                        "github-sync",
+                        "--repo-root",
+                        str(target_repo),
+                        "--source-path",
+                        "source.txt",
+                        "--output-dir",
+                        str(blocked_output),
+                        "--format",
+                        "json",
+                    ],
+                    cwd=str(target_repo),
+                    env=runtime_env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                blocked_receipt_path = blocked_output / "github-sync-preflight.receipt.json"
+                assert blocked_result.returncode == 1, blocked_result.stdout + blocked_result.stderr
+                blocked_receipt = json.loads(blocked_receipt_path.read_text(encoding="utf-8"))
+                assert json.loads(blocked_result.stdout) == blocked_receipt
+                assert blocked_receipt["status"] == "blocked"
+                assert "origin_missing" in blocked_receipt["blockers"]
+                assert blocked_receipt["fetch"]["status"] == "not_started"
+                assert blocked_receipt["repository"]["normalized_origin"] is None
+                assert blocked_receipt["publication"]["filename"] == "github-sync-preflight.receipt.json"
+                assert blocked_receipt["publication"]["status"] == "published"
+
+                for args in (
+                    ("remote", "add", "origin", str(remote)),
+                    ("fetch", "origin"),
+                    ("branch", "--set-upstream-to=origin/main", "main"),
+                    ("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"),
+                ):
+                    self._issue_69_run_subprocess_capture([git_executable, *args], cwd=target_repo)
+                self._assert_no_generated_python_caches(target_repo)
+                status_result = self._issue_69_run_subprocess_capture(
+                    [git_executable, "status", "--porcelain=v1"],
+                    cwd=target_repo,
+                )
+                assert status_result.stdout == ""
+
+            assert_installed_preflight_contract("init")
+
+            stale_module = installed_runtime_root / runtime_files[0]
+            stale_module.write_text("# stale issue-314 runtime module\n", encoding="utf-8")
+            update_result = self._issue_69_run_subprocess_capture(
+                [str(spec_dock_command), "update", str(target_repo)],
+                cwd=isolated_cwd,
+                env=runtime_env,
+            )
+            assert update_result.returncode == 0, update_result.stdout + update_result.stderr
+            assert stale_module.read_bytes() == (provider_runtime_root / runtime_files[0]).read_bytes()
+            assert_installed_preflight_contract("update")
+
     def test_issue_69_windows_helper_prefers_existing_exe_launcher(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             venv_dir = Path(tmp)
@@ -4433,8 +4801,11 @@ class TestInitUpdate(CliRuntimeHarness):
 
         pyproject_patterns = self._issue_69_extract_pyproject_stale_exclusion_patterns(pyproject_text)
         setup_patterns = self._issue_69_extract_setup_stale_exclusion_patterns(setup_text)
+        setup_cache_patterns = self._issue_69_extract_setup_python_cache_exclusion_patterns(setup_text)
 
-        pyproject_normalized_patterns = {f"spec_dock/{pattern}" for pattern in pyproject_patterns}
+        pyproject_cache_patterns = set(pyproject_patterns) & set(self._ISSUE_69_PYTHON_CACHE_EXCLUSION_PATTERNS)
+        pyproject_stale_patterns = set(pyproject_patterns) - pyproject_cache_patterns
+        pyproject_normalized_patterns = {f"spec_dock/{pattern}" for pattern in pyproject_stale_patterns}
         setup_pattern_set = set(setup_patterns)
         expected_pattern_set = set(self._ISSUE_69_STALE_EXCLUSION_ARTIFACT_RELATIVE_PATTERNS)
 
@@ -4444,6 +4815,57 @@ class TestInitUpdate(CliRuntimeHarness):
         assert setup_pattern_set == expected_pattern_set, (
             "issue-69 stale exclusion patterns must stay aligned to the approved exact pattern set"
         )
+        assert pyproject_cache_patterns == set(self._ISSUE_69_PYTHON_CACHE_EXCLUSION_PATTERNS), (
+            "issue-69 pyproject Python cache exclusions must stay aligned to the approved exact pattern set"
+        )
+        assert set(setup_cache_patterns) == set(self._ISSUE_69_SETUP_PYTHON_CACHE_EXCLUSION_PATTERNS), (
+            "issue-69 setup Python cache exclusions must stay aligned to the approved exact pattern set"
+        )
+
+    def test_issue_69_wheel_and_sdist_exclude_python_cache_from_source_build_context(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+
+            self._issue_69_prepare_build_context(repo_root, build_context)
+            present_before_build = self._issue_69_seed_python_cache_fixtures_in_source_context(build_context)
+            expected_cache_fixtures = set(self._ISSUE_69_PYTHON_CACHE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
+            assert present_before_build == expected_cache_fixtures, (
+                "issue-69 Python cache fixture set must exist in source build context before build"
+            )
+
+            wheel_path, sdist_path, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+            )
+
+            wheel_inventory = self._issue_69_collect_wheel_file_inventory(wheel_path)
+            sdist_inventory = self._issue_69_collect_sdist_source_file_inventory(sdist_path)
+            wheel_cache_inventory = sorted(
+                path for path in wheel_inventory if self._is_generated_python_cache_path(Path(path))
+            )
+            sdist_cache_inventory = sorted(
+                path for path in sdist_inventory if self._is_generated_python_cache_path(Path(path))
+            )
+            assert wheel_cache_inventory == [], (
+                f"issue-69 wheel unexpectedly shipped generated Python caches: {wheel_cache_inventory[:10]}"
+            )
+            assert sdist_cache_inventory == [], (
+                f"issue-69 sdist unexpectedly shipped generated Python caches: {sdist_cache_inventory[:10]}"
+            )
+            for cache_artifact_path in expected_cache_fixtures:
+                assert cache_artifact_path not in wheel_inventory, (
+                    f"issue-69 wheel unexpectedly shipped generated Python cache: {cache_artifact_path}"
+                )
+                assert cache_artifact_path not in sdist_inventory, (
+                    f"issue-69 sdist unexpectedly shipped generated Python cache: {cache_artifact_path}"
+                )
 
     def test_checked_in_dogfooding_runtime_surface_includes_doctor_and_explicit_target_hint(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -4476,6 +4898,165 @@ class TestInitUpdate(CliRuntimeHarness):
     def test_checked_in_dogfooding_mirror_docs_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         self._assert_checked_in_dogfooding_mirror_docs_match_provider_assets(repo_root)
+
+    def test_chatgpt_preservation_contract_is_single_owned_and_projected(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        pairs = {
+            "spec-dock/docs/workflow_spec_authoring.md": (
+                "src/spec_dock/assets/spec_dock/docs/workflow_spec_authoring.md"
+            ),
+            "spec-dock/docs/workflow_chatgpt_authoring_pack.md": (
+                "src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md"
+            ),
+            "spec-dock/docs/authoring/chatgpt-pack.md": (
+                "src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md"
+            ),
+            ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md"
+            ),
+            ".agents/skills/spec-dock-initiative-planning/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-initiative-planning/SKILL.md"
+            ),
+            ".agents/skills/spec-dock-epic-planning/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-epic-planning/SKILL.md"
+            ),
+            ".agents/skills/spec-dock-issue-planning/SKILL.md": (
+                "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
+            ),
+        }
+        for dogfood_path, provider_path in pairs.items():
+            assert (repo_root / dogfood_path).read_bytes() == (repo_root / provider_path).read_bytes()
+
+        shared_skill = (repo_root / pairs[".agents/skills/spec-dock-chatgpt-authoring/SKILL.md"]).read_text(
+            encoding="utf-8"
+        )
+        branch_section = shared_skill.split("Choose exactly one branch:", 1)[1].split("Evaluate an import result", 1)[0]
+        branch_bullets = [line for line in branch_section.splitlines() if line.startswith("- ")]
+        assert len(branch_bullets) == 4
+        preservation_bullets = {line.removeprefix("- ").split(":", 1)[0]: line for line in branch_bullets}
+        branch_contracts = {
+            "Complete standalone Markdown": (
+                "Workbench",
+                "explicitly runs `artifact import chatgpt-output`",
+                "verifies the receipt",
+                "`imported_byte_exact`",
+                "only from the Workbench source to the imported Artifact",
+            ),
+            "Complete received inline answer": (
+                "captures only the complete answer text",
+                "without adding, removing, reformatting, or normalizing content",
+                "explicitly imports it",
+                "`captured_received_text`",
+                "never claim identity with provider-original bytes",
+                "wrapper transcript containing prompts or metadata",
+            ),
+            "Genuinely incomplete or unavailable inline output": (
+                "`skipped_inline_unavailable`",
+                "reason, decision owner, nonblocking rationale, and next action or revisit condition",
+                "Do not record source/destination paths, hashes, byte counts, or a byte-exact claim",
+            ),
+            "ZIP/tree output": (
+                "review, quarantine, stage, and validation lane",
+                "Do not convert it to single-file import",
+                "weaken existing ZIP safety checks",
+            ),
+        }
+        assert set(preservation_bullets) == set(branch_contracts)
+        for branch, tokens in branch_contracts.items():
+            branch_line = preservation_bullets[branch]
+            for token in tokens:
+                assert token in branch_line
+
+        import_result_bullets = [line for line in shared_skill.splitlines() if line.startswith("- `committed=")]
+        assert len(import_result_bullets) == 2
+        import_pass = next(line for line in import_result_bullets if "with no warning" in line)
+        for token in (
+            "`committed=true`",
+            "final repo-relative path",
+            "SHA-256",
+            "byte count",
+            "`import_kind=chatgpt-output`",
+            "`storage_identity=blank`",
+            "preservation result is `pass`",
+        ):
+            assert token in import_pass
+        import_warning = next(
+            line for line in shared_skill.splitlines() if line.startswith("- The same complete receipt")
+        )
+        for token in (
+            "complete receipt",
+            "`committed=true`",
+            "warning",
+            "`pass-with-warning`",
+            "retain the warning",
+            "do not retry automatically",
+            "duplicate import",
+        ):
+            assert token in import_warning
+        import_block = next(line for line in import_result_bullets if "`committed=false`" in line)
+        for token in (
+            "missing receipt field",
+            "eligibility failure",
+            "unresolved semantic completeness",
+            "block adoption and canonical rewrite",
+        ):
+            assert token in import_block
+        failed_import = next(
+            line
+            for line in shared_skill.splitlines()
+            if line.startswith("- Never reclassify a complete source whose import failed")
+        )
+        assert "`skipped_inline_unavailable`" in failed_import
+        assert "canonical adoption completed" in shared_skill
+        assert "reviewer pass, including fresh `spec-reviewer`, `code-reviewer`, or `qa-reviewer` pass" in shared_skill
+        assert "PR delivery" in shared_skill
+
+        for dogfood_path in (
+            ".agents/skills/spec-dock-initiative-planning/SKILL.md",
+            ".agents/skills/spec-dock-epic-planning/SKILL.md",
+            ".agents/skills/spec-dock-issue-planning/SKILL.md",
+        ):
+            caller = (repo_root / dogfood_path).read_text(encoding="utf-8")
+            assert (
+                "Immediately after output is received, and before claim review, Evidence Adoption Ledger "
+                "disposition, or canonical rewrite, invoke the shared `spec-dock-chatgpt-authoring` preservation "
+                "checkpoint."
+            ) in caller
+            assert "Refer to the shared skill for branch, status, and import-result rules" in caller
+            for forbidden_matrix_token in (
+                *(f"- {heading}:" for heading in branch_contracts),
+                "establishes `imported_byte_exact`",
+                "Record `captured_received_text`",
+                "record `skipped_inline_unavailable`",
+                "`committed=true`",
+                "`committed=false`",
+                "`pass-with-warning`",
+                "`import_kind=chatgpt-output`",
+                "`storage_identity=blank`",
+                "missing receipt field",
+                "duplicate import",
+                "review, quarantine, stage, and validation lane",
+                "single-file import",
+                "weaken existing ZIP safety checks",
+            ):
+                assert forbidden_matrix_token not in caller
+
+        workflow = (repo_root / "spec-dock/docs/workflow_spec_authoring.md").read_text(encoding="utf-8")
+        assert (
+            "output received -> preservation checkpoint -> EAL disposition -> canonical rewrite -> fresh reviewer"
+        ) in workflow
+        reference = (repo_root / "spec-dock/docs/authoring/chatgpt-pack.md").read_text(encoding="utf-8")
+        zip_rows = [line for line in reference.splitlines() if line.startswith("|") and "ZIP / tree" in line]
+        assert len(zip_rows) == 1
+        zip_row = zip_rows[0]
+        zip_cells = [cell.strip() for cell in zip_row.strip("|").split("|")]
+        assert len(zip_cells) == 4
+        assert "ZIP / tree" in zip_cells[0]
+        for token in ("review", "quarantine", "stage", "validation lane", "route"):
+            assert token in zip_cells[1]
+        assert "existing review/stage evidence" in zip_cells[2]
+        assert "single-file import conversion" in zip_cells[3]
+        assert "ZIP safety contract" in zip_cells[3]
 
     def test_checked_in_dogfooding_mirror_templates_match_provider_assets(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -10219,6 +10800,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert "hard-unrecoverable" in authoring_text
         assert "--oracle" not in authoring_text
         assert "single backend command" in authoring_text
+        for preflight_contract in (
+            "Run the SpecDock entrypoint as direct argv.",
+            "shell wrappers, redirects, pipes, tee, heredocs",
+            "command substitution, or inline environment assignment",
+            "A nonzero fetch result is not evidence that additional permissions are required.",
+            "Never add require_escalated or change sandbox/permission mode",
+            "Use --output-dir to persist the preflight receipt.",
+            "Retry is owned by SpecDock and preserves the same execution shape.",
+            "Do not replace preflight with agent-owned raw git fetch.",
+            "Do not silently switch to local-context or default branch.",
+            "github-sync-preflight.receipt.json",
+            "repository や remote を再取得・再検証しません",
+        ):
+            assert preflight_contract in authoring_text
         forbidden_claims_section = self._issue_71_extract_markdown_section_by_heading_prefix(
             markdown_text=authoring_text,
             heading_prefix="Forbidden Claims",
@@ -10246,6 +10841,42 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             assert "does not grant degraded reviewer" in manual_text
 
         repo_root = Path(__file__).resolve().parents[3]
+        workflow_asset_path = repo_root / "src/spec_dock/assets/spec_dock/docs/workflow_chatgpt_authoring_pack.md"
+        pack_reference_asset_path = repo_root / "src/spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md"
+        workflow_text = workflow_asset_path.read_text(encoding="utf-8")
+        pack_reference_text = pack_reference_asset_path.read_text(encoding="utf-8")
+        for docs_contract in (
+            "direct argv",
+            "shell wrapper",
+            "require_escalated",
+            "github-sync-preflight.receipt.json",
+            "blocked result",
+            "operator remediation",
+            "暗黙に切り替えません",
+            "再取得・再検証しません",
+        ):
+            assert docs_contract in workflow_text
+        for pack_contract in (
+            "--output-dir",
+            "github-sync-preflight.receipt.json",
+            "current_repository_revalidated",
+            "観測時点",
+            "canonical adoption",
+            "reviewer pass",
+            "PR-ready",
+        ):
+            assert pack_contract in pack_reference_text
+
+        assert (repo_root / ".agents/skills/spec-dock-chatgpt-authoring/SKILL.md").read_bytes() == (
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-chatgpt-authoring/SKILL.md"
+        ).read_bytes()
+        assert (repo_root / "spec-dock/docs/workflow_chatgpt_authoring_pack.md").read_bytes() == (
+            workflow_asset_path.read_bytes()
+        )
+        assert (repo_root / "spec-dock/docs/authoring/chatgpt-pack.md").read_bytes() == (
+            pack_reference_asset_path.read_bytes()
+        )
+
         epic_plan_template = (repo_root / "src/spec_dock/assets/spec_dock/templates/epic/plan.md").read_text(
             encoding="utf-8"
         )
@@ -10273,6 +10904,12 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             installed_path = target / ".agents" / "skills" / "spec-dock-chatgpt-authoring" / "SKILL.md"
             assert installed_path.is_file()
             assert installed_path.read_text(encoding="utf-8") == authoring_text
+            assert (target / "spec-dock" / "docs" / "workflow_chatgpt_authoring_pack.md").read_text(
+                encoding="utf-8"
+            ) == workflow_text
+            assert (target / "spec-dock" / "docs" / "authoring" / "chatgpt-pack.md").read_text(
+                encoding="utf-8"
+            ) == pack_reference_text
 
     def test_deleted_role_skill_assets_stay_absent_from_provider_and_dogfooding_mirror(self) -> None:
         import spec_dock.cli as cli
@@ -10433,18 +11070,20 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         workspace_write_workers = ("dev-coder", "doc-writer", "utility-worker")
         scoped_delegated_authors = ("system-architect", "implementation-planner")
+        inherited_runtime_profile_roles = (
+            "dev-coder",
+            "code-reviewer",
+            "spec-reviewer",
+            "qa-reviewer",
+        )
         expected_runtime_profiles = {
             "system-architect": ("gpt-5.6-sol", "high"),
             "implementation-planner": ("gpt-5.6-sol", "high"),
             "consultant": ("gpt-5.6-sol", "high"),
             "deep-consultant": ("gpt-5.6-sol", "max"),
-            "dev-coder": ("gpt-5.6-terra", "medium"),
             "repo-analyst": ("gpt-5.6-terra", "medium"),
             "researcher": ("gpt-5.6-terra", "medium"),
             "doc-writer": ("gpt-5.6-terra", "medium"),
-            "spec-reviewer": ("gpt-5.6-terra", "high"),
-            "qa-reviewer": ("gpt-5.6-terra", "high"),
-            "code-reviewer": ("gpt-5.6-sol", "high"),
             "spec-manager": ("gpt-5.6-luna", "low"),
             "utility-worker": ("gpt-5.6-luna", "low"),
             "spark-worker": ("gpt-5.3-codex-spark", "medium"),
@@ -10452,6 +11091,51 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "worker": ("gpt-5.6-luna", "low"),
             "explorer": ("gpt-5.6-terra", "medium"),
         }
+        expected_github_runtime_profiles = {
+            "consultant": ("gpt-5.4", "xhigh"),
+            "doc-writer": ("gpt-5.4", "high"),
+            "orchestrator": ("gpt-5.4", "high"),
+            "repo-analyst": ("gpt-5.4", "high"),
+            "researcher": ("gpt-5.4", "medium"),
+            "spec-manager": (
+                "gpt-5.4-mini",
+                "high enough for safe command execution, not for broad design authorship",
+            ),
+            "utility-worker": ("gpt-5.4", "medium"),
+        }
+
+        def parse_github_runtime_profile(text: str) -> tuple[str, str]:
+            lines = text.splitlines()
+            assert lines[0] == "---"
+            frontmatter_end_indexes = [index for index, line in enumerate(lines[1:], start=1) if line == "---"]
+            assert frontmatter_end_indexes
+            frontmatter_end = frontmatter_end_indexes[0]
+
+            model_values = []
+            for line in lines[1:frontmatter_end]:
+                match = re.fullmatch(r"model:[ \t]*(\S+)[ \t]*", line)
+                if match:
+                    model_values.append(match.group(1))
+            assert len(model_values) == 1
+
+            reasoning_heading_indexes = [
+                index
+                for index, line in enumerate(lines[frontmatter_end + 1 :], start=frontmatter_end + 1)
+                if line == "Reasoning profile:"
+            ]
+            assert len(reasoning_heading_indexes) == 1
+            reasoning_start = reasoning_heading_indexes[0] + 1
+            reasoning_end = next(
+                (index for index, line in enumerate(lines[reasoning_start:], start=reasoning_start) if not line),
+                len(lines),
+            )
+            target_depth_values = []
+            for line in lines[reasoning_start:reasoning_end]:
+                match = re.fullmatch(r"- Target depth:[ \t]+(.+?)\.[ \t]*", line)
+                if match:
+                    target_depth_values.append(match.group(1))
+            assert len(target_depth_values) == 1
+            return model_values[0], target_depth_values[0]
 
         with cli._assets_dir() as assets_dir:
             agents_dir = assets_dir / "install_root" / ".codex" / "agents"
@@ -10472,6 +11156,42 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                     parsed = tomllib.loads(provider_path.read_text(encoding="utf-8"))
                     assert parsed.get("model") == expected_model
                     assert parsed.get("model_reasoning_effort") == expected_effort
+
+            for agent_name in inherited_runtime_profile_roles:
+                codex_provider_path = agents_dir / f"{agent_name}.toml"
+                codex_dogfooding_path = dogfooding_root / ".codex" / "agents" / f"{agent_name}.toml"
+                github_provider_path = assets_dir / "install_root" / ".github" / "agents" / f"{agent_name}.agent.md"
+                github_dogfooding_path = dogfooding_root / ".github" / "agents" / f"{agent_name}.agent.md"
+
+                assert codex_dogfooding_path.read_bytes() == codex_provider_path.read_bytes()
+                assert github_dogfooding_path.read_bytes() == github_provider_path.read_bytes()
+
+                for surface, path in (
+                    ("provider", codex_provider_path),
+                    ("dogfooding", codex_dogfooding_path),
+                ):
+                    with _case(agent=agent_name, surface=surface, taxonomy="inherited-runtime-profile"):
+                        parsed = tomllib.loads(path.read_text(encoding="utf-8"))
+                        assert "model" not in parsed
+                        assert "model_reasoning_effort" not in parsed
+
+                for surface, path in (
+                    ("provider", github_provider_path),
+                    ("dogfooding", github_dogfooding_path),
+                ):
+                    with _case(agent=agent_name, surface=surface, taxonomy="inherited-runtime-profile"):
+                        text = path.read_text(encoding="utf-8")
+                        frontmatter = text.split("---", 2)[1]
+                        assert not re.search(r"(?m)^model\s*:", frontmatter)
+                        assert "Reasoning profile" not in text
+                        assert "Target depth" not in text
+
+            for agent_name, expected_profile in expected_github_runtime_profiles.items():
+                with _case(agent=agent_name, taxonomy="github-runtime-profile"):
+                    provider_path = assets_dir / "install_root" / ".github" / "agents" / f"{agent_name}.agent.md"
+                    dogfooding_path = dogfooding_root / ".github" / "agents" / f"{agent_name}.agent.md"
+                    assert dogfooding_path.read_bytes() == provider_path.read_bytes()
+                    assert parse_github_runtime_profile(provider_path.read_text(encoding="utf-8")) == expected_profile
 
             for agent_name in read_only_specialists:
                 with _case(agent=agent_name, taxonomy="read-only-specialist"):
@@ -12520,11 +13240,32 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         merge_preparer_phrases = (
             "github-pr-merge-preparer",
             "failure_class",
-            "Default autonomous repair limit is one repair attempt for `P0` family",
-            "Default autonomous repair limit is two repair attempts for the same `P1`",
-            "Default total autonomous repair limit is four repair attempts per PR",
-            "Stop at a human gate when the same",
-            "appears after a repair",
+            "## ChatGPT Consultation Gate",
+            "## Integrated Repair Strategy",
+            "## Iteration Ledger",
+            "strategy_delta",
+            "orchestrator_disposition",
+            "Repair iteration count is telemetry only.",
+            "must never authorize continuation or force a stop",
+            "same `root_cause_family` recurring after a repair commit triggers mandatory",
+            "Recurrence alone is neither automatic stop authority nor",
+            "automatic continuation authority.",
+            "`fresh`: bound to the current head, inventory, family grouping, material",
+            "`stale`: the head, inventory, grouping, evidence, or strategy changed",
+            "For `stale`, refresh first.",
+            "ChatGPT recommendations are advisory evidence only.",
+            "The main orchestrator must record `orchestrator_disposition`",
+            "bound_strategy_context",
+            "fallback_invocation_id",
+            "fallback_approved_by",
+            "fallback_approved_at",
+            "fallback_manual_analysis_ref",
+            "fallback_consumed_at",
+            "`fallback_approval_denied` is an unconditional stop.",
+            "An expired or consumed fallback approval is an unconditional stop.",
+            "A fallback approval is bound to exactly one `fallback_invocation_id` and must not be reused.",
+            "Only when refresh and the defined recovery paths are hard-unrecoverable",
+            "material `strategy_delta`",
             "Stop at a human gate when the blocker is `permission_or_auth`,",
             "`external_or_flaky`, `base_branch_conflict`, `unknown`, a requirement",
             "expansion, breaking change, migration, secret/deployment setting change",
@@ -12545,6 +13286,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         for phrase in merge_preparer_phrases:
             assert phrase in merge_preparer
+
+        removed_repair_limit_phrases = (
+            "Default autonomous repair limit is one repair attempt for `P0` family",
+            "Default autonomous repair limit is two repair attempts for the same `P1`",
+            "Default total autonomous repair limit is four repair attempts per PR",
+            "Stop at a human gate when the same `root_cause_family` appears after a repair",
+            "repair unit is incomplete or repeatedly fails",
+        )
+        for phrase in removed_repair_limit_phrases:
+            assert phrase not in merge_preparer
 
         workflow_phrases = (
             "github-pr-merge-preparer",
@@ -38283,6 +39034,91 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert "init-local-00001" in self._read_active_pointer_text(target, "initiative", "requirement.md")
             assert "epic-local-00001" in self._read_active_pointer_text(target, "epic", "requirement.md")
             assert "iss-local-00001" in self._read_active_pointer_text(target, "issue", "requirement.md")
+
+    def test_update_rejects_workbench_symlink_from_persisted_manifest_and_active_entrypoint(self) -> None:
+        import spec_dock.cli as cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            specdock_dir = target / "spec-dock"
+            active_dir = specdock_dir / "active"
+            real_issue = specdock_dir / "scratch-targets" / "iss-local-00999-scratch"
+            real_issue.mkdir(parents=True)
+            self._write_json_force(
+                real_issue / ".meta.json",
+                {
+                    "schema_version": 1,
+                    "type": "issue",
+                    "id": "iss-local-00999",
+                    "title": "Scratch issue",
+                    "slug": "scratch",
+                },
+            )
+            (real_issue / "requirement.md").write_text("scratch requirement\n", encoding="utf-8")
+            workbench_link = specdock_dir / ".workbench" / "issue-link"
+            workbench_link.parent.mkdir()
+            workbench_link.symlink_to(real_issue, target_is_directory=True)
+
+            issue_link = active_dir / "issue"
+            if issue_link.is_symlink() or issue_link.is_file():
+                issue_link.unlink(missing_ok=True)
+            elif issue_link.is_dir():
+                shutil.rmtree(issue_link)
+            issue_link.symlink_to(os.path.relpath(workbench_link, start=active_dir), target_is_directory=True)
+
+            persisted_path = workbench_link.relative_to(target).as_posix()
+            self._write_json_force(
+                specdock_dir / ".agent" / "active.json",
+                {
+                    "schema_version": 2,
+                    "initiative": None,
+                    "epic": None,
+                    "issue": {"id": "iss-local-00999", "path": persisted_path},
+                },
+            )
+
+            assert (
+                cli._resolve_manifest_target_dir(
+                    specdock_dir,
+                    "issue",
+                    expected_id="iss-local-00999",
+                    persisted_path=persisted_path,
+                )
+                is None
+            )
+            assert (
+                cli._resolve_persisted_path_dir(
+                    specdock_dir,
+                    layer="issue",
+                    expected_id="iss-local-00999",
+                    persisted_path=persisted_path,
+                )
+                is None
+            )
+            assert (
+                cli._resolve_existing_active_entrypoint(
+                    specdock_dir,
+                    active_dir=active_dir,
+                    layer="issue",
+                )
+                is None
+            )
+            assert main(["update", str(target)]) == 0
+
+            placeholder = specdock_dir / "system" / "active-none" / "issue"
+            resolved = cli._resolve_existing_active_entrypoint(
+                specdock_dir,
+                active_dir=active_dir,
+                layer="issue",
+            )
+            assert resolved == (placeholder.resolve(), None)
+            assert self._read_active_pointer_text(target, "issue", "README.md") == (
+                placeholder / "README.md"
+            ).read_text(encoding="utf-8")
+            context_pack_text = (active_dir / "context-pack.md").read_text(encoding="utf-8")
+            assert "- issue: (none)" in context_pack_text
+            assert "iss-local-00999" not in context_pack_text
 
     def test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

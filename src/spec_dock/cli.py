@@ -62,6 +62,8 @@ _DEFAULT_SPEC_DOCK_GITIGNORE = (
     ".agent/\n"
     "# legacy v2 name (kept ignored for safe upgrades)\n"
     ".work/\n"
+    "# local disposable work areas (reserved exact directory name at any scope)\n"
+    ".workbench/\n"
     "active/\n"
 )
 _MANAGED_NATIVE_SHIM_PREFIXES = (".codex/agents/", ".github/agents/")
@@ -295,18 +297,19 @@ def _resolve_manifest_target_dir(
     if expected_id is None:
         return None
 
-    repo_root = specdock_dir.parent.resolve()
+    lexical_repo_root = specdock_dir.parent
+    repo_root = lexical_repo_root.resolve()
     candidates: list[Path] = []
 
     if persisted_path is not None:
         candidate = Path(persisted_path)
         if not candidate.is_absolute():
-            candidate = repo_root / candidate
+            candidate = lexical_repo_root / candidate
         candidates.append(candidate)
 
     # Fallback: persisted path can be missing/corrupt; recover by id if possible.
     initiatives_root = specdock_dir / "initiatives"
-    for meta_path in sorted(initiatives_root.rglob(".meta.json"), key=lambda p: p.as_posix()):
+    for meta_path in _iter_manifest_meta_paths(initiatives_root):
         try:
             loaded = json.loads(meta_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -319,10 +322,14 @@ def _resolve_manifest_target_dir(
         break
 
     for candidate in candidates:
+        if _has_lexical_workbench_component(candidate, lexical_repo_root):
+            continue
         resolved = candidate.resolve()
         try:
-            resolved.relative_to(repo_root)
+            relative = resolved.relative_to(repo_root)
         except ValueError:
+            continue
+        if ".workbench" in relative.parts:
             continue
         if not resolved.is_dir():
             continue
@@ -343,6 +350,27 @@ def _resolve_manifest_target_dir(
     return None
 
 
+def _iter_manifest_meta_paths(initiatives_root: Path) -> list[Path]:
+    matches: list[Path] = []
+    for current_root, child_dirnames, filenames in os.walk(initiatives_root, topdown=True):
+        child_dirnames[:] = sorted(name for name in child_dirnames if name != ".workbench")
+        if ".meta.json" in filenames:
+            matches.append(Path(current_root) / ".meta.json")
+    return sorted(matches, key=lambda path: path.as_posix())
+
+
+def _has_lexical_workbench_component(path: Path, repo_root: Path) -> bool:
+    absolute = path.absolute()
+    for root in (repo_root.absolute(), repo_root.resolve()):
+        try:
+            relative = absolute.relative_to(root)
+        except ValueError:
+            continue
+        if ".workbench" in relative.parts:
+            return True
+    return False
+
+
 def _resolve_persisted_path_dir(
     specdock_dir: Path,
     *,
@@ -353,13 +381,18 @@ def _resolve_persisted_path_dir(
     if persisted_path is None:
         return None
     candidate = Path(persisted_path)
-    repo_root = specdock_dir.parent.resolve()
+    lexical_repo_root = specdock_dir.parent
+    repo_root = lexical_repo_root.resolve()
     if not candidate.is_absolute():
-        candidate = repo_root / candidate
+        candidate = lexical_repo_root / candidate
+    if _has_lexical_workbench_component(candidate, lexical_repo_root):
+        return None
     resolved = candidate.resolve()
     try:
-        resolved.relative_to(repo_root)
+        relative = resolved.relative_to(repo_root)
     except ValueError:
+        return None
+    if ".workbench" in relative.parts:
         return None
     if not resolved.is_dir():
         return None
@@ -402,7 +435,11 @@ def _resolve_existing_active_entrypoint(
 
     if link.exists() or link.is_symlink():
         with suppress(OSError):
-            candidates.append(link.resolve())
+            if link.is_symlink():
+                target = link.readlink()
+                candidates.append(target if target.is_absolute() else link.parent / target)
+            else:
+                candidates.append(link)
 
     if pathfile.is_file():
         try:
@@ -410,13 +447,18 @@ def _resolve_existing_active_entrypoint(
         except OSError:
             rel_target = ""
         if rel_target:
-            candidates.append((active_dir / rel_target).resolve())
+            candidates.append(active_dir / rel_target)
 
     placeholder_candidate: tuple[Path, str | None] | None = None
-    for candidate in candidates:
+    for lexical_candidate in candidates:
+        if _has_lexical_workbench_component(lexical_candidate, specdock_dir.parent):
+            continue
+        candidate = lexical_candidate.resolve()
         try:
-            candidate.relative_to(repo_root)
+            relative = candidate.relative_to(repo_root)
         except ValueError:
+            continue
+        if ".workbench" in relative.parts:
             continue
         if not candidate.is_dir():
             continue
@@ -589,9 +631,13 @@ def _ensure_active_fallback_entrypoints(specdock_dir: Path) -> None:
 
         # If `.path` exists but does not resolve to a valid active entrypoint,
         # treat it as stale so recovery can rebuild from persisted state/placeholder.
-        elif pathfile.exists():
-            with suppress(OSError):
-                pathfile.unlink()
+        else:
+            if link.is_symlink():
+                with suppress(OSError):
+                    link.unlink()
+            if pathfile.exists():
+                with suppress(OSError):
+                    pathfile.unlink()
 
         if link.exists() or link.is_symlink() or pathfile.exists():
             continue

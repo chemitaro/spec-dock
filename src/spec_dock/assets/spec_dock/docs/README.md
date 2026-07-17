@@ -75,6 +75,10 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 ./spec-dock/scripts/spec-dock validate
 ./spec-dock/scripts/spec-dock sync
 
+# experimental: one-shot scoped Workbench copy / byte-preserving ChatGPT Markdown import
+./spec-dock/scripts/spec-dock workbench copy --scope <initiative|epic|issue-id> --to <linked-worktree>
+./spec-dock/scripts/spec-dock artifact import chatgpt-output --issue <issue-id> --file <workbench-file.md> --title "..."
+
 # 管理対象 files/docs/templates/scripts/skills の更新（refresh）
 ./spec-dock/scripts/spec-dock update
 ./spec-dock/scripts/spec-dock update /path/to/project
@@ -100,5 +104,8 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - `./spec-dock/scripts/spec-dock update [path]` は repo-local self-update path で、target 省略時は current directory を更新する。明示 path を渡すとその managed repo を更新する
 - runtime update は installer update の wrapper であり、固定 upstream `git+https://github.com/chemitaro/spec-dock` を `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>` として実行する。arbitrary source / cache / `--force` option は公開しない
 - update は managed files/docs/templates/scripts/skills の更新であり、`init --force` でも old workspace の in-place migration ツールでもない。current contract mismatch は手動 normalize / rebuild が必要な場合がある
+- Workbench は experimental、Git 管理外、non-canonical、disposable な作業場である。root `spec-dock/.workbench/` は日付bucketと必要fileの手動選択だけを使い、root一括copy commandは持たない。Initiative / Epic / Issue scopeのcopyは、同一repositoryのlinked worktreeへ明示実行するsource-winsのone-shot copyであり、自動syncもcopy-backも行わない
+- Workbench copyはdirectoryをそのまま扱い、言語、拡張子、MIME、内容によるfile classifierを持たない。`artifact import chatgpt-output`はapproved Workbenchの単一Markdownをsource/bytes不変でblank Artifactへcopyする。`chatgpt-output` typed tokenは予約せず、`new artifact`と共存する
+- imported ChatGPT outputはevidence-onlyであり、canonical採用にはEvidence Adoption Ledgerの採否、canonical docsへの再記述、fresh reviewer gateが必要である。updateは既存Workbenchをunmanaged local contentとして保持し、migration、normalize、delete、promotionしない
 - Issue plan は agent-native / behavior-slice based execution contract を持つが、cadence policy の detail/reference は `workflow_issue.md`
 - naming 制約、GitHub 副作用、deps / sync の詳細は `reference_*.md` を参照する

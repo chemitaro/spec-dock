@@ -44,6 +44,19 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         "new_artifact",
     )
 
+    p_artifact = sub.add_parser("artifact", help="Manage scope-local artifacts")
+    artifact_sub = p_artifact.add_subparsers(dest="artifact_cmd", required=True)
+    artifact_import = artifact_sub.add_parser("import", help="Import an existing file as an artifact")
+    artifact_import_sub = artifact_import.add_subparsers(dest="artifact_import_kind", required=True)
+    _bind_leaf(
+        artifact_import_sub.add_parser(
+            "chatgpt-output",
+            help="Import opaque Markdown bytes from an approved Workbench",
+        ),
+        registry,
+        "artifact_import_chatgpt_output",
+    )
+
     p_active = sub.add_parser("active", help="Manage the active pointers")
     active_sub = p_active.add_subparsers(dest="active_cmd", required=True)
     _bind_leaf(active_sub.add_parser("set", help="Set active pointers (initiative/epic/issue)"), registry, "active_set")
@@ -230,6 +243,23 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         worktree_sub.add_parser("remove", help="Remove a Git worktree without deleting its branch"),
         registry,
         "worktree_remove",
+    )
+
+    p_workbench = sub.add_parser(
+        "workbench",
+        help="Run explicit experimental operations on non-canonical Workbench content",
+    )
+    workbench_sub = p_workbench.add_subparsers(dest="workbench_cmd", required=True)
+    _bind_leaf(
+        workbench_sub.add_parser(
+            "copy",
+            help=(
+                "Experimental one-shot copy of disposable, non-canonical scoped Workbench content "
+                "to another worktree without synchronization"
+            ),
+        ),
+        registry,
+        "workbench_copy",
     )
 
     _bind_leaf(
