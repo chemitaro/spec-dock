@@ -3,7 +3,7 @@
 ID: "iss-00315"
 タイトル: "Experimental Workbench Ignore And Opaque Traversal Foundation"
 関連GitHub: ["#315"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-13"
 依存: ["requirement.md", "design.md", "plan.md"]
@@ -49,7 +49,9 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-315-001 | resolved | implementation | S00 repo-analyst / reviewer | `spec_dock_runtime/app.py::_scan_nodes` に旧recursive scan定義があるがhelper群のcallsiteはない | W1で変更; 未参照としてno-op; scope拡張 | `app.py` entry moduleは到達するがlegacy private helperは未参照のため変更しない。参照が判明した場合のみplan再レビュー | no_action | `rg -n "_scan_nodes|_iter_node_meta_paths|_find_legacy_meta_paths" src/spec_dock`; `review_iss00315_s00` | S02でcallsiteを再確認し、未参照ならIssue-local no-opを確定 |
+| D-315-002 | resolved | test-strategy | S06 worker / reviewer | full init/update laneの2 fixed snapshot constantsがEpic 00312 node/deps追加を未反映 | S06へ混在; S99でrefresh; 無視 | S06 preservationとは独立だがS99 full unit gateをblockするため、S99でcurrent canonical node/depsへmechanical refreshする | promoted_to_plan | failing selectors; commit `3acdd76c`; `review_iss00315_s06` | plan S99 full unit gate内で2 selectors→full suiteをpassさせる |
+| D-315-003 | resolved | operation | S06 worker / reviewer | `uvx --from .`がignored stale `build/lib` legacy skillによりmanifest overlap | productionで適応; stale build cleanup; clean isolated build検証 | stale ignored buildはproduct contractではない。clean wheelをmanaged tempへbuildし、そのwheel由来の`uvx init`/`update`成功をS99で確認したためtracked production変更は不要 | no_action | `uv build --wheel`成功、wheel由来`uvx --no-cache ... spec-dock init/update`成功、`review_iss00315_s06` | closed。再発時はcheckout-local ignored buildをproduct defectと混同せずclean wheelで再検証 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +65,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | partially_adopted | GPT-5.6 Pro GitHub-synced Issue planning | canonical requirement/design/plan candidates | Callsite inventory、exact-component opacity、step slicing、deferred PR boundaryを採用。候補module/error/test名、GitHub上のempty test file claim、未実行test/pass claimはauthority化しない | `artifacts/20260713t044108z-research-chatgpt-5-6-pro-issue-planning-evidence.md`; SHA-256 `6080fe2c3e75060eb3a31f9b5014bf5fdd96d9bdd8a68352e5cf2f6b71ddbac7` | canonical requirement/design/planへ統合し、各fresh review pass済み |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +73,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | Default semantic discoveryがWorkbench内部へ入らないfoundation | Explicit operations regression、update preservation、provider/dogfood parity | 低。全rglob置換を禁止しcallsite分類を要件化 | pass。`review_iss00315_requirement` |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,7 +81,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | Parent Epic W1、actual runtime/docs/tests、GPT-5.6 planning evidence | product open questionなし | partially_adopted/re-written | passed | no | promote |
+| design | Runtime/installer/authoring callsiteとGPT-5.6 planning evidence | exact helper/error名は実装自由度 | partially_adopted/re-written | passed | no | promote |
+| plan | reviewed design、GPT-5.6 step proposal、standard profile obligations | product open questionなし | partially_adopted/re-written | passed | no | execute approved plan |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +111,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| ChatGPT 5.6 Pro evidence producer | iss-00315 | `artifacts/20260713t044108z-research-chatgpt-5-6-pro-issue-planning-evidence.md` | GitHub current branch、parent Epic、runtime/docs/tests | requirement/design/plan candidates | partially_adopted | `requirement.md`、`design.md`、`plan.md` | pass: Issue scope only | canonical artifactsへ検証・再記述 | candidate file download、exact symbol/test/pass claims、strict候補（actual classificationはstandard） | none | passed | execute approved plan |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -124,62 +128,166 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- exact `.workbench` component を Git ignore 対象かつ default semantic discovery の opaque boundary とした。
+- node / graph / assurance / installer recovery / delete fallback / delegated authoring / authoring source traversal を境界前で除外し、明示 delete/remove と update byte preservation は既存契約のまま維持した。
+- provider authority、dogfood projection、guide、回帰テストを同期し、Issue 316–318 の機能は先行実装していない。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-07-13 HH:MM - HH:MM）
+### セッションログ（2026-07-13 S00）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S00 Inventory, assurance, baseline
+- Closure: 実装開始条件。C315-01–08のcallsite mapping
+
+#### 委任と実施内容
+- repo-analyst workerへread-only inventoryとfocused baselineを委譲した。
+- production/reportのworker編集はなく、親が検証済み結果を本台帳へ統合した。
+- recursive callsiteを次のとおり分類した。
+
+| 分類 | Callsite | Workbench到達 | 後続step |
+|---|---|---|---|
+| default-semantic-discovery | `infra/fs_repo.py` current/legacy metadata scan | あり | S02 top-down prune |
+| default-semantic-discovery | `infra/assurance_store.py::_issue_records` | あり | S03 |
+| default-semantic-discovery | `src/spec_dock/cli.py::_resolve_manifest_target_dir` fallback/persisted candidate | あり | S03 |
+| default-semantic-discovery | `application/delete_node.py::_matching_target_directories` | あり | S03 |
+| default-semantic-discovery | `application/delegated_authoring.py::_resolve_scope_dir` | あり | S03 |
+| default-semantic-discovery | `domain/authoring_pack/source_manifest.py` blocker/manifest traversal | あり | S04 |
+| default-semantic-discovery（legacy helper未参照） | `spec_dock_runtime/app.py::_scan_nodes` | entry moduleは到達するがhelper callsiteなし | S02 reachability再確認/no-op |
+| explicit-user-operation | `delegated_authoring.py::_directory_state` diff guard | 明示対象を意図的にhash | 変更しない |
+| explicit-user-operation | scope delete/worktree remove、authoring pack review/stage/digest | 明示対象 | S05 characterizationまたは変更なし |
+| generated-known-tree | installer/template/scaffold/install-root traversal | 既知tree | 変更しない |
+
+#### Baseline evidence
+- installer active recovery、current/legacy metadata validation、assurance、delete、delegated authoring、authoring source manifestのfocused 10 testsを実行。
+- Worker結果: `10 passed in 23.65s`。fresh reviewer再実行: `10 passed in 21.79s`。
+- 最初のselectorはauthoring class名を誤記してcollection error/no testsとなり、`TestAuthoringCli`へ修正したrunをbaseline authorityとした。
+- `git status --short`: clean。
+
+```sh
+uv run pytest -q \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_recovers_active_entrypoints_from_id_when_persisted_paths_are_broken \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_falls_back_to_placeholder_when_persisted_active_manifest_is_broken \
+  tests/cli_runtime/test_validate.py::TestCliValidate::test_validate_rejects_missing_or_invalid_required_meta_identity_fields \
+  tests/cli_runtime/test_validate.py::TestCliValidate::test_validate_and_sync_fail_fast_on_legacy_meta_json \
+  tests/cli_runtime/test_assurance.py::TestCliAssurance::test_assurance_explicit_target_takes_precedence_over_active \
+  tests/cli_runtime/test_delete.py::TestCliDelete::test_delete_issue_target_invalid_metadata_returns_structured_json \
+  tests/cli_runtime/test_delegated_authoring.py::TestDelegatedAuthoringCli::test_baseline_status_writes_content_hash_snapshot \
+  tests/cli_runtime/test_delegated_authoring.py::TestDelegatedAuthoringCli::test_diff_guard_active_issue_fallback_requires_exact_meta_id \
+  tests/cli_runtime/test_authoring.py::TestAuthoringCli::test_authoring_preflight_source_manifest_ignores_python_cache_files \
+  tests/cli_runtime/test_authoring.py::TestAuthoringCli::test_authoring_preflight_rejects_symlinked_source_manifest_inputs
+```
+
+#### Risk / step mapping
+- filter-after-rglobは禁止。S02/S03/S04はdescendant access前にtop-down pruneまたはcanonical structure walkを用いる。
+- Installer S03はfallback scanとpersisted Workbench descendantの双方を検証する。
+- Delete depth guardだけではWorkbench排除にならない。
+- S02: node graph、S03: independent resolvers、S04: authoring、S05: explicit deletion、S06: preservationへ計画どおり割り当てる。
+
+### セッションログ（2026-07-13 S01）
+
+#### 対象
+- Step: S01 Ignore asset and installer fallback
+- AC: AC-315-001
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` S01
+  - closure: C315-01
 
 #### 実施内容
-- ...
+- dev-coderへTDD実装を委譲。
+- Provider `.gitignore`とinstaller fallbackへexact `.workbench/` patternを追加。
+- Root/Initiative/Epic/Issue scope matrixと`.workbench-notes` negativeをtest化。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+uv run pytest tests/unit/infra/test_init_update.py -k 'workbench_directories' -q
+# Red: 2 failed -> Green: 2 passed
 
-<result>
+uv run pytest tests/unit/infra/test_init_update.py -k 'init_creates_expected_structure or workbench_directories' -q
+# 3 passed
+
+uv run pytest tests/cli_runtime/test_sync.py -k 'spec_dock_gitignore' -q
+# 2 passed
+
+git diff --check
+# pass
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S01 | Red | red-required | assetではroot probe non-ignore、fallbackではpattern欠落 | focused pytest | pass | 2 expected failures |
+| S01 | Green | exact patternとscope/near-name matrix | focused 2、init regression 3、sync regression 2 passed | pytest commands above | pass | provider/fallback parity |
+| S01 | Refactor | no refactor needed | 3-file minimal diff、Ruff/diff-check pass | worker inspection / `git diff --check` | approved-no-op | runtime traversal未変更 |
+| S02 | Red | red-required | exact boundary legacy/currentとtop-down sentinelが3 failed、near-name/outside strictは3 passed | focused pytest | pass | expected failures confirmed |
+| S02 | Green | node metadata/graph opacity | focused 6、worker regression 97、reviewer regression 125 passed | pytest / fresh review | pass | `os.walk(topdown=True)` structural prune |
+| S02 | Refactor | no further refactor | two-file scoped diff、legacy app helper unchanged | Ruff / `git diff --check` | approved-no-op | ordering/error precedence preserved |
+| S03 | Red | red-required | focused 7件中4 failed（persisted/active target、resolver prune欠落） | focused pytest | pass | 3 existing-safe cases passed |
+| S03 | Green | independent resolver parity | focused 7、worker 89+3、reviewer 118 passed/29 skipped | pytest / fresh review | pass | four production callsites only |
+| S03 | Refactor | local minimal helpers | generic frameworkを作らず責任ごとにexact prune | Ruff / `git diff --check` | pass | deterministic ordering preserved |
+| S04 | Red | red-required | 11件中10 failed（lstat/stat、parent prune、preflight short-circuit欠落） | focused pytest | pass | near-nameのみexisting pass |
+| S04 | Green | authoring reject/prune | worker focused 12、existing 11、reviewer 40 passed | pytest / fresh review | pass | blocker before manifest/observer |
+| S04 | Refactor | domain/application boundary | empty manifest helperとtop-down walkに限定 | Ruff / `git diff --check` | pass | body/deep descendant非漏洩 |
+| S05 | Alternative | characterization-first | 既存実装がnonempty Workbench delete/removeを満たす | code inspection + tests | approved-no-op | intentional Red不要 |
+| S05 | Green | explicit operations unchanged | worker 5、reviewer targeted 2/full 65 passed | pytest / fresh review | pass | production change none |
+| S05 | Refactor | not applicable | test-only two-file diff | `git diff --check` | approved-no-op | hermetic fixtures |
+| S06 | Alternative | characterization-first | existing installer preserved all four scope sentinels | focused update test | approved-no-op | production installer change none |
+| S06 | Green | preservation and provider/dogfood parity | 1+3+2 tests、7 files byte parity、normal update success | pytest/cmp/update | pass | dogfood projection refreshed |
+| S06 | Refactor | not applicable | one test + generated projection | Ruff / `git diff --check` | approved-no-op | snapshot drift routed S99 |
+| S90 | Alternative | docs inspection | public first-read guideへのW1 boundary記載が必要 | provider docs inventory | pass | templates/workflow/README no-op |
+| S90 | Green | provider/dogfood guide parity | focused 3、reviewer 2、byte parity | pytest/cmp/update | pass | Issue316–318未先行 |
+| S90 | Refactor | no further docs expansion | two identical guide files | `git diff --check` | approved-no-op | experimental minimal text |
+| S99-snapshot | Red | discovered regression | checked-in cutover snapshot 2 selectors failed | focused pytest | pass | Epic00312 nodes/deps missing |
+| S99-snapshot | Green | mechanical current snapshot refresh | 2 selectors + related 3 passed | pytest / fresh review | pass | production behavior unchanged |
+| S99-snapshot | Refactor | not applicable | one test file、3 constants only | `git diff --check` | approved-no-op | current canonical data matched |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S01 | fallbackでもfull git-check-ignore matrixを追加すればさらに強い | code-reviewer | S01 nonblocking、S06 update/preservationとの重複を避け現testを採用 | C315-01 | no | `review_iss00315_s01` |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S01 | C315-01 | supported scopesでexact directory ignored、near-name non-reserved、fallback parity | Red/Green、fresh reviewer再実行2 passed | pass | AC-315-001 closed |
+| S02 | C315-02, C315-03 | node/graph opacity and no descendant access | focused 6、downstream 125、fresh reviewer pass | pass | AC-315-002–003 closed |
+| S03 | C315-04 | independent resolvers exclude exact Workbench before selection/access | focused 7、surrounding 118、fresh reviewer pass | pass | AC-315-004 closed |
+| S04 | C315-05 | explicit reject and parent subtree prune before access/hash | focused 12、reviewer 40、fresh pass | pass | AC-315-005 closed |
+| S05 | C315-06 | scope/worktree explicit deletion remains unblocked | characterization + reviewer full 65 pass | approved-no-op | AC-315-006–007 closed |
+| S06 | C315-07 | update preserves opaque bytes and refreshes managed assets/dogfood | focused tests + 7-file parity + reviewer | pass | AC-315-008–009 closed |
+| S90 | C315-08 | W1 scope/docs boundary resolved | guide diff/parity + fresh spec review | pass | final scope closureはS99 |
+| S99 | C315-08 | whole-Issue scope、docs、non-scope、deferred delivery evidenceが整合 | final QA/code/spec review、validate/sync、branch push evidence | pass | W1 final scope closure |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| C315-01 | S01 | yes | red-required | 2 expected failures | focused pytest + init/sync regression | pass | exact/near-name matrix |
+| C315-02 | S02 | yes | red-required | exact workbench metadata failure | focused infra + validate/deps/sync | pass | current/legacy and near-name |
+| C315-03 | S02 | yes | red-required | prune sentinel failure | monkeypatched top-down walk sentinel | pass | descendant access prevented |
+| C315-04 | S03 | yes | red-required | 4 expected failures | installer/runtime resolver focused + regressions | pass | fallback/persisted/active/near-name |
+| C315-05 | S04 | yes | red-required | 10 expected failures | domain + preflight focused/regression | pass | file/dir/descendant/parent/near-name |
+| C315-06 | S05 | yes | characterization-first | existing dirty removal behavior | delete/worktree CLI suites | approved-no-op | no special blocker/backup/promotion |
+| C315-07 | S06 | yes | characterization-first | existing preservation behavior | init/update test + cmp/update parity | pass | four scope binary sentinels |
+| C315-08 | S90/S99 | yes | review-required | S90 docs review pass | final QA/code/spec review + validate/sync + deferred delivery inspection | pass | scope/docs/non-scope closure |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| C315-01 | S01 | worker tests + `review_iss00315_s01` rerun | pass | no P0/P1/blocker |
+| C315-02 | S02 | worker 97 + reviewer 125 regression | pass | graph consumers use `load_node_records` |
+| C315-03 | S02 | focused sentinel + code inspection | pass | prune before descent |
+| C315-04 | S03 | focused 7 + reviewer 118 regression | pass | no P0/P1/blocker |
+| C315-05 | S04 | focused 12 + reviewer 40 regression | pass | no blocker or diagnostic leak |
+| C315-06 | S05 | targeted 2 + full 65 | pass | binary scratch、remote close、branch keep |
+| C315-07 | S06 | preservation 1、workbench 3、parity 2、7 cmp | pass | snapshot drift別closureでS99へ |
+| C315-08 | S90/S99 | docs parity、final QA/code/spec review、validate/sync、deferred delivery inspection | pass | W1 scope closed; W2–W4 not implemented |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | C315-01 | workbench directory init tests | C315-01 | planどおり | no | no |
 
 #### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 `workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
@@ -190,65 +298,138 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| ワークフロー利用依頼 / 明示承認 / なし（user request to use SpecDock workflow / explicit approval / none） | ... | iss-00315 | 現在セッション（current session） / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | 範囲: active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility。破壊的操作 / 外部公開 / credentialed external mutation / scope expansion / private external system use / out-of-workflow role は含めない | 完了 / セッション終了 / scope 変更 / host policy conflict / user revocation（issue complete / session end / scope change / host policy conflict / user revocation） | none / denied / unavailable / host conflict | 続行 / separate-confirmation exception は user に確認 / block gate / record waiver request |
+| ユーザーによる Epic Execution / Issue Planning / Issue Execution workflow 利用依頼 | current Work3 checkout | iss-00315 | Work3移行後の現在セッション | spec-reviewer / code-reviewer / qa-reviewer / repo-analyst / dev-coder / doc-writer | active repo/worktree、active scope、current session、documented role responsibilityに限定 | issue完了、scope変更、session終了、host policy conflict、user revocation | none | workflow内を続行。境界外は別途確認 |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S00 | delegated | recursive callsite inventory and baseline | repo-analyst | read-only runtime/installer/tests inventory | approved `plan.md` S00 | none | all file edits and S01+ implementation | focused baseline tests | baseline regression or scope-changing reachability | inventory、tests、risks、step mapping | pass |
+| S01 | delegated | shipped scaffold and installer fallback | dev-coder | ignore asset、fallback constant、focused tests | approved `plan.md` S01 | 3 scoped files | runtime traversal、Issue 316+、report | Red/Green、init/sync regression、Ruff/diff-check | scope expansion or regression | worker summary、changed files、verification、risks | pass |
+| S02 | delegated | runtime metadata discovery | dev-coder | `infra/fs_repo.py` and focused tests | approved `plan.md` S02 | node discovery + tests | S03+、legacy dead helper、report | Red/Green、validate/deps/sync regression | error semantic drift or scope expansion | worker summary、tests、app.py decision | pass |
+| S03 | delegated | independent recursive resolvers | dev-coder | assurance/installer/delete/delegated + focused tests | approved `plan.md` S03 | four callsites + two test files | S04+、generic framework、report | Red/Green、surrounding regression、Ruff | selection/error regression | worker summary、tests、risks | pass |
+| S04 | delegated | authoring source semantic boundary | dev-coder | source manifest、preflight、focused tests | approved `plan.md` S04 | domain/application + one test file | S05+、pack semantics、report | Red/Green、authoring regression、Ruff | existing preflight contract regression | worker summary、tests、risks | pass |
+| S05 | delegated | explicit delete/remove characterization | dev-coder | delete/worktree tests | approved `plan.md` S05 | two test files | production、S06+、report | characterization + full adjacent suites | unexpected blocker or destructive external operation | summary、tests、no-op rationale | pass |
+| S06 | delegated | update preservation and parity | dev-coder | init/update test + normal dogfood update | approved `plan.md` S06 | test + generated consumer projection | S90 docs、production change unless needed、report | byte equality、provider parity、related tests | data loss or parity failure | summary、tests、projection、risks | pass |
+| S90 | delegated | docs impact resolution | doc-writer | provider docs inventory + guide update/parity | approved `plan.md` S90 | provider guide + generated dogfood guide | Issue316–318 commands/workflow、report | docs diff、focused installer tests、parity | contract overclaim or scope leakage | changed files、rationale、verification | pass |
+| S99-snapshot | delegated | final gate discovered snapshot drift | dev-coder | three checked-in dogfood constants | plan S99 + D-315-002 | one test file | production/runtime/report | failing selectors then Green | canonical mismatch | diff、Red/Green、risks | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S00 | repo-analyst | recursive callsiteを3分類し、default discoveryのWorkbench到達点と後続stepを確定 | none | worker `10 passed in 23.65s`; reviewer rerun `10 passed in 21.79s`; status clean | passed（`review_iss00315_s00`） | none; legacy helperはS02でcallsite再確認 | accepted / approved-no-op |
+| S01 | dev-coder | exact ignore patternをprovider/fallbackへ追加しscope/near-name matrixをTDD化 | `.gitignore`, `src/spec_dock/cli.py`, `tests/unit/infra/test_init_update.py` | Red 2 failed; Green 2+3+2 passed; Ruff/diff-check pass | passed（`review_iss00315_s01`） | fallback full matrixはnonblocking | accepted |
+| S02 | dev-coder | current/legacy metadata discoveryをtop-down exact boundary pruneへ変更 | `infra/fs_repo.py`, `test_runtime_fs_repo_workbench_opacity.py` | Red 3 failed/3 passed; Green 6; worker 97; reviewer 125 passed | passed（`review_iss00315_s02`） | os.walk error handling差は既存回帰で許容 | accepted |
+| S03 | dev-coder | 4独立resolverをtop-down pruneしpersisted/active direct targetもreject | `cli.py`, `assurance_store.py`, `delete_node.py`, `delegated_authoring.py`, focused tests 2 | Red 4/7 failed; Green 7; reviewer 118 passed/29 skipped | passed（`review_iss00315_s03`） | combined hidden+valid fallback fixtureはnonblocking | accepted |
+| S04 | dev-coder | exact sourceをaccess前rejectしparent sourceのWorkbench subtreeをprune、preflightをshort-circuit | `source_manifest.py`, `github_sync_preflight.py`, focused test | Red 10/11 failed; Green 12; reviewer 40 passed | passed（`review_iss00315_s04`） | full authoring suiteはS99へ | accepted |
+| S05 | dev-coder | nonempty binary Workbenchをscope/worktreeと共に削除する既存契約をtest固定 | `test_delete.py`, `test_worktree.py` | worker 5; reviewer targeted 2/full 65 passed | passed（`review_iss00315_s05`） | none | accepted / production approved-no-op |
+| S06 | dev-coder | four-scope binary sentinel preservationをtest固定し通常updateでdogfood 7 filesをrefresh | `test_init_update.py`, dogfood `.gitignore` + runtime 6 | preservation 1、workbench 3、parity 2、7 cmp、normal update pass | passed（`review_iss00315_s06`） | fixed snapshot 2 failuresはS99、stale build uvxはclean laneへ | accepted / installer approved-no-op |
+| S90 | doc-writer | guideへexperimental ignore/opaque/disposable boundaryだけを追加 | provider/dogfood `docs/guide.md` | writer 3、reviewer 2、byte parity、diff-check | passed（`review_iss00315_s90`） | explicit operation clarityはnonblocking | accepted |
+| S99-snapshot | dev-coder | Epic00312 + iss315-319のnode/depsを3 fixed constantsへmechanical refresh | `tests/unit/infra/test_init_update.py` | Red 2 failed; Green 2 + related 3 passed | passed（`review_iss00315_s99_snapshot`） | none | accepted |
 
 #### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+- なし。production code、tests、shipped docs、provider/dogfood projection の変更はすべて適切な worker へ委任した。
 
 #### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
 
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
-| `lite` | `not applicable` | `not applicable` | ライト該当なし理由（lite not applicable reason） | `pass / fail / blocked` | `ready / blocked` |
-| `standard` | `system-architect / implementation-planner / manual fallback` | `used / skipped / unavailable / denied` | `artifacts/...` / manual evidence / skip reason: ... | `pass / fail / blocked` | `ready / blocked` |
-| `strict` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / manual fallback evidence | `pass / fail / blocked` | `ready / blocked` |
-| `critical` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / explicit approval and risk acceptance | `pass / fail / blocked` | `ready / blocked` |
+| `standard` | `system-architect / implementation-planner` | `used` | GPT-5.6 Pro planning evidence `artifacts/20260713t044108z-research-chatgpt-5-6-pro-issue-planning-evidence.md` をcanonical docsへ部分採用 | passed | ready |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| planning-requirement | requirement promotion | spec-reviewer | fresh | passed | no | promote | `review_iss00315_requirement` |
+| planning-design | design promotion | spec-reviewer | fresh | passed | no | promote | `review_iss00315_design` |
+| planning-plan | plan promotion | spec-reviewer | fresh | passed | no | execute approved plan | `review_iss00315_plan`; static analysis gate追加後 |
+| S00 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s00`; approved-no-op、10 tests再実行pass |
+| S01 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s01`; focused 2 tests再実行pass、P0/P1なし |
+| S02 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s02`; 125 passed、P0/P1なし |
+| S03 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s03`; 118 passed/29 skipped、P0/P1なし |
+| S04 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s04`; 40 passed、P0/P1なし |
+| S05 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s05`; approved-no-op、65 passed |
+| S06 | step review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s06`; preservation/parity pass、snapshot drift S99へ |
+| S90 | docs impact review | spec-reviewer | fresh | passed | no | promote | `review_iss00315_s90`; provider/dogfood parity、scope適合 |
+| S99-snapshot | remediation review | code-reviewer | fresh | passed | no | promote | `review_iss00315_s99_snapshot`; canonical literal match |
+| S99-final-initial | final QA | qa-reviewer | fresh | passed | no | retain | 30 focused integrated tests、追加integration test不要 |
+| S99-final-initial | final integrated review | code-reviewer | fresh | failed | no | remediate | persisted/active fallbackのP1とabsolute source ancestorのP2 |
+| S99-final-initial | final alignment review | spec-reviewer | fresh | failed | no | remediate | report bookkeeping 3件のみ。implementation/spec driftなし |
+| S99-final-rereview-1 | final QA re-review | qa-reviewer | fresh | passed | no | retain | remediation回帰37 passed、追加integration test不要 |
+| S99-final-rereview-1 | final integrated re-review | code-reviewer | fresh | failed | no | remediate | resolve-before-guardのintermediate symlink P1 |
+| S99-final-rereview-1 | final alignment re-review | spec-reviewer | fresh | passed | no | retain | report bookkeepingと既存契約へのremediation整合を確認 |
+| S99-final-rereview-2 | final QA | qa-reviewer | fresh | passed | no | complete QA gate | focused 19、active/recovery 25 passed。追加integration test不要 |
+| S99-final-rereview-2 | final integrated review | code-reviewer | fresh | passed | no | complete code gate | focused 21、Workbench統合31 passed。P0/P1/P2なし |
+| S99-final-rereview-2 | final alignment review | spec-reviewer | fresh | failed | no | update final ledger then re-review | implementation/spec driftなし。code/QA pass未反映だけをblocker化 |
+| S99-final-close | final alignment close review | spec-reviewer | fresh | passed | no | complete spec gate | D-315-003 package evidenceを含む全台帳整合、blocking findingsなし |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S00 | approved-no-op | report evidence only | `7def2c10e29078e82c6a30441e79fe7cee3b1883` | `git status --short` -> clean | inventory/baseline stepでproduction変更不要 | plan S00、recursive callsites、focused 10 tests | `git status --short` -> clean | `review_iss00315_s00` passed |
+| S01 | committed | provider/fallback ignore + focused tests + report | `914abdf79976b4e3b58a696493155722dbd7062f` | `git status --short` -> clean | N/A | C315-01 | `git diff --check` -> pass | `review_iss00315_s01` passed |
+| S02 | committed | fs_repo prune + focused tests + report | `0c694c76a2f1d56d9b44491fcc1c462774ab8715` | `git status --short` -> clean | N/A | C315-02, C315-03 | `git diff --check` -> pass | `review_iss00315_s02` passed |
+| S03 | committed | independent resolver prune + focused tests + report | `baf0307370aafc931c37f4eb72b4b3f6857fd59d` | `git status --short` -> clean | N/A | C315-04 | `git diff --check` -> pass | `review_iss00315_s03` passed |
+| S04 | committed | authoring reject/prune + focused tests + report | `54601de823f3bca5e3fdf7faab9f980bfe5f18a2` | `git status --short` -> clean | N/A | C315-05 | `git diff --check` -> pass | `review_iss00315_s04` passed |
+| S05 | committed | delete/remove characterization tests + report | `0677335d39cbdb6232e8b8990efe7782594754d3` | `git status --short` -> clean | existing behavior already satisfies contract | C315-06 | `git diff --check` -> pass | `review_iss00315_s05` passed |
+| S06 | committed | preservation test + dogfood projection + report | `ed6a8a1eabc3a6655ac4b1e6b3b9dfcaec16fcc1` | `git status --short` -> clean | production installer already preserves Workbench | C315-07 | `git diff --check` -> pass | `review_iss00315_s06` passed |
+| S90 | committed | provider/dogfood guide + report | `c448f808affcd08295c05cc9eadd04eecd2d6706` | `git status --short` -> clean | N/A | C315-08 docs portion | `git diff --check` -> pass | `review_iss00315_s90` passed |
+| S99-snapshot | committed | snapshot constants + report | `a6826ac6379c5d799323807156624eb2229267ce` | `git status --short` -> clean | N/A | D-315-002 | `git diff --check` -> pass | `review_iss00315_s99_snapshot` passed |
+| S99-quality-checkpoint | committed | formatter + final command evidence + migration checkpoint report | `65b8b5b8f27b2f4859dc09a34c78ccae5b75273e` | clean; originへpush済み | N/A | C315-01–08 command evidence | unit/CLI/lint pass | fresh final reviewをWork3で実施 |
+| S99-final-ledger | ready-to-commit | final reviewer verdicts、C315-08、deferred delivery、placeholder除去 | final report commit（この台帳確定後） | post-commit external evidenceとして記録 | N/A | full Issue contract | `git diff --check`、fresh final spec pass | final commit hashは自己参照せず外部送達証跡へ記録 |
+| S99-review-remediation | committed | resolver/source symlink guard + regression tests | `1ddedf1c` | reportのみunstaged、実装/test差分なし | N/A | C315-03–05 | focused 29、fresh code/QA pass | code/test remediation closure |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- Provider/runtime/docs/testsとdogfood projection: 各S01–S90 commitに記録。
+- Checkpoint差分: formatter適用済みtest 3 filesと本report。
 
 #### コミット
-- <hash> <message>
+- Planning: `1fb5fa0106b19f74aedce10480fb7381e88fb09b`
+- S00–S90: `7def2c10`、`914abdf7`、`0c694c76`、`baf03073`、`54601de8`、`0677335d`、`ed6a8a1e`、`c448f808`
+- S99 snapshot: `a6826ac6379c5d799323807156624eb2229267ce`
 
 #### メモ
-- ...
+- ユーザー指示により、clean checkpoint後に現在のmain checkoutからlinked worktreeへ移行する。Issue Finishと次Issue開始は移行後。
 
 ---
 
-### セッションログ（2026-07-13 HH:MM - HH:MM）
+### セッションログ（2026-07-13 S99 quality checkpoint）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S99 final command gate / worktree migration checkpoint
+- AC: AC-315-001–009
 
 #### 実施内容
-- ...
+- `uv run pytest tests/unit`: `997 passed in 366.93s`。
+- `uv run pytest tests/cli_runtime`: `1118 passed, 75 skipped, 2 warnings in 1184.14s`。warningsはduplicate ZIP fixtureの既知`UserWarning`。
+- 初回`make lint`: Ruff check/mypy pass、format checkで新規test 3 filesを検出。
+- `uv run ruff format`を3 filesへ適用後、affected focused testsは`16 passed, 543 deselected`。
+- 再`make lint`: Ruff check、Ruff format check、mypyすべてpass。
+- Work3移行後に`./spec-dock/scripts/spec-dock validate`（nodes=209）と通常`sync`を再実行し、tracked差分なし。
+- checkpoint HEAD `65b8b5b8f27b2f4859dc09a34c78ccae5b75273e`をoriginへpush済み。
+
+### セッションログ（2026-07-13 S99 reviewer-fail remediation）
+
+- fresh code reviewが、`_resolve_manifest_target_dir`の拒否後に`_resolve_persisted_path_dir`と`_resolve_existing_active_entrypoint`が`.workbench` descendantを再採用できるP1を検出した。
+- dev-coderへS03/S04契約内のbounded remediationを委任し、両resolverへrepo-relative exact-component guardを追加した。
+- 同reviewで検出したP2は、absolute in-repo sourceのWorkbench判定をrepo-relative componentへ限定し、absolute-outside-repo blockerを維持する最小修正で閉じた。
+- Red: 新規3 testsが修正前に失敗。Green: workerでsource manifest 15、installer resolver 21 passed。親再検証でfocused 24 passed、Ruff check/format、`git diff --check` pass。
+- provider/dogfood `source_manifest.py` byte parityを維持。新しい仕様判断はなく、RQ-315-002/005、DES-315-004/005の実装欠落を補完した。
+- 初回spec reviewの3件は、frontmatter/scaffold除去、C315-08 closure、deferred delivery/push evidenceとして本台帳へ反映した。
+- 1回目のcode re-reviewで、`.resolve()`後にcomponentを判定するため`.workbench/link -> safe target`のintermediate symlinkで境界を迂回できるP1を検出した。
+- 同workerへ再委任し、installerのmanifest/persisted/existing-active 3 resolver、delegated active fallback、absolute authoring helperをresolve前lexical guardとresolve後physical guardの二段に統一した。
+- Active symlinkは`readlink()`した字句targetを先に検査し、invalid managed symlinkはtargetを削除せずpointerだけ除去してplaceholderへ復旧する。
+- Symlink fixtureのRed後、workerでsource/resolver 20、installer 21 passed。親再検証でWorkbench focused 29 passed、Ruff check/format、`git diff --check`、provider/dogfood parityがpassした。
+- remediation後の`uv run pytest tests/unit`は、変更関連を含む1001件pass、既存timeout境界test 1件のみ`polls=1`でfail。当該test単独再実行は`1 passed in 2.21s`で、変更非関連のtiming flakeと確認した。
+- managed `codex-tmp` sessionへ`uv build --wheel`し、生成wheelから`uvx --no-cache ... spec-dock init <consumer>`、同wheelで`spec-dock update <consumer>`が成功した。D-315-003のclean isolated package gateをcloseした。
+- reviewer-pass済みproduction/test remediationは`1ddedf1c`として独立commitし、最終report commitをself-referenceなしで分離する。
+
+## Deferred PR Delivery Gate
+
+| defer先 | dependency edge | per-Issue PRを作らない理由 | branch / pushed head | merge-prepared claim | final quality Issueに残るgate | remaining risk |
+|---|---|---|---|---|---|---|
+| `iss-00319` | `iss-00319 -> iss-00315`（`deps check` / Epic plan） | reviewed Epic planがW1–W4を順次統合し、W5でEpic-wide final qualityと単一PR送達を行うため | `iss-00315-experimental-workbench-ignore-and-opaque-traversal-foundation` / `65b8b5b8f27b2f4859dc09a34c78ccae5b75273e`、origin同期済み | W1では主張しない | `iss-00319`のPR Delivery Gate / Merge Preparation Gate | Windows delete harness skip可能性はnon-blocking。W2–W4との統合回帰はW5で再確認 |
 
 ---
 
@@ -257,37 +438,45 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| `docs/guide.md`のみ更新。templates/README/workflow/skill/migrationはno-op | yes | doc-writer | provider/dogfood byte parity、focused tests | pass（`review_iss00315_s90`） |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | 追加integration test不要 | 最終候補でfocused 19、active/recovery 25 passed。`git diff --check`、provider/dogfood parity pass。unit 997 / CLI 1118 pass 75 skip / lint checkpointと整合 | pass（fresh、P0/P1/P2なし） |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | 初回: persisted/active fallback P1 + absolute ancestor P2を修正。再review 1: intermediate symlinkのresolve-before-guard P1を5経路で修正。最終: lexical/physical二段guard、pointer-only cleanup、parityを確認 | 2 | pass（fresh、P0/P1/P2なし） |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | 初回fail: C315-08/deferred/scaffold。再review 1 pass。後続fail: code/QA台帳未反映、D-315-003 package evidence不足。全て解消後にfinal close review | 4 | pass（fresh、blocking findingsなし） |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| C315-01–08、三者final review、deferred delivery、validate/sync、package gate、push evidenceを確定する本台帳 | Issue 315 final report ledgerのみ | final response、origin branch、Issue Finish lifecycle evidence | ready-to-commit |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: linked worktree移行後、active scopeが未設定だった。
+  - 解決: `active set`ではなく正規lifecycleの`issue start iss-00315`で復元した。
+- 問題: 初回final spec reviewで移行前placeholder、C315-08未close、deferred delivery/push evidence不足を検出した。
+  - 解決: 実装を変更せず、本observed evidence ledgerを実状態へ更新してfresh re-reviewへ戻した。
 
 ## 学んだこと (任意)
-- ...
+- active scopeはworktree-local状態であり、linked worktreeへのコード移行とは別にlifecycle復元が必要。
 
 ## 今後の推奨事項 (任意)
-- ...
+- Issue 316以降もfinal report commitのhashは自己参照せず、commit後clean/push evidenceを外部送達証跡へ残す。
 
 ## 省略/例外メモ (必須)
-- 該当なし
+- per-Issue PR deliveryのみreviewed Epic planにより`iss-00319`へ延期する。Issue 315の実装・review・validate/sync・commit・push・Issue Finishは省略しない。
+
+<!-- spec-dock:managed-section begin id="report.step-evidence" -->
+## Step Evidence
+- Record Red, Green, and refactor evidence for each executed step.
+- Link each closure id to its observed verification result.
+<!-- spec-dock:managed-section end id="report.step-evidence" -->

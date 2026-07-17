@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from spec_dock_runtime.domain.authoring_pack.authority_boundary import is_credential_like_path
+from spec_dock_runtime.domain.authoring_pack.preflight_contract import RECEIPT_KIND, receipt_digest_value
 from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     ADOPTION_STATUS,
     AUTHORITY,
@@ -47,7 +48,7 @@ def prepare_prompt_pack(request: PromptPackPrepareRequest) -> PromptPackPrepareR
             remediation=("remove symlinked prompt pack output directories before preparing the pack",),
         )
 
-    blockers = _required_preflight_blockers(preflight)
+    blockers = [*_preflight_receipt_blockers(preflight), *_required_preflight_blockers(preflight)]
     if blockers:
         result = _result(
             request,
@@ -169,6 +170,7 @@ def _provenance(preflight: dict[str, Any]) -> dict[str, object]:
         "local_head": preflight.get("local_head"),
         "remote_head": preflight.get("remote_head"),
         "source_manifest_hash": preflight.get("source_manifest_hash"),
+        "preflight_receipt": _preflight_receipt_binding(preflight),
         **authority_boundary(),
     }
     if preflight.get("evidence_mode") == "local-context":
@@ -216,14 +218,133 @@ def _is_cache_path(path: str) -> bool:
 
 def _stale_if_payload(request: PromptPackPrepareRequest, preflight: dict[str, Any]) -> dict[str, object]:
     if request.stale_if_path is not None:
-        return _read_json(request.stale_if_path)
-    return {
-        "local_head_changes": preflight.get("local_head"),
-        "remote_head_changes": preflight.get("remote_head"),
-        "source_manifest_hash_changes": preflight.get("source_manifest_hash"),
-        "github_sync_changes": preflight.get("github_sync"),
-        "evidence_mode_changes": preflight.get("evidence_mode"),
+        payload: dict[str, object] = _read_json(request.stale_if_path)
+    else:
+        payload = {
+            "local_head_changes": preflight.get("local_head"),
+            "remote_head_changes": preflight.get("remote_head"),
+            "source_manifest_hash_changes": preflight.get("source_manifest_hash"),
+            "github_sync_changes": preflight.get("github_sync"),
+            "evidence_mode_changes": preflight.get("evidence_mode"),
+        }
+    payload.update(_stale_if_receipt_binding(preflight))
+    return payload
+
+
+def _preflight_receipt_blockers(preflight: dict[str, Any]) -> list[str]:
+    if "schema_version" not in preflight:
+        if any(key in preflight for key in ("receipt_kind", "receipt_digest", "fetch", "freshness")):
+            return ["preflight_receipt_schema_missing"]
+        return []
+
+    blockers: list[str] = []
+    if type(preflight.get("schema_version")) is not int or preflight.get("schema_version") != 1:
+        blockers.append("preflight_receipt_schema_unsupported")
+    if preflight.get("receipt_kind") != RECEIPT_KIND:
+        blockers.append("preflight_receipt_kind_mismatch")
+
+    receipt_digest = preflight.get("receipt_digest")
+    if not isinstance(receipt_digest, dict):
+        blockers.append("preflight_receipt_digest_missing")
+    else:
+        if receipt_digest.get("algorithm") != "sha256":
+            blockers.append("preflight_receipt_digest_algorithm_unsupported")
+        value = receipt_digest.get("value")
+        if not isinstance(value, str) or value != receipt_digest_value(preflight):
+            blockers.append("preflight_receipt_digest_mismatch")
+
+    if preflight.get("status") != "pass":
+        return blockers
+
+    receipt_blockers = preflight.get("blockers")
+    if not isinstance(receipt_blockers, list):
+        blockers.append("preflight_receipt_blockers_invalid")
+    elif receipt_blockers:
+        blockers.append("preflight_receipt_pass_has_blockers")
+    evidence_mode = preflight.get("evidence_mode")
+    fetch = preflight.get("fetch")
+    freshness = preflight.get("freshness")
+    if not isinstance(fetch, dict):
+        blockers.append("preflight_receipt_fetch_missing")
+        fetch = {}
+    if not isinstance(freshness, dict):
+        blockers.append("preflight_receipt_freshness_missing")
+        freshness = {}
+
+    if evidence_mode == "github-synced":
+        if preflight.get("sync_state") != "synced":
+            blockers.append("preflight_receipt_sync_state_not_synced")
+        if preflight.get("github_sync") != "verified":
+            blockers.append("preflight_receipt_github_sync_not_verified")
+        if fetch.get("status") != "success":
+            blockers.append("preflight_receipt_fetch_not_success")
+        if freshness.get("remote_head_disposition") != "fetched_remote_tracking_ref":
+            blockers.append("preflight_receipt_remote_head_not_fetched")
+        if freshness.get("concurrent_change_check") != "stable":
+            blockers.append("preflight_receipt_concurrent_change_not_stable")
+        snapshot_id = freshness.get("snapshot_id")
+        final_snapshot_id = freshness.get("final_guard_snapshot_id")
+        if not isinstance(snapshot_id, str) or not snapshot_id:
+            blockers.append("preflight_receipt_snapshot_missing")
+        if final_snapshot_id != snapshot_id:
+            blockers.append("preflight_receipt_final_guard_mismatch")
+        if not isinstance(freshness.get("observed_at"), str) or not freshness.get("observed_at"):
+            blockers.append("preflight_receipt_observed_at_missing")
+    elif evidence_mode == "local-context":
+        if preflight.get("sync_state") != "local_context":
+            blockers.append("preflight_receipt_sync_state_not_local_context")
+        if preflight.get("github_sync") != "not_verified":
+            blockers.append("preflight_receipt_local_context_github_sync_invalid")
+        if fetch.get("status") != "not_applicable":
+            blockers.append("preflight_receipt_local_context_fetch_invalid")
+        if freshness.get("remote_head_disposition") != "not_applicable":
+            blockers.append("preflight_receipt_local_context_remote_disposition_invalid")
+        if freshness.get("concurrent_change_check") != "not_applicable":
+            blockers.append("preflight_receipt_local_context_guard_invalid")
+    else:
+        blockers.append("preflight_receipt_evidence_mode_unsupported")
+    return blockers
+
+
+def _preflight_receipt_binding(preflight: dict[str, Any]) -> dict[str, object]:
+    if "schema_version" not in preflight:
+        return {
+            "format": "legacy_unversioned",
+            "current_repository_revalidated": False,
+        }
+
+    receipt_digest = preflight.get("receipt_digest")
+    freshness = preflight.get("freshness")
+    payload: dict[str, object] = {
+        "format": "versioned",
+        "schema_version": preflight.get("schema_version"),
+        "receipt_kind": preflight.get("receipt_kind"),
+        "receipt_digest": dict(receipt_digest) if isinstance(receipt_digest, dict) else {},
+        "current_repository_revalidated": False,
     }
+    if isinstance(freshness, dict):
+        for key in ("snapshot_id", "observed_at"):
+            value = freshness.get(key)
+            if isinstance(value, str) and value:
+                payload[key] = value
+    return payload
+
+
+def _stale_if_receipt_binding(preflight: dict[str, Any]) -> dict[str, object]:
+    binding = _preflight_receipt_binding(preflight)
+    payload: dict[str, object] = {
+        "preflight_receipt_format": binding["format"],
+        "current_repository_revalidated": False,
+    }
+    if binding["format"] == "versioned":
+        receipt_digest = binding.get("receipt_digest")
+        if isinstance(receipt_digest, dict) and isinstance(receipt_digest.get("value"), str):
+            payload["preflight_receipt_digest_changes"] = receipt_digest["value"]
+        if isinstance(binding.get("snapshot_id"), str):
+            payload["preflight_snapshot_id_changes"] = binding["snapshot_id"]
+        if isinstance(binding.get("observed_at"), str):
+            payload["preflight_observed_at"] = binding["observed_at"]
+    return payload
 
 
 def _required_preflight_blockers(preflight: dict[str, Any]) -> list[str]:

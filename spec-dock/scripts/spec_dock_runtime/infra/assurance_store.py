@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any, Literal
 
@@ -31,6 +32,15 @@ _PLANNING_SOURCE_ARTIFACTS: tuple[tuple[str, str], ...] = (
     ("design", "design.md"),
     ("plan", "plan.md"),
 )
+
+
+def _iter_issue_meta_paths(initiatives_root: Path) -> list[Path]:
+    matches: list[Path] = []
+    for current_root, child_dirnames, filenames in os.walk(initiatives_root, topdown=True):
+        child_dirnames[:] = sorted(name for name in child_dirnames if name != ".workbench")
+        if ".meta.json" in filenames:
+            matches.append(Path(current_root) / ".meta.json")
+    return sorted(matches, key=lambda path: path.as_posix())
 
 
 @dataclass(frozen=True)
@@ -371,7 +381,7 @@ class AssuranceStore:
 
     def _issue_records(self) -> list[_IssueRecord]:
         records: list[_IssueRecord] = []
-        for meta_path in sorted((self.specdock_dir / "initiatives").glob("**/.meta.json")):
+        for meta_path in _iter_issue_meta_paths(self.specdock_dir / "initiatives"):
             try:
                 payload = load_json(meta_path)
             except RuntimeError:

@@ -6,10 +6,11 @@ Operational entrypoint は `.agents/skills/spec-dock-chatgpt-authoring/SKILL.md`
 ## 基本原則
 
 - ChatGPT / Oracle output は常に `authority: evidence_only` として扱う。
-- ChatGPT-first planning route は、非自明な Initiative / Epic / Issue planning の正規 evidence-production route である。`spec-dock-chatgpt-authoring` は evidence lane であり、canonical adoption は各 planning skill が所有する。
+- ChatGPT-first planning route は、非自明な Initiative / Epic / Issue planning の正規 evidence-production route である。`spec-dock-chatgpt-authoring` は evidence lane であり、各 planning skill は共有checkpointの呼出し時点とscope固有のhandoffを所有する。Preservation実行、EAL disposition、canonical rewriteはmain orchestratorが所有する。
 - ZIP / tree / staged evidence / candidate validation / approval check の `pass` は command-local validation pass であり、canonical adoption、fresh reviewer pass、execution-ready、PR-ready、merge-ready ではない。
 - canonical `requirement.md` / `design.md` / `plan.md` / `report.md` の single-writer は main orchestrator である。
-- ChatGPT evidence を採用する場合、main orchestrator が Evidence Adoption Ledger に採否を記録し、canonical docsへ再記述し、fresh reviewer gate を通す。
+- ChatGPT output の受領後、main orchestrator は採否判断や canonical rewrite の前に semantic completeness と output form を分類し、preservation checkpoint を実行する。保存方法、exact status、receipt / exception field は [authoring/chatgpt-pack.md](authoring/chatgpt-pack.md) が reference authority を持つ。
+- ChatGPT evidence を採用する場合、main orchestrator が capture / import、Evidence Adoption Ledger の採否、canonical docsへの再記述を実行し、fresh reviewer gate を通す。Import command、shared skill、planning skillは、canonical adoption、reviewer pass、execution-ready、finish、PR-ready、merge-ready、PR deliveryを自己主張しない。
 - reviewed Epic plan が final delivery Issue を明示している場合だけ、中間 Issue は個別 PR を作らず、relay-style に `issue finish` から次 Issue の `issue start` へ進む。それ以外の multi-Issue Epic では通常の PR Delivery / Merge Preparation Gate に従う。
 - Capacity limit、queued tab、retryable timeout、recoverable browser/backend failure は wait / retry / recover で扱う。manual planning skill は hard / unrecoverable failure と user-approved emergency backup evidence がある場合だけ使う。
 
@@ -22,24 +23,42 @@ skinparam monochrome true
 actor Human
 participant "Planning Skill" as Planning
 participant "ChatGPT Authoring Evidence Lane" as ChatGPT
+participant "Main Orchestrator" as Main
 participant "Report / EAL" as Report
 participant "Spec Reviewer" as Reviewer
 participant "Issue Execution" as Execution
 participant "Final Quality Issue" as FinalGate
 
 Human -> Planning : clarify scope / approve slices
-Planning -> ChatGPT : request ZIP/tree evidence
-ChatGPT --> Planning : evidence-only candidates
-Planning -> Report : adopt / reject claims
-Planning -> Reviewer : review canonical docs
-Reviewer --> Planning : review_status pass
+Planning -> ChatGPT : request evidence
+ChatGPT --> Planning : output received
+Planning -> Main : request shared preservation checkpoint
+Main -> Main : capture/import or exception/ZIP route
+Main -> Report : EAL disposition
+Main -> Main : canonical rewrite
+Main -> Reviewer : review canonical docs
+Reviewer --> Main : review_status pass
+Main --> Planning : reviewed canonical handoff
 Planning -> Execution : handoff execution-ready Issue
 Execution -> FinalGate : relay after each Issue finish
 FinalGate -> Human : mergeable PR evidence
 @enduml
 ```
 
-この図の `ChatGPT Authoring Evidence Lane` は reviewer pass や execution-ready を付与しない。採用判断、canonical rewrite、fresh reviewer gate、Issue relay、final quality / PR delivery は SpecDock 側 workflow が所有する。
+この図の `Planning Skill` はshared checkpointの呼出し時点とscope固有handoffを所有し、preservation実行、採用判断、canonical rewriteは行いません。`Main Orchestrator` がcapture/importまたはexception/ZIP route、EAL disposition、canonical rewriteを明示実行し、fresh reviewerへ渡します。`ChatGPT Authoring Evidence Lane` はreviewer passやexecution-readyを付与せず、Issue relayとfinal quality / PR deliveryも各downstream workflowのauthorityに残ります。
+
+## 保存チェックポイント（Preservation checkpoint）
+
+ChatGPT output は次のいずれかへ事前分類します。File の存在、拡張子、size、encoding だけで semantic completeness を自動判定しません。分類できない間は preservation status を付けず、import、EAL disposition、canonical rewrite を block します。
+
+- 完成 standalone Markdown: Workbench source を `artifact import chatgpt-output` で明示的に保存する。
+- 完全に受信した inline answer: answer 本文だけを追加、削除、整形せず Workbench Markdown へ capture して明示的に import する。Provider 内部の original bytes との同一性は主張しない。
+- 本当に不完全または取得不能な inline output: unavailable exception を記録する。完全な source の保存失敗をこの branch へ読み替えない。
+- ZIP / tree: 既存の review / quarantine / stage lane を使い、single-file import へ流さない。
+
+External preserved evidence、delegated draft evidence、ZIP/tree staged evidence は独立した lane です。External preserved evidence の本文へ delegated draft 用 frontmatter や diff guard を追加せず、既存 delegated / ZIP safety contractも変更しません。詳細なstatus、failure、EAL fieldは [authoring/chatgpt-pack.md](authoring/chatgpt-pack.md) を参照します。
+
+Standalone importは単一`.md` fileだけを対象にし、sourceを残してbytesを変更しないblank Artifact copyとして実行します。言語、拡張子、MIME、内容のclassifierやautomatic importはありません。`chatgpt-output`はimport kindであってtyped Artifact tokenではなく、template-based `new artifact`と独立して共存します。
 
 ## 証跡モード（Evidence mode）
 
@@ -49,6 +68,22 @@ FinalGate -> Human : mergeable PR evidence
 GitHub に push 済みの branch / commit / source manifest を ChatGPT が参照できる前提で使います。
 
 この mode でも ChatGPT output は正本ではありません。GitHub 上に存在する状態を参照した evidence として扱い、canonical adoption には EAL、canonical rewrite、fresh reviewer gate が必要です。
+
+#### GitHub 同期 preflight の安全な実行
+
+preflight は shell を介さず、SpecDock entrypoint を direct argv で実行します。shell wrapper、redirect、pipe、`tee`、heredoc、command substitution、inline environment assignment を追加しません。
+
+```text
+./spec-dock/scripts/spec-dock authoring preflight github-sync --output-dir <existing-external-directory>
+```
+
+`--output-dir` は任意です。receipt を保存する場合は、既存かつ repository 外の non-symlink directory を指定します。receipt は stdout の `--format` と独立した JSON で、file 名は `github-sync-preflight.receipt.json` に固定されます。安全な出力先では pass result と blocked result のどちらも保存されるため、shell redirect は不要です。
+
+fetch と限定 retry は SpecDock が所有し、retry 時も同じ command / environment policy を保ちます。fetch の nonzero は追加権限が必要であることの証跡ではありません。nonzero を理由に `require_escalated` を追加したり、sandbox / permission mode を変更したり、agent-owned raw `git fetch` で preflight を置き換えたりしません。
+
+blocked result では `blockers`、bounded diagnostics、`remediation` を確認し、remote 設定、authentication、rate limit、repository state、安全な出力先など、示された operator remediation を修正して同じ preflight を再実行します。`local-context` または default branch へ暗黙に切り替えません。evidence mode や fallback を変更する場合は、その変更を明示し、planning workflow の authority と `report.md` の記録要件に従います。
+
+receipt が示す freshness は preflight の `observed_at` / snapshot 観測時点に限られます。`authoring pack prepare` は versioned receipt の kind、schema、digest、fetch / snapshot semantics を検証して prompt pack provenance に binding しますが、pack prepare 時点の current repository / remote を再取得・再検証しません。したがって receipt を backend invocation 直前まで fresh である証明として扱いません。
 
 ### `local-context`
 
@@ -67,7 +102,7 @@ Epic candidate は提案であり、Epic node creation の前に human approval 
 推奨 flow:
 
 1. Initiative requirement を人間と main orchestrator で固定する。必要なら ChatGPT evidence を使ってもよい。
-2. `authoring preflight github-sync` で GitHub 同期状態を確認する。
+2. `authoring preflight github-sync` を direct argv で実行して GitHub 同期状態を確認する。receipt が必要なら `--output-dir <existing-external-directory>` を指定する。
 3. `authoring pack prepare --mode initiative` で prompt pack を作る。
 4. `authoring backend invoke` で backend command を使って ChatGPT / Oracle を呼び出す。
 5. `authoring pack review` と `authoring pack stage` で ZIP / tree output を evidence として点検・配置する。
@@ -83,7 +118,7 @@ Issue candidate / draft は提案であり、Issue node creation の前に human
 
 1. Epic requirement を固定する。必要に応じて Epic design / plan まで ChatGPT に一括生成させる。
 2. `authoring pack prepare --mode epic` で prompt pack を作る。
-3. ChatGPT output は ZIP / tree で受け取り、`authoring pack review` と `authoring pack stage` で evidence として扱う。
+3. ChatGPT output を preservation checkpoint で分類する。ZIP / tree なら `authoring pack review` と `authoring pack stage`、完成 standalone / inline なら reference contractの明示保存を使う。
 4. `authoring validate epic-issue-candidates` で Issue candidate を検査する。
 5. 人間が Issue slice を承認した後、Issue node を作成する。
 6. 作成した各 Issue の draft docs は Issue-local artifacts として扱い、Issue planning 時に正式版へ採用する。
@@ -104,6 +139,7 @@ main orchestrator が採用部分を canonical docs に再記述し、fresh `spe
 
 ```bash
 ./spec-dock/scripts/spec-dock authoring preflight github-sync
+./spec-dock/scripts/spec-dock authoring preflight github-sync --output-dir <existing-external-directory>
 ./spec-dock/scripts/spec-dock authoring pack prepare
 ./spec-dock/scripts/spec-dock authoring backend invoke
 ./spec-dock/scripts/spec-dock authoring pack review

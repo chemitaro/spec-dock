@@ -144,6 +144,18 @@ locked worktree などで Git が force-equivalent remove を拒否した場合�
 branch は削除しません。成功 JSON の `branch_deleted` は常に `false` です。
 `worktree delete` alias はありません。
 
+## Scoped Workbench handoff（experimental）
+
+```bash
+./spec-dock/scripts/spec-dock workbench copy --scope <initiative|epic|issue-id> --to <target>
+```
+
+`--to`は`worktree show`と同じstable id、absolute path、またはdirectory basenameで既存linked worktreeを指定します。`--scope`はsource worktreeに存在するfull Initiative / Epic / Issue idです。Root `spec-dock/.workbench/`は対象外で、rootでは日付bucketから必要fileを手動選択します。
+
+Copyは明示的なone-shot operationです。Source scope直下の`.workbench/`全体を同じscopeのdestinationへ重ね、destination-only entryを保持し、同じpathではsourceが勝ちます。自動sync、watch、copy-back、destinationからsourceへの反映はありません。言語、拡張子、MIME、内容で対象fileを選ぶclassifierもありません。通常file、directory、symlink objectをそのまま扱い、FIFOなどのunsupported special entryやdirectory/non-directory衝突は選別・skipせずcontent-free errorで停止します。Workbenchはnon-canonical、disposableであり、copy成功は永続化やadoptionを意味しません。
+
+`spec-dock update`は既存root/scoped Workbenchをunmanaged local contentとして保持します。Workbenchを別layoutへmigration、normalize、delete、canonical Artifactへpromotionしません。
+
 ## スコープ境界（scope boundary）
 
 この command family は create / list / show / remove のみを扱います。

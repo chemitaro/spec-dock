@@ -1,4 +1,5 @@
 import contextlib
+import importlib
 from pathlib import Path
 import re
 import sys
@@ -59,6 +60,18 @@ def _runtime_modules():
     finally:
         sys.path.pop(0)
     return runtime_app, app_contracts, app_create_node, app_ports, new_commands, infra_contracts, presentation_cli_text
+
+
+def _artifact_runtime_modules():
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        app_create_artifact_doc = importlib.import_module("spec_dock_runtime.application.create_artifact_doc")
+        from spec_dock_runtime.application import contracts as app_contracts, ports as app_ports
+        from spec_dock_runtime.infra import contracts as infra_contracts
+    finally:
+        sys.path.pop(0)
+    return app_create_artifact_doc, app_contracts, app_ports, infra_contracts
 
 
 def _record(
@@ -241,6 +254,29 @@ class TestRuntimeNewDocS09:
         rules_dir.mkdir(parents=True, exist_ok=True)
         (rules_dir / "artifacts.md").write_text("issue artifacts rules\n", encoding="utf-8")
         (rules_dir / "discussions.md").write_text("issue discussions rules\n", encoding="utf-8")
+
+    def _prepare_blank_artifact_template(self, specdock_dir: Path) -> None:
+        templates_dir = specdock_dir / "templates" / "artifacts"
+        templates_dir.mkdir(parents=True, exist_ok=True)
+        (templates_dir / "blank.md").write_text(
+            "id=<ARTIFACT_ID>\ntitle=<ARTIFACT_TITLE>\nscope=<SCOPE_ID>\n",
+            encoding="utf-8",
+        )
+
+    def _prepare_exhausted_artifact_slots(self, specdock_dir: Path, issue_record) -> Path:
+        artifacts_dir = Path(issue_record.path) / "artifacts"
+        artifacts_dir.mkdir(parents=True)
+        rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+        (artifacts_dir / "rules.md").symlink_to(rules_source)
+        timestamp = "20260312t010203z"
+        (artifacts_dir / f"{timestamp}-existing.md").write_text("standard\n", encoding="utf-8")
+        for suffix in range(1, 100):
+            if suffix % 2:
+                filename = f"{timestamp}-{suffix:02d}-adr-existing.md"
+            else:
+                filename = f"{timestamp}-{suffix:02d}-existing.md"
+            (artifacts_dir / filename).write_text(f"suffix={suffix}\n", encoding="utf-8")
+        return artifacts_dir
 
     def _ports(self, app_ports, *, specdock_dir: Path, records, events=None, clock=None):
         return app_ports.Ports(
@@ -460,6 +496,72 @@ class TestRuntimeNewDocS09:
                 content = result.path.read_text(encoding="utf-8")
                 assert f"type={doc_type}" in content
                 assert f"id={expected_ids[doc_type]}" in content
+
+    def test_pr_repair_batch_continuation_fields_remain_markdown_only_and_runtime_opaque(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_discussion_templates(specdock_dir)
+            template = specdock_dir / "templates" / "discussions" / "pr-repair-batch.md"
+            template.write_text(
+                (
+                    "type=pr-repair-batch\n"
+                    "id=<PR_REPAIR_BATCH_ID>\n"
+                    "title=<PR_REPAIR_BATCH_TITLE>\n"
+                    "scope=<SCOPE_ID>\n"
+                    "author=<YOUR_NAME>\n"
+                    "date=YYYY-MM-DD\n"
+                    "## ChatGPT Consultation Gate\n"
+                    "consultation_status: pending\n"
+                    "## Integrated Repair Strategy\n"
+                    "strategy_delta: pending\n"
+                    "orchestrator_disposition: pending\n"
+                    "## Iteration Ledger\n"
+                    "iteration_count: telemetry only\n"
+                ),
+                encoding="utf-8",
+            )
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            request = app_contracts.CreateDiscussionDocRequest(
+                doc_type="pr-repair-batch",
+                scope_node_id="iss-local-00001",
+                title="PR Repair Batch",
+                slug=None,
+            )
+            result = app_create_node.create_discussion_doc(request, ports)
+
+            assert result.doc_type == "pr-repair-batch"
+            assert result.doc_id == "20260312t010203z-pr-repair-batch"
+            assert result.path.name == "20260312t010203z-pr-repair-batch-pr-repair-batch.md"
+            content = result.path.read_text(encoding="utf-8")
+            for marker in (
+                "## ChatGPT Consultation Gate",
+                "consultation_status: pending",
+                "## Integrated Repair Strategy",
+                "strategy_delta: pending",
+                "orchestrator_disposition: pending",
+                "## Iteration Ledger",
+                "iteration_count: telemetry only",
+            ):
+                assert marker in content
+            assert request.__dict__ == {
+                "doc_type": "pr-repair-batch",
+                "scope_node_id": "iss-local-00001",
+                "title": "PR Repair Batch",
+                "slug": None,
+                "scope_kind": None,
+            }
 
     def test_report_and_reflection_are_not_creatable_discussion_doc_types(self) -> None:
         (
@@ -1257,6 +1359,134 @@ class TestRuntimeNewDocS09:
             assert len([doc_id for doc_id in doc_ids if "-01-" in doc_id]) == 1
             assert len([doc_id for doc_id in doc_ids if "-01-" not in doc_id]) == 1
             assert sorted(result.doc_type for result in results) == ["adr", "disc"]
+
+    def test_parallel_new_artifact_allocates_after_shared_create_lock(self, monkeypatch) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            Path(issue_record.path).mkdir(parents=True)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            acquire_barrier = threading.Barrier(2)
+            original_acquire = app_create_artifact_doc._acquire_create_lock
+
+            def _barrier_acquire(specdock_path):
+                acquire_barrier.wait(timeout=5.0)
+                return original_acquire(specdock_path)
+
+            monkeypatch.setattr(app_create_artifact_doc, "_acquire_create_lock", _barrier_acquire)
+            request = app_contracts.CreateArtifactDocRequest(
+                artifact_type="blank",
+                scope_node_id="iss-local-00001",
+                title="ChatGPT Output Shared Slot",
+                slug="chatgpt-output-shared-slot",
+            )
+
+            results = self._run_parallel_doc_create(
+                lambda req: app_create_artifact_doc.create_artifact_doc(req, ports),
+                request,
+                request,
+            )
+
+            assert sorted(result.artifact_id for result in results) == [
+                "20260312t010203z",
+                "20260312t010203z-01",
+            ]
+            assert sorted(result.path.name for result in results) == [
+                "20260312t010203z-01-chatgpt-output-shared-slot.md",
+                "20260312t010203z-chatgpt-output-shared-slot.md",
+            ]
+
+    def test_new_artifact_preserves_typed_blank_suffix_exhaustion_semantics(self) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            artifacts_dir = self._prepare_exhausted_artifact_slots(specdock_dir, issue_record)
+            before = {
+                path.name: path.read_bytes()
+                for path in artifacts_dir.iterdir()
+                if path.is_file() and not path.is_symlink()
+            }
+            events: list[str] = []
+            ports = self._ports(
+                app_ports,
+                specdock_dir=specdock_dir,
+                records=[issue_record],
+                events=events,
+            )
+
+            with pytest.raises(RuntimeError, match="Artifact timestamp suffix exhaustion"):
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Exhausted Slot",
+                        slug="exhausted-slot",
+                    ),
+                    ports,
+                )
+
+            after = {
+                path.name: path.read_bytes()
+                for path in artifacts_dir.iterdir()
+                if path.is_file() and not path.is_symlink()
+            }
+            assert after == before
+            assert events == []
+            lock_path = self._create_lock_path(specdock_dir)
+            assert not lock_path.exists()
+            reacquired_path, reacquired_token = app_create_artifact_doc._acquire_create_lock(specdock_dir)
+            try:
+                assert reacquired_path == lock_path
+                assert lock_path.exists()
+            finally:
+                app_create_artifact_doc._release_create_lock(
+                    reacquired_path,
+                    reacquired_token,
+                    specdock_dir=specdock_dir,
+                )
+            assert not lock_path.exists()
+
+    def test_new_artifact_body_error_remains_primary_when_lock_release_fails(self, monkeypatch) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            self._prepare_exhausted_artifact_slots(specdock_dir, issue_record)
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            original_release = app_create_artifact_doc._release_create_lock
+
+            def _release_then_fail(lock_path, lock_token, *, specdock_dir):
+                original_release(lock_path, lock_token, specdock_dir=specdock_dir)
+                raise RuntimeError("injected create lock release failure")
+
+            monkeypatch.setattr(app_create_artifact_doc, "_release_create_lock", _release_then_fail)
+
+            with pytest.raises(RuntimeError, match="Artifact timestamp suffix exhaustion") as exc_info:
+                app_create_artifact_doc.create_artifact_doc(
+                    app_contracts.CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-local-00001",
+                        title="Exhausted Slot",
+                        slug="exhausted-slot",
+                    ),
+                    ports,
+                )
+
+            assert str(exc_info.value.__cause__) == "injected create lock release failure"
+            assert not self._create_lock_path(specdock_dir).exists()
 
     def test_invalid_slug_fail_fast_no_write(self) -> None:
         (

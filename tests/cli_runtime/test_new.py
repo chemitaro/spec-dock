@@ -1207,6 +1207,86 @@ class TestCliNew(CliRuntimeHarness):
             assert "`check_failure:<job_or_check_name>`" not in content
             assert "No required check failure remains." not in content
 
+    def test_new_artifact_pr_repair_batch_uses_evidence_gated_continuation_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+            self._write_runtime_clock(
+                target,
+                now_iso="2026-03-12T01:02:03+00:00",
+                today="2026-03-12",
+            )
+
+            p = self._run_runtime_capture(
+                target,
+                ["new", "artifact", "pr-repair-batch", "--issue", "iss-00003", "--title", "PR Repair Batch"],
+            )
+
+            assert p.returncode == 0, p.stdout + p.stderr
+            created = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+                / "iss-00003-add-refresh-token"
+                / "artifacts"
+                / "20260312t010203z-pr-repair-batch-pr-repair-batch.md"
+            )
+            content = created.read_text(encoding="utf-8")
+            normalized = " ".join(content.split())
+
+            # Existing generated identity and front-matter behavior remain stable.
+            for marker in (
+                "種別: pr-repair-batch",
+                'ID: "20260312t010203z-pr-repair-batch"',
+                'タイトル: "PR Repair Batch"',
+                '親: ["iss-00003"]',
+                '最終更新: "2026-03-12"',
+                "# 20260312t010203z-pr-repair-batch PR Repair Batch",
+            ):
+                assert marker in content
+
+            required_markers = (
+                "## ChatGPT Consultation Gate",
+                "## Integrated Repair Strategy",
+                "## Iteration Ledger",
+                "consultation_status",
+                "bound_strategy_context",
+                "fallback_invocation_id",
+                "fallback_approved_by",
+                "fallback_approved_at",
+                "fallback_manual_analysis_ref",
+                "fallback_consumed_at",
+                "strategy_delta",
+                "orchestrator_disposition",
+                "telemetry only",
+                "Do not paste raw model conversation",
+                "`fallback_approval_denied` is an unconditional stop.",
+                "An expired or consumed fallback approval is an unconditional stop.",
+                "A fallback approval is bound to exactly one `fallback_invocation_id` and must not be reused.",
+                "material `strategy_delta`",
+            )
+            forbidden_markers = (
+                "Loop limits for the same root-cause family or total repair attempts are reached.",
+                "same `root_cause_family` reappears after a repair commit",
+                "repair unit is incomplete or repeatedly fails",
+            )
+            missing = [marker for marker in required_markers if marker not in normalized]
+            forbidden_present = [marker for marker in forbidden_markers if marker in normalized]
+            assert not missing and not forbidden_present, (
+                f"missing evidence-gated markers: {missing}; "
+                f"legacy stop-authority markers still present: {forbidden_present}"
+            )
+            for state in ("fresh", "stale", "failed", "unavailable", "consultation_denied", "unsafe"):
+                assert state in normalized
+            assert "refresh" in normalized and "hard-unrecoverable" in normalized
+            assert "advisory evidence" in normalized
+            assert "orchestrator" in normalized
+
     def test_new_artifact_draft_scope_failures_do_not_setup_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

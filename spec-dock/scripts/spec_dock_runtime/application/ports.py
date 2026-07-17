@@ -8,12 +8,16 @@ if TYPE_CHECKING:
 
     from spec_dock_runtime.application.contracts import (
         ArtifactWriteResult,
+        BinaryArtifactPublishRequest,
+        BinaryArtifactPublishResult,
         BootstrapResult,
         GitHubCapabilityDiagnostic,
         GitHubCapabilityProbeRequest,
         GitWorktreeRecord,
+        GuardedWorkbenchSource,
         SyncCommandResult,
         SyncRequest,
+        WorkbenchSourceGuardRequest,
     )
     from spec_dock_runtime.domain.models import IssueSnapshot, SpecGraph
     from spec_dock_runtime.infra.contracts import (
@@ -170,6 +174,22 @@ class FilesystemGateway(Protocol):
 
     def remove_target(self, path: Path) -> None: ...
 
+    def path_kind(self, path: Path) -> str: ...
+
+    def guard_workbench_ancestry(self, root: Path, endpoint: Path, *, allow_missing_leaf: bool = False) -> None: ...
+
+    def guard_workbench_inventory(self, specdock_dir: Path) -> None: ...
+
+    def copy_workbench(self, source: Path, destination: Path) -> None: ...
+
+
+class WorkbenchSourceGuard(Protocol):
+    def guard_source(self, request: WorkbenchSourceGuardRequest) -> GuardedWorkbenchSource: ...
+
+
+class BinaryArtifactPublisher(Protocol):
+    def publish(self, request: BinaryArtifactPublishRequest) -> BinaryArtifactPublishResult: ...
+
 
 class EnvironmentGateway(Protocol):
     def getenv(self, name: str) -> str | None: ...
@@ -220,3 +240,5 @@ class Ports:
     bootstrap_gateway: BootstrapGateway | None = None
     environment_gateway: EnvironmentGateway | None = None
     filesystem_gateway: FilesystemGateway | None = None
+    workbench_source_guard: WorkbenchSourceGuard | None = None
+    binary_artifact_publisher: BinaryArtifactPublisher | None = None

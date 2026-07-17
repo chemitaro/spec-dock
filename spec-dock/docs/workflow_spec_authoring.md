@@ -26,8 +26,9 @@ scope 固有の lifecycle / governance は `workflow_initiative.md` / `workflow_
 - 調査後もユーザー意図、受け入れ条件、スコープ、非スコープ、優先順位に影響する未確定事項が残る場合は、[workflow_clarification.md](workflow_clarification.md) に従い、次 phase へ進む前に orchestrator が一問ずつヒアリングする。
 - scope / non-scope に影響する未確認事項が残る場合は `blocked` または `incomplete` として扱い、次 phase へ進めない。
 - authoring 中に Decision-only finding を見つけた場合は、execution handoff 前に [authoring/scope-layering.md](authoring/scope-layering.md) と [authoring/decision-routing.md](authoring/decision-routing.md) で placement を確認する。Issue-local なら対象 Issue に閉じ、cross-issue なら Epic、cross-epic / investment なら Initiative、long-lived architecture decision なら ADR 候補、判断材料不足なら clarification へ戻す。routing 判断は canonical artifact または `report.md` の evidence に残し、template や skill に長い例を複製しない。
-- ChatGPT / Oracle を使う場合は [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md) を参照し、output を delegated evidence として扱う。ZIP/tree/staged evidence、candidate validation、draft adoption validation、approval check の `pass` は command-local pass であり、canonical adoption、fresh reviewer pass、execution-ready、PR-ready ではない。
-- ChatGPT evidence を採用する場合は、Evidence Adoption Ledger に採否を記録し、main orchestrator が canonical docs へ再記述し、fresh `spec-reviewer` pass を通す。
+- ChatGPT / Oracle を使う場合は [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md) を参照し、external preserved evidence、delegated draft evidence、ZIP/tree staged evidence を独立した lane として扱う。ZIP/tree/staged evidence、candidate validation、draft adoption validation、approval check の `pass` は command-local pass であり、canonical adoption、fresh reviewer pass、execution-ready、PR-ready ではない。
+- ChatGPT output の受領後は、採否判断や canonical rewrite より先に preservation checkpoint を実行する。main orchestrator は output form と semantic completeness を分類し、該当する保存または既存 ZIP/tree lane の証跡を確認してから Evidence Adoption Ledger に採否を記録する。完全な source が存在するのに保存が未完了、失敗、receipt 不明、または未分類なら次工程を block し、source unavailable として迂回しない。
+- ChatGPT evidence を採用する場合は、Evidence Adoption Ledger に採否を記録し、main orchestrator が canonical docs へ再記述し、fresh `spec-reviewer` pass を通す。順序は `output received -> preservation checkpoint -> EAL disposition -> canonical rewrite -> fresh reviewer` である。
 - ChatGPT-first planning route is the normal route for non-trivial Initiative / Epic / Issue planning. Browser tab capacity、retryable timeout、stale sync、fixable backend setup は wait / retry / recover の対象であり、manual route へ自動 fallback しない。
 - Manual route is a human-approved emergency backup only. `spec-dock-initiative-planning-manual`、`spec-dock-epic-planning-manual`、`spec-dock-issue-planning-manual` は hard / unrecoverable failure と explicit human approval、failure evidence、recovery attempts、fresh reviewer gate を必要とする。
 
@@ -60,6 +61,10 @@ Artifact output は runtime-owned `new artifact <type>` generation で作成し�
 
 Sub-agent-created draft は最低限、`created_by_role`、`scope_id`、`source_paths`、`intended_targets`、`adoption_status: unreviewed`、`reflected_to: []`、`diff_guard_result`、fallback decision、report evidence destination、adoption ledger note を持ちます。Evidence Adoption Ledger fields は ID、adoption_status、source、source_role、claim、target_artifact、target_section、rationale、evidence_strength、evidence_path、adopter、reviewer、blocking、next_action を標準にします。標準 delegated draft evidence として task manifest hash、Permission Profile hash、session invocation hash、probe run id、session hash を要求しません。これらは historical evidence または明示された例外証跡としてだけ扱います。
 権限や採用可否の wildcard 指定は使いません。`*`、`grants.*`、`all` は invalid wildcard token として扱い、scope-local artifact direct-write の根拠にしてはなりません。
+
+Workbench から `artifact import chatgpt-output` で保存した external evidence は、delegated authoring role が作成した draft ではありません。Imported body は evidence-only のまま内容不変とし、delegated draft 用 frontmatter、provenance fields、diff guard を追加しません。この分離は existing delegated draft の frontmatter、provenance、diff guard、authority restriction を緩和するものではありません。
+
+このimportはapproved Workbenchの完成した単一Markdownをsource/bytes不変でcopyする明示操作です。`chatgpt-output` typed Artifact tokenを予約せず、templateから作る`new artifact`と共存します。File type/content classifier、automatic import、Workbench source削除は行いません。
 
 Sub-agent-created draft は `authority: accepted`、`adoption_status: adopted`、non-empty `reflected_to`、reviewer pass、phase completion、implementation readiness を自己主張してはなりません。`reflected_to` は実際に canonical artifact へ反映済みの対象だけを表し、予定先は `intended_targets` で表します。
 
@@ -163,10 +168,12 @@ Historical `iss-00126` task manifest / Permission Profile / probe / session arti
 2. 対象 artifact に対応する `docs/authoring/<scope>-<phase>.md` がある場合は最初に読む。
 3. 対象 scope の `workflow_*.md` と phase playbook を読む。
 4. 調査結果、仮説、選択肢、質問を必要に応じて `artifacts/` に分離する。raw / untyped capture は `blank`、人間への正式質問は一問一答の `interview`、事実調査は `research`、論点整理 / synthesis は `disc`、長期判断は `adr` を使う。formal question trigger と lightweight chat question の境界は `workflow_clarification.md` の bridge/reference detail を参照する。
-5. 対象 artifact を更新する。
-6. fresh `spec-reviewer` を起動し、対象 artifact と upstream artifact を review する。
-7. `fail` なら修正し、fresh `spec-reviewer` で再レビューする。
-8. `pass` なら `report.md` に gate evidence を残し、次 phase へ進む。
+5. ChatGPT output を受領した場合、main orchestrator が semantic completeness と output form を分類し、[workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md) の preservation checkpoint を実行する。保存、exception、または ZIP/tree route の必要証跡が成立するまで採否判断や canonical rewrite へ進まない。
+6. main orchestrator が Evidence Adoption Ledger に採否を記録する。
+7. 対象 artifact を更新する。
+8. fresh `spec-reviewer` を起動し、対象 artifact と upstream artifact を review する。
+9. `fail` なら修正し、fresh `spec-reviewer` で再レビューする。
+10. `pass` なら `report.md` に gate evidence を残し、次 phase へ進む。
 
 ## 要件ゲート（requirement gate）
 

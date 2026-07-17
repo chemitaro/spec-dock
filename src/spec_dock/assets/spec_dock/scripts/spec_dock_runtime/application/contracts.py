@@ -389,6 +389,149 @@ class WorktreeCommandError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class WorkbenchCopyRequest:
+    scope_id: str
+    target: str
+
+
+class WorkbenchCopyError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        side: str | None = None,
+        mutation_started: bool = False,
+    ) -> None:
+        self.code = code
+        self.side = side
+        self.mutation_started = mutation_started
+        super().__init__(message)
+
+
+class WorkbenchFilesystemError(RuntimeError):
+    """Content-free filesystem failure with honest mutation-boundary state."""
+
+    def __init__(self, *, mutation_started: bool) -> None:
+        self.mutation_started = mutation_started
+        super().__init__("workbench filesystem operation failed")
+
+
+BinaryArtifactCleanupState = Literal["not_created", "removed", "retained"]
+BinaryArtifactPublishWarning = Literal[
+    "create_lock_release_failed",
+    "directory_fsync_failed",
+    "destination_mismatch",
+    "destination_read_failed",
+    "temp_cleanup_retained",
+]
+
+
+@dataclass(frozen=True)
+class WorkbenchSourceGuardRequest:
+    repo_root: Path
+    specdock_dir: Path
+    scope_directories: tuple[Path, ...]
+    source_path: Path
+
+
+@dataclass(frozen=True)
+class GuardedWorkbenchSource:
+    source_path: Path
+    workbench_root: Path
+    device: int
+    inode: int
+    mode: int
+
+
+@dataclass(frozen=True)
+class BinaryArtifactPublishRequest:
+    source: WorkbenchSourceGuardRequest
+    destination_path: Path
+
+
+@dataclass(frozen=True)
+class BinaryArtifactPublishResult:
+    source_path: Path
+    destination_path: Path
+    source_sha256: str
+    stream_sha256: str
+    staged_sha256: str
+    destination_sha256: str
+    source_byte_count: int
+    stream_byte_count: int
+    staged_byte_count: int
+    destination_byte_count: int
+    source_inode: int
+    staged_inode: int
+    cleanup_state: BinaryArtifactCleanupState
+    warning_codes: tuple[BinaryArtifactPublishWarning, ...] = ()
+    committed: bool = True
+
+
+class BinaryArtifactPublishError(RuntimeError):
+    """Stable content-free failure raised before formal publication."""
+
+    def __init__(self, *, code: str, cleanup_state: BinaryArtifactCleanupState) -> None:
+        self.code = code
+        self.cleanup_state = cleanup_state
+        self.committed = False
+        super().__init__(f"binary artifact publication failed: {code}")
+
+
+ArtifactImportKind = Literal["chatgpt-output"]
+ArtifactStorageIdentity = Literal["blank"]
+
+
+@dataclass(frozen=True)
+class ArtifactImportRequest:
+    import_kind: ArtifactImportKind
+    scope_node_id: str
+    scope_kind: Literal["initiative", "epic", "issue"]
+    source_path: Path
+    title: str
+    slug: str | None
+
+
+@dataclass(frozen=True)
+class ArtifactImportResult:
+    import_kind: ArtifactImportKind
+    storage_identity: ArtifactStorageIdentity
+    artifact_id: str
+    scope_id: str
+    source_path: Path
+    destination_path: Path
+    sha256: str
+    byte_count: int
+    committed: bool
+    cleanup_state: BinaryArtifactCleanupState
+    warning_codes: tuple[BinaryArtifactPublishWarning, ...] = ()
+
+
+class ArtifactImportError(RuntimeError):
+    """Stable content-free failure for the public artifact import command."""
+
+    def __init__(self, *, code: str, cleanup_state: BinaryArtifactCleanupState) -> None:
+        self.code = code
+        self.cleanup_state = cleanup_state
+        self.committed = False
+        super().__init__(f"artifact import failed: {code}")
+
+
+@dataclass(frozen=True)
+class WorkbenchCopyResult:
+    scope_id: str
+    source_worktree: WorktreeRecordView
+    target_worktree: WorktreeRecordView
+    target_workbench_path: Path
+    experimental: bool = True
+    canonical: bool = False
+    disposable: bool = True
+    one_shot: bool = True
+    sync: bool = False
+
+
+@dataclass(frozen=True)
 class TargetRef:
     kind: str
     node_id: str | None
@@ -865,6 +1008,9 @@ class UseCases:
     sync: Callable[[SyncRequest], SyncCommandResult]
     check_deps: Callable[[CheckDepsRequest], DepsCheckResult]
     validate_tree: Callable[[ValidateTreeRequest], ValidationResult]
+    import_artifact: Callable[[ArtifactImportRequest], ArtifactImportResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("import_artifact is not configured")
+    )
     show_assurance: Callable[[ShowAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("show_assurance is not configured")
     )
@@ -912,6 +1058,9 @@ class UseCases:
     )
     worktree_remove: Callable[[WorktreeRemoveRequest], WorktreeRemoveResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("worktree_remove is not configured")
+    )
+    workbench_copy: Callable[[WorkbenchCopyRequest], WorkbenchCopyResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("workbench_copy is not configured")
     )
     repo_root: Path | None = None
     specdock_dir: Path | None = None

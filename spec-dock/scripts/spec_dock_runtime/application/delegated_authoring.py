@@ -856,19 +856,48 @@ def _file_states_for_entries(
 
 
 def _resolve_scope_dir(specdock_dir: Path, scope_id: str) -> Path | None:
-    meta_paths = sorted(specdock_dir.glob(f"initiatives/**/{scope_id}*/.meta.json"))
+    meta_paths = _iter_scope_meta_paths(specdock_dir / "initiatives")
     for meta_path in meta_paths:
         if _scope_meta_matches(meta_path, scope_id):
             return meta_path.parent
     active_issue = specdock_dir / "active" / "issue"
     if active_issue.exists():
         try:
-            resolved = active_issue.resolve()
+            target = active_issue.readlink() if active_issue.is_symlink() else active_issue
+            candidate = target if target.is_absolute() else active_issue.parent / target
         except OSError:
-            resolved = active_issue
+            candidate = active_issue
+        if _is_workbench_descendant(candidate, specdock_dir):
+            return None
+        resolved = candidate.resolve()
         if _scope_meta_matches(resolved / ".meta.json", scope_id):
             return resolved
     return None
+
+
+def _iter_scope_meta_paths(initiatives_root: Path) -> list[Path]:
+    matches: list[Path] = []
+    for current_root, child_dirnames, filenames in os.walk(initiatives_root, topdown=True):
+        child_dirnames[:] = sorted(name for name in child_dirnames if name != ".workbench")
+        if ".meta.json" in filenames:
+            matches.append(Path(current_root) / ".meta.json")
+    return sorted(matches, key=lambda path: path.as_posix())
+
+
+def _is_workbench_descendant(path: Path, specdock_dir: Path) -> bool:
+    lexical_path = path.absolute()
+    for root in (specdock_dir.absolute(), specdock_dir.resolve()):
+        try:
+            lexical_relative = lexical_path.relative_to(root)
+        except ValueError:
+            continue
+        if ".workbench" in lexical_relative.parts:
+            return True
+    try:
+        relative = path.resolve().relative_to(specdock_dir.resolve())
+    except (OSError, ValueError):
+        return False
+    return ".workbench" in relative.parts
 
 
 def _scope_meta_matches(meta_path: Path, scope_id: str) -> bool:
