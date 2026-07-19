@@ -4,7 +4,7 @@ ID: "init-00322"
 タイトル: "GPT 56 ChatGPT First Intelligence Architecture"
 状態: "draft | approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-17"
+最終更新: "2026-07-19"
 依存: ["requirement.md", "design.md", "plan.md"]
 ---
 
@@ -20,10 +20,11 @@ ID: "init-00322"
   - 改訂版`requirement.md`は回収済みファイルから完全コピーし、source／destination SHA-256一致を確認した。本文にP0/P1はなく、report evidence不足だけがP1として残ったため台帳を更新した。
   - 初回改訂版`design.md`のfresh review findingsは、同じGPT-5.6 Pro会話でcomplete-file revisionへ反映した。
   - 最終design V3とplanを完全コピーし、回収元／配置先SHA-256一致を確認した。Requirement／Design／Planのfresh reviewer gateはすべてPASSした。
+  - Humanの明示指示により、`20260719t135413z-init-00322-architecture-aware-execution-brief-complete-replacement.zip`からcanonical三文書を完全置換し、9件のArtifactを追加した。現在の三文書はfresh Planning Review前のcomplete replacement candidateである。
 - 次のマイルストーン:
-  - Humanが7 Epicの名称・境界・依存を承認した後、Epic Node／dependencyをmaterializeする。本依頼では正本差し替えとartifact配置までで止める。
+  - fresh Requirement／Design／Plan Reviewを順に通過した後、Humanが更新後の7 Epicの名称・境界・依存を承認する。Epic Node／dependencyのmaterializeはその承認まで行わない。
 - ブロッカー:
-  - なし。packは現行authoring-pack schemaと非互換のためbuilt-in reviewで`rejected`となったが、内容安全性と整合性は以下の受入証跡で独立に検査した。
+  - 今回のcomplete replacement candidateはfresh Requirement／Design／Plan Review未実行のため、review-passed、execution-ready、PR-ready、merge-ready、completedを主張できない。
 
 ## ChatGPT Planning Pack受入証跡
 
@@ -56,6 +57,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 |---|---|---|---|---|---|---|
 | EAL-001 | 採用（`adopted`） | GPT-5.6 Proとの議論および拡張版Planning Pack（`external-chatgpt-evidence`） | `requirement.md`、`design.md`、`plan.md`、`artifacts/` | Humanが既存`init-00322`の正本3文書をcomplete fileで差し替え、同梱artifactをInitiative配下へ配置するよう明示した。Codexは正本3文書の意味内容を再執筆しない。 | pack SHA-256、`CHECKSUMS.sha256`全件一致、`MANIFEST.json`、`artifacts/20260716t235120z-15-disc-enriched-artifact-set-internal-self-review.md` | 原本コピー後のSHA-256照合とfresh reviewer gate |
 | EAL-002 | 採用（`adopted`） | GPT-5.6 Pro complete-bundle revisionおよびdesign V3（`external-chatgpt-authoring`） | `requirement.md`、`design.md`、`plan.md` | 元Pack requirementと改訂designのfresh review findingsをpartial patchではなくcomplete fileへ反映した。Humanの完全ファイル差し替え指示をadoption sourceとし、Mainは回収済み各ファイルを意味変更せず`cp`する。 | ChatGPT conversation `6a54785a-93e8-83ee-97d2-d502c17f2567`、Oracle sessions `init-00322-complete-planning-bundle`／`init-00322-design-v2-recovery`／`init-00322-design-v3-recovery`、初回model evidence `requested=Pro GPT-5.6 Sol / resolved=GPT-5.6 Sol + Pro / verified=yes`、改訂文書SHA-256: requirement `7f376478a4c7aa0e2cbd36700c7e57e04cd59711e0a96c5bf424bce1a2b6569f`、design V3 `4254abb32fb32f37c7b800e48bf2e40fa48a5c4e78e5914801bfd7f8431afbc9`、plan `3f0bd00fc553888ec71b50b112571c6d7a93da933b556e454b42680ef43414f1` | design V3 fresh review後、planを完全コピー・レビュー |
+| EAL-003 | 採用候補（`partially_adopted`） | `20260719t135413z-init-00322-architecture-aware-execution-brief-complete-replacement.zip`（`external-chatgpt-evidence`） | `requirement.md`、`design.md`、`plan.md`、新規9 Artifact | Humanが対象branchへのcomplete-file replacementを明示指示したため、三文書を完全置換し、9 Artifactを同名追加した。Humanの直接承認により、意味を変えない16行の行末空白除去とPlantUML複数行ラベル9件の`\n`化だけを適用した。Artifact front matterの自己申告はcanonical authorityとせず、fresh三段Review完了まではcandidateとして扱う。 | package SHA-256 `53cf0ca4244ef64c9cdf344fac37dba0de6fac42e33311f5d355497ba6af8960`、source branch、baseline Git blob 4件一致、ZIP integrity pass、`CHECKSUMS.sha256`全件一致、`MANIFEST.json`、Internal Self-Review、PlantUML 1.2026.6 render検証 | Requirement、Design、Planの順でfresh Reviewを実行し、P0／P1がなければcurrent revisionの採用を確定する |
+| EAL-004 | 置換済み（`superseded`） | `20260719t114039z-init-00322-architecture-aware-execution-brief-planning-update.zip`と対応prompt | 最終canonical文書・Artifactへの採用なし | Humanが新complete replacement packageを唯一のauthoritative inputと指定したため、旧delta型package／promptは使用・merge・copy対象から除外した。 | 新packageの`CODEX-APPLY-PROMPT.md`とHumanの上書き指示 | 再参照しない。fresh ReviewはEAL-003のcomplete replacementだけを対象にする |
 
 ### Complete-bundle revisionの転送・保存証跡
 
@@ -84,6 +87,7 @@ ZIP内frontmatterの`authority: accepted`はsource claimであり、それ自体
 | ADR-07 | `adopted` | Plan-driven Delivery Topology / Human Merge Gate | Issue / Epic / PR deliveryとfinish semanticsの上位方針として採用 | `artifacts/20260716t123423z-07-adr-plan-driven-delivery-topology-and-human-merge-gate.md` |
 | ADR-08 | `adopted` | 最小永続状態とWorkbench / `report.md`境界 | 新しいWorkflow databaseを追加しない方針として採用 | `artifacts/20260716t123423z-08-adr-minimal-persistent-state-and-workbench-boundary.md` |
 | ADR-09 | `adopted` | 文書migrationなしの全Scope cutover | 既存Scope文書を一括変換せずWorkflow / Actorを切り替える方針として採用 | `artifacts/20260716t123423z-09-adr-global-workflow-cutover-without-document-migration.md` |
+| ADR-10 | `partially_adopted` | Architecture-Aware Execution Briefをfrozen subordinate contractとして扱う | Humanの明示指示に基づくcomplete replacement candidateとして採用。Artifact front matterの自己申告は採用根拠にせず、fresh三段Review完了後に確定する | `artifacts/20260719t135413z-05-adr-architecture-aware-execution-brief-as-frozen-subordinate-contract.md` |
 
 `adopted`は上記decisionの採用を表し、各ADRに記載された将来の`reflected_to`がすでに実装・文書反映済みであることや、reviewer pass / readiness / completionを意味しない。
 
