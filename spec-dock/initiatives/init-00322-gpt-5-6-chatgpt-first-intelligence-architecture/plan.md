@@ -97,6 +97,20 @@ C. Architecture-Aware Execution Brief
 - qualityが悪化するresource削減を採用しない。
 - ChatGPT latencyを含む総時間と品質tradeoffを明示する。
 
+### 4.4 Epic別metric responsibility
+
+各EpicのJIT Epic Planningは、下表のmetric責務をIssue Seed、計測時点、証拠形式、収集担当、failure時のroutingへ具体化する。Epic 7はInitiative-levelの最終評価とclosureを所有するが、Epic 1〜6の計測実装、baseline採取、証拠作成を代替しない。
+
+| Epic | JIT Planningで具体化するmetric責務 |
+|---|---|
+| Epic 1 | M-001〜M-013のbaseline／telemetry feasibility、M-008を支えるadapter／Prompt／field変更容易性の計測可能性 |
+| Epic 2 | M-001、M-002、M-003、M-007のPlanning経路に関する介入、handoff量、旧認知route除去、reliability |
+| Epic 3 | M-003、M-007のReview経路に関する旧Reviewer依存除去、Protocol reliability、evidence不足時のfail-closed |
+| Epic 4 | M-002、M-003、M-007、M-009〜M-013のBrief品質、実装収束、Codex resource、汎用性、総Delivery効率の実測 |
+| Epic 5 | M-004、M-007、M-013のHuman Gate integrity、Delivery reliability、PR／mergeまでの総時間 |
+| Epic 6 | M-005、M-006、M-007のminimal state、provider／installed／dogfood parity、cutover／rollback reliability |
+| Epic 7 | M-001〜M-013のInitiative-level集計、M-008 changeability drill、品質・resource・latencyの継続判断 |
+
 ## 5. マイルストーン
 
 | Milestone | 成果 | 完了条件 |
@@ -111,15 +125,33 @@ C. Architecture-Aware Execution Brief
 
 ## 6. Epicポートフォリオ
 
-| # | Epic | 目的 | Requirement coverage | 依存 |
-|---:|---|---|---|---|
-| 1 | **Delegation Foundation, Asset Inventory, and Thin ChatGPT Adapter** | inventory、共通authority、薄いOracle／GitHub boundary、Execution Brief command skeleton、baselineを確立する。 | REQ-001, REQ-004, REQ-005, REQ-018, REQ-022 | なし |
-| 2 | **Integrated Planning Bundle and Planning Workflow Cutover** | Initiative／Epic／Issue Planningをcomplete-file生成、セルフレビュー、canonical placement、Formal Planning Reviewへ切り替える。 | REQ-002, REQ-003, REQ-018 | Epic 1 |
-| 3 | **Contract-Driven Review Protocols and Targeted Review** | Formal／Targeted Reviewを契約駆動のScope、Perspective、structured resultへ統一する。 | REQ-006〜REQ-009, REQ-018 | Epic 1 |
-| 4 | **Architecture-Aware Execution Brief, Repair Batch, and Executor-Centered Issue Execution** | 実装前の高深度分析をfrozen Briefへ変換し、Formal blockerはRepair Batchへ変換し、一つのcustom ExecutorでIssueを実行する。 | REQ-010〜REQ-013, REQ-016, REQ-018, REQ-020〜REQ-024 | Epic 2, Epic 3 |
-| 5 | **Plan-Driven Epic and PR Delivery** | Epic Delivery Topology、Issue／Epic Review、PR repair、Human Merge Gate、finish semanticsを実装する。 | REQ-014, REQ-015, REQ-018 | Epic 2, Epic 3, Epic 4 |
-| 6 | **Global Cutover, Asset Parity, and Legacy Surface Removal** | 新surface完成後、旧surfaceを除去し、全ScopeをvNextへcutoverする。 | REQ-016〜REQ-018 | Epic 2〜Epic 5 |
-| 7 | **End-to-End Dogfood, Final Quality, and Release** | 全Workflowをdogfoodし、全REQ／AC、Execution Brief comparative eval、metrics、統合品質を検証する。 | REQ-001〜REQ-025 | Epic 1〜Epic 6 |
+| # | Epic | 目的 | Requirement coverage | 主実装責任AC | 依存 |
+|---:|---|---|---|---|---|
+| 1 | **Delegation Foundation, Asset Inventory, and Thin ChatGPT Adapter** | inventory、共通authority、薄いOracle／GitHub boundary、Execution Brief command skeleton、baselineを確立する。 | REQ-001, REQ-004, REQ-005, REQ-018, REQ-022 | AC-002, AC-004, AC-009 | なし |
+| 2 | **Integrated Planning Bundle and Planning Workflow Cutover** | Initiative／Epic／Issue Planningをcomplete-file生成、セルフレビュー、canonical placement、Formal Planning Reviewへ切り替える。 | REQ-002, REQ-003, REQ-018 | AC-001, AC-003 | Epic 1 |
+| 3 | **Contract-Driven Review Protocols and Targeted Review** | Formal／Targeted Reviewを契約駆動のScope、Perspective、structured resultへ統一する。 | REQ-006〜REQ-009, REQ-018 | AC-005〜AC-007 | Epic 1 |
+| 4 | **Architecture-Aware Execution Brief, Repair Batch, and Executor-Centered Issue Execution** | 実装前の高深度分析をfrozen Briefへ変換し、Formal blockerはRepair Batchへ変換し、一つのcustom ExecutorでIssueを実行する。 | REQ-010〜REQ-013, REQ-016, REQ-018, REQ-020〜REQ-024 | AC-008, AC-010, AC-011, AC-019〜AC-023 | Epic 2, Epic 3 |
+| 5 | **Plan-Driven Epic and PR Delivery** | Epic Delivery Topology、Issue／Epic Review、PR repair、Human Merge Gate、finish semanticsを実装する。 | REQ-014, REQ-015, REQ-018 | AC-012〜AC-015 | Epic 2, Epic 3, Epic 4 |
+| 6 | **Global Cutover, Asset Parity, and Legacy Surface Removal** | 新surface完成後、旧surfaceを除去し、全ScopeをvNextへcutoverする。 | REQ-016〜REQ-018 | AC-016, AC-017 | Epic 2〜Epic 5 |
+| 7 | **End-to-End Dogfood, Final Quality, and Release** | 全Workflowをdogfoodし、全REQ／AC、Execution Brief comparative eval、metrics、統合品質を検証する。 | REQ-001〜REQ-025 | AC-018, AC-024, AC-025 | Epic 1〜Epic 6 |
+
+### 6.1 AC責任モデル
+
+- **主実装責任**: 当該ACを成立させるcapability、Workflow、test、documentation、migration／cutover処理を、そのEpicのmerge boundary内で実装し、Epic Deliveryへ証拠を渡す責任。
+- **共同実装／証拠提供**: 主実装責任EpicがACを成立させるために必要なintegration surface、dogfood結果、parity結果、review結果、Git／GitHub evidenceを提供する責任。主実装責任の移転ではない。
+- **Initiative-level final verification／closure**: Epic 7が、Epic 1〜6のHuman merge済み成果と自身のdogfood／evaluationを用いてAC-001〜AC-025を最終確認し、Human merge後のcompletion反映までを統合する責任。証拠不足や未実装が見つかった場合は元の主実装責任Epicへ戻し、Epic 7が未承認の機能実装や責任再配分を黙って引き受けない。
+
+### 6.2 Epic別AC handoff summary
+
+| Epic | 主実装責任AC | 共同実装／証拠提供AC | Initiative-level final verification／closure |
+|---|---|---|---|
+| Epic 1 | AC-002, AC-004, AC-009 | AC-001, AC-003, AC-016, AC-018, AC-019, AC-021, AC-023, AC-025 | Epic 7へ証拠handoff。final closureは所有しない |
+| Epic 2 | AC-001, AC-003 | AC-002, AC-004, AC-005, AC-016, AC-017, AC-018, AC-022 | Epic 7へ証拠handoff。final closureは所有しない |
+| Epic 3 | AC-005, AC-006, AC-007 | AC-001, AC-002, AC-004, AC-008, AC-011〜AC-014, AC-016, AC-018 | Epic 7へ証拠handoff。final closureは所有しない |
+| Epic 4 | AC-008, AC-010, AC-011, AC-019〜AC-023 | AC-001, AC-002, AC-004, AC-005, AC-009, AC-012, AC-013, AC-016〜AC-018, AC-024, AC-025 | Epic 7へ証拠handoff。final closureは所有しない |
+| Epic 5 | AC-012〜AC-015 | AC-001, AC-002, AC-004, AC-005, AC-009, AC-011, AC-016, AC-018 | Epic 7へ証拠handoff。final closureは所有しない |
+| Epic 6 | AC-016, AC-017 | AC-001, AC-002, AC-009, AC-010, AC-018 | Epic 7へ証拠handoff。final closureは所有しない |
+| Epic 7 | AC-018, AC-024, AC-025 | AC-001〜AC-025のHuman merge済み証拠を統合し、不足を主実装責任Epicへ返す | AC-001〜AC-025の最終検証とHuman merge後のInitiative closure |
 
 ## 7. Epic詳細
 
@@ -128,6 +160,16 @@ C. Architecture-Aware Execution Brief
 - 推奨slug: `delegation-foundation-asset-inventory-and-thin-chatgpt-adapter`
 - 目的:
   - 全vNext Epicが依存するinventory、authority境界、薄いCLI／Oracle／GitHub binding、metrics baseline、Execution Brief command skeletonを確立する。
+- Requirement coverage:
+  - REQ-001, REQ-004, REQ-005, REQ-018, REQ-022。
+- Acceptance Criteria responsibility:
+  - 主実装責任: AC-002, AC-004, AC-009。
+  - 共同実装／証拠提供: AC-001, AC-003, AC-016, AC-018, AC-019, AC-021, AC-023, AC-025。
+  - Initiative-level final verification／closure: Epic 7へ証拠をhandoffし、Epic 1はfinal closureを所有しない。
+- 依存:
+  - なし。
+- Metric responsibility:
+  - M-001〜M-013のbaseline／telemetry feasibilityと、M-008を支える変更容易性の計測可能性をJIT Epic Planningで具体化する。
 - 主成果物:
   - maintained Skill／Agent／Workflow／Template／Script inventory。
   - `spec-dock-chatgpt` application boundary。
@@ -145,9 +187,8 @@ C. Architecture-Aware Execution Brief
   - exact GitHub branch／HEAD smoke。
   - deterministic anchorsがCodex意味分析なしで生成できる。
   - baseline対象と計測方法が定義される。
-- Delivery boundary:
+- Delivery Boundary:
   - 独立merge boundary。Human merge後に完了反映。
-
 
 ### Epic 2: Integrated Planning Bundle and Planning Workflow Cutover
 
@@ -156,8 +197,14 @@ C. Architecture-Aware Execution Brief
   - Initiative／Epic／Issue Planningを、complete-file生成、セルフレビュー、content-preserving placement、Formal Planning Review、Human decomposition gateへ切り替える。
 - Requirement coverage:
   - REQ-002, REQ-003, REQ-018。
+- Acceptance Criteria responsibility:
+  - 主実装責任: AC-001, AC-003。
+  - 共同実装／証拠提供: AC-002, AC-004, AC-005, AC-016, AC-017, AC-018, AC-022。
+  - Initiative-level final verification／closure: Epic 7へ証拠をhandoffし、Epic 2はfinal closureを所有しない。
 - 依存:
   - Epic 1。
+- Metric responsibility:
+  - M-001、M-002、M-003、M-007のPlanning経路に関する介入、handoff量、旧認知route除去、reliabilityをJIT Epic Planningで具体化する。
 - 主成果物:
   1. `workflow_planning.md`。
   2. vNext Initiative／Epic／Issue Planning Skills。
@@ -175,9 +222,8 @@ C. Architecture-Aware Execution Brief
   - P0／P1でcomplete Bundleをrevisionし、P2／P3だけでは文書を変更しない。
   - Human approval後だけ子Nodeを作成する。
   - evidence front matterだけでadoptionを成立させない。
-- Delivery boundary:
+- Delivery Boundary:
   - 独立merge boundary。Human merge後にEpic完了を反映する。
-
 
 ### Epic 3: Contract-Driven Review Protocols and Targeted Review
 
@@ -186,8 +232,14 @@ C. Architecture-Aware Execution Brief
   - Planning／Checkpoint／Issue Delivery／Epic DeliveryのFormal ReviewとTargeted Reviewを、契約駆動のScope、Temporal Window、Perspective、structured resultへ統一する。
 - Requirement coverage:
   - REQ-006, REQ-007, REQ-008, REQ-009, REQ-018。
+- Acceptance Criteria responsibility:
+  - 主実装責任: AC-005, AC-006, AC-007。
+  - 共同実装／証拠提供: AC-001, AC-002, AC-004, AC-008, AC-011〜AC-014, AC-016, AC-018。
+  - Initiative-level final verification／closure: Epic 7へ証拠をhandoffし、Epic 3はfinal closureを所有しない。
 - 依存:
   - Epic 1。
+- Metric responsibility:
+  - M-003、M-007の旧Reviewer依存除去、Protocol reliability、evidence不足時のfail-closedをJIT Epic Planningで具体化する。
 - 主成果物:
   1. `workflow_review.md`。
   2. Planning／Checkpoint／Issue Delivery／Epic Delivery／Targeted Review Prompt。
@@ -205,7 +257,7 @@ C. Architecture-Aware Execution Brief
   - fresh Reviewへ前回finding、Authorの弁明、期待verdictを混入しない。
   - Targeted Reviewがadvisoryでありrepository mutationを発生させない。
   - `repository-conventions`が規約なしでN/Aを返し、規約を捏造しない。
-- Delivery boundary:
+- Delivery Boundary:
   - 独立merge boundary。Human merge後にEpic完了を反映する。
 
 ### Epic 4: Architecture-Aware Execution Brief, Repair Batch, and Executor-Centered Issue Execution
@@ -217,8 +269,14 @@ C. Architecture-Aware Execution Brief
   - 一つのcustom ExecutorとExecution Tranche／MilestoneでIssueを実行する。
 - Requirement coverage:
   - REQ-010〜REQ-013, REQ-016, REQ-018, REQ-020〜REQ-024。
+- Acceptance Criteria responsibility:
+  - 主実装責任: AC-008, AC-010, AC-011, AC-019〜AC-023。
+  - 共同実装／証拠提供: AC-001, AC-002, AC-004, AC-005, AC-009, AC-012, AC-013, AC-016〜AC-018, AC-024, AC-025。
+  - Initiative-level final verification／closure: Epic 7へ証拠をhandoffし、Epic 4はfinal closureを所有しない。
 - 依存:
   - Epic 2, Epic 3。
+- Metric responsibility:
+  - M-002、M-003、M-007、M-009〜M-013のBrief品質、実装収束、Codex resource、汎用性、総Delivery効率をJIT Epic Planningで具体化する。
 - 主成果物:
   1. `workflow_execution_brief.md`。
   2. Architecture-Aware Execution Brief Promptとoutput contract。
@@ -256,9 +314,8 @@ C. Architecture-Aware Execution Brief
   - Executorとintegration CLIがcommit／pushしない。
   - Mainがdiff／verification後に明示commit／pushする。
   - Issue Handoff ExitをE2Eで完了する。
-- Delivery boundary:
+- Delivery Boundary:
   - 独立merge boundary。Human merge後に完了反映。
-
 
 ### Epic 5: Plan-Driven Epic and PR Delivery
 
@@ -267,8 +324,14 @@ C. Architecture-Aware Execution Brief
   - Epic Delivery Topology、Issue／Epic Review、Delivery Owner、PR repair、Human Merge Gate、merge確認後のfinish semanticsを実装する。
 - Requirement coverage:
   - REQ-014, REQ-015, REQ-018。
+- Acceptance Criteria responsibility:
+  - 主実装責任: AC-012〜AC-015。
+  - 共同実装／証拠提供: AC-001, AC-002, AC-004, AC-005, AC-009, AC-011, AC-016, AC-018。
+  - Initiative-level final verification／closure: Epic 7へ証拠をhandoffし、Epic 5はfinal closureを所有しない。
 - 依存:
   - Epic 2, Epic 3, Epic 4。
+- Metric responsibility:
+  - M-004、M-007、M-013のHuman Gate integrity、Delivery reliability、PR／mergeまでの総時間をJIT Epic Planningで具体化する。
 - 主成果物:
   1. Delivery Topologyを扱うEpic Planning／Epic Execution。
   2. Issue Exit ContractのHandoff／Merge経路。
@@ -286,9 +349,8 @@ C. Architecture-Aware Execution Brief
   - P2／P3だけでbranchを変更しない。
   - 修復後のnew HEADで必要なgateを再観測する。
   - Human merge前にfinishせず、merge後にreviewed headを確認する。
-- Delivery boundary:
+- Delivery Boundary:
   - 独立merge boundary。Human merge後にEpic完了を反映する。
-
 
 ### Epic 6: Global Cutover, Asset Parity, and Legacy Surface Removal
 
@@ -297,8 +359,18 @@ C. Architecture-Aware Execution Brief
   - vNext replacement surface完成後に旧Workflow／Skill／Agent／Document／Template／Scriptを除去し、全Scopeの公式Workflow authorityをvNextへ切り替える。
 - Requirement coverage:
   - REQ-016, REQ-017, REQ-018。
+- Acceptance Criteria responsibility:
+  - 主実装責任: AC-016, AC-017。
+  - 共同実装／証拠提供: AC-001, AC-002, AC-009, AC-010, AC-018。
+  - Initiative-level final verification／closure: Epic 7へ証拠をhandoffし、Epic 6はfinal closureを所有しない。
 - 依存:
   - Epic 2, Epic 3, Epic 4, Epic 5。
+- Metric responsibility:
+  - M-005、M-006、M-007のminimal state、provider／installed／dogfood parity、cutover／rollback reliabilityをJIT Epic Planningで具体化する。
+- JIT Epic Planningで具体化する既知follow-up:
+  - cutover前後のrollback rehearsalを実行し、手順と観測証拠を残す。
+  - provider／installed／dogfoodと公開Workflowが同一のvNext authority sourceを参照し、mixed authorityがないことを確認する。
+  - abort後にknown-good boundaryへ復元できることを検証し、closed Scopeを書き換えず、旧／新authorityを併存させない。
 - 主成果物:
   1. provider／installed／dogfood parity。
   2. 旧authoring lane、manual planning、local reviewers、custom Explorer、Repository Analyst、Docs Writerの削除。
@@ -318,13 +390,24 @@ C. Architecture-Aware Execution Brief
   - 必要契約が不足する場合だけ局所Planning refreshを行う。
   - closed Scopeが変更されない。
   - cutover abort／rollbackがmixed authorityを作らずに実行できる。
-- Delivery boundary:
+- Delivery Boundary:
   - 独立merge boundary。Human merge後にEpic完了を反映する。
 
 ### Epic 7: End-to-End Dogfood, Final Quality, and Release
 
+- 推奨slug: `end-to-end-dogfood-final-quality-and-release`
+- 目的:
+  - Epic 1〜6のHuman merge済みcapabilityを代表Workflowで統合dogfoodし、全REQ／AC、Architecture-Aware Execution Brief比較、metrics、最新gate、release handoffをInitiative-levelで最終検証する。
 - Requirement coverage:
   - REQ-001〜REQ-025。
+- Acceptance Criteria responsibility:
+  - 主実装責任: AC-018, AC-024, AC-025。
+  - Initiative-level final verification: AC-001〜AC-025について、各主実装責任EpicのHuman merge済み成果と証拠を確認し、不足、矛盾、stale evidenceを元の責任Epicへ返す。
+  - Initiative-level closure: Epic 7のHuman merge後に最終reviewed headと全completion evidenceを確認し、Initiative completionを`report.md`へ反映する。final verificationはEpic 1〜6の実装責任を移転しない。
+- 依存:
+  - Epic 1〜Epic 6。原則として全依存EpicがHuman merge済みであり、各EpicのAC handoff evidenceが利用可能であること。
+- Metric responsibility:
+  - M-001〜M-013をInitiative-levelで集計し、M-008 changeability drillと品質・resource・latencyの継続判断をJIT Epic Planningで具体化する。
 - 主成果物:
   - Initiative／Epic／Issue Planning dogfood。
   - Formal Review／Repair／Issue／Epic／PR Delivery dogfood。
@@ -333,14 +416,25 @@ C. Architecture-Aware Execution Brief
   - Evidence quality／implementation convergence／Codex resource／wall-clock report。
   - M-001〜M-013 evaluation report。
   - changeability drill。
+  - AC-001〜AC-025 final verification matrixとowner別evidence disposition。
   - Initiative Final Completion Summary、release delivery。
+- 対象外:
+  - 承認済みREQ／ACのclosureに不要な新規feature workstream、product capability、framework固有機能の追加。
+  - Human承認を伴わないEpicの追加、分割、統合、責任再配分その他のre-slicing。必要な場合は§13のcontrolled re-slicingへ戻す。
+  - Epic 1〜6の未完実装や証拠不足を、Epic 7のfinal verification名目で黙って吸収すること。
+  - 自動merge、Human merge前のEpic／Initiative finish、merge-preparedをcompletionとして扱うこと。
 - 完了条件:
-  - AC-001〜AC-025の証拠が揃う。
+  - AC-001〜AC-025のowner別証拠が揃い、主実装責任とfinal verification／closureの分離が維持される。
   - M-001〜M-013が評価される。
   - architecture-neutralityとnon-inventionが確認される。
   - quality、resource、latencyのtradeoffに基づく継続判断が記録される。
   - latest HEADでChatGPT Delivery Review、CI、GitHub Codex PR Reviewがterminal。
   - merge-preparedでHuman Gateへ停止し、Human merge後にInitiative完了条件を確認する。
+- Delivery Boundary:
+  - Epic 7は独立したmerge boundaryとし、approved Epic 7 Scope内のdogfood、evaluation、final-quality evidence、および既存契約を満たすためのbounded repairだけを含める。新規feature workstreamや未承認re-slicingを混在させない。
+  - latest HEADのrequired gateとAC evidenceが揃った時点で`merge-prepared`に停止し、Main、Executor、ChatGPT、Runtimeはmergeを実行しない。
+  - mergeはHumanだけが行う。
+  - Human merge後、Mainがmerged headと最終reviewed headの整合、required gate、AC-001〜AC-025 evidence、M-001〜M-013評価を再確認し、Epic 7およびInitiativeのcompletionを`report.md`へ反映する。merge前にはcompletionを反映しない。
 
 ## 8. 依存DAGと並列化
 
@@ -428,11 +522,35 @@ E1..E6 -> E7
 | REQ-020〜REQ-024 | Epic 1, Epic 4, Epic 7 |
 | REQ-025 | Epic 7 |
 
-| Acceptance Criteria | 主なEpic |
-|---|---|
-| AC-001〜AC-018 | Epic 1〜Epic 7（vNext基盤全体） |
-| AC-019〜AC-023 | Epic 1, Epic 4 |
-| AC-024〜AC-025 | Epic 7 |
+AC responsibilityは§6.1の責任モデルに従う。`主実装責任Epic`はcapabilityとEpic-level evidenceを成立させ、`共同実装／証拠提供Epic`は必要なintegration evidenceを提供する。`Initiative-level final verification／closure owner`であるEpic 7は全ACを再検証するが、主実装責任を引き取らない。
+
+| Acceptance Criteria | Canonical acceptance condition | 主実装責任Epic | 共同実装／証拠提供Epic | Initiative-level final verification／closure owner |
+|---|---|---|---|---|
+| AC-001 | `init-00322`の三文書が相互に矛盾せず、REQ-001〜REQ-025と7 Epicのtraceabilityを持つ。 | Epic 2 | Epic 1, Epic 3〜Epic 6 | Epic 7 |
+| AC-002 | Actor responsibilityとHuman GateがPlanning、Review、Execution Brief、Repair、Execution、Deliveryで一貫し、ChatGPT evidenceの自己申告だけでauthorityが成立しない。 | Epic 1 | Epic 2〜Epic 6 | Epic 7 |
+| AC-003 | Initiative／Epic／Issue Planningが完全Bundle生成、セルフレビュー、内容不変配置、必要なHuman分割承認を実行できる。 | Epic 2 | Epic 1 | Epic 7 |
+| AC-004 | ChatGPT連携境界がGitHub exact repository／branch／HEADへfail closedでbindされ、default branchまたはtracked file添付へ黙ってfallbackしない。 | Epic 1 | Epic 2〜Epic 5 | Epic 7 |
+| AC-005 | Planning、Checkpoint、Issue Delivery、Epic DeliveryのReviewがP0／P1、P2／P3、証拠不足を意図したsemanticsで扱う。 | Epic 3 | Epic 2, Epic 4, Epic 5 | Epic 7 |
+| AC-006 | `repository-conventions`が規約あり／なしの双方で動作し、未定義規約を捏造しない。 | Epic 3 | — | Epic 7 |
+| AC-007 | Targeted Reviewが対象とPerspectiveを受け、advisory結果だけを返し、Formal Gateやrepository mutationを発生させない。 | Epic 3 | — | Epic 7 |
+| AC-008 | Repair BatchがSource HEADへbindされ、Mainの採用後にfreezeされ、materialな契約変更をPlanningへ返せる。 | Epic 4 | Epic 3 | Epic 7 |
+| AC-009 | Executor、`spec-dock-chatgpt`、隠れたautomationがGit transactionを行わず、Mainが定義済みtransitionで明示的にcommit／pushし、Humanだけがmergeする。 | Epic 1 | Epic 4〜Epic 6 | Epic 7 |
+| AC-010 | 主要write Agentがcustom Executor一つへ統合され、不要なWriter／Reviewer／Analyzer経路がmaintained surfaceから除去される。 | Epic 4 | Epic 6 | Epic 7 |
+| AC-011 | Issue ExecutionがExecution Tranche、Architecture-Aware Execution Brief、Checkpoint、Repair、Issue Delivery、Issue Exit ContractをE2Eで処理できる。 | Epic 4 | Epic 3, Epic 5 | Epic 7 |
+| AC-012 | Epic DeliveryがIssue ReviewとEpic Reviewを区別し、Delivery Ownerとintegration verificationを用いてPR Deliveryへ進める。 | Epic 5 | Epic 3, Epic 4 | Epic 7 |
+| AC-013 | PR DeliveryがP0／P1またはrequired CI failureを修復し、新HEADで必要なgateを再観測してmerge-preparedで停止する。 | Epic 5 | Epic 3, Epic 4 | Epic 7 |
+| AC-014 | P2／P3だけではbranch mutation、再CI、再Reviewを行わない。 | Epic 5 | Epic 3 | Epic 7 |
+| AC-015 | Human merge前にMerge Exitの`issue finish`／`epic finish`を行わず、merge後に最終reviewed headを確認する。 | Epic 5 | — | Epic 7 |
+| AC-016 | provider、installed、dogfoodでSkill／Agent／Workflow／Template／Scriptの責務parityが確認され、旧必須surfaceが残っていない。 | Epic 6 | Epic 1〜Epic 5 | Epic 7 |
+| AC-017 | 既存open Scopeが文書migrationなしでvNext Workflowへ入り、不足契約だけを局所Planning refreshできる。 | Epic 6 | Epic 2, Epic 4 | Epic 7 |
+| AC-018 | 代表dogfoodとInitiative-level final qualityが完了条件を満たし、各Epicが独立したmerge boundaryでHuman mergeまで完了する。 | Epic 7 | Epic 1〜Epic 6 | Epic 7 |
+| AC-019 | 非機械的な代表Milestoneで、ChatGPTがexact HEADから関連Artifactとrepository evidenceを横断調査し、目的、現状、適用Concern、テスト戦略、実装戦略、停止条件を含むBriefを生成する。 | Epic 4 | Epic 1 | Epic 7 |
+| AC-020 | DDD／イベント駆動を含むUnitでは該当Concernを選択し、CLI／build／documentation等のUnitでは非該当Concernを強制せず、存在しないdomain／event概念を捏造しない。 | Epic 4 | — | Epic 7 |
+| AC-021 | `ready` BriefだけがWorkbench candidateからIssue Artifactへ昇格・freezeされ、`planning-gap`／`insufficient-evidence`ではExecutorを開始しない。 | Epic 4 | Epic 1 | Epic 7 |
+| AC-022 | accepted Briefが`plan.md`を変更せず、特定Execution Unitのsubordinate contractとしてExecutorへ渡され、Briefと対応実装が同一candidate commitに含まれる。 | Epic 4 | Epic 2 | Epic 7 |
+| AC-023 | ChatGPTが関連Artifactを意味的に選択し、Codex／wrapperは決定的なnavigation anchorsだけを提供する。Mainはraw Artifactを再分析せず、binding、status、evidence、scopeを確認する。 | Epic 4 | Epic 1 | Epic 7 |
+| AC-024 | Briefなし、汎用Brief、Architecture-Aware Briefを代表Unitで比較し、Architecture-Aware BriefがEvidence completeness、test strategy、first-pass convergence、または手戻りで改善し、品質を悪化させない。 | Epic 7 | Epic 4 | Epic 7 |
+| AC-025 | Codex tokenまたはproxyとしてのtool call、探索回数、failure cycle、handoff量の少なくとも一つが改善し、改善しない場合も品質効果と総遅延を含む継続判断が記録される。 | Epic 7 | Epic 1, Epic 4 | Epic 7 |
 
 ## 11. Epic materialization handoff
 
@@ -454,13 +572,20 @@ Dependency edgeは名前と意味で作成し、永続Seed IDやmapperを導入�
 
 - Initiative三文書。
 - Human／`report.md` dispositionが確認できる関連ADR evidence。
-- Epicの目的、Scope、Non-goal、Requirement／AC coverage。
+- Epicの目的、Scope、Non-goal、Requirement coverage。
+- §6.1と§10に基づく主実装責任AC、共同実装／証拠提供AC、Initiative-level final verification／closure owner。
+- 各主実装責任ACについて、JIT Epic PlanningでIssue Seed、実装surface、verification、evidence destination、Epic Delivery判定を具体化する。
+- 共同実装／証拠提供ACについて、handoff先、必要証拠、stale判定、主実装責任Epicへ戻す条件を具体化する。
 - 依存EpicとHuman merge状態。
 - 現行repository inventory／影響surface。
 - 必須Human Gate。
-- Epic completion criteriaとDelivery boundary。
-- metricsへの責務。
+- Epic completion criteriaとDelivery Boundary。
+- §4.4に基づくmetric責務、baseline、計測時点、証拠形式。
 - Epic 4にはArchitecture-Aware Execution BriefのInterview、Discussion、Research、ADR。
+- Epic 6にはrollback rehearsal、authority single-source確認、known-good boundary restoration verification。
+- Epic 7にはEpic 1〜6のHuman merge済みAC evidence matrix、未充足ACを元の主実装責任Epicへ戻すrouting、merge-prepared停止、Human merge、post-merge completion反映手順。
+
+Epic handoffで`Epic 7が最終確認する`ことだけを記載して主実装責任を省略してはならない。Epic 7のfinal verification／closureは、Epic 1〜6の実装、repair、evidence作成を代替しない。
 
 ## 13. Controlled re-slicing
 
@@ -535,7 +660,8 @@ Initiativeの実装は、次の条件を満たした後に開始する。
 2. Humanが7 Epicの名称、責任境界、依存DAG、Delivery Boundaryを承認している。
 3. MainがEpic Nodeとdependencyを作成し、`validate`／`sync`が成功している。
 4. Epic 1のJIT Planningに、asset inventory、thin adapter、exact GitHub binding、Execution Brief command skeleton、baseline／telemetry feasibilityを含める。
-5. 各後続Epicは依存EpicのHuman merge後にJIT Planningを開始し、Issue Seed、Review Topology、Delivery Topology、Final Quality／Delivery Issueを具体化する。
-6. Epic 4のdogfoodでは、Briefなし、generic Brief、Architecture-Aware Execution Briefを比較できる代表Execution Unitを選ぶ。
-7. Epic 6のglobal cutoverは、Epic 1〜5のreplacement surface、parity、replay、abort／rollback条件が揃うまで実行しない。
-8. Epic 7は全Epicを統合し、全REQ／AC、M-001〜M-013、dual-review、changeability、Initiative Final Completion Summaryを評価する。
+5. 各EpicのJIT Planningは、§6.1、§6.2、§10の主実装責任AC／共同実装・証拠提供ACと、§4.4のmetric責務をIssue Seed、verification、evidence handoffへ具体化する。
+6. 各後続Epicは依存EpicのHuman merge後にJIT Planningを開始し、Issue Seed、Review Topology、Delivery Topology、Final Quality／Delivery Issueを具体化する。
+7. Epic 4のdogfoodでは、Briefなし、generic Brief、Architecture-Aware Execution Briefを比較できる代表Execution Unitを選ぶ。
+8. Epic 6のglobal cutoverは、Epic 1〜5のreplacement surface、parity、no-migration replay、rollback rehearsal、authority single-source確認、known-good boundary restoration verificationが揃うまで実行しない。
+9. Epic 7はEpic 1〜6のHuman merge済み成果を統合し、全REQ／AC、M-001〜M-013、dual-review、changeability、Initiative Final Completion Summaryを評価する。新規feature workstreamまたは未承認re-slicingが必要な場合は開始せず、§13とHuman Gateへ戻る。
