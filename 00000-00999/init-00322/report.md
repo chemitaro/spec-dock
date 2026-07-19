@@ -109,6 +109,14 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | 設計（design） | V2 SHA `44cb7e5001f2a9ceb8c90f45ec26b958807549d9b863aff4a17e2cbd874acba4`のlifecycle findingをV3 SHA `4254abb32fb32f37c7b800e48bf2e40fa48a5c4e78e5914801bfd7f8431afbc9`へ反映。size `30498` bytes、gzip／UTF-8検査pass、`cp`後のsource／destination SHA一致 | Handoff Exitはcontrol／evidenceをEpicへ返すだけでfinishせず、Merge ExitだけがHuman mergeとreviewed head確認後にfinishするよう明確化。requirement再open不要 | 初回改訂designとV2を`superseded`とし、design V3を完全コピーで採用 | `pass` at `2026-07-17T13:20:17+0900 JST`。fresh reviewer `/root/review_design_v3_fresh`、target SHA `4254abb32fb32f37c7b800e48bf2e40fa48a5c4e78e5914801bfd7f8431afbc9`、P0/P1なし | いいえ | planへ昇格 |
 | 計画（plan） | 改訂版SHA `3f0bd00fc553888ec71b50b112571c6d7a93da933b556e454b42680ef43414f1`、size `27527` bytes、gzip／UTF-8検査pass、`cp`後のsource／destination SHA一致。requirement／design fresh pass済み | open questionなし | complete-fileとして完全コピーで採用 | `pass` at `2026-07-17T13:23:16+0900 JST`。fresh reviewer `/root/review_plan_v1_fresh`、target SHA `3f0bd00fc553888ec71b50b112571c6d7a93da933b556e454b42680ef43414f1`、P0/P1なし。P2/P3: bootstrap textとline-item traceは非ブロッキング | いいえ | Humanの7 Epic承認待ち。Node materializationは本依頼の対象外 |
 
+### Complete replacement fresh review gate（2026-07-19）
+
+| フェーズ | 対象revision | fresh reviewer | verdict | findings | blocking | 次アクション |
+|---|---|---|---|---|---|---|
+| requirement | commit `b58f74c7a7ec6cef4e8f915cc9a2ab6e5ffcaef2` | `/root/review_requirement_b58f74c7` | `pass` at `2026-07-19T14:44:57Z` | P0=0、P1=0。P2=1: `20260719t135413z-06-disc-full-bundle-traceability.md`のAC-023要約に非blocking不一致。P2だけを理由にbranch変更しない | いいえ | design fresh Reviewへ進む |
+| design | pending | pending | pending | pending | はい | requirement gate evidence確定後に実行 |
+| plan | pending | pending | pending | pending | はい | design gate pass後に実行 |
+
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
   - used: GPT-5.6 Proによるexternal ChatGPT complete-bundle authoringを使用した。
