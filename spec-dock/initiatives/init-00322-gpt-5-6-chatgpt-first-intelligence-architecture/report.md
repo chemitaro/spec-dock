@@ -22,6 +22,7 @@ ID: "init-00322"
   - 最終design V3とplanを完全コピーし、回収元／配置先SHA-256一致を確認した。Requirement／Design／Planのfresh reviewer gateはすべてPASSした。
   - Humanの明示指示により、`20260719t135413z-init-00322-architecture-aware-execution-brief-complete-replacement.zip`からcanonical三文書を完全置換し、9件のArtifactを追加した。
   - complete replacementのRequirement／Design ReviewはPASS、初回Plan ReviewはP1 2件でFAILとなった。GPT-5.6 Proのcomplete-bundle revisionを完全ファイルで反映したcommit `221dd4130d7fdbc00909dc6231d7669cda17efb7`に対するfresh Plan ReviewはPASS（P0=0、P1=0、P2=1）した。
+  - Humanの可視化依頼に基づき、既存の7 Epic DAGをWave 0〜5、最大並列幅2として整理し、`plan.md` §8へPlantUMLを埋め込んだ。PlantUML 1.2026.6 renderとfresh Plan ReviewはPASSした。
 - 次のマイルストーン:
   - Humanが更新後の7 Epicの名称・責任境界・依存DAG・Delivery Boundaryを承認する。Epic Node／dependencyのmaterializeはその承認まで行わない。
 - ブロッカー:
@@ -62,6 +63,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-004 | 置換済み（`superseded`） | `20260719t114039z-init-00322-architecture-aware-execution-brief-planning-update.zip`と対応prompt | 最終canonical文書・Artifactへの採用なし | Humanが新complete replacement packageを唯一のauthoritative inputと指定したため、旧delta型package／promptは使用・merge・copy対象から除外した。 | 新packageの`CODEX-APPLY-PROMPT.md`とHumanの上書き指示 | 再参照しない。fresh ReviewはEAL-003のcomplete replacementだけを対象にする |
 | EAL-005 | 採用候補（`partially_adopted`） | GPT-5.6 Pro Plan Review complete-bundle revision（`external-chatgpt-authoring`） | complete `requirement.md`、`design.md`、`plan.md`、Traceability／Internal Self-Review Artifact | commit `f51448f463f0622f7e745af44683747bb4ba377e`のfresh Plan ReviewでP1 2件を検出したため、partial patchを行わずcomplete Bundleを再生成した。requirement／designはsource branchとbyte-identical、planと2 ArtifactはAC実装責任／最終closure責任の分離、Epic 7の依存／対象外／Delivery Boundary、P2 follow-upを完全ファイルへ反映した。Humanが許可済みの非意味的整形例外として、コピー後にPlan末尾の余分な空行1行だけを除去した。 | Oracle session `init-00322-plan-review-complete`、GPT-5.6 Pro verified、ZIP SHA-256 `57a19dbaafc6921345fa7deceec0eeeb9bc4561529e1877ffc991c9aa4373aa3`、ZIP CRC／`CHECKSUMS.sha256` pass、source commit `f51448f463f0622f7e745af44683747bb4ba377e`、package SHA-256: plan `f65ccf1f5b2ef277d723a69bc7f38264d9d05e7e28a46252cad5dfe812ee0e72`、destination SHA-256: requirement `bfc42a1e78eefe13f7295f3a221b0964b09bc08bc00c05b2f54d6115c19e4f4e`、design `93dfbcfd8c14439ea6da439d2fa40413888f5d9739abd468dd9af1a87c95c9d0`、plan `cdb7bd7688226f3fda7a7b4c320df2a10d3dea959290a4acd7d18e65bb9e6d97` | validation後にcomplete-bundle revisionをcommit／pushし、fresh Plan Reviewを再実行する |
 | EAL-006 | 採用（`adopted`） | fresh Plan Review（`spec-reviewer`） | EAL-003／EAL-005のcurrent complete replacement disposition | exact pushed commit `221dd4130d7fdbc00909dc6231d7669cda17efb7`をゼロベースでレビューし、P0=0／P1=0でPASSした。P2はEpic 7 JIT Planningで最低4週間／代表Workflow 5件以上の評価窓を明示する非blocking follow-upのみ。 | fresh reviewer `/root/review_plan_221dd413`、remote／local HEAD一致、Plan SHA-256 `cdb7bd7688226f3fda7a7b4c320df2a10d3dea959290a4acd7d18e65bb9e6d97` | Humanの7 Epic承認へ進む。承認前にEpic Node／dependencyをmaterializeしない |
+| EAL-007 | 採用（`adopted`） | HumanのEpic依存／並列化可視化依頼（`operator-intent`） | `plan.md` §8.1／§8.2 | reviewer-pass済みの完全DAGとHuman merge gateだけを、Wave表とPlantUMLの推移簡約へ再表現した。新しいEpic境界、依存、Delivery Boundary、materializationは追加していない。ChatGPT authoringは新規planning claimを作らないdocs-only visualizationのため使用しなかった。 | Plan SHA-256 `4979e9642989c2f652dbcae9458b7accbf16b581e5c722cf8ff3d503cb28c273`、PlantUML 1.2026.6 syntax／SVG render PASS、fresh reviewer `/root/review_dependency_diagram` | Humanの7 Epic承認へ進む。P3の表見出し表現だけを理由にbranch変更しない |
 
 ### Complete-bundle revisionの転送・保存証跡
 
@@ -120,11 +122,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | design | commit `1aa6c28e634d10185e564a64f068eacea77bd2b2`（design SHA-256 `93dfbcfd8c14439ea6da439d2fa40413888f5d9739abd468dd9af1a87c95c9d0`） | `/root/review_design_1aa6c28e` | `pass` at `2026-07-19T14:50:45Z` | P0=0、P1=0。P2=2: cutover rollback詳細の§14への昇格候補、requirementと同じTraceability Artifact AC-023要約不一致。P2だけを理由にbranch変更しない | いいえ | requirement再open不要。plan fresh Reviewへ進む |
 | plan | commit `f51448f463f0622f7e745af44683747bb4ba377e` | `/root/review_plan_f51448f4` | `fail` | P0=0、P1=2: AC ownershipが粗く、実装責任とInitiative-level final verification／closure責任が未分離。Epic 7に明示的な依存、対象外、Delivery Boundaryがない。P2=2: Epic 6 rollback rehearsal／known-good復元、Epic別metric責務のJIT具体化 | はい | requirement／design再openは不要。GPT-5.6 Proでcomplete Bundleをrevisionし、fresh Plan Reviewを再実行する |
 | plan revision | commit `221dd4130d7fdbc00909dc6231d7669cda17efb7`（plan SHA-256 `cdb7bd7688226f3fda7a7b4c320df2a10d3dea959290a4acd7d18e65bb9e6d97`） | `/root/review_plan_221dd413` | `pass` at `2026-07-19` | P0=0、P1=0。P2=1: Epic 7 JIT PlanningでRequirement正本の最低4週間／代表Workflow 5件以上、task-shape sampling、証拠日付、closure gateを明示的に引き継ぐ。P2だけを理由にbranch変更しない | いいえ | Humanの7 Epic承認へ進める。承認前のNode materializationは禁止 |
+| plan dependency visualization | working tree Plan SHA-256 `4979e9642989c2f652dbcae9458b7accbf16b581e5c722cf8ff3d503cb28c273` | `/root/review_dependency_diagram` | `pass` at `2026-07-20` | P0=0、P1=0、P2=0、P3=1。完全DAG、Epic 2／3だけの並列化、Human merge gate、推移簡約図が整合。P3はWave表見出しの軽微な表現だけでbranch変更しない | いいえ | Humanの7 Epic承認へ進める。承認前のNode materializationは禁止 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
   - used: GPT-5.6 Proによるexternal ChatGPT complete-bundle authoringを使用した。
   - local sub-agentのscope-local direct-write delegated draftは使用していない。ChatGPT出力はMainが安全な一時領域へ回収し、Human指示とEAL disposition後に完全ファイルコピーする。
+  - 2026-07-20のdependency visualization refreshでは、既存reviewer-pass済みDAGのdocs-only再表現に限定したため、追加のChatGPT authoring／delegated draftは使用していない。fresh spec-reviewerだけを実行した。
 - lifecycle state（契約値）:
   - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
 - 昇格不可 state:
