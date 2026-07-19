@@ -448,6 +448,86 @@ E2 + E3 + E4 + E5 -> E6
 E1..E6 -> E7
 ```
 
+### 8.1 並列実行Wave
+
+| Wave | 対象Epic | 並列性 | 次Waveへの開始条件 |
+|---:|---|---|---|
+| 0 | Epic 1 | 単独 | Epic 1をHuman merge済みにする |
+| 1 | Epic 2、Epic 3 | **相互に独立して並列実行可能** | Epic 2とEpic 3の両方をHuman merge済みにする |
+| 2 | Epic 4 | 単独 | Epic 2、Epic 3、Epic 4をHuman merge済みにする |
+| 3 | Epic 5 | 単独 | Epic 2〜Epic 5をHuman merge済みにする |
+| 4 | Epic 6 | 単独 | Epic 2〜Epic 6をHuman merge済みにする |
+| 5 | Epic 7 | 単独の最終統合 | Epic 1〜Epic 6をHuman merge済みにし、owner別AC evidenceを利用可能にする |
+
+- 最大並列幅は2であり、並列区間はWave 1のEpic 2／Epic 3だけである。
+- Epic 4以降は、前Waveまでの成果を統合するため実効的に直列となる。
+- 各矢印の開始条件は、原則として依存Epicの実装完了ではなくHuman merge完了である。
+
+### 8.2 Epic依存と並列可能性の可視化
+
+- **Title**: init-00322 Epic Dependency and Parallel Execution Waves
+- **Question answered**: どのEpicが何に依存し、どこを並列実行できるか。
+- **Scope**: 7 Epicの実効開始順序とHuman merge gate。上記DAGの推移的に冗長な辺は省略する。
+- **Excluded details**: 各Epic内のIssue分割、実装手順、test command、PR内の並列作業。
+- **Update trigger**: HumanがEpic境界、依存DAG、またはDelivery Boundaryの変更を承認したとき。
+
+```plantuml
+@startuml
+title init-00322 Epic Dependency and Parallel Execution Waves
+top to bottom direction
+skinparam linetype ortho
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment center
+
+package "Wave 0\nFoundation" as W0 #D6EAF8 {
+  rectangle "Epic 1\nDelegation Foundation" as E1
+}
+
+package "Wave 1\nParallel Lane" as W1 #D5F5E3 {
+  together {
+    rectangle "Epic 2\nIntegrated Planning" as E2
+    rectangle "Epic 3\nReview Protocols" as E3
+  }
+}
+
+package "Wave 2\nExecution Integration" as W2 #FCF3CF {
+  rectangle "Epic 4\nExecution Brief / Repair / Execution" as E4
+}
+
+package "Wave 3\nDelivery" as W3 #FCF3CF {
+  rectangle "Epic 5\nEpic and PR Delivery" as E5
+}
+
+package "Wave 4\nGlobal Cutover" as W4 #FDEBD0 {
+  rectangle "Epic 6\nCutover / Parity / Legacy Removal" as E6
+}
+
+package "Wave 5\nFinal Integration" as W5 #F5B7B1 {
+  rectangle "Epic 7\nDogfood / Final Quality / Release" as E7
+}
+
+E1 --> E2 : Human merge後に開始可能
+E1 --> E3 : Human merge後に開始可能
+E2 --> E4 : 両EpicのHuman mergeが必要
+E3 --> E4 : 両EpicのHuman mergeが必要
+E4 --> E5 : 統合済み実行基盤へ依存
+E5 --> E6 : Delivery基盤のHuman mergeへ依存
+E6 --> E7 : Epic 1〜6のHuman mergeと証拠へ依存
+
+legend bottom
+  |= 色 |= 意味 |
+  |<#D6EAF8>| Foundation |
+  |<#D5F5E3>| 並列実行可能なWave |
+  |<#FCF3CF>| 段階統合 |
+  |<#FDEBD0>| Global cutover |
+  |<#F5B7B1>| 最終統合 |
+endlegend
+@enduml
+```
+
+この図は開始順序を読みやすくするため、上記の完全DAGを推移簡約している。たとえばEpic 5は完全DAG上ではEpic 2、Epic 3、Epic 4へ明示的に依存するが、Epic 4のHuman mergeがEpic 2／Epic 3のHuman mergeを前提とするため、図ではEpic 4からEpic 5への実効依存として表現する。完全な依存判定では上記text DAGとEpicポートフォリオを正本とする。
+
 ## 9. Initiative意思決定ゲート
 
 ### G0 Bootstrap Adoption
