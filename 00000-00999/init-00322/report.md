@@ -20,11 +20,12 @@ ID: "init-00322"
   - 改訂版`requirement.md`は回収済みファイルから完全コピーし、source／destination SHA-256一致を確認した。本文にP0/P1はなく、report evidence不足だけがP1として残ったため台帳を更新した。
   - 初回改訂版`design.md`のfresh review findingsは、同じGPT-5.6 Pro会話でcomplete-file revisionへ反映した。
   - 最終design V3とplanを完全コピーし、回収元／配置先SHA-256一致を確認した。Requirement／Design／Planのfresh reviewer gateはすべてPASSした。
-  - Humanの明示指示により、`20260719t135413z-init-00322-architecture-aware-execution-brief-complete-replacement.zip`からcanonical三文書を完全置換し、9件のArtifactを追加した。現在の三文書はfresh Planning Review前のcomplete replacement candidateである。
+  - Humanの明示指示により、`20260719t135413z-init-00322-architecture-aware-execution-brief-complete-replacement.zip`からcanonical三文書を完全置換し、9件のArtifactを追加した。
+  - complete replacementのRequirement／Design ReviewはPASS、初回Plan ReviewはP1 2件でFAILとなった。GPT-5.6 Proのcomplete-bundle revisionを完全ファイルで反映したcommit `221dd4130d7fdbc00909dc6231d7669cda17efb7`に対するfresh Plan ReviewはPASS（P0=0、P1=0、P2=1）した。
 - 次のマイルストーン:
-  - fresh Requirement／Design／Plan Reviewを順に通過した後、Humanが更新後の7 Epicの名称・境界・依存を承認する。Epic Node／dependencyのmaterializeはその承認まで行わない。
+  - Humanが更新後の7 Epicの名称・責任境界・依存DAG・Delivery Boundaryを承認する。Epic Node／dependencyのmaterializeはその承認まで行わない。
 - ブロッカー:
-  - 今回のcomplete replacement candidateはfresh Requirement／Design／Plan Review未実行のため、review-passed、execution-ready、PR-ready、merge-ready、completedを主張できない。
+  - Planning Review上のP0／P1はない。Humanの7 Epic承認がmaterialization開始前の必須gateとして残る。
 
 ## ChatGPT Planning Pack受入証跡
 
@@ -60,6 +61,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-003 | 採用候補（`partially_adopted`） | `20260719t135413z-init-00322-architecture-aware-execution-brief-complete-replacement.zip`（`external-chatgpt-evidence`） | `requirement.md`、`design.md`、`plan.md`、新規9 Artifact | Humanが対象branchへのcomplete-file replacementを明示指示したため、三文書を完全置換し、9 Artifactを同名追加した。Humanの直接承認により、意味を変えない16行の行末空白除去とPlantUML複数行ラベル9件の`\n`化だけを適用した。Artifact front matterの自己申告はcanonical authorityとせず、fresh三段Review完了まではcandidateとして扱う。 | package SHA-256 `53cf0ca4244ef64c9cdf344fac37dba0de6fac42e33311f5d355497ba6af8960`、source branch、baseline Git blob 4件一致、ZIP integrity pass、`CHECKSUMS.sha256`全件一致、`MANIFEST.json`、Internal Self-Review、PlantUML 1.2026.6 render検証 | Requirement、Design、Planの順でfresh Reviewを実行し、P0／P1がなければcurrent revisionの採用を確定する |
 | EAL-004 | 置換済み（`superseded`） | `20260719t114039z-init-00322-architecture-aware-execution-brief-planning-update.zip`と対応prompt | 最終canonical文書・Artifactへの採用なし | Humanが新complete replacement packageを唯一のauthoritative inputと指定したため、旧delta型package／promptは使用・merge・copy対象から除外した。 | 新packageの`CODEX-APPLY-PROMPT.md`とHumanの上書き指示 | 再参照しない。fresh ReviewはEAL-003のcomplete replacementだけを対象にする |
 | EAL-005 | 採用候補（`partially_adopted`） | GPT-5.6 Pro Plan Review complete-bundle revision（`external-chatgpt-authoring`） | complete `requirement.md`、`design.md`、`plan.md`、Traceability／Internal Self-Review Artifact | commit `f51448f463f0622f7e745af44683747bb4ba377e`のfresh Plan ReviewでP1 2件を検出したため、partial patchを行わずcomplete Bundleを再生成した。requirement／designはsource branchとbyte-identical、planと2 ArtifactはAC実装責任／最終closure責任の分離、Epic 7の依存／対象外／Delivery Boundary、P2 follow-upを完全ファイルへ反映した。Humanが許可済みの非意味的整形例外として、コピー後にPlan末尾の余分な空行1行だけを除去した。 | Oracle session `init-00322-plan-review-complete`、GPT-5.6 Pro verified、ZIP SHA-256 `57a19dbaafc6921345fa7deceec0eeeb9bc4561529e1877ffc991c9aa4373aa3`、ZIP CRC／`CHECKSUMS.sha256` pass、source commit `f51448f463f0622f7e745af44683747bb4ba377e`、package SHA-256: plan `f65ccf1f5b2ef277d723a69bc7f38264d9d05e7e28a46252cad5dfe812ee0e72`、destination SHA-256: requirement `bfc42a1e78eefe13f7295f3a221b0964b09bc08bc00c05b2f54d6115c19e4f4e`、design `93dfbcfd8c14439ea6da439d2fa40413888f5d9739abd468dd9af1a87c95c9d0`、plan `cdb7bd7688226f3fda7a7b4c320df2a10d3dea959290a4acd7d18e65bb9e6d97` | validation後にcomplete-bundle revisionをcommit／pushし、fresh Plan Reviewを再実行する |
+| EAL-006 | 採用（`adopted`） | fresh Plan Review（`spec-reviewer`） | EAL-003／EAL-005のcurrent complete replacement disposition | exact pushed commit `221dd4130d7fdbc00909dc6231d7669cda17efb7`をゼロベースでレビューし、P0=0／P1=0でPASSした。P2はEpic 7 JIT Planningで最低4週間／代表Workflow 5件以上の評価窓を明示する非blocking follow-upのみ。 | fresh reviewer `/root/review_plan_221dd413`、remote／local HEAD一致、Plan SHA-256 `cdb7bd7688226f3fda7a7b4c320df2a10d3dea959290a4acd7d18e65bb9e6d97` | Humanの7 Epic承認へ進む。承認前にEpic Node／dependencyをmaterializeしない |
 
 ### Complete-bundle revisionの転送・保存証跡
 
@@ -88,7 +90,7 @@ ZIP内frontmatterの`authority: accepted`はsource claimであり、それ自体
 | ADR-07 | `adopted` | Plan-driven Delivery Topology / Human Merge Gate | Issue / Epic / PR deliveryとfinish semanticsの上位方針として採用 | `artifacts/20260716t123423z-07-adr-plan-driven-delivery-topology-and-human-merge-gate.md` |
 | ADR-08 | `adopted` | 最小永続状態とWorkbench / `report.md`境界 | 新しいWorkflow databaseを追加しない方針として採用 | `artifacts/20260716t123423z-08-adr-minimal-persistent-state-and-workbench-boundary.md` |
 | ADR-09 | `adopted` | 文書migrationなしの全Scope cutover | 既存Scope文書を一括変換せずWorkflow / Actorを切り替える方針として採用 | `artifacts/20260716t123423z-09-adr-global-workflow-cutover-without-document-migration.md` |
-| ADR-10 | `partially_adopted` | Architecture-Aware Execution Briefをfrozen subordinate contractとして扱う | Humanの明示指示に基づくcomplete replacement candidateとして採用。Artifact front matterの自己申告は採用根拠にせず、fresh三段Review完了後に確定する | `artifacts/20260719t135413z-05-adr-architecture-aware-execution-brief-as-frozen-subordinate-contract.md` |
+| ADR-10 | `adopted` | Architecture-Aware Execution Briefをfrozen subordinate contractとして扱う | Humanの明示指示とEAL-006のfresh三段Review PASSに基づき採用する。Artifact front matterの自己申告だけを採用根拠にしない | `artifacts/20260719t135413z-05-adr-architecture-aware-execution-brief-as-frozen-subordinate-contract.md` |
 
 `adopted`は上記decisionの採用を表し、各ADRに記載された将来の`reflected_to`がすでに実装・文書反映済みであることや、reviewer pass / readiness / completionを意味しない。
 
@@ -117,7 +119,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | requirement | commit `b58f74c7a7ec6cef4e8f915cc9a2ab6e5ffcaef2` | `/root/review_requirement_b58f74c7` | `pass` at `2026-07-19T14:44:57Z` | P0=0、P1=0。P2=1: `20260719t135413z-06-disc-full-bundle-traceability.md`のAC-023要約に非blocking不一致。P2だけを理由にbranch変更しない | いいえ | design fresh Reviewへ進む |
 | design | commit `1aa6c28e634d10185e564a64f068eacea77bd2b2`（design SHA-256 `93dfbcfd8c14439ea6da439d2fa40413888f5d9739abd468dd9af1a87c95c9d0`） | `/root/review_design_1aa6c28e` | `pass` at `2026-07-19T14:50:45Z` | P0=0、P1=0。P2=2: cutover rollback詳細の§14への昇格候補、requirementと同じTraceability Artifact AC-023要約不一致。P2だけを理由にbranch変更しない | いいえ | requirement再open不要。plan fresh Reviewへ進む |
 | plan | commit `f51448f463f0622f7e745af44683747bb4ba377e` | `/root/review_plan_f51448f4` | `fail` | P0=0、P1=2: AC ownershipが粗く、実装責任とInitiative-level final verification／closure責任が未分離。Epic 7に明示的な依存、対象外、Delivery Boundaryがない。P2=2: Epic 6 rollback rehearsal／known-good復元、Epic別metric責務のJIT具体化 | はい | requirement／design再openは不要。GPT-5.6 Proでcomplete Bundleをrevisionし、fresh Plan Reviewを再実行する |
-| plan revision candidate | complete Bundle SHA-256: requirement `bfc42a1e...`、design `93dfbcfd...`、plan `f65ccf1f...` | GPT-5.6 Pro session `init-00322-plan-review-complete` | fresh review pending | P1 2件とP2 follow-upをcomplete plan／2 Artifactへ反映。requirement／designはbyte-identical | はい | validation、commit、push後にfresh Plan Reviewを実行する |
+| plan revision | commit `221dd4130d7fdbc00909dc6231d7669cda17efb7`（plan SHA-256 `cdb7bd7688226f3fda7a7b4c320df2a10d3dea959290a4acd7d18e65bb9e6d97`） | `/root/review_plan_221dd413` | `pass` at `2026-07-19` | P0=0、P1=0。P2=1: Epic 7 JIT PlanningでRequirement正本の最低4週間／代表Workflow 5件以上、task-shape sampling、証拠日付、closure gateを明示的に引き継ぐ。P2だけを理由にbranch変更しない | いいえ | Humanの7 Epic承認へ進める。承認前のNode materializationは禁止 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -146,6 +148,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | GPT-5.6 Pro（external ChatGPT authoring） | `init-00322` | Oracle sessions `init-00322-complete-planning-bundle`／`init-00322-design-v2-recovery`／`init-00322-design-v3-recovery`で生成し、安全な一時領域へ回収 | 元Pack三文書、29 artifacts、会話export、SpecDock authoring docs、fresh reviewer findings | `requirement.md`、`design.md`、`plan.md` | `integrated`（requirement）、`integrated`（design V3）、`integrated`（plan） | requirement: `requirement.md`; design: `design.md`; plan: `plan.md` | source／destination SHA一致、gzip integrity、UTF-8、size確認。欠損ZIPは棄却 | complete-fileの内容をMainが意味変更せず順次コピー | `report.md`置換、reviewer pass／readiness自己申告、欠損ZIP、初回改訂design、design V2 | なし | 三phase fresh review PASS。HumanのEpic承認まではNode materializationしない |
 | GPT-5.6 Pro（external ChatGPT authoring） | `init-00322` Plan Review revision | Oracle session `init-00322-plan-review-complete`のcomplete ZIPを安全な一時領域へ回収 | commit `f51448f463f0622f7e745af44683747bb4ba377e`のcomplete Bundle、fresh Plan Review P1／P2 findings | `requirement.md`、`design.md`、`plan.md`、Traceability／Internal Self-Review Artifact | `partially_integrated`（fresh Plan Review待ち） | complete 5 files | ZIP CRC、safe relative regular paths、checksums、manifest、source／destination SHA一致 | requirement／designはbyte-identical、plan／2 Artifactを完全ファイルで差し替え | self-claimed review pass／readiness、Epic Node materialization | fresh Plan Review pending | validation・commit・push後にfresh Plan Reviewを実行し、P0／P1=0なら採用確定 |
+| spec-reviewer | `init-00322` Plan Review revision | exact pushed commit `221dd4130d7fdbc00909dc6231d7669cda17efb7` | current requirement／design／plan、Traceability／Internal Self-Review Artifact | EAL-006、Complete replacement fresh review gate | `integrated` | `report.md` | read-only fresh review、repository mutationなし | P0=0／P1=0でPASS、P2=1をnonblocking follow-up化 | branch change要求、Epic materialization | なし | `pass` | Humanの7 Epic承認へ進む |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
