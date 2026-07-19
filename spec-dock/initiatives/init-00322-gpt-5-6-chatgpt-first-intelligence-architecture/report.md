@@ -114,8 +114,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | フェーズ | 対象revision | fresh reviewer | verdict | findings | blocking | 次アクション |
 |---|---|---|---|---|---|---|
 | requirement | commit `b58f74c7a7ec6cef4e8f915cc9a2ab6e5ffcaef2` | `/root/review_requirement_b58f74c7` | `pass` at `2026-07-19T14:44:57Z` | P0=0、P1=0。P2=1: `20260719t135413z-06-disc-full-bundle-traceability.md`のAC-023要約に非blocking不一致。P2だけを理由にbranch変更しない | いいえ | design fresh Reviewへ進む |
-| design | pending | pending | pending | pending | はい | requirement gate evidence確定後に実行 |
-| plan | pending | pending | pending | pending | はい | design gate pass後に実行 |
+| design | commit `1aa6c28e634d10185e564a64f068eacea77bd2b2`（design SHA-256 `93dfbcfd8c14439ea6da439d2fa40413888f5d9739abd468dd9af1a87c95c9d0`） | `/root/review_design_1aa6c28e` | `pass` at `2026-07-19T14:50:45Z` | P0=0、P1=0。P2=2: cutover rollback詳細の§14への昇格候補、requirementと同じTraceability Artifact AC-023要約不一致。P2だけを理由にbranch変更しない | いいえ | requirement再open不要。plan fresh Reviewへ進む |
+| plan | pending | pending | pending | pending | はい | design gate evidence確定後に実行 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
