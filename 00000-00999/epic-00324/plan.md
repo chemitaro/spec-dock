@@ -81,10 +81,10 @@ ID: "epic-00324"
 | `E1-I01`      | Delegation asset inventoryとauthority mapを確立する。                                                                | E-RQ-002、E-RQ-009                   | E-AC-001                   | `delegation-inventory.json`、schema、coverage validator、initial classification report                        | なし                         | `standard`      | provider system assetを追加し、dogfood system projectionを作る。install_rootはscan対象であり削除しない。                                           | schema、unique ID、path existence、coverage、projection tests                                            | `E1-I02`、`E1-I05`、`E1-I06`へasset／owner mapを渡す。         |
 | `E1-I02`      | separate `spec-dock-chatgpt` executable、layered package、command／result contractを作る。                           | E-RQ-001、E-RQ-003                   | E-AC-002、E-AC-008          | wrapper、CLI／commands／application／domain／infra／presentation skeleton、reserved command tree、dry-run envelope | `E1-I01`                   | `strict`        | provider scriptsを追加。dogfood projectionを後続integration前に検証。Core `spec-dock` registryは変更しない。                                     | help、argument validation、dry-run、unsupported capability、authority negative tests                     | `E1-I03`、`E1-I04`、`E1-I05`へpublic contractsを渡す。        |
 | `E1-I03`      | exact target binding、deterministic anchors、strict GitHub sync preflight、attachment policy、no-hidden-Gitを実装する。 | E-RQ-004、E-RQ-005、E-RQ-008、E-RQ-011 | E-AC-003、E-AC-004、E-AC-007 | TargetBinding、AnchorSet、strict preflight adapter、Git／path policy、text／JSON diagnostics                     | `E1-I02`                   | `strict`        | provider adapter packageとnarrow Runtime reuse seam。dogfood projectionはgenerated。current authoring preflight compatibilityを保持。 | hermetic Git matrix、digest golden、subprocess spy、HEAD／index／worktree invariance                      | `E1-I04`と`E1-I06`へbound request foundationを渡す。         |
-| `E1-I04`      | operator-configured backend port、Human Relay、`workflow_chatgpt_delegation.md`を実装する。                           | E-RQ-006、E-RQ-007、E-RQ-011          | E-AC-005、E-AC-006          | BackendInvocationPort、relay package、failure mapping、redaction、workflow doc                                 | `E1-I03`                   | `strict`        | provider adapter infraとprovider docsを追加。private backend assetは追加しない。current authoring Skillを削除しない。                            | backend stub、timeout、nonzero、redaction、relay digest、manual round-trip                                | `E1-I06`へtransport／docs integration contractを渡す。       |
-| `E1-I05`      | M-001〜M-013 feasibility、historical baseline、M-008 changeability measurementを準備する。                             | E-RQ-010                            | E-AC-010、E-AC-011          | metrics schema、feasibility matrix、baseline evidence、changeability rehearsal record                         | `E1-I01`、`E1-I02`          | `standard`      | provider docs／system schemaとEpic artifactsへ影響。Runtime state DBは追加しない。                                                         | all-M coverage、sample rule、non-invention、changed-file／migration absence assertions                   | `E1-I06`と`E1-QA`へbaseline／metric evidenceを渡す。          |
+| `E1-I04`      | operator-configured backend port、Human Relay、`workflow_chatgpt_delegation.md`を実装する。                           | E-RQ-006、E-RQ-007、E-RQ-011          | E-AC-005、E-AC-006。E-AC-011 backend/config実証を支援 | BackendInvocationPort、relay package、failure mapping、redaction、workflow doc、backend/config change evidence | `E1-I03`、`E1-I05` | `strict` | provider adapter infraとprovider docsを追加。private backend assetは追加しない。current authoring Skillを削除しない。 | backend stub、timeout、nonzero、redaction、relay digest、manual round-trip、M-008 backend/config evidence | `E1-I06`と`E1-QA`へtransport／docs／change evidenceを渡す。 |
+| `E1-I05`      | M-001〜M-013 feasibility、historical baseline、M-008 measurement protocol／fixtureを準備する。                         | E-RQ-010                            | E-AC-010。E-AC-011 protocol／fixtureを支援 | metrics schema、feasibility matrix、baseline evidence、changeability measurement protocol／fixture | `E1-I01`、`E1-I02` | `standard` | provider docs／system schemaとEpic artifactsへ影響。Runtime state DBは追加しない。 | all-M coverage、sample rule、non-invention、protocol／fixture assertions | `E1-I04`へ測定protocolを渡し、`E1-I06`と`E1-QA`へbaseline／metric evidenceを渡す。 |
 | `E1-I06`      | installer、provider／dogfood projection、docs navigation、compatibilityを統合する。                                     | E-RQ-002、E-RQ-009                   | E-AC-009                   | installer executable handling、init／update projection、docs links、compatibility regression                   | `E1-I03`、`E1-I04`、`E1-I05` | `strict`        | `src/spec_dock/cli.py`、provider assets、dogfood projection、installer tests。install_root旧surfaceは保持。                            | init／update、package data、provider-dogfood parity、current authoring regression                        | `E1-QA`へinstallable integrated candidateを渡す。           |
-| `E1-QA`       | mainへmerge済みの全implementation成果を統合確認し、exact HEAD smoke、rollback、full qualityを閉じる。                         | 全E-RQ                               | 全E-AC                      | full verification evidence、live smoke、rollback rehearsal、closure matrix、Issue固有PR          | `E1-I01`〜`E1-I06`          | `strict`        | 全provider／installed consumer／dogfood surfaceを検査する。新feature scopeは追加しない。                                                       | full test、live GitHub smoke、Human Relay smoke、no-hidden-Git、baseline、rollback、fresh Epic spec review | E1-QA専用PRをHuman Merge Gateへ渡す。先行Issue差分はすべてmainへmerge済みでなければならない。 |
+| `E1-QA`       | mainへmerge済みの全implementation成果を統合確認し、exact HEAD smoke、rollback、full qualityを閉じる。                         | primary ownershipなし。全E-RQをintegration verification | primary ownershipなし。全E-ACをintegration verification | full verification evidence、live smoke、rollback rehearsal、closure matrix、Issue固有PR | `E1-I01`〜`E1-I06` | `strict` | 全provider／installed consumer／dogfood surfaceを検査する。新feature scopeや未完実装を引き取らない。 | full test、live GitHub smoke、Human Relay smoke、no-hidden-Git、baseline、rollback、fresh Epic spec review | E1-QA専用PRをHuman Merge Gateへ渡す。先行Issue差分はすべてmainへmerge済みでなければならない。 |
 
 ## 5. Candidateごとのhandoff package
 
@@ -232,7 +232,7 @@ Required evidence:
 * source／unit／collector／owner
 * direct／proxy／deferred／unavailable classification
 * qualifying historical runs
-* M-008 representative change rehearsal
+* M-008 measurement protocolとfixture。Prompt resource、backend command／model config、output fieldの実surfaceに対する実証はowning Issueが供給し、E1-QAが統合確認する
 * privacy／redaction review
 
 ### 5.6 `E1-I06`
@@ -306,8 +306,9 @@ Required evidence:
 E1-I01
   -> E1-I02
       -> E1-I03
-          -> E1-I04
       -> E1-I05
+E1-I03 + E1-I05
+  -> E1-I04
 E1-I03 + E1-I04 + E1-I05
   -> E1-I06
 E1-I01 + E1-I02 + E1-I03 + E1-I04 + E1-I05 + E1-I06
@@ -338,6 +339,7 @@ I01 --> I02
 I02 --> I03
 I02 --> I05
 I03 --> I04
+I05 --> I04
 I03 --> I06
 I04 --> I06
 I05 --> I06
@@ -358,11 +360,11 @@ I06 --> QA
 | Adapter contract       | `E1-I02`  | `E1-I01` handoff                         | stable CLI／domain contracts                            |
 | Deterministic Git lane | `E1-I03`  | `E1-I02` contracts                       | exact binding、anchors、preflight、no-hidden-Git evidence |
 | Metrics lane           | `E1-I05`  | `E1-I01`と`E1-I02` contracts              | all-M feasibilityとbaseline evidence                    |
-| Transport lane         | `E1-I04`  | `E1-I03` binding contract                | backend／relay evidence                                 |
+| Transport lane         | `E1-I04`  | `E1-I03` bindingと`E1-I05` measurement protocolがmerge済み | backend／relay／M-008 actual evidence |
 | Distribution lane      | `E1-I06`  | `E1-I03`、`E1-I04`、`E1-I05`               | installable provider／dogfood candidate                 |
 | Final integration      | `E1-QA`   | 全implementation Issue PRがmainへmerge済み  | E1-QA固有PRのHuman mergeとEpic Delivery Boundary       |
 
-`E1-I03`と`E1-I05`は`E1-I02`後に並列実行可能である。`E1-I04`はbinding／anchor contractに依存する。`E1-I06`はimplementation contractsが揃うまで開始しない。
+`E1-I03`と`E1-I05`は`E1-I02`後に並列実行可能である。`E1-I04`は両IssueのPRがmainへmergeされた後、binding／anchor contractとmeasurement protocolを受け取って開始する。`E1-I06`はimplementation contractsが揃うまで開始しない。
 
 ### 7.1 Issue branch／PR lifecycle
 
@@ -394,6 +396,12 @@ Blockers:
 * primary AC responsibilityの欠落
 
 ### G1: Inventory and boundary freeze
+
+Checkpoint transition invariant:
+
+* 各Gのevidence completionはhandoff-readyを示すだけであり、downstream Issueのbranch-start readinessを単独では成立させない。
+* downstream Issueをunblockするのは、全owning dependency IssueのPRがHuman mergeされ、各merged SHAが更新済みmainに含まれることをMainが確認した後だけである。
+* checkpoint本文の`Unblocks`は常にこのmerge-and-observe条件を含む。
 
 Owners:
 
@@ -727,7 +735,7 @@ Materialization後のdependency rule:
 
 * actual `E1-I02` Issueはactual `E1-I01` Issueへ依存する。
 * actual `E1-I03` Issueはactual `E1-I02` Issueへ依存する。
-* actual `E1-I04` Issueはactual `E1-I03` Issueへ依存する。
+* actual `E1-I04` Issueはactual `E1-I03`と`E1-I05` Issueへ依存する。
 * actual `E1-I05` Issueはactual `E1-I01`と`E1-I02` Issueへ依存する。
 * actual `E1-I06` Issueはactual `E1-I03`、`E1-I04`、`E1-I05` Issueへ依存する。
 * actual `E1-QA` Issueは全implementation Issueへ依存する。
@@ -779,7 +787,7 @@ Rules:
 | E-RQ-007 | `E1-I04`                | `E1-QA`                   | relay package、round-trip smoke                         | AC-018／AC-023 co-evidence |
 | E-RQ-008 | `E1-I03`                | `E1-I02`、`E1-I04`、`E1-QA` | Git argv audit、before-after snapshot                   | AC-009 primary evidence   |
 | E-RQ-009 | `E1-I06`                | `E1-I01`、`E1-QA`          | init／update、parity、current lane regression             | AC-016／AC-018 co-evidence |
-| E-RQ-010 | `E1-I05`                | `E1-QA`                   | all-M matrix、baseline、M-008 rehearsal                  | AC-025 co-evidence        |
+| E-RQ-010 | `E1-I05`                | `E1-I04`、`E1-QA`          | all-M matrix、baseline、M-008 protocolとintegrated rehearsal | AC-025 co-evidence     |
 | E-RQ-011 | `E1-I03`、`E1-I04`       | `E1-I02`、`E1-QA`          | status taxonomy、retry、redaction、observability          | M-007／M-013 evidence      |
 | E-RQ-012 | 全Issue                   | `E1-QA`                   | per-Issue base SHA、branch、PR、review／CI、merged SHA     | Delivery evidence         |
 
@@ -797,7 +805,7 @@ Rules:
 | E-AC-008 | `E1-I02`、`E1-I04`、`E1-QA` | evidence-only envelope、forbidden authority claim checks           |
 | E-AC-009 | `E1-I06`、`E1-QA`          | fresh init／update、provider-dogfood parity、current lane regression |
 | E-AC-010 | `E1-I05`、`E1-QA`          | M-001〜M-013 coverage、historical baseline、missing-data disposition |
-| E-AC-011 | `E1-I05`、`E1-QA`          | M-008 rehearsal、changed-file／migration evidence                   |
+| E-AC-011 | `E1-I04`、`E1-I05`、`E1-QA` | I05 measurement protocol／fixture、I04 backend/config evidence、QA integrated rehearsal |
 | E-AC-012 | `E1-QA`                   | full tests、live exact HEAD smoke、relay smoke、rollback evidence    |
 | E-AC-013 | 全Issue／`E1-QA`           | Issue単位PR、review／CI、Human merge、merged SHA chain                |
 

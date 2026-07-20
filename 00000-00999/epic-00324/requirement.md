@@ -345,7 +345,7 @@ ID: "epic-00324"
 
 * secret、token、cookie、browser profile、private key、`.env*`、production dumpをPrompt、inventory、metrics artifact、relay packageへ含めない。
 * direct argvを使用し、`shell=True`、pipe、redirect、command substitutionを使用しない。
-* external fileは明示指定、regular file、non-symlink、non-secret-like、Git-untrackedまたはrepository外でなければならない。
+* external fileは明示指定、regular file、non-symlink、non-secret-likeで、repository外またはGit ignoredなWorkbench fileでなければならない。repository内のnon-ignored untracked fileはclean preflightと両立しないため拒否する。
 * stdout／stderr、argv、path、environment由来のdiagnosticsをboundedかつredactedにする。
 * backend configのprivate absolute pathをdurable outputへ保存しない。
 
