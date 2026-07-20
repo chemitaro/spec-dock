@@ -23,10 +23,12 @@ ID: "init-00322"
   - Humanの明示指示により、`20260719t135413z-init-00322-architecture-aware-execution-brief-complete-replacement.zip`からcanonical三文書を完全置換し、9件のArtifactを追加した。
   - complete replacementのRequirement／Design ReviewはPASS、初回Plan ReviewはP1 2件でFAILとなった。GPT-5.6 Proのcomplete-bundle revisionを完全ファイルで反映したcommit `221dd4130d7fdbc00909dc6231d7669cda17efb7`に対するfresh Plan ReviewはPASS（P0=0、P1=0、P2=1）した。
   - Humanの可視化依頼に基づき、既存の7 Epic DAGをWave 0〜5、最大並列幅2として整理し、`plan.md` §8へPlantUMLを埋め込んだ。内容上の変更ではないためreview gateは不要とするHuman判断を採用し、PlantUML 1.2026.6 renderと非必須のread-only整合確認だけを実施した。
+  - Humanが7 Epic構成を承認したため、`epic-00324`〜`epic-00330`と17件のdirect dependency edgeをmaterializeし、GitHub Issue #324〜#330へlinkした。
+  - Epic 1だけをJIT具体化し、Epic 2〜7はempty scaffoldを維持している。
 - 次のマイルストーン:
-  - Humanが更新後の7 Epicの名称・責任境界・依存DAG・Delivery Boundaryを承認する。Epic Node／dependencyのmaterializeはその承認まで行わない。
+  - Epic 1の改訂Planning Bundleをfresh ChatGPT spec reviewへ通し、HumanへIssue candidate承認を求める。
 - ブロッカー:
-  - Planning Review上のP0／P1はない。Humanの7 Epic承認がmaterialization開始前の必須gateとして残る。
+  - Epic 1のfresh ChatGPT spec review完了まではIssue materializationを行わない。
 
 ## ChatGPT Planning Pack受入証跡
 
@@ -64,6 +66,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-005 | 採用候補（`partially_adopted`） | GPT-5.6 Pro Plan Review complete-bundle revision（`external-chatgpt-authoring`） | complete `requirement.md`、`design.md`、`plan.md`、Traceability／Internal Self-Review Artifact | commit `f51448f463f0622f7e745af44683747bb4ba377e`のfresh Plan ReviewでP1 2件を検出したため、partial patchを行わずcomplete Bundleを再生成した。requirement／designはsource branchとbyte-identical、planと2 ArtifactはAC実装責任／最終closure責任の分離、Epic 7の依存／対象外／Delivery Boundary、P2 follow-upを完全ファイルへ反映した。Humanが許可済みの非意味的整形例外として、コピー後にPlan末尾の余分な空行1行だけを除去した。 | Oracle session `init-00322-plan-review-complete`、GPT-5.6 Pro verified、ZIP SHA-256 `57a19dbaafc6921345fa7deceec0eeeb9bc4561529e1877ffc991c9aa4373aa3`、ZIP CRC／`CHECKSUMS.sha256` pass、source commit `f51448f463f0622f7e745af44683747bb4ba377e`、package SHA-256: plan `f65ccf1f5b2ef277d723a69bc7f38264d9d05e7e28a46252cad5dfe812ee0e72`、destination SHA-256: requirement `bfc42a1e78eefe13f7295f3a221b0964b09bc08bc00c05b2f54d6115c19e4f4e`、design `93dfbcfd8c14439ea6da439d2fa40413888f5d9739abd468dd9af1a87c95c9d0`、plan `cdb7bd7688226f3fda7a7b4c320df2a10d3dea959290a4acd7d18e65bb9e6d97` | validation後にcomplete-bundle revisionをcommit／pushし、fresh Plan Reviewを再実行する |
 | EAL-006 | 採用（`adopted`） | fresh Plan Review（`spec-reviewer`） | EAL-003／EAL-005のcurrent complete replacement disposition | exact pushed commit `221dd4130d7fdbc00909dc6231d7669cda17efb7`をゼロベースでレビューし、P0=0／P1=0でPASSした。P2はEpic 7 JIT Planningで最低4週間／代表Workflow 5件以上の評価窓を明示する非blocking follow-upのみ。 | fresh reviewer `/root/review_plan_221dd413`、remote／local HEAD一致、Plan SHA-256 `cdb7bd7688226f3fda7a7b4c320df2a10d3dea959290a4acd7d18e65bb9e6d97` | Humanの7 Epic承認へ進む。承認前にEpic Node／dependencyをmaterializeしない |
 | EAL-007 | 採用（`adopted`） | HumanのEpic依存／並列化可視化依頼とreview不要判断（`operator-intent`） | `plan.md` §8.1／§8.2 | reviewer-pass済みの完全DAGとHuman merge gateだけを、Wave表とPlantUMLの推移簡約へ再表現した。新しいEpic境界、依存、Delivery Boundary、materializationは追加していないため、Human判断に従い新しいreview gateを要求しない。ChatGPT authoringも使用しなかった。 | Plan SHA-256 `4979e9642989c2f652dbcae9458b7accbf16b581e5c722cf8ff3d503cb28c273`、PlantUML 1.2026.6 syntax／SVG render PASS、非必須のread-only整合確認 `/root/review_dependency_diagram` | Humanの7 Epic承認へ進む。可視化確認をphase promotion gateとして扱わない |
+| EAL-008 | 採用（`adopted`） | Humanの7 Epic構成承認とEpic 1具体化指示（`operator-intent`） | Epic Node、dependency metadata、Epic 1 Planning Bundle | 承認済み7 Epicを全件materializeし、完全DAGを登録した。Epic 1だけをChatGPT Useで具体化し、Epic 2〜7はJIT Planningまでempty scaffoldを維持する。 | commit `abbd652c7d1e05fc269fff08be238e58cc6eef0a`、GitHub Issue #324〜#330、17 direct edges、`validate nodes=219` | Epic 1のfresh ChatGPT spec review後、Issue candidate承認へ進む |
 
 ### Complete-bundle revisionの転送・保存証跡
 
@@ -187,7 +190,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 変更点/差分（Planとの差分） (任意)
 - 予定の変更:
-  - なし。Epic Node／dependencyはHuman承認後にmaterializeする計画どおり未作成。
+  - Human承認後、7 Epic Nodeとdependencyをmaterializeした。
+  - Humanの追加判断により、Epic 1はEpic全体1 PRではなく各Issueの専用branch／個別PR／review／Human merge方式を採用する。
 - やらないことにしたもの（理由）:
   - 原本ZIPの現行authoring-pack schema化は行わない。検査済みMarkdownを直接配置し、原本は転送証跡として扱う。
 
@@ -210,7 +214,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## フォローアップ（別Issue化） (必須)
 - Epic/Issue links:
-  - 未作成。Humanの7 Epic承認後にPlan §6のportfolioをNode化する。
+  - Epic Node: `epic-00324`〜`epic-00330`を作成済み。
+  - Epic 1 Issue: candidateのみ。fresh reviewとHuman承認前はmaterializeしない。
 
 ## 省略/例外メモ (必須)
 - 該当なし
