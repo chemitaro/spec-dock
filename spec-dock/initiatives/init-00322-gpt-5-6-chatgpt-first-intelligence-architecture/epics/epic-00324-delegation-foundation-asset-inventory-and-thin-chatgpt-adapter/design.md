@@ -215,8 +215,8 @@ R1 -[hidden]-> C1
 | DS-001 Inventory and authority map           | maintained assetの所在、owner、projection、lifecycleを固定する。                   | E-RQ-002、E-RQ-009。E-AC-001、E-AC-009。                            | `E1-I01`               | static inventory schema、coverage rule   | manifest、scan report、path／parity tests                            |
 | DS-002 Adapter boundary and command skeleton | separate executable、layered package、command tree、result envelopeを確立する。 | E-RQ-001、E-RQ-003。E-AC-002、E-AC-008。                            | `E1-I02`               | CLI／application public contract         | help／parser tests、dry-run fixture、forbidden-claim tests           |
 | DS-003 Binding, anchors, strict preflight    | exact target／branch／HEADとno-hidden-Gitを成立させる。                          | E-RQ-004、E-RQ-005、E-RQ-008、E-RQ-011。E-AC-003、E-AC-004、E-AC-007。 | `E1-I03`               | TargetBinding、AnchorSet、PreflightResult | hermetic Git tests、digest fixtures、argv spy                       |
-| DS-004 Backend and Human Relay               | operator-configured transportと同一contract recoveryを提供する。                | E-RQ-006、E-RQ-007、E-RQ-011。E-AC-005、E-AC-006。                   | `E1-I04`               | BackendInvocationPort、RelayPackage      | backend stub tests、relay round-trip、workflow doc                  |
-| DS-005 Metrics and changeability             | M-001〜M-013 feasibility、baseline、M-008 drillを準備する。                     | E-RQ-010。E-AC-010、E-AC-011。                                     | `E1-I05`               | MetricFeasibilityRecord、baseline rubric | coverage matrix、baseline artifact、changeability rehearsal         |
+| DS-004 Backend and Human Relay               | operator-configured transportと同一contract recoveryを提供し、backend/configに対するM-008実証を供給する。 | E-RQ-006、E-RQ-007、E-RQ-011。E-AC-005、E-AC-006、E-AC-011 supporting evidence。 | `E1-I04` | BackendInvocationPort、RelayPackage | backend stub tests、relay round-trip、workflow doc、backend/config change evidence |
+| DS-005 Metrics and changeability             | M-001〜M-013 feasibility、baseline、M-008測定protocol／fixtureを準備する。        | E-RQ-010。E-AC-010。E-AC-011はprotocol／fixture evidenceのみ。       | `E1-I05`               | MetricFeasibilityRecord、baseline rubric | coverage matrix、baseline artifact、changeability measurement protocol |
 | DS-006 Distribution and compatibility        | installer、dogfood、docs、current lane regressionを統合する。                   | E-RQ-002、E-RQ-009。E-AC-009、E-AC-012。                            | `E1-I06`               | managed asset API、docs navigation       | init／update tests、provider-dogfood parity、current lane regression |
 | DS-007 Final quality and delivery            | 各implementation PRがmerge済みのlatest mainからE1-QA専用branchを作り、全contractsを統合検証する。 | 全E-RQ、全E-AC。 | `E1-QA` | Issue単位deliveryとEpic closure boundary | full tests、exact HEAD smoke、rollback rehearsal、PR merge chain、closure matrix |
 
@@ -389,8 +389,8 @@ Foundationとして許可する共通option:
 --repo-root <path>
 --ref <named-branch>
 --context <text>
---context-file <external-or-untracked-file>
---file <external-or-untracked-file>
+--context-file <repository-external-or-ignored-workbench-file>
+--file <repository-external-or-ignored-workbench-file>
 --format text|json
 --dry-run
 --backend-command <operator-configured-command>
@@ -407,7 +407,7 @@ implicit active target fallback for formal invocation
 implicit local-context fallback
 ```
 
-`--context-file`と`--file`はregular non-symlink fileに限定し、Git-tracked file、secret-like path、`.env*`を拒否する。
+`--context-file`と`--file`はregular non-symlink fileに限定し、Git-tracked file、repository内のnon-ignored untracked file、secret-like path、`.env*`を拒否する。許可対象はrepository外またはGit ignoredなWorkbench fileだけであり、clean preflightの除外集合は設けない。
 
 ### 8.4 Result envelope
 
@@ -507,7 +507,7 @@ Formal commandは次を順番に確認する。
 9. local HEADとremote HEADが一致する。
 10. preflight開始時とfinal guard時でrepository snapshotが変化していない。
 11. target metadataとcanonical pathがexpected HEADでtrackedである。
-12. explicit external fileがtracked contentではない。
+12. explicit external fileがrepository外またはGit ignoredなWorkbench fileであり、tracked contentおよびrepository内non-ignored untracked contentではない。
 13. expected HEADとrequest bindingが一致する。
 
 ### 10.3 Failure classifications
@@ -679,11 +679,15 @@ Rules:
 ```text
 schema_version
 request_digest
+request_body | request_package_reference
+request_package_digest
 task_kind
 target_binding
 deterministic_anchors
-operator_context_digest
-external_file_digests
+operator_context_refs[]
+operator_context_digests[]
+external_file_refs[]
+external_file_digests[]
 required_repository_access
 constraints
 forbidden_authority_claims
@@ -699,6 +703,13 @@ authority = evidence_only
 ```
 
 Relay packageにtracked repository content本文を含めない。
+
+Rules:
+
+* `request_body`をinline保持するか、Workbench内のimmutable request packageをsafe logical referenceとSHA-256 digestで参照する。digestだけを残してrequestを再構成不能にしてはならない。
+* `operator_context_refs[]`と`external_file_refs[]`はprivate absolute pathではなくrelay packageから解決可能なsafe logical referenceを持ち、各digestと対応する。
+* relay実行結果またはre-entry recordは`request_digest`をechoする。
+* Mainはre-entry時にechoされたdigest、relay packageのdigest、再構成したrequest digestの一致を確認し、不一致ならadoptionをblockedにする。
 
 ### 13.2 Relay flow
 
@@ -739,10 +750,10 @@ else binding established
     Adapter --> Main : evidence-only result
   else backend unavailable
     Backend --> Adapter : transport failure
-    Adapter -> WB : relay package with request digest
+    Adapter -> WB : reproducible request package + digest
     Adapter --> Main : operator action required
     Main -> Human : approved relay handoff
-    Human -> GPT : same bound request
+    Human -> GPT : reconstructed same bound request
     GPT -> GH : verify exact repo / branch / HEAD
     GPT --> Human : complete output
     Human -> WB : complete result
@@ -757,11 +768,14 @@ end
 Human Relay後のMainは次だけを確認する。
 
 * relay request digest
+* relay request bodyまたはcontent-addressed request package reference
+* operator context／external fileのsafe logical referenceとdigest
 * exact binding
 * complete output presence
 * output source／session reference
 * forbidden authority claim
 * preservation classification
+* returned output／re-entry recordがechoするrequest digestとの一致
 
 Mainはraw outputを自動でcanonical docsへ書かず、既存のpreservation、EAL、canonical integration、fresh reviewer workflowへ戻す。
 
@@ -1002,13 +1016,17 @@ skinparam shadowing false
 
 actor Human
 participant "Main Orchestrator" as Main
+participant "Executor" as Executor
 participant "Issue Branch" as Branch
 participant "Pull Request" as PR
 participant "main" as MainBranch
 
 Main -> MainBranch : verify dependency merged SHAs
 Main -> Branch : create from then-current main
-Main -> Branch : implement and verify one Issue
+Main -> Executor : delegate one bounded Issue
+Executor -> Branch : implement and run Issue verification
+Executor --> Main : diff and verification evidence
+Main -> Branch : inspect and commit explicit transition
 Main -> PR : open Issue-specific PR
 PR -> PR : CI and required reviews
 Human -> PR : merge
@@ -1027,7 +1045,7 @@ Main -> Branch : start dependent Issue from updated main
 * AnchorSet normalization／digest
 * exact ID／path resolver
 * parent／dependency traversal
-* external file policy
+* external file policy: repository-external／ignored Workbenchのpositive testsと、tracked／non-ignored untracked／symlink／secret-likeのnegative tests
 * strict preflight classification
 * config resolution
 * backend argv construction
