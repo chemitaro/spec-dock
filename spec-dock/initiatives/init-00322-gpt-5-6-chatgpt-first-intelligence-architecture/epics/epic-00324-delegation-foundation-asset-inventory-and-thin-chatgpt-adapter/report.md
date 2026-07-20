@@ -2,120 +2,131 @@
 種別: レポート（Epic）
 ID: "epic-00324"
 タイトル: "Delegation Foundation Asset Inventory and Thin ChatGPT Adapter"
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-20"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["init-00322"]
 ---
 
-# epic-00324 Delegation Foundation Asset Inventory and Thin ChatGPT Adapter — レポート（進捗 / 決定 / 結果）
+# epic-00324 Delegation Foundation Asset Inventory and Thin ChatGPT Adapter — レポート
 
-> このテンプレートは observed evidence slot scaffold です。Epic の進捗、採用判断、reviewer state、blocking / next action、closure / follow-up を記録する starting shape を提供しますが、workflow / compliance authority ではありません。判断の詳細と lifecycle policy は skills / docs / accepted ADRs / reviewer gates を参照し、観測した証跡だけをこの report ledger に残します。
+## 進捗サマリー
 
-## 進捗サマリー (必須)
-- 現在地（何が完了し、何が未完か）:
-  - ...
-- 次のマイルストーン:
-  - ...
+- 完了:
+  - Humanが承認した7 Epicを `epic-00324`〜`epic-00330`としてmaterializeした。
+  - Initiative Planの完全DAGを17件のdirect dependency edgeとして登録した。
+  - Epic 1のPlanning Bundle候補をChatGPT Use（GPT-5.6 Pro）で一括生成した。
+  - ChatGPT完全出力をbyte-exactなEvidence Artifactとして保存した。
+  - ローカル実装と照合し、`requirement.md`、`design.md`、`plan.md`へ採用した。
+  - Humanの補足指示により、Epic全体1 PR方式を撤回し、各Issueの専用branch／個別PR／review／Human merge方式へ改訂した。
+- 現在地:
+  - 正本3文書はfresh ChatGPT spec review前のreview targetである。
+- 未完:
+  - review targetをcommit／pushし、最新revisionに対するfresh ChatGPT spec reviewを完了する。
+  - Human承認後にのみIssue candidateを実Issueへmaterializeする。
 - ブロッカー:
-  - ...
+  - 現時点ではなし。review verdict取得まではPlanning promotionを行わない。
 
-## 証跡採用台帳（Evidence Adoption Ledger / 必須）
+## Materialization証跡
 
-Delegated draft、worker note、research、reviewer finding、discussion、command output を canonical artifact やEpic判断へ取り込む場合、この台帳に採用判断を記録する。raw transcript ではなく、orchestrator が検証した採否・理由・証跡・次アクションだけを記録する。
+- Parent Initiative: `init-00322` / GitHub Issue `#322`
+- Epic nodes:
+  - `epic-00324` / GitHub `#324`
+  - `epic-00325` / GitHub `#325`
+  - `epic-00326` / GitHub `#326`
+  - `epic-00327` / GitHub `#327`
+  - `epic-00328` / GitHub `#328`
+  - `epic-00329` / GitHub `#329`
+  - `epic-00330` / GitHub `#330`
+- Direct dependency edges: 17件
+- Validation: `nodes=219`
+- Materialization commit: `abbd652c7d1e05fc269fff08be238e58cc6eef0a`
+- Remote verification: local HEADとorigin branch HEADの一致を確認した。
+- Boundary:
+  - Epic 2〜7の正本文書はempty scaffoldを維持する。
+  - Epic 1のIssue candidateは計画上のcandidate keyであり、実Issue IDではない。
 
-- `adoption_status`: `adopted` / `partially_adopted` / `rejected` / `deferred` / `stale` / `blocked`
-- `blocked` または `stale` の unresolved entry は promotion / implementation start / issue ready / issue finish / phase completion を止める。
-- `deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せる。
-- Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
-- Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
+## 証跡採用台帳（Evidence Adoption Ledger）
 
-| 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
-|---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| ID | adoption_status | source | target | rationale | evidence | blocking | next_action |
+|---|---|---|---|---|---|---|---|
+| EAL-001 | `partially_adopted` | ChatGPT Use session `init00322-epic1-planning` / GPT-5.6 Pro | `requirement.md`、`design.md`、`plan.md` | GitHub-synced revisionを参照したcomplete batchを初期候補として採用した。正本では不正なfrontmatter終端を正規化し、その後EAL-003のHuman指示でDelivery Topologyを改訂した。 | `artifacts/20260720t010710z-chatgpt-output-chatgpt-epic1-integrated-planning-bundle-candidate.md`; source revision `abbd652c7d1e05fc269fff08be238e58cc6eef0a`; SHA-256 `94ee25f8ec15c0d25d3d11c6690ff985ec17fd13f1f312fb2725c95cc693614c`; 141447 bytes | yes | 改訂後review targetをpushし、fresh ChatGPT spec reviewを実施する |
+| EAL-002 | `adopted` | repository facts / Main verification | ChatGPT候補のbackend設定記述 | `--backend-command`、`SPECDOCK_CHATGPT_COMMAND`、互換`ORACLE_CHATGPT_COMMAND`の解決順をprovider codeとshipped docsで確認した。 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack/backend_invoke_contract.py`; `src/spec_dock/assets/spec_dock/docs/reference_authoring_pack_backend.md` | no | fresh reviewで整合性を再確認する |
+| EAL-003 | `adopted` | Human補足指示 | Epic 1の`requirement.md`、`design.md`、`plan.md` | 既存候補がper-Issue PRを作らずE1-QAで一つのEpic PRへ集約する設計だったため、Issueごとのbranch／PR／review／Human mergeへ明示的に変更した。依存Issueは先行PRのmain merge後に更新済みmainから開始する。 | 本conversationの2026-07-20 Human指示、E-RQ-012、E-AC-013、design §20.4、plan §7.1／§22 | yes | 改訂revisionをfresh ChatGPT spec reviewへ回す |
 
-## 目的整合台帳（Objective Alignment Ledger / 必須）
+### Preservation receipt
 
-主要目的と副次要件の主従が逆転していないことを記録する。特に clarification / authoring / handoff の変更では、primary objective evidence、secondary requirement evidence、inversion risk、reviewer verdict を残す。
+- evidence mode: `github-synced`
+- source / Workbench / imported Artifact SHA-256: `94ee25f8ec15c0d25d3d11c6690ff985ec17fd13f1f312fb2725c95cc693614c`
+- source / Workbench / imported Artifact size: `141447` bytes
+- byte comparison: pass
+- artifact import:
+  - `committed=true`
+  - `import_kind=chatgpt-output`
+  - `storage_identity=blank`
+  - `warning_codes=[]`
+- complete output preservation: pass
+- diff-check exception: byte-exact Artifactの2517行目にsource由来の行末空白1件を保持する。canonical 3文書とreportには行末空白なし。
+- canonical adoption: partial until fresh review passes
 
-| 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
+## 目的整合台帳（Objective Alignment Ledger）
+
+| 対象 | primary objective evidence | secondary requirement evidence | inversion risk | reviewer verdict |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | 後続Epicが共用するDelegation Foundation、asset inventory、thin adapterへEpic 1を限定した。 | GitHub exact HEAD、no-hidden-Git、Human Relay、metrics baseline、provider／dogfood parityを受入条件化した。 | low | pending |
+| OAL-002 | Epic 2〜7をJIT具体化のまま保持した。 | Epic 1計画には6 implementation candidateと1 final quality candidateだけを提案した。 | none | pending |
+| OAL-003 | Issue責務とreview／rollback単位を一致させるため、各Issueを独立PRとしてdeliveryする。 | dependency merge後のmainからbranch作成、parallel branchのbase更新、E1-QA固有PRを定義した。 | low | pending |
 
-## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
+## 仕様authoringゲート（Spec Authoring Gate）
 
-Requirement / design / plan の phase promotion ごとに、調査、未確定事項、回答、採用判断、reviewer verdict、blocking / non-blocking、次アクションを記録する。
-
-| フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
+| phase | investigated facts | open questions / answers | adoption decision | reviewer verdict | blocking | promotion / next_action |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | Initiative正本、承認済み7 Epic DAG、ADR、current provider／installed／dogfood構造、GitHub exact revision | open questionなし | ChatGPT complete batchから部分採用 | pending | yes | pushed revisionへのfresh review |
+| design | requirement、layered runtime、authoring backend contract、Git ownership boundary、PlantUML | open questionなし | ChatGPT complete batchから部分採用 | pending | yes | local diagram validation後にfresh review |
+| plan | requirement／design、Issue slicing規則、final quality Issue、dependency／parallel lane、Human指定のper-Issue PR方式 | 実Issue materializationはHumanの別承認待ち | ChatGPT complete batchをHuman指示で改訂して部分採用 | pending | yes | candidate keysとIssue単位Delivery Topologyの妥当性をfresh review |
 
-## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
-- 委任 authoring の使用:
-  - used / not used
-- 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
-- lifecycle state（契約値）:
-  - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
-- 昇格不可 state:
-  - `stale`, `rejected`, `superseded`, `blocked`
-- 標準出力先:
-  - 対象 scope の `artifacts/` direct child にある flat Markdown
-  - filename: typed artifacts use `<ts>-<type>-<slug>.md` or `<ts>-<nn>-<type>-<slug>.md`; blank artifacts use `<ts>-<slug>.md` or `<ts>-<nn>-<slug>.md`
-- 軽量 provenance:
-  - `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
-  - 互換 label: role, phase, scope, authorization source, source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
-- 禁止 self-claim:
-  - `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
-- 禁止 wildcard token:
-  - `*`, `grants.*`, `all`
-- 標準必須にしない field:
-  - task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
-- historical note:
-  - legacy `discussions/` と既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
+## 委任ドラフト証跡（Delegated Draft Evidence）
 
-| ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+- 使用: external ChatGPT authoring evidence laneを使用した。
+- authorization source: HumanがEpic 1の一括具体化とspec reviewにChatGPT Useを代替利用するよう明示した。
+- lifecycle: `produced` → `integrated` → fresh review pending
+- canonical authority: ChatGPT出力単独では成立しない。
+- local sub-agentによるscope-local direct-write draft: not used
+- raw evidence path: `artifacts/20260720t010710z-chatgpt-output-chatgpt-epic1-integrated-planning-bundle-candidate.md`
+- intended targets: `requirement.md`、`design.md`、`plan.md`
+- reflected_to: 正本3文書（frontmatter終端正規化と、Human指示によるIssue単位Delivery Topology改訂を実施）
+- reviewer result: pending
+- promotion decision: pending
 
-### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
-| 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
-|---|---|---|---|---|
-| ワークフロー単位の許可証跡不足（missing workflow-scoped authorization evidence） | blocked / incomplete | ワークフロー利用依頼の authorization source と boundary を記録する、または手動 authoring に戻す | ワークフロー単位の named role 許可（Workflow-Scoped Authorization） / この section | ineligible |
-| 前段 reviewer pass 不足 / stale（missing/stale previous reviewer pass） | blocked / incomplete | レビューゲートを再実行する（rerun reviewer gate） | Spec Authoring Gate / reviewer evidence | ineligible |
-| 設計中の要件 gap（requirement gap during design） | blocked / incomplete | requirement phase へ戻す | 判断台帳 / ゲート証跡（decision ledger / gate evidence） | ineligible |
-| 計画中の設計 gap（design gap during plan） | blocked / incomplete | design phase へ戻す | 判断台帳 / ゲート証跡（decision ledger / gate evidence） | ineligible |
-| ロール利用不可（role unavailable） | blocked / manual path | 利用不可を記録し、妥当なら手動で続行する | この section | ineligible |
-| 禁止行為の試行（forbidden action attempt） | rejected | ドラフトを破棄し incident を記録する | この section / decision ledger | ineligible |
-| 古いドラフト（stale draft） | stale | 再生成または差分調整する | この section | ineligible |
-| 置換済みドラフト（superseded draft） | superseded | 置換先ドラフトを参照する | この section | ineligible |
-| 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
-| reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（reviewer gate evidence） | ineligible |
+## 決定事項
 
-## 決定事項（ADRリンク） (必須)
-- adr-xxxx-...: <1行要約>
-- ...
+- Initiative ADR-01: ChatGPT、Main、Runtimeの責務分離を継承する。
+- Initiative ADR-03: thin adapterとGitHub exact HEAD bindingを継承する。
+- Initiative ADR-06: Git transactionはMainが所有し、adapter／executorは実行しない。
+- Initiative ADR-08: Workbenchを一時証跡、Artifactと`report.md`を永続証跡とする。
+- Epic 1では旧surface削除、global cutover、semantic Prompt完成、automatic canonical adoptionを行わない。
+- Epic 2〜7はmaterialize済みだが、JIT Planningまで正本文書を具体化しない。
 
-## 完了した Issue / PR / Release (必須)
-- iss-xxxx-...: Done（PR: ...）
-- ...
+## Issue candidate状況
 
-## 受け入れ条件（E-AC）の達成状況 (必須)
-- E-AC-001: Pass / Fail（証拠: ...）
-- E-AC-002: ...
+- `E1-I01`〜`E1-I06`: implementation Issue candidate。未materialize。
+- `E1-QA`: 全implementation candidateに依存するfinal quality Issue candidate。未materialize。
+- Human approval前にGitHub Issue、SpecDock Issue Node、Issue dependencyを作成しない。
 
-## ロールアウト結果（必要なら） (任意)
-- 段階公開の状況:
-  - ...
-- 監視値（エラー率/レイテンシなど）:
-  - ...
-- 障害/アラート:
-  - ...
+## 受け入れ条件の達成状況
 
-## フォローアップ（別Issue化） (必須)
-- iss-xxxx-...:
-  - ...
+- E-AC-001〜E-AC-013: 実装前のため未達。
+- Planning gate: fresh ChatGPT spec review待ち。
+- Epic execution readiness: 未成立。
+- Epic completion: 未成立。
 
-## 省略/例外メモ (必須)
-- 該当なし
+## フォローアップ
+
+- fresh ChatGPT spec reviewのblocking findingを正本へ反映し、必要なら新revisionで再レビューする。
+- review pass後、HumanへIssue candidate構成の承認を求める。
+- Epic 2〜7は各実施時点にJIT Planningする。
+
+## 省略／例外メモ
+
+- 「Epic仕様書」はSpecDock上の`requirement.md`、`design.md`、`plan.md`のPlanning Bundleとして管理する。独立した第4文書は作成しない。
