@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "epic",
+  "id": "epic-00324",
+  "title": "Delegation Foundation Asset Inventory and Thin ChatGPT Adapter",
+  "slug": "delegation-foundation-asset-inventory-and-thin-chatgpt-adapter",
+  "created_at": "2026-07-20T09:22:44+09:00",
+  "updated_at": "2026-07-20T09:22:44+09:00",
+  "parent_id": "init-00322",
+  "initiative_id": "init-00322",
+  "epic_id": null,
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 324,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
