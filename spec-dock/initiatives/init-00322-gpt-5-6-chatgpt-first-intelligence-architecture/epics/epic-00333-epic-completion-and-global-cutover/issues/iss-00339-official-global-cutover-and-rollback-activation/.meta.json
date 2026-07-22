@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00339",
+  "title": "Official Global Cutover and Rollback Activation",
+  "slug": "official-global-cutover-and-rollback-activation",
+  "created_at": "2026-07-23T08:37:49+09:00",
+  "updated_at": "2026-07-23T08:40:23+09:00",
+  "parent_id": "epic-00333",
+  "initiative_id": "init-00322",
+  "epic_id": "epic-00333",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 339,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "depends_on": [
+    "iss-00338"
+  ]
+}
