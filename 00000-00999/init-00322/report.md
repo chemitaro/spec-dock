@@ -219,3 +219,34 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 省略/例外メモ (必須)
 - 該当なし
+
+<!-- spec-dock-portfolio-materialization:b9bf1b1b3a7637784d19a6928b7d50d8881011bf1343faf65804a941c03a3b43 -->
+
+## Portfolio Materialization Disposition — 20260722t074747z
+
+- Candidate ZIP: `20260722t074747z-init-00322-complete-portfolio-candidate-v16.zip`
+- Observed transport filename: `20260722t074747z-init-00322-complete-portfolio-candidate-v16(1).zip`
+- Candidate SHA-256: `b9bf1b1b3a7637784d19a6928b7d50d8881011bf1343faf65804a941c03a3b43`
+- Source repository／branch／HEAD: `chemitaro/spec-dock` / `codex/init-00322-chatgpt56-planning-pack-adoption` / `2667b4342f803606859a71740b29f0b51b1b3f37`
+- Fresh Formal Review: `PASS` (`20260722t-review-pass-init-00322-candidate-v16.md`; `sha256: 1c9ac416aa4805f918f780955da068576d396686465400ff54008ebee7120a49`)
+- Human approval source record: `spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/.workbench/initiative-planning/b9bf1b1b3a7637784d19a6928b7d50d8881011bf1343faf65804a941c03a3b43/human-portfolio-approval.md` (`sha256: 95e62c14a65d6747aadec201a72a97af67fdec2a820b05fbe30580693fcfab8c`)
+- Canonical Human approval／M-019 evidence: `spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/artifacts/20260721t231721z-03-disc-human-portfolio-approval-and-m019-evidence.md`
+- M-019 signed matrix: `12/12 PASS`, violations `0`, approver `iwasawayuuta`, approved at `2026-07-22T11:13:45Z`
+- Materialized Portfolio: 3 Epic Nodes / 7 Issue Nodes / 9 direct dependencies
+- Legacy retirement: old 7 Epic Nodes / 17 direct dependencies retired and verified
+- Initiative canonical replacement: requirement／design／plan `replacement-exact`
+- Epic canonical rendering: all 3 Epic Bundles bound and `replacement-exact`
+- Canonical Initiative Artifacts: `25` entries from `ARTIFACT-MATERIALIZATION-MAP.json`
+- Canonical Epic ADRs: `4` entries rendered `accepted`／`authority: accepted`／`mirror_eligible: true` under `EPIC-ADR-ADOPTION.md` and verified against the source collector contract
+- Package-only non-authoritative Artifacts: `1`
+- M-017 materialization evidence locator: `spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/.workbench/initiative-planning/b9bf1b1b3a7637784d19a6928b7d50d8881011bf1343faf65804a941c03a3b43/staging-inspection-ledger.md#M-017-materialization-evidence`
+- M-018 publication evidence locator: `spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/.workbench/initiative-planning/b9bf1b1b3a7637784d19a6928b7d50d8881011bf1343faf65804a941c03a3b43/staging-inspection-ledger.md#M-018-publication-evidence`
+- M-019 evidence locator: `spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/artifacts/20260721t231721z-03-disc-human-portfolio-approval-and-m019-evidence.md` (`source-record-sha256: 95e62c14a65d6747aadec201a72a97af67fdec2a820b05fbe30580693fcfab8c`)
+- Validation: doctor／validate／sync／repository conventions／candidate-to-canonical parity PASS
+- Disposition: `materialized-and-ready-for-one-explicit-commit`
+- Publication evidence model: pre-commit report. Observed commit／push／remote HEAD are authoritative in Git／remote ref and the Candidate-SHA-bound Workbench ledger, not predicted in this block.
+
+## Candidate v16 Non-blocking Follow-up
+
+- `INIT-00322-V16-RT-001`: Epic 2のactor-journey図へ共通joinを明示する可読性改善は、Candidate v16の内容を変更せず、将来の別Candidate revisionとfresh Formal Reviewで扱う。
+- Candidate v16の承認済みbytesおよび意味内容には、このP3修正を混入していない。
