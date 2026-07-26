@@ -5,7 +5,7 @@ ID: "iss-00334"
 関連GitHub: ["#334"]
 状態: "draft | approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-23"
+最終更新: "2026-07-27"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00331", "init-00322"]
 ---
@@ -50,6 +50,9 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-20260726-RT001 | open | implementation | fresh Red Team v14 review / Codex Main | ChatGPTの三文書responseからmandatory controlsを含むimmutable Issue Candidate ZIPへ変換するownerとcreate→archive Review integration testが閉じていない | Candidate内で補完しない; generic packへ再構成する; Issue-local packaging責務を最小追加する | Issue-local packaging責務を最小追加する | 親E1-I1、Initiative Design、ADR 20がIssue Candidate packageを要求し、v14のREQ-004／Design 9／S03は三文書出力で止まる | promoted_to_plan | `artifacts/20260726t153105z-disc-v14-red-team-finding-admission.md`; `artifacts/20260726t152913z-chatgpt-output-v14-fresh-red-team-review.md` | Blue Team v15でRequirement／Design／Planを完全置換し、fresh Red Team review後にresolvedへ更新する |
+| D-20260726-RT002 | resolved | scope | fresh Red Team v14 review / Codex Main | 暫定Charterのsame-thread Blue運用を恒久product contractへ昇格すべきか | Candidateへsession locatorを追加する; 現在の運用だけ同一threadを維持する | Candidate変更は行わず、現在の運用だけ同一Blue threadを維持する | Charterはnon-authoritative evidenceであり、将来標準への自動適用を禁止する。D-001〜D-024、親canonical docs、accepted ADRに恒久same-thread locator義務はない | rejected | `artifacts/20260726t153105z-disc-v14-red-team-finding-admission.md`; Charter §§1, 8, 21 | product changeなし。v15修正は既存Blue threadで継続する |
+| D-20260726-RT003 | open | implementation | fresh Red Team v14 review / Codex Main | existing archive primitive再利用方針とS05のexact target/allowed pathsが両立しない | 新validatorを複製する; private helperへ依存する; existing primitiveを後方互換にbounded extensionする | existing primitiveを後方互換にbounded extensionするpathだけをS05へ追加する | exact sourceのgeneric validatorはroot／metadataをhard-codeし、v14のREQ-019／Design 8.2はextension/reuseと重複禁止を要求する | promoted_to_plan | `artifacts/20260726t153105z-disc-v14-red-team-finding-admission.md`; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack/zip_contract.py` | Blue Team v15でS05 allowlistとfocused regressionを修正し、fresh Red Team review後にresolvedへ更新する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -64,6 +67,10 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
 | EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-20260726-V14-REVIEW | partially_adopted | reviewer / fresh Red Team / read-only | next Candidate revision instruction | v14 Reviewの3 findingをMain Admissionで個別判定し、RT-001とRT-003だけをrevision対象として採用した | `artifacts/20260726t152913z-chatgpt-output-v14-fresh-red-team-review.md` SHA-256 `30a6eaa65a92bd9fc20b2dc0f974a9e0227a2d9bb7ae16a23eadcd8a720a1ec1`; thread `6a6621ad-d8fc-83ee-a2c1-f44aafe55b81` | admitted findingだけを同一Blue threadへ渡し、v15をfresh reviewする |
+| EAL-20260726-RT001 | adopted | reviewer finding / Codex Main admission | v15 `requirement.md`、`design.md`、`plan.md` | 親が要求するIssue Candidate package chainのIssue-local blockerであり、最小修正で閉じられる | `artifacts/20260726t153105z-disc-v14-red-team-finding-admission.md` §3.1 | Blue Team v15 revision、deterministic preflight、fresh Red Team review |
+| EAL-20260726-RT002 | rejected | reviewer finding / Codex Main admission | no Candidate change | init-00322限定の運用契約を恒久product requirementへ昇格するoverreachであり、Candidate blocking impactを認めない | `artifacts/20260726t153105z-disc-v14-red-team-finding-admission.md` §§2, 4 | Candidate変更なし。同一Blue thread継続は現在の運用で満たす |
+| EAL-20260726-RT003 | adopted | reviewer finding / Codex Main admission | v15 `design.md`、`plan.md` | Candidate自身のreuse義務とexact source上のhard-coded generic validatorに対してS05 allowlistが実装不能な矛盾を持つ | `artifacts/20260726t153105z-disc-v14-red-team-finding-admission.md` §3.2; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack/zip_contract.py` | Blue Team v15 revision、deterministic preflight、fresh Red Team review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -80,6 +87,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
 | 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement / design / plan — Candidate v14 | parent Initiative／Epic、accepted ADR 20／22、D-001〜D-024、exact source HEAD `feefb9e8e96015e48cdb1f837e8f775da8b3d8aa`、deterministic preflight `121/121 PASS` | RT-001とRT-003をadmit。RT-002はCandidate変更対象外 | partially_adopted | failed（fresh Red Team evidence。canonical `spec-reviewer` passではない） | yes | 同一Blue threadでv15完全置換 → deterministic preflight → fresh Red Team review |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
