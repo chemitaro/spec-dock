@@ -2,831 +2,231 @@
 種別: 要件定義書（Issue）
 ID: "iss-00334"
 タイトル: "Implement ChatGPT Issue Planning Workflow"
-関連GitHub: ["#334"]
-状態: "draft | approved"
-作成者: "iwasawayuuta"
-最終更新: "2026-07-23"
+状態: "draft"
+作成者: "Blue Team"
+最終更新: "2026-07-27"
 親: ["epic-00331", "init-00322"]
+planning_profile_guidance: "strict"
+planning_profile_guidance_source: "Main-supplied current guidance; assurance classification remains external"
 ---
 
 # iss-00334 Implement ChatGPT Issue Planning Workflow — Issue 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
-
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
-
----
-
 ## 0. 文書の位置づけ
 
-### この文書が定義すること
-
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
-
-### この文書が定義しないこと
-
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
-
----
-
-## 1. 概要
-
-### 1.1 目的
-
-このIssueで達成したい目的を1〜3文で記述する。
-
-- 目的:
-  - ...
-
-### 1.2 観測可能な成果
-
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
-
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
-
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
-
-### 1.3 このIssueの種類
-
-該当するものに印を付ける。
-
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
-
----
-
-## 2. 背景・現状
-
-### 2.1 現在の状態
-
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
+本書は、既存Issue NodeまたはSeedから完全なIssue Planning BundleをJIT生成し、独立Review、Human Gate、採用、検証、Planning publicationを経て実装引き渡し可能な状態を導出する製品能力の **WHAT** を定義する。実装方法とTDD順序は `design.md` と `plan.md` が所有する。
 
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
+このCandidate packageは `authority=candidate`、`adoption_status=unreviewed` の非正本Evidenceである。現在のsource bindingは `chemitaro/spec-dock` / `iss-00334-implement-chatgpt-issue-planning-workflow` / `2e86ec64289ec8102470df75329025d46bbfa51a`。本書の存在だけではReview結果、Human authorization、canonical adoption、assurance mutation、execution readiness、PR readiness、merge readiness、Issue finish、Epic completionのいずれも成立しない。
 
-### 3.3 このIssueで再定義してはいけないもの
+現在のplanning profileはMainから `strict` として供給されたguidanceである。Candidateは `.assurance.json` を変更せず、classification／compositionはMainがCandidate外で既存Workflowに従って実行する。
 
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
+## 1. Product Outcome
 
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
+Humanがofficial `spec-dock-issue-planning` Skillを起点に、MainとSpecDockが次を一つのIssue Planning walking skeletonとして完了できる。
 
----
+1. exact repository／branch／HEADへbindしたIssue Planningを開始する。
+2. `spec-dock-chatgpt planning create`でChatGPT Plannerからcomplete `requirement.md`／`design.md`／`plan.md` responseを受け取り、Core Runtimeがmandatory controlsを付与したimmutable Issue Candidate ZIPをfinal artifactとして生成する。
+3. `spec-dock-chatgpt review planning`でread-only Reviewを行う。
+4. 必要時は`spec-dock-chatgpt planning revise`でSemantic complete replacementまたはbounded Mechanical revisionを行う。
+5. exact reviewed identityへbindされたHuman Issue Plan Adoption and Implementation-Start Authorization後にだけ、mode固有の採用／parity、validation、Planning publicationを実行する。
+6. 上記の論理積からだけ実装引き渡し可能状態を導出する。
 
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
+## 2. Actors and Authority
 
-### 4.1 主な関係者（Actor）
+| Actor | Authority |
+|---|---|
+| Human | Issue Plan adoption、implementation start、mergeの最終判断 |
+| `spec-dock-issue-planning` Skill | Human entrypoint、Review transport／Revision lane／Human Gateのsemantic selection |
+| Codex Main | context収集、deterministic filesystem／Git操作、canonical placement、commit／push、evidence統合 |
+| `spec-dock-chatgpt` | target解決、Git preflight、Prompt合成、Oracle/backend起動、result retrievalのthin adapter |
+| Core Runtime | three-document response validation、immutable Issue Candidate packaging、safe archive、identity、adoption、parity、validation、publication、derived readinessの決定的処理 |
+| ChatGPT Planner | complete三文書responseの生成。outputはRuntime packaging前かつadoption前のEvidence |
+| ChatGPT Reviewer | read-only findings／verdictの生成。repository／Candidateを変更しない |
 
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
+## 3. Scope
 
-| 関係者（Actor） | 役割 | このIssueとの関係 |
-|---|---|---|
-| ... | ... | ... |
+### 3.1 In Scope
 
-### 4.2 開始条件（Trigger）
+- official `spec-dock-issue-planning` SkillからのIssue Planning起動。
+- independent repo-local `spec-dock-chatgpt` command family: `planning create`、`planning revise`、`review planning`。
+- exact target、parent、dependency、relevant paths、repository／branch／HEADの解決。
+- GitHub-visible named branch、clean tree、upstream、local HEADとremote HEADの一致を確認するpreflight。
+- provider-managed closed Markdown Prompt resources。
+- complete Requirement／Design／Plan authoringと、mandatory controlsを含むimmutable Issue Candidate ZIP packaging。
+- `archive-candidate` defaultと、material reasonがある場合の`git-bound` fallback。silent fallbackなし。
+- Semantic complete replacementとbounded Mechanical revision。
+- read-only Review outputのCandidate外保存と基本的なpre／post mutation guard。
+- Human Gate、deterministic adoption、parity、validation、Planning publication、derived readiness。
+- provider-first source、wheel／sdist、fresh init、update、dogfood parity。
+- feature-complete直前にHumanが選ぶeligible IssueでのJIT dogfood。
+- Issue-local tests、docs、Skill、Prompt、provider／installed projection。
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
+### 3.2 Mandatory Non-goals
 
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
+1. **Current Portfolio replanning禁止:** 現在のHuman-approved Initiative／Epic Portfolioを再設計・再分割しない。
+2. **Downstream Issue pre-authoring禁止:** 後続IssueのRequirement／Design／Planを先行作成せず、他IssueのPlanningを本Issueの成果物として代行しない。
+3. **Human authority bypass禁止:** Human Portfolio Approval、Issue-local Human Gate、merge判断を自動化・代行・迂回しない。
+4. **Planning-only completion禁止:** Planning文書またはPlanning runだけをIssue完了とせず、Workflow implementation、tests、docs、projectionを完了する。
 
-### 4.3 代表シナリオ
+### 3.3 Routed Outside This Issue
 
-#### シナリオ SC-001:
+shared Issue delivery／report／HEAD cycle、PR merge semantics、Issue finish、lifecycle recovery、Epic completion、他Initiativeへ適用する一般Review frameworkは既存ownerの外部制約として参照するだけであり、本Issueで再設計または実装しない。
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+## 4. Functional Requirements
 
-#### シナリオ SC-002:
+### REQ-001 Official Skill Entry
+Human向けofficial interfaceは`spec-dock-issue-planning` Skillであり、Skillはbounded contextを組み立ててrepo-local `spec-dock-chatgpt`へ委譲する。
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+### REQ-002 Independent CLI
+`spec-dock-chatgpt`はCore lifecycle CLIから独立したrepo-local executableとして提供し、`planning create`、`planning revise`、`review planning`を公開する。
 
-#### シナリオ SC-XXX:
+### REQ-003 Exact Git Binding
+正式runはrepository、named branch、expected HEAD、upstream、clean tree、local／remote equalityを検証し、GitHub exact HEADを確認できない場合はfail closedとする。default branch、添付tracked file、記憶へ暗黙fallbackしない。
 
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+### REQ-004 Complete Bundle and Runtime Candidate Package
+`planning create`は二層のoutput contractを持つ。ChatGPT Planner responseは一つのfresh sessionから得たcomplete `requirement.md`、`design.md`、`plan.md`だけであり、Main／Runtimeはその意味内容を再構成しない。成功時のpublic final artifactはCore Runtimeが生成するimmutable Issue Candidate ZIPであり、三文書に加えて`SOURCE-BASELINE.json`、`MANIFEST.json`、`CHECKSUMS.sha256`、`PLACEHOLDER-ORACLE-MAP.json`を必須とする。Runtimeはversion、logical filename、Candidate ID、internal root、source repository／branch／HEADを一回のrun identityから決定し、archive close後のexternal ZIP SHA-256を返す。partial bundle、mandatory control欠落、identity不整合、既存final target衝突ではfinal ZIPを残さない。
 
----
+### REQ-005 Closed Prompt Resources
+Planning／Review Promptはprovider-managed closed Markdown resourcesから構成し、public raw Prompt overrideまたはarbitrary custom templateを受け付けない。
 
-## 5. スコープ
+### REQ-006 Dual Review Transport
+`archive-candidate`をpre-canonical semantic iterationのdefaultとし、actual path／CI／GitHub inline review等のmaterial reasonがある場合だけ`git-bound`を選択できる。mode間のReview結果を流用せず、silent fallbackしない。
 
-### 5.1 対象範囲（In 対象範囲（Scope））
-
-このIssueで必ず実現することを列挙する。
-
-- ...
-- ...
-
-### 5.2 対象外（Out of 対象範囲（Scope））
-
-このIssueでは実現しないことを列挙する。
-
-- ...
-- ...
-
-### 5.3 変更しないもの（Unchanged / Must Not Change）
-
-関連はあるが、このIssueで変更してはいけないものを列挙する。
-
-- ...
-- ...
+### REQ-007 Dual Revision Lanes
+Semantic RevisionはChatGPT Blue Teamによるcomplete Candidate replacement、Mechanical Revisionは事前にpath／field／old-new literal／meaning invariant／diff budgetを閉じられる変更だけとする。どちらも変更後identityとfresh Reviewを必要とする。
 
-### 5.4 判断が必要な境界
+### REQ-008 Read-only Review Isolation
+ReviewerはCandidate、canonical file、patch、replacement document、revised ZIPを生成・変更しない。Review outputはCandidate／canonical pathから分離した明示destinationへ書き、Review前後でtracked treeとCandidate bytesが不変であることを確認する。
 
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
-
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 6. 要求される振る舞い
-
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
-
-### 振る舞い BH-001:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-002:
-
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
-
-### 振る舞い BH-XXX:
-
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 7. 受け入れ条件
-
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
-
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-002:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-XXX:
-
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
+### REQ-009 Single Adoption and Publication Lifecycle
+Issue Planningは次の一つのlifecycleだけを持つ。
 
 ```text
-...
+exact reviewed identity
+→ future fresh Planning Review result
+→ exact identity-bound Human Plan adoption and implementation-start decision
+→ archive: deterministic canonical adoption + candidate-to-canonical parity
+   or git-bound: exact reviewed-content canonical/commit parity
+→ required validation
+→ dedicated Planning commit/push and remote parity
+→ readiness derived from the complete conjunction
 ```
 
-### 例 EX-002: 出力例
-
-```text
-...
-```
-
-### 例 EX-003: エラー例
-
-```text
-...
-```
-
-### 契約上の注意
-
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
+Review、Human Gate、parity、validation、publicationのいずれか単独では実装引き渡し可能状態にならない。
 
-### 10.2 移行性
+### REQ-010 Archive Adoption
+archive pathではexact logical filename、ZIP SHA、internal root、MANIFEST identity、source bindingを照合し、fixed-order atomic replacement後にCandidate-to-canonical byte／declared-placeholder parityとCandidate外差分0を証明する。
 
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
+### REQ-011 Git-bound Adoption
+Git-bound pathではexact reviewed HEAD／target pathsへHuman decisionをbindし、reviewed target blobsの不変性、approval-only adoption diff、publication commit tree parityを証明する。
 
-### 10.3 可観測性
+### REQ-012 Planning Publication
+MainはPlanning専用commitを作成しpushし、local publication HEAD、remote branch HEAD、commit treeが一致することを確認する。publication failureではreadinessを導出しない。
 
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
+### REQ-013 Derived Readiness
+RuntimeはReview、Human decision、mode-specific parity、validation、publicationの論理積を評価してreadiness結果を返す。専用state database、receipt registry、custom Git refを新設しない。
 
-### 10.4 性能・スケール
+### REQ-014 Negative Adoption Fixtures
+以下を独立fixtureとして拒否し、どれか一件でも成立する場合はExecutor startを禁止する。
 
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
+| ID | Rejected condition |
+|---|---|
+| PA-NF-01 | archive Review resultだけ |
+| PA-NF-02 | git-bound Review resultだけ |
+| PA-NF-03 | Human Gateだけ |
+| PA-NF-04 | parityだけ |
+| PA-NF-05 | wrong logical Candidate filenameまたはZIP SHA |
+| PA-NF-06 | wrong reviewed HEADまたはtarget paths |
+| PA-NF-07 | source drift後のstale identity |
+| PA-NF-08 | adoption中のsemantic mutation |
+| PA-NF-09 | parity failure |
+| PA-NF-10 | validationまたはPlanning publication failure |
 
-### 10.5 セキュリティ・プライバシー
+### REQ-015 Workbench and Durable Evidence
+Workbenchはprompt、explicit external files、downloaded Candidate、Review result、diagnosticsのtemporary surfaceに限定する。Human decisionはWorkbench source JSON SHAとcanonical Issue Artifactへ記録し、raw transcriptを保存しない。`report.md`はPlanning receipt、Review authority、Human authorization authority、readiness state storeにしない。
 
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
+### REQ-016 Assurance Boundary
+Candidate generation、adoption、publication、readinessは`.assurance.json`を変更しない。Mainは既存assurance workflowをCandidate外で実行する。
 
----
+### REQ-017 Provider-first Projection
+実装authorityは`src/spec_dock/` provider surfaceに置き、installed／dogfood copiesは`init`／`update`で生成する。同一Issueでwheel、sdist、fresh init、update、provider／installed／dogfood parityを検証する。
 
-## 11. 制約
+### REQ-018 JIT Dogfood
+feature-complete直前にHumanが、open real Issue、E1 dependency chain外、Portfolio replanning不要、genuine refresh need、bounded rollback、他作業非干渉、Human Gate実行可能という条件を満たすtargetを一件選び、選択modeのfull positive chainを完走する。
 
-### 制約 CON-001:
+### REQ-019 Existing Primitive Reuse
+Git preflight、direct argv、redaction、safe ZIP、digest、atomic file replacement／publication、current validation primitivesを再利用し、同じ安全機能を別subsystemとして複製しない。
 
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
+### REQ-020 Delivery Boundary
+本Issueはone Issue／one branch／one Delivery PR／required review／Human mergeに従う。S99後のPR delivery、merge、finishはcurrent shared workflowへhandoffし、そのowner contractを本Issueで変更しない。
 
-### 制約 CON-002:
+## 5. Non-functional and Security Requirements
 
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
+### REQ-021 Sensitive Data and Process Safety
+Prompt、Operator Context、explicit files、Workbench、Candidate、Review outputへsecret、token、cookie、credential、private key、`.env`、production dump、private customer dataを含めない。process launchはdirect argvをdefaultとし、untrusted valueをshell stringへ補間しない。不可避なshell例外はHuman-approved Design、fixed template、安全なinput handling、injection regression、rollback mechanism／trigger／tested rollback evidenceを必要とする。
 
----
+### REQ-022 Candidate Archive Safety
+archive interfaceはregular UTF-8 text only、single safe root、no traversal／absolute／backslash ambiguity／NUL、no symlink／hardlink／device／FIFO／socket、no duplicate／casefold／Unicode-normalization collision、no encryption／nested archive／executable／unexpected binary、CRC／MANIFEST／CHECKSUMS一致をfail closedで検証する。Prospective implementation limits are: outer ZIP `<= 10,000,000` bytes、entries `<= 64`、each expanded file `<= 2,000,000` bytes、aggregate expanded `<= 10,000,000` bytes、UTF-8 path `<= 240` bytes、per-entry compression ratio `<= 100`。境界はinclusiveとし、超過時はfinal extraction／adoption outputを残さない。
 
-## 12. 依存関係
+### REQ-023 Compatibility
+existing Core CLI、existing authoring-pack safety primitives、existing Issue lifecycle、provider／consumer directory ownershipを壊さず、new CLIをadditiveに導入する。physical legacy route removalはE1-I3へ残す。
 
-### 12.1 前提となるIssue / PR / 作業
+### REQ-024 Observability
+representative Planning／Review runごとにplanned／unplanned Human intervention、handoff byte／character count、Agent／Skill invocation、Review result、wall-clock、failure modeをCandidate外evidenceへ記録する。
 
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
+## 6. Acceptance Criteria
 
-このIssueが完了した後に必要になる可能性がある作業を記述する。
+### AC-001 Official Entry and Complete Output
+Humanがofficial Skillを起動すると、Skillがrepo-local `spec-dock-chatgpt planning create`へ到達する。Plannerがcomplete三文書を返した場合、commandはmandatory controlsを含むimmutable Issue Candidate ZIPとexternal SHA-256を返し、そのZIPを変更・再packagingせず`review planning --mode archive-candidate`のinputにできる。情報不足時はfinal ZIPを作らず明示的`information_insufficient`を返す。
 
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
+### AC-002 Command Family
+`spec-dock-chatgpt --help`と各subcommand helpが三command familyを示し、Core `spec-dock` lifecycle commandと混在しない。
 
-### 12.3 ブロッカー
+### AC-003 Git Fail-closed
+clean／upstream／local-remote／exact HEADの各negative fixtureがbackend起動前に非成功となり、tracked file attachmentやdefault fallbackを行わない。
 
-- ...
-- ...
+### AC-004 Create and Revision
+fake backendでcreate／Semantic revisionがcomplete三文書responseを返すと、Runtimeは旧identityを上書きせずmandatory controlsを含むcomplete immutable ZIPを生成する。Mechanical revisionはclosed change setだけを許可し、変更後は同じpackaging pathでnew identityを生成する。不完全bundle、mandatory control欠落、scope追加、undeclared targetはfinal ZIPなしで拒否する。
 
----
+### AC-005 Dual Review
+archiveとgit-boundのpositive fixtureがそれぞれexact identityへbindされ、mode mismatch、silent fallback、stale sourceを拒否する。
 
-## 13. 等級（Grade）判定材料
+### AC-006 Archive Integrity
+安全なCandidateは受理され、path/type/collision/encryption/nested archive/binary/CRC/inventory/checksum/resource-limitの代表negative fixtureはpartial outputなしで拒否される。
 
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
+### AC-007 Review Isolation
+Review commandの前後でCandidate bytesとtracked treeが不変であり、resultは明示されたCandidate外destinationにだけ生成される。
 
-内部profile名は `lite / standard / strict / critical` を使用する。
+### AC-008 Archive Positive Chain
+archive modeのrepresentative fixtureがfuture fresh Review result、exact identity-bound Human decision、atomic adoption、Candidate parity、validation、Planning publicationの全条件を満たしたときだけreadinessを導出する。
 
-### 13.1 推奨 Issue 等級（Issue Grade）
+### AC-009 Git-bound Positive Chain
+git-bound fixtureがfuture fresh Review result、exact HEAD／paths-bound Human decision、target blob不変、approval-only diff、validation、Planning publicationの全条件を満たしたときだけreadinessを導出する。
 
-現時点の推奨を一つ選ぶ。
+### AC-010 Adoption Negative Set
+PA-NF-01〜PA-NF-10を各独立に実行し、10／10 reject、violations 0を得る。
 
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
+### AC-011 Security
+secret/path/shell metacharacter fixturesがPrompt、diagnostic、Candidate、Review outputへ漏れず、backendはdirect argvで起動される。
 
-### 13.2 推奨理由
+### AC-012 Provider and Distribution Parity
+`uv build`でwheel／sdistを作成し、fresh initとupdate後に`spec-dock-chatgpt`がregular executableとして直接起動し、provider／installed／dogfoodのmanaged bytesとSkill／Prompt inventoryが一致する。
 
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
+### AC-013 State Boundary
+Candidate workflowによる`.assurance.json` mutation、new Planning database、Review receipt registry、raw transcript保存、`report.md` authority化が0である。
 
-### 13.3 リスク事実（Risk Facts）
+### AC-014 JIT Dogfood
+Human-selected eligible Issue一件で、selected modeのcreate→Review→Human Gate→adoption/parity→validation/publication→readiness handoffを完走し、current Portfolio／downstream Issueへのunauthorized mutationが0である。
 
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
+### AC-015 Existing Compatibility
+existing authoring-pack focused tests、Core CLI tests、validate／sync regressionが維持され、new public routeはprovider-firstでinstall/update可能である。
 
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
+### AC-016 Delivery Handoff
+全product steps、S90、S99完了後、current shared delivery workflowへone branch／one Delivery PRとしてhandoffし、required review後のmergeはHumanだけが実行する。
 
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
+### AC-017 Source Identity
+Review identityはcurrent repository／branch／HEADと直接関係するsource setへbindし、いずれかが変化した場合は再Reviewまたはnew Candidateを要求する。任意のtransitive完全性や固定件数はauthorityとしない。
 
-#### `strict` 以上を検討する条件
+## 7. Completion Boundary
 
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
-
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
-
-#### `lite` を検討できる条件
-
-すべて満たす場合のみ `lite` を検討できる。
-
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
-
----
-
-## 14. 設計への引き渡し
-
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
-
-### 14.1 設計で必ず扱うべき論点
-
-- ...
-- ...
-
-### 14.2 責任所有者が未確定のもの
-
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.3 境界が未確定のもの
-
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.4 契約影響が未確定のもの
-
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.5 上位へ昇格すべき可能性がある判断
-
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 15. 実装計画への引き渡し
-
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
-
-### 15.1 計画で分解すべき成果
-
-- ...
-- ...
-
-### 15.2 検証が必要な観測点
-
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
-
-### 15.3 TDDが必要な振る舞い候補
-
-振る舞い変更がある場合のみ記述する。
-
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
-
-### 15.4 TDD不要または限定的でよい理由
-
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
-
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-07-23 | 初稿（Initial draft） | ... | ... |
+本Issueのproduct work完了候補は、implementation、focused tests、docs／Skill／Prompt、provider／installed／dogfood parity、JIT dogfood、S99、current shared delivery handoffが揃った状態である。Candidate package単体はその状態を成立させない。
