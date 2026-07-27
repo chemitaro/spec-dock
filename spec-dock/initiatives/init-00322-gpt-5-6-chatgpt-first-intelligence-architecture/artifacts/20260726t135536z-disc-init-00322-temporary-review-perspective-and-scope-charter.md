@@ -2,7 +2,7 @@
 種別: disc
 ID: "20260726t135536z-disc-init-00322-temporary-review-perspective-and-scope-charter"
 タイトル: "init-00322限定 Planning Candidate Review Perspective and Scope Charter（暫定運用判断）"
-状態: "provisional-active"
+状態: "superseded"
 作成者: "Codex Main"
 最終更新: "2026-07-26"
 親: ["init-00322"]
@@ -12,7 +12,7 @@ ID: "20260726t135536z-disc-init-00322-temporary-review-perspective-and-scope-cha
 scope: "initiative"
 scope_id: "init-00322"
 authority: "explicit-human-approved-provisional-direction"
-adoption_status: "provisional-working-agreement"
+adoption_status: "superseded"
 canonical_status: "non-authoritative-evidence"
 effective_from: "2026-07-26"
 expires_when:
@@ -23,7 +23,9 @@ reuse_outside_scope: "prohibited unless separately reviewed and explicitly adopt
 source_repository: "chemitaro/spec-dock"
 source_branch: "iss-00334-implement-chatgpt-issue-planning-workflow"
 source_commit: "7de65ae64e15cd89290a000bdadcdd4f4ae979a3"
-reflected_to: []
+superseded_by: "20260727t060629z-disc-init-00322-defect-only-spec-review-charter.md"
+reflected_to:
+  - "20260727t060629z-disc-init-00322-defect-only-spec-review-charter.md"
 ---
 
 # init-00322限定 Planning Candidate Review Perspective and Scope Charter
