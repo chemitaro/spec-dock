@@ -12,7 +12,7 @@ ID: "iss-00334"
 
 # iss-00334 Implement ChatGPT Issue Planning Workflow — 実装報告
 
-本書は Issue の観測証跡台帳である。planned requirements と closure contract は `plan.md` が所有し、本書は採用判断、reviewer verdict、実行結果、closure delta、commit evidence を時系列で記録する。2026-07-27 時点では canonical planning repair が完了し、fresh canonical review を待っている。製品実装は開始していない。
+本書は Issue の観測証跡台帳である。planned requirements と closure contract は `plan.md` が所有し、本書は採用判断、reviewer verdict、実行結果、closure delta、commit evidence を時系列で記録する。2026-07-27 時点では canonical planning repair snapshot `2984c696b4c7e94cbed6fd63697a563f55fd3631` に対するfresh ChatGPT reviewがFAILし、bounded correctionを待っている。製品実装は開始していない。
 
 ## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger / 必須）
 
@@ -39,6 +39,7 @@ ID: "iss-00334"
 | EAL-20260727-SPECIALISTS | adopted | system-architect and implementation-planner read-only reviews | `design.md` and `plan.md` amendment | public route、transaction、archive closure、Closure Index、step ownership、live boundaryの欠陥がsourceと整合したため全件採用した | `artifacts/20260726t235800z-review-system-architect-fail.md`; `artifacts/20260726t235801z-review-implementation-planner-fail.md` | amendmentをfresh spec-reviewerへ渡す |
 | EAL-20260727-CANONICAL-FAIL | adopted | fresh spec-reviewer read-only review | canonical planning repair | 9件のP1がRequirement、Design、Plan、Assurance、Reportの実証可能な欠陥だったため全件採用した | `artifacts/20260726t235522z-review-canonical-spec-review-fail.md` | P1-01〜P1-09修正後にfresh re-reviewする |
 | EAL-20260727-MAIN-REPAIR | adopted | Human-authorized Codex Main repair | `requirement.md`、`design.md`、`plan.md`、`.assurance.json`、`report.md` | ユーザーが今回に限りCodex Mainによる仕様修正を明示承認し、採用済みP1のowner文書を最小範囲で更新した | `requirement.md`; `design.md`; `plan.md`; `.assurance.json`; 本書のDecision Ledger | fresh spec-reviewerの正式判定を取得する |
+| EAL-20260727-CHATGPT-REVIEW | adopted | fresh ChatGPT spec-reviewer with GitHub connector | bounded Design／Plan correction | exact remote HEADと六添付のidentityを照合し、前回P1-02〜P1-09のclosure、P1-01のschema gap、git-bound start-gate gap、S01／S03のtest ownership gapを確認した | `artifacts/20260727t004653z-chatgpt-fresh-canonical-review-fail.md` | 別のBlue Team ChatGPT threadでP1／P2を具体化し、修正後は別fresh reviewを行う |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -76,7 +77,7 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| canonical planning | canonical spec review | spec-reviewer | fresh | failed | no | re-review required | `artifacts/20260726t235522z-review-canonical-spec-review-fail.md` のP1-01〜P1-09を修正済み。修正版のfresh判定待ち |
+| canonical planning | ChatGPT-first canonical spec review | spec-reviewer | fresh | failed | no | re-review required | `artifacts/20260727t004653z-chatgpt-fresh-canonical-review-fail.md`。P1-01、P1-10、P2-01、P2-02のbounded correction待ち |
 
 ## Assurance記録
 
@@ -153,7 +154,7 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | 差分確認 | 次アクション |
 |---|---|---|---|---|---|
-| canonical planning repair | review required | Requirement、Design、Plan、Assurance、Report、review artifacts | dedicated remote review snapshot。exact hashはChatGPT submissionとGit historyで固定 | `git diff --check` pass | snapshotをcommit／pushし、GitHub connector付きfresh ChatGPT reviewを実施する |
+| canonical planning repair | review failed | Requirement、Design、Plan、Assurance、Report、review artifacts | `2984c696b4c7e94cbed6fd63697a563f55fd3631` | remote-equal snapshotをChatGPTがGitHub connectorで確認 | separate Blue Team correction後にnew snapshotをcommit／pushしてfresh ChatGPT reviewする |
 | S01 | not started | `plan.md` S01 exact scope | none | 製品実装差分なし | planning gate通過後にdev-coderへ委任する |
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
@@ -163,7 +164,7 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 | Docs Impact S90 | docs、templates、README、workflow、skill、migration notes | not started | S01〜S09 closure後に判定 |
 | Final QA | issue-wide obligation coverage | not started | S90後にfresh qa-reviewer |
 | Final Code Review | integrated code and tests | not started | step-local review後にfresh issue-wide code-reviewer |
-| Final Spec Review | Requirement、Design、Plan、Report、implementation、tests、docs alignment | failed | `artifacts/20260726t235522z-review-canonical-spec-review-fail.md`; current planning repairをfresh re-review |
+| Final Spec Review | Requirement、Design、Plan、Report、implementation、tests、docs alignment | failed | `artifacts/20260727t004653z-chatgpt-fresh-canonical-review-fail.md`; bounded correction後に別fresh ChatGPT review |
 | Final Commit | final report ledger and issue-wide closure | blocked | S99とfresh final reviewsのpass後に実施 |
 
 ## 遭遇した問題と解決
