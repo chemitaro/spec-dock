@@ -9,7 +9,14 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+    from spec_dock_runtime.application.issue_planning import (
+        PlanningApplyRequest,
+        PlanningCreateRequest,
+        PlanningReviewRequest,
+        PlanningReviseRequest,
+    )
     from spec_dock_runtime.domain.assurance import AssuranceContract
+    from spec_dock_runtime.domain.issue_planning_contracts import PlanningCommandResult
     from spec_dock_runtime.domain.models import (
         ActiveSelection,
         BranchDecision,
@@ -1061,6 +1068,18 @@ class UseCases:
     )
     workbench_copy: Callable[[WorkbenchCopyRequest], WorkbenchCopyResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("workbench_copy is not configured")
+    )
+    planning_create: Callable[[PlanningCreateRequest], PlanningCommandResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("planning_create is not configured")
+    )
+    planning_revise: Callable[[PlanningReviseRequest], PlanningCommandResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("planning_revise is not configured")
+    )
+    planning_review: Callable[[PlanningReviewRequest], PlanningCommandResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("planning_review is not configured")
+    )
+    planning_apply: Callable[[PlanningApplyRequest], PlanningCommandResult] = lambda _req: (_ for _ in ()).throw(
+        RuntimeError("planning_apply is not configured")
     )
     repo_root: Path | None = None
     specdock_dir: Path | None = None
