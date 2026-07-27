@@ -2,7 +2,7 @@
 種別: 要件定義書（Issue）
 ID: "iss-00334"
 タイトル: "Implement ChatGPT Issue Planning Workflow"
-状態: "draft"
+状態: "approved"
 作成者: "Blue Team"
 最終更新: "2026-07-27"
 親: ["epic-00331", "init-00322"]
@@ -16,9 +16,9 @@ planning_profile_guidance_source: "Main-supplied current guidance; assurance cla
 
 本書は、既存Issue NodeまたはSeedから完全なIssue Planning BundleをJIT生成し、独立Review、Human Gate、採用、検証、Planning publicationを経て実装引き渡し可能な状態を導出する製品能力の **WHAT** を定義する。実装方法とTDD順序は `design.md` と `plan.md` が所有する。
 
-このCandidate packageは `authority=candidate`、`adoption_status=unreviewed` の非正本Evidenceである。現在のsource bindingは `chemitaro/spec-dock` / `iss-00334-implement-chatgpt-issue-planning-workflow` / `2e86ec64289ec8102470df75329025d46bbfa51a`。本書の存在だけではReview結果、Human authorization、canonical adoption、assurance mutation、execution readiness、PR readiness、merge readiness、Issue finish、Epic completionのいずれも成立しない。
+本書はHumanが正式配置を指示したCandidate v15を基礎に、fresh canonical `spec-reviewer` の指摘をMainが反映したcanonical Requirementである。planning repairのsource baselineは `chemitaro/spec-dock` / `iss-00334-implement-chatgpt-issue-planning-workflow` / `eadbfa544ad972c799162552f5684482d26e89b5`。このHEADは修正前のimplementation surfaceを識別するbaselineであり、Review／apply／implementation entryではcurrent branch HEADとrelevant source manifestを再取得し、implementation-relevant driftがあればfresh Reviewを要求する。本書の存在だけではfresh reviewer pass、Human implementation-start authorization、execution readiness、PR readiness、merge readiness、Issue finish、Epic completionのいずれも成立しない。Candidate provenanceと過去の非権限状態は`report.md`だけが保持する。
 
-現在のplanning profileはMainから `strict` として供給されたguidanceである。Candidateは `.assurance.json` を変更せず、classification／compositionはMainがCandidate外で既存Workflowに従って実行する。
+既存assurance runtimeが分類する`authorized_profile=standard`を置き換えず、本Issueはpublic command、archive security、multi-file recovery、credentialed live dogfoodを含むためMainがIssue-localな`strict`強化を適用する。差分はspecialist evidence、全negative matrix、step reviewer、S90／S99を省略しないことであり、これらの高リスク契約がRequirementから除かれfresh spec reviewを通過した場合だけstandardへ戻せる。classification／compositionはMainがCandidate workflow外で既存assurance手順に従って実行する。
 
 ## 1. Product Outcome
 
@@ -28,7 +28,7 @@ Humanがofficial `spec-dock-issue-planning` Skillを起点に、MainとSpecDock�
 2. `spec-dock-chatgpt planning create`でChatGPT Plannerからcomplete `requirement.md`／`design.md`／`plan.md` responseを受け取り、Core Runtimeがmandatory controlsを付与したimmutable Issue Candidate ZIPをfinal artifactとして生成する。
 3. `spec-dock-chatgpt review planning`でread-only Reviewを行う。
 4. 必要時は`spec-dock-chatgpt planning revise`でSemantic complete replacementまたはbounded Mechanical revisionを行う。
-5. exact reviewed identityへbindされたHuman Issue Plan Adoption and Implementation-Start Authorization後にだけ、mode固有の採用／parity、validation、Planning publicationを実行する。
+5. exact reviewed identityへbindされたHuman Issue Plan Adoption and Implementation-Start Authorization後にだけ、`spec-dock-chatgpt planning apply`でmode固有の採用／parity、validation、Planning publicationを実行する。
 6. 上記の論理積からだけ実装引き渡し可能状態を導出する。
 
 ## 2. Actors and Authority
@@ -38,8 +38,8 @@ Humanがofficial `spec-dock-issue-planning` Skillを起点に、MainとSpecDock�
 | Human | Issue Plan adoption、implementation start、mergeの最終判断 |
 | `spec-dock-issue-planning` Skill | Human entrypoint、Review transport／Revision lane／Human Gateのsemantic selection |
 | Codex Main | context収集、deterministic filesystem／Git操作、canonical placement、commit／push、evidence統合 |
-| `spec-dock-chatgpt` | target解決、Git preflight、Prompt合成、Oracle/backend起動、result retrievalのthin adapter |
-| Core Runtime | three-document response validation、immutable Issue Candidate packaging、safe archive、identity、adoption、parity、validation、publication、derived readinessの決定的処理 |
+| `spec-dock-chatgpt` | target解決、Git preflight、Prompt合成、Oracle/backend起動、result retrieval、およびHuman-supplied evidenceをCore Runtimeへ渡すpublic apply adapter |
+| Core Runtime | three-document response validation、immutable Issue Candidate packaging、safe archive、identity、transactional adoption、parity、validation、publication、derived readinessの決定的処理 |
 | ChatGPT Planner | complete三文書responseの生成。outputはRuntime packaging前かつadoption前のEvidence |
 | ChatGPT Reviewer | read-only findings／verdictの生成。repository／Candidateを変更しない |
 
@@ -48,7 +48,7 @@ Humanがofficial `spec-dock-issue-planning` Skillを起点に、MainとSpecDock�
 ### 3.1 In Scope
 
 - official `spec-dock-issue-planning` SkillからのIssue Planning起動。
-- independent repo-local `spec-dock-chatgpt` command family: `planning create`、`planning revise`、`review planning`。
+- independent repo-local `spec-dock-chatgpt` command family: `planning create`、`planning revise`、`review planning`、`planning apply`。
 - exact target、parent、dependency、relevant paths、repository／branch／HEADの解決。
 - GitHub-visible named branch、clean tree、upstream、local HEADとremote HEADの一致を確認するpreflight。
 - provider-managed closed Markdown Prompt resources。
@@ -78,7 +78,7 @@ shared Issue delivery／report／HEAD cycle、PR merge semantics、Issue finish�
 Human向けofficial interfaceは`spec-dock-issue-planning` Skillであり、Skillはbounded contextを組み立ててrepo-local `spec-dock-chatgpt`へ委譲する。
 
 ### REQ-002 Independent CLI
-`spec-dock-chatgpt`はCore lifecycle CLIから独立したrepo-local executableとして提供し、`planning create`、`planning revise`、`review planning`を公開する。
+`spec-dock-chatgpt`はCore lifecycle CLIから独立したrepo-local executableとして提供し、`planning create`、`planning revise`、`review planning`、`planning apply`を公開する。`planning apply`だけがHuman-supplied decisionを検証して採用後半を呼び出せるsupported public routeであり、internal moduleのad-hoc Python呼出しを製品経路にしない。
 
 ### REQ-003 Exact Git Binding
 正式runはrepository、named branch、expected HEAD、upstream、clean tree、local／remote equalityを検証し、GitHub exact HEADを確認できない場合はfail closedとする。default branch、添付tracked file、記憶へ暗黙fallbackしない。
@@ -114,17 +114,19 @@ exact reviewed identity
 
 Review、Human Gate、parity、validation、publicationのいずれか単独では実装引き渡し可能状態にならない。
 
+後半lifecycleの公開入口は`planning apply`だけとする。CLIはHuman decisionを生成または推測せず、exact reviewed identity、review result、Human decision source、mode-specific identity、expected source HEAD、canonical decision-artifact destinationを明示入力として要求する。入力欠落、不一致、stale、または未許可destinationではrepository mutation前に非成功とする。
+
 ### REQ-010 Archive Adoption
-archive pathではexact logical filename、ZIP SHA、internal root、MANIFEST identity、source bindingを照合し、fixed-order atomic replacement後にCandidate-to-canonical byte／declared-placeholder parityとCandidate外差分0を証明する。
+archive pathではexact logical filename、ZIP SHA、internal root、MANIFEST identity、source bindingを照合する。全入力をrepository外のoperation staging areaで先に検証し、canonical Human decision artifactをnew-fileとして固定したうえで`requirement.md`→`design.md`→`plan.md`の順にtransactional replacementする。commit前の失敗はpre-operation bytes／modeへreverse-order restoreしてclean baselineを再証明し、rollback自体が失敗した場合は`recovery_required`として自動続行しない。成功時はCandidate-to-canonical byte／declared-placeholder parity、明示されたHuman decision artifact以外のunexpected Candidate-external diff 0を証明する。
 
 ### REQ-011 Git-bound Adoption
 Git-bound pathではexact reviewed HEAD／target pathsへHuman decisionをbindし、reviewed target blobsの不変性、approval-only adoption diff、publication commit tree parityを証明する。
 
 ### REQ-012 Planning Publication
-MainはPlanning専用commitを作成しpushし、local publication HEAD、remote branch HEAD、commit treeが一致することを確認する。publication failureではreadinessを導出しない。
+Mainは`planning apply`を明示的に起動し、RuntimeにPlanning専用commitを作成・pushさせ、local publication HEAD、remote branch HEAD、commit treeが一致することを確認する。commit前の失敗はrollbackする。commit成功後のpush失敗はlocal commitを破棄・rewriteせず`publication_pending`を返し、same operation identityでだけretryできる。remote divergenceまたはoperation identity不一致は`blocked_remote_diverged`とし、force push、automatic reset、別Candidateへのfallbackを行わない。publication failureではreadinessを導出しない。
 
 ### REQ-013 Derived Readiness
-RuntimeはReview、Human decision、mode-specific parity、validation、publicationの論理積を評価してreadiness結果を返す。専用state database、receipt registry、custom Git refを新設しない。
+RuntimeはReview、Human decision、mode-specific parity、validation、publicationの論理積を評価し、全条件成立時だけ`ready`を返す。非成立時のstable statusは`blocked`、`stale`、`rejected`、`rolled_back`、`publication_pending`、`blocked_remote_diverged`、`recovery_required`のいずれかとし、CLI exit codeは`ready=0`、それ以外=`1`とする。operation-local staging／recovery manifestとexternal result JSONは許可するが、専用state database、receipt registry、custom Git refを新設しない。
 
 ### REQ-014 Negative Adoption Fixtures
 以下を独立fixtureとして拒否し、どれか一件でも成立する場合はExecutor startを禁止する。
@@ -143,7 +145,7 @@ RuntimeはReview、Human decision、mode-specific parity、validation、publicat
 | PA-NF-10 | validationまたはPlanning publication failure |
 
 ### REQ-015 Workbench and Durable Evidence
-Workbenchはprompt、explicit external files、downloaded Candidate、Review result、diagnosticsのtemporary surfaceに限定する。Human decisionはWorkbench source JSON SHAとcanonical Issue Artifactへ記録し、raw transcriptを保存しない。`report.md`はPlanning receipt、Review authority、Human authorization authority、readiness state storeにしない。
+Workbenchはprompt、explicit external files、downloaded Candidate、Review result、Human decision source、operation-local staging／backup／recovery manifest、diagnosticsのtemporary surfaceに限定する。Human decisionはWorkbench source JSON SHAと、`planning apply --decision-artifact`で明示されたIssue `artifacts/` direct-child JSONへbyte-exactに記録し、raw transcriptを保存しない。operation完了後はbackupを削除し、result JSONは観測Evidenceとしてだけ保持する。`report.md`はPlanning receipt、Review authority、Human authorization authority、readiness state storeにしない。
 
 ### REQ-016 Assurance Boundary
 Candidate generation、adoption、publication、readinessは`.assurance.json`を変更しない。Mainは既存assurance workflowをCandidate外で実行する。
@@ -152,10 +154,10 @@ Candidate generation、adoption、publication、readinessは`.assurance.json`を
 実装authorityは`src/spec_dock/` provider surfaceに置き、installed／dogfood copiesは`init`／`update`で生成する。同一Issueでwheel、sdist、fresh init、update、provider／installed／dogfood parityを検証する。
 
 ### REQ-018 JIT Dogfood
-feature-complete直前にHumanが、open real Issue、E1 dependency chain外、Portfolio replanning不要、genuine refresh need、bounded rollback、他作業非干渉、Human Gate実行可能という条件を満たすtargetを一件選び、選択modeのfull positive chainを完走する。
+feature-complete直前に、まずhermetic fake-remote testでselection／abort／recovery contractを検証する。その後Humanが、open real Issue、E1 dependency chain外、Portfolio replanning不要、genuine refresh need、dedicated clean worktree／branch、bounded pre-commit rollback、他作業非干渉、Human Gate実行可能という条件を満たすtargetを一件選び、credentialed mutation範囲とevidence destinationを明示承認した場合だけMainが選択modeのfull positive chainを完走する。target選択または承認がない限りlive backend／canonical write／pushを開始しない。
 
 ### REQ-019 Existing Primitive Reuse
-Git preflight、direct argv、redaction、safe ZIP、digest、atomic file replacement／publication、current validation primitivesを再利用し、同じ安全機能を別subsystemとして複製しない。
+Git preflight、direct argv、redaction、safe ZIP、digest、atomic file replacement／publication、current validation primitivesを再利用し、同じ安全機能を別subsystemとして複製しない。multi-file adoptionではcurrent `runbook_store.py`のstage／backup／restore patternをshared scoped transaction primitiveへ抽出し、runbook projectionとIssue Planning双方から使用する。private helperへのcross-module couplingまたは同等処理の複製は禁止する。
 
 ### REQ-020 Delivery Boundary
 本Issueはone Issue／one branch／one Delivery PR／required review／Human mergeに従う。S99後のPR delivery、merge、finishはcurrent shared workflowへhandoffし、そのowner contractを本Issueで変更しない。
@@ -180,7 +182,7 @@ representative Planning／Review runごとにplanned／unplanned Human intervent
 Humanがofficial Skillを起動すると、Skillがrepo-local `spec-dock-chatgpt planning create`へ到達する。Plannerがcomplete三文書を返した場合、commandはmandatory controlsを含むimmutable Issue Candidate ZIPとexternal SHA-256を返し、そのZIPを変更・再packagingせず`review planning --mode archive-candidate`のinputにできる。情報不足時はfinal ZIPを作らず明示的`information_insufficient`を返す。
 
 ### AC-002 Command Family
-`spec-dock-chatgpt --help`と各subcommand helpが三command familyを示し、Core `spec-dock` lifecycle commandと混在しない。
+`spec-dock-chatgpt --help`と各subcommand helpが`planning create`、`planning revise`、`review planning`、`planning apply`を示し、Core `spec-dock` lifecycle commandと混在しない。`planning apply --help`はHuman decision、review identity、mode identity、source HEAD、decision artifact、output directoryを必須契約として示す。
 
 ### AC-003 Git Fail-closed
 clean／upstream／local-remote／exact HEADの各negative fixtureがbackend起動前に非成功となり、tracked file attachmentやdefault fallbackを行わない。
@@ -198,10 +200,10 @@ archiveとgit-boundのpositive fixtureがそれぞれexact identityへbindされ
 Review commandの前後でCandidate bytesとtracked treeが不変であり、resultは明示されたCandidate外destinationにだけ生成される。
 
 ### AC-008 Archive Positive Chain
-archive modeのrepresentative fixtureがfuture fresh Review result、exact identity-bound Human decision、atomic adoption、Candidate parity、validation、Planning publicationの全条件を満たしたときだけreadinessを導出する。
+archive modeのrepresentative fixtureを`planning apply`へ与え、future fresh Review result、exact identity-bound Human decision、transactional adoption、Candidate parity、validation、Planning publicationの全条件を満たしたときだけ`ready`を導出する。commit前faultはbaselineへrollbackし、commit後push faultは`publication_pending`からsame-operation retryで収束する。
 
 ### AC-009 Git-bound Positive Chain
-git-bound fixtureがfuture fresh Review result、exact HEAD／paths-bound Human decision、target blob不変、approval-only diff、validation、Planning publicationの全条件を満たしたときだけreadinessを導出する。
+git-bound fixtureを`planning apply`へ与え、future fresh Review result、exact HEAD／paths-bound Human decision、target blob不変、approval-only diff、validation、Planning publicationの全条件を満たしたときだけ`ready`を導出する。
 
 ### AC-010 Adoption Negative Set
 PA-NF-01〜PA-NF-10を各独立に実行し、10／10 reject、violations 0を得る。
@@ -216,7 +218,7 @@ secret/path/shell metacharacter fixturesがPrompt、diagnostic、Candidate、Rev
 Candidate workflowによる`.assurance.json` mutation、new Planning database、Review receipt registry、raw transcript保存、`report.md` authority化が0である。
 
 ### AC-014 JIT Dogfood
-Human-selected eligible Issue一件で、selected modeのcreate→Review→Human Gate→adoption/parity→validation/publication→readiness handoffを完走し、current Portfolio／downstream Issueへのunauthorized mutationが0である。
+hermetic testでlive-operation selection／abort／recovery contractを先にGreenにする。その後、Humanがtarget、worktree／branch、credentialed mutation、evidence destinationを明示承認したeligible Issue一件だけで、Mainがselected modeのcreate→Review→Human Gate→`planning apply`→readiness handoffを完走し、current Portfolio／downstream Issueへのunauthorized mutationが0である。live runをpytest workerへ委任しない。
 
 ### AC-015 Existing Compatibility
 existing authoring-pack focused tests、Core CLI tests、validate／sync regressionが維持され、new public routeはprovider-firstでinstall/update可能である。
@@ -227,6 +229,21 @@ existing authoring-pack focused tests、Core CLI tests、validate／sync regress
 ### AC-017 Source Identity
 Review identityはcurrent repository／branch／HEADと直接関係するsource setへbindし、いずれかが変化した場合は再Reviewまたはnew Candidateを要求する。任意のtransitive完全性や固定件数はauthorityとしない。
 
-## 7. Completion Boundary
+## 7. Error Conditions
+
+| ID | Observable failure | Required result |
+|---|---|---|
+| EC-001 | unknown Issue、dirty tree、upstream欠落、local／remote／expected HEAD不一致 | backend／repository mutation前に`blocked`または`stale` |
+| EC-002 | Planner response不完全、unexpected file、non-UTF-8、authority claim、secret-like payload | final Candidateなしで`rejected` |
+| EC-003 | Review mode／identity不一致、Review mutation、silent fallback要求 | Review evidenceをinvalid化して`rejected` |
+| EC-004 | REQ-022のarchive safety classまたはinclusive ceiling違反 | extraction／Review／adoption outputなしで`rejected` |
+| EC-005 | Human decision欠落、不一致、stale、destination不正 | repository mutation前に`blocked` |
+| EC-006 | canonical replacementまたはpre-commit validation failure | baseline復元成功なら`rolled_back`、復元失敗なら`recovery_required` |
+| EC-007 | commit作成失敗 | worktree/indexをbaselineへ戻し`rolled_back`、復元不能なら`recovery_required` |
+| EC-008 | commit成功後のpush失敗またはresponse loss | local commitを保持して`publication_pending`、same-operation retryだけ許可 |
+| EC-009 | retry時のremote divergence、operation identity／tree mismatch | `blocked_remote_diverged`、force push／automatic resetなし |
+| EC-010 | JIT dogfood target不適格またはHumanのcredentialed mutation承認なし | live backend／canonical mutation／push前に`blocked` |
+
+## 8. Completion Boundary
 
 本Issueのproduct work完了候補は、implementation、focused tests、docs／Skill／Prompt、provider／installed／dogfood parity、JIT dogfood、S99、current shared delivery handoffが揃った状態である。Candidate package単体はその状態を成立させない。

@@ -3,310 +3,187 @@
 ID: "iss-00334"
 タイトル: "Implement ChatGPT Issue Planning Workflow"
 関連GitHub: ["#334"]
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-27"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00331", "init-00322"]
 ---
 
-# iss-00334 Implement ChatGPT Issue Planning Workflow — 実装報告（観測証跡台帳 / Observed Evidence Ledger）
+# iss-00334 Implement ChatGPT Issue Planning Workflow — 実装報告
 
-> `report.md` は観測証跡台帳（observed evidence ledger）の scaffold です。planned requirements、evidence destination、closure 条件は `plan.md` が持ち、この文書は実際の Red / Green / Refactor evidence、発見された tests、closure delta、reviewer status、commit/no-op evidence を記録する evidence slot です。workflow / compliance authority は skills、docs、accepted ADRs、reviewer gates に置きます。
+本書は Issue の観測証跡台帳である。planned requirements と closure contract は `plan.md` が所有し、本書は採用判断、reviewer verdict、実行結果、closure delta、commit evidence を時系列で記録する。2026-07-27 時点では canonical planning repair が完了し、fresh canonical review を待っている。製品実装は開始していない。
 
 ## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger / 必須）
 
-`report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
-
-Material な判断がない場合もこの section は残し、次を明示する。
-
-- No material interpretation changes.
-- No decision entries.
-
-Ledger entry は次の契約値を使う。
-
-- `Status`: `open` / `resolved` / `superseded`
-- `Type`: `interpretation` / `scope` / `implementation` / `compatibility` / `test-strategy` / `operation` / `deviation` / `follow-up`
-- `Disposition`: `applied` / `rejected` / `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` / `converted_to_followup` / `deferred` / `no_action` / `superseded`
-
-完了時の意味論（completion semantics）:
-- issue completion 前に `Status=open` の entry を残してはならない。
-- `Status=resolved` は `Disposition`、evidence、必要な follow-up を持つ。
-- `Status=superseded` または `Disposition=superseded` は置換先 entry ID を持つ。
-- `Disposition=promoted_to_design` / `promoted_to_adr` / `promoted_to_plan` は昇格先 artifact と evidence を持つ。
-- `Disposition=converted_to_followup` は follow-up issue / discussion / ADR candidate の参照を持つ。
-- `Disposition=deferred` は scope 外である理由、blocking でない根拠、revisit 条件を持つ。
-- `Disposition=no_action` は issue-local な判断で追加対応不要である理由を持つ。将来も効く durable decision を `report.md` だけに閉じ込めてはならない。
-
-Disposition ごとの必須証跡:
-- `applied`: 変更した artifact / 実装証跡と、issue-local 適用で十分な理由。
-- `rejected`: 却下した選択肢、理由、blocking impact が残らない根拠。
-- `promoted_to_design` / `promoted_to_adr` / `promoted_to_plan`: 昇格先 artifact 参照と証跡。
-- `converted_to_followup`: follow-up issue / discussion / ADR candidate 参照と blocking / non-blocking の分類。
-- `deferred`: scope-out 理由、non-blocking の根拠、revisit 条件。
-- `no_action`: 判断が issue-local で durable ではない理由。
-- `superseded`: 置換先 entry ID と置換理由。
-
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
-| D-20260726-RT001 | resolved | implementation | fresh Red Team v14 review / Codex Main | ChatGPTの三文書responseからmandatory controlsを含むimmutable Issue Candidate ZIPへ変換するownerとcreate→archive Review integration testが閉じていない | Candidate内で補完しない; generic packへ再構成する; Issue-local packaging責務を最小追加する | Candidate v15でPlanner responseとRuntime packagingを分離し、S05をsole ownerとしてdirect handoff testを追加する | 親E1-I1、Initiative Design、ADR 20のIssue Candidate package義務をv15が満たし、fresh Red TeamがRP-01〜RP-07をPASSと判定した | applied | `artifacts/20260726t164657z-disc-v15-red-team-pass-admission.md`; `artifacts/20260726t164628z-chatgpt-output-v15-fresh-red-team-review.md` | Candidate review cycleは完了。canonical adoptionと実装開始はHuman Gate待ち |
-| D-20260726-RT002 | resolved | scope | fresh Red Team v14 review / Codex Main | 暫定Charterのsame-thread Blue運用を恒久product contractへ昇格すべきか | Candidateへsession locatorを追加する; 現在の運用だけ同一threadを維持する | Candidate変更は行わず、現在の運用だけ同一Blue threadを維持する | Charterはnon-authoritative evidenceであり、将来標準への自動適用を禁止する。D-001〜D-024、親canonical docs、accepted ADRに恒久same-thread locator義務はない | rejected | `artifacts/20260726t153105z-disc-v14-red-team-finding-admission.md`; Charter §§1, 8, 21 | product changeなし。v15修正は既存Blue threadで継続する |
-| D-20260726-RT003 | resolved | implementation | fresh Red Team v14 review / Codex Main | existing archive primitive再利用方針とS05のexact target/allowed pathsが両立しない | 新validatorを複製する; private helperへ依存する; existing primitiveを後方互換にbounded extensionする | Candidate v15でdata-only named contractとgeneric default後方互換testをS05へ追加する | v15がexact sourceの既存primitiveをbounded extensionするallowed pathsとpositive／negative testsを閉じ、fresh Red TeamがRP-02、RP-03、RP-06をPASSと判定した | applied | `artifacts/20260726t164657z-disc-v15-red-team-pass-admission.md`; `artifacts/20260726t164628z-chatgpt-output-v15-fresh-red-team-review.md` | Candidate review cycleは完了。canonical adoptionと実装開始はHuman Gate待ち |
-| D-20260727-V15-ADOPTION | resolved | operation | Human / Codex Main | PASS済みCandidate v15をIssueの正式なcanonical pathsへ配置する | Candidate内部rootをそのまま置く; 内容を書き写す; 三文書をwhole-file置換しsupporting artifactsとexact ZIPを正式配置する | 三文書はbyte-for-byte置換し、supporting artifactsはIssue `artifacts/`へ配置し、package controlsはexact ZIP内で保持する | Humanがexact v15を確認後に正式配置を指示した。Candidate SHA、source target blobs、remote-equal adoption base、Red PASSを照合済み | applied | `artifacts/20260726t225541z-disc-v15-human-adoption-decision.md`; Candidate SHA-256 `07a2c240c9d2edee5faa58f0ad4ab09b05b542dba2e1a8d61234d479c0355fbd`; `cmp` source/destination PASS | fresh canonical `spec-reviewer`を実施する。implementation startは別Human authorization待ち |
+| D-20260726-RT001 | resolved | implementation | fresh Red Team v14 | Issue Candidate ZIP の生成 owner と create→archive review integration test が未確定 | generic packへ再構成; Issue-local packaging責務を追加 | Planner response と runtime packaging を分離し、S05を唯一の packaging owner とする | 親仕様と ADR 20 の package 義務を最小の Issue-local responsibility で閉じる | applied | `artifacts/20260726t153105z-disc-v14-red-team-finding-admission.md`; `artifacts/20260726t164628z-chatgpt-output-v15-fresh-red-team-review.md` | canonical planningへ採用済み |
+| D-20260726-RT002 | resolved | scope | fresh Red Team v14 | review運用中のsame-thread continuityを恒久product contractへ昇格するか | session locatorを製品契約へ追加; 運用限定で維持 | Initiative限定の運用とし、product contractへ昇格しない | temporary charterを恒久要件へ昇格すると scope overreach になる | rejected | `artifacts/20260726t153105z-disc-v14-red-team-finding-admission.md` | product変更なし |
+| D-20260726-RT003 | resolved | compatibility | fresh Red Team v14 | generic archive primitive再利用とS05 allowlistが両立しなかった | validator複製; private helper依存; bounded extension | named data-only contractを追加し、generic defaultをcharacterization testで保護する | 既存contractを再利用しつつIssue固有identityを閉じられる | applied | `artifacts/20260726t164657z-disc-v15-red-team-pass-admission.md` | S05で実装・検証する |
+| D-20260727-V15-ADOPTION | resolved | operation | Human / Codex Main | PASS済みCandidate v15をcanonical pathsへ配置する | internal rootをそのまま置く; 転記; whole-file replacement | 三文書をbyte-for-byte置換し、supporting artifactsとexact ZIPをIssueへ配置した | Humanの正式配置指示、ZIP SHA、source blob parity、fresh Red PASSを確認した | applied | `artifacts/20260726t225541z-disc-v15-human-adoption-decision.md`; ZIP SHA-256 `07a2c240c9d2edee5faa58f0ad4ab09b05b542dba2e1a8d61234d479c0355fbd` | canonical reviewで独立検証する |
+| D-20260727-SR001 | resolved | implementation | system-architect / spec-reviewer | Human Gate後のsupported lifecycle routeがなかった | hidden application API; Core CLI sequence; ChatGPT CLI subcommand | `spec-dock-chatgpt planning apply` を唯一の公開 late-lifecycle route とする | Skillから明示的に呼べ、mode identity、Human decision、expected HEAD、external outputを一契約で固定できる | promoted_to_design | `design.md` Public Command Design; `plan.md` S01／S06 | fresh canonical re-review |
+| D-20260727-SR002 | resolved | operation | system-architect / spec-reviewer | multi-file adoptionのcrash／rollback／retry意味論がなかった | private helper依存; primitive複製; shared transaction抽出 | `scoped_file_transaction.py` を抽出し、pre-commit rollbackとpost-commit publication resumeを分離する | commit済みcanonical historyをforce/resetせず、同一operationを安全に再開できる | promoted_to_design | `design.md` Apply State Machine／Transaction Boundary; `plan.md` S06 | fault-injection testsで閉じる |
+| D-20260727-SR003 | resolved | test-strategy | implementation-planner / spec-reviewer | archive classとClosure Indexが集約され未閉鎖を検出できなかった | representative cases; class別closure | REQ-022の25 class、REQ／AC／EC、PA-NF、Design riskを個別required rowにする | material obligation単位で入力、期待値、bug class、owner、evidenceを再現できる | promoted_to_plan | `plan.md` Spec-Locked Closure Index／S05 | 各required rowをReportへ閉包する |
+| D-20260727-SR004 | resolved | scope | implementation-planner / spec-reviewer | S02 test ownershipとS09 live mutation boundaryが矛盾した | allowlist拡大; step分割 | S02A docs／S02B test、S09A hermetic／S09B Main-Human live gateへ分割する | role、mutable surface、credential boundaryを一致させる | promoted_to_plan | `plan.md` S02A／S02B／S09A／S09B | step順に実行する |
+| D-20260727-SR005 | resolved | operation | Codex Main | standard assuranceとIssue固有の高リスクcontrolsの差分を明示する必要があった | profileを無根拠にstrictへ変更; standardのみ; issue-local overlay | authorized profileはstandardのまま、archive、transaction、public contract、live mutationにstrict相当のissue-local overlayを適用する | classifier authorityを改変せず高リスク面のclosureを強化できる | applied | `.assurance.json`; `requirement.md`; `design.md`; `plan.md`; 本書 Assurance記録 | reviewed amendmentで高リスク面が消えた場合だけoverlayを解除する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
-Delegated draft、worker note、research、reviewer finding、discussion、command output を canonical artifact や実装判断へ取り込む場合、この台帳に採用判断を記録する。raw transcript ではなく、orchestrator が検証した採否・理由・証跡・次アクションだけを記録する。
-
-- `adoption_status`: `adopted` / `partially_adopted` / `rejected` / `deferred` / `stale` / `blocked`
-- `blocked` または `stale` の unresolved entry は promotion / implementation start / issue ready / issue finish / phase completion を止める。
-- `deferred` は blocking でない根拠と revisit 条件を持つ場合だけ完了時に残せる。
-- Evidence Adoption Ledger なしで delegated evidence の採用を主張してはならない。
-- Evidence Adoption Ledger fields: ID, adoption_status, source, source_role, claim, target_artifact, target_section, rationale, evidence_strength, evidence_path, adopter, reviewer, blocking, next_action.
+`adoption_status` は `adopted`、`partially_adopted`、`rejected`、`deferred` のいずれかを用いる。`stale` または `blocked` の未解決entryはpromotionとimplementation startを止める。
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
-| EAL-20260726-V14-REVIEW | partially_adopted | reviewer / fresh Red Team / read-only | next Candidate revision instruction | v14 Reviewの3 findingをMain Admissionで個別判定し、RT-001とRT-003だけをrevision対象として採用した | `artifacts/20260726t152913z-chatgpt-output-v14-fresh-red-team-review.md` SHA-256 `30a6eaa65a92bd9fc20b2dc0f974a9e0227a2d9bb7ae16a23eadcd8a720a1ec1`; thread `6a6621ad-d8fc-83ee-a2c1-f44aafe55b81` | admitted findingだけを同一Blue threadへ渡し、v15をfresh reviewする |
-| EAL-20260726-RT001 | adopted | reviewer finding / Codex Main admission | v15 `requirement.md`、`design.md`、`plan.md` | 親が要求するIssue Candidate package chainのIssue-local blockerであり、最小修正で閉じられる | `artifacts/20260726t153105z-disc-v14-red-team-finding-admission.md` §3.1 | Blue Team v15 revision、deterministic preflight、fresh Red Team review |
-| EAL-20260726-RT002 | rejected | reviewer finding / Codex Main admission | no Candidate change | init-00322限定の運用契約を恒久product requirementへ昇格するoverreachであり、Candidate blocking impactを認めない | `artifacts/20260726t153105z-disc-v14-red-team-finding-admission.md` §§2, 4 | Candidate変更なし。同一Blue thread継続は現在の運用で満たす |
-| EAL-20260726-RT003 | adopted | reviewer finding / Codex Main admission | v15 `design.md`、`plan.md` | Candidate自身のreuse義務とexact source上のhard-coded generic validatorに対してS05 allowlistが実装不能な矛盾を持つ | `artifacts/20260726t153105z-disc-v14-red-team-finding-admission.md` §3.2; `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack/zip_contract.py` | Blue Team v15 revision、deterministic preflight、fresh Red Team review |
-| EAL-20260726-V15-REVIEW | adopted | reviewer / fresh Red Team / read-only | Candidate v15 review-cycle closure evidence | exact Candidate identityとsource HEADをGitHub／添付ZIPで照合し、RP-01〜RP-07 PASS、P0/P1/nonblocking 0件を確認した。canonical adoption authorityは付与しない | `artifacts/20260726t164628z-chatgpt-output-v15-fresh-red-team-review.md` SHA-256 `def84b590618a405fc2be2ce30999ccdd9f610a2a28f0b116fd3164c06c9f51a`; thread `6a6633e1-dff4-83ee-8c82-40270b06f29e`; `artifacts/20260726t164657z-disc-v15-red-team-pass-admission.md` | Candidate review/fix cycleを終了し、Human adoption decisionを待つ |
-| EAL-20260727-V15-ADOPTION | adopted | Human decision / reviewed Candidate ZIP / Codex Main | canonical Issue `requirement.md`、`design.md`、`plan.md`、supporting artifacts | Humanの正式配置指示、fresh Red PASS、127/127 preflight、source target blob一致、exact ZIP SHAを満たすためv15 planning contentを採用した。implementation-start authorityは採用対象外 | `artifacts/20260726t225541z-disc-v15-human-adoption-decision.md`; `artifacts/20260726t154840z-iss-00334-issue-planning-candidate-v15.zip`; `artifacts/20260726t164628z-chatgpt-output-v15-fresh-red-team-review.md` | fresh canonical `spec-reviewer` passを取得するまでexecution handoffを停止する |
+| EAL-20260726-V15-REVIEW | adopted | fresh Red Team read-only review | Candidate v15 review-cycle closure | exact Candidate identity、source HEAD、127件のpreflight、RP-01〜RP-07を独立確認したためreview evidenceとして採用した | `artifacts/20260726t164628z-chatgpt-output-v15-fresh-red-team-review.md`; `artifacts/20260726t164657z-disc-v15-red-team-pass-admission.md` | canonical reviewで現在の正本を再検証する |
+| EAL-20260727-V15-ADOPTION | adopted | Human decision and reviewed Candidate ZIP | canonical `requirement.md`、`design.md`、`plan.md`、supporting artifacts | Humanの正式配置指示、source blob parity、exact ZIP SHAを満たしたためcanonical contentへ採用した | `artifacts/20260726t225541z-disc-v15-human-adoption-decision.md`; `artifacts/20260726t154840z-iss-00334-issue-planning-candidate-v15.zip` | canonical planning repairとfresh reviewを実施する |
+| EAL-20260727-SPECIALISTS | adopted | system-architect and implementation-planner read-only reviews | `design.md` and `plan.md` amendment | public route、transaction、archive closure、Closure Index、step ownership、live boundaryの欠陥がsourceと整合したため全件採用した | `artifacts/20260726t235800z-review-system-architect-fail.md`; `artifacts/20260726t235801z-review-implementation-planner-fail.md` | amendmentをfresh spec-reviewerへ渡す |
+| EAL-20260727-CANONICAL-FAIL | adopted | fresh spec-reviewer read-only review | canonical planning repair | 9件のP1がRequirement、Design、Plan、Assurance、Reportの実証可能な欠陥だったため全件採用した | `artifacts/20260726t235522z-review-canonical-spec-review-fail.md` | P1-01〜P1-09修正後にfresh re-reviewする |
+| EAL-20260727-MAIN-REPAIR | adopted | Human-authorized Codex Main repair | `requirement.md`、`design.md`、`plan.md`、`.assurance.json`、`report.md` | ユーザーが今回に限りCodex Mainによる仕様修正を明示承認し、採用済みP1のowner文書を最小範囲で更新した | `requirement.md`; `design.md`; `plan.md`; `.assurance.json`; 本書のDecision Ledger | fresh spec-reviewerの正式判定を取得する |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
-主要目的と副次要件の主従が逆転していないことを記録する。特に clarification / authoring / handoff の変更では、primary objective evidence、secondary requirement evidence、inversion risk、reviewer verdict を残す。
-
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| canonical planning repair | ChatGPT-first Issue Planningのcreate→revise→review→Human Gate→apply→publication→readinessが `requirement.md` REQ-001〜REQ-024 と `design.md` public routeで一貫する | archive safety、transaction recovery、source binding、closure traceabilityを `plan.md` のrequired rowsへ固定した | low。security／compliance controlsはprimary lifecycleを補強し、置換していない | 前回failの全P1を修正済み。fresh re-reviewが次の正式判定 |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
-Requirement / design / plan の phase promotion ごとに、調査、未確定事項、回答、採用判断、reviewer verdict、blocking / non-blocking、次アクションを記録する。
-
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
-| requirement / design / plan — Candidate v14 | parent Initiative／Epic、accepted ADR 20／22、D-001〜D-024、exact source HEAD `feefb9e8e96015e48cdb1f837e8f775da8b3d8aa`、deterministic preflight `121/121 PASS` | RT-001とRT-003をadmit。RT-002はCandidate変更対象外 | partially_adopted | failed（fresh Red Team evidence。canonical `spec-reviewer` passではない） | yes | 同一Blue threadでv15完全置換 → deterministic preflight → fresh Red Team review |
-| requirement / design / plan — Candidate v15 | parent Initiative／Epic、accepted ADR 20／22、D-001〜D-024、v14 Main Admission、exact source HEAD `2e86ec64289ec8102470df75329025d46bbfa51a`、deterministic preflight `127/127 PASS` | なし。RT-001／RT-003はresolved、RT-002はrejected dispositionを維持 | adopted as review evidence only | passed（fresh Red Team evidence。canonical `spec-reviewer` passまたはcanonical adoptionではない） | no（Candidate review cycleのみ） | review/fix cycle完了。Human adoption decisionまでcanonical置換と実装開始を停止 |
-| requirement / design / plan — canonical v15 placement | Candidate v15 exact ZIP、fresh Red PASS、Human adoption instruction、source target blob parity、GitHub sync preflight at `bc2449c5b75598fac1f414deb28604d129253009` | implementation startは未承認。Candidate内same-second artifact slotsはformal filename collision規則で機械的に配置 | adopted into canonical paths | provisional（fresh canonical `spec-reviewer`未実施） | yes | 配置後guidanceは`.assurance.json`未作成により`design-not-substantive`。既存assurance workflowとfresh canonical `spec-reviewer`を完了し、別Human authorizationまでimplementationを開始しない |
+| requirement | parent Initiative／Epic、accepted ADR 20／22、current runtime、Candidate v15、canonical fail artifactを照合 | なし。public apply routeとsource bindingをRequirementへ確定した | P1-01、P1-07、P1-08、P1-09をcanonical requirementへ採用 | failed | yes | fresh canonical re-review |
+| design | command parser、runbook transaction、GitHub preflight、archive review、binary publisherとcanonical fail artifactを照合 | なし。apply state machine、transaction、recovery、shared primitiveをDesignへ確定した | P1-01、P1-02、P1-06、P1-08、P1-09をcanonical designへ採用 | failed | yes | fresh canonical re-review |
+| plan | Issue plan authoring contract、Closure Index schema、test ownership、archive class、PA-NF、live boundaryを照合 | なし。required rowsとS02／S09 splitをPlanへ確定した | P1-03、P1-04、P1-05、P1-06、P1-09をcanonical planへ採用 | failed | yes | fresh canonical re-review |
+
+`failed` は `artifacts/20260726t235522z-review-canonical-spec-review-fail.md` の直近正式判定を表す。修正内容の自己承認は行わず、別のfresh `spec-reviewer`が再判定する。
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
-- 委任 authoring の使用:
-  - used / not used
-- 未使用の場合:
-  - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
-- lifecycle state（契約値）:
-  - `requested`, `produced`, `integrated`, `partially_integrated`, `rejected`, `superseded`, `blocked`, `stale`
-- 昇格不可 state:
-  - `stale`, `rejected`, `superseded`, `blocked`
-- 標準出力先:
-  - 対象 scope の `artifacts/` direct child にある flat Markdown
-  - filename: typed artifacts use `<ts>-<type>-<slug>.md` or `<ts>-<nn>-<type>-<slug>.md`; blank artifacts use `<ts>-<slug>.md` or `<ts>-<nn>-<slug>.md`
-- 軽量 provenance:
-  - `created_by_role`, `scope_id`, `source_paths`, `intended_targets`, `adoption_status: unreviewed`, `reflected_to: []`, `diff_guard_result`, fallback decision, report evidence destination, adoption ledger note
-  - 互換 label: source artifacts, draft artifact path, status, integration result, rejected portions, blockers, reviewer result, promotion decision
-- 禁止 self-claim:
-  - `authority: accepted`, `adoption_status: adopted`, non-empty `reflected_to`, reviewer pass, phase completion, implementation readiness
-- 禁止 wildcard token:
-  - `*`, `grants.*`, `all`
-- 標準必須にしない field:
-  - task manifest hash, Permission Profile hash, session invocation hash, probe run id, session hash
-- historical note:
-  - legacy `discussions/` と既存 `iss-00126` などの manifest/Profile/probe/session artifacts は grandfathered evidence として残し、削除・rename・validation failure 化しない。
+
+今回のP1修正ではdelegated authoring draftを使用していない。ユーザーがCodex Mainによる直接修正を明示承認し、Mainがread-only specialist／reviewer evidenceをowner文書へ手動統合した。
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| Codex Main | iss-00334 canonical planning repair | 該当なし | `artifacts/20260726t235800z-review-system-architect-fail.md`; `artifacts/20260726t235801z-review-implementation-planner-fail.md`; `artifacts/20260726t235522z-review-canonical-spec-review-fail.md` | `requirement.md`; `design.md`; `plan.md`; `.assurance.json`; `report.md` | not used | `requirement.md`; `design.md`; `plan.md`; `.assurance.json`; `report.md` | `git diff --check` successful; planning validation successful | manual authoring | none | none | failed | fresh re-review後にexecute manual-authored canonical docs |
 
-### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
-| 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
-|---|---|---|---|---|
-| ワークフロー単位の許可証跡不足（missing workflow-scoped authorization evidence） | blocked / incomplete | ワークフロー利用依頼の authorization source と boundary を記録する、または手動 authoring に戻す | ワークフロー単位の named role 許可（Workflow-Scoped Authorization） / この section | ineligible |
-| 前段 reviewer pass 不足 / stale（missing/stale previous reviewer pass） | blocked / incomplete | レビューゲートを再実行する（rerun reviewer gate） | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
-| 設計中の要件 gap（requirement gap during design） | blocked / incomplete | requirement phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| 計画中の設計 gap（design gap during plan） | blocked / incomplete | design phase へ戻す | 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger） | ineligible |
-| ロール利用不可（role unavailable） | blocked / manual path | 利用不可を記録し、妥当なら手動で続行する | この section | ineligible |
-| 禁止行為の試行（forbidden action attempt） | rejected | ドラフトを破棄し incident を記録する | この section / decision ledger | ineligible |
-| 古いドラフト（stale draft） | stale | 再生成または差分調整する | この section | ineligible |
-| 置換済みドラフト（superseded draft） | superseded | 置換先ドラフトを参照する | この section | ineligible |
-| 委任使用主張に対する証跡不足（missing draft evidence when delegated use is claimed） | incomplete | 証跡を追加する、または委任使用 claim を外す | この section | ineligible |
-| reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
+## グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 
-## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
-
-## 実装記録（セッションログ） (必須)
-
-### セッションログ（2026-07-23 HH:MM - HH:MM）
-
-#### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
-- 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
-
-#### 実施内容
-- ...
-
-#### 実行コマンド / 結果
-```bash
-<command>
-
-<result>
-```
-
-#### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
-| ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
-
-#### 発見されたテスト / リスク（Discovered Tests）
-| ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
-|---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
-
-#### ステップ契約の完了証跡（Step Contract Closure）
-| ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
-|---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### テスト契約の完了証跡（Test Contract Closure）
-| クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
-|---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
-
-- `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
-
-#### クロージャ網羅（Closure Coverage）
-| クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
-|---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
-
-#### クロージャ差分（Closure Delta）
-| 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
-|---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
-
-#### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
-`workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
-
-Authorization source は、ユーザーによる SpecDock workflow 利用依頼でよい。範囲は active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility に限る。この section は role ごと・phase ごとの追加承認 gate ではなく、scope 内の named role 利用前に追加許可を求める根拠にしてはならない。
-
-別途確認が必要なのは scope expansion、破壊的操作、外部公開、credential を伴う外部 mutation、private external system、SpecDock workflow 外の role 利用である。unavailable / denied / host conflict は fail-closed とし、fresh `passed` reviewer gate の代替にしてはならない。
-
-| 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
-|---|---|---|---|---|---|---|---|---|
-| ワークフロー利用依頼 / 明示承認 / なし（user request to use SpecDock workflow / explicit approval / none） | ... | iss-00334 | 現在セッション（current session） / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | 範囲: active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility。破壊的操作 / 外部公開 / credentialed external mutation / scope expansion / private external system use / out-of-workflow role は含めない | 完了 / セッション終了 / scope 変更 / host policy conflict / user revocation（issue complete / session end / scope change / host policy conflict / user revocation） | none / denied / unavailable / host conflict | 続行 / separate-confirmation exception は user に確認 / block gate / record waiver request |
-
-#### 実装委任ゲート（Implementation Delegation Gate）
-`workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
-
-| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
-
-#### 委任 worker 証跡（Delegated Worker Evidence）
-| ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
-|---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
-
-#### 親実装例外（Parent Implementation Exception）
-| ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
-
-#### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
-Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
+Assurance classifierのauthorityは`standard`である。Issue-local overlayとして、untrusted archive、public command contract、multi-file transaction、credentialed live mutationにstrict相当のclosureを追加した。overlayの解除条件は、これら高リスク面が不要になったことをowner文書で示し、assurance再分類とfresh spec reviewを通すreviewed amendmentである。
 
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
-| `lite` | `not applicable` | `not applicable` | ライト該当なし理由（lite not applicable reason） | `pass / fail / blocked` | `ready / blocked` |
-| `standard` | `system-architect / implementation-planner / manual fallback` | `used / skipped / unavailable / denied` | `artifacts/...` / manual evidence / skip reason: ... | `pass / fail / blocked` | `ready / blocked` |
-| `strict` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / manual fallback evidence | `pass / fail / blocked` | `ready / blocked` |
-| `critical` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / explicit approval and risk acceptance | `pass / fail / blocked` | `ready / blocked` |
+| standard | system-architect and implementation-planner | used | `artifacts/20260726t235800z-review-system-architect-fail.md`; `artifacts/20260726t235801z-review-implementation-planner-fail.md`; findingsを `design.md` と `plan.md` に統合済み | failed | blocked |
 
-#### レビューゲート状態（Reviewer Gate Status）
+## レビューゲート状態（Reviewer Gate Status）
+
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| canonical planning | canonical spec review | spec-reviewer | fresh | failed | no | re-review required | `artifacts/20260726t235522z-review-canonical-spec-review-fail.md` のP1-01〜P1-09を修正済み。修正版のfresh判定待ち |
 
-#### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
-| マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
-|---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+## Assurance記録
 
-#### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `./spec-dock/scripts/spec-dock assurance classify --stage requirement --issue iss-00334 --format json`: valid。`authorized_profile=standard`、`status=provisional`としてcurrent三文書へ再束縛した。
+- `./spec-dock/scripts/spec-dock assurance verify --issue iss-00334 --format json`: valid。
+- source binding:
+  - Requirement SHA-256: `ad6a7ddea25f459d7692d2746e6061b1d692bb6f543aaaa27d28c78e2794d501`
+  - Design SHA-256: `a16f2d612633eec0d2ab77dca593ffbcf889539f4d1be0d8288f6d22724fe84f`
+  - Plan SHA-256: `898a12afa984651a27905fb4d200e8aa6a8fd114f14df76806d6f28cf5f5b5ff`
+- `./spec-dock/scripts/spec-dock assurance compose --artifact all --issue iss-00334 --format json --dry-run`: Design／Planに`substantive_content_conflict`、`changed_paths=[]`を返した。current owner文書を上書きしないapproved no-opとして、non-dry-run composeは実施していない。
+- strict相当overlayのdelta: exhaustive archive negative closure、transaction fault injection、specialist evidence、fresh spec/code/QA review、hermetic testとlive operationの分離。
+- revert condition: public contract、untrusted archive、multi-file transaction、credentialed live mutationがscopeから除外されたreviewed amendmentに対し、assurance再分類とfresh spec reviewがpassした場合のみ解除する。
 
-#### コミット
-- <hash> <message>
+## 実装記録（セッションログ） (必須)
 
-#### メモ
-- ...
-
----
-
-### セッションログ（2026-07-23 HH:MM - HH:MM）
+### セッションログ（2026-07-27 — canonical planning repair）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+
+- Planning gate: P1-01〜P1-09
+- 製品実装step: 未開始
+- Planned source: `plan.md` Spec-Locked Closure Index、S01〜S99
 
 #### 実施内容
-- ...
 
----
+- formal `system-architect`、`implementation-planner`、`spec-reviewer` のread-only findingsをIssue artifactsへ保存した。
+- Requirement、Design、Planをowner別に修正した。
+- Assuranceをcurrent三文書SHAへ再束縛した。
+- Reportの候補版履歴を保持しつつ、readiness用templateを実値へ置換した。
+
+#### 実行コマンド / 結果
+
+| コマンド | 観測結果 |
+|---|---|
+| `./spec-dock/scripts/spec-dock validate` | pass。222 nodesを検証 |
+| `git diff --check` | pass |
+| `./spec-dock/scripts/spec-dock assurance classify --stage requirement --issue iss-00334 --format json` | pass。standard／provisionalをcurrent三文書へ記録 |
+| `./spec-dock/scripts/spec-dock assurance verify --issue iss-00334 --format json` | pass |
+| `./spec-dock/scripts/spec-dock assurance compose --artifact all --issue iss-00334 --format json --dry-run` | approved no-op。Design／Plan substantive conflict、changed pathsなし |
+
+#### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
+
+| 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 例外 | 次アクション（next action） |
+|---|---|---|---|---|---|---|---|---|
+| ユーザーのSpecDock workflow利用依頼と今回のCodex直接修正承認 | current `chemitaro/spec-dock` worktree | iss-00334 | current task | system-architect、implementation-planner、spec-reviewer、dev-coder、code-reviewer、qa-reviewer | active Issueとdocumented role責務。破壊的操作、scope expansion、credentialed external mutationは含めない | Issue完了、scope変更、user revocation、session終了 | Codex Mainの直接修正許可はcanonical planning repairに限定し、製品実装のworker delegation contractを変更しない | fresh spec-reviewer pass後にS01へ進む |
+
+#### 実装委任ゲート（Implementation Delegation Gate）
+
+| ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 必須検証（required verification） | 停止条件（stop conditions） | 観測結果（observed result） |
+|---|---|---|---|---|---|---|---|---|
+| S01 | delegated after planning pass | shipped CLI contractとtestsのbounded implementation | dev-coder | `plan.md` S01のexact targets／allowed pathsのみ | canonical `requirement.md`、`design.md`、`plan.md` | S01 Red／Green command、focused code review、diff allowlist | spec-reviewer fail、scope escape、test failure、new requirement gap | blocked。fresh planning review待ち |
+
+#### 発見されたテスト / リスク（Discovered Tests）
+
+planning repairで発見されたarchive safety、transaction fault、publication resume、live-operation boundaryのtest obligationsは、`plan.md`の`CLOS-ARC-01`〜`CLOS-ARC-25`、`CLOS-RISK-001`〜`CLOS-RISK-005`へ採用済みである。製品実装中に新しいtest／riskを発見した場合は、実装で吸収せずここへentryを追加し、materialな変更はPlan amendmentへ戻す。
+
+#### ステップ契約の完了証跡（Step Contract Closure）
+
+製品実装stepのclosure evidenceはまだ存在しない。S01開始後、各step ownerが持つ全`required=yes` rowについて、observed evidence、reviewer verdict、commit candidate、clean checkを追記する。
+
+#### テスト契約の完了証跡（Test Contract Closure）
+
+製品test contractはまだ実行していない。`plan.md`の各`tc-*`とSpec-Locked Closure Indexの対応を維持し、実行した事実だけを追記する。
+
+#### クロージャ網羅（Closure Coverage）
+
+planning repairではClosure Indexのschemaとownerを確定した。実装closureは未開始であり、S99までに全`required=yes` rowのobserved evidenceをこのsectionへ集約する。
+
+#### クロージャ差分（Closure Delta）
+
+現時点でapproved Planからのimplementation closure deltaはない。追加、変更、削除、alias mappingが生じた場合は、理由、resolved closure、plan amendment要否、fresh re-review要否を記録する。
+
+## マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
+
+| マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | 差分確認 | 次アクション |
+|---|---|---|---|---|---|
+| canonical planning repair | review required | Requirement、Design、Plan、Assurance、Report、review artifacts | dedicated remote review snapshot。exact hashはChatGPT submissionとGit historyで固定 | `git diff --check` pass | snapshotをcommit／pushし、GitHub connector付きfresh ChatGPT reviewを実施する |
+| S01 | not started | `plan.md` S01 exact scope | none | 製品実装差分なし | planning gate通過後にdev-coderへ委任する |
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
-### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
-| 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
-|---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
-
-### 最終 QA ゲート（Final QA Gate）
-| レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
-|---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
-
-### 最終コードレビューゲート（Final Code Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
-
-### 最終 spec review ゲート（Final Spec Review Gate）
-| レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
-|---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
-
-### 最終 commit（Final Commit）
-| 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
+| ゲート | 対象 | 観測結果 | 証跡 / 次アクション |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| Docs Impact S90 | docs、templates、README、workflow、skill、migration notes | not started | S01〜S09 closure後に判定 |
+| Final QA | issue-wide obligation coverage | not started | S90後にfresh qa-reviewer |
+| Final Code Review | integrated code and tests | not started | step-local review後にfresh issue-wide code-reviewer |
+| Final Spec Review | Requirement、Design、Plan、Report、implementation、tests、docs alignment | failed | `artifacts/20260726t235522z-review-canonical-spec-review-fail.md`; current planning repairをfresh re-review |
+| Final Commit | final report ledger and issue-wide closure | blocked | S99とfresh final reviewsのpass後に実施 |
 
-## 遭遇した問題と解決 (任意)
-- 問題: 現行のgeneric `authoring pack review`はgeneric prompt-pack schemaを前提とし、Issue Planning Candidate ZIPを直接検証できない。
-  - 解決: Candidate v15ではMainがIssue-specific contractに沿う127項目のdeterministic preflightを実施し、fresh Red TeamがZIPを独立検査した。Candidate-specific validatorはiss-00334の実装対象として残す。
-- 問題: ChatGPT Useのsame-thread follow-upではmodel selection evidenceが`skipped`／`verified=no`となり、継続時の選択modelを再検証できない。
-  - 解決: Blue Team continuityはconversation IDで維持し、fresh Red Team runでは`requested=Pro`、`resolved=Pro`、`verified=yes`を確認した。これはwrapperの観測上の制約として報告する。
-- 問題: Candidate内の3 supporting artifactsが同一timestamp slot `20260726t154840z`を共有し、そのままIssue `artifacts/`へ置くとSpecDockのduplicate artifact guardが失敗した。
-  - 解決: 本文bytesを変更せず、discを標準名、2 research artifactsをsame-second collision形式の`-01-`／`-02-`へ配置した。元のlogical pathsとchecksumsはexact Candidate ZIP内で保持する。
-- 問題: canonical配置後の`guidance issue-planning`は、`.assurance.json`未作成のため`state=blocked`、`reason_code=design-not-substantive`を返した。
-  - 解決: Candidate契約どおり本adoptionではassuranceを変更せず、配置自体とexecution readinessを分離した。既存assurance workflowとfresh canonical `spec-reviewer`を次の必須gateとして残す。
+## 遭遇した問題と解決
 
-## 学んだこと (任意)
-- ...
+- Candidate v15のfresh Red Team PASSはCandidate review-cycle evidenceであり、canonical readinessの代替にならない。
+  - Human adoption後、fresh canonical specialistsと`spec-reviewer`を実行し、9件のP1をowner文書へ反映した。
+- initial canonical placementには`.assurance.json`がなく、workflow guidanceが`design-not-substantive`を返した。
+  - assurance classifyでcurrent三文書へstandard／provisionalを再束縛し、verifyをpassさせた。compose dry-runはsubstantive owner文書とのconflictを安全に検出したため書込みを行わなかった。
+- review passを修正者が自己宣言するとreviewer gateが循環する。
+  - 本書は直近の正式failを保持し、修正版を別のfresh `spec-reviewer`へ渡す。PASS取得後にだけauthoring、specialist、reviewer rowsを更新し、さらにfresh final reviewで統合後のReportを検証する。
 
-## 今後の推奨事項 (任意)
-- ...
+## 学んだこと
+
+- Candidate review、Human adoption、canonical review、execution readinessは別々のauthority gateとして記録しなければならない。
+- post-commit publication failureはcanonical rollbackではなく、operation identityを保ったresumeとして扱う必要がある。
+
+## 今後の推奨事項
+
+- S01以降は`plan.md`のstep順、exact allowlist、required closure rowを守り、各stepをfresh reviewしてから次へ進む。
 
 ## 省略/例外メモ (必須)
-- 該当なし
+
+- 今回の例外は、ユーザーがCodex Mainによるcanonical planning repairを直接承認したことだけである。製品実装のdelegation、review、Human-only live mutation gateは省略しない。
