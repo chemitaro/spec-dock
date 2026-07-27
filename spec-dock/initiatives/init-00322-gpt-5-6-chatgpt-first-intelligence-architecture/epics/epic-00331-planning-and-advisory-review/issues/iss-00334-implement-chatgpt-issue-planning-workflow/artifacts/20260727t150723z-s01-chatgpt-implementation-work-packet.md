@@ -52,7 +52,7 @@ S01 の完了境界は次のとおりとする。
 * PlanningContext、Candidate identity、Reviewed identity、Revision request、Review result、Human decision の closed contract が実装される。
 * existing Issue から canonical three paths を決定し、unknown Issue、Initiative／Epic、未 materialize の Seed を fail closed で拒否する。
 * valid production operation が Candidate生成、Review完了、adoption完了を偽って返してはならない。S01 の dispatch tracer は injected fake use case で検証し、`candidate_created` 等の実 success を live handler から発生させない。
-* focused CLI／domain／application／presentation tests が Green となり、Core CLI regression がない。これは approved S01 の Goal／Work／Tests／Exit と一致する。 
+* focused CLI／domain／application／presentation tests が Green となり、Core CLI regression がない。これは approved S01 の Goal／Work／Tests／Exit と一致する。
 
 以下は明示的に S01 外である。
 
@@ -67,7 +67,7 @@ S01 の完了境界は次のとおりとする。
 * root `spec-dock/` dogfood projection
 * wheel／sdist、fresh init／update parity、live dogfood
 
-添付された Requirement／Design／Plan も同じ S01 境界を補助的に示しているが、以下の packet は GitHub exact HEAD の正本を優先している。 
+添付された Requirement／Design／Plan も同じ S01 境界を補助的に示しているが、以下の packet は GitHub exact HEAD の正本を優先している。
 
 ---
 
