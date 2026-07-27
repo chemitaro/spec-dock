@@ -131,18 +131,44 @@ S01 CLI shell
 
 ## 8. Spec-Locked Closure Index
 
-この索引はmaterial obligationsのbounded coverage ledgerであり、全test implementation inventoryやglobal proof registryではない。summary rowは既存test-card参照を安定させるaliasで`required=no`、individual rowがS99で閉じる必須契約である。各stepの`step closure contract`は、そのstepを`Closure owner`に持つ全`required=yes` rowを明示的に包含する。
+この索引はmaterial obligationsのbounded coverage ledgerであり、全test implementation inventoryやglobal proof registryではない。summary rowは既存test-card参照を安定させるaliasで`required=no`であり、closure stateを持たない。individual `required=yes` rowがS99で閉じる必須契約である。
+
+Closure stateは`Closure ID`と`Closure owner`の組で管理する。
+
+- single-owner rowは一つのowner portionを持つ。
+- multi-owner rowはownerごとに独立したportionを持つ。例: owner=`S01/S06`は`(Closure ID,S01)`と`(Closure ID,S06)`の二portionである。
+- owner portion stateの許可値は`open`、`passed`、`failed`、`blocked`だけである。
+- stepは自身のowner portionだけを`passed`にできる。他owner portionまたはaggregate rowをcloseできない。
+- aggregate stateは、全owner portionが`passed`のときだけ`closed`である。一つでも`open|failed|blocked`ならaggregateは`open`である。
+- observed testだけ、reviewerだけ、commit候補だけではowner portionを`passed`にしない。step-local required evidence、required reviewer、Main Result Approval、commitまたはapproved-no-op、post-commit clean checkの全条件を要求する。
+- 後続drift、invalidated evidence、failed re-reviewは該当owner portionを再び`open|failed|blocked`にし、aggregateを再openする。
+- 本Plan内でmulti-owner rowについて「closeする」と書かれている箇所は、明示的にaggregate closureと書かれていない限り、そのstepのowner portionだけを意味する。
+
+Mainは`report.md#Step-Contract-Closure`または`report.md#Test-Contract-Closure`へ次のexact fieldsを一行ずつ記録する。
+
+```text
+closure_id
+closure_owner
+owner_portion_state
+observed_evidence
+reviewer_verdict
+commit_or_approved_noop
+post_commit_clean
+recorded_at_head
+```
+
+`report.md#Closure-Coverage`は各required rowについて全owner portion stateとderived aggregate stateを表示する。S99は全`required=yes` aggregate stateが`closed`であることを検証し、portion-level passをaggregate closureの代用にしない。
 
 | Closure ID | Spec link | Observable input/state | Locked expectation | Bug class guarded | Closure owner | Required | Evidence level | Closure evidence / verification | Evidence destination |
 |---|---|---|---|---|---|---|---|---|---|
-| `CLOS-CLI` | REQ-002 / AC-002 | independent entrypoint help | four supported planning commands only | hidden／missing public route | S01 | no | summary | `tc-s01-001` | `report.md#Step-Contract-Closure` |
-| `CLOS-CREATE` | REQ-004 / AC-001,004 | complete Planner response | immutable controlled Candidate and direct Review handoff | partial／repacked Candidate | S03/S05 | no | summary | `tc-s05-001` | `report.md#Step-Contract-Closure` |
+| `CLOS-CLI` | REQ-002 / AC-002 | independent entrypoint help and parser matrix | four commands; exact archive/git review/apply options; no placeholder or cross-mode acceptance | hidden／incomplete public route | S01 | no | summary | `tc-s01-001`, `tc-s01-004` | `report.md#Step-Contract-Closure` |
+| `CLOS-CREATE` | REQ-004 / AC-001,004 | complete Planner response | immutable seven-file Candidate with closed v1 controls and direct Review handoff | partial／schema-ambiguous／repacked Candidate | S03/S05 | no | summary | `tc-s05-001`, `tc-s05-003`, `tc-s05-006` | `report.md#Step-Contract-Closure` |
 | `CLOS-GIT` | REQ-003 / AC-003,017 | named branch and expected source | backend starts only on exact clean remote-equal source | stale/default-branch execution | S03 | no | summary | `tc-s03-001`, `tc-s03-002` | `report.md#Step-Contract-Closure` |
-| `CLOS-SEC` | REQ-021 / AC-011 | prompt／argv／diagnostics | direct argv and redaction | secret leak／shell injection | S03 | no | summary | `tc-s03-003` | `report.md#Step-Contract-Closure` |
+| `CLOS-SEC` | REQ-021 / AC-011 | benign metacharacter fixture and prohibited-content fixture | direct argv without shell; prohibited content blocked before backend | shell injection／secret transmission | S03 | no | summary | `tc-s03-003`, `tc-s03-004` | `report.md#Step-Contract-Closure` |
 | `CLOS-REVISION` | REQ-007 / AC-004 | semantic or mechanical request | lane is explicit and new identity is mandatory | semantic change disguised as mechanical | S04 | no | summary | `tc-s04-001`, `tc-s04-002` | `report.md#Step-Contract-Closure` |
 | `CLOS-REVIEW` | REQ-006,008 / AC-005,007 | archive or git identity | mode-bound read-only Review with mutation guard | mode reuse／review mutation | S05 | no | summary | `tc-s05-001`, `tc-s05-005` | `report.md#Step-Contract-Closure` |
-| `CLOS-ARCHIVE` | REQ-010,022 / AC-006 | Candidate ZIP bytes | every archive class is fail-closed with partial output 0 | path escape／resource exhaustion／identity swap | S05 | no | summary | `tc-s05-003`, `tc-s05-004[*]` | `report.md#Step-Contract-Closure` |
-| `CLOS-ADOPTION` | REQ-009–012 / AC-008,009 | validated Review v1 + Human decision v1 + exact reviewed identity | closed evidence schemas, sole public transactional apply, and remote-equal publication | unbound authority／partial adoption／hidden mutation | S06 | no | summary | `tc-s06-001`, `tc-s06-002`, `tc-s06-009`, `tc-s06-010` | `report.md#Step-Contract-Closure` |
+| `CLOS-ARCHIVE` | REQ-010,022 / AC-006 | Candidate ZIP bytes and control schemas | v1 controls, every archive class, cross-file and external digest fail closed with outputs 0 | path escape／resource exhaustion／identity or control substitution | S05 | no | summary | `tc-s05-003`, `tc-s05-004[*]`, `tc-s05-006[*]` | `report.md#Step-Contract-Closure` |
+| `CLOS-ADOPTION` | REQ-009–012 / AC-008,009 | exact parser identity + Review v1 + Human decision v1 | approved full apply or rejected decision-record only; sole public transactional route; remote-equal publication | unbound authority／partial adoption／undurable rejection | S06 | no | summary | `tc-s06-001`, `tc-s06-002`, `tc-s06-009`–`tc-s06-012` | `report.md#Step-Contract-Closure` |
 | `CLOS-READINESS` | REQ-013,014 / AC-010,013 | valid Review pass／Human dual authorization／identity／parity／validation／publication | only full typed conjunction returns ready | review-only／Human-only／schema-invalid start | S06/S08 | no | summary | `tc-s06-003[*]`, `tc-s06-009`, `tc-s06-010`, `tc-s08-001` | `report.md#Step-Contract-Closure` |
 | `CLOS-SKILL` | REQ-001,005 / AC-001,011 | shipped Skill／Prompt inventory | official route and closed resources match CLI | legacy route／raw override | S02A/S02B | no | summary | `tc-s02a-001`, `tc-s02b-001` | `report.md#Step-Contract-Closure` |
 | `CLOS-PROJECTION` | REQ-017,023 / AC-012,015 | wheel／sdist／init／update | provider bytes and executable projection agree | provider／consumer drift | S07 | no | summary | `tc-s07-001`, `tc-s07-002` | `report.md#Step-Contract-Closure` |
@@ -156,26 +182,26 @@ S01 CLI shell
 | Closure ID | Spec link | Observable input/state | Locked expectation | Bug class guarded | Closure owner | Required | Evidence level | Closure evidence / verification | Evidence destination |
 |---|---|---|---|---|---|---|---|---|---|
 | `CLOS-REQ-001` | REQ-001 / AC-001 | Human invokes official Skill | Skill reaches create/review/revise/apply route | bypass／legacy entry | S02A/S02B | yes | inspect-only + red-required | `tc-s02a-001`, `tc-s02b-001` | `report.md#Test-Contract-Closure` |
-| `CLOS-REQ-002` | REQ-002 / AC-002 / Design §3 | CLI help and argv | four commands including `planning apply` are callable | lifecycle available only through internals | S01 | yes | red-required | `tc-s01-001`, CLI help test | `report.md#Test-Contract-Closure` |
+| `CLOS-REQ-002` | REQ-002 / AC-002 / Design §3 | CLI help and parser argv matrix | four commands; exact archive/git review/apply options; repository/branch derived; mode options closed | lifecycle available only through internals／placeholder argv | S01 | yes | red-required | `tc-s01-001`, `tc-s01-004` | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-003` | REQ-003 / AC-003,017 | repo／branch／HEAD／upstream／tree | exact Git binding before backend or mutation | stale／dirty／default fallback | S03 | yes | red-required | `tc-s03-001`, `tc-s03-002` | `report.md#Test-Contract-Closure` |
-| `CLOS-REQ-004` | REQ-004 / AC-001,004 | complete three-doc response | mandatory seven-file immutable package, no overwrite | partial／identity-inconsistent artifact | S03/S05 | yes | red-required | `tc-s05-001`, `tc-s05-003` | `report.md#Test-Contract-Closure` |
+| `CLOS-REQ-004` | REQ-004 / AC-001,004 / Design §4.2 | complete three-doc response and four exact controls | canonical v1 control bytes, exact inventory/checksums/cross-file binding, no overwrite | schema-divergent／identity-inconsistent artifact | S03/S05 | yes | red-required | `tc-s05-001`, `tc-s05-003`, `tc-s05-006[*]` | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-005` | REQ-005 / AC-011 | prompt resource selection | declared provider resources only | raw override／prompt injection | S02A/S02B | yes | red-required | `tc-s02b-002` | `report.md#Test-Contract-Closure` |
-| `CLOS-REQ-006` | REQ-006 / AC-005 | explicit Review mode | mode-bound identity, no silent fallback／reuse | cross-mode evidence reuse | S05 | yes | red-required | `tc-s05-005` + archive positive | `report.md#Test-Contract-Closure` |
+| `CLOS-REQ-006` | REQ-006 / AC-005 / Design §§3,4.3 | explicit Review mode and full parser identity | archive identity or git identity with exact Issue/base; no silent fallback／reuse | cross-mode／base-field evidence reuse | S05 | yes | red-required | `tc-s05-005`, `tc-s01-004` + archive positive | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-007` | REQ-007 / AC-004 | semantic／mechanical revision input | complete replacement or closed bounded edit creates new identity | semantic drift hidden in mechanical lane | S04 | yes | red-required | `tc-s04-001`, `tc-s04-002` | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-008` | REQ-008 / AC-007 | pre/post Candidate and Git inventory | reviewer writes only separate result | Candidate／repo mutation | S05 | yes | red-required | `tc-s05-001` mutation assertions | `report.md#Test-Contract-Closure` |
-| `CLOS-REQ-009` | REQ-009 / AC-008,009 / Design §§3,4.3–4.6,5 | exact `PlanningReviewResultV1` + exact `PlanningHumanDecisionV1` + same reviewed identity | `planning apply` is sole supported route; both archive and git-bound identities are admitted without reinterpretation | ad-hoc internal call／Candidate-only gate／partial authority | S01/S06 | yes | red-required | apply help + `tc-s06-001`, `tc-s06-002`, `tc-s06-009`, `tc-s06-010` | `report.md#Test-Contract-Closure` |
+| `CLOS-REQ-009` | REQ-009 / AC-008,009 / Design §§3,4.3–5.1 | exact CLI identity + Review v1 + Human decision v1 | approved full apply; rejected decision-record; both modes admitted without reinterpretation | ad-hoc call／Candidate-only gate／undurable rejection | S01/S06 | yes | red-required | `tc-s01-004`, `tc-s06-001`, `tc-s06-002`, `tc-s06-009`–`tc-s06-012` | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-010` | REQ-010 / AC-008 / Design §5.1 | archive identity and canonical targets | staged validation, fixed-order replacement, parity, rollback | mixed canonical bytes | S06 | yes | red-required | `tc-s06-001`, `tc-s06-004`, `tc-s06-005` | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-011` | REQ-011 / AC-009 | reviewed HEAD／paths and blobs | git-bound blobs remain exact; approval-only diff | post-review semantic mutation | S06 | yes | red-required | `tc-s06-002` | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-012` | REQ-012 / AC-008,009 | H0/H1/local/remote/tree | push success yields parity; failure is resumable | commit loss／force/reset recovery | S06 | yes | red-required | `tc-s06-006`, `tc-s06-007` | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-013` | REQ-013 / AC-008–010,013 | review/Human/parity/validation/publication | only full conjunction returns `ready`; no state registry | partial gate treated ready | S06/S08 | yes | red-required | `tc-s06-003[*]`, `tc-s08-001` | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-014` | REQ-014 / AC-010 | each PA-NF fixture separately | 10/10 non-ready and no partial output | grouped negative hides gap | S06/S08 | yes | red-required | `tc-s06-003[pa-nf-01..10]` | `report.md#Test-Contract-Closure` |
-| `CLOS-REQ-015` | REQ-015 / AC-013 / Design §4.4 | exact Review bytes／exact Human decision bytes／decision artifact／result JSON | Human decision cross-binds exact Review SHA and identity; positive bytes alone are copied; no transcript or authority registry | evidence substitution／authority conflation／partial approval | S06 | yes | red-required | `tc-s06-009`, `tc-s06-010`, state-boundary assertions | `report.md#Test-Contract-Closure` |
+| `CLOS-REQ-015` | REQ-015 / AC-013 / Design §§4.4–5.1 | exact Review bytes／Human decision bytes／decision artifact／publication | approved adoption or durable rejected decision-record; revoked unsupported; no authority registry | evidence substitution／false revocation／partial approval | S06 | yes | red-required | `tc-s06-009`, `tc-s06-010`, `tc-s06-011`, state-boundary assertions | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-016` | REQ-016 / AC-013 | `.assurance.json` before/after candidate flow | product flow leaves assurance unchanged | hidden profile mutation | S06/S08 | yes | red-required | state-boundary fixture | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-017` | REQ-017 / AC-012 | provider/wheel/sdist/fresh/update/dogfood bytes | provider-first parity | generated tree as authority | S07 | yes | red-required | `tc-s07-001`, `tc-s07-002` | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-018` | REQ-018 / AC-014 / Design §13 | eligible target + explicit Human authority | hermetic gate first; Main alone runs live chain | worker-owned credentialed mutation | S09A/S09B | yes | manual-required | `tc-s09a-001`, `tc-s09b-001` | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-019` | REQ-019 / AC-015 / Design §§5.1,8 | archive/runbook/transaction primitives | bounded shared reuse with characterization Green | duplicated safety subsystem | S05/S06/S08 | yes | covered-existing + red-required | archive default + runbook + scoped transaction suites | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-020` | REQ-020 / AC-016 | branch／PR／merge handoff | one Issue/branch/PR; Human-only merge | issue-level policy rewrite | S90/S99/Final Exit | yes | inspect-only | docs/spec review + final handoff inspection | `report.md#Final-Quality-Gate` |
-| `CLOS-REQ-021` | REQ-021 / AC-011 | metacharacter／secret fixtures and argv capture | no leak; direct argv | injection／credential disclosure | S03/S08 | yes | red-required | `tc-s03-003`, integrated security fixture | `report.md#Test-Contract-Closure` |
+| `CLOS-REQ-021` | REQ-021 / AC-011 | benign metacharacter and prohibited sentinel fixtures | benign values remain argv elements; prohibited content rejected before backend call | shell injection／secret disclosure to backend | S03/S08 | yes | red-required | `tc-s03-003`, `tc-s03-004`, integrated security fixture | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-022` | REQ-022 / AC-006 | every archive matrix row | inclusive ceilings pass; every prohibited class rejects; outputs 0 | incomplete archive safety coverage | S05 | yes | red-required | `tc-s05-004[arc-01..25]` | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-023` | REQ-023 / AC-015 | Core CLI/generic archive/lifecycle behavior | additive route and existing behavior Green | compatibility regression | S05/S07/S08 | yes | covered-existing | `tc-s05-002`, `tc-s08-002` | `report.md#Test-Contract-Closure` |
 | `CLOS-REQ-024` | REQ-024 / AC-014 | representative run metrics | intervention, bytes, invocations, result, time, failure recorded outside Candidate | unobservable dogfood | S09B | yes | manual-required | `tc-s09b-001` evidence artifact | `report.md#Test-Contract-Closure` |
@@ -188,7 +214,7 @@ S01 CLI shell
 | `CLOS-EC-002` | EC-002 | malformed Planner response | `rejected`, final Candidate absent | partial Candidate leak | S03/S05 | yes | red-required | incomplete response/package fixture | `report.md#Test-Contract-Closure` |
 | `CLOS-EC-003` | EC-003 | Review identity/mode/mutation mismatch | invalid Review, no fallback | false Review authority | S05 | yes | red-required | `tc-s05-005` + mutation fixture | `report.md#Test-Contract-Closure` |
 | `CLOS-EC-004` | EC-004 | any archive matrix violation | `rejected`, extraction/review/adoption output absent | unsafe archive side effects | S05 | yes | red-required | `tc-s05-004[arc-01..25]` | `report.md#Test-Contract-Closure` |
-| `CLOS-EC-005` | EC-005 / Design §4.4.3 | malformed／negative／mismatched／stale Human evidence or destination | schema/cross-binding mismatch is `rejected`; current source drift is `stale`; rejected/revoked authority is `blocked`; mutation 0 | approval bypass／wrong status masking | S06 | yes | red-required | `tc-s06-003[pa-nf-03,05,06,07]`, `tc-s06-009`, `tc-s06-010` | `report.md#Test-Contract-Closure` |
+| `CLOS-EC-005` | EC-005 / Design §4.4.3 | named missing／malformed／negative／mismatched／stale／destination fixtures | missing Review/Human=`blocked`; malformed/cross-binding/unsafe/unsupported-revoked=`rejected`; source drift=`stale`; valid rejection publishes decision-only then returns `blocked`; no named fixture accepts multiple status | approval bypass／wrong status masking／undurable rejection | S06 | yes | red-required | `tc-s06-003`, `tc-s06-009`, `tc-s06-010`, `tc-s06-011` | `report.md#Test-Contract-Closure` |
 | `CLOS-EC-006` | EC-006 | replace/validation fault before commit | exact rollback or `recovery_required` | mixed canonical state | S06 | yes | red-required | `tc-s06-004`, `tc-s06-005` | `report.md#Test-Contract-Closure` |
 | `CLOS-EC-007` | EC-007 | commit failure | baseline restored or `recovery_required` | dirty/index drift | S06 | yes | red-required | `tc-s06-005[commit-failure]` | `report.md#Test-Contract-Closure` |
 | `CLOS-EC-008` | EC-008 | commit success + push failure/response loss | `publication_pending`; same-operation resume | destructive history rollback | S06 | yes | red-required | `tc-s06-006` | `report.md#Test-Contract-Closure` |
@@ -199,10 +225,10 @@ S01 CLI shell
 
 | Closure ID | Spec link | Observable input/state | Locked expectation | Bug class guarded | Closure owner | Required | Evidence level | Closure evidence / verification | Evidence destination |
 |---|---|---|---|---|---|---|---|---|---|
-| `CLOS-PA-NF-01` | PA-NF-01 | valid archive Review v1 pass only | `blocked`, mutation 0 | Review-only start | S06/S08 | yes | red-required | `tc-s06-003[pa-nf-01]`, `tc-s06-010[review-only-archive]` | `report.md#Test-Contract-Closure` |
-| `CLOS-PA-NF-02` | PA-NF-02 | valid git-bound Review v1 pass only | `blocked`, mutation 0 | Review-only start | S06/S08 | yes | red-required | `tc-s06-003[pa-nf-02]`, `tc-s06-010[review-only-git]` | `report.md#Test-Contract-Closure` |
-| `CLOS-PA-NF-03` | PA-NF-03 | valid Human approved decision without exact Review file | `blocked` or digest-binding `rejected`, mutation 0 | approval-only start | S06/S08 | yes | red-required | `tc-s06-003[pa-nf-03]`, `tc-s06-010[human-only]` | `report.md#Test-Contract-Closure` |
-| `CLOS-PA-NF-04` | PA-NF-04 | parity only | non-ready | parity-only start | S06/S08 | yes | red-required | `tc-s06-003[pa-nf-04]` | `report.md#Test-Contract-Closure` |
+| `CLOS-PA-NF-01` | PA-NF-01 | valid archive Review v1 only; Human source absent | `blocked`, exit 1, mutation 0 | Review-only start | S06/S08 | yes | red-required | `tc-s06-003[pa-nf-01]` | `report.md#Test-Contract-Closure` |
+| `CLOS-PA-NF-02` | PA-NF-02 | valid git-bound Review v1 only; Human source absent | `blocked`, exit 1, mutation 0 | Review-only start | S06/S08 | yes | red-required | `tc-s06-003[pa-nf-02]` | `report.md#Test-Contract-Closure` |
+| `CLOS-PA-NF-03` | PA-NF-03 | Human approved source only; Review-result source absent | `blocked`, exit 1, mutation 0 | approval-only start | S06/S08 | yes | red-required | `tc-s06-003[pa-nf-03]` | `report.md#Test-Contract-Closure` |
+| `CLOS-PA-NF-04` | PA-NF-04 | parity only; Review and Human sources absent | `blocked`, exit 1, mutation 0 | parity-only start | S06/S08 | yes | red-required | `tc-s06-003[pa-nf-04]` | `report.md#Test-Contract-Closure` |
 | `CLOS-PA-NF-05` | PA-NF-05 | wrong archive logical filename or ZIP SHA in any binding surface | `rejected`, mutation 0 | Candidate substitution | S06/S08 | yes | red-required | `tc-s06-003[pa-nf-05]`, `tc-s06-010[wrong-archive-identity]` | `report.md#Test-Contract-Closure` |
 | `CLOS-PA-NF-06` | PA-NF-06 | wrong git-bound reviewed HEAD or target paths in any binding surface | `rejected`, mutation 0 | git target substitution | S06/S08 | yes | red-required | `tc-s06-003[pa-nf-06]`, `tc-s06-010[wrong-git-identity]` | `report.md#Test-Contract-Closure` |
 | `CLOS-PA-NF-07` | PA-NF-07 | previously valid identity followed by current source drift | `stale`, mutation 0 | stale approval reuse | S06/S08 | yes | red-required | `tc-s06-003[pa-nf-07]`, `tc-s06-010[stale-source]` | `report.md#Test-Contract-Closure` |
@@ -232,7 +258,7 @@ S01 CLI shell
 | `CLOS-ARC-16` | REQ-022 executable | executable mode/forbidden file | `rejected`, outputs 0 | executable payload | S05 | yes | red-required | `tc-s05-004[arc-16-executable]` | `report.md#Test-Contract-Closure` |
 | `CLOS-ARC-17` | REQ-022 binary | invalid UTF-8/NUL-like binary | `rejected`, outputs 0 | opaque payload | S05 | yes | red-required | `tc-s05-004[arc-17-binary]` | `report.md#Test-Contract-Closure` |
 | `CLOS-ARC-18` | REQ-022 CRC | corrupt CRC/data | `rejected`, outputs 0 | corrupted content acceptance | S05 | yes | red-required | `tc-s05-004[arc-18-crc]` | `report.md#Test-Contract-Closure` |
-| `CLOS-ARC-19` | REQ-022 inventory | MANIFEST/CHECKSUMS/control mismatch | `rejected`, outputs 0 | missing/substituted file | S05 | yes | red-required | `tc-s05-004[arc-19-inventory]` | `report.md#Test-Contract-Closure` |
+| `CLOS-ARC-19` | REQ-004,022 inventory／controls | each required control key, canonical bytes, MANIFEST inventory, CHECKSUMS coverage, cross-file digest | valid exact v1 controls pass; every missing／unknown／duplicate／wrong-version／serialization／inventory／digest parameter rejects with outputs 0 | missing/substituted/ambiguous control file | S05 | yes | red-required | `tc-s05-004[arc-19-inventory]`, `tc-s05-006[ctl-*]` | `report.md#Test-Contract-Closure` |
 | `CLOS-ARC-20` | REQ-022 outer size | `10,000,000` and `10,000,001` byte ZIP | ceiling passes; +1 rejects; outputs 0 on reject | oversized transport | S05 | yes | red-required | `tc-s05-004[arc-20-outer-size]` | `report.md#Test-Contract-Closure` |
 | `CLOS-ARC-21` | REQ-022 entry count | `64` and `65` entries | ceiling passes; +1 rejects; outputs 0 on reject | entry-count exhaustion | S05 | yes | red-required | `tc-s05-004[arc-21-entry-count]` | `report.md#Test-Contract-Closure` |
 | `CLOS-ARC-22` | REQ-022 per-file size | `2,000,000` and `2,000,001` expanded bytes | ceiling passes; +1 rejects; outputs 0 on reject | single-file exhaustion | S05 | yes | red-required | `tc-s05-004[arc-22-file-size]` | `report.md#Test-Contract-Closure` |
@@ -288,11 +314,19 @@ S01 CLI shell
 #### planned contract
 
 - scope: 上記exact target filesだけ。
-- test obligation: four-command public help、known-valid Issueのexact positive target resolution、unknown Issueのfail-closed resolution、source contract、regressionを検証する。
+- test obligation:
+  - four-command public help。
+  - exact archive／git-bound `review planning` and `planning apply` option inventory。
+  - required `--issue`。
+  - deterministic repository／branch derivation and absence of public overrides。
+  - git base `none`／`semantic-base` positive contract。
+  - omitted、cross-mode、contradictory、unsupported merge-base negative matrix。
+  - known-valid Issue exact target resolution。
+  - unknown Issue fail-closed resolution。
 - positive target oracle: known-valid fixtureはrepo root、canonical Issue path、parent Epic／Initiative、declared dependencies、explicit branch／HEADをexactに返し、default branch、active alias、attached／tracked file、first-match searchへのfallbackがないことを観測する。
-- red or alternative evidence requirement: red-required: current source has no `spec-dock-chatgpt` entrypoint、public command family、またはapproved exact target-resolution contract。
+- red or alternative evidence requirement: red-required: current source has no complete public parser surface or approved exact target-resolution contract。
 - green verification: `uv run pytest tests/cli_runtime/test_chatgpt_planning.py tests/unit/domain/test_issue_planning_contracts.py tests/unit/presentation/test_issue_planning.py -q`
-- refactor guardrail: Green後のbounded tidyだけ。新しいpublic contract、shared policy、unrelated cleanupを追加しない。
+- refactor guardrail: Green後のbounded tidyだけ。新しいcommand family、repository／branch override、merge-base support、shared policy、unrelated cleanupを追加しない。
 - amendment trigger: target追加、parent boundary変更、new persistent state、existing public behavior破壊、Human Gate semantics変更が必要なら停止し、plan amendment／fresh reviewへ戻る。
 
 #### delegation contract
@@ -324,13 +358,18 @@ S01 CLI shell
 
 #### 具体テストケース一覧
 
-- `tc-s01-001` acceptance: 独立CLIが四つのsupported commandを公開する
-  - 前提: provider treeにnew entrypointがなく、temp managed repoを使う。
-  - 操作: entrypointの`--help`と各subcommand helpを直接実行する。
-  - 期待結果: planning create／planning revise／review planning／planning applyが表示され、apply helpはreview result、Human decision、decision artifact、expected HEAD、mode identity、external outputを要求し、Core lifecycle commandは混入しない。
-  - 失敗検出: entrypoint混線またはcommand欠落を検出する。
+- `tc-s01-001` acceptance: 独立CLIが四つのsupported commandとexact mode helpを公開する
+  - 前提: temp managed repositoryを使う。
+  - 操作: entrypoint、各command、archive／git mode helpを直接実行する。
+  - 期待結果:
+    - planning create／planning revise／review planning／planning applyだけが表示される。
+    - archive Review helpは`--issue --mode archive-candidate --candidate --logical-filename --zip-sha256 --output`を示す。
+    - git Review helpは`--issue --mode git-bound --reviewed-head --target --base-kind [--base-head] --output`を示す。
+    - archive apply helpとgit apply helpがDesign §3のexact argsを示す。
+    - `[mode identity]`、public repository／branch override、Core lifecycle commandは表示されない。
+  - 失敗検出: incomplete public identity、placeholder contract、entrypoint混線を検出する。
   - 検証方法: `tests/cli_runtime/test_chatgpt_planning.py`
-  - 関連 closure id: `CLOS-CLI`
+  - 関連 closure id: `CLOS-CLI`, `CLOS-REQ-002`
 
 - `tc-s01-002` negative: unknown targetをfail closedにする
   - 前提: Issue registry／canonical treeに存在しないIDを指定する。
@@ -348,13 +387,30 @@ S01 CLI shell
   - 検証方法: `tests/unit/domain/test_issue_planning_contracts.py`
   - 関連 closure id: `CLOS-CLI`, `CLOS-EC-001`
 
+- `tc-s01-004` contract: mode-specific parser matrixを閉じる
+  - 前提:
+    - positive: `archive-review`、`archive-apply-approved`、`archive-apply-rejected`、`git-review-none`、`git-review-semantic-base`、`git-apply-none`、`git-apply-semantic-base`。
+    - negative: `missing-issue`、`missing-mode-identity`、`archive-with-git-option`、`git-with-archive-option`、`missing-target`、`unsorted-targets`、`duplicate-target`、`none-with-base-head`、`semantic-base-without-base-head`、`semantic-base-nonancestor`、`unsupported-merge-base`、`repository-override`、`branch-override`。
+  - 操作: parserとidentity constructorを各named parameterで実行する。
+  - 期待結果:
+    - positiveはone exact `ReviewedPlanningIdentityV1`を構築する。
+    - missing Review／Human authority sourceだけは`blocked`。
+    - 他negativeは`rejected`。
+    - backend call、filesystem mutation、Git mutationは0。
+    - repository／branchはfixture current Git/upstreamから導出される。
+  - 失敗検出: hidden defaults、Issue inference、cross-mode option、base field omission、silent sortingを防ぐ。
+  - 検証方法: `tests/cli_runtime/test_chatgpt_planning.py`, `tests/unit/domain/test_issue_planning_contracts.py`
+  - 関連 closure id: `CLOS-CLI`, `CLOS-REQ-002`, `CLOS-REQ-006`, `CLOS-REQ-009`
+
 #### report evidence destination
 
 Mainだけが`report.md`の`Implementation Delegation Gate`、`Step Contract Closure`、`Test Contract Closure`、`Closure Coverage`、`Spec Interpretation / Decision Ledger`へevidenceを統合する。Workerはstructured evidenceを返し、canonical reportを変更しない。
 
 #### step closure contract
 
-`CLOS-CLI`、`CLOS-REQ-002`、`CLOS-EC-001`およびClosure IndexでS01をownerに持つ全`required=yes` rowは、four-command help Green、unknown-target negative Green、known-valid exact target-resolution positive Green、required reviewer passed、commit候補または正当なapproved-no-op、post-commit clean checkが揃った場合だけcloseする。
+`CLOS-CLI`、`CLOS-REQ-002`、`CLOS-REQ-009`のS01 owner portion、`CLOS-EC-001`のS01 owner portion、およびClosure IndexでS01をownerに持つ全`required=yes` owner portionは、exact help Green、parser matrix全件、unknown-target negative Green、known-valid target positive Green、required reviewer passed、commit候補または正当なapproved-no-op、post-commit clean checkが揃った場合だけ`passed`にする。
+
+S01は`CLOS-REQ-009` aggregateをcloseしない。S06 owner portionが`passed`になるまでaggregate stateは`open`のままとする。
 
 #### step gate
 
@@ -559,12 +615,22 @@ exact Git preflight、pre-produced closed Prompt、direct-argv backendを通し�
 #### planned contract
 
 - scope: 上記exact target filesだけ。
-- test obligation: exact Git preflight、backend non-invocation on source mismatch、complete three-document response validation、planning-specific direct argv capture、planning-specific redaction、no repository mutation。
-- planning-specific argv／redaction fixture owner: `tests/unit/application/test_issue_planning.py`または`tests/integration/test_chatgpt_planning_fake_oracle.py`のS03 allowed pathだけ。authoring-pack fixtureをS03 Red ownerにしない。
-- red or alternative evidence requirement: red-required: fake backend create、planning-specific argv capture、またはredaction assertionがGit／source／response／invocation validation実装前に失敗する。
+- test obligation:
+  - exact Git preflight。
+  - backend non-invocation on source mismatch。
+  - complete three-document response validation。
+  - benign shell metacharacterのplanning-specific direct argv capture。
+  - prohibited secret-like contentのpre-invocation rejection。
+  - no repository mutation。
+- direct-argv fixtureとprohibited-content fixtureを分離し、一つのfixtureで双方をcloseしない。
+- planning-specific fixture ownerは`tests/unit/application/test_issue_planning.py`または`tests/integration/test_chatgpt_planning_fake_oracle.py`のS03 allowed pathだけ。authoring-pack fixtureをS03 Red ownerにしない。
+- prohibited-content validationはPrompt rendering、attachment materialization、backend argv construction、backend invocationより前に行う。
+- red or alternative evidence requirement:
+  - direct-argv Red: benign metacharacterがshell stringへ結合されるknown-bad。
+  - prohibited-content Red: sentinelがbackend argvまたはrendered inputへ到達するknown-bad。
 - owned Green verification: `uv run pytest tests/unit/application/test_issue_planning.py tests/integration/test_chatgpt_planning_fake_oracle.py -q`
-- covered-existing regression: `uv run pytest tests/unit/authoring_pack/test_github_fetch_policy.py -q`。このfileは変更せず、new planning fixtureを追加せず、S03 closureのRed evidenceとして数えない。failureはshared primitive regressionとしてS03 integrationをblockする。
-- refactor guardrail: Green後のbounded tidyだけ。Candidate packaging、archive identity、new persistent state、shared policy、unrelated cleanupをこのstepへ追加しない。
+- covered-existing regression: `uv run pytest tests/unit/authoring_pack/test_github_fetch_policy.py -q`。file変更、planning fixture追加、S03 Red ownershipは禁止する。
+- refactor guardrail: Candidate packaging、archive identity、new persistent state、shared policy、unrelated cleanupを追加しない。
 - amendment trigger: target追加、parent boundary変更、new persistent state、existing public behavior破壊、Human Gate semantics変更が必要なら停止し、plan amendment／fresh reviewへ戻る。
 
 #### delegation contract
@@ -610,13 +676,29 @@ exact Git preflight、pre-produced closed Prompt、direct-argv backendを通し�
   - 検証方法: `tests/unit/application/test_issue_planning.py`
   - 関連 closure id: `CLOS-GIT`, `CLOS-SEC`
 
-- `tc-s03-003` security: planning Prompt／path／operator contextをdirect argvで扱い、diagnosticをredactする
-  - 前提: shell metacharacterを含むoperator contextとpath、secret-like sentinel、argv-capturing fake backendをplanning application fixtureとして用意する。
-  - 操作: planning createのdry-run backend invocationを行い、captured argvとbounded diagnosticを取得する。
-  - 期待結果: untrusted valuesはindividual argv elementsとしてbyte-preservingに渡され、shell executionは0。secret-like sentinelはdiagnostic、result、Planner responseへ出現しない。
-  - 失敗検出: command injection、planning-specific argv regression、diagnostic leakageを防ぐ。
+- `tc-s03-003` security: benign shell metacharacterをseparate direct argv elementsとして扱う
+  - 前提: spaces、quotes、semicolon、dollar、parentheses、Unicodeを含むがREQ-021 prohibited contentではないoperator contextとsafe external path、argv-capturing fake backendを用意する。
+  - 操作: planning createのbackend invocationを実行する。
+  - 期待結果:
+    - backend call countは1。
+    - each untrusted valueはone argv elementとしてbyte-preservingに保持される。
+    - `shell=False`相当でshell string construction／shell executionは0。
+    - repository mutationは0。
+  - 失敗検出: command injection、argv element collapse、shell fallbackを防ぐ。
   - 検証方法: `tests/unit/application/test_issue_planning.py`
   - 関連 closure id: `CLOS-GIT`, `CLOS-SEC`, `CLOS-REQ-021`
+
+- `tc-s03-004` security: prohibited secret-like contentをbackend invocation前に拒否する
+  - 前提: unique secret sentinelと、secret／token／cookie／credential／private-key marker、`.env` path、production-dump marker、private-customer-data markerを各独立parameterとしてoperator context、explicit file、attachment candidateへ配置する。
+  - 操作: planning createのpre-invocation input validationを実行する。
+  - 期待結果:
+    - status=`rejected`、exit 1。
+    - backend call countは0。
+    - rendered Prompt、attachment staging tree、attachment inventory、captured argv、diagnostics、text／JSON result、Planner response、Candidate outputのいずれにもsentinelが存在しない。
+    - repository／output final artifact mutationは0。
+  - 失敗検出: direct argvでshell injectionだけを防ぎ、secretをbackendへ送信する回帰を防ぐ。
+  - 検証方法: `tests/unit/application/test_issue_planning.py`, `tests/integration/test_chatgpt_planning_fake_oracle.py`
+  - 関連 closure id: `CLOS-SEC`, `CLOS-REQ-021`
 
 #### report evidence destination
 
@@ -624,7 +706,9 @@ Mainだけが`report.md`の`Implementation Delegation Gate`、`Step Contract Clo
 
 #### step closure contract
 
-`CLOS-GIT`, `CLOS-SEC`, `CLOS-REQ-003`, `CLOS-REQ-021`のS03 portion、`CLOS-EC-001`, `CLOS-EC-002`のS03 portion、およびClosure IndexでS03をownerに持つ全`required=yes` rowは、planning-owned source／response／argv／redaction testsのtargeted Green、covered-existing Git fetch policy regression Green、required reviewer passed、commit候補または正当なapproved-no-op、post-commit clean checkが揃った場合だけcloseする。`tests/unit/authoring_pack/test_github_fetch_policy.py`はcovered-existingであり、S03 planning fixture、allowed edit、Red ownerにはしない。`CLOS-CREATE`と`CLOS-REQ-004`はS05までopenのままにする。
+`CLOS-GIT`、`CLOS-SEC`、`CLOS-REQ-003`、`CLOS-REQ-021`のS03 owner portion、`CLOS-EC-001`、`CLOS-EC-002`のS03 owner portion、およびClosure IndexでS03をownerに持つ全`required=yes` owner portionは、source／response Green、benign direct-argv Green、prohibited-content backend-call-zero Green、covered-existing Git-fetch policy Green、required reviewer passed、commit候補または正当なapproved-no-op、post-commit clean checkが揃った場合だけ`passed`にする。
+
+`tests/unit/authoring_pack/test_github_fetch_policy.py`はcovered-existingであり、S03 planning fixture、allowed edit、Red ownerにはしない。`CLOS-CREATE`と`CLOS-REQ-004` aggregateはS05 owner portionがpassedになるまでopenのままにする。
 
 #### step gate
 
@@ -760,15 +844,28 @@ S03／S04のcomplete three-document responseからmandatory controlsを含むimm
 #### planned contract
 
 - scope: 上記exact target filesだけ。
-- packaging owner: S05のみ。ChatGPT responseはexact三文書、Runtime final artifactは三文書＋`SOURCE-BASELINE.json`＋`MANIFEST.json`＋`CHECKSUMS.sha256`＋`PLACEHOLDER-ORACLE-MAP.json`のimmutable ZIP。
-- identity rule: initial createはversion 1、revisionはpredecessor version + 1。complete response検証後にrun-scoped UTC timestampを一度取得し、logical filename／Candidate ID／internal rootをpure derivationする。source bindingはS03 preflight resultを使用し、external SHAはarchive close後に計算する。
-- publication rule: owned temporary fileからsafe external output directoryのnew final filenameへatomic publishし、existing final targetを上書きしない。failure時はtemporary fileをcleanupし、final ZIP、final extraction tree、Review resultを残さない。
-- shared primitive rule: `zip_contract.py`にclosed data-only `ArchiveReviewContract`を追加し、引数省略時のexisting authoring-pack root／required metadata／limits／status taxonomyを完全に保持する。Issue Candidate contractはexpected root、mandatory paths、current ceilings、closed identity modeだけを追加する。registry、callback/plugin、parallel validator、allocator、general archive framework、all-resource matrixは作らない。
-- test obligation: create→final ZIP→archive Review direct handoff、generic default regression、Issue Candidate positive identity/inventory、unsafe/missing-control negative、git-bound exact target、read-only mutation guard。
-- red or alternative evidence requirement: red-required for direct create→archive Review and Issue-specific root/control validation; covered-existing for generic authoring-pack default characterization。
+- packaging owner: S05のみ。ChatGPT responseはexact三文書、Runtime final artifactは三文書＋Design §4.2のexact-versioned four controlsのimmutable ZIP。
+- control serialization:
+  - JSON controlsはCanonicalControlJsonV1。
+  - Placeholder map v1はexact empty。
+  - CHECKSUMSはall covered entries except itself。
+  - external ZIP SHAはarchive外で計算。
+- identity rule: initial createはversion 1、revisionはpredecessor version + 1。one timestampからlogical filename／Candidate ID／internal rootを導出する。source bindingはS03 preflight resultを使う。
+- publication rule: owned temporary fileからsafe external output directoryのnew final filenameへatomic publishし、existing final targetを上書きしない。
+- shared primitive rule: `zip_contract.py`へclosed data-only Issue Candidate contractを追加し、argument omitted時のexisting authoring-pack default behaviorを完全に保持する。
+- test obligation:
+  - create→exact final ZIP→archive Review direct handoff。
+  - generic default regression。
+  - exact control-schema positive。
+  - every required-key／unknown／duplicate／version／canonical-byte／inventory／checksum／cross-file／external-SHA negative。
+  - archive／git Review identity including Issue and git base。
+  - read-only mutation guard。
+- red or alternative evidence requirement:
+  - red-required for direct handoff and Issue-specific control schema。
+  - covered-existing for generic authoring-pack default。
 - green verification: `uv run pytest tests/cli_runtime/test_authoring.py tests/manual_tests/test_review_chatgpt_authoring_pack.py tests/unit/infra/test_issue_planning_archive.py tests/integration/test_chatgpt_planning_fake_oracle.py -q`
-- refactor guardrail: Green後のbounded tidyだけ。generic defaultの意味変更、new public framework、shared policy、unrelated cleanupを追加しない。
-- amendment trigger: existing generic behaviorを保てない、target追加、parent boundary変更、new persistent state、Human Gate semantics変更が必要なら停止し、plan amendment／fresh reviewへ戻る。
+- refactor guardrail: generic default意味変更、dynamic placeholder support、merge-base support、new schema registry、parallel validator、unrelated cleanupを追加しない。
+- amendment trigger: existing generic behaviorを保てない、control schema拡張、target追加、new persistent state、Human Gate semantics変更が必要なら停止し、plan amendment／fresh reviewへ戻る。
 
 #### delegation contract
 
@@ -816,13 +913,19 @@ S03／S04のcomplete three-document responseからmandatory controlsを含むimm
   - 検証方法: `tests/cli_runtime/test_authoring.py`, `tests/manual_tests/test_review_chatgpt_authoring_pack.py`
   - 関連 closure id: `CLOS-ARCHIVE`, `CLOS-INTEGRATION`
 
-- `tc-s05-003` acceptance: Issue Candidate named contractがidentityとinventoryを検証する
-  - 前提: expected root、version、logical filename、Candidate ID、source binding、三文書と四control filesを持つsafe Candidateを用意する。
-  - 操作: Issue Candidate contractでarchive validationを実行する。
-  - 期待結果: MANIFEST inventory、CHECKSUMS、source baseline、placeholder map、Candidate identityが一致し、external SHAがresultへ返る。
-  - 失敗検出: mandatory control omission、cross-Candidate substitution、stale source、checksum mismatchを防ぐ。
+- `tc-s05-003` acceptance: exact v1 Candidate controlsとidentityを検証する
+  - 前提: Design §4.2のcanonical source baseline、manifest、empty placeholder map、checksums、三文書を持つsafe Candidateを用意する。
+  - 操作: Issue Candidate named contractでpackagingとarchive validationを実行する。
+  - 期待結果:
+    - required seven rolesがexactly one。
+    - actual inventory == MANIFEST entries。
+    - JSON controlsはcanonical bytes。
+    - source／placeholder digests、CHECKSUMS lines、entry bytesが一致する。
+    - Candidate ID／version／timestamp／logical filename／root／Issue／source bindingが一致する。
+    - actual external ZIP SHAがresultへ返る。
+  - 失敗検出: mandatory control omission、cross-Candidate substitution、stale source、ambiguous serialization、checksum mismatchを防ぐ。
   - 検証方法: `tests/unit/infra/test_issue_planning_archive.py`
-  - 関連 closure id: `CLOS-CREATE`, `CLOS-ARCHIVE`
+  - 関連 closure id: `CLOS-CREATE`, `CLOS-ARCHIVE`, `CLOS-REQ-004`
 
 - `tc-s05-004` negative: unsafeまたはincomplete Issue Candidateをpartial outputなしで拒否する
   - 前提: 下記`REQ-022 archive safety closure matrix`の`arc-01`〜`arc-25`を独立parameterとして用意する。
@@ -864,13 +967,35 @@ S03／S04のcomplete three-document responseからmandatory controlsを含むimm
 | `arc-24-path-length` | UTF-8 path `<=240` bytes | 240 and 241 bytes | 240 pass; 241 `rejected: resource_limit` | reject uses common cleanup |
 | `arc-25-ratio` | compression ratio `<=100` | exactly 100 and >100 | 100 pass; >100 `rejected: resource_limit` | reject uses common cleanup |
 
-- `tc-s05-005` negative: git-bound modeはexact target setを要求する
-  - 前提: reviewed HEADまたはtarget pathsを欠落／不一致にする。
-  - 操作: review planning --mode git-boundを実行する。
-  - 期待結果: backend起動前にinsufficient evidenceとなりarchiveへ切り替わらない。
-  - 失敗検出: mode混同とsilent fallbackを防ぐ。
+- `tc-s05-005` contract: Review identityはexact Issueとclosed git baseを要求する
+  - 前提:
+    - archive positive。
+    - git positive `base=none`。
+    - git positive `base=semantic-base` with exact ancestor。
+    - negative `missing-issue`、`missing-reviewed-head`、`missing-target`、`unsorted-target`、`duplicate-target`、`none-with-head`、`semantic-base-without-head`、`semantic-base-nonancestor`、`unsupported-merge-base`、cross-mode options。
+  - 操作: `review planning` identity constructionとpreflightを実行する。
+  - 期待結果: positiveはexact `ReviewedPlanningIdentityV1`へbindする。negativeはbackend前に`rejected`でarchive fallbackなし。
+  - 失敗検出: Issue inference、base omission、mode混同、silent fallbackを防ぐ。
   - 検証方法: `tests/integration/test_chatgpt_planning_fake_oracle.py`
-  - 関連 closure id: `CLOS-REVIEW`, `CLOS-ARCHIVE`
+  - 関連 closure id: `CLOS-REVIEW`, `CLOS-REQ-006`
+
+- `tc-s05-006` contract: Candidate control-file schemasをfield-by-fieldにfail closedで検証する
+  - 前提: valid Candidateをbaselineとし、次のnamed parameter generatorを各controlへ適用する。
+    - `ctl-<file>-missing-<required-key>`: 各required keyを一件ずつ除去。
+    - `ctl-<file>-unknown-key`。
+    - `ctl-<file>-duplicate-<key>`: 各representative object level。
+    - `ctl-<file>-wrong-version`。
+    - `ctl-<file>-bom`、`ctl-<file>-crlf`、`ctl-<file>-trailing-space`、`ctl-<file>-extra-line`。
+    - SOURCE: wrong Issue／parent／repository／branch／HEAD、unsorted／duplicate dependencies、unsorted／unsafe／untracked relevant path。
+    - MANIFEST: wrong Candidate ID／version／timestamp／filename／root、wrong source digest、wrong placeholder digest、missing／extra／duplicate／unsorted entry、wrong role、wrong coverage、nonstatic content mode。
+    - PLACEHOLDER: nonempty files、unknown token field。
+    - CHECKSUMS: missing／extra／duplicate line、self-entry、wrong digest、uppercase digest、wrong order、one-space／tab separator、root-prefixed path、CRLF。
+    - archive: supplied external ZIP SHA mismatch。
+  - 操作: each named parameterをpackaging validationまたはReview validationへ渡す。
+  - 期待結果: 全negativeが`rejected`、exit 1。final ZIP、extraction tree、Review result、adoption output、owned temp leakは0。parameter IDはtest reportへ保持する。
+  - 失敗検出: permissive control parsing、unknown-key tolerance、serialization divergence、self-referential checksum、cross-file substitutionを防ぐ。
+  - 検証方法: `tests/unit/infra/test_issue_planning_archive.py`
+  - 関連 closure id: `CLOS-CREATE`, `CLOS-ARCHIVE`, `CLOS-REQ-004`, `CLOS-ARC-19`
 
 #### report evidence destination
 
@@ -878,7 +1003,9 @@ Mainだけが`report.md`の`Implementation Delegation Gate`、`Step Contract Clo
 
 #### step closure contract
 
-`CLOS-CREATE`, `CLOS-REVIEW`, `CLOS-ARCHIVE`、`CLOS-REQ-004`, `CLOS-REQ-006`, `CLOS-REQ-008`, `CLOS-REQ-022`, `CLOS-EC-002`〜`CLOS-EC-004`, `CLOS-ARC-01`〜`CLOS-ARC-25`, `CLOS-RISK-002`, `CLOS-RISK-004`のS05 portion、およびClosure IndexでS05をownerに持つ全`required=yes` rowは、direct create→Review Green、generic default regression、matrix 25/25のnamed result、reject cleanup evidence、required reviewer passed、commit候補または正当なapproved-no-op、post-commit clean checkが揃った場合だけcloseする。
+`CLOS-CREATE`、`CLOS-REVIEW`、`CLOS-ARCHIVE`、`CLOS-REQ-004`、`CLOS-REQ-006`、`CLOS-REQ-008`、`CLOS-REQ-022`、`CLOS-EC-002`〜`CLOS-EC-004`、`CLOS-ARC-01`〜`CLOS-ARC-25`、`CLOS-RISK-002`、`CLOS-RISK-004`のS05 owner portion、およびClosure IndexでS05をownerに持つ全`required=yes` owner portionは、direct create→Review Green、control-schema positive、field-by-field control negative全件、git base identity matrix、generic default regression、archive matrix 25/25、reject cleanup evidence、required reviewer passed、commit候補または正当なapproved-no-op、post-commit clean checkが揃った場合だけ`passed`にする。
+
+S03/S05またはS05/S08等のmulti-owner aggregateは、他owner portionがpassedになるまでopenのままとする。
 
 #### step gate
 
@@ -926,23 +1053,43 @@ public `planning apply`からclosed `PlanningReviewResultV1`と`PlanningHumanDec
 #### planned contract
 
 - scope: 上記exact target filesだけ。
-- evidence schema obligation: `domain/issue_planning_contracts.py`へclosed named `PlanningReviewResultV1`／`PlanningHumanDecisionV1` validationを実装する。required key exact、unknown／duplicate key reject、closed enum、strict UTC timestamp、mode-specific identity、canonical identity digest、exact Review file SHA cross-binding、Human decision truth tableをDesign §§4.3–4.4どおり固定する。
-- no-new-subsystem obligation: external JSON Schema registry、receipt registry、database、custom Git ref、general approval frameworkを追加しない。existing digest、approval、Git preflight primitivesをbounded reuseする。
-- public contract: `planning apply`はDesign §3のexact argsを受け、`ready`だけexit 0、`blocked|stale|rejected|rolled_back|publication_pending|blocked_remote_diverged|recovery_required`はexit 1でtext／JSON同一statusを返す。
-- pre-mutation status contract:
-  - malformed／wrong version／wrong kind／unknown key／duplicate key／invalid enum／timestamp／digestは`rejected`。
-  - Review／Human／CLI modeまたはidentity mismatch、Review file SHA mismatchは`rejected`。
-  - validated identityに対するcurrent source driftは`stale`。
-  - valid Review `fail`、valid Human `rejected|revoked`は`blocked`。
-  - すべてrepository mutation 0。
-- transaction obligation: all inputs and staged bytesをmutation前に検証し、new decision artifact→`requirement.md`→`design.md`→`plan.md`をshared scoped transactionで処理する。commit前の各fault pointはreverse-order restoreとbaseline verificationを行う。
-- recovery obligation: operation ID、atomic recovery manifest、commit trailer、tree digestでidempotencyを固定する。commit後はautomatic rollbackせず、push failure／response lossを`publication_pending`としてsame-operation retryする。remote divergenceは`blocked_remote_diverged`で停止する。
+- evidence schema obligation: Design §§4.3–4.4のclosed Review／Human schemasを実装する。Human v1 decisionはapproved／rejectedだけで、revokedを拒否する。
+- parser obligation: Design §3のexact archive／git apply args、Issue、derived repository／branch、git base rules、mutual exclusionsを実装する。
+- no-new-subsystem obligation: external schema registry、authority／revocation registry、database、custom Git ref、general approval frameworkを追加しない。
+- status obligation:
+  - missing Review/Human source=`blocked`。
+  - malformed／partial／cross-binding／unsafe destination／unsupported revoked=`rejected`。
+  - current source drift=`stale`。
+  - Review fail + Human approved=`blocked`。
+  - valid Human rejectedはdecision-record transaction。
+- adoption obligation: approved + Review passだけがdecision artifact＋canonical三文書をtransactionalに処理する。
+- rejection obligation: rejected decisionはdecision artifactだけをtransactionalに処理し、verified publication後も`blocked`。publicationでHEADを変更し、old H0-bound evidenceをstaleにする。
+- revocation boundary: post-publication withdrawalはshared Human／Main stop-or-revert ownerへrouteし、planning runtime内でsupersession lookupを実装しない。
+- transaction obligation: adoptionとrejection-recordの双方でpre-commit rollback、restore verification、post-commit no-resetを維持する。
+- recovery lookup obligation:
+  - operation directoryは`<canonical-output>/.spec-dock-planning-operations/<operation-id>/`。
+  - manifestとcommit workspace trailerへoutput-directory identityをbindする。
+  - pre-commit same-operation retryはsame exact output directoryを必須とする。
+  - missing／different outputでpartial stateを検出した場合は`recovery_required`、new mutation 0、directory scan 0。
 - shared reuse obligation: `runbook_store.py`のstage／backup／restoreを`scoped_file_transaction.py`へ抽出し、existing runbook testsをcharacterizationとして先にGreenにする。private helper import／duplicate transactionは禁止する。
-- test obligation: Review v1 schema matrix、Human decision v1 truth table、exact Review SHA binding、archive／git identity cross-binding、wrong mode／identity／stale source status mapping、public CLI E2E、archive／git positive、PA-NF 10 independent rows、replacement／validation／commit fault、rollback failure、crash resume、push retry、remote divergence、runbook regression、state boundaryを検証する。
-- red or alternative evidence requirement: red-required: current approval check is evidence-only and does not implement the closed evidence schemas or the complete E1-I1 readiness conjunction.
+- test obligation:
+  - Review schema matrix。
+  - Human approved／rejected truth table。
+  - revoked unsupported。
+  - exact Review SHA／identity binding。
+  - exact public CLI mode matrix。
+  - archive／git approved positives。
+  - durable rejected decision-record。
+  - PA-NF exact status 10/10。
+  - replacement／validation／commit fault。
+  - rollback failure。
+  - same-output crash recovery。
+  - wrong-output recovery failure。
+  - push retry／remote divergence。
+  - runbook regression／state boundary。
 - green verification: `uv run pytest tests/cli_runtime/test_chatgpt_planning.py tests/unit/application/test_issue_planning.py tests/unit/domain/test_issue_planning_contracts.py tests/unit/infra/test_scoped_file_transaction.py tests/unit/infra/test_runbook_store.py tests/unit/presentation/test_issue_planning.py tests/integration/test_chatgpt_planning_fake_oracle.py -q`
-- refactor guardrail: Green後のbounded tidyだけ。Designで承認済みのclosed evidence validation、`planning apply`、shared scoped transaction以外のpublic contract／shared policy／unrelated cleanupを追加しない。
-- amendment trigger: target追加、parent boundary変更、new persistent state、existing public behavior破壊、Human Gate semantics変更が必要なら停止し、plan amendment／fresh reviewへ戻る。
+- refactor guardrail: Designで承認済みのclosed evidence validation、approved adoption、rejected decision-record、deterministic recovery workspace、shared transaction以外のpublic contract／shared policyを追加しない。
+- amendment trigger: revocation implementation、merge-base support、new state registry、target追加、parent boundary変更、existing behavior破壊が必要なら停止しplan amendment／fresh reviewへ戻る。
 
 #### delegation contract
 
@@ -979,29 +1126,44 @@ public `planning apply`からclosed `PlanningReviewResultV1`と`PlanningHumanDec
 
 #### 具体テストケース一覧
 
-- `tc-s06-001` acceptance: public applyでarchive full conjunctionだけがreadinessを導出する
-  - 前提: exact review evidence、Human decision、atomic adoption parity、validation、remote-equal publicationを用意する。
-  - 操作: Design §3のrequired argsで`planning apply --mode archive-candidate`をCLIから実行する。
-  - 期待結果: decision artifactと三文書だけをPlanning commitに含め、remote/tree parity後にtext／JSONとも`status=ready`、exit 0、各evidence locatorとoperation IDを返す。
-  - 失敗検出: Review-onlyまたはHuman-only startを防ぐ。
+- `tc-s06-001` acceptance: exact archive applyでapproved full conjunctionだけがreadyになる
+  - 前提: valid archive Candidate v1 controls、Review pass、Human approved、safe new decision destination、clean local=remote=expected H0を用意する。
+  - 操作: Design §3 archive apply exact argvでpublic CLIを実行する。
+  - 期待結果: decision artifactと三文書だけをPlanning adoption commitに含め、remote/tree parity後にtext／JSONとも`status=ready`、exit 0。operation／workspace trailersとevidence locatorsを返す。
+  - 失敗検出: hidden args、Review-only／Human-only start、control substitutionを防ぐ。
   - 検証方法: `tests/integration/test_chatgpt_planning_fake_oracle.py`
   - 関連 closure id: `CLOS-ADOPTION`, `CLOS-READINESS`
 
-- `tc-s06-002` acceptance: git-bound target blobを維持する
-  - 前提: reviewed HEAD/paths、Human decision、approval-only adoption diffを用意する。
-  - 操作: git-bound adoptionとpublicationを実行する。
-  - 期待結果: reviewed target blobsが不変でlocal/remote publication parityが成立する。
-  - 失敗検出: Review後semantic mutationを防ぐ。
+- `tc-s06-002` acceptance: exact git-bound applyでtarget blobとbase identityを維持する
+  - 前提:
+    - positive `base=none`。
+    - positive `base=semantic-base` with exact ancestor。
+    - Review pass、Human approved、approval-only diff。
+  - 操作: Design §3 git-bound apply exact argvでpublicationを実行する。
+  - 期待結果: reviewed target blobsとbase identityが不変でlocal／remote publication parityが成立し`ready`。
+  - 失敗検出: Review後semantic mutation、base omission、CLI identity driftを防ぐ。
   - 検証方法: `tests/integration/test_chatgpt_planning_fake_oracle.py`
   - 関連 closure id: `CLOS-ADOPTION`, `CLOS-READINESS`
 
-- `tc-s06-003` negative: PA-NF setを独立拒否する
-  - 前提: PA-NF-01〜PA-NF-10を一件ずつ満たすfixturesを用意する。
-  - 操作: `pa-nf-01`〜`pa-nf-10`のnamed parameterを一件ずつ`planning apply`／readiness evaluatorへ渡す。
-  - 期待結果: 10/10が各契約に応じた`blocked|stale|rejected|rolled_back|publication_pending`でexit 1、canonical partial output 0、violations 0。test reportは各parameter IDを保持する。
-  - 失敗検出: 複合gateの短絡を防ぐ。
-  - 検証方法: `tests/unit/domain/test_issue_planning_contracts.py`
-  - 関連 closure id: `CLOS-ADOPTION`, `CLOS-READINESS`
+- `tc-s06-003` negative: PA-NF setを一つのexact statusで評価する
+  - 前提: 次のnamed parametersを用意する。
+  - 期待status:
+    - `pa-nf-01-review-only-archive` → `blocked`
+    - `pa-nf-02-review-only-git` → `blocked`
+    - `pa-nf-03-human-only` → `blocked`
+    - `pa-nf-04-parity-only` → `blocked`
+    - `pa-nf-05-wrong-archive-identity` → `rejected`
+    - `pa-nf-06-wrong-git-identity` → `rejected`
+    - `pa-nf-07-source-drift` → `stale`
+    - `pa-nf-08-semantic-mutation-during-adoption` → `rolled_back`
+    - `pa-nf-09-parity-failure-before-commit` → `rolled_back`
+    - `pa-nf-10-validation-failure` → `rolled_back`
+    - `pa-nf-10-publication-failure` → `publication_pending`
+  - 操作: each named parameterを`planning apply`／readiness evaluatorへ渡す。
+  - 期待結果: each parameterが上記exact status、exit 1、no readinessを返す。pre-mutation parametersはmutation 0。rollback parametersはbaseline exact restore。publication failureはlocal committed H1だけを保持する。
+  - 失敗検出: status union、generic reject、複合gate短絡を防ぐ。
+  - 検証方法: `tests/unit/domain/test_issue_planning_contracts.py`, `tests/unit/application/test_issue_planning.py`, `tests/integration/test_chatgpt_planning_fake_oracle.py`
+  - 関連 closure id: `CLOS-ADOPTION`, `CLOS-READINESS`, `CLOS-PA-NF-01`〜`CLOS-PA-NF-10`
 
 - `tc-s06-004` recovery: replacement／validationの各fault pointをrollbackする
   - 前提: decision artifact追加後、requirement後、design後、plan後、parity／validation中に例外を注入できるbaselineを用意する。
@@ -1051,18 +1213,72 @@ public `planning apply`からclosed `PlanningReviewResultV1`と`PlanningHumanDec
   - 検証方法: `tests/unit/domain/test_issue_planning_contracts.py`, `tests/unit/application/test_issue_planning.py`
   - 関連 closure id: `CLOS-ADOPTION`, `CLOS-READINESS`, `CLOS-REQ-009`, `CLOS-REQ-015`
 
-- `tc-s06-010` contract: Human decision truth table、exact Review SHA、mode-neutral start gateを検証する
-  - 前提: valid archive／git Review v1 pass、各exact Review file SHA、same-identity Human decisionと、named fixtures `approved-archive`、`approved-git`、`partial-plan-only`、`partial-start-only`、`wrong-review-sha`、`wrong-mode`、`wrong-archive-identity`、`wrong-git-identity`、`stale-source`、`review-fail`、`human-rejected`、`human-revoked`、`revoked-missing-prior-sha`、`review-only-archive`、`review-only-git`、`human-only`を用意する。
-  - 操作: `planning apply` pre-mutation validation／authority evaluationを各parameterで実行する。
+- `tc-s06-010` contract: Human decision truth table、exact Review SHA、mode-neutral gateを検証する
+  - 前提: valid archive／git Review resultsとnamed fixtures:
+    - `approved-archive`
+    - `approved-git-none`
+    - `approved-git-semantic-base`
+    - `rejected-review-pass`
+    - `rejected-review-fail`
+    - `partial-plan-only`
+    - `partial-start-only`
+    - `wrong-review-sha`
+    - `wrong-mode`
+    - `wrong-issue`
+    - `wrong-archive-identity`
+    - `wrong-git-identity`
+    - `stale-source`
+    - `review-fail-human-approved`
+    - `review-only-archive`
+    - `review-only-git`
+    - `human-only`
+    - `revoked-unsupported`
+  - 操作: preflight／authority evaluationを各parameterで実行する。
   - 期待結果:
-    - `approved-archive`と`approved-git`だけがtransaction preflightへ進む。両方とも`plan_adoption=true`かつ`implementation_start=true`を要求する。
-    - partial authorization、wrong Review SHA、wrong mode、cross-document identity mismatch、invalid revocationは`rejected`。
-    - valid identity後のcurrent source driftは`stale`。
-    - valid Review `fail`、Human `rejected`、Human `revoked`、Review-only、Human-onlyは`blocked`。
-    - 全negative parameterでcanonical files、decision artifact、index、HEAD、operation manifest mutationは0。
-  - 失敗検出: Candidate-only gate、git-bound exclusion、partial Human approval、Review file substitution、stale approval reuse、negative decisionの誤authorizationを防ぐ。
-  - 検証方法: `tests/unit/domain/test_issue_planning_contracts.py`, `tests/unit/application/test_issue_planning.py`, `tests/integration/test_chatgpt_planning_fake_oracle.py`
-  - 関連 closure id: `CLOS-ADOPTION`, `CLOS-READINESS`, `CLOS-REQ-009`, `CLOS-REQ-015`, `CLOS-EC-005`, `CLOS-PA-NF-01`〜`CLOS-PA-NF-07`
+    - approved three positivesだけがfull adoptionへ進む。
+    - rejected two positivesだけがdecision-recordへ進む。
+    - partial、wrong SHA／mode／Issue／identity、revoked unsupportedは`rejected`。
+    - source driftは`stale`。
+    - Review fail + Human approved、Review-only、Human-onlyは`blocked`。
+    - pre-mutation negativeでrepository／index／HEAD／manifest mutation 0。
+  - 失敗検出: Candidate-only gate、git exclusion、partial approval、Review substitution、false revocationを防ぐ。
+  - 検証方法: `tests/unit/domain/test_issue_planning_contracts.py`, `tests/unit/application/test_issue_planning.py`
+  - 関連 closure id: `CLOS-ADOPTION`, `CLOS-READINESS`, `CLOS-REQ-009`, `CLOS-REQ-015`, `CLOS-EC-005`
+
+- `tc-s06-011` acceptance／recovery: rejected decisionをdurable decision-only transactionとしてpublishする
+  - 前提: valid Review passまたはfail、same-identity Human rejected、safe new decision destination、clean H0を用意する。
+  - 操作:
+    1. rejected decisionで`planning apply`を実行する。
+    2. decision artifact add後、commit前validation、commit、pushに各faultを注入する。
+    3. published rejection H1へold H0-bound approved decisionを再投入する。
+  - 期待結果:
+    - normal pathはdecision artifact一件だけをcommit／pushし、remote parity後`blocked`、exit 1。
+    - canonical三文書bytes、`.assurance.json`は不変。
+    - pre-commit faultは`rolled_back`または`recovery_required`。
+    - post-commit push faultは`publication_pending`。
+    - H1でold H0 Review／approvalは`stale`となりfull adoptionへ進まない。
+  - 失敗検出: nondurable rejection、rejectionによるcanonical rewrite、old approval reuseを防ぐ。
+  - 検証方法: `tests/unit/application/test_issue_planning.py`, `tests/unit/infra/test_scoped_file_transaction.py`, `tests/integration/test_chatgpt_planning_fake_oracle.py`
+  - 関連 closure id: `CLOS-ADOPTION`, `CLOS-REQ-015`, `CLOS-EC-005`
+
+- `tc-s06-012` recovery: deterministic operation workspaceへmanifest lookupをbindする
+  - 前提:
+    - canonical output A。
+    - different output B。
+    - same operation ID。
+    - adoption／rejection-record双方についてstage後またはfirst replacement後のcrash state。
+  - 操作:
+    1. output Aでcrashさせる。
+    2. same args + output Aでretryする。
+    3. fresh crash stateを作り、same args + output Bまたはmissing Aでretryする。
+    4. post-commit `publication_pending` stateでoperation／workspace trailersを照合する。
+  - 期待結果:
+    - output A retryはexact deterministic operation directory／manifestを読み、rollbackまたはresumeする。
+    - output B／missing Aは`recovery_required`、exit 1、new operation directory作成 0、directory scan 0、new mutation 0。
+    - post-commit retryはboth trailers、tree、parent、output identity一致時だけ再開する。
+  - 失敗検出: lost manifest、wrong-workspace resume、global directory search、backup取り違えを防ぐ。
+  - 検証方法: `tests/unit/application/test_issue_planning.py`, `tests/unit/infra/test_scoped_file_transaction.py`, `tests/integration/test_chatgpt_planning_fake_oracle.py`
+  - 関連 closure id: `CLOS-EC-006`, `CLOS-EC-008`, `CLOS-RISK-001`, `CLOS-RISK-005`
 
 #### report evidence destination
 
@@ -1070,20 +1286,31 @@ Mainだけが`report.md`の`Implementation Delegation Gate`、`Step Contract Clo
 
 #### step closure contract
 
-`CLOS-ADOPTION`, `CLOS-READINESS`, `CLOS-REQ-009`〜`CLOS-REQ-016`のS06 portion、`CLOS-EC-005`〜`CLOS-EC-009`, `CLOS-PA-NF-01`〜`CLOS-PA-NF-10`, `CLOS-RISK-001`, `CLOS-RISK-004`, `CLOS-RISK-005`のS06 portion、およびClosure IndexでS06をownerに持つ全`required=yes` rowは、次がすべて揃った場合だけcloseする。
+`CLOS-ADOPTION`、`CLOS-READINESS`、`CLOS-REQ-009`〜`CLOS-REQ-016`のS06 owner portion、`CLOS-EC-005`〜`CLOS-EC-009`、`CLOS-PA-NF-01`〜`CLOS-PA-NF-10`、`CLOS-RISK-001`、`CLOS-RISK-004`、`CLOS-RISK-005`のS06 owner portion、およびClosure IndexでS06をownerに持つ全`required=yes` owner portionは、次がすべて揃った場合だけ`passed`にする。
 
-- `PlanningReviewResultV1` archive／git positive 2/2。
-- Review schema named negative matrix全件。
-- `PlanningHumanDecisionV1` approved／rejected／revoked truth table全件。
-- exact Review-result SHAおよびreviewed identity object／digest cross-binding。
-- wrong mode／wrong identity=`rejected`、current source drift=`stale`、valid negative authority=`blocked`のstatus matrix。
-- public CLI Green。
-- PA-NF 10/10 named results。
-- 全pre-commit fault rollback、rollback-failure stop、push resume、remote-divergence stop。
+- exact archive／git apply parser positives。
+- omitted／cross-mode／base negative matrix。
+- Review schema matrix全件。
+- Human approved／rejected truth table全件。
+- revoked unsupported。
+- exact Review SHA／Issue／identity cross-binding。
+- exact EC-005 status matrix。
+- archive／git approved positive。
+- durable rejected decision-record positive。
+- old-approval stale assertion。
+- PA-NF exact status 10/10。
+- 全pre-commit fault rollback。
+- rollback-failure stop。
+- deterministic same-output recovery。
+- wrong-output `recovery_required`。
+- push resume。
+- remote-divergence stop。
 - runbook regression。
 - required reviewer pass。
 - commit候補または正当なapproved-no-op。
 - post-commit clean check。
+
+S06 portionがpassedしても、S08をownerに含むmulti-owner aggregateはS08 portionがpassedになるまでopenのままとする。
 
 #### step gate
 
@@ -1099,7 +1326,7 @@ uv run pytest \
   -q
 ```
 
-scope外diff 0、Review schema matrix全件、Human truth table全件、archive／git approved positive 2/2、PA-NF 10/10、fault matrix全件、existing runbook unchanged、fresh `code-reviewer` passed、Main Step Result Approvalを確認する。失敗、skip、unavailable、denied、provisionalをpassとして扱わない。
+scope外diff 0、exact parser matrix、Review schema matrix、Human approved／rejected truth table、revoked unsupported、archive／git approved positives、durable rejection、PA-NF exact status全件、fault matrix、same／wrong-output recovery、existing runbook unchanged、fresh `code-reviewer` passed、Main Step Result Approvalを確認する。失敗、skip、unavailable、denied、provisionalをpassとして扱わない。
 
 ### S07 Installer and provider projection
 

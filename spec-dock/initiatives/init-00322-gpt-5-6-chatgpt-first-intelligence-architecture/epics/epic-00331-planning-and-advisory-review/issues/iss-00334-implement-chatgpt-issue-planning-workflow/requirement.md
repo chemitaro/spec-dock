@@ -145,7 +145,17 @@ RuntimeはReview、Human decision、mode-specific parity、validation、publicat
 | PA-NF-10 | validationまたはPlanning publication failure |
 
 ### REQ-015 Workbench and Durable Evidence
-Workbenchはprompt、explicit external files、downloaded Candidate、Review result、Human decision source、operation-local staging／backup／recovery manifest、diagnosticsのtemporary surfaceに限定する。Human decisionはWorkbench source JSON SHAと、`planning apply --decision-artifact`で明示されたIssue `artifacts/` direct-child JSONへbyte-exactに記録し、raw transcriptを保存しない。operation完了後はbackupを削除し、result JSONは観測Evidenceとしてだけ保持する。`report.md`はPlanning receipt、Review authority、Human authorization authority、readiness state storeにしない。
+
+Workbenchはprompt、explicit external files、downloaded Candidate、Review result、Human decision source、operation-local staging／backup／recovery manifest、diagnosticsのtemporary surfaceに限定する。raw transcriptを保存せず、`report.md`をPlanning receipt、Review authority、Human authorization authority、readiness state storeにしない。
+
+`PlanningHumanDecisionV1`のv1許可decisionは`approved`と`rejected`だけである。
+
+- `approved`はexact Review-result bytesとexact reviewed identityへbindし、`plan_adoption=true`かつ`implementation_start=true`を要求する。`planning apply`はvalidated Human decision sourceのexact bytesを明示されたIssue `artifacts/` direct-child JSONへ記録し、mode固有のcanonical adoption、validation、Planning publicationを一つのtransactionとして実行する。
+- `rejected`はexact Review-result bytesとexact reviewed identityへbindし、`plan_adoption=false`かつ`implementation_start=false`を要求する。`planning apply`はdecision artifactだけを追加するbounded decision-record transactionを実行し、`requirement.md`、`design.md`、`plan.md`を変更しない。dedicated Planning decision commitのpushとremote parityが成立した後もresultは`blocked`、exit `1`であり、readinessを導出しない。
+- published rejectionはrepository HEADを変更するため、rejection前のHEADへbindされたReview result、Human approval、Candidate identity、git-bound identityを`stale`にする。その後のapprovalはnew HEADへbindしたfresh Reviewとnew Human decisionを必要とする。
+- `revoked`は`PlanningHumanDecisionV1` v1に含めない。approved publication後のHuman withdrawal、implementation stop、または履歴取消しはcurrent shared Human／Main stop-or-revert workflowのowner境界で扱い、`planning apply`は`decision=revoked`を`rejected`としてrepository mutation前に拒否する。source-changing stop／revert evidenceがない口頭またはWorkbench上のrevocation claimを、既存approvalを失効させるproduct authorityとして扱わない。
+
+decision artifactは`planning apply --decision-artifact`で明示された新規Issue `artifacts/` direct-child JSONだけへbyte-exactに記録する。operation完了後はbackupを削除し、external result JSONは観測Evidenceとしてだけ保持する。専用authority registry、revocation registry、state database、custom Git refを新設しない。
 
 ### REQ-016 Assurance Boundary
 Candidate generation、adoption、publication、readinessは`.assurance.json`を変更しない。Mainは既存assurance workflowをCandidate外で実行する。
@@ -206,7 +216,8 @@ archive modeのrepresentative fixtureを`planning apply`へ与え、future fresh
 git-bound fixtureを`planning apply`へ与え、future fresh Review result、exact HEAD／paths-bound Human decision、target blob不変、approval-only diff、validation、Planning publicationの全条件を満たしたときだけ`ready`を導出する。
 
 ### AC-010 Adoption Negative Set
-PA-NF-01〜PA-NF-10を各独立に実行し、10／10 reject、violations 0を得る。
+
+PA-NF-01〜PA-NF-10を各独立named fixtureとして実行し、各fixtureがDesign／Planで固定された一つのexact stable status、exit `1`、readinessなし、許可されたmutation contractだけを返すことを確認する。genericな「reject」または複数statusの許容を代替証拠にせず、10／10でexpected status一致、violations 0を得る。
 
 ### AC-011 Security
 secret/path/shell metacharacter fixturesがPrompt、diagnostic、Candidate、Review outputへ漏れず、backendはdirect argvで起動される。
@@ -237,7 +248,7 @@ Review identityはcurrent repository／branch／HEADと直接関係するsource 
 | EC-002 | Planner response不完全、unexpected file、non-UTF-8、authority claim、secret-like payload | final Candidateなしで`rejected` |
 | EC-003 | Review mode／identity不一致、Review mutation、silent fallback要求 | Review evidenceをinvalid化して`rejected` |
 | EC-004 | REQ-022のarchive safety classまたはinclusive ceiling違反 | extraction／Review／adoption outputなしで`rejected` |
-| EC-005 | Human decision欠落、不一致、stale、destination不正 | repository mutation前に`blocked` |
+| EC-005 | Review／Human gate evidenceまたはdecision destinationの不成立 | required Review-result sourceまたはHuman-decision sourceの欠落／不存在は`blocked`、mutation 0。malformed JSON、wrong schema version／kind、missing／unknown／duplicate key、invalid enum／timestamp／digest、partial authorization、Review／Human／CLI mode・Issue・identity・digest mismatch、unsafe／existing／scope外destination、unsupported `decision=revoked`は`rejected`、mutation 0。validated identityに対するcurrent source／Candidate／target driftは`stale`、mutation 0。valid Review `fail`とHuman `approved`の組合せは`blocked`、mutation 0。valid Human `rejected`はdecision-record transactionへ進み、verified remote publication後に`blocked`、exit `1`、canonical三文書mutation 0 |
 | EC-006 | canonical replacementまたはpre-commit validation failure | baseline復元成功なら`rolled_back`、復元失敗なら`recovery_required` |
 | EC-007 | commit作成失敗 | worktree/indexをbaselineへ戻し`rolled_back`、復元不能なら`recovery_required` |
 | EC-008 | commit成功後のpush失敗またはresponse loss | local commitを保持して`publication_pending`、same-operation retryだけ許可 |
