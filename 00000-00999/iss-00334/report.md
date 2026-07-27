@@ -12,7 +12,7 @@ ID: "iss-00334"
 
 # iss-00334 Implement ChatGPT Issue Planning Workflow — 実装報告
 
-本書は Issue の観測証跡台帳である。planned requirements と closure contract は `plan.md` が所有し、本書は採用判断、reviewer verdict、実行結果、closure delta、commit evidence を時系列で記録する。2026-07-27 時点では canonical planning repair snapshot `2984c696b4c7e94cbed6fd63697a563f55fd3631` に対するfresh ChatGPT reviewのFAILを受け、専用Blue Team ChatGPT threadのbounded correctionをDesign／Planへ採用した。別のfresh ChatGPT reviewは未実施であり、製品実装は開始していない。
+本書は Issue の観測証跡台帳である。planned requirements と closure contract は `plan.md` が所有し、本書は採用判断、reviewer verdict、実行結果、closure delta、commit evidence を時系列で記録する。2026-07-27 時点では snapshot `546245f1072e6d7822fc7885eff814ac1eca1dc5` に対するfresh ChatGPT Red Team reviewのFAILを受け、同一の専用Blue Team authoring threadがP1-12〜P1-16とP2-03／P2-04のbounded correctionを作成し、MainがRequirement／Design／Planへ統合した。次のfresh ChatGPT Red Team reviewは未実施であり、製品実装は開始していない。
 
 ## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger / 必須）
 
@@ -28,6 +28,8 @@ ID: "iss-00334"
 | D-20260727-SR004 | resolved | scope | implementation-planner / spec-reviewer | S02 test ownershipとS09 live mutation boundaryが矛盾した | allowlist拡大; step分割 | S02A docs／S02B test、S09A hermetic／S09B Main-Human live gateへ分割する | role、mutable surface、credential boundaryを一致させる | promoted_to_plan | `plan.md` S02A／S02B／S09A／S09B | step順に実行する |
 | D-20260727-SR005 | resolved | operation | Codex Main | standard assuranceとIssue固有の高リスクcontrolsの差分を明示する必要があった | profileを無根拠にstrictへ変更; standardのみ; issue-local overlay | authorized profileはstandardのまま、archive、transaction、public contract、live mutationにstrict相当のissue-local overlayを適用する | classifier authorityを改変せず高リスク面のclosureを強化できる | applied | `.assurance.json`; `requirement.md`; `design.md`; `plan.md`; 本書 Assurance記録 | reviewed amendmentで高リスク面が消えた場合だけoverlayを解除する |
 | D-20260727-CG006 | resolved | contract | dedicated ChatGPT Blue Team | apply evidence schema、mode-neutral start gate、S01 positive oracle、S03 test ownershipが未閉鎖だった | ad-hoc JSON; Candidate-only gate; generic Git test流用; closed named contracts | `ReviewedPlanningIdentityV1`、`PlanningReviewResultV1`、`PlanningHumanDecisionV1`をclosed contract化し、archive／git-bound双方を同じdual authorization gateへ通す | exact bytes／identity／digest bindingとstatus semanticsを実装前に固定し、P1／P2をtestable closureへ変換できる | applied | `artifacts/20260727t014215z-chatgpt-blue-bounded-correction.md`; `design.md` §§3,4.3–4.6,10; `plan.md` S01／S03／S06 | remote snapshotを別fresh ChatGPT reviewerへ渡す |
+| D-20260727-CG007 | resolved | contract | fresh ChatGPT Red Team / dedicated ChatGPT Blue Team | EC-005 status、public CLI identity、negative decision、Candidate controls、secret preflight、multi-owner closure、recovery lookupが未閉鎖だった | status unionを維持; broad authority registry; representative schema test; closed bounded contracts | approved adoptionとdurable rejected decision-recordを分離し、`revoked`をv1外へ置く。CLI／Candidate controls／security／closure portion／recovery workspaceをexact contract化する | RedのP1-12〜P1-16とP2-03／P2-04を、既存境界とone-Issue/one-branch/one-PRを維持して実証可能な契約へ変換する | applied | `artifacts/20260727t022302z-chatgpt-fresh-canonical-review-fail.md`; `artifacts/20260727t024714z-chatgpt-blue-bounded-correction-followup.md`; current三文書 | exact new remote HEADで別fresh Red reviewを行う |
+| D-20260727-OP008 | resolved | operation | Codex Main | fresh Red promptに実在しない40文字SHAを指定した | 仕様変更; review破棄; 実行証跡として是正 | 製品仕様は変更せず、実際にreviewされたbranch HEADをFAIL evidenceとして保持し、次回は`git rev-parse HEAD`の実値をそのまま指定する | reviewerは実在するbranch HEADを解決して内容をreviewしたが、requested identity mismatch自体はblockingだった | recorded | Red artifact P1-11; requested `546245f1b0a7f8fe616fe6f13b6f4534f40d77cc`; actual `546245f1072e6d7822fc7885eff814ac1eca1dc5` | commit／push後のactual full HEADを再取得してfresh reviewへ渡す |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -42,22 +44,24 @@ ID: "iss-00334"
 | EAL-20260727-MAIN-REPAIR | adopted | Human-authorized Codex Main repair | `requirement.md`、`design.md`、`plan.md`、`.assurance.json`、`report.md` | ユーザーが今回に限りCodex Mainによる仕様修正を明示承認し、採用済みP1のowner文書を最小範囲で更新した | `requirement.md`; `design.md`; `plan.md`; `.assurance.json`; 本書のDecision Ledger | fresh spec-reviewerの正式判定を取得する |
 | EAL-20260727-CHATGPT-REVIEW | adopted | fresh ChatGPT spec-reviewer with GitHub connector | bounded Design／Plan correction | exact remote HEADと六添付のidentityを照合し、前回P1-02〜P1-09のclosure、P1-01のschema gap、git-bound start-gate gap、S01／S03のtest ownership gapを確認した | `artifacts/20260727t004653z-chatgpt-fresh-canonical-review-fail.md` | 別のBlue Team ChatGPT threadでP1／P2を具体化し、修正後は別fresh reviewを行う |
 | EAL-20260727-CHATGPT-BLUE | adopted | dedicated ChatGPT Blue Team authoring thread with GitHub connector | `design.md` and `plan.md` bounded correction | exact repository／branch／HEADとcanonical Git blobsを確認し、正式FAILの2 P1／2 P2だけをreplacement-ready blocksへ具体化した。Requirement meaningと既閉鎖controlsは変更不要と確認した | `artifacts/20260727t014215z-chatgpt-blue-bounded-correction.md`; Design／Plan diff | correction snapshotをcommit／pushし、別fresh Red Team threadで再レビューする |
+| EAL-20260727-CHATGPT-RED-2 | adopted | fresh ChatGPT Red Team read-only review | snapshot `546245f1072e6d7822fc7885eff814ac1eca1dc5` | actual branch HEADとcanonical filesを読んだ正式FAILとしてP0=0、P1=6、P2=2を採用した。P1-11はMainのrequested SHA誤りでありproduct findingとしては採用しない | `artifacts/20260727t022302z-chatgpt-fresh-canonical-review-fail.md` | P1-12〜P1-16、P2-03／P2-04をBlue Teamへ渡す |
+| EAL-20260727-CHATGPT-BLUE-2 | adopted | same dedicated ChatGPT Blue Team authoring conversation | Requirement／Design／Plan bounded correction | actual HEADとformal Red resultへbindし、該当findingsだけをreplacement-ready blocksへ具体化した。BlueはPASS判定やrepository mutationを行っていない | `artifacts/20260727t024714z-chatgpt-blue-bounded-correction-followup.md`; current三文書diff | assurance再束縛、commit／push後に新規Red threadでfresh review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| canonical planning repair | ChatGPT-first Issue Planningのcreate→revise→review→Human Gate→apply→publication→readinessが `requirement.md` REQ-001〜REQ-024 と `design.md` public routeで一貫する | closed Review／Human JSON contract、archive safety、transaction recovery、source binding、closure traceabilityを `plan.md` のrequired rowsへ固定した | low。security／compliance controlsはprimary lifecycleを補強し、置換していない | ChatGPT Blue correctionを採用済み。fresh Red re-reviewが次の正式判定 |
+| canonical planning repair | ChatGPT-first Issue Planningのcreate→revise→review→Human Gate→apply→publication→readinessが `requirement.md` REQ-001〜REQ-024 と `design.md` public routeで一貫する | closed Review／Human JSON contract、archive safety、transaction recovery、source binding、secret preflight、owner-portion closureを `plan.md` のrequired rowsへ固定した | low。security／compliance controlsはprimary lifecycleを補強し、置換していない | Red FAILをBlue correctionへ反映済み。新規fresh Red re-reviewが次の正式判定 |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | parent Initiative／Epic、accepted ADR 20／22、current runtime、Candidate v15、canonical fail artifactを照合 | なし。public apply routeとsource bindingをRequirementへ確定した | P1-01、P1-07、P1-08、P1-09をcanonical requirementへ採用 | failed | yes | fresh canonical re-review |
-| design | command parser、runbook transaction、GitHub preflight、archive review、binary publisher、formal ChatGPT FAIL、Blue correctionを照合 | なし。closed Review／Human schema、identity digest、validation order、mode-neutral dual authorizationをDesignへ確定した | 既存P1修正に加えてlatest P1-01／P1-10をcanonical designへ採用 | failed | yes | correction snapshotのfresh canonical re-review |
-| plan | Issue plan authoring contract、Closure Index schema、test ownership、archive class、PA-NF、live boundary、Blue correctionを照合 | なし。archive／git-bound start gate、S01 positive oracle、S03 fixture ownership、S06 schema matrixをPlanへ確定した | latest P1 start-gateとP2-01／P2-02をcanonical planへ採用 | failed | yes | correction snapshotのfresh canonical re-review |
+| requirement | parent Initiative／Epic、accepted ADR 20／22、current runtime、formal Red FAIL、Blue follow-upを照合 | なし。EC-005 exact statusとapproved／rejected lifecycleを確定した | P1-12／P1-14のRequirement owner部分を採用 | failed | yes | new snapshotのfresh canonical re-review |
+| design | command parser、runbook transaction、GitHub preflight、archive review、formal Red FAIL、same-thread Blue follow-upを照合 | なし。public CLI identity、control schemas、negative decision、deterministic recoveryを確定した | P1-12〜P1-15、P2-04のDesign owner部分を採用 | failed | yes | new snapshotのfresh canonical re-review |
+| plan | Closure Index、test ownership、archive controls、PA-NF、security、recovery、Blue follow-upを照合 | なし。owner portion、secret pre-invocation、control negative matrix、durable rejection、recovery lookupを確定した | P1-12〜P1-16、P2-03／P2-04のPlan owner部分を採用 | failed | yes | new snapshotのfresh canonical re-review |
 
-`failed` は `artifacts/20260726t235522z-review-canonical-spec-review-fail.md` の直近正式判定を表す。修正内容の自己承認は行わず、別のfresh `spec-reviewer`が再判定する。
+`failed` は `artifacts/20260727t022302z-chatgpt-fresh-canonical-review-fail.md` の直近正式判定を表す。修正内容の自己承認は行わず、別のfresh ChatGPT Red Team threadが再判定する。
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 
@@ -67,6 +71,7 @@ ID: "iss-00334"
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Codex Main | iss-00334 canonical planning repair | 該当なし | `artifacts/20260726t235800z-review-system-architect-fail.md`; `artifacts/20260726t235801z-review-implementation-planner-fail.md`; `artifacts/20260726t235522z-review-canonical-spec-review-fail.md` | `requirement.md`; `design.md`; `plan.md`; `.assurance.json`; `report.md` | not used | `requirement.md`; `design.md`; `plan.md`; `.assurance.json`; `report.md` | `git diff --check` successful; planning validation successful | manual authoring | none | none | failed | fresh re-review後にexecute manual-authored canonical docs |
 | ChatGPT Blue Team | iss-00334 bounded planning correction | `artifacts/20260727t014215z-chatgpt-blue-bounded-correction.md` | remote HEAD `b5447aef2c4d2ad5fabbab532cb9cef0e8d397b0`; `design.md`; `plan.md`; formal FAIL artifact | `design.md`; `plan.md` | adopted | `design.md`; `plan.md`; `.assurance.json`; `report.md` | exact target headings present; `git diff --check` successful; `spec-dock validate` 222 nodes; assurance verify valid | bounded manual integration | repository mutation／patch／review verdict claims | none | failed from prior Red; Blue did not self-review | commit／push後に別fresh ChatGPT Red review |
+| ChatGPT Blue Team | iss-00334 second bounded planning correction | `artifacts/20260727t024714z-chatgpt-blue-bounded-correction-followup.md` | actual remote HEAD `546245f1072e6d7822fc7885eff814ac1eca1dc5`; formal Red FAIL artifact | `requirement.md`; `design.md`; `plan.md` | adopted | `requirement.md`; `design.md`; `plan.md`; `.assurance.json`; `report.md` | P1-12〜P1-16、P2-03／P2-04だけを統合; validate／diff-check／assurance verify successful | bounded manual integration | P1-11のproduct変更、repository mutation、review verdict claims | follow-up model selector verification unavailable | failed from fresh Red; Blue did not self-review | commit／push後に別fresh ChatGPT Red review |
 
 ## グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 
@@ -74,22 +79,22 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
-| standard | system-architect and implementation-planner; ChatGPT Blue Team authoring evidence | used | `artifacts/20260726t235800z-review-system-architect-fail.md`; `artifacts/20260726t235801z-review-implementation-planner-fail.md`; `artifacts/20260727t014215z-chatgpt-blue-bounded-correction.md` | failed | blocked |
+| standard | system-architect and implementation-planner; ChatGPT Blue Team authoring evidence | used | prior specialist artifacts; `artifacts/20260727t014215z-chatgpt-blue-bounded-correction.md`; `artifacts/20260727t024714z-chatgpt-blue-bounded-correction-followup.md` | failed | blocked |
 
 ## レビューゲート状態（Reviewer Gate Status）
 
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| canonical planning | ChatGPT-first canonical spec review | spec-reviewer | stale after correction | failed | no | fresh re-review required | `artifacts/20260727t004653z-chatgpt-fresh-canonical-review-fail.md`のP1-01、P1-10、P2-01、P2-02をBlue correctionへ反映済み。別fresh threadの判定待ち |
+| canonical planning | ChatGPT-first canonical spec review | fresh Red Team | stale after correction | failed | no | fresh re-review required | `artifacts/20260727t022302z-chatgpt-fresh-canonical-review-fail.md`のP1-12〜P1-16、P2-03／P2-04をBlue correctionへ反映済み。P1-11はMainのrequested SHA誤り。別fresh threadの判定待ち |
 
 ## Assurance記録
 
 - `./spec-dock/scripts/spec-dock assurance classify --stage requirement --issue iss-00334 --format json`: valid。`authorized_profile=standard`、`status=provisional`としてcurrent三文書へ再束縛した。
 - `./spec-dock/scripts/spec-dock assurance verify --issue iss-00334 --format json`: valid。
 - source binding:
-  - Requirement SHA-256: `ad6a7ddea25f459d7692d2746e6061b1d692bb6f543aaaa27d28c78e2794d501`
-  - Design SHA-256: `2ea30b99363059b2f1540193e9e3e94ddb6539c704f22447e956539f61e4735d`
-  - Plan SHA-256: `b951a77dffe7da84c04d2a30f5884454c88620184010e04352e5112b7e37adb4`
+  - Requirement SHA-256: `a1b2a06e25fd686fcfb85679cdc5f78a9de684ab51b1a11efba54e9f2c0cbc03`
+  - Design SHA-256: `6e2adc750fb5472056e337e86856e4f803c8194839f8ca72525db35dc8e72fae`
+  - Plan SHA-256: `74c1a7825db98e7c427c06649dde82bffe936d6c1a9381e83b3d87c311882531`
 - `./spec-dock/scripts/spec-dock assurance compose --artifact all --issue iss-00334 --format json --dry-run`: Design／Planに`substantive_content_conflict`、`changed_paths=[]`を返した。current owner文書を上書きしないapproved no-opとして、non-dry-run composeは実施していない。
 - strict相当overlayのdelta: exhaustive archive negative closure、transaction fault injection、specialist evidence、fresh spec/code/QA review、hermetic testとlive operationの分離。
 - revert condition: public contract、untrusted archive、multi-file transaction、credentialed live mutationがscopeから除外されたreviewed amendmentに対し、assurance再分類とfresh spec reviewがpassした場合のみ解除する。
@@ -187,11 +192,46 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - wrapperはUI上のrate-limit noticeを専用statusで返さず、generic `prompt-commit-timeout`として報告した。
 - `chatgpt-use`のdocumented identity-sensitive flowに従い、同時添付をやめ、GitHub connectorでexact remote snapshotを確立して成功した。Oracle direct実行、API fallback、別profileは使用していない。
 
+### セッションログ（2026-07-27 — second fresh Red / same Blue correction）
+
+#### 対象
+
+- Actual reviewed snapshot: `546245f1072e6d7822fc7885eff814ac1eca1dc5`
+- Erroneously requested snapshot: `546245f1b0a7f8fe616fe6f13b6f4534f40d77cc`
+- Formal findings: P1-11〜P1-16、P2-03、P2-04
+- Product correction scope: P1-12〜P1-16、P2-03、P2-04
+- 製品実装step: 未開始
+
+#### 実施内容
+
+- 新規ChatGPT Red Team threadがGitHub connectorでbranch actual HEAD、canonical五文書、prior review／Blue artifacts、repository feasibility surfacesをread-only reviewした。
+- Mainが誤ったrequested SHAを指定したためP1-11が発生した。reviewerはactual branch HEADを解決して内容をreviewしたが、正式判定はP0=0、P1=6、P2=2のFAIL、S01 blockedである。
+- 正式review artifactだけを既存の専用Blue Team conversationへ渡し、actual HEADへbindしたbounded correctionを作成した。
+- MainはRequirement R-01〜R-03、Design D-01〜D-14、Plan P-01〜P-20の対象箇所を統合し、assuranceを再束縛した。
+
+#### 実行コマンド / 結果
+
+| コマンド | 観測結果 |
+|---|---|
+| fresh `chatgpt-use` Red session | FAIL。P0=0、P1=6、P2=2、S01 blocked。actual HEADをreview、repository mutation 0 |
+| `chatgpt-use --followup iss00334-blue-planning-correction-r5` | same conversation URLでBlue authoring継続。GitHub actual HEAD確認、replacement-ready blocks取得。follow-up selector evidenceは`resolved=(unavailable); verified=no` |
+| `./spec-dock/scripts/spec-dock validate` | pass。222 nodesを検証 |
+| `git diff --check` | pass |
+| `./spec-dock/scripts/spec-dock assurance classify --stage requirement --issue iss-00334 --format json` | pass。standard／provisionalをcurrent三文書へ再束縛 |
+| `./spec-dock/scripts/spec-dock assurance verify --issue iss-00334 --format json` | pass |
+| `./spec-dock/scripts/spec-dock assurance compose --artifact all --issue iss-00334 --format json --dry-run` | expected invalid。Design／Plan `substantive_content_conflict`、`changed_paths=[]`。non-dry-run未実施 |
+
+#### 判定
+
+- Blue outputはauthoring evidenceであり、review PASSではない。
+- follow-upは同一Blue conversation URLとGitHub actual HEAD確認を保持したが、model selector再検証がunavailableだった。この制約を残し、次の正式判定は新規fresh Red Team threadだけが行う。
+- 次回Red promptのsource HEADはcommit／push後に`git rev-parse HEAD`から取得したexact 40文字を貼り付け、手入力で再構成しない。
+
 ## マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | 差分確認 | 次アクション |
 |---|---|---|---|---|---|
-| canonical planning repair | correction integrated; fresh review pending | Design、Plan、Assurance、Report、Blue authoring artifact | commit pending | `git diff --check`、validate 222 nodes、assurance verify pass | new snapshotをcommit／pushし、別fresh ChatGPT reviewを行う |
+| canonical planning repair | second correction integrated; fresh review pending | Requirement、Design、Plan、Assurance、Report、fresh Red FAIL、Blue follow-up artifacts | commit pending | `git diff --check`、validate 222 nodes、assurance verify pass | new snapshotをcommit／pushし、actual full HEADで別fresh ChatGPT reviewを行う |
 | S01 | not started | `plan.md` S01 exact scope | none | 製品実装差分なし | planning gate通過後にdev-coderへ委任する |
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
