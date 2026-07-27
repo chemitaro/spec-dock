@@ -121,14 +121,16 @@ ReviewはCandidateまたはtracked treeを変更せず、resultを明示され�
 
 Reviewは現在の設計を前提として、実在する欠落、矛盾、重複、path／identity／ownerのずれ、具体的な実装不能、安全性またはHuman authority違反だけをfindingとする。改善提案や再設計案だけでFAILにしない。
 
+P0／P1だけをblocking findingとする。P2／P3はnon-blocking observationであり、P2／P3だけのReviewではCandidateを変更せずPASSとしてHuman Gateへ進める。
+
 ### REQ-007 Revision Request
 
 `planning revise`は`--request <json>`を必須とし、Skillが選んだlaneと修正対象を明示する。
 
-- Semantic: 対象Candidate identity、採用するreview finding IDs、維持すべき設計前提を渡し、完全な三文書replacementを要求する。
+- Semantic: 対象Candidate identity、採用するP0／P1 review finding IDs、維持すべき設計前提を渡し、完全な三文書replacementを要求する。
 - Mechanical: 対象Candidate identity、target file、old text、new text、meaning invariant、diff budgetを渡し、指定箇所以外のsemantic changeを禁止する。一意に適用できないrequestはSemantic laneへ暗黙fallbackせず拒否する。
 
-旧Candidateは上書きせず、revision成功後は新version／Candidate ID／ZIP SHAを持つcomplete Candidateを生成し、fresh Reviewへ戻す。
+Revision request validatorはP2／P3 finding IDを修正triggerとして受理しない。旧Candidateは上書きせず、P0／P1 revision成功後は新version／Candidate ID／ZIP SHAを持つcomplete Candidateを生成し、fresh Reviewへ戻す。
 
 ### REQ-008 Human Decision
 
