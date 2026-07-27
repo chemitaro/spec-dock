@@ -16,7 +16,9 @@ ID: "iss-00334"
 
 2026-07-27、Humanはレビュー／修正ループによるPlanning肥大化を停止し、Blue Teamの設計前提を尊重するdefect-only reviewへ戻すよう指示した。Mainは、過去のreview由来の証明行列、重複closure graph、将来拡張向けcontractを正本から除き、四command、exact Git binding、Candidate、fresh review、Human Gate、安全なapply／publication、provider-first、JIT dogfoodに絞って三文書を再基準化した。前回の4 findingは実害を再判定し、public result、revision input、git-bound exact targets、Seed routingの四点だけを簡潔な契約として反映した。
 
-snapshot `a0d1b4dedf68f1957a01d1fd48cd2e3a1be64b03`へのfresh defect-only ChatGPT ReviewはP0=0、P1=1のFAILだった。P1-01は親Epic E1-REQ-005に対し、P2／P3-only Reviewでもrevisionし得る直接矛盾であったため採用した。revision triggerをP0／P1だけに限定する最小修正を行い、同findingのclosure review待ちである。製品実装はまだ開始していない。
+snapshot `a0d1b4dedf68f1957a01d1fd48cd2e3a1be64b03`へのfresh defect-only ChatGPT ReviewはP0=0、P1=1のFAILだった。P1-01は親Epic E1-REQ-005に対し、P2／P3-only Reviewでもrevisionし得る直接矛盾であったため採用した。revision triggerをP0／P1だけに限定する最小修正を行った。
+
+correction snapshot `ec801c374038e7e5ad4f31b3919440aa9b79eeaa`への別fresh closure ReviewはP0=0、P1=0のPASSで、P1-01 closed、direct regressionなしと判定した。これをcurrent Spec Authoring Gateの正式PASSとして採用する。製品実装はまだ開始していない。
 
 ## 仕様解釈・判断台帳（Spec Interpretation / Decision Ledger / 必須）
 
@@ -57,6 +59,7 @@ snapshot `a0d1b4dedf68f1957a01d1fd48cd2e3a1be64b03`へのfresh defect-only ChatG
 | EAL-20260727-CHATGPT-BLUE-3 | adopted | same dedicated ChatGPT Blue Team authoring thread | Requirement／Design／Plan／Report bounded correction | exact remote HEAD、canonical blobs、fresh Red artifactを確認し、status determinism、bounded recovery observability、acyclic owner graph、Report milestoneだけを具体化した。BlueはPASS判定、repository mutation、patch、ZIP生成を行っていない | `artifacts/20260727t035110z-chatgpt-blue-bounded-correction-followup.md`; fresh Red artifact; bounded owner-document replacement blocks | Mainがactual diff／validation／assurance rebindingを確認し、new immutable HEADで別fresh review |
 | EAL-20260727-REBASELINE | partially_adopted | Human direction、approved parent scope、current repository facts | canonical Requirement／Design／Plan rebaseline | prior Blue／Red evidenceから製品境界と実害のある4点だけを採用し、追加schema、proof matrix、closure graph、再設計提案は採用しなかった | current三文書; D-20260727-RB010; Initiative defect-only review charter | validate、assurance再束縛、commit／push後にdefect-only fresh review |
 | EAL-20260727-DEFECT-REVIEW | adopted | fresh ChatGPT Pro defect-only review | snapshot `a0d1b4dedf68f1957a01d1fd48cd2e3a1be64b03` | exact HEAD／three targetsへbindし、親Epicとの直接矛盾1件だけを報告したため正式review evidenceとして採用 | `artifacts/20260727t070247z-chatgpt-defect-only-review-fail.json`; SHA-256 `052fa9ea2533c301a28037cc98f7dee7cc2654429bf627e642fd4387519f0740` | P1-01 correctionをcommit／pushしclosure review |
+| EAL-20260727-CLOSURE-PASS | adopted | fresh ChatGPT Pro correction reviewer | snapshot `ec801c374038e7e5ad4f31b3919440aa9b79eeaa` | P1-01 closureとdirect regressionだけを確認しP0=0、P1=0、PASSを返した | `artifacts/20260727t070853z-chatgpt-defect-only-closure-review-pass.json`; SHA-256 `1ae92cc537a06cee0be7e21a5f6eeb944a9bf735d8fbc250bfbbdc559651bd97` | Spec Authoring GateをPASSとして実装開始判断へhandoff |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -68,9 +71,9 @@ snapshot `a0d1b4dedf68f1957a01d1fd48cd2e3a1be64b03`へのfresh defect-only ChatG
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | approved parent scope、current repository facts、P1-01を照合 | P0／P1だけをrevision trigger、P2／P3-onlyはCandidate不変 | REQ-001〜014へ再基準化しP1-01を修正 | failed | yes | exact correction HEADのclosure review |
-| design | existing primitives、provider ownership、P1-01を照合 | Review severityとRevisionRequest validationのownerを確定 | 14 design sectionsへ再基準化しP1-01を修正 | failed | yes | exact correction HEADのclosure review |
-| plan | Requirement／Design、P1-01を照合 | S04とS07でP2／P3 revision 0を検証 | S01〜S07へ再基準化しP1-01を修正 | failed | yes | exact correction HEADのclosure review |
+| requirement | approved parent scope、current repository facts、P1-01を照合 | P0／P1だけをrevision trigger、P2／P3-onlyはCandidate不変 | REQ-001〜014へ再基準化しP1-01を修正 | passed | no | Human implementation-start decisionへhandoff |
+| design | existing primitives、provider ownership、P1-01を照合 | Review severityとRevisionRequest validationのownerを確定 | 14 design sectionsへ再基準化しP1-01を修正 | passed | no | S01実装へhandoff可能 |
+| plan | Requirement／Design、P1-01を照合 | S04とS07でP2／P3 revision 0を検証 | S01〜S07へ再基準化しP1-01を修正 | passed | no | S01実装へhandoff可能 |
 
 過去のFAILは当時のsnapshotに対する履歴として保持する。current rebaselineの判定には流用せず、new exact HEADを別fresh reviewerが限定scopeで判定する。
 
@@ -92,7 +95,7 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
-| standard | system-architect and implementation-planner; ChatGPT Blue Team authoring evidence | used | prior specialist artifacts; `artifacts/20260727t014215z-chatgpt-blue-bounded-correction.md`; `artifacts/20260727t024714z-chatgpt-blue-bounded-correction-followup.md`; `artifacts/20260727t035110z-chatgpt-blue-bounded-correction-followup.md` | failed | blocked |
+| standard | defect-only ChatGPT review and prior authoring evidence | used | `artifacts/20260727t070247z-chatgpt-defect-only-review-fail.json`; `artifacts/20260727t070853z-chatgpt-defect-only-closure-review-pass.json` | passed | implementation-start decisionへhandoff可能 |
 
 ## レビューゲート状態（Reviewer Gate Status）
 
@@ -101,6 +104,7 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 | canonical planning | ChatGPT-first canonical spec review | fresh Red Team | current for published HEAD; stale after bounded correction | failed | no | new immutable correction snapshot requires fresh review | `artifacts/20260727t033431z-chatgpt-fresh-canonical-review-fail.md`。P0=0、P1=3、P2=1。P1-17／P1-18／P1-19、P2-05 bounded correction対象。P1-11〜P1-16はpreserved |
 | canonical planning rebaseline | defect-only canonical spec review | fresh reviewer | pending new exact HEAD | pending | no | implementation remains blocked until PASS | current三文書だけをreviewed targetとし、既存設計を覆す提案をfindingにしない |
 | rebaseline correction | defect-only closure review | fresh ChatGPT Pro reviewer | current for `a0d1b4dedf68f1957a01d1fd48cd2e3a1be64b03`; stale after correction | failed | no | correction HEAD must close P1-01 without direct regression | `artifacts/20260727t070247z-chatgpt-defect-only-review-fail.json`。P0=0、P1=1 |
+| correction closure | defect-only closure review | fresh ChatGPT Pro reviewer | current for `ec801c374038e7e5ad4f31b3919440aa9b79eeaa` | passed | no | Spec Authoring Gate PASS。new material spec changeで失効 | `artifacts/20260727t070853z-chatgpt-defect-only-closure-review-pass.json`。P0=0、P1=0、P1-01 closed |
 
 ## Assurance記録
 
@@ -149,7 +153,7 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 必須検証（required verification） | 停止条件（stop conditions） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | delegated after planning pass | shipped CLI contractとtestsのbounded implementation | dev-coder | `plan.md` S01のexact targets／allowed pathsのみ | canonical `requirement.md`、`design.md`、`plan.md` | S01 Red／Green command、focused code review、diff allowlist | spec-reviewer fail、scope escape、test failure、new requirement gap | blocked。fresh planning review待ち |
+| S01 | delegated after planning pass | shipped CLI contractとtestsのbounded implementation | dev-coder | `plan.md` S01のplanned surfacesのみ。exact filenamesはrepository inspectionで確定 | canonical `requirement.md`、`design.md`、`plan.md` | S01 Red／Green command、focused code review、diff allowlist | spec-reviewer fail、scope escape、test failure、new requirement gap | planning gate passed。Human implementation-start decision待ち |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 
