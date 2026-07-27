@@ -127,7 +127,7 @@ Human
 - `decision=rejected`はvalid Review resultと同じidentityへbindされている場合、decision artifactだけを記録するdecision-record transactionへ進む。verified remote publication後のstatusは`blocked`、exit `1`であり、canonical三文書を変更しない。
 - `decision=revoked`はv1 unsupported enumとして`rejected`、exit `1`、mutation 0とする。
 - `--decision-artifact`はactive Issueの`artifacts/` direct childにある新規lowercase JSON pathだけを受け付け、既存file、symlink parent、scope外pathを`rejected`する。
-- text／JSONは同じstable `status`を返す。`ready`だけexit `0`、`blocked`、`stale`、`rejected`、`rolled_back`、`publication_pending`、`blocked_remote_diverged`、`recovery_required`はexit `1`。
+- text／JSONは同じclosed `status`と`reason`を返す。`status`は`ready|blocked|stale|rejected|rolled_back|publication_pending|blocked_remote_diverged|recovery_required`だけであり、`ready`だけexit `0`、それ以外はexit `1`とする。`failed`、`invalid`、`insufficient evidence`をpublic statusとして追加せず、必要な区別はclosed `reason`で表す。同じnamed observable conditionは常に同じstatus／reasonを返す。
 - output directoryはrepository／canonical tree外のexisting non-symlink directoryに限定する。
 
 ## 4. Core Contracts
@@ -429,44 +429,73 @@ Allowed decision combinations are closed:
 
 `PlanningHumanDecisionV1`はrevocation registryではない。approved publication後のwithdrawal／stop／revertはexisting shared Human／Main workflowのowner境界で扱い、`planning apply`はrevocation claimを受理・永続化・推測しない。
 
-#### 4.4.3 Validation order and stable status semantics
+#### 4.4.3 Validation order and deterministic status semantics
 
-`planning apply`は次の順序で検証する。
+`planning apply`は次のordered classificationをrepository mutation前から順に適用する。複数条件が同時に成立する場合は、番号が最も小さい条件だけをpublic `status`／`reason`に使用する。
 
-1. required request identity options、Review／Human source options、output、decision destinationの存在を確認する。
-2. path safetyとmode-specific option matrixを検証する。
-3. Review／Human external JSONをそれぞれ一回だけbytesとして読み、exact file SHA-256を計算する。
-4. UTF-8、JSON object、duplicate key、schema version、evidence kind、required／unknown key、field type、enum、timestamp、digest formatを検証する。
-5. 各`reviewed_identity`を§4.3で検証し、canonical digestを再計算する。
-6. Review、Human、CLI mode identity、Issue IDのexact cross-bindingを検証する。
-7. Human `review_result_sha256`とactual Review-result bytesを照合する。
-8. current repository／branch／HEAD／Candidate bytes／target blobsをreviewed identityへ照合し、source freshnessを再評価する。
-9. Review verdictとHuman decision combinationを評価する。
-10. `approved`はfull adoption transaction、`rejected`はdecision-record transactionへ進む。
+1. required option／source presence。
+2. mode-specific option matrixとpath safety。
+3. Review／Human exact file-byte readとdigest。
+4. JSON／schema／field validation。
+5. reviewed identity validationとdigest再計算。
+6. Review／Human／CLI／Issue cross-binding。
+7. apply-time source freshness。
+8. Review verdict／Human decision combination。
+9. recovery-state classification。
+10. transaction／publication result。
 
-Stable mapping:
+Pre-mutation mapping:
 
-| Named condition | Status | Exit | Repository mutation |
+| Named reason | Status | Exit | Repository mutation |
 |---|---|---:|---:|
-| `missing-review-source` | `blocked` | 1 | 0 |
-| `missing-human-source` | `blocked` | 1 | 0 |
-| malformed JSON、wrong version／kind、missing／unknown／duplicate key、invalid type／enum／timestamp／digest | `rejected` | 1 | 0 |
-| partial authorization | `rejected` | 1 | 0 |
-| wrong reviewer role、non-fresh declaration、non-read-only authority | `rejected` | 1 | 0 |
-| Review／Human／CLI mode mismatch | `rejected` | 1 | 0 |
-| Review／Human／CLI Issue／identity object／identity digest mismatch | `rejected` | 1 | 0 |
-| Human `review_result_sha256` mismatch | `rejected` | 1 | 0 |
-| unsafe／existing／scope外 decision destination | `rejected` | 1 | 0 |
-| unsupported `decision=revoked` | `rejected` | 1 | 0 |
-| valid identityに対するcurrent source／Candidate／target drift | `stale` | 1 | 0 |
-| valid Review `fail` + Human `approved` | `blocked` | 1 | 0 |
-| valid Review `pass` + Human `approved` with both authorizations | full adoption transactionへ継続 | not yet ready | 0 until staging |
-| valid Review `pass|fail` + Human `rejected` with both authorizations false | decision-record transactionへ継続 | not yet final | 0 until staging |
-| rejection-record commit／push／remote parity verified | `blocked` | 1 | decision artifact + one Planning decision commit only |
+| `missing_review_source` | `blocked` | 1 | 0 |
+| `missing_human_source` | `blocked` | 1 | 0 |
+| `malformed_evidence` | `rejected` | 1 | 0 |
+| `wrong_schema_version` | `rejected` | 1 | 0 |
+| `wrong_evidence_kind` | `rejected` | 1 | 0 |
+| `missing_required_key` | `rejected` | 1 | 0 |
+| `unknown_key` | `rejected` | 1 | 0 |
+| `duplicate_key` | `rejected` | 1 | 0 |
+| `invalid_field_type` | `rejected` | 1 | 0 |
+| `invalid_enum` | `rejected` | 1 | 0 |
+| `invalid_timestamp` | `rejected` | 1 | 0 |
+| `invalid_digest` | `rejected` | 1 | 0 |
+| `partial_authorization` | `rejected` | 1 | 0 |
+| `wrong_reviewer_role` | `rejected` | 1 | 0 |
+| `nonfresh_review_declaration` | `rejected` | 1 | 0 |
+| `non_read_only_review_authority` | `rejected` | 1 | 0 |
+| `mode_mismatch` | `rejected` | 1 | 0 |
+| `issue_mismatch` | `rejected` | 1 | 0 |
+| `identity_object_mismatch` | `rejected` | 1 | 0 |
+| `identity_digest_mismatch` | `rejected` | 1 | 0 |
+| `review_result_digest_mismatch` | `rejected` | 1 | 0 |
+| `unsafe_decision_destination` | `rejected` | 1 | 0 |
+| `unsupported_revocation` | `rejected` | 1 | 0 |
+| `source_identity_drift` | `stale` | 1 | 0 |
+| `candidate_identity_drift` | `stale` | 1 | 0 |
+| `git_target_drift` | `stale` | 1 | 0 |
+| `review_failed_for_approval` | `blocked` | 1 | 0 |
+| `review_only` | `blocked` | 1 | 0 |
+| `human_only` | `blocked` | 1 | 0 |
+| `parity_only` | `blocked` | 1 | 0 |
+| valid Review `pass` + valid Human `approved` | transaction preflightへ継続 | not yet ready | 0 until staging |
+| valid Review `pass|fail` + valid Human `rejected` | decision-record transactionへ継続 | not yet final | 0 until staging |
 
-decision-record transaction中のpre-commit failure、restore failure、push failure、remote divergenceはfull adoptionと同じ`rolled_back`、`recovery_required`、`publication_pending`、`blocked_remote_diverged` semanticsを使用する。
+Post-mutation／publication mapping:
 
-Review-only、Human-only、parity-onlyでは`ready`にしない。mode reinterpretation、waiver、silent fallback、missing field default、unknown-key ignore、unsupported revocationのbest-effort translationを行わない。
+| Named reason | Status | Exit | Required state |
+|---|---|---:|---|
+| `precommit_fault_restored` | `rolled_back` | 1 | bytes／mode／index／HEAD／clean statusがH0とexact一致 |
+| `restore_incomplete` | `recovery_required` | 1 | original recovery workspaceとbounded remediationを保持 |
+| `repository_visible_partial_without_workspace` | `recovery_required` | 1 | new mutation 0、original exact outputを要求 |
+| `publication_incomplete` | `publication_pending` | 1 | exact local H1保持 |
+| `remote_diverged` | `blocked_remote_diverged` | 1 | force／reset／amend／new commit 0 |
+| `rejection_record_published` | `blocked` | 1 | decision artifact + exact Planning decision commitだけ |
+| `adoption_published` | `ready` | 0 | full readiness conjunction成立 |
+
+stage-only workspace orphanが別output invocationから不可視で、repository／index／HEADがexact clean H0、supplied outputにmanifestがない場合は`repository_visible_partial_without_workspace`に分類しない。§4.6の`new_workspace_attempt`として扱う。
+
+Review-only、Human-only、parity-only、published rejectionでは`ready`を導出しない。mode reinterpretation、waiver、silent fallback、missing-field default、unknown-key ignore、unsupported revocation translationを行わない。
 
 ### 4.5 Readiness Result
 
@@ -537,19 +566,105 @@ PlanningApplyOperation
 
 validated `approved`または`rejected` gate通過後だけ、`human_decision_bytes`を`decision_artifact_repo_path`へbyte-exactにstageする。Review result、Human decision、identity、source、destinationのvalidation中はcanonical tree、index、HEAD、operation manifestを変更しない。
 
-#### Recovery workspace identity
+#### Recovery workspace identity and bounded observability
 
 1. `--output`はexisting non-symlink directoryとして検証する。
-2. `canonical_output_directory`はstrict realpath解決後のabsolute normalized path。
+2. `canonical_output_directory`はstrict realpath解決後のabsolute normalized pathとする。
 3. `output_directory_identity_sha256 = sha256(UTF-8 bytes of canonical_output_directory)`。
-4. operation directoryは`<canonical-output-directory>/.spec-dock-planning-operations/<operation-id>/`。
-5. recovery manifestは`<operation-directory>/recovery-manifest.json`。
+4. `workspace_attempt_id = sha256(canonical JSON of operation_id and output_directory_identity_sha256)`。
+5. operation directoryは次のexact pathとする。
 
-`RecoveryManifestV1`はcanonical JSONであり、schema version、operation／workspace／Issue／expected HEAD／reviewed identity／Review／Human digests、decision destination、phase、target path、before／staged digest、backup locator、completed flagをexact required fieldsとして持つ。manifestはphase／target完了ごとにatomic replacementし、backup locatorはoperation-directory-relative non-symlink pathに限定する。
+```text
+<canonical-output-directory>/
+  .spec-dock-planning-operations/
+    <operation-id>/
+```
 
-same-operation pre-commit retryはsame `--output`を必須とし、computed output identity、operation directory、manifest identity／digestsがexact一致しなければ`recovery_required`、exit 1、new mutation 0とする。post-commit retryはcommitの二つのtrailers、exact tree、parent H0、same output identityを照合する。different／missing outputでpartial stateを検出した場合は他directoryを列挙・検索せず`recovery_required`とし、original exact outputの再指定をremediationとして返す。
+6. recovery manifestは次のexact pathとする。
 
-manifestがなくworktree／index／HEADがexact clean H0ならnew invocationとして開始できる。global registry、home／repository scan、custom Git ref、databaseを作らない。verified success時はbackupを削除し、completed manifestとexternal result JSONは観測Evidenceとしてだけ保持する。
+```text
+<operation-directory>/recovery-manifest.json
+```
+
+`RecoveryManifestV1`はcanonical JSONであり、次をexact required fieldsとして持つ。
+
+```text
+schema_version = spec-dock.planning-recovery-manifest.v1
+operation_id
+operation_kind
+workspace_attempt_id
+output_directory_identity_sha256
+issue_id
+expected_head
+reviewed_identity_sha256
+review_result_sha256
+human_decision_sha256
+decision_artifact_repo_path
+phase
+targets[
+  repo_path,
+  before_sha256 or null,
+  staged_sha256,
+  backup_relative_path or null,
+  completed
+]
+```
+
+manifestはphase／target完了ごとにatomic replacementする。backup locatorはoperation-directory-relative non-symlink pathだけを許可する。
+
+Recovery state classes are closed:
+
+##### A. `workspace_only_stage`
+
+次がすべて成立する状態。
+
+- manifest phaseが`preflight`または`staged`。
+- repository targetを一件も変更していない。
+- 全target `completed=false`。
+- 全`backup_relative_path=null`。
+- index／worktree／HEADがexact clean H0。
+- operation commit trailerが存在しない。
+
+Behavior:
+
+- same exact output invocationはmanifest identityを照合し、owned staged bytesとmanifestを安全にcleanupしてpreflightから再開する。cleanup失敗だけを`recovery_required: stage_orphan_cleanup_failed`とする。
+- different／missing output invocationがsupplied outputにmanifestを持たず、repositoryがexact clean H0なら`new_workspace_attempt`として開始できる。別outputを列挙・検索せず、未知のstage-only orphanだけを理由に`recovery_required`を返さない。
+- original output workspaceはauthorityを持たないinert orphanである。same-output reuse時にRuntimeがcleanupする。Mainが手動cleanupする場合は、exact known operation path、valid manifest、stage-only phase、completed target 0、backup 0、operation commit 0を確認した場合だけoperation directoryを削除し、その観測結果をCandidate外evidenceへ記録する。
+- global orphan registry、home scan、repository-wide output scan、custom Git refを作らない。
+
+##### B. `repository_visible_precommit`
+
+repository／indexはH0から変化しているがcommitは存在せず、current bytesがexact immutable inputsから導出したtransaction prefixと一致する状態。
+
+Transaction prefixは次の順だけを許可する。
+
+```text
+decision artifact
+→ requirement.md
+→ design.md
+→ plan.md
+```
+
+- same exact outputとvalid manifestがある場合だけrollback／resumeできる。
+- different／missing outputでmanifestを取得できない場合は`recovery_required: repository_visible_partial_without_workspace`、exit 1、new operation directory作成 0、new repository mutation 0とする。
+- current dirty stateがexact transaction prefixと一致しない場合はrecovery stateと推測せず`blocked: dirty_tree`とする。
+
+##### C. `committed_publication`
+
+exact local H1がoperation trailerとworkspace trailerを持つ状態。
+
+- same output identity、parent H0、tree、operation trailer、workspace trailerが一致する場合だけpush／remote verificationからresumeする。
+- different／missing output identityは`recovery_required: committed_operation_workspace_mismatch`とし、new commit／reset／amend／force pushを行わない。
+- remote divergenceは`blocked_remote_diverged`とする。
+
+##### D. `clean_new_attempt`
+
+supplied outputにmanifestがなく、repository／index／HEADがexact clean H0で、operation commitも存在しない状態。
+
+- new invocationとして開始できる。
+- 他outputの存在を推測またはscanしない。
+
+completed success時はbackupを削除する。completed manifestとexternal result JSONはoperation-local observational evidenceとして保持できるが、readiness authorityにはしない。
 
 ## 5. One Decision, Adoption, and Publication Lifecycle
 
@@ -585,7 +700,21 @@ Candidate or reviewed git target at H0
 ```text
 preflight
   → validate all immutable inputs
-  → bind deterministic recovery workspace
+  → classify recovery state using:
+       supplied output workspace
+       exact repository/index/HEAD
+       exact operation/tree trailers
+  → workspace_only_stage at same output:
+       cleanup owned stage-only workspace
+       restart preflight
+  → clean_new_attempt:
+       bind new workspace attempt
+  → repository_visible_precommit:
+       require exact original workspace
+       rollback or stop recovery_required
+  → committed_publication:
+       require exact original workspace
+       resume publication or stop
   → if operation_kind = adoption:
        stage decision artifact + canonical replacement set outside repository
     else operation_kind = rejection-record:
@@ -603,18 +732,25 @@ preflight
     else rejection-record: blocked
 ```
 
-- `ScopedFileTransaction`を`infra/scoped_file_transaction.py`へ置き、`runbook_store.py`のcurrent stage／backup／restore behaviorを同primitiveへ移してcharacterization testsを維持する。Issue Planningは同primitiveを使用し、private helperをimportせず、同等実装を複製しない。
-- mutation前にCandidate／git identity、Review result、Human decision、operation kind、decision destination、clean branch、upstream、local==remote==expected HEAD、deterministic operation directory safetyをすべて検証する。
+- `ScopedFileTransaction`を`infra/scoped_file_transaction.py`へ置き、`runbook_store.py`のcurrent stage／backup／restore behaviorを同primitiveへ移してcharacterization testsを維持する。Issue Planningは同primitiveを使用し、private helperをimportせず同等実装を複製しない。
+- mutation前にCandidate／git identity、Review result、Human decision、operation kind、decision destination、clean branch、upstream、local／remote／expected HEAD、workspace safetyを検証する。
 - adoptionのallowed diffはnew decision artifactとexact canonical replacement setだけである。
-- rejection-recordのallowed diffはnew decision artifact一件だけであり、`requirement.md`、`design.md`、`plan.md`、`.assurance.json`、他artifactを変更してはならない。
-- stage完了後からcommit成功前までの例外、validation failure、commit failure、process interruptはreverse-order restoreを試み、new decision artifactを除去し、original bytes／mode／index／HEAD／`git status --porcelain=v1`を照合する。成功は`rolled_back`、一点でも不一致なら`recovery_required`で停止する。
-- recovery manifestは§4.6のdeterministic pathにatomic updateする。same-operation invocationだけがsame output identityのmanifestを読み、commitが存在しなければrollbackを完了してclean baselineから再開する。異なるoperationはexisting operation directory／manifestを上書きしない。
-- commit成功後はautomatic rollback、reset、amend、force pushを行わない。push失敗またはresponse lossではlocal H1を保持して`publication_pending`を返す。
-- same-operation retryはoperation trailer、workspace trailer、exact tree、parent H0、manifest identityを照合してpushまたはremote verificationから再開する。
-- retry時にremote==H1ならpush済みとしてremote/tree verificationへ進む。remoteがH0でもlocal H1がexactならpushをretryする。それ以外は`blocked_remote_diverged`とし、Human／Mainへreconcileを返す。
-- adoption verified successだけが`ready`を返す。
-- rejection-record verified successは`blocked`、exit `1`を返し、evidence locator、old H0、new H1、decision digest、fresh Review requiredを示す。
-- success時はbackupを削除する。external result JSONとcompleted recovery manifestは観測Evidenceであり、readiness authorityはReview、Human approval、canonical parity、validation、local／remote commit/treeから再構成する。
+- rejection-recordのallowed diffはnew decision artifact一件だけであり、`requirement.md`、`design.md`、`plan.md`、`.assurance.json`、他artifactを変更しない。
+- external staging完了前またはstage-only完了後のcrashでrepositoryがexact clean H0なら、repository rollbackは不要である。same-output retryはowned stage-only workspaceをcleanupして再開する。
+- stage-only crash後のdifferent-output invocationは、supplied outputにmanifestがなくrepositoryがexact clean H0ならfresh workspace attemptとして開始できる。unknown original outputをscanせず、false `recovery_required`を生成しない。
+- decision artifact追加後からcommit成功前までの例外、validation failure、commit failure、process interruptはreverse-order restoreを試み、new decision artifactを除去し、original bytes／mode／index／HEAD／`git status --porcelain=v1`を照合する。
+- restore成功は`rolled_back: precommit_fault_restored`。
+- restore不一致は`recovery_required: restore_incomplete`。
+- wrong-output retryでrepositoryがexact transaction prefixに一致する場合は`recovery_required: repository_visible_partial_without_workspace`。
+- wrong-output retryでdirty stateがtransaction prefixと一致しない場合は`blocked: dirty_tree`。
+- commit成功後はautomatic rollback、reset、amend、force pushを行わない。
+- push failureまたはresponse lossではlocal H1を保持して`publication_pending: publication_incomplete`を返す。
+- same-operation retryはoperation trailer、workspace trailer、exact tree、parent H0、same output identityを照合する。
+- wrong output identityを持つpost-commit retryは`recovery_required: committed_operation_workspace_mismatch`とする。
+- remoteがH1ならremote verificationへ進む。remoteがH0かつlocal H1がexactならpushをretryする。それ以外は`blocked_remote_diverged: remote_diverged`。
+- adoption verified successだけが`ready: adoption_published`。
+- rejection-record verified successは`blocked: rejection_record_published`。
+- success時はbackupを削除する。external result JSONとcompleted manifestは観測Evidenceであり、readiness authorityはReview、Human approval、canonical parity、validation、local／remote commit/treeから再構成する。
 
 ## 6. Review Transport and Isolation
 
@@ -740,24 +876,45 @@ Issue Candidate contractは§4.2のexact root、mandatory paths、control-file s
 - approved publication後のHuman withdrawal／stop／revertはcurrent shared workflowへrouteし、source-changing evidenceがないrevocation claimをproduct authorityにしない。
 - MainだけがHuman-supplied evidenceを確認して`planning apply`を起動する。CLI／RuntimeはReview verdict、Human decision、approver identity、missing field、modeを生成・推測しない。
 - Runtimeはshared transaction primitiveでfull adoptionまたはdecision-recordを処理し、Main authority下でGit commit／pushを行う。
-- RuntimeはPA-NF-01〜PA-NF-10をexact named statusで独立に拒否またはnon-ready化する。
+- RuntimeはPA-NF-01〜PA-NF-09、PA-NF-10A、PA-NF-10Bの11 fixtureをexact named statusで独立に拒否またはnon-ready化する。
 - Candidate adoption、decision recording、publication、readinessの副作用として`.assurance.json`を変更しない。
 
 ## 11. Security and Failure Handling
 
-| Failure | Result | Recovery |
+| Named observable failure | Public result | Recovery |
 |---|---|---|
-| GitHub access／HEAD mismatch | blocked／stale, backend not started | branch／remoteを修正してnew run |
-| unsafe Prompt／attachment／output path | rejected | safe external pathを選択 |
-| backend missing／timeout／nonzero | blocked, bounded redacted diagnostic | same session recovery／Human Relay under same contract |
-| malformed／partial bundle | failed, no canonical mutation | Semantic revision or rerun |
-| unsafe archive／integrity mismatch | rejected, no final extraction | new complete Candidate |
-| Review mutation detected | invalid Review evidence | restore clean state and fresh Review |
-| valid Human rejection | bounded decision-record transaction。verified remote parity後も`blocked`、canonical三文書mutation 0 | published rejection HEADへsourceをrefreshし、後続approvalはfresh Reviewから開始 |
-| unsupported Human revocation claim | `rejected`、mutation 0 | current shared Human／Main stop-or-revert ownerへroute |
-| replacement／pre-commit validation／commit failure | `rolled_back` or `recovery_required`, no readiness | reverse-order restoreを検証。restore不完全なら自動続行禁止 |
-| push failure／response loss after commit | `publication_pending`, no readiness | same operation identityでcommit/treeを照合しpush／remote verificationからresume |
-| retry時のremote divergence | `blocked_remote_diverged`, no readiness | force push／resetせずHuman／Main reconcile |
+| unknown Issue | `blocked: unknown_issue` | valid Issue IDを選択してnew run |
+| dirty tree before operation | `blocked: dirty_tree` | unrelated workを解消しclean H0からnew run |
+| upstream missing | `blocked: upstream_missing` | upstreamを設定してnew run |
+| remote access unavailable | `blocked: remote_unavailable` | remote accessを復旧してnew run |
+| current branch／upstream branch mismatch | `stale: branch_upstream_mismatch` | intended named branchへsource refresh |
+| local／remote HEAD mismatch | `stale: local_remote_mismatch` | fetch／reconcile後にfresh identity |
+| expected HEAD mismatch | `stale: expected_head_mismatch` | current exact HEADへfresh Review／Human decision |
+| information insufficient | `blocked: information_insufficient` | bounded missing contextを補いnew run |
+| unsafe Prompt／attachment／output path | `rejected: unsafe_path` | safe external pathを選択 |
+| prohibited secret-like content | `rejected: prohibited_content` | prohibited contentを除去。backend call 0 |
+| backend missing | `blocked: backend_unavailable` | backendを利用可能にしてsame contractでnew run |
+| backend timeout | `blocked: backend_timeout` | bounded diagnostic後にnew run |
+| backend nonzero | `blocked: backend_nonzero` | bounded redacted diagnosticに従いnew run |
+| malformed／partial Planner response | `rejected: malformed_planner_response` | Semantic rerun／revision。final Candidate 0 |
+| unexpected response file | `rejected: unexpected_response_file` | closed three-file responseでrerun |
+| non-UTF-8 response | `rejected: non_utf8_response` | valid UTF-8 responseでrerun |
+| authority claim in Planner response | `rejected: planner_authority_claim` | authority claimを含まないfresh response |
+| unsafe archive／integrity mismatch | `rejected: archive_rejected` | new complete Candidate |
+| Review mutation detected | `rejected: review_mutation_detected` | clean stateへ戻しfresh Review |
+| Human approved against Review fail | `blocked: review_failed_for_approval` | findings反映後にfresh Review |
+| valid Human rejection | decision-record transaction後`blocked: rejection_record_published` | published H1へsource refreshし、後続approvalはfresh Review |
+| unsupported Human revocation claim | `rejected: unsupported_revocation` | shared Human／Main stop-or-revert ownerへroute |
+| stage-only same-output cleanup failure | `recovery_required: stage_orphan_cleanup_failed` | exact original outputでbounded cleanup |
+| repository-visible precommit state + original workspace unavailable | `recovery_required: repository_visible_partial_without_workspace` | exact original outputを再指定 |
+| unrelated dirty state during retry | `blocked: dirty_tree` | unrelated workを解消 |
+| pre-commit fault + exact restore | `rolled_back: precommit_fault_restored` | clean H0からsame or new run |
+| restore incomplete | `recovery_required: restore_incomplete` | automatic continuation禁止 |
+| push failure／response loss after H1 | `publication_pending: publication_incomplete` | same operation／workspaceでresume |
+| wrong workspace for committed operation | `recovery_required: committed_operation_workspace_mismatch` | exact original outputを再指定 |
+| retry remote divergence | `blocked_remote_diverged: remote_diverged` | force／resetせずHuman／Main reconcile |
+
+Classification orderはCLI／path → target／Git → prohibited content → backend → Planner response → Review／Human apply evidence → recovery state → transaction／publicationとする。同じnamed fixtureに複数statusを許可しない。
 
 Sensitive diagnostics are bounded and redacted. Direct argv is default. Shell exception is unavailable without explicit Human-approved Design and rollback evidence.
 
