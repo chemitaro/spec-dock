@@ -86,6 +86,10 @@ S06 --> S07
 
 S02のGit／backend adapterとS03のCandidate domain部分はS01後に並列実装可能だが、S03 integrationはS02完了後に行う。
 
+## 実装ステップ
+
+S01〜S07を一つずつ実行する。各stepの開始前にChatGPT Proでcurrent HEADと該当sourceを確認し、exact allowed paths、テストケース、実装順、停止条件、サブエージェントへの指示をIssue `artifacts/`へ保存する。このstep execution artifactは本計画の範囲を拡張せず、各stepの`Work`、`Tests`、`Exit`を具体化する実行入力として扱う。Mainはartifactをsourceと照合してからbounded workerへ渡し、結果を`report.md`へ記録する。
+
 ## 5. S01 — CLI Skeleton and Domain Contracts
 
 ### Goal
