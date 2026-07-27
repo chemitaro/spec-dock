@@ -198,7 +198,8 @@ fresh read-only Reviewと、明示requestに基づく二つのrevision laneを�
 - Reviewer repository mutationを検出して失敗。
 - Review result schema、P0／P1 verdict rule。
 - Semantic complete replacement、Mechanical unique-match replacement。
-- undeclared finding、wrong Candidate、old text 0件／複数match、diff budget超過、scope expansionでnew ZIP 0。
+- P2／P3-only ReviewではCandidate不変、revision backend call 0。
+- undeclared finding、P2／P3 finding trigger、wrong Candidate、old text 0件／複数match、diff budget超過、scope expansionでnew ZIP 0。
 - old Candidate不変、new version／Candidate ID／ZIP SHA。
 
 ### Exit
@@ -297,7 +298,7 @@ Humanが次を明示承認する。
 1. eligible targetとpreflightを確認する。
 2. `planning create`を実行する。
 3. fresh defect-only `review planning`を実行する。
-4. findingがあれば必要最小限のrevisionを一回ずつ行い、new Candidateをfresh reviewする。
+4. P0／P1 findingがあれば必要最小限のrevisionを一回ずつ行い、new Candidateをfresh reviewする。P2／P3だけの場合はCandidateを変更しない。
 5. exact identityへHuman decisionを取得する。
 6. `planning apply`を実行し`ready`とremote parityを確認する。
 7. intervention count、handoff量、wall-clock、failure modeをreportへ記録する。

@@ -207,13 +207,13 @@ PlanningReviewResult
 - verdict = pass | fail
 - findings[]
   - id
-  - severity = p0 | p1 | p2
+  - severity = p0 | p1 | p2 | p3
   - exact_location
   - violated_requirement_or_contradiction
   - concrete_impact
 ```
 
-PASS条件はP0／P1が0件であること。P2はnon-blocking observationであり、改善提案をP1へ昇格しない。Reviewerはreplacement、patch、Candidate ZIPを返さない。
+PASS条件はP0／P1が0件であること。P2／P3はnon-blocking observationであり、Candidate revisionを起動しない。改善提案をP1へ昇格しない。Reviewerはreplacement、patch、Candidate ZIPを返さない。
 
 ## 6. Revision Design
 
@@ -231,7 +231,7 @@ preserve_assumptions[]
 Semantic fields:
 
 ```text
-finding_ids[]
+finding_ids[] = P0／P1 only
 review_result_sha256
 ```
 
@@ -245,7 +245,7 @@ meaning_invariant
 diff_budget
 ```
 
-Semantic laneはprior Candidateとformal findingsを同じBlue Team conversationへ渡し、complete三文書responseを要求する。Mechanical laneはRuntimeがexact old textの一意match、target allowlist、new text、meaning invariant、diff budgetを検証して限定置換する。0件match、複数match、budget超過は拒否し、Semantic laneへ切り替えない。
+Semantic laneはprior Candidateとformal P0／P1 findingsを同じBlue Team conversationへ渡し、complete三文書responseを要求する。Mechanical laneはRuntimeがexact old textの一意match、target allowlist、new text、meaning invariant、diff budgetを検証して限定置換する。P2／P3-only request、0件match、複数match、budget超過は拒否し、Semantic laneへ切り替えない。
 
 いずれも共通packaging pathへ渡し、新identityを生成する。partial patchのままReviewへ渡さない。
 
