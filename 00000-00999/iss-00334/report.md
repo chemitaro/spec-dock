@@ -61,6 +61,7 @@ correction snapshot `ec801c374038e7e5ad4f31b3919440aa9b79eeaa`への別fresh clo
 | EAL-20260727-REBASELINE | partially_adopted | Human direction、approved parent scope、current repository facts | canonical Requirement／Design／Plan rebaseline | prior Blue／Red evidenceから製品境界と実害のある4点だけを採用し、追加schema、proof matrix、closure graph、再設計提案は採用しなかった | current三文書; D-20260727-RB010; Initiative defect-only review charter | validate、assurance再束縛、commit／push後にdefect-only fresh review |
 | EAL-20260727-DEFECT-REVIEW | adopted | fresh ChatGPT Pro defect-only review | snapshot `a0d1b4dedf68f1957a01d1fd48cd2e3a1be64b03` | exact HEAD／three targetsへbindし、親Epicとの直接矛盾1件だけを報告したため正式review evidenceとして採用 | `artifacts/20260727t070247z-chatgpt-defect-only-review-fail.json`; SHA-256 `052fa9ea2533c301a28037cc98f7dee7cc2654429bf627e642fd4387519f0740` | P1-01 correctionをcommit／pushしclosure review |
 | EAL-20260727-CLOSURE-PASS | adopted | fresh ChatGPT Pro correction reviewer | snapshot `ec801c374038e7e5ad4f31b3919440aa9b79eeaa` | P1-01 closureとdirect regressionだけを確認しP0=0、P1=0、PASSを返した | `artifacts/20260727t070853z-chatgpt-defect-only-closure-review-pass.json`; SHA-256 `1ae92cc537a06cee0be7e21a5f6eeb944a9bf735d8fbc250bfbbdc559651bd97` | Spec Authoring GateをPASSとして実装開始判断へhandoff |
+| EAL-20260728-S01-PACKET | adopted | ChatGPT Pro with GitHub connector | S01 bounded implementation input | remote branchとexact HEAD `b1ee8d091deba166b805145e7367190de6a14578`を確認し、approved S01を拡張せずallowed paths、Red-first tests、実装順、停止条件、dev-coder指示へ具体化した | `artifacts/20260727t150723z-s01-chatgpt-implementation-work-packet.md`; Oracle session `iss00334-s01-implementa-brief` | bounded dev-coderへ渡し、observed evidenceをreportへ記録する |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -85,6 +86,7 @@ correction snapshot `ec801c374038e7e5ad4f31b3919440aa9b79eeaa`への別fresh clo
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Codex Main | iss-00334 planning rebaseline | `artifacts/20260727t070853z-chatgpt-defect-only-closure-review-pass.json` | `requirement.md`; `design.md`; `plan.md`; parent Epic; prior Evidence Adoption Ledger | `requirement.md`; `design.md`; `plan.md` | adopted | `requirement.md`; `design.md`; `plan.md`; `.assurance.json`; `report.md` | `git diff --check`、`spec-dock validate`、assurance verify successful | manual authoring integration | review-derived overgrowth | none | passed | execute approved plan |
+| ChatGPT Pro | iss-00334 / S01 | `artifacts/20260727t150723z-s01-chatgpt-implementation-work-packet.md` | current GitHub branch at `b1ee8d091deba166b805145e7367190de6a14578`; canonical Requirement／Design／Plan; S01 runtime surfaces | S01 dev-coder handoff | adopted | S01 execution input | Issue artifact direct childのみ追加、canonical／implementation path変更0 | exact allowed paths、tests、sequence、stop conditionsを採用 | S02以降の実装、再設計提案 | none | review not required by Human instruction | execute S01 |
 
 ## グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 
@@ -151,7 +153,7 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 必須検証（required verification） | 停止条件（stop conditions） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | delegated after planning pass | shipped CLI contractとtestsのbounded implementation | dev-coder | `plan.md` S01のplanned surfacesのみ。exact filenamesはrepository inspectionで確定 | canonical `requirement.md`、`design.md`、`plan.md` | S01 Red／Green command、focused code review、diff allowlist | spec-reviewer fail、scope escape、test failure、new requirement gap | planning gate passed。Human implementation-start decision待ち |
+| S01 | delegated | shipped CLI contractとtestsのbounded implementation | dev-coder | `plan.md` S01と`artifacts/20260727t150723z-s01-chatgpt-implementation-work-packet.md`のexact allowed paths | canonical `requirement.md`、`design.md`、`plan.md`、S01 work packet | S01 Red／Green command、focused code review、diff allowlist | scope escape、test failure、new requirement gap、S02以降の実装が必要 | execution guidance ready、Human implementation-start指示あり、ChatGPT具体化済み。dev-coderへ委任する |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 
