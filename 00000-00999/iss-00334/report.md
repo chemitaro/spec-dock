@@ -86,7 +86,8 @@ correction snapshot `ec801c374038e7e5ad4f31b3919440aa9b79eeaa`への別fresh clo
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Codex Main | iss-00334 planning rebaseline | `artifacts/20260727t070853z-chatgpt-defect-only-closure-review-pass.json` | `requirement.md`; `design.md`; `plan.md`; parent Epic; prior Evidence Adoption Ledger | `requirement.md`; `design.md`; `plan.md` | adopted | `requirement.md`; `design.md`; `plan.md`; `.assurance.json`; `report.md` | `git diff --check`、`spec-dock validate`、assurance verify successful | manual authoring integration | review-derived overgrowth | none | passed | execute approved plan |
-| ChatGPT Pro | iss-00334 / S01 | `artifacts/20260727t150723z-s01-chatgpt-implementation-work-packet.md` | current GitHub branch at `b1ee8d091deba166b805145e7367190de6a14578`; canonical Requirement／Design／Plan; S01 runtime surfaces | S01 dev-coder handoff | adopted | S01 execution input | Issue artifact direct childのみ追加、canonical／implementation path変更0 | exact allowed paths、tests、sequence、stop conditionsを採用 | S02以降の実装、再設計提案 | none | review not required by Human instruction | execute S01 |
+
+S01 ChatGPT work packetはcanonical authoring draftではなく、Human指示に基づくreview不要のstep execution inputである。したがってDelegated Draft Evidenceへは分類せず、`EAL-20260728-S01-PACKET`とImplementation Delegation Gateで追跡する。
 
 ## グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 
@@ -105,6 +106,8 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 | rebaseline correction | defect-only closure review | fresh ChatGPT Pro reviewer | current for `a0d1b4dedf68f1957a01d1fd48cd2e3a1be64b03`; stale after correction | failed | no | correction HEAD must close P1-01 without direct regression | `artifacts/20260727t070247z-chatgpt-defect-only-review-fail.json`。P0=0、P1=1 |
 | correction closure | defect-only closure review | fresh ChatGPT Pro reviewer | current for `ec801c374038e7e5ad4f31b3919440aa9b79eeaa` | passed | no | Spec Authoring Gate PASS。new material spec changeで失効 | `artifacts/20260727t070853z-chatgpt-defect-only-closure-review-pass.json`。P0=0、P1=0、P1-01 closed |
 | execution readiness | canonical spec gate | spec-reviewer | fresh | passed | no | execute approved plan | ChatGPT Pro closure PASSをspec-reviewer evidenceとして採用。plan marker追加はstep concrete artifact contractの明記だけでscope／behavior変更なし |
+| S01 | per-step code review | code-reviewer | fresh for pre-fix uncommitted S01 diff | failed | no | 3 P1をbounded dev-coder follow-upで修正しfresh re-review | git-bound target／Semantic revision／Human decisionのexact identity・raw Review bindingを迂回可能 |
+| S01 | per-step code re-review | code-reviewer | fresh for post-fix uncommitted S01 diff | passed | no | S01 commit候補へ進む | 3 P1 closed、archive／git-bound positive path、Review parsing、CLI surface、allowlistに直接回帰なし |
 
 ## Assurance記録
 
@@ -153,7 +156,7 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 必須検証（required verification） | 停止条件（stop conditions） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | delegated | shipped CLI contractとtestsのbounded implementation | dev-coder | `plan.md` S01と`artifacts/20260727t150723z-s01-chatgpt-implementation-work-packet.md`のexact allowed paths | canonical `requirement.md`、`design.md`、`plan.md`、S01 work packet | S01 Red／Green command、focused code review、diff allowlist | scope escape、test failure、new requirement gap、S02以降の実装が必要 | execution guidance ready、Human implementation-start指示あり、ChatGPT具体化済み。dev-coderへ委任する |
+| S01 | delegated | shipped CLI contractとtestsのbounded implementation | dev-coder | `plan.md` S01と`artifacts/20260727t150723z-s01-chatgpt-implementation-work-packet.md`のexact allowed paths | canonical `requirement.md`、`design.md`、`plan.md`、S01 work packet | S01 Red／Green command、focused code review、diff allowlist | scope escape、test failure、new requirement gap、S02以降の実装が必要 | initial implementation 109 tests Green。fresh reviewの3 P1を同workerがbounded修正し、116 tests Green、fresh re-review pass、allowlist escape 0 |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 
@@ -265,6 +268,36 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 | コマンド | 観測結果 |
 |---|---|
 | fresh `chatgpt-use` Red session `iss00334-fresh-red-planning-review-2` | FAIL。P0=0、P1=3、P2=1、S01 blocked。Pro selector `verified=yes`、repository mutation 0 |
+
+### セッションログ（2026-07-28 — S01 CLI Skeleton and Domain Contracts）
+
+#### 実行入力と委任
+
+- ChatGPT Pro session `iss00334-s01-implementa-brief`はGitHub connectorでbranch `iss-00334-implement-chatgpt-issue-planning-workflow`、source HEAD `b1ee8d091deba166b805145e7367190de6a14578`を確認した。
+- 具体化結果を`artifacts/20260727t150723z-s01-chatgpt-implementation-work-packet.md`へ保存し、canonical scopeを拡張しないS01 execution inputとして採用した。Human指示に従いartifact自体のreviewは行わない。
+- artifact／report-only commit `20b45946`をpush後、product source treeがChatGPT確認時点と同一であることを確認し、`dev-coder`へS01 exact allowlistを委任した。
+
+#### Red / Green / verification evidence
+
+| 種別 | コマンド / evidence | 観測結果 |
+|---|---|---|
+| Red | `test_result_rejects_invalid_success_pair` | `ready/candidate_created`を拒否しないcontract欠落により`DID NOT RAISE ValueError`、exit 1 |
+| Focused tests | `uv run pytest -q tests/unit/domain/test_issue_planning_contracts.py tests/unit/application/test_issue_planning.py tests/unit/commands/test_issue_planning.py tests/unit/presentation/test_issue_planning.py tests/cli_runtime/test_chatgpt_cli.py tests/cli_runtime/test_runtime_shell_s11.py` | post-fix 116 passed、failed 0、skipped 0 |
+| Help smoke | `spec-dock-chatgpt --help`; `planning create --help`; `review planning --help` | 3 commandsともexit 0。公開groupは`planning`／`review`のみ |
+| Static | S01 allowed sources／testsへの`ruff check` | All checks passed |
+| Type | changed runtime 8 modulesへの`mypy` | Success: no issues found |
+| Canonical validation | `./spec-dock/scripts/spec-dock validate` | pass、nodes=222 |
+| Diff guard | `git status --short`; `git diff --check` | 14 changed entriesはS01 allowlist内、escape 0、diff check pass |
+
+#### Closure state
+
+- `S01-CLI-001`〜`S01-CLI-010`、`S01-RES-001`〜`S01-RES-005`、`S01-CTX-001`〜`S01-CTX-002`、`S01-ID-001`〜`S01-ID-004`、`S01-JSON-001`〜`S01-JSON-003`、`S01-REVIEW-001`〜`S01-REVIEW-003`、`S01-REV-001`〜`S01-REV-005`、`S01-HUM-001`〜`S01-HUM-004`、`S01-RESULT-001`〜`S01-RESULT-004`、`S01-REG-001`のimplementation／test evidenceを取得した。
+- production use casesはfail closedで未設定とし、fake use case以外からsuccess reasonを返さない。
+- discovered characterizationとして、Issue形式IDを持つnon-Issue `StoredMetaRecord`もresolverが拒否することを確認した。
+- fresh S01 `code-reviewer`は3件のP1を報告した。別Issueのgit-bound path tuple、raw Review bytesとSemantic revision object、raw Review bytes内identityとHuman decision identityの不一致が受理されるため、同じ`dev-coder`へnegative testsと最小修正を再委任する。
+- bounded follow-upは4件のcontract Redを追加し、resolver-derived exact tuple、strict-parsed Review object、Human decision identity/digest bindingを閉じた。post-fix focused/Core laneは116 passed。
+- fresh code re-reviewはfindings 0、`review_status: pass`。commit候補とpost-commit clean checkが未完了であるため、次stepは開始しない。
+- No material implementation decisions beyond the approved plan.
 | `chatgpt-use --followup iss00334-blue-planning-correction-r5` | same Blue conversationでauthoring継続。GitHub exact HEAD確認、replacement-ready blocks取得。follow-up selector evidenceは`resolved=(unavailable); verified=no` |
 | `./spec-dock/scripts/spec-dock validate` | pass。222 nodesを検証 |
 | `git diff --check` | pass |
@@ -284,7 +317,7 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 |---|---|---|---|---|---|
 | second canonical correction snapshot | committed and published; fresh review failed | Requirement、Design、Plan、Assurance、Report、prior Red／Blue artifacts | `3fc0e61ef8425abc0b4a5488d51e7060b0ed03cc` | remote branch HEADとexact identicalをGitHub connectorで確認 | P1-17〜P1-19／P2-05 bounded correctionへ進む |
 | third bounded correction | authoring complete; commit pending | Requirement、Design、Plan、Report、new Red artifact、Assurance rebinding | pending — Main must record actual resulting full HEAD | integration後にvalidate、diff-check、assurance verify、clean checkを実行 | one immutable commitをpushし、actual resulting 40-character HEADで別fresh Red review |
-| S01 | not started | `plan.md` S01 exact scope | none | 製品実装差分なし | P0=0／P1=0のfresh planning reviewとsame-identity Human authorization後だけ委任 |
+| S01 | commit candidate | S01 allowed code／tests、mechanical artifact whitespace fix、report evidence | fresh code-reviewer pass | implementation Green、3 P1 closed、116 tests pass、uncommitted | focused commit、push、post-commit clean checkでS01をclose |
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
