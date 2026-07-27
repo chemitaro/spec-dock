@@ -125,24 +125,54 @@ Git-bound pathではexact reviewed HEAD／target pathsへHuman decisionをbind�
 ### REQ-012 Planning Publication
 Mainは`planning apply`を明示的に起動し、RuntimeにPlanning専用commitを作成・pushさせ、local publication HEAD、remote branch HEAD、commit treeが一致することを確認する。commit前の失敗はrollbackする。commit成功後のpush失敗はlocal commitを破棄・rewriteせず`publication_pending`を返し、same operation identityでだけretryできる。remote divergenceまたはoperation identity不一致は`blocked_remote_diverged`とし、force push、automatic reset、別Candidateへのfallbackを行わない。publication failureではreadinessを導出しない。
 
-### REQ-013 Derived Readiness
-RuntimeはReview、Human decision、mode-specific parity、validation、publicationの論理積を評価し、全条件成立時だけ`ready`を返す。非成立時のstable statusは`blocked`、`stale`、`rejected`、`rolled_back`、`publication_pending`、`blocked_remote_diverged`、`recovery_required`のいずれかとし、CLI exit codeは`ready=0`、それ以外=`1`とする。operation-local staging／recovery manifestとexternal result JSONは許可するが、専用state database、receipt registry、custom Git refを新設しない。
+### REQ-013 Derived Readiness and Deterministic Public Status
+
+RuntimeはReview、Human decision、mode-specific parity、validation、publicationの論理積を評価し、approved adoptionの全条件成立時だけ`ready`を返す。
+
+Public resultはtext／JSONで同一の`status`と`reason`を持つ。
+
+- `status`の許可値は`ready`、`blocked`、`stale`、`rejected`、`rolled_back`、`publication_pending`、`blocked_remote_diverged`、`recovery_required`だけである。
+- `ready`だけexit `0`、それ以外はexit `1`である。
+- `reason`はDesignで定義するclosed snake-case reason codeであり、同じnamed observable conditionは常に同じ`status`／`reason`へ写像する。
+- named acceptance fixtureは一つのexact expected statusを持ち、`A|B`、`A or B`、generic nonzero、generic failureを期待値にしない。
+- 一つのinvocationに複数の不成立条件がある場合はDesignのordered classificationで最初に成立した条件だけをpublic resultへ使用する。
+
+Stable status classes:
+
+| Observable class | Required status |
+|---|---|
+| malformed／contradictory CLI、unsafe path、prohibited content、malformed Planner／Review／Human data、schema／identity／digest mismatch、Review mutation、unsafe archive | `rejected` |
+| unknown Issue、dirty tree、upstream欠落またはremote access unavailable、required Review／Human source欠落、backend missing／timeout／nonzero、Review `fail` + Human `approved`、verified rejected-decision publication | `blocked` |
+| local／remote HEAD不一致、expected HEAD不一致、branch／upstream source identity不一致、Candidate／reviewed target drift、published rejection後のold H0-bound evidence | `stale` |
+| repository mutation開始後のpre-commit faultでexact baseline restoreに成功 | `rolled_back` |
+| restore不一致、same-output manifest不整合、またはrepository-visible partial operationに必要なoriginal recovery workspaceを安全に取得できない | `recovery_required` |
+| exact local H1 commitが存在するがpush／response／remote verificationが未完了 | `publication_pending` |
+| retry時のremote／tree／operation identity divergence | `blocked_remote_diverged` |
+| approved adoptionのReview／Human／parity／validation／remote publicationが全成立 | `ready` |
+
+外部workspaceだけへstageした後、repository／index／HEADがexact clean H0のままcrashした状態はrepository-visible partial operationではない。別output invocationからそのorphan workspaceを発見できない場合、それだけを理由に`recovery_required`を返してはならない。RuntimeはDesignのstage-only orphan contractに従い、global registry、home scan、repository-wide workspace scan、custom Git refを新設しない。
+
+operation-local staging／recovery manifestとexternal result JSONは許可するが、専用state database、receipt registry、authority registryを新設しない。
 
 ### REQ-014 Negative Adoption Fixtures
-以下を独立fixtureとして拒否し、どれか一件でも成立する場合はExecutor startを禁止する。
 
-| ID | Rejected condition |
-|---|---|
-| PA-NF-01 | archive Review resultだけ |
-| PA-NF-02 | git-bound Review resultだけ |
-| PA-NF-03 | Human Gateだけ |
-| PA-NF-04 | parityだけ |
-| PA-NF-05 | wrong logical Candidate filenameまたはZIP SHA |
-| PA-NF-06 | wrong reviewed HEADまたはtarget paths |
-| PA-NF-07 | source drift後のstale identity |
-| PA-NF-08 | adoption中のsemantic mutation |
-| PA-NF-09 | parity failure |
-| PA-NF-10 | validationまたはPlanning publication failure |
+以下を11件の独立named fixtureとして評価する。各fixtureは一つのexact status、exit `1`、readinessなし、下表で許可されたmutation contractだけを持つ。
+
+| ID | Named rejected／non-ready condition | Exact status | Required mutation result |
+|---|---|---|---|
+| PA-NF-01 | valid archive Review resultだけ。Human source absent | `blocked` | repository mutation 0 |
+| PA-NF-02 | valid git-bound Review resultだけ。Human source absent | `blocked` | repository mutation 0 |
+| PA-NF-03 | Human approved sourceだけ。Review-result source absent | `blocked` | repository mutation 0 |
+| PA-NF-04 | parityだけ。Review／Human sources absent | `blocked` | repository mutation 0 |
+| PA-NF-05 | wrong logical Candidate filenameまたはZIP SHA | `rejected` | repository mutation 0 |
+| PA-NF-06 | wrong reviewed HEAD、target paths、Issueまたはgit base | `rejected` | repository mutation 0 |
+| PA-NF-07 | validated identity後のsource／Candidate／target drift | `stale` | repository mutation 0 |
+| PA-NF-08 | adoption中のsemantic mutationをpre-commitで検出しexact restore成功 | `rolled_back` | baseline exact restore、commit 0 |
+| PA-NF-09 | pre-commit parity failureでexact restore成功 | `rolled_back` | baseline exact restore、commit 0 |
+| PA-NF-10A | pre-commit validation failureでexact restore成功 | `rolled_back` | baseline exact restore、commit 0 |
+| PA-NF-10B | exact H1 commit作成後のpush failureまたはresponse loss | `publication_pending` | local H1保持、automatic reset／amend／force push 0 |
+
+PA-NF-08、PA-NF-09、PA-NF-10Aでrestore自体が失敗するfixtureはPA-NFのstatusを変更せず、EC-006／EC-007の独立`recovery_required` fixtureとして扱う。PA-NF-10AとPA-NF-10Bを一つの代表fixtureまたは一つのgeneric failure countでcloseしない。
 
 ### REQ-015 Workbench and Durable Evidence
 
@@ -189,7 +219,7 @@ representative Planning／Review runごとにplanned／unplanned Human intervent
 ## 6. Acceptance Criteria
 
 ### AC-001 Official Entry and Complete Output
-Humanがofficial Skillを起動すると、Skillがrepo-local `spec-dock-chatgpt planning create`へ到達する。Plannerがcomplete三文書を返した場合、commandはmandatory controlsを含むimmutable Issue Candidate ZIPとexternal SHA-256を返し、そのZIPを変更・再packagingせず`review planning --mode archive-candidate`のinputにできる。情報不足時はfinal ZIPを作らず明示的`information_insufficient`を返す。
+Humanがofficial Skillを起動すると、Skillがrepo-local `spec-dock-chatgpt planning create`へ到達する。Plannerがcomplete三文書を返した場合、commandはmandatory controlsを含むimmutable Issue Candidate ZIPとexternal SHA-256を返し、そのZIPを変更・再packagingせず`review planning --mode archive-candidate`のinputにできる。情報不足時はfinal ZIPを作らず、`status=blocked`、`reason=information_insufficient`、exit `1`を返す。
 
 ### AC-002 Command Family
 `spec-dock-chatgpt --help`と各subcommand helpが`planning create`、`planning revise`、`review planning`、`planning apply`を示し、Core `spec-dock` lifecycle commandと混在しない。`planning apply --help`はHuman decision、review identity、mode identity、source HEAD、decision artifact、output directoryを必須契約として示す。
@@ -217,7 +247,9 @@ git-bound fixtureを`planning apply`へ与え、future fresh Review result、exa
 
 ### AC-010 Adoption Negative Set
 
-PA-NF-01〜PA-NF-10を各独立named fixtureとして実行し、各fixtureがDesign／Planで固定された一つのexact stable status、exit `1`、readinessなし、許可されたmutation contractだけを返すことを確認する。genericな「reject」または複数statusの許容を代替証拠にせず、10／10でexpected status一致、violations 0を得る。
+PA-NF-01〜PA-NF-09、PA-NF-10A、PA-NF-10Bを各独立named fixtureとして実行し、11／11でRequirement表のexact status、exit `1`、readinessなし、許可されたmutation contractと一致し、violations 0を得る。
+
+genericな「reject」、generic nonzero、複数statusの許容、PA-NF-10A／10Bの一括closeを代替証拠にしない。
 
 ### AC-011 Security
 secret/path/shell metacharacter fixturesがPrompt、diagnostic、Candidate、Review outputへ漏れず、backendはdirect argvで起動される。
@@ -244,7 +276,7 @@ Review identityはcurrent repository／branch／HEADと直接関係するsource 
 
 | ID | Observable failure | Required result |
 |---|---|---|
-| EC-001 | unknown Issue、dirty tree、upstream欠落、local／remote／expected HEAD不一致 | backend／repository mutation前に`blocked`または`stale` |
+| EC-001 | target／Git preflight不成立 | unknown Issueは`blocked: unknown_issue`。dirty treeは`blocked: dirty_tree`。upstream欠落は`blocked: upstream_missing`。remote access unavailableは`blocked: remote_unavailable`。current branch／upstream branch identity不一致は`stale: branch_upstream_mismatch`。local／remote HEAD不一致は`stale: local_remote_mismatch`。expected HEAD不一致は`stale: expected_head_mismatch`。すべてbackend／repository mutation前、exit `1` |
 | EC-002 | Planner response不完全、unexpected file、non-UTF-8、authority claim、secret-like payload | final Candidateなしで`rejected` |
 | EC-003 | Review mode／identity不一致、Review mutation、silent fallback要求 | Review evidenceをinvalid化して`rejected` |
 | EC-004 | REQ-022のarchive safety classまたはinclusive ceiling違反 | extraction／Review／adoption outputなしで`rejected` |
