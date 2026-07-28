@@ -32,7 +32,7 @@ Workbench は一時的、worktree-local、破棄可能、non-canonical であり
 3. root と3種類の node の README は byte-identical である。
 4. 各 `.workbench/README.md` は Git tracking 対象になり、同じ `.workbench/` 内のその他の entry は深さや形式によらず ignore される。
 5. tracked README は通常の Git checkout により別 worktree へ現れる。
-6. ignored な作業ファイルは checkout だけでは別 worktree へ移らず、必要な場合だけ明示的な `workbench copy` で移せる。
+6. ignored な作業ファイルは checkout だけでは別 worktree へ移らない。Initiative / Epic / Issue の node-scoped Workbench だけは、必要な場合に明示的な `workbench copy` で移せる。root Workbench は同 helper の対象外である。
 7. source tree、wheel、sdist、installed package resources のすべてに4つの Workbench README asset が収録される。
 8. shipped docs が Workbench shell、Git 境界、manual copy、evidence-only authority を一貫して説明する。
 
@@ -166,11 +166,12 @@ Workbench は一時的、worktree-local、破棄可能、non-canonical であり
 - 前提: README が commit され、source worktree に ignored な作業ファイルがある。
 - 操作:
   1. Git linked worktree を作成する。
-  2. 必要な場合だけ `workbench copy` を実行する。
+  2. Initiative / Epic / Issue の対応する node scope で、必要な場合だけ `workbench copy` を実行する。
 - 期待結果:
   - README は通常 checkout で新 worktree へ現れる。
-  - ignored な作業ファイルは checkout だけでは現れない。
-  - 明示 copy 後にだけ ignored な作業ファイルが移る。
+  - node-scoped ignored な作業ファイルは checkout だけでは現れず、明示 copy 後にだけ移る。
+  - root の ignored payload は `workbench copy` の対象外である。
+  - CLI は root selector / root copy route を引き続き拒否する。
   - automatic sync または copy-back は発生しない。
 
 ### SC-344-005 Semantic opacity
@@ -208,6 +209,7 @@ Workbench は一時的、worktree-local、破棄可能、non-canonical であり
 - arbitrary-file source validation、publication、naming、privacy。
 - existing root / node の migration または backfill command。
 - Workbench automatic copy、watch、sync、copy-back。
+- root selector、root bulk copy、root path-selection route の追加。
 - Workbench content classifier、retention、expiration、cleanup。
 - Workbench を canonical source にする変更。
 - candidate wheel を使った full end-to-end product verification。
@@ -252,10 +254,10 @@ root と各 node kind の README は byte-identical とし、少なくとも次�
 2. Git tracking を意図する Workbench file は `README.md` だけである。
 3. その他の Workbench file は Git に ignore される。
 4. 保存価値のある file は、repository root から repo-local runtime の `./spec-dock/scripts/spec-dock artifact import file ...` を実行し、対象 scope の `artifacts/` へ明示 import する。
-5. Workbench file は自動 copy / sync されず、必要な場合だけ manual `workbench copy` を使う。
+5. Workbench file は自動 copy / sync されない。`workbench copy` は Initiative / Epic / Issue の対応する node-scoped Workbench で ignored payload を明示的に移す optional helper であり、root Workbench は対象外である。
 6. Git ignore は security boundary ではなく、禁止された secret を保存してはならない。
 7. file の明示指定または import は read / import authorization に限られ、import 結果は evidence-only である。canonical adoption には別の reviewed workflow が必要である。
-8. tracked README は通常の Git checkout で別 worktree へ現れ、manual copy が必要なのは ignored な作業ファイルである。
+8. tracked README は root / node とも通常の Git checkout で別 worktree へ現れる。node-scoped ignored payload は必要時に manual `workbench copy` で移し、root の ignored payload は同 helper では移らない。root で durable に残す一 file は generic Artifact import を使う。
 9. 人間、model、tool は README を含む Workbench content を canonical input として扱ってはならない。
 
 ### I344-RQ-004 README-only tracking
@@ -288,7 +290,9 @@ Workbench subtree は default semantic discovery から除外され続けなけ�
 tracked README は通常の Git checkout で他 worktree へ materialize されなければならない。
 
 - linked worktree 作成だけで ignored work file を移行してはならない。
-- manual `workbench copy` は ignored work file を必要時に移すための明示的 one-shot operation とする。
+- manual `workbench copy` は Initiative / Epic / Issue の対応する node-scoped ignored work file を必要時に移すための明示的 one-shot operation とする。
+- root `.workbench/` は同 command の対象外とし、root selector、root bulk copy、root path-selection route を追加してはならない。
+- root の ignored payload は `workbench copy` では移らない。durable に残す一 file は generic Artifact import の root destination を利用する。
 - automatic hook、watch、sync、copy-back を追加してはならない。
 - existing `workbench copy` の ignored content に対する公開挙動を壊してはならない。
 - Git checkout された byte-identical な generated README 同士では、manual copy 後も README content に差分が生じてはならない。
@@ -331,8 +335,9 @@ generic import の実装は `iss-00345` の責務であることも明記する�
 | `AC-344-004` | `I344-RQ-004` | top-level README だけが trackable で、nested / case variant / other payload は ignore される |
 | `AC-344-005` | `I344-RQ-005` | update と既存操作は existing root / Initiative / Epic / Issue に README を生成せず、existing `.workbench/` の entry、bytes、names、mtime を変更しない。新規 child 作成は child だけに README を生成し、existing ancestor / sibling の README 状態と Workbench 状態を変更しない。managed templates、docs、runtime、`.gitignore` の正規 update は許可される |
 | `AC-344-006` | `I344-RQ-006` | README、fake metadata、ADR-like file、binary、invalid UTF-8 が semantic discovery と validation 結果を変えない |
-| `AC-344-007A` | `I344-RQ-007` | linked worktree には README が checkout され、ignored file は manual copy 後にだけ現れる。byte-identical な generated README 同士では copy 後も content diff がない |
-| `AC-344-007B` | `I344-RQ-007`, `I344-RQ-009` | source / target README が異なる場合も README 専用 filter を追加せず、既存 opaque whole-tree source-wins behavior が維持される |
+| `AC-344-007A` | `I344-RQ-007` | linked worktree には root / node README が checkout され、node-scoped ignored file は manual copy 後にだけ現れる。byte-identical な generated README 同士では copy 後も content diff がない |
+| `AC-344-007B` | `I344-RQ-007`, `I344-RQ-009` | Initiative / Epic / Issue で source / target README が異なる場合も README 専用 filter を追加せず、既存 opaque whole-tree source-wins behavior が維持される |
+| `AC-344-007C` | `I344-RQ-003`, `I344-RQ-007`, `I344-RQ-010` | 4つの共通 README が root/node の checkout と node-scoped helper の違いを説明し、CLI は root selector / root copy route を引き続き拒否する |
 | `AC-344-008` | `I344-RQ-008` | source / wheel / sdist / installed inventory が exact allowlist と一致し、4 README bytes が一致する |
 | `AC-344-009` | `I344-RQ-009` | current `workbench copy` と existing workspace の focused regression が通る |
 | `AC-344-010` | `I344-RQ-010` | shipped docs が shell、Git、copy、security、authority、Issue 境界を矛盾なく説明する |
@@ -387,7 +392,7 @@ generic import の実装は `iss-00345` の責務であることも明記する�
 
 ## 11. 完了条件
 
-- `AC-344-001` から `AC-344-006`、`AC-344-007A`、`AC-344-007B`、`AC-344-008` から `AC-344-010` がすべて Issue-local evidence で満たされる。
+- `AC-344-001` から `AC-344-006`、`AC-344-007A`、`AC-344-007B`、`AC-344-007C`、`AC-344-008` から `AC-344-010` がすべて Issue-local evidence で満たされる。
 - requirement、design、plan が fresh `spec-reviewer` の pass を得る。
 - focused implementation / QA / code / spec review gate が pass する。
 - Issue report に実行済みの証跡、未実施事項、`iss-00346` への deferred delivery record が記録される。
