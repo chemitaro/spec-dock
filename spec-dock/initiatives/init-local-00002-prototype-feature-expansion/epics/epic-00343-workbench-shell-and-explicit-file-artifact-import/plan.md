@@ -28,8 +28,8 @@ layer別Issueへは分割しない。Candidate 1と2は各々CLI / installer / a
 - Epic classification: `multi-issue implementation`
 - Issue candidate count: exactly 3
 - final quality Issue: required
-- Issue node: `not_created_pending_human_approval`
-- canonical Issue docs: `not_created_pending_human_approval`
+- Issue nodes: `iss-00344`, `iss-00345`, `iss-00346`
+- canonical Issue docs: runtime scaffold created。各Issueのjust-in-time planningで正式化する。
 - merge: human-only。計画上の最終到達点はmergeable PR preparationであり、mergeは行わない。
 
 ## 2. Scope / Non-scope
@@ -107,6 +107,7 @@ Candidate 2 / 3はaccepted ADRを再判断しない。`--` family、full destina
 
 ### Candidate 1 — Workbench Shell Scaffolding
 
+- Issue: `iss-00344` / GitHub `#344`
 - candidate key: `candidate-epic-00343-01-workbench-shell`
 - recommended grade: `standard`
 - tranche: A
@@ -150,6 +151,7 @@ uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/te
 
 ### Candidate 2 — Generic Single-File Artifact Import
 
+- Issue: `iss-00345` / GitHub `#345`
 - candidate key: `candidate-epic-00343-02-generic-file-import`
 - recommended grade: `critical`
 - tranche: A
@@ -199,6 +201,7 @@ uv run pytest tests/cli_runtime/test_artifact_import_chatgpt_output.py tests/cli
 
 ### Candidate 3 — Integration Distribution And Final Quality
 
+- Issue: `iss-00346` / GitHub `#346`
 - candidate key: `candidate-epic-00343-03-final-quality`
 - recommended grade: `strict`
 - tranche: B
@@ -253,12 +256,12 @@ Candidate 2 Generic Import ──────┘
 - Candidate 1と2のproduct dependencyはなく、論理上parallelizableである。
 - 同一Epic branch / worktreeと`pyproject.toml` / provider docs / regression surfaceの衝突を避けるため、executionは原則Candidate 1 → Candidate 2 → Candidate 3の順で1 Issueずつ行う。
 - Candidate 3は1 / 2の両方へdirect dependencyを持つ。
-- 実Issue ID採番後だけ、metadata直編集ではなく次を実行する。
+- dependency edgeはmetadata直編集ではなく、次のruntime commandで登録済みである。
 
 ```bash
-./spec-dock/scripts/spec-dock deps add --from <candidate-3-issue-id> --to <candidate-1-issue-id>
-./spec-dock/scripts/spec-dock deps add --from <candidate-3-issue-id> --to <candidate-2-issue-id>
-./spec-dock/scripts/spec-dock deps check <candidate-3-issue-id>
+./spec-dock/scripts/spec-dock deps add --from iss-00346 --to iss-00344
+./spec-dock/scripts/spec-dock deps add --from iss-00346 --to iss-00345
+./spec-dock/scripts/spec-dock deps check iss-00346
 ./spec-dock/scripts/spec-dock validate
 ./spec-dock/scripts/spec-dock sync
 ```
@@ -271,8 +274,8 @@ Candidate 1 / 2はreview済みlocal milestone commitまで閉じ、per-Issue PR�
 
 - implementation-planner evidenceをEALでdispositionし、main orchestratorが本planへ再記述する。
 - fresh `spec-reviewer` pass。
-- ユーザーがexactly 3 slicesとIssue作成を承認する。
-- 完了前のIssue node作成は禁止。
+- ユーザーがexactly 3 slicesとIssue作成を承認する。2026-07-29に承認済み。
+- 承認に基づき3 Issueをruntime commandで作成済み。
 
 ### G1 Per-Issue planning gate
 
@@ -307,14 +310,14 @@ Candidate 1 / 2はreview済みlocal milestone commitまで閉じ、per-Issue PR�
 
 | Candidate | Issue node | draft-requirement | draft-design | draft-plan |
 |---|---|---|---|---|
-| Candidate 1 | `not_created_pending_human_approval` | `not_created_pending_human_approval` | `not_created_pending_human_approval` | `not_created_pending_human_approval` |
-| Candidate 2 | `not_created_pending_human_approval` | `not_created_pending_human_approval` | `not_created_pending_human_approval` | `not_created_pending_human_approval` |
-| Candidate 3 | `not_created_pending_human_approval` | `not_created_pending_human_approval` | `not_created_pending_human_approval` | `not_created_pending_human_approval` |
+| Candidate 1 | `issues/iss-00344-workbench-shell-scaffolding/` | `not_created` | `not_created` | `not_created` |
+| Candidate 2 | `issues/iss-00345-generic-single-file-artifact-import/` | `not_created` | `not_created` | `not_created` |
+| Candidate 3 | `issues/iss-00346-integration-distribution-and-final-quality/` | `not_created` | `not_created` | `not_created` |
 
 ### Handoff-ready
 
 - canonical Epic requirement / design / plan / accepted ADRとCandidate固有のscope、forbidden boundary、acceptance owner、dependencies、verification seedが参照できる。
-- Issue nodeとdraft pathは人間承認後にruntime-owned commandで作成する。
+- Issue nodeは人間承認後にruntime-owned commandで作成済み。Issue-local draft evidenceは必要に応じて各Issue planningで作成する。
 - Issue-local draft requirement / design / planはcurrent stateを反映するjust-in-time Issue planning evidenceであり、Epic planning中にexecution-readyを主張しない。
 
 ### Execution-ready
@@ -380,7 +383,8 @@ Candidate 1 / 2はreview済みlocal milestone commitまで閉じ、per-Issue PR�
 - requirement amendment blocker: none。second fresh README requirement review `pass`、confidence 0.99。
 - design amendment blocker: none。third fresh README design review `pass`、confidence 0.92。
 - plan amendment blocker: none。second fresh README plan review `pass`、confidence 0.99。
-- Issue creation blocker:
-  - exactly 3 slicesに対する人間承認が未取得。
+- Issue creation blocker: none。人間承認済み、3 Issueとdependency edgeを作成済み。
 - Issue nodes:
-  - 0。レビューと人間承認前には作成しない。
+  - `iss-00344`、`iss-00345`、`iss-00346`。
+- next action:
+  - dependency-readyな`iss-00344`をstartし、ChatGPT-first Issue planningを行う。

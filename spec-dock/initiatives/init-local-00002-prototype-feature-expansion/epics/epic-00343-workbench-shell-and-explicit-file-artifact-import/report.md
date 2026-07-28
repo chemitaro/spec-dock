@@ -20,13 +20,14 @@ ID: "epic-00343"
   - requirementは4回目のfresh reviewで`pass`し、design authoringへ昇格した。
   - system-architectのscope-local evidence draftをmain orchestratorが全件確認し、canonical `design.md`へ再記述した。9回目fresh design reviewは`pass`した。
   - implementation-plannerのscope-local draftを全件確認し、exactly 3 vertical slicesをcanonical `plan.md`へ再記述した。2回目fresh plan reviewは`pass`した。
-  - requirement / design / planのauthoring gateは一度すべて通過したが、ユーザー指示によりWorkbench shellを`.gitkeep`から利用方法を説明する`.workbench/README.md`へ改善するamendmentを開始した。Issue nodeは0件のままである。
+  - requirement / design / planのauthoring gateは一度すべて通過したが、ユーザー指示によりWorkbench shellを`.gitkeep`から利用方法を説明する`.workbench/README.md`へ改善するamendmentを行った。
   - README amendment後のrequirement、design、planはそれぞれfresh reviewで`pass`した。4 templateのtracked guidance、README以外のignore、no-backfill、evidence-only authority、package distribution contractが確定した。
   - team onboarding ArtifactもREADME contractへ更新した。
+  - ユーザーが3 slicesを採用し、`iss-00344` / `iss-00345` / `iss-00346`をGitHub Issue #344 / #345 / #346として作成した。`iss-00346`から`iss-00344` / `iss-00345`へのdirect dependencyをruntime commandで登録した。
 - 次のマイルストーン:
-  - 3 vertical Issue sliceとIssue作成に対する人間承認を得る。
+  - dependency-readyな`iss-00344`をstartし、ChatGPT-first Issue planningとfresh reviewを完了する。
 - ブロッカー:
-  - authoring blockerなし。Issue作成は人間承認待ち。
+  - Epic authoring / Issue creation blockerなし。`iss-00344`のIssue planningは未着手。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -75,6 +76,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-033 | adopted | team onboarding README amendment | main orchestrator | `.gitkeep`説明をtracked guidance README、evidence-only authority、package distributionへ更新 | onboarding Artifact; reviewed requirement/design/plan | summary、terms、Workbench diagrams、Candidate 1、FAQ、checklist | 新規参加者とmodelがREADMEの役割、Git境界、importとcanonical adoptionの差を前提知識なしで理解できるよう正本改訂へ同期 | canonical-derived explanation | `artifacts/20260728t110707z-epic-00343-team-onboarding-guide.md` | main orchestrator | canonical phase gates pass | no | human approval待ち |
 | EAL-034 | adopted | first onboarding README amendment review | spec-reviewer | tracked READMEとignored workfileのworktree移行説明が未分離 | onboarding Artifact; reviewed requirement/design/plan | FAQ worktree copy | READMEはGit checkoutで現れ、manual `workbench copy`はREADME以外のignored作業fileだけに必要と明記 | independent review | first fresh onboarding amendment review result、confidence 0.99 | main orchestrator | second fresh onboarding review pending | yes | re-review後にcommit |
 | EAL-035 | adopted | second onboarding README amendment review | spec-reviewer | README checkout / ignored workfile manual copy、Candidate 1、diagram / FAQ closure | onboarding Artifact; reviewed requirement/design/plan | onboarding amendment gate | findingなしの`pass`を採用し、README contract amendmentの説明資料を完了 | independent review | second fresh onboarding amendment review result、confidence 0.99 | main orchestrator | second fresh onboarding review pass | no | commit / push |
+| EAL-036 | adopted | Epic plan adoption and Issue creation approval | user | reviewed requirement / design / planとexactly 3 vertical slicesを採用し、3 Issue作成・dependency登録・Issue 1 planningを依頼 | `plan.md`; created Issue nodes; `report.md` | Issue handoff / approval gate | 人間承認をIssue creation authorityとして採用 | primary | 2026-07-29 user instruction in current session | main orchestrator | runtime verification pending | no | 3 Issueを作成しdependencyを登録 |
+| EAL-037 | adopted | Issue creation and dependency commands | SpecDock runtime | `iss-00344` / `iss-00345` / `iss-00346`作成、`iss-00346 -> iss-00344, iss-00345`登録 | `plan.md`; Issue nodes; `report.md` | progress / handoff | GitHub-linked runtime-owned node creationとdirect edge登録を実測し、`validate` nodes=216、`iss-00344` / `iss-00345` ready、`iss-00346` blockers=2を確認 | command evidence | `new issue`; `deps add`; `deps check`; `validate` outputs | main orchestrator | local verification passed | no | scaffold commit / push後に`iss-00344`をstart |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -100,6 +103,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 |---|---|---|---|---|---|---|---|---|
 | ユーザーによる「必要なら新たなEpicを作成し、そのEpicをactiveにして仕切り直してよい」という明示依頼 | `chemitaro/spec-dock`; `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/692d/spec-dock` | source: `epic-00312`; target Initiative: `init-local-00002`; created Epic: `epic-00343` | current Codex session、2026-07-28のEpic routing operation | `spec-manager`によるInitiative active設定、GitHub Epic issue #343作成、local Epic scaffold作成、Epic active設定、branch作成 / checkout、GitHub sync | この一回のsuccessor Epic routingに必要なcredentialed GitHub mutationとlocal SpecDock mutationだけを許可。Issue node、PR、merge、close、source実装変更は含まない | #343作成・active/checkout/sync完了時に消費済み。再作成、別scope、追加external mutationには無効 | なし。#343 / `epic-00343` / branch `epic-00343-workbench-shell-and-explicit-file-artifact-import`を作成済み | 完了済みoperationとして保持。追加Epic mutationは行わない |
 | ユーザーによる`spec-dock-clarification`指定、Epic再構成、ChatGPT-UseによるMarkdown ZIP authoring、fresh reviewの明示依頼 | `chemitaro/spec-dock`; `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/692d/spec-dock` | source evidence: `epic-00312`; canonical target: `init-local-00002 / epic-00343`; Issueなし | current Codex session、2026-07-28 | ChatGPT Pro advisory authoring、`repo-analyst`によるread-only解析、fresh `spec-reviewer`によるrequirement/design/plan review、main orchestratorによるcanonical Epic docs統合 | planning evidence生成・review・canonical authoringに限定。source実装変更、Issue node作成、追加credentialed external mutation、PR/merge/closeは含まない | user revocation、active repo/worktreeまたはEpic変更、current session終了、source HEAD変更でevidence stale、workflow boundary外のactionが必要になった時 | なし。ChatGPT follow-up wrapperのpre-submit SIGPIPEは同一browser conversationの手動follow-upで回復し、fixed ZIPをreview済み | phase順序とfresh reviewer gateを継続し、Issue作成前に人間承認を得る |
+| ユーザーによるEpic仕様採用、3 Issue作成・dependency登録、Issue 1 start、ChatGPT-Use authoring / reviewの明示依頼 | `chemitaro/spec-dock`; `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/692d/spec-dock` | `epic-00343`; `iss-00344` / `iss-00345` / `iss-00346` | current Codex session、2026-07-29 | runtimeによる3 GitHub-linked Issue作成、dependency登録、`iss-00344` start、ChatGPT Pro authoring / spec review、main orchestrator canonical adoption、fresh reviewer gate | 指定3 Issueと最初のIssue planningに限定。source実装、Issue finish、PR、merge、closeは含まない | 3 node作成・edge登録後、Issue planning部分は`iss-00344`のcanonical docsとreview gate完了まで有効 | なし | scaffold commit / push後に`iss-00344`をstartし、github-synced ChatGPT-first planningへ進む |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -150,7 +154,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - 旧`epic-00312`のtemplate-free / byte-preserving publication ADRはimplementation evidenceとして参照できるが、generic importの新しいauthorityを自動付与しない。
 
 ## 完了した Issue / PR / Release (必須)
-- なし。reviewed planと人間承認前のためIssue nodeを作成していない。
+- 完了したIssue / PR / Releaseはなし。
+- 作成済みIssue: `iss-00344` (#344)、`iss-00345` (#345)、`iss-00346` (#346)。
 - GitHub Epic issue: #343。
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
@@ -165,7 +170,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
   - 該当なし。
 
 ## フォローアップ（別Issue化） (必須)
-- なし。plan reviewと人間承認後に必要最小限のvertical Issueを作成する。
+- `iss-00344`: Workbench Shell Scaffolding。
+- `iss-00345`: Generic Single File Artifact Import。
+- `iss-00346`: Integration Distribution And Final Quality。`iss-00344` / `iss-00345`完了後にreadyとなる。
 
 ## 省略/例外メモ (必須)
 - 該当なし
