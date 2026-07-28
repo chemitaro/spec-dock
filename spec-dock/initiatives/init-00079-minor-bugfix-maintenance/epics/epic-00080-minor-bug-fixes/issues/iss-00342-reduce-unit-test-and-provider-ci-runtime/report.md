@@ -403,20 +403,20 @@ read-only specialist consentと、scope-local `artifacts/` direct childへの限
 | S01 | utility-worker | pytest strict markersとfast/full marker registryだけを追加 | `pyproject.toml` | TOML parse、pytest help、diff check pass | S01-R1 passed | none | accepted。default `-m fast`、dependency、Make変更なし |
 | S02 | dev-coder | explicit full optionとflagなしconditional policy skipをRed-firstで実装 | `tests/conftest.py`,`tests/unit/test_provider_test_lanes.py` | Red exit1; Green active1; module9 passed; required-fast7; C/F/H=2705/670/2035; ruff/diff pass | S02-R2 passed | repository full bodyはS05まで未実行 | accepted。S01 classifier/inventoryとlegitimate skipを維持 |
 | S02 | utility-worker | marker registry/strictnessがS02にも十分かinspection | none | TOML assertion、diff check、`git diff --quiet -- pyproject.toml` pass | S02-R2 passed | option implementationはconftest責務 | approved-no-op。default selection/plugin/dependency変更不要 |
-| S03 | dev-coder | existing required-fast nodeへevent/identity/non-shipping contractをRed-first追加 | `tests/unit/infra/test_init_update.py` | missing workflow Red; Green 1 passed; related 3 passed; ruff/format/diff pass | pending | live Actions executionは後続external gate | accepted。workflowはread-only検証し追加修正なし |
-| S03 | utility-worker | PR fast workflowを限定化しmain/manual full workflowを追加 | `.github/workflows/provider-ci.yml`,`.github/workflows/provider-full-regression.yml` | expanded contract node 1 passed、diff check pass | pending | text inspectionはYAML indentation contractへ依存 | accepted。permissions/secrets/schedule/assets変更なし |
+| S03 | dev-coder | existing required-fast nodeへevent/identity/non-shipping contractをRed-first追加 | `tests/unit/infra/test_init_update.py` | missing workflow Red; Green 1 passed; related 3 passed; ruff/format/diff pass | S03-R2 passed | live Actions executionは後続external gate | accepted。workflowはread-only検証し追加修正なし |
+| S03 | utility-worker | PR fast workflowを限定化しmain/manual full workflowを追加 | `.github/workflows/provider-ci.yml`,`.github/workflows/provider-full-regression.yml` | expanded contract node 1 passed、diff check pass | S03-R2 passed | text inspectionはYAML indentation contractへ依存 | accepted。permissions/secrets/schedule/assets変更なし |
 | S04 | dev-coder | committed SHAでlocal fast integration bundleをread-only実行 | none | root/unit/focused、marker-only、required-fast、lint、partition、diff/validate/assurance全pass | S04-R2 passed | formal full性能・結果はS05まで未確認 | accepted。H body 0、failure nonzero、unexplained delta 0、前後clean |
 | S05-F1 | dev-coder | same-condition Pair 1を計測しfull nonzeroで停止、focused exact nodeをtriage | none | fast 669 passed/2036 skipped/8.98s; full 1 failed/2628 passed/76 skipped/1590.76s; focused 1 failed/0.45s | pending amendment review | snapshot correction後のnew 3-pairにはamendmentが必要 | evidence accepted。Pair 2/3と追加fullを禁止しD-006へ統合 |
 | S05R | dev-coder | current Issue pathとempty dependsをstatic snapshotへ各1件追加 | `tests/unit/infra/test_init_update.py` | focused 1 passed/1.82s、related 1 passed/7.05s、213 parity、ruff/format/diff pass | S05R-R1 passed | S04R/new manifest/new 3-pair未実施 | accepted。exact 2 entries、test weakeningなし |
 | S04R | dev-coder | new SHAでS04 exact bundleをread-only再実行 | none | root/unit各669 passed、H body0、required-fast7、lint/partition/diff/validate/assurance pass | S04R-R2 passed | new 3-pair未実施 | accepted。manifest 445 files `48ef40...4363`、前後clean |
-| S05-A | dev-coder | repaired SHAでaccepted fast→full 3 pairsをread-only計測 | none | fast各exit0約9.4〜9.7s、full各exit0約1651〜1656s、F∪H/policy skip0/drift0 | S05-A-QA1 passed | M3b未完了 | accepted。pre-merge full総数4、5回目未実行 |
+| S05-A | dev-coder | repaired SHAでaccepted fast→full 3 pairsをread-only計測 | none | fast各exit0約9.4〜9.7s、full各exit0約1651〜1656s、F∪H/policy skip0/drift0 | S05-A-QA1 passed | pre-deliveryの未解決リスクなし。外部S111/S120はclosure snapshotで追跡 | accepted。M3b `788383c7` committed/clean、pre-merge full総数4、5回目未実行 |
 | S90 | doc-writer | README/AGENTSをordinary/full/PR/main/manual/failure/rollback/human mergeへ整合 | `README.md`,`AGENTS.md` | implementation comparison、targeted rg、diff check、manifest 445/hash一致 | S90-R2 passed | none | accepted。wrapper/schedule/hard SLA/automatic rollback追加なし |
 | S98 | spec-manager | Issue #342へnamed external-evidence anchorを作成しreadback | none | Issue open、marker、10 slots、owner/predicate、secret-free、URL確認 | S98-R1 passed | S100後slot更新はexternal only | accepted。repo/Issue state変更なし |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | unavailable / denied / host conflict / impossible because ... | approval source / risk accepted: yes / no | `path/to/file` | ... | ... | `command` -> pass / docs-only inspection -> pass | reviewer role + passed / failed / unavailable / denied / waived / provisional | blocked / incomplete / waived with explicit risk acceptance / next action |
+| N/A | delegated paths and named roles were available; parent made no implementation or reviewer-finding fix | risk acceptance: no | N/A | report-ledger orchestration only | N/A | delegated changes received required verification | required fresh reviewers passed per step | not applicable; no unavailable, denied, host conflict, waiver, or provisional result |
 
 #### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
@@ -458,6 +458,10 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S90-R1 | docs/spec/implementation alignment review | spec-reviewer | historical | failed | no | blocked | docs自体は整合したがTest Contract Closure/Closure CoverageにS90の5 closure行欠落のP1 1件 |
 | S90-R2 | docs/spec/implementation alignment re-review | spec-reviewer | fresh | passed | no | proceed to M4a commit | 5 closure、tc-s90-001/EVD-TL-007、docs/spec/implementation、manifestを確認。findings 0、confidence 0.99 |
 | S98-R1 | durable anchor/non-circularity review | spec-reviewer | fresh | passed | no | proceed to M4b commit | single anchor、10 slots、owner/predicate、non-circularity、secret-freeを確認。findings 0、confidence 0.99 |
+| S99-QA1 | final issue-wide QA review | qa-reviewer | fresh | passed | no | final QA gate passed | accepted 3-pair full evidence、fast/full lane behavior、workflow routing、failure/recovery、15 pass + 7 pending_external snapshotを確認。追加integration testはalready sufficient |
+| S99-Code1 | final issue-wide code review | code-reviewer | fresh | passed | no | final code review gate passed | merge-baseからのimplementation/tests/workflows/docs diffを確認。findings 0 |
+| S99-Spec1 | final issue-wide alignment review | spec-reviewer | historical | failed | no | blocked pending remediation | external anchorのowner/predicate不整合、Parent Implementation Exception placeholder、S03/S05-A worker evidence staleのP1 2件/P2 1件 |
+| S99-Spec2 | final issue-wide alignment re-review | spec-reviewer | fresh | passed | no | proceed to S100 final ledger/commit | S99-Spec1の3指摘を解消。同一anchorの10 slots、N/A例外、worker evidence、15 pass + 7 pending_external、manifest 445/`48ef40...4363`を確認。findings 0、confidence 0.99 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -474,13 +478,21 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S98 / M4b | committed | external anchor index commit | `7aee0736a55b43f7c4e30a9dd9e8a92f2766a33f` | `git status --short` -> clean | N/A | N/A | N/A | S98-R1 fresh pass、anchor readback、commit、cleanを確認しResult Approval |
 
 #### 変更したファイル
-- `path/to/file1` - ...
-- `path/to/file2` - ...
+- `pyproject.toml`, `tests/conftest.py`, `tests/unit/test_provider_test_lanes.py` - fast/full marker分類、明示opt-in、policy skip契約
+- `.github/workflows/provider-ci.yml`, `.github/workflows/provider-full-regression.yml` - PR fast merge gateとmain/manual full regressionの分離
+- `tests/unit/infra/test_init_update.py` - workflow routing/non-shipping/dogfooding snapshot契約
+- `README.md`, `AGENTS.md` - contributor向けコマンド、CI、障害対応、rollback、人間merge境界
+- Issue #342 canonical docs/artifacts/report と親Epic plan - 要件、設計、ADR、実装計画、onboarding、観測証跡
 
 #### コミット
 - `ac67751b7b32297be88196cb0825d307518f6ae2` `test(test-lanes): 実装前テスト基準を固定`
 - `392b5bb9d4869419179fc6d53a6e29a8c36b921a` `test(test-lanes): pytestテストレーン分類を追加`
 - `e63fe928e20525c07bf34bd02c5e95b9d11e761c` `test(test-lanes): 完全回帰を明示opt-inへ分離`
+- `35d4ef4c4fa948df563e6bc6f8a3c7b40096c234` `ci(provider): PR高速検証と完全回帰を分離`
+- `42d021fb28f4cd45f550f86b9ebea10d93ae8be7` `test(dogfooding): 現行Issueのスナップショットを追加`
+- `788383c788f0e289c6e3684fccf86343a0f23201` `docs(test-lanes): 完全回帰の計測証跡を確定`
+- `d23c1affb4b1711e16db76a22ab8dd38cd75ac8c` `docs(test-lanes): テストレーン運用手順を追加`
+- `7aee0736a55b43f7c4e30a9dd9e8a92f2766a33f` `docs(test-lanes): 外部証跡アンカーを記録`
 
 #### メモ
 - ...
@@ -962,12 +974,45 @@ LC_ALL=C git ls-files -- 'tests/**' 'src/**' pyproject.toml uv.lock '.github/wor
 - anchor comment: `https://github.com/chemitaro/spec-dock/issues/342#issuecomment-5108185654`
 - comment ID: `IC_kwDOQ99OK88AAAABMHi6Ng`
 - schema slots: PR Delivery、reviewed head SHA、3 PR executions、Merge Preparation、human merge、latest-main full、incident exception、final 22-closure audit、sync/validate、issue-finish/closeout。
-- current slots: all `pending` with owner and acceptance predicate。
+- current slots: all `pending` with the approved owners and exact acceptance predicates: PR Delivery=S110、reviewed head SHA=S100→S110 readback、3 PR executions=S111、Merge Preparation=S112、human merge=human、latest-main full=S120、incident exception=S120（red-only。GreenはN/A）、final 22-closure audit=S130、sync/validate=S130、issue-finish/closeout=S130。
 - authorization: user request to complete implementation and submit a mergeable PR + approved S98 execution contract。
-- readback: exact marker、required 10 slots、Issue linkage/open state、secret-free bodyを確認。
+- readback: exact marker、required 10 slots、上記owner/predicate、Issue linkage/open state、secret-free bodyを同一comment IDで再確認。S99-R1 remediationでも新規commentは作成していない。
 - `EVD-TL-010`: S100後にreviewed repo artifactsを書き戻さず、S110〜S130 evidenceを同一commentへ追記できるdurable destinationを確立。
 - `spec-manager`: `No material implementation decisions beyond the approved plan.`
 - orchestrator disposition: noteを採用。approved schemaをそのまま作成し、repo files、Issue state、credentials/secretsを変更していない。
+
+---
+
+## S99 Pre-delivery Closure Status Snapshot
+
+`pending_external`はpassではなく、S98 anchorの後続観測が完了するまでIssue completionを許可しない。
+
+| Closure ID | Pre-delivery status | Local/deterministic evidence | External slot / owner / acceptance predicate |
+|---|---|---|---|
+| `CLOS-TL-AC-001` | pass | S04R root/unit/focused H body0、failure nonzero | N/A |
+| `CLOS-TL-AC-002` | pass | C/F/H partition、accepted full 3 pairs | N/A |
+| `CLOS-TL-AC-003` | pending_external | S03 identity/PR truth table pass | `3 PR executions` / S111 / same reviewed SHAでProvider CI/provider-tests 3回pass、full0 |
+| `CLOS-TL-AC-004` | pending_external | S03 main trigger/full command pass | `latest-main full` / S120 / human merge後latest main SHAでautomatic full 1件を観測 |
+| `CLOS-TL-AC-005` | pass | local/manual command、dispatch、docs一致 | N/A |
+| `CLOS-TL-AC-006` | pass | required-fast exact 7 nodes pass | N/A |
+| `CLOS-TL-AC-007` | pass | node/marker/manifest delta説明、weakening0 | N/A |
+| `CLOS-TL-AC-008` | pending_external | local accepted 3 pairsはfast<full | `3 PR executions` / S111 / same reviewed SHAの各PR runが38.1分未満 |
+| `CLOS-TL-AC-009` | pass | exact five-event matrix | N/A |
+| `CLOS-TL-AC-010` | pending_external | failure operation docs/spec pass | `latest-main full` / S120 / SHA/test/log/duration/owner/next actionを記録 |
+| `CLOS-TL-AC-011` | pass | rollback procedure/docs、human merge boundary | N/A |
+| `CLOS-TL-BH-001` | pass | ordinary 3入口、controlled failure propagation | N/A |
+| `CLOS-TL-BH-002` | pass | explicit full F∪H、policy skip0 | N/A |
+| `CLOS-TL-BH-003` | pending_external | PR deterministic routing/identity pass | `3 PR executions` / S111 / PR lint+fastのみ3回pass、full0 |
+| `CLOS-TL-BH-004` | pending_external | main deterministic routing/concurrency pass | `latest-main full` / S120 / human merge後にfull 1件起動 |
+| `CLOS-TL-BH-005` | pass | local/manual direct full permission一致 | N/A |
+| `CLOS-TL-BH-006` | pass | schedule trigger0 | N/A |
+| `CLOS-TL-BH-007` | pending_external | S05 Red保持/recovery、failure docs pass | `latest-main full` / S120 / Redなら遡及blockせずowner/next action、Greenならstatus/logを記録 |
+| `CLOS-TL-CON-001` | pass | accepted ADR/no schedule/human merge境界維持 | N/A |
+| `CLOS-TL-CON-002` | pass | provider workflows consumer non-shipping | N/A |
+| `CLOS-TL-CON-003` | pass | workflow schedule0、scope expansionなし | N/A |
+| `CLOS-TL-CON-004` | pass | coverage weakening/dependency追加0、manifest一致 | N/A |
+
+Summary: pre-delivery `pass=15`、`pending_external=7`、その他のpending/unresolved=0。
 
 ---
 
@@ -982,32 +1027,32 @@ LC_ALL=C git ls-files -- 'tests/**' 'src/**' pyproject.toml uv.lock '.github/wor
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| qa-reviewer | whole issue obligation coverage | already sufficient | S04R local fast gate、S05-A accepted formal full 3 pairs、workflow/failed-run recovery、22-row pre-delivery snapshotをfresh確認 | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| code-reviewer | issue-wide integrated diff | findings 0。pytest hook/config、workflow、tests、docsの境界と退行リスクをfresh確認 | 0 | pass |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | R1: anchor owner/predicate、parent exception placeholder、stale worker evidenceを指摘。修正後R2 findings 0 | 1 | pass |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| 22 closureのpre-delivery snapshotは`pass=15`、`pending_external=7`、その他0。S99 QA/code/spec fresh pass | Issue `report.md`のS99 remediationとS100 final ledgerのみ。未commit implementation catch-upなし | Issue #342の既存anchor comment `IC_kwDOQ99OK88AAAABMHi6Ng`。S100 commit/clean後のreviewed head SHAとS110〜S130 evidenceを同一commentへ追記 | commit boundary ready。S110はfinal commitとclean readbackまでblocked |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: 初回formal fullでdogfooding snapshotがcurrent Issue pathを含まず1件失敗した。
+  - 解決: 失敗をRed evidenceとして保持し、approved recovery amendmentに従ってexact 2 entriesを修正後、fresh integrated gateと新規3-pair full measurementを完了した。
 
 ## 学んだこと (任意)
-- ...
+- full regressionを通常pytestから外すだけでなく、marker選択単独では実行許可にならない明示flag契約にすると、日常interfaceの単純さと意図的full実行を両立できる。
 
 ## 今後の推奨事項 (任意)
-- ...
+- S110〜S112のPR観測とhuman merge後のS120/S130は、reviewed bytesへ追記せずIssue #342の既存external-evidence anchorで閉じる。
 
 ## 省略/例外メモ (必須)
 - 該当なし
