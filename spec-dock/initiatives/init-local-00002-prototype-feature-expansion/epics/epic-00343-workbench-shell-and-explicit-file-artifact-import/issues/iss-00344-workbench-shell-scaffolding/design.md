@@ -62,6 +62,7 @@ assurance_profile: "standard"
 | Existing copy | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workbench.py` | node-scoped one-shot orchestration |
 | Existing filesystem copy | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_cli.py` | opaque source-wins merge |
 | Packaging | `pyproject.toml` | package include / exclude |
+| Build output prune | `setup.py` | custom `build_py` post-build cleanup / stale fixture removal |
 
 | Requirement | Design |
 |---|---|
@@ -111,6 +112,7 @@ assurance_profile: "standard"
 | node create | template tree を再帰 copy するため asset 追加で計画・結果・filesystemへ現せる |
 | legacy prune | `templates/README.md` 以外の nested README を除去する |
 | package exclusion | nested template README を broad pattern で除外する |
+| build output prune | custom `build_py` が通常 copy 後に `templates/*/**/README.md` を除去するため、4 Workbench README も build tree から削除する |
 | semantic discovery | exact `.workbench` subtree を top-down prune する |
 | `workbench copy` | Initiative / Epic / Issue full ID の node scope、opaque one-shot source-wins |
 
@@ -223,6 +225,7 @@ provider と installer fallback の ignore contract を同一にする。
 - `[N]` `_prune_legacy_scaffold` の README preserve ruleを exact allowlist にする。
 - `[N]` `pyproject.toml` の broad nested README exclusion を削除または exact paths と両立する形へ限定する。
 - `[N]` package data に4つの `.workbench/README.md` を explicit に含める。
+- `[N]` `setup.py` の custom `build_py` が通常 copy 後に呼ぶ `_prune_stale_build_outputs()` を、下記5 pathの normalized template-root-relative exact allowlistを保存する cleanupへ変更する。broad nested README patternの単純削除ではなく、allowlist外の stale nested READMEは引き続き除去する。
 - `[N]` source / wheel / normalized sdist / installed resources の README inventory は、正規化した `spec_dock/assets/spec_dock/templates/` root からの次の exact relative path 5件だけとする。
   - `README.md`
   - `root/.workbench/README.md`
@@ -315,6 +318,7 @@ Copy -[#red,dashed]-> RootPayload : unsupported
 | root / Initiative / Epic / Issue `.workbench/README.md` assets | shared guidance bytes |
 | Initiative / Epic / Issue templates | future node shell |
 | `pyproject.toml` | explicit package include / broad exclusion解消 |
+| `setup.py` | custom `build_py` post-build pruneをexact allowlist-awareにし、4 Workbench READMEを保存しつつallowlist外のstale nested READMEを除去 |
 | provider docs 4件 | operator contract |
 | installer/runtime tests | fresh/existing、node paths、ignore、opacity、copy、distribution |
 | dogfood `spec-dock/**` | primary implementationにしない。Issue 346でprojectionを扱う |
@@ -332,14 +336,14 @@ Copy -[#red,dashed]-> RootPayload : unsupported
 | `TC-344-007A` | checkout と identical README copy no-diff |
 | `TC-344-007B` | divergent README source-wins compatibility |
 | `TC-344-007C` | root route rejection と guidance scope |
-| `TC-344-008` | source/wheel/sdist/installed exact inventory / bytes |
+| `TC-344-008` | custom `build_py` post-build pruneを実際に通し、4 allowlisted hidden READMEが残り、allowlist外のstale nested READMEが除去され、source/wheel/normalized sdist/installed resourcesのexact inventory / bytesが一致することを `tests/unit/infra/test_init_update.py` で検証 |
 | `TC-344-009` | existing `workbench copy` focused suite |
 | `TC-344-010` | shipped docs semantic assertions |
 
 ## 11. Rollback
 
 - ignore contract の rollback を最初に行い、ignored payload が Git status に露出する時間を作らない。
-- provider README assets、installer freshness branch、package config、tests、docs を同一 Issue diff として revert 可能にする。
+- provider README assets、installer freshness branch、`pyproject.toml`、`setup.py` のbuild prune、tests、docs を同一 Issue diff として revert 可能にする。
 - rollback で generated / existing Workbench README や user content を自動削除しない。
 - temporary build artifacts だけを repository 外で破棄する。
 
