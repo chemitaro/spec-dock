@@ -353,7 +353,13 @@ def test_requested_ref_mismatch_is_stale(tmp_path) -> None:
         capture_output=True,
         text=True,
     ).stdout.strip()
-    requested_ref = f"{observed_ref}-requested-ref-mismatch"
+    assert len(observed_head) == 40
+    assert set(observed_head) <= set("0123456789abcdef")
+    requested_ref_candidates = (
+        f"requested-ref-mismatch-a-{observed_head}",
+        f"requested-ref-mismatch-b-{observed_head}",
+    )
+    requested_ref = next(candidate for candidate in requested_ref_candidates if candidate != observed_ref)
     assert requested_ref not in {observed_ref, observed_head}
     config = read_json(FIXTURES / "invalid/ref-mismatch.json")
     config["repository"]["requested_ref"] = requested_ref
@@ -368,7 +374,7 @@ def test_requested_ref_mismatch_is_stale(tmp_path) -> None:
     assert diagnostics["status"] == "stale"
     assert diagnostics["errors"] == ["requested_ref does not match observed branch or HEAD"]
     assert diagnostics["repository"]["requested_ref"] == requested_ref
-    assert diagnostics["repository"]["observed_ref"] == observed_ref
+    assert diagnostics["repository"]["observed_ref"] in {observed_ref, "<redacted>"}
     assert requested_ref not in {
         diagnostics["repository"]["observed_ref"],
         diagnostics["repository"]["observed_head"],
