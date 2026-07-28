@@ -5,7 +5,7 @@ ID: "iss-00342"
 関連GitHub: ["#342"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-28"
+最終更新: "2026-07-29"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00080", "init-00079"]
 ---
@@ -18,7 +18,7 @@ ID: "iss-00342"
 
 `report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
 
-Materialな判断がない場合はno-decisionを明示する。本IssueではD-001〜D-006がcurrent decision ledgerである。
+Materialな判断がない場合はno-decisionを明示する。本IssueではD-001〜D-007がcurrent decision ledgerである。
 
 Ledger entry は次の契約値を使う。
 
@@ -100,6 +100,9 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-032 | `adopted` | S122 bounded integrated verification and QA review | recovery fix SHA / full regression | S120 external Redを保持し、修正SHAでfocused、module、lint、validate、assurance、test-relevant manifest、唯一のroot fullを確認した | focused 1 passed、module body 81 passed、`make lint` pass、validate `nodes=213`、assurance verify pass。manifest tracked 445 / aggregate `350b279b6692fce8791ec31f0d3d5cabd239841c099de8b84ac8d7ba49cc2d86`、説明可能deltaは対象testのみ。`uv run pytest --run-full-regression` exactly 1回: 2705 collected = 2629 passed + 76 legitimate skipped、policy skip 0、warnings 2、1636.38s、対象node pass。fresh `qa-reviewer`; findings `[]`; `review_status=pass`; confidence 0.99 | S123 final quality reviews and report-only commit |
 | EAL-033 | `adopted` | S123 final code-review finding and remediation amendment | `plan.md` / target test | branch名をrequested refへ埋め込むと、合法なbranch名にmetadata禁止語が含まれる環境でref mismatchより先にvalidationが拒否するP1を検出した | fresh `code-reviewer`; P1 1件; `review_status=fail`; confidence 0.98。HEAD hex由来のsafe fixed-format mismatch、single allowed test path、focused/module/lint、fresh re-review、second full禁止をplanへ追加 | fresh amendment spec review後にbounded test-only remediation |
 | EAL-034 | `adopted` | S123 remediation amendment spec review R1 | `plan.md` / pytest lane policy | safe mismatchとsecond root full禁止は整合したが、focused/moduleにexplicit full permissionとpassed/policy-skip acceptanceがなく、既定skipによる偽Green余地を検出した | fresh `spec-reviewer`; P1 1件; `review_status=fail`; confidence 0.99。focused 1 passed / policy skip 0、module 81 passed / policy skip 0となるexact `--run-full-regression` commandsをplanへ追加 | fresh amendment spec re-review |
+| EAL-035 | `adopted` | S123 remediation amendment spec review R2 | `plan.md` / `report.md` | R1で不足したexplicit full permission、passed件数、policy skip 0をfocused/moduleのexact commandsへ追加した | fresh `spec-reviewer`; findings `[]`; `review_status=pass`; confidence 0.99; reviewed plan `b518b30a130cdbde7ff806c1e6c44120c9d1d6251952e8f53a8dc7552a779080`; reviewed report `a438a4b48dc869a063d7b35f203a7aa455ebc5dab82252635ea4ec59f986e884`; assurance refresh/verify pass、validate `nodes=213` | bounded test-only remediation |
+| EAL-036 | `adopted` | S123 bounded remediation and code re-review | target test / test-only commit | branch名を入力から除き、40桁lowercase HEAD hex由来のsafe a/b候補からobserved refと異なる値を選択した。diagnostics observed refはraw値または既存contractの`<redacted>`だけを許可する | focused 1 passed / policy skip 0、module 81 passed / policy skip 0、`make lint`、diff check pass。code review R1はdiagnostics redactionのP1 1件 / fail / confidence 0.99、assertion修正後R2 findings `[]` / pass / confidence 0.99。test-only commit `11f18775f340cf77e8065a4541dfded9c142fc78` | final issue-wide QA/code/spec reviews |
+| EAL-037 | `adopted` | S123 final issue-wide quality reviews | current integrated diff / final report | origin/main以降の4-path差分、S122 full evidenceの合成的再利用、S123 remediation、current ledger/summary、S124/S130 pending境界をfreshに照合した | final `code-reviewer`: findings `[]` / pass / confidence 0.99。final `qa-reviewer`: findings `[]` / pass / confidence 0.99、second full不要・S122 evidence再利用可。final `spec-reviewer` R1: stale summary P1 + ledger range P2 / fail、report-only修正後R2 findings `[]` / pass / confidence 0.99、reviewed report `51e9deca342f40d46850e088b464d0958c162ab2fc98e6965ae5b407ab89c802` | report-only final commit後にS124 new PR delivery |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -165,7 +168,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装サマリー (任意)
 - S00 baseline characterizationを完了し、current SHAでcollection 2,696件、required-fast 7件、known flaky候補1件を変更なしで再確認した。
-- S01以降の実装は未着手であり、この時点ではsource、test、config、workflow、contributor docsに変更はない。
+- S01〜S123の実装・検証を完了した。post-merge Redに対する最終変更は対象testだけで、production、workflow、fixture、marker、skip/xfail、selectorは変更していない。
+- S124の新PR delivery / merge preparationと、human merge後のlatest `main` automatic fullおよびS130 lifecycle closeoutは未完了である。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -1087,6 +1091,14 @@ Summary: pre-delivery `pass=15`、`pending_external=7`、その他のpending/unr
 - Docs impact: inspect-only。通常command、full permission、workflow routing、運用contractは変更せず、既存`README.md`/`AGENTS.md`の説明に追加変更は不要。
 - S123 final code review R1: P1 1件 / fail / confidence 0.98。branch名にmetadata禁止語が含まれる場合、S121のrequested refがref mismatchより先に拒否される同一環境依存bug classを検出した。
 - S123 remediation disposition: branch名をrequested refへ含めず、observed HEADのsafe hexから必ず異なる固定形式を構成する。対象test以外を変更せず、focused/module/lintとfresh re-reviewを必須とし、S122のsole root fullは再実行しない。
+- S123 amendment review: R1はexplicit full permission/passed件数/policy skip acceptance欠落をP1として検出。exact focused/module commandsへ追加し、R2 findings 0 / pass / confidence 0.99。plan `b518b30a...779080`、report `a438a4b4...6e884`、assurance refresh/verify、validate `nodes=213`。
+- S123 remediation implementation: branch名を入力から除き、40桁lowercase HEAD hexだけからsafe a/b候補を作り、observed refと異なる候補を選択した。diagnostics observed refはraw値または既存redaction contractの`<redacted>`だけを許可する。
+- S123 remediation verification: exact focused 1 passed / policy skip 0、exact module 81 passed / policy skip 0、`make lint`、diff check pass。root fullは再実行していない。
+- S123 code re-review: R1はdiagnostics observed ref redaction未考慮をP1として検出。assertion修正後R2 findings 0 / pass / confidence 0.99。
+- S123 remediation commit: `11f18775f340cf77e8065a4541dfded9c142fc78`、対象test 1 fileのみ、post-commit clean。current test-relevant manifest tracked 445 / aggregate `9db332e0bf4f1a514228ae204d3dfb224e2f829fd2ac16ef47f0e5508c60747d`、S122 full manifestからのdeltaは対象test input/assertionだけ。
+- S123 final code review: findings 0 / pass / confidence 0.99。origin/main以降の統合差分にblocking code findingなし。
+- S123 final QA review: findings 0 / pass / confidence 0.99。S122 full後のdeltaは対象testだけで、final focused/moduleがbodyを実行したためfull evidenceの合成的再利用は妥当、second full不要と判定した。
+- S123 final spec review: R1はstale implementation summary P1とDecision Ledger range P2を検出。report-only修正後R2 findings 0 / pass / confidence 0.99。S124、human merge、latest `main` automatic full、S130は未完了のまま保持した。
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence
