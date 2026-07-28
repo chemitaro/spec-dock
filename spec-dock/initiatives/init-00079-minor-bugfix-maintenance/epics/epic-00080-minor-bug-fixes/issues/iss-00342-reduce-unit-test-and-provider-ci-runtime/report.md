@@ -256,7 +256,7 @@ uv run pytest -q -p no:cacheprovider \
 | S04R | `CLOS-TL-AC-001`,`CLOS-TL-BH-001`,`CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | snapshot correction後のroot/unit/focused fast gate、failure propagation、new manifestを再固定 | root/unit各669 passed、H body 0、required-fast 7、lint/validate/assurance pass、manifest `48ef40...4363`、S04R-R2 fresh pass | pass | M3a-r `87f5ef44`、post-commit clean確認済み |
 | S05-A | `CLOS-TL-AC-002`,`007`,`008`,`CLOS-TL-BH-002`,`007`,`CLOS-TL-CON-004` | repaired SHAでsame-condition 3-pair Green、full completeness、failure visibility | fast 9.70/9.39/9.61s、full 1650.73/1654.60/1656.30s、全full exit0/F∪H/policy skip0、drift0、S05-A-QA1 fresh pass | pass | M3b `788383c7`、post-commit clean確認済み |
 | S90 | `CLOS-TL-AC-005`,`010`,`011`,`CLOS-TL-BH-007`,`CLOS-TL-CON-001` | contributor/agent docsをfinal commands/events/failure/rollback/human merge境界へ整合 | README/AGENTS surgical diff、implementation comparison、diff check、manifest対象差分0/hash一致、S90-R2 fresh pass | pass | M4a `d23c1aff`、post-commit clean確認済み |
-| S98 | all 22 post-commit evidence slots | S100後のPR/check/merge/lifecycle証跡をsingle durable anchorへ保存 | Issue #342 comment marker/schema/readback、open state、secret-free、repo diffなし | pass | fresh spec-reviewerとM4b anchor-index commitはpending |
+| S98 | all 22 post-commit evidence slots | S100後のPR/check/merge/lifecycle証跡をsingle durable anchorへ保存 | Issue #342 comment marker/schema/readback、open state、secret-free、repo diffなし、S98-R1 fresh pass | pass | M4b `7aee0736`、post-commit clean確認済み |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -471,7 +471,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04R / M3a-r | committed | post-recovery integrated evidence commit | `87f5ef44fa3efb06f6e7ab4ed61e06db77fcc614` | `git status --short` -> clean | N/A | N/A | N/A | S04R-R2 fresh pass、new manifest、commit、cleanを確認しResult Approval |
 | S05-A / M3b | committed | accepted measurement ledger commit | `788383c788f0e289c6e3684fccf86343a0f23201` | `git status --short` -> clean | N/A | N/A | N/A | S05-A-QA1 fresh pass、accepted 3-pair、commit、cleanを確認しResult Approval |
 | S90 / M4a | committed | contributor docs commit | `d23c1affb4b1711e16db76a22ab8dd38cd75ac8c` | `git status --short` -> clean | N/A | N/A | N/A | S90-R2 fresh pass、manifest一致、commit、cleanを確認しResult Approval |
-| S98 / M4b | pending | external anchor index commit | pending | pending | N/A | N/A | N/A | fresh S98 spec-reviewer pass後にreport-only commit |
+| S98 / M4b | committed | external anchor index commit | `7aee0736a55b43f7c4e30a9dd9e8a92f2766a33f` | `git status --short` -> clean | N/A | N/A | N/A | S98-R1 fresh pass、anchor readback、commit、cleanを確認しResult Approval |
 
 #### 変更したファイル
 - `path/to/file1` - ...
