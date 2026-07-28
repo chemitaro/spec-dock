@@ -715,7 +715,7 @@ S90 step gate:
 - TC-344-001〜010をreport evidenceへ対応づける。
 - S01〜S03 focused suiteを同じrevisionで再実行する。
 - fresh `code-reviewer`、`qa-reviewer`、`spec-reviewer` のblocking findingを閉じる。
-- clean status、commit SHA、Issue 346 handoffを記録する。
+- final commit前にreport ledger、commit scope、post-commit external evidence destination、Issue 346 handoffを記録し、commit後のclean statusとHEAD SHAは外部引き渡し証跡にのみ記録する。
 - PR作成、merge preparation、Issue finishは行わない。
 
 #### S99 behavior slice execution
@@ -733,7 +733,7 @@ Planned contract:
 - alternative evidence: review/governance部分はinspect-only、aggregate commandはcovered-existingとして再実行する。
 - green verification: Section 16 exact gates、three fresh reviewer PASS、post-commit `git status --short` empty。
 - refactor guardrail: S99で実装refactorを行わず、findingは該当stepへ戻す。
-- report evidence destination: EVD-009/010、Final Quality Gate、Step/Test Contract Closure、commit SHA。
+- report evidence destination: EVD-009/010、Final Quality Gate、Step/Test Contract Closure、final commit scope、post-commit external evidence destination、ready/blocked。実際のHEAD SHAとclean resultはcommit後の外部引き渡し証跡にのみ記録する。
 - amendment trigger: required closure変更、new bug class、reviewer scope変更、Issue 346 ownership変更が必要な場合。
 
 #### S99 delegation contract
@@ -770,17 +770,18 @@ Planned contract:
 
 - required: TC-344-001〜010、EVD-001〜011、S01/S02/S03/S90 step gate。
 - close condition:全exact verification PASS、fresh QA/code/spec reviewer blocking finding 0、report/handoff complete。
-- evidence: report Step Contract Closure、Test Contract Closure、reviewer gate、commit SHA、EVD-009/010。
+- evidence: report Step Contract Closure、Test Contract Closure、reviewer gate、EVD-009/010、final commit scope、post-commit external evidence destination、ready/blocked。実際のHEAD SHAとclean resultは外部引き渡し証跡とする。
 - commit候補: final report/review evidence commit。実装差分を混在させない。
 
 S99 step gate:
 
-1. aggregate verification、全closure evidence、Issue 346 handoffを`report.md`へ記録する。
+1. aggregate verification、全closure evidence、Issue 346 handoff、final report ledger、final commit scope、post-commit external evidence destination、ready/blockedをfinal commit前に`report.md`へ記録する。
 2. fresh `qa-reviewer`、issue-wide fresh `code-reviewer`、fresh `spec-reviewer` が全てPASSするまで、findingをowner stepへ戻して修正・再レビューする。
 3. reviewer verdict/fix commit/採否をreportへ追記し、main orchestratorがS99 resultを承認する。
 4. final report/review evidence commitを作成する。S99ではapproved-no-opを認めない。
-5. commit後に`git status --short`がemptyであることとHEAD SHAを確認し、commit SHAをEVD-009/010へ記録する。
-6. PR、merge preparation、Issue finishは実行せず、Issue 346 handoffで停止する。
+5. commit後に`git rev-parse HEAD`と`git status --short`を実行し、HEAD SHAとclean resultを確認する。
+6. 実際のHEAD SHAとclean resultは、宣言済みの外部引き渡し証跡（final responseとIssue 346 handoffまたはIssue comment）にのみ記録する。final commit後に`report.md`を編集せず、EVD-009/010をpost-commit SHA保存先として扱わない。
+7. PR、merge preparation、Issue finishは実行せず、Issue 346 handoffで停止する。
 
 ## 11. Verification Ladder
 
@@ -887,7 +888,7 @@ Final exit:
 - [ ] reportに実測evidenceと未実施理由を記録。
 - [ ] Issue 345/346 scopeを実装していない。
 - [ ] per-Issue PR、merge、finishを行っていない。
-- [ ] reviewable commitとclean statusを記録。
+- [ ] final commit前のreportにcommit scopeとpost-commit external evidence destinationを記録し、commit後のHEAD SHAとclean statusを外部引き渡し証跡に記録。
 
 ## 17. Follow-up Candidates
 
