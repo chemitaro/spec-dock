@@ -57,7 +57,7 @@ GitHub connector inspection established:
 | Branch-versus-required-HEAD comparison | `identical`; ahead `0`, behind `0`, file diff empty     |
 | Package identity at that ref           | `spec-dock` version `0.2.3`                             |
 
-The attached S06 brief is the binding task boundary for this packet. 
+The attached S06 brief is the binding task boundary for this packet.
 
 ### Verification limits
 
