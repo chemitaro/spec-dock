@@ -940,7 +940,7 @@ Final exit:
 - [x] `setup.py` post-build pruneがM3に含まれる。
 - [x] report evidence destinationとstop conditionがある。
 - [x] Issue 346へのdeferred deliveryとhuman-only merge境界がある。
-- [ ] ChatGPT plan review PASS。
+- [x] ChatGPT plan review PASS。
 - [ ] fresh `spec-reviewer` plan review PASS。
 
 ## 19. 変更履歴
