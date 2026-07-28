@@ -134,7 +134,7 @@ Red方針:
 title Issue 344 implementation dependency
 start
 :M1 provider shell;
-:M2 opacity / worktree / docs;
+:M2 opacity / worktree / copy compatibility;
 :M3 packaging / distribution;
 :S90 docs impact resolution;
 :S99 final Issue-local quality gate;
@@ -216,7 +216,7 @@ Must not happen:
 | B-004 | M1 | exact top-level READMEだけがtracking eligible | TC-344-004 | B-001 | planned |
 | B-005 | M2 | README/payloadがsemantic observationを変えない | TC-344-006 | B-001 | planned |
 | B-006 | M2 | checkout/manual copy/source-wins/root rejectionを維持 | TC-344-007A/B/C、009 | B-003/004 | planned |
-| B-007 | M90 | shipped docsが新しいoperator boundaryを説明 | TC-344-010 | B-005/006 | planned |
+| B-007 | S90 | shipped docsが新しいoperator boundaryを説明 | TC-344-010 | B-005/006 | planned |
 | B-008 | M3 | installer/build pruneがexact 5 pathsだけを保存 | TC-344-008 | B-001 | planned |
 | B-009 | M3 | source/wheel/sdist/installed inventoryとbytesが一致 | TC-344-008 | B-008 | planned |
 
@@ -643,10 +643,28 @@ S03 step gate:
 ### S90 — Docs / Template Impact Resolution
 
 - provider docs 4件: update required。
-- Workbench README templates: update required。
+- 4 Workbench README templates: S01-owned implementation。S90ではread-only parity/reference。
 - skills/workflow docs: semantic contract変更なし。変更不要をreportに記録。
 - dogfood workspace: Issue 346でcandidate wheelから検証。直接変更しない。
 - deprecated wordingはcontext-awareに検索し、blind replacementしない。
+
+#### S90 behavior slice execution
+
+- depends on: S01、S02。
+- unblocks: S99。
+- target files: provider docs 3件、`templates/README.md`、docs assertions、Issue report。4 canonical `.workbench/README.md` はread-only reference。
+- integration checkpoint: S01/S02のobserved shell/copy boundaryと4 canonical READMEをshipped docsへ照合する。
+- annotation: AFK。canonical README wording変更はHITL design amendment。
+
+Planned contract:
+
+- scope: TC-344-007C/010をdocs-only vertical sliceとして閉じる。
+- test obligation: 9 guidance elements、deprecated wording、root/node copy差、security/authority、Issue 345/346 boundary。
+- alternative evidence: inspect-only + docs semantic assertion。production code Redは要求しない。
+- green verification: `TestInitUpdate::test_shipped_docs_describe_workbench_readme_boundary`、docs diff、canonical README parity inspection。
+- refactor guardrail:意味を変えない局所wording整理だけを許可し、canonical READMEを変更しない。
+- report evidence destination: EVD-008/010とS90 session log。
+- amendment trigger: canonical README wording、runtime behavior、Issue ownershipの変更が必要な場合。
 
 #### S90 delegation contract
 
@@ -700,6 +718,24 @@ S90 step gate:
 - clean status、commit SHA、Issue 346 handoffを記録する。
 - PR作成、merge preparation、Issue finishは行わない。
 
+#### S99 behavior slice execution
+
+- depends on: S01、S02、S03、S90のcommitted result。
+- unblocks: Issue 346のdependency admission。Issue 344のfinish/PR/mergeはunblockしない。
+- target files: Issue reportとreview evidenceのみ。review finding修正はowner stepへ戻す。
+- integration checkpoint: 全exact verificationと三者reviewを同一HEADへ固定する。
+- annotation: HITL result approval。mergeは常にhuman-only。
+
+Planned contract:
+
+- scope: 全TC/EVD、aggregate verification、fresh QA/code/spec review、Issue 346 handoffを閉じる。
+- test obligation: 全step gateのsame-revision再実行、stale evidence検出、reviewer independence、clean commit。
+- alternative evidence: review/governance部分はinspect-only、aggregate commandはcovered-existingとして再実行する。
+- green verification: Section 16 exact gates、three fresh reviewer PASS、post-commit `git status --short` empty。
+- refactor guardrail: S99で実装refactorを行わず、findingは該当stepへ戻す。
+- report evidence destination: EVD-009/010、Final Quality Gate、Step/Test Contract Closure、commit SHA。
+- amendment trigger: required closure変更、new bug class、reviewer scope変更、Issue 346 ownership変更が必要な場合。
+
 #### S99 delegation contract
 
 - delegated role: fresh `qa-reviewer`、issue-wide fresh `code-reviewer`、fresh `spec-reviewer`（全てread-only）。
@@ -736,6 +772,15 @@ S90 step gate:
 - close condition:全exact verification PASS、fresh QA/code/spec reviewer blocking finding 0、report/handoff complete。
 - evidence: report Step Contract Closure、Test Contract Closure、reviewer gate、commit SHA、EVD-009/010。
 - commit候補: final report/review evidence commit。実装差分を混在させない。
+
+S99 step gate:
+
+1. aggregate verification、全closure evidence、Issue 346 handoffを`report.md`へ記録する。
+2. fresh `qa-reviewer`、issue-wide fresh `code-reviewer`、fresh `spec-reviewer` が全てPASSするまで、findingをowner stepへ戻して修正・再レビューする。
+3. reviewer verdict/fix commit/採否をreportへ追記し、main orchestratorがS99 resultを承認する。
+4. final report/review evidence commitを作成する。S99ではapproved-no-opを認めない。
+5. commit後に`git status --short`がemptyであることとHEAD SHAを確認し、commit SHAをEVD-009/010へ記録する。
+6. PR、merge preparation、Issue finishは実行せず、Issue 346 handoffで停止する。
 
 ## 11. Verification Ladder
 
@@ -811,8 +856,8 @@ planには実測値を書かない。未実施commandをPASSと記録せず、fa
 
 | 対象 | 影響 | 対応 |
 |---|---|---|
-| provider docs 4件 | yes | S02で新operator contractへ更新 |
-| 4 Workbench README templates | yes | S01でcanonical bytesを追加 |
+| provider docs 3件 + `templates/README.md` | yes | S90でnew operator contractへ更新 |
+| 4 Workbench README templates | yes | S01でcanonical bytesを追加。S90はread-only parity/reference |
 | template root README | yes | new node behavior説明を更新 |
 | skills | no known semantic change | S90で再確認しreportへN/A根拠 |
 | workflow docs | no known semantic change | import/copy workflow変更がないことを確認 |
