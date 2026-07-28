@@ -253,7 +253,7 @@ uv run pytest -q -p no:cacheprovider \
 | S04 | `CLOS-TL-AC-001`,`CLOS-TL-BH-001`,`CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | committed implementationのroot/unit/focused fast gate、failure propagation、coverage deltaをfullなしで統合確認 | root 669 passed、unit 669 passed、H body 0、required-fast 7 passed、lint/validate/assurance pass、S04-R2 fresh pass | pass | M3a `a07955c4`、post-commit clean確認済み |
 | S05-F1 | `CLOS-TL-AC-002`,`007`,`008`,`CLOS-TL-BH-002`,`007`,`CLOS-TL-CON-004` | same-condition 3-pair Green、full completeness、failure visibility | Pair 1 fast exit0/full exit1、focused failure再現、Pair 2/3未実行、condition drift 0 | fail / incomplete | D-006とplan amendmentのfresh review待ち。RedをGreenへ読み替えない |
 | S05R | `CLOS-TL-AC-007`,`CLOS-TL-BH-007`,`CLOS-TL-CON-004` | current Issue path/empty dependsのexact 2-entry snapshot correction | S05-F1 Red→focused 1 passed、related validate/sync 1 passed、213 path/depends parity、ruff/diff pass、S05R-R1 fresh pass | pass | M3r `42d021fb`、post-commit clean確認済み |
-| S04R | `CLOS-TL-AC-001`,`CLOS-TL-BH-001`,`CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | snapshot correction後のroot/unit/focused fast gate、failure propagation、new manifestを再固定 | root/unit各669 passed、H body 0、required-fast 7、lint/validate/assurance pass、manifest `48ef40...4363` | pass | fresh code-reviewerとM3a-r evidence commitはpending |
+| S04R | `CLOS-TL-AC-001`,`CLOS-TL-BH-001`,`CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | snapshot correction後のroot/unit/focused fast gate、failure propagation、new manifestを再固定 | root/unit各669 passed、H body 0、required-fast 7、lint/validate/assurance pass、manifest `48ef40...4363`、S04R-R2 fresh pass | pass | M3a-r `87f5ef44`、post-commit clean確認済み |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -433,7 +433,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S03 / M2 | committed | workflow contract commit | `35d4ef4c4fa948df563e6bc6f8a3c7b40096c234` | `git status --short` -> clean | N/A | N/A | N/A | S03-R2 fresh pass、required verification、commit、cleanを確認しResult Approval |
 | S04 / M3a | committed | integrated evidence commit | `a07955c4c05e5be038cf42b1d6142e65d173cb65` | `git status --short` -> clean | N/A | N/A | N/A | S04-R2 fresh pass、same-SHA integrated verification、commit、cleanを確認しResult Approval |
 | S05R / M3r | committed | snapshot recovery commit | `42d021fb28f4cd45f550f86b9ebea10d93ae8be7` | `git status --short` -> clean | N/A | N/A | N/A | S05R-R1 fresh pass、exact 2-entry correction、commit、cleanを確認しResult Approval |
-| S04R / M3a-r | pending | post-recovery integrated evidence commit | pending | pending | N/A | N/A | N/A | fresh S04R code-reviewer pass後にreport-only commit |
+| S04R / M3a-r | committed | post-recovery integrated evidence commit | `87f5ef44fa3efb06f6e7ab4ed61e06db77fcc614` | `git status --short` -> clean | N/A | N/A | N/A | S04R-R2 fresh pass、new manifest、commit、cleanを確認しResult Approval |
 
 #### 変更したファイル
 - `path/to/file1` - ...
