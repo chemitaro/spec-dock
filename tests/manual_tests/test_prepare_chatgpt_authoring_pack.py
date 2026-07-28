@@ -345,16 +345,34 @@ def test_invalid_assurance_path_type_fails_without_traceback(tmp_path) -> None:
 
 def test_requested_ref_mismatch_is_stale(tmp_path) -> None:
     output_dir = tmp_path / "ref-mismatch"
+    observed_ref = current_ref()
+    observed_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    requested_ref = f"{observed_ref}-requested-ref-mismatch"
+    assert requested_ref not in {observed_ref, observed_head}
+    config = read_json(FIXTURES / "invalid/ref-mismatch.json")
+    config["repository"]["requested_ref"] = requested_ref
+    config_path = tmp_path / "ref-mismatch.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
 
-    result = run_pack(FIXTURES / "invalid/ref-mismatch.json", output_dir)
+    result = run_pack(config_path, output_dir)
 
     assert result.returncode == 3
     assert_no_cli_host_paths(result, tmp_path, REPO_ROOT)
     diagnostics = read_json(output_dir / "diagnostics.json")
     assert diagnostics["status"] == "stale"
     assert diagnostics["errors"] == ["requested_ref does not match observed branch or HEAD"]
-    assert diagnostics["repository"]["requested_ref"] == "main"
-    assert diagnostics["repository"]["observed_ref"] != "main"
+    assert diagnostics["repository"]["requested_ref"] == requested_ref
+    assert diagnostics["repository"]["observed_ref"] == observed_ref
+    assert requested_ref not in {
+        diagnostics["repository"]["observed_ref"],
+        diagnostics["repository"]["observed_head"],
+    }
     assert not (output_dir / "chatgpt-use-prompt.md").exists()
 
 
