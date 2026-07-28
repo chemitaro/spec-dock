@@ -18,7 +18,7 @@ ID: "iss-00342"
 
 `report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
 
-Materialな判断がない場合はno-decisionを明示する。本IssueではD-001〜D-004がcurrent decision ledgerである。
+Materialな判断がない場合はno-decisionを明示する。本IssueではD-001〜D-005がcurrent decision ledgerである。
 
 Ledger entry は次の契約値を使う。
 
@@ -50,6 +50,7 @@ Disposition ごとの必須証跡:
 | D-002 | resolved | scope | orchestrator | ChatGPT候補がscheduleと旧421秒baselineを前提にした | schedule採用; schedule棄却; 再質問 | schedule案と旧性能値を棄却し、現在の実測とaccepted ADRを優先する | local-context bodyはChatGPTから未観測であり、現行実測はfull約37〜38分、ユーザーはschedule非採用を明示した | rejected | `oracle:iss00342-test-ci-planning`; ZIP SHA-256 `f300cbff69ce241e85462fd5a37fcf2ff7beacad77d8b1d40c133749783e1e01`; local source-hash reconciliation | scheduleをdesign/planへ入れない |
 | D-003 | resolved | implementation | assurance classifier | requirementのpre-classification推奨はstrictだったがruntime classifierはstandardをauthorizedにした | strict維持; standard採用; reclassify | authorized profile `standard`を採用し、test omission / workflow riskはspecialist evidenceとfresh reviewsで補強する | hard triggerなし、product data/security/credential/irreversible migrationなし、rollback可能 | applied | `.assurance.json`; `assurance classify --stage requirement`; `assurance compose --artifact all` | Standard design / plan templateをauthoring |
 | D-004 | resolved | test-strategy | user / ChatGPT authoring | 旧設計のdefault `-m fast`とmandatory Make facadeが、通常pytestをそのまま使いたいowner intentと矛盾した | default marker selection; permanent skip; environment `skipif`; pytest option-controlled conditional policy skip | direct ordinary pytestを維持し、`--run-full-regression`だけを明示permissionにする。`-m full_regression` aloneはpermissionにせず、flagなしselected heavyへsession-local policy skipを追加する | selectionとexecution permissionを分離し、focused longをreason付きskipにしながらlegitimate skipを解除しない | promoted_to_adr | `artifacts/20260728t105349z-03-adr-use-direct-pytest-commands-with-explicit-full-regression-opt-in.md`; ChatGPT ZIP SHA-256 `511b81980c67da9d7e6b9290c20e59959e7d0835496aecee86f170bdc4402212` | canonical amendmentとfresh review |
+| D-005 | resolved | interpretation | dev-coder / orchestrator | S00のread-only characterization中、必須の`guidance issue-execution`がignored generated runbook projectionをrefreshした | filesystem writeを理由にS00をfailする; tracked/canonical差分をwrite境界として扱う | generated runbookはcanonical authorityではなく、source/test/config/workflow/docs/reportのtracked差分がなく実行前後cleanであるため、S00のread-only契約は満たす | skillがguidance実行を必須とし、projectionをauthorityとして扱わないことを明記している。実装対象とcanonical docsには変更がない | no_action | S00 worker evidence; `git status --short`実行前後clean; generated projectionはignored | issue-localな実行証跡解釈であり、product contractや将来の設計判断を変更しない |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -155,62 +156,111 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S00 baseline characterizationを完了し、current SHAでcollection 2,696件、required-fast 7件、known flaky候補1件を変更なしで再確認した。
+- S01以降の実装は未着手であり、この時点ではsource、test、config、workflow、contributor docsに変更はない。
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-07-28 HH:MM - HH:MM）
+### セッションログ（2026-07-28 23:43 - 23:46 JST）
 
 #### 対象
-- Step: S01, S02, ...
-- AC/EC: AC-___, EC-___
+- Step: S00 Baseline characterization
+- AC/EC: AC-006、AC-007、CON-004
 - 計画上の出典（Planned source）:
-  - `plan.md` section:
-  - closure ids:
+  - `plan.md` section: `S00 Baseline characterization`
+  - closure ids: `CLOS-TL-AC-006`、`CLOS-TL-AC-007`、`CLOS-TL-CON-004`
 
 #### 実施内容
-- ...
+- `dev-coder`へread-only characterizationを委任し、current SHAのroot collection、required-fast 7 nodes、known flaky候補を各1回観測した。
+- sorted node IDsと明示skip/skipif/xfail source inventoryを正規化し、baseline SHAとtoolchainへ結び付くSHA-256 digestとして固定した。
+- source/test/config/workflow/docs/reportはworker実行中read-onlyとし、実行前後のtracked worktreeがcleanであることを確認した。
+- 必須runtime guidanceがignored generated runbook projectionをrefreshした可能性はD-005へ記録し、canonical/tracked差分なしとして採用した。
 
 #### 実行コマンド / 結果
 ```bash
-<command>
+git rev-parse HEAD
+# 701b7ae5cbb197e26aa69968ba53ccb9c722a873
 
-<result>
+uv run python --version
+# Python 3.12.11
+
+uv run pytest --collect-only -q -p no:cacheprovider
+# exit 0; 2696 tests collected in 0.23s; baseline count delta 0
+
+uv run pytest --collect-only -q -p no:cacheprovider \
+  | awk '/^tests\/.*::/ { sub(/\r$/, ""); print }' \
+  | LC_ALL=C sort \
+  | uv run python -c 'import hashlib, sys; data = sys.stdin.buffer.read(); print(f"count={data.count(chr(10).encode())}"); print(f"sha256={hashlib.sha256(data).hexdigest()}")'
+# exit 0; count=2696
+# sha256=07ac3d3846e02d85b95edff9ec9c55240598dafa6364e458a61b5c962833859c
+
+rg -n --no-heading --color=never \
+  'pytest\.mark\.(skip|skipif|xfail)([^[:alnum:]_]|$)' tests \
+  | awk '{ sub(/\r$/, ""); print }' \
+  | LC_ALL=C sort \
+  | uv run python -c 'import hashlib, sys; data = sys.stdin.buffer.read(); print(f"count={data.count(chr(10).encode())}"); print(f"sha256={hashlib.sha256(data).hexdigest()}")'
+# exit 0; count=67
+# sha256=b77e4a64ca5dd3e909f6df9f850ef312317880918884fffafa56f274d6dda3af
+# explicit source occurrences: skip=67, skipif=0, xfail=0
+
+uv run pytest --collect-only -q -p no:cacheprovider -m skip
+# exit 0; 68/2696 selected, 2628 deselected
+uv run pytest --collect-only -q -p no:cacheprovider -m skipif
+# exit 5; 0 selected, 2696 deselected
+uv run pytest --collect-only -q -p no:cacheprovider -m xfail
+# exit 5; 0 selected, 2696 deselected
+
+uv run pytest -q -p no:cacheprovider \
+  tests/unit/cli/test_cli_smoke.py::TestCliSmoke::test_active_set_legacy_flag_reports_parser_error \
+  tests/unit/cli/test_cli_smoke.py::TestCliSmoke::test_active_set_by_id_succeeds_through_runtime_subprocess \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_docs_match_provider_assets \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_templates_match_provider_assets \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_68_workflow_seed_matches_repo_root_ci_workflow \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_68_provider_only_workflow_is_not_shipped_via_install_root \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets
+# exit 0; 7 passed in 1.87s
+
+uv run pytest -q -p no:cacheprovider \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_187_s430_final_snapshot_timeout_preserves_stable_completion_state
+# exit 0; 1 passed in 2.36s
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | 赤フェーズ / 代替証跡（Red / alternative） | red-required / covered-existing / inspect-only / manual-required | ... | `command` / 文書点検（docs inspection） / 手動記録（manual record） | pass / approved-no-op / fail / blocked | ... |
-| S01 | 緑フェーズ（Green） | ... | ... | `command` / 点検（inspection） / 手動記録（manual record） | pass / fail / blocked | ... |
-| S01 | リファクタリング（Refactor） | guardrail satisfied / no refactor needed | ... | 差分点検（diff inspection） / command | pass / approved-no-op / fail / blocked | ... |
+| S00 | 代替証跡（characterization-first） | current C、sorted node IDs、skip/xfail inventory、required-fast 7件、known flaky raw result | C=2696、node digest `07ac3d...859c`、marker source digest `b77e4a...a3af`、required-fast 7 passed、known flaky 1 passed | collect-only、normalized digest pipelines、exact focused commands | pass | baseline count delta 0。known flakyの1回passはflaky解消の証拠にしない |
+| S00 | リファクタリング（Refactor） | read-only stepのためrefactorなし | tracked diffなし | `git status --short` | approved-no-op | source/test/config/workflow/docs/reportのworker変更なし |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none / ... | implementation / review / QA / user report | recorded / added test / deferred / amended plan | tc-001 / new | yes / no | ... |
+| S00 | runtime guidanceがignored generated projectionをrefreshした可能性 | worker observation | D-005でtracked/canonical差分なしのdiagnostic side effectとして解決 | none | no | 実行前後`git status --short` clean |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | tc-001 | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| S00 | `CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | collection、required-fast、known flaky、coverage baselineをcurrent SHAで固定 | C=2696、node digest `07ac3d...859c`、marker inventory digest `b77e4a...a3af`、7 passed、1 passed、tracked diffなし、S00-R2 fresh review pass | pass | M0 commitとpost-commit cleanは後続欄で閉じる |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| tc-001 | S01 | yes | red-required / covered-existing / inspect-only / manual-required | ... | ... | pass / approved-no-op / fail / blocked | ... |
+| `CLOS-TL-AC-006` | S00 | yes | characterization-first + automated | research C=2696、required-fast 7 passed | collect-only + required-fast exact command | pass | current C=2696、required-fast 7 passed |
+| `CLOS-TL-AC-007` | S00 | yes | characterization-first + review | research baselineとknown flaky候補 | sorted node digest、marker inventory digest、known flaky exact command | pass | node digest `07ac3d...859c`、marker digest `b77e4a...a3af`、known flakyは1回pass、reviewはpending |
+| `CLOS-TL-CON-004` | S00 | yes | characterization-first + review | test weakening禁止 | `git status --short`、sorted node/marker inventory、focused result | pass | workerによるtest/config変更なし、reviewはpending |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| tc-001 | S01 | ... | pass / approved-no-op / fail / blocked | ... |
+| `CLOS-TL-AC-006` | S00 | C=2696、required-fast 7 passed | pass | current SHA `701b7ae5` |
+| `CLOS-TL-AC-007` | S00 | C=2696、sorted node digest `07ac3d...859c`、known flaky exact node pass | pass | SHA `701b7ae5`、Python 3.12.11、uv 0.11.24、macOS arm64、normalization pipelineを固定しcommitから再生成可能 |
+| `CLOS-TL-CON-004` | S00 | marker source 67行/digest `b77e4a...a3af`、marker collection skip=68/skipif=0/xfail=0、tracked source clean | pass | source occurrenceとparameterized item数は粒度が異なる。runtime skip数とは主張しない |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none / added / removed / changed / alias-mapped | tc-001 | tc-001 / test-name | tc-001 | ... | yes / no | yes / no |
+| none | `CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | `tc-s00-001`,`tc-s00-002` | same | required row、locked expectation、required、spec linkに変更なし | no | no |
 
 #### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 `workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
@@ -237,12 +287,12 @@ read-only specialist consentと、scope-local `artifacts/` direct childへの限
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated / approved-local-execution / degraded mode | multi-layer / shipped scaffold / pattern analysis / integration / large worker scope / none | repo-analyst / dev-coder / doc-writer / N/A | ... | ... | ... | ... | ... | ... | worker summary / changed files / verification / risks / integration decision | pass / fail / blocked |
+| S00 | delegated | approved planがread-only baseline operatorを要求 | dev-coder | current SHAのcollection、required-fast、known flaky characterization | approved requirement/design/plan、research、`pyproject.toml`、`tests/**` | read-only commandsのみ | source/test/config/workflow/docs/report変更、full実行 | collect-only、required-fast 7、known flaky exact node、前後clean | C drift、required-fast欠落、unexpected failure、tracked write | command/exit/count/elapsed/SHA、risk、EVD note、Ledger Note | pass |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder / doc-writer / repo-analyst | ... | `path/to/file` | `command` -> pass / docs-only inspection -> pass | pass / fail / unavailable / denied / waived / provisional | none / ... | accepted / rejected / needs follow-up |
+| S00 | dev-coder | current SHAのC、required-fast 7件、known flakyをread-onlyで再観測 | none | collect-only: 2696/exit 0; node/marker digests再生成一致; required-fast: 7 passed; known flaky: 1 passed | S00-R2 passed | known flakyの1回passは解消証拠ではない | evidence accepted。projection副作用はD-005でno_action |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -273,11 +323,13 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | plan-R4 | plan re-review | spec-reviewer | historical | failed | no | blocked | dev-coder role contractが禁止するconfig/workflow mutationをS01/S03へ割り当てたP1 1件 |
 | plan-R5 | plan re-review | spec-reviewer | fresh | passed | no | execute approved plan | R1〜R4 remediation、22 closure/24 cards、role configs、delivery/lifecycle gatesを再確認。findings 0、confidence 0.99 |
 | command-amendment-R1 | requirement / design / plan amendment review | spec-reviewer | fresh | passed | no | promote | direct ordinary pytest、explicit full permission、conditional policy skipへの改訂をcurrent bytesで確認。findings 0、confidence 0.99 |
+| S00-R1 | baseline characterization review | code-reviewer | historical | failed | no | blocked | countだけでは同数node入れ替えとskip/xfail差分を検出できず、baseline manifest evidenceが不足 |
+| S00-R2 | baseline characterization re-review | code-reviewer | fresh | passed | no | proceed to M0 commit | node digestとmarker inventory digestを独立再生成し一致。findings 0、confidence 0.99 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S00 / M0 | pending | baseline ledger commit | pending | pre-review clean | N/A | N/A | N/A | fresh code-reviewer pass後にcommit |
 
 #### 変更したファイル
 - `path/to/file1` - ...
