@@ -6,7 +6,10 @@ from typing import TYPE_CHECKING
 from spec_dock_runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
-    from spec_dock_runtime.domain.issue_planning_contracts import PlanningCommandResult
+    from spec_dock_runtime.domain.issue_planning_contracts import (
+        PlanningCommandResult,
+        PlanningReviewResult,
+    )
 
 
 def render_planning_result_text(result: PlanningCommandResult) -> CliText:
@@ -44,3 +47,25 @@ def render_planning_result_json(result: PlanningCommandResult) -> CliText:
         stderr_lines=[],
         warnings=[],
     )
+
+
+def render_planning_review_summary(result: PlanningReviewResult) -> str:
+    lines = [
+        "# Planning Review Summary",
+        "",
+        f"- mode: `{result.reviewed_identity.mode}`",
+        f"- issue_id: `{result.reviewed_identity.issue_id}`",
+        f"- reviewed_identity_sha256: `{result.reviewed_identity_sha256}`",
+        f"- verdict: `{result.verdict}`",
+        f"- finding_count: {len(result.findings)}",
+    ]
+    if result.findings:
+        lines.extend(("", "## Findings", ""))
+        lines.extend(
+            f"- `{finding.id}`: `{finding.severity}`"
+            for finding in sorted(
+                result.findings,
+                key=lambda item: (item.severity, item.id.encode("utf-8")),
+            )
+        )
+    return "\n".join(lines) + "\n"

@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 import sys
 
@@ -145,3 +146,60 @@ def test_planner_prompt_contains_exact_inner_document_contract(tmp_path: Path) -
         positions.append(prompt.index(start))
     assert positions == sorted(positions)
     assert "no prose" in prompt.lower()
+
+
+def test_review_prompt_classifies_exact_targets_and_formal_evidence() -> None:
+    attachment = issue_planning_prompt.PlanningPromptAttachment
+    identity = b'{"mode":"archive-candidate"}\n'
+    candidate = b"PK\x03\x04exact candidate bytes"
+    synthesized = issue_planning_prompt.synthesize_planning_evidence_prompt(
+        role="reviewer",
+        source_head="a" * 40,
+        repository="owner/repo",
+        branch="feature/issue",
+        exact_attachments=(
+            attachment(
+                name="target-candidate.zip",
+                classification="review-target",
+                source_label="candidate.zip",
+                content=candidate,
+            ),
+            attachment(
+                name="reviewed-identity.json",
+                classification="formal-evidence",
+                source_label="reviewed-identity.json",
+                content=identity,
+            ),
+        ),
+    )
+    assert synthesized.exact_attachments[0].content == candidate
+    assert "review-target" in synthesized.prompt
+    assert hashlib.sha256(candidate).hexdigest() in synthesized.prompt
+
+
+def test_semantic_revision_prompt_is_self_contained_without_session_locator() -> None:
+    attachment = issue_planning_prompt.PlanningPromptAttachment
+    synthesized = issue_planning_prompt.synthesize_planning_evidence_prompt(
+        role="planner",
+        source_head="a" * 40,
+        repository="owner/repo",
+        branch="feature/issue",
+        exact_attachments=(
+            attachment(
+                name="prior-candidate.zip",
+                classification="review-target",
+                source_label="candidate.zip",
+                content=b"candidate",
+            ),
+            attachment(
+                name="planning-review-result.json",
+                classification="formal-evidence",
+                source_label="planning-review-result.json",
+                content=b'{"verdict":"fail"}',
+            ),
+        ),
+        instructions=("selected finding: F-1", "preserve assumption: boundary"),
+    )
+    assert "selected finding: F-1" in synthesized.prompt
+    assert "preserve assumption: boundary" in synthesized.prompt
+    assert "session_locator" not in synthesized.prompt

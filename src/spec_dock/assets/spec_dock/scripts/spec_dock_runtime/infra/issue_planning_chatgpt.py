@@ -200,6 +200,17 @@ def _write_transport_pack(
         name = f"context-{index:03d}.md"
         attachment_names.append(name)
         (pack / name).write_text(f"source_path: {relative}\n\n{body}", encoding="utf-8")
+    exact_source_hashes: dict[str, str] = {}
+    for attachment in synthesized.exact_attachments:
+        if attachment.name in attachment_names:
+            raise ValueError("exact planning attachment name collides with prompt pack")
+        target = pack / attachment.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(attachment.content)
+        if hashlib.sha256(target.read_bytes()).hexdigest() != attachment.sha256:
+            raise OSError("exact planning attachment changed while writing prompt pack")
+        attachment_names.append(attachment.name)
+        exact_source_hashes[attachment.source_label] = attachment.sha256
     (pack / "chatgpt-use-prompt.md").write_text(synthesized.prompt, encoding="utf-8")
     (pack / "expected-output-contract.md").write_text(
         "The exact response frame in chatgpt-use-prompt.md is required.\n",
@@ -228,12 +239,18 @@ def _write_transport_pack(
         "adoption_status": "unreviewed",
         "bundle_generation_not_promotion": True,
     }
+    source_hashes = {
+        path: hashlib.sha256(body.encode("utf-8")).hexdigest()
+        for path, body in synthesized.attachments
+    }
+    for label, digest in exact_source_hashes.items():
+        existing = source_hashes.get(label)
+        if existing is not None and existing != digest:
+            raise ValueError("planning attachment source label has conflicting bytes")
+        source_hashes[label] = digest
     source_manifest = {
-        "source_paths": [path for path, _ in synthesized.attachments],
-        "source_hashes": {
-            path: hashlib.sha256(body.encode("utf-8")).hexdigest()
-            for path, body in synthesized.attachments
-        },
+        "source_paths": list(source_hashes),
+        "source_hashes": source_hashes,
         "source_manifest_hash": source.source_manifest_hash,
     }
     _write_json(pack / "manifest.json", manifest)

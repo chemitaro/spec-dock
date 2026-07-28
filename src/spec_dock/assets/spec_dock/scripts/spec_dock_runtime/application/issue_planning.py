@@ -3,26 +3,42 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import hashlib
+import json
+import os
 from pathlib import Path
+import re
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
     GitHubSyncPreflightRequest,
     run_github_sync_preflight,
 )
-from spec_dock_runtime.application.issue_planning_prompt import synthesize_issue_planning_prompt
+from spec_dock_runtime.application.issue_planning_prompt import (
+    PlanningPromptAttachment,
+    synthesize_issue_planning_prompt,
+    synthesize_planning_evidence_prompt,
+)
+from spec_dock_runtime.domain.authoring_pack.authority_boundary import (
+    private_absolute_path_finding,
+    scan_constraint_sensitive_payload,
+)
 from spec_dock_runtime.domain.ids import normalize_id_input
 from spec_dock_runtime.domain.issue_planning_candidate import (
     DOCUMENT_NAMES,
+    apply_mechanical_revision,
     build_candidate_material,
     parse_current_front_matter_baseline,
     parse_planner_payload,
+    render_planner_payload,
 )
 from spec_dock_runtime.domain.issue_planning_contracts import (
     PlanningCommandResult,
     PlanningContext,
     PlanningInvocationResult,
+    PlanningReviewResult,
+    PlanningRevisionRequestV1,
     PlanningSourceEvidence,
+    ReviewedPlanningIdentity,
 )
 from spec_dock_runtime.infra.clock import now_iso
 from spec_dock_runtime.infra.issue_planning_candidate import (
@@ -32,9 +48,23 @@ from spec_dock_runtime.infra.issue_planning_candidate import (
     CandidateOutputRejected,
     CandidatePublicationFailed,
     PublishedCandidate,
+    VerifiedIssueCandidate,
     build_and_publish_candidate,
+    load_verified_issue_candidate,
+    open_safe_directory_descriptor,
+    read_bounded_regular_file,
+    read_bounded_regular_file_at,
     validate_candidate_output_directory,
 )
+from spec_dock_runtime.infra.issue_planning_review import (
+    PublishedPlanningReview,
+    publish_planning_review_evidence,
+    read_external_review_result,
+)
+from spec_dock_runtime.presentation.issue_planning import render_planning_review_summary
+
+MAX_REVIEW_SOURCE_FILE_BYTES = 2_000_000
+MAX_REVIEW_SOURCE_TOTAL_BYTES = 10_000_000
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -54,6 +84,16 @@ class PlanningReviseRequest:
     candidate_path: Path
     request_path: Path
     output_dir: Path
+
+
+@dataclass(frozen=True)
+class PlanningRevisionEvidenceInput:
+    review_result_path: Path
+    review_result_sha256: str
+
+    def __post_init__(self) -> None:
+        if re.fullmatch(r"[0-9a-f]{64}", self.review_result_sha256) is None:
+            raise ValueError("review_result_sha256 must be lowercase SHA-256")
 
 
 @dataclass(frozen=True)
@@ -274,6 +314,11 @@ def run_issue_planning_transport(
             reason=reason,
             source_evidence=None if reason == "sensitive_input_rejected" else source_evidence,
         )
+    if _exact_attachments_have_sensitive_content(synthesized):
+        return PlanningInvocationResult(
+            status="rejected",
+            reason="sensitive_input_rejected",
+        )
     if not _attachments_match_source_manifest(
         synthesized,
         repository.source_manifest.source_hashes,
@@ -477,6 +522,578 @@ def run_issue_planning_create(
     )
 
 
+def run_issue_planning_review(
+    *,
+    request: PlanningReviewRequest,
+    records: Sequence[StoredMetaRecord],
+    repo_root: Path,
+    repo_slug_resolver: Callable[[Path], str | None],
+    backend_invoker: Callable[..., PlanningInvocationResult],
+    relevant_source_paths: Sequence[str] = (),
+    operator_context: Sequence[str] = (),
+    timeout_seconds: float | None = None,
+    preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult] = run_github_sync_preflight,
+    transport_runner: Callable[..., PlanningInvocationResult] = run_issue_planning_transport,
+    candidate_loader: Callable[[Path, Path], VerifiedIssueCandidate] = load_verified_issue_candidate,
+    publisher: Callable[..., PublishedPlanningReview] = publish_planning_review_evidence,
+    clock: Callable[[], str] = now_iso,
+) -> PlanningCommandResult:
+    repository_descriptor: int | None = None
+    try:
+        target = resolve_existing_issue_target(request.issue_id, records, repo_root)
+        validate_candidate_output_directory(request.output_dir, repo_root)
+        if request.mode == "archive-candidate":
+            if request.candidate_path is None or request.reviewed_head is not None:
+                raise ValueError("archive Review requires only a Candidate")
+            candidate = candidate_loader(request.candidate_path, repo_root)
+            if candidate.identity.issue_id != target.issue_id:
+                raise ValueError("Candidate Issue does not match Review target")
+        elif request.mode == "git-bound":
+            if request.candidate_path is not None or request.reviewed_head is None:
+                raise ValueError("git-bound Review requires only reviewed_head")
+            if re.fullmatch(r"[0-9a-f]{40}", request.reviewed_head) is None:
+                raise ValueError("reviewed_head is invalid")
+            candidate = None
+        else:
+            raise ValueError("Review mode is invalid")
+        repository_descriptor = open_safe_directory_descriptor(repo_root.resolve(strict=True))
+    except CandidateArchiveRejected as error:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="archive_rejected",
+            issue_id=request.issue_id,
+            details=error.findings,
+        )
+    except (OSError, UnicodeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="review_request_rejected",
+            issue_id=request.issue_id,
+        )
+
+    captured_identity: list[ReviewedPlanningIdentity] = []
+
+    def review_prompt_synthesizer(**kwargs: Any) -> Any:
+        context = cast("PlanningContext", kwargs["context"])
+        if request.mode == "archive-candidate":
+            assert candidate is not None
+            identity = ReviewedPlanningIdentity(
+                mode="archive-candidate",
+                issue_id=target.issue_id,
+                repository=context.repository,
+                branch=context.branch,
+                source_head=context.source_head,
+                candidate_identity=candidate.identity,
+            )
+            targets = (
+                PlanningPromptAttachment(
+                    name="target-candidate.zip",
+                    classification="review-target",
+                    source_label=candidate.identity.logical_filename,
+                    content=candidate.zip_bytes,
+                ),
+            )
+        else:
+            assert request.reviewed_head is not None
+            assert repository_descriptor is not None
+            if context.source_head != request.reviewed_head:
+                raise ValueError("reviewed HEAD does not match synchronized source")
+            identity = ReviewedPlanningIdentity(
+                mode="git-bound",
+                issue_id=target.issue_id,
+                repository=context.repository,
+                branch=context.branch,
+                source_head=context.source_head,
+                canonical_target_paths=target.canonical_issue_paths,
+                expected_canonical_target_paths=target.canonical_issue_paths,
+            )
+            targets = tuple(
+                PlanningPromptAttachment(
+                    name=f"target-{Path(path).name}",
+                    classification="review-target",
+                    source_label=path,
+                    content=read_bounded_regular_file_at(
+                        repository_descriptor,
+                        path,
+                        max_bytes=MAX_REVIEW_SOURCE_FILE_BYTES,
+                    ),
+                )
+                for path in target.canonical_issue_paths
+            )
+        identity_bytes = _canonical_json_bytes(identity.to_dict())
+        assert repository_descriptor is not None
+        supplemental = _read_review_supplemental_attachments(
+            context,
+            repository_descriptor=repository_descriptor,
+        )
+        captured_identity[:] = [identity]
+        return synthesize_planning_evidence_prompt(
+            role="reviewer",
+            source_head=context.source_head,
+            repository=context.repository,
+            branch=context.branch,
+            exact_attachments=(
+                *targets,
+                PlanningPromptAttachment(
+                    name="reviewed-identity.json",
+                    classification="formal-evidence",
+                    source_label="reviewed-identity.json",
+                    content=identity_bytes,
+                ),
+                PlanningPromptAttachment(
+                    name="reviewed-identity-sha256.txt",
+                    classification="formal-evidence",
+                    source_label="reviewed-identity-sha256.txt",
+                    content=f"{identity.sha256}\n".encode("ascii"),
+                ),
+            ),
+            supplemental_attachments=supplemental,
+        )
+
+    try:
+        transport = transport_runner(
+            issue=target.issue_id,
+            records=records,
+            repo_root=repo_root,
+            role="reviewer",
+            repo_slug_resolver=repo_slug_resolver,
+            backend_invoker=backend_invoker,
+            relevant_source_paths=relevant_source_paths,
+            operator_context=operator_context,
+            timeout_seconds=timeout_seconds,
+            preflight_runner=preflight_runner,
+            prompt_synthesizer=review_prompt_synthesizer,
+        )
+    finally:
+        assert repository_descriptor is not None
+        os.close(repository_descriptor)
+    if transport.status != "pass":
+        if (
+            request.mode == "git-bound"
+            and transport.reason == "git_preflight_blocked"
+            and "source_snapshot_mismatch" in transport.details
+        ):
+            return PlanningCommandResult(
+                status="stale",
+                reason="review_target_changed",
+                issue_id=target.issue_id,
+            )
+        return PlanningCommandResult(
+            status=cast("Literal['blocked', 'rejected']", transport.status),
+            reason=transport.reason,
+            issue_id=target.issue_id,
+            details=transport.details,
+        )
+    payload = transport.transient_payload
+    if (
+        transport.reason != "transport_received"
+        or transport.source_evidence is None
+        or payload is None
+        or transport.response_sha256 != hashlib.sha256(payload).hexdigest()
+        or len(captured_identity) != 1
+    ):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="review_result_rejected",
+            issue_id=target.issue_id,
+        )
+    identity = captured_identity[0]
+    try:
+        parsed = PlanningReviewResult.from_json_bytes(
+            payload,
+            expected_canonical_target_paths=(
+                target.canonical_issue_paths if request.mode == "git-bound" else None
+            ),
+        )
+        if parsed.reviewed_identity != identity or parsed.reviewed_identity_sha256 != identity.sha256:
+            raise ValueError("Review result identity mismatch")
+        if _review_result_has_sensitive_content(parsed):
+            raise ValueError("Review result contains unsafe dynamic content")
+    except (UnicodeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="review_result_rejected",
+            issue_id=target.issue_id,
+        )
+    if candidate is not None:
+        try:
+            current = candidate_loader(cast("Path", request.candidate_path), repo_root)
+        except CandidateArchiveRejected:
+            return PlanningCommandResult(
+                status="stale",
+                reason="review_target_changed",
+                issue_id=target.issue_id,
+            )
+        if current.identity != candidate.identity or current.zip_bytes != candidate.zip_bytes:
+            return PlanningCommandResult(
+                status="stale",
+                reason="review_target_changed",
+                issue_id=target.issue_id,
+            )
+    source_paths = tuple(
+        sorted(
+            {*target.canonical_issue_paths, *relevant_source_paths},
+            key=lambda value: value.encode("utf-8"),
+        )
+    )
+    post = preflight_runner(
+        GitHubSyncPreflightRequest(
+            repo_root=repo_root,
+            ref=None,
+            allow_default_branch_fallback=False,
+            source_paths=source_paths,
+            expected_source_hash=transport.source_evidence.source_manifest_hash,
+        )
+    )
+    repository = post.repository
+    evidence = transport.source_evidence
+    if (
+        post.status != "pass"
+        or repository is None
+        or repository.branch != evidence.branch
+        or repository.local_head != evidence.local_head
+        or repository.remote_head != evidence.remote_head
+        or repository.source_manifest.source_manifest_hash != evidence.source_manifest_hash
+    ):
+        return PlanningCommandResult(
+            status="stale",
+            reason="review_target_changed",
+            issue_id=target.issue_id,
+        )
+    try:
+        published = publisher(
+            output_dir=request.output_dir,
+            repo_root=repo_root,
+            reviewed_identity_sha256=identity.sha256,
+            review_result_bytes=payload,
+            summary_bytes=render_planning_review_summary(parsed).encode("utf-8"),
+            operation_time=datetime.fromisoformat(clock().replace("Z", "+00:00")),
+        )
+    except FileExistsError:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="output_collision",
+            issue_id=target.issue_id,
+        )
+    except (OSError, UnicodeError, ValueError):
+        return PlanningCommandResult(
+            status="blocked",
+            reason="review_publication_failed",
+            issue_id=target.issue_id,
+        )
+    return PlanningCommandResult(
+        status="ok",
+        reason="review_completed",
+        issue_id=target.issue_id,
+        output={
+            "review_result_file": published.review_result_file,
+            "review_summary_file": published.review_summary_file,
+            "review_result_sha256": published.review_result_sha256,
+            "reviewed_identity_sha256": identity.sha256,
+            "verdict": parsed.verdict,
+        },
+    )
+
+
+def run_issue_planning_revise(
+    *,
+    request: PlanningReviseRequest,
+    review_evidence: PlanningRevisionEvidenceInput,
+    records: Sequence[StoredMetaRecord],
+    repo_root: Path,
+    repo_slug_resolver: Callable[[Path], str | None],
+    backend_invoker: Callable[..., PlanningInvocationResult],
+    timeout_seconds: float | None = None,
+    preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult] = run_github_sync_preflight,
+    transport_runner: Callable[..., PlanningInvocationResult] = run_issue_planning_transport,
+    candidate_loader: Callable[[Path, Path], VerifiedIssueCandidate] = load_verified_issue_candidate,
+    publisher: Callable[..., PublishedCandidate] = build_and_publish_candidate,
+    clock: Callable[[], str] = now_iso,
+) -> PlanningCommandResult:
+    issue_id = "iss-00000"
+    try:
+        candidate = candidate_loader(request.candidate_path, repo_root)
+        issue_id = candidate.identity.issue_id
+        target = resolve_existing_issue_target(issue_id, records, repo_root)
+        output_guard = validate_candidate_output_directory(request.output_dir, repo_root)
+        request_bytes = _read_external_bounded_file(request.request_path, repo_root=repo_root)
+        revision = PlanningRevisionRequestV1.from_json_bytes(request_bytes)
+        if revision.candidate_identity != candidate.identity:
+            raise ValueError("revision Candidate identity mismatch")
+    except CandidateArchiveRejected as error:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="archive_rejected",
+            issue_id=issue_id,
+            details=error.findings,
+        )
+    except (OSError, UnicodeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="revision_request_rejected",
+            issue_id=issue_id,
+        )
+    try:
+        review_bytes = read_external_review_result(
+            review_evidence.review_result_path,
+            repo_root=repo_root,
+            expected_sha256=review_evidence.review_result_sha256,
+        )
+    except FileNotFoundError:
+        return PlanningCommandResult(
+            status="blocked",
+            reason="revision_review_unavailable",
+            issue_id=issue_id,
+        )
+    except (OSError, UnicodeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="revision_evidence_mismatch",
+            issue_id=issue_id,
+        )
+    try:
+        review = PlanningReviewResult.from_json_bytes(review_bytes)
+        reviewed = review.reviewed_identity
+        if (
+            reviewed.mode != "archive-candidate"
+            or reviewed.candidate_identity != candidate.identity
+        ):
+            raise ValueError("revision Review Candidate identity mismatch")
+        if _review_result_has_sensitive_content(review):
+            raise ValueError("revision Review contains unsafe dynamic content")
+        blocking = tuple(
+            finding for finding in review.findings if finding.severity in ("p0", "p1")
+        )
+        if not blocking:
+            return PlanningCommandResult(
+                status="blocked",
+                reason="revision_not_required",
+                issue_id=issue_id,
+            )
+        if revision.lane == "semantic":
+            if revision.review_result_sha256 != review_evidence.review_result_sha256:
+                raise ValueError("semantic Review digest mismatch")
+            revision.validate_against(review, review_bytes)
+    except (UnicodeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="revision_evidence_mismatch",
+            issue_id=issue_id,
+        )
+    source = _revision_source_state(
+        candidate=candidate,
+        target=target,
+        repo_root=repo_root,
+        preflight_runner=preflight_runner,
+    )
+    if isinstance(source, PlanningCommandResult):
+        return source
+    context, source_evidence = source
+    operation_time = datetime.fromisoformat(clock().replace("Z", "+00:00"))
+    try:
+        baseline = parse_current_front_matter_baseline(
+            {name: candidate.files[name] for name in DOCUMENT_NAMES}
+        )
+    except ValueError:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="archive_rejected",
+            issue_id=issue_id,
+        )
+    if revision.lane == "mechanical":
+        try:
+            revised_documents = apply_mechanical_revision(
+                {name: candidate.files[name] for name in DOCUMENT_NAMES},
+                target_file=cast("str", revision.target_file),
+                old_text=cast("str", revision.old_text),
+                new_text=cast("str", revision.new_text),
+                diff_budget=cast("int", revision.diff_budget),
+            )
+            payload = render_planner_payload(revised_documents)
+            planner_documents = parse_planner_payload(payload)
+        except (UnicodeError, ValueError):
+            return PlanningCommandResult(
+                status="rejected",
+                reason="mechanical_revision_rejected",
+                issue_id=issue_id,
+            )
+    else:
+        selected = {
+            finding.id: finding
+            for finding in review.findings
+            if finding.id in revision.finding_ids
+        }
+
+        def revision_prompt_synthesizer(**kwargs: Any) -> Any:
+            runtime_context = cast("PlanningContext", kwargs["context"])
+            if (
+                runtime_context.repository != candidate.identity.source_repository
+                or runtime_context.branch != candidate.identity.source_branch
+                or runtime_context.source_head != candidate.identity.source_head
+            ):
+                raise ValueError("semantic revision source changed")
+            base = synthesize_issue_planning_prompt(**kwargs)
+            attachments = [
+                PlanningPromptAttachment(
+                    name="prior-candidate.zip",
+                    classification="review-target",
+                    source_label=candidate.identity.logical_filename,
+                    content=candidate.zip_bytes,
+                ),
+                PlanningPromptAttachment(
+                    name="planning-review-result.json",
+                    classification="formal-evidence",
+                    source_label="planning-review-result.json",
+                    content=review_bytes,
+                ),
+            ]
+            attachments.extend(
+                PlanningPromptAttachment(
+                    name=f"prior-{name}",
+                    classification="supplemental-context",
+                    source_label=f"candidate/{name}",
+                    content=candidate.files[name],
+                )
+                for name in DOCUMENT_NAMES
+            )
+            instructions = (
+                *(
+                    f"selected finding {finding.id}: {finding.severity}"
+                    for finding in selected.values()
+                ),
+                *(f"preserve assumption: {item}" for item in revision.preserve_assumptions),
+            )
+            return synthesize_planning_evidence_prompt(
+                role="planner",
+                source_head=runtime_context.source_head,
+                repository=runtime_context.repository,
+                branch=runtime_context.branch,
+                exact_attachments=tuple(attachments),
+                instructions=instructions,
+                supplemental_attachments=base.attachments,
+            )
+
+        transport = transport_runner(
+            issue=issue_id,
+            records=records,
+            repo_root=repo_root,
+            role="planner",
+            repo_slug_resolver=repo_slug_resolver,
+            backend_invoker=backend_invoker,
+            relevant_source_paths=tuple(
+                cast("list[str]", candidate.source_baseline["relevant_paths"])
+            ),
+            operator_context=(),
+            timeout_seconds=timeout_seconds,
+            preflight_runner=preflight_runner,
+            prompt_synthesizer=revision_prompt_synthesizer,
+        )
+        if transport.status != "pass":
+            return PlanningCommandResult(
+                status=cast("Literal['blocked', 'rejected']", transport.status),
+                reason=transport.reason,
+                issue_id=issue_id,
+                details=transport.details,
+            )
+        payload = transport.transient_payload
+        if (
+            payload is None
+            or transport.response_sha256 != hashlib.sha256(payload).hexdigest()
+            or transport.source_evidence is None
+        ):
+            return PlanningCommandResult(
+                status="rejected",
+                reason="planner_response_rejected",
+                issue_id=issue_id,
+            )
+        source_evidence = transport.source_evidence
+        try:
+            planner_documents = parse_planner_payload(payload)
+        except (UnicodeError, ValueError):
+            return PlanningCommandResult(
+                status="rejected",
+                reason="planner_response_rejected",
+                issue_id=issue_id,
+            )
+    try:
+        material = build_candidate_material(
+            planner_documents=planner_documents,
+            baseline=baseline,
+            context=context,
+            source_evidence=source_evidence,
+            planner_payload=payload,
+            operation_time=operation_time,
+            version=candidate.identity.version + 1,
+        )
+    except (UnicodeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="planner_response_rejected",
+            issue_id=issue_id,
+        )
+    current_source = _revision_source_state(
+        candidate=candidate,
+        target=target,
+        repo_root=repo_root,
+        preflight_runner=preflight_runner,
+    )
+    try:
+        current_candidate = candidate_loader(request.candidate_path, repo_root)
+    except CandidateArchiveRejected:
+        current_candidate = None
+    if (
+        isinstance(current_source, PlanningCommandResult)
+        or current_candidate is None
+        or current_candidate.identity != candidate.identity
+        or current_candidate.zip_bytes != candidate.zip_bytes
+    ):
+        return PlanningCommandResult(
+            status="stale",
+            reason="revision_source_stale",
+            issue_id=issue_id,
+        )
+    try:
+        published = publisher(
+            output_guard=output_guard,
+            repo_root=repo_root,
+            material=material,
+        )
+    except CandidateCollision:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="output_collision",
+            issue_id=issue_id,
+        )
+    except CandidateArchiveRejected as error:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="archive_rejected",
+            issue_id=issue_id,
+            details=error.findings,
+        )
+    except CandidateBuildFailed:
+        return PlanningCommandResult(
+            status="blocked",
+            reason="candidate_build_failed",
+            issue_id=issue_id,
+        )
+    except CandidatePublicationFailed:
+        return PlanningCommandResult(
+            status="blocked",
+            reason="candidate_publication_failed",
+            issue_id=issue_id,
+        )
+    return PlanningCommandResult(
+        status="ok",
+        reason="candidate_revised",
+        issue_id=issue_id,
+        output={
+            "candidate_identity": published.identity.to_dict(),
+            "zip_byte_count": published.zip_byte_count,
+        },
+    )
+
+
 def _content_free_preflight_categories(blockers: Sequence[str]) -> tuple[str, ...]:
     if not blockers:
         return ("repository_snapshot_missing",)
@@ -514,6 +1131,109 @@ def _content_free_preflight_categories(blockers: Sequence[str]) -> tuple[str, ..
     return tuple(dict.fromkeys(categories))
 
 
+def _revision_source_state(
+    *,
+    candidate: VerifiedIssueCandidate,
+    target: ExistingIssueTarget,
+    repo_root: Path,
+    preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult],
+) -> tuple[PlanningContext, PlanningSourceEvidence] | PlanningCommandResult:
+    baseline = candidate.source_baseline
+    try:
+        source_paths = tuple(
+            sorted(
+                {
+                    *cast("list[str]", baseline["canonical_issue_paths"]),
+                    *cast("list[str]", baseline["relevant_paths"]),
+                },
+                key=lambda value: value.encode("utf-8"),
+            )
+        )
+        preflight = preflight_runner(
+            GitHubSyncPreflightRequest(
+                repo_root=repo_root,
+                ref=None,
+                allow_default_branch_fallback=False,
+                source_paths=source_paths,
+                expected_source_hash=cast("str", baseline["source_manifest_hash"]),
+            )
+        )
+    except (KeyError, TypeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="archive_rejected",
+            issue_id=candidate.identity.issue_id,
+        )
+    if preflight.status != "pass" or preflight.repository is None:
+        return PlanningCommandResult(
+            status="blocked",
+            reason="git_preflight_blocked",
+            issue_id=candidate.identity.issue_id,
+            details=_content_free_preflight_categories(preflight.blockers),
+        )
+    repository = preflight.repository
+    if (
+        repository.branch != candidate.identity.source_branch
+        or repository.local_head != candidate.identity.source_head
+        or repository.remote_head != candidate.identity.source_head
+        or repository.source_manifest.source_manifest_hash
+        != baseline["source_manifest_hash"]
+    ):
+        return PlanningCommandResult(
+            status="stale",
+            reason="revision_source_stale",
+            issue_id=candidate.identity.issue_id,
+        )
+    try:
+        context = PlanningContext(
+            issue_id=candidate.identity.issue_id,
+            repository=candidate.identity.source_repository,
+            branch=candidate.identity.source_branch,
+            source_head=candidate.identity.source_head,
+            parent_epic_id=target.parent_epic_id,
+            parent_initiative_id=target.parent_initiative_id,
+            dependency_summary=tuple(cast("list[str]", baseline["dependency_ids"])),
+            canonical_issue_paths=target.canonical_issue_paths,
+            relevant_source_paths=tuple(cast("list[str]", baseline["relevant_paths"])),
+            operator_context=(),
+        )
+        evidence = PlanningSourceEvidence(
+            repository=candidate.identity.source_repository,
+            branch=candidate.identity.source_branch,
+            upstream=f"origin/{candidate.identity.source_branch}",
+            local_head=candidate.identity.source_head,
+            remote_head=candidate.identity.source_head,
+            source_manifest_hash=cast("str", baseline["source_manifest_hash"]),
+            snapshot_id=repository.snapshot_id,
+            remote_head_disposition="fetched_remote_tracking_ref",
+        )
+    except (KeyError, TypeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="archive_rejected",
+            issue_id=candidate.identity.issue_id,
+        )
+    return context, evidence
+
+
+def _read_external_bounded_file(path: Path, *, repo_root: Path) -> bytes:
+    lexical = path.absolute()
+    if not lexical.exists() or not lexical.is_file() or _contains_symlink(Path(lexical.anchor), lexical):
+        raise ValueError("external input path is unsafe")
+    resolved = lexical.resolve(strict=True)
+    repository = repo_root.resolve(strict=True)
+    if resolved == repository or resolved.is_relative_to(repository):
+        raise ValueError("external input must be outside repository")
+    try:
+        data = read_bounded_regular_file(resolved, max_bytes=1024 * 1024)
+    except ValueError as error:
+        if "bounded" in str(error):
+            raise ValueError("external input exceeds bounded size") from None
+        raise ValueError("external input path is unsafe") from None
+    data.decode("utf-8", errors="strict")
+    return data
+
+
 def _attachments_match_source_manifest(
     synthesized: object,
     expected_hashes: dict[str, str],
@@ -532,4 +1252,94 @@ def _attachments_match_source_manifest(
         ):
             return False
         actual_hashes[attachment[0]] = hashlib.sha256(attachment[1].encode("utf-8")).hexdigest()
-    return actual_hashes == expected_hashes
+    if actual_hashes != expected_hashes:
+        return False
+    exact_attachments = getattr(synthesized, "exact_attachments", None)
+    if not isinstance(exact_attachments, tuple):
+        return False
+    for attachment in exact_attachments:
+        source_label = getattr(attachment, "source_label", None)
+        classification = getattr(attachment, "classification", None)
+        content = getattr(attachment, "content", None)
+        if (
+            classification == "review-target"
+            and isinstance(source_label, str)
+            and source_label in expected_hashes
+            and (
+                not isinstance(content, bytes)
+                or hashlib.sha256(content).hexdigest() != expected_hashes[source_label]
+            )
+        ):
+            return False
+    return True
+
+
+def _read_review_supplemental_attachments(
+    context: PlanningContext,
+    *,
+    repository_descriptor: int,
+) -> tuple[tuple[str, str], ...]:
+    for value in context.operator_context:
+        if scan_constraint_sensitive_payload(value) or private_absolute_path_finding(value):
+            raise ValueError("sensitive Review context rejected")
+    attachments: list[tuple[str, str]] = []
+    total = 0
+    paths = tuple(
+        sorted(
+            {*context.canonical_issue_paths, *context.relevant_source_paths},
+            key=lambda value: value.encode("utf-8"),
+        )
+    )
+    for path in paths:
+        content = read_bounded_regular_file_at(
+            repository_descriptor,
+            path,
+            max_bytes=MAX_REVIEW_SOURCE_FILE_BYTES,
+        )
+        total += len(content)
+        if total > MAX_REVIEW_SOURCE_TOTAL_BYTES:
+            raise ValueError("Review context exceeds bounded size")
+        text = content.decode("utf-8", errors="strict")
+        if scan_constraint_sensitive_payload(text) or private_absolute_path_finding(text):
+            raise ValueError("sensitive Review context rejected")
+        attachments.append((path, text))
+    return tuple(attachments)
+
+
+def _exact_attachments_have_sensitive_content(synthesized: object) -> bool:
+    exact_attachments = getattr(synthesized, "exact_attachments", None)
+    if not isinstance(exact_attachments, tuple):
+        return True
+    for attachment in exact_attachments:
+        content = getattr(attachment, "content", None)
+        if not isinstance(content, bytes):
+            return True
+        text = content.decode("utf-8", errors="ignore")
+        if scan_constraint_sensitive_payload(text) or private_absolute_path_finding(text):
+            return True
+    return False
+
+
+def _canonical_json_bytes(value: dict[str, Any]) -> bytes:
+    return (
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        + b"\n"
+    )
+
+
+def _review_result_has_sensitive_content(result: PlanningReviewResult) -> bool:
+    for finding in result.findings:
+        for value in (
+            finding.id,
+            finding.exact_location,
+            finding.violated_requirement_or_contradiction,
+            finding.concrete_impact,
+        ):
+            if scan_constraint_sensitive_payload(value) or private_absolute_path_finding(value):
+                return True
+    return False

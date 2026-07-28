@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import zipfile
@@ -112,7 +113,11 @@ def _planner_payload() -> bytes:
     return b"".join(chunks)
 
 
-def _successful_transport(payload: bytes | None = None):
+def _successful_transport(
+    payload: bytes | None = None,
+    *,
+    source_manifest_hash: str = "c" * 64,
+):
     contracts = __import__(
         "spec_dock_runtime.domain.issue_planning_contracts",
         fromlist=["PlanningInvocationResult", "PlanningSourceEvidence"],
@@ -124,7 +129,7 @@ def _successful_transport(payload: bytes | None = None):
         upstream="origin/feature/issue",
         local_head="a" * 40,
         remote_head="a" * 40,
-        source_manifest_hash="c" * 64,
+        source_manifest_hash=source_manifest_hash,
         snapshot_id="b" * 64,
         remote_head_disposition="fetched_remote_tracking_ref",
     )
@@ -643,6 +648,1360 @@ def test_create_uses_one_dependency_snapshot_for_transport_and_source_baseline(
         baseline = json.loads(archive.read(f"{internal_root}/SOURCE-BASELINE.json"))
     assert loader_calls == ["iss-00003"]
     assert baseline["dependency_ids"] == transport_dependencies == ["iss-00001"]
+
+
+def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    candidate_output = tmp_path / "candidates"
+    review_output = tmp_path / "reviews"
+    candidate_output.mkdir()
+    review_output.mkdir()
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_review"],
+    )
+    created = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", candidate_output),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=lambda **kwargs: _successful_transport(),
+        clock=lambda: "2026-07-28T12:00:00+00:00",
+    )
+    candidate = candidate_output / created.output["candidate_identity"]["logical_filename"]
+    calls: list[object] = []
+    mutate_candidate = [False]
+
+    def review_transport(**kwargs):
+        contracts = __import__(
+            "spec_dock_runtime.domain.issue_planning_contracts",
+            fromlist=["PlanningContext"],
+        )
+        context = contracts.PlanningContext(
+            issue_id="iss-00003",
+            repository="owner/repo",
+            branch="feature/issue",
+            source_head="a" * 40,
+            parent_epic_id="epic-00002",
+            parent_initiative_id="init-00001",
+            dependency_summary=(),
+            canonical_issue_paths=resolve_existing_issue_target(
+                "iss-00003",
+                [_record(issue_dir)],
+                repo,
+            ).canonical_issue_paths,
+            relevant_source_paths=(),
+            operator_context=(),
+        )
+        synthesized = kwargs["prompt_synthesizer"](
+            role="reviewer",
+            context=context,
+            repo_root=repo,
+            upstream="origin/feature/issue",
+            remote_head="a" * 40,
+        )
+        calls.append(synthesized)
+        if mutate_candidate[0]:
+            candidate.write_bytes(b"changed after Reviewer invocation")
+        identity_bytes = next(
+            item.content
+            for item in synthesized.exact_attachments
+            if item.name == "reviewed-identity.json"
+        )
+        identity = contracts.ReviewedPlanningIdentity.from_json_bytes(identity_bytes)
+        supplied_identity_digest = next(
+            item.content.decode("ascii").strip()
+            for item in synthesized.exact_attachments
+            if item.name == "reviewed-identity-sha256.txt"
+        )
+        assert supplied_identity_digest == identity.sha256
+        review = contracts.PlanningReviewResult(
+            reviewed_identity=identity,
+            reviewed_identity_sha256=supplied_identity_digest,
+            verdict="pass",
+            findings=(),
+        )
+        payload = json.dumps(
+            review.to_dict(),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        preflight = _preflight()
+        assert preflight.repository is not None
+        evidence = contracts.PlanningSourceEvidence(
+            repository="owner/repo",
+            branch="feature/issue",
+            upstream="origin/feature/issue",
+            local_head="a" * 40,
+            remote_head="a" * 40,
+            source_manifest_hash=preflight.repository.source_manifest.source_manifest_hash,
+            snapshot_id="b" * 64,
+            remote_head_disposition="fetched_remote_tracking_ref",
+        )
+        return contracts.PlanningInvocationResult(
+            status="pass",
+            reason="transport_received",
+            source_evidence=evidence,
+            response_bytes=len(payload),
+            response_sha256=hashlib.sha256(payload).hexdigest(),
+            transient_payload=payload,
+        )
+
+    result = module.run_issue_planning_review(
+        request=module.PlanningReviewRequest(
+            issue_id="iss-00003",
+            mode="archive-candidate",
+            output_dir=review_output,
+            candidate_path=candidate,
+        ),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=review_transport,
+        preflight_runner=lambda request: _preflight(),
+        clock=lambda: "2026-07-28T13:00:00+00:00",
+    )
+    assert (result.status, result.reason) == ("ok", "review_completed")
+    assert result.output["verdict"] == "pass"
+    assert (review_output / result.output["review_result_file"]).is_file()
+    assert len(calls) == 1
+    assert [item.classification for item in calls[0].exact_attachments].count("review-target") == 1
+    before_directories = tuple(review_output.iterdir())
+    mutate_candidate[0] = True
+    stale = module.run_issue_planning_review(
+        request=module.PlanningReviewRequest(
+            issue_id="iss-00003",
+            mode="archive-candidate",
+            output_dir=review_output,
+            candidate_path=candidate,
+        ),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=review_transport,
+        preflight_runner=lambda request: _preflight(),
+        clock=lambda: "2026-07-28T13:01:00+00:00",
+    )
+    assert (stale.status, stale.reason) == ("stale", "review_target_changed")
+    assert tuple(review_output.iterdir()) == before_directories
+    assert len(calls) == 2
+
+
+def test_git_bound_review_has_exact_three_targets(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "reviews"
+    output.mkdir()
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_review"],
+    )
+    captured: list[object] = []
+
+    def transport(**kwargs):
+        contracts = __import__(
+            "spec_dock_runtime.domain.issue_planning_contracts",
+            fromlist=["PlanningContext"],
+        )
+        target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], repo)
+        context = contracts.PlanningContext(
+            issue_id="iss-00003",
+            repository="owner/repo",
+            branch="feature/issue",
+            source_head="a" * 40,
+            parent_epic_id="epic-00002",
+            parent_initiative_id="init-00001",
+            dependency_summary=(),
+            canonical_issue_paths=target.canonical_issue_paths,
+            relevant_source_paths=(),
+            operator_context=(),
+        )
+        synthesized = kwargs["prompt_synthesizer"](
+            role="reviewer",
+            context=context,
+            repo_root=repo,
+            upstream="origin/feature/issue",
+            remote_head="a" * 40,
+        )
+        captured.extend(
+            item for item in synthesized.exact_attachments if item.classification == "review-target"
+        )
+        identity_bytes = next(
+            item.content for item in synthesized.exact_attachments if item.name == "reviewed-identity.json"
+        )
+        identity = contracts.ReviewedPlanningIdentity.from_json_bytes(
+            identity_bytes,
+            expected_canonical_target_paths=target.canonical_issue_paths,
+        )
+        review = contracts.PlanningReviewResult(
+            reviewed_identity=identity,
+            reviewed_identity_sha256=identity.sha256,
+            verdict="pass",
+            findings=(),
+        )
+        payload = json.dumps(review.to_dict(), sort_keys=True, separators=(",", ":")).encode()
+        snapshot = _preflight()
+        assert snapshot.repository is not None
+        evidence = contracts.PlanningSourceEvidence(
+            repository="owner/repo",
+            branch="feature/issue",
+            upstream="origin/feature/issue",
+            local_head="a" * 40,
+            remote_head="a" * 40,
+            source_manifest_hash=snapshot.repository.source_manifest.source_manifest_hash,
+            snapshot_id="b" * 64,
+            remote_head_disposition="fetched_remote_tracking_ref",
+        )
+        return contracts.PlanningInvocationResult(
+            status="pass",
+            reason="transport_received",
+            source_evidence=evidence,
+            response_bytes=len(payload),
+            response_sha256=hashlib.sha256(payload).hexdigest(),
+            transient_payload=payload,
+        )
+
+    result = module.run_issue_planning_review(
+        request=module.PlanningReviewRequest(
+            issue_id="iss-00003",
+            mode="git-bound",
+            output_dir=output,
+            reviewed_head="a" * 40,
+        ),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=transport,
+        preflight_runner=lambda request: _preflight(),
+        clock=lambda: "2026-07-28T14:00:00+00:00",
+    )
+    assert (result.status, result.reason) == ("ok", "review_completed")
+    assert [item.name for item in captured] == [
+        "target-design.md",
+        "target-plan.md",
+        "target-requirement.md",
+    ]
+    before_directories = tuple(output.iterdir())
+    stale = module.run_issue_planning_review(
+        request=module.PlanningReviewRequest(
+            issue_id="iss-00003",
+            mode="git-bound",
+            output_dir=output,
+            reviewed_head="a" * 40,
+        ),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=transport,
+        preflight_runner=lambda request: _preflight(blockers=("dirty_tracked",)),
+        clock=lambda: "2026-07-28T14:01:00+00:00",
+    )
+    assert (stale.status, stale.reason) == ("stale", "review_target_changed")
+    assert tuple(output.iterdir()) == before_directories
+
+
+@pytest.mark.parametrize(
+    ("transient_bytes", "expected_reason"),
+    [
+        (b"transient canonical target bytes", "review_target_changed"),
+        (b"token=abc123secret", "sensitive_input_rejected"),
+    ],
+)
+def test_git_bound_review_rejects_transient_exact_target_bytes_before_backend(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    transient_bytes: bytes,
+    expected_reason: str,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "reviews"
+    output.mkdir()
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_review"],
+    )
+    target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], repo)
+    manifest = build_source_manifest(repo, target.canonical_issue_paths)
+    transient_target = repo / target.canonical_issue_paths[0]
+    original_bytes = transient_target.read_bytes()
+    original_read_bytes = Path.read_bytes
+    transient_reads = [0]
+    original_open = os.open
+    backend_calls: list[object] = []
+    leaked_target_bytes: list[bytes] = []
+
+    def transient_read(path: Path) -> bytes:
+        if path == transient_target and transient_reads[0] == 0:
+            transient_reads[0] += 1
+            return transient_bytes
+        return original_read_bytes(path)
+
+    def transient_open(path, flags, *args, **kwargs):
+        if (
+            path == transient_target.name
+            and kwargs.get("dir_fd") is not None
+            and transient_reads[0] == 0
+        ):
+            transient_reads[0] += 1
+            backup = transient_target.with_suffix(".original")
+            transient_target.rename(backup)
+            transient_target.write_bytes(transient_bytes)
+            descriptor = original_open(path, flags, *args, **kwargs)
+            transient_target.unlink()
+            backup.rename(transient_target)
+            return descriptor
+        return original_open(path, flags, *args, **kwargs)
+
+    def backend(**kwargs):
+        backend_calls.append(kwargs)
+        synthesized = kwargs["synthesized"]
+        leaked_target_bytes.extend(
+            attachment.content
+            for attachment in synthesized.exact_attachments
+            if attachment.source_label == target.canonical_issue_paths[0]
+        )
+        contracts = __import__(
+            "spec_dock_runtime.domain.issue_planning_contracts",
+            fromlist=["PlanningReviewResult"],
+        )
+        identity_bytes = next(
+            attachment.content
+            for attachment in synthesized.exact_attachments
+            if attachment.name == "reviewed-identity.json"
+        )
+        identity = contracts.ReviewedPlanningIdentity.from_json_bytes(
+            identity_bytes,
+            expected_canonical_target_paths=target.canonical_issue_paths,
+        )
+        review = contracts.PlanningReviewResult(
+            reviewed_identity=identity,
+            reviewed_identity_sha256=identity.sha256,
+            verdict="pass",
+            findings=(),
+        )
+        payload = json.dumps(review.to_dict(), sort_keys=True, separators=(",", ":")).encode()
+        return _successful_transport(
+            payload,
+            source_manifest_hash=manifest.source_manifest_hash,
+        )
+
+    monkeypatch.setattr(Path, "read_bytes", transient_read)
+    monkeypatch.setattr(os, "open", transient_open)
+    result = module.run_issue_planning_review(
+        request=module.PlanningReviewRequest(
+            issue_id="iss-00003",
+            mode="git-bound",
+            output_dir=output,
+            reviewed_head="a" * 40,
+        ),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=backend,
+        preflight_runner=lambda request: _preflight(source_manifest=manifest),
+        clock=lambda: "2026-07-28T14:00:00+00:00",
+    )
+    assert (result.status, result.reason) in {
+        ("stale", expected_reason),
+        ("rejected", expected_reason),
+    }
+    assert backend_calls == []
+    assert leaked_target_bytes == []
+    assert list(output.iterdir()) == []
+    assert transient_target.read_bytes() == original_bytes
+    assert transient_bytes.decode("utf-8") not in repr(result)
+
+
+@pytest.mark.parametrize("swap_kind", ["fifo", "symlink"])
+def test_git_bound_review_target_swap_is_nonblocking_and_rejected_before_backend(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    swap_kind: str,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "reviews"
+    output.mkdir()
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_review"],
+    )
+    target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], repo)
+    manifest = build_source_manifest(repo, target.canonical_issue_paths)
+    target_path = repo / target.canonical_issue_paths[0]
+    sensitive_target = repo / "sensitive.md"
+    sensitive_target.write_text("token=abc123secret", encoding="utf-8")
+    original_open = os.open
+    original_read_bytes = Path.read_bytes
+    swapped = [False]
+    backend_calls: list[object] = []
+
+    def swap_target() -> None:
+        if swapped[0]:
+            return
+        swapped[0] = True
+        target_path.unlink()
+        if swap_kind == "fifo":
+            os.mkfifo(target_path)
+        else:
+            target_path.symlink_to(sensitive_target)
+
+    def swap_during_open(path, flags, *args, **kwargs):
+        if path == target_path.name and kwargs.get("dir_fd") is not None and not swapped[0]:
+            swap_target()
+            if swap_kind == "fifo":
+                assert flags & os.O_NONBLOCK
+        return original_open(path, flags, *args, **kwargs)
+
+    def reject_blocking_pathname_read(path: Path) -> bytes:
+        if path == target_path:
+            swap_target()
+            raise AssertionError("git-bound target used blocking pathname read")
+        return original_read_bytes(path)
+
+    def backend(**kwargs):
+        backend_calls.append(kwargs)
+        pytest.fail("unsafe target reached backend")
+
+    monkeypatch.setattr(os, "open", swap_during_open)
+    monkeypatch.setattr(Path, "read_bytes", reject_blocking_pathname_read)
+    result = module.run_issue_planning_review(
+        request=module.PlanningReviewRequest(
+            issue_id="iss-00003",
+            mode="git-bound",
+            output_dir=output,
+            reviewed_head="a" * 40,
+        ),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=backend,
+        preflight_runner=lambda request: _preflight(source_manifest=manifest),
+    )
+    assert result.status in {"rejected", "stale"}
+    assert backend_calls == []
+    assert list(output.iterdir()) == []
+
+
+def test_mechanical_revision_requires_blocking_review_and_publishes_v2(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    candidates = tmp_path / "candidates"
+    revised = tmp_path / "revised"
+    candidates.mkdir()
+    revised.mkdir()
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_revise"],
+    )
+    snapshot = _preflight()
+    assert snapshot.repository is not None
+    created = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", candidates),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=lambda **kwargs: _successful_transport(
+            source_manifest_hash=snapshot.repository.source_manifest.source_manifest_hash
+        ),
+        clock=lambda: "2026-07-28T12:00:00+00:00",
+    )
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["IssueCandidateIdentity"],
+    )
+    identity = contracts.IssueCandidateIdentity.from_dict(created.output["candidate_identity"])
+    reviewed_identity = contracts.ReviewedPlanningIdentity(
+        mode="archive-candidate",
+        issue_id="iss-00003",
+        repository="owner/repo",
+        branch="feature/issue",
+        source_head="a" * 40,
+        candidate_identity=identity,
+    )
+    finding = contracts.PlanningReviewFinding(
+        id="F-1",
+        severity="p1",
+        exact_location="plan.md",
+        violated_requirement_or_contradiction="missing exact wording",
+        concrete_impact="cannot execute",
+    )
+    review = contracts.PlanningReviewResult(
+        reviewed_identity=reviewed_identity,
+        reviewed_identity_sha256=reviewed_identity.sha256,
+        verdict="fail",
+        findings=(finding,),
+    )
+    review_bytes = json.dumps(
+        review.to_dict(),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    review_path = tmp_path / "review.json"
+    review_path.write_bytes(review_bytes)
+    request_path = tmp_path / "mechanical.json"
+    request_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "lane": "mechanical",
+                "candidate_identity": identity.to_dict(),
+                "preserve_assumptions": ["scope"],
+                "target_file": "plan.md",
+                "old_text": "Substantive",
+                "new_text": "Executable",
+                "meaning_invariant": "same scope",
+                "diff_budget": len(b"Substantive") + len(b"Executable"),
+            },
+            separators=(",", ":"),
+        ),
+        encoding="utf-8",
+    )
+    backend_calls: list[object] = []
+    candidate_path = candidates / identity.logical_filename
+    old_sha = hashlib.sha256(candidate_path.read_bytes()).hexdigest()
+    result = module.run_issue_planning_revise(
+        request=module.PlanningReviseRequest(candidate_path, request_path, revised),
+        review_evidence=module.PlanningRevisionEvidenceInput(
+            review_path,
+            hashlib.sha256(review_bytes).hexdigest(),
+        ),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+        preflight_runner=lambda request: _preflight(),
+        clock=lambda: "2026-07-28T15:00:00+00:00",
+    )
+    assert (result.status, result.reason) == ("ok", "candidate_revised")
+    assert result.output["candidate_identity"]["version"] == 2
+    assert backend_calls == []
+    assert hashlib.sha256(candidate_path.read_bytes()).hexdigest() == old_sha
+
+
+def test_p2_only_review_blocks_revision_without_backend_or_candidate(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    candidates = tmp_path / "candidates"
+    revised = tmp_path / "revised"
+    candidates.mkdir()
+    revised.mkdir()
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_revise"],
+    )
+    snapshot = _preflight()
+    assert snapshot.repository is not None
+    created = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", candidates),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        transport_runner=lambda **kwargs: _successful_transport(
+            source_manifest_hash=snapshot.repository.source_manifest.source_manifest_hash
+        ),
+        clock=lambda: "2026-07-28T12:00:00+00:00",
+    )
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["IssueCandidateIdentity"],
+    )
+    identity = contracts.IssueCandidateIdentity.from_dict(created.output["candidate_identity"])
+    reviewed_identity = contracts.ReviewedPlanningIdentity(
+        mode="archive-candidate",
+        issue_id="iss-00003",
+        repository="owner/repo",
+        branch="feature/issue",
+        source_head="a" * 40,
+        candidate_identity=identity,
+    )
+    review = contracts.PlanningReviewResult(
+        reviewed_identity=reviewed_identity,
+        reviewed_identity_sha256=reviewed_identity.sha256,
+        verdict="pass",
+        findings=(
+            contracts.PlanningReviewFinding(
+                id="F-2",
+                severity="p2",
+                exact_location="plan.md",
+                violated_requirement_or_contradiction="observation",
+                concrete_impact="non-blocking",
+            ),
+        ),
+    )
+    review_bytes = json.dumps(review.to_dict(), sort_keys=True, separators=(",", ":")).encode()
+    review_path = tmp_path / "review.json"
+    review_path.write_bytes(review_bytes)
+    request_path = tmp_path / "mechanical.json"
+    request_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "lane": "mechanical",
+                "candidate_identity": identity.to_dict(),
+                "preserve_assumptions": [],
+                "target_file": "plan.md",
+                "old_text": "Substantive",
+                "new_text": "Executable",
+                "meaning_invariant": "same scope",
+                "diff_budget": 100,
+            },
+            separators=(",", ":"),
+        ),
+        encoding="utf-8",
+    )
+    backend_calls: list[object] = []
+    result = module.run_issue_planning_revise(
+        request=module.PlanningReviseRequest(
+            candidates / identity.logical_filename,
+            request_path,
+            revised,
+        ),
+        review_evidence=module.PlanningRevisionEvidenceInput(
+            review_path,
+            hashlib.sha256(review_bytes).hexdigest(),
+        ),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+        preflight_runner=lambda request: _preflight(),
+    )
+    assert (result.status, result.reason) == ("blocked", "revision_not_required")
+    assert backend_calls == []
+    assert list(revised.iterdir()) == []
+
+
+def test_semantic_revision_uses_exact_review_and_complete_replacement(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    candidates = tmp_path / "candidates"
+    revised = tmp_path / "revised"
+    candidates.mkdir()
+    revised.mkdir()
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_revise"],
+    )
+    snapshot = _preflight()
+    assert snapshot.repository is not None
+    source_hash = snapshot.repository.source_manifest.source_manifest_hash
+    created = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", candidates),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        transport_runner=lambda **kwargs: _successful_transport(
+            source_manifest_hash=source_hash
+        ),
+        clock=lambda: "2026-07-28T12:00:00+00:00",
+    )
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["IssueCandidateIdentity"],
+    )
+    identity = contracts.IssueCandidateIdentity.from_dict(created.output["candidate_identity"])
+    reviewed_identity = contracts.ReviewedPlanningIdentity(
+        mode="archive-candidate",
+        issue_id="iss-00003",
+        repository="owner/repo",
+        branch="feature/issue",
+        source_head="a" * 40,
+        candidate_identity=identity,
+    )
+    review = contracts.PlanningReviewResult(
+        reviewed_identity=reviewed_identity,
+        reviewed_identity_sha256=reviewed_identity.sha256,
+        verdict="fail",
+        findings=(
+            contracts.PlanningReviewFinding(
+                id="F-1",
+                severity="p1",
+                exact_location="design.md",
+                violated_requirement_or_contradiction="missing behavior",
+                concrete_impact="implementation blocked",
+            ),
+        ),
+    )
+    review_bytes = json.dumps(review.to_dict(), sort_keys=True, separators=(",", ":")).encode()
+    review_sha = hashlib.sha256(review_bytes).hexdigest()
+    review_path = tmp_path / "review.json"
+    review_path.write_bytes(review_bytes)
+    request_path = tmp_path / "semantic.json"
+    request_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "lane": "semantic",
+                "candidate_identity": identity.to_dict(),
+                "preserve_assumptions": ["keep scope"],
+                "finding_ids": ["F-1"],
+                "review_result_sha256": review_sha,
+            },
+            separators=(",", ":"),
+        ),
+        encoding="utf-8",
+    )
+    calls: list[object] = []
+
+    def semantic_transport(**kwargs):
+        target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], repo)
+        context = contracts.PlanningContext(
+            issue_id="iss-00003",
+            repository="owner/repo",
+            branch="feature/issue",
+            source_head="a" * 40,
+            parent_epic_id="epic-00002",
+            parent_initiative_id="init-00001",
+            dependency_summary=(),
+            canonical_issue_paths=target.canonical_issue_paths,
+            relevant_source_paths=(),
+            operator_context=(),
+        )
+        synthesized = kwargs["prompt_synthesizer"](
+            role="planner",
+            context=context,
+            repo_root=repo,
+            upstream="origin/feature/issue",
+            remote_head="a" * 40,
+        )
+        calls.append(synthesized)
+        return _successful_transport(
+            _planner_payload(),
+            source_manifest_hash=source_hash,
+        )
+
+    result = module.run_issue_planning_revise(
+        request=module.PlanningReviseRequest(
+            candidates / identity.logical_filename,
+            request_path,
+            revised,
+        ),
+        review_evidence=module.PlanningRevisionEvidenceInput(review_path, review_sha),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        transport_runner=semantic_transport,
+        preflight_runner=lambda request: _preflight(),
+        clock=lambda: "2026-07-28T16:00:00+00:00",
+    )
+    assert (result.status, result.reason) == ("ok", "candidate_revised")
+    assert result.output["candidate_identity"]["version"] == 2
+    assert len(calls) == 1
+    names = {item.name for item in calls[0].exact_attachments}
+    assert {"prior-candidate.zip", "planning-review-result.json"} <= names
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "malformed_json",
+        "wrong_identity",
+        "wrong_attachment_digest",
+        "verdict_mismatch",
+        "authority_output",
+        "secret_finding",
+        "private_path_finding",
+    ],
+)
+def test_review_rejects_malformed_wrong_identity_digest_verdict_and_authority_output(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "reviews"
+    output.mkdir()
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_review"],
+    )
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["IssueCandidateIdentity"],
+    )
+    identity = contracts.IssueCandidateIdentity(
+        issue_id="iss-00003",
+        candidate_id="iss-00003-v1-token",
+        version=1,
+        logical_filename="candidate.zip",
+        observed_transport_filename="candidate.zip",
+        internal_root="candidate",
+        source_repository="owner/repo",
+        source_branch="feature/issue",
+        source_head="a" * 40,
+        zip_sha256="d" * 64,
+    )
+    candidate = __import__(
+        "spec_dock_runtime.infra.issue_planning_candidate",
+        fromlist=["VerifiedIssueCandidate"],
+    ).VerifiedIssueCandidate(
+        identity=identity,
+        files={},
+        source_baseline={},
+        zip_bytes=b"candidate",
+    )
+    publisher_calls: list[object] = []
+
+    def transport(**kwargs):
+        context = contracts.PlanningContext(
+            issue_id="iss-00003",
+            repository="owner/repo",
+            branch="feature/issue",
+            source_head="a" * 40,
+            parent_epic_id="epic-00002",
+            parent_initiative_id="init-00001",
+            dependency_summary=(),
+            canonical_issue_paths=resolve_existing_issue_target(
+                "iss-00003",
+                [_record(issue_dir)],
+                repo,
+            ).canonical_issue_paths,
+            relevant_source_paths=(),
+            operator_context=(),
+        )
+        synthesized = kwargs["prompt_synthesizer"](
+            role="reviewer",
+            context=context,
+            repo_root=repo,
+            upstream="origin/feature/issue",
+            remote_head="a" * 40,
+        )
+        runtime_identity = contracts.ReviewedPlanningIdentity.from_json_bytes(
+            next(
+                item.content
+                for item in synthesized.exact_attachments
+                if item.name == "reviewed-identity.json"
+            )
+        )
+        supplied_identity_digest = next(
+            item.content.decode("ascii").strip()
+            for item in synthesized.exact_attachments
+            if item.name == "reviewed-identity-sha256.txt"
+        )
+        finding = {
+            "id": "F-1",
+            "severity": "p1",
+            "exact_location": "plan.md",
+            "violated_requirement_or_contradiction": "violation",
+            "concrete_impact": "impact",
+        }
+        value = {
+            "reviewed_identity": runtime_identity.to_dict(),
+            "reviewed_identity_sha256": supplied_identity_digest,
+            "verdict": "fail",
+            "findings": [finding],
+        }
+        if mutation == "malformed_json":
+            payload = b"{"
+        else:
+            if mutation == "wrong_identity":
+                value["reviewed_identity"] = {
+                    **runtime_identity.to_dict(),
+                    "candidate_identity": {
+                        **identity.to_dict(),
+                        "candidate_id": "iss-00003-v1-other",
+                    },
+                }
+                other = contracts.ReviewedPlanningIdentity.from_dict(value["reviewed_identity"])
+                value["reviewed_identity_sha256"] = other.sha256
+            elif mutation == "wrong_attachment_digest":
+                value["reviewed_identity_sha256"] = "e" * 64
+            elif mutation == "verdict_mismatch":
+                value["verdict"] = "pass"
+            elif mutation == "authority_output":
+                value["patch"] = "forbidden"
+            elif mutation == "secret_finding":
+                value["findings"][0]["concrete_impact"] = "token=abc123secret"
+            else:
+                value["findings"][0]["exact_location"] = "/Users/alice/private/spec.md"
+            payload = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        evidence = contracts.PlanningSourceEvidence(
+            repository="owner/repo",
+            branch="feature/issue",
+            upstream="origin/feature/issue",
+            local_head="a" * 40,
+            remote_head="a" * 40,
+            source_manifest_hash="b" * 64,
+            snapshot_id="c" * 64,
+            remote_head_disposition="fetched_remote_tracking_ref",
+        )
+        return contracts.PlanningInvocationResult(
+            status="pass",
+            reason="transport_received",
+            source_evidence=evidence,
+            response_bytes=len(payload),
+            response_sha256=hashlib.sha256(payload).hexdigest(),
+            transient_payload=payload,
+        )
+
+    result = module.run_issue_planning_review(
+        request=module.PlanningReviewRequest(
+            issue_id="iss-00003",
+            mode="archive-candidate",
+            output_dir=output,
+            candidate_path=tmp_path / "candidate.zip",
+        ),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        transport_runner=transport,
+        candidate_loader=lambda path, root: candidate,
+        publisher=lambda **kwargs: publisher_calls.append(kwargs),
+    )
+    assert (result.status, result.reason) == ("rejected", "review_result_rejected")
+    assert publisher_calls == []
+    assert list(output.iterdir()) == []
+    assert "abc123secret" not in repr(result)
+    assert "/Users/alice" not in repr(result)
+
+
+def _semantic_revision_setup(tmp_path: Path) -> dict[str, object]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    candidates = tmp_path / "candidates"
+    revised = tmp_path / "revised"
+    candidates.mkdir()
+    revised.mkdir()
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_revise"],
+    )
+    snapshot = _preflight()
+    assert snapshot.repository is not None
+    source_hash = snapshot.repository.source_manifest.source_manifest_hash
+    created = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", candidates),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        transport_runner=lambda **kwargs: _successful_transport(
+            source_manifest_hash=source_hash
+        ),
+        clock=lambda: "2026-07-28T12:00:00+00:00",
+    )
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["IssueCandidateIdentity"],
+    )
+    identity = contracts.IssueCandidateIdentity.from_dict(created.output["candidate_identity"])
+    reviewed_identity = contracts.ReviewedPlanningIdentity(
+        mode="archive-candidate",
+        issue_id="iss-00003",
+        repository="owner/repo",
+        branch="feature/issue",
+        source_head="a" * 40,
+        candidate_identity=identity,
+    )
+    review = contracts.PlanningReviewResult(
+        reviewed_identity=reviewed_identity,
+        reviewed_identity_sha256=reviewed_identity.sha256,
+        verdict="fail",
+        findings=(
+            contracts.PlanningReviewFinding(
+                id="F-1",
+                severity="p1",
+                exact_location="design.md",
+                violated_requirement_or_contradiction="missing behavior",
+                concrete_impact="implementation blocked",
+            ),
+        ),
+    )
+    review_bytes = json.dumps(review.to_dict(), sort_keys=True, separators=(",", ":")).encode()
+    review_sha = hashlib.sha256(review_bytes).hexdigest()
+    review_path = tmp_path / "review.json"
+    review_path.write_bytes(review_bytes)
+    request_path = tmp_path / "semantic.json"
+    request_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "lane": "semantic",
+                "candidate_identity": identity.to_dict(),
+                "preserve_assumptions": ["keep scope"],
+                "finding_ids": ["F-1"],
+                "review_result_sha256": review_sha,
+            },
+            separators=(",", ":"),
+        ),
+        encoding="utf-8",
+    )
+    return {
+        "repo": repo,
+        "issue_dir": issue_dir,
+        "candidates": candidates,
+        "revised": revised,
+        "module": module,
+        "contracts": contracts,
+        "identity": identity,
+        "review_path": review_path,
+        "review_sha": review_sha,
+        "request_path": request_path,
+        "source_hash": source_hash,
+    }
+
+
+@pytest.mark.parametrize(
+    ("field", "sensitive_value"),
+    [
+        ("concrete_impact", "credential token=abc123secret"),
+        ("exact_location", "/Users/alice/private/spec.md"),
+    ],
+)
+def test_semantic_revision_rejects_sensitive_external_review_before_backend(
+    tmp_path: Path,
+    field: str,
+    sensitive_value: str,
+) -> None:
+    setup = _semantic_revision_setup(tmp_path)
+    review_path = setup["review_path"]
+    review_value = json.loads(review_path.read_text(encoding="utf-8"))
+    review_value["findings"][0][field] = sensitive_value
+    review_bytes = json.dumps(
+        review_value,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    review_path.write_bytes(review_bytes)
+    review_sha = hashlib.sha256(review_bytes).hexdigest()
+    request_path = setup["request_path"]
+    request_value = json.loads(request_path.read_text(encoding="utf-8"))
+    request_value["review_result_sha256"] = review_sha
+    request_path.write_text(
+        json.dumps(request_value, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    backend_calls: list[object] = []
+    leaked_review_bytes: list[bytes] = []
+
+    def transport(**kwargs):
+        backend_calls.append(kwargs)
+        target = resolve_existing_issue_target(
+            "iss-00003",
+            [_record(setup["issue_dir"])],
+            setup["repo"],
+        )
+        contracts = setup["contracts"]
+        context = contracts.PlanningContext(
+            issue_id="iss-00003",
+            repository="owner/repo",
+            branch="feature/issue",
+            source_head="a" * 40,
+            parent_epic_id="epic-00002",
+            parent_initiative_id="init-00001",
+            dependency_summary=(),
+            canonical_issue_paths=target.canonical_issue_paths,
+            relevant_source_paths=(),
+            operator_context=(),
+        )
+        synthesized = kwargs["prompt_synthesizer"](
+            role="planner",
+            context=context,
+            repo_root=setup["repo"],
+            upstream="origin/feature/issue",
+            remote_head="a" * 40,
+        )
+        leaked_review_bytes.extend(
+            attachment.content
+            for attachment in synthesized.exact_attachments
+            if attachment.name == "planning-review-result.json"
+        )
+        return contracts.PlanningInvocationResult(
+            status="blocked",
+            reason="backend_timeout",
+        )
+
+    module = setup["module"]
+    identity = setup["identity"]
+    result = module.run_issue_planning_revise(
+        request=module.PlanningReviseRequest(
+            setup["candidates"] / identity.logical_filename,
+            request_path,
+            setup["revised"],
+        ),
+        review_evidence=module.PlanningRevisionEvidenceInput(review_path, review_sha),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=transport,
+        preflight_runner=lambda request: _preflight(),
+    )
+    assert (result.status, result.reason) == ("rejected", "revision_evidence_mismatch")
+    assert backend_calls == []
+    assert leaked_review_bytes == []
+    assert list(setup["revised"].iterdir()) == []
+    assert sensitive_value not in repr(result)
+
+
+@pytest.mark.parametrize("mutation", ["partial", "extra", "wrong_issue", "scope_escape"])
+def test_semantic_partial_extra_wrong_issue_or_scope_escape_publishes_zero(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    setup = _semantic_revision_setup(tmp_path)
+    module = setup["module"]
+    identity = setup["identity"]
+    payload = _planner_payload()
+    if mutation == "partial":
+        payload = payload.split(
+            b"<<<SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name=plan.md>>>",
+            1,
+        )[0]
+    elif mutation == "extra":
+        payload += b"\nextra"
+    elif mutation == "wrong_issue":
+        payload = payload.replace(b"iss-00003", b"iss-99999")
+    else:
+        payload = payload.replace(b"epic-00002", b"epic-99999")
+
+    def transport(**kwargs):
+        contracts = setup["contracts"]
+        target = resolve_existing_issue_target(
+            "iss-00003",
+            [_record(setup["issue_dir"])],
+            setup["repo"],
+        )
+        context = contracts.PlanningContext(
+            issue_id="iss-00003",
+            repository="owner/repo",
+            branch="feature/issue",
+            source_head="a" * 40,
+            parent_epic_id="epic-00002",
+            parent_initiative_id="init-00001",
+            dependency_summary=(),
+            canonical_issue_paths=target.canonical_issue_paths,
+            relevant_source_paths=(),
+            operator_context=(),
+        )
+        kwargs["prompt_synthesizer"](
+            role="planner",
+            context=context,
+            repo_root=setup["repo"],
+            upstream="origin/feature/issue",
+            remote_head="a" * 40,
+        )
+        return _successful_transport(
+            payload,
+            source_manifest_hash=setup["source_hash"],
+        )
+
+    result = module.run_issue_planning_revise(
+        request=module.PlanningReviseRequest(
+            setup["candidates"] / identity.logical_filename,
+            setup["request_path"],
+            setup["revised"],
+        ),
+        review_evidence=module.PlanningRevisionEvidenceInput(
+            setup["review_path"],
+            setup["review_sha"],
+        ),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        transport_runner=transport,
+        preflight_runner=lambda request: _preflight(),
+    )
+    assert (result.status, result.reason) == ("rejected", "planner_response_rejected")
+    assert list(setup["revised"].iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    ("status", "reason"),
+    [
+        ("blocked", "backend_timeout"),
+        ("blocked", "backend_nonzero"),
+        ("rejected", "backend_response_malformed"),
+    ],
+)
+def test_semantic_transport_nonpass_preserves_existing_reason(
+    tmp_path: Path,
+    status: str,
+    reason: str,
+) -> None:
+    setup = _semantic_revision_setup(tmp_path)
+    module = setup["module"]
+    identity = setup["identity"]
+    contracts = setup["contracts"]
+    result = module.run_issue_planning_revise(
+        request=module.PlanningReviseRequest(
+            setup["candidates"] / identity.logical_filename,
+            setup["request_path"],
+            setup["revised"],
+        ),
+        review_evidence=module.PlanningRevisionEvidenceInput(
+            setup["review_path"],
+            setup["review_sha"],
+        ),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        transport_runner=lambda **kwargs: contracts.PlanningInvocationResult(
+            status=status,
+            reason=reason,
+        ),
+        preflight_runner=lambda request: _preflight(),
+    )
+    assert (result.status, result.reason) == (status, reason)
+    assert list(setup["revised"].iterdir()) == []
+
+
+@pytest.mark.parametrize("swap_kind", ["fifo", "symlink"])
+def test_revision_request_transient_swap_is_nonblocking_and_rejected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    swap_kind: str,
+) -> None:
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["_read_external_bounded_file"],
+    )
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    request_path = tmp_path / "revision.json"
+    request_path.write_text("{}", encoding="utf-8")
+    original_open = os.open
+    swapped = [False]
+
+    def swap_before_open(path, flags, *args, **kwargs):
+        if (
+            (Path(path) == request_path or (path == request_path.name and kwargs.get("dir_fd") is not None))
+            and not swapped[0]
+        ):
+            swapped[0] = True
+            request_path.unlink()
+            if swap_kind == "fifo":
+                os.mkfifo(request_path)
+                assert flags & os.O_NONBLOCK
+            else:
+                request_path.symlink_to(repo)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", swap_before_open)
+    with pytest.raises(ValueError):
+        module._read_external_bounded_file(request_path, repo_root=repo)
+    assert swapped == [True]
+
+
+def test_revision_request_rejects_oversize_without_pathname_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["_read_external_bounded_file"],
+    )
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    request_path = tmp_path / "revision.json"
+    limit = 1024 * 1024
+    request_path.write_bytes(b"x" * (limit + 1))
+    original_read_bytes = Path.read_bytes
+    pathname_reads = [0]
+    descriptor_read_requests: list[int] = []
+    original_os_read = os.read
+
+    def observe_pathname_read(path: Path) -> bytes:
+        if path == request_path:
+            pathname_reads[0] += 1
+        return original_read_bytes(path)
+
+    def observe_descriptor_read(descriptor: int, count: int) -> bytes:
+        descriptor_read_requests.append(count)
+        return original_os_read(descriptor, count)
+
+    monkeypatch.setattr(Path, "read_bytes", observe_pathname_read)
+    monkeypatch.setattr(os, "read", observe_descriptor_read)
+    with pytest.raises(ValueError, match="bounded"):
+        module._read_external_bounded_file(request_path, repo_root=repo)
+    assert pathname_reads == [0]
+    assert sum(descriptor_read_requests) <= limit + 1
+
+
+def test_revision_request_parent_swap_never_redirects_into_repo(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["_read_external_bounded_file"],
+    )
+    repo = tmp_path / "repo"
+    external = tmp_path / "external"
+    repo.mkdir()
+    external.mkdir()
+    request_path = external / "revision.json"
+    original_bytes = b"{}"
+    redirected_bytes = b'{"token":"abc123secret"}'
+    request_path.write_bytes(original_bytes)
+    (repo / request_path.name).write_bytes(redirected_bytes)
+    backup = tmp_path / "external-backup"
+    original_open = os.open
+    original_read_bytes = Path.read_bytes
+    swapped = [False]
+
+    def swap_parent() -> None:
+        if swapped[0]:
+            return
+        swapped[0] = True
+        external.rename(backup)
+        external.symlink_to(repo, target_is_directory=True)
+
+    def swap_during_open(path, flags, *args, **kwargs):
+        if Path(path) == request_path and not swapped[0]:
+            swap_parent()
+            return original_open(path, flags, *args, **kwargs)
+        if path == external.name and flags & getattr(os, "O_DIRECTORY", 0) and not swapped[0]:
+            descriptor = original_open(path, flags, *args, **kwargs)
+            swap_parent()
+            return descriptor
+        return original_open(path, flags, *args, **kwargs)
+
+    def swap_during_pathname_read(path: Path) -> bytes:
+        if path == request_path:
+            swap_parent()
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(os, "open", swap_during_open)
+    monkeypatch.setattr(Path, "read_bytes", swap_during_pathname_read)
+    data = module._read_external_bounded_file(request_path, repo_root=repo)
+    assert data == original_bytes
+    assert redirected_bytes not in data
+    assert swapped == [True]
 
 
 def _preflight(
