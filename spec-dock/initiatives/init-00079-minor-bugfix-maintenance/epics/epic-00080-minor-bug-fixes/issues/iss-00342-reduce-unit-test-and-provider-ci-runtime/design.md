@@ -25,7 +25,7 @@ Issue Grade: "standard"
 ### この文書が定義すること
 
 - fast / full-regression test itemの分類規則と完全性不変条件
-- bare/default pytest、明示fast、明示fullのコマンド契約
+- bare/default pytest、marker selection、明示full permissionのコマンド契約
 - PR、`main` push、`workflow_dispatch`のevent routing
 - merge前に残す代表的CLI / provider parity contract
 - post-merge failureの観測、再実行、rollback
@@ -89,13 +89,14 @@ Issue Grade: "standard"
 ### 2.2 採用する設計方針
 
 - `[N]` 全test itemを`fast`または`full_regression`のちょうど一方へ分類する。
-- `[N]` bare/default pytestは`fast`だけを実行する。
-- `[N]` formal full commandは`fast or full_regression`を明示し、論理的な全集合を実行する。
+- `[N]` bare/default pytestはfast bodyを実行し、selected `full_regression` itemをstable reason付きpolicy skipにする。
+- `[N]` formal full commandは`--run-full-regression`を明示し、repository policy skipなしで論理的な全集合を実行する。
 - `[N]` PRは既存`Provider CI` / `provider-tests` identityを維持したfast merge gateだけを実行する。
 - `[N]` `main` pushと`workflow_dispatch`は独立workflowでformal full commandだけを実行する。
 - `[N]` schedule / cronは導入しない。
 - `[N]` post-merge full failureはredのまま可視化し、maintainerがforward fixまたはrerunする。既存mergeを遡ってblockしない。
-- `[P]` pytest native markerとcollection hookを使い、追加dependencyや独自CLI flagを導入しない。
+- `[N]` pytest native option `--run-full-regression`でlong itemの実行許可を表し、`-m` selectionと分離する。
+- `[P]` pytest native markerとcollection hookを使い、追加dependencyや独自wrapperを導入しない。
 
 ### 2.3 採用しない方針
 
@@ -108,7 +109,8 @@ Issue Grade: "standard"
 | heavy testsを`tests/integration`へ移す | external boundaryではないlocal testの意味を歪める |
 | pytest-xdist / sharding / cacheを導入する | lane分離に不要で、このIssueのscopeを広げる |
 | 単一workflow内の複雑なevent conditional | routing inspectionとcheck identityを複雑にする |
-| 独自`--full-regression` flagを追加する | native `-m`で十分であり、保守対象を増やす |
+| default `addopts = -m fast`を追加する | `-m full_regression` aloneが意図しないopt-inになり、focused longがreason付きskipにならない |
+| 恒久的skipをlong分類に使う | full modeでlegitimate skipと安全に区別して解除できない |
 
 ## 3. 正本・根拠（Normative Sources）
 
@@ -116,15 +118,17 @@ Issue Grade: "standard"
 |---|---|---|
 | Issue requirement | `requirement.md` | AC-001〜011、BH-001〜007、CON-001〜004 |
 | accepted ADR | `artifacts/20260728t025412z-adr-separate-fast-merge-gate-and-full-regression-execution.md` | Option Aとno-schedule policy |
+| accepted ADR | `artifacts/20260728t105349z-03-adr-use-direct-pytest-commands-with-explicit-full-regression-opt-in.md` | direct pytestと明示full permission |
 | answered interview | `artifacts/20260728t015759z-01-interview-full-regression-merge-gate-policy.md` | owner intent |
 | research | `artifacts/20260728t015759z-research-unit-test-and-provider-ci-runtime-investigation.md` | timings、collection、workflow baseline |
 | existing workflow | `.github/workflows/provider-ci.yml` | `Provider CI` / `provider-tests` compatibility authority |
-| pytest config | `pyproject.toml` | default selectorとmarker registryの配置 |
-| command surface | `Makefile` | contributor / CI共通entrypoint |
+| pytest config | `pyproject.toml` | marker registryとstrictnessの配置 |
+| pytest hook | `tests/conftest.py` | option、early classification、conditional policy skip |
 | test collection | `tests/` | full collection authority |
 | existing contract tests | `tests/unit/cli/test_cli_smoke.py`、`tests/unit/infra/test_init_update.py` | required-fast inventory |
 | contributor docs | `README.md`、`AGENTS.md` | local commandとfailure operation |
 | advisory evidence | `oracle:iss00342-test-ci-planning` | partially adopted。正本ではない |
+| advisory evidence | `oracle:iss00342-pytest-opt-in-authoring` | direct command amendment candidate。正本ではない |
 
 正本の優先順位は、accepted ADR → Issue requirement → Issue design → Issue plan → artifacts / advisory draftとする。
 
@@ -132,7 +136,7 @@ Issue Grade: "standard"
 
 | Requirement | 設計ID | 設計上の扱い |
 |---|---|---|
-| AC-001、BH-001 | `DES-TL-001`、`DES-TL-003` | total classifierとdefault `-m fast` |
+| AC-001、BH-001 | `DES-TL-001`、`DES-TL-003` | total classifierとconditional policy skip |
 | AC-002、BH-002 | `DES-TL-001`、`DES-TL-003` | disjoint unionとformal full command |
 | AC-003、BH-003 | `DES-TL-004` | PR-only fast workflow、identity維持 |
 | AC-004、BH-004 | `DES-TL-005` | `main` pushのpost-merge full |
@@ -200,7 +204,7 @@ Issue Grade: "standard"
 |---|---|---|---|
 | `DES-TL-001` | classification | 全itemをfast / full_regressionの排他的かつ完全な2集合にする | `[N]` |
 | `DES-TL-002` | merge contract | heavy prefix内から7つのrepresentative nodeをrequired-fastとして固定する | `[N]` |
-| `DES-TL-003` | command | bare pytestと`make test-provider-fast`はfast、`make test-provider-full`は全集合 | `[N]` |
+| `DES-TL-003` | command | bare pytestはordinary policy、`--run-full-regression`は明示permission、`-m` aloneはpermissionでない | `[N]` |
 | `DES-TL-004` | PR workflow | `Provider CI` / `provider-tests`を維持し、PRでlint + fastだけを実行 | `[N]` |
 | `DES-TL-005` | full workflow | 独立workflowが`main` push / manualでfullだけを実行し、scheduleを持たない | `[N]` |
 | `DES-TL-006` | verification | collection、routing、coverage delta、performanceを再現可能に検証 | `[N]` |
@@ -272,7 +276,7 @@ end note
 - Question answered:
   - test-lane contractをどのartifactが所有し、どの依存順でTDD実装するか。
 - Scope:
-  - classifier、pytest config、Make facade、provider workflows、contract tests、contributor docs、report evidence。
+  - classifier、pytest option / policy skip、provider workflows、contract tests、contributor docs、report evidence。
 - Excluded details:
   - product runtime、consumer scaffold内部、private test helper、GitHub branch protection設定。
 - Update trigger:
@@ -285,8 +289,8 @@ top to bottom direction
 
 rectangle "contract tests\nRed first" as TESTS
 rectangle "tests/conftest.py\nitem classifier" as CLASSIFIER
-rectangle "pyproject.toml\nmarkers + default fast" as PYPROJECT
-rectangle "Makefile\nstable fast/full facade" as MAKE
+rectangle "pyproject.toml\nmarkers + strictness" as PYPROJECT
+rectangle "tests/conftest.py\noption + policy skip" as POLICY
 rectangle "provider-ci.yml\nPR fast" as PRWF
 rectangle "provider-full-regression.yml\nmain/manual full" as FULLWF
 rectangle "README.md / AGENTS.md\ncontributor operation" as DOCS
@@ -294,14 +298,14 @@ rectangle "report.md\nobserved evidence" as REPORT
 
 TESTS --> CLASSIFIER : verifies local classification
 TESTS --> PYPROJECT : verifies selectors
-TESTS --> MAKE : verifies command contract
+TESTS --> POLICY : verifies permission / skip contract
 TESTS --> PRWF : verifies routing / identity
 TESTS --> FULLWF : verifies routing / non-shipping
-PRWF --> MAKE : invokes test-provider-fast
-FULLWF --> MAKE : invokes test-provider-full
-MAKE --> PYPROJECT : invokes pytest with selector
+PRWF --> POLICY : invokes uv run pytest
+FULLWF --> POLICY : invokes --run-full-regression
+POLICY --> PYPROJECT : uses registered markers
 PYPROJECT --> CLASSIFIER : loads registered markers + hook
-DOCS --> MAKE : documents stable commands
+DOCS --> POLICY : documents direct commands
 DOCS --> PRWF : documents merge gate
 DOCS --> FULLWF : documents failure / rerun
 REPORT ..> TESTS : records results
@@ -310,7 +314,7 @@ REPORT ..> FULLWF : records post-merge observations
 @enduml
 ```
 
-実装起点はcontract testsである。classifier / pytest configをGreenにした後、Make facade、workflow routing、docsの順に進め、観測結果は最後に`report.md`へ集約する。
+実装起点はcontract testsである。classifier / pytest option / policy skipをGreenにした後、workflow routing、docsの順に進め、観測結果は最後に`report.md`へ集約する。
 
 ## 9. 振る舞い設計
 
@@ -372,45 +376,34 @@ REPORT ..> FULLWF : records post-merge observations
 
 ### DES-TL-003: local / CI command contract
 
-`pyproject.toml`:
+`pyproject.toml`はmarker registryとstrictnessだけを持つ。
 
 ```toml
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["--strict-markers", "-m", "fast"]
+addopts = ["--strict-markers"]
 markers = [
   "fast: default provider test lane used during development and pull requests",
   "full_regression: long-running provider regression excluded from the default lane",
 ]
 ```
 
-`Makefile`:
-
-```make
-.PHONY: lint test-provider-fast test-provider-full
-
-test-provider-fast:
-	uv run pytest -m fast
-
-test-provider-full:
-	uv run pytest -m "fast or full_regression"
-```
-
 固定contract:
 
-- bare `uv run pytest`はfast。
-- `uv run pytest tests/unit`もfastで、heavy-classified item実行数は0。
-- `make test-provider-fast`はPRと同じfast selector。
-- `make test-provider-full`はdefault `-m fast`を明示overrideし、`F ∪ H`を実行するformal full entrypoint。
-- `uv run pytest -m full_regression`は診断用heavy-only selectorであり、formal full contractではない。
-- contributorとworkflowはraw selectorを複製せず、原則としてMake targetを呼ぶ。
+- bare `uv run pytest`と`uv run pytest tests/unit`はselected heavy itemへpolicy skipを追加し、heavy body実行数を0にする。
+- focused heavy without flagはstable reason付きskip、exit 0とする。
+- `uv run pytest -m full_regression`はheavy-only selectorだがpermissionを与えず、selected heavyをpolicy skipする。
+- `uv run pytest --run-full-regression`は`F ∪ H`を選択し、repository policy skipを追加しないformal full entrypoint。
+- `uv run pytest --run-full-regression -m full_regression`はrunnable heavy-only entrypoint。
+- full flagはexisting skip / skipif / xfailを削除・上書きしない。
+- contributorとworkflowはMake wrapperを必須とせずdirect pytest commandを使う。
 
 ### DES-TL-004: PR fast workflow
 
 - `.github/workflows/provider-ci.yml`のworkflow name `Provider CI`とjob key/name `provider-tests`を維持する。
 - triggerは`pull_request`だけとする。
 - existing Python 3.11 setupとinstall stepを維持する。
-- test stepsは`make lint`と`make test-provider-fast`。
+- test stepsは`make lint`と`uv run pytest`。
 - full command、full job、push、scheduleを含めない。
 - fork PRでも通常の`pull_request` eventから同identityのcheckが作られる。
 
@@ -421,7 +414,7 @@ test-provider-full:
   - `push.branches: [main]`
   - `workflow_dispatch`
 - triggerに`pull_request`、non-`main` push、`schedule`を含めない。
-- job key/nameは`provider-full-regression`、commandは`make test-provider-full`。
+- job key/nameは`provider-full-regression`、commandは`uv run pytest --run-full-regression`。
 - `continue-on-error`を設定せず、failureはred runとして残す。
 - workflow permissions、secret、live external credentialを追加しない。
 - `main` push concurrencyは同branchの古いin-progress runをcancelし、最新SHAのrunを残す。
@@ -451,7 +444,7 @@ Event truth table:
   - conflict / forbidden overrideがcollection error
   - default / fastではheavy item実行数0
   - formal fullのcollectionが`F ∪ H`
-- workflow regression testはYAML parser dependencyを追加せず、既存`test_init_update.py`のdeterministic text inspectionを拡張してevent matrix、job identity、Make target、no scheduleを検証する。
+- workflow regression testはYAML parser dependencyを追加せず、既存`test_init_update.py`のdeterministic text inspectionを拡張してevent matrix、job identity、direct command、no scheduleを検証する。
 - provider-only non-shipping testは`provider-ci.yml`と`provider-full-regression.yml`の双方について、`src/spec_dock/assets/install_root/.github/workflows/`に存在せず、代表的なinit / update targetへ生成されないことを明示assertする。
 - before / afterについてfull node ID集合、count、skip / xfail、test deletion / assertion changeをdiffする。
 - local fast / fullは同一checkout・Python・cache条件で3組測定し、各組でfast < fullを確認する。
@@ -463,11 +456,11 @@ Event truth table:
 
 - post-merge full failure ownerはrepository maintainer。
 - GitHub Actionsの`Provider Full Regression` runからSHA、failed test、log、duration、summaryを確認する。
-- local reproductionは同SHAで`make test-provider-full`。
+- local reproductionは同SHAで`uv run pytest --run-full-regression`。
 - 通常対応はforward fixまたはGitHub Actions rerun。自動rollback / Issue作成はしない。
 - selector漏れ、required check欠落、許容不能なescapeが判明した場合:
-  1. `.github/workflows/provider-ci.yml`のPR test commandを`make test-provider-full`へ戻す。
-  2. bare pytestによる誤操作が問題なら`pyproject.toml`のdefault `-m fast`を外す。
+  1. `.github/workflows/provider-ci.yml`のPR test commandを`uv run pytest --run-full-regression`へ戻す。
+  2. policy skipによる誤操作が問題ならflagなしpolicy追加を無効化する。
   3. markers、manual full command、full workflow、計測証跡は保持する。
   4. 修正したclassifierをfresh reviewし、fast gate再導入を別判断する。
 
@@ -475,9 +468,8 @@ Event truth table:
 
 | 構成要素 | 責任 | Must Not Do | 設計ID |
 |---|---|---|---|
-| `tests/conftest.py` | total classificationとfail-closed guard | workflow policyやtest business logicを持つ | `DES-TL-001`、`002` |
-| `pyproject.toml` | marker登録とbare pytest default | full commandを暗黙に定義する | `DES-TL-003` |
-| `Makefile` | stable fast/full command | selector semanticsをworkflowごとに分岐する | `DES-TL-003` |
+| `tests/conftest.py` | total classification、full option、conditional policy skip | legitimate skipを解除する | `DES-TL-001`、`002`、`003` |
+| `pyproject.toml` | marker登録とstrictness | default selectionを変更する | `DES-TL-003` |
 | `provider-ci.yml` | PR merge gate | push / full / scheduleを実行する | `DES-TL-004` |
 | `provider-full-regression.yml` | main post-merge / manual full | PR required checkになる | `DES-TL-005` |
 | `test_provider_test_lanes.py` | classifier / collection contract | product behaviorを再検証する | `DES-TL-006` |
@@ -490,7 +482,7 @@ Event truth table:
 | Contract | 影響 | 内容 |
 |---|---|---|
 | public product CLI / API | none | `spec-dock` runtimeは不変 |
-| local contributor command | changed | bare pytestをfastへ変更し、2つのMake targetを追加 |
+| local contributor command | changed | ordinary pytestを維持し、`--run-full-regression`だけを明示opt-inとして追加 |
 | GitHub check identity | compatible | `Provider CI` / `provider-tests`を維持 |
 | GitHub event routing | changed | PR fast、main/manual fullへ分離 |
 | scaffold / template | none | provider-only workflowをshipしない |
@@ -537,7 +529,7 @@ Event truth table:
 |---|---|---|
 | `EVD-TL-001` | C / F / H / U集合 | collect-only node ID、count、set差分 |
 | `EVD-TL-002` | required-fast inventory | focused pytest |
-| `EVD-TL-003` | default / fast / full command | command、count、exit、duration |
+| `EVD-TL-003` | ordinary / marker-only / explicit full command | command、selection、policy skip、executed count、exit、duration |
 | `EVD-TL-004` | workflow truth table / identity | deterministic testとYAML diff |
 | `EVD-TL-005` | local performance | same-condition paired 3 runs |
 | `EVD-TL-006` | PR performance | 3 GitHub runsのSHA / elapsed / counts |
@@ -560,8 +552,8 @@ Event truth table:
 │       ├── test_provider_test_lanes.py                  [A] lane / command / routing contract
 │       └── infra/
 │           └── test_init_update.py                      [M] parity and provider-only non-shipping
-├── pyproject.toml                                       [M] markers, strict markers, default fast
-├── Makefile                                             [M] stable fast / full commands
+├── pyproject.toml                                       [M] markers and strict markers only
+├── Makefile                                             [R] existing lint command only
 ├── .github/
 │   └── workflows/
 │       ├── provider-ci.yml                              [M] pull_request lint + fast
@@ -582,7 +574,10 @@ Event truth table:
     │                       ├── design.md                 [R] amend only after re-review
     │                       ├── plan.md                   [R] amend only after re-review
     │                       └── report.md                 [M] implementation and verification evidence
-    └── <other consumer workspace files>                 [R] no scaffold refresh
+    ├── docs/                                            [R] no scaffold refresh
+    ├── scripts/                                         [R] no scaffold refresh
+    ├── system/                                          [R] no scaffold refresh
+    └── templates/                                       [R] no scaffold refresh
 ```
 
 ### 16.2 変更対象と主要依存
@@ -594,7 +589,6 @@ Event truth table:
 | `tests/unit/infra/test_init_update.py` | provider workflow parityと2つのprovider-only workflow非配布を固定する | yes |
 | `README.md` | fast / full command、post-merge failure operation、rollback | yes |
 | `AGENTS.md` | agent向けdefault / explicit full contract | yes |
-| `Makefile` | shared stable command | yes |
 | `pyproject.toml` | marker / selector contract | yes |
 | `.github/workflows/provider-ci.yml` | PR fast routing | yes |
 | `.github/workflows/provider-full-regression.yml` | main/manual full routing | yes |
@@ -603,8 +597,8 @@ Event truth table:
 
 主要依存:
 
-- contract tests → classifier / pytest config → Make facade → workflows → docs / report。
-- provider workflows → Make targets。workflowへraw marker expressionを複製しない。
+- contract tests → classifier / pytest option / policy skip → workflows → docs / report。
+- provider workflows → direct pytest commands。workflowへmarker expressionを複製しない。
 - non-shipping tests → root workflowと`src/spec_dock/assets/install_root/`、代表init / update target。
 - `src/spec_dock/assets/**`またはIssue外`spec-dock/**`に変更が必要になった場合は停止して設計を再reviewする。
 
@@ -644,7 +638,7 @@ Event truth table:
 |---|---|---|---|
 | `DES-TL-001` | total / disjoint / non-empty heavy / conflict failure | unit + CLI collection | `EVD-TL-001` |
 | `DES-TL-002` | 7 nodeの存在、分類、代表contract | focused unit / subprocess | `EVD-TL-002` |
-| `DES-TL-003` | bare、fast、full selectorとcounts | CLI / Make | `EVD-TL-003` |
+| `DES-TL-003` | bare/marker-only/fullのselection、permission、policy skip | pytest CLI / hook | `EVD-TL-003` |
 | `DES-TL-004` | PR-only、identity、lint + fast | contract test / inspection | `EVD-TL-004` |
 | `DES-TL-005` | main/manual full、no schedule、concurrency | contract test / Actions observation | `EVD-TL-004`、`007` |
 | `DES-TL-006` | collection delta、3 paired local、3 PR runs | automated + manual evidence | `EVD-TL-005`、`006`、`008` |
@@ -656,7 +650,7 @@ Event truth table:
 
 - `DES-TL-001`: total / disjoint classifier
 - `DES-TL-002`: heavy prefixesとrequired-fast 7 node
-- `DES-TL-003`: bare fast、stable Make fast/full
+- `DES-TL-003`: ordinary pytest、marker-only非許可、explicit full permission
 - `DES-TL-004`: PR-only fastとexisting identity
 - `DES-TL-005`: main/manual full、no schedule
 - `DES-TL-006`: completeness / routing / performance evidence
@@ -667,7 +661,7 @@ Event truth table:
 | Seed ID | 振る舞い / 成果 | Design | Requirement |
 |---|---|---|---|
 | `B-SEED-TL-001` | classifierが全itemを排他的に分類し、invalid inventoryをfail-closeする | `DES-TL-001`、`002` | AC-001、002、006、007 |
-| `B-SEED-TL-002` | default / fast / full commandが同じlane contractを使う | `DES-TL-003` | AC-001、002 |
+| `B-SEED-TL-002` | ordinary / marker-only / explicit full commandがselectionとpermissionを分離する | `DES-TL-003` | AC-001、002 |
 | `B-SEED-TL-003` | PRがexisting identityでfastだけを実行する | `DES-TL-004` | AC-003、009 |
 | `B-SEED-TL-004` | main/manualがfullだけを実行し、scheduleがない | `DES-TL-005` | AC-004、005、009 |
 | `B-SEED-TL-005` | collection / coverage / performance evidenceがreportに残る | `DES-TL-006` | AC-007、008 |
