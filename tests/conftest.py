@@ -29,13 +29,29 @@ REQUIRED_FAST_NODE_IDS = frozenset({
     ),
 })
 
+POLICY_SKIP_REASON = "full_regression test is disabled by default; use --run-full-regression to run it"
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--run-full-regression",
+        action="store_true",
+        default=False,
+        help="Run full_regression tests instead of applying the default policy skip.",
+    )
+
 
 def _classification_error(item: pytest.Item, reason: str) -> pytest.UsageError:
     return pytest.UsageError(f"test lane classification conflict for {item.nodeid}: {reason}")
 
 
 @pytest.hookimpl(tryfirst=True)
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(
+    config: pytest.Config,
+    items: list[pytest.Item],
+) -> None:
+    run_full_regression = config.getoption("--run-full-regression")
+
     for item in items:
         has_fast = item.get_closest_marker("fast") is not None
         has_full_regression = item.get_closest_marker("full_regression") is not None
@@ -72,3 +88,5 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
                 item,
                 "item must have exactly one of fast or full_regression",
             )
+        if is_full_regression and not run_full_regression:
+            item.add_marker(pytest.mark.skip(reason=POLICY_SKIP_REASON))
