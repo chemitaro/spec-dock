@@ -254,6 +254,7 @@ uv run pytest -q -p no:cacheprovider \
 | S05-F1 | `CLOS-TL-AC-002`,`007`,`008`,`CLOS-TL-BH-002`,`007`,`CLOS-TL-CON-004` | same-condition 3-pair Green、full completeness、failure visibility | Pair 1 fast exit0/full exit1、focused failure再現、Pair 2/3未実行、condition drift 0 | fail / incomplete | D-006とplan amendmentのfresh review待ち。RedをGreenへ読み替えない |
 | S05R | `CLOS-TL-AC-007`,`CLOS-TL-BH-007`,`CLOS-TL-CON-004` | current Issue path/empty dependsのexact 2-entry snapshot correction | S05-F1 Red→focused 1 passed、related validate/sync 1 passed、213 path/depends parity、ruff/diff pass、S05R-R1 fresh pass | pass | M3r `42d021fb`、post-commit clean確認済み |
 | S04R | `CLOS-TL-AC-001`,`CLOS-TL-BH-001`,`CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | snapshot correction後のroot/unit/focused fast gate、failure propagation、new manifestを再固定 | root/unit各669 passed、H body 0、required-fast 7、lint/validate/assurance pass、manifest `48ef40...4363`、S04R-R2 fresh pass | pass | M3a-r `87f5ef44`、post-commit clean確認済み |
+| S05-A | `CLOS-TL-AC-002`,`007`,`008`,`CLOS-TL-BH-002`,`007`,`CLOS-TL-CON-004` | repaired SHAでsame-condition 3-pair Green、full completeness、failure visibility | fast 9.70/9.39/9.61s、full 1650.73/1654.60/1656.30s、全full exit0/F∪H/policy skip0、drift0 | pass | fresh qa-reviewerとM3b measurement commitはpending |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -291,6 +292,12 @@ uv run pytest -q -p no:cacheprovider \
 | `CLOS-TL-AC-007` | S05R | yes | red-required + review pending | S05-F1 full/focused exit1 | focused snapshot node + exact diff | pass | actual/expected paths 213、depends 213一致 |
 | `CLOS-TL-BH-007` | S05R | yes | red-required | unexpected full Red | focused failure reproduction→Green | pass | Redを隠さずbounded origin fix |
 | `CLOS-TL-CON-004` | S05R | yes | red-required + review pending | snapshot omission 1 | exact two-entry diff、ruff、diff check | pass | assertion/skip/xfail/classifier変更0 |
+| `CLOS-TL-AC-002` | S05-A | yes | manual-required + QA pending | temporary full contract Green | accepted 3 paired formal full | pass | 各full 2705=F∪H、policy skip0 |
+| `CLOS-TL-AC-007` | S05-A | yes | manual-required + QA pending | new manifest `48ef40...4363` | 3-pair before/after SHA/manifest/clean | pass | coverage omission/unexplained delta0 |
+| `CLOS-TL-AC-008` | S05-A | yes | manual-required + QA pending | S05-F1 Red、recovery/S04R | fast/full accepted 3 pairs | pass | 各pair fast<full、full約27.5分 |
+| `CLOS-TL-BH-002` | S05-A | yes | manual-required | formal full permission | full counts/policy skip inspection | pass | H=2035>0、全full exit0 |
+| `CLOS-TL-BH-007` | S05-A | yes | manual-required | prior Redを保持 | accepted runs failure0 + log hashes | pass | Red読み替えなし、5回目なし |
+| `CLOS-TL-CON-004` | S05-A | yes | manual-required + QA pending | S04R no weakening | manifest/full counts/log comparison | pass | unexplained delta0 |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -325,6 +332,12 @@ uv run pytest -q -p no:cacheprovider \
 | `CLOS-TL-AC-007` | S05R | current path/empty dependsをstatic snapshotへ追加し213件一致 | pass | new manifestはS04Rで再固定 |
 | `CLOS-TL-BH-007` | S05R | S05-F1/focused Redを保持しfocused Greenへ修正 | pass | formal full suiteは未再実行 |
 | `CLOS-TL-CON-004` | S05R | exact 2 entries、assertion weakening/skip/xfail変更0 | pass | fresh code review pending |
+| `CLOS-TL-AC-002` | S05-A | 3 fullすべて2629 passed/76 legitimate skipped、policy skip0 | pass | full=F∪H |
+| `CLOS-TL-AC-007` | S05-A | manifest 445/`48ef40...4363`、condition drift0 | pass | coverage omission0 |
+| `CLOS-TL-AC-008` | S05-A | 9.70<1650.73、9.39<1654.60、9.61<1656.30 | pass | 3 paired measurements |
+| `CLOS-TL-BH-002` | S05-A | H=2035、全full exit0 | pass | explicit full permission |
+| `CLOS-TL-BH-007` | S05-A | failure0、accepted logs 6 hashes、5回目未実行 | pass | S05-F1は別Red evidenceとして保持 |
+| `CLOS-TL-CON-004` | S05-A | C=2705、全full counts=2705、manifest drift0 | pass | weakeningなし |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -366,6 +379,7 @@ read-only specialist consentと、scope-local `artifacts/` direct childへの限
 | S04 | delegated | approved planがverification-only integrated operatorを要求 | dev-coder | committed SHAのroot/unit/focused fast gateとcoverage delta | approved docs、S00-S03 evidence、committed implementation | read-only commandsのみ | source/config/workflow/report変更、formal full execution | focused contracts、root/unit collect/run、marker-only、required-fast、lint、global verifier、diff/validate | H body execution、unknown failure、unexplained delta、dirty source | commands/exits/counts/elapsed/SHA、EVD-TL-001/002/003/004/008、Ledger Note | verification pass; reviewer pending |
 | S05R | delegated | approved recovery amendmentがexact snapshot correctionを要求 | dev-coder | current Issue path/empty dependsの2-entry correction | approved amendment、S05-F1/focused Red、current metadata | `tests/unit/infra/test_init_update.py` only | Issue metadata、source/config/workflow/docs、assertion/skip/xfail/classifier/helper | focused/related snapshot nodes、213 parity、ruff/format、diff | other path/value、metadata異常、allowed外diff | Red provenance、Green、exact diff、risk、no-material decision | implementation pass; reviewer pending |
 | S04R | delegated | amended planがmanifest変更後のfresh integrated gateを要求 | dev-coder | new committed SHAのS04 exact bundleとmanifest再固定 | approved amendment、S05R committed/clean、S04 contract | read-only commandsのみ | source/config/workflow/report変更、formal full suite | root/unit/focused、marker-only、required-fast、lint、partition、manifest、diff/validate | H body、unknown failure、unexplained delta、dirty source | exact commands/results/SHA/manifest、risk、no-material decision | verification pass; reviewer pending |
+| S05-A | delegated | approved amendmentがrepaired SHAのnew 3-pairを要求 | dev-coder | same-condition accepted 3-pair measurement | S04R committed/clean、new manifest、measurement protocol | read-only commands/scratch logs | source/config/workflow/report変更、5回目full | preflight、fast→full×3、pair前後SHA/manifest/clean、counts/log hashes | any nonzero、fast>=full、H=0、drift | exact ledger/log hashes/EVD-TL-005/008/no-material decision | measurement pass; QA pending |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -381,6 +395,7 @@ read-only specialist consentと、scope-local `artifacts/` direct childへの限
 | S05-F1 | dev-coder | same-condition Pair 1を計測しfull nonzeroで停止、focused exact nodeをtriage | none | fast 669 passed/2036 skipped/8.98s; full 1 failed/2628 passed/76 skipped/1590.76s; focused 1 failed/0.45s | pending amendment review | snapshot correction後のnew 3-pairにはamendmentが必要 | evidence accepted。Pair 2/3と追加fullを禁止しD-006へ統合 |
 | S05R | dev-coder | current Issue pathとempty dependsをstatic snapshotへ各1件追加 | `tests/unit/infra/test_init_update.py` | focused 1 passed/1.82s、related 1 passed/7.05s、213 parity、ruff/format/diff pass | S05R-R1 passed | S04R/new manifest/new 3-pair未実施 | accepted。exact 2 entries、test weakeningなし |
 | S04R | dev-coder | new SHAでS04 exact bundleをread-only再実行 | none | root/unit各669 passed、H body0、required-fast7、lint/partition/diff/validate/assurance pass | S04R-R2 passed | new 3-pair未実施 | accepted。manifest 445 files `48ef40...4363`、前後clean |
+| S05-A | dev-coder | repaired SHAでaccepted fast→full 3 pairsをread-only計測 | none | fast各exit0約9.4〜9.7s、full各exit0約1651〜1656s、F∪H/policy skip0/drift0 | S05-A-QA1 passed | M3b未完了 | accepted。pre-merge full総数4、5回目未実行 |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -423,6 +438,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S05R-R1 | dogfooding snapshot recovery review | code-reviewer | fresh | passed | no | proceed to M3r commit | exact 2-entry correction、Red sensitivity、213 parity、test weakening 0を確認。findings 0、confidence 0.99 |
 | S04R-R1 | post-recovery integrated fast gate review | code-reviewer | historical | failed | no | blocked | exact commands/resultsと採用manifest pipeline不足のP1 1件 |
 | S04R-R2 | post-recovery integrated fast gate re-review | code-reviewer | fresh | passed | no | proceed to M3a-r commit | exact commands/results、manifest pipeline、same-SHA/cleanを確認。findings 0、confidence 0.99 |
+| S05-A-QA1 | accepted three-pair measurement review | qa-reviewer | fresh | passed | no | proceed to M3b commit | Red保持、recovery順序、3-pair completeness、log hashes、総数4/5回目なしを確認。integration evidence sufficient、confidence 0.99 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -434,6 +450,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04 / M3a | committed | integrated evidence commit | `a07955c4c05e5be038cf42b1d6142e65d173cb65` | `git status --short` -> clean | N/A | N/A | N/A | S04-R2 fresh pass、same-SHA integrated verification、commit、cleanを確認しResult Approval |
 | S05R / M3r | committed | snapshot recovery commit | `42d021fb28f4cd45f550f86b9ebea10d93ae8be7` | `git status --short` -> clean | N/A | N/A | N/A | S05R-R1 fresh pass、exact 2-entry correction、commit、cleanを確認しResult Approval |
 | S04R / M3a-r | committed | post-recovery integrated evidence commit | `87f5ef44fa3efb06f6e7ab4ed61e06db77fcc614` | `git status --short` -> clean | N/A | N/A | N/A | S04R-R2 fresh pass、new manifest、commit、cleanを確認しResult Approval |
+| S05-A / M3b | pending | accepted measurement ledger commit | pending | pending | N/A | N/A | N/A | fresh qa-reviewer pass後にreport-only commit |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -855,6 +872,49 @@ LC_ALL=C git ls-files -- 'tests/**' 'src/**' pyproject.toml uv.lock '.github/wor
 - 上記はexit 0、tracked 445、aggregate `48ef40dbf0a145e288406c22ee7693b0ebcee8289a3b358a2a34cf3ad0ff4363`。
 - `dev-coder`: `No material implementation decisions beyond the approved plan.`
 - orchestrator disposition: noteを採用。S04 exact bundleの再実行で追加decision entryは不要。補助manifest pipelineの`tee /dev/stderr`失敗結果は破棄し、二段階出力なしの再現可能pipelineをexit 0で採用した。
+
+---
+
+### セッションログ（2026-07-29 01:50 - 03:14 JST）
+
+#### S05 accepted new three-pair measurement
+
+- SHA: `ec52e7e4479faab43a6ba07b92454ec5902943a1`
+- Python 3.12.11、pytest 9.0.3、uv 0.11.24、全6 runsで`PYTEST_ADDOPTS='-p no:cacheprovider'`。
+- `TEST-RELEVANT-MANIFEST`: tracked 445、aggregate `48ef40dbf0a145e288406c22ee7693b0ebcee8289a3b358a2a34cf3ad0ff4363`。
+- scratch: `/private/tmp/codex-agent-work/501/session-20260728t164956z-iss00342-s05-accepted-pairs-bc2cc4ce`。
+- partition preflight 1 passed/1.09s。開始/各pair前後/終了のSHA、manifest、clean、env drift 0。
+
+| Pair | Fast result | Full result | Comparison |
+|---|---|---|---|
+| 1 | exit0、669 passed/2036 skipped、9.70s | exit0、2629 passed/76 legitimate skipped、1650.73s | `9.70 < 1650.73` |
+| 2 | exit0、669 passed/2036 skipped、9.39s | exit0、2629 passed/76 legitimate skipped、1654.60s | `9.39 < 1654.60` |
+| 3 | exit0、669 passed/2036 skipped、9.61s | exit0、2629 passed/76 legitimate skipped、1656.30s | `9.61 < 1656.30` |
+
+各pairのexact command:
+
+```sh
+/usr/bin/time -p env PYTEST_ADDOPTS='-p no:cacheprovider' uv run pytest > <scratch>/pair-N-fast.log 2>&1
+/usr/bin/time -p env PYTEST_ADDOPTS='-p no:cacheprovider' uv run pytest --run-full-regression > <scratch>/pair-N-full.log 2>&1
+```
+
+- C/F/H=`2705/670/2035`、H>0。各fullは`2629+76=2705=F∪H`、repository policy skip 0、failure 0。
+- 76 skipsは既存legitimate skips。各fullに既知duplicate ZIP entry warning 2件。
+- S05-F1のfailed attempt 1回とaccepted full 3回でpre-merge総数4。5回目は未実行。
+- accepted log SHA-256:
+  - pair1 fast `d4cd89f54a217d8d56edbd3bd2990a612b4e648964421b6c0d90e87d311451a7`
+  - pair1 full `9b42e276ab6c3fe89be6a8bc860aeec933e109a860bfa0821ea7cd967af5d8a7`
+  - pair2 fast `6e4b8727f989af54c86de6f72378a0740fc8188ccdaaec27881cc8f4e899f143`
+  - pair2 full `ab2895e30765db08c3a3b42696086d380b8d484bacaf4b6aec2ab0ede8e77ca6`
+  - pair3 fast `b4e4b13b59040c78a50ac57c2f34614ed9956e397bd19553386106a6003e5c6a`
+  - pair3 full `2f99a582fb7bc906222e32fd8de6c55b87413be33545b7a8c7872054b702e878`
+
+#### EVD-TL-005 / EVD-TL-008
+
+- `EVD-TL-005`: same SHA/cache/manifestのaccepted 3 pairsすべてfast<full、全full Green。
+- `EVD-TL-008`: manifest一致、全2705 nodes、policy skip0、coverage omission/unexplained delta0。
+- `dev-coder`: `No material implementation decisions beyond the approved plan.`
+- orchestrator disposition: noteを採用。approved recovery protocolを厳守し、5回目fullを実行していないため追加decision entryは不要。
 
 ---
 
