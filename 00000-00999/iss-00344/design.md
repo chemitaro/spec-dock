@@ -159,7 +159,7 @@ assurance_profile: "standard"
 
 ## 残す価値があるファイル
 
-残す価値がある一つのファイルは、repository root から repo-local runtime を使い、対象の root、Initiative、Epic、Issue の Artifact へ明示的に import します。
+残す価値がある一つのファイルは、repository root から repo-local runtime を使い、対象の root、Initiative、Epic、Issue scope の `artifacts/` へ Artifact として明示的に import します。
 
 `./spec-dock/scripts/spec-dock artifact import file ...`
 
@@ -223,12 +223,12 @@ provider と installer fallback の ignore contract を同一にする。
 - `[N]` `_prune_legacy_scaffold` の README preserve ruleを exact allowlist にする。
 - `[N]` `pyproject.toml` の broad nested README exclusion を削除または exact paths と両立する形へ限定する。
 - `[N]` package data に4つの `.workbench/README.md` を explicit に含める。
-- `[N]` source / wheel / normalized sdist / installed resources の README inventory は次の5 fileだけとする。
-  - `templates/README.md`
-  - root `.workbench/README.md`
-  - Initiative `.workbench/README.md`
-  - Epic `.workbench/README.md`
-  - Issue `.workbench/README.md`
+- `[N]` source / wheel / normalized sdist / installed resources の README inventory は、正規化した `spec_dock/assets/spec_dock/templates/` root からの次の exact relative path 5件だけとする。
+  - `README.md`
+  - `root/.workbench/README.md`
+  - `initiative/.workbench/README.md`
+  - `epic/.workbench/README.md`
+  - `issue/.workbench/README.md`
 - `[N]` 4 Workbench README の bytes を全 surface で比較する。
 - `[N]` inventory の探索 root は各 surface で正規化した `spec_dock/assets/spec_dock/templates/` subtree とし、package 全体の README inventory とは解釈しない。
 
@@ -354,5 +354,5 @@ Copy -[#red,dashed]-> RootPayload : unsupported
 blocking open question はない。
 
 - package backend の hidden path挙動は implementation evidence で閉じる。
-- exact README wording の可読性調整は9 guidance elementsとbyte parityを維持する限り許可する。
+- README wording の可読性調整を含むすべての本文変更は、design amendment、4 asset canonical bytes の更新、fresh design reviewを要する。
 - design delta が existing copy implementation変更を要求した場合は実装せず design reviewへ戻る。
