@@ -411,8 +411,10 @@ S01 step gate:
 1. `dev-coder` がRed/Green/refactor、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
 2. main orchestratorがworker outputを検証し、delegation evidenceとclosure deltaをcanonical `report.md`へ統合する。
 3. fresh `code-reviewer` のblocking findingを閉じる。
-4. main orchestratorがstep resultを承認する。
-5. commit候補: `feat(workbench): Workbench README shellを生成`。no-opの場合はapproved-no-op理由とevidenceをreportへ記録する。
+4. milestone actual commit `feat(workbench): Workbench README shellを生成` を作成する。差分が本当にない場合だけ、no-op確認対象、diff-clean command、read-only confirmationをreportへ記録して`approved-no-op`とする。
+5. commit後またはapproved-no-op確定後に`git status --short`を実行し、意図しないstaged/unstaged changeがないことを確認してclose stateを`committed`または`approved-no-op`へ確定する。
+6. main orchestratorがStep / Milestone Result Approvalを与える。
+7. Result Approval前はS02/S03のimplementation、review、commitを開始しない。
 
 ### M2 / S02 — Semantic opacity、linked-worktree positioning、copy compatibility
 
@@ -516,8 +518,10 @@ S02 step gate:
 1. `dev-coder` がcharacterization/Red/Green、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
 2. main orchestratorがworker outputを検証し、delegation evidenceとclosure deltaをcanonical `report.md`へ統合する。
 3. fresh `code-reviewer` のblocking findingを閉じる。
-4. main orchestratorがstep resultを承認する。
-5. commit候補: `test(workbench): README shellのopacityとcopy互換を固定`。production no-opをreportで明記する。
+4. milestone actual commit `test(workbench): README shellのopacityとcopy互換を固定` を作成する。差分が本当にない場合だけ、production no-op、確認対象、diff-clean command、read-only confirmationをreportへ記録して`approved-no-op`とする。
+5. commit後またはapproved-no-op確定後に`git status --short`を実行し、意図しないstaged/unstaged changeがないことを確認してclose stateを`committed`または`approved-no-op`へ確定する。
+6. main orchestratorがStep / Milestone Result Approvalを与える。
+7. Result Approval前はS90/S99のimplementation、review、commitを開始しない。
 
 ### M3 / S03 — Packaging、focused distribution evidence、deferred handoff
 
@@ -647,8 +651,10 @@ S03 step gate:
 1. `dev-coder` がRed/Green/build/static、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
 2. main orchestratorがworker outputを検証し、delegation evidenceとclosure deltaをcanonical `report.md`へ統合する。
 3. fresh `code-reviewer` のblocking findingを閉じる。
-4. main orchestratorがstep resultを承認する。
-5. commit候補: `build(workbench): README assetsの配布契約を固定`。no-opの場合はexact distribution evidenceを必須とする。
+4. milestone actual commit `build(workbench): README assetsの配布契約を固定` を作成する。差分が本当にない場合だけ、exact distribution evidence、diff-clean command、read-only confirmationをreportへ記録して`approved-no-op`とする。
+5. commit後またはapproved-no-op確定後に`git status --short`を実行し、意図しないstaged/unstaged changeがないことを確認してclose stateを`committed`または`approved-no-op`へ確定する。
+6. main orchestratorがStep / Milestone Result Approvalを与える。
+7. Result Approval前はS99のimplementation、review、commitを開始しない。
 
 ### S90 — Docs / Template Impact Resolution
 
@@ -726,8 +732,10 @@ S90 step gate:
 4. `doc-writer` がdocs 4件だけを変更してexact assertionをGreenにし、docs inspection、changed files、unresolved wording、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
 5. main orchestratorがworker outputを検証し、Green/delegation/closure delta evidenceをcanonical `report.md`へ統合する。
 6. fresh `spec-reviewer` がdocs/spec contractをPASSするまでdocs findingを修正・再レビューする。
-7. main orchestratorが両reviewとS90 resultを承認する。
-8. commit候補: `docs(workbench): README shellの運用境界を更新`。docs no-opはsemantic assertion付きapproved-no-opだけを許可するが、test contractのreviewは省略しない。
+7. milestone actual commit `docs(workbench): README shellの運用境界を更新` を作成する。差分が本当にない場合だけ、semantic assertion、diff-clean command、read-only confirmationをreportへ記録して`approved-no-op`とするが、test contractのreviewは省略しない。
+8. commit後またはapproved-no-op確定後に`git status --short`を実行し、意図しないstaged/unstaged changeがないことを確認してclose stateを`committed`または`approved-no-op`へ確定する。
+9. main orchestratorが両reviewを含むStep / Milestone Result Approvalを与える。
+10. Result Approval前はS99のimplementation、review、commitを開始しない。
 
 ### S99 — Final Issue-local Quality Gate
 
@@ -796,11 +804,12 @@ S99 step gate:
 
 1. aggregate verification、全closure evidence、Issue 346 handoff、final report ledger、final commit scope、post-commit external evidence destination、ready/blockedをfinal commit前に`report.md`へ記録する。
 2. fresh `qa-reviewer`、issue-wide fresh `code-reviewer`、fresh `spec-reviewer` が全てPASSするまで、findingをowner stepへ戻して修正・再レビューする。
-3. reviewer verdict/fix commit/採否をreportへ追記し、main orchestratorがS99 resultを承認する。
+3. reviewer verdict/fix commit/採否をreportへ追記し、main orchestratorがfinal evidence commitをauthorizationする。この判断はS99の最終Result Approvalではない。
 4. final report/review evidence commitを作成する。S99ではapproved-no-opを認めない。
 5. commit後に`git rev-parse HEAD`と`git status --short`を実行し、HEAD SHAとclean resultを確認する。
 6. 実際のHEAD SHAとclean resultは、宣言済みの外部引き渡し証跡（final responseとIssue 346 handoffまたはIssue comment）にのみ記録する。final commit後に`report.md`を編集せず、EVD-009/010をpost-commit SHA保存先として扱わない。
-7. PR、merge preparation、Issue finishは実行せず、Issue 346 handoffで停止する。
+7. main orchestratorが外部HEAD SHA/clean evidenceと`committed` close stateを確認し、S99の最終Step / Milestone Result Approvalを与える。
+8. PR、merge preparation、Issue finishは実行せず、Issue 346 handoffで停止する。
 
 ## 11. Verification Ladder
 
@@ -898,12 +907,14 @@ S90未解決のままS99へ進まない。
 | Static/diff | M3のscoped Ruff check/format、Mypy、`git diff --check` | pass |
 | Docs/templates | semantic assertions、4-byte parity | pass |
 | Reviews | fresh code/QA/spec reviewer | blocking finding 0 |
+| Milestone admission | S01/S02/S03/S90 report gateとGit evidence | 各stepが`committed`または正当な`approved-no-op`、post-commit/no-op clean、Result Approval済み |
 | Handoff | report EVD-010 | Issue 346 owner/deps明記 |
 
 Final exit:
 
 - [ ] 全Closure完了。
 - [ ] M1〜M3、S90、S99完了。
+- [ ] S01/S02/S03/S90が`committed`または正当な`approved-no-op`、clean、Result Approval済み。
 - [ ] unresolved blocking findingなし。
 - [ ] reportに実測evidenceと未実施理由を記録。
 - [ ] Issue 345/346 scopeを実装していない。
