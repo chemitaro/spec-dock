@@ -220,7 +220,9 @@ Workbench は一時的、worktree-local、破棄可能、non-canonical であり
 
 - existing `workbench copy` の source-wins、destination-only preserve、one-shot という公開挙動。
 - existing Workbench 内の user content、bytes、names、mtime。
-- existing root / node の files。
+- existing scope の canonical documents、metadata、Workbench user content。これらは backfill または本 Issue と無関係な mutation の対象にしない。
+- new node 作成時の existing ancestor / sibling の canonical state と Workbench state。
+- 通常 update による `spec-dock/docs`、`templates`、`scripts`、`system`、`spec-dock/.gitignore` など managed provider assets の更新は許可する。
 - `validate`、`sync`、dependency、active context の semantic input。
 - node ID、metadata、dependency topology。
 - Artifact または ADR の既存 contract。
@@ -351,7 +353,8 @@ generic import の実装は `iss-00345` の責務であることも明記する�
 ### 9.1 互換性
 
 - schema migration を追加しない。
-- existing root / node を書き換えない。
+- existing scope の canonical documents、metadata、Workbench user content を backfill または無関係な mutation で書き換えない。
+- 通常 update による managed provider assets の更新は許可する。
 - Workbench の有無に依存しない既存 command の成功条件を維持する。
 
 ### 9.2 セキュリティとプライバシー
