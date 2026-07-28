@@ -161,10 +161,10 @@ M2はM1のtracked READMEを、M3はM1の4 assetとM2のoperator contractを前�
 
 | Step | Vertical behavior slice | Requirements / AC | Depends on | Unblocks |
 |---|---|---|---|---|
-| S01 | fresh root/future nodesへtracked README shellを生成 | RQ-001〜005 / AC-001〜005 | none | S02、S03 |
-| S02 | Workbench opacityとcheckout/manual copy互換を観測 | RQ-006/007/009 / AC-006、007A/B/C、009 | S01 | S90、S99 |
-| S03 | exact five-path distributionを4 surfacesで観測 | RQ-008 / AC-008 | S01、S02 regression | S99、Issue 346 |
-| S90 | shipped operator docsを実挙動へ整合 | RQ-003/007/010 / AC-007C、010 | S01、S02 | S99 |
+| S01 | fresh root/future nodesへtracked README shellを生成 | RQ-001〜005 / AC-001〜005 | none | S02 |
+| S02 | Workbench opacityとcheckout/manual copy互換を観測 | RQ-006/007/009 / AC-006、007A/B/C、009 | S01 Result Approval | S03 |
+| S03 | exact five-path distributionを4 surfacesで観測 | RQ-008 / AC-008 | S02 Result Approval | S90 |
+| S90 | shipped operator docsを実挙動へ整合 | RQ-003/007/010 / AC-007C、010 | S03 Result Approval | S99 |
 | S99 | 全AC/TC、review、handoffを同一HEADで閉じる | RQ-001〜010 / 全AC | S01〜S90 | Issue 346 |
 
 ## 5. 受け入れ範囲（Acceptance Envelope）
@@ -336,7 +336,7 @@ ReportのEVD-002/003へexact-copy Red/Green、CRLF fixture bytes、placeholder r
 #### S01 behavior slice execution
 
 - depends on: approved requirement/design/plan。
-- unblocks: S02のcheckout/opacity、S03のdistribution。
+- unblocks: S02のcheckout/opacityだけ。
 - target files: installer、provider/fallback ignore、4 README assets、generic scaffolder、S01 tests。
 - integration checkpoint: fresh rootとnew nodeをpublic command seamからmaterializeし、filesystemとreal Gitで観測する。
 - annotation: AFK。ただしcanonical README wording変更はHITL amendment。
@@ -414,7 +414,7 @@ S01 step gate:
 4. milestone actual commit `feat(workbench): Workbench README shellを生成` を作成する。差分が本当にない場合だけ、no-op確認対象、diff-clean command、read-only confirmationをreportへ記録して`approved-no-op`とする。
 5. commit後またはapproved-no-op確定後に`git status --short`を実行し、意図しないstaged/unstaged changeがないことを確認してclose stateを`committed`または`approved-no-op`へ確定する。
 6. main orchestratorがStep / Milestone Result Approvalを与える。
-7. Result Approval前はS02/S03のimplementation、review、commitを開始しない。
+7. Result Approval前はS02のimplementation、review、commitを開始しない。S03以降はS02以降の各Result Approvalを順に待つ。
 
 ### M2 / S02 — Semantic opacity、linked-worktree positioning、copy compatibility
 
@@ -451,8 +451,8 @@ Reportへopacity result、worktree README hash、copy前後inventory、README co
 
 #### S02 behavior slice execution
 
-- depends on: S01。
-- unblocks: S90のoperator docs、S99 final gate。
+- depends on: S01 Result Approval。
+- unblocks: S03のdistributionだけ。
 - target files: opacity tests、copy tests。copy/discovery production filesはread-only。canonical report統合はmain orchestratorだけが行う。
 - integration checkpoint: committed READMEを含むsource repoからlinked worktreeを作り、checkoutとmanual copyを一続きに観測する。
 - annotation: AFK。public copy semantics変更が必要ならHITL amendment。
@@ -521,7 +521,7 @@ S02 step gate:
 4. milestone actual commit `test(workbench): README shellのopacityとcopy互換を固定` を作成する。差分が本当にない場合だけ、production no-op、確認対象、diff-clean command、read-only confirmationをreportへ記録して`approved-no-op`とする。
 5. commit後またはapproved-no-op確定後に`git status --short`を実行し、意図しないstaged/unstaged changeがないことを確認してclose stateを`committed`または`approved-no-op`へ確定する。
 6. main orchestratorがStep / Milestone Result Approvalを与える。
-7. Result Approval前はS90/S99のimplementation、review、commitを開始しない。
+7. Result Approval前はS03のimplementation、review、commitを開始しない。S90以降はS03以降の各Result Approvalを順に待つ。
 
 ### M3 / S03 — Packaging、focused distribution evidence、deferred handoff
 
@@ -585,8 +585,8 @@ git diff --check
 
 #### S03 behavior slice execution
 
-- depends on: S01。S02のcopy testは独立だがM3 commit前にPASSを再確認する。
-- unblocks: S99とIssue 346のcandidate wheel integration。
+- depends on: S02 Result Approval。
+- unblocks: S90のoperator docsだけ。
 - target files: `pyproject.toml`、`setup.py`、`tests/unit/infra/test_init_update.py`、Issue report。
 - integration checkpoint: same temporary buildからwheel/sdist/installed resourcesを比較する。
 - annotation: AFK。exact five-path変更またはnew backend mechanismはHITL amendment。
@@ -654,7 +654,7 @@ S03 step gate:
 4. milestone actual commit `build(workbench): README assetsの配布契約を固定` を作成する。差分が本当にない場合だけ、exact distribution evidence、diff-clean command、read-only confirmationをreportへ記録して`approved-no-op`とする。
 5. commit後またはapproved-no-op確定後に`git status --short`を実行し、意図しないstaged/unstaged changeがないことを確認してclose stateを`committed`または`approved-no-op`へ確定する。
 6. main orchestratorがStep / Milestone Result Approvalを与える。
-7. Result Approval前はS99のimplementation、review、commitを開始しない。
+7. Result Approval前はS90のimplementation、review、commitを開始しない。S99はS90 Result Approvalを待つ。
 
 ### S90 — Docs / Template Impact Resolution
 
@@ -666,7 +666,7 @@ S03 step gate:
 
 #### S90 behavior slice execution
 
-- depends on: S01、S02。
+- depends on: S03 Result Approval。
 - unblocks: S99。
 - target files: provider docs 3件、`templates/README.md`、`tests/unit/infra/test_init_update.py` のdocs semantic assertion、Issue report。4 canonical `.workbench/README.md` はread-only reference。
 - integration checkpoint: S01/S02のobserved shell/copy boundaryと4 canonical READMEをshipped docsへ照合する。
@@ -747,7 +747,7 @@ S90 step gate:
 
 #### S99 behavior slice execution
 
-- depends on: S01、S02、S03、S90のcommitted result。
+- depends on: S01、S02、S03、S90がすべてResult Approval済み、かつ各close stateが`committed`または正当な`approved-no-op`。S99自身はmandatory final evidence commit後のexternal HEAD SHA/clean確認と`committed` close stateでのみ閉じる。
 - unblocks: Issue 346のdependency admission。Issue 344のfinish/PR/mergeはunblockしない。
 - target files: Issue reportとreview evidenceのみ。review finding修正はowner stepへ戻す。
 - integration checkpoint: 全exact verificationと三者reviewを同一HEADへ固定する。
