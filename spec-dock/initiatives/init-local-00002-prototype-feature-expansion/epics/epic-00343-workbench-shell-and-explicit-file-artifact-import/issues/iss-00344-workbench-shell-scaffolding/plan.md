@@ -53,7 +53,7 @@ ID: "iss-00344"
 3つのmicro-batchを順番に実行する。
 
 1. S01: fresh rootとfuture nodeを同じREADME shellで生成し、README-only trackingを成立させる。
-2. S02: semantic opacity、linked-worktree時のcheckout/manual copy境界、shipped docsを同一観測で閉じる。
+2. S02: semantic opacityとlinked-worktree時のcheckout/manual copy境界を同一観測で閉じる。
 3. S03: installer pruneとbuild pruneを含むdistribution exact allowlistを成立させ、Issue 346へ証跡を引き渡す。
 
 各micro-batchは次の順序を守る。
@@ -93,6 +93,7 @@ Red方針:
 | build cleanup | `setup.py` | custom `build_py` post-build pruneをexact allowlist-awareにする |
 | shipped docs | `src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,reference_worktree.md}`、`src/spec_dock/assets/spec_dock/templates/README.md` | operator boundaryを説明 |
 | installer tests | `tests/unit/infra/test_init_update.py` | fresh/existing、ignore、asset parity、build/distribution |
+| scaffolder tests | `tests/unit/infra/test_runtime_template_scaffolder.py` | real provider exact-copy、placeholder render、path-agnostic guardrail |
 | node tests | `tests/cli_runtime/test_runtime_new_doc_s09.py` | Initiative/Epic/Issue planned/result/filesystem parity |
 | opacity tests | `tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py` | Workbench semantic opacity |
 | copy tests | `tests/cli_runtime/test_workbench.py` | checkout/manual copy/source-wins compatibility |
@@ -123,10 +124,10 @@ Red方針:
 | Milestone | 成果 | Behaviors | Gate | 状態 |
 |---|---|---|---|---|
 | M1 / S01 | provider shell、fresh root、future nodes、README-only tracking | B-001〜B-004 | shell/ignore/no-backfill focused suite | planned |
-| M2 / S02 | opacity、checkout/manual copy、shipped docs | B-005〜B-007 | opacity/copy/docs focused suite | planned |
+| M2 / S02 | opacity、checkout/manual copy | B-005〜B-006 | opacity/copy focused suite | planned |
 | M3 / S03 | source/wheel/sdist/installed exact inventory | B-008〜B-009 | custom build prune + distribution suite | planned |
-| M90 | docs/template impact resolution | B-007 | semantic assertionとdeprecated wording inspection | planned |
-| M99 | Issue-local final quality | all | closure、focused regression、review、handoff | planned |
+| S90 | docs/template impact resolution | B-007 | semantic assertionとdeprecated wording inspection | planned |
+| S99 | Issue-local final quality | all | closure、focused regression、review、handoff | planned |
 
 ```plantuml
 @startuml
@@ -135,13 +136,35 @@ start
 :M1 provider shell;
 :M2 opacity / worktree / docs;
 :M3 packaging / distribution;
-:M90 docs impact resolution;
-:M99 final Issue-local quality gate;
+:S90 docs impact resolution;
+:S99 final Issue-local quality gate;
 stop
 @enduml
 ```
 
 M2はM1のtracked READMEを、M3はM1の4 assetとM2のoperator contractを前提とする。blocking failureは次へ持ち越さない。
+
+### 4.4 この計画で満たす要件ID
+
+`I344-RQ-001`〜`I344-RQ-010`、`AC-344-001`〜`AC-344-006`、`AC-344-007A/B/C`、`AC-344-008`〜`AC-344-010`をすべて対象とする。
+
+### 4.5 依存関係から導く実装順序
+
+1. S01でprovider asset、installer、generic scaffolder、Git trackingという生成経路を先に成立させる。
+2. S02でS01の生成物を使い、semantic opacityとlinked-worktree copy compatibilityをcharacterizeする。
+3. S03でS01のprovider assetsをpackage surfaceへ配布し、S02 regressionを同revisionで再確認する。
+4. S90でS01/S02の実測contractをoperator docsへ反映する。
+5. S99で全stepのevidenceとreviewを同一HEADに収束させる。
+
+### 4.6 ステップ一覧と要件 ↔ ステップ対応
+
+| Step | Vertical behavior slice | Requirements / AC | Depends on | Unblocks |
+|---|---|---|---|---|
+| S01 | fresh root/future nodesへtracked README shellを生成 | RQ-001〜005 / AC-001〜005 | none | S02、S03 |
+| S02 | Workbench opacityとcheckout/manual copy互換を観測 | RQ-006/007/009 / AC-006、007A/B/C、009 | S01 | S90、S99 |
+| S03 | exact five-path distributionを4 surfacesで観測 | RQ-008 / AC-008 | S01、S02 regression | S99、Issue 346 |
+| S90 | shipped operator docsを実挙動へ整合 | RQ-003/007/010 / AC-007C、010 | S01、S02 | S99 |
+| S99 | 全AC/TC、review、handoffを同一HEADで閉じる | RQ-001〜010 / 全AC | S01〜S90 | Issue 346 |
 
 ## 5. 受け入れ範囲（Acceptance Envelope）
 
@@ -165,89 +188,92 @@ Must not happen:
 
 ## 6. Spec-Locked Closure Index
 
-| Closure ID | Requirement | Design | 閉じる内容 | Verification | Report |
-|---|---|---|---|---|---|
-| TC-344-001 | AC-344-001 | DES-344-001 | fresh root生成 / existing no-backfill | installer unit | EVD-001 |
-| TC-344-002A | AC-344-002 | DES-344-002 | future 3 node path parity | runtime CLI | EVD-002 |
-| TC-344-002B | AC-344-002/003 | DES-344-002 | unchanged UTF-8 bytesはpath非依存のexact-copy seamを通り、placeholder templateは従来どおりrenderされる | real provider scaffolder unit | EVD-002/003 |
-| TC-344-003 | AC-344-003 | DES-344-003 | 4 README bytesと9 guidance elements | asset unit + byte hash | EVD-003 |
-| TC-344-004 | AC-344-004 | DES-344-004 | exact pathname ignore matrix | real Git repository | EVD-004 |
-| TC-344-005 | AC-344-005 | DES-344-001/002/005 | existing state不変 | snapshot/mtime test | EVD-001/002 |
-| TC-344-006 | AC-344-006 | DES-344-006 | semantic opacity | infra/CLI regression | EVD-005 |
-| TC-344-007A | AC-344-007A | DES-344-007 | checkoutとidentical README copy no-diff | linked-worktree test | EVD-006 |
-| TC-344-007B | AC-344-007B | DES-344-007 | divergent README source-wins維持 | copy regression | EVD-006 |
-| TC-344-007C | AC-344-007C | DES-344-003/007/009 | root route拒否とguidance scope | CLI/docs assertion | EVD-006/008 |
-| TC-344-008 | AC-344-008 | DES-344-008 | post-build pruneを含むexact distribution inventory | build/unit/resource inspection | EVD-007 |
-| TC-344-009 | AC-344-009 | DES-344-005/007 | existing copy focused regression | CLI suite | EVD-006 |
-| TC-344-010 | AC-344-010 | DES-344-009 | shipped docs consistency | semantic assertion/inspection | EVD-008 |
+全rowは`required=yes`であり、locked expectationまたはrequired値を変える場合はplan amendmentとfresh reviewを要する。
+
+| ID | Required | Spec link | Owner | Observable input / state | Locked expectation | Bug class guarded | Evidence level | Closure evidence |
+|---|---|---|---|---|---|---|---|---|
+| TC-344-001 | yes | AC-344-001 / DES-344-001 | S01 | fresh rootとpre-existing root | freshだけREADME生成、existingはno-backfill | freshness判定の遅延・既存汚染 | installer unit + real Git | EVD-001 |
+| TC-344-002A | yes | AC-344-002 / DES-344-002 | S01 | new Initiative/Epic/Issue plan/result/filesystem | 3 node kindのpath parity | node-kind漏れ・ancestor変更 | runtime CLI | EVD-002 |
+| TC-344-002B | yes | AC-344-002/003 / DES-344-002 | S01 | unchanged CRLF UTF-8とplaceholder template | unchangedはpath非依存exact-copy、changedはrender | text rewrite・README専用分岐 | real provider unit | EVD-002/003 |
+| TC-344-003 | yes | AC-344-003 / DES-344-003 | S01 | 4 provider README bytes | byte-identical、9 guidance elements、exact command | wording drift・placeholder混入 | asset byte/hash assertion | EVD-003 |
+| TC-344-004 | yes | AC-344-004 / DES-344-004 | S01 | regular/symlink/directory/nested/case/near-name paths | exact top-level README pathnameだけtracking eligible | payload露出・過剰再包含 | real Git matrix | EVD-004 |
+| TC-344-005 | yes | AC-344-005 / DES-344-001/002/005 | S01 | existing Workbench before/after init/update/new child | entry、bytes、names、mtime不変 | backfill・既存状態破壊 | snapshot/mtime regression | EVD-001/002 |
+| TC-344-006 | yes | AC-344-006 / DES-344-006 | S02 | README、fake metadata、ADR-like、binary、invalid UTF-8 | validate/sync/deps/active/source observation不変 | semantic source化 | infra/CLI regression | EVD-005 |
+| TC-344-007A | yes | AC-344-007A / DES-344-007 | S02 | linked worktreeとidentical README | READMEはcheckout、ignored payloadはmanual copy、content diffなし | checkout/copy混同 | linked-worktree Git test | EVD-006 |
+| TC-344-007B | yes | AC-344-007B / DES-344-007 | S02 | divergent source/target node README | existing opaque whole-tree source-wins | README filterによる互換破壊 | copy regression | EVD-006 |
+| TC-344-007C | yes | AC-344-007C / DES-344-003/007/009 | S02/S90 | root selectorと4 README guidance | root route拒否、node helper scope明示 |未提供root機能の示唆 | CLI rejection + docs assertion | EVD-006/008 |
+| TC-344-008 | yes | AC-344-008 / DES-344-008 | S03 | source/wheel/sdist/installed template subtree | exact 5 paths、4 bytes一致、stale nested READMEなし | package exclude/prune欠落 | custom build + installed resource | EVD-007 |
+| TC-344-009 | yes | AC-344-009 / DES-344-005/007 | S02 | existing `workbench copy` suite |公開failure/source-wins/atomicity不変 | copy regression | CLI suite | EVD-006 |
+| TC-344-010 | yes | AC-344-010 / DES-344-009 | S90 | shipped docs 4件 | shell/Git/copy/security/authority/sibling境界が一致 | operator誤誘導 | docs semantic assertion | EVD-008 |
 
 ## 7. Behavior Backlog
 
 | Behavior | Milestone | 保証 | Closure | 依存 | 状態 |
 |---|---|---|---|---|---|
-| B-001 | M1 | 4 provider READMEがbyte-identicalでcanonical guidanceを持つ | TC-344-003 | none | ready |
-| B-002 | M1 | fresh rootだけがroot READMEを得る | TC-344-001/005 | B-001 | planned |
+| B-001 | M1 | 4 provider READMEがbyte-identicalでcanonical guidanceを持つ | TC-344-003 | none | planned |
+| B-002 | M1 | fresh initを通すとroot READMEが生成され、Gitではexact pathnameだけがtracking eligibleになる | TC-344-001/003/004/005 | none | ready |
 | B-003 | M1 | future Initiative/Epic/Issueがgeneric recursionでREADMEを得て、unchanged bytesはgeneric exact-copy、placeholder bytesはrenderされる | TC-344-002A/002B/005 | B-001 | planned |
 | B-004 | M1 | exact top-level READMEだけがtracking eligible | TC-344-004 | B-001 | planned |
 | B-005 | M2 | README/payloadがsemantic observationを変えない | TC-344-006 | B-001 | planned |
 | B-006 | M2 | checkout/manual copy/source-wins/root rejectionを維持 | TC-344-007A/B/C、009 | B-003/004 | planned |
-| B-007 | M2/M90 | shipped docsが新しいoperator boundaryを説明 | TC-344-010 | B-005/006 | planned |
+| B-007 | M90 | shipped docsが新しいoperator boundaryを説明 | TC-344-010 | B-005/006 | planned |
 | B-008 | M3 | installer/build pruneがexact 5 pathsだけを保存 | TC-344-008 | B-001 | planned |
 | B-009 | M3 | source/wheel/sdist/installed inventoryとbytesが一致 | TC-344-008 | B-008 | planned |
 
 ## 8. Active Behavior
 
-- Behavior: `B-001`
+- Behavior: `B-002`
 - Milestone: M1
-- Closure: `TC-344-003`
-- Design: `DES-344-003`
-- 次に行う理由: 全生成面、ignore、copy、distributionが参照するcanonical bytesを先に固定するため。
+- Closure: `TC-344-001`, `TC-344-003`, `TC-344-004`, `TC-344-005`
+- Design: `DES-344-001`, `DES-344-003`, `DES-344-004`, `DES-344-005`
+- 次に行う理由: provider assetからinstaller、filesystem、real Git observationまでを薄く通す最小vertical tracer bulletだから。
 - 分割判断: one-cycle
 
-Given provider template treeにWorkbench README assetがない
+Given freshなtemporary Git repositoryにSpecDock rootがまだ存在しない
 
-When 4 node-kind assetとcontent/parity testを追加する
+When provider assetを含むcurrent checkoutから`spec-dock init`相当を実行する
 
-Then 4 assetがUTF-8/LF/末尾newline 1つでbyte-identicalとなり、9 guidance elementsとexact repo-local commandを含む。
+Then root `.workbench/README.md` がcanonical bytesで生成され、そのexact pathnameだけがGit tracking eligibleになり、other payloadはignoreされる。
 
 | 項目 | 内容 |
 |---|---|
-| Allowed paths | 4 README assets、`tests/unit/infra/test_init_update.py` |
+| Allowed paths | root README asset、provider/fallback ignore、`src/spec_dock/cli.py`、`tests/unit/infra/test_init_update.py` |
 | Forbidden paths | runtime copy/import implementation、dogfood projection |
-| Required checks | asset existence、byte equality、guidance assertions、`git diff --check` |
-| Report destination | `report.md` EVD-003 / session log |
-| Stop conditions | canonical text変更がapproved designのfenced blockを外れる |
+| Required checks | fresh init output bytes、real `git check-ignore`/status、other payload ignore、existing root no-backfill |
+| Report destination | `report.md` EVD-001/EVD-003/EVD-004 / S01 session log |
+| Stop conditions | fresh判定がmutation前に固定できない、canonical textがapproved designを外れる、payloadがGitへ露出する |
 
 ## 9. Active TDD Cycle
 
 - Cycle ID: `TDD-344-001`
-- Parent: B-001
+- Parent: B-002
 - Type: red-green-refactor
 - Status: planned
 
 Behavioral hypothesis:
 
 ```text
-4つのexplicit provider assetをapproved designのcanonical bytesで配置すれば、
-root/node kind固有のruntime branchなしに全shell surfaceの共通authorityを固定できる。
+fresh initのpublic installer pathを通してroot READMEを生成し、
+real Git observationでREADME-only trackingを確認できれば、最小のend-to-end shell価値が成立する。
 ```
 
 Red:
 
-- `TestInitUpdate::test_workbench_readme_assets_are_byte_identical_and_complete` を先に追加する。
-- asset missingまたはguidance mismatchで失敗することを確認する。
+- `tests/unit/infra/test_init_update.py::TestInitUpdate::test_fresh_init_creates_only_tracked_root_workbench_readme` を先に追加する。
+- root README asset不在、installer未生成、またはREADMEを含むWorkbench全体ignoreのいずれかで失敗することを確認する。
 - production change前から成功、または別理由で失敗した場合は停止してtestを修正する。
 
 Minimal Green:
 
-- 4 exact assetだけを追加する。
+- root exact asset、pre-mutation freshness branch、root copy、3-rule provider/fallback ignoreだけを追加する。
 - generation framework、README parser、placeholder tokenは追加しない。
 - designのcanonical fenced blockからwordingを変更しない。
+- remaining 3 node assets、generic exact-copy、full ignore matrixは同じS01の後続cycleで広げる。
 
 Focused verification:
 
 ```bash
-uv run pytest tests/unit/infra/test_init_update.py -k workbench_readme
+uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_fresh_init_creates_only_tracked_root_workbench_readme
 git diff --check
 ```
 
@@ -302,14 +328,93 @@ git diff --check
 
 ReportのEVD-002/003へexact-copy Red/Green、CRLF fixture bytes、placeholder render result、path-agnostic assertionを記録する。あわせて4 README SHA-256、fresh/existing snapshot、ignore matrix、node path parityを記録し、M1差分だけをreviewable commitにする。
 
-### M2 / S02 — Semantic opacity、linked-worktree positioning、shipped docs
+#### S01 behavior slice execution
+
+- depends on: approved requirement/design/plan。
+- unblocks: S02のcheckout/opacity、S03のdistribution。
+- target files: installer、provider/fallback ignore、4 README assets、generic scaffolder、S01 tests。
+- integration checkpoint: fresh rootとnew nodeをpublic command seamからmaterializeし、filesystemとreal Gitで観測する。
+- annotation: AFK。ただしcanonical README wording変更はHITL amendment。
+
+Planned contract:
+
+- scope: TC-344-001〜005をthin root tracerから3 node/full matrixへ拡張する。
+- test obligation: fresh/existing、3 node kinds、unchanged/changed bytes、negative ignore paths、preservation invariants。
+- red evidence: 各caseでasset missing、未生成、rewrite、過剰ignore/no-ignoreの想定failureを確認する。
+- green verification: 上記Gateのexact pytest/Git evidence。
+- refactor guardrail: README/path-specific abstraction、node-kind branch、new frameworkを追加しない。
+- amendment trigger: pre-mutation freshness、generic exact-copy、3-rule ignoreのいずれかを満たせない場合。
+
+#### S01 delegation contract
+
+- delegated role: `dev-coder`
+- input docs: approved `requirement.md`、`design.md`、本`plan.md`、`workflow_issue.md`、`authoring/issue-plan.md`、S01 target source/tests。
+- allowed paths: Section 3.1のinstaller、provider ignore、4 README assets、generic scaffolder、installer/node/scaffolder tests。
+- forbidden changes: copy/discovery read-only 3 files、generic import、root copy route、dogfood projection、S02/S03/S90 files。
+- acceptance criteria: TC-344-001〜005のlocked expectationをすべて満たす。
+- required tests: S01 Gateのexact commandsとreal Git ignore/status matrix。
+- reviewer focus: fresh `code-reviewer` がfreshness/no-backfill、generic exact-copy/render、ignore exposure、node parityを確認する。
+- stop conditions: allowed path外変更、unexpected Red、existing regression、approved canonical wording/contract変更が必要。
+- output required: changed files、Red/Green/refactor結果、unresolved risks、EVD-001〜004へ転記するworker summary、`No material implementation decisions beyond the approved plan.` または判断を含むLedger Note。
+
+#### S01 具体テストケース一覧
+
+- `tc-s01-001` acceptance / vertical tracer: fresh initでroot READMEだけをtracking可能にする
+  - 前提: `spec-dock/` が存在しないtemporary Git repositoryと、README以外のWorkbench payloadを用意する。
+  - 操作: current providerからfresh initを実行し、生成bytes、`git check-ignore`、`git status --short`を観測する。
+  - 期待結果: root READMEがcanonical bytesで生成されtracking eligible、other payloadはignoreされる。
+  - 失敗検出: assetだけ存在してinstaller/public observationが未接続、またはpayloadがGitへ露出する回帰を検出する。
+  - 検証方法: `TestInitUpdate::test_fresh_init_creates_only_tracked_root_workbench_readme`。
+  - 関連 closure id: TC-344-001、TC-344-003、TC-344-004。
+
+- `tc-s01-002` negative: existing scopeをbackfill/変更しない
+  - 前提: file、directory、symlink、empty directoryのexisting rootと、既存node Workbenchのbytes/names/mtime snapshotを用意する。
+  - 操作: update、existing `init --force`、new child creationを実行する。
+  - 期待結果: existing root/nodeはREADMEをbackfillせず、existing Workbench snapshotは不変で、新規childだけREADMEを得る。
+  - 失敗検出: freshnessの遅延判定、ancestor/sibling mutation、mtime変更を検出する。
+  - 検証方法: `TestInitUpdate::test_update_and_force_init_do_not_backfill_workbench_readme` と new-node preservation test。
+  - 関連 closure id: TC-344-001、TC-344-002A、TC-344-005。
+
+- `tc-s01-003` invariant: generic exact-copyとplaceholder renderを両立する
+  - 前提: CRLFを含むunchanged UTF-8 fixture、placeholderによりbytesが変わるfixture、READMEでないpath-neutral fixtureを用意する。
+  - 操作: real provider `copy_scaffolded_tree()` を3 fixtureへ実行する。
+  - 期待結果: unchanged bytesは完全一致、placeholderはrenderされ、同じ挙動がpath名に依存しない。
+  - 失敗検出: `read_text`/`write_text` newline rewrite、render停止、README/path-specific分岐を検出する。
+  - 検証方法: S01 Gateの3 exact `test_runtime_template_scaffolder.py` node。
+  - 関連 closure id: TC-344-002B、TC-344-003。
+
+- `tc-s01-004` matrix: exact pathnameだけをGit tracking対象へ戻す
+  - 前提: regular file、symlink、directory/descendant、nested README、case variant、near-nameをtemporary Git repositoryへ配置する。
+  - 操作: provider/fallback 3-rule ignoreを適用して`git check-ignore -v`とstatusを観測する。
+  - 期待結果: exact top-level `.workbench/README.md` pathnameだけが再包含され、その他はignoreまたはGit非objectのまま。
+  - 失敗検出: nested/case/near-nameの露出、directory descendantの再包含を検出する。
+  - 検証方法: `TestInitUpdate::test_workbench_gitignore_tracks_only_top_level_readme`。
+  - 関連 closure id: TC-344-004。
+
+#### S01 step closure contract
+
+| Closure | Required | Close condition | Planned evidence |
+|---|---|---|---|
+| TC-344-001 | yes | fresh/existing全root variantがlocked expectationどおり | EVD-001 + exact pytest |
+| TC-344-002A/B | yes | 3 node parityとreal generic copy/renderがPASS | EVD-002/003 + exact nodes |
+| TC-344-003 | yes | 4 bytes/guidanceとtracer output一致 | EVD-003 + hashes |
+| TC-344-004 | yes | full real Git matrix一致 | EVD-004 |
+| TC-344-005 | yes | before/after snapshot不変 | EVD-001/002 |
+
+S01 step gate:
+
+1. reportへRed/Green/refactor、delegation evidence、closure deltaをcommit前に記録する。
+2. fresh `code-reviewer` のblocking findingを閉じる。
+3. main orchestratorがstep resultを承認する。
+4. commit候補: `feat(workbench): Workbench README shellを生成`。no-opの場合はapproved-no-op理由とevidenceをreportへ記録する。
+
+### M2 / S02 — Semantic opacity、linked-worktree positioning、copy compatibility
 
 成果:
 
 - tracked README、fake metadata、ADR-like Markdown、binary、invalid UTF-8を含めてもsemantic observationが不変。
 - linked worktreeではREADMEがcheckoutされ、ignored payloadはmanual copy後だけ現れる。
 - identical/divergent READMEとも既存opaque source-winsを維持。
-- shipped docs 4件がoptional/no-backfill/security/authority/Issue境界を説明。
 
 Red/characterization seeds:
 
@@ -317,7 +422,6 @@ Red/characterization seeds:
 - `test_linked_worktree_gets_readme_via_checkout_before_manual_copy`
 - `test_manual_copy_preserves_tracked_readme_bytes_and_copies_ignored_files`
 - divergent README source-winsとroot selector rejectionの既存test
-- `test_shipped_docs_describe_workbench_readme_boundary`
 
 Green sequence:
 
@@ -325,18 +429,88 @@ Green sequence:
 2. READMEを含むfixtureでもexact `.workbench` top-down pruneが維持されることを固定する。
 3. Git checkoutとmanual copyのobservable差をtestする。
 4. copy implementationにはREADME-aware branchを追加しない。
-5. provider docs 4件をapproved designの用語へ更新し、generic importをIssue 345の未実装機能として記載する。
+5. docsで必要になる観測語とdeprecated wording inventoryをEVD-008候補として記録し、実際のdocs変更はS90へ渡す。
 
 Gate:
 
 ```bash
 uv run pytest tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py
 uv run pytest tests/cli_runtime/test_workbench.py
-uv run pytest tests/unit/infra/test_init_update.py -k 'workbench and docs'
 git diff --check
 ```
 
-Reportへopacity result、worktree README hash、copy前後inventory、README content diff、copy regression、docs changed pathsを記録する。
+Reportへopacity result、worktree README hash、copy前後inventory、README content diff、copy regression、S90へ渡すdeprecated wording inventoryを記録する。
+
+#### S02 behavior slice execution
+
+- depends on: S01。
+- unblocks: S90のoperator docs、S99 final gate。
+- target files: opacity tests、copy tests、report。copy/discovery production filesはread-only。
+- integration checkpoint: committed READMEを含むsource repoからlinked worktreeを作り、checkoutとmanual copyを一続きに観測する。
+- annotation: AFK。public copy semantics変更が必要ならHITL amendment。
+
+Planned contract:
+
+- scope: TC-344-006、007A/B/C、009を既存runtime変更なしで閉じる。
+- test obligation: opaque inputs、linked checkout、identical/divergent copy、root rejection、existing failure/atomicity regression。
+- red/alternative evidence: existing behaviorはcharacterization-first、README checkout接続はred-required。
+- green verification: S02 Gateのexact suitesとGit content diff。
+- refactor guardrail: copy/discovery production sourceを変更しない。
+- amendment trigger: README filter、root selector、new semantic exclusionが必要になる場合。
+
+#### S02 delegation contract
+
+- delegated role: `dev-coder`
+- input docs: approved specs、本plan、S01 report evidence、`workflow_issue.md`、copy/opacity sourceとtests。
+- allowed paths: `tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py`、`tests/cli_runtime/test_workbench.py`、Issue report。
+- forbidden changes: `application/workbench.py`、`infra/fs_cli.py`、`infra/fs_repo.py`、docs、package config、generic import、dogfood projection。
+- acceptance criteria: TC-344-006、007A/B/C、009のlocked expectation。
+- required tests: S02 Gateの2 suites、temporary linked-worktree Git diff、root selector rejection。
+- reviewer focus: fresh `code-reviewer` がsemantic opacity、source-wins、collision/atomicity、root rejectionを確認する。
+- stop conditions: read-only production change、unexpected existing regression、S01 evidence不成立、allowed path外変更。
+- output required: test-only diff、characterization/Red/Green結果、copy inventory/hashes、EVD-005/006へ転記するsummaryとLedger Note。
+
+#### S02 具体テストケース一覧
+
+- `tc-s02-001` invariant: Workbench内容はsemantic observationを変えない
+  - 前提: README、fake metadata、ADR-like Markdown、binary、invalid UTF-8を同じ`.workbench`へ配置する。
+  - 操作: validate、sync、deps、active context、authoring source manifestの既存observation seamを実行する。
+  - 期待結果: Workbenchなしbaselineと結果が一致し、parse/decode errorを出さない。
+  - 失敗検出: READMEをauthority/sourceとして読む回帰とbinary decode回帰を検出する。
+  - 検証方法: `tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py`。
+  - 関連 closure id: TC-344-006。
+
+- `tc-s02-002` acceptance: linked worktreeではcheckout後にmanual payloadだけcopyする
+  - 前提: tracked READMEとignored payloadを持つsource node、同commitのlinked worktreeを用意する。
+  - 操作: linked worktree作成前後とnode-scoped `workbench copy` 後のinventory/hash/Git diffを観測する。
+  - 期待結果: READMEはcheckoutで存在し、payloadはcopy後だけ現れ、README content diffはない。
+  - 失敗検出: payload自動同期、README欠落、copyによるtracked diffを検出する。
+  - 検証方法: `tests/cli_runtime/test_workbench.py` のlinked-worktree exact tests。
+  - 関連 closure id: TC-344-007A、TC-344-009。
+
+- `tc-s02-003` compatibility / negative: divergent source-winsとroot rejectionを維持する
+  - 前提: source/target README bytesが異なるnode pair、root/local-id/unsupported selectorsを用意する。
+  - 操作: node copyと各invalid invocationを実行する。
+  - 期待結果: node copyはwhole-tree source-wins、invalid selectorは既存errorで拒否され、destination-only/collision/atomicity契約は不変。
+  - 失敗検出: README filter、root route追加、failure semantics driftを検出する。
+  - 検証方法: `tests/cli_runtime/test_workbench.py` 全suite。
+  - 関連 closure id: TC-344-007B、TC-344-007C、TC-344-009。
+
+#### S02 step closure contract
+
+| Closure | Required | Close condition | Planned evidence |
+|---|---|---|---|
+| TC-344-006 | yes | 全opaque fixtureでbaseline observation一致 | EVD-005 |
+| TC-344-007A | yes | checkout/manual copy/no-diff観測一致 | EVD-006 |
+| TC-344-007B/C | yes | divergent source-winsとroot rejectionが既存contractどおり | EVD-006 |
+| TC-344-009 | yes | existing copy suite全件PASS | EVD-006 |
+
+S02 step gate:
+
+1. reportへcharacterization/Red/Green、delegation evidence、closure deltaをcommit前に記録する。
+2. fresh `code-reviewer` のblocking findingを閉じる。
+3. main orchestratorがstep resultを承認する。
+4. commit候補: `test(workbench): README shellのopacityとcopy互換を固定`。production no-opをreportで明記する。
 
 ### M3 / S03 — Packaging、focused distribution evidence、deferred handoff
 
@@ -396,7 +570,77 @@ git diff --check
 
 上記2つのexact pytest nodeがrepository外temporary build、custom post-build prune、wheel/sdist extraction、temporary install、installed-resource inspectionを所有する。inventory rootは各surfaceでnormalized `spec_dock/assets/spec_dock/templates/` subtreeとする。allowlist外README、surface欠落、byte mismatchのいずれかでM3は失敗し、結果をEVD-007へ、static command結果をEVD-011へ記録する。
 
-### M90 — Docs / Template Impact Resolution
+#### S03 behavior slice execution
+
+- depends on: S01。S02のcopy testは独立だがM3 commit前にPASSを再確認する。
+- unblocks: S99とIssue 346のcandidate wheel integration。
+- target files: `pyproject.toml`、`setup.py`、`tests/unit/infra/test_init_update.py`、Issue report。
+- integration checkpoint: same temporary buildからwheel/sdist/installed resourcesを比較する。
+- annotation: AFK。exact five-path変更またはnew backend mechanismはHITL amendment。
+
+Planned contract:
+
+- scope: TC-344-008とEVD-010/011 handoffを閉じる。
+- test obligation: declarative exclusion、post-build prune、pre/post stale fixture、4 surfaces、bytes、extra/missing inventory、static quality。
+- red evidence: broad exclusion/post-build pruneにより4 hidden READMEが欠落する既知Redを確認する。
+- green verification: M3 Gateの2 exact build nodesとscoped static commands。
+- refactor guardrail:既存local-wheelhouse helperを再利用し、新しいbuild frameworkを作らない。
+- amendment trigger: 5 paths以外を保存する必要、Issue 346 E2E前倒し、backend contract変更が必要な場合。
+
+#### S03 delegation contract
+
+- delegated role: `dev-coder`
+- input docs: approved specs、本plan、S01 evidence、`setup.py`、`pyproject.toml`、existing Issue 69 build helpers、`workflow_issue.md`。
+- allowed paths: `pyproject.toml`、`setup.py`、`tests/unit/infra/test_init_update.py`、Issue report。
+- forbidden changes: runtime copy/import、provider docs、dogfood projection、dependency mutation、PR/merge/finish。
+- acceptance criteria: TC-344-008のexact five-path/byte/stale-removal contractとEVD-010 handoffを満たす。
+- required tests: M3 Gateに列挙した2 exact nodes、full installer test file、scoped Ruff/format/Mypy/diff。
+- reviewer focus: fresh `code-reviewer` がdual exclusion/prune、normalization、temporary isolation、false-positive inventoryを確認する。
+- stop conditions: network dependency、repository内build output、allowlist緩和、surface未検証、allowed path外変更。
+- output required: build filenames/inventories/hashes、pre/post snapshot、static results、EVD-007/010/011へ転記するsummaryとLedger Note。
+
+#### S03 具体テストケース一覧
+
+- `tc-s03-001` regression: custom build pruneはallowlistを保存しstale READMEを除去する
+  - 前提: `SPEC_DOCK_BUILD_PY_SEED_STALE_FIXTURES=1`で5 READMEと`issue/legacy/README.md`をbuild treeへ存在させる。
+  - 操作: pre-prune snapshotを保存してcustom `build_py`を通すwheel buildをtemporary directoryで実行する。
+  - 期待結果: pre-pruneにはallowlist/stale双方があり、post-prune wheelには5 pathsだけが残る。
+  - 失敗検出: broad pruneによるhidden README削除、またはstale nested README残留を検出する。
+  - 検証方法: `TestInitUpdate::test_workbench_readme_build_prune_preserves_allowlist_and_removes_stale_nested_readme`。
+  - 関連 closure id: TC-344-008。
+
+- `tc-s03-002` acceptance: 全distribution surfaceのinventoryとbytesを一致させる
+  - 前提: local wheelhouseを使うisolated build contextとexpected normalized five pathsを用意する。
+  - 操作: wheel/sdistをbuildし、ZIP/TAR inventoryをnormalizeし、temporary wheel installから4 resource bytesを読む。
+  - 期待結果: source/wheel/sdist/installed inventoryがexact five paths、4 Workbench README bytesがsourceと一致する。
+  - 失敗検出: package-data/exclude、sdist prefix、hidden directory、installed resourceのmissing/extra/byte driftを検出する。
+  - 検証方法: `TestInitUpdate::test_workbench_readme_distribution_inventory_and_bytes_match_all_surfaces`。
+  - 関連 closure id: TC-344-008。
+
+- `tc-s03-003` quality: scoped static contractを満たす
+  - 前提: S01〜S03のchanged Python/test pathsが確定している。
+  - 操作: M3 GateのRuff check、Ruff format、Mypy、`git diff --check`をexact path listで実行する。
+  - 期待結果: 全commandがexit 0で、未対象changed Python pathがない。
+  - 失敗検出: style/type/format error、path list漏れ、whitespace errorを検出する。
+  - 検証方法: M3 Gate exact commandsと`git diff --name-only`照合。
+  - 関連 closure id: TC-344-008。
+
+#### S03 step closure contract
+
+| Closure | Required | Close condition | Planned evidence |
+|---|---|---|---|
+| TC-344-008 | yes | dual prune/exclude、4-surface exact inventory/bytes、stale removalが同revisionでPASS | EVD-007 |
+| static quality | yes | scoped Ruff/format/Mypy/diff全PASS | EVD-011 |
+| Issue 346 handoff | yes | owner/dependency/deferred gatesをreportへ記録 | EVD-010 |
+
+S03 step gate:
+
+1. reportへRed/Green/build/static/delegation evidence、closure deltaをcommit前に記録する。
+2. fresh `code-reviewer` のblocking findingを閉じる。
+3. main orchestratorがstep resultを承認する。
+4. commit候補: `build(workbench): README assetsの配布契約を固定`。no-opの場合はexact distribution evidenceを必須とする。
+
+### S90 — Docs / Template Impact Resolution
 
 - provider docs 4件: update required。
 - Workbench README templates: update required。
@@ -404,13 +648,94 @@ git diff --check
 - dogfood workspace: Issue 346でcandidate wheelから検証。直接変更しない。
 - deprecated wordingはcontext-awareに検索し、blind replacementしない。
 
-### M99 — Final Issue-local Quality Gate
+#### S90 delegation contract
+
+- delegated role: `doc-writer`
+- input docs: approved specs、本plan、S01/S02 observed evidence、canonical README bytes、provider docs 4件、`workflow_issue.md`。
+- allowed paths: `src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,reference_worktree.md}`、`src/spec_dock/assets/spec_dock/templates/README.md`、docs assertions、Issue report。
+- forbidden changes: runtime/installer/package config、canonical Issue specs、dogfood projection、Issue 345/346 implementation。
+- acceptance criteria: TC-344-007CとTC-344-010のoperator guidanceを満たし、generic importをimplementedと誤記しない。
+- required docs verification: semantic assertion、deprecated wording inspection、docs diff、4 canonical READMEとの用語照合。
+- reviewer focus: fresh `spec-reviewer` がauthority/security/copy/root/sibling境界を確認する。
+- stop conditions: wordingがapproved designの意味を変える、runtime changeが必要、deprecated wordingの文脈判断不能。
+- output required: changed docs、inspection results、unresolved wording、EVD-008へ転記するsummaryとLedger Note。
+
+#### S90 具体テストケース一覧
+
+- `tc-s90-001` docs acceptance: operator boundaryを一貫して説明する
+  - 前提: provider docs 4件とcanonical READMEの9 guidance elementsを用意する。
+  - 操作: shell/optional/no-backfill/README-only tracking/opacity/security/checkout/node copy/root exclusion/evidence-only importをsemantic assertionする。
+  - 期待結果: 4 docsが同じ境界を説明し、Issue 345のgeneric importを未実装として位置づける。
+  - 失敗検出: Workbench全体をGit管理外とする旧説明、root copy示唆、import implemented claimを検出する。
+  - 検証方法: `TestInitUpdate::test_shipped_docs_describe_workbench_readme_boundary` とdocs diff inspection。
+  - 関連 closure id: TC-344-007C、TC-344-010。
+
+- `tc-s90-002` inspect-only: skills/workflow/dogfood影響を誤って変更しない
+  - 前提: changed-path一覧とIssue 346 ownershipを用意する。
+  - 操作: skills/workflow docsのsemantic change不要、dogfood projection deferredをinspectionする。
+  - 期待結果:不要な変更がなく、N/A/deferred根拠がreportへ記録される。
+  - 失敗検出: one-off consumer edit、Issue 345/346 scope侵食を検出する。
+  - 検証方法: `git diff --name-only` とEVD-008/010 inspection。
+  - 関連 closure id: TC-344-010。
+
+#### S90 step closure contract
+
+| Closure | Required | Close condition | Planned evidence |
+|---|---|---|---|
+| TC-344-007C | yes | root/node checkout/helper scopeが4 docsで正しい | EVD-008 |
+| TC-344-010 | yes | shipped docs semantic assertionsとdeprecated wording disposition完了 | EVD-008 |
+
+S90 step gate:
+
+1. reportへdocs inspection、delegation evidence、closure deltaをcommit前に記録する。
+2. fresh `spec-reviewer` のblocking findingを閉じる。
+3. main orchestratorがstep resultを承認する。
+4. commit候補: `docs(workbench): README shellの運用境界を更新`。docs no-opはsemantic assertion付きapproved-no-opだけを許可する。
+
+### S99 — Final Issue-local Quality Gate
 
 - TC-344-001〜010をreport evidenceへ対応づける。
 - S01〜S03 focused suiteを同じrevisionで再実行する。
 - fresh `code-reviewer`、`qa-reviewer`、`spec-reviewer` のblocking findingを閉じる。
 - clean status、commit SHA、Issue 346 handoffを記録する。
 - PR作成、merge preparation、Issue finishは行わない。
+
+#### S99 delegation contract
+
+- delegated role: fresh `qa-reviewer`、issue-wide fresh `code-reviewer`、fresh `spec-reviewer`（全てread-only）。
+- input docs: approved requirement/design/plan、report、S01〜S90 commits/evidence、aggregate diff、exact command outputs。
+- allowed paths: read-only review。修正はfinding採用後に該当stepの`dev-coder`/`doc-writer`へ戻す。
+- forbidden changes: reviewer自身のsource/spec edit、waiver/provisional pass、PR/merge/finish、Issue 346 evidenceの先取り。
+- acceptance criteria: 全required closureとstep gateがclosed、blocking finding 0、handoff complete。
+- required verification: Section 16 exact final gateとreviewer mapping。
+- reviewer focus: QA=test sufficiency、code=aggregate implementation、spec=requirement/design/plan/report alignment。
+- stop conditions: missing report evidence、stale review、failure、dirty/uncommitted implementation、assurance invalid。
+- output required:各review verdict/findings/scope、採否とfix commit、EVD-009/010、`No material implementation decisions beyond the approved plan.` またはLedger Note。
+
+#### S99 具体テストケース一覧
+
+- `tc-s99-001` aggregate verification: 全focused obligationを同revisionで再実行する
+  - 前提: S01〜S90がstep gateを通過しaggregate diffがcommit済み。
+  - 操作: Section 16のinstaller/node/exact-copy、opacity/copy、distribution、static/docs commandsを実行する。
+  - 期待結果: 全required closureのplanned evidenceが同一HEADでPASSしreportに対応する。
+  - 失敗検出: stale/異なるrevisionのevidence、未実施gate、cross-step regressionを検出する。
+  - 検証方法: exact commands、HEAD SHA、report closure inspection。
+  - 関連 closure id: TC-344-001〜010。
+
+- `tc-s99-002` governance: reviewとdeferred delivery境界を閉じる
+  - 前提: aggregate evidenceとIssue 346 dependency edgeが存在する。
+  - 操作: fresh QA/code/spec reviewを行い、reportのhandoff/no-PR/human-only fieldsをinspectionする。
+  - 期待結果: blocking finding 0、delivery ownerがIssue 346、per-Issue PR/merge/finish claimなし。
+  - 失敗検出: stale reviewer、missing handoff、premature delivery/completion claimを検出する。
+  - 検証方法: EVD-009/010とGit/dependency status inspection。
+  - 関連 closure id: TC-344-001〜010。
+
+#### S99 step closure contract
+
+- required: TC-344-001〜010、EVD-001〜011、S01/S02/S03/S90 step gate。
+- close condition:全exact verification PASS、fresh QA/code/spec reviewer blocking finding 0、report/handoff complete。
+- evidence: report Step Contract Closure、Test Contract Closure、reviewer gate、commit SHA、EVD-009/010。
+- commit候補: final report/review evidence commit。実装差分を混在させない。
 
 ## 11. Verification Ladder
 
@@ -432,11 +757,11 @@ full repository regression、candidate wheel consumer E2E、dogfood projection�
 |---|---|---|---|---|
 | B-001〜004 | `dev-coder` | installer、assets、ignore、generic scaffolder、近接tests | freshness/no-backfill/ignore/generic exact-copy/render | M1 session |
 | B-005〜006 | `dev-coder` | opacity/copy testsのみ。copy sourceはread-only | semantic opacity/source-wins/root rejection | M2 session |
-| B-007 | `doc-writer` | provider docs 4件 | authority/security/Issue境界 | M90 |
+| B-007 | `doc-writer` | provider docs 4件 | authority/security/Issue境界 | S90 |
 | B-008〜009 | `dev-coder` | `pyproject.toml`、`setup.py`、distribution tests | dual prune/exclude/exact inventory | M3 session |
-| M99 code | fresh `code-reviewer` | read-only | aggregate implementation risks | review gate |
-| M99 QA | fresh `qa-reviewer` | read-only | AC/TC evidence and commands | review gate |
-| M99 spec | fresh `spec-reviewer` | read-only | requirement/design/plan/report alignment | review gate |
+| S99 code | fresh `code-reviewer` | read-only | aggregate implementation risks | review gate |
+| S99 QA | fresh `qa-reviewer` | read-only | AC/TC evidence and commands | review gate |
+| S99 spec | fresh `spec-reviewer` | read-only | requirement/design/plan/report alignment | review gate |
 
 各委任は一つのBehaviorまたはMilestoneに限定し、canonical adoption、phase completion、merge authorityを自己宣言させない。
 
@@ -489,11 +814,11 @@ planには実測値を書かない。未実施commandをPASSと記録せず、fa
 | provider docs 4件 | yes | S02で新operator contractへ更新 |
 | 4 Workbench README templates | yes | S01でcanonical bytesを追加 |
 | template root README | yes | new node behavior説明を更新 |
-| skills | no known semantic change | M90で再確認しreportへN/A根拠 |
+| skills | no known semantic change | S90で再確認しreportへN/A根拠 |
 | workflow docs | no known semantic change | import/copy workflow変更がないことを確認 |
 | dogfood workspace | deferred | Issue 346のcandidate wheel検証 |
 
-M90未解決のままM99へ進まない。
+S90未解決のままS99へ進まない。
 
 ## 16. Final Quality Gate
 
@@ -512,7 +837,7 @@ M90未解決のままM99へ進まない。
 Final exit:
 
 - [ ] 全Closure完了。
-- [ ] M1〜M3、M90、M99完了。
+- [ ] M1〜M3、S90、S99完了。
 - [ ] unresolved blocking findingなし。
 - [ ] reportに実測evidenceと未実施理由を記録。
 - [ ] Issue 345/346 scopeを実装していない。
@@ -532,7 +857,7 @@ Final exit:
 - [x] AC-344-001〜010がClosure Indexへ対応する。
 - [x] DES-344-001〜009がMilestone/Behaviorへ対応する。
 - [x] 3つのvertical micro-batchが独立検証可能である。
-- [x] Active TDD CycleはB-001だけに限定される。
+- [x] Active TDD CycleはB-002のfresh-init vertical tracerだけに限定される。
 - [x] Red、Minimal Green、Refactor guardrailがある。
 - [x] allowed/read-only/forbidden pathが区別される。
 - [x] `setup.py` post-build pruneがM3に含まれる。
