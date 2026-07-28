@@ -77,14 +77,18 @@ ID: "iss-00342"
   - `artifacts/20260728t015759z-research-unit-test-and-provider-ci-runtime-investigation.md`
   - `artifacts/20260728t015759z-01-interview-full-regression-merge-gate-policy.md`
   - `artifacts/20260728t025412z-adr-separate-fast-merge-gate-and-full-regression-execution.md`
+  - `artifacts/20260728t105349z-03-adr-use-direct-pytest-commands-with-explicit-full-regression-opt-in.md`
+  - `artifacts/20260728t105349z-draft-requirement-pytest-opt-in-full-regression-draft-requirement.md`
 - ChatGPT-first evidence:
   - `oracle:iss00342-test-ci-planning`
   - ZIP SHA-256: `f300cbff69ce241e85462fd5a37fcf2ff7beacad77d8b1d40c133749783e1e01`
   - pack review / stage: pass、authority=`evidence_only`、adoption=`partially_adopted`
+  - `oracle:iss00342-pytest-opt-in-authoring`
+  - ZIP SHA-256: `511b81980c67da9d7e6b9290c20e59959e7d0835496aecee86f170bdc4402212`
+  - pack review / stage: pass、authority=`evidence_only`、adoption=`unreviewed`
 - 現行実装:
   - `.github/workflows/provider-ci.yml`
   - `pyproject.toml`
-  - `Makefile`
   - `README.md`
   - `tests/cli_runtime/harness.py`
   - `tests/unit/infra/test_init_update.py`
@@ -175,14 +179,14 @@ ID: "iss-00342"
 ### 5.1 対象範囲
 
 - fast default laneとfull regression laneの明示的なtest contract。
-- bare/default pytest pathをfastにする設定または同等の仕組み。
-- 明示ローカルfull commandとGitHub manual full trigger。
+- bare/default pytest pathでは長時間itemをpolicy skipし、通常のpytestコマンドを維持する仕組み。
+- pytest-native `--run-full-regression`による明示ローカルfull commandとGitHub manual full trigger。
 - PRではfastのみ、`main` pushではfullのみを保証するProvider CI event routing。
 - 既存`provider-tests` check identityの維持。
 - heavy test集合、fast test集合、full test集合の機械的な完全性検証。
 - fast laneに残す代表的CLI contractとprovider / dogfooding parity obligation。
 - workflow routing、selector、collection、performance、failure visibilityの回帰テスト。
-- README、AGENTS、Makefile、pytest configuration、workflowのコマンド契約整合。
+- README、AGENTS、pytest configuration、workflowのdirect command契約整合。
 
 ### 5.2 対象外
 
@@ -194,6 +198,8 @@ ID: "iss-00342"
 - external consumer repositoryのpipeline変更。
 - branch protection設定をcredentialed APIで直接変更する作業。
 - full regression failureからGitHub Issueを自動起票する仕組み。
+- default `addopts = -m fast`による通常testのselection変更。
+- Make targetまたは独自wrapperを通常・full実行の必須interfaceにすること。
 
 ### 5.3 変更してはいけないもの
 
@@ -271,12 +277,19 @@ ID: "iss-00342"
 - bare/default pytest command、`tests/unit`の通常command、documented fast commandのいずれでも、full-regression分類されたtest itemの実行数が0である。
 - selectorの誤りでfull-regression testが実行された場合は回帰テストが失敗する。
 
-### AC-002: manual fullは全集合を実行する
+### AC-002: manual fullは明示flagで全集合を実行する
 
-- `make test-provider-full`またはdesignで定める同等のstable commandが存在する。
+- `uv run pytest --run-full-regression`がstableなformal full commandとして存在する。
 - full commandのcollected item ID集合は、fast集合とheavy集合のunionに一致する。
 - fast集合とheavy集合のintersectionは空である。
 - selector対象外となるtest itemが0である。
+- repository policy skipが0である。
+- 既存のlegitimate `skip` / `skipif` / `xfail`を解除しない。
+
+### AC-002a: marker selectionだけではfull実行を許可しない
+
+- `uv run pytest -m full_regression`だけではselected heavy itemを実行せず、stable reason付きpolicy skip、exit 0となる。
+- `uv run pytest --run-full-regression -m full_regression`ではrepository policy skipなしでselected heavy itemを実行する。
 
 ### AC-003: PR routing
 
@@ -350,7 +363,7 @@ full regressionはfast test集合を内包するため、`main` pushと`workflow
 ## 8. 例外・エッジケース
 
 - heavy markerまたは同等selectorが0件になった場合は、成功扱いせず分類contract failureとする。
-- full commandがdefault除外設定を引き継ぎ、heavy testを実行しない場合は失敗とする。
+- full flagがrepository policy skipを残し、heavy testを実行しない場合は失敗とする。
 - 新規testがfast/heavyのどちらにも分類されない場合は、collection completeness guardで失敗する。
 - representative smokeが遅くなった場合、無言で外さず、代替contract evidenceと選定理由をreviewする。
 - `main`への連続pushでfull runをcancelする場合、最新SHAに対するfull runが必ず1件残る。
@@ -360,13 +373,14 @@ full regressionはfast test集合を内包するため、`main` pushと`workflow
 
 ## 9. 外部コマンド契約
 
-最低限、次の利用者向けcontractを提供する。正確なflagやmarker名はdesignで定める。
+最低限、次の利用者向けcontractを提供する。
 
 | 用途 | 必須entrypoint | 意味 |
 |---|---|---|
-| 通常開発 | bare/default pytest path | fast lane |
-| 明示fast | `make test-provider-fast`または同等 | CIと同じfast contract |
-| 明示full | `make test-provider-full`または同等 | 全test集合 |
+| 通常開発 | `uv run pytest` / `uv run pytest tests/unit` / focused pytest | fast bodyを実行し、selected heavyはpolicy skip |
+| 診断selection | `uv run pytest -m full_regression` | heavyを選択するが実行許可はせずpolicy skip |
+| 明示full | `uv run pytest --run-full-regression` | policy skipなしで全test集合 |
+| 明示heavy-only | `uv run pytest --run-full-regression -m full_regression` | policy skipなしでheavy集合 |
 | GitHub manual | `workflow_dispatch` | local fullと同じfull contract |
 
 command名、README、workflowの実行内容が乖離してはならない。
@@ -437,7 +451,7 @@ schedule / cronの導入はscope expansionであり、このIssueでは禁止す
 ### 13.2 理由
 
 - product data、migration、security / privacy、external credential、不可逆変更を伴わず、既存PR full gateへ戻せるため`standard`とする。
-- 一方でmerge protectionとpost-merge detection policyを変更し、pytest selector、workflow event routing、Makefile、docs、test inventoryが連動する。
+- 一方でmerge protectionとpost-merge detection policyを変更し、pytest option / hook、workflow event routing、docs、test inventoryが連動する。
 - selector漏れは検証義務を静かに弱め得るため、Standardのspecialist evidence、fresh spec review、collection completeness、rollbackを省略しない。
 - branch protection現物が403で未観測であり、compatibilityをjob identityで保守的に扱う。
 
@@ -460,7 +474,9 @@ schedule / cronの導入はscope expansionであり、このIssueでは禁止す
 designで必ず定める:
 
 - fast/heavy/fullの集合モデルとselector contract
-- bare/default pytestをfastにし、full opt-inで除外を確実に解除する方式
+- bare/default pytestでselected heavyへsession-local policy skipを追加し、`--run-full-regression`でそのpolicyを追加しない方式
+- `-m` selectionとfull execution permissionを分離する契約
+- existing skip / skipif / xfailを削除・上書きしない境界
 - representative CLI / parity smokeの選定規則と初期inventory
 - Provider CIのworkflow/job構造とevent truth table
 - `provider-tests` check identityの維持方法
@@ -474,7 +490,7 @@ planで分解する:
 
 1. baselineとtest item集合の固定
 2. selector / markerのRed test
-3. fast/full local command contract
+3. direct ordinary / pytest-native full option contract
 4. representative smoke inventory
 5. workflow event routingのRed test
 6. PR fastと`main` / manual fullの実装
@@ -490,7 +506,6 @@ planで分解する:
   - `README.md`
   - `AGENTS.md`のtest command記述（必要な場合）
   - `.github/workflows/provider-ci.yml`または独立full workflow
-  - `Makefile`
   - `pyproject.toml`
   - test lane inventoryまたは同等の保守文書
 - Issue-local evidence:
