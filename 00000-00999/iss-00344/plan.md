@@ -86,6 +86,7 @@ Red方針:
 | 種別 | Path / Target | 責任 |
 |---|---|---|
 | installer | `src/spec_dock/cli.py` | fresh root判定、root README copy、legacy README exact allowlist、fallback ignore |
+| generic scaffolder | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/template_scaffolder.py` | replacement後もbytes不変なUTF-8 fileをexact-copyし、通常placeholder templateはrenderするpath-agnostic primitive |
 | provider ignore | `src/spec_dock/assets/spec_dock/.gitignore` | top-level `.workbench/README.md` だけをtracking eligibilityへ戻す |
 | provider templates | `src/spec_dock/assets/spec_dock/templates/{root,initiative,epic,issue}/.workbench/README.md` | 4つのbyte-identical guidance asset |
 | package config | `pyproject.toml` | broad nested README exclusionを狭め、4 assetをpackage dataへ含める |
@@ -102,9 +103,8 @@ Red方針:
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workbench.py`
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_cli.py`
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/template_scaffolder.py`
 
-これらのruntime contract変更が必要なら実装を停止し、design amendmentとfresh reviewへ戻る。
+これら3つのcopy/discovery contract変更が必要なら実装を停止し、design amendmentとfresh reviewへ戻る。`template_scaffolder.py` のgeneric exact-copy branchはapproved `DES-344-002` の実装対象であり、このread-only boundaryには含めない。
 
 ### 3.3 禁止変更
 
@@ -168,7 +168,8 @@ Must not happen:
 | Closure ID | Requirement | Design | 閉じる内容 | Verification | Report |
 |---|---|---|---|---|---|
 | TC-344-001 | AC-344-001 | DES-344-001 | fresh root生成 / existing no-backfill | installer unit | EVD-001 |
-| TC-344-002 | AC-344-002 | DES-344-002 | future 3 node path parity | runtime CLI | EVD-002 |
+| TC-344-002A | AC-344-002 | DES-344-002 | future 3 node path parity | runtime CLI | EVD-002 |
+| TC-344-002B | AC-344-002/003 | DES-344-002 | unchanged UTF-8 bytesはpath非依存のexact-copy seamを通り、placeholder templateは従来どおりrenderされる | real provider scaffolder unit | EVD-002/003 |
 | TC-344-003 | AC-344-003 | DES-344-003 | 4 README bytesと9 guidance elements | asset unit + byte hash | EVD-003 |
 | TC-344-004 | AC-344-004 | DES-344-004 | exact pathname ignore matrix | real Git repository | EVD-004 |
 | TC-344-005 | AC-344-005 | DES-344-001/002/005 | existing state不変 | snapshot/mtime test | EVD-001/002 |
@@ -186,7 +187,7 @@ Must not happen:
 |---|---|---|---|---|---|
 | B-001 | M1 | 4 provider READMEがbyte-identicalでcanonical guidanceを持つ | TC-344-003 | none | ready |
 | B-002 | M1 | fresh rootだけがroot READMEを得る | TC-344-001/005 | B-001 | planned |
-| B-003 | M1 | future Initiative/Epic/Issueがgeneric recursionでREADMEを得る | TC-344-002/005 | B-001 | planned |
+| B-003 | M1 | future Initiative/Epic/Issueがgeneric recursionでREADMEを得て、unchanged bytesはgeneric exact-copy、placeholder bytesはrenderされる | TC-344-002A/002B/005 | B-001 | planned |
 | B-004 | M1 | exact top-level READMEだけがtracking eligible | TC-344-004 | B-001 | planned |
 | B-005 | M2 | README/payloadがsemantic observationを変えない | TC-344-006 | B-001 | planned |
 | B-006 | M2 | checkout/manual copy/source-wins/root rejectionを維持 | TC-344-007A/B/C、009 | B-003/004 | planned |
@@ -272,25 +273,34 @@ Red test seeds:
 - `test_workbench_gitignore_tracks_only_top_level_readme`
 - `test_new_node_workbench_readme_matrix`
 - `test_new_node_workbench_readme_does_not_touch_existing_scopes`
+- `tests/unit/infra/test_runtime_template_scaffolder.py::test_copy_scaffolded_tree_uses_exact_copy_for_unchanged_utf8_bytes`
+- `tests/unit/infra/test_runtime_template_scaffolder.py::test_copy_scaffolded_tree_still_renders_changed_placeholder_text`
+- `tests/unit/infra/test_runtime_template_scaffolder.py::test_copy_scaffolded_tree_exact_copy_is_path_agnostic`
 
 Green sequence:
 
 1. B-001の4 assetsとcontent parityを成立させる。
 2. `fresh_specdock = not os.path.lexists(specdock_dir)` 相当をmutation前に固定し、fresh rootだけへcopyする。
 3. `_prune_legacy_scaffold` をexact allowlist-awareにする。
-4. node template recursionで3 kindのplanned/result/filesystem path parityを成立させる。
-5. provider/fallback ignoreを同じ3-rule contractへ変更する。
+4. `copy_scaffolded_tree()` でrender後bytesがsource bytesと同じUTF-8 fileは`shutil.copy2`相当のexact-copy seamを通し、bytesが変わるplaceholder templateは従来のrender/writeを維持する。
+5. CRLFを含むpath-neutral UTF-8 fixtureでtext rewriteを検出し、README/path-specific branchがないことを固定する。
+6. node template recursionで3 kindのplanned/result/filesystem path parityを成立させる。
+7. provider/fallback ignoreを同じ3-rule contractへ変更する。
 
 Gate:
 
 ```bash
 uv run pytest tests/unit/infra/test_init_update.py -k 'workbench or readme'
+uv run pytest \
+  tests/unit/infra/test_runtime_template_scaffolder.py::test_copy_scaffolded_tree_uses_exact_copy_for_unchanged_utf8_bytes \
+  tests/unit/infra/test_runtime_template_scaffolder.py::test_copy_scaffolded_tree_still_renders_changed_placeholder_text \
+  tests/unit/infra/test_runtime_template_scaffolder.py::test_copy_scaffolded_tree_exact_copy_is_path_agnostic
 uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py -k workbench
 uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py
 git diff --check
 ```
 
-ReportへRed、Green、4 README SHA-256、fresh/existing snapshot、ignore matrix、node path parityを記録する。M1差分だけをreviewable commitにする。
+ReportのEVD-002/003へexact-copy Red/Green、CRLF fixture bytes、placeholder render result、path-agnostic assertionを記録する。あわせて4 README SHA-256、fresh/existing snapshot、ignore matrix、node path parityを記録し、M1差分だけをreviewable commitにする。
 
 ### M2 / S02 — Semantic opacity、linked-worktree positioning、shipped docs
 
@@ -339,28 +349,52 @@ Reportへopacity result、worktree README hash、copy前後inventory、README co
 
 Red seed:
 
-- `TestInitUpdate::test_workbench_readme_distribution_allowlist`
-- custom `build_py` prune後のallowlisted/legacy README区別test
+- `tests/unit/infra/test_init_update.py::TestInitUpdate::test_workbench_readme_build_prune_preserves_allowlist_and_removes_stale_nested_readme`
+- `tests/unit/infra/test_init_update.py::TestInitUpdate::test_workbench_readme_distribution_inventory_and_bytes_match_all_surfaces`
 
 Green sequence:
 
 1. `pyproject.toml` のbroad nested README exclusionを4 assetsと両立する形へ狭める。
 2. package dataに4 exact pathsを含める。
 3. `setup.py` のpost-build pruneでnormalized exact 5 pathsを保存し、それ以外のnested READMEを削除する。
-4. custom build pathを実際に通してwheel/sdistを生成する。
-5. temporary installから`importlib.resources`で4 assetsを読み、source bytesと比較する。
-6. reportにfocused結果とIssue 346 deferred boundaryを分けて記録する。
+4. `TestInitUpdate` の既存local-wheelhouse build helperを再利用し、repository外の`tempfile.TemporaryDirectory()`下へbuild context、wheel、sdist、venvを作る。helper内部のexact invocationは`python -m build --wheel --sdist --no-isolation --outdir <temporary-dist>`とする。
+5. build-prune testは`SPEC_DOCK_BUILD_PY_SEED_STALE_FIXTURES=1`と`SPEC_DOCK_BUILD_PY_PRE_PRUNE_SNAPSHOT=<temporary-json>`を設定し、pre-pruneでallowlist/stale fixtureが存在し、post-prune wheelで5 pathsが残りstale nested READMEだけが消えることを確認する。
+6. distribution testはwheel ZIP、sdist TARのpackage-root prefixを除去し、installed resourceでは`spec_dock/assets/spec_dock/templates/`をrootとして、すべて同じtemplate-root-relative pathへ正規化する。
+7. temporary wheel installから`importlib.resources.files("spec_dock").joinpath("assets/spec_dock/templates/...")`で4 assetsを読み、source bytesと比較する。
+8. reportにfocused結果とIssue 346 deferred boundaryを分けて記録する。
 
 Gate:
 
 ```bash
-uv run pytest tests/unit/infra/test_init_update.py -k 'workbench_readme or stale_build'
-uv build
+uv run pytest \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_workbench_readme_build_prune_preserves_allowlist_and_removes_stale_nested_readme \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_workbench_readme_distribution_inventory_and_bytes_match_all_surfaces
 uv run pytest tests/unit/infra/test_init_update.py
+uv run ruff check \
+  src/spec_dock/cli.py \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/template_scaffolder.py \
+  setup.py \
+  tests/unit/infra/test_init_update.py \
+  tests/unit/infra/test_runtime_template_scaffolder.py \
+  tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py \
+  tests/cli_runtime/test_runtime_new_doc_s09.py \
+  tests/cli_runtime/test_workbench.py
+uv run ruff format --check \
+  src/spec_dock/cli.py \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/template_scaffolder.py \
+  setup.py \
+  tests/unit/infra/test_init_update.py \
+  tests/unit/infra/test_runtime_template_scaffolder.py \
+  tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py \
+  tests/cli_runtime/test_runtime_new_doc_s09.py \
+  tests/cli_runtime/test_workbench.py
+uv run mypy \
+  src/spec_dock/cli.py \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/template_scaffolder.py
 git diff --check
 ```
 
-build artifact inspectionはrepository外のtemporary directoryで行う。allowlist外README、surface欠落、byte mismatchのいずれかでM3は失敗する。
+上記2つのexact pytest nodeがrepository外temporary build、custom post-build prune、wheel/sdist extraction、temporary install、installed-resource inspectionを所有する。inventory rootは各surfaceでnormalized `spec_dock/assets/spec_dock/templates/` subtreeとする。allowlist外README、surface欠落、byte mismatchのいずれかでM3は失敗し、結果をEVD-007へ、static command結果をEVD-011へ記録する。
 
 ### M90 — Docs / Template Impact Resolution
 
@@ -383,10 +417,10 @@ build artifact inspectionはrepository外のtemporary directoryで行う。allow
 | Level | 目的 | Command / Evidence |
 |---|---|---|
 | L1 | Active cycle | `uv run pytest tests/unit/infra/test_init_update.py -k workbench_readme` |
-| L2 | Installer/node local | `uv run pytest tests/unit/infra/test_init_update.py tests/cli_runtime/test_runtime_new_doc_s09.py` |
+| L2 | Installer/node/exact-copy local | `uv run pytest tests/unit/infra/test_init_update.py tests/unit/infra/test_runtime_template_scaffolder.py tests/cli_runtime/test_runtime_new_doc_s09.py` |
 | L3 | Opacity/copy local | `uv run pytest tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py tests/cli_runtime/test_workbench.py` |
-| L4 | Build/distribution | `uv build` と exact inventory/resource inspection tests |
-| L5 | Static/diff | repositoryで設定済みの対象file lint/type check、`git diff --check` |
+| L4 | Build/distribution | M3記載の2つのexact `TestInitUpdate` node |
+| L5 | Static/diff | M3記載のscoped Ruff check/format、Mypy、`git diff --check` |
 | L6 | Docs/template | semantic assertions、deprecated wording inspection、4 asset byte equality |
 | L7 | Issue final | focused aggregate、closure inspection、fresh code/QA/spec reviews |
 
@@ -396,7 +430,7 @@ full repository regression、candidate wheel consumer E2E、dogfood projection�
 
 | Step | Role | Allowed Paths | Reviewer Focus | Report |
 |---|---|---|---|---|
-| B-001〜004 | `dev-coder` | installer、assets、ignore、近接tests | freshness/no-backfill/ignore/generic recursion | M1 session |
+| B-001〜004 | `dev-coder` | installer、assets、ignore、generic scaffolder、近接tests | freshness/no-backfill/ignore/generic exact-copy/render | M1 session |
 | B-005〜006 | `dev-coder` | opacity/copy testsのみ。copy sourceはread-only | semantic opacity/source-wins/root rejection | M2 session |
 | B-007 | `doc-writer` | provider docs 4件 | authority/security/Issue境界 | M90 |
 | B-008〜009 | `dev-coder` | `pyproject.toml`、`setup.py`、distribution tests | dual prune/exclude/exact inventory | M3 session |
@@ -420,6 +454,7 @@ full repository regression、candidate wheel consumer E2E、dogfood projection�
 | EVD-008 | docs | changed paths、semantic assertions、deprecated wording disposition |
 | EVD-009 | reviews | finding、採否、fix commit、fresh verdict |
 | EVD-010 | handoff | dependency edge、deferred gates、delivery owner |
+| EVD-011 | static quality | scoped Ruff check/format、Mypy、diff checkのexact command/result |
 
 planには実測値を書かない。未実施commandをPASSと記録せず、failureと代替確認もreportへ残す。
 
@@ -466,10 +501,10 @@ M90未解決のままM99へ進まない。
 |---|---|---|
 | Requirement closure | TC-344-001〜010とreport照合 | all closed |
 | Design compliance | DES-344-001〜009とdiff照合 | deviationなし |
-| Installer/node | `uv run pytest tests/unit/infra/test_init_update.py tests/cli_runtime/test_runtime_new_doc_s09.py` | pass |
+| Installer/node/exact-copy | `uv run pytest tests/unit/infra/test_init_update.py tests/unit/infra/test_runtime_template_scaffolder.py tests/cli_runtime/test_runtime_new_doc_s09.py` | pass |
 | Opacity/copy | `uv run pytest tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py tests/cli_runtime/test_workbench.py` | pass |
-| Distribution | `uv build` + exact inventory/resource tests | pass |
-| Static/diff | configured focused lint/type checks、`git diff --check` | pass |
+| Distribution | M3の2 exact `TestInitUpdate` node | pass |
+| Static/diff | M3のscoped Ruff check/format、Mypy、`git diff --check` | pass |
 | Docs/templates | semantic assertions、4-byte parity | pass |
 | Reviews | fresh code/QA/spec reviewer | blocking finding 0 |
 | Handoff | report EVD-010 | Issue 346 owner/deps明記 |
