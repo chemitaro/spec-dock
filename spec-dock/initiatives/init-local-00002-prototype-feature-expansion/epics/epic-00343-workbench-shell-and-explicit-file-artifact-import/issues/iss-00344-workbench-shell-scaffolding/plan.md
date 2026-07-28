@@ -408,10 +408,11 @@ Planned contract:
 
 S01 step gate:
 
-1. reportへRed/Green/refactor、delegation evidence、closure deltaをcommit前に記録する。
-2. fresh `code-reviewer` のblocking findingを閉じる。
-3. main orchestratorがstep resultを承認する。
-4. commit候補: `feat(workbench): Workbench README shellを生成`。no-opの場合はapproved-no-op理由とevidenceをreportへ記録する。
+1. `dev-coder` がRed/Green/refactor、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
+2. main orchestratorがworker outputを検証し、delegation evidenceとclosure deltaをcanonical `report.md`へ統合する。
+3. fresh `code-reviewer` のblocking findingを閉じる。
+4. main orchestratorがstep resultを承認する。
+5. commit候補: `feat(workbench): Workbench README shellを生成`。no-opの場合はapproved-no-op理由とevidenceをreportへ記録する。
 
 ### M2 / S02 — Semantic opacity、linked-worktree positioning、copy compatibility
 
@@ -450,7 +451,7 @@ Reportへopacity result、worktree README hash、copy前後inventory、README co
 
 - depends on: S01。
 - unblocks: S90のoperator docs、S99 final gate。
-- target files: opacity tests、copy tests、report。copy/discovery production filesはread-only。
+- target files: opacity tests、copy tests。copy/discovery production filesはread-only。canonical report統合はmain orchestratorだけが行う。
 - integration checkpoint: committed READMEを含むsource repoからlinked worktreeを作り、checkoutとmanual copyを一続きに観測する。
 - annotation: AFK。public copy semantics変更が必要ならHITL amendment。
 
@@ -467,7 +468,7 @@ Planned contract:
 
 - delegated role: `dev-coder`
 - input docs: approved specs、本plan、S01 report evidence、`workflow_issue.md`、copy/opacity sourceとtests。
-- allowed paths: `tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py`、`tests/cli_runtime/test_workbench.py`、Issue report。
+- allowed paths: `tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py`、`tests/cli_runtime/test_workbench.py`。
 - forbidden changes: `application/workbench.py`、`infra/fs_cli.py`、`infra/fs_repo.py`、docs、package config、generic import、dogfood projection。
 - acceptance criteria: TC-344-006、007A/B/C、009のlocked expectation。
 - required tests: S02 Gateの2 suites、temporary linked-worktree Git diff、root selector rejection。
@@ -512,10 +513,11 @@ Planned contract:
 
 S02 step gate:
 
-1. reportへcharacterization/Red/Green、delegation evidence、closure deltaをcommit前に記録する。
-2. fresh `code-reviewer` のblocking findingを閉じる。
-3. main orchestratorがstep resultを承認する。
-4. commit候補: `test(workbench): README shellのopacityとcopy互換を固定`。production no-opをreportで明記する。
+1. `dev-coder` がcharacterization/Red/Green、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
+2. main orchestratorがworker outputを検証し、delegation evidenceとclosure deltaをcanonical `report.md`へ統合する。
+3. fresh `code-reviewer` のblocking findingを閉じる。
+4. main orchestratorがstep resultを承認する。
+5. commit候補: `test(workbench): README shellのopacityとcopy互換を固定`。production no-opをreportで明記する。
 
 ### M3 / S03 — Packaging、focused distribution evidence、deferred handoff
 
@@ -557,6 +559,7 @@ uv run ruff check \
   tests/unit/infra/test_runtime_template_scaffolder.py \
   tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py \
   tests/cli_runtime/test_runtime_new_doc_s09.py \
+  tests/cli_runtime/test_new.py \
   tests/cli_runtime/test_workbench.py
 uv run ruff format --check \
   src/spec_dock/cli.py \
@@ -566,6 +569,7 @@ uv run ruff format --check \
   tests/unit/infra/test_runtime_template_scaffolder.py \
   tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py \
   tests/cli_runtime/test_runtime_new_doc_s09.py \
+  tests/cli_runtime/test_new.py \
   tests/cli_runtime/test_workbench.py
 uv run mypy \
   src/spec_dock/cli.py \
@@ -596,7 +600,7 @@ Planned contract:
 
 - delegated role: `dev-coder`
 - input docs: approved specs、本plan、S01 evidence、`setup.py`、`pyproject.toml`、existing Issue 69 build helpers、`workflow_issue.md`。
-- allowed paths: `pyproject.toml`、`setup.py`、`tests/unit/infra/test_init_update.py`、Issue report。
+- allowed paths: `pyproject.toml`、`setup.py`、`tests/unit/infra/test_init_update.py`。
 - forbidden changes: runtime copy/import、provider docs、dogfood projection、dependency mutation、PR/merge/finish。
 - acceptance criteria: TC-344-008のexact five-path/byte/stale-removal contractとEVD-010 handoffを満たす。
 - required tests: M3 Gateに列挙した2 exact nodes、full installer test file、scoped Ruff/format/Mypy/diff。
@@ -627,7 +631,7 @@ Planned contract:
   - 操作: M3 GateのRuff check、Ruff format、Mypy、`git diff --check`をexact path listで実行する。
   - 期待結果: 全commandがexit 0で、未対象changed Python pathがない。
   - 失敗検出: style/type/format error、path list漏れ、whitespace errorを検出する。
-  - 検証方法: M3 Gate exact commandsと`git diff --name-only`照合。
+  - 検証方法: M3 Gate exact commands（Ruff check/formatは`tests/cli_runtime/test_new.py`を含む同一path list）と`git diff --name-only`照合。
   - 関連 closure id: TC-344-008。
 
 #### S03 step closure contract
@@ -640,10 +644,11 @@ Planned contract:
 
 S03 step gate:
 
-1. reportへRed/Green/build/static/delegation evidence、closure deltaをcommit前に記録する。
-2. fresh `code-reviewer` のblocking findingを閉じる。
-3. main orchestratorがstep resultを承認する。
-4. commit候補: `build(workbench): README assetsの配布契約を固定`。no-opの場合はexact distribution evidenceを必須とする。
+1. `dev-coder` がRed/Green/build/static、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
+2. main orchestratorがworker outputを検証し、delegation evidenceとclosure deltaをcanonical `report.md`へ統合する。
+3. fresh `code-reviewer` のblocking findingを閉じる。
+4. main orchestratorがstep resultを承認する。
+5. commit候補: `build(workbench): README assetsの配布契約を固定`。no-opの場合はexact distribution evidenceを必須とする。
 
 ### S90 — Docs / Template Impact Resolution
 
@@ -679,8 +684,8 @@ S90は同じvertical slice内で、test contractとdocs変更の責務を次の�
 2. `doc-writer` がprovider docs 4件だけを変更し、既に存在するsemantic assertionをGreenにする。fresh `spec-reviewer` がauthority/security/copy/root/sibling境界とapproved specsへの整合を確認する。
 
 - input docs: approved specs、本plan、S01/S02 observed evidence、canonical README bytes、provider docs 4件、`workflow_issue.md`。
-- `dev-coder` allowed paths: `tests/unit/infra/test_init_update.py` とIssue reportのみ。
-- `doc-writer` allowed paths: `src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,reference_worktree.md}`、`src/spec_dock/assets/spec_dock/templates/README.md`、Issue reportのみ。
+- `dev-coder` allowed paths: `tests/unit/infra/test_init_update.py` のみ。
+- `doc-writer` allowed paths: `src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,reference_worktree.md}`、`src/spec_dock/assets/spec_dock/templates/README.md` のみ。
 - forbidden changes: runtime/installer/package config、canonical Issue specs、dogfood projection、Issue 345/346 implementation。`doc-writer`によるPython test編集と`dev-coder`によるdocs編集も禁止する。
 - acceptance criteria: TC-344-007CとTC-344-010のoperator guidanceを満たし、generic importをimplementedと誤記せず、semantic assertionが期待したRedからGreenになる。
 - required docs verification: exact semantic assertion node、deprecated wording inspection、docs diff、4 canonical READMEとの用語照合。
@@ -715,12 +720,14 @@ S90は同じvertical slice内で、test contractとdocs変更の責務を次の�
 
 S90 step gate:
 
-1. `dev-coder` がexact semantic assertion testを追加し、期待どおりのRedをreportへ記録する。
-2. fresh `code-reviewer` がtest contractをPASSするまでtest findingを修正・再レビューする。
-3. `doc-writer` がdocs 4件だけを変更してexact assertionをGreenにし、docs inspection、delegation evidence、closure deltaをcommit前にreportへ記録する。
-4. fresh `spec-reviewer` がdocs/spec contractをPASSするまでdocs findingを修正・再レビューする。
-5. main orchestratorが両reviewとS90 resultを承認する。
-6. commit候補: `docs(workbench): README shellの運用境界を更新`。docs no-opはsemantic assertion付きapproved-no-opだけを許可するが、test contractのreviewは省略しない。
+1. `dev-coder` がexact semantic assertion testだけを追加し、期待どおりのRed、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
+2. main orchestratorがworker outputを検証し、Red evidenceをcanonical `report.md`へ統合する。
+3. fresh `code-reviewer` がtest contractをPASSするまでtest findingを修正・再レビューする。
+4. `doc-writer` がdocs 4件だけを変更してexact assertionをGreenにし、docs inspection、changed files、unresolved wording、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
+5. main orchestratorがworker outputを検証し、Green/delegation/closure delta evidenceをcanonical `report.md`へ統合する。
+6. fresh `spec-reviewer` がdocs/spec contractをPASSするまでdocs findingを修正・再レビューする。
+7. main orchestratorが両reviewとS90 resultを承認する。
+8. commit候補: `docs(workbench): README shellの運用境界を更新`。docs no-opはsemantic assertion付きapproved-no-opだけを許可するが、test contractのreviewは省略しない。
 
 ### S99 — Final Issue-local Quality Gate
 
