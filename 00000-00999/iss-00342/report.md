@@ -329,14 +329,14 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S00 / M0 | pending | baseline ledger commit | pending | pre-review clean | N/A | N/A | N/A | fresh code-reviewer pass後にcommit |
+| S00 / M0 | committed | baseline ledger commit | `ac67751b7b32297be88196cb0825d307518f6ae2` | `git status --short` -> clean | N/A | N/A | N/A | S00-R2 fresh code-reviewer pass、required evidence、commit、cleanを確認しResult Approval |
 
 #### 変更したファイル
 - `path/to/file1` - ...
 - `path/to/file2` - ...
 
 #### コミット
-- <hash> <message>
+- `ac67751b7b32297be88196cb0825d307518f6ae2` `test(test-lanes): 実装前テスト基準を固定`
 
 #### メモ
 - ...
