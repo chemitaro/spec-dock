@@ -86,6 +86,49 @@ def test_complete_frame_with_secret_is_rejected_without_leakage() -> None:
     assert secret not in str(result.to_dict())
 
 
+def test_complete_frame_with_transcript_marker_mentions_is_accepted() -> None:
+    classify = issue_planning_chatgpt.classify_transport_frame
+    payload = (
+        "# Raw transcript vocabulary\n\n"
+        "The term raw transcript names an evidence class.\n"
+        "- ChatGPT transcript、credential、private absolute pathを保存しない。\n"
+        "The runtime must not persist a browser transcript."
+    ).encode()
+    result = classify(
+        b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
+        + b"a" * 40
+        + b">>>\n"
+        + payload
+        + b"\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n",
+        role="planner",
+        source_head="a" * 40,
+    )
+
+    assert (result.status, result.reason) == ("pass", "transport_received")
+    assert result.transient_payload == payload
+    assert payload not in repr(result).encode()
+    assert payload.decode() not in str(result.to_dict())
+
+
+def test_complete_frame_with_structured_transcript_is_rejected_without_leakage() -> None:
+    classify = issue_planning_chatgpt.classify_transport_frame
+    payload = "# Oracle Browser Transcript\n## Prompt\nprivate requirement body\n## Answer\nprivate response body"
+    result = classify(
+        (
+            "<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
+            + "a" * 40
+            + f">>>\n{payload}\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n"
+        ).encode(),
+        role="planner",
+        source_head="a" * 40,
+    )
+
+    assert (result.status, result.reason) == ("rejected", "sensitive_input_rejected")
+    assert result.transient_payload is None
+    assert "private requirement body" not in repr(result)
+    assert "private response body" not in str(result.to_dict())
+
+
 @pytest.mark.parametrize(
     ("blockers", "exit_code", "stdout", "expected"),
     [
