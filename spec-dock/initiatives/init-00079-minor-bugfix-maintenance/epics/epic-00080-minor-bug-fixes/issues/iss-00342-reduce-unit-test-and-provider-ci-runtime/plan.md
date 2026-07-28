@@ -5,7 +5,7 @@ ID: "iss-00342"
 Issue Grade: "standard"
 状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-28"
+最終更新: "2026-07-29"
 関連GitHub: ["#342"]
 関連Requirement: ["requirement.md"]
 関連Design: ["design.md"]
@@ -97,7 +97,7 @@ baseline characterization
 - active Redは原則1件だけとし、原因を確認してからMinimal Greenへ進む。
 - expected Redと異なるfailure、既存regression、unknown Redは即時停止する。
 - S00は`characterization-first`、S90は`inspect-only`、S05/S111/S120は`manual-required` evidenceとする。
-- 30〜40分のformal fullはS00〜S04で実行せず、pre-merge routine measurementではS05の最終batchでexactly 3回だけ実行する。
+- 30〜40分のformal fullはS00〜S04で実行せず、S05のfinal acceptance evidenceは同一new SHAのexactly 3回とする。2.2.1のpre-amendment failed attempt 1回を別failure evidenceとして保持し、pre-merge総上限は4回とする。
 - S05後の追加fullは、post-merge failureをsame SHAで再現するincident responseに限る。routing確認だけの追加`workflow_dispatch` fullは行わない。
 
 ### 2.2 known flakyの扱い
@@ -113,7 +113,15 @@ baseline characterization
 - planned full 3回の外でpre-merge full rerunを自動実行しない。exact focused rerunでtriageする。
 - known flaky以外のfailure、別node併発、node omissionはunexpected regressionとして停止する。
 - 3回のfullの1回でもnonzeroならS05は未完了で、final readinessへ進まない。ownerが原因・risk・follow-upを解消するか、requirement/design/planをamendしてfresh reviewを通すまでpassへ読み替えない。
-- human merge後のmain full failureだけは、incident ID、same SHA、理由、回数、結果をS98 external-evidence anchorに記録して`uv run pytest --run-full-regression`を追加実行できる。このincident reproductionはpre-merge exactly 3制約の外側である。
+- human merge後のmain full failureだけは、incident ID、same SHA、理由、回数、結果をS98 external-evidence anchorに記録して`uv run pytest --run-full-regression`を追加実行できる。このincident reproductionはpre-merge総上限4回の外側である。
+
+#### 2.2.1 S05 failed-attempt recovery amendment
+
+- 2026-07-29のS05 Pair 1 formal fullは、current `iss-00342`の`.meta.json`がdogfooding cutover snapshotへ未収載だったためexit 1で停止した。このrunはfailure evidenceとして保持し、AC-008のGreen 3-pair evidenceへ数えない。
+- origin fixは`tests/unit/infra/test_init_update.py`の既存static snapshotへcurrent Issue pathと空の`depends_on`を追加するbounded correctionだけとし、assertion、skip、xfail、lane分類を弱めない。
+- fixをfresh `code-reviewer`が承認しcommit/cleanを確認した後、manifest変更によりstaleとなるS04を同一契約で再実行し、fresh review/commit/cleanを完了する。
+- その後、new SHAとnew `TEST-RELEVANT-MANIFEST`でfast→fullを3組実行し、3組すべてをAC-008のfinal evidenceとする。pre-amendment failure 1回を含むpre-merge formal fullの総上限は4回であり、5回目を自動実行しない。
+- recovery後の3組の1回でもnonzero、fast>=full、condition drift、coverage mismatchがあれば再停止し、追加fullを実行しない。
 
 ## 3. Scope and Change Surface
 
@@ -198,7 +206,7 @@ S05 freshnessはcommit間の全path差分ではなく、test/runtime結果を決
 - S05開始時に、対象となるtracked fileのsorted path、各SHA-256、集約SHA-256、Python/cache条件を記録する。
 - S90、S98、S99、S100の各gateで同じmanifestを再計算し、集約SHA-256一致を必須とする。
 - `README.md`、`AGENTS.md`、Issue `report.md`、Issue artifacts、`.assurance.json`、external-evidence metadataだけの変更はmanifest対象外であり、それ自体ではS05 evidenceをstaleにしない。S90のfresh spec-reviewerはdocs command/event contract、S98/S99はledger/anchor整合を別途確認する。
-- manifest対象の1 byteでも変化した場合、S04を再実行しS05 evidenceをstaleとする。fullを再計測する前にowner disposition、plan amendment要否、fresh reviewer要否を判断し、現行planの「pre-merge routine full exactly 3」を暗黙に超えない。
+- manifest対象の1 byteでも変化した場合、S04を再実行しS05 evidenceをstaleとする。fullを再計測する前にowner disposition、plan amendment要否、fresh reviewer要否を判断し、2.2.1以外ではpre-merge formal full総上限を暗黙に増やさない。
 - S99後にmanifest対象またはdocs contractを変更した場合、origin stepへ戻し、該当step review、S90、S99を再実行する。
 
 ## 5. Acceptance Envelope
@@ -569,14 +577,14 @@ closure rowの削除、locked expectation、required-fast inventory、truth tabl
 | Delegated role | `dev-coder` measurement operator |
 | Input docs | approved docs、S04 evidence、measurement protocol |
 | Allowed paths | source/config/workflow read-only。main orchestratorの`report.md`転記のみ |
-| Forbidden changes | measurement間のsource/config変更、自動4回目pre-merge full、redのGreen読み替え |
-| Bounded batch | fast→fullを同一順序で3組。pre-merge routine fullはexactly 3回 |
+| Forbidden changes | measurement間のsource/config変更、自動5回目pre-merge full、pre-amendment redのGreen読み替え |
+| Bounded batch | pre-amendment failed full 1回をfailure evidenceとして保持。bounded snapshot correction、fresh S04後にfast→fullを同一順序でnew 3組。pre-merge formal fullは総上限4回 |
 | Acceptance criteria | 3組すべてfast<full、full=F∪H、all full exit 0、condition drift 0 |
-| Required verification | preflight; `uv run pytest`; `uv run pytest --run-full-regression`を3組で各1回 |
+| Required verification | failed attempt/focused triage evidence; snapshot correction focused test; fresh S04; new manifest preflight; `uv run pytest`; `uv run pytest --run-full-regression`をnew 3組で各1回 |
 | Refactor guardrail | measurement-only。性能最適化やflaky fixを混在させない |
 | Reviewer focus | fresh `qa-reviewer`: protocol、3-pair completeness、failure classification、coverage parity |
 | Stop conditions | any full nonzero、fast>=full、H=0、condition drift、unexplained delta |
-| Amendment trigger | 3-pair protocol変更、known flaky risk acceptance要求、追加pre-merge full要求 |
+| Amendment trigger | recovery後の追加full要求、known flaky risk acceptance要求、snapshot correctionを超えるscope変更 |
 | Output required | pairごとのSHA/condition/elapsed/exit/count/failure、sorted `TEST-RELEVANT-MANIFEST`と集約SHA、`EVD-TL-005/008`note、Ledger Noteまたはno-material-decision文 |
 | Report destination | Step/Test Contract Closure、Measurement Ledger、`EVD-TL-005/008` |
 
@@ -594,14 +602,53 @@ closure rowの削除、locked expectation、required-fast inventory、truth tabl
   - 前提: known flakyを含むformal full。
   - 操作: 各fullのfailure node/logを分類する。
   - 期待結果: nonzeroは常にS05未完了。focused triageだけ行い、owner dispositionまでreadinessを止める。
-  - 失敗検出: known flaky名目のfalse Green、4回目自動full、unexpected regression隠蔽を検出する。
+  - 失敗検出: known flaky名目のfalse Green、amendmentなしの追加fullまたは5回目full、unexpected regression隠蔽を検出する。
   - 検証方法: raw log、focused exact-node result、owner/follow-up statusをreportへ記録する。
   - 関連 closure id: `CLOS-TL-AC-007`,`CLOS-TL-BH-007`,`CLOS-TL-CON-004`
 
 #### Step closure / Result Approval
 
 - Close: 3 pairs Green、fresh qa-reviewer pass、M3b measurement ledger commit候補、commit後clean。
-- Nonzero: S05はfail/未完了のまま。自動4回目fullは禁止。原因解消またはamend+fresh reviewなしにS90へ進まない。
+- Nonzero: S05はfail/未完了のまま。2.2.1のamendment前は自動4回目fullを禁止し、amendment/fresh review後も総上限4回を超える5回目は禁止する。原因解消、fresh S04、new 3-pair Green、fresh qa-reviewer passなしにS90へ進まない。
+
+### S05R Dogfooding snapshot recovery
+
+#### Planned contract / delegation contract
+
+| 項目 | 契約 |
+|---|---|
+| Behavior goal | current `iss-00342` metadataをdogfooding cutover snapshotへ追加し、S05-F1のunexpected Redを解消する |
+| Planned obligation / evidence level | `red-required`; `CLOS-TL-AC-007`,`CLOS-TL-BH-007`,`CLOS-TL-CON-004` |
+| Pre-implementation evidence | S05-F1 formal full exit 1、focused exact node exit 1、actual 213 / expected 212、差分current Issue path 1件、D-006、fresh amendment review pass |
+| Delegated role | `dev-coder` |
+| Input docs | approved requirement/design、amended plan、S05-F1 logs/report evidence、current `.meta.json`、snapshot test |
+| Allowed paths | `tests/unit/infra/test_init_update.py` only |
+| Forbidden changes | Issue `.meta.json`、source/config/workflow/docs、assertion/skip/xfail/lane分類、snapshot生成方式、他のexpected path/value |
+| Bounded batch | existing S05-F1/focused failureをactive Red evidenceとして採用 → `_CHECKED_IN_DOGFOODING_META_JSON_PATHS`へcurrent Issue path 1件、`_CHECKED_IN_DOGFOODING_DEPENDS_ON_BY_META_PATH`へ同pathのempty list 1件を追加 → focused exact node Green → related static snapshot tests/lint/diff |
+| Acceptance criteria | focused node exit 0、observed/expected meta paths=213、depends_on map一致、diffは2 snapshot entriesだけ、assertion weakening 0 |
+| Required verification | focused exact node、related dogfooding snapshot/validate test、ruff check/format、`git diff --check` |
+| Refactor guardrail | static tuple/dictのsorted位置へ2 entryを追加するだけ。helper化やdynamic expected生成を行わない |
+| Reviewer focus | fresh `code-reviewer`: exact 2-entry correction、Red感度、test weakening 0、scope最小性 |
+| Stop conditions | current Issue以外の差分、actual metadata異常、empty depends_on不一致、allowed外diff |
+| Amendment trigger | snapshot entry追加以外の修正、test contract変更、追加full要求 |
+| Output required | changed file、Red provenance、Green commands/results、213-path parity、diff、risk、Ledger Noteまたはno-material-decision文 |
+| Report destination | Delegation/Worker Evidence、Step/Test Contract Closure、D-006 recovery evidence |
+
+#### 具体テストケース一覧
+
+- `tc-s05r-001` red-required: current Issue metadataをcutover snapshotへ反映する
+  - 前提: S05-F1とfocused exact nodeがcurrent Issue path 1件の不足でexit 1。
+  - 操作: exact pathをpath tupleとdepends-on mapへ追加し、同一focused nodeを再実行する。
+  - 期待結果: 213 pathと全depends_onが一致し、focused nodeがGreen。
+  - 失敗検出: pathだけ追加してdepends mapを落とす、assertionを弱める、dynamic expectedでsnapshot contractを消す変更を検出する。
+  - 検証方法: focused exact node、diff inspection、fresh code review。
+  - 関連 closure id: `CLOS-TL-AC-007`,`CLOS-TL-BH-007`,`CLOS-TL-CON-004`
+
+#### Step closure / Result Approval
+
+- Close: active Red provenance、Minimal Green、focused/related/static verification、fresh code-reviewer pass、M3r commit候補、post-commit clean。
+- S05R close後はmanifest変更を理由にS04を同じrequired bundleで再実行し、fresh code-reviewer pass、M3a-r evidence commit、post-commit cleanを完了する。その前にnew 3-pairを開始しない。
+- Finding: origin workerへbounded follow-upし、fresh review/commit/clean完了までS04Rまたは追加fullへ進まない。
 
 ### S90 Docs Impact Resolution
 
@@ -800,7 +847,7 @@ S99はpre-delivery readiness gateであり、S111/S120でしか観測できな�
 - Acceptance: latest main SHAにfull run 1件、status/duration/count/failure/logが観測できる。
 - No extra routing run: manual `workflow_dispatch`はdeterministic contract testで閉じ、routing確認だけの追加40分runは行わない。
 - Failure: redを遡及merge blockにしない。owner、next action、rerun/forward-fix/rollback dispositionをS98 anchorへ記録する。
-- Incident exception: same SHA local `uv run pytest --run-full-regression` reproductionはpre-merge exactly 3の外で追加可能。incident ID、理由、回数、結果をS98 anchorへ記録する。
+- Incident exception: same SHA local `uv run pytest --run-full-regression` reproductionはpre-merge総上限4回の外で追加可能。incident ID、理由、回数、結果をS98 anchorへ記録する。
 - Forbidden: automatic rollback、automatic Issue creation、schedule、agent merge。
 
 #### 具体テストケース一覧
@@ -869,7 +916,7 @@ S99はpre-delivery readiness gateであり、S111/S120でしか観測できな�
 | L4 | lane algebra | fast/heavy/full collect-only verifier |
 | L5 | static | `make lint`、`git diff --check` |
 | L6 | default ordinary entrypoints | bare pytest、`uv run pytest tests/unit`、focused pytestのH実行0、stable skip reason、controlled failure nonzero |
-| L7 | pre-merge full | S05の3 paired runs exactly 3 |
+| L7 | pre-merge full | pre-amendment failed attempt 1 + repaired SHAのaccepted 3 paired runs、総上限4 |
 | L8 | docs/spec | S90 README/AGENTS diff、fresh spec review |
 | L9 | durable evidence boundary | S98 Issue #342 external-evidence anchor URL/readback/schema |
 | L10 | pre-delivery final review | S99 fresh QA/code/spec passes、15 pass + 7 `pending_external` |
@@ -893,7 +940,7 @@ uv run pytest -q \
   tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets
 ```
 
-`uv run pytest --run-full-regression`はpre-merge routineではS05でexactly 3回だけ使う。command inventoryへの記載はS00〜S04での実行許可ではない。S120 failureのsame-SHA incident reproductionだけは記録付き追加実行を許す。
+`uv run pytest --run-full-regression`はpre-mergeでは2.2.1のfailed attempt 1回と、repaired SHAのfinal 3-pair batchだけに使い、総上限4回とする。command inventoryへの記載はS00〜S04での実行許可ではない。S120 failureのsame-SHA incident reproductionだけは記録付き追加実行を許す。
 
 ## 12. Delegation / Review / Commit Summary
 
@@ -989,7 +1036,7 @@ closure statusはS99で15件を`pass`、`EXT-PENDING-TL` 7件を`pending_externa
 - [ ] S01-S03のRed / Minimal Green / worker evidenceとper-step code reviewがある
 - [ ] S04でbare pytest、`tests/unit`、focused pytestのH body実行0、stable policy skip、controlled failure nonzero、lint / validate / deltaがGreenでfresh code-reviewer pass
 - [ ] S05 stable `TEST-RELEVANT-MANIFEST`で3 paired runs、各fast<full、全full exit 0、fresh qa-reviewer pass
-- [ ] pre-merge routine full commandはS05のexactly 3回だけ。post-merge incident例外は別記録
+- [ ] pre-merge formal fullはfailed attempt 1回とrepaired SHAのaccepted 3回だけで総上限4。post-merge incident例外は別記録
 - [ ] known flakyがfullから消えず、unexpected regressionと分離され、redならS05未完了
 - [ ] allowed paths以外のdiffがない
 - [ ] deletion / skip / xfail / assertion weakening / dependency / schedule / permissionがない
@@ -1031,7 +1078,7 @@ Rollback:
 - [x] Red / alternative evidenceとMinimal Greenを定義した
 - [x] allowed / forbidden pathsを固定した
 - [x] known flakyを隠さない契約がある
-- [x] pre-merge routine fullをS05の3 paired batchへ集約しpost-merge incident例外を分離した
+- [x] pre-merge fullをS05へ集約し、failed attempt recoveryを含む総上限4とpost-merge incident例外を分離した
 - [x] S05 freshnessを明示的な`TEST-RELEVANT-MANIFEST`で判定し、必須ledger/docs-only commitと分離した
 - [x] 22 closureへobservable state、locked expectation、bug guard、required、evidence level、exact EVD/TC anchorを記録した
 - [x] bare pytest、`tests/unit`、focused pytestのselected/executed集合とcontrolled failure nonzeroを具体カードへ固定した
@@ -1059,3 +1106,4 @@ Rollback:
 | 2026-07-28 | plan-R3 remediation | S99 future-evidence cycle、S05 manifest freshness、bare/unit/Make fast入口とfailure propagation、stale report gateを修正 | iwasawayuuta |
 | 2026-07-28 | plan-R4 remediation | dev-coderが禁止されるconfig/workflow mutationをbounded utility-workerへpath分離し、test-first順とreview routingを固定 | iwasawayuuta |
 | 2026-07-28 | plan-R5 approval | fresh spec-reviewer findings 0 / pass（confidence 0.99）を受け、reviewer-passed executable planとしてapprovedへ昇格 | iwasawayuuta |
+| 2026-07-29 | S05 failed-attempt recovery amendment | current Issue snapshot欠落によるformal full Redを保持し、bounded snapshot correction、fresh S04、repaired SHAのnew 3-pair batch、pre-merge総上限4を定義 | iwasawayuuta |
