@@ -59,6 +59,99 @@ def _raise(exc: BaseException):
     return _raiser
 
 
+def _managed_tree_bytes(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file() and "__pycache__" not in path.parts and not path.name.endswith(".pyc")
+    }
+
+
+def test_issue_334_init_and_update_install_chatgpt_assets_byte_exact(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    provider_scripts = repo_root / "src/spec_dock/assets/spec_dock/scripts"
+    provider_skill = (
+        repo_root
+        / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning"
+    )
+    provider_docs = repo_root / "src/spec_dock/assets/spec_dock/docs"
+    target = tmp_path / "target"
+    target.mkdir()
+
+    assert main(["init", str(target)]) == 0
+    assert os.access(target / "spec-dock/scripts/spec-dock", os.X_OK)
+    assert os.access(target / "spec-dock/scripts/spec-dock-chatgpt", os.X_OK)
+    assert _managed_tree_bytes(target / "spec-dock/scripts") == _managed_tree_bytes(
+        provider_scripts
+    )
+    assert _managed_tree_bytes(
+        target / ".agents/skills/spec-dock-issue-planning"
+    ) == _managed_tree_bytes(provider_skill)
+    for name in ("README.md", "workflow_issue.md"):
+        assert (target / "spec-dock/docs" / name).read_bytes() == (
+            provider_docs / name
+        ).read_bytes()
+
+    (target / "spec-dock/scripts/spec-dock-chatgpt").write_text(
+        "stale\n",
+        encoding="utf-8",
+    )
+    assert main(["update", str(target)]) == 0
+    assert (target / "spec-dock/scripts/spec-dock-chatgpt").read_bytes() == (
+        provider_scripts / "spec-dock-chatgpt"
+    ).read_bytes()
+    assert os.access(target / "spec-dock/scripts/spec-dock-chatgpt", os.X_OK)
+
+
+def test_issue_334_update_restores_managed_assets_and_preserves_unmanaged_content(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "target"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+    initiative_sentinel = target / "spec-dock/initiatives/preservation/value.txt"
+    initiative_sentinel.parent.mkdir(parents=True)
+    initiative_sentinel.write_bytes(b"persistent\n")
+    unmanaged_sentinel = target / "unmanaged-s06-sentinel.txt"
+    unmanaged_sentinel.write_bytes(b"unmanaged\n")
+    (target / ".agents/skills/spec-dock-issue-planning/SKILL.md").write_bytes(b"stale\n")
+
+    assert main(["update", str(target)]) == 0
+
+    assert initiative_sentinel.read_bytes() == b"persistent\n"
+    assert unmanaged_sentinel.read_bytes() == b"unmanaged\n"
+    provider_skill = (
+        Path(__file__).resolve().parents[3]
+        / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
+    )
+    assert (
+        target / ".agents/skills/spec-dock-issue-planning/SKILL.md"
+    ).read_bytes() == provider_skill.read_bytes()
+
+
+def test_issue_334_checked_in_dogfood_projection_matches_provider() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    comparisons = (
+        (
+            repo_root / "src/spec_dock/assets/spec_dock/scripts",
+            repo_root / "spec-dock/scripts",
+        ),
+        (
+            repo_root / "src/spec_dock/assets/spec_dock/docs",
+            repo_root / "spec-dock/docs",
+        ),
+        (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning",
+            repo_root / ".agents/skills/spec-dock-issue-planning",
+        ),
+    )
+    for provider, dogfood in comparisons:
+        assert _managed_tree_bytes(dogfood) == _managed_tree_bytes(provider)
+
+
 _ISS_00031_STALE_WHEEL_PATHS = (
     "spec_dock/assets/spec_dock/templates/adr.md",
     "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",
@@ -2294,21 +2387,25 @@ class TestInitUpdate(CliRuntimeHarness):
         planning_fragments = (
             "This is the primary planning route and it is ChatGPT-first.",
             "does not split the workflow into separate planning modes",
-            "./spec-dock/scripts/spec-dock guidance issue-planning",
+            "./spec-dock/scripts/spec-dock-chatgpt --help",
             "spec-dock/docs/workflow_issue.md",
-            "spec-dock/docs/workflow_spec_authoring.md",
-            "spec-dock/docs/phase_plan_issue.md",
-            "spec-dock/docs/authoring/issue-plan.md",
             "spec-dock/docs/authoring/decision-routing.md",
             "Issue Planning has one workflow",
             "requirement-heavy",
             "draft-heavy",
             "context-heavy",
             "information_insufficient",
-            "spec-dock-chatgpt-authoring",
-            "Evidence Adoption Ledger",
-            "fresh `spec-reviewer` pass after canonical changes",
-            "ChatGPT output is evidence only",
+            "planning create",
+            "review planning",
+            "planning revise",
+            "planning apply",
+            "planning-review-result.json",
+            "planning-revision-request.json",
+            "planning-human-decision.json",
+            "fixed sibling",
+            "fresh conversation",
+            "Candidate and Review output are evidence only",
+            "ready/adoption_published",
         )
         for fragment in planning_fragments:
             assert fragment in planning_text, f"{source} planning skill missing ChatGPT-first fragment: {fragment}"
@@ -5014,7 +5111,6 @@ class TestInitUpdate(CliRuntimeHarness):
         for dogfood_path in (
             ".agents/skills/spec-dock-initiative-planning/SKILL.md",
             ".agents/skills/spec-dock-epic-planning/SKILL.md",
-            ".agents/skills/spec-dock-issue-planning/SKILL.md",
         ):
             caller = (repo_root / dogfood_path).read_text(encoding="utf-8")
             assert (
@@ -5040,6 +5136,15 @@ class TestInitUpdate(CliRuntimeHarness):
                 "weaken existing ZIP safety checks",
             ):
                 assert forbidden_matrix_token not in caller
+        issue_planning = (
+            repo_root / ".agents/skills/spec-dock-issue-planning/SKILL.md"
+        ).read_text(encoding="utf-8")
+        assert "./spec-dock/scripts/spec-dock-chatgpt planning create" in issue_planning
+        assert "./spec-dock/scripts/spec-dock-chatgpt review planning" in issue_planning
+        assert "preserving immutable Candidate and fresh Review evidence outside the repository" in issue_planning
+        assert "planning-review-result.json" in issue_planning
+        assert "planning-human-decision.json" in issue_planning
+        assert "Candidate and Review output are evidence only" in issue_planning
 
         workflow = (repo_root / "spec-dock/docs/workflow_spec_authoring.md").read_text(encoding="utf-8")
         assert (
@@ -10780,20 +10885,26 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         assert authoring_text.startswith("---\nname: spec-dock-chatgpt-authoring\n")
 
-        for planning_text in (initiative_planning_text, epic_planning_text, issue_planning_text):
+        for planning_text in (initiative_planning_text, epic_planning_text):
             assert "This is the primary planning route and it is ChatGPT-first." in planning_text
             assert "Wait, retry, or recover" in planning_text
             assert "Manual Backup" in planning_text
             assert "information_insufficient" in planning_text
 
+        assert "This is the primary planning route and it is ChatGPT-first." in issue_planning_text
+        assert "Manual Backup" in issue_planning_text
+        assert "information_insufficient" in issue_planning_text
         assert "Issue Planning has one workflow" in issue_planning_text
         for context_type in ("requirement-heavy", "draft-heavy", "context-heavy"):
             assert context_type in issue_planning_text
         for removed_mode_name in ("zero-base", "requirement-first"):
             assert removed_mode_name not in issue_planning_text
         assert "Do not create separate workflow modes" in issue_planning_text
-        assert "Evidence Adoption Ledger" in issue_planning_text
-        assert "fresh `spec-reviewer` pass after canonical changes" in issue_planning_text
+        assert "./spec-dock/scripts/spec-dock-chatgpt planning create" in issue_planning_text
+        assert "./spec-dock/scripts/spec-dock-chatgpt review planning" in issue_planning_text
+        assert "planning-review-result.json" in issue_planning_text
+        assert "planning-human-decision.json" in issue_planning_text
+        assert "ready/adoption_published" in issue_planning_text
 
         assert "evidence-only" in authoring_text
         assert "Failure Classification" in authoring_text
@@ -12166,18 +12277,23 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         for fragment in (
             "workflow_issue.md",
-            "workflow_spec_authoring.md",
-            "phase_plan_issue.md",
-            "authoring/issue-plan.md",
             "primary planning route and it is ChatGPT-first",
             "Issue Planning has one workflow",
             "requirement-heavy",
             "draft-heavy",
             "context-heavy",
             "information_insufficient",
-            "Evidence Adoption Ledger",
-            "fresh `spec-reviewer` pass after canonical changes",
-            "ChatGPT output is evidence only",
+            "./spec-dock/scripts/spec-dock-chatgpt",
+            "planning create",
+            "review planning",
+            "planning revise",
+            "planning apply",
+            "planning-review-result.json",
+            "fixed sibling",
+            "fresh conversation",
+            "planning-human-decision.json",
+            "Candidate and Review output are evidence only",
+            "ready/adoption_published",
         ):
             assert fragment in issue_planning_text
 
@@ -12319,8 +12435,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "draft-heavy",
             "context-heavy",
             "information_insufficient",
-            "Evidence Adoption Ledger",
-            "fresh `spec-reviewer` pass after canonical changes",
+            "immutable Candidate",
+            "fresh Review evidence",
+            "planning apply",
+            "exact Human approval",
+            "ready/adoption_published",
             "human-approved emergency backup",
         ):
             assert fragment in issue_planning_text

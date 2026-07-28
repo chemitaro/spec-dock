@@ -801,10 +801,11 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
 
         _prune_legacy_scaffold(specdock_dir)
 
-        # Ensure runtime script is executable (best-effort).
-        runtime_script = specdock_dir / "scripts" / "spec-dock"
-        if runtime_script.exists():
-            _make_executable(runtime_script)
+        # Ensure runtime scripts are executable (best-effort).
+        for runtime_name in ("spec-dock", "spec-dock-chatgpt"):
+            runtime_script = specdock_dir / "scripts" / runtime_name
+            if runtime_script.exists():
+                _make_executable(runtime_script)
 
         # Best-effort: placeholders are not user-authored specs; discourage edits.
         _make_readonly_tree(specdock_dir / "system" / "active-none")

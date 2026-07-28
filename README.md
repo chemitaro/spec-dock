@@ -76,8 +76,8 @@ Troubleshooting:
 
 ## Usage (local scripts)
 
-After `init`, day-to-day operations are done via the runtime script installed into your repo:
-`./spec-dock/scripts/spec-dock`.
+After `init`, Core operations use `./spec-dock/scripts/spec-dock`. ChatGPT-first Issue Planning uses
+the separate repo-local `./spec-dock/scripts/spec-dock-chatgpt` executable.
 
 ```bash
 # Create nodes:
@@ -121,6 +121,12 @@ After `init`, day-to-day operations are done via the runtime script installed in
 ./spec-dock/scripts/spec-dock issue start iss-local-00001 # local node id
 ./spec-dock/scripts/spec-dock issue finish                # lifecycle closure: GitHub close + active clear
 
+# ChatGPT-first Issue Planning (all output paths must be external to the repository)
+./spec-dock/scripts/spec-dock-chatgpt planning create --issue iss-00123 --output /path/to/output
+./spec-dock/scripts/spec-dock-chatgpt review planning --issue iss-00123 --mode archive-candidate --candidate /path/to/candidate.zip --output /path/to/review
+./spec-dock/scripts/spec-dock-chatgpt planning revise --candidate /path/to/candidate.zip --request /path/to/review/planning-revision-request.json --output /path/to/output
+./spec-dock/scripts/spec-dock-chatgpt planning apply --issue iss-00123 --mode archive-candidate --review-result /path/to/review/planning-review-result.json --human-decision /path/to/decision.json --expected-head <sha> --output /path/to/operation --candidate /path/to/candidate.zip --logical-filename <name> --zip-sha256 <sha256>
+
 # Manual / recovery active-set path (low-level)
 ./spec-dock/scripts/spec-dock active set 123             # default: active only (no checkout)
 ./spec-dock/scripts/spec-dock active set iss-local-00001 # local node id (no checkout)
@@ -141,6 +147,10 @@ After `init`, day-to-day operations are done via the runtime script installed in
 ```
 
 Notes:
+- `planning revise` uses only the exact sibling `planning-review-result.json` beside its request.
+  `archive-candidate` and `git-bound` Reviews are distinct identities. Candidate and Review results
+  remain evidence-only until exact Human approval is applied and the result is `ready`. Planning
+  does not imply PR creation, Issue finish, or merge.
 - `./spec-dock/scripts/spec-dock update [path]` is the repo-local self-update path. It wraps the
   installer update command by running
   `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>`.

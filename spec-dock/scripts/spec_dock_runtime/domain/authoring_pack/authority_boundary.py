@@ -95,6 +95,15 @@ def scan_constraint_sensitive_payload(text: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(findings))
 
 
+def private_absolute_path_finding(text: str) -> str | None:
+    if re.search(
+        r"(^|[\s'\"=])(?:/Users/[^/\s]+/|/private/|/var/folders(?:/|$)|/tmp(?:/|$))",
+        text,
+    ):
+        return "private_absolute_path"
+    return None
+
+
 def is_credential_like_path(value: str) -> bool:
     for raw_part in re.split(r"[\\/]", value.lower()):
         part = re.sub(r"^\d{3}-", "", raw_part)

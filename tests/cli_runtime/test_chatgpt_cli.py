@@ -16,6 +16,13 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime import chatgpt_app  # noqa: E402
 from spec_dock_runtime.application.contracts import UseCases  # noqa: E402
+from spec_dock_runtime.application.issue_planning import (  # noqa: E402
+    PlanningApplyRequest,
+    PlanningCreateRequest,
+    PlanningReviewRequest,
+    PlanningReviseRequest,
+)
+from spec_dock_runtime.cli import bootstrap  # noqa: E402
 from spec_dock_runtime.domain.issue_planning_contracts import PlanningCommandResult  # noqa: E402
 
 
@@ -169,3 +176,60 @@ def test_help_returns_before_repository_resolution(monkeypatch) -> None:
     stdout = io.StringIO()
     with contextlib.redirect_stdout(stdout):
         assert chatgpt_app.main(["--help"]) == 0
+
+
+def test_issue_planning_revise_help_states_review_sibling_contract() -> None:
+    result = _run_help("planning", "revise", "--help")
+    assert result.returncode == 0
+    assert "planning-review-result.json" in result.stdout
+    assert "same directory" in result.stdout.lower()
+
+
+def test_build_runtime_configures_all_issue_planning_use_cases(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specdock_dir = tmp_path / "spec-dock"
+    specdock_dir.mkdir()
+    calls: list[str] = []
+
+    def configured(name: str):
+        def operation(**kwargs):
+            calls.append(name)
+            request = kwargs["request"]
+            issue_id = getattr(request, "issue_id", "iss-00003")
+            return PlanningCommandResult(
+                status="blocked",
+                reason=f"{name}_reached",
+                issue_id=issue_id,
+            )
+
+        return operation
+
+    monkeypatch.setattr(bootstrap._NodeReader, "load_node_records", lambda self: ())
+    monkeypatch.setattr(bootstrap, "application_run_issue_planning_create", configured("create"), raising=False)
+    monkeypatch.setattr(bootstrap, "application_run_issue_planning_review", configured("review"), raising=False)
+    monkeypatch.setattr(bootstrap, "application_run_issue_planning_revise", configured("revise"), raising=False)
+    monkeypatch.setattr(bootstrap, "application_run_issue_planning_apply", configured("apply"), raising=False)
+
+    use_cases = bootstrap.build_runtime(specdock_dir, repo_root=tmp_path).use_cases
+    use_cases.planning_create(PlanningCreateRequest("iss-00003", tmp_path))
+    use_cases.planning_review(
+        PlanningReviewRequest("iss-00003", "git-bound", tmp_path, reviewed_head="a" * 40)
+    )
+    use_cases.planning_revise(
+        PlanningReviseRequest(tmp_path / "candidate.zip", tmp_path / "request.json", tmp_path)
+    )
+    use_cases.planning_apply(
+        PlanningApplyRequest(
+            issue_id="iss-00003",
+            mode="git-bound",
+            review_result_path=tmp_path / "review.json",
+            human_decision_path=tmp_path / "decision.json",
+            expected_head="a" * 40,
+            output_dir=tmp_path,
+            reviewed_head="a" * 40,
+        )
+    )
+
+    assert calls == ["create", "review", "revise", "apply"]
