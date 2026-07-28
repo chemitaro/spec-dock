@@ -10,6 +10,10 @@ RUNTIME_SCRIPTS_DIR = (
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application import issue_planning_prompt  # noqa: E402
+from spec_dock_runtime.domain.authoring_pack.authority_boundary import (  # noqa: E402
+    scan_constraint_sensitive_payload,
+    scan_sensitive_payload,
+)
 from spec_dock_runtime.domain.issue_planning_contracts import PlanningContext  # noqa: E402
 
 
@@ -39,6 +43,133 @@ def _write_context_files(repo_root: Path) -> None:
         target = repo_root / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(f"content:{path}\n", encoding="utf-8")
+
+
+def test_constraint_scan_accepts_transcript_marker_mentions_without_complete_turn_pair() -> None:
+    fixtures = (
+        "The term raw transcript names an evidence class.",
+        "# ChatGPT transcript handling",
+        "- The runtime must not persist a browser transcript.",
+        "Example label: `raw transcript`.",
+        "- diagnosticへsecret value、absolute private path、raw transcriptを保存しない。",
+        "- raw transcript、credential、private absolute pathを保存しない。",
+        "# Raw transcript example\n\nUser: this is an isolated field example",
+        ("ChatGPT transcript is discussed here.\n\nAnswer: this isolated field has no matching Prompt turn"),
+    )
+
+    for fixture in fixtures:
+        assert not any(finding.startswith("raw_transcript:") for finding in scan_constraint_sensitive_payload(fixture))
+
+
+def test_prompt_synthesis_accepts_transcript_marker_mentions_without_turn_pairs(
+    tmp_path: Path,
+) -> None:
+    _write_context_files(tmp_path)
+    canonical_content = {
+        "design.md": "# Raw transcript vocabulary\n\nThe term raw transcript names an evidence class.\n",
+        "plan.md": "- ChatGPT transcript、credential、private absolute pathを保存しない。\n",
+        "requirement.md": "The runtime must not persist a browser transcript.\n",
+    }
+    for relative in _context().canonical_issue_paths:
+        (tmp_path / relative).write_text(
+            canonical_content[Path(relative).name],
+            encoding="utf-8",
+        )
+
+    synthesized = issue_planning_prompt.synthesize_issue_planning_prompt(
+        role="planner",
+        context=_context(),
+        repo_root=tmp_path,
+        upstream="origin/feature/issue",
+        remote_head="a" * 40,
+    )
+
+    canonical_paths = set(_context().canonical_issue_paths)
+    canonical_attachments = {path: content for path, content in synthesized.attachments if path in canonical_paths}
+    assert set(canonical_attachments) == canonical_paths
+    for relative, content in canonical_attachments.items():
+        assert content.encode("utf-8") == (tmp_path / relative).read_bytes()
+    assert tuple(path for path, _ in synthesized.attachments) == tuple(
+        sorted((path for path, _ in synthesized.attachments), key=lambda value: value.encode("utf-8"))
+    )
+
+
+def test_constraint_scan_rejects_structured_transcript_turn_pairs() -> None:
+    fixtures = (
+        (
+            "# Raw transcript\n\nUser: requirement\nAssistant: response",
+            "raw_transcript:raw transcript",
+        ),
+        (
+            "# ChatGPT transcript\n\nPrompt: requirement\nAnswer: response",
+            "raw_transcript:chatgpt transcript",
+        ),
+        (
+            "# Oracle Browser Transcript\n\n## Prompt\n\nrequirement\n\n## Answer\n\nresponse",
+            "raw_transcript:browser transcript",
+        ),
+        (
+            "# Raw transcript\n\n> User：requirement\n- Assistant: response",
+            "raw_transcript:raw transcript",
+        ),
+        (
+            "# Browser transcript\n\n### Prompt ###\n\n###### Answer ##",
+            "raw_transcript:browser transcript",
+        ),
+    )
+
+    for fixture, expected in fixtures:
+        assert expected in scan_constraint_sensitive_payload(fixture)
+
+
+def test_constraint_scan_rejects_mixed_marker_mention_and_transcript_payload() -> None:
+    fixture = (
+        "This section discusses the phrase raw transcript as planning vocabulary.\n\n"
+        "User: requirement\n"
+        "Assistant: response"
+    )
+    assert "raw_transcript:raw transcript" in scan_constraint_sensitive_payload(fixture)
+    ordered_findings = scan_constraint_sensitive_payload(
+        "Raw transcript, ChatGPT transcript, and browser transcript are discussed.\n\n"
+        "User: requirement\n"
+        "Assistant: response"
+    )
+    assert ordered_findings == (
+        "raw_transcript:raw transcript",
+        "raw_transcript:chatgpt transcript",
+        "raw_transcript:browser transcript",
+    )
+
+
+def test_constraint_scan_requires_complete_ordered_turn_pair() -> None:
+    fixtures = (
+        "Raw transcript example\nUser: only",
+        "ChatGPT transcript example\nAnswer: second half only",
+        "Browser transcript example\nAssistant: response\nUser: request",
+        "ChatGPT transcript example\nAnswer: response\nPrompt: request",
+        "Raw transcript example\nPrompt design: requirement\nAnswer format: response",
+        "Raw transcript example\nUser: request Assistant: response",
+        "Raw transcript example\nUser: request\nSystem: response",
+        "User: request\nAssistant: response",
+    )
+    for fixture in fixtures:
+        assert not any(finding.startswith("raw_transcript:") for finding in scan_constraint_sensitive_payload(fixture))
+
+
+def test_constraint_scan_handles_many_unpaired_turn_labels() -> None:
+    fixture = "Raw transcript example\n" + "\n".join("User: request" for _ in range(10_000))
+    assert not any(finding.startswith("raw_transcript:") for finding in scan_constraint_sensitive_payload(fixture))
+
+
+def test_transcript_marker_mentions_do_not_mask_secret_or_private_key_findings() -> None:
+    token_findings = scan_constraint_sensitive_payload("The term raw transcript is documentation. token=abc123secret")
+    private_key_findings = scan_constraint_sensitive_payload(
+        "Browser transcript is a label.\n-----BEGIN PRIVATE KEY-----"
+    )
+
+    assert "secret_like_payload:token" in token_findings
+    assert "secret_like_payload:private key" in private_key_findings
+    assert "raw_transcript:raw transcript" in scan_sensitive_payload("raw transcript")
 
 
 def test_synthesize_prompt_is_deterministic_and_contains_source_identity(tmp_path: Path) -> None:

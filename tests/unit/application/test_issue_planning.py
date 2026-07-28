@@ -413,6 +413,76 @@ def test_transport_sensitive_git_identity_rejection_does_not_leak_source_evidenc
     assert secret_branch not in str(result.to_dict())
 
 
+def test_transport_with_transcript_marker_mentions_reaches_backend_once(tmp_path: Path) -> None:
+    issue_dir = _issue_tree(tmp_path)
+    marker_content = {
+        "design.md": "# Raw transcript vocabulary\n\nThe term raw transcript names an evidence class.\n",
+        "plan.md": "- ChatGPT transcript、credential、private absolute pathを保存しない。\n",
+        "requirement.md": "The runtime must not persist a browser transcript.\n",
+    }
+    for filename, content in marker_content.items():
+        (issue_dir / filename).write_text(content, encoding="utf-8")
+    target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], tmp_path)
+    manifest = build_source_manifest(tmp_path, target.canonical_issue_paths)
+    backend_result = _successful_transport()
+    backend_calls: list[dict[str, Any]] = []
+
+    def backend(**kwargs):
+        backend_calls.append(kwargs)
+        return backend_result
+
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_transport"],
+    )
+    result = module.run_issue_planning_transport(
+        issue="iss-00003",
+        records=[_record(issue_dir)],
+        repo_root=tmp_path,
+        role="planner",
+        preflight_runner=lambda request: _preflight(source_manifest=manifest),
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=backend,
+    )
+
+    assert result is backend_result
+    assert result.reason != "sensitive_input_rejected"
+    assert len(backend_calls) == 1
+    synthesized = backend_calls[0]["synthesized"]
+    assert {path for path, _ in synthesized.attachments} == set(target.canonical_issue_paths)
+
+
+def test_transport_with_structured_transcript_stops_before_backend_without_leakage(
+    tmp_path: Path,
+) -> None:
+    issue_dir = _issue_tree(tmp_path)
+    transcript = "# Oracle Browser Transcript\n## Prompt\nprivate requirement body\n## Answer\nprivate response body\n"
+    (issue_dir / "requirement.md").write_text(transcript, encoding="utf-8")
+    target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], tmp_path)
+    manifest = build_source_manifest(tmp_path, target.canonical_issue_paths)
+    backend_calls: list[object] = []
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_transport"],
+    )
+
+    result = module.run_issue_planning_transport(
+        issue="iss-00003",
+        records=[_record(issue_dir)],
+        repo_root=tmp_path,
+        role="planner",
+        preflight_runner=lambda request: _preflight(source_manifest=manifest),
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+    )
+
+    assert (result.status, result.reason) == ("rejected", "sensitive_input_rejected")
+    assert result.source_evidence is None
+    assert backend_calls == []
+    assert "private requirement body" not in repr(result)
+    assert "private response body" not in str(result.to_dict())
+
+
 def test_current_front_matter_inconsistency_short_circuits_backend(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()

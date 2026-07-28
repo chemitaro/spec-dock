@@ -49,6 +49,82 @@ def test_issue_candidate_profile_accepts_exact_generated_zip(tmp_path: Path) -> 
     assert module.review_pack_input(path, profile=profile).status == "pass"
 
 
+def test_issue_candidate_profile_accepts_transcript_marker_mentions_without_turn_pairs(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "candidate.zip"
+    required = (
+        "CHECKSUMS.sha256",
+        "MANIFEST.json",
+        "PLACEHOLDER-ORACLE-MAP.json",
+        "SOURCE-BASELINE.json",
+        "design.md",
+        "plan.md",
+        "requirement.md",
+    )
+    marker_content = {
+        "design.md": "# Raw transcript vocabulary\n\nThe term raw transcript names an evidence class.\n",
+        "plan.md": "- ChatGPT transcript、credential、private absolute pathを保存しない。\n",
+        "requirement.md": "The runtime must not persist a browser transcript.\n",
+    }
+    with zipfile.ZipFile(path, "w") as archive:
+        for name in required:
+            info = zipfile.ZipInfo(f"candidate/{name}")
+            info.create_system = 3
+            info.external_attr = (stat.S_IFREG | 0o644) << 16
+            archive.writestr(
+                info,
+                marker_content.get(name, "{}\n"),
+            )
+    validator_calls: list[tuple[tuple[str, ...], str]] = []
+
+    def validate(files, root):
+        validator_calls.append((tuple(sorted(files)), root))
+        return ()
+
+    module = _zip_contract()
+    profile = module.issue_candidate_v1_profile(
+        expected_root="candidate",
+        cross_file_validator=validate,
+    )
+    result = module.review_pack_input(path, profile=profile)
+
+    assert result.status == "pass"
+    assert tuple(sorted(Path(name).name for name in result.reviewed_files)) == tuple(sorted(required))
+    assert validator_calls == [(tuple(sorted(required)), "candidate")]
+
+
+def test_issue_candidate_profile_rejects_structured_transcript_payload(tmp_path: Path) -> None:
+    path = tmp_path / "candidate.zip"
+    transcript = "# Oracle Browser Transcript\n## Prompt\nprivate requirement body\n## Answer\nprivate response body\n"
+    required = (
+        "CHECKSUMS.sha256",
+        "MANIFEST.json",
+        "PLACEHOLDER-ORACLE-MAP.json",
+        "SOURCE-BASELINE.json",
+        "design.md",
+        "plan.md",
+        "requirement.md",
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        for name in required:
+            info = zipfile.ZipInfo(f"candidate/{name}")
+            info.create_system = 3
+            info.external_attr = (stat.S_IFREG | 0o644) << 16
+            archive.writestr(info, transcript if name == "design.md" else "{}\n")
+    module = _zip_contract()
+    profile = module.issue_candidate_v1_profile(
+        expected_root="candidate",
+        cross_file_validator=lambda files, root: (),
+    )
+    result = module.review_pack_input(path, profile=profile)
+
+    assert result.status == "rejected"
+    assert "raw_transcript" in result.findings
+    assert "private requirement body" not in repr(result.findings)
+    assert str(tmp_path) not in repr(result.findings)
+
+
 def test_issue_candidate_profile_rejects_tree_input(tmp_path: Path) -> None:
     module = _zip_contract()
     profile = module.issue_candidate_v1_profile(
