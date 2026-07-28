@@ -1,17 +1,47 @@
 ---
-種別: 設計書（Epic）
-ID: "epic-00343"
-タイトル: "Workbench Shell And Explicit File Artifact Import"
-関連GitHub: ["#343"]
+種別: disc
+ID: "20260728t083918z-disc"
+タイトル: "Epic 00343 Workbench And File Import Architecture Draft"
 状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-28"
-依存: ["requirement.md"]
-親: ["init-local-00002"]
+親: ["epic-00343"]
+関連: []
+authority: "proposed"
+created_by_role: system-architect
+scope_id: epic-00343
+source_paths:
+  - spec-dock/active/epic/requirement.md
+  - spec-dock/active/epic/report.md
+  - spec-dock/active/initiative/requirement.md
+  - spec-dock/active/initiative/design.md
+  - spec-dock/active/initiative/plan.md
+  - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/design.md
+  - spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00312-experimental-local-workbench-and-worktree-handoff/artifacts/20260728t080013z-research-chatgpt-pro-epic-replanning-zip-evidence.md
+  - src/spec_dock/cli.py
+  - src/spec_dock/assets/spec_dock/.gitignore
+  - src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py
+  - src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_artifact_doc.py
+  - src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_artifact.py
+  - src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py
+  - src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/artifacts.py
+  - src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py
+  - src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py
+  - src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py
+  - tests/cli_runtime/test_artifact_import_chatgpt_output.py
+  - tests/cli_runtime/test_artifact_import_s04.py
+  - tests/unit/infra/test_binary_artifact_publisher.py
+  - tests/unit/infra/test_init_update.py
+intended_targets:
+  - spec-dock/active/epic/design.md
+adoption_status: unreviewed
+reflected_to: []
+diff_guard_result: passed
 ---
 
-# epic-00343 Workbench Shell And Explicit File Artifact Import — 設計
+# epic-00343 Workbench Shell And Explicit File Artifact Import — 設計ドラフト証跡
 
+> この文書は`system-architect`による委任設計ドラフトである。正本`design.md`のauthority、採用、phase promotion、reviewer pass、implementation readinessを主張しない。source requirement revisionはSHA-256 `068eda6ba36aadc93884ca8791a40c4f31998bcb47050014f07d0e623391e20c`である。
 
 ## 1. Requirement Coverage
 
@@ -104,16 +134,12 @@ node_id: null for root; full/normalized id for node
 
 ### D-005 Explicit source guard and publication reuse
 
-`FilesystemBinaryArtifactPublisher`のsource open、temp copy、hash、fsync、source stability確認をprivate `_stage_and_verify_guarded(...)`へ抽出し、二つのpublic entryを持たせる。
+`FilesystemBinaryArtifactPublisher`のbyte publication本体をprivate `_publish_guarded(...)`へ抽出し、二つのpublic entryを持たせる。
 
 1. 現行`publish(BinaryArtifactPublishRequest)`:
    - 現行Workbench guardを通し、`chatgpt-output`互換を維持する。
 2. 新規`publish_explicit_file(ExplicitFileArtifactPublishRequest)`:
-   - generic explicit-file guardを通し、同じstaging / verification coreを使う。
-   - mutableなtemp pathnameをsourceにせず、verified open `temp_fd`とsecurely opened `destination_parent_fd`をpublication primitiveへ渡す。
-   - Linuxは保持中の`temp_fd`を指すcurrent-processの`/proc/self/fd/<temp_fd>`をsourceに、`linkat(..., destination_parent_fd, name, AT_SYMLINK_FOLLOW)`でno-replace hard linkする。`/proc/self/fd`は任意pathnameの再解決ではなく、closeされていないverified FDのkernel-owned handleとしてだけ使う。macOSは`fclonefileat(temp_fd, destination_parent_fd, name, 0)`を使う。いずれもverified FD identityとopened destination directoryへ拘束され、formal nameが既存なら置換しない。
-   - publication直前にvisible destination parentのdevice/inodeをopened FDと照合する。照合後、FD-bound no-replace primitiveが成功した時点を単一のcommit pointとする。
-   - FD-bound no-replace primitiveを提供できないplatformではformal destination作成前に`publication_unsupported`でfail closedにする。
+   - generic explicit-file guardを通し、同じ`_publish_guarded`を使う。
 
 portは`ExplicitFileArtifactPublisher`として新設し、bootstrapでは現行と同じ`FilesystemBinaryArtifactPublisher` instanceをwireする。generic use caseを`workbench_source_guard`へ依存させない。
 
@@ -122,24 +148,12 @@ Explicit source guardは次を行う。
 1. relative inputはrepository root基準でabsolute lexical pathへする。`..`は禁止せず、指定された一fileだけを扱う。
 2. `os.open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)`相当でleaf symlinkを拒否し、ancestor symlinkはOS path resolutionに委ねて許容する。
 3. `fstat`でreadable regular file、device/inode/modeを固定する。directory/FIFO/socket/deviceは拒否する。
-4. publication中は同じFD、または再open後に同じdevice/inode/modeと検証したFDだけを読む。stage後の最終検証では、同じsource FDを先頭から再読してhash / byte countをstaged tempと照合し、その直後にFD statとvisible path identityを再検証する。観測できた変化は`source_changed`でpublishしない。
+4. publication中は同じFD、または再open後に同じdevice/inode/modeと検証したFDだけを読む。stage後にFD stat/hashとvisible path identityを再検証し、変化時は`source_changed`でpublishしない。
 5. sourceの親directoryをenumerateしない。
 
 source visibilityはfail-closedで分類する。lexical pathとstrict-resolved pathの双方がrepo内で、open FD identityとresolved path statが一致する場合だけ`repo_relative`とする。それ以外は`basename_only`とし、resolved absolute pathはapplicationへ返さない。
 
 supported platformでleaf no-followとFD identity検証を満たせない場合、通常path openへdegradeせず`source_guard_unsupported`でpublish前にfail closedとする。
-
-Publication capability matrix:
-
-| Environment | Supported capability | Probe / outcome |
-|---|---|---|
-| Linux | mounted `/proc`がcurrent-process FD linkを公開し、通常権限callerがdestination directory内のnamed owned temp FDから同directoryへ`linkat(..., AT_SYMLINK_FOLLOW)` hard linkとdirectory `fsync`を実行できる | import前にdestination directory内のowned tempでcapability probeする。未対応またはpolicy拒否は`publication_unsupported`でformal destination作成前にfail closed。`CAP_DAC_READ_SEARCH`を要求しない通常権限testを必須にする |
-| macOS | destination directory内のnamed owned tempとformal destinationが同じclone-capable filesystemにあり、`fclonefileat` no-replace cloneとdirectory `fsync`を許可する | import前にdestination directory内のowned tempでcapability probeする。clone非対応volumeまたはpolicy拒否は`publication_unsupported`でformal destination作成前にfail closed |
-| その他 | leaf no-follow、FD identity、FD-bound no-replace commit、directory durabilityの同等primitiveをproviderが明示実装した場合だけsupported | primitive未実装時は`source_guard_unsupported`または`publication_unsupported` |
-
-original sourceはrepository外volumeを含む任意のreadable filesystemに置ける。bytesはdestination directory内のowned staged tempへstream copyするため、publication primitiveのsame-filesystem制約は**staged tempとformal destinationの間だけ**に適用し、original sourceとdestinationがcross-filesystemでもsuccess laneである。
-
-capability probeはcontent-free errorへ正規化し、probe entryをowned temp namespace外へ残さない。candidate wheelのinstalled-consumer testは通常権限Linuxのsupported filesystemとmacOSのclone-capable filesystemをsuccess laneとし、少なくとも一つのunsupported fixtureでfail-closed laneを確認する。OS名だけで成功を保証せず、上表のcapabilityを満たすenvironmentを本Epicのsupported environmentとする。
 
 ### D-006 Generic filename family and shared slot ledger
 
@@ -211,19 +225,9 @@ retry_disposition: safe_after_remediation
 canonical: false
 ```
 
-pre-publication errorにはsource path/basename、destination path、exception text、hash/countを含めない。unknown exceptionは`runtime_failed`へ潰す。publish後のdirectory fsync、owned temp cleanup failureはexit 0、`committed_with_warning`、`retry_disposition=not_needed`とし、重複retryを防ぐ。
+source path/basename、destination path、exception text、hash/countをerrorへ含めない。unknown exceptionは`runtime_failed`へ潰す。publish後のdirectory fsync、destination再読、owned temp cleanup failureはexit 0、`committed_with_warning`、`retry_disposition=not_needed`とし、重複retryを防ぐ。
 
 target/source displayとrepository-relative destinationはpublication前に確定し、publisherが`committed=true`を返した後にfallible path解決を行わない。create lock release failureもpostcommit warningへ変換する。これにより、formal file公開後の内部整形失敗を`committed=false`へ誤分類しない。
-
-generic pathではverified FDとopened parent FDをbindingするOS primitiveの成功を単一のcommit pointとし、別のmutable source pathnameを再解決しない。commit前failureは`not_committed`、commit後は`committed`またはdirectory fsync / owned temp cleanupだけの`committed_with_warning`である。現行`chatgpt-output` wrapperのwarning contractは互換性のため別finalizerに残す。
-
-Threat modelは、shared create lockに従うSpecDock process間のcollision、initial copyまたは最終source再読/identity検証で観測できるexplicit sourceの外部変更、publication直前までに観測できるdestination ancestry変更を扱う。次はnon-cooperating writerに対してOS-level leaseを取得しない本command単独の保証対象外とする。
-
-- 最終source再読とidentity検証が完了した後からFD-bound commit syscallまでの間に、別processが同じsource inodeへin-place writeすること。
-- last visible-parent identity checkとFD-bound commit syscallの間に、別processがrepository directory自体をrename / replaceすること。
-- commit後にrepository write権限を持つactorがArtifactを変更すること。
-
-この境界でもcommand自身はsourceを変更せず、staged bytesのhash / countとformal destinationのbytesは一致する。E-RQ-013の「検知したsource変更はsuccess公開しない」は最終source再読/identity検証までを検出境界とし、T3は境界の直前と直後を別fixtureで固定する。この除外はdestination file collisionまたはSpecDock同士のconcurrencyを除外しない。
 
 ### D-009 Opaque lifecycle
 
@@ -231,9 +235,6 @@ Threat modelは、shared create lockに従うSpecDock process間のcollision、i
 - `validate`はrootおよびnodeのArtifact directoryでbasename/symlink/slotだけを検証し、bodyをread/decodeしない。
 - `sync`のADR mirrorは現行どおりtyped ADR basenameだけを候補にし、generic parserをtyped parserへ接続しない。generic `.md`もbasename判定でskipし、bodyを読まない。
 - non-Markdown generic fileはdefault semantic discoveryに追加しない。
-- dependency生成は`application/check_deps.py`が`SpecGraph` / dependency topology / Issue statusを、`presentation/json_state.py::render_deps_issues_artifact`と`render_deps_raw_artifact`がそのdomain resultを入力にする現行境界を維持する。generic Artifact directoryやbodyを新しい入力へ加えない。
-- active context生成は`infra/active_store.py::_render_context_pack`および`presentation/json_state.py::render_context_pack`が`ActiveManifest` / derived index pathだけを入力にする現行境界を維持し、generic Artifactを列挙・decodeしない。
-- authoring diff guard / source manifestで利用者がgeneric fileを明示指定した場合はopaque bytesのSHA-256算出を許すが、UTF-8 / Markdownとしてdecodeせず、default contextへ暗黙追加しない。
 - import successは`canonical=false`を明示し、採用は別workflowに委ねる。
 
 ## 4. Alternatives Considered
@@ -264,12 +265,6 @@ Threat modelは、shared create lockに従うSpecDock process間のcollision、i
 - 棄却理由:dependency/status/active projectionへroot概念が漏れ、Artifact importだけのためにgraph contractを拡張する。root targetはapplication-level value objectで十分である。
 
 ## 5. Boundary / Contract Model
-
-- Title: Generic File Import Component Boundary
-- Question answered: generic importをどのlayerへ追加し、既存publisherとnode graphをどう分離するか。
-- Scope: CLI、application、domain、publisher port / adapter、root/node Artifact destination。
-- Excluded details: exact function body、OS別system call、test fixture。
-- Update trigger: component ownership、dependency direction、public request/result boundaryが変わるとき。
 
 ```plantuml
 @startuml
@@ -341,7 +336,7 @@ presentation/cli_text.py
 - product contract:
   - fresh-reviewed `epic-00343/requirement.md`
   - fresh-reviewed canonical `design.md` / `plan.md`
-  - `artifacts/20260728t100038z-adr-generic-imported-file-identity-and-privacy-boundary.md`
+  - accepted ADR（作成・採用された場合）
 - advisory evidence:
   - 旧`epic-00312` interviews / research / historical design
   - ChatGPT Pro ZIP evidence SHA-256 `ecd4c65a608ee4474fd5e06b0230150ba56106a5eee7418811367c9cbadca371`
@@ -352,12 +347,6 @@ Providerを先に変更し、dogfood側runtime/docs/templatesの手編集をimpl
 ## 8. Data Flow / Domain Model / Interface Contract
 
 ### 8.1 Import flow
-
-- Title: Explicit Single-File Import Sequence
-- Question answered: explicit sourceとtargetが、preflightからprivacy-safe resultまでどの順序で処理されるか。
-- Scope: target resolution、source guard、slot allocation、verified no-replace publication、result mapping。
-- Excluded details: chunk loop、normalization algorithm内部、exception class hierarchy。
-- Update trigger: operation順序、commit point、lock / allocation ownership、public outcomeが変わるとき。
 
 ```plantuml
 @startuml
@@ -389,20 +378,14 @@ CLI --> User : exit 0, retry not needed
 
 ### 8.2 State model
 
-- Title: Generic Import Publication State
-- Question answered: formal destinationの有無、integrity、warning、retry dispositionをどう区別するか。
-- Scope: preflight、staged、not committed、FD-bound commit、verified committed、durability/cleanup warning。
-- Excluded details: individual error code、filesystem primitive、UI wording。
-- Update trigger: commit point、integrity verification、exit status、retry policyが変わるとき。
-
 ```plantuml
 @startuml
 [*] --> preflight
 preflight --> not_committed : target/source invalid
 preflight --> staged : source eligible + slot allocated
 staged --> not_committed : copy/hash/source change/publish failure
-staged --> committed : FD-bound no-replace commit succeeds
-committed --> committed_with_warning : durability/cleanup warning
+staged --> committed : no-replace publish
+committed --> committed_with_warning : durability/readback/cleanup warning
 committed --> [*]
 committed_with_warning --> [*]
 not_committed --> [*]
@@ -411,19 +394,17 @@ not_committed --> [*]
 
 Invariant:
 
-- `publication_state=not_committed` / `committed=false`は、本commandがformal destination entryを作成していないことを示す。allocation後の競合により、同名pathへ既存または他actor所有のentryが存在する場合はあるため、そのentryを本commandのArtifactとして返したり変更したりしない。
-- `publication_state=committed|committed_with_warning`ならverified complete bytesがformal destinationに存在し、自動retryしない。
+- `committed=false`ならformal destinationは存在しない。
+- `committed=true`ならverified complete bytesがformal destinationに存在し、自動retryしない。
 - sourceは全stateでcommandによりwrite/delete/move/renameされない。
 - warningはcommitを巻き戻さない。
-
-`destination_exists`は`not_committed`かつ`retry_disposition=safe_after_remediation`で返す。callerは競合entryを自動削除せず、次回実行でcreate lock配下のslot再割当を行う。target preflight等の非競合failureも同じstateを使うが、codeに応じた人間のremediation後だけretryする。
 
 ### 8.3 Failure code family
 
 - request/target: `target_invalid`, `target_not_found`, `target_ambiguous`
 - source: `source_missing`, `source_ineligible`, `source_unreadable`, `source_changed`
 - allocation: `create_lock_failed`, `artifact_allocation_failed`, `artifact_slot_exhausted`
-- publication: `temp_create_failed`, `hash_failed`, `hash_mismatch`, `file_fsync_failed`, `destination_exists`, `destination_ineligible`, `publication_unsupported`, `filesystem_failed`
+- publication: 既存publisherの`temp_create_failed`, `hash_failed`, `hash_mismatch`, `file_fsync_failed`, `destination_exists`, `destination_ineligible`, `filesystem_failed`
 - fallback: `runtime_not_configured`, `runtime_failed`
 
 全codeはcontent-freeであり、underlying exception messageを連結しない。
@@ -431,7 +412,6 @@ Invariant:
 ## 9. File / Module Change Plan
 
 ```text
-pyproject.toml                                                 # Modify: 3 template `.workbench/.gitkeep`の明示package-data
 src/spec_dock/
 ├── cli.py                                                     # Modify: fresh root marker判定、default ignore
 └── assets/spec_dock/
@@ -478,12 +458,6 @@ tests/
 
 Exact test file placementは既存suiteの局所命名へ合わせて調整できるが、責務とtest seamは変えない。
 
-\`pyproject.toml\`のcurrent \`assets/**/*\`はdotfile収録を保証しないため、次のhidden marker pathをpackage dataへ明示追加する。source treeだけで動作する状態をpassとしない。
-
-- \`assets/spec_dock/templates/initiative/.workbench/.gitkeep\`
-- \`assets/spec_dock/templates/epic/.workbench/.gitkeep\`
-- \`assets/spec_dock/templates/issue/.workbench/.gitkeep\`
-
 ## 10. Migration / Compatibility / Rollback
 
 ### Migration
@@ -513,7 +487,7 @@ Exact test file placementは既存suiteの局所命名へ合わせて調整で�
 
 - success text/JSONはtarget、safe source display、destination、full artifact identity、commit/warning/retry/canonical stateを同じ意味で返す。
 - precommit errorはstable codeとcommit/cleanup/retry stateだけを返す。
-- durability / cleanupのpostcommit warningは`committed=true`を維持し、warning codeを列挙する。
+- postcommit warningは`committed=true`を維持し、warning codeを列挙する。
 - metrics/database/log sidecarは追加しない。
 - debug exception tracebackをpublic resultへ混ぜない。開発時testはexception chainingを内部観測できるが、CLI output snapshotには出さない。
 - Workbench shell生成はnew/initの既存created-path resultとfilesystemを照合し、専用telemetryは追加しない。
@@ -543,24 +517,20 @@ Exact test file placementは既存suiteの局所命名へ合わせて調整で�
 - ancestor symlink inside/outside成功、leaf symlink拒否。
 - missing、directory、FIFO/socket/device、unreadable。
 - empty、invalid UTF-8、NUL、PDF/image/ZIP、large streamのsource=staged=destination bytes/hash。
-- stage中および最終再読中のsource content/identity change、最終source検証直後のnon-cooperating write境界、publication直前までのdestination ancestry swap、hash mismatch、fsync、FD-bound publication unsupported/failure、cleanup fault injection。
-- command起因failure時source stat/bytes不変。本commandがformal destinationを作成しないことを確認し、`destination_exists` fixtureでは競合actor所有entryが保持されることも確認する。
-- Linux success時はformal destinationとverified tempが同一device/inode、macOS success時はFD-bound clone結果がverified source bytesと一致し、generic pathにdestination mismatch warningが存在しないことを確認する。
-- 通常権限Linuxの`/proc/self/fd` + `AT_SYMLINK_FOLLOW` hard-link対応filesystemとmacOS clone-capable filesystemのsuccess、clone非対応 / policy拒否の`publication_unsupported`、probe cleanupを確認する。original sourceがdestinationとは別filesystemでも、destination directory内stagingによりsuccessすることを実volumeまたはmount fixtureで確認する。
+- stage中source content/identity change、destination ancestry swap、hash mismatch、fsync、publish、readback、cleanup fault injection。
+- failure時source stat/bytes不変、formal destinationなし。
 
 ### T4 Privacy / state
 
 - external sourceの全success/failure/warningでabsolute path、parent component、body fragment、SHA、byte countがtext/JSON/stderr/tracked fileにない。
 - internal source successはrepo-relative、external successはbasenameだけ。
 - unknown exceptionは`runtime_failed`へ縮退。
-- durability / cleanup warningはexit 0、committed、retry不要。precommit failureはexit 1、not committed。
+- postpublish warningはexit 0、committed、retry不要。precommit failureはexit 1、not committed。
 
 ### T5 Opaque lifecycle / compatibility
 
 - generic `.md` original basenameが`adr-decision.md` / `research-note.md`でもADR mirrorやtyped Artifactにならない。
 - binary/invalid UTF-8 import後に`validate`、`sync --no-github`、default discoveryがpassし、bodyをopenしないtest doubleを使う。
-- binary/invalid UTF-8 import後に`deps check --json`、deps derived artifact rendering、active context-pack再生成がpassし、`application/check_deps.py`、`presentation/json_state.py`、`infra/active_store.py`からgeneric bodyをopen/decodeしないことをspyで確認する。
-- generic fileをauthoring contextへ明示指定した場合はbinary hashだけが生成でき、implicit source selectionやUTF-8 decodeが行われないことを確認する。
 - existing `chatgpt-output`、`new artifact`、`workbench copy` suitesを変更なしまたは互換assert追加でpassさせる。
 
 ### T6 Distribution / dogfood
@@ -573,13 +543,13 @@ Exact test file placementは既存suiteの局所命名へ合わせて調整で�
 
 ## 13. ADR Candidates
 
-Accepted ADR: **Generic imported-file Artifact identity and privacy boundary**
+候補: **Generic imported-file Artifact identity and privacy boundary**
 
-- ADR candidate: resolved by Epic-local accepted ADR。
+- ADR candidate: yes。
 - hard to reverse: yes。`--` filename family、full basename identity、external source非開示、postcommit retry semanticsはtracked fileとpublic CLIへ残る。
 - surprising without context: yes。original basenameが`adr-*.md`でもtyped ADRではなく、SHA/countを外部source結果へ出さない。
 - real tradeoff: yes。既存typed grammarへの統合より、semantic isolationとprivacyを優先する。
-- Decision record: `artifacts/20260728t100038z-adr-generic-imported-file-identity-and-privacy-boundary.md`をauthorityとし、D-006/D-008およびplanのIssue ownershipから参照する。
+- 推奨: main orchestratorがcanonical designへ採用する際、Epic-local accepted ADRの要否を判断する。ADRを作らない場合もD-006/D-008とEALへ判断理由を残す。
 
 Workbench shellのfresh-only/no-backfillはrequirementで十分に固定され、独立ADRは不要である。
 
@@ -589,7 +559,7 @@ Workbench shellのfresh-only/no-backfillはrequirementで十分に固定され�
 |---|---|---|
 | Git ignore negation誤り | markerまでignore、またはcontents露出 | real Git repoで4 placement、nested entries、near-nameを`git check-ignore -v`検証 |
 | hidden `.gitkeep` package-data欠落 | installed consumerだけshellなし | wheel inventoryとcandidate wheel fresh init |
-| ancestor symlink / source mutation race | 指定外file readまたはstale snapshot publish | `O_NOFOLLOW` leaf、FD identity固定、最終full reread、検出境界後のnon-cooperating in-place writeは明示的threat-model外、content-free fail |
+| ancestor symlink race | 指定外file readまたは不整合publish | `O_NOFOLLOW` leaf、FD identity固定、post-stage再検証、content-free fail |
 | external path漏洩 | privacy violation | safe result object以外をrendererへ渡さず、全failure/warning snapshotでsecret path sentinel否定 |
 | generic `.md` semantic誤認 | invalid UTF-8でsync失敗、ADR誤mirror | typed parserとgeneric parser分離、basename判定後のみbody read |
 | family横断slot競合 | duplicate identity / overwrite risk | common name-only slot ledger、shared create lock、infra no-replace |
@@ -597,7 +567,6 @@ Workbench shellのfresh-only/no-backfillはrequirementで十分に固定され�
 | root Artifact rule不整合 | rootだけauthoring guidanceなし | `docs/rules/root/artifacts.md`と初回setup symlink、root validate test |
 | scanner範囲拡大 | artifact directoryが大きい場合の遅延 | direct child name/statだけ、body/MIME/archiveを読まない |
 | rollback後Workbench露出 | untracked scratchが`git status`へ出る | ignore rule先行rollback、user content非削除 |
-| filesystem capability不足 | supported OSでもimportが常時fail | OS名でなくFD-bound no-replace / directory durability capabilityをprobeし、supported matrixのsuccess laneとfail-closed laneを配布testで固定 |
 
 ## 15. Requirement Clarification Requests
 
@@ -607,5 +576,21 @@ Workbench shellのfresh-only/no-backfillはrequirementで十分に固定され�
   - public generic resultからhash/byte countを一律除外する。
   - root Artifact rulesを追加する。
   - external判定が不確かなsourceは`basename_only`へ倒す。
-- resolved decision:
-  - D-006/D-008の長期contractは`artifacts/20260728t100038z-adr-generic-imported-file-identity-and-privacy-boundary.md`へ昇格し、accepted済みである。plan / IssueはこのADRを唯一のdecision recordとして参照し、候補として再判断しない。
+- main orchestrator判断候補:
+  - D-006/D-008をEpic-local ADRへ昇格するか。これはdesign採用のblocking clarificationではない。
+
+## 16. Integration Notes for Main Orchestrator
+
+- canonical `design.md`へはD-001〜D-009、boundary diagram、state model、file tree、test strategyを再記述して採用する。
+- 旧`epic-00312` designから採用するのはpublisher/reuse/opacity/manual copyのrepository-confirmed部分だけであり、Workbench lifecycle中心、Workbench-only import、title/slug、旧Issue再利用は採用しない。
+- ChatGPT ZIPは3 vertical slicesと高水準structureを参考にするが、self-authorityや旧Epic再利用は採用しない。
+- `report.md` EALへ本artifactの採否、source requirement hash、fresh design reviewer結果を記録する。
+- fresh `spec-reviewer` pass前にplanへ進めない。
+- fallback decision: delegated scope-local artifact authoringが利用可能だったためmanual `/private/tmp` draftは作成しなかった。
+- report evidence destination: `spec-dock/active/epic/report.md`のEvidence Adoption Ledger / Delegated Draft Evidence / Spec Authoring Gate。
+- adoption ledger note: `adoption_status=unreviewed`。main orchestratorが採否を決めるまで`reflected_to`は空のままにする。
+- diff guard: invocation前から存在したcanonical `requirement.md` / `report.md`の変更を除き、本roleが追加・編集したのは本artifact一件だけであることを`git status --short`とpath-targeted diffで確認した。
+- leaf evidence used: none。repo factsは本roleが直接確認した。
+- forbidden actions avoided: canonical docs、source、tests、package/config、GitHub issue、phase stateを変更していない。
+
+No canonical edit, final authority, promotion, reviewer-pass, or user-dialogue ownership is claimed.
