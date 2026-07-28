@@ -29,6 +29,8 @@ PlanningStatus = Literal[
 ReviewSeverity = Literal["p0", "p1", "p2", "p3"]
 ReviewVerdict = Literal["pass", "fail"]
 RevisionLane = Literal["semantic", "mechanical"]
+PlanningInvocationStatus = Literal["pass", "blocked", "rejected"]
+RemoteHeadDisposition = Literal["fetched_remote_tracking_ref"]
 
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -289,6 +291,118 @@ class PlanningContext:
             "canonical_issue_paths": list(self.canonical_issue_paths),
             "relevant_source_paths": list(self.relevant_source_paths),
             "operator_context": list(self.operator_context),
+        }
+
+
+@dataclass(frozen=True)
+class PlanningSourceEvidence:
+    repository: str
+    branch: str
+    upstream: str
+    local_head: str
+    remote_head: str
+    source_manifest_hash: str
+    snapshot_id: str
+    remote_head_disposition: RemoteHeadDisposition
+
+    def __post_init__(self) -> None:
+        repository = _repository(self.repository, field_name="repository")
+        branch = _non_empty(self.branch, field_name="branch")
+        upstream = _non_empty(self.upstream, field_name="upstream")
+        if upstream != f"origin/{branch}":
+            raise ValueError("upstream must be the current origin branch")
+        local_head = _sha(self.local_head, length=40, field_name="local_head")
+        remote_head = _sha(self.remote_head, length=40, field_name="remote_head")
+        if local_head != remote_head:
+            raise ValueError("local_head and remote_head must match")
+        if self.remote_head_disposition != "fetched_remote_tracking_ref":
+            raise ValueError("remote_head_disposition must be fetched_remote_tracking_ref")
+        object.__setattr__(self, "repository", repository)
+        object.__setattr__(self, "branch", branch)
+        object.__setattr__(self, "upstream", upstream)
+        object.__setattr__(self, "local_head", local_head)
+        object.__setattr__(self, "remote_head", remote_head)
+        object.__setattr__(
+            self,
+            "source_manifest_hash",
+            _sha(self.source_manifest_hash, length=64, field_name="source_manifest_hash"),
+        )
+        object.__setattr__(
+            self,
+            "snapshot_id",
+            _sha(self.snapshot_id, length=64, field_name="snapshot_id"),
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "repository": self.repository,
+            "branch": self.branch,
+            "upstream": self.upstream,
+            "local_head": self.local_head,
+            "remote_head": self.remote_head,
+            "source_manifest_hash": self.source_manifest_hash,
+            "snapshot_id": self.snapshot_id,
+            "remote_head_disposition": self.remote_head_disposition,
+        }
+
+
+@dataclass(frozen=True)
+class PlanningInvocationResult:
+    status: PlanningInvocationStatus
+    reason: str
+    source_evidence: PlanningSourceEvidence | None = None
+    backend_exit_code: int | None = None
+    response_bytes: int = 0
+    response_sha256: str | None = None
+    details: tuple[str, ...] = ()
+    transient_payload: bytes | None = field(default=None, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        allowed_reasons = {
+            "transport_received",
+            "git_preflight_blocked",
+            "github_upstream_required",
+            "upstream_branch_mismatch",
+            "planning_context_rejected",
+            "sensitive_input_rejected",
+            "backend_unavailable",
+            "backend_timeout",
+            "backend_nonzero",
+            "backend_output_missing",
+            "backend_response_partial",
+            "backend_response_malformed",
+        }
+        if self.status not in {"pass", "blocked", "rejected"}:
+            raise ValueError("invalid planning invocation status")
+        if self.reason not in allowed_reasons:
+            raise ValueError("invalid planning invocation reason")
+        if self.status == "pass" and self.reason != "transport_received":
+            raise ValueError("pass requires transport_received")
+        if self.response_bytes < 0:
+            raise ValueError("response_bytes must be non-negative")
+        if self.response_sha256 is not None:
+            object.__setattr__(
+                self,
+                "response_sha256",
+                _sha(self.response_sha256, length=64, field_name="response_sha256"),
+            )
+        if self.transient_payload is not None and not isinstance(self.transient_payload, bytes):
+            raise ValueError("transient_payload must be bytes")
+        object.__setattr__(
+            self,
+            "details",
+            _string_tuple(self.details, field_name="details"),
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "status": self.status,
+            "reason": self.reason,
+            "source_evidence": self.source_evidence.to_dict() if self.source_evidence else None,
+            "backend_exit_code": self.backend_exit_code,
+            "response_bytes": self.response_bytes,
+            "response_sha256": self.response_sha256,
+            "details": list(self.details),
         }
 
 

@@ -9,6 +9,16 @@ RUNTIME_SCRIPTS_DIR = (
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application.issue_planning import resolve_existing_issue_target  # noqa: E402
+from spec_dock_runtime.domain.authoring_pack.preflight_contract import (  # noqa: E402
+    FetchSummary,
+    FreshnessEvidence,
+    PreflightResult,
+    RepositorySnapshot,
+)
+from spec_dock_runtime.domain.authoring_pack.source_manifest import (  # noqa: E402
+    build_source_manifest,
+    empty_source_manifest,
+)
 from spec_dock_runtime.domain.issue_planning_contracts import ReviewedPlanningIdentity  # noqa: E402
 from spec_dock_runtime.infra.contracts import StoredMetaRecord  # noqa: E402
 
@@ -127,3 +137,231 @@ def test_resolve_existing_issue_rejects_missing_canonical_document(tmp_path: Pat
     (issue_dir / "plan.md").unlink()
     with pytest.raises(ValueError, match="incomplete"):
         resolve_existing_issue_target("iss-00003", [_record(issue_dir)], tmp_path)
+
+
+@pytest.mark.parametrize(
+    "blockers",
+    [
+        ("dirty_tracked",),
+        ("staged_changes",),
+        ("untracked_files",),
+        ("detached_head",),
+        ("remote_branch_missing",),
+        ("origin_fetch_failed",),
+        ("ahead_of_remote",),
+        ("behind_remote",),
+        ("diverged_from_remote",),
+        ("concurrent_repo_change",),
+    ],
+)
+def test_transport_short_circuits_backend_for_git_preflight_failures(
+    tmp_path: Path,
+    blockers: tuple[str, ...],
+) -> None:
+    issue_dir = _issue_tree(tmp_path)
+    backend_calls: list[object] = []
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_transport"],
+    )
+    run = module.run_issue_planning_transport
+    result = run(
+        issue="iss-00003",
+        records=[_record(issue_dir)],
+        repo_root=tmp_path,
+        role="planner",
+        preflight_runner=lambda request: _preflight(blockers=blockers),
+        repo_slug_resolver=lambda root: "owner/repo",
+        prompt_synthesizer=lambda **kwargs: object(),
+        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+    )
+    assert (result.status, result.reason) == ("blocked", "git_preflight_blocked")
+    assert result.details == blockers
+    assert backend_calls == []
+
+
+def test_transport_rejects_wrong_upstream_branch_before_backend(tmp_path: Path) -> None:
+    issue_dir = _issue_tree(tmp_path)
+    backend_calls: list[object] = []
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_transport"],
+    )
+    run = module.run_issue_planning_transport
+    result = run(
+        issue="iss-00003",
+        records=[_record(issue_dir)],
+        repo_root=tmp_path,
+        role="planner",
+        preflight_runner=lambda request: _preflight(upstream="origin/other"),
+        repo_slug_resolver=lambda root: "owner/repo",
+        prompt_synthesizer=lambda **kwargs: object(),
+        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+    )
+    assert (result.status, result.reason) == ("blocked", "upstream_branch_mismatch")
+    assert backend_calls == []
+
+
+def test_transport_rejects_non_github_origin_without_leaking_error(tmp_path: Path) -> None:
+    issue_dir = _issue_tree(tmp_path)
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_transport"],
+    )
+    run = module.run_issue_planning_transport
+    private_url = "/Users/alice/private/repository"
+
+    def reject_slug(root: Path) -> str:
+        raise RuntimeError(f"origin is not GitHub: {private_url}")
+
+    result = run(
+        issue="iss-00003",
+        records=[_record(issue_dir)],
+        repo_root=tmp_path,
+        role="planner",
+        preflight_runner=lambda request: _preflight(),
+        repo_slug_resolver=reject_slug,
+        prompt_synthesizer=lambda **kwargs: object(),
+        backend_invoker=lambda **kwargs: pytest.fail("backend must not run"),
+    )
+    assert (result.status, result.reason) == ("blocked", "github_upstream_required")
+    assert private_url not in repr(result)
+    assert private_url not in str(result.to_dict())
+
+
+def test_preflight_failure_redacts_unsafe_blocker_path_and_secret(tmp_path: Path) -> None:
+    issue_dir = _issue_tree(tmp_path)
+    private_value = "/Users/alice/private/token=abc123secret"
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_transport"],
+    )
+    result = module.run_issue_planning_transport(
+        issue="iss-00003",
+        records=[_record(issue_dir)],
+        repo_root=tmp_path,
+        role="planner",
+        preflight_runner=lambda request: _preflight(
+            blockers=(f"unsafe_source_path:absolute-outside-repo:{private_value}",)
+        ),
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("backend must not run"),
+    )
+    assert result.details == ("unsafe_source_path",)
+    assert private_value not in repr(result)
+    assert private_value not in str(result.to_dict())
+
+
+def test_transport_rejects_source_mutation_after_preflight_before_backend(tmp_path: Path) -> None:
+    issue_dir = _issue_tree(tmp_path)
+    source_paths = tuple(
+        sorted(
+            (
+                (issue_dir / "design.md").relative_to(tmp_path).as_posix(),
+                (issue_dir / "plan.md").relative_to(tmp_path).as_posix(),
+                (issue_dir / "requirement.md").relative_to(tmp_path).as_posix(),
+            ),
+            key=lambda value: value.encode("utf-8"),
+        )
+    )
+    manifest = build_source_manifest(tmp_path, source_paths)
+    backend_calls: list[object] = []
+
+    def mutate_then_synthesize(**kwargs):
+        (issue_dir / "plan.md").write_text("mutated after preflight", encoding="utf-8")
+        from spec_dock_runtime.application.issue_planning_prompt import (
+            synthesize_issue_planning_prompt,
+        )
+
+        return synthesize_issue_planning_prompt(**kwargs)
+
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_transport"],
+    )
+    result = module.run_issue_planning_transport(
+        issue="iss-00003",
+        records=[_record(issue_dir)],
+        repo_root=tmp_path,
+        role="planner",
+        preflight_runner=lambda request: _preflight(source_manifest=manifest),
+        repo_slug_resolver=lambda root: "owner/repo",
+        prompt_synthesizer=mutate_then_synthesize,
+        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+    )
+    assert (result.status, result.reason) == ("blocked", "git_preflight_blocked")
+    assert result.details == ("source_snapshot_mismatch",)
+    assert backend_calls == []
+
+
+def test_transport_sensitive_git_identity_rejection_does_not_leak_source_evidence(
+    tmp_path: Path,
+) -> None:
+    issue_dir = _issue_tree(tmp_path)
+    secret_branch = "token=abc123secret"
+    backend_calls: list[object] = []
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_transport"],
+    )
+    result = module.run_issue_planning_transport(
+        issue="iss-00003",
+        records=[_record(issue_dir)],
+        repo_root=tmp_path,
+        role="planner",
+        preflight_runner=lambda request: _preflight(
+            branch=secret_branch,
+            upstream=f"origin/{secret_branch}",
+        ),
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+    )
+    assert (result.status, result.reason) == ("rejected", "sensitive_input_rejected")
+    assert result.source_evidence is None
+    assert result.details == ()
+    assert backend_calls == []
+    assert secret_branch not in repr(result)
+    assert secret_branch not in str(result.to_dict())
+
+
+def _preflight(
+    *,
+    blockers: tuple[str, ...] = (),
+    branch: str = "feature/issue",
+    upstream: str = "origin/feature/issue",
+    source_manifest=None,
+) -> PreflightResult:
+    manifest = source_manifest or empty_source_manifest()
+    repository = RepositorySnapshot(
+        normalized_origin="github.com/owner/repo",
+        branch=branch,
+        local_head="a" * 40,
+        upstream=upstream,
+        effective_ref=branch,
+        remote_head="a" * 40,
+        remote_head_disposition="fetched_remote_tracking_ref",
+        worktree_state=blockers,
+        source_manifest=manifest,
+        snapshot_id="b" * 64,
+    )
+    return PreflightResult(
+        status="blocked" if blockers else "pass",
+        evidence_mode="github-synced",
+        sync_state="blocked" if blockers else "synced",
+        github_sync="failed" if blockers else "verified",
+        requested_ref=branch,
+        effective_ref=branch,
+        local_head="a" * 40,
+        remote_head="a" * 40,
+        source_manifest=manifest,
+        source_hash_mismatch_checked=False,
+        blockers=blockers,
+        fetch=FetchSummary(status="failed" if "origin_fetch_failed" in blockers else "success"),
+        freshness=FreshnessEvidence(
+            snapshot_id="b" * 64,
+            final_guard_snapshot_id="b" * 64,
+            concurrent_change_check="changed" if "concurrent_repo_change" in blockers else "stable",
+            remote_head_disposition="fetched_remote_tracking_ref",
+        ),
+        repository=repository,
+    )
