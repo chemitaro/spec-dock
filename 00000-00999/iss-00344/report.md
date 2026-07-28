@@ -73,6 +73,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-004 | adopted | ChatGPT requirement re-review (`FAIL`, advisory) | `requirement.md`, `report.md` | F-005 の残存 root-wide immutability を managed provider update 可能な境界へ修正し、F-006 の premature design promotion claim を撤回した | `artifacts/20260728t160531z-chatgpt-output-chatgpt-issue-00344-requirement-rereview.md`; SHA-256 `c0a35277c3f3322b16269bbf3d60d88043fbe8aa31da1ee9701ddf4b9c7f5ffb`; 7,890 bytes | commit / push 後に fresh ChatGPT re-review と fresh `spec-reviewer` review |
 | EAL-005 | adopted | ChatGPT requirement third review (`FAIL`, advisory) | `requirement.md`, `report.md` | F-007 を採用し、root/node checkout、node-scoped copy helper、root helper exclusion を明示した | `artifacts/20260728t162105z-chatgpt-output-chatgpt-issue-00344-requirement-third-review.md`; SHA-256 `48a0cd7dae46233be5e8283d7698a6460c2c20798c55553a6d6667ea1d9cf281`; 6,133 bytes | commit / push 後に fresh ChatGPT re-review と fresh `spec-reviewer` review |
 | EAL-006 | adopted | ChatGPT requirement final review (`PASS`, advisory) | `requirement.md`, `report.md` | commit `1087ea15` を connected GitHub app で確認した fresh review。blocking finding なし、F-007 と親 Epic / current copy contract の整合を確認した | `artifacts/20260728t164218z-chatgpt-output-chatgpt-issue-00344-requirement-final-review.md`; SHA-256 `756b70eb67743c7d4fa87ce98ee1e3acad9c97fefd00fd9ea192aab6beddca49`; 6,115 bytes | fresh `spec-reviewer` requirement review |
+| EAL-007 | adopted | fresh `spec-reviewer` requirement review (`PASS`) | `requirement.md`, `report.md` | P0/P1なし。P2のChatGPT external evidence / delegated draft lane誤分類を修正し、requirement phaseをapprovedとした | reviewer output on commit `2e0bb6ae`; `requirement.md`; Delegated Draft Evidence row | assurance classify / design compose |
+| EAL-008 | partially_adopted | ChatGPT planning candidate design section (`advisory`) | `design.md` | reviewed requirement、parent Epic、local sourceと照合し、freshness、template recursion、ignore、opacity、copy compatibility、distribution exact allowlist、docs責任をStandard designへ統合 | `artifacts/20260728t153458z-chatgpt-output-chatgpt-issue-00344-planning-candidate.md`; `.assurance.json` authorized profile `standard` | commit / push 後に ChatGPT design review と fresh `spec-reviewer` review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -80,7 +82,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | fresh root と future Initiative / Epic / Issue に tracked `.workbench/README.md` を含む optional shell を生成し、existing scope を backfill しない (`I344-RQ-001`〜`I344-RQ-005`) | semantic opacity、node-scoped `workbench copy` compatibility、package parity、generic import / PR delivery の sibling Issue 境界 (`I344-RQ-006`〜`I344-RQ-010`) | low: copy/import/package の副次境界は primary shell を成立させる guardrail に限定し、root copy や generic import 実装を本 Issue へ取り込んでいない | ChatGPT advisory pass; fresh `spec-reviewer` requirement verdict pending |
+| OAL-001 | fresh root と future Initiative / Epic / Issue に tracked `.workbench/README.md` を含む optional shell を生成し、existing scope を backfill しない (`I344-RQ-001`〜`I344-RQ-005`) | semantic opacity、node-scoped `workbench copy` compatibility、package parity、generic import / PR delivery の sibling Issue 境界 (`I344-RQ-006`〜`I344-RQ-010`) | low: copy/import/package の副次境界は primary shell を成立させる guardrail に限定し、root copy や generic import 実装を本 Issue へ取り込んでいない | pass: ChatGPT advisory PASS、fresh `spec-reviewer` PASS |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -88,8 +90,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | 親 Epic requirement/design/plan、provider source、package config、relevant tests、ChatGPT authoring/review Artifacts | F-001〜F-007 を canonical docs に反映。final ChatGPT review は blocking finding なし | partially_adopted | ChatGPT advisory passed; fresh `spec-reviewer` pending | yes | fresh `spec-reviewer` requirement review |
-| design | requirement review 後に開始 | requirement gate 待ち | none | pending | yes | requirement pass 後に assurance classify / compose |
+| requirement | 親 Epic requirement/design/plan、provider source、package config、relevant tests、ChatGPT authoring/review Artifacts | F-001〜F-007 を canonical docs に反映。final ChatGPT review は blocking finding なし | adopted | passed (ChatGPT advisory PASS; fresh `spec-reviewer` PASS, P2 non-blocking lane classification correction applied) | no | promote to assurance classify / design compose |
+| design | approved requirement、parent Epic、provider source、current copy / package contracts、ChatGPT planning candidate | blocking open question なし。copy implementation変更が必要ならdesignへ戻る | partially_adopted | pending | yes | commit / push 後に ChatGPT design review、その後 fresh `spec-reviewer` review |
 | plan | design review 後に開始 | design gate 待ち | none | pending | yes | design pass 後に作成 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
@@ -118,7 +120,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| ChatGPT advanced reasoning | iss-00344 | `artifacts/20260728t153458z-chatgpt-output-chatgpt-issue-00344-planning-candidate.md` | parent Epic docs; Issue scaffold; provider source; `pyproject.toml`; relevant tests | `requirement.md`, `design.md`, `plan.md` | partially_integrated | [`requirement.md`] | local source / parent scope checked | requirement candidate integrated | design / plan details are held until their phase gates | requirement review pending | pending | requirement review required |
+| 該当なし | iss-00344 | 該当なし | 該当なし | 該当なし | not used | [] | not_run | delegated draft lane 未使用。ChatGPT preserved external evidence は Evidence Adoption Ledger の EAL-001〜EAL-006 で管理 | 該当なし | なし | fresh `spec-reviewer` PASS | delegated draft promotion なし |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
