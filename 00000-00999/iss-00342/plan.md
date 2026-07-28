@@ -912,6 +912,14 @@ S99はpre-delivery readiness gateであり、S111/S120でしか観測できな�
 ### S123 Recovery final quality / final commit
 
 - Precondition: S121 code review pass、S122 QA pass、formal full Green。
+- S123 code reviewで、branch名にmetadata禁止語が含まれる場合はS121の`requested_ref`がref mismatchより先に拒否される同一環境依存bug classを検出した場合、次のbounded remediationだけを許可する。
+  - Allowed path: `tests/manual_tests/test_prepare_chatgpt_authoring_pack.py`のみ。
+  - `requested_ref`はbranch名を含めず、Gitが返す40桁hexのobserved HEADからsafe fixed-formatで構成し、observed ref/HEADの双方と異なることをassertする。
+  - focused nodeは`uv run pytest --run-full-regression -q -p no:cacheprovider tests/manual_tests/test_prepare_chatgpt_authoring_pack.py::test_requested_ref_mismatch_is_stale`で1 passed / policy skip 0を確認する。
+  - module bodyは`uv run pytest --run-full-regression -q -p no:cacheprovider tests/manual_tests/test_prepare_chatgpt_authoring_pack.py`でexpected 81 passed / policy skip 0を確認する。
+  - `make lint`、`git diff --check`を実行し、fresh `code-reviewer`を取得してtest-only remediation commitを作る。
+  - production、workflow、fixture、marker、skip/xfail、selectorは変更しない。
+  - S122 fullは再実行しない。formal full後のdeltaが上記test input構成だけであることをmanifest/diffで固定し、final `qa-reviewer`がS122 fullの再利用可能性とsecond-full禁止を確認する。
 - Required fresh reviewers: issue-wide `code-reviewer`、`qa-reviewer`、`spec-reviewer`。
 - Docs impact: command/workflow/operation contractは変えないためinspect-only。更新が必要というfindingがあれば`doc-writer`へ戻す。
 - Main orchestratorはrecovery evidence、review verdict、closure delta、external anchor destinationだけを`report.md`へ統合する。
@@ -1175,3 +1183,4 @@ Rollback:
 | 2026-07-28 | plan-R5 approval | fresh spec-reviewer findings 0 / pass（confidence 0.99）を受け、reviewer-passed executable planとしてapprovedへ昇格 | iwasawayuuta |
 | 2026-07-29 | S05 failed-attempt recovery amendment | current Issue snapshot欠落によるformal full Redを保持し、bounded snapshot correction、fresh S04、repaired SHAのnew 3-pair batch、pre-merge総上限4を定義 | iwasawayuuta |
 | 2026-07-29 | S120 post-merge regression recovery amendment | `main`固定のref-mismatch test Redを保持し、test-only S121、fix SHAのfull最大1回、fresh final reviews、新PR merge-preparationを定義 | iwasawayuuta |
+| 2026-07-29 | S123 final-review remediation amendment | branch名由来のmetadata拒否を同一環境依存bug classとして閉じ、HEAD hex由来のsafe mismatch、focused/module/lint、fresh review、second full禁止を定義 | iwasawayuuta |
