@@ -235,11 +235,13 @@ uv run pytest -q -p no:cacheprovider \
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
 | S00 | runtime guidanceがignored generated projectionをrefreshした可能性 | worker observation | D-005でtracked/canonical差分なしのdiagnostic side effectとして解決 | none | no | 実行前後`git status --short` clean |
+| S01 | new contract testsによりroot collectionが5件増加 | implementation | expected closure deltaとして記録 | `CLOS-TL-AC-002`,`CLOS-TL-AC-007` | no | C 2696→2701、F 661→666、H 2035据え置き。追加5件はlane contract tests |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
 | S00 | `CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | collection、required-fast、known flaky、coverage baselineをcurrent SHAで固定 | C=2696、node digest `07ac3d...859c`、marker inventory digest `b77e4a...a3af`、7 passed、1 passed、tracked diffなし、S00-R2 fresh review pass | pass | M0 commitとpost-commit cleanは後続欄で閉じる |
+| S01 | `CLOS-TL-AC-001`,`CLOS-TL-AC-002`,`CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-BH-001`,`CLOS-TL-BH-002` | partial-safe exactly-one classifier、global partition、required-fast、conflict、early marker visibility | active Red→Green、lane module 5 passed、required-fast 7 passed、C/F/H=2701/666/2035 | pass | fresh code-reviewerとM1a commit gateはpending |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -247,6 +249,12 @@ uv run pytest -q -p no:cacheprovider \
 | `CLOS-TL-AC-006` | S00 | yes | characterization-first + automated | research C=2696、required-fast 7 passed | collect-only + required-fast exact command | pass | current C=2696、required-fast 7 passed |
 | `CLOS-TL-AC-007` | S00 | yes | characterization-first + review | research baselineとknown flaky候補 | sorted node digest、marker inventory digest、known flaky exact command | pass | node digest `07ac3d...859c`、marker digest `b77e4a...a3af`、known flakyは1回pass、reviewはpending |
 | `CLOS-TL-CON-004` | S00 | yes | characterization-first + review | test weakening禁止 | `git status --short`、sorted node/marker inventory、focused result | pass | workerによるtest/config変更なし、reviewはpending |
+| `CLOS-TL-AC-001` | S01 | yes | red-required | classifier欠落のexpected Red | focused/H=0 contract test | pass | Red exit 1からGreen 1 passed。S02 command/policy部分は未実装 |
+| `CLOS-TL-AC-002` | S01 | yes | red-required | S00 C/F/H=2696/661/2035 | lane module + root F/H verifier | pass | C/F/H=2701/666/2035、U=0、overlap=0 |
+| `CLOS-TL-AC-006` | S01 | yes | automated | required-fast exact 7 baseline | root verifier + required-fast exact command | pass | required-fast 7 nodes∈F、7 passed |
+| `CLOS-TL-AC-007` | S01 | yes | red-required + review | S00 node/marker baseline | conflict/override negative tests + collection delta | pass | expected +5 lane testsのみ。fresh review pending |
+| `CLOS-TL-BH-001` | S01 | yes | red-required | classifierなし | focused classification contract | pass | partial-safe classificationを確認。execution policyはS02 owner |
+| `CLOS-TL-BH-002` | S01 | yes | red-required | H=2035 baseline | global verifier + marker selection | pass | H=2035を維持。full permissionはS02 owner |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -256,11 +264,16 @@ uv run pytest -q -p no:cacheprovider \
 | `CLOS-TL-AC-006` | S00 | C=2696、required-fast 7 passed | pass | current SHA `701b7ae5` |
 | `CLOS-TL-AC-007` | S00 | C=2696、sorted node digest `07ac3d...859c`、known flaky exact node pass | pass | SHA `701b7ae5`、Python 3.12.11、uv 0.11.24、macOS arm64、normalization pipelineを固定しcommitから再生成可能 |
 | `CLOS-TL-CON-004` | S00 | marker source 67行/digest `b77e4a...a3af`、marker collection skip=68/skipif=0/xfail=0、tracked source clean | pass | source occurrenceとparameterized item数は粒度が異なる。runtime skip数とは主張しない |
+| `CLOS-TL-AC-001` | S01 | focused Red→Green、H=0 subset成功 | pass | S02 command/policy closureは未完了 |
+| `CLOS-TL-AC-002` | S01 | C/F/H=2701/666/2035、U=0、overlap=0 | pass | global verifierのみがrepository completenessを要求 |
+| `CLOS-TL-AC-006` | S01 | required-fast 7 nodes∈F、7 passed | pass | exact inventory不変 |
+| `CLOS-TL-AC-007` | S01 | conflict/forbidden overrideはcollection nonzero、expected +5 test delta | pass | fresh review pending |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
 | none | `CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | `tc-s00-001`,`tc-s00-002` | same | required row、locked expectation、required、spec linkに変更なし | no | no |
+| added | `CLOS-TL-AC-002`,`CLOS-TL-AC-007` | `tc-s01-001`〜`tc-s01-004` | same | S01 contract test 5 itemsをfastへ追加。locked expectationとrequired-fast inventoryは不変 | no | no |
 
 #### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 `workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
@@ -288,11 +301,14 @@ read-only specialist consentと、scope-local `artifacts/` direct childへの限
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S00 | delegated | approved planがread-only baseline operatorを要求 | dev-coder | current SHAのcollection、required-fast、known flaky characterization | approved requirement/design/plan、research、`pyproject.toml`、`tests/**` | read-only commandsのみ | source/test/config/workflow/docs/report変更、full実行 | collect-only、required-fast 7、known flaky exact node、前後clean | C drift、required-fast欠落、unexpected failure、tracked write | command/exit/count/elapsed/SHA、risk、EVD note、Ledger Note | pass |
+| S01 | delegated | tests/hookとpytest configをrole/path分離してtest-first実装するapproved contract | dev-coder + bounded utility-worker | classifier contract testsとhook / marker registryとstrictness | approved requirement/design/plan、S00 evidence、current pytest config/tests | dev-coder: `tests/conftest.py`,`tests/unit/test_provider_test_lanes.py`; utility-worker: `pyproject.toml` | workflow/docs/Make/dependency、S02 option/policy、test weakening | active Red、lane module、root F/H collection、required-fast、ruff、TOML/help、diff check | unexpected Red、focused global guard、inventory変更、allowed外diff | role別changed files、Red/Green/Refactor、commands、risk、EVD note、no-material decision | implementation pass; reviewer pending |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S00 | dev-coder | current SHAのC、required-fast 7件、known flakyをread-onlyで再観測 | none | collect-only: 2696/exit 0; node/marker digests再生成一致; required-fast: 7 passed; known flaky: 1 passed | S00-R2 passed | known flakyの1回passは解消証拠ではない | evidence accepted。projection副作用はD-005でno_action |
+| S01 | dev-coder | classifier contractをRed-firstで追加しpartial-safe classifierをMinimal Green | `tests/conftest.py`,`tests/unit/test_provider_test_lanes.py` | Red exit1; Green active 1 passed; module 5 passed; required-fast 7 passed; C/F/H=2701/666/2035; ruff/diff pass | S01-R1 passed | future competing tryfirst hookはordering再検証が必要 | accepted。S02 option/policyは未実装を確認 |
+| S01 | utility-worker | pytest strict markersとfast/full marker registryだけを追加 | `pyproject.toml` | TOML parse、pytest help、diff check pass | S01-R1 passed | none | accepted。default `-m fast`、dependency、Make変更なし |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -325,11 +341,13 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | command-amendment-R1 | requirement / design / plan amendment review | spec-reviewer | fresh | passed | no | promote | direct ordinary pytest、explicit full permission、conditional policy skipへの改訂をcurrent bytesで確認。findings 0、confidence 0.99 |
 | S00-R1 | baseline characterization review | code-reviewer | historical | failed | no | blocked | countだけでは同数node入れ替えとskip/xfail差分を検出できず、baseline manifest evidenceが不足 |
 | S00-R2 | baseline characterization re-review | code-reviewer | fresh | passed | no | proceed to M0 commit | node digestとmarker inventory digestを独立再生成し一致。findings 0、confidence 0.99 |
+| S01-R1 | classifier / marker config review | code-reviewer | fresh | passed | no | proceed to M1a commit | partial safety、exactly-one、required-fast/heavy規則、early marker、strict config、S02非混入を確認。findings 0、confidence 0.99 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S00 / M0 | committed | baseline ledger commit | `ac67751b7b32297be88196cb0825d307518f6ae2` | `git status --short` -> clean | N/A | N/A | N/A | S00-R2 fresh code-reviewer pass、required evidence、commit、cleanを確認しResult Approval |
+| S01 / M1a | pending | classifier / marker config commit | pending | pending | N/A | N/A | N/A | fresh S01 code-reviewer pass後にcommit |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -343,14 +361,58 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 ---
 
-### セッションログ（2026-07-28 HH:MM - HH:MM）
+### セッションログ（2026-07-28 23:55 - 2026-07-29 00:05 JST）
 
 #### 対象
-- Step: ...
-- AC/EC: ...
+- Step: S01 Classifier / pytest marker config
+- AC/EC: AC-001、AC-002、AC-006、AC-007、BH-001、BH-002
+- 計画上の出典:
+  - `plan.md` section: `S01 Classifier / pytest marker config`
+  - concrete tests: `tc-s01-001`〜`tc-s01-004`
 
 #### 実施内容
-- ...
+- `dev-coder`が`tests/unit/test_provider_test_lanes.py`へobservable classifier contractをRed-firstで追加した。
+- bounded `utility-worker`が`pyproject.toml`へstrict markersと`fast` / `full_regression` registryだけを追加した。
+- `dev-coder`が`tests/conftest.py`へpartial-safe exactly-one classifierを実装し、required-fast、heavy prefixes、explicit conflict / forbidden override、early marker visibilityをGreenにした。
+
+#### Red / Green / verification
+
+```text
+Red:
+uv run pytest -q -p no:cacheprovider \
+  tests/unit/test_provider_test_lanes.py::test_focused_collection_does_not_require_global_inventory
+-> exit 1; S01 classifier is missing: tests/conftest.py
+
+Green:
+same command
+-> 1 passed in 0.09s
+
+uv run pytest -q -p no:cacheprovider tests/unit/test_provider_test_lanes.py
+-> 5 passed in 1.46s
+
+required-fast exact 7 nodes
+-> 7 passed in 1.94s
+
+root collect-only
+-> C=2701
+-m fast
+-> F=666, H deselected=2035
+-m full_regression
+-> H=2035, F deselected=666
+
+uv run ruff check tests/conftest.py tests/unit/test_provider_test_lanes.py
+-> All checks passed
+uv run ruff format --check tests/conftest.py tests/unit/test_provider_test_lanes.py
+-> 2 files already formatted
+git diff --check
+-> exit 0
+```
+
+#### Refactor / tidy
+
+- classificationは単一hookに限定し、global completeness verifierはcontract test側に保持した。
+- S02の`--run-full-regression`、conditional policy skip、permission処理は追加していない。
+- dependency、Make target、default `-m fast`、workflow/docs変更はない。
 
 ---
 
