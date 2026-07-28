@@ -3,7 +3,7 @@
 ID: "iss-00344"
 タイトル: "Workbench Shell Scaffolding"
 関連GitHub: ["#344"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-29"
 依存: ["requirement.md", "design.md"]
@@ -46,7 +46,7 @@ ID: "iss-00344"
 - [x] no-backfill、README-only tracking、semantic opacity、copy compatibility、distribution exact allowlistが設計で固定されている。
 - [x] `setup.py` custom `build_py` post-build pruneが既知の変更面に含まれる。
 - [x] report evidence destinationがある。
-- [ ] 本計画のChatGPT reviewとfresh `spec-reviewer` reviewがPASSするまでは実装へ進まない。
+- [x] 本計画のChatGPT reviewとfresh `spec-reviewer` reviewがPASSするまでは実装へ進まない。
 
 ## 2. 実装戦略（Implementation Strategy）
 
@@ -295,7 +295,7 @@ Green後、重複bytesを抽象化せず、test helperの局所整理だけを�
 Red test seeds:
 
 - `test_workbench_readme_assets_are_byte_identical_and_complete`
-- `test_fresh_init_creates_tracked_root_workbench_readme`
+- `test_fresh_init_creates_only_tracked_root_workbench_readme`
 - `test_update_and_force_init_do_not_backfill_workbench_readme`
 - `test_workbench_gitignore_tracks_only_top_level_readme`
 - `test_new_node_workbench_readme_matrix`
@@ -941,7 +941,7 @@ Final exit:
 - [x] report evidence destinationとstop conditionがある。
 - [x] Issue 346へのdeferred deliveryとhuman-only merge境界がある。
 - [x] ChatGPT plan review PASS。
-- [ ] fresh `spec-reviewer` plan review PASS。
+- [x] fresh `spec-reviewer` plan review PASS。
 
 ## 19. 変更履歴
 
