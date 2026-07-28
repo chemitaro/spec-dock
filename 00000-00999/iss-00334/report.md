@@ -320,7 +320,8 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - residual follow-upはorchestration-level Red 1件を追加し、1 failed／0 errorsを確認した。`sensitive_input_rejected`時だけunsafeな`source_evidence`をresultから除外し、safe pathとnon-sensitive failure evidenceを維持した。
 - post-fix focused laneは119 passed。親の独立再実行ではfocused＋S01 regression 147 passed、ruff、mypy、`validate` nodes=222、`git diff --check`がpassした。
 - 別fresh closure reviewはfindings 0、`review_status: pass`。P1-A／B／Cのclosure、safe source evidence維持、backend short-circuitを確認した。
-- S02 product implementation、required verification、fresh reviewは完了した。commit候補、push、post-commit clean／remote parity checkは未完了である。
+- S02 milestone commit `796a1ce4c8b4f2161f0d646cf45f3afc6aaf40e2`をoriginへpushし、local／remote parity、`git show --check`、post-commit clean worktreeを確認した。
+- S02 product implementation、required verification、fresh review、commit、push、post-commit clean／remote parity checkは完了した。S02をclosedとし、S03 ChatGPT具体化へ進める。
 - No material implementation decisions beyond the approved plan.
 | `chatgpt-use --followup iss00334-blue-planning-correction-r5` | same Blue conversationでauthoring継続。GitHub exact HEAD確認、replacement-ready blocks取得。follow-up selector evidenceは`resolved=(unavailable); verified=no` |
 | `./spec-dock/scripts/spec-dock validate` | pass。222 nodesを検証 |
@@ -342,7 +343,7 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 | second canonical correction snapshot | committed and published; fresh review failed | Requirement、Design、Plan、Assurance、Report、prior Red／Blue artifacts | `3fc0e61ef8425abc0b4a5488d51e7060b0ed03cc` | remote branch HEADとexact identicalをGitHub connectorで確認 | P1-17〜P1-19／P2-05 bounded correctionへ進む |
 | third bounded correction | authoring complete; commit pending | Requirement、Design、Plan、Report、new Red artifact、Assurance rebinding | pending — Main must record actual resulting full HEAD | integration後にvalidate、diff-check、assurance verify、clean checkを実行 | one immutable commitをpushし、actual resulting 40-character HEADで別fresh Red review |
 | S01 | committed | S01 allowed code／tests、mechanical artifact whitespace fix、report evidence | fresh code-reviewer pass | commit `c597bd146c1d68e619cdc1e24b1b76dd405fe36a`、origin push成功、post-commit clean、local／remote parity | S01 closed。S02 work packetへ進む |
-| S02 | commit candidate | S02 allowlisted runtime／Prompt resources／testsとreport evidence | final fresh code-reviewer pass、findings 0 | Red 34＋review Red 3＋residual Red 1をGreen。focused 119 passed、親再実行147 passed、S01/shared/Core／static／validate pass、17 pathsはS02 allowlist＋Main reportのみ | focused commit／push／post-commit clean／remote parityでS02をclose |
+| S02 | committed | S02 allowlisted runtime／Prompt resources／testsとreport evidence | final fresh code-reviewer pass、findings 0 | commit `796a1ce4c8b4f2161f0d646cf45f3afc6aaf40e2`、origin push成功、post-commit clean、local／remote parity | S02 closed。S03 ChatGPT work packetへ進む |
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
