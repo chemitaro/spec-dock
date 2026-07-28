@@ -1,5 +1,9 @@
+from datetime import datetime, timezone
+import hashlib
+import json
 from pathlib import Path
 import sys
+import zipfile
 
 import pytest
 
@@ -20,7 +24,10 @@ from spec_dock_runtime.domain.authoring_pack.source_manifest import (  # noqa: E
     empty_source_manifest,
 )
 from spec_dock_runtime.domain.issue_planning_contracts import ReviewedPlanningIdentity  # noqa: E402
-from spec_dock_runtime.infra.contracts import StoredMetaRecord  # noqa: E402
+from spec_dock_runtime.infra.contracts import (  # noqa: E402
+    DirectDependencyResolution,
+    StoredMetaRecord,
+)
 
 
 def _record(path: Path, *, node_id: str = "iss-00003", kind: str = "issue") -> StoredMetaRecord:
@@ -53,6 +60,82 @@ def _issue_tree(repo_root: Path) -> Path:
     for filename in ("requirement.md", "design.md", "plan.md"):
         (issue_dir / filename).write_text(filename, encoding="utf-8")
     return issue_dir
+
+
+def _planning_document(filename: str, *, issue_id: str = "iss-00003") -> bytes:
+    kind = {
+        "requirement.md": "要件定義書（Issue）",
+        "design.md": "設計書（Issue）",
+        "plan.md": "実装計画書（Issue）",
+    }[filename]
+    dependency = {
+        "requirement.md": "",
+        "design.md": '依存: ["requirement.md"]\n',
+        "plan.md": '依存: ["requirement.md", "design.md"]\n',
+    }[filename]
+    return (
+        "---\n"
+        f"種別: {kind}\n"
+        f'ID: "{issue_id}"\n'
+        'タイトル: "Issue"\n'
+        '状態: "approved"\n'
+        '作成者: "Author"\n'
+        '最終更新: "2026-07-27"\n'
+        f"{dependency}"
+        '親: ["epic-00002", "init-00001"]\n'
+        "---\n\n"
+        f"# {issue_id} Issue\n\n"
+        "## Section\n\n"
+        "Substantive content.\n"
+    ).encode()
+
+
+def _planning_tree(repo_root: Path) -> Path:
+    issue_dir = _issue_tree(repo_root)
+    for filename in ("requirement.md", "design.md", "plan.md"):
+        (issue_dir / filename).write_bytes(_planning_document(filename))
+    return issue_dir
+
+
+def _planner_payload() -> bytes:
+    chunks: list[bytes] = []
+    filenames = ("requirement.md", "design.md", "plan.md")
+    for index, filename in enumerate(filenames):
+        chunks.extend(
+            (
+                f"<<<SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={filename}>>>\n".encode(),
+                _planning_document(filename),
+                f"<<<END-SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={filename}>>>".encode()
+                + (b"\n" if index < len(filenames) - 1 else b""),
+            )
+        )
+    return b"".join(chunks)
+
+
+def _successful_transport(payload: bytes | None = None):
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["PlanningInvocationResult", "PlanningSourceEvidence"],
+    )
+    value = payload or _planner_payload()
+    evidence = contracts.PlanningSourceEvidence(
+        repository="owner/repo",
+        branch="feature/issue",
+        upstream="origin/feature/issue",
+        local_head="a" * 40,
+        remote_head="a" * 40,
+        source_manifest_hash="c" * 64,
+        snapshot_id="b" * 64,
+        remote_head_disposition="fetched_remote_tracking_ref",
+    )
+    return contracts.PlanningInvocationResult(
+        status="pass",
+        reason="transport_received",
+        source_evidence=evidence,
+        response_bytes=len(value),
+        response_sha256=hashlib.sha256(value).hexdigest(),
+        transient_payload=value,
+    )
 
 
 def test_resolve_existing_issue_returns_parents_and_exact_three_paths(tmp_path: Path) -> None:
@@ -322,6 +405,244 @@ def test_transport_sensitive_git_identity_rejection_does_not_leak_source_evidenc
     assert backend_calls == []
     assert secret_branch not in repr(result)
     assert secret_branch not in str(result.to_dict())
+
+
+def test_current_front_matter_inconsistency_short_circuits_backend(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    (issue_dir / "plan.md").write_bytes(_planning_document("plan.md", issue_id="iss-99999"))
+    output = tmp_path / "output"
+    output.mkdir()
+    backend_calls: list[object] = []
+    result = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    ).run_issue_planning_create(
+        request=__import__(
+            "spec_dock_runtime.application.issue_planning",
+            fromlist=["PlanningCreateRequest"],
+        ).PlanningCreateRequest("iss-00003", output),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+    )
+    assert (result.status, result.reason) == ("rejected", "planning_context_rejected")
+    assert backend_calls == []
+
+
+def test_create_maps_s02_nonpass_without_candidate_work(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "output"
+    output.mkdir()
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["PlanningInvocationResult"],
+    )
+    publisher_calls: list[object] = []
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    )
+    result = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", output),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=lambda **kwargs: contracts.PlanningInvocationResult(
+            status="blocked",
+            reason="backend_timeout",
+        ),
+        publisher=lambda **kwargs: publisher_calls.append(kwargs),
+    )
+    assert (result.status, result.reason) == ("blocked", "backend_timeout")
+    assert publisher_calls == []
+
+
+def test_create_rejects_transient_payload_digest_mismatch(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "output"
+    output.mkdir()
+    transport = _successful_transport()
+    object.__setattr__(transport, "response_sha256", "d" * 64)
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    )
+    result = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", output),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=lambda **kwargs: transport,
+    )
+    assert (result.status, result.reason) == ("rejected", "planner_response_rejected")
+    assert list(output.iterdir()) == []
+
+
+def test_create_returns_ok_candidate_created_only_after_atomic_publication(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "output"
+    output.mkdir()
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    )
+    result = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", output),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=lambda **kwargs: _successful_transport(),
+        clock=lambda: datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc).isoformat(),
+    )
+    assert (result.status, result.reason) == ("ok", "candidate_created")
+    identity = result.output["candidate_identity"]
+    final = output / identity["logical_filename"]
+    assert final.is_file()
+    assert hashlib.sha256(final.read_bytes()).hexdigest() == identity["zip_sha256"]
+
+
+def test_create_success_output_has_only_safe_keys(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "output"
+    output.mkdir()
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    )
+    result = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", output),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=lambda **kwargs: _successful_transport(),
+        clock=lambda: "2026-07-28T12:00:00+00:00",
+    )
+    assert set(result.output) == {"candidate_identity", "zip_byte_count"}
+    assert str(output) not in str(result.to_dict())
+    assert _planner_payload().decode() not in str(result.to_dict())
+
+
+def test_unsupported_atomic_publication_leaves_final_absent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "output"
+    output.mkdir()
+    infra = __import__(
+        "spec_dock_runtime.infra.issue_planning_candidate",
+        fromlist=["atomic_publish_no_replace"],
+    )
+
+    def unsupported(source: Path, destination: Path) -> None:
+        raise NotImplementedError
+
+    monkeypatch.setattr(infra, "atomic_publish_no_replace", unsupported)
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    )
+    result = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", output),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        transport_runner=lambda **kwargs: _successful_transport(),
+        clock=lambda: "2026-07-28T12:00:00+00:00",
+    )
+    assert (result.status, result.reason) == ("blocked", "candidate_publication_failed")
+    assert list(output.iterdir()) == []
+
+
+def test_atomic_publication_collision_preserves_existing_candidate_bytes(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "output"
+    output.mkdir()
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    )
+    arguments = {
+        "request": module.PlanningCreateRequest("iss-00003", output),
+        "records": [_record(issue_dir)],
+        "repo_root": repo,
+        "repo_slug_resolver": lambda root: "owner/repo",
+        "backend_invoker": lambda **kwargs: None,
+        "transport_runner": lambda **kwargs: _successful_transport(),
+        "clock": lambda: "2026-07-28T12:00:00+00:00",
+    }
+    first = module.run_issue_planning_create(**arguments)
+    candidate = output / first.output["candidate_identity"]["logical_filename"]
+    before = candidate.read_bytes()
+    second = module.run_issue_planning_create(**arguments)
+    assert (second.status, second.reason) == ("rejected", "output_collision")
+    assert candidate.read_bytes() == before
+    assert len(list(output.iterdir())) == 1
+
+
+def test_create_uses_one_dependency_snapshot_for_transport_and_source_baseline(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "output"
+    output.mkdir()
+    loader_calls: list[str] = []
+    transport_dependencies: list[str] = []
+
+    def changing_loader(issue_id: str) -> list[DirectDependencyResolution]:
+        loader_calls.append(issue_id)
+        resolved = "iss-00001" if len(loader_calls) == 1 else "iss-00002"
+        return [DirectDependencyResolution(raw_ref=resolved, resolved_node_id=resolved)]
+
+    def transport_runner(**kwargs):
+        dependencies = kwargs["dependency_loader"]("iss-00003")
+        transport_dependencies.extend(item.resolved_node_id for item in dependencies)
+        return _successful_transport()
+
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    )
+    result = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", output),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        dependency_loader=changing_loader,
+        transport_runner=transport_runner,
+        clock=lambda: "2026-07-28T12:00:00+00:00",
+    )
+    candidate = output / result.output["candidate_identity"]["logical_filename"]
+    internal_root = result.output["candidate_identity"]["internal_root"]
+    with zipfile.ZipFile(candidate) as archive:
+        baseline = json.loads(archive.read(f"{internal_root}/SOURCE-BASELINE.json"))
+    assert loader_calls == ["iss-00003"]
+    assert baseline["dependency_ids"] == transport_dependencies == ["iss-00001"]
 
 
 def _preflight(

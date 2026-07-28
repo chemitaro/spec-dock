@@ -124,3 +124,24 @@ def test_synthesize_prompt_scans_complete_dynamic_identity_block(tmp_path: Path)
             upstream="/private/host/repository",
             remote_head="a" * 40,
         )
+
+
+def test_planner_prompt_contains_exact_inner_document_contract(tmp_path: Path) -> None:
+    _write_context_files(tmp_path)
+    prompt = issue_planning_prompt.synthesize_issue_planning_prompt(
+        role="planner",
+        context=_context(),
+        repo_root=tmp_path,
+        upstream="origin/feature/issue",
+        remote_head="a" * 40,
+    ).prompt
+    filenames = ("requirement.md", "design.md", "plan.md")
+    positions: list[int] = []
+    for filename in filenames:
+        start = f"<<<SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={filename}>>>"
+        end = f"<<<END-SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={filename}>>>"
+        assert prompt.count(start) == 1
+        assert prompt.count(end) == 1
+        positions.append(prompt.index(start))
+    assert positions == sorted(positions)
+    assert "no prose" in prompt.lower()

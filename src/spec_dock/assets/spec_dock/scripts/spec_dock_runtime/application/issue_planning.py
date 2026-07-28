@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import hashlib
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
     GitHubSyncPreflightRequest,
@@ -11,10 +12,28 @@ from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
 )
 from spec_dock_runtime.application.issue_planning_prompt import synthesize_issue_planning_prompt
 from spec_dock_runtime.domain.ids import normalize_id_input
+from spec_dock_runtime.domain.issue_planning_candidate import (
+    DOCUMENT_NAMES,
+    build_candidate_material,
+    parse_current_front_matter_baseline,
+    parse_planner_payload,
+)
 from spec_dock_runtime.domain.issue_planning_contracts import (
+    PlanningCommandResult,
     PlanningContext,
     PlanningInvocationResult,
     PlanningSourceEvidence,
+)
+from spec_dock_runtime.infra.clock import now_iso
+from spec_dock_runtime.infra.issue_planning_candidate import (
+    CandidateArchiveRejected,
+    CandidateBuildFailed,
+    CandidateCollision,
+    CandidateOutputRejected,
+    CandidatePublicationFailed,
+    PublishedCandidate,
+    build_and_publish_candidate,
+    validate_candidate_output_directory,
 )
 
 if TYPE_CHECKING:
@@ -271,6 +290,190 @@ def run_issue_planning_transport(
         source_evidence=source_evidence,
         synthesized=synthesized,
         timeout_seconds=timeout_seconds,
+    )
+
+
+def run_issue_planning_create(
+    *,
+    request: PlanningCreateRequest,
+    records: Sequence[StoredMetaRecord],
+    repo_root: Path,
+    repo_slug_resolver: Callable[[Path], str | None],
+    backend_invoker: Callable[..., PlanningInvocationResult],
+    dependency_loader: Callable[[str], Sequence[DirectDependencyResolution]] | None = None,
+    relevant_source_paths: Sequence[str] = (),
+    operator_context: Sequence[str] = (),
+    timeout_seconds: float | None = None,
+    preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult] = run_github_sync_preflight,
+    prompt_synthesizer: Callable[..., Any] = synthesize_issue_planning_prompt,
+    transport_runner: Callable[..., PlanningInvocationResult] = run_issue_planning_transport,
+    publisher: Callable[..., PublishedCandidate] = build_and_publish_candidate,
+    clock: Callable[[], str] = now_iso,
+) -> PlanningCommandResult:
+    try:
+        target = resolve_existing_issue_target(request.issue_id, records, repo_root)
+        current_documents = {
+            name: (repo_root / next(
+                path for path in target.canonical_issue_paths if Path(path).name == name
+            )).read_bytes()
+            for name in DOCUMENT_NAMES
+        }
+        baseline = parse_current_front_matter_baseline(current_documents)
+        if (
+            baseline.issue_id != target.issue_id
+            or baseline.parents != (target.parent_epic_id, target.parent_initiative_id)
+        ):
+            raise ValueError("current front matter does not match the existing Issue target")
+    except (OSError, UnicodeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="planning_context_rejected",
+            issue_id=request.issue_id,
+        )
+    try:
+        output_guard = validate_candidate_output_directory(request.output_dir, repo_root)
+    except CandidateOutputRejected:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="candidate_output_rejected",
+            issue_id=target.issue_id,
+        )
+
+    dependency_snapshot: tuple[DirectDependencyResolution, ...] | None = None
+
+    def load_dependency_snapshot(issue_id: str) -> tuple[DirectDependencyResolution, ...]:
+        nonlocal dependency_snapshot
+        if issue_id != target.issue_id:
+            raise ValueError("dependency snapshot requested for a different Issue")
+        if dependency_snapshot is None:
+            dependency_snapshot = tuple(dependency_loader(issue_id)) if dependency_loader else ()
+        return dependency_snapshot
+
+    transport = transport_runner(
+        issue=target.issue_id,
+        records=records,
+        repo_root=repo_root,
+        role="planner",
+        repo_slug_resolver=repo_slug_resolver,
+        backend_invoker=backend_invoker,
+        dependency_loader=load_dependency_snapshot,
+        relevant_source_paths=relevant_source_paths,
+        operator_context=operator_context,
+        timeout_seconds=timeout_seconds,
+        preflight_runner=preflight_runner,
+        prompt_synthesizer=prompt_synthesizer,
+    )
+    if transport.status != "pass":
+        return PlanningCommandResult(
+            status=cast("Literal['blocked', 'rejected']", transport.status),
+            reason=transport.reason,
+            issue_id=target.issue_id,
+            details=transport.details,
+        )
+    payload = transport.transient_payload
+    if (
+        transport.reason != "transport_received"
+        or transport.source_evidence is None
+        or payload is None
+        or transport.response_sha256 is None
+        or hashlib.sha256(payload).hexdigest() != transport.response_sha256
+    ):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="planner_response_rejected",
+            issue_id=target.issue_id,
+        )
+    try:
+        planner_documents = parse_planner_payload(payload)
+    except (UnicodeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="planner_response_rejected",
+            issue_id=target.issue_id,
+        )
+    operation_time = datetime.fromisoformat(clock().replace("Z", "+00:00"))
+    try:
+        dependencies = load_dependency_snapshot(target.issue_id)
+        context = PlanningContext(
+            issue_id=target.issue_id,
+            repository=transport.source_evidence.repository,
+            branch=transport.source_evidence.branch,
+            source_head=transport.source_evidence.local_head,
+            parent_epic_id=target.parent_epic_id,
+            parent_initiative_id=target.parent_initiative_id,
+            dependency_summary=tuple(
+                sorted(
+                    {resolution.resolved_node_id for resolution in dependencies},
+                    key=lambda value: value.encode("utf-8"),
+                )
+            ),
+            canonical_issue_paths=target.canonical_issue_paths,
+            relevant_source_paths=tuple(
+                sorted(set(relevant_source_paths), key=lambda value: value.encode("utf-8"))
+            ),
+            operator_context=tuple(
+                sorted(set(operator_context), key=lambda value: value.encode("utf-8"))
+            ),
+        )
+        material = build_candidate_material(
+            planner_documents=planner_documents,
+            baseline=baseline,
+            context=context,
+            source_evidence=transport.source_evidence,
+            planner_payload=payload,
+            operation_time=operation_time,
+        )
+    except (UnicodeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="planner_response_rejected",
+            issue_id=target.issue_id,
+        )
+    try:
+        published = publisher(
+            output_guard=output_guard,
+            repo_root=repo_root,
+            material=material,
+        )
+    except CandidateCollision:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="output_collision",
+            issue_id=target.issue_id,
+        )
+    except CandidateArchiveRejected as error:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="archive_rejected",
+            issue_id=target.issue_id,
+            details=error.findings,
+        )
+    except CandidateBuildFailed:
+        return PlanningCommandResult(
+            status="blocked",
+            reason="candidate_build_failed",
+            issue_id=target.issue_id,
+        )
+    except CandidatePublicationFailed:
+        return PlanningCommandResult(
+            status="blocked",
+            reason="candidate_publication_failed",
+            issue_id=target.issue_id,
+        )
+    except CandidateOutputRejected:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="candidate_output_rejected",
+            issue_id=target.issue_id,
+        )
+    return PlanningCommandResult(
+        status="ok",
+        reason="candidate_created",
+        issue_id=target.issue_id,
+        output={
+            "candidate_identity": published.identity.to_dict(),
+            "zip_byte_count": published.zip_byte_count,
+        },
     )
 
 
