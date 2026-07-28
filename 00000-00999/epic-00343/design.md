@@ -17,7 +17,7 @@ ID: "epic-00343"
 
 | Requirement | 設計上の受け皿 |
 |---|---|
-| E-RQ-001〜007 | fresh init判定、node template marker、Git ignore rule、既存opaque traversal、manual-only `workbench copy` |
+| E-RQ-001〜007 | fresh init判定、Workbench guidance README、Git ignore rule、既存opaque traversal、manual-only `workbench copy` |
 | E-RQ-008〜012 | 独立`artifact import file` command、root/node target resolver、repo-root relative resolution、explicit-file source guard |
 | E-RQ-013〜018 | FD identity固定、既存byte-preserving publisher、global slot allocator、generic `--` filename、publication state、privacy mapper |
 | E-RQ-019〜020 | no-sidecar/no-canonical mutation、name-only validation、ADR mirrorからのsemantic isolation |
@@ -26,7 +26,7 @@ ID: "epic-00343"
 
 主要なE-AC traceは次の通りである。
 
-- E-AC-001〜007: installer fresh-state fixture、node create matrix、`git check-ignore`、no-backfill mutation matrix、opacity、manual copy regression。
+- E-AC-001〜007: installer fresh-state fixture、README content/parity、node create matrix、`git check-ignore`、no-backfill mutation matrix、opacity、manual copy regression。
 - E-AC-008〜016: command/application/domain/infra/presentationのtarget/source/file-form/collision/publication/privacy matrix。
 - E-AC-017〜020: validate/sync opacity、compatibility、candidate wheelのfresh/update consumer、dogfood parityとfull regression。
 
@@ -34,9 +34,9 @@ ID: "epic-00343"
 
 ### 2.1 現行Workbench境界
 
-- `src/spec_dock/assets/spec_dock/.gitignore`は現在`.workbench/`全体をignoreするため、tracked shell markerを再包含できない。
+- `src/spec_dock/assets/spec_dock/.gitignore`は現在`.workbench/`全体をignoreするため、tracked shell READMEを再包含できない。
 - `src/spec_dock/cli.py::_install_spec_dock`はfresh initとupdateの双方から呼ばれ、`force`だけではfreshかexistingかを表せない。関数冒頭でwrite前の`specdock_dir`存在を観測しなければno-backfillを守れない。
-- future Initiative / Epic / Issueは`application/create_node.py::execute_create_plan`からkind別template treeをcopyする。`_scaffold_file_paths`と`infra/template_scaffolder.py::copy_scaffolded_tree`はhidden fileも通常fileとして扱うため、各node templateへの`.workbench/.gitkeep`追加だけでplanned pathと実fileを一致させられる。
+- future Initiative / Epic / Issueは`application/create_node.py::execute_create_plan`からkind別template treeをcopyする。`_scaffold_file_paths`と`infra/template_scaffolder.py::copy_scaffolded_tree`はhidden directory内の通常fileも扱うため、各node templateへの`.workbench/README.md`追加でplanned pathと実fileを一致させられる。
 - `.workbench`のsemantic opacityは`infra/fs_repo.py`、`application/delegated_authoring.py`、`application/delete_node.py`、authoring source manifestなどでtop-down prune済みである。本Epicはこの境界を緩めない。
 - `application/workbench.py::workbench_copy`と`infra/fs_cli.py::copy_workbench`はexplicit one-shot source-wins helperとして存在する。自動hookや同期を追加する必要はない。
 
@@ -51,28 +51,53 @@ ID: "epic-00343"
 
 ## 3. Design Decisions
 
-### D-001 Fresh-only shell generation
+### D-001 Fresh-only guidance shell generation
 
-`_install_spec_dock`の最初に`fresh_specdock = not os.path.lexists(specdock_dir)`を固定し、managed asset copy後、`fresh_specdock`のときだけ`spec-dock/.workbench/.gitkeep`を作る。`update`、existing workspaceへの`init --force`、通常runtime commandからこの処理を呼ばない。
+意味のないempty markerは使わず、次の4 provider assetsへbyte-identicalな`.workbench/README.md`を置く。
 
-Initiative / Epic / Issueは、次のprovider templatesへempty `.workbench/.gitkeep`を追加する。
+- `src/spec_dock/assets/spec_dock/templates/root/.workbench/README.md`
+- `src/spec_dock/assets/spec_dock/templates/initiative/.workbench/README.md`
+- `src/spec_dock/assets/spec_dock/templates/epic/.workbench/README.md`
+- `src/spec_dock/assets/spec_dock/templates/issue/.workbench/README.md`
 
-- `src/spec_dock/assets/spec_dock/templates/initiative/.workbench/.gitkeep`
-- `src/spec_dock/assets/spec_dock/templates/epic/.workbench/.gitkeep`
-- `src/spec_dock/assets/spec_dock/templates/issue/.workbench/.gitkeep`
+`templates/root`はfresh root Workbench shell専用のprovider assetとする。`_install_spec_dock`の最初に`fresh_specdock = not os.path.lexists(specdock_dir)`を固定し、managed asset copy後、`fresh_specdock`のときだけroot templateのREADMEを`spec-dock/.workbench/README.md`へcopyする。`update`、existing workspaceへの`init --force`、通常runtime commandからroot copyを呼ばない。
 
-これによりnew nodeのcreate plan、collision preflight、result pathsがmarkerを自然に含む。既存ancestor/siblingを走査してmarkerを補う処理は作らない。
+Initiative / Epic / Issueは既存kind別template treeのcopyでREADMEを生成する。これによりnew nodeのcreate plan、collision preflight、result pathsへREADMEが自然に含まれる。既存ancestor / siblingを走査してREADMEを補う処理は作らない。
 
-### D-002 Tracked marker / ignored contents
+4 READMEのcanonical guidance contractは同一で、少なくとも次の内容を平易なMarkdownで記載する。
+
+```markdown
+# SpecDock Workbench
+
+This directory is a temporary, worktree-local workspace.
+
+- `README.md` is the only file here intended for Git tracking.
+- Other files are ignored by Git and are not canonical SpecDock state.
+- Files may be discarded when this worktree is removed.
+- To preserve one file, explicitly import it into the target `artifacts/`
+  directory with `spec-dock artifact import file`.
+- Workbench files are not copied or synchronized automatically. Use the
+  manual `workbench copy` command only when needed.
+- Git ignore is not a security boundary. Do not store prohibited secrets here.
+- Models and tools must not treat Workbench files as canonical input.
+  Explicitly naming a file only authorizes reading or importing it as evidence;
+  canonical adoption is a separate reviewed workflow.
+```
+
+wordingの軽微な改善は許容するが、E-RQ-003の7要素を削除しない。4 assetsのbyte parityをtestで固定し、node kindごとの説明driftを防ぐ。
+
+### D-002 Tracked README / ignored contents
 
 provider `.gitignore`と`src/spec_dock/cli.py::_DEFAULT_SPEC_DOCK_GITIGNORE`の`.workbench/`を次へ置換する。
 
 ```gitignore
 **/.workbench/*
-!**/.workbench/.gitkeep
+!**/.workbench/README.md
 ```
 
-Workbench directory自体をignoreせず、その直下entryをignoreすることで、top-level `.gitkeep`だけを再包含する。ignored child directoryはそのsubtree全体をignoreする。near-name `.workbench-notes`等は一致しない。updateはignore contractだけを配布し、既存scopeへmarkerを作らない。
+Workbench directory自体をignoreせず、その直下entryをignoreすることで、top-level `README.md`だけを再包含する。ignored child directoryはそのsubtree全体をignoreする。nested `README.md`、case variant `readme.md`、near-name `.workbench-notes`は再包含しない。updateはignore contractとprovider template assetsだけを配布し、existing scopeの`.workbench/`へREADMEをcopyしない。
+
+READMEはGit guidanceであってsemantic sourceではない。既存top-down Workbench pruneを維持し、validate / sync / dependency / ADR / authoring default discoveryはREADMEを含むWorkbench subtreeを読まない。利用者がgeneric importの`--file`でREADMEまたは別fileを明示した場合だけ、read/importのexplicit source authorizationとして扱う。この指定とimport結果はevidence-onlyであり、canonical adoptionには別のreviewed workflowが必要である。
 
 ### D-003 Generic import is an additive use case
 
@@ -431,11 +456,11 @@ Invariant:
 ## 9. File / Module Change Plan
 
 ```text
-pyproject.toml                                                 # Modify: 3 template `.workbench/.gitkeep`の明示package-data
+pyproject.toml                                                 # Modify: 4 Workbench READMEの明示package-dataと広域README除外の限定化
 src/spec_dock/
-├── cli.py                                                     # Modify: fresh root marker判定、default ignore
+├── cli.py                                                     # Modify: fresh root README copy判定、default ignore
 └── assets/spec_dock/
-    ├── .gitignore                                             # Modify: marker再包含とcontents ignore
+    ├── .gitignore                                             # Modify: README再包含とcontents ignore
     ├── docs/
     │   ├── README.md                                          # Modify: public command要約
     │   ├── guide.md                                           # Modify: shell/import/manual-copy境界
@@ -443,9 +468,10 @@ src/spec_dock/
     │   ├── reference_worktree.md                              # Modify: manual-only copy positioning
     │   └── rules/root/artifacts.md                            # Add: root Artifact evidence rules
     ├── templates/
-    │   ├── initiative/.workbench/.gitkeep                     # Add: future Initiative shell
-    │   ├── epic/.workbench/.gitkeep                           # Add: future Epic shell
-    │   └── issue/.workbench/.gitkeep                          # Add: future Issue shell
+    │   ├── root/.workbench/README.md                           # Add: fresh root guidance source
+    │   ├── initiative/.workbench/README.md                     # Add: future Initiative shell
+    │   ├── epic/.workbench/README.md                           # Add: future Epic shell
+    │   └── issue/.workbench/README.md                          # Add: future Issue shell
     └── scripts/spec_dock_runtime/
         ├── cli/
         │   ├── parser.py                                      # Modify: artifact import file leaf
@@ -463,14 +489,14 @@ src/spec_dock/
 tests/
 ├── unit/
 │   ├── infra/
-│   │   ├── test_init_update.py                                # Modify: fresh/no-backfill/package marker
+│   │   ├── test_init_update.py                                # Modify: fresh/no-backfill/package README
 │   │   └── test_binary_artifact_publisher.py                  # Modify: external/ancestor symlink/faults
 │   ├── domain/test_artifacts.py                               # Modify: generic grammar/global slots/normalization
 │   ├── application/test_import_file_artifact.py               # Add: targets/states/privacy
 │   ├── commands/test_artifact_import_file.py                  # Add: CLI cardinality
 │   └── presentation/test_artifact_import_file.py              # Add: full privacy mapping
 └── cli_runtime/
-    ├── test_runtime_new_doc_s09.py                            # Modify: future node marker + cross-family slot
+    ├── test_runtime_new_doc_s09.py                            # Modify: future node README + cross-family slot
     ├── test_artifact_import_chatgpt_output.py                 # Read/verify: compatibility
     ├── test_artifact_import_s04.py                            # Read/verify: publisher compatibility
     └── test_artifact_import_file.py                           # Add: root/node/file-form/opaque lifecycle
@@ -478,20 +504,28 @@ tests/
 
 Exact test file placementは既存suiteの局所命名へ合わせて調整できるが、責務とtest seamは変えない。
 
-\`pyproject.toml\`のcurrent \`assets/**/*\`はdotfile収録を保証しないため、次のhidden marker pathをpackage dataへ明示追加する。source treeだけで動作する状態をpassとしない。
+\`pyproject.toml\`のcurrent \`assets/**/*\`はhidden directory配下の収録を保証しないため、次のREADME pathをpackage dataへ明示追加する。source treeだけで動作する状態をpassとしない。
 
-- \`assets/spec_dock/templates/initiative/.workbench/.gitkeep\`
-- \`assets/spec_dock/templates/epic/.workbench/.gitkeep\`
-- \`assets/spec_dock/templates/issue/.workbench/.gitkeep\`
+- \`assets/spec_dock/templates/root/.workbench/README.md\`
+- \`assets/spec_dock/templates/initiative/.workbench/README.md\`
+- \`assets/spec_dock/templates/epic/.workbench/README.md\`
+- \`assets/spec_dock/templates/issue/.workbench/README.md\`
+
+同時に、current \`[tool.setuptools.exclude-package-data]\`の
+\`assets/spec_dock/templates/*/**/README.md\`は上記4 fileにも一致するため、そのまま残さない。
+この広域patternを削除し、除外が必要なlegacy READMEが実在する場合だけexact pathへ限定する。
+package contractは「\`templates/README.md\`と上記4 Workbench READMEだけを許可し、
+それ以外のnested template READMEはsource / wheel / sdist / installed resourcesの全surfaceで0件」とする。
+これによりincludeとexcludeの優先順位へ依存せず、将来の意図しないREADME増殖もinventory testでfail closedにする。
 
 ## 10. Migration / Compatibility / Rollback
 
 ### Migration
 
 - schema/database migrationなし。
-- fresh initだけroot markerを作る。
-- updateはmanaged templates/runtime/docs/ignoreを更新するが、rootまたはexisting nodeにmarkerを作らない。
-- update後に作成するnodeは更新済みtemplateからmarkerを得る。
+- fresh initだけroot Workbench READMEをcopyする。
+- updateはmanaged templates/runtime/docs/ignoreを更新するが、rootまたはexisting nodeにWorkbench READMEを作らない。
+- update後に作成するnodeは更新済みtemplateからREADMEを得る。
 - existing Workbench bytes/names/mtimesへ触れない。
 - root `artifacts/`は最初のroot import時だけ作成する。
 
@@ -507,7 +541,7 @@ Exact test file placementは既存suiteの局所命名へ合わせて調整で�
 - provider runtime/templates/docs/ignore変更を同一Epic commit単位でrevertできる。
 - generic import済みArtifactはuser evidenceであり、rollback時に削除・renameしない。新commandがなくても通常tracked fileとして残る。
 - `.gitignore` rollbackでWorkbench contentsがuntracked表示され得るため、rollback手順は旧`.workbench/` ignore ruleを先に復元してからruntime/templateを戻す。
-- markerは空fileであり、rollbackで自動削除しない。既存repositoryのuser-owned stateとして残してもvalidである。
+- 生成済みWorkbench READMEはrollbackで自動削除しない。既存repositoryのtracked guidance / user-owned stateとして残ってもvalidである。
 
 ## 11. Observability
 
@@ -522,12 +556,14 @@ Exact test file placementは既存suiteの局所命名へ合わせて調整で�
 
 ### T1 Workbench shell
 
-- fresh init: root `.workbench/.gitkeep`が存在し、`git add -n`対象。
-- future node: Initiative / Epic / Issueのplanned paths、result、filesystemにmarker。
-- ignore: root/3 node kindsでmarker以外のtext/binary/nested/symlink entryが`git status`へ出ない。
-- no-backfill: markerなしexisting root/3 nodeを用意し、existing init、update、sync、validate、active set、new Artifact、new ADRを実行してmarker/Workbench stat不変。
-- new node作成時: new nodeだけmarkerあり、ancestor/sibling不変。
-- opacity: fake metadata、ADR-like `.md`、invalid UTF-8、broken subtreeでdiscovery/source manifest不変。
+- fresh init: root `.workbench/README.md`が存在し、`git add -n`対象で、E-RQ-003の7 guidance要素を含む。
+- future node: Initiative / Epic / Issueのplanned paths、result、filesystemにREADME。
+- parity: root / Initiative / Epic / Issueの4 provider READMEと生成結果がbyte-identical。
+- template inventory: `templates/README.md`を除くnested `README.md`は上記4 `.workbench/README.md`だけであり、既存の「node templateにREADMEなし」assertをこのexact allowlistへ置換する。
+- ignore: root / 3 node kindsでtop-level `README.md`以外のtext/binary/nested/symlink entry、nested `README.md`、case variant `readme.md`が`git status`へ出ない。
+- no-backfill: READMEなしexisting root / 3 nodeを用意し、existing init、update、sync、validate、active set、new Artifact、new ADRを実行してREADME / Workbench stat不変。
+- new node作成時: new nodeだけREADMEあり、ancestor / sibling不変。
+- opacity: tracked READMEを含むWorkbench subtreeのfake metadata、ADR-like `.md`、invalid UTF-8、broken subtreeでdiscovery / source manifest不変。
 
 ### T2 Domain / allocation
 
@@ -565,10 +601,11 @@ Exact test file placementは既存suiteの局所命名へ合わせて調整で�
 
 ### T6 Distribution / dogfood
 
-- candidate wheelからfresh consumerへinitしroot/future node markerとgeneric importを確認。
-- markerなしexisting consumerへupdateしno-backfill、以後new node markerを確認。
-- provider asset inventoryとwheel package-dataにhidden `.gitkeep`を確認。
-- dogfoodはprovider変更後に正式update経路でprojectionし、existing `epic-00343`へmarkerがbackfillされないことを確認。
+- candidate wheelからfresh consumerへinitしroot / future node READMEとgeneric importを確認。
+- READMEなしexisting consumerへupdateしno-backfill、以後new node READMEを確認。
+- `pyproject.toml`の広域nested README exclusionが除去またはexact legacy pathへ限定され、4 Workbench READMEがexcludeされないことを静的に確認。
+- source / wheel / sdist / installed resourcesで、`templates/README.md`と4 hidden-directory Workbench READMEだけがREADME allowlistに一致し、全4 fileのbytesがprovider assetsと一致することを確認。
+- dogfoodはprovider変更後に正式update経路でprojectionし、existing `epic-00343`へREADMEがbackfillされないことを確認。
 - focused suites後に`uv run pytest`、manual external file/root/node import、fresh QA/code/spec reviewを行う。
 
 ## 13. ADR Candidates
@@ -587,8 +624,10 @@ Workbench shellのfresh-only/no-backfillはrequirementで十分に固定され�
 
 | Risk | 影響 | Mitigation |
 |---|---|---|
-| Git ignore negation誤り | markerまでignore、またはcontents露出 | real Git repoで4 placement、nested entries、near-nameを`git check-ignore -v`検証 |
-| hidden `.gitkeep` package-data欠落 | installed consumerだけshellなし | wheel inventoryとcandidate wheel fresh init |
+| Git ignore negation誤り | READMEまでignore、またはcontents露出 | real Git repoで4 placement、nested/case-variant/near-name entriesを`git check-ignore -v`検証 |
+| hidden-directory README package-data欠落 | installed consumerだけguidance shellなし | explicit package-data、広域README exclusionの限定化、4 surface exact allowlist、byte parity、candidate wheel fresh init |
+| nested README広域exclude / include競合 | sourceではpassするがwheelから4 guidance fileが消える | `assets/spec_dock/templates/*/**/README.md`を残さず、exact allowlistをsource / wheel / sdist / installed resourcesで検証 |
+| README内容drift | node kindごとにmodel guidanceが変わる | 4 provider assetsと生成結果のbyte parity test |
 | ancestor symlink / source mutation race | 指定外file readまたはstale snapshot publish | `O_NOFOLLOW` leaf、FD identity固定、最終full reread、検出境界後のnon-cooperating in-place writeは明示的threat-model外、content-free fail |
 | external path漏洩 | privacy violation | safe result object以外をrendererへ渡さず、全failure/warning snapshotでsecret path sentinel否定 |
 | generic `.md` semantic誤認 | invalid UTF-8でsync失敗、ADR誤mirror | typed parserとgeneric parser分離、basename判定後のみbody read |

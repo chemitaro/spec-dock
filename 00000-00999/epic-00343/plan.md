@@ -17,7 +17,7 @@ ID: "epic-00343"
 本Epicを、利用者が観測できる価値を各Issue内で端から端まで閉じる必要最小限の3 Issueへ分割する。
 
 1. **Workbench Shell Scaffolding**
-   - fresh repositoryと今後作成するInitiative / Epic / Issueで、Git追跡可能なshell markerを持つoptional Workbenchを直ちに利用可能にする。
+   - fresh repositoryと今後作成するInitiative / Epic / Issueで、利用方法をその場で説明するtracked `.workbench/README.md`を持つoptional Workbenchを直ちに利用可能にする。
 2. **Generic Single-File Artifact Import**
    - Workbench内外、repository内外の明示single file一件を、root / Initiative / Epic / IssueのArtifactへ安全にimportできるCLI capabilityを提供する。
 3. **Integration Distribution And Final Quality**
@@ -36,8 +36,9 @@ layer別Issueへは分割しない。Candidate 1と2は各々CLI / installer / a
 
 ### Scope
 
-- fresh init rootとfuture Initiative / Epic / Issueの`.workbench/.gitkeep`。
-- markerだけをGit追跡可能にし、Workbenchのその他contentsを深さに関係なくignoreするcontract。
+- fresh init rootとfuture Initiative / Epic / Issueの`.workbench/README.md`。
+- READMEだけをGit追跡可能にし、Workbenchのその他contentsを深さに関係なくignoreするcontract。
+- READMEがpurpose、worktree-local / disposable / noncanonical、explicit Artifact import、manual-only copy、Git ignore非security boundary、evidence-only authorityをmodel / humanへ説明するcontract。
 - optional presence、existing root / node no-backfill、semantic opacity、worktree-local / disposable contract。
 - existing manual one-shot `workbench copy`の互換維持。
 - `artifact import file --file <path>`とexactly one root / node selector。
@@ -50,7 +51,7 @@ layer別Issueへは分割しない。Candidate 1と2は各々CLI / installer / a
 
 - existing root / nodeへのWorkbench backfill。
 - Workbench presenceのvalidity要件化。
-- Workbench contentのGit tracking、automatic copy、watch、sync、copy-back。
+- `.workbench/README.md`以外のWorkbench contentのGit tracking、automatic copy、watch、sync、copy-back。
 - directory / glob / bulk / recursive import。
 - source parse、MIME分類、format変換、archive展開。
 - typed `file` token、title / slug要求、persistent provenance catalog。
@@ -92,7 +93,7 @@ layer別Issueへは分割しない。Candidate 1と2は各々CLI / installer / a
 
 | Design / decision | Owner |
 |---|---|
-| D-001〜002 fresh-only shell、tracked marker / ignored contents | Candidate 1 |
+| D-001〜002 fresh-only shell、tracked guidance README / ignored contents | Candidate 1 |
 | D-003〜004 additive import use case、root target | Candidate 2 |
 | D-005 explicit source guard / FD-bound publication | Candidate 2 |
 | D-006〜007 generic filename / global slot / minimal normalization | Candidate 2 |
@@ -111,18 +112,20 @@ Candidate 2 / 3はaccepted ADRを再判断しない。`--` family、full destina
 - tranche: A
 - dependencies: none
 - user-visible value:
-  - fresh init直後とfuture node作成直後にWorkbench shellが存在し、markerだけをtrackingしつつscratch contentsをGitへ出さず利用できる。
+  - fresh init直後とfuture node作成直後にWorkbench shellが存在し、READMEを読めば利用方法とauthority boundaryを理解でき、scratch contentsをGitへ出さず利用できる。
 - vertical scope:
   - `src/spec_dock/cli.py`のfresh root判定。
   - provider `.gitignore`。
-  - Initiative / Epic / Issue templatesの`.workbench/.gitkeep`。
-  - hidden marker package-data。
+  - root / Initiative / Epic / Issue templatesのbyte-identicalな`.workbench/README.md`。
+  - provider `.gitignore`のREADME-only tracking contract。
+  - hidden-directory README package-dataと、既存broad nested README exclusionの削除またはexact legacy pathへの限定。
   - new-node planned / result / filesystem path parity。
   - optional / no-backfill / opacity / manual-only copy compatibility。
   - shell / manual copy public docs。
 - deliverables:
   - installer → provider assets/templates → runtime node creation → Git observation → focused tests → docs。
-  - source treeとcandidate package inventoryでhidden markerを観測できるevidence。
+  - README本文にpurpose、temporary/worktree-local/noncanonical、README-only tracking、explicit import、manual copy、secret注意、evidence-only authorityを含むguidance。
+  - source / wheel / sdist / installed resourcesのexact README allowlistと4 asset byte parity evidence。
 - focused verification:
 
 ```bash
@@ -132,17 +135,18 @@ uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/te
 ```
 
 - scenario matrix:
-  - fresh rootとfuture 3 node kindsのmarker / `git add -n` / planned-result parity。
+  - fresh rootとfuture 3 node kindsのREADME content / byte parity / `git add -n` / planned-result parity。
   - root + 3 node kindsのnested ignore / near-name。
+  - `templates/README.md`と4 Workbench README以外のnested template READMEがsource / wheel / sdist / installed resourcesに存在しない。
   - existing init/update/sync/validate/active/artifact/ADRのno-backfill。
   - fake metadata、binary、invalid UTF-8、broken subtreeのsemantic opacity。
   - linked worktree creation時に自動copyせず、明示`workbench copy`だけが現行behaviorを維持。
 - rollback:
   - provider template / ignore / installer deltaをIssue commit単位でrevertする。
-  - user Workbench contentsや既存markerを自動削除しない。
+  - user Workbench contentsや生成済みREADMEを自動削除しない。
   - ignore rollbackではscratch露出を防ぐ旧ruleを先に復元する。
 - forbidden boundary:
-  - backfill、required Workbench、automatic copy/sync、Workbench content tracking。
+  - backfill、required Workbench、automatic copy/sync、README以外のWorkbench content tracking。
 
 ### Candidate 2 — Generic Single-File Artifact Import
 
@@ -221,10 +225,10 @@ uv run pytest
 ```
 
   - candidate wheelをtemporary Git repositoryへinstallし、fresh root / future node shellとroot / node generic importを通常権限で実測する。
-  - markerなしpre-feature consumerをupdateし、existing root / nodeをbackfillせず、その後のnew nodeだけmarkerを得る。
+  - READMEなしpre-feature consumerをupdateし、existing root / nodeをbackfillせず、その後のnew nodeだけREADMEを得る。
   - destinationと別filesystemのexternal sourceを成功importし、external path/body/hash/count sentinelがoutput / provenanceへ漏れない。
   - unsupported filesystem capabilityはformal destination作成前にfail closedとなる。
-  - dogfood update後もexisting `epic-00343`へmarkerをbackfillせず、validate / sync / deps / contextがpassする。
+  - dogfood update後もexisting `epic-00343`へREADMEをbackfillせず、validate / sync / deps / contextがpassする。
 - repair boundary:
   - integration failureの最小修正は許可する。
   - major feature未実装をCandidate 3へ先送りしない。
@@ -334,7 +338,7 @@ Candidate 1 / 2はreview済みlocal milestone commitまで閉じ、per-Issue PR�
 ### Docs impact
 
 - Candidate 1:
-  - `docs/README.md`、`guide.md`、`reference_worktree.md`へshell auto-generation、optional/no-backfill、ignored/disposable、manual-only copyを反映する。
+  - `docs/README.md`、`guide.md`、`reference_worktree.md`へREADME shell auto-generation、optional/no-backfill、README-only tracking、ignored/disposable、evidence-only authority、manual-only copyを反映する。
 - Candidate 2:
   - `docs/README.md`、`guide.md`、`reference_naming.md`へroot / node target、source policy、generic `--` family、privacy-safe state、evidence-only authorityを反映する。
   - `docs/rules/root/artifacts.md`を追加する。
@@ -353,7 +357,7 @@ Candidate 1 / 2はreview済みlocal milestone commitまで閉じ、per-Issue PR�
 
 1. Workbench ignoreを戻す場合、scratchが`git status`へ露出しないruleを先に復元する。
 2. runtime / template / package deltaをreviewable commit単位でrevertする。
-3. generic imported Artifact、existing marker、Workbench user contentを削除・renameしない。
+3. generic imported Artifact、生成済みWorkbench README、Workbench user contentを削除・renameしない。
 4. existing typed / blank Artifact、`chatgpt-output`、`workbench copy` dataをmigrationしない。
 5. rollback後にfocused compatibility、validate、syncを再実行する。
 
@@ -373,8 +377,9 @@ Candidate 1 / 2はreview済みlocal milestone commitまで閉じ、per-Issue PR�
 
 ## 10. Current blockers / approval gate
 
-- design blocker: none。ninth fresh design review `pass`、confidence 0.96。
-- plan blocker: none。second fresh plan review `pass`、confidence 0.99。
+- requirement amendment blocker: none。second fresh README requirement review `pass`、confidence 0.99。
+- design amendment blocker: none。third fresh README design review `pass`、confidence 0.92。
+- plan amendment blocker: none。second fresh README plan review `pass`、confidence 0.99。
 - Issue creation blocker:
   - exactly 3 slicesに対する人間承認が未取得。
 - Issue nodes:

@@ -18,7 +18,7 @@ ID: "epic-00343"
 1. fresh `spec-dock init`および今後作成するInitiative / Epic / Issueに、すぐ使えるWorkbench shellを自動配置する。
 2. Workbench内外、repository内外を問わず、利用者が明示したsingle file一件を、指定scopeのArtifactへ安全にimportできるようにする。
 
-Workbenchはcanonical stateではなく、存在しなくてもrepositoryはvalidである。Workbenchの中身はGit管理せず、worktree-localかつdisposableとする。永続化が必要なfileだけを明示importして`artifacts/`へ保存する。
+Workbenchはcanonical stateではなく、存在しなくてもrepositoryはvalidである。利用方法を説明する`.workbench/README.md`だけをGit管理し、それ以外のWorkbench contentsはGit管理せず、worktree-localかつdisposableとする。永続化が必要なfileだけを明示importして`artifacts/`へ保存する。
 
 ## 2. Initiativeとの整合
 
@@ -37,9 +37,10 @@ Workbenchはcanonical stateではなく、存在しなくてもrepositoryはvali
 
 - fresh initはroot Workbench shellを生成する。
 - 今後の`new initiative` / `new epic` / `new issue`は、作成nodeにWorkbench shellを生成する。
-- shell markerだけをGit tracking可能とし、Workbench内のその他のentryはignoreする。
+- shell fileは意味のないplaceholderではなく、Workbenchの目的・利用方法・非canonical境界を説明する`.workbench/README.md`とする。
+- `.workbench/README.md`だけをGit tracking可能とし、Workbench内のその他のentryはignoreする。
 - existing root / nodeへはbackfillしない。
-- Workbenchまたはmarkerが欠けていてもvalidとする。
+- WorkbenchまたはREADMEが欠けていてもvalidとする。
 - Workbench内容はworktree-localであり、worktreeを破棄すれば失われてよい。
 
 ### 3.2 Explicit single-file Artifact import
@@ -65,7 +66,7 @@ Workbenchはcanonical stateではなく、存在しなくてもrepositoryはvali
 
 - fresh-init-only root Workbench shell。
 - future Initiative / Epic / Issue Workbench shell。
-- shell markerを除くWorkbench contentsのGit ignore。
+- tracked `.workbench/README.md`を除くWorkbench contentsのGit ignore。
 - optional presence、no-backfill、opacity、disposable contract。
 - generic single-file Artifact importのCLIからfilesystem publicationまで。
 - root / Initiative / Epic / Issue target routing。
@@ -80,7 +81,7 @@ Workbenchはcanonical stateではなく、存在しなくてもrepositoryはvali
 
 - existing root / nodeへのWorkbench backfill。
 - Workbench presenceのvalidation必須化。
-- Workbench contentsのGit tracking。
+- `.workbench/README.md`以外のWorkbench contentsのGit tracking。
 - automatic handoff、watch、sync、copy-back。
 - directory、glob、bulk、recursive、multiple-file import。
 - source contentsのparse、classification、format conversion、archive extraction。
@@ -116,16 +117,19 @@ Workbenchはcanonical stateではなく、存在しなくてもrepositoryはvali
 ### 6.1 Workbench shell
 
 - E-RQ-001 Fresh root shell:
-  - `spec-dock`が存在しないtargetへのfresh `spec-dock init`は、root Workbench directoryとtracked shell markerを生成する。
+  - `spec-dock`が存在しないtargetへのfresh `spec-dock init`は、root Workbench directoryとtracked `.workbench/README.md`を生成する。
 - E-RQ-002 Future node shell:
-  - 今後の`new initiative` / `new epic` / `new issue`は、作成node直下にWorkbench directoryとtracked shell markerを生成する。
+  - 今後の`new initiative` / `new epic` / `new issue`は、作成node直下にWorkbench directoryとtracked `.workbench/README.md`を生成する。
 - E-RQ-003 Tracked shell / ignored contents:
-  - shell markerはGit tracking可能で、同じWorkbench内のその他すべてのentryはdepth、extension、contentによらずignoreされる。
+  - tracked shell fileは`.workbench/README.md`とし、空placeholderや`.gitkeep`を新規生成しない。
+  - READMEは、少なくともWorkbenchの目的、一時的・worktree-local・non-canonicalであること、README以外のcontentsはGit管理外であること、永続化する一fileは明示的に`artifact import file`で対象Artifactへ取り込むこと、worktree間のcopyは必要時だけmanual `workbench copy`を使うこと、Git ignoreはsecret保護境界ではないことを説明する。
+  - READMEは人間とmodelへのguidanceであり、SpecDockがWorkbench contentsをsemantic discoveryする入口やcanonical authorityにはしない。
+  - `.workbench/README.md`だけがGit tracking可能で、同じWorkbench内のその他すべてのentryはdepth、extension、contentによらずignoreされる。
 - E-RQ-004 Optional presence:
-  - Workbenchまたはmarkerがないexisting root / nodeもvalidとし、利用者が手動作成できる。
+  - WorkbenchまたはREADMEがないexisting root / nodeもvalidとし、利用者が手動作成できる。
 - E-RQ-005 No backfill:
-  - `init` against existing workspace、`update`、`sync`、`validate`、active切替、Artifact / ADR作成など既存scopeを対象とする通常mutationは、existing root / Initiative / Epic / Issueへshell markerを追加しない。
-  - new node commandは新しく作成したnodeだけにmarkerを生成し、既存ancestor / siblingへはbackfillしない。
+  - `init` against existing workspace、`update`、`sync`、`validate`、active切替、Artifact / ADR作成など既存scopeを対象とする通常mutationは、existing root / Initiative / Epic / IssueへWorkbench READMEを追加しない。
+  - new node commandは新しく作成したnodeだけにREADMEを生成し、既存ancestor / siblingへはbackfillしない。
 - E-RQ-006 Opaque and disposable:
   - Workbench subtreeはdefault semantic discoveryから除外し、その内容をnode、Artifact、ADR、dependency、authoring sourceとして解釈しない。
   - Workbench内容の欠落またはworktree削除はSpecDock validityやcanonical readinessを損なわない。
@@ -201,15 +205,17 @@ Workbenchはcanonical stateではなく、存在しなくてもrepositoryはvali
 ### 7.1 Workbench
 
 - E-AC-001 Fresh root shell:
-  - fresh init後にroot Workbench shell markerが存在し、Git add対象になる。
+  - fresh init後にroot `.workbench/README.md`が存在し、Git add対象になる。
+  - README本文がE-RQ-003の目的、Git境界、Artifact import、manual copy、disposable、secret注意を説明する。
 - E-AC-002 New-node matrix:
-  - new Initiative / Epic / Issueの各nodeにmarkerが作られ、planned path / result / filesystemが一致する。
+  - new Initiative / Epic / Issueの各nodeに`.workbench/README.md`が作られ、planned path / result / filesystemが一致する。
+  - rootと3 node kindsのREADMEは同じcanonical guidance内容を持つ。
 - E-AC-003 Ignore matrix:
-  - rootと3 node kindsのWorkbenchにarbitrary nested filesを置いてもmarker以外は`git status`へ出ない。
+  - rootと3 node kindsのWorkbenchにarbitrary nested filesを置いてもREADME以外は`git status`へ出ない。
 - E-AC-004 No-backfill matrix:
-  - markerのないexisting root / Initiative / Epic / Issueを用意する。
-  - existing workspaceへの`init`、`update`、`sync`、`validate`、active切替、Artifact / ADR作成を各scopeへ実行しても、どのexisting scopeにもmarkerを生成しない。
-  - new node作成時はnew nodeだけにmarkerを生成し、existing ancestor / siblingのmarker状態とWorkbench bytes / names / mtimesを変更しない。
+  - READMEのないexisting root / Initiative / Epic / Issueを用意する。
+  - existing workspaceへの`init`、`update`、`sync`、`validate`、active切替、Artifact / ADR作成を各scopeへ実行しても、どのexisting scopeにもREADMEを生成しない。
+  - new node作成時はnew nodeだけにREADMEを生成し、existing ancestor / siblingのREADME状態とWorkbench bytes / names / mtimesを変更しない。
 - E-AC-005 Optional validity:
   - Workbenchのないscopeと利用者が手動作成したWorkbenchの双方でvalidate / syncが成功する。
 - E-AC-006 Opacity regression:
@@ -278,7 +284,7 @@ Workbenchはcanonical stateではなく、存在しなくてもrepositoryはvali
 - Security / privacy:
   - explicit file一件以外を探索せず、external absolute pathやbodyを通常outputへ出さない。
 - Compatibility:
-  - existing commands、old Artifact families、existing root / nodeのmarker stateを変更しない。
+  - existing commands、old Artifact families、existing root / nodeのWorkbench README有無を変更しない。
 - Portability:
   - supported platformで同じobservable guaranteeを満たす。具体的filesystem primitiveはdesignで決定する。
 - Maintainability:
