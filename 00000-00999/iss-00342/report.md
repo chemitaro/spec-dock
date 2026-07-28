@@ -245,7 +245,7 @@ uv run pytest -q -p no:cacheprovider \
 | S00 | `CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | collection、required-fast、known flaky、coverage baselineをcurrent SHAで固定 | C=2696、node digest `07ac3d...859c`、marker inventory digest `b77e4a...a3af`、7 passed、1 passed、tracked diffなし、S00-R2 fresh review pass | pass | M0 commitとpost-commit cleanは後続欄で閉じる |
 | S01 | `CLOS-TL-AC-001`,`CLOS-TL-AC-002`,`CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-BH-001`,`CLOS-TL-BH-002` | partial-safe exactly-one classifier、global partition、required-fast、conflict、early marker visibility | active Red→Green、lane module 5 passed、required-fast 7 passed、C/F/H=2701/666/2035 | pass | fresh code-reviewerとM1a commit gateはpending |
 | S02 | `CLOS-TL-AC-001`,`CLOS-TL-AC-002`,`CLOS-TL-AC-005`,`CLOS-TL-BH-001`,`CLOS-TL-BH-002`,`CLOS-TL-BH-005` | ordinary pytest、marker-only、explicit full permission、policy skip、failure伝播、legitimate skip保全 | active Red→Green、lane module 9 passed、required-fast 7 passed、C/F/H=2705/670/2035 | pass | fresh code-reviewerとM1b commit gateはpending |
-| S03 | `CLOS-TL-AC-003`,`CLOS-TL-AC-004`,`CLOS-TL-AC-005`,`CLOS-TL-AC-009`,`CLOS-TL-BH-003`〜`006`,`CLOS-TL-CON-002`,`003` | PR/main/manual truth table、identity、direct commands、concurrency、non-shipping | missing full workflow Red→Green、expanded node 1 passed、related 3 passed、diff check | pass | fresh code-reviewerとM2 commit gateはpending |
+| S03 | `CLOS-TL-AC-003`,`CLOS-TL-AC-004`,`CLOS-TL-AC-005`,`CLOS-TL-AC-009`,`CLOS-TL-BH-003`〜`006`,`CLOS-TL-CON-002`,`003` | PR/main/manual truth table、identity、direct commands、concurrency、non-shipping | missing full workflow Red→Green、expanded node 1 passed、related 3 passed、diff check、S03-R2 fresh pass | pass | M2 `35d4ef4c`、post-commit clean確認済み |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -385,7 +385,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S01-R1 | classifier / marker config review | code-reviewer | fresh | passed | no | proceed to M1a commit | partial safety、exactly-one、required-fast/heavy規則、early marker、strict config、S02非混入を確認。findings 0、confidence 0.99 |
 | S02-R1 | full option / policy skip review | code-reviewer | historical | failed | no | blocked | runtime diffは正しいがEVD-TL-003 labelと両worker no-material-decisionがreportに不足 |
 | S02-R2 | full option / policy skip re-review | code-reviewer | fresh | passed | no | proceed to M1b commit | runtime contract、pytest 8/9、EVD-TL-003、worker notes、config no-opを確認。findings 0、confidence 0.99 |
-| S03-R1 | workflow routing / identity / non-shipping review | code-reviewer | fresh | initial fail / R2 pass | yes | pass | R1でBH-003〜006の個別report証跡欠落を検出。補完後R2はfindings 0、confidence 0.99 |
+| S03-R1 | workflow routing / identity / non-shipping review | code-reviewer | fresh R2 | passed | no | proceed to M2 commit | R1でBH-003〜006の個別report証跡欠落を検出。補完後R2はfindings 0、confidence 0.99 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -393,7 +393,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S00 / M0 | committed | baseline ledger commit | `ac67751b7b32297be88196cb0825d307518f6ae2` | `git status --short` -> clean | N/A | N/A | N/A | S00-R2 fresh code-reviewer pass、required evidence、commit、cleanを確認しResult Approval |
 | S01 / M1a | committed | classifier / marker config commit | `392b5bb9d4869419179fc6d53a6e29a8c36b921a` | `git status --short` -> clean | N/A | N/A | N/A | S01-R1 fresh pass、required verification、commit、cleanを確認しResult Approval |
 | S02 / M1b | committed | pytest option / policy contract commit | `e63fe928e20525c07bf34bd02c5e95b9d11e761c` | `git status --short` -> clean | `pyproject.toml` sliceはapproved-no-op | S01でcommit済みのstrict markersとmarker registry | `git diff --quiet -- pyproject.toml` | S02-R2 fresh pass、M1b commit、cleanを確認しResult Approval |
-| S03 / M2 | pending | workflow contract commit | pending | pending | N/A | N/A | N/A | fresh S03 code-reviewer pass後にcommit |
+| S03 / M2 | committed | workflow contract commit | `35d4ef4c4fa948df563e6bc6f8a3c7b40096c234` | `git status --short` -> clean | N/A | N/A | N/A | S03-R2 fresh pass、required verification、commit、cleanを確認しResult Approval |
 
 #### 変更したファイル
 - `path/to/file1` - ...
