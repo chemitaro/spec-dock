@@ -237,6 +237,7 @@ uv run pytest -q -p no:cacheprovider \
 | S00 | runtime guidanceがignored generated projectionをrefreshした可能性 | worker observation | D-005でtracked/canonical差分なしのdiagnostic side effectとして解決 | none | no | 実行前後`git status --short` clean |
 | S01 | new contract testsによりroot collectionが5件増加 | implementation | expected closure deltaとして記録 | `CLOS-TL-AC-002`,`CLOS-TL-AC-007` | no | C 2696→2701、F 661→666、H 2035据え置き。追加5件はlane contract tests |
 | S02 | new command/policy contract testsによりroot collectionが4件増加 | implementation | expected closure deltaとして記録 | `CLOS-TL-AC-001`,`CLOS-TL-AC-002`,`CLOS-TL-AC-007` | no | C/F 2701/666→2705/670、H 2035据え置き。追加4件はS02 contract tests |
+| S03 | provider workflow testを新規追加せず既存required-fast nodeを拡張 | implementation | event/identity/non-shipping contractを既存node内で追加 | `CLOS-TL-AC-003`,`004`,`005`,`009`,`CLOS-TL-CON-002`,`003` | no | collection count delta 0。required-fast exact inventoryも不変 |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
@@ -244,6 +245,7 @@ uv run pytest -q -p no:cacheprovider \
 | S00 | `CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | collection、required-fast、known flaky、coverage baselineをcurrent SHAで固定 | C=2696、node digest `07ac3d...859c`、marker inventory digest `b77e4a...a3af`、7 passed、1 passed、tracked diffなし、S00-R2 fresh review pass | pass | M0 commitとpost-commit cleanは後続欄で閉じる |
 | S01 | `CLOS-TL-AC-001`,`CLOS-TL-AC-002`,`CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-BH-001`,`CLOS-TL-BH-002` | partial-safe exactly-one classifier、global partition、required-fast、conflict、early marker visibility | active Red→Green、lane module 5 passed、required-fast 7 passed、C/F/H=2701/666/2035 | pass | fresh code-reviewerとM1a commit gateはpending |
 | S02 | `CLOS-TL-AC-001`,`CLOS-TL-AC-002`,`CLOS-TL-AC-005`,`CLOS-TL-BH-001`,`CLOS-TL-BH-002`,`CLOS-TL-BH-005` | ordinary pytest、marker-only、explicit full permission、policy skip、failure伝播、legitimate skip保全 | active Red→Green、lane module 9 passed、required-fast 7 passed、C/F/H=2705/670/2035 | pass | fresh code-reviewerとM1b commit gateはpending |
+| S03 | `CLOS-TL-AC-003`,`CLOS-TL-AC-004`,`CLOS-TL-AC-005`,`CLOS-TL-AC-009`,`CLOS-TL-BH-003`〜`006`,`CLOS-TL-CON-002`,`003` | PR/main/manual truth table、identity、direct commands、concurrency、non-shipping | missing full workflow Red→Green、expanded node 1 passed、related 3 passed、diff check | pass | fresh code-reviewerとM2 commit gateはpending |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -263,6 +265,16 @@ uv run pytest -q -p no:cacheprovider \
 | `CLOS-TL-BH-001` | S02 | yes | red-required | ordinary policy未実装 | controlled fast/H temporary project | pass | fast body実行、H body0、fast failure exit1 |
 | `CLOS-TL-BH-002` | S02 | yes | red-required | explicit full permission未実装 | flag付きH/root contract | pass | H body実行、policy reasonなし |
 | `CLOS-TL-BH-005` | S02 | yes | red-required | local full command未実装 | help/root/heavy-only/focused contract | pass | selectionとpermissionを分離 |
+| `CLOS-TL-AC-003` | S03 | yes | red-required + external pending | current Provider CI push+PR | deterministic workflow test | pass | `Provider CI`/`provider-tests`維持、PR lint+ordinary only。external PR observationはS111 |
+| `CLOS-TL-AC-004` | S03 | yes | red-required + post-merge pending | full workflow missing | deterministic event/concurrency test | pass | main push full only。external main observationはS120 |
+| `CLOS-TL-AC-005` | S03 | yes | red-required | manual workflow missing | workflow_dispatch/direct full/no schedule test | pass | local optionはS02、docsはS90 |
+| `CLOS-TL-AC-009` | S03 | yes | red-required | old push+PR routing | exact five-event matrix | pass | PR yes/no、non-main no/no、main no/yes、dispatch no/yes、schedule no/no |
+| `CLOS-TL-BH-003` | S03 | yes | red-required + external pending | PR workflow also ran on push | identity/direct PR command/event test | pass | PRは`make lint`+ordinaryのみ、fullなし。external PR executionはS111 |
+| `CLOS-TL-BH-004` | S03 | yes | red-required + post-merge pending | main専用full workflow missing | main event/direct full/concurrency test | pass | main pushはfullのみ、branch単位latest-only。external main executionはS120 |
+| `CLOS-TL-BH-005` | S03 | yes | red-required | manual full workflow missing | workflow_dispatch/direct full test | pass | manualは`run_id`単位で隔離し、PR/main runをcancelしない |
+| `CLOS-TL-BH-006` | S03 | yes | red-required + inspect-only | accepted no-schedule policy | exact five-event matrix + forbidden-key inspection | pass | schedule、permissions、secrets、`continue-on-error`は0 |
+| `CLOS-TL-CON-002` | S03 | yes | red-required + diff inspection | provider-ci non-shipping baseline | install_root/init/update absence checks for both workflows | pass | `src/spec_dock/assets/**`不変 |
+| `CLOS-TL-CON-003` | S03 | yes | inspect-only | no schedule accepted policy | changed workflow trigger inspection | pass | schedule key 0 |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -279,6 +291,16 @@ uv run pytest -q -p no:cacheprovider \
 | `CLOS-TL-AC-001` | S02 | ordinary/focused/marker-onlyのH body0、stable reason、failure propagation | pass | repository full bodyはS05 owner |
 | `CLOS-TL-AC-002` | S02 | flag付きtemporary F∪H、policy skip0、legitimate skip/skipif/xfail維持 | pass | repository formal full実測はS05 owner |
 | `CLOS-TL-AC-005` | S02 | helpとdirect full permission contract | pass | workflow/manual routingはS03/S90 owner |
+| `CLOS-TL-AC-003` | S03 | identity/direct PR command/truth table | pass | external PR executionはpending_external owner S111 |
+| `CLOS-TL-AC-004` | S03 | main-only trigger/concurrency/full command | pass | external main executionはpending_external owner S120 |
+| `CLOS-TL-AC-005` | S03 | workflow_dispatch/direct full/no schedule | pass | contributor docsはS90 |
+| `CLOS-TL-AC-009` | S03 | deterministic five-event matrix | pass | requirement exact match |
+| `CLOS-TL-BH-003` | S03 | PR identity、lint+ordinary direct command、PR fullなし | pass | external PR executionはpending_external owner S111 |
+| `CLOS-TL-BH-004` | S03 | main push fullのみ、branch単位latest-only concurrency | pass | external main executionはpending_external owner S120 |
+| `CLOS-TL-BH-005` | S03 | workflow_dispatch full、manual `run_id` isolation | pass | local/manual command docsはS90 |
+| `CLOS-TL-BH-006` | S03 | schedule/permissions/secrets/continue-on-error 0 | pass | accepted no-schedule policy維持 |
+| `CLOS-TL-CON-002` | S03 | install_root/init/updateにprovider workflowsなし | pass | provider-only boundary維持 |
+| `CLOS-TL-CON-003` | S03 | changed workflow schedule 0 | pass | accepted no-schedule policy維持 |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -286,6 +308,7 @@ uv run pytest -q -p no:cacheprovider \
 | none | `CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | `tc-s00-001`,`tc-s00-002` | same | required row、locked expectation、required、spec linkに変更なし | no | no |
 | added | `CLOS-TL-AC-002`,`CLOS-TL-AC-007` | `tc-s01-001`〜`tc-s01-004` | same | S01 contract test 5 itemsをfastへ追加。locked expectationとrequired-fast inventoryは不変 | no | no |
 | added | `CLOS-TL-AC-001`,`CLOS-TL-AC-002`,`CLOS-TL-AC-007` | `tc-s02-001`〜`tc-s02-004` | same | S02 command/policy contract test 4 itemsをfastへ追加。permission/skip contractは計画どおり | no | no |
+| changed | `CLOS-TL-AC-003`,`004`,`005`,`009`,`CLOS-TL-BH-003`〜`006`,`CLOS-TL-CON-002`,`003` | `tc-s03-001`〜`tc-s03-003` | same | existing required-fast provider workflow nodeを拡張。node追加/削除なし | no | no |
 
 #### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 `workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
@@ -315,6 +338,7 @@ read-only specialist consentと、scope-local `artifacts/` direct childへの限
 | S00 | delegated | approved planがread-only baseline operatorを要求 | dev-coder | current SHAのcollection、required-fast、known flaky characterization | approved requirement/design/plan、research、`pyproject.toml`、`tests/**` | read-only commandsのみ | source/test/config/workflow/docs/report変更、full実行 | collect-only、required-fast 7、known flaky exact node、前後clean | C drift、required-fast欠落、unexpected failure、tracked write | command/exit/count/elapsed/SHA、risk、EVD note、Ledger Note | pass |
 | S01 | delegated | tests/hookとpytest configをrole/path分離してtest-first実装するapproved contract | dev-coder + bounded utility-worker | classifier contract testsとhook / marker registryとstrictness | approved requirement/design/plan、S00 evidence、current pytest config/tests | dev-coder: `tests/conftest.py`,`tests/unit/test_provider_test_lanes.py`; utility-worker: `pyproject.toml` | workflow/docs/Make/dependency、S02 option/policy、test weakening | active Red、lane module、root F/H collection、required-fast、ruff、TOML/help、diff check | unexpected Red、focused global guard、inventory変更、allowed外diff | role別changed files、Red/Green/Refactor、commands、risk、EVD note、no-material decision | implementation pass; reviewer pending |
 | S02 | delegated | hook/testsとconfig no-op確認をrole/path分離するapproved contract | dev-coder + bounded utility-worker | option/policy contract testsとhook / marker registry/strictness inspection | approved docs、S01 evidence、current pytest config/tests | dev-coder: `tests/conftest.py`,`tests/unit/test_provider_test_lanes.py`; utility-worker: `pyproject.toml` inspection | workflow/docs/Make/dependency、classifier/inventory変更、repository full実行 | active Red、lane module、help、required-fast、collect-only、ruff、config no-op、diff check | unexpected Red、legitimate skip変更、policy leakage、allowed外diff | role別evidence、Red/Green/Refactor、commands、risk、no-material decision | implementation pass; reviewer pending |
+| S03 | delegated | workflow testsとworkflow YAMLをrole/path分離してtest-first実装するapproved contract | dev-coder + bounded utility-worker | event/identity/non-shipping tests / provider workflows | approved docs、S02 evidence、current workflows、existing parity tests | dev-coder: `tests/unit/infra/test_init_update.py`; utility-worker: provider workflow 2 files | branch protection、permissions/secrets/schedule、assets/docs/other workflows | active Red、expanded node、related focused 3、ruff/format、diff check | identity維持不能、consumer shipping、credential/permission必要、allowed外diff | role別Red/Green、routing/rollback evidence、EVD-TL-004、no-material decision | implementation pass; reviewer pending |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -324,6 +348,8 @@ read-only specialist consentと、scope-local `artifacts/` direct childへの限
 | S01 | utility-worker | pytest strict markersとfast/full marker registryだけを追加 | `pyproject.toml` | TOML parse、pytest help、diff check pass | S01-R1 passed | none | accepted。default `-m fast`、dependency、Make変更なし |
 | S02 | dev-coder | explicit full optionとflagなしconditional policy skipをRed-firstで実装 | `tests/conftest.py`,`tests/unit/test_provider_test_lanes.py` | Red exit1; Green active1; module9 passed; required-fast7; C/F/H=2705/670/2035; ruff/diff pass | S02-R2 passed | repository full bodyはS05まで未実行 | accepted。S01 classifier/inventoryとlegitimate skipを維持 |
 | S02 | utility-worker | marker registry/strictnessがS02にも十分かinspection | none | TOML assertion、diff check、`git diff --quiet -- pyproject.toml` pass | S02-R2 passed | option implementationはconftest責務 | approved-no-op。default selection/plugin/dependency変更不要 |
+| S03 | dev-coder | existing required-fast nodeへevent/identity/non-shipping contractをRed-first追加 | `tests/unit/infra/test_init_update.py` | missing workflow Red; Green 1 passed; related 3 passed; ruff/format/diff pass | pending | live Actions executionは後続external gate | accepted。workflowはread-only検証し追加修正なし |
+| S03 | utility-worker | PR fast workflowを限定化しmain/manual full workflowを追加 | `.github/workflows/provider-ci.yml`,`.github/workflows/provider-full-regression.yml` | expanded contract node 1 passed、diff check pass | pending | text inspectionはYAML indentation contractへ依存 | accepted。permissions/secrets/schedule/assets変更なし |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -359,6 +385,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S01-R1 | classifier / marker config review | code-reviewer | fresh | passed | no | proceed to M1a commit | partial safety、exactly-one、required-fast/heavy規則、early marker、strict config、S02非混入を確認。findings 0、confidence 0.99 |
 | S02-R1 | full option / policy skip review | code-reviewer | historical | failed | no | blocked | runtime diffは正しいがEVD-TL-003 labelと両worker no-material-decisionがreportに不足 |
 | S02-R2 | full option / policy skip re-review | code-reviewer | fresh | passed | no | proceed to M1b commit | runtime contract、pytest 8/9、EVD-TL-003、worker notes、config no-opを確認。findings 0、confidence 0.99 |
+| S03-R1 | workflow routing / identity / non-shipping review | code-reviewer | fresh | initial fail / R2 pass | yes | pass | R1でBH-003〜006の個別report証跡欠落を検出。補完後R2はfindings 0、confidence 0.99 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -366,6 +393,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S00 / M0 | committed | baseline ledger commit | `ac67751b7b32297be88196cb0825d307518f6ae2` | `git status --short` -> clean | N/A | N/A | N/A | S00-R2 fresh code-reviewer pass、required evidence、commit、cleanを確認しResult Approval |
 | S01 / M1a | committed | classifier / marker config commit | `392b5bb9d4869419179fc6d53a6e29a8c36b921a` | `git status --short` -> clean | N/A | N/A | N/A | S01-R1 fresh pass、required verification、commit、cleanを確認しResult Approval |
 | S02 / M1b | committed | pytest option / policy contract commit | `e63fe928e20525c07bf34bd02c5e95b9d11e761c` | `git status --short` -> clean | `pyproject.toml` sliceはapproved-no-op | S01でcommit済みのstrict markersとmarker registry | `git diff --quiet -- pyproject.toml` | S02-R2 fresh pass、M1b commit、cleanを確認しResult Approval |
+| S03 / M2 | pending | workflow contract commit | pending | pending | N/A | N/A | N/A | fresh S03 code-reviewer pass後にcommit |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -500,6 +528,62 @@ git diff --check
 - `dev-coder`: `No material implementation decisions beyond the approved plan.`
 - bounded `utility-worker`: `No material implementation decisions beyond the approved plan.`
 - orchestrator disposition: 両noteを採用。仕様解釈、plan逸脱、tradeoff、open question、follow-upはなく、D-001〜D-005への追加decision entryは不要。
+
+---
+
+### セッションログ（2026-07-29 00:23 - 00:38 JST）
+
+#### 対象
+
+- Step: S03 Provider workflow split
+- AC/EC: AC-003、AC-004、AC-005、AC-009、CON-002、CON-003
+- 計画上の出典:
+  - `plan.md` section: `S03 Provider workflow split`
+  - closure: `CLOS-TL-AC-003`、`CLOS-TL-AC-004`、`CLOS-TL-AC-005`、`CLOS-TL-AC-009`、`CLOS-TL-CON-002`、`CLOS-TL-CON-003`
+
+#### 実施内容
+
+- `dev-coder`が既存required-fast node `TestInitUpdate::test_issue_68_provider_only_workflow_is_not_shipped_via_install_root`を拡張し、event matrix、workflow/job identity、direct commands、concurrency、consumer non-shippingをRed-firstで固定した。
+- bounded `utility-worker`が`Provider CI`を`pull_request`専用へ限定し、main pushと`workflow_dispatch`でdirect full commandを実行する独立`Provider Full Regression` workflowを追加した。
+- provider-only workflowは`src/spec_dock/assets/install_root/**`へ追加せず、init/update後のconsumer repoにも配布されない既存境界を維持した。
+
+#### Red / Green / verification
+
+```text
+Red:
+uv run pytest -q -p no:cacheprovider \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_68_provider_only_workflow_is_not_shipped_via_install_root
+-> exit 1; .github/workflows/provider-full-regression.yml missing
+
+Green:
+same command
+-> 1 passed in 0.18s
+
+related focused 3 nodes
+-> 3 passed in 0.19s
+
+uv run ruff check tests/unit/infra/test_init_update.py
+-> All checks passed
+uv run ruff format --check tests/unit/infra/test_init_update.py
+-> 1 file already formatted
+git diff --check
+-> exit 0
+```
+
+#### EVD-TL-004 workflow routing / identity / non-shipping evidence
+
+- event truth table: pull request=`Provider CI`のみ、non-main push=両方なし、main push=`Provider Full Regression`のみ、manual dispatch=`Provider Full Regression`のみ、schedule=両方なし。
+- identity: required check名`Provider CI`、job ID `provider-tests`を維持。独立full workflowは`Provider Full Regression`、job ID `provider-full-regression`。
+- direct commands: PR jobは`make lint`と`uv run pytest`、full jobは`uv run pytest --run-full-regression`を直接実行し、test wrapperを追加していない。
+- concurrency: main pushはbranch単位latest-only、manual runは`run_id`単位で分離し相互cancelしない。
+- boundary: provider workflowsはrepo rootにのみ存在し、install_root/init/updateのconsumer outputへ配布しない。permissions、secrets、schedule、`continue-on-error`を追加していない。
+- rollback viability: 新規full workflowを削除し、`provider-ci.yml`の既存push triggerを戻す局所的なworkflow差分で復旧でき、provider assetやruntime migrationを伴わない。
+
+#### Worker Ledger Notes
+
+- `dev-coder`: `No material implementation decisions beyond the approved plan.`
+- bounded `utility-worker`: `No material implementation decisions beyond the approved plan.`
+- orchestrator disposition: 両noteを採用。設計済みtruth tableとpath ownershipをそのまま実装しており、追加の仕様判断、tradeoff、open question、follow-upはない。
 
 ---
 
