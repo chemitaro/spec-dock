@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 import re
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -34,13 +34,23 @@ from spec_dock_runtime.domain.issue_planning_candidate import (
 from spec_dock_runtime.domain.issue_planning_contracts import (
     PlanningCommandResult,
     PlanningContext,
+    PlanningHumanDecisionV1,
     PlanningInvocationResult,
     PlanningReviewResult,
     PlanningRevisionRequestV1,
     PlanningSourceEvidence,
     ReviewedPlanningIdentity,
+    raw_bytes_sha256,
 )
 from spec_dock_runtime.infra.clock import now_iso
+from spec_dock_runtime.infra.issue_planning_apply import (
+    ExpectedPlanningTargets,
+    PlanningApplyExecution,
+    PlanningApplyOperation,
+    PlanningApplyOutputRejected,
+    load_expected_planning_targets,
+    planning_apply_resume_available,
+)
 from spec_dock_runtime.infra.issue_planning_candidate import (
     CandidateArchiveRejected,
     CandidateBuildFailed,
@@ -201,6 +211,416 @@ def _contains_symlink(root: Path, target: Path) -> bool:
         if current.is_symlink():
             return True
     return False
+
+
+def run_issue_planning_apply(
+    *,
+    request: PlanningApplyRequest,
+    records: Sequence[StoredMetaRecord],
+    repo_root: Path,
+    repo_slug_resolver: Callable[[Path], str | None],
+    validation_runner: Callable[[], object],
+    sync_runner: Callable[[], object],
+    preflight_runner: Callable[
+        [GitHubSyncPreflightRequest], PreflightResult
+    ] = run_github_sync_preflight,
+    candidate_loader: Callable[
+        [Path, Path], VerifiedIssueCandidate
+    ] = load_verified_issue_candidate,
+    expected_target_loader: Callable[
+        [Path, str, tuple[str, str, str]], ExpectedPlanningTargets
+    ] = load_expected_planning_targets,
+    resume_probe: Callable[..., bool] = planning_apply_resume_available,
+    transaction_runner: Callable[..., PlanningApplyExecution],
+) -> PlanningCommandResult:
+    issue_id = request.issue_id
+    try:
+        target = resolve_existing_issue_target(request.issue_id, records, repo_root)
+    except ValueError:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="apply_request_rejected",
+            issue_id=issue_id,
+        )
+    issue_id = target.issue_id
+    if not _apply_mode_options_are_closed(request):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="apply_request_rejected",
+            issue_id=issue_id,
+        )
+    try:
+        validate_candidate_output_directory(request.output_dir, repo_root)
+    except (CandidateOutputRejected, OSError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="apply_output_rejected",
+            issue_id=issue_id,
+        )
+    if not request.review_result_path.exists():
+        return PlanningCommandResult(
+            status="blocked",
+            reason="review_result_unavailable",
+            issue_id=issue_id,
+        )
+    if not request.human_decision_path.exists():
+        return PlanningCommandResult(
+            status="blocked",
+            reason="human_decision_unavailable",
+            issue_id=issue_id,
+        )
+    try:
+        review_bytes = _read_external_bounded_file(
+            request.review_result_path,
+            repo_root=repo_root,
+        )
+    except OSError:
+        return PlanningCommandResult(
+            status="blocked",
+            reason="review_result_unavailable",
+            issue_id=issue_id,
+        )
+    except (UnicodeDecodeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="review_result_rejected",
+            issue_id=issue_id,
+        )
+    try:
+        human_bytes = _read_external_bounded_file(
+            request.human_decision_path,
+            repo_root=repo_root,
+        )
+    except OSError:
+        return PlanningCommandResult(
+            status="blocked",
+            reason="human_decision_unavailable",
+            issue_id=issue_id,
+        )
+    except (UnicodeDecodeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="human_decision_rejected",
+            issue_id=issue_id,
+        )
+    expected_paths = _review_expected_paths_for_parse(review_bytes, request.mode)
+    try:
+        review = PlanningReviewResult.from_json_bytes(
+            review_bytes,
+            expected_canonical_target_paths=expected_paths,
+        )
+    except ValueError:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="review_result_rejected",
+            issue_id=issue_id,
+        )
+    if _review_result_has_sensitive_content(review):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="review_result_rejected",
+            issue_id=issue_id,
+        )
+    try:
+        human = PlanningHumanDecisionV1.from_json_bytes(
+            human_bytes,
+            review_result_bytes=review_bytes,
+            expected_canonical_target_paths=(
+                review.reviewed_identity.canonical_target_paths
+                if request.mode == "git-bound"
+                else None
+            ),
+        )
+    except ValueError:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="human_decision_rejected",
+            issue_id=issue_id,
+        )
+    identity = review.reviewed_identity
+    if (
+        review.reviewed_identity != human.reviewed_identity
+        or identity.issue_id != issue_id
+        or human.issue_id != issue_id
+        or identity.mode != request.mode
+        or request.expected_head != identity.source_head
+    ):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="review_identity_rejected",
+            issue_id=issue_id,
+        )
+    if human.decision == "approved" and review.verdict != "pass":
+        return PlanningCommandResult(
+            status="blocked",
+            reason="review_not_passed",
+            issue_id=issue_id,
+        )
+
+    verified_candidate: VerifiedIssueCandidate | None = None
+    if request.mode == "archive-candidate":
+        candidate_identity = identity.candidate_identity
+        if (
+            candidate_identity is None
+            or request.logical_filename != candidate_identity.logical_filename
+            or request.zip_sha256 != candidate_identity.zip_sha256
+        ):
+            return PlanningCommandResult(
+                status="rejected",
+                reason="candidate_identity_rejected",
+                issue_id=issue_id,
+            )
+        assert request.candidate_path is not None
+        try:
+            verified_candidate = candidate_loader(request.candidate_path, repo_root)
+        except CandidateArchiveRejected as error:
+            return PlanningCommandResult(
+                status="rejected",
+                reason="archive_rejected",
+                issue_id=issue_id,
+                details=tuple(str(item) for item in error.args[0])
+                if error.args and isinstance(error.args[0], tuple)
+                else (),
+            )
+        if verified_candidate.identity != candidate_identity:
+            return PlanningCommandResult(
+                status="stale",
+                reason="apply_target_changed",
+                issue_id=issue_id,
+            )
+    else:
+        if (
+            request.reviewed_head != identity.source_head
+            or identity.canonical_target_paths != target.canonical_issue_paths
+        ):
+            return PlanningCommandResult(
+                status="rejected",
+                reason="review_identity_rejected",
+                issue_id=issue_id,
+            )
+
+    repository = repo_slug_resolver(repo_root)
+    if repository is None or repository != identity.repository:
+        return PlanningCommandResult(
+            status="stale",
+            reason="apply_target_changed",
+            issue_id=issue_id,
+        )
+    source_paths: tuple[str, ...] = target.canonical_issue_paths
+    expected_source_hash: str | None = None
+    if verified_candidate is not None:
+        baseline = verified_candidate.source_baseline
+        canonical = baseline.get("canonical_issue_paths", ())
+        relevant = baseline.get("relevant_paths", ())
+        if isinstance(canonical, list) and isinstance(relevant, list):
+            source_paths = tuple(
+                sorted(
+                    {
+                        *(str(item) for item in canonical),
+                        *(str(item) for item in relevant),
+                    },
+                    key=lambda value: value.encode("utf-8"),
+                )
+            )
+        value = baseline.get("source_manifest_hash")
+        expected_source_hash = value if isinstance(value, str) else None
+    try:
+        expected_targets = expected_target_loader(
+            repo_root,
+            request.expected_head,
+            target.canonical_issue_paths,
+        )
+    except (OSError, ValueError):
+        return PlanningCommandResult(
+            status="stale",
+            reason="apply_target_changed",
+            issue_id=issue_id,
+        )
+    decided_at = datetime.fromisoformat(human.decided_at.replace("Z", "+00:00"))
+    timestamp = decided_at.astimezone(timezone.utc).strftime("%Y%m%dt%H%M%Sz")
+    issue_dir = PurePath(target.canonical_issue_paths[0]).parent
+    decision_path = (
+        issue_dir
+        / "artifacts"
+        / f"{timestamp}-planning-human-decision-placeholder.json"
+    ).as_posix()
+    replacements: dict[str, bytes] = {}
+    if (
+        request.mode == "archive-candidate"
+        and human.decision == "approved"
+        and verified_candidate is not None
+    ):
+        replacements = {
+            name: verified_candidate.files[name]
+            for name in DOCUMENT_NAMES
+        }
+    try:
+        operation = PlanningApplyOperation.create(
+            issue_id=issue_id,
+            mode=request.mode,
+            repository=identity.repository,
+            branch=identity.branch,
+            expected_head=request.expected_head,
+            reviewed_identity=identity,
+            reviewed_identity_sha256=review.reviewed_identity_sha256,
+            review_result_sha256=raw_bytes_sha256(review_bytes),
+            human_decision_sha256=raw_bytes_sha256(human_bytes),
+            decision=human.decision,
+            canonical_target_paths=target.canonical_issue_paths,
+            pre_apply_target_blob_oids=expected_targets.blob_oids,
+            candidate_identity=(
+                None if verified_candidate is None else verified_candidate.identity
+            ),
+            decision_artifact_path=decision_path,
+            human_decision_bytes=human_bytes,
+            replacement_documents=replacements,
+            pre_apply_document_bytes=expected_targets.documents,
+        )
+    except ValueError:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="apply_request_rejected",
+            issue_id=issue_id,
+        )
+    try:
+        resume_available = resume_probe(
+            operation,
+            output_dir=request.output_dir,
+        )
+    except (OSError, PlanningApplyOutputRejected, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="apply_output_rejected",
+            issue_id=issue_id,
+        )
+    if resume_available:
+        execution = transaction_runner(
+            operation,
+            repo_root=repo_root,
+            output_dir=request.output_dir,
+            validation_runner=validation_runner,
+            sync_runner=sync_runner,
+        )
+        return _planning_result_from_execution(issue_id, execution)
+
+    preflight = preflight_runner(
+        GitHubSyncPreflightRequest(
+            repo_root=repo_root,
+            ref=identity.branch,
+            source_paths=source_paths,
+            expected_source_hash=expected_source_hash,
+        )
+    )
+    if (
+        preflight.status != "pass"
+        or preflight.local_head != request.expected_head
+        or preflight.remote_head != request.expected_head
+    ):
+        if request.mode == "archive-candidate" and any(
+            blocker in {
+                "source_hash_mismatch",
+                "dirty_tracked",
+                "dirty_untracked",
+                "dirty_index",
+            }
+            for blocker in preflight.blockers
+        ):
+            return PlanningCommandResult(
+                status="stale",
+                reason="fresh_review_required",
+                issue_id=issue_id,
+            )
+        if preflight.status == "blocked":
+            return PlanningCommandResult(
+                status="blocked",
+                reason="git_preflight_blocked",
+                issue_id=issue_id,
+            )
+        return PlanningCommandResult(
+            status="stale",
+            reason="apply_target_changed",
+            issue_id=issue_id,
+        )
+    observed_source_hash = getattr(preflight.source_manifest, "source_manifest_hash", None)
+    if expected_source_hash is not None and observed_source_hash != expected_source_hash:
+        return PlanningCommandResult(
+            status="stale",
+            reason="apply_target_changed",
+            issue_id=issue_id,
+        )
+    execution = transaction_runner(
+        operation,
+        repo_root=repo_root,
+        output_dir=request.output_dir,
+        validation_runner=validation_runner,
+        sync_runner=sync_runner,
+    )
+    return _planning_result_from_execution(issue_id, execution)
+
+
+def _planning_result_from_execution(
+    issue_id: str,
+    execution: PlanningApplyExecution,
+) -> PlanningCommandResult:
+    return PlanningCommandResult(
+        status=execution.status,
+        reason=execution.reason,
+        issue_id=issue_id,
+        output={
+            key: value
+            for key, value in execution.to_output().items()
+            if value is not None
+        },
+        details=execution.details,
+    )
+
+
+def _apply_mode_options_are_closed(request: PlanningApplyRequest) -> bool:
+    if re.fullmatch(r"[0-9a-f]{40}", request.expected_head) is None:
+        return False
+    if request.mode == "archive-candidate":
+        return (
+            request.candidate_path is not None
+            and request.logical_filename is not None
+            and request.zip_sha256 is not None
+            and re.fullmatch(r"[0-9a-f]{64}", request.zip_sha256) is not None
+            and request.reviewed_head is None
+        )
+    if request.mode == "git-bound":
+        return (
+            request.candidate_path is None
+            and request.logical_filename is None
+            and request.zip_sha256 is None
+            and request.reviewed_head is not None
+            and re.fullmatch(r"[0-9a-f]{40}", request.reviewed_head) is not None
+        )
+    return False
+
+
+def _review_expected_paths_for_parse(
+    review_bytes: bytes,
+    mode: object,
+) -> tuple[str, str, str] | None:
+    if mode != "git-bound":
+        return None
+    try:
+        value = json.loads(review_bytes)
+        identity = value["reviewed_identity"]
+        paths = identity["canonical_target_paths"]
+        if (
+            isinstance(paths, list)
+            and len(paths) == 3
+            and all(isinstance(item, str) for item in paths)
+        ):
+            return (paths[0], paths[1], paths[2])
+    except (KeyError, TypeError, json.JSONDecodeError):
+        pass
+    return None
+
+
+def _git_blob_oid(content: bytes) -> str:
+    header = f"blob {len(content)}\0".encode("ascii")
+    return hashlib.sha1(header + content).hexdigest()
 
 
 def run_issue_planning_transport(
