@@ -47,16 +47,31 @@ ID: "epic-00080"
     - E-AC-002
   - depends on:
     - なし
+- iss-00342-reduce-unit-test-and-provider-ci-runtime:
+  - 目的:
+    - repo-local の tightly coupled test / Provider CI contract bug として、通常開発と PR feedback を阻害する長時間完全回帰の実行契約を整理する
+  - deliverable:
+    - requirement / design / plan / report
+    - research / interview / accepted ADR
+  - tranche:
+    - tranche-2
+  - closes:
+    - E-RQ-001
+    - E-RQ-002
+    - E-RQ-004
+    - E-AC-001
+  - depends on:
+    - なし
 
 ## 統合チェックポイント
 - G1 decomposition review:
   - issue scope が single actionable bug に閉じているか
 - G2 integration readiness:
-  - issue docs が implementation-ready か
+  - first issue と future appended issues の issue docs が、それぞれの issue status に応じて implementation-ready か
 - G3 rollout/docs impact:
   - background evidence と fix scope が混線していないか
 - G9 final epic spec review:
-  - reusable bucket と first issue が整合しているか
+  - reusable bucket、first issue、future appended issues が整合しているか
 
 ## 品質ゲート
 - test / observability / migration / docs:
@@ -79,7 +94,7 @@ ID: "epic-00080"
 
 ## final exit contract
 - E-AC closure:
-  - first issue `iss-00082` が spec-authored 済み
+  - first issue `iss-00082` と future appended issues は、それぞれの issue status に応じた spec-authoring / closure evidence を持つ。追加だけで issue の承認または完了を意味しない
 - integration / rollout complete:
   - yes
 - docs impact resolved:
