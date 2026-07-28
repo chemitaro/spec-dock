@@ -365,7 +365,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 |---|---|---|---|---|---|---|---|---|
 | S00 / M0 | committed | baseline ledger commit | `ac67751b7b32297be88196cb0825d307518f6ae2` | `git status --short` -> clean | N/A | N/A | N/A | S00-R2 fresh code-reviewer pass、required evidence、commit、cleanを確認しResult Approval |
 | S01 / M1a | committed | classifier / marker config commit | `392b5bb9d4869419179fc6d53a6e29a8c36b921a` | `git status --short` -> clean | N/A | N/A | N/A | S01-R1 fresh pass、required verification、commit、cleanを確認しResult Approval |
-| S02 / M1b | pending | pytest option / policy contract commit | pending | pending | `pyproject.toml` sliceはapproved-no-op | S01でcommit済みのstrict markersとmarker registry | `git diff --quiet -- pyproject.toml` | utility-workerがDES-TL-003責務境界をread-only確認 |
+| S02 / M1b | committed | pytest option / policy contract commit | `e63fe928e20525c07bf34bd02c5e95b9d11e761c` | `git status --short` -> clean | `pyproject.toml` sliceはapproved-no-op | S01でcommit済みのstrict markersとmarker registry | `git diff --quiet -- pyproject.toml` | S02-R2 fresh pass、M1b commit、cleanを確認しResult Approval |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -374,6 +374,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 #### コミット
 - `ac67751b7b32297be88196cb0825d307518f6ae2` `test(test-lanes): 実装前テスト基準を固定`
 - `392b5bb9d4869419179fc6d53a6e29a8c36b921a` `test(test-lanes): pytestテストレーン分類を追加`
+- `e63fe928e20525c07bf34bd02c5e95b9d11e761c` `test(test-lanes): 完全回帰を明示opt-inへ分離`
 
 #### メモ
 - ...
