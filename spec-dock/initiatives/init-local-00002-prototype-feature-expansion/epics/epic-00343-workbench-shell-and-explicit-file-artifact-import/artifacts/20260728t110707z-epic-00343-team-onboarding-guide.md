@@ -37,11 +37,12 @@ reflected_to: []
 
 ### 1.1 作業場所を最初から用意する
 
-新しく作成したSpecDock repositoryと、今後作成するInitiative、Epic、Issueには、`.workbench/`という作業用directoryの「空の器」を自動で用意します。
+新しく作成したSpecDock repositoryと、今後作成するInitiative、Epic、Issueには、`.workbench/`という作業用directoryと、その場で利用方法を説明するREADMEを自動で用意します。
 
-- `.workbench/.gitkeep`だけをGitで管理します。
+- `.workbench/README.md`だけをGitで管理します。
 - `.workbench/`へ置いた作業中のfileはGitで管理しません。
 - 作業fileは正式な仕様や成果物ではありません。
+- READMEは作業fileを正本へ格上げするものではなく、明示importもevidence保存にとどまります。
 - Git worktreeを閉じれば、そのworktree内の作業fileも一緒に捨てられる前提です。
 - 既存repositoryや既存nodeには、後から自動追加しません。
 - `.workbench/`がなくてもSpecDockは正常です。
@@ -128,8 +129,8 @@ e3 --> t3
 | Initiative | 複数のEpicをまとめる上位の目的 |
 | Epic | 複数Issueで完成させる、まとまった利用者価値 |
 | Issue | 実装・検証できる大きさへ分割した作業単位 |
-| Workbench | 正式採用前のfileを置く、Git管理外の一時作業directory |
-| Workbench shell | Gitで存在だけを保持する`.workbench/.gitkeep` |
+| Workbench | 正式採用前のfileを置く一時作業directory。`README.md`だけtrackedで、その他はGit管理外 |
+| Workbench shell | 利用方法を説明するtracked `.workbench/README.md`を持つdirectory |
 | Artifact | 調査、判断、説明資料、外部出力など、対象nodeに紐づけて残すfile |
 | canonical / 正本 | 意思決定や実装が従う正式な文書 |
 | provider | SpecDockを他repositoryへ配布するsource側 |
@@ -146,12 +147,12 @@ e3 --> t3
 ```text
 spec-dock/
 ├── .workbench/
-│   ├── .gitkeep            # Gitで管理する
+│   ├── README.md           # Gitで管理する利用ガイド
 │   └── ...                 # 作業file。Gitでは管理しない
 └── initiatives/
     └── init-xxxxx-.../
         ├── .workbench/
-        │   ├── .gitkeep
+        │   ├── README.md
         │   └── ...
         └── epics/
             └── epic-xxxxx-.../
@@ -173,7 +174,21 @@ spec-dock/
 
 Workbench自体は必須ではありません。削除してもSpecDockは壊れず、必要なら手動で作り直せます。
 
-### 4.3 Git worktreeとの関係
+### 4.3 READMEがその場で説明すること
+
+root / Initiative / Epic / IssueのREADMEは同じ内容を持ち、最低限次を伝えます。
+
+1. ここはtemporaryかつworktree-localな作業場所である。
+2. `README.md`だけがGit追跡対象で、その他のfileはignoredかつnoncanonicalである。
+3. worktreeを削除すれば作業fileも失われ得る。
+4. 一fileを残すには、対象を明示して`artifact import file`でArtifactへ保存する。
+5. Workbench間copyは自動ではなく、必要なときだけmanual `workbench copy`を使う。
+6. Git ignoreはsecurity boundaryではないため、禁止されたsecretを置かない。
+7. fileを明示することはread/importの許可にすぎず、import結果もevidence-onlyである。canonical adoptionには別のreviewed workflowが必要である。
+
+READMEは案内板です。`validate`、`sync`、dependency、ADR、authoringのdefault discoveryがWorkbenchを意味解釈する入口にはしません。
+
+### 4.4 Git worktreeとの関係
 
 ```plantuml
 @startuml
@@ -182,22 +197,22 @@ left to right direction
 
 node "Main worktree" as main {
   folder ".workbench/" as mwb {
-    file ".gitkeep\ntracked" as mmarker
+    file "README.md\ntracked guidance" as mreadme
     file "local notes\nignored" as mnotes
   }
 }
 
 node "Feature worktree" as feature {
   folder ".workbench/" as fwb {
-    file ".gitkeep\ntracked" as fmarker
+    file "README.md\ntracked guidance" as freadme
     file "feature experiments\nignored" as fnotes
   }
 }
 
 cloud "Git history" as git
 
-mmarker --> git : tracked
-fmarker --> git : tracked
+mreadme --> git : tracked
+freadme --> git : tracked
 mnotes -[hidden]-> git : not tracked
 fnotes -[hidden]-> git : not tracked
 main ..> feature : 必要な場合だけ\nmanual workbench copy
@@ -206,7 +221,7 @@ main ..> feature : 必要な場合だけ\nmanual workbench copy
 
 - Title: Git worktreeとWorkbench
 - Question answered: なぜWorkbench contentsをGit管理せず、copyをmanual補助にするのか。
-- Scope: shell marker、local contents、worktree間copy。
+- Scope: tracked guidance README、local contents、worktree間copy。
 - Excluded details: Git worktree作成command、copy conflict algorithm。
 - Update trigger: Workbenchのtracking、copy、lifecycle方針が変わるとき。
 
@@ -390,22 +405,25 @@ end note
 利用者価値:
 
 - fresh repository / future nodeを作成すると、すぐ使えるWorkbench shellがある。
-- markerだけGitへ入り、scratch contentsはGitへ出ない。
+- READMEを読めば利用方法と正本境界が分かり、READMEだけGitへ入り、scratch contentsはGitへ出ない。
 - 既存nodeは変わらない。
 
 主な変更:
 
 - installerのfresh root判定。
 - provider `.gitignore`。
-- Initiative / Epic / Issue templates。
-- hidden `.gitkeep`のwheel package-data。
+- root / Initiative / Epic / Issueのbyte-identicalな`.workbench/README.md` templates。
+- README-only trackingを作るprovider `.gitignore`。
+- hidden-directory READMEのpackage-dataと、既存の広域README除外規則の限定化。
 - node creationのplanned / result / filesystem parity。
 - Workbench / `workbench copy` docs。
 
 主な検証:
 
 - fresh rootと3 node kind。
-- real Gitでmarkerだけtracking。
+- real GitでREADMEだけtracking。
+- README本文の7 guidance要素と4 templateのbyte parity。
+- source / wheel / sdist / installed resourcesで許可されたREADMEだけが存在するexact inventory。
 - nested contentsをignore。
 - update / sync / validate / active / Artifact / ADRによるno-backfill。
 - fake metadata、binary、broken subtreeをsemantic scanしない。
@@ -581,11 +599,15 @@ https://github.com/chemitaro/spec-dock
 
 ### Workbench contentsはGitへ入りますか
 
-入りません。`.gitkeep`だけをtrackingします。
+`.workbench/README.md`だけが入ります。README以外の作業fileはtrackingしません。
+
+### READMEを読んだmodelはWorkbench fileを正本として使えますか
+
+いいえ。利用者がfileを明示することはread/importの許可にすぎません。import後もArtifact evidenceであり、正本文書へ採用するには別のreviewed workflowが必要です。
 
 ### worktreeを作るとWorkbench contentsもcopyされますか
 
-自動ではcopyしません。必要な場合だけmanual `workbench copy`を使います。
+tracked `.workbench/README.md`は通常のGit checkoutにより新しいworktreeにも現れます。README以外のignoredな作業fileは自動では移りません。必要な作業fileがある場合だけmanual `workbench copy`を使います。
 
 ### import対象はWorkbench内だけですか
 
@@ -605,7 +627,7 @@ https://github.com/chemitaro/spec-dock
 
 ## 13. チームで説明するときの短い話し方
 
-> このEpicは、SpecDockの各作業対象に最初から使える一時作業場所を用意し、そこで作ったfileや外部fileのうち、残したい一fileだけを正式なArtifact領域へ安全にcopyできるようにします。Workbenchの中身はGit管理せず、既存nodeも勝手に変えません。importはMarkdownに限定せず、元file、名前、privacyを守ります。実装はWorkbench shell、generic file import、配布と最終品質の3 Issueに分け、最後のIssueが前2つを統合してmergeable PRまで責任を持ちます。
+> このEpicは、SpecDockの各作業対象に利用ガイド付きの一時作業場所を最初から用意し、そこで作ったfileや外部fileのうち、残したい一fileだけをArtifact領域へ安全にcopyできるようにします。WorkbenchではREADMEだけをGit管理し、その他の作業fileと既存nodeは勝手に変えません。importはMarkdownに限定せず、元file、名前、privacyを守りますが、結果はevidenceであり自動的に正本にはなりません。実装はWorkbench shell、generic file import、配布と最終品質の3 Issueに分け、最後のIssueが前2つを統合してmergeable PRまで責任を持ちます。
 
 ## 14. 現在のチェックリスト
 
@@ -616,6 +638,8 @@ https://github.com/chemitaro/spec-dock
 - [x] requirementの再構成とfresh review pass。
 - [x] designの再構成、accepted ADR、fresh review pass。
 - [x] planの3 vertical slices化とfresh review pass。
+- [x] Workbench shellを`.gitkeep`から利用ガイド付き`.workbench/README.md`へ改訂。
+- [x] README amendmentのrequirement / design / plan fresh review pass。
 - [x] planning commitsをGitHubへpush。
 - [ ] 人間による3 Issue作成の承認。
 - [ ] 3 Issueの作成とdependency登録。
