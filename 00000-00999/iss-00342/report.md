@@ -256,6 +256,7 @@ uv run pytest -q -p no:cacheprovider \
 | S04R | `CLOS-TL-AC-001`,`CLOS-TL-BH-001`,`CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | snapshot correction後のroot/unit/focused fast gate、failure propagation、new manifestを再固定 | root/unit各669 passed、H body 0、required-fast 7、lint/validate/assurance pass、manifest `48ef40...4363`、S04R-R2 fresh pass | pass | M3a-r `87f5ef44`、post-commit clean確認済み |
 | S05-A | `CLOS-TL-AC-002`,`007`,`008`,`CLOS-TL-BH-002`,`007`,`CLOS-TL-CON-004` | repaired SHAでsame-condition 3-pair Green、full completeness、failure visibility | fast 9.70/9.39/9.61s、full 1650.73/1654.60/1656.30s、全full exit0/F∪H/policy skip0、drift0、S05-A-QA1 fresh pass | pass | M3b `788383c7`、post-commit clean確認済み |
 | S90 | `CLOS-TL-AC-005`,`010`,`011`,`CLOS-TL-BH-007`,`CLOS-TL-CON-001` | contributor/agent docsをfinal commands/events/failure/rollback/human merge境界へ整合 | README/AGENTS surgical diff、implementation comparison、diff check、manifest対象差分0/hash一致、S90-R2 fresh pass | pass | M4a `d23c1aff`、post-commit clean確認済み |
+| S98 | all 22 post-commit evidence slots | S100後のPR/check/merge/lifecycle証跡をsingle durable anchorへ保存 | Issue #342 comment marker/schema/readback、open state、secret-free、repo diffなし | pass | fresh spec-reviewerとM4b anchor-index commitはpending |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -392,6 +393,7 @@ read-only specialist consentと、scope-local `artifacts/` direct childへの限
 | S04R | delegated | amended planがmanifest変更後のfresh integrated gateを要求 | dev-coder | new committed SHAのS04 exact bundleとmanifest再固定 | approved amendment、S05R committed/clean、S04 contract | read-only commandsのみ | source/config/workflow/report変更、formal full suite | root/unit/focused、marker-only、required-fast、lint、partition、manifest、diff/validate | H body、unknown failure、unexplained delta、dirty source | exact commands/results/SHA/manifest、risk、no-material decision | verification pass; reviewer pending |
 | S05-A | delegated | approved amendmentがrepaired SHAのnew 3-pairを要求 | dev-coder | same-condition accepted 3-pair measurement | S04R committed/clean、new manifest、measurement protocol | read-only commands/scratch logs | source/config/workflow/report変更、5回目full | preflight、fast→full×3、pair前後SHA/manifest/clean、counts/log hashes | any nonzero、fast>=full、H=0、drift | exact ledger/log hashes/EVD-TL-005/008/no-material decision | measurement pass; QA pending |
 | S90 | delegated | approved planがcontributor-facing operationのdocs resolutionを要求 | doc-writer | final commands/events/failure/rollback/human merge docs | approved docs、implementation、S05 manifest、README/AGENTS | `README.md`,`AGENTS.md` only | source/tests/workflows/templates/skills/assets、schedule/SLA/automatic operation | targeted rg、implementation comparison、diff check、manifest equality | scaffold docs必要、policy ambiguity、new automation | changed files/diff/verification/risk/EVD-TL-007/no-material decision | docs implementation pass; spec review pending |
+| S98 | delegated | approved planがnon-circular durable external anchorを要求 | spec-manager | Issue #342 named comment作成/readback | S90 committed/clean、approved S98 schema、Issue #342 open | GitHub Issue comment only | repo files、Issue close、secret、review代替 | marker/schema/URL/readback/open state/diff check | auth不足、duplicate anchor、schema/secret defect | URL/comment ID/EVD-TL-010/no-material decision | anchor created; spec review pending |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -409,6 +411,7 @@ read-only specialist consentと、scope-local `artifacts/` direct childへの限
 | S04R | dev-coder | new SHAでS04 exact bundleをread-only再実行 | none | root/unit各669 passed、H body0、required-fast7、lint/partition/diff/validate/assurance pass | S04R-R2 passed | new 3-pair未実施 | accepted。manifest 445 files `48ef40...4363`、前後clean |
 | S05-A | dev-coder | repaired SHAでaccepted fast→full 3 pairsをread-only計測 | none | fast各exit0約9.4〜9.7s、full各exit0約1651〜1656s、F∪H/policy skip0/drift0 | S05-A-QA1 passed | M3b未完了 | accepted。pre-merge full総数4、5回目未実行 |
 | S90 | doc-writer | README/AGENTSをordinary/full/PR/main/manual/failure/rollback/human mergeへ整合 | `README.md`,`AGENTS.md` | implementation comparison、targeted rg、diff check、manifest 445/hash一致 | S90-R2 passed | none | accepted。wrapper/schedule/hard SLA/automatic rollback追加なし |
+| S98 | spec-manager | Issue #342へnamed external-evidence anchorを作成しreadback | none | Issue open、marker、10 slots、owner/predicate、secret-free、URL確認 | S98-R1 passed | S100後slot更新はexternal only | accepted。repo/Issue state変更なし |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -454,6 +457,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S05-A-QA1 | accepted three-pair measurement review | qa-reviewer | fresh | passed | no | proceed to M3b commit | Red保持、recovery順序、3-pair completeness、log hashes、総数4/5回目なしを確認。integration evidence sufficient、confidence 0.99 |
 | S90-R1 | docs/spec/implementation alignment review | spec-reviewer | historical | failed | no | blocked | docs自体は整合したがTest Contract Closure/Closure CoverageにS90の5 closure行欠落のP1 1件 |
 | S90-R2 | docs/spec/implementation alignment re-review | spec-reviewer | fresh | passed | no | proceed to M4a commit | 5 closure、tc-s90-001/EVD-TL-007、docs/spec/implementation、manifestを確認。findings 0、confidence 0.99 |
+| S98-R1 | durable anchor/non-circularity review | spec-reviewer | fresh | passed | no | proceed to M4b commit | single anchor、10 slots、owner/predicate、non-circularity、secret-freeを確認。findings 0、confidence 0.99 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -467,6 +471,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04R / M3a-r | committed | post-recovery integrated evidence commit | `87f5ef44fa3efb06f6e7ab4ed61e06db77fcc614` | `git status --short` -> clean | N/A | N/A | N/A | S04R-R2 fresh pass、new manifest、commit、cleanを確認しResult Approval |
 | S05-A / M3b | committed | accepted measurement ledger commit | `788383c788f0e289c6e3684fccf86343a0f23201` | `git status --short` -> clean | N/A | N/A | N/A | S05-A-QA1 fresh pass、accepted 3-pair、commit、cleanを確認しResult Approval |
 | S90 / M4a | committed | contributor docs commit | `d23c1affb4b1711e16db76a22ab8dd38cd75ac8c` | `git status --short` -> clean | N/A | N/A | N/A | S90-R2 fresh pass、manifest一致、commit、cleanを確認しResult Approval |
+| S98 / M4b | pending | external anchor index commit | pending | pending | N/A | N/A | N/A | fresh S98 spec-reviewer pass後にreport-only commit |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -947,6 +952,22 @@ LC_ALL=C git ls-files -- 'tests/**' 'src/**' pyproject.toml uv.lock '.github/wor
 - S05 manifest対象差分0、tracked 445、aggregate `48ef40dbf0a145e288406c22ee7693b0ebcee8289a3b358a2a34cf3ad0ff4363`一致。
 - `doc-writer`: `No material implementation decisions beyond the approved plan.`
 - orchestrator disposition: noteを採用。approved contributor contractの反映のみで、new schedule/SLA/automation/wrapperはない。
+
+---
+
+## Post-commit External Evidence Index
+
+- marker: `[iss-00342 external-evidence]`
+- Issue: `https://github.com/chemitaro/spec-dock/issues/342`（OPEN）
+- anchor comment: `https://github.com/chemitaro/spec-dock/issues/342#issuecomment-5108185654`
+- comment ID: `IC_kwDOQ99OK88AAAABMHi6Ng`
+- schema slots: PR Delivery、reviewed head SHA、3 PR executions、Merge Preparation、human merge、latest-main full、incident exception、final 22-closure audit、sync/validate、issue-finish/closeout。
+- current slots: all `pending` with owner and acceptance predicate。
+- authorization: user request to complete implementation and submit a mergeable PR + approved S98 execution contract。
+- readback: exact marker、required 10 slots、Issue linkage/open state、secret-free bodyを確認。
+- `EVD-TL-010`: S100後にreviewed repo artifactsを書き戻さず、S110〜S130 evidenceを同一commentへ追記できるdurable destinationを確立。
+- `spec-manager`: `No material implementation decisions beyond the approved plan.`
+- orchestrator disposition: noteを採用。approved schemaをそのまま作成し、repo files、Issue state、credentials/secretsを変更していない。
 
 ---
 
