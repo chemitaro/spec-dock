@@ -95,6 +95,7 @@ Red方針:
 | installer tests | `tests/unit/infra/test_init_update.py` | fresh/existing、ignore、asset parity、build/distribution |
 | scaffolder tests | `tests/unit/infra/test_runtime_template_scaffolder.py` | real provider exact-copy、placeholder render、path-agnostic guardrail |
 | node tests | `tests/cli_runtime/test_runtime_new_doc_s09.py` | Initiative/Epic/Issue planned/result/filesystem parity |
+| lifecycle no-backfill tests | `tests/cli_runtime/test_new.py` | validate、sync、active switching、Artifact/ADR作成、future child作成を通したexisting Workbench保存 |
 | opacity tests | `tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py` | Workbench semantic opacity |
 | copy tests | `tests/cli_runtime/test_workbench.py` | checkout/manual copy/source-wins compatibility |
 | Issue evidence | Issue 344 `report.md` | observed execution/review evidence |
@@ -197,7 +198,7 @@ Must not happen:
 | TC-344-002B | yes | AC-344-002/003 / DES-344-002 | S01 | unchanged CRLF UTF-8とplaceholder template | unchangedはpath非依存exact-copy、changedはrender | text rewrite・README専用分岐 | real provider unit | EVD-002/003 |
 | TC-344-003 | yes | AC-344-003 / DES-344-003 | S01 | 4 provider README bytes | byte-identical、9 guidance elements、exact command | wording drift・placeholder混入 | asset byte/hash assertion | EVD-003 |
 | TC-344-004 | yes | AC-344-004 / DES-344-004 | S01 | regular/symlink/directory/nested/case/near-name paths | exact top-level README pathnameだけtracking eligible | payload露出・過剰再包含 | real Git matrix | EVD-004 |
-| TC-344-005 | yes | AC-344-005 / DES-344-001/002/005 | S01 | existing Workbench before/after init/update/new child | entry、bytes、names、mtime不変 | backfill・既存状態破壊 | snapshot/mtime regression | EVD-001/002 |
+| TC-344-005 | yes | AC-344-005 / DES-344-001/002/005 | S01 | existing rootと代表的なexisting Initiative/Epic/Issue Workbenchのbefore/after、existing init/update、validate、sync、active switching、Artifact作成、ADR作成、future child作成 | 全existing scopeのentry inventory、file bytes、names、mtime不変。future child作成時は新規childだけREADMEを得てancestor/siblingは不変 | backfill・既存状態破壊・read-only commandの副作用 | exact 2 pytest nodesのsnapshot/mtime regression | EVD-001/002 |
 | TC-344-006 | yes | AC-344-006 / DES-344-006 | S02 | README、fake metadata、ADR-like、binary、invalid UTF-8 | validate/sync/deps/active/source observation不変 | semantic source化 | infra/CLI regression | EVD-005 |
 | TC-344-007A | yes | AC-344-007A / DES-344-007 | S02 | linked worktreeとidentical README | READMEはcheckout、ignored payloadはmanual copy、content diffなし | checkout/copy混同 | linked-worktree Git test | EVD-006 |
 | TC-344-007B | yes | AC-344-007B / DES-344-007 | S02 | divergent source/target node README | existing opaque whole-tree source-wins | README filterによる互換破壊 | copy regression | EVD-006 |
@@ -299,6 +300,7 @@ Red test seeds:
 - `test_workbench_gitignore_tracks_only_top_level_readme`
 - `test_new_node_workbench_readme_matrix`
 - `test_new_node_workbench_readme_does_not_touch_existing_scopes`
+- `tests/cli_runtime/test_new.py::TestCliNew::test_workbench_no_backfill_preserves_existing_scopes_across_all_triggers`
 - `tests/unit/infra/test_runtime_template_scaffolder.py::test_copy_scaffolded_tree_uses_exact_copy_for_unchanged_utf8_bytes`
 - `tests/unit/infra/test_runtime_template_scaffolder.py::test_copy_scaffolded_tree_still_renders_changed_placeholder_text`
 - `tests/unit/infra/test_runtime_template_scaffolder.py::test_copy_scaffolded_tree_exact_copy_is_path_agnostic`
@@ -323,6 +325,9 @@ uv run pytest \
   tests/unit/infra/test_runtime_template_scaffolder.py::test_copy_scaffolded_tree_exact_copy_is_path_agnostic
 uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py -k workbench
 uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py
+uv run pytest \
+  tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_and_force_init_do_not_backfill_workbench_readme \
+  tests/cli_runtime/test_new.py::TestCliNew::test_workbench_no_backfill_preserves_existing_scopes_across_all_triggers
 git diff --check
 ```
 
@@ -349,7 +354,7 @@ Planned contract:
 
 - delegated role: `dev-coder`
 - input docs: approved `requirement.md`、`design.md`、本`plan.md`、`workflow_issue.md`、`authoring/issue-plan.md`、S01 target source/tests。
-- allowed paths: Section 3.1のinstaller、provider ignore、4 README assets、generic scaffolder、installer/node/scaffolder tests。
+- allowed paths: Section 3.1のinstaller、provider ignore、4 README assets、generic scaffolder、installer/node/scaffolder/lifecycle no-backfill tests。
 - forbidden changes: copy/discovery read-only 3 files、generic import、root copy route、dogfood projection、S02/S03/S90 files。
 - acceptance criteria: TC-344-001〜005のlocked expectationをすべて満たす。
 - required tests: S01 Gateのexact commandsとreal Git ignore/status matrix。
@@ -368,11 +373,11 @@ Planned contract:
   - 関連 closure id: TC-344-001、TC-344-003、TC-344-004。
 
 - `tc-s01-002` negative: existing scopeをbackfill/変更しない
-  - 前提: file、directory、symlink、empty directoryのexisting rootと、既存node Workbenchのbytes/names/mtime snapshotを用意する。
-  - 操作: update、existing `init --force`、new child creationを実行する。
-  - 期待結果: existing root/nodeはREADMEをbackfillせず、existing Workbench snapshotは不変で、新規childだけREADMEを得る。
-  - 失敗検出: freshnessの遅延判定、ancestor/sibling mutation、mtime変更を検出する。
-  - 検証方法: `TestInitUpdate::test_update_and_force_init_do_not_backfill_workbench_readme` と new-node preservation test。
+  - 前提: file、directory、symlink、empty directoryのexisting rootと、代表的なexisting Initiative/Epic/Issue Workbenchについてentry inventory、file bytes、names、mtimeのsnapshotを用意する。
+  - 操作: existing init/update、validate、sync、active switching、Artifact作成、ADR作成、future child creationを順に実行し、各操作後に同じsnapshotを取得する。
+  - 期待結果: 全existing root/nodeはREADMEをbackfillせず、各操作後もexisting Workbench snapshotが不変で、future child creationでは新規childだけREADMEを得てancestor/siblingは不変である。
+  - 失敗検出: freshnessの遅延判定、read-only/creation commandの副作用、ancestor/sibling mutation、bytes/name/mtime変更を検出する。
+  - 検証方法: `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_update_and_force_init_do_not_backfill_workbench_readme tests/cli_runtime/test_new.py::TestCliNew::test_workbench_no_backfill_preserves_existing_scopes_across_all_triggers`。
   - 関連 closure id: TC-344-001、TC-344-002A、TC-344-005。
 
 - `tc-s01-003` invariant: generic exact-copyとplaceholder renderを両立する
@@ -399,7 +404,7 @@ Planned contract:
 | TC-344-002A/B | yes | 3 node parityとreal generic copy/renderがPASS | EVD-002/003 + exact nodes |
 | TC-344-003 | yes | 4 bytes/guidanceとtracer output一致 | EVD-003 + hashes |
 | TC-344-004 | yes | full real Git matrix一致 | EVD-004 |
-| TC-344-005 | yes | before/after snapshot不変 | EVD-001/002 |
+| TC-344-005 | yes | exact 2 pytest nodesが全trigger後のroot/Initiative/Epic/Issue snapshotとancestor/sibling不変を証明 | EVD-001/002 |
 
 S01 step gate:
 
@@ -652,7 +657,7 @@ S03 step gate:
 
 - depends on: S01、S02。
 - unblocks: S99。
-- target files: provider docs 3件、`templates/README.md`、docs assertions、Issue report。4 canonical `.workbench/README.md` はread-only reference。
+- target files: provider docs 3件、`templates/README.md`、`tests/unit/infra/test_init_update.py` のdocs semantic assertion、Issue report。4 canonical `.workbench/README.md` はread-only reference。
 - integration checkpoint: S01/S02のobserved shell/copy boundaryと4 canonical READMEをshipped docsへ照合する。
 - annotation: AFK。canonical README wording変更はHITL design amendment。
 
@@ -660,23 +665,28 @@ Planned contract:
 
 - scope: TC-344-007C/010をdocs-only vertical sliceとして閉じる。
 - test obligation: 9 guidance elements、deprecated wording、root/node copy差、security/authority、Issue 345/346 boundary。
-- alternative evidence: inspect-only + docs semantic assertion。production code Redは要求しない。
-- green verification: `TestInitUpdate::test_shipped_docs_describe_workbench_readme_boundary`、docs diff、canonical README parity inspection。
+- alternative evidence: docs semantic assertionは`dev-coder`がRedを作成し、docs変更は`doc-writer`がGreenにする。production runtime code Redは要求しない。
+- green verification: `tests/unit/infra/test_init_update.py::TestInitUpdate::test_shipped_docs_describe_workbench_readme_boundary`、docs diff、canonical README parity inspection。
 - refactor guardrail:意味を変えない局所wording整理だけを許可し、canonical READMEを変更しない。
 - report evidence destination: EVD-008/010とS90 session log。
 - amendment trigger: canonical README wording、runtime behavior、Issue ownershipの変更が必要な場合。
 
 #### S90 delegation contract
 
-- delegated role: `doc-writer`
+S90は同じvertical slice内で、test contractとdocs変更の責務を次の順序で分離する。
+
+1. `dev-coder` が `tests/unit/infra/test_init_update.py::TestInitUpdate::test_shipped_docs_describe_workbench_readme_boundary` のみを追加し、現行docsに対する期待どおりのRedを記録する。fresh `code-reviewer` がassertionの要件追跡、過剰拘束、対象path、Red理由を確認する。
+2. `doc-writer` がprovider docs 4件だけを変更し、既に存在するsemantic assertionをGreenにする。fresh `spec-reviewer` がauthority/security/copy/root/sibling境界とapproved specsへの整合を確認する。
+
 - input docs: approved specs、本plan、S01/S02 observed evidence、canonical README bytes、provider docs 4件、`workflow_issue.md`。
-- allowed paths: `src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,reference_worktree.md}`、`src/spec_dock/assets/spec_dock/templates/README.md`、docs assertions、Issue report。
-- forbidden changes: runtime/installer/package config、canonical Issue specs、dogfood projection、Issue 345/346 implementation。
-- acceptance criteria: TC-344-007CとTC-344-010のoperator guidanceを満たし、generic importをimplementedと誤記しない。
-- required docs verification: semantic assertion、deprecated wording inspection、docs diff、4 canonical READMEとの用語照合。
-- reviewer focus: fresh `spec-reviewer` がauthority/security/copy/root/sibling境界を確認する。
-- stop conditions: wordingがapproved designの意味を変える、runtime changeが必要、deprecated wordingの文脈判断不能。
-- output required: changed docs、inspection results、unresolved wording、EVD-008へ転記するsummaryとLedger Note。
+- `dev-coder` allowed paths: `tests/unit/infra/test_init_update.py` とIssue reportのみ。
+- `doc-writer` allowed paths: `src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,reference_worktree.md}`、`src/spec_dock/assets/spec_dock/templates/README.md`、Issue reportのみ。
+- forbidden changes: runtime/installer/package config、canonical Issue specs、dogfood projection、Issue 345/346 implementation。`doc-writer`によるPython test編集と`dev-coder`によるdocs編集も禁止する。
+- acceptance criteria: TC-344-007CとTC-344-010のoperator guidanceを満たし、generic importをimplementedと誤記せず、semantic assertionが期待したRedからGreenになる。
+- required docs verification: exact semantic assertion node、deprecated wording inspection、docs diff、4 canonical READMEとの用語照合。
+- reviewer focus: fresh `code-reviewer` がtest contract、fresh `spec-reviewer` がdocs/spec contractをそれぞれ確認する。
+- stop conditions: test Redがdocs contract以外の理由、wordingがapproved designの意味を変える、runtime changeが必要、deprecated wordingの文脈判断不能。
+- output required: test Red/Green、changed test/docs、両review verdict、inspection results、unresolved wording、EVD-008へ転記するsummaryとLedger Note。
 
 #### S90 具体テストケース一覧
 
@@ -685,7 +695,7 @@ Planned contract:
   - 操作: shell/optional/no-backfill/README-only tracking/opacity/security/checkout/node copy/root exclusion/evidence-only importをsemantic assertionする。
   - 期待結果: 4 docsが同じ境界を説明し、Issue 345のgeneric importを未実装として位置づける。
   - 失敗検出: Workbench全体をGit管理外とする旧説明、root copy示唆、import implemented claimを検出する。
-  - 検証方法: `TestInitUpdate::test_shipped_docs_describe_workbench_readme_boundary` とdocs diff inspection。
+  - 検証方法: `uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_shipped_docs_describe_workbench_readme_boundary` とdocs diff inspection。
   - 関連 closure id: TC-344-007C、TC-344-010。
 
 - `tc-s90-002` inspect-only: skills/workflow/dogfood影響を誤って変更しない
@@ -705,10 +715,12 @@ Planned contract:
 
 S90 step gate:
 
-1. reportへdocs inspection、delegation evidence、closure deltaをcommit前に記録する。
-2. fresh `spec-reviewer` のblocking findingを閉じる。
-3. main orchestratorがstep resultを承認する。
-4. commit候補: `docs(workbench): README shellの運用境界を更新`。docs no-opはsemantic assertion付きapproved-no-opだけを許可する。
+1. `dev-coder` がexact semantic assertion testを追加し、期待どおりのRedをreportへ記録する。
+2. fresh `code-reviewer` がtest contractをPASSするまでtest findingを修正・再レビューする。
+3. `doc-writer` がdocs 4件だけを変更してexact assertionをGreenにし、docs inspection、delegation evidence、closure deltaをcommit前にreportへ記録する。
+4. fresh `spec-reviewer` がdocs/spec contractをPASSするまでdocs findingを修正・再レビューする。
+5. main orchestratorが両reviewとS90 resultを承認する。
+6. commit候補: `docs(workbench): README shellの運用境界を更新`。docs no-opはsemantic assertion付きapproved-no-opだけを許可するが、test contractのreviewは省略しない。
 
 ### S99 — Final Issue-local Quality Gate
 
@@ -788,7 +800,7 @@ S99 step gate:
 | Level | 目的 | Command / Evidence |
 |---|---|---|
 | L1 | Active cycle | `uv run pytest tests/unit/infra/test_init_update.py -k workbench_readme` |
-| L2 | Installer/node/exact-copy local | `uv run pytest tests/unit/infra/test_init_update.py tests/unit/infra/test_runtime_template_scaffolder.py tests/cli_runtime/test_runtime_new_doc_s09.py` |
+| L2 | Installer/node/exact-copy/no-backfill local | `uv run pytest tests/unit/infra/test_init_update.py tests/unit/infra/test_runtime_template_scaffolder.py tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/test_new.py::TestCliNew::test_workbench_no_backfill_preserves_existing_scopes_across_all_triggers` |
 | L3 | Opacity/copy local | `uv run pytest tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py tests/cli_runtime/test_workbench.py` |
 | L4 | Build/distribution | M3記載の2つのexact `TestInitUpdate` node |
 | L5 | Static/diff | M3記載のscoped Ruff check/format、Mypy、`git diff --check` |
@@ -803,7 +815,8 @@ full repository regression、candidate wheel consumer E2E、dogfood projection�
 |---|---|---|---|---|
 | B-001〜004 | `dev-coder` | installer、assets、ignore、generic scaffolder、近接tests | freshness/no-backfill/ignore/generic exact-copy/render | M1 session |
 | B-005〜006 | `dev-coder` | opacity/copy testsのみ。copy sourceはread-only | semantic opacity/source-wins/root rejection | M2 session |
-| B-007 | `doc-writer` | provider docs 4件 | authority/security/Issue境界 | S90 |
+| B-007 test contract | `dev-coder` | `tests/unit/infra/test_init_update.py`のexact semantic assertionのみ | fresh `code-reviewer`: requirement trace/過剰拘束/Red理由 | S90 |
+| B-007 docs | `doc-writer` | provider docs 4件 | fresh `spec-reviewer`: authority/security/Issue境界 | S90 |
 | B-008〜009 | `dev-coder` | `pyproject.toml`、`setup.py`、distribution tests | dual prune/exclude/exact inventory | M3 session |
 | S99 code | fresh `code-reviewer` | read-only | aggregate implementation risks | review gate |
 | S99 QA | fresh `qa-reviewer` | read-only | AC/TC evidence and commands | review gate |
@@ -872,7 +885,7 @@ S90未解決のままS99へ進まない。
 |---|---|---|
 | Requirement closure | TC-344-001〜010とreport照合 | all closed |
 | Design compliance | DES-344-001〜009とdiff照合 | deviationなし |
-| Installer/node/exact-copy | `uv run pytest tests/unit/infra/test_init_update.py tests/unit/infra/test_runtime_template_scaffolder.py tests/cli_runtime/test_runtime_new_doc_s09.py` | pass |
+| Installer/node/exact-copy/no-backfill | `uv run pytest tests/unit/infra/test_init_update.py tests/unit/infra/test_runtime_template_scaffolder.py tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/test_new.py::TestCliNew::test_workbench_no_backfill_preserves_existing_scopes_across_all_triggers` | pass |
 | Opacity/copy | `uv run pytest tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py tests/cli_runtime/test_workbench.py` | pass |
 | Distribution | M3の2 exact `TestInitUpdate` node | pass |
 | Static/diff | M3のscoped Ruff check/format、Mypy、`git diff --check` | pass |
