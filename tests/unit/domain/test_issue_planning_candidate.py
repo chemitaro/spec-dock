@@ -118,6 +118,92 @@ def _material():
     )
 
 
+def test_revision_candidate_uses_prior_version_plus_one() -> None:
+    module = _candidate()
+    documents = _documents()
+    baseline = module.parse_current_front_matter_baseline(documents)
+    context, evidence = _source()
+    payload = _payload(documents)
+    material = module.build_candidate_material(
+        planner_documents=module.parse_planner_payload(payload),
+        baseline=baseline,
+        context=context,
+        source_evidence=evidence,
+        planner_payload=payload,
+        operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+        version=2,
+    )
+    assert material.version == 2
+    assert material.candidate_id == "iss-00003-v2-20260728t120000z"
+    assert material.logical_filename.endswith("-candidate-v2.zip")
+    assert module.verify_issue_candidate_files(material.files, material.internal_root) == ()
+
+
+@pytest.mark.parametrize("version", [0, True])
+def test_candidate_version_rejects_zero_and_bool(version: object) -> None:
+    module = _candidate()
+    documents = _documents()
+    baseline = module.parse_current_front_matter_baseline(documents)
+    context, evidence = _source()
+    payload = _payload(documents)
+    with pytest.raises(ValueError, match="version"):
+        module.build_candidate_material(
+            planner_documents=module.parse_planner_payload(payload),
+            baseline=baseline,
+            context=context,
+            source_evidence=evidence,
+            planner_payload=payload,
+            operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            version=version,
+        )
+
+
+def test_mechanical_revision_replaces_one_target_body_match_with_utf8_budget() -> None:
+    module = _candidate()
+    documents = _documents()
+    old = "Substantive"
+    new = "具体的"
+    cost = len(old.encode()) + len(new.encode())
+    revised = module.apply_mechanical_revision(
+        documents,
+        target_file="plan.md",
+        old_text=old,
+        new_text=new,
+        diff_budget=cost,
+    )
+    assert old.encode() not in revised["plan.md"]
+    assert new.encode() in revised["plan.md"]
+    assert revised["requirement.md"] == documents["requirement.md"]
+    assert revised["design.md"] == documents["design.md"]
+    with pytest.raises(ValueError, match="budget"):
+        module.apply_mechanical_revision(
+            documents,
+            target_file="plan.md",
+            old_text=old,
+            new_text=new,
+            diff_budget=cost - 1,
+        )
+
+
+@pytest.mark.parametrize("old_text", ["missing", "Substantive content."])
+def test_mechanical_revision_rejects_zero_or_multiple_body_matches(old_text: str) -> None:
+    module = _candidate()
+    documents = _documents()
+    if old_text != "missing":
+        documents["plan.md"] = documents["plan.md"].replace(
+            b"Substantive content.",
+            b"Substantive content. Substantive content.",
+        )
+    with pytest.raises(ValueError, match="exactly one"):
+        module.apply_mechanical_revision(
+            documents,
+            target_file="plan.md",
+            old_text=old_text,
+            new_text="replacement",
+            diff_budget=100,
+        )
+
+
 def test_parse_planner_payload_accepts_exact_three_document_grammar() -> None:
     parsed = _candidate().parse_planner_payload(_payload())
     assert tuple(parsed) == ("requirement.md", "design.md", "plan.md")

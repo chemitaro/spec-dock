@@ -232,16 +232,18 @@ def build_candidate_material(
     source_evidence: PlanningSourceEvidence,
     planner_payload: bytes,
     operation_time: datetime,
+    version: int = 1,
 ) -> CandidateMaterial:
+    if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+        raise ValueError("Candidate version must be a positive integer")
     _validate_source_binding(context, source_evidence, baseline)
     instant = _as_utc(operation_time).replace(microsecond=0)
     normalized = normalize_planner_documents(planner_documents, baseline, instant)
     timestamp_token = instant.strftime("%Y%m%dt%H%M%Sz")
     created_at_utc = instant.strftime("%Y-%m-%dT%H:%M:%SZ")
-    version = 1
-    stem = f"{timestamp_token}-{baseline.issue_id}-issue-planning-candidate-v1"
+    stem = f"{timestamp_token}-{baseline.issue_id}-issue-planning-candidate-v{version}"
     logical_filename = f"{stem}.zip"
-    candidate_id = f"{baseline.issue_id}-v1-{timestamp_token}"
+    candidate_id = f"{baseline.issue_id}-v{version}-{timestamp_token}"
 
     source_baseline = canonical_control_json_bytes(
         {
@@ -588,7 +590,7 @@ def _valid_candidate_naming(candidate: Mapping[str, Any], internal_root: str) ->
         or re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", created_at) is None
         or isinstance(candidate.get("version"), bool)
         or not isinstance(candidate.get("version"), int)
-        or candidate.get("version") != 1
+        or cast("int", candidate.get("version")) < 1
     ):
         return False
     try:
@@ -596,13 +598,76 @@ def _valid_candidate_naming(candidate: Mapping[str, Any], internal_root: str) ->
     except ValueError:
         return False
     token = instant.strftime("%Y%m%dt%H%M%Sz")
-    expected_root = f"{token}-{issue_id}-issue-planning-candidate-v1"
+    version = cast("int", candidate["version"])
+    expected_root = f"{token}-{issue_id}-issue-planning-candidate-v{version}"
     return (
         internal_root == expected_root
         and candidate.get("internal_root") == expected_root
         and candidate.get("logical_filename") == f"{expected_root}.zip"
-        and candidate.get("candidate_id") == f"{issue_id}-v1-{token}"
+        and candidate.get("candidate_id") == f"{issue_id}-v{version}-{token}"
     )
+
+
+def render_planner_payload(documents: Mapping[str, bytes]) -> bytes:
+    _require_document_inventory(documents)
+    chunks: list[bytes] = []
+    for index, name in enumerate(DOCUMENT_NAMES):
+        chunks.extend(
+            (
+                _START_MARKER.format(name=name).encode(),
+                documents[name],
+                _END_MARKER.format(name=name).encode()
+                + (b"\n" if index < len(DOCUMENT_NAMES) - 1 else b""),
+            )
+        )
+    payload = b"".join(chunks)
+    if parse_planner_payload(payload) != documents:
+        raise ValueError("rendered planner payload is not self-consistent")
+    return payload
+
+
+def mechanical_replacement_cost(old_text: str, new_text: str) -> int:
+    if not isinstance(old_text, str) or not isinstance(new_text, str):
+        raise ValueError("mechanical replacement text must be strings")
+    return len(old_text.encode("utf-8")) + len(new_text.encode("utf-8"))
+
+
+def apply_mechanical_revision(
+    documents: Mapping[str, bytes],
+    *,
+    target_file: str,
+    old_text: str,
+    new_text: str,
+    diff_budget: int,
+) -> Mapping[str, bytes]:
+    _require_document_inventory(documents)
+    if target_file not in DOCUMENT_NAMES:
+        raise ValueError("mechanical target file is not allowed")
+    if (
+        not old_text
+        or not new_text
+        or old_text == new_text
+        or isinstance(diff_budget, bool)
+        or not isinstance(diff_budget, int)
+        or diff_budget < 1
+    ):
+        raise ValueError("mechanical revision request is invalid")
+    if mechanical_replacement_cost(old_text, new_text) > diff_budget:
+        raise ValueError("mechanical revision exceeds diff budget")
+    fields, body = _parse_document(target_file, documents[target_file])
+    del fields
+    old_bytes = old_text.encode("utf-8")
+    new_bytes = new_text.encode("utf-8")
+    if body.count(old_bytes) != 1:
+        raise ValueError("mechanical old text must match exactly one body occurrence")
+    revised = dict(documents)
+    revised[target_file] = documents[target_file][:-len(body)] + body.replace(
+        old_bytes,
+        new_bytes,
+        1,
+    )
+    _parse_document(target_file, revised[target_file])
+    return MappingProxyType(revised)
 
 
 def _require_document_inventory(documents: Mapping[str, bytes]) -> None:

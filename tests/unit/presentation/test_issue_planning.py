@@ -56,3 +56,44 @@ def test_renderer_does_not_promote_ok_to_ready() -> None:
     )
     assert "status: ok" in render_planning_result_text(result).stdout_lines
     assert json.loads(render_planning_result_json(result).stdout_lines[0])["status"] == "ok"
+
+
+def test_review_summary_is_deterministic_and_authority_neutral() -> None:
+    module = __import__(
+        "spec_dock_runtime.presentation.issue_planning",
+        fromlist=["render_planning_review_summary"],
+    )
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["PlanningReviewResult"],
+    )
+    identity = contracts.ReviewedPlanningIdentity(
+        mode="archive-candidate",
+        issue_id="iss-00003",
+        repository="owner/repo",
+        branch="feature/issue",
+        source_head="a" * 40,
+        candidate_identity=contracts.IssueCandidateIdentity(
+            issue_id="iss-00003",
+            candidate_id="iss-00003-v1-token",
+            version=1,
+            logical_filename="candidate.zip",
+            observed_transport_filename="candidate.zip",
+            internal_root="candidate",
+            source_repository="owner/repo",
+            source_branch="feature/issue",
+            source_head="a" * 40,
+            zip_sha256="b" * 64,
+        ),
+    )
+    result = contracts.PlanningReviewResult(
+        reviewed_identity=identity,
+        reviewed_identity_sha256=identity.sha256,
+        verdict="pass",
+        findings=(),
+    )
+    first = module.render_planning_review_summary(result)
+    assert first == module.render_planning_review_summary(result)
+    assert "/Users/" not in first
+    assert "approval" not in first.lower()
+    assert "replacement" not in first.lower()

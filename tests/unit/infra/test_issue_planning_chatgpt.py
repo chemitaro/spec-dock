@@ -149,3 +149,28 @@ def _source_evidence() -> PlanningSourceEvidence:
         snapshot_id="c" * 64,
         remote_head_disposition="fetched_remote_tracking_ref",
     )
+
+
+def test_prompt_pack_preserves_exact_binary_attachment_bytes(tmp_path: Path) -> None:
+    prompt_module = __import__(
+        "spec_dock_runtime.application.issue_planning_prompt",
+        fromlist=["PlanningPromptAttachment"],
+    )
+    candidate = b"PK\x03\x04\x00\xffexact"
+    synthesized = SynthesizedPlanningPrompt(
+        role="reviewer",
+        prompt="fixed prompt",
+        attachments=(),
+        exact_attachments=(
+            prompt_module.PlanningPromptAttachment(
+                name="target-candidate.zip",
+                classification="review-target",
+                source_label="candidate.zip",
+                content=candidate,
+            ),
+        ),
+    )
+    pack = tmp_path / "pack"
+    issue_planning_chatgpt._write_transport_pack(pack, synthesized, _source_evidence())
+    assert (pack / "target-candidate.zip").read_bytes() == candidate
+    assert validate_prompt_pack(pack).status == "pass"
