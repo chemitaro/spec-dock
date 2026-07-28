@@ -255,6 +255,7 @@ uv run pytest -q -p no:cacheprovider \
 | S05R | `CLOS-TL-AC-007`,`CLOS-TL-BH-007`,`CLOS-TL-CON-004` | current Issue path/empty dependsのexact 2-entry snapshot correction | S05-F1 Red→focused 1 passed、related validate/sync 1 passed、213 path/depends parity、ruff/diff pass、S05R-R1 fresh pass | pass | M3r `42d021fb`、post-commit clean確認済み |
 | S04R | `CLOS-TL-AC-001`,`CLOS-TL-BH-001`,`CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004` | snapshot correction後のroot/unit/focused fast gate、failure propagation、new manifestを再固定 | root/unit各669 passed、H body 0、required-fast 7、lint/validate/assurance pass、manifest `48ef40...4363`、S04R-R2 fresh pass | pass | M3a-r `87f5ef44`、post-commit clean確認済み |
 | S05-A | `CLOS-TL-AC-002`,`007`,`008`,`CLOS-TL-BH-002`,`007`,`CLOS-TL-CON-004` | repaired SHAでsame-condition 3-pair Green、full completeness、failure visibility | fast 9.70/9.39/9.61s、full 1650.73/1654.60/1656.30s、全full exit0/F∪H/policy skip0、drift0、S05-A-QA1 fresh pass | pass | M3b `788383c7`、post-commit clean確認済み |
+| S90 | `CLOS-TL-AC-005`,`010`,`011`,`CLOS-TL-BH-007`,`CLOS-TL-CON-001` | contributor/agent docsをfinal commands/events/failure/rollback/human merge境界へ整合 | README/AGENTS surgical diff、implementation comparison、diff check、manifest対象差分0/hash一致 | pass | fresh spec-reviewerとM4a docs commitはpending |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -298,6 +299,11 @@ uv run pytest -q -p no:cacheprovider \
 | `CLOS-TL-BH-002` | S05-A | yes | manual-required | formal full permission | full counts/policy skip inspection | pass | H=2035>0、全full exit0 |
 | `CLOS-TL-BH-007` | S05-A | yes | manual-required | prior Redを保持 | accepted runs failure0 + log hashes | pass | Red読み替えなし、5回目なし |
 | `CLOS-TL-CON-004` | S05-A | yes | manual-required + QA pending | S04R no weakening | manifest/full counts/log comparison | pass | unexplained delta0 |
+| `CLOS-TL-AC-005` | S90 | yes | inspect-only + review pending | final local/manual command実装 | `tc-s90-001`: README/AGENTS command comparison | pass | ordinary/marker-only/explicit fullを実装どおり記載 |
+| `CLOS-TL-AC-010` | S90 | yes | inspect-only + review pending | failure operation未記載 | `tc-s90-001`: owner/evidence/forward-fix/rerun inspection | pass | maintainer、SHA/test/log/duration/summary、same-SHA reproductionを記載 |
+| `CLOS-TL-AC-011` | S90 | yes | inspect-only + review pending | rollback/human merge未記載 | `tc-s90-001`: rollback/human boundary inspection | pass | automatic rollbackなし、fast gate復旧手順、human-only merge |
+| `CLOS-TL-BH-007` | S90 | yes | inspect-only + review pending | post-merge failure contract | `tc-s90-001`: docs/spec/workflow comparison | pass | Redを遡及block扱いせずforward fix/rerun、次merge判断を停止可能 |
+| `CLOS-TL-CON-001` | S90 | yes | inspect-only + review pending | no-wrapper/no-schedule scope | `tc-s90-001`: docs diff + implementation comparison | pass | new wrapper/SLA/schedule/automationなし、README/AGENTSのみ |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -338,6 +344,11 @@ uv run pytest -q -p no:cacheprovider \
 | `CLOS-TL-BH-002` | S05-A | H=2035、全full exit0 | pass | explicit full permission |
 | `CLOS-TL-BH-007` | S05-A | failure0、accepted logs 6 hashes、5回目未実行 | pass | S05-F1は別Red evidenceとして保持 |
 | `CLOS-TL-CON-004` | S05-A | C=2705、全full counts=2705、manifest drift0 | pass | weakeningなし |
+| `CLOS-TL-AC-005` | S90 | `EVD-TL-007`: ordinary/marker-only/explicit full commands | pass | implementation一致 |
+| `CLOS-TL-AC-010` | S90 | `EVD-TL-007`: owner、SHA/test/log/duration/summary、same-SHA reproduction | pass | failure operationを明示 |
+| `CLOS-TL-AC-011` | S90 | `EVD-TL-007`: rollback contract、automatic rollbackなし、human merge | pass | operational boundaryを明示 |
+| `CLOS-TL-BH-007` | S90 | `EVD-TL-007`: post-merge Redのforward fix/rerun | pass | accepted recovery/failure semanticsと一致 |
+| `CLOS-TL-CON-001` | S90 | README/AGENTS only、manifest対象diff0/hash `48ef40...4363` | pass | scope expansionなし |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -380,6 +391,7 @@ read-only specialist consentと、scope-local `artifacts/` direct childへの限
 | S05R | delegated | approved recovery amendmentがexact snapshot correctionを要求 | dev-coder | current Issue path/empty dependsの2-entry correction | approved amendment、S05-F1/focused Red、current metadata | `tests/unit/infra/test_init_update.py` only | Issue metadata、source/config/workflow/docs、assertion/skip/xfail/classifier/helper | focused/related snapshot nodes、213 parity、ruff/format、diff | other path/value、metadata異常、allowed外diff | Red provenance、Green、exact diff、risk、no-material decision | implementation pass; reviewer pending |
 | S04R | delegated | amended planがmanifest変更後のfresh integrated gateを要求 | dev-coder | new committed SHAのS04 exact bundleとmanifest再固定 | approved amendment、S05R committed/clean、S04 contract | read-only commandsのみ | source/config/workflow/report変更、formal full suite | root/unit/focused、marker-only、required-fast、lint、partition、manifest、diff/validate | H body、unknown failure、unexplained delta、dirty source | exact commands/results/SHA/manifest、risk、no-material decision | verification pass; reviewer pending |
 | S05-A | delegated | approved amendmentがrepaired SHAのnew 3-pairを要求 | dev-coder | same-condition accepted 3-pair measurement | S04R committed/clean、new manifest、measurement protocol | read-only commands/scratch logs | source/config/workflow/report変更、5回目full | preflight、fast→full×3、pair前後SHA/manifest/clean、counts/log hashes | any nonzero、fast>=full、H=0、drift | exact ledger/log hashes/EVD-TL-005/008/no-material decision | measurement pass; QA pending |
+| S90 | delegated | approved planがcontributor-facing operationのdocs resolutionを要求 | doc-writer | final commands/events/failure/rollback/human merge docs | approved docs、implementation、S05 manifest、README/AGENTS | `README.md`,`AGENTS.md` only | source/tests/workflows/templates/skills/assets、schedule/SLA/automatic operation | targeted rg、implementation comparison、diff check、manifest equality | scaffold docs必要、policy ambiguity、new automation | changed files/diff/verification/risk/EVD-TL-007/no-material decision | docs implementation pass; spec review pending |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -396,6 +408,7 @@ read-only specialist consentと、scope-local `artifacts/` direct childへの限
 | S05R | dev-coder | current Issue pathとempty dependsをstatic snapshotへ各1件追加 | `tests/unit/infra/test_init_update.py` | focused 1 passed/1.82s、related 1 passed/7.05s、213 parity、ruff/format/diff pass | S05R-R1 passed | S04R/new manifest/new 3-pair未実施 | accepted。exact 2 entries、test weakeningなし |
 | S04R | dev-coder | new SHAでS04 exact bundleをread-only再実行 | none | root/unit各669 passed、H body0、required-fast7、lint/partition/diff/validate/assurance pass | S04R-R2 passed | new 3-pair未実施 | accepted。manifest 445 files `48ef40...4363`、前後clean |
 | S05-A | dev-coder | repaired SHAでaccepted fast→full 3 pairsをread-only計測 | none | fast各exit0約9.4〜9.7s、full各exit0約1651〜1656s、F∪H/policy skip0/drift0 | S05-A-QA1 passed | M3b未完了 | accepted。pre-merge full総数4、5回目未実行 |
+| S90 | doc-writer | README/AGENTSをordinary/full/PR/main/manual/failure/rollback/human mergeへ整合 | `README.md`,`AGENTS.md` | implementation comparison、targeted rg、diff check、manifest 445/hash一致 | S90-R2 passed | none | accepted。wrapper/schedule/hard SLA/automatic rollback追加なし |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -439,6 +452,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04R-R1 | post-recovery integrated fast gate review | code-reviewer | historical | failed | no | blocked | exact commands/resultsと採用manifest pipeline不足のP1 1件 |
 | S04R-R2 | post-recovery integrated fast gate re-review | code-reviewer | fresh | passed | no | proceed to M3a-r commit | exact commands/results、manifest pipeline、same-SHA/cleanを確認。findings 0、confidence 0.99 |
 | S05-A-QA1 | accepted three-pair measurement review | qa-reviewer | fresh | passed | no | proceed to M3b commit | Red保持、recovery順序、3-pair completeness、log hashes、総数4/5回目なしを確認。integration evidence sufficient、confidence 0.99 |
+| S90-R1 | docs/spec/implementation alignment review | spec-reviewer | historical | failed | no | blocked | docs自体は整合したがTest Contract Closure/Closure CoverageにS90の5 closure行欠落のP1 1件 |
+| S90-R2 | docs/spec/implementation alignment re-review | spec-reviewer | fresh | passed | no | proceed to M4a commit | 5 closure、tc-s90-001/EVD-TL-007、docs/spec/implementation、manifestを確認。findings 0、confidence 0.99 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -451,6 +466,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S05R / M3r | committed | snapshot recovery commit | `42d021fb28f4cd45f550f86b9ebea10d93ae8be7` | `git status --short` -> clean | N/A | N/A | N/A | S05R-R1 fresh pass、exact 2-entry correction、commit、cleanを確認しResult Approval |
 | S04R / M3a-r | committed | post-recovery integrated evidence commit | `87f5ef44fa3efb06f6e7ab4ed61e06db77fcc614` | `git status --short` -> clean | N/A | N/A | N/A | S04R-R2 fresh pass、new manifest、commit、cleanを確認しResult Approval |
 | S05-A / M3b | committed | accepted measurement ledger commit | `788383c788f0e289c6e3684fccf86343a0f23201` | `git status --short` -> clean | N/A | N/A | N/A | S05-A-QA1 fresh pass、accepted 3-pair、commit、cleanを確認しResult Approval |
+| S90 / M4a | pending | contributor docs commit | pending | pending | N/A | N/A | N/A | fresh S90 spec-reviewer pass後にREADME/AGENTS/report commit |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -918,12 +934,29 @@ LC_ALL=C git ls-files -- 'tests/**' 'src/**' pyproject.toml uv.lock '.github/wor
 
 ---
 
+### セッションログ（2026-07-29 03:15 - 03:22 JST）
+
+#### S90 Docs Impact Resolution
+
+- `doc-writer`が`README.md`と`AGENTS.md`だけを更新した。
+- ordinary `uv run pytest`、`uv run pytest tests/unit`、focused pytestは通常interfaceのままfast bodyを実行し、selected heavyはstable reasonでpolicy skipすることを記載。
+- `-m full_regression`単独はpermissionでなく、explicit fullは`uv run pytest --run-full-regression`、heavy-onlyはflagとmarkerを併用することを記載。
+- PR `Provider CI` / `provider-tests`は`make lint`+ordinary pytestのmerge blocker、main push/`workflow_dispatch`は独立`Provider Full Regression`のpost-merge non-blocker、schedule/cronなしを記載。
+- failure owner、SHA/test/log/duration/summary、same-SHA reproduction、forward fix/rerun、automatic rollback/Issueなし、rollback contract、human-only mergeを記載。
+- implementation comparison、targeted `rg`、`git diff --check`はpass。
+- S05 manifest対象差分0、tracked 445、aggregate `48ef40dbf0a145e288406c22ee7693b0ebcee8289a3b358a2a34cf3ad0ff4363`一致。
+- `doc-writer`: `No material implementation decisions beyond the approved plan.`
+- orchestrator disposition: noteを採用。approved contributor contractの反映のみで、new schedule/SLA/automation/wrapperはない。
+
+---
+
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| `README.md`,`AGENTS.md` | yes | doc-writer | commands/events/failure/rollback/human merge、diff check、manifest一致 | S90-R2 pass |
+| templates / workflow / skill / migration notes | no | N/A | implementationで契約済み、S90 scope外、追加変更不要 | N/A |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
