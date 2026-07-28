@@ -119,7 +119,7 @@ ID: "init-local-00002"
     - current runtime baseline
     - `init-local-00003`のarchitecture guardrailに抵触しないこと
   - 状態:
-    - requirementはreview済み、designはfresh re-review中。reviewed planと人間承認前のためIssue nodeは未作成である。
+    - designはpass済み、canonical planはfresh review中。人間承認前のためIssue nodeは未作成である。
 - epic-0003-operator-value-expansion:
   - 目的:
     - operator が日常運用で得られる feature value を広げる。

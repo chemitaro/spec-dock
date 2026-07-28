@@ -18,6 +18,7 @@ derived_from:
 reflected_to:
   - "epic-00343/requirement.md"
   - "epic-00343/design.md"
+  - "epic-00343/plan.md"
   - "epic-00343/report.md"
 ---
 
