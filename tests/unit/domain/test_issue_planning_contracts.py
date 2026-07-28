@@ -663,3 +663,64 @@ def test_non_success_result_maps_to_exit_one() -> None:
     )
     assert result.exit_code == 1
     assert result.is_ready is False
+
+
+def test_source_evidence_and_transport_result_are_closed_and_payload_is_transient() -> None:
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["PlanningSourceEvidence", "PlanningInvocationResult"],
+    )
+    evidence = contracts.PlanningSourceEvidence(
+        repository="owner/repo",
+        branch="feature/issue",
+        upstream="origin/feature/issue",
+        local_head="a" * 40,
+        remote_head="a" * 40,
+        source_manifest_hash="b" * 64,
+        snapshot_id="c" * 64,
+        remote_head_disposition="fetched_remote_tracking_ref",
+    )
+    result = contracts.PlanningInvocationResult(
+        status="pass",
+        reason="transport_received",
+        source_evidence=evidence,
+        backend_exit_code=0,
+        response_bytes=6,
+        response_sha256="d" * 64,
+        transient_payload=b"secret",
+    )
+    serialized = result.to_dict()
+    assert serialized["source_evidence"]["repository"] == "owner/repo"
+    assert "transient_payload" not in serialized
+    assert "secret" not in repr(result)
+    assert "secret" not in str(serialized)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"repository": "OWNER/repo"},
+        {"upstream": "upstream/feature/issue"},
+        {"local_head": "A" * 40},
+        {"remote_head": "b" * 40},
+        {"remote_head_disposition": "unverified_cache"},
+    ],
+)
+def test_source_evidence_rejects_non_exact_git_identity(changes: dict[str, object]) -> None:
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["PlanningSourceEvidence"],
+    )
+    values: dict[str, object] = {
+        "repository": "owner/repo",
+        "branch": "feature/issue",
+        "upstream": "origin/feature/issue",
+        "local_head": "a" * 40,
+        "remote_head": "a" * 40,
+        "source_manifest_hash": "b" * 64,
+        "snapshot_id": "c" * 64,
+        "remote_head_disposition": "fetched_remote_tracking_ref",
+    }
+    values.update(changes)
+    with pytest.raises(ValueError):
+        contracts.PlanningSourceEvidence(**values)

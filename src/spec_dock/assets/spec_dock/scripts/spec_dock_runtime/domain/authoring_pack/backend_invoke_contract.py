@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import re
 from typing import Literal
@@ -94,6 +94,13 @@ class BackendInvokeRequest:
     evidence_mode: EvidenceMode = "github-synced"
     timeout_seconds: float | None = None
     dry_run: bool = False
+    working_dir: Path | None = None
+
+
+@dataclass(frozen=True)
+class BackendStreamCapture:
+    stdout: bytes = field(default=b"", repr=False)
+    stderr: bytes = field(default=b"", repr=False)
 
 
 @dataclass(frozen=True)

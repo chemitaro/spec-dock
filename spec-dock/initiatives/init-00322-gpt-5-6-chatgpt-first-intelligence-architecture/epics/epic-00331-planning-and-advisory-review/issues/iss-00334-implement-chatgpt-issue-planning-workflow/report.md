@@ -158,11 +158,14 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 必須検証（required verification） | 停止条件（stop conditions） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | delegated | shipped CLI contractとtestsのbounded implementation | dev-coder | `plan.md` S01と`artifacts/20260727t150723z-s01-chatgpt-implementation-work-packet.md`のexact allowed paths | canonical `requirement.md`、`design.md`、`plan.md`、S01 work packet | S01 Red／Green command、focused code review、diff allowlist | scope escape、test failure、new requirement gap、S02以降の実装が必要 | initial implementation 109 tests Green。fresh reviewの3 P1を同workerがbounded修正し、116 tests Green、fresh re-review pass、allowlist escape 0 |
-| S02 | delegated | Git identity、bounded PlanningContext、Prompt synthesis、fixed ChatGPT Use transportのbounded implementation | dev-coder | `plan.md` S02と`artifacts/20260727t161404z-s02-chatgpt-implementation-work-packet.md`のwrite allowlist | canonical `requirement.md`、`design.md`、`plan.md`、S01実装、S02 work packet | Red-first Git／backend／security tests、S01／shared primitive regression、fresh code review、diff allowlist | public CLI／bootstrap変更、S03以降、parallel Git/subprocess framework、wrapper ABI変更、scope外pathが必要 | S01 committed／pushed／clean。ChatGPT具体化済み、artifact／report-only commit後に委任する |
+| S02 | delegated | Git identity、bounded PlanningContext、Prompt synthesis、fixed ChatGPT Use transportのbounded implementation | dev-coder | `plan.md` S02と`artifacts/20260727t161404z-s02-chatgpt-implementation-work-packet.md`のwrite allowlist | canonical `requirement.md`、`design.md`、`plan.md`、S01実装、S02 work packet | Red-first Git／backend／security tests、S01／shared primitive regression、fresh code review、diff allowlist | public CLI／bootstrap変更、S03以降、parallel Git/subprocess framework、wrapper ABI変更、scope外pathが必要 | Red 34 failed／76 passed／0 errorsからfocused 115 passedへGreen。S01/shared/Core regressions、ruff、mypy、validate、diff check pass。16 changed pathsはallowlist内、fresh code review待ち |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 
 planning repairで発見されたarchive safety、transaction fault、publication resume、live-operation boundaryのtest obligationsは、`plan.md`の`CLOS-ARC-01`〜`CLOS-ARC-25`、`CLOS-RISK-001`〜`CLOS-RISK-005`へ採用済みである。製品実装中に新しいtest／riskを発見した場合は、実装で吸収せずここへentryを追加し、materialな変更はPlan amendmentへ戻す。
+
+- S02で、実temporary Git repositoryを使うclean／synced preflight tracer、fixed backend failure classification、ephemeral Prompt pack validationをdiscovered characterizationとして追加した。いずれもapproved S02 obligationの具体化であり、canonical closureの追加・削除・意味変更はない。
+- fixed wrapperのlive ABI、実ChatGPT response framing、provider Promptのinstalled／dogfood projectionはS02 hermetic testsでは未検証であり、後続S06／S07のownerへ引き継ぐ。
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 
@@ -307,7 +310,17 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - ChatGPT Pro session `iss00334-s02-implementa-brief`はGitHub connectorで同branch／exact HEADを確認し、S02だけのwork packetを生成した。Promptでは既存`run_github_sync_preflight`、`invoke_backend`、authority-boundary/redactionの再利用、S03以降の禁止、no-patch／no-reviewを固定した。
 - 回答を`artifacts/20260727t161404z-s02-chatgpt-implementation-work-packet.md`へ保存した。これはreview不要のstep execution inputであり、canonical authoring draftではない。
 - work packetが提示したresource bound、internal result field、response frameはapproved S02の「bounded context」「source evidence」「partial response classification」を実装可能にするimplementation-local detailsとしてのみ採用する。Requirement／Design／Planの意味、public CLI、後続step境界を変更する場合は停止する。
-- S02 product implementation、Red／Green evidence、fresh code review、commit候補は未開始である。
+- S02 Red-first commandは110 testsをcollectし、76 passed／34 failed／0 errorsとなった。34 failuresはGit preflight short-circuit、bounded Prompt synthesis、source identity、exact response frame／security、single backend core transient capture、transport tracerの未実装behaviorに到達した。
+- bounded `dev-coder`実装後、focused lane 115 passed、S01 command／presentation／CLI regression 28 passed、shared backend／preflight regression 104 passed（312 deselected）、Git fetch policy／receipt 56 passed、Core shell 12 passedとなった。
+- 親の独立再実行ではfocused＋S01 regression 143 passed、shared lanes／Core、ruff、mypy、`validate` nodes=222、`git diff --check`がpassした。16 changed pathsはS02 work packet allowlist内で、forbidden path変更は0である。
+- fresh S02 `code-reviewer`は3件のP1を報告した。preflight blocker detailsのprivate path漏洩、Prompt assembly前後のsource snapshot race、branch等dynamic identityのscan欠落がS02のnon-leakage／exact source bindingを破るため、同じ`dev-coder`へnegative testsと最小修正を再委任する。
+- bounded follow-upは3件のexact Redを追加し、3 failed／0 errorsを確認した。既存`SourceManifest.source_hashes`を再利用してPrompt attachment bytesをpreflight evidenceへbindし、blocker detailsをcontent-free化し、serialized dynamic identity全体をsecurity scanへ通した。
+- post-fix focused laneは118 passed。親の独立再実行ではfocused＋S01 regression 146 passed、shared lanes／Core、ruff、mypy、`validate` nodes=222、`git diff --check`がpassした。
+- 別fresh re-reviewでpreflight blocker non-leakageとsource snapshot raceは閉鎖したが、sensitive dynamic identityを拒否したresultが未加工`source_evidence`を保持し、`to_dict()`からbranch／upstreamを再漏洩するP1-C残存経路が見つかった。同じworkerへorchestration-level Redと最小修正を再委任する。
+- residual follow-upはorchestration-level Red 1件を追加し、1 failed／0 errorsを確認した。`sensitive_input_rejected`時だけunsafeな`source_evidence`をresultから除外し、safe pathとnon-sensitive failure evidenceを維持した。
+- post-fix focused laneは119 passed。親の独立再実行ではfocused＋S01 regression 147 passed、ruff、mypy、`validate` nodes=222、`git diff --check`がpassした。
+- 別fresh closure reviewはfindings 0、`review_status: pass`。P1-A／B／Cのclosure、safe source evidence維持、backend short-circuitを確認した。
+- S02 product implementation、required verification、fresh reviewは完了した。commit候補、push、post-commit clean／remote parity checkは未完了である。
 - No material implementation decisions beyond the approved plan.
 | `chatgpt-use --followup iss00334-blue-planning-correction-r5` | same Blue conversationでauthoring継続。GitHub exact HEAD確認、replacement-ready blocks取得。follow-up selector evidenceは`resolved=(unavailable); verified=no` |
 | `./spec-dock/scripts/spec-dock validate` | pass。222 nodesを検証 |
@@ -329,7 +342,7 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 | second canonical correction snapshot | committed and published; fresh review failed | Requirement、Design、Plan、Assurance、Report、prior Red／Blue artifacts | `3fc0e61ef8425abc0b4a5488d51e7060b0ed03cc` | remote branch HEADとexact identicalをGitHub connectorで確認 | P1-17〜P1-19／P2-05 bounded correctionへ進む |
 | third bounded correction | authoring complete; commit pending | Requirement、Design、Plan、Report、new Red artifact、Assurance rebinding | pending — Main must record actual resulting full HEAD | integration後にvalidate、diff-check、assurance verify、clean checkを実行 | one immutable commitをpushし、actual resulting 40-character HEADで別fresh Red review |
 | S01 | committed | S01 allowed code／tests、mechanical artifact whitespace fix、report evidence | fresh code-reviewer pass | commit `c597bd146c1d68e619cdc1e24b1b76dd405fe36a`、origin push成功、post-commit clean、local／remote parity | S01 closed。S02 work packetへ進む |
-| S02 | not started | `plan.md` S02 exact scope | none | ChatGPT work packet saved、product diff 0 | artifact／report-only commit、push、clean後にbounded dev-coderへ委任 |
+| S02 | commit candidate | S02 allowlisted runtime／Prompt resources／testsとreport evidence | final fresh code-reviewer pass、findings 0 | Red 34＋review Red 3＋residual Red 1をGreen。focused 119 passed、親再実行147 passed、S01/shared/Core／static／validate pass、17 pathsはS02 allowlist＋Main reportのみ | focused commit／push／post-commit clean／remote parityでS02をclose |
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
