@@ -49,7 +49,8 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | scope | user / Epic 343 | `.gitkeep` では Workbench の用途と境界を伝えられない | `.gitkeep`; tracked README; directory only | fresh root と future node に tracked `.workbench/README.md` を生成し、既存 scope は変更しない | 親 Epic の採用済み要件とユーザー承認に一致する | applied | `../../requirement.md`; `requirement.md` | design と plan で実装・検証境界を具体化する |
+| D-002 | resolved | compatibility | ChatGPT authoring / local source inspection | tracked README と ignored payload の worktree 間移動を混同するリスク | automatic copy; README 専用 copy; Git checkout + manual opaque copy | README は通常 checkout、ignored payload だけを必要時に `workbench copy` で移す | Git tracking と既存 one-shot copy の責務が分離される | promoted_to_design | `artifacts/20260728t153458z-chatgpt-output-chatgpt-issue-00344-planning-candidate.md`; `requirement.md#I344-RQ-007` | `design.md` |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +64,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | partially_adopted | ChatGPT authoring (`gpt-5.5-pro`, GitHub Connector, evidence-only) | `requirement.md` | 親 Epic と local source に整合する要件、受け入れ条件、境界を採用。実装順序と具体設計は design / plan phase まで未採用 | `artifacts/20260728t153458z-chatgpt-output-chatgpt-issue-00344-planning-candidate.md`; SHA-256 `3eec9fd0865d452aa59e6faa883fb8c07c074e606790af76b94aab255f560835`; 85,422 bytes | ChatGPT requirement review と fresh `spec-reviewer` review |
+| EAL-002 | adopted | `artifact import chatgpt-output` command | Issue Artifact | Workbench に保存した ChatGPT 完全回答を opaque bytes のまま Issue Artifact へ保存した | import receipt: `status=ok`, `import_kind=chatgpt-output`, `storage_identity=blank`, `committed=true`, `cleanup_state=removed` | なし |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -79,7 +81,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | 親 Epic requirement/design/plan、provider source、package config、relevant tests、ChatGPT Artifact | blocking question なし。hidden package asset の実挙動は design / implementation evidence で確認する | partially_adopted | pending | yes | ChatGPT review 後、fresh `spec-reviewer` review |
+| design | requirement review 後に開始 | requirement gate 待ち | none | pending | yes | requirement pass 後に assurance classify / compose |
+| plan | design review 後に開始 | design gate 待ち | none | pending | yes | design pass 後に作成 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -107,7 +111,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| ChatGPT advanced reasoning | iss-00344 | `artifacts/20260728t153458z-chatgpt-output-chatgpt-issue-00344-planning-candidate.md` | parent Epic docs; Issue scaffold; provider source; `pyproject.toml`; relevant tests | `requirement.md`, `design.md`, `plan.md` | partially_integrated | [`requirement.md`] | local source / parent scope checked | requirement candidate integrated | design / plan details are held until their phase gates | requirement review pending | pending | requirement review required |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -190,7 +194,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| ワークフロー利用依頼 / 明示承認 / なし（user request to use SpecDock workflow / explicit approval / none） | ... | iss-00344 | 現在セッション（current session） / ... | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | 範囲: active repo/worktree、active SpecDock scope、current session、SpecDock-defined named roles、documented role responsibility。破壊的操作 / 外部公開 / credentialed external mutation / scope expansion / private external system use / out-of-workflow role は含めない | 完了 / セッション終了 / scope 変更 / host policy conflict / user revocation（issue complete / session end / scope change / host policy conflict / user revocation） | none / denied / unavailable / host conflict | 続行 / separate-confirmation exception は user に確認 / block gate / record waiver request |
+| user request to use SpecDock workflow and ChatGPT authoring/review | `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/692d/spec-dock` | iss-00344 | current session | spec-reviewer / code-reviewer / qa-reviewer / read-only specialist | active repo/worktree、active Issue、current session、SpecDock-defined role responsibility。実装、merge、scope expansion は含めない | Issue planning 完了 / session end / scope change / user revocation | none | planning と review gate を続行 |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.

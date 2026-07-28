@@ -3,7 +3,7 @@
 ID: "iss-00344"
 タイトル: "Workbench Shell Scaffolding"
 関連GitHub: ["#344"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-29"
 親: ["epic-00343", "init-local-00002"]
@@ -11,822 +11,383 @@ ID: "iss-00344"
 
 # iss-00344 Workbench Shell Scaffolding — Issue 要件定義
 
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
-
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
-
----
-
 ## 0. 文書の位置づけ
 
-### この文書が定義すること
+この文書は、fresh な SpecDock root と今後作成される Initiative、Epic、Issue に optional Workbench shell を提供するための、観測可能な成果、境界、受け入れ条件を定義する。
 
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
+実装方法、変更ファイル、テスト実行順序は `design.md` と `plan.md` で扱う。generic single-file Artifact import は `iss-00345`、candidate wheel を使った統合 E2E、dogfood projection、full regression、Epic 全体の最終レビューと PR 送達は `iss-00346` の責務とする。
 
-### この文書が定義しないこと
-
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
-
----
-
-## 1. 概要
+## 1. 目的と観測可能な成果
 
 ### 1.1 目的
 
-このIssueで達成したい目的を1〜3文で記述する。
+fresh な SpecDock root、および今後新規作成される Initiative、Epic、Issue に、利用方法と権限境界を説明する tracked `.workbench/README.md` を含む optional Workbench shell を提供する。
 
-- 目的:
-  - ...
+Workbench は一時的、worktree-local、破棄可能、non-canonical であり、README 以外の内容は Git 管理外とする。既存 root および既存 node への backfill は行わない。
 
-### 1.2 観測可能な成果
+### 1.2 完了後に観測できること
 
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
+1. fresh target で `spec-dock init` を実行すると、`spec-dock/.workbench/README.md` が生成される。
+2. 今後新規作成する Initiative、Epic、Issue の各 node 直下に `.workbench/README.md` が生成される。
+3. root と3種類の node の README は byte-identical である。
+4. 各 `.workbench/README.md` は Git tracking 対象になり、同じ `.workbench/` 内のその他の entry は深さや形式によらず ignore される。
+5. tracked README は通常の Git checkout により別 worktree へ現れる。
+6. ignored な作業ファイルは checkout だけでは別 worktree へ移らず、必要な場合だけ明示的な `workbench copy` で移せる。
+7. source tree、wheel、sdist、installed package resources のすべてに4つの Workbench README asset が収録される。
+8. shipped docs が Workbench shell、Git 境界、manual copy、evidence-only authority を一貫して説明する。
 
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
+### 1.3 完了後に観測できてはいけないこと
 
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
+- 既存 root または既存 node への自動 backfill。
+- Workbench または README の不在を理由とする validation error。
+- `.workbench/README.md` 以外の Workbench 内容の Git 追跡。
+- automatic copy、watch、sync、copy-back。
+- README または Workbench 内容を node、Artifact、ADR、dependency、authoring source として解釈する挙動。
+- `.workbench/.gitkeep` の生成。
+- `iss-00345` が所有する generic import 実装。
+- `iss-00346` が所有する dogfood projection、full regression、PR 作成または merge。
 
-### 1.3 このIssueの種類
+### 1.4 この Issue の種類
 
-該当するものに印を付ける。
+- [x] 新規振る舞いの追加
+- [x] 既存振る舞いの変更
+- [x] 仕様・文書の明確化
+- [x] テンプレート変更
+- [x] CLI / script 挙動変更
+- [x] migration / compatibility を伴う変更
+- [x] セキュリティ・プライバシー / authorization に関係する変更
 
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
+## 2. 背景と現状
 
----
+現行 provider scaffold は Workbench 全体を `.gitignore` で除外しており、利用方法を説明する tracked file を生成しない。fresh root や新規 node で `.workbench/README.md` を自動生成する契約もない。
 
-## 2. 背景・現状
+そのため、利用者や model は Workbench の用途、Git 境界、Artifact への明示 import、canonical adoption との違いを Workbench 自体から確認できない。また、空 directory を Git に残すための `.gitkeep` は利用規約を伝えず、本件の目的に適合しない。
 
-### 2.1 現在の状態
+一方で、既存の Workbench は optional、ignored、semantic に opaque であり、`workbench copy` は明示的な one-shot operation として存在する。この互換境界は維持する必要がある。
 
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
+### 2.1 根拠
 
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
+- 親 Epic:
+  - `../../requirement.md`
+  - `../../design.md`
+  - `../../plan.md`
+- ChatGPT authoring evidence:
+  - `artifacts/20260728t153458z-chatgpt-output-chatgpt-issue-00344-planning-candidate.md`
+- provider source:
+  - `src/spec_dock/cli.py`
+  - `src/spec_dock/assets/spec_dock/templates/`
+  - `src/spec_dock/assets/spec_dock/.gitignore`
+  - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/`
+- packaging:
+  - `pyproject.toml`
+- relevant tests:
+  - `tests/unit/infra/test_init_update.py`
+  - `tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py`
+  - `tests/cli_runtime/test_runtime_new_doc_s09.py`
+  - `tests/cli_runtime/test_workbench.py`
 
 ## 3. 親スコープと継承条件
 
-このIssueが属する上位スコープを記述する。
+### 3.1 親 Initiative
 
-### 3.1 親Initiative
+- Initiative: `init-local-00002`
+- 継承する制約:
+  - provider source は `src/spec_dock/` に置く。
+  - `spec-dock/` は dogfooding projection であり、一次実装 authority にしない。
+  - Artifact と canonical specification の authority を混同しない。
 
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
+### 3.2 親 Epic
 
-### 3.2 親Epic
+- Epic: `epic-00343`
+- 継承する要件:
+  - `E-RQ-001`: fresh root shell
+  - `E-RQ-002`: future node shell
+  - `E-RQ-003`: tracked README / ignored contents
+  - `E-RQ-004`: optional presence
+  - `E-RQ-005`: no-backfill
+  - `E-RQ-006`: semantic opacity / disposable
+  - `E-RQ-007`: manual copy only
+  - `E-RQ-023`: Workbench copy compatibility
+  - `E-RQ-024`: provider / distribution parity の Issue-local 部分
+  - `E-RQ-025`: shell / copy に関する documentation
 
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
+### 3.3 この Issue で再定義しないもの
 
-### 3.3 このIssueで再定義してはいけないもの
+- generic arbitrary-file Artifact import の CLI、source guard、filename、publication、privacy 契約。
+- `artifact import chatgpt-output` の既存契約。
+- Artifact naming grammar と root Artifact target。
+- Workbench retention、TTL、session model。
+- Workbench copy の automatic lifecycle。
+- canonical adoption workflow。
+- Epic の Issue 分割と dependency 方向。
+- PR Delivery Gate と Merge Preparation Gate の最終所有者。
 
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
+## 4. 関係者と代表シナリオ
 
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
-
----
-
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
-
-### 4.1 主な関係者（Actor）
-
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
-
-| 関係者（Actor） | 役割 | このIssueとの関係 |
+| 関係者 | 役割 | この Issue との関係 |
 |---|---|---|
-| ... | ... | ... |
+| SpecDock 利用者 | root または node を作成して Workbench を利用する | README から用途と境界を確認する |
+| 開発 agent / model | 一時作業ファイルを扱う | README を operator guidance として参照する |
+| installer CLI | fresh root を生成する | root Workbench shell を fresh-init-only で配置する |
+| repo-local runtime | Initiative / Epic / Issue を生成する | node template から Workbench shell を配置する |
+| Git | tracked file を checkout する | README のみを materialize し、他の内容を ignore する |
+| package consumer | wheel / sdist を利用する | provider asset を installed resources から取得する |
+| reviewer | 要件・実装・証跡を確認する | no-backfill、opacity、package parity を判定する |
 
-### 4.2 開始条件（Trigger）
+### SC-344-001 Fresh root
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
+- 前提: target に `spec-dock` path が存在しない。
+- 操作: `spec-dock init <target>` を実行する。
+- 期待結果:
+  - `spec-dock/.workbench/README.md` が生成される。
+  - README は Git tracking 候補になる。
+  - Workbench のその他の entry は ignore される。
 
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
+### SC-344-002 Future node
 
-### 4.3 代表シナリオ
+- 前提: Issue 344 の provider template が導入されている。
+- 操作: Initiative、Epic、Issue のいずれかを新規作成する。
+- 期待結果:
+  - 新しい node だけに `.workbench/README.md` が生成される。
+  - create plan、command result、filesystem の path 集合が一致する。
+  - existing ancestor と sibling は変更されない。
 
-#### シナリオ SC-001:
+### SC-344-003 Existing workspace update
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+- 前提: root と既存 node に `.workbench/README.md` がない。
+- 操作: `spec-dock update` または existing workspace の更新経路を実行する。
+- 期待結果:
+  - managed templates、docs、runtime、ignore 契約は更新される。
+  - existing root / node には README を生成しない。
+  - 更新後に新規作成した node には README を生成する。
 
-#### シナリオ SC-002:
+### SC-344-004 Linked worktree
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+- 前提: README が commit され、source worktree に ignored な作業ファイルがある。
+- 操作:
+  1. Git linked worktree を作成する。
+  2. 必要な場合だけ `workbench copy` を実行する。
+- 期待結果:
+  - README は通常 checkout で新 worktree へ現れる。
+  - ignored な作業ファイルは checkout だけでは現れない。
+  - 明示 copy 後にだけ ignored な作業ファイルが移る。
+  - automatic sync または copy-back は発生しない。
 
-#### シナリオ SC-XXX:
+### SC-344-005 Semantic opacity
 
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+- 前提: Workbench 内に README、fake metadata、ADR-like Markdown、binary、invalid UTF-8 がある。
+- 操作: validate、sync、dependency check、default discovery を実行する。
+- 期待結果:
+  - Workbench subtree の内容は意味解釈されない。
+  - Workbench 内容を理由とする node、ADR、dependency、authoring source の増減や decode error が発生しない。
 
----
+## 5. 対象範囲
 
-## 5. スコープ
+### 5.1 In scope
 
-### 5.1 対象範囲（In 対象範囲（Scope））
+- fresh-init-only root Workbench shell。
+- future Initiative / Epic / Issue Workbench shell。
+- 4つの byte-identical な provider README asset。
+- README の guidance contract。
+- README-only Git tracking 契約。
+- installer fallback `.gitignore` との一致。
+- existing root / node no-backfill。
+- optional presence と semantic opacity。
+- existing `workbench copy` の focused compatibility。
+- package-data include / exclude の調整。
+- source、wheel、sdist、installed resource の exact README inventory。
+- provider-first docs。
+- Issue-local focused tests と evidence destination。
+- `iss-00346` への deferred PR delivery record。
 
-このIssueで必ず実現することを列挙する。
+### 5.2 Out of scope
 
-- ...
-- ...
+- `spec-dock artifact import file` の実装。
+- root または node Artifact destination の実装。
+- arbitrary-file source validation、publication、naming、privacy。
+- existing root / node の migration または backfill command。
+- Workbench automatic copy、watch、sync、copy-back。
+- Workbench content classifier、retention、expiration、cleanup。
+- Workbench を canonical source にする変更。
+- candidate wheel を使った full end-to-end product verification。
+- dogfood `spec-dock/**` への正式 projection。
+- full test suite closure。
+- Epic-wide final QA / code / spec review。
+- push、PR 作成、merge preparation、merge。
 
-### 5.2 対象外（Out of 対象範囲（Scope））
+### 5.3 変更しないもの
 
-このIssueでは実現しないことを列挙する。
+- existing `workbench copy` の source-wins、destination-only preserve、one-shot という公開挙動。
+- existing Workbench 内の user content、bytes、names、mtime。
+- existing root / node の files。
+- `validate`、`sync`、dependency、active context の semantic input。
+- node ID、metadata、dependency topology。
+- Artifact または ADR の既存 contract。
+- Git worktree lifecycle と GitHub Issue state。
 
-- ...
-- ...
+## 6. 要件
 
-### 5.3 変更しないもの（Unchanged / Must Not Change）
+### I344-RQ-001 Fresh root shell
 
-関連はあるが、このIssueで変更してはいけないものを列挙する。
+`spec-dock` が存在しない target への fresh init は、root に `.workbench/README.md` を生成しなければならない。
 
-- ...
-- ...
+- 空 placeholder または `.gitkeep` を代替として生成してはならない。
+- root Workbench または README が後から削除されても workspace は valid でなければならない。
 
-### 5.4 判断が必要な境界
+### I344-RQ-002 Future node shell
 
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
+今後新規作成される Initiative、Epic、Issue には、各 node 直下の `.workbench/README.md` を生成しなければならない。
 
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
+- create plan、command result、filesystem で README path が一致しなければならない。
+- node 作成を契機として ancestor または sibling へ README を追加してはならない。
 
----
+### I344-RQ-003 README guidance
 
-## 6. 要求される振る舞い
+root と各 node kind の README は byte-identical とし、少なくとも次を明示しなければならない。
 
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
+1. Workbench は一時的、worktree-local、disposable、non-canonical である。
+2. Git tracking を意図する Workbench file は `README.md` だけである。
+3. その他の Workbench file は Git に ignore される。
+4. 保存価値のある file は対象 scope の `artifacts/` へ `spec-dock artifact import file` で明示 import する。
+5. Workbench file は自動 copy / sync されず、必要な場合だけ manual `workbench copy` を使う。
+6. Git ignore は security boundary ではなく、禁止された secret を保存してはならない。
+7. file の明示指定または import は read / import authorization に限られ、import 結果は evidence-only である。canonical adoption には別の reviewed workflow が必要である。
+8. tracked README は通常の Git checkout で別 worktree へ現れ、manual copy が必要なのは ignored な作業ファイルである。
+9. 人間、model、tool は README を含む Workbench content を canonical input として扱ってはならない。
 
-### 振る舞い BH-001:
+### I344-RQ-004 README-only tracking
 
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
+各 scope の `.workbench/README.md` だけを Git tracking 可能とし、同じ Workbench 内のその他の entry を ignore しなければならない。
 
-### 振る舞い BH-002:
+- file の深さ、extension、encoding、content によって例外を作ってはならない。
+- nested `README.md` と case variant `readme.md` を tracking 対象にしてはならない。
+- `.workbench-notes` など near-name directory へ Workbench 用 ignore rule を適用してはならない。
 
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
+### I344-RQ-005 Optional presence and no-backfill
 
-### 振る舞い BH-XXX:
+Workbench と README の存在は validity 要件ではない。
 
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+- existing root / node へ README を追加してはならない。
+- update、existing workspace への init / update、validate、sync、active 切替、Artifact / ADR 作成を backfill 契機にしてはならない。
+- future node 作成時も新規 node 以外へ README を追加してはならない。
+- existing Workbench の entry、bytes、names、mtime を変更してはならない。
 
----
+### I344-RQ-006 Semantic opacity and disposability
+
+Workbench subtree は default semantic discovery から除外され続けなければならない。
+
+- README を node metadata、Artifact、ADR、dependency、authoring source または canonical guidance source として解釈してはならない。
+- Workbench の削除または worktree 破棄は SpecDock validity を損なってはならない。
+- README は operator guidance であって workflow authority ではない。
+
+### I344-RQ-007 Git checkout and manual copy positioning
+
+tracked README は通常の Git checkout で他 worktree へ materialize されなければならない。
+
+- linked worktree 作成だけで ignored work file を移行してはならない。
+- manual `workbench copy` は ignored work file を必要時に移すための明示的 one-shot operation とする。
+- automatic hook、watch、sync、copy-back を追加してはならない。
+- existing `workbench copy` の ignored content に対する公開挙動を壊してはならない。
+
+### I344-RQ-008 Provider and distribution parity
+
+4つの Workbench README asset は provider source tree、built wheel、built sdist、installed package resources の全 surface へ収録されなければならない。
+
+template README の package inventory は次の exact allowlist とする。
+
+- existing `templates/README.md`
+- root Workbench README
+- Initiative Workbench README
+- Epic Workbench README
+- Issue Workbench README
+
+allowlist 外の nested template README を意図せず配布してはならない。
+
+### I344-RQ-009 Compatibility
+
+existing workspace の validity、Workbench の optional 性、semantic opacity、explicit `workbench copy` command surface、one-shot / noncanonical / disposable / no-sync 契約、existing user content、provider-first source-of-record 境界を維持しなければならない。
+
+### I344-RQ-010 Documentation
+
+shipped provider docs は fresh root / future node shell、existing scope no-backfill、optional presence、README-only tracking、ignored / disposable / noncanonical content、Git checkout と manual copy の役割分担、no automatic sync、Git ignore は security boundary ではないこと、explicit import は evidence-only であることを一貫して説明しなければならない。
+
+generic import の実装は `iss-00345` の責務であることも明記する。
 
 ## 7. 受け入れ条件
 
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
-
-### 受け入れ条件 AC-001:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-002:
-
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
-
-### 受け入れ条件 AC-XXX:
-
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
-
----
-
-## 8. 例外・エッジケース
-
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
-
-### 例外・エッジケース EC-001:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
-### 例外・エッジケース EC-002:
-
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
-
----
-
-## 9. 入力・出力・契約の例
-
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
-
-### 例 EX-001: 入力例
-
-```text
-...
-```
-
-### 例 EX-002: 出力例
-
-```text
-...
-```
-
-### 例 EX-003: エラー例
-
-```text
-...
-```
-
-### 契約上の注意
-
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-
----
-
-## 10. 非機能要求・品質要求
-
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
-
-### 10.1 互換性
-
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
-
-### 10.2 移行性
-
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-
-### 10.3 可観測性
-
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
-
-### 10.4 性能・スケール
-
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
-
-### 10.5 セキュリティ・プライバシー
-
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
-
----
-
-## 11. 制約
-
-### 制約 CON-001:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
-### 制約 CON-002:
-
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
-
----
-
-## 12. 依存関係
-
-### 12.1 前提となるIssue / PR / 作業
-
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
-|---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
-
-### 12.2 後続作業
-
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
-|---|---|---|---|
-| ... | ... | ... | ... |
-
-### 12.3 ブロッカー
-
-- ...
-- ...
-
----
-
-## 13. 等級（Grade）判定材料
-
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
-
-内部profile名は `lite / standard / strict / critical` を使用する。
-
-### 13.1 推奨 Issue 等級（Issue Grade）
-
-現時点の推奨を一つ選ぶ。
-
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
-
-### 13.2 推奨理由
-
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
-
-### 13.3 リスク事実（Risk Facts）
-
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
-
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
+| ID | 対応要件 | 受け入れ条件 |
 |---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
+| `AC-344-001` | `I344-RQ-001` | fresh init で root `.workbench/README.md` が生成され、existing init / update では backfill されない |
+| `AC-344-002` | `I344-RQ-002` | 新規 Initiative / Epic / Issue の各 node にだけ README が生成され、create plan / result / filesystem が一致する |
+| `AC-344-003` | `I344-RQ-003` | 4 README が byte-identical で9つの guidance element を含む |
+| `AC-344-004` | `I344-RQ-004` | top-level README だけが trackable で、nested / case variant / other payload は ignore される |
+| `AC-344-005` | `I344-RQ-005` | update、既存操作、新規 child 作成で existing root / ancestor / sibling が変更されない |
+| `AC-344-006` | `I344-RQ-006` | README、fake metadata、ADR-like file、binary、invalid UTF-8 が semantic discovery と validation 結果を変えない |
+| `AC-344-007` | `I344-RQ-007` | linked worktree には README が checkout され、ignored file は manual copy 後にだけ現れ、README bytes は変わらない |
+| `AC-344-008` | `I344-RQ-008` | source / wheel / sdist / installed inventory が exact allowlist と一致し、4 README bytes が一致する |
+| `AC-344-009` | `I344-RQ-009` | current `workbench copy` と existing workspace の focused regression が通る |
+| `AC-344-010` | `I344-RQ-010` | shipped docs が shell、Git、copy、security、authority、Issue 境界を矛盾なく説明する |
 
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
+## 8. 例外・境界条件
 
-#### `strict` 以上を検討する条件
+- target の `spec-dock` が file、directory、または symlink として既に存在する場合は fresh root とみなさない。
+- fresh / existing 判定は installer mutation より前に固定する。
+- pre-existing empty `spec-dock` directory も existing root とみなし backfill しない。
+- existing user-created `.workbench/README.md` を update で上書きしない。
+- Workbench README の削除は validation failure としない。
+- directory symlink / descendant symlink は Workbench copy の既存 security rule に従い、本 Issue で緩和しない。
+- binary、invalid UTF-8、large file、nested directory の有無は semantic discovery に影響しない。
+- package backend の hidden directory 処理は build artifact と installed resource で実測する。
 
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
+## 9. 非機能要件
 
-#### `critical` を検討する条件
+### 9.1 互換性
 
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
+- schema migration を追加しない。
+- existing root / node を書き換えない。
+- Workbench の有無に依存しない既存 command の成功条件を維持する。
 
-#### `lite` を検討できる条件
+### 9.2 セキュリティとプライバシー
 
-すべて満たす場合のみ `lite` を検討できる。
+- Git ignore を secret 保護手段として説明しない。
+- README 以外の Workbench content を Git へ露出させない。
+- Workbench content の semantic parse、network upload、automatic import を追加しない。
 
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
+### 9.3 可観測性
 
----
+- init / create の result path と実 filesystem path が一致する。
+- package inventory と byte parity を machine-verifiable にする。
+- focused test、build、review 結果を Issue report に記録できる。
 
-## 14. 設計への引き渡し
+### 9.4 性能
 
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
+- README 追加による create plan は固定4 asset 以下の増分である。
+- Workbench subtree の再帰 semantic scan を追加しない。
 
-### 14.1 設計で必ず扱うべき論点
+## 10. リスク信号
 
-- ...
-- ...
-
-### 14.2 責任所有者が未確定のもの
-
-| 論点 | 候補 | 未確定理由 |
+| ID | リスク信号 | 必須対応 |
 |---|---|---|
-| ... | ... | ... |
+| `RS-344-001` | existing root / node に README が追加された | blocking regression として修正し再レビューする |
+| `RS-344-002` | README 以外の Workbench content が Git status に現れた | ignore 契約を修正し、nested / case variant test を追加する |
+| `RS-344-003` | Workbench 内容が discovery / validation 結果を変えた | semantic opacity 回帰として修正する |
+| `RS-344-004` | source にはあるが wheel / sdist / installed resource にない | package-data を修正し全 surface を再検証する |
+| `RS-344-005` | README を得るために manual copy が必要と説明された | Git checkout と manual copy の役割分担を修正する |
+| `RS-344-006` | Issue 345 / 346 の責務を実装または完了主張した | scope を戻し parent dependency に defer する |
 
-### 14.3 境界が未確定のもの
+## 11. 完了条件
 
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
+- `AC-344-001` から `AC-344-010` がすべて Issue-local evidence で満たされる。
+- requirement、design、plan が fresh `spec-reviewer` の pass を得る。
+- focused implementation / QA / code / spec review gate が pass する。
+- Issue report に実行済みの証跡、未実施事項、`iss-00346` への deferred delivery record が記録される。
+- `iss-00346 -> iss-00344` dependency が維持される。
+- 本 Issue では PR-ready、merge-ready、Issue finish、Epic completion を主張しない。
 
-### 14.4 契約影響が未確定のもの
+## 12. 仮定と未確定事項
 
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.5 上位へ昇格すべき可能性がある判断
-
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 15. 実装計画への引き渡し
-
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
-
-### 15.1 計画で分解すべき成果
-
-- ...
-- ...
-
-### 15.2 検証が必要な観測点
-
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
-
-### 15.3 TDDが必要な振る舞い候補
-
-振る舞い変更がある場合のみ記述する。
-
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
-
-### 15.4 TDD不要または限定的でよい理由
-
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
-
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-07-29 | 初稿（Initial draft） | ... | ... |
+- README の exact wording はこの Issue の design で固定するが、9つの guidance element は変更しない。
+- `workbench copy` は opaque whole-tree merge の既存実装を維持し、README 専用 filter は追加しない。
+- `pyproject.toml` の broad nested README exclusion は exact distribution allowlist と両立するよう design で解決する。
+- hidden `.workbench/README.md` の wheel / sdist 収録挙動は `uv build` 実測まで未検証である。
+- manual copy による README mtime 変化は公開契約にしない。公開互換性は content no-diff で判定する。
