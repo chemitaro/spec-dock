@@ -161,7 +161,7 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 |---|---|---|---|---|---|---|---|---|
 | S01 | delegated | shipped CLI contractとtestsのbounded implementation | dev-coder | `plan.md` S01と`artifacts/20260727t150723z-s01-chatgpt-implementation-work-packet.md`のexact allowed paths | canonical `requirement.md`、`design.md`、`plan.md`、S01 work packet | S01 Red／Green command、focused code review、diff allowlist | scope escape、test failure、new requirement gap、S02以降の実装が必要 | initial implementation 109 tests Green。fresh reviewの3 P1を同workerがbounded修正し、116 tests Green、fresh re-review pass、allowlist escape 0 |
 | S02 | delegated | Git identity、bounded PlanningContext、Prompt synthesis、fixed ChatGPT Use transportのbounded implementation | dev-coder | `plan.md` S02と`artifacts/20260727t161404z-s02-chatgpt-implementation-work-packet.md`のwrite allowlist | canonical `requirement.md`、`design.md`、`plan.md`、S01実装、S02 work packet | Red-first Git／backend／security tests、S01／shared primitive regression、fresh code review、diff allowlist | public CLI／bootstrap変更、S03以降、parallel Git/subprocess framework、wrapper ABI変更、scope外pathが必要 | Red 34 failed／76 passed／0 errorsからfocused 119 passedへGreen。3 P1と残存1 P1をnegative testsで閉鎖し、final fresh reviewはfindings 0／pass。S01/shared/Core regressions、ruff、mypy、validate、diff check pass。milestone commit `796a1ce4c8b4f2161f0d646cf45f3afc6aaf40e2`をpushしclosed |
-| S03 | delegated | Planner responseのstrict extraction、Issue Candidate identity、named ZIP contract、atomic no-replace publicationのbounded implementation | dev-coder | `plan.md` S03と`artifacts/20260728t020250z-s03-chatgpt-implementation-work-packet.md`の11-path write allowlist | canonical `requirement.md`、`design.md`、`plan.md`、S01／S02実装、S03 work packet | Red-first Candidate／ZIP profile／atomic publication tests、focused regression、fresh code review、diff allowlist | source HEAD mismatch、allowlist外変更、public CLI／bootstrap変更、generic ZIP default変更、atomic no-replace不能、failure後final filename残存、S04以降、secret／private raw serialization | work packetを保存しReportへ採用済み。artifact／Reportをcommit・pushし、clean remote parityを確認してから実装委任する |
+| S03 | delegated | Planner responseのstrict extraction、Issue Candidate identity、named ZIP contract、atomic no-replace publicationのbounded implementation | dev-coder | `plan.md` S03と`artifacts/20260728t020250z-s03-chatgpt-implementation-work-packet.md`の11-path write allowlist | canonical `requirement.md`、`design.md`、`plan.md`、S01／S02実装、S03 work packet | Red-first Candidate／ZIP profile／atomic publication tests、focused regression、fresh code review、diff allowlist | source HEAD mismatch、allowlist外変更、public CLI／bootstrap変更、generic ZIP default変更、atomic no-replace不能、failure後final filename残存、S04以降、secret／private raw serialization | Red 43 failed／36 passedからfocused 105 passedへGreen。fresh reviewの3 P1を同workerがexact Redで再現・修正し、focused 108 passed、S01／S02/Core 112 passed、generic archive 57 passed、fresh re-review findings 0／pass。11 changed pathsはallowlist内 |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 
@@ -169,10 +169,12 @@ planning repairで発見されたarchive safety、transaction fault、publicatio
 
 - S02で、実temporary Git repositoryを使うclean／synced preflight tracer、fixed backend failure classification、ephemeral Prompt pack validationをdiscovered characterizationとして追加した。いずれもapproved S02 obligationの具体化であり、canonical closureの追加・削除・意味変更はない。
 - fixed wrapperのlive ABI、実ChatGPT response framing、provider Promptのinstalled／dogfood projectionはS02 hermetic testsでは未検証であり、後続S06／S07のownerへ引き継ぐ。
+- S03で、実際のS02 outer response frameを`.strip()`した後もfinal inner end markerをEOFとしてexact parseできるintegration testを追加した。S02 transport contractを変更せず、S03 extractionの既存入力境界をcharacterizeする。
+- S03のmacOS atomic no-replace publicationは実行検証済みである。Linux `renameat2(RENAME_NOREPLACE)`分岐はstatic／type verificationに留まり、Linux実環境の確認は後続の統合検証へ引き継ぐ。
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 
-製品実装stepのclosure evidenceはまだ存在しない。S01開始後、各step ownerが持つ全`required=yes` rowについて、observed evidence、reviewer verdict、commit candidate、clean checkを追記する。
+S01〜S03の製品実装step closure evidenceを本書のImplementation Delegation Gate、Test Contract Closure、session log、Milestone Gateへ記録した。S03はREQ-004、REQ-012のCandidate生成部分、AC-001のCandidate生成部分、AC-006、AC-011を、fake transport→Candidate ZIP、independent controls verification、generic archive regressionで閉じた。commit、push、post-commit cleanはMilestone Gateで追跡する。
 
 #### テスト契約の完了証跡（Test Contract Closure）
 
@@ -336,6 +338,14 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - follow-up session `required-repository-connector-context-github-108`は12項目をすべてimplementation-localと分類し、exact marker grammar、current Japanese frontmatter normalization、v1 Candidate naming／controls、detached external ZIP SHA、named Issue Candidate ZIP profile、temporary buildからatomic no-replace publicationまでを11-path allowlist内へ限定した。follow-up selector evidenceは`resolved=(unavailable)`／`verified=no`だが、initial Pro verified conversationの継続である。
 - replacement packetを`artifacts/20260728t020250z-s03-chatgpt-implementation-work-packet.md`へ保存した。SHA-256は`efb47085457cea57fc4b83ab31f053b77793b4beaca22c86ebf73bad1aaa29e1`である。これはreview不要のstep execution inputであり、canonical authoring draftではない。
 - S03 packetはpublic CLI、bootstrap、generic ZIP default、S04以降、canonical三文書の意味を変更しない。artifact／Report commitとorigin push後にbounded dev-coderへ渡す。
+- S03 packet／Report commit `386fd0c01a4003a0a860beb02463bab6ea9c6fa4`をoriginへpushし、local／remote parityとclean worktreeを確認してからdev-coderへ委任した。
+- Red-first laneは79 testsをcollectし、43 failed／36 passed／0 errorsだった。failuresはCandidate domain、named ZIP profile、atomic publication、Planner inner grammar、application create orchestrationの未実装behaviorに到達し、既存S01／S02 testsはpassした。
+- initial implementation後、S03 focused 105 passed、S01／S02／Core regression 112 passed、generic authoring-pack characterization 57 passed、ruff、mypy、`validate` nodes=222、`git diff --check`がpassした。差分はpacketの11-path allowlistとMainのReport integrationだけである。
+- fresh defect-only code reviewは3件のP1を報告した。dependency snapshot二重取得によるPrompt／Candidate mismatch、invalid placeholder schemaの`TypeError`伝播、JSON boolean `true`のmanifest version受理であり、いずれもS03 exact binding／strict fail-closed contractを直接破るため採用した。
+- bounded follow-upは3件のnegative Redを追加し、3 failedを確認した。同一dependency snapshotをtransportとpackagingへbindし、検証済みplaceholder listだけを反復し、manifest versionでboolを明示拒否した。
+- post-fix親独立検証はS03 focused 108 passed、S01／S02／Core regression 112 passed、generic archive 57 passed、ruff、mypy、`validate` nodes=222、`git diff --check`がpassした。
+- 別fresh re-reviewはfindings 0、`review_status: pass`、confidence 0.97。3 P1 closureと同じS03契約への明白なP0／P1回帰なしを確認した。
+- S03 product implementation、required verification、fresh reviewは完了した。milestone commit、push、post-commit clean／remote parityを確認するまでS04は開始しない。
 - No material implementation decisions beyond the approved plan.
 
 | `chatgpt-use --followup iss00334-blue-planning-correction-r5` | same Blue conversationでauthoring継続。GitHub exact HEAD確認、replacement-ready blocks取得。follow-up selector evidenceは`resolved=(unavailable); verified=no` |
@@ -359,7 +369,7 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 | third bounded correction | authoring complete; commit pending | Requirement、Design、Plan、Report、new Red artifact、Assurance rebinding | pending — Main must record actual resulting full HEAD | integration後にvalidate、diff-check、assurance verify、clean checkを実行 | one immutable commitをpushし、actual resulting 40-character HEADで別fresh Red review |
 | S01 | committed | S01 allowed code／tests、mechanical artifact whitespace fix、report evidence | fresh code-reviewer pass | commit `c597bd146c1d68e619cdc1e24b1b76dd405fe36a`、origin push成功、post-commit clean、local／remote parity | S01 closed。S02 work packetへ進む |
 | S02 | committed | S02 allowlisted runtime／Prompt resources／testsとreport evidence | final fresh code-reviewer pass、findings 0 | commit `796a1ce4c8b4f2161f0d646cf45f3afc6aaf40e2`、origin push成功、post-commit clean、local／remote parity | S02 closed。S03 ChatGPT work packetへ進む |
-| S03 | not started | S03 review不要work packetとReport adoption evidence | packet SHA-256 `efb47085457cea57fc4b83ab31f053b77793b4beaca22c86ebf73bad1aaa29e1`; source HEAD `530cca24943892dd440ca67823a9d68dfc46763d` | implementation未開始。artifact／Reportのみをcommit候補とする | commit／push／clean remote parity後、11-path allowlistでbounded dev-coderへ委任 |
+| S03 | review passed; commit pending | S03 allowlisted runtime／Prompt resource／testsとReport execution evidence | final fresh code-reviewer pass、findings 0、confidence 0.97 | S03 108、S01／S02／Core 112、generic archive 57、ruff、mypy、validate、diff check pass。11 implementation paths＋Main Report integration | focused milestone commitを作成し、push／post-commit clean／remote parity後にS03をclosedとする |
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
