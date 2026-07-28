@@ -75,6 +75,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-006 | adopted | ChatGPT requirement final review (`PASS`, advisory) | `requirement.md`, `report.md` | commit `1087ea15` を connected GitHub app で確認した fresh review。blocking finding なし、F-007 と親 Epic / current copy contract の整合を確認した | `artifacts/20260728t164218z-chatgpt-output-chatgpt-issue-00344-requirement-final-review.md`; SHA-256 `756b70eb67743c7d4fa87ce98ee1e3acad9c97fefd00fd9ea192aab6beddca49`; 6,115 bytes | fresh `spec-reviewer` requirement review |
 | EAL-007 | adopted | fresh `spec-reviewer` requirement review (`PASS`) | `requirement.md`, `report.md` | P0/P1なし。P2のChatGPT external evidence / delegated draft lane誤分類を修正し、requirement phaseをapprovedとした | reviewer output on commit `2e0bb6ae`; `requirement.md`; Delegated Draft Evidence row | assurance classify / design compose |
 | EAL-008 | partially_adopted | ChatGPT planning candidate design section (`advisory`) | `design.md` | reviewed requirement、parent Epic、local sourceと照合し、freshness、template recursion、ignore、opacity、copy compatibility、distribution exact allowlist、docs責任をStandard designへ統合 | `artifacts/20260728t153458z-chatgpt-output-chatgpt-issue-00344-planning-candidate.md`; `.assurance.json` authorized profile `standard` | commit / push 後に ChatGPT design review と fresh `spec-reviewer` review |
+| EAL-009 | adopted | ChatGPT design review (`FAIL`, advisory) | `design.md`, `report.md` | B-001〜B-003とNB-001を採用。Git trackingをpathname contractへ限定し、canonical README完全本文、generic byte-stable materialization、package inventory探索rootを設計へ固定した | `artifacts/20260728t170651z-chatgpt-output-chatgpt-issue-00344-design-review.md`; SHA-256 `53d496a9f09008f1a5623611035daf982e4f8a62a0901c80f450c55f3b49355f`; 10,259 bytes | commit / push 後に fresh ChatGPT design re-review と fresh `spec-reviewer` review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -91,7 +92,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
 | requirement | 親 Epic requirement/design/plan、provider source、package config、relevant tests、ChatGPT authoring/review Artifacts | F-001〜F-007 を canonical docs に反映。final ChatGPT review は blocking finding なし | adopted | passed (ChatGPT advisory PASS; fresh `spec-reviewer` PASS, P2 non-blocking lane classification correction applied) | no | promote to assurance classify / design compose |
-| design | approved requirement、parent Epic、provider source、current copy / package contracts、ChatGPT planning candidate | blocking open question なし。copy implementation変更が必要ならdesignへ戻る | partially_adopted | pending | yes | commit / push 後に ChatGPT design review、その後 fresh `spec-reviewer` review |
+| design | approved requirement、parent Epic、provider source、current copy / package contracts、ChatGPT planning candidate / design review | ChatGPT review B-001〜B-003、NB-001をcanonical designへ修正済み | partially_adopted | failed (`B-001`〜`B-003`; `NB-001`) | yes | commit / push 後に fresh ChatGPT design re-review、その後 fresh `spec-reviewer` review |
 | plan | design review 後に開始 | design gate 待ち | none | pending | yes | design pass 後に作成 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）

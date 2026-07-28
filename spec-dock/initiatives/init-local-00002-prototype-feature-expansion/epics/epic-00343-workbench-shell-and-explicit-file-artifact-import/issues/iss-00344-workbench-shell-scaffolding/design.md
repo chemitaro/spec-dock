@@ -129,16 +129,53 @@ assurance_profile: "standard"
 - `[N]` Initiative / Epic / Issue template の各 root に `.workbench/README.md` を配置する。
 - `[N]` `_scaffold_file_paths` と `copy_scaffolded_tree` の generic recursion を利用し、node-kind-specific runtime branch を追加しない。
 - `[N]` new node だけを生成し、ancestor / sibling の canonical state と Workbench state を変更しない。
+- `[N]` generic scaffolder は、placeholder replacement 後の UTF-8 bytes が source bytes と同一なら text rewrite をせず exact byte copy する。replacement により bytes が変化する通常 template は既存 text rendering を維持する。
+- `[N]` この byte-stable primitive は path / README / Workbench を意味解釈しない generic contract とし、README-specific branch を追加しない。
+- `[N]` root は existing exact file-copy seam、node は上記 generic exact-copy branchを使い、4 output の bytes を同一にする。
 
 ### DES-344-003 Shared README contract
 
 - `[N]` provider authority は4 asset とし、bytes を完全一致させる。
+- `[N]` asset encoding は UTF-8、newline は LF、末尾 newline は1つとし、template placeholder tokenを含めない。
 - `[P]` maintenance は1つの source text からの mechanical parity check で補助できるが、新しい generation framework は追加しない。
 - `[N]` README は requirement の9 guidance elementsを含む。
 - `[N]` command は repository root から `./spec-dock/scripts/spec-dock artifact import file ...` と記載する。
 - `[N]` root/node とも tracked README は Git checkout で現れる。
 - `[N]` `workbench copy` は Initiative / Epic / Issue の node-scoped ignored payload 用 helper と説明し、root は対象外とする。
 - `[N]` root の durable one-file preservation は generic Artifact import を案内する。
+- `[N]` 次の fenced block 内部（開始行 `# Workbench` から末尾の空行直前まで）を4 asset共通の canonical Markdown bytes とする。wording変更は design amendment と fresh reviewを要する。
+
+~~~markdown
+# Workbench
+
+このディレクトリは、一時的で worktree-local、破棄可能、non-canonical な作業領域です。下書き、調査メモ、model の中間成果など、まだ正本へ採用していないファイルを置けます。Workbench がなくても SpecDock workspace は valid であり、worktree を破棄すると内容も失われ得ます。
+
+## Git と安全上の境界
+
+- Git tracking を意図する Workbench path は、この direct child の `README.md` だけです。
+- `.workbench/README.md` 以外の Workbench entry は Git に ignore されます。
+- Git ignore は security boundary ではありません。secret、credential、private customer data、その他保存を禁止された情報を置かないでください。
+- 人間、model、tool は、この README を含む Workbench content を canonical specification、ADR、metadata、dependency、authoring source として扱ってはいけません。
+
+## 残す価値があるファイル
+
+残す価値がある一つのファイルは、repository root から repo-local runtime を使い、対象の root、Initiative、Epic、Issue の Artifact へ明示的に import します。
+
+`./spec-dock/scripts/spec-dock artifact import file ...`
+
+ファイルの明示指定は、そのファイルを read / import する許可に限られます。import 結果は evidence-only であり、canonical adoption を意味しません。正本へ反映するには、別の reviewed workflow が必要です。
+
+## linked worktree 間の扱い
+
+- tracked `README.md` は root / node とも通常の Git checkout で別 worktree に現れます。
+- その他の ignored Workbench file は自動 copy / sync されません。
+- Initiative、Epic、Issue の対応する node-scoped ignored payload は、必要な場合だけ full ID を指定して manual one-shot helper を実行します。
+
+`./spec-dock/scripts/spec-dock workbench copy --scope <full-id> --to <linked-worktree>`
+
+- root `.workbench/` の ignored payload はこの helper の対象外です。root で durable に残す一 file は generic Artifact import を使ってください。
+- automatic hook、watch、sync、copy-back はありません。
+~~~
 
 ### DES-344-004 README-only Git tracking
 
@@ -147,12 +184,15 @@ provider と installer fallback の ignore contract を同一にする。
 ```gitignore
 **/.workbench/*
 !**/.workbench/README.md
+**/.workbench/README.md/**
 ```
 
-- `[N]` exact top-level `README.md` だけを再包含する。
-- `[N]` nested `README.md`、case variant `readme.md`、binary、directory、symlink は ignore されたままとする。
+- `[N]` Git tracking eligibility は entry type ではなく exact pathname identity で定義する。fresh / future shell が生成する exact path は regular file である。
+- `[N]` nested `README.md`、case variant `readme.md`、other payload は ignore されたままとする。
+- `[N]` exact path が pre-existing symlink の場合、Git ignore は file type を区別できないため pathname として再包含され得る。installer はその entryを生成・変更せず、copy security contractも緩和しない。
+- `[N]` exact path が directory の場合は descendant ignore rule により配下 entry を再包含しない。Git は directory 自体を tracking object としない。
 - `[N]` `.workbench-notes` など near-name path へ rule を拡張しない。
-- `[N]` actual Git repository で `git check-ignore` / status matrix を検証する。
+- `[N]` actual Git repository で regular file、symlink、directory、directory descendant、nested / case variant / near-name を含む `git check-ignore` / status matrix を検証する。
 
 ### DES-344-005 No-backfill and preservation
 
@@ -190,6 +230,7 @@ provider と installer fallback の ignore contract を同一にする。
   - Epic `.workbench/README.md`
   - Issue `.workbench/README.md`
 - `[N]` 4 Workbench README の bytes を全 surface で比較する。
+- `[N]` inventory の探索 root は各 surface で正規化した `spec_dock/assets/spec_dock/templates/` subtree とし、package 全体の README inventory とは解釈しない。
 
 ### DES-344-009 Shipped documentation
 
