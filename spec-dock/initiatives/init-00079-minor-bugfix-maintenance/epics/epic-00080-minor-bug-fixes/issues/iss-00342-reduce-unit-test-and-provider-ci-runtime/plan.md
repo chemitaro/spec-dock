@@ -75,7 +75,7 @@ Issue Grade: "standard"
 baseline characterization
   -> classifier / selector Red
   -> classifier / selector Green
-  -> Make command Red / Green
+  -> pytest option / policy-skip Red / Green
   -> workflow routing Red / Green
   -> focused / lint / fast integration
   -> final 3-pair fast/full measurement batch
@@ -113,7 +113,7 @@ baseline characterization
 - planned full 3回の外でpre-merge full rerunを自動実行しない。exact focused rerunでtriageする。
 - known flaky以外のfailure、別node併発、node omissionはunexpected regressionとして停止する。
 - 3回のfullの1回でもnonzeroならS05は未完了で、final readinessへ進まない。ownerが原因・risk・follow-upを解消するか、requirement/design/planをamendしてfresh reviewを通すまでpassへ読み替えない。
-- human merge後のmain full failureだけは、incident ID、same SHA、理由、回数、結果をS98 external-evidence anchorに記録して`make test-provider-full`を追加実行できる。このincident reproductionはpre-merge exactly 3制約の外側である。
+- human merge後のmain full failureだけは、incident ID、same SHA、理由、回数、結果をS98 external-evidence anchorに記録して`uv run pytest --run-full-regression`を追加実行できる。このincident reproductionはpre-merge exactly 3制約の外側である。
 
 ## 3. Scope and Change Surface
 
@@ -124,8 +124,8 @@ baseline characterization
 | `tests/conftest.py` | add | partial-safe item classifier / `dev-coder` | `DES-TL-001`、`DES-TL-002` |
 | `tests/unit/test_provider_test_lanes.py` | add | lane / command / routing contract / `dev-coder` | `DES-TL-001`、`DES-TL-003`、`DES-TL-006` |
 | `tests/unit/infra/test_init_update.py` | modify | workflow identity / non-shipping tests / `dev-coder` | `DES-TL-002`、`DES-TL-005`、`DES-TL-006` |
-| `pyproject.toml` | modify | markers、strict markers、default fast / bounded `utility-worker` config slice | `DES-TL-003` |
-| `Makefile` | modify | stable fast / full facade / bounded `utility-worker` config slice | `DES-TL-003` |
+| `pyproject.toml` | modify | markers、strict markers only / bounded `utility-worker` config slice | `DES-TL-003` |
+| `Makefile` | read-only | existing `lint` command only | `DES-TL-003` |
 | `.github/workflows/provider-ci.yml` | modify | pull_request lint + fast / bounded `utility-worker` workflow slice | `DES-TL-004` |
 | `.github/workflows/provider-full-regression.yml` | add | main / manual full / bounded `utility-worker` workflow slice | `DES-TL-005` |
 | `README.md` | modify by doc-writer | contributor operation | `DES-TL-007` |
@@ -171,7 +171,7 @@ title iss-00342 implementation order
 start
 :S00 Baseline characterization;
 :S01 Classifier and pytest config;
-:S02 Make fast/full facade;
+:S02 Pytest option and policy skip;
 :S03 PR/full workflow routing;
 :S04 Focused/lint/fast integrated gate;
 :S05 Three paired fast/full runs;
@@ -194,7 +194,7 @@ stop
 
 S05 freshnessはcommit間の全path差分ではなく、test/runtime結果を決める次の`TEST-RELEVANT-MANIFEST`で判定する。
 
-- manifest対象: `tests/**`、`src/**`、`pyproject.toml`、`uv.lock`、`Makefile`、`.github/workflows/**`
+- manifest対象: `tests/**`、`src/**`、`pyproject.toml`、`uv.lock`、`.github/workflows/**`
 - S05開始時に、対象となるtracked fileのsorted path、各SHA-256、集約SHA-256、Python/cache条件を記録する。
 - S90、S98、S99、S100の各gateで同じmanifestを再計算し、集約SHA-256一致を必須とする。
 - `README.md`、`AGENTS.md`、Issue `report.md`、Issue artifacts、`.assurance.json`、external-evidence metadataだけの変更はmanifest対象外であり、それ自体ではS05 evidenceをstaleにしない。S90のfresh spec-reviewerはdocs command/event contract、S98/S99はledger/anchor整合を別途確認する。
@@ -231,22 +231,22 @@ S05 freshnessはcommit間の全path差分ではなく、test/runtime結果を決
 
 | Closure ID | Spec link / Design | Observable input / state | Locked expectation | Bug class guarded | Required | Evidence level | Evidence / report anchor | Owner step / verification path |
 |---|---|---|---|---|---|---|---|---|
-| `CLOS-TL-AC-001` | AC-001 / `DES-TL-001`,`003` | bare pytest、`tests/unit`、documented Make fastのselected/executed node setとcontrolled failure | 3経路すべてH実行0、各failure pathはnonzero | heavy leakage or swallowed default failure | yes | red-required + automated | `EVD-TL-001`,`EVD-TL-003`; `TC-CLOS-TL-AC-001` | S01/S02/S04; `tc-s01-001`,`tc-s01-004`,`tc-s02-001`,`tc-s02-002`,`tc-s04-001` |
+| `CLOS-TL-AC-001` | AC-001 / `DES-TL-001`,`003` | bare pytest、`tests/unit`、focused pytestのselected/executed node setとcontrolled failure | 3経路すべてH実行0、各failure pathはnonzero | heavy leakage or swallowed default failure | yes | red-required + automated | `EVD-TL-001`,`EVD-TL-003`; `TC-CLOS-TL-AC-001` | S01/S02/S04; `tc-s01-001`,`tc-s01-004`,`tc-s02-001`,`tc-s02-002`,`tc-s04-001` |
 | `CLOS-TL-AC-002` | AC-002 / `DES-TL-001`,`003` | root collection C、F/H partition、full selector | F∩H=∅、F∪H=C、U=0、H>0 | silent full omission | yes | red-required + manual-required | `EVD-TL-001`,`EVD-TL-003`,`EVD-TL-005`; `TC-CLOS-TL-AC-002` | S01/S02/S05; `tc-s01-002`,`tc-s02-001`,`tc-s05-001` |
 | `CLOS-TL-AC-003` | AC-003 / `DES-TL-004` | PR event、existing workflow/job identity | `Provider CI` / `provider-tests`でlint+fastのみ、full 0 | required-check rename or PR full | yes | red-required + external | `EVD-TL-004`,`EVD-TL-006`; `TC-CLOS-TL-AC-003` | S03/S111; `tc-s03-001`,`tc-s03-002`,`tc-s111-001` |
 | `CLOS-TL-AC-004` | AC-004 / `DES-TL-005` | `main` push SHAとfull workflow runs | main pushでfull 1 job、PR重複なし | missing or duplicate post-merge full | yes | red-required + post-merge manual | `EVD-TL-004`,`EVD-TL-007`; `TC-CLOS-TL-AC-004` | S03/S120; `tc-s03-001`,`tc-s120-001` |
-| `CLOS-TL-AC-005` | AC-005 / `DES-TL-003`,`005` | Make full target、workflow_dispatch、docs | 同じfull contract、schedule 0、明示手動操作可能 | manual/full contract drift | yes | red-required + inspect-only | `EVD-TL-003`,`EVD-TL-004`,`EVD-TL-007`; `TC-CLOS-TL-AC-005` | S02/S03/S90; `tc-s02-001`,`tc-s03-001`,`tc-s90-001` |
+| `CLOS-TL-AC-005` | AC-005 / `DES-TL-003`,`005` | direct full command、workflow_dispatch、docs | 同じfull contract、schedule 0、明示手動操作可能 | manual/full contract drift | yes | red-required + inspect-only | `EVD-TL-003`,`EVD-TL-004`,`EVD-TL-007`; `TC-CLOS-TL-AC-005` | S02/S03/S90; `tc-s02-001`,`tc-s03-001`,`tc-s90-001` |
 | `CLOS-TL-AC-006` | AC-006 / `DES-TL-002` | required-fast 7 exact node IDs | 7件すべて存在しFに分類、focused実行pass | representative smoke omitted | yes | characterization-first + automated | `EVD-TL-002`; `TC-CLOS-TL-AC-006` | S00/S01/S04; `tc-s00-001`,`tc-s01-002`,`tc-s04-001` |
 | `CLOS-TL-AC-007` | AC-007 / `DES-TL-001`,`006` | before/after node、skip、xfail、assertion diff | unexplained delta 0 | coverage weakening by omission | yes | characterization-first + review | `EVD-TL-001`,`EVD-TL-008`; `TC-CLOS-TL-AC-007` | S00/S04/S05/S99; `tc-s00-001`,`tc-s04-001`,`tc-s05-002`,`tc-s99-001` |
 | `CLOS-TL-AC-008` | AC-008 / `DES-TL-006` | same-condition local 3 pairsとsame reviewed SHA PR 3 runs | 各local fast<full、各PR run<38.1m baseline | unsubstantiated latency claim | yes | manual-required + external | `EVD-TL-005`,`EVD-TL-006`; `TC-CLOS-TL-AC-008` | S05/S111; `tc-s05-001`,`tc-s111-001` |
 | `CLOS-TL-AC-009` | AC-009 / `DES-TL-004`,`005`,`006` | PR/non-main/main/manual/schedule event matrix | yes/no matrixがrequirementと完全一致 | event routing drift | yes | red-required | `EVD-TL-004`; `TC-CLOS-TL-AC-009` | S03; `tc-s03-001` |
 | `CLOS-TL-AC-010` | AC-010 / `DES-TL-005`,`007` | main failureのSHA/test/log/owner/rerun record | failureが可視で、ownerとnext actionが残る | silent post-merge red | yes | inspect-only + post-merge manual | `EVD-TL-007`; `TC-CLOS-TL-AC-010` | S90/S120; `tc-s90-001`,`tc-s120-001` |
 | `CLOS-TL-AC-011` | AC-011 / `DES-TL-007` | rollback procedureとPR command | PR fastをfullへ戻せ、manual/full evidenceは保持 | unsafe fast gate without rollback | yes | inspect-only + spec review | `EVD-TL-007`; `TC-CLOS-TL-AC-011` | S90/S99/S112; `tc-s90-001`,`tc-s99-001`,`tc-s112-001` |
-| `CLOS-TL-BH-001` | BH-001 / `DES-TL-001`,`003` | bare pytest、`tests/unit`、Make fastと各controlled failing-fast probe | fastだけ選択し、3入口すべてfailureをnonzeroで伝播 | default bypass or swallowed failure | yes | red-required | `EVD-TL-001`,`EVD-TL-003`; `TC-CLOS-TL-BH-001` | S01/S02/S04; `tc-s01-001`,`tc-s01-004`,`tc-s02-001`,`tc-s02-002`,`tc-s04-001` |
-| `CLOS-TL-BH-002` | BH-002 / `DES-TL-001`,`003` | explicit full selector | default `-m fast`をoverrideしF∪Hを選択 | full command still fast-only | yes | red-required + manual-required | `EVD-TL-001`,`EVD-TL-003`,`EVD-TL-005`; `TC-CLOS-TL-BH-002` | S01/S02/S05; `tc-s01-002`,`tc-s02-001`,`tc-s05-001` |
+| `CLOS-TL-BH-001` | BH-001 / `DES-TL-001`,`003` | bare pytest、`tests/unit`、focused pytestと各controlled failing-fast probe | F bodyを実行しH bodyは0、3入口すべてfailureをnonzeroで伝播 | default bypass or swallowed failure | yes | red-required | `EVD-TL-001`,`EVD-TL-003`; `TC-CLOS-TL-BH-001` | S01/S02/S04; `tc-s01-001`,`tc-s01-004`,`tc-s02-001`,`tc-s02-002`,`tc-s04-001` |
+| `CLOS-TL-BH-002` | BH-002 / `DES-TL-001`,`003` | explicit full permission | `--run-full-regression`でpolicy skipなしにF∪Hを選択 | full command still policy-skipped | yes | red-required + manual-required | `EVD-TL-001`,`EVD-TL-003`,`EVD-TL-005`; `TC-CLOS-TL-BH-002` | S01/S02/S05; `tc-s01-002`,`tc-s02-001`,`tc-s05-001` |
 | `CLOS-TL-BH-003` | BH-003 / `DES-TL-004` | `pull_request` workflow execution | lint+fastのみでfullなし | PR merge blocked by full | yes | red-required + external | `EVD-TL-004`,`EVD-TL-006`; `TC-CLOS-TL-BH-003` | S03/S111; `tc-s03-001`,`tc-s111-001` |
 | `CLOS-TL-BH-004` | BH-004 / `DES-TL-005` | human merge後のlatest main SHA | post-merge fullが1件起動 | missing background regression | yes | red-required + post-merge manual | `EVD-TL-004`,`EVD-TL-007`; `TC-CLOS-TL-BH-004` | S03/S120; `tc-s03-001`,`tc-s120-001` |
-| `CLOS-TL-BH-005` | BH-005 / `DES-TL-003`,`005` | local Makeとmanual dispatch job command | 両方が同じfull selector contract | local/CI full divergence | yes | red-required | `EVD-TL-003`,`EVD-TL-004`; `TC-CLOS-TL-BH-005` | S02/S03; `tc-s02-001`,`tc-s03-001` |
+| `CLOS-TL-BH-005` | BH-005 / `DES-TL-003`,`005` | local direct commandとmanual dispatch job command | 両方が同じfull permission contract | local/CI full divergence | yes | red-required | `EVD-TL-003`,`EVD-TL-004`; `TC-CLOS-TL-BH-005` | S02/S03; `tc-s02-001`,`tc-s03-001` |
 | `CLOS-TL-BH-006` | BH-006 / `DES-TL-005` | workflow trigger keys | schedule key 0 | accidental cron reintroduction | yes | inspect-only | `EVD-TL-004`; `TC-CLOS-TL-BH-006` | S03; `tc-s03-001` |
 | `CLOS-TL-BH-007` | BH-007 / `DES-TL-005`,`007` | nonzero full resultとfailure record | redを保持し遡及merge blockにしない | hidden failure or false rollback | yes | manual-required + inspect-only | `EVD-TL-005`,`EVD-TL-007`; `TC-CLOS-TL-BH-007` | S05/S90/S120; `tc-s05-002`,`tc-s90-001`,`tc-s120-001` |
 | `CLOS-TL-CON-001` | CON-001 / `DES-TL-001`〜`007` | accepted ADRとcanonical docs/diff | Option A/no schedule/human merge境界を変更しない | implementation redefines policy | yes | spec-review | `EVD-TL-009`; `TC-CLOS-TL-CON-001` | S90/S99; `tc-s90-001`,`tc-s99-001` |
@@ -262,7 +262,7 @@ closure rowの削除、locked expectation、required-fast inventory、truth tabl
 |---|---|---|---|---|
 | `B-TL-000` | M0 | baseline集合とknown flakyを固定 | AC-006/007、CON-004 | ready |
 | `B-TL-001` | M1 | partial-safe exactly-one classification | AC-001/002/006/007 | planned |
-| `B-TL-002` | M1 | stable fast/full command facade | AC-001/002/005 | planned |
+| `B-TL-002` | M1 | ordinary pytest / explicit full permission contract | AC-001/002/005 | planned |
 | `B-TL-003` | M2 | PR/main/manual routingとidentity/non-shipping | AC-003/004/005/009 | planned |
 | `B-TL-004` | M3 | focused/lint/fast/coverage gate | AC-001/006/007/009 | planned |
 | `B-TL-005` | M3 | 3 paired final full evidence | AC-002/007/008 | planned |
@@ -341,24 +341,24 @@ closure rowの削除、locked expectation、required-fast inventory、truth tabl
 - Close: S00 evidence、fresh code-reviewer pass、M0 baseline ledger commit候補、commit後`git status --short` clean。
 - Finding:同roleへbounded follow-upしfresh re-review。source差分が必要ならS00を閉じずplan amendment判定へ戻る。
 
-### S01 Classifier / pytest config
+### S01 Classifier / pytest marker config
 
 #### Planned contract / delegation contract
 
 | 項目 | 契約 |
 |---|---|
 | Behavior goal | focused collectionを壊さず各collected itemをexactly one F/Hへ分類し、global verifierで完全性を証明する |
-| Planned obligation / evidence level | `red-required`; `CLOS-TL-AC-001`,`002`,`006`,`007`,`BH-001`,`BH-002` |
-| Pre-implementation evidence | S00 approved evidence、current marker/addopts、heavy prefixes、required-fast 7 node |
+| Planned obligation / evidence level | `red-required`; `CLOS-TL-AC-002`,`006`,`007` |
+| Pre-implementation evidence | S00 approved evidence、current marker registry、heavy prefixes、required-fast 7 node |
 | Delegated role | `dev-coder`: `tests/conftest.py`と`tests/unit/test_provider_test_lanes.py`; bounded `utility-worker`: `pyproject.toml`だけ |
 | Input docs | approved requirement/design/plan、S00 report evidence、`pyproject.toml`、relevant tests |
 | Allowed paths | `dev-coder`: `tests/conftest.py`、`tests/unit/test_provider_test_lanes.py`; `utility-worker`: `pyproject.toml` |
 | Forbidden changes | Make/workflow/docs、test移動/削除、skip/xfail/assertion weakening、dependency追加 |
-| Bounded batch | `dev-coder`がcontract Redを作る → `utility-worker`がapproved marker/addopts configだけをGreenにする → `dev-coder`がpartial-safe hookとglobal verifierをGreenにする。role間でpathを共有しない |
-| Acceptance criteria | subsetはexactly-one分類のみ。global verifierだけがF∩H=∅、F∪H=C、U=0、H>0、7 node∈Fを検査。controlled failing-fast probeはbare pytestと`pytest tests/unit`の双方でnonzero |
-| Required tests | step-local tests、one-node/H=0 focused run、both-marker conflict、root verifier、required-fast exact command、temporary pytester projectのbare/unit failure propagation |
+| Bounded batch | `dev-coder`がclassification contract Redを作る → `utility-worker`がmarker registry/strictnessだけをGreenにする → `dev-coder`がpartial-safe classifierとglobal verifierをGreenにする。optionとpolicy skipはS02まで実装しない |
+| Acceptance criteria | subsetはexactly-one分類のみ。global verifierだけがF∩H=∅、F∪H=C、U=0、H>0、7 node∈Fを検査。dynamic markerは`-m fast/full_regression` evaluationから見える |
+| Required tests | step-local tests、one-node/H=0 focused collection、both-marker conflict、root verifier、required-fast exact command、dynamic marker visibility |
 | Refactor guardrail | classification ruleを1箇所に限定し、single-use abstractionやtest-specific bypassを追加しない |
-| Reviewer focus | fresh `code-reviewer`: partial safety、marker conflict、set algebra、default override、coverage weakening |
+| Reviewer focus | fresh `code-reviewer`: partial safety、marker conflict、early marker visibility、set algebra、coverage weakening |
 | Stop conditions | focused runがglobal inventory不足でfail、conflict黙殺、inventory/selector変更、allowed外diff |
 | Amendment trigger | heavy prefixまたはrequired-fast inventory変更、分類contract変更、new dependency必要 |
 | Output required | role別changed files、Red/Green/Refactor、commands、unresolved risk、`EVD-TL-001/002`note、各workerのLedger Noteまたはno-material-decision文 |
@@ -390,59 +390,75 @@ closure rowの削除、locked expectation、required-fast inventory、truth tabl
   - 検証方法: focused negative test。
   - 関連 closure id: `CLOS-TL-AC-007`,`CLOS-TL-CON-004`
 
-- `tc-s01-004` red-required: bare pytestと`tests/unit`がfast failureを伝播する
-  - 前提: `pytester`または同等のtemporary mini-projectへ、productionと同じmarker/addopts/classifier contractと、単一のcontrolled failing-fast itemを配置する。repo source/testは変更しない。
-  - 操作: mini-project rootでbare pytestを実行し、次に`pytest tests/unit`を実行する。
-  - 期待結果: 両方がfailing-fast itemを選択し、full-regression itemを選択せず、通常のtests-failed nonzeroを返す。
-  - 失敗検出: default selector bypass、`tests/unit`だけのheavy leakage、failure exitのswallowを検出する。
-  - 検証方法: focused contract testでselected node IDs、deselected H、exit status、代表error outputをassertする。
-  - 関連 closure id: `CLOS-TL-AC-001`,`CLOS-TL-BH-001`,`CLOS-TL-AC-006`
+- `tc-s01-004` red-required: dynamic classification markerがselection前に見える
+  - 前提: temporary mini-projectへF/H分類対象itemを配置し、option/policy skipはまだ実装しない。
+  - 操作: `-m fast`と`-m full_regression`でcollect-onlyを行う。
+  - 期待結果: early hookが付けたmarkerによりF/Hが各expressionから選択され、未分類と重複は0。
+  - 失敗検出: marker evaluation後のlate classification、H deselectionの誤分類、unclassified itemを検出する。
+  - 検証方法: focused contract testでselected node IDsとset partitionをassertする。
+  - 関連 closure id: `CLOS-TL-AC-002`,`CLOS-TL-AC-006`,`CLOS-TL-AC-007`
 
 #### Step closure / Result Approval
 
 - Close: role-separated worker evidence、Red感度、Minimal Green、focused/global verification、refactor decision、report更新、fresh code-reviewer pass、M1a commit候補、commit後clean。
 - Finding: finding pathに応じてS01 `dev-coder`または`utility-worker`へbounded follow-upし、fresh code-reviewer passまで進まない。commit後だけS02へ進む。
 
-### S02 Make command facade
+### S02 Pytest option and conditional policy skip
 
 #### Planned contract / delegation contract
 
 | 項目 | 契約 |
 |---|---|
-| Behavior goal | stable local fast/full facadeがpytest defaultを意図どおり選択/overrideする |
+| Behavior goal | ordinary pytestを維持し、explicit full permissionとconditional policy skipを実装する |
 | Planned obligation / evidence level | `red-required`; `CLOS-TL-AC-001`,`002`,`005`,`BH-001`,`BH-002`,`BH-005` |
-| Pre-implementation evidence | S01 committed/clean、pytest CLIの後置`-m` override実測 |
-| Delegated role | bounded `utility-worker`: `Makefile`; `dev-coder`: `tests/unit/test_provider_test_lanes.py` |
-| Input docs | approved docs、S01 evidence、`Makefile`、`pyproject.toml`、lane tests |
-| Allowed paths | `utility-worker`: `Makefile`; `dev-coder`: `tests/unit/test_provider_test_lanes.py` |
+| Pre-implementation evidence | S01 classifier/marker committed/clean、`--run-full-regression`未実装のexpected Red |
+| Delegated role | `dev-coder`: `tests/conftest.py`、`tests/unit/test_provider_test_lanes.py`; bounded `utility-worker`: `pyproject.toml` |
+| Input docs | approved docs、S01 evidence、`pyproject.toml`、lane tests |
+| Allowed paths | `dev-coder`: `tests/conftest.py`、`tests/unit/test_provider_test_lanes.py`; `utility-worker`: `pyproject.toml` |
 | Forbidden changes | classifier、workflow、docs、dependency/parallelism/cache追加、formal full execution |
-| Bounded batch | `dev-coder`がtarget/failure contract testをRedにする → `utility-worker`が`Makefile`の2 targetだけをGreenにする → `dev-coder`がfocused verificationを行う。role間でpathを共有しない |
-| Acceptance criteria | fast=`uv run pytest -m fast`、full=`uv run pytest -m "fast or full_regression"`、full collect=F∪H。fast commandのchild nonzeroをMakeがnonzeroとして伝播 |
-| Required tests | focused command contract tests、PATH-local `uv` failure stub、`make -n`、fast/full collect-only、global verifier |
-| Refactor guardrail | selector文字列を不要に抽象化せず、既存Make styleへ合わせる |
-| Reviewer focus | fresh `code-reviewer`: selector quoting/precedence、full parity、scope最小性 |
-| Stop conditions | raw selector重複を別所へ波及、dependency/flag追加必要、full実行が必要 |
-| Amendment trigger | facade名/selector contractまたはpytest defaultの変更 |
+| Bounded batch | `dev-coder`がoption/permission/policy-skip contract testをRedにする → `utility-worker`がmarker registry/strictnessだけをGreenにする → `dev-coder`がhookとfocused verificationをGreenにする。role間でpathを共有しない |
+| Acceptance criteria | ordinary=`uv run pytest`、full=`uv run pytest --run-full-regression`、full collect=F∪H、ordinary H body=0、full policy skip=0。`-m full_regression` aloneはpermissionにならない |
+| Required tests | focused command contract tests、temporary controlled failure、ordinary/full collect-only、global verifier |
+| Refactor guardrail | option/classifier/policy-skipを不要に抽象化せず、既存pytest styleへ合わせる |
+| Reviewer focus | fresh `code-reviewer`: hook order、selection/permission分離、full parity、scope最小性 |
+| Stop conditions | raw selector重複を別所へ波及、non-pytest dependency追加必要、legitimate skip変更、full実行が必要 |
+| Amendment trigger | option名、permission contract、policy skipまたはpytest defaultの変更 |
 | Output required | role別changed files、Red/Green/Refactor、commands、risk、`EVD-TL-003`note、各workerのLedger Noteまたはno-material-decision文 |
 | Report destination | Delegation/Worker Evidence、Step/Test Contract Closure、`EVD-TL-003` |
 
 #### 具体テストケース一覧
 
-- `tc-s02-001` red-required: fast/full facadeのselector集合を固定する
-  - 前提: S01のF/H partitionと`pyproject.toml` default fast。
-  - 操作: Make targetをinspectし、各targetをcollect-only相当で評価する。
-  - 期待結果: fast=F、full=F∪Hで、fullがdefault fastをoverrideする。
-  - 失敗検出: missing target、wrong quoting、fullがHを落とす回帰を検出する。
-  - 検証方法: focused command test、`make -n`、set verifier。
+- `tc-s02-001` red-required: ordinary/fullのselectionとpermissionを固定する
+  - 前提: S01のF/H partitionと`--run-full-regression`未実装状態。
+  - 操作: bare、marker-only、flag付きroot/heavy-onlyをcontrolled projectで評価する。
+  - 期待結果: ordinaryはH body=0、marker-onlyはpolicy skip、flag付きfullはF∪Hかつpolicy skip=0。
+  - 失敗検出: option欠落、marker-only bypass、policy skip leakage、fullがHを落とす回帰を検出する。
+  - 検証方法: focused command test、help、set verifier。
   - 関連 closure id: `CLOS-TL-AC-001`,`CLOS-TL-AC-002`,`CLOS-TL-AC-005`,`CLOS-TL-BH-001`,`CLOS-TL-BH-002`,`CLOS-TL-BH-005`
 
-- `tc-s02-002` red-required: documented Make fastがchild failureをnonzeroで伝播する
-  - 前提: temporary `PATH`先頭の`uv` stubがinvocationを記録して任意のnonzeroを返し、real environment/networkへ接続しない。
-  - 操作: `make test-provider-fast`をstubbed PATHで実行する。
-  - 期待結果: logged argvが`run pytest -m fast`と一致し、Make processもnonzeroになる。
+- `tc-s02-002` red-required: ordinary pytestがfast failureをnonzeroで伝播する
+  - 前提: temporary projectにcontrolled failing-fast itemを配置し、real environment/networkへ接続しない。
+  - 操作: controlled failing-fast itemを含む`uv run pytest`をstubbed/temporary projectで実行する。
+  - 期待結果: fast item failureがpytest processのnonzeroとして伝播する。
   - 失敗検出: command drift、error swallowing、fallback full executionを検出する。
-  - 検証方法: focused contract testでstub argv、Make exit、full command未実行をassertする。
+  - 検証方法: focused contract testでpytest exit、selected/executed item、full command未実行をassertする。
   - 関連 closure id: `CLOS-TL-AC-001`,`CLOS-TL-BH-001`
+
+- `tc-s02-003` red-required: selected heavyはpermissionなしでpolicy skipする
+  - 前提: focused heavy item、root/unit subset、stable reason。
+  - 操作: bare root、`tests/unit`、focused heavy、`-m full_regression` aloneを実行する。
+  - 期待結果: selected H bodyは0、focused/marker-onlyはstable reason付きskipとexit 0、F failureはnonzero。
+  - 失敗検出: H body leakage、deselection/no-tests、marker-only bypass、failure swallowを検出する。
+  - 検証方法: selected/executed node IDs、skip reason、exit status。
+  - 関連 closure id: `CLOS-TL-AC-001`,`CLOS-TL-BH-001`,`CLOS-TL-BH-002`
+
+- `tc-s02-004` red-required: full flagはpolicyだけを解除する
+  - 前提: focused heavy、root F/H、既存legitimate skip/skipif/xfail fixture。
+  - 操作: flag付きfocused heavy、heavy-only、root fullを実行する。
+  - 期待結果: repository policy skipは0、H bodyを実行し、legitimate outcomesは不変、failing Hはnonzero。
+  - 失敗検出: policy leakage、legitimate skip removal、full omission、failure swallowを検出する。
+  - 検証方法: outcome/count/set/exit comparison。
+  - 関連 closure id: `CLOS-TL-AC-002`,`CLOS-TL-AC-007`,`CLOS-TL-BH-002`,`CLOS-TL-BH-005`
 
 #### Step closure / Result Approval
 
@@ -485,7 +501,7 @@ closure rowの削除、locked expectation、required-fast inventory、truth tabl
 - `tc-s03-002` regression: required check identityを維持する
   - 前提: existing `Provider CI` workflowと`provider-tests` job。
   - 操作: modified workflowのname/job/commandをinspectする。
-  - 期待結果: identityは不変、commandだけがfast facadeになる。
+  - 期待結果: identityは不変、commandだけがdirect ordinary pytestになる。
   - 失敗検出: branch protectionが参照するstatus identity renameを検出する。
   - 検証方法: existing identity regression test。
   - 関連 closure id: `CLOS-TL-AC-003`,`CLOS-TL-BH-003`
@@ -509,7 +525,7 @@ closure rowの削除、locked expectation、required-fast inventory、truth tabl
 
 | 項目 | 契約 |
 |---|---|
-| Behavior goal | committed implementationのbare pytest、`tests/unit`、documented Make fastがfocused/lint/set/coverage/failure contractをfullなしで満たす |
+| Behavior goal | committed implementationのbare pytest、`tests/unit`、focused pytestがlint/set/coverage/failure contractをfullなしで満たす |
 | Planned obligation / evidence level | `covered-existing`; `CLOS-TL-AC-001`,`006`,`007`,`CON-004` |
 | Pre-implementation evidence | S01-S03 committed/clean、各step reviewer pass |
 | Delegated role | `dev-coder` verification operator |
@@ -517,8 +533,8 @@ closure rowの削除、locked expectation、required-fast inventory、truth tabl
 | Allowed paths | source/config/workflow read-only。main orchestratorの`report.md`転記のみ |
 | Forbidden changes | verification中のfix、full execution、allowed外diff |
 | Bounded batch | focused failure-contract tests、3入口のcollect-onlyと実行、required-fast、lint、global verifier、diff/validateを1bundle |
-| Acceptance criteria | bare root selected=F、`tests/unit` selected=F∩`tests/unit`、Make fast selected=F、3実行すべてH intersection 0/exit 0、controlled failure 3入口nonzero、unexplained delta 0 |
-| Required verification | focused `tc-s01-004`/`tc-s02-002`; `uv run pytest --collect-only -q`; `uv run pytest`; `uv run pytest --collect-only -q tests/unit`; `uv run pytest tests/unit`; `make test-provider-fast`; required-fast command; `make lint`; global verifier; `git diff --check`; SpecDock validate |
+| Acceptance criteria | bare rootと`tests/unit`はselected Hをpolicy skipし、focused fastは通常実行、focused heavyはstable reason付きskip。3入口すべてH body 0、controlled failure nonzero、unexplained delta 0 |
+| Required verification | focused `tc-s01-004`/`tc-s02-002`; `uv run pytest --help`; `uv run pytest --collect-only -q`; `uv run pytest`; `uv run pytest --collect-only -q tests/unit`; `uv run pytest tests/unit`; focused heavy without flag; `uv run pytest -m full_regression -rs`; required-fast command; `make lint`; global verifier; `git diff --check`; SpecDock validate |
 | Refactor guardrail | verification-only。failureはorigin stepへ戻しその場でfixしない |
 | Reviewer focus | fresh `code-reviewer`: integrated diff、commands、H=0、coverage delta、forbidden change 0 |
 | Stop conditions | H execution、unknown failure、node/skip/xfail/assertion delta、dirty/unreviewed source |
@@ -530,9 +546,9 @@ closure rowの削除、locked expectation、required-fast inventory、truth tabl
 
 - `tc-s04-001` covered-existing: local fast integration bundleを閉じる
   - 前提: S01-S03のreviewed commitsとclean worktree。
-  - 操作: `tc-s01-004`/`tc-s02-002`、bare root collect/run、`tests/unit` collect/run、`make test-provider-fast`、required-fast、lint、global verifier、diff/validateを順に実行する。
-  - 期待結果: bare root=F、unit=F∩unit、Make=F、各H実行0/Green。controlled bare/unit/Make failureは各nonzeroで、coverage delta 0。
-  - 失敗検出: 3入口のheavy leakage、default/addopts drift、failure swallow、step単体では見えないselector/workflow/coverage統合回帰を検出する。
+  - 操作: `tc-s01-004`/`tc-s02-002`、help、bare root collect/run、`tests/unit` collect/run、focused heavy without flag、marker-only diagnostic、required-fast、lint、global verifier、diff/validateを順に実行する。
+  - 期待結果: bare root/unitのF bodyがGreen、selected H bodyは0。focused fastはGreen、focused heavyはstable reason付きskip。controlled fast failureはnonzeroで、coverage delta 0。
+  - 失敗検出: 3入口のheavy leakage、permission/policy-skip drift、legitimate skip mutation、failure swallow、step単体では見えないselector/workflow/coverage統合回帰を検出する。
   - 検証方法: collect-selected node IDs、実行exit/count、failure probe exit/error、exact command/resultを同一SHAで`report.md`へ記録する。
   - 関連 closure id: `CLOS-TL-AC-001`,`CLOS-TL-BH-001`,`CLOS-TL-AC-006`,`CLOS-TL-AC-007`,`CLOS-TL-CON-004`
 
@@ -556,7 +572,7 @@ closure rowの削除、locked expectation、required-fast inventory、truth tabl
 | Forbidden changes | measurement間のsource/config変更、自動4回目pre-merge full、redのGreen読み替え |
 | Bounded batch | fast→fullを同一順序で3組。pre-merge routine fullはexactly 3回 |
 | Acceptance criteria | 3組すべてfast<full、full=F∪H、all full exit 0、condition drift 0 |
-| Required verification | preflight; `make test-provider-fast`; `make test-provider-full`を3組で各1回 |
+| Required verification | preflight; `uv run pytest`; `uv run pytest --run-full-regression`を3組で各1回 |
 | Refactor guardrail | measurement-only。性能最適化やflaky fixを混在させない |
 | Reviewer focus | fresh `qa-reviewer`: protocol、3-pair completeness、failure classification、coverage parity |
 | Stop conditions | any full nonzero、fast>=full、H=0、condition drift、unexplained delta |
@@ -613,7 +629,7 @@ closure rowの削除、locked expectation、required-fast inventory、truth tabl
 #### 具体テストケース一覧
 
 - `tc-s90-001` inspect-only: contributor operationを実装と照合する
-  - 前提: final reviewed Make targetsとworkflow truth table。
+  - 前提: final reviewed direct commandsとworkflow truth table。
   - 操作: README/AGENTSのcommands、events、owner、rerun、rollbackを照合する。
   - 期待結果: implementationと一致し、schedule/automatic rollback/hard SLAを導入しない。S05の`TEST-RELEVANT-MANIFEST`は不変。
   - 失敗検出: stale command、PR full誤案内、post-merge redの遡及block解釈、manifest対象byte driftを検出する。
@@ -784,7 +800,7 @@ S99はpre-delivery readiness gateであり、S111/S120でしか観測できな�
 - Acceptance: latest main SHAにfull run 1件、status/duration/count/failure/logが観測できる。
 - No extra routing run: manual `workflow_dispatch`はdeterministic contract testで閉じ、routing確認だけの追加40分runは行わない。
 - Failure: redを遡及merge blockにしない。owner、next action、rerun/forward-fix/rollback dispositionをS98 anchorへ記録する。
-- Incident exception: same SHA local `make test-provider-full` reproductionはpre-merge exactly 3の外で追加可能。incident ID、理由、回数、結果をS98 anchorへ記録する。
+- Incident exception: same SHA local `uv run pytest --run-full-regression` reproductionはpre-merge exactly 3の外で追加可能。incident ID、理由、回数、結果をS98 anchorへ記録する。
 - Forbidden: automatic rollback、automatic Issue creation、schedule、agent merge。
 
 #### 具体テストケース一覧
@@ -852,7 +868,7 @@ S99はpre-delivery readiness gateであり、S111/S120でしか観測できな�
 | L3 | workflow / non-shipping | focused `test_init_update.py` subset |
 | L4 | lane algebra | fast/heavy/full collect-only verifier |
 | L5 | static | `make lint`、`git diff --check` |
-| L6 | default fast entrypoints | bare pytest、`uv run pytest tests/unit`、`make test-provider-fast`のH実行0とcontrolled failure nonzero |
+| L6 | default ordinary entrypoints | bare pytest、`uv run pytest tests/unit`、focused pytestのH実行0、stable skip reason、controlled failure nonzero |
 | L7 | pre-merge full | S05の3 paired runs exactly 3 |
 | L8 | docs/spec | S90 README/AGENTS diff、fresh spec review |
 | L9 | durable evidence boundary | S98 Issue #342 external-evidence anchor URL/readback/schema |
@@ -877,7 +893,7 @@ uv run pytest -q \
   tests/unit/infra/test_init_update.py::TestInitUpdate::test_issue_71_checked_in_dogfooding_agent_tooling_parity_matches_install_root_assets
 ```
 
-`make test-provider-full`はpre-merge routineではS05でexactly 3回だけ使う。command inventoryへの記載はS00〜S04での実行許可ではない。S120 failureのsame-SHA incident reproductionだけは記録付き追加実行を許す。
+`uv run pytest --run-full-regression`はpre-merge routineではS05でexactly 3回だけ使う。command inventoryへの記載はS00〜S04での実行許可ではない。S120 failureのsame-SHA incident reproductionだけは記録付き追加実行を許す。
 
 ## 12. Delegation / Review / Commit Summary
 
@@ -885,7 +901,7 @@ uv run pytest -q \
 |---|---|---|---|
 | S00 | dev-coder read-only | fresh code-reviewer | M0 baseline ledger commit + clean |
 | S01 | dev-coder (tests/hook) + utility-worker (pyproject config) | fresh code-reviewer | M1a classifier/config commit + clean |
-| S02 | dev-coder (tests) + utility-worker (Makefile) | fresh code-reviewer | M1b Make contract commit + clean |
+| S02 | dev-coder (hook/tests) + utility-worker (pyproject) | fresh code-reviewer | M1b pytest option/policy contract commit + clean |
 | S03 | dev-coder (tests) + utility-worker (workflows) | fresh code-reviewer | M2 workflow contract commit + clean |
 | S04 | dev-coder operator | fresh code-reviewer | M3a integrated evidence commit + clean |
 | S05 | dev-coder operator | fresh qa-reviewer | M3b measurement evidence commit + clean |
@@ -971,7 +987,7 @@ closure statusはS99で15件を`pass`、`EXT-PENDING-TL` 7件を`pending_externa
 - [ ] 全22 closureがreportまたはS98 external evidenceへ結び付く
 - [ ] S00 baseline / known flaky evidenceがある
 - [ ] S01-S03のRed / Minimal Green / worker evidenceとper-step code reviewがある
-- [ ] S04でbare pytest、`tests/unit`、Make fastのH実行0、controlled failure nonzero、lint / validate / deltaがGreenでfresh code-reviewer pass
+- [ ] S04でbare pytest、`tests/unit`、focused pytestのH body実行0、stable policy skip、controlled failure nonzero、lint / validate / deltaがGreenでfresh code-reviewer pass
 - [ ] S05 stable `TEST-RELEVANT-MANIFEST`で3 paired runs、各fast<full、全full exit 0、fresh qa-reviewer pass
 - [ ] pre-merge routine full commandはS05のexactly 3回だけ。post-merge incident例外は別記録
 - [ ] known flakyがfullから消えず、unexpected regressionと分離され、redならS05未完了
@@ -993,8 +1009,8 @@ closure statusはS99で15件を`pass`、`EXT-PENDING-TL` 7件を`pending_externa
 Rollback:
 
 1. merge / next phaseを停止。
-2. PR commandを`make test-provider-full`へ戻す。
-3. bare defaultがunsafeなら`pyproject.toml`の`-m fast`を外す。
+2. PR commandを`uv run pytest --run-full-regression`へ戻す。
+3. bare defaultがunsafeならflagなしconditional policy skipを無効化する。
 4. markers、manual full、post-merge workflow、measurement evidenceは保持。
 5. classifier修正後にfresh code/spec reviewを行う。
 
@@ -1018,7 +1034,7 @@ Rollback:
 - [x] pre-merge routine fullをS05の3 paired batchへ集約しpost-merge incident例外を分離した
 - [x] S05 freshnessを明示的な`TEST-RELEVANT-MANIFEST`で判定し、必須ledger/docs-only commitと分離した
 - [x] 22 closureへobservable state、locked expectation、bug guard、required、evidence level、exact EVD/TC anchorを記録した
-- [x] bare pytest、`tests/unit`、documented Make fastの選択集合とcontrolled failure nonzeroを具体カードへ固定した
+- [x] bare pytest、`tests/unit`、focused pytestのselected/executed集合とcontrolled failure nonzeroを具体カードへ固定した
 - [x] implementation stepsへ完全なdelegation contractとnested concrete test cardsを配置した
 - [x] dev-coder禁止pathをutility-workerへ分離し、S01〜S03のtest/code/config/workflow ownershipをpath単位で固定した
 - [x] per-step reviewer、Result Approval、milestone commit、clean checkを直列化した
