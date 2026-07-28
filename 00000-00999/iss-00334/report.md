@@ -371,7 +371,8 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - 全P1をexact negative testsで再現し、canonical digestの明示、shared sensitive scan、retained dirfd-relative evidence publication、SourceManifest direct target binding、Candidate single-open immutable snapshot、descriptor-first bounded readers、root/repo dirfd openat traversal、captured bytesのdigest／scan／transport一本化で閉鎖した。
 - final親独立検証はS04 focused 167 passed、S01 regression 101 passed、S02 regression 31 passed、S03 regression 137 passed、ruff、mypy、`validate` nodes=222、`git diff --check`、17-path allowlistがpassした。
 - final fresh code reviewはfindings 0、`review_status: pass`、confidence 0.95。external inputs、git-bound targets、Candidate snapshot、Review／revision non-leakage、dirfd publicationに明白なP0／P1なしを確認した。
-- S04 product implementation、required verification、fresh reviewは完了した。milestone commit、push、post-commit clean／remote parityを確認するまでS05は開始しない。
+- S04 milestone commit `6042553343225541709f71e74eeeca549ead2089`をoriginへpushし、local／remote parity、`git show --check`、post-commit clean worktreeを確認した。
+- S04 product implementation、required verification、fresh review、commit、push、post-commit clean／remote parity checkは完了した。S04をclosedとし、S05 ChatGPT具体化へ進める。
 - No material implementation decisions beyond the approved plan.
 
 | `chatgpt-use --followup iss00334-blue-planning-correction-r5` | same Blue conversationでauthoring継続。GitHub exact HEAD確認、replacement-ready blocks取得。follow-up selector evidenceは`resolved=(unavailable); verified=no` |
@@ -396,7 +397,7 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 | S01 | committed | S01 allowed code／tests、mechanical artifact whitespace fix、report evidence | fresh code-reviewer pass | commit `c597bd146c1d68e619cdc1e24b1b76dd405fe36a`、origin push成功、post-commit clean、local／remote parity | S01 closed。S02 work packetへ進む |
 | S02 | committed | S02 allowlisted runtime／Prompt resources／testsとreport evidence | final fresh code-reviewer pass、findings 0 | commit `796a1ce4c8b4f2161f0d646cf45f3afc6aaf40e2`、origin push成功、post-commit clean、local／remote parity | S02 closed。S03 ChatGPT work packetへ進む |
 | S03 | committed | S03 allowlisted runtime／Prompt resource／testsとReport execution evidence | final fresh code-reviewer pass、findings 0、confidence 0.97 | commit `70fe45acdf0002ec399343f7d11dba0e87856700`、origin push成功、post-commit clean、local／remote parity | S03 closed。S04 ChatGPT work packetへ進む |
-| S04 | review passed; commit pending | S04 17-path Review／revision runtime、Prompt resources、tests、Report execution evidence | final fresh code-reviewer pass、findings 0、confidence 0.95 | S04 167、S01 101、S02 31、S03 137、ruff、mypy、validate、diff、allowlist pass。17 implementation paths＋Main Report integration | focused milestone commitを作成し、push／post-commit clean／remote parity後にS04をclosedとする |
+| S04 | committed | S04 17-path Review／revision runtime、Prompt resources、tests、Report execution evidence | final fresh code-reviewer pass、findings 0、confidence 0.95 | commit `6042553343225541709f71e74eeeca549ead2089`、origin push成功、post-commit clean、local／remote parity | S04 closed。S05 ChatGPT work packetへ進む |
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
