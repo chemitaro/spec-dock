@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from typing import Any
 import zipfile
 
 import pytest
@@ -1586,7 +1587,7 @@ def test_review_rejects_malformed_wrong_identity_digest_verdict_and_authority_ou
     assert "/Users/alice" not in repr(result)
 
 
-def _semantic_revision_setup(tmp_path: Path) -> dict[str, object]:
+def _semantic_revision_setup(tmp_path: Path) -> dict[str, Any]:
     repo = tmp_path / "repo"
     repo.mkdir()
     issue_dir = _planning_tree(repo)
@@ -1671,6 +1672,66 @@ def _semantic_revision_setup(tmp_path: Path) -> dict[str, object]:
         "request_path": request_path,
         "source_hash": source_hash,
     }
+
+
+def test_revision_without_explicit_evidence_uses_exact_review_sibling(
+    tmp_path: Path,
+) -> None:
+    setup = _semantic_revision_setup(tmp_path)
+    request_path = setup["request_path"]
+    sibling_request = request_path.with_name("planning-revision-request.json")
+    request_path.rename(sibling_request)
+    review_path = setup["review_path"]
+    sibling_review = sibling_request.with_name("planning-review-result.json")
+    review_path.rename(sibling_review)
+    module = setup["module"]
+    identity = setup["identity"]
+
+    result = module.run_issue_planning_revise(
+        request=module.PlanningReviseRequest(
+            setup["candidates"] / identity.logical_filename,
+            sibling_request,
+            setup["revised"],
+        ),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        transport_runner=lambda **kwargs: _successful_transport(
+            source_manifest_hash=setup["source_hash"],
+        ),
+        preflight_runner=lambda request: _preflight(),
+        clock=lambda: "2026-07-28T12:10:00+00:00",
+    )
+
+    assert (result.status, result.reason) == ("ok", "candidate_revised")
+
+
+def test_revision_does_not_scan_for_review_evidence(tmp_path: Path) -> None:
+    setup = _semantic_revision_setup(tmp_path)
+    request_path = setup["request_path"]
+    sibling_request = request_path.with_name("planning-revision-request.json")
+    request_path.rename(sibling_request)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    setup["review_path"].rename(elsewhere / "planning-review-result.json")
+    module = setup["module"]
+    identity = setup["identity"]
+
+    result = module.run_issue_planning_revise(
+        request=module.PlanningReviseRequest(
+            setup["candidates"] / identity.logical_filename,
+            sibling_request,
+            setup["revised"],
+        ),
+        records=[_record(setup["issue_dir"])],
+        repo_root=setup["repo"],
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("backend must not run"),
+        preflight_runner=lambda request: _preflight(),
+    )
+
+    assert (result.status, result.reason) == ("blocked", "revision_review_unavailable")
 
 
 @pytest.mark.parametrize(

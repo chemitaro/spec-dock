@@ -203,3 +203,38 @@ def test_semantic_revision_prompt_is_self_contained_without_session_locator() ->
     assert "selected finding: F-1" in synthesized.prompt
     assert "preserve assumption: boundary" in synthesized.prompt
     assert "session_locator" not in synthesized.prompt
+
+
+def test_installed_runtime_resolves_managed_issue_planning_resources(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    application_file = (
+        tmp_path
+        / "spec-dock"
+        / "scripts"
+        / "spec_dock_runtime"
+        / "application"
+        / "issue_planning_prompt.py"
+    )
+    application_file.parent.mkdir(parents=True)
+    application_file.write_text("# installed runtime fixture\n", encoding="utf-8")
+    resource_root = (
+        tmp_path
+        / ".agents"
+        / "skills"
+        / "spec-dock-issue-planning"
+        / "resources"
+    )
+    resource_root.mkdir(parents=True)
+    for name in (
+        "planner-prompt.md",
+        "reviewer-prompt.md",
+        "revision-prompt.md",
+        "transport-output-contract.md",
+    ):
+        (resource_root / name).write_text(name, encoding="utf-8")
+
+    monkeypatch.setattr(issue_planning_prompt, "__file__", str(application_file))
+
+    assert issue_planning_prompt._provider_resource_root() == resource_root

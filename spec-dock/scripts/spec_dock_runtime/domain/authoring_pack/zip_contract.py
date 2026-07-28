@@ -4,7 +4,9 @@ from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
-from typing import Literal
+import stat
+from typing import TYPE_CHECKING, Literal
+import unicodedata
 import zipfile
 
 from spec_dock_runtime.domain.authoring_pack.authority_boundary import (
@@ -19,6 +21,9 @@ from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     REQUIRED_METADATA,
 )
 from spec_dock_runtime.domain.authoring_pack.provenance_contract import provenance_state_findings
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
 
 PackReviewStatus = Literal["pass", "fail", "blocked", "stale", "rejected"]
 PackInputKind = Literal["zip", "tree"]
@@ -73,7 +78,55 @@ class PackReviewResult:
         }
 
 
-def review_pack_input(input_path: Path) -> PackReviewResult:
+@dataclass(frozen=True)
+class ZipReviewProfile:
+    name: str
+    expected_root: str
+    required_paths: tuple[str, ...]
+    allowed_suffixes: frozenset[str]
+    max_file_count: int
+    max_entry_bytes: int
+    max_total_bytes: int
+    max_entry_compression_ratio: int
+    max_total_compression_ratio: int
+    cross_file_validator: Callable[[Mapping[str, bytes], str], tuple[str, ...]]
+
+
+def issue_candidate_v1_profile(
+    *,
+    expected_root: str,
+    cross_file_validator: Callable[[Mapping[str, bytes], str], tuple[str, ...]],
+) -> ZipReviewProfile:
+    required = (
+        "CHECKSUMS.sha256",
+        "MANIFEST.json",
+        "PLACEHOLDER-ORACLE-MAP.json",
+        "SOURCE-BASELINE.json",
+        "design.md",
+        "plan.md",
+        "requirement.md",
+    )
+    return ZipReviewProfile(
+        name="issue-planning-candidate-v1",
+        expected_root=expected_root,
+        required_paths=required,
+        allowed_suffixes=frozenset({".md", ".json", ".sha256"}),
+        max_file_count=7,
+        max_entry_bytes=2_000_000,
+        max_total_bytes=10_000_000,
+        max_entry_compression_ratio=100,
+        max_total_compression_ratio=100,
+        cross_file_validator=cross_file_validator,
+    )
+
+
+def review_pack_input(
+    input_path: Path,
+    *,
+    profile: ZipReviewProfile | None = None,
+) -> PackReviewResult:
+    if profile is not None:
+        return _review_profile_input(input_path, profile)
     if not input_path.exists():
         return PackReviewResult(
             status="blocked",
@@ -98,6 +151,165 @@ def review_pack_input(input_path: Path) -> PackReviewResult:
         input_kind="tree",
         findings=("unsupported_input_kind",),
     )
+
+
+def _review_profile_input(input_path: Path, profile: ZipReviewProfile) -> PackReviewResult:
+    if not input_path.exists():
+        return _profile_result(input_path, "tree", ("input_missing",))
+    if input_path.is_symlink():
+        return _profile_result(input_path, "tree", ("symlink_input_root",))
+    if input_path.is_dir() or not zipfile.is_zipfile(input_path):
+        return _profile_result(input_path, "tree", ("zip_input_required",))
+    return _review_profile_zip(input_path, profile)
+
+
+def _review_profile_zip(input_path: Path, profile: ZipReviewProfile) -> PackReviewResult:
+    findings: list[str] = []
+    payloads: dict[str, bytes] = {}
+    reviewed_files: list[str] = []
+    total_size = 0
+    total_compressed = 0
+    seen: set[str] = set()
+    casefolded: set[str] = set()
+    normalized: set[str] = set()
+    try:
+        with zipfile.ZipFile(input_path) as archive:
+            infos = archive.infolist()
+            if len(infos) > profile.max_file_count:
+                findings.append("file_count_limit")
+            for info in infos:
+                if info.is_dir():
+                    findings.append("directory_entry")
+                    continue
+                rel_name = _profile_relative_name(info.filename, profile.expected_root)
+                if rel_name is None:
+                    findings.append("wrong_root")
+                    continue
+                if not _profile_safe_relative_path(rel_name):
+                    findings.append("unsafe_path")
+                    continue
+                if rel_name in seen:
+                    findings.append("duplicate_entry")
+                    continue
+                folded = rel_name.casefold()
+                nfc = unicodedata.normalize("NFC", rel_name)
+                if folded in casefolded:
+                    findings.append("casefold_collision")
+                    continue
+                if nfc in normalized:
+                    findings.append("unicode_nfc_collision")
+                    continue
+                seen.add(rel_name)
+                casefolded.add(folded)
+                normalized.add(nfc)
+                reviewed_files.append(rel_name)
+                total_size += info.file_size
+                total_compressed += info.compress_size
+                entry_findings = _profile_entry_findings(info, rel_name, profile)
+                findings.extend(entry_findings)
+                if entry_findings:
+                    continue
+                try:
+                    content = archive.read(info)
+                except (RuntimeError, OSError, zipfile.BadZipFile):
+                    findings.append("unreadable_payload")
+                    continue
+                try:
+                    content.decode("ascii" if rel_name == "CHECKSUMS.sha256" else "utf-8")
+                except UnicodeDecodeError:
+                    findings.append("binary_payload")
+                    continue
+                payloads[rel_name] = content
+    except (OSError, zipfile.BadZipFile):
+        return _profile_result(input_path, "zip", ("unreadable_archive",))
+
+    if total_size > profile.max_total_bytes:
+        findings.append("total_size_limit")
+    if total_size and total_size / max(total_compressed, 1) > profile.max_total_compression_ratio:
+        findings.append("total_compression_ratio_limit")
+    if tuple(sorted(seen, key=lambda value: value.encode("utf-8"))) != profile.required_paths:
+        findings.append("inventory_mismatch")
+    if not findings:
+        for content in payloads.values():
+            findings.extend(
+                _safe_profile_findings(scan_constraint_sensitive_payload(content.decode("utf-8")))
+            )
+        findings.extend(_safe_profile_findings(profile.cross_file_validator(payloads, profile.expected_root)))
+    unique_findings = tuple(dict.fromkeys(findings))
+    return PackReviewResult(
+        status="pass" if not unique_findings else "rejected",
+        input_path=str(input_path),
+        input_kind="zip",
+        authority_level=profile.name,
+        findings=unique_findings,
+        reviewed_files=tuple(sorted(reviewed_files, key=lambda value: value.encode("utf-8"))),
+        content_sha256=_content_digest(list(payloads.items())) if not unique_findings else None,
+    )
+
+
+def _profile_result(
+    input_path: Path,
+    input_kind: PackInputKind,
+    findings: tuple[str, ...],
+) -> PackReviewResult:
+    return PackReviewResult(
+        status="blocked" if findings == ("input_missing",) else "rejected",
+        input_path=str(input_path),
+        input_kind=input_kind,
+        authority_level="issue-planning-candidate-v1",
+        findings=findings,
+    )
+
+
+def _profile_relative_name(name: str, root: str) -> str | None:
+    prefix = f"{root}/"
+    if not name.startswith(prefix):
+        return None
+    return name[len(prefix) :]
+
+
+def _profile_safe_relative_path(value: str) -> bool:
+    if not value or "\0" in value or "\\" in value:
+        return False
+    if len(value) >= 2 and value[0].isalpha() and value[1] == ":":
+        return False
+    path = PurePosixPath(value)
+    return (
+        not path.is_absolute()
+        and path.as_posix() == value
+        and all(part not in {"", ".", ".."} and not part.startswith(".") for part in path.parts)
+    )
+
+
+def _profile_entry_findings(
+    info: zipfile.ZipInfo,
+    rel_name: str,
+    profile: ZipReviewProfile,
+) -> tuple[str, ...]:
+    findings: list[str] = []
+    if info.flag_bits & 0x1:
+        findings.append("encrypted_entry")
+    file_type = stat.S_IFMT(info.external_attr >> 16)
+    if file_type == stat.S_IFLNK:
+        findings.append("symlink_entry")
+    elif file_type != stat.S_IFREG:
+        findings.append("special_entry")
+    if (info.external_attr >> 16) & 0o111:
+        findings.append("executable_entry")
+    if info.file_size > profile.max_entry_bytes:
+        findings.append("entry_size_limit")
+    if info.file_size and info.file_size / max(info.compress_size, 1) > profile.max_entry_compression_ratio:
+        findings.append("entry_compression_ratio_limit")
+    suffix = PurePosixPath(rel_name).suffix.lower()
+    if suffix in NESTED_ARCHIVE_SUFFIXES:
+        findings.append("nested_archive")
+    if suffix not in profile.allowed_suffixes:
+        findings.append("unsupported_suffix")
+    return tuple(findings)
+
+
+def _safe_profile_findings(findings: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(finding.partition(":")[0] for finding in findings)
 
 
 def _review_zip(input_path: Path) -> PackReviewResult:
