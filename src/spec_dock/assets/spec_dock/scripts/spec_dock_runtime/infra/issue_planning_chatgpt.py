@@ -35,6 +35,7 @@ _PREFLIGHT_TIMEOUT_SECONDS = 10.0
 _DEFAULT_RUN_TIMEOUT_SECONDS = 2 * 60 * 60
 _DEFAULT_RECOVERY_TIMEOUT_SECONDS = 2 * 60
 _TERMINAL_STATUSES = frozenset({"completed"})
+_SessionState = Literal["terminal", "nonterminal", "missing", "invalid"]
 _ROOT_CAPABILITIES = (
     b"--engine",
     b"--file",
@@ -133,16 +134,32 @@ def invoke_issue_planning_chatgpt(
         except (subprocess.TimeoutExpired, OSError):
             needs_recovery = True
 
-        if needs_recovery or not _session_is_terminal(session_root, session_id=session_id):
-            recovered = _recover_same_session(
+        session_state = _session_state(session_root, session_id=session_id)
+        if session_state == "invalid":
+            return _result(
+                "rejected",
+                "oracle_artifact_rejected",
+                source_evidence,
+                exit_code,
+            )
+        if needs_recovery or session_state != "terminal":
+            recovered_state = _recover_same_session(
                 executable=final_executable,
+                executable_identity=executable_identity,
                 session_id=session_id,
                 session_root=session_root,
                 child_env=child_env,
                 cwd=repo_root,
                 timeout=min(run_timeout, _DEFAULT_RECOVERY_TIMEOUT_SECONDS),
             )
-            if not recovered:
+            if recovered_state == "invalid":
+                return _result(
+                    "rejected",
+                    "oracle_artifact_rejected",
+                    source_evidence,
+                    exit_code,
+                )
+            if recovered_state != "terminal":
                 return _result(
                     "blocked",
                     "oracle_session_recovery_required",
@@ -250,18 +267,27 @@ def _run_oracle(
 def _recover_same_session(
     *,
     executable: Path,
+    executable_identity: tuple[int, int, int, int],
     session_id: str,
     session_root: Path,
     child_env: dict[str, str],
     cwd: Path,
     timeout: float,
-) -> bool:
-    if _session_is_terminal(session_root, session_id=session_id):
-        return True
+) -> _SessionState:
+    initial_state = _session_state(session_root, session_id=session_id)
+    if initial_state in {"terminal", "invalid"}:
+        return initial_state
+    recovery_executable = _resolve_oracle_executable()
+    if (
+        recovery_executable is None
+        or recovery_executable != executable
+        or _executable_identity(recovery_executable) != executable_identity
+    ):
+        return "nonterminal"
     try:
         completed = _run_oracle(
             [
-                str(executable),
+                str(recovery_executable),
                 "session",
                 session_id,
                 "--harvest",
@@ -272,23 +298,23 @@ def _recover_same_session(
             timeout=timeout,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return False
-    return completed.returncode == 0 and _session_is_terminal(
-        session_root,
-        session_id=session_id,
-    )
+        return "nonterminal"
+    final_state = _session_state(session_root, session_id=session_id)
+    if completed.returncode != 0 and final_state != "invalid":
+        return "nonterminal"
+    return final_state
 
 
-def _session_is_terminal(session_root: Path, *, session_id: str) -> bool:
+def _session_state(session_root: Path, *, session_id: str) -> _SessionState:
     try:
         status_value = read_session_status(
             session_root,
             session_id=session_id,
             oracle_version=SUPPORTED_ORACLE_VERSION,
         )
-    except OracleArtifactError:
-        return False
-    return status_value in _TERMINAL_STATUSES
+    except OracleArtifactError as error:
+        return "missing" if error.code == "oracle_session_missing" else "invalid"
+    return "terminal" if status_value in _TERMINAL_STATUSES else "nonterminal"
 
 
 def _collect_typed_result(

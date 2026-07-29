@@ -259,6 +259,164 @@ def test_timeout_with_unknown_terminal_state_requires_human_recovery(
     assert "private" not in repr(result)
 
 
+def test_recovery_revalidates_path_identity_before_harvest(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+    identities = iter([(1, 2, 3, 4), (1, 2, 3, 4), (1, 2, 3, 5)])
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        if "--prompt" in argv:
+            _write_metadata_only(kwargs["env"], argv, status="running")
+            raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+        pytest.fail("changed Oracle identity must prevent harvest")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    monkeypatch.setattr(issue_planning_chatgpt, "_executable_identity", lambda _path: next(identities))
+    result = _invoke(tmp_path, timeout_seconds=0.1)
+
+    assert (result.status, result.reason) == (
+        "blocked",
+        "oracle_session_recovery_required",
+    )
+    assert sum("--prompt" in argv for argv in calls) == 1
+    assert sum("--harvest" in argv for argv in calls) == 0
+    assert result.authoring_zip is None
+    assert result.review_json is None
+    assert result.transient_payload is None
+
+
+@pytest.mark.parametrize("invalid_metadata", ["wrong-session", "wrong-mode", "malformed"])
+def test_invalid_session_metadata_is_rejected_without_harvest(
+    monkeypatch,
+    tmp_path: Path,
+    invalid_metadata: str,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        if "--prompt" in argv:
+            session_id = _session_id(argv)
+            session = _session_dir(kwargs["env"], session_id)
+            session.mkdir(parents=True, exist_ok=True)
+            if invalid_metadata == "malformed":
+                (session / "meta.json").write_bytes(b'{"id":')
+            else:
+                _write_metadata(
+                    session,
+                    "wrong-session" if invalid_metadata == "wrong-session" else session_id,
+                    "completed",
+                    [],
+                    mode="api" if invalid_metadata == "wrong-mode" else "browser",
+                )
+            return _completed(argv)
+        pytest.fail("invalid metadata must prevent harvest")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path)
+
+    assert (result.status, result.reason) == ("rejected", "oracle_artifact_rejected")
+    assert sum("--prompt" in argv for argv in calls) == 1
+    assert sum("--harvest" in argv for argv in calls) == 0
+    assert "oracle-home" not in repr(result)
+
+
+@pytest.mark.parametrize("invalid_json", [b'{"verdict":"pass","verdict":"fail"}', b'{"score":NaN}'])
+def test_public_adapter_normalizes_strict_reviewer_json_failures(
+    monkeypatch,
+    tmp_path: Path,
+    invalid_json: bytes,
+) -> None:
+    executable = _fake_executable(tmp_path)
+
+    def fake_run(argv, **kwargs):
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        _write_reviewer_session(kwargs["env"], argv, answer=invalid_json)
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path, role="reviewer")
+
+    assert (result.status, result.reason) == ("rejected", "oracle_artifact_rejected")
+    assert result.transient_payload is None
+    assert invalid_json.decode() not in repr(result)
+
+
+@pytest.mark.parametrize("zip_failure", ["encrypted", "unsupported-compression"])
+def test_public_adapter_normalizes_unsupported_zip_features(
+    monkeypatch,
+    tmp_path: Path,
+    zip_failure: str,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    zip_bytes = _zip_with_unsupported_feature(zip_failure)
+
+    def fake_run(argv, **kwargs):
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        _write_planner_session(kwargs["env"], argv, zip_bytes=zip_bytes)
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path)
+
+    assert (result.status, result.reason) == ("rejected", "oracle_artifact_rejected")
+    assert result.transient_payload is None
+    assert "requirement.md" not in repr(result)
+
+
+def test_public_adapter_rejects_zip_entry_count_overflow(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for index in range(2049):
+            archive.writestr(f"candidate/{index}.md", "")
+
+    def fake_run(argv, **kwargs):
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        _write_planner_session(kwargs["env"], argv, zip_bytes=buffer.getvalue())
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path)
+    assert (result.status, result.reason) == ("rejected", "oracle_artifact_rejected")
+    assert result.transient_payload is None
+
+
 @pytest.mark.parametrize("role", ["planner", "reviewer"])
 def test_cross_kind_output_is_rejected(monkeypatch, tmp_path: Path, role: str) -> None:
     executable = _fake_executable(tmp_path)
@@ -429,22 +587,31 @@ def _write_planner_session(
     argv: list[str],
     *,
     session_id: str | None = None,
+    zip_bytes: bytes | None = None,
 ) -> None:
     resolved_id = session_id or _session_id(argv)
     session = _session_dir(env, resolved_id)
     artifact = session / "artifacts" / "iss-00003-issue-planning-documents.zip"
     artifact.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(artifact, "w") as archive:
-        archive.writestr("iss-00003-issue-planning-documents/requirement.md", "body\n")
+    if zip_bytes is None:
+        with zipfile.ZipFile(artifact, "w") as archive:
+            archive.writestr("iss-00003-issue-planning-documents/requirement.md", "body\n")
+    else:
+        artifact.write_bytes(zip_bytes)
     _write_metadata(session, resolved_id, "completed", [_artifact("file", artifact)])
 
 
-def _write_reviewer_session(env: dict[str, str], argv: list[str]) -> None:
+def _write_reviewer_session(
+    env: dict[str, str],
+    argv: list[str],
+    *,
+    answer: bytes = b'{"verdict":"pass"}',
+) -> None:
     session_id = _session_id(argv)
     session = _session_dir(env, session_id)
     transcript = session / "artifacts" / "transcript.md"
     transcript.parent.mkdir(parents=True, exist_ok=True)
-    transcript.write_bytes(b'# Oracle Browser Transcript\n## Prompt\nprivate prompt\n## Answer\n{"verdict":"pass"}\n')
+    transcript.write_bytes(b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\n## Answer\n" + answer + b"\n")
     _write_metadata(session, session_id, "completed", [_artifact("transcript", transcript)])
 
 
@@ -471,17 +638,35 @@ def _write_metadata(
     session_id: str,
     status: str,
     artifacts: list[dict[str, object]],
+    *,
+    mode: str = "browser",
 ) -> None:
     session.mkdir(parents=True, exist_ok=True)
     (session / "meta.json").write_text(
         json.dumps({
             "id": session_id,
             "status": status,
-            "mode": "browser",
+            "mode": mode,
             "artifacts": artifacts,
         }),
         encoding="utf-8",
     )
+
+
+def _zip_with_unsupported_feature(failure: str) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_STORED) as archive:
+        archive.writestr("candidate/requirement.md", "body\n")
+    payload = bytearray(buffer.getvalue())
+    local = payload.index(b"PK\x03\x04")
+    central = payload.index(b"PK\x01\x02")
+    if failure == "encrypted":
+        payload[local + 6 : local + 8] = (1).to_bytes(2, "little")
+        payload[central + 8 : central + 10] = (1).to_bytes(2, "little")
+    else:
+        payload[local + 8 : local + 10] = (99).to_bytes(2, "little")
+        payload[central + 10 : central + 12] = (99).to_bytes(2, "little")
+    return bytes(payload)
 
 
 def _planning_tree(repo_root: Path) -> Path:
