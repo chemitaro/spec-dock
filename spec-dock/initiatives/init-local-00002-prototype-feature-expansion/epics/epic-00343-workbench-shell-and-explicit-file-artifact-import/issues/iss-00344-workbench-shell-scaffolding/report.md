@@ -132,6 +132,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-055 | adopted | ChatGPT-Use S99 U001 final specification review (`PASS`, advisory) | S99 final spec gate after branch-changing repair | 正規ラッパーとGitHub connectorでexact pushed head `0a26ec4183229c8f0a38ce244114d2b28896dec8`を確認したfresh review。finding 0、P0/P1 0。requirement→design→plan→implementationのtraceability、no-backfill、semantic opacity、exact five-path distribution、U001のgeneration/uninstall symmetryを確認した | `artifacts/20260729t152956z-chatgpt-output-s99-final-spec-review-u001-0a26ec41.md`; SHA-256 `18e5ea9fea133e762fc45722d2f229c893e23aaf82763dfcebfb42a4c3688b4b`; 3,133 bytes | mandatory evidence-only final commitを許可し、そのexact headでEVD-013を観測する |
 | EAL-056 | adopted | ChatGPT-Use S99 U001 final QA review (`PASS`, advisory) | S99 final QA gate after branch-changing repair | 正規ラッパーとGitHub connectorでexact pushed head `0a26ec4183229c8f0a38ce244114d2b28896dec8`を確認したfresh review。finding 0、P0/P1 0。dry-run classification、unchanged removal、idempotent retry、modified README/payload preservation、no-backfill、focused/aggregate/default/CI証跡を十分と判定した | `artifacts/20260729t153006z-chatgpt-output-s99-final-qa-review-u001-0a26ec41.md`; SHA-256 `853c7bb99049d68da5390111da32a32a3dedbd731833414ae94de613d25f9628`; 3,206 bytes | PR本文のdefault skip数を`2051`へ更新済み。evidence-only final commit後にexact-head observation |
 | EAL-057 | partially_adopted | ChatGPT-Use PR #350 exact-head final code review (`PASS`, advisory) | S99 final code gate after branch-changing repair | 正規ラッパーでPR #350 exact head `0a26ec4183229c8f0a38ce244114d2b28896dec8`をGitHub connectorから確認したfresh review。P0/P1 0、`overall_correctness=patch is correct`。U001がprevious P1を閉じ、modified READMEとarbitrary payloadを保存することを確認した。P2 historical-hash/provenanceはcurrent exact-byte契約の将来互換性リスクとして採用するが、review自身がcurrent PR branchを変更しないよう明示しているためdeferする | `artifacts/20260729t162217z-chatgpt-output-s99-final-code-review-u001-0a26ec41.md`; SHA-256 `8396964804a457b76c88f8d029b7fdc46ea8a258e6c7c3964e42cad4488cf94e`; 3,532 bytes | P2はcurrent PRのblockerではない。historical-hash inventoryまたはinstallation provenanceを検討する場合は別Issueで扱う。mandatory evidence-only final commitを許可する |
+| EAL-058 | partially_adopted | ChatGPT-Use S99 combined final quality gate (`PASS`, advisory) | exact-head integrated spec/code/QA gate | 正規ラッパーの単一プロンプトに`spec-reviewer`、`code-reviewer`、`qa-reviewer`のread-only責務契約を結合し、GitHub connectorでPR #350 exact head `8cedd846dcf6b6ec1a337d0eda705dd58d5ca8de`とfull PR rangeを確認した。三者すべて`review_status=pass`、統合gate `pass`、P0/P1 0、`next_action=proceed`。CODE-P2-001 historical README provenanceとQA-P3-001旧review thread表示はnon-blockingとして採用するが、review自身がbranch更新不要と明示しているためcurrent PRではdeferする | `artifacts/20260729t225507z-chatgpt-output-s99-combined-final-quality-gate.md`; SHA-256 `096b3af2359be2df9a9d11d1092eb125201dccf5c1410b30b68e53d81718f634`; 16,304 bytes; reviewed commit `8cedd846dcf6b6ec1a337d0eda705dd58d5ca8de`; model `requested=Pro / resolved=Pro / verified=yes` | Artifactと本reportだけのevidence-only commitを許可する。commit/push後は新exact headのCIと固定PR observationだけを行い、branch-changing repairへ戻らない |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -413,6 +414,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | PR #350 U001 spec | final specification review | spec-reviewer responsibility via ChatGPT-Use | fresh | passed | no | authorize evidence-only final commit | exact target `0a26ec4183229c8f0a38ce244114d2b28896dec8`; finding 0、P0/P1 0。EAL-055 |
 | PR #350 U001 QA | final QA review | qa-reviewer responsibility via ChatGPT-Use | fresh | passed | no | authorize evidence-only final commit | exact target `0a26ec4183229c8f0a38ce244114d2b28896dec8`; finding 0、P0/P1 0。EAL-056 |
 | PR #350 U001 code | final code review | code-reviewer responsibility via ChatGPT-Use | fresh | passed | no | defer P2 and authorize evidence-only final commit | exact target `0a26ec4183229c8f0a38ce244114d2b28896dec8`; P0/P1 0、P2 historical provenance 1件はnon-blocking。EAL-057 |
+| PR #350 combined gate | combined final specification / code / QA review | three responsibility contracts via one ChatGPT-Use prompt | fresh | passed | no | evidence-only commit then exact-head observation | exact target `8cedd846dcf6b6ec1a337d0eda705dd58d5ca8de`; three role PASS、integrated PASS、P0/P1 0。P2 historical provenanceとP3 stale thread表示はnon-blocking。EAL-058 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -423,7 +425,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S90 test lane | committed | exact aggregate semantic test、EAL-040〜043、delegation/Red/review evidence | accepted review target `a084cea911ef61524b9b24a52b7e0b22e182716e` | clean / pushed、local=remote確認済み | not applicable | not applicable | not applicable | not applicable |
 | S90 docs lane | committed | provider docs 4件、EAL-044/045、Green/delegation/review evidence | review target `5b5033068cb10af222ce820df9c4eec4a17d69e3`; closure head `e8df32e913d4774ab9d5a970cc3d34886bccfc4e` | clean / pushed / local=remote確認済み | not applicable | not applicable | not applicable | not applicable |
 | S95 | committed | exact 10 dogfooding mirror paths、EAL-047、projection/verification/recovery evidence | review target `78cec6762364a79c57df98b6870cb8d41c316a71`; closure head `de03a0e88f7a5b429daad25c1073574dfadc13af` | clean / pushed / local=remote確認済み | not applicable | not applicable | not applicable | not applicable |
-| S99 / PR repair U001 | reviewed / final evidence commit authorized | U001後の三者review Artifacts、repair batch/disc、report | implementation/review target `0a26ec4183229c8f0a38ce244114d2b28896dec8`; EAL-055〜057 fresh PASS | final evidence commit後にclean / local=remoteを確認する | not applicable | not applicable | not applicable | not applicable |
+| S99 / PR repair U001 | reviewed / combined-gate evidence commit authorized | combined final gate Artifact、report | implementation target `0a26ec4183229c8f0a38ce244114d2b28896dec8`; prior evidence head / combined review target `8cedd846dcf6b6ec1a337d0eda705dd58d5ca8de`; EAL-055〜058 PASS | evidence-only commit後にclean / local=remoteを確認する | not applicable | not applicable | not applicable | not applicable |
 
 #### Step / Milestone Result Approval
 
@@ -434,7 +436,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S03 | committed | `0efe3055860706a9f4b68ae1ddaa767371079b03`; clean / pushed / local=remote確認済み | EAL-038 fresh PASS、minor enum findingをclosure reportで解消 | approved | S90 admitted |
 | S90 | committed | `e8df32e913d4774ab9d5a970cc3d34886bccfc4e`; clean / pushed / local=remote確認済み | EAL-043 code-review PASS、EAL-045 spec-review PASS、prior blocking 2件closed | approved | S95 admitted |
 | S95 | committed | `de03a0e88f7a5b429daad25c1073574dfadc13af`; clean / pushed / local=remote確認済み | EAL-048 fresh PASS、finding 0、環境回復accepted | approved | S99 admitted |
-| S99 | reviewed / evidence commit pending | `0a26ec4183229c8f0a38ce244114d2b28896dec8`; pushed/local=remote、aggregate Green | EAL-055〜057 fresh PASS、P0/P1 0。P2 historical provenanceはdeferred | approved for mandatory evidence-only final commit; EVD-013 pending | final evidence commit、new exact-head PR observation |
+| S99 | reviewed / combined-gate evidence commit pending | implementation target `0a26ec4183229c8f0a38ce244114d2b28896dec8`; combined review target `8cedd846dcf6b6ec1a337d0eda705dd58d5ca8de`; pushed/local=remote、aggregate Green | EAL-055〜058 PASS、P0/P1 0。P2 historical provenanceとP3旧thread表示はdeferred | approved for evidence-only commit; EVD-013 pending | evidence-only commit、new exact-head PR observation |
 
 #### 変更したファイル
 - `src/spec_dock/cli.py` - pre-mutation freshness、fresh root copy、installer README allowlist、fallback ignore
@@ -461,6 +463,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - S95 review target: `78cec6762364a79c57df98b6870cb8d41c316a71`
 - S95 closure head: `de03a0e88f7a5b429daad25c1073574dfadc13af`
 - S99 U001 final review target: `0a26ec4183229c8f0a38ce244114d2b28896dec8`
+- S99 combined final quality gate target: `8cedd846dcf6b6ec1a337d0eda705dd58d5ca8de`
 
 #### メモ
 - `No material implementation decisions beyond the approved plan.`
@@ -490,7 +493,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| EAL-053〜057、U001 aggregate、fresh三者PASS、P2 deferを記録 | fresh三者review Artifacts、repair batch/disc、reportのみ | final response and new ready PR exact-head observation | authorized; commit/push後にEVD-013を取得 |
+| EAL-053〜058、U001 aggregate、個別三者PASS、結合三者gate PASS、P2/P3 deferを記録 | combined final gate Artifact、reportのみ | final response and new ready PR exact-head observation | authorized; commit/push後にEVD-013を取得 |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: S95 formal updateがmanaged mirror投影後、sandbox内の`.agents/host-adapters/meta.json`書き込みで`EPERM`となった。
