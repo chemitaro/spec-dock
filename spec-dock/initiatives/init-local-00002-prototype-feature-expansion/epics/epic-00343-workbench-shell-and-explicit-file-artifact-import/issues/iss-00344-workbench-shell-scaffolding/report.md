@@ -54,7 +54,7 @@ Disposition ごとの必須証跡:
 | D-003 | resolved | interpretation | ChatGPT requirement review F-001 | `spec-dock artifact import file` が global installer CLI と repo-local runtime のどちらか曖昧 | installer dispatch; shorthand; repo-local exact command | repository root から `./spec-dock/scripts/spec-dock artifact import file ...` を実行する契約へ限定 | current console script と Issue 345 ownership を誤解させない | applied | `artifacts/20260728t155212z-chatgpt-output-chatgpt-issue-00344-requirement-review.md`; `requirement.md#I344-RQ-003` | fresh re-review |
 | D-004 | resolved | compatibility | ChatGPT requirement review F-002/F-003 | no-backfill と source-wins copy の受け入れ条件が過大・競合 | root 全体不変; Workbench 状態限定; README filter; conditional source-wins | no-backfill の不変対象を README / Workbench state に限定し、copy は identical / divergent の2ケースへ分割 | parent Epic と現行 runtime contract に一致する | applied | `requirement.md#AC-344-005`; `requirement.md#AC-344-007A`; `requirement.md#AC-344-007B` | fresh re-review |
 | D-005 | resolved | scope | ChatGPT requirement third review F-007 | root と node の共通 README が `workbench copy` の root support を示唆する | root route 追加; guidance 分離; helper scope 明示 | tracked README は root/node とも checkout、helper は Initiative/Epic/Issue の node-scoped ignored payload のみ、root ignored payload は対象外と固定 | existing CLI と親 Epic の compatibility ownership に一致する | applied | `artifacts/20260728t162105z-chatgpt-output-chatgpt-issue-00344-requirement-third-review.md`; `requirement.md#I344-RQ-007`; `requirement.md#AC-344-007C` | fresh re-review |
-| D-006 | resolved | deviation | user | 通常のSub-agent reviewerではなく、各stepの前後でChatGPT-Useを全面活用する実行方法が指定された | 通常Sub-agent reviewer; ChatGPT advisoryだけ追加; reviewer責務をChatGPT-Useで実行 | reviewer名を責務契約として維持し、push済みexact commitをChatGPT-UseがJSON reviewするoverlayをplanへ追加する | 実装scopeとclosure contractを変えず、ユーザー指定の高深度reviewと過剰実装抑制を両立できる | promoted_to_plan | `plan.md#11-chatgpt-first-execution-overlay`; user instruction on 2026-07-29 | amendment commitをpush後、ChatGPT-Useでfresh spec reviewする |
+| D-006 | resolved | deviation | user | 通常のSub-agent reviewerではなく、各stepの前後でChatGPT-Useを全面活用する実行方法が指定された | 通常Sub-agent reviewer; ChatGPT advisoryだけ追加; reviewer責務をChatGPT-Useで実行 | reviewer名を責務契約として維持し、push済みexact commitをChatGPT-UseがJSON reviewするoverlayをplanへ追加する | 実装scopeとclosure contractを変えず、ユーザー指定の高深度reviewと過剰実装抑制を両立できる | promoted_to_plan | `plan.md#11-chatgpt-first-execution-overlay`; user instruction on 2026-07-29 | F-001〜F-004を限定修正し、新exact commitへfresh reviewする |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -94,6 +94,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-024 | adopted | ChatGPT terminal plan review (`PASS`, advisory) | `plan.md`, `report.md` | connected GitHub appでcommit `00ee3da37a6f75d60969989c8370cba0231adf2c`を確認したfresh terminal review。B-001〜B-008-R1/B-005-R1は全てCLOSED、blocking/non-blocking findingなし。一本道のResult Approval admission、S99 predecessor close state、external-only final evidenceを確認した | `artifacts/20260728t204554z-chatgpt-output-chatgpt-issue-00344-terminal-plan-pass.md`; SHA-256 `fa09700bc8b5bb15b130b89d1b2ef48621879dc08db2f29115c0aac612a806b9`; 14,525 bytes | fresh `spec-reviewer` plan review |
 | EAL-025 | adopted | fresh `spec-reviewer` plan review (`PASS`) | `plan.md`, `report.md` | commit `85de9b37a6bacc1ddf56664ac50d3fa42ac8b8ef`を独立レビュー。blocking/material findingなし、`review_status: pass`。P3のS01 Red seed名表記差をexact nodeへ正規化し、plan phaseをapprovedとした | reviewer output; `plan.md`; terminal ChatGPT PASS artifact; parent Epic/workflow/authoring docs | assurance再分類 / planning completion。実装は本依頼のscope外 |
 | EAL-026 | partially_adopted | user-specified ChatGPT-First execution method | `plan.md`, `report.md` | step scopeとclosure contractを維持し、pre-step具体化Artifact、`dev-coder`共有、push済みexact commitのJSON review、finding採否を追加した。fresh review完了前はplanをdraftに戻した | `plan.md#11-chatgpt-first-execution-overlay`; D-006; merge commit `3829600aa304ee76c6e8dcfbe31d2b6b2511927b` | amendment commitをpushし、ChatGPT-Use spec reviewをArtifact化する |
+| EAL-027 | adopted | ChatGPT-Use fresh plan amendment review (`FAIL`, advisory) | `plan.md`, `report.md` | commit `41073c582575d6af70a60a95a56203a63b07064d`をGitHub同期後にreview。F-001〜F-003をblocking/majorとして採用し、candidate review commit→fresh review→evidence-only closure commitの非循環順序、S90のrole分離、blocking/major 0のPASS条件へ限定修正した。F-004も採用し、旧PASSをstaleとしてcurrent readinessをblockedへ同期した | `artifacts/20260729t032949z-chatgpt-output-chatgpt-first-plan-review-41073c58.md`; SHA-256 `8715545fe690431dc5d9e1dc43023283a8d07e75a7e9979cff39ae8455f4f4c0`; reviewed commit `41073c582575d6af70a60a95a56203a63b07064d` | 修正をcommit/pushし、新exact SHAへfresh ChatGPT-Use `spec-reviewer`責務review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -101,7 +102,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | fresh root と future Initiative / Epic / Issue に tracked `.workbench/README.md` を含む optional shell を生成し、existing scope を backfill しない (`I344-RQ-001`〜`I344-RQ-005`) | semantic opacity、node-scoped `workbench copy` compatibility、package parity、generic import / PR delivery の sibling Issue 境界 (`I344-RQ-006`〜`I344-RQ-010`) | low: copy/import/package の副次境界は primary shell を成立させる guardrail に限定し、root copy や generic import 実装を本 Issue へ取り込んでいない | pass: ChatGPT advisory PASS、fresh `spec-reviewer` PASS |
+| OAL-001 | fresh root と future Initiative / Epic / Issue に tracked `.workbench/README.md` を含む optional shell を生成し、existing scope を backfill しない (`I344-RQ-001`〜`I344-RQ-005`) | semantic opacity、node-scoped `workbench copy` compatibility、package parity、generic import / PR delivery の sibling Issue 境界 (`I344-RQ-006`〜`I344-RQ-010`) | low: copy/import/package の副次境界は primary shell を成立させる guardrail に限定し、root copy や generic import 実装を本 Issue へ取り込んでいない | prior PASSはChatGPT-First amendmentでstale。current reviewはscope creepなし、実行順序finding修正後にfresh re-review待ち |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -111,7 +112,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 |---|---|---|---|---|---|---|
 | requirement | 親 Epic requirement/design/plan、provider source、package config、relevant tests、ChatGPT authoring/review Artifacts | F-001〜F-007 を canonical docs に反映。final ChatGPT review は blocking finding なし | adopted | passed (ChatGPT advisory PASS; fresh `spec-reviewer` PASS, P2 non-blocking lane classification correction applied) | no | promote to assurance classify / design compose |
 | design | approved requirement、parent Epic、provider source、current copy / package contracts、ChatGPT planning candidate / design reviews | B-001〜B-006、NB-001/NB-002をcanonical designへ修正し、post-B-006 fresh ChatGPT reviewとfresh `spec-reviewer` reviewで新規findingなし | adopted | passed (ChatGPT advisory PASS; fresh `spec-reviewer` PASS) | no | assurance再分類 / plan compose |
-| plan | approved requirement/design、ChatGPT planning candidate、Standard assurance obligations、current provider/build/test seams、Issue plan authoring規約 | prior findings B-001〜B-008-R1/B-005-R1をcanonical planへ修正済み。terminal ChatGPT reviewで全finding CLOSED、fresh `spec-reviewer`はblocking/material findingなし | adopted | passed (ChatGPT advisory PASS; fresh `spec-reviewer` PASS) | no | assurance再分類 / planning completion。実装は本依頼のscope外 |
+| plan | approved requirement/design、ChatGPT planning candidate、Standard assurance obligations、current provider/build/test seams、Issue plan authoring規約 | prior findings B-001〜B-008-R1/B-005-R1は修正済み。ChatGPT-First amendment reviewでF-001〜F-004を検出し、限定修正中 | partially_adopted | failed on reviewed commit `41073c582575d6af70a60a95a56203a63b07064d`; prior PASSはstale | yes | 修正版をcommit/pushし、新exact SHAへfresh ChatGPT-Use `spec-reviewer`責務review |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -222,7 +223,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user request to execute Issue 344 with ChatGPT-First authoring/review | `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/692d/spec-dock` | iss-00344 | current session | dev-coder; ChatGPT-Use executing code-reviewer / spec-reviewer / qa-reviewer responsibility contracts | active repo/worktree、active Issue、current session、approved step scope。merge、Issue 345/346、scope expansionは含めない | Issue 344 execution終了 / session end / scope change / user revocation | none | amendmentをpushし、ChatGPT-Use fresh spec review後にS01を開始 |
+| user request to execute Issue 344 with ChatGPT-First authoring/review | `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/692d/spec-dock` | iss-00344 | current session | dev-coder; doc-writer (S90 only); ChatGPT-Use executing code-reviewer / spec-reviewer / qa-reviewer responsibility contracts | active repo/worktree、active Issue、current session、approved step scope。merge、Issue 345/346、scope expansionは含めない | Issue 344 execution終了 / session end / scope change / user revocation | none | F-001〜F-004修正版をpushし、ChatGPT-Use fresh spec review後にS01を開始 |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
@@ -246,15 +247,12 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
-| `lite` | `not applicable` | `not applicable` | ライト該当なし理由（lite not applicable reason） | `pass / fail / blocked` | `ready / blocked` |
-| `standard` | `system-architect / implementation-planner / manual fallback` | `used / skipped / unavailable / denied` | `artifacts/...` / manual evidence / skip reason: ... | `pass / fail / blocked` | `ready / blocked` |
-| `strict` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / manual fallback evidence | `pass / fail / blocked` | `ready / blocked` |
-| `critical` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / explicit approval and risk acceptance | `pass / fail / blocked` | `ready / blocked` |
+| `standard` | `implementation-planner / manual fallback` | `skipped` | skip reason: approved requirement/design/planとChatGPT planning/review Artifactsが既にあり、追加delegated draftは重複authoringになる。今回の実行overlayはmain orchestratorが限定修正した | `failed` on `41073c582575d6af70a60a95a56203a63b07064d`; fresh re-review required | `blocked` |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| plan amendment / S01 admission | ChatGPT-First plan amendment review | spec-reviewer | fresh | failed | no | blocked | ChatGPT-Use reviewed exact commit `41073c582575d6af70a60a95a56203a63b07064d`; F-001 blocking、F-002/F-003 major、F-004 minorを採用。修正後のfresh re-review待ち |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
