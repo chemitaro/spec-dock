@@ -14,6 +14,7 @@ from spec_dock.cli import main as installer_main
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BRANCH = "feature/issue-planning"
 ISSUE_ID = "iss-00334"
+CURRENT_ROADMAP = b"S01 through S10 are closed, including S07 and S08. S11 review is pending. S12 through S14 remain."
 
 
 def _run_git(repo: Path, *args: str, env: dict[str, str]) -> str:
@@ -182,7 +183,8 @@ def guide(issue_id: str, epic_id: str, initiative_id: str) -> bytes:
         "## Exact current branch gate\n\n"
         "The exact current branch is mandatory; no default branch fallback is permitted.\n\n"
         "## Roadmap and operations\n\n"
-        "S01 through S07 are complete. S08 through S14 remain.\n\n"
+        "S01 through S10 are closed, including S07 and S08. S11 review is pending. "
+        "S12 through S14 remain.\n\n"
         "## Provider authority and projection\n\nProvider authority precedes projection.\n\n"
         "## Failure modes\n\nFailure modes stop closed.\n\n"
         "## First-day checklist\n\nThe first-day checklist directs the new member.\n\n"
@@ -543,6 +545,61 @@ def _assert_candidate_contract(candidate: Path) -> None:
         assert len(source["canonical_issue_paths"]) == 3
 
 
+def _candidate_companion(
+    candidate: Path,
+    candidate_identity: dict[str, Any],
+) -> tuple[str, bytes]:
+    assert hashlib.sha256(candidate.read_bytes()).hexdigest() == candidate_identity["zip_sha256"]
+    with zipfile.ZipFile(candidate) as archive:
+        root = candidate.name.removesuffix(".zip")
+        manifest = json.loads(archive.read(f"{root}/MANIFEST.json"))
+        companion = next(entry for entry in manifest["entries"] if entry["role"] == "onboarding-companion")
+        payload = archive.read(f"{root}/{companion['path']}")
+        checksums = archive.read(f"{root}/CHECKSUMS.sha256").decode("ascii")
+    assert CURRENT_ROADMAP in payload
+    assert f"{hashlib.sha256(payload).hexdigest()}  {companion['path']}" in checksums.splitlines()
+    return companion["path"], payload
+
+
+def _assert_pass_review_carries_companion(
+    review_path: Path,
+    *,
+    mode: str,
+    candidate_identity: dict[str, Any],
+    companion_path: str,
+    companion_bytes: bytes,
+) -> None:
+    review = json.loads(review_path.read_bytes())
+    assert review["verdict"] == "pass"
+    reviewed_identity = review["reviewed_identity"]
+    if mode == "archive-candidate":
+        assert reviewed_identity["candidate_identity"] == candidate_identity
+        return
+    binding = reviewed_identity["git_bound_operation_binding"]
+    assert binding["candidate_identity"] == candidate_identity
+    assert binding["onboarding_companion"] == {
+        "path": companion_path,
+        "sha256": hashlib.sha256(companion_bytes).hexdigest(),
+    }
+
+
+def _assert_ready_companion(
+    target: Path,
+    operation: Path,
+    *,
+    issue_dir: Path,
+    companion_path: str,
+    companion_bytes: bytes,
+) -> None:
+    operation_files = list(operation.glob("planning-apply-*/operation.json"))
+    assert len(operation_files) == 1
+    payload = json.loads(operation_files[0].read_text(encoding="utf-8"))
+    expected_target = (issue_dir.relative_to(target) / companion_path).as_posix()
+    assert payload["companion_target_path"] == expected_target
+    assert payload["companion_sha256"] == hashlib.sha256(companion_bytes).hexdigest()
+    assert (target / expected_target).read_bytes() == companion_bytes
+
+
 def _write_approval(review_path: Path, destination: Path) -> dict[str, Any]:
     review_bytes = review_path.read_bytes()
     review = json.loads(review_bytes)
@@ -631,6 +688,7 @@ def test_archive_full_fake_chain_reaches_ready(
         oracle_home=oracle_home,
         executable=executable,
     )
+    companion_path, companion_bytes = _candidate_companion(candidate, identity)
     review_path, _ = _review(
         target,
         reviews,
@@ -639,6 +697,13 @@ def test_archive_full_fake_chain_reaches_ready(
         env=runtime_env,
         oracle_home=oracle_home,
         executable=executable,
+    )
+    _assert_pass_review_carries_companion(
+        review_path,
+        mode="archive-candidate",
+        candidate_identity=identity,
+        companion_path=companion_path,
+        companion_bytes=companion_bytes,
     )
     assert canonical_before == {name: (issue_dir / name).read_bytes() for name in canonical_before}
     assert _forbidden_snapshot(target, issue_dir) == forbidden_before
@@ -674,6 +739,13 @@ def test_archive_full_fake_chain_reaches_ready(
         executable=executable,
     )
     assert result["status"] == "ready"
+    _assert_ready_companion(
+        target,
+        operation,
+        issue_dir=issue_dir,
+        companion_path=companion_path,
+        companion_bytes=companion_bytes,
+    )
     assert _forbidden_snapshot(target, issue_dir) == forbidden_before
     assert (
         _run_git(target, "rev-parse", "HEAD", env=env)
@@ -696,13 +768,14 @@ def test_git_bound_full_fake_chain_reaches_ready(
         path.mkdir()
     forbidden_before = _forbidden_snapshot(target, issue_dir)
     before = {name: (issue_dir / name).read_bytes() for name in ("requirement.md", "design.md", "plan.md")}
-    candidate, _identity, create = _create(
+    candidate, identity, create = _create(
         target,
         output,
         env=runtime_env,
         oracle_home=oracle_home,
         executable=executable,
     )
+    companion_path, companion_bytes = _candidate_companion(candidate, identity)
     review_path, review = _review(
         target,
         reviews,
@@ -711,6 +784,13 @@ def test_git_bound_full_fake_chain_reaches_ready(
         env=runtime_env,
         oracle_home=oracle_home,
         executable=executable,
+    )
+    _assert_pass_review_carries_companion(
+        review_path,
+        mode="git-bound",
+        candidate_identity=identity,
+        companion_path=companion_path,
+        companion_bytes=companion_bytes,
     )
     binding = create["output"]["git_bound_operation_binding_sha256"]
     assert review["output"]["git_bound_operation_binding_sha256"] == binding
@@ -751,6 +831,13 @@ def test_git_bound_full_fake_chain_reaches_ready(
     operation_files = list(operation.glob("planning-apply-*/operation.json"))
     assert len(operation_files) == 1
     assert json.loads(operation_files[0].read_text(encoding="utf-8"))["git_bound_operation_binding_sha256"] == binding
+    _assert_ready_companion(
+        target,
+        operation,
+        issue_dir=issue_dir,
+        companion_path=companion_path,
+        companion_bytes=companion_bytes,
+    )
     assert before == {name: (issue_dir / name).read_bytes() for name in before}
     assert _forbidden_snapshot(target, issue_dir) == forbidden_before
     assert (
