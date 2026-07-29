@@ -146,13 +146,17 @@ branch は削除しません。成功 JSON の `branch_deleted` は常に `false
 
 ## Scoped Workbench handoff（experimental）
 
+Workbench は任意です。optional、temporary、worktree-local、disposable、non-canonical な作業領域です。`.workbench/README.md` は direct child の README-only tracking surface で、その他の Workbench entry は ignored payload として Git に ignore されます。Git ignore は security boundary ではありません。Workbench content の read / import authorization は evidence-only であり、canonical adoption ではありません。
+
+tracked `.workbench/README.md` は root / node とも通常の Git checkout で linked worktree に現れます。ignored payload は checkout では移らず、copy の対象は node-scoped payload に限られます。
+
 ```bash
 ./spec-dock/scripts/spec-dock workbench copy --scope <initiative|epic|issue-id> --to <target>
 ```
 
-`--to`は`worktree show`と同じstable id、absolute path、またはdirectory basenameで既存linked worktreeを指定します。`--scope`はsource worktreeに存在するfull Initiative / Epic / Issue idです。Root `spec-dock/.workbench/`は対象外で、rootでは日付bucketから必要fileを手動選択します。
+`--to`は`worktree show`と同じstable id、absolute path、またはdirectory basenameで既存linked worktreeを指定します。`--scope`はsource worktreeに存在するfull Initiative / Epic / Issue idです。Initiative / Epic / Issue の ignored payload は明示的な manual one-shot copy の対象です。root は対象外です。Root `spec-dock/.workbench/`で durable に残す file の route は `./spec-dock/scripts/spec-dock artifact import file ...` ですが、Issue #345 で planned、unimplemented です。
 
-Copyは明示的なone-shot operationです。Source scope直下の`.workbench/`全体を同じscopeのdestinationへ重ね、destination-only entryを保持し、同じpathではsourceが勝ちます。自動sync、watch、copy-back、destinationからsourceへの反映はありません。言語、拡張子、MIME、内容で対象fileを選ぶclassifierもありません。通常file、directory、symlink objectをそのまま扱い、FIFOなどのunsupported special entryやdirectory/non-directory衝突は選別・skipせずcontent-free errorで停止します。Workbenchはnon-canonical、disposableであり、copy成功は永続化やadoptionを意味しません。
+Copyは明示的なone-shot operationです。Source scope直下の`.workbench/`全体を同じscopeのdestinationへ重ね、source-wins は destination-only entries を保持します。README-specific filter は適用しません。no automatic hook, watch, sync, or copy-back。言語、拡張子、MIME、内容で対象fileを選ぶclassifierもありません。通常file、directory、symlink objectをそのまま扱い、FIFOなどのunsupported special entryやdirectory/non-directory衝突は選別・skipせずcontent-free errorで停止します。Workbenchはnon-canonical、disposableであり、copy成功は永続化やadoptionを意味しません。
 
 `spec-dock update`は既存root/scoped Workbenchをunmanaged local contentとして保持します。Workbenchを別layoutへmigration、normalize、delete、canonical Artifactへpromotionしません。
 
