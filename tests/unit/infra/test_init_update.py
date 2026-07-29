@@ -72,10 +72,7 @@ def test_issue_334_init_and_update_install_chatgpt_assets_byte_exact(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[3]
     provider_scripts = repo_root / "src/spec_dock/assets/spec_dock/scripts"
-    provider_skill = (
-        repo_root
-        / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning"
-    )
+    provider_skill = repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning"
     provider_docs = repo_root / "src/spec_dock/assets/spec_dock/docs"
     target = tmp_path / "target"
     target.mkdir()
@@ -83,16 +80,12 @@ def test_issue_334_init_and_update_install_chatgpt_assets_byte_exact(
     assert main(["init", str(target)]) == 0
     assert os.access(target / "spec-dock/scripts/spec-dock", os.X_OK)
     assert os.access(target / "spec-dock/scripts/spec-dock-chatgpt", os.X_OK)
-    assert _managed_tree_bytes(target / "spec-dock/scripts") == _managed_tree_bytes(
-        provider_scripts
+    assert _managed_tree_bytes(target / "spec-dock/scripts") == _managed_tree_bytes(provider_scripts)
+    assert _managed_tree_bytes(target / ".agents/skills/spec-dock-issue-planning") == _managed_tree_bytes(
+        provider_skill
     )
-    assert _managed_tree_bytes(
-        target / ".agents/skills/spec-dock-issue-planning"
-    ) == _managed_tree_bytes(provider_skill)
     for name in ("README.md", "workflow_issue.md"):
-        assert (target / "spec-dock/docs" / name).read_bytes() == (
-            provider_docs / name
-        ).read_bytes()
+        assert (target / "spec-dock/docs" / name).read_bytes() == (provider_docs / name).read_bytes()
 
     (target / "spec-dock/scripts/spec-dock-chatgpt").write_text(
         "stale\n",
@@ -126,9 +119,7 @@ def test_issue_334_update_restores_managed_assets_and_preserves_unmanaged_conten
         Path(__file__).resolve().parents[3]
         / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
     )
-    assert (
-        target / ".agents/skills/spec-dock-issue-planning/SKILL.md"
-    ).read_bytes() == provider_skill.read_bytes()
+    assert (target / ".agents/skills/spec-dock-issue-planning/SKILL.md").read_bytes() == provider_skill.read_bytes()
 
 
 def test_issue_334_checked_in_dogfood_projection_matches_provider() -> None:
@@ -143,8 +134,7 @@ def test_issue_334_checked_in_dogfood_projection_matches_provider() -> None:
             repo_root / "spec-dock/docs",
         ),
         (
-            repo_root
-            / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning",
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning",
             repo_root / ".agents/skills/spec-dock-issue-planning",
         ),
     )
@@ -5138,9 +5128,7 @@ class TestInitUpdate(CliRuntimeHarness):
                 "weaken existing ZIP safety checks",
             ):
                 assert forbidden_matrix_token not in caller
-        issue_planning = (
-            repo_root / ".agents/skills/spec-dock-issue-planning/SKILL.md"
-        ).read_text(encoding="utf-8")
+        issue_planning = (repo_root / ".agents/skills/spec-dock-issue-planning/SKILL.md").read_text(encoding="utf-8")
         assert "./spec-dock/scripts/spec-dock-chatgpt planning create" in issue_planning
         assert "./spec-dock/scripts/spec-dock-chatgpt review planning" in issue_planning
         assert "preserving immutable Candidate and fresh Review evidence outside the repository" in issue_planning

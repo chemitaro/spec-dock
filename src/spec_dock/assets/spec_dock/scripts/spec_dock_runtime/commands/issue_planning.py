@@ -229,9 +229,7 @@ def _validate_mode_options(
 
 def _run_create(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_args(args, PlanningCreateArgs, "planning create")
-    result = use_cases.planning_create(
-        PlanningCreateRequest(issue_id=typed.issue_id, output_dir=typed.output_dir)
-    )
+    result = use_cases.planning_create(PlanningCreateRequest(issue_id=typed.issue_id, output_dir=typed.output_dir))
     return _outcome(result, typed.output_format)
 
 
@@ -287,9 +285,5 @@ def _expect_args(args: CommandArgs, expected_type: type, command: str):
 
 
 def _outcome(result, output_format: OutputFormat) -> CommandOutcome:
-    text = (
-        render_planning_result_json(result)
-        if output_format == "json"
-        else render_planning_result_text(result)
-    )
+    text = render_planning_result_json(result) if output_format == "json" else render_planning_result_text(result)
     return CommandOutcome(exit_code=result.exit_code, text=text)

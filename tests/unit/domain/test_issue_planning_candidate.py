@@ -7,9 +7,7 @@ import zipfile
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 
@@ -20,9 +18,7 @@ def _candidate():
     )
 
 
-COMPANION_PATH = (
-    "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
-)
+COMPANION_PATH = "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
 
 
 def _document(filename: str, *, body: str | None = None, changes: dict[str, str] | None = None) -> bytes:
@@ -320,29 +316,21 @@ def test_s10_authoring_payload_rejects_invalid_text_framing(mutation: str) -> No
         "no_lf": payload.rstrip(b"\n"),
         "invalid_utf8": b"\xff\n",
     }[mutation]
-    assert (
-        _candidate().validate_issue_authoring_files(
-            files,
-            "authoring",
-            expected_companion_path=COMPANION_PATH,
-        )
-        == ("authoring_payload_invalid",)
-    )
+    assert _candidate().validate_issue_authoring_files(
+        files,
+        "authoring",
+        expected_companion_path=COMPANION_PATH,
+    ) == ("authoring_payload_invalid",)
 
 
 def test_s10_current_v4_guide_satisfies_completeness_contract() -> None:
     repository_root = Path(__file__).resolve().parents[3]
     pack = (
-        repository_root
-        / "spec-dock/active/issue/artifacts/"
+        repository_root / "spec-dock/active/issue/artifacts/"
         "20260729t-iss-00334-onboarding-companion-planning-amendment-v4.zip"
     )
     with zipfile.ZipFile(pack) as archive:
-        guide_name = next(
-            name
-            for name in archive.namelist()
-            if name.endswith(f"issue/{COMPANION_PATH}")
-        )
+        guide_name = next(name for name in archive.namelist() if name.endswith(f"issue/{COMPANION_PATH}"))
         guide = archive.read(guide_name)
     _candidate().validate_onboarding_companion(COMPANION_PATH, guide)
 
@@ -500,9 +488,7 @@ def test_v1_naming_uses_one_utc_second_instant() -> None:
     material = _material()
     assert material.created_at_utc == "2026-07-28T12:00:00Z"
     assert material.candidate_id == "iss-00003-v1-20260728t120000z"
-    assert material.logical_filename == (
-        "20260728t120000z-iss-00003-issue-planning-candidate-v1.zip"
-    )
+    assert material.logical_filename == ("20260728t120000z-iss-00003-issue-planning-candidate-v1.zip")
     assert material.internal_root == material.logical_filename.removesuffix(".zip")
 
 
@@ -512,9 +498,7 @@ def test_s10_manifest_has_exact_eight_sorted_entries_and_one_companion_role() ->
     paths = [entry["path"] for entry in manifest["entries"]]
     assert paths == sorted(material.files, key=lambda value: value.encode())
     assert len(paths) == 8
-    companion_entries = [
-        entry for entry in manifest["entries"] if entry["role"] == "onboarding-companion"
-    ]
+    companion_entries = [entry for entry in manifest["entries"] if entry["role"] == "onboarding-companion"]
     assert companion_entries == [
         {
             "checksum_covered": True,
@@ -624,12 +608,10 @@ def test_candidate_verifier_rejects_non_array_placeholder_files_without_exceptio
     module = _candidate()
     material = _material()
     changed = dict(material.files)
-    placeholder = module.canonical_control_json_bytes(
-        {
-            "files": 1,
-            "schema_version": "spec-dock.issue-candidate-placeholder-map.v1",
-        }
-    )
+    placeholder = module.canonical_control_json_bytes({
+        "files": 1,
+        "schema_version": "spec-dock.issue-candidate-placeholder-map.v1",
+    })
     manifest = json.loads(changed["MANIFEST.json"])
     manifest["placeholder_oracle_map_sha256"] = hashlib.sha256(placeholder).hexdigest()
     changed["PLACEHOLDER-ORACLE-MAP.json"] = placeholder
@@ -654,6 +636,5 @@ def test_candidate_verifier_rejects_boolean_manifest_version() -> None:
 def _checksums(module, files: dict[str, bytes]) -> bytes:
     companion = next(path for path in files if path.startswith("artifacts/"))
     return "".join(
-        f"{hashlib.sha256(files[path]).hexdigest()}  {path}\n"
-        for path in module.checksum_paths(companion)
+        f"{hashlib.sha256(files[path]).hexdigest()}  {path}\n" for path in module.checksum_paths(companion)
     ).encode("ascii")

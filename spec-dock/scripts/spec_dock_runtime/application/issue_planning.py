@@ -222,12 +222,8 @@ def run_issue_planning_apply(
     repo_slug_resolver: Callable[[Path], str | None],
     validation_runner: Callable[[], object],
     sync_runner: Callable[[], object],
-    preflight_runner: Callable[
-        [GitHubSyncPreflightRequest], PreflightResult
-    ] = run_github_sync_preflight,
-    candidate_loader: Callable[
-        [Path, Path], VerifiedIssueCandidate
-    ] = load_verified_issue_candidate,
+    preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult] = run_github_sync_preflight,
+    candidate_loader: Callable[[Path, Path], VerifiedIssueCandidate] = load_verified_issue_candidate,
     expected_target_loader: Callable[
         [Path, str, tuple[str, str, str]], ExpectedPlanningTargets
     ] = load_expected_planning_targets,
@@ -313,9 +309,7 @@ def run_issue_planning_apply(
     try:
         review = PlanningReviewResult.from_json_bytes(
             review_bytes,
-            expected_canonical_target_paths=(
-                target.canonical_issue_paths if request.mode == "git-bound" else None
-            ),
+            expected_canonical_target_paths=(target.canonical_issue_paths if request.mode == "git-bound" else None),
         )
     except ValueError:
         return PlanningCommandResult(
@@ -334,9 +328,7 @@ def run_issue_planning_apply(
             human_bytes,
             review_result_bytes=review_bytes,
             expected_canonical_target_paths=(
-                review.reviewed_identity.canonical_target_paths
-                if request.mode == "git-bound"
-                else None
+                review.reviewed_identity.canonical_target_paths if request.mode == "git-bound" else None
             ),
         )
     except ValueError:
@@ -478,31 +470,16 @@ def run_issue_planning_apply(
     decided_at = datetime.fromisoformat(human.decided_at.replace("Z", "+00:00"))
     timestamp = decided_at.astimezone(timezone.utc).strftime("%Y%m%dt%H%M%Sz")
     issue_dir = PurePath(target.canonical_issue_paths[0]).parent
-    decision_path = (
-        issue_dir
-        / "artifacts"
-        / f"{timestamp}-planning-human-decision-placeholder.json"
-    ).as_posix()
+    decision_path = (issue_dir / "artifacts" / f"{timestamp}-planning-human-decision-placeholder.json").as_posix()
     replacements: dict[str, bytes] = {}
-    if (
-        request.mode == "archive-candidate"
-        and human.decision == "approved"
-        and verified_candidate is not None
-    ):
-        replacements = {
-            name: verified_candidate.files[name]
-            for name in DOCUMENT_NAMES
-        }
+    if request.mode == "archive-candidate" and human.decision == "approved" and verified_candidate is not None:
+        replacements = {name: verified_candidate.files[name] for name in DOCUMENT_NAMES}
     companion_target_path: str | None = None
     companion_bytes: bytes | None = None
     if verified_candidate is not None:
-        companion_target_path = (
-            issue_dir / verified_candidate.onboarding_companion.path
-        ).as_posix()
+        companion_target_path = (issue_dir / verified_candidate.onboarding_companion.path).as_posix()
         if human.decision == "approved":
-            companion_bytes = verified_candidate.files[
-                verified_candidate.onboarding_companion.path
-            ]
+            companion_bytes = verified_candidate.files[verified_candidate.onboarding_companion.path]
     try:
         operation = PlanningApplyOperation.create(
             issue_id=issue_id,
@@ -517,9 +494,7 @@ def run_issue_planning_apply(
             decision=human.decision,
             canonical_target_paths=target.canonical_issue_paths,
             pre_apply_target_blob_oids=expected_targets.blob_oids,
-            candidate_identity=(
-                None if verified_candidate is None else verified_candidate.identity
-            ),
+            candidate_identity=(None if verified_candidate is None else verified_candidate.identity),
             git_bound_operation_binding_sha256=(
                 identity.git_bound_operation_binding.binding_sha256
                 if identity.git_bound_operation_binding is not None
@@ -527,9 +502,7 @@ def run_issue_planning_apply(
             ),
             companion_target_path=companion_target_path,
             companion_sha256=(
-                verified_candidate.onboarding_companion.sha256
-                if verified_candidate is not None
-                else None
+                verified_candidate.onboarding_companion.sha256 if verified_candidate is not None else None
             ),
             decision_artifact_path=decision_path,
             human_decision_bytes=human_bytes,
@@ -578,7 +551,8 @@ def run_issue_planning_apply(
         or preflight.remote_head != request.expected_head
     ):
         if request.mode == "archive-candidate" and any(
-            blocker in {
+            blocker
+            in {
                 "source_hash_mismatch",
                 "dirty_tracked",
                 "dirty_untracked",
@@ -615,11 +589,7 @@ def run_issue_planning_apply(
     except CandidateArchiveRejected:
         return PlanningCommandResult(
             status="stale" if request.mode == "archive-candidate" else "rejected",
-            reason=(
-                "apply_target_changed"
-                if request.mode == "archive-candidate"
-                else "operation_binding_mismatch"
-            ),
+            reason=("apply_target_changed" if request.mode == "archive-candidate" else "operation_binding_mismatch"),
             issue_id=issue_id,
         )
     if (
@@ -628,16 +598,11 @@ def run_issue_planning_apply(
         or current_candidate.zip_bytes != verified_candidate.zip_bytes
         or current_candidate.files != verified_candidate.files
         or current_candidate.source_baseline != verified_candidate.source_baseline
-        or current_candidate.onboarding_companion
-        != verified_candidate.onboarding_companion
+        or current_candidate.onboarding_companion != verified_candidate.onboarding_companion
     ):
         return PlanningCommandResult(
             status="stale" if request.mode == "archive-candidate" else "rejected",
-            reason=(
-                "apply_target_changed"
-                if request.mode == "archive-candidate"
-                else "operation_binding_mismatch"
-            ),
+            reason=("apply_target_changed" if request.mode == "archive-candidate" else "operation_binding_mismatch"),
             issue_id=issue_id,
         )
     if request.mode == "git-bound":
@@ -680,11 +645,7 @@ def _planning_result_from_execution(
         status=execution.status,
         reason=execution.reason,
         issue_id=issue_id,
-        output={
-            key: value
-            for key, value in execution.to_output().items()
-            if value is not None
-        },
+        output={key: value for key, value in execution.to_output().items() if value is not None},
         details=execution.details,
     )
 
@@ -805,9 +766,7 @@ def run_issue_planning_transport(
         ),
         canonical_issue_paths=target.canonical_issue_paths,
         relevant_source_paths=relevant,
-        operator_context=tuple(
-            sorted(set(operator_context), key=lambda value: value.encode("utf-8"))
-        ),
+        operator_context=tuple(sorted(set(operator_context), key=lambda value: value.encode("utf-8"))),
         onboarding_companion_path=onboarding_companion_path,
     )
     try:
@@ -874,15 +833,15 @@ def run_issue_planning_create(
     try:
         target = resolve_existing_issue_target(request.issue_id, records, repo_root)
         current_documents = {
-            name: (repo_root / next(
-                path for path in target.canonical_issue_paths if Path(path).name == name
-            )).read_bytes()
+            name: (
+                repo_root / next(path for path in target.canonical_issue_paths if Path(path).name == name)
+            ).read_bytes()
             for name in DOCUMENT_NAMES
         }
         baseline = parse_current_front_matter_baseline(current_documents)
-        if (
-            baseline.issue_id != target.issue_id
-            or baseline.parents != (target.parent_epic_id, target.parent_initiative_id)
+        if baseline.issue_id != target.issue_id or baseline.parents != (
+            target.parent_epic_id,
+            target.parent_initiative_id,
         ):
             raise ValueError("current front matter does not match the existing Issue target")
     except (OSError, UnicodeError, ValueError):
@@ -997,12 +956,8 @@ def run_issue_planning_create(
                 )
             ),
             canonical_issue_paths=target.canonical_issue_paths,
-            relevant_source_paths=tuple(
-                sorted(set(relevant_source_paths), key=lambda value: value.encode("utf-8"))
-            ),
-            operator_context=tuple(
-                sorted(set(operator_context), key=lambda value: value.encode("utf-8"))
-            ),
+            relevant_source_paths=tuple(sorted(set(relevant_source_paths), key=lambda value: value.encode("utf-8"))),
+            operator_context=tuple(sorted(set(operator_context), key=lambda value: value.encode("utf-8"))),
             onboarding_companion_path=onboarding_companion_path,
         )
         material = build_candidate_material(
@@ -1126,11 +1081,7 @@ def run_issue_planning_review(
     except CandidateArchiveRejected as error:
         return PlanningCommandResult(
             status="rejected",
-            reason=(
-                "operation_binding_rejected"
-                if request.mode == "git-bound"
-                else "archive_rejected"
-            ),
+            reason=("operation_binding_rejected" if request.mode == "git-bound" else "archive_rejected"),
             issue_id=request.issue_id,
             details=error.findings,
         )
@@ -1292,9 +1243,7 @@ def run_issue_planning_review(
     try:
         parsed = PlanningReviewResult.from_json_bytes(
             payload,
-            expected_canonical_target_paths=(
-                target.canonical_issue_paths if request.mode == "git-bound" else None
-            ),
+            expected_canonical_target_paths=(target.canonical_issue_paths if request.mode == "git-bound" else None),
         )
         if parsed.reviewed_identity != identity or parsed.reviewed_identity_sha256 != identity.sha256:
             raise ValueError("Review result identity mismatch")
@@ -1382,11 +1331,7 @@ def run_issue_planning_review(
             "review_result_sha256": published.review_result_sha256,
             "reviewed_identity_sha256": identity.sha256,
             **(
-                {
-                    "git_bound_operation_binding_sha256": (
-                        identity.git_bound_operation_binding.binding_sha256
-                    )
-                }
+                {"git_bound_operation_binding_sha256": (identity.git_bound_operation_binding.binding_sha256)}
                 if identity.git_bound_operation_binding is not None
                 else {}
             ),
@@ -1475,16 +1420,11 @@ def run_issue_planning_revise(
     try:
         review = PlanningReviewResult.from_json_bytes(review_bytes)
         reviewed = review.reviewed_identity
-        if (
-            reviewed.mode != "archive-candidate"
-            or reviewed.candidate_identity != candidate.identity
-        ):
+        if reviewed.mode != "archive-candidate" or reviewed.candidate_identity != candidate.identity:
             raise ValueError("revision Review Candidate identity mismatch")
         if _review_result_has_sensitive_content(review):
             raise ValueError("revision Review contains unsafe dynamic content")
-        blocking = tuple(
-            finding for finding in review.findings if finding.severity in ("p0", "p1")
-        )
+        blocking = tuple(finding for finding in review.findings if finding.severity in ("p0", "p1"))
         if not blocking:
             return PlanningCommandResult(
                 status="blocked",
@@ -1521,9 +1461,7 @@ def run_issue_planning_revise(
         onboarding_companion_path=onboarding_companion_path,
     )
     try:
-        baseline = parse_current_front_matter_baseline(
-            {name: candidate.files[name] for name in DOCUMENT_NAMES}
-        )
+        baseline = parse_current_front_matter_baseline({name: candidate.files[name] for name in DOCUMENT_NAMES})
     except ValueError:
         return PlanningCommandResult(
             status="rejected",
@@ -1535,9 +1473,7 @@ def run_issue_planning_revise(
             revised_payloads = apply_mechanical_revision(
                 {
                     **{name: candidate.files[name] for name in DOCUMENT_NAMES},
-                    candidate.onboarding_companion.path: candidate.files[
-                        candidate.onboarding_companion.path
-                    ],
+                    candidate.onboarding_companion.path: candidate.files[candidate.onboarding_companion.path],
                 },
                 target_file=cast("str", revision.target_file),
                 onboarding_companion_path=candidate.onboarding_companion.path,
@@ -1545,12 +1481,8 @@ def run_issue_planning_revise(
                 new_text=cast("str", revision.new_text),
                 diff_budget=cast("int", revision.diff_budget),
             )
-            planner_documents = {
-                name: revised_payloads[name] for name in DOCUMENT_NAMES
-            }
-            onboarding_companion_bytes = revised_payloads[
-                candidate.onboarding_companion.path
-            ]
+            planner_documents = {name: revised_payloads[name] for name in DOCUMENT_NAMES}
+            onboarding_companion_bytes = revised_payloads[candidate.onboarding_companion.path]
             source_payload_sha256 = cast(
                 "str",
                 candidate.source_baseline["planner_payload_sha256"],
@@ -1566,11 +1498,7 @@ def run_issue_planning_revise(
                 issue_id=issue_id,
             )
     else:
-        selected = {
-            finding.id: finding
-            for finding in review.findings
-            if finding.id in revision.finding_ids
-        }
+        selected = {finding.id: finding for finding in review.findings if finding.id in revision.finding_ids}
 
         def revision_prompt_synthesizer(**kwargs: Any) -> Any:
             runtime_context = cast("PlanningContext", kwargs["context"])
@@ -1584,13 +1512,11 @@ def run_issue_planning_revise(
                 issue_id,
                 onboarding_companion_path,
             )
-            base = synthesize_issue_planning_prompt(
-                **{
-                    **kwargs,
-                    "role": "semantic_revision",
-                    "output_expectation": expectation,
-                }
-            )
+            base = synthesize_issue_planning_prompt(**{
+                **kwargs,
+                "role": "semantic_revision",
+                "output_expectation": expectation,
+            })
             attachments = [
                 PlanningPromptAttachment(
                     name="prior-candidate.zip",
@@ -1615,10 +1541,7 @@ def run_issue_planning_revise(
                 for name in DOCUMENT_NAMES
             )
             instructions = (
-                *(
-                    f"selected finding {finding.id}: {finding.severity}"
-                    for finding in selected.values()
-                ),
+                *(f"selected finding {finding.id}: {finding.severity}" for finding in selected.values()),
                 *(f"preserve assumption: {item}" for item in revision.preserve_assumptions),
             )
             return synthesize_planning_evidence_prompt(
@@ -1639,9 +1562,7 @@ def run_issue_planning_revise(
             role="semantic_revision",
             repo_slug_resolver=repo_slug_resolver,
             backend_invoker=backend_invoker,
-            relevant_source_paths=tuple(
-                cast("list[str]", candidate.source_baseline["relevant_paths"])
-            ),
+            relevant_source_paths=tuple(cast("list[str]", candidate.source_baseline["relevant_paths"])),
             operator_context=(),
             timeout_seconds=timeout_seconds,
             preflight_runner=preflight_runner,
@@ -1858,8 +1779,7 @@ def _revision_source_state(
         repository.branch != candidate.identity.source_branch
         or repository.local_head != candidate.identity.source_head
         or repository.remote_head != candidate.identity.source_head
-        or repository.source_manifest.source_manifest_hash
-        != baseline["source_manifest_hash"]
+        or repository.source_manifest.source_manifest_hash != baseline["source_manifest_hash"]
     ):
         return PlanningCommandResult(
             status="stale",
@@ -1902,10 +1822,7 @@ def _resolve_onboarding_companion_path(operation_time: datetime) -> str:
     if operation_time.tzinfo is None:
         raise ValueError("operation time must be timezone-aware")
     timestamp = operation_time.astimezone(timezone.utc).strftime("%Y%m%dt%H%M%Sz")
-    return (
-        f"artifacts/{timestamp}-"
-        "guide-new-member-chatgpt-first-issue-planning.md"
-    )
+    return f"artifacts/{timestamp}-guide-new-member-chatgpt-first-issue-planning.md"
 
 
 def _source_evidence_is_current(
@@ -1943,8 +1860,7 @@ def _source_evidence_is_current(
         and repository.local_head == evidence.local_head
         and repository.remote_head == evidence.remote_head
         and repository.remote_head_disposition == evidence.remote_head_disposition
-        and repository.source_manifest.source_manifest_hash
-        == evidence.source_manifest_hash
+        and repository.source_manifest.source_manifest_hash == evidence.source_manifest_hash
     )
 
 
@@ -1997,10 +1913,7 @@ def _attachments_match_source_manifest(
             classification == "review-target"
             and isinstance(source_label, str)
             and source_label in expected_hashes
-            and (
-                not isinstance(content, bytes)
-                or hashlib.sha256(content).hexdigest() != expected_hashes[source_label]
-            )
+            and (not isinstance(content, bytes) or hashlib.sha256(content).hexdigest() != expected_hashes[source_label])
         ):
             return False
     return True

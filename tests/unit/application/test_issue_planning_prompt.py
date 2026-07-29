@@ -4,9 +4,7 @@ import sys
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application import issue_planning_prompt  # noqa: E402
@@ -33,9 +31,7 @@ def _context(**changes: object) -> PlanningContext:
         ),
         "relevant_source_paths": ("src/example.py",),
         "operator_context": ("preserve approved scope",),
-        "onboarding_companion_path": (
-            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
-        ),
+        "onboarding_companion_path": ("artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"),
     }
     values.update(changes)
     return PlanningContext(**values)  # type: ignore[arg-type]
@@ -365,22 +361,11 @@ def test_installed_runtime_resolves_managed_issue_planning_resources(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     application_file = (
-        tmp_path
-        / "spec-dock"
-        / "scripts"
-        / "spec_dock_runtime"
-        / "application"
-        / "issue_planning_prompt.py"
+        tmp_path / "spec-dock" / "scripts" / "spec_dock_runtime" / "application" / "issue_planning_prompt.py"
     )
     application_file.parent.mkdir(parents=True)
     application_file.write_text("# installed runtime fixture\n", encoding="utf-8")
-    resource_root = (
-        tmp_path
-        / ".agents"
-        / "skills"
-        / "spec-dock-issue-planning"
-        / "resources"
-    )
+    resource_root = tmp_path / ".agents" / "skills" / "spec-dock-issue-planning" / "resources"
     resource_root.mkdir(parents=True)
     for name in (
         "planner-prompt.md",

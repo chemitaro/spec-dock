@@ -7,9 +7,7 @@ import sys
 from typing import cast
 import zipfile
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application import issue_planning  # noqa: E402
@@ -38,9 +36,7 @@ from spec_dock_runtime.infra.issue_planning_chatgpt import (  # noqa: E402
     resolve_issue_planning_github_repository,
 )
 
-DEFAULT_COMPANION_PATH = (
-    "artifacts/20260728t120000z-guide-new-member-chatgpt-first-issue-planning.md"
-)
+DEFAULT_COMPANION_PATH = "artifacts/20260728t120000z-guide-new-member-chatgpt-first-issue-planning.md"
 
 
 def test_synced_source_to_transport_tracer_preserves_identity_and_is_not_lifecycle_success(
@@ -196,10 +192,7 @@ def test_typed_authoring_zip_rejects_stale_source_before_candidate(tmp_path: Pat
     repo.mkdir()
     issue_dir = repo / "spec-dock/initiatives/i/epics/e/issues/x"
     issue_dir.mkdir(parents=True)
-    documents = {
-        name: _planning_document(name)
-        for name in ("requirement.md", "design.md", "plan.md")
-    }
+    documents = {name: _planning_document(name) for name in ("requirement.md", "design.md", "plan.md")}
     for name, content in documents.items():
         (issue_dir / name).write_bytes(content)
     output = tmp_path / "output"
@@ -210,12 +203,8 @@ def test_typed_authoring_zip_rejects_stale_source_before_candidate(tmp_path: Pat
         repo_root=repo,
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: None,
-        transport_runner=lambda **kwargs: _transport_result(
-            payload=_authoring_zip(documents)
-        ),
-        preflight_runner=lambda request: _preflight(
-            source_manifest=build_source_manifest(repo, request.source_paths)
-        ),
+        transport_runner=lambda **kwargs: _transport_result(payload=_authoring_zip(documents)),
+        preflight_runner=lambda request: _preflight(source_manifest=build_source_manifest(repo, request.source_paths)),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     assert (result.status, result.reason) == ("stale", "planning_source_stale")
@@ -263,10 +252,7 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
     repo.mkdir()
     issue_dir = repo / "spec-dock/initiatives/i/epics/e/issues/x"
     issue_dir.mkdir(parents=True)
-    documents = {
-        name: _planning_document(name)
-        for name in ("requirement.md", "design.md", "plan.md")
-    }
+    documents = {name: _planning_document(name) for name in ("requirement.md", "design.md", "plan.md")}
     for name, content in documents.items():
         (issue_dir / name).write_bytes(content)
     candidates = tmp_path / "candidates"
@@ -282,9 +268,7 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
         repo_root=repo,
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: None,
-        transport_runner=lambda **kwargs: _transport_result(
-            payload=_authoring_zip(documents)
-        ),
+        transport_runner=lambda **kwargs: _transport_result(payload=_authoring_zip(documents)),
         preflight_runner=lambda request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
@@ -319,11 +303,7 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
             remote_head="a" * 40,
         )
         identity = contracts.ReviewedPlanningIdentity.from_json_bytes(
-            next(
-                item.content
-                for item in synthesized.exact_attachments
-                if item.name == "reviewed-identity.json"
-            )
+            next(item.content for item in synthesized.exact_attachments if item.name == "reviewed-identity.json")
         )
         reviewer_identities.append(identity)
         findings = (
@@ -352,9 +332,7 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
         ).encode()
         return _review_transport_result(payload=payload)
 
-    first_identity = contracts.IssueCandidateIdentity.from_dict(
-        created.output["candidate_identity"]
-    )
+    first_identity = contracts.IssueCandidateIdentity.from_dict(created.output["candidate_identity"])
     first_review = issue_planning.run_issue_planning_review(
         request=issue_planning.PlanningReviewRequest(
             issue_id="iss-00003",
@@ -449,9 +427,7 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
         clock=lambda: "2026-07-28T14:00:00+00:00",
     )
     assert (revision.status, revision.reason) == ("ok", "candidate_revised")
-    second_identity = contracts.IssueCandidateIdentity.from_dict(
-        revision.output["candidate_identity"]
-    )
+    second_identity = contracts.IssueCandidateIdentity.from_dict(revision.output["candidate_identity"])
     second_review = issue_planning.run_issue_planning_review(
         request=issue_planning.PlanningReviewRequest(
             issue_id="iss-00003",
@@ -629,14 +605,7 @@ def _authoring_zip(
 
 def _onboarding_companion() -> bytes:
     diagrams = "\n\n".join(
-        "```plantuml\n"
-        "@startuml\n"
-        f"title {title}\n"
-        "actor Human\n"
-        "component SpecDock\n"
-        "Human --> SpecDock\n"
-        "@enduml\n"
-        "```"
+        f"```plantuml\n@startuml\ntitle {title}\nactor Human\ncomponent SpecDock\nHuman --> SpecDock\n@enduml\n```"
         for title in (
             "system context",
             "responsibility boundary",

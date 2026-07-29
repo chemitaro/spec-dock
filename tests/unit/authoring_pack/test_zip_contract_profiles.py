@@ -7,9 +7,7 @@ import zipfile
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 
@@ -20,9 +18,7 @@ def _zip_contract():
     )
 
 
-COMPANION_PATH = (
-    "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
-)
+COMPANION_PATH = "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
 CANDIDATE_INVENTORY = (
     "CHECKSUMS.sha256",
     "MANIFEST.json",

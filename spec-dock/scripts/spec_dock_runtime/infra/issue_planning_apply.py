@@ -225,9 +225,7 @@ class PlanningApplyOperation:
             or reviewed_identity.source_head != expected_head
         ):
             raise ValueError("reviewed identity does not match apply target")
-        if tuple(sorted(canonical_target_paths, key=lambda value: value.encode())) != tuple(
-            canonical_target_paths
-        ):
+        if tuple(sorted(canonical_target_paths, key=lambda value: value.encode())) != tuple(canonical_target_paths):
             raise ValueError("canonical target paths must be byte-sorted")
         for path in canonical_target_paths:
             _safe_repo_relative(path)
@@ -248,26 +246,22 @@ class PlanningApplyOperation:
                 git_bound_operation_binding_sha256 is None
                 or _SHA256.fullmatch(git_bound_operation_binding_sha256) is None
                 or binding is None
-                or binding.binding_sha256
-                != git_bound_operation_binding_sha256
+                or binding.binding_sha256 != git_bound_operation_binding_sha256
                 or binding.candidate_identity != candidate_identity
-                or binding.onboarding_companion.path
-                != PurePosixPath(companion_path).relative_to(issue_dir).as_posix()
+                or binding.onboarding_companion.path != PurePosixPath(companion_path).relative_to(issue_dir).as_posix()
                 or binding.onboarding_companion.sha256 != companion_sha256
                 or reviewed_identity.canonical_target_paths != canonical_target_paths
             ):
                 raise ValueError("git-bound operation binding mismatch")
         elif (
-            git_bound_operation_binding_sha256 is not None
-            or reviewed_identity.candidate_identity != candidate_identity
+            git_bound_operation_binding_sha256 is not None or reviewed_identity.candidate_identity != candidate_identity
         ):
             raise ValueError("archive apply Candidate identity mismatch")
         if (
             set(pre_apply_target_blob_oids) != set(canonical_target_paths)
             or set(pre_apply_document_bytes) != set(DOCUMENT_NAMES)
             or any(_SHA40.fullmatch(value) is None for value in pre_apply_target_blob_oids.values())
-            or hashlib.sha256(human_decision_bytes).hexdigest()
-            != human_decision_sha256
+            or hashlib.sha256(human_decision_bytes).hexdigest() != human_decision_sha256
         ):
             raise ValueError("planning apply preimage evidence mismatch")
         expected_documents = set(DOCUMENT_NAMES) if decision == "approved" and mode == "archive-candidate" else set()
@@ -275,10 +269,7 @@ class PlanningApplyOperation:
             raise ValueError("replacement document inventory does not match apply mode")
         if (replacement_companion is not None) != (decision == "approved"):
             raise ValueError("replacement companion does not match Human decision")
-        if (
-            replacement_companion is not None
-            and hashlib.sha256(replacement_companion).hexdigest() != companion_sha256
-        ):
+        if replacement_companion is not None and hashlib.sha256(replacement_companion).hexdigest() != companion_sha256:
             raise ValueError("replacement companion SHA mismatch")
         core: dict[str, object] = {
             "schema_version": _OPERATION_SCHEMA,
@@ -296,9 +287,7 @@ class PlanningApplyOperation:
             "pre_apply_target_blob_oids": dict(
                 sorted(pre_apply_target_blob_oids.items(), key=lambda item: item[0].encode())
             ),
-            "candidate_identity": (
-                None if candidate_identity is None else candidate_identity.to_dict()
-            ),
+            "candidate_identity": (None if candidate_identity is None else candidate_identity.to_dict()),
             "git_bound_operation_binding_sha256": git_bound_operation_binding_sha256,
             "companion_target_path": companion_path,
             "companion_sha256": companion_sha256,
@@ -311,9 +300,7 @@ class PlanningApplyOperation:
         timestamp = artifact.name[:16]
         if re.fullmatch(r"[0-9]{8}t[0-9]{6}z", timestamp) is None:
             raise ValueError("decision artifact requires a UTC timestamp prefix")
-        artifact_name = (
-            f"{timestamp}-planning-human-decision-{operation_id[:16]}.json"
-        )
+        artifact_name = f"{timestamp}-planning-human-decision-{operation_id[:16]}.json"
         deterministic_artifact = artifact.with_name(artifact_name).as_posix()
         return cls(
             operation_id=operation_id,
@@ -337,9 +324,7 @@ class PlanningApplyOperation:
             decision_artifact_path=deterministic_artifact,
             human_decision_bytes=bytes(human_decision_bytes),
             replacement_documents=MappingProxyType(dict(replacement_documents)),
-            replacement_companion=(
-                None if replacement_companion is None else bytes(replacement_companion)
-            ),
+            replacement_companion=(None if replacement_companion is None else bytes(replacement_companion)),
             pre_apply_document_bytes=MappingProxyType(dict(pre_apply_document_bytes)),
         )
 
@@ -359,11 +344,7 @@ def _canonical_json_bytes(value: Mapping[str, object]) -> bytes:
 
 def _safe_repo_relative(value: str) -> PurePosixPath:
     path = PurePosixPath(value)
-    if (
-        path.is_absolute()
-        or not path.parts
-        or any(part in ("", ".", "..") for part in path.parts)
-    ):
+    if path.is_absolute() or not path.parts or any(part in ("", ".", "..") for part in path.parts):
         raise ValueError("unsafe repository-relative path")
     return path
 
@@ -375,9 +356,7 @@ def validate_planning_git_argv(argv: tuple[str, ...]) -> None:
         raise PlanningApplyUnsafeGitCommand("prohibited planning Git operation")
     if argv[1:2] == ("update-ref",):
         raise PlanningApplyUnsafeGitCommand("custom Git refs are prohibited")
-    if argv[1:2] == ("push",) and any(
-        word.startswith("+") or word.startswith(":") for word in argv[2:]
-    ):
+    if argv[1:2] == ("push",) and any(word.startswith("+") or word.startswith(":") for word in argv[2:]):
         raise PlanningApplyUnsafeGitCommand("non-fast-forward Git push is prohibited")
 
 
@@ -476,9 +455,7 @@ def record_planning_apply_operation(
             raise PlanningApplyOutputRejected("operation identity collision")
         _validate_existing_operation_evidence(operation_dir)
         manifest = operation_dir / "operation.json"
-        if (
-            manifest.read_bytes() != operation.operation_core_bytes
-        ):
+        if manifest.read_bytes() != operation.operation_core_bytes:
             raise PlanningApplyOutputRejected("operation identity collision")
         try:
             state = json.loads((operation_dir / "state.json").read_bytes())
@@ -602,12 +579,10 @@ def _set_operation_state(
 ) -> None:
     _write_private_atomic(
         operation_dir / "state.json",
-        _canonical_json_bytes(
-            {
-                "operation_id": operation.operation_id,
-                "state": state,
-            }
-        ),
+        _canonical_json_bytes({
+            "operation_id": operation.operation_id,
+            "state": state,
+        }),
     )
 
 
@@ -624,12 +599,10 @@ def _record_operation_attempt(
             continue
         _write_private_no_replace(
             path,
-            _canonical_json_bytes(
-                {
-                    "attempt": number,
-                    "operation_id": operation.operation_id,
-                }
-            ),
+            _canonical_json_bytes({
+                "attempt": number,
+                "operation_id": operation.operation_id,
+            }),
         )
         return
     raise PlanningApplyOutputRejected("operation attempt bound exceeded")
@@ -729,11 +702,7 @@ def _changed_paths(repo_root: Path, *, cached: bool = False) -> set[str] | None:
     result = _run_git(repo_root, tuple(argv))
     if result.returncode != 0:
         return None
-    return {
-        item.decode("utf-8")
-        for item in result.stdout.split(b"\0")
-        if item
-    }
+    return {item.decode("utf-8") for item in result.stdout.split(b"\0") if item}
 
 
 def _operation_result(
@@ -816,10 +785,7 @@ def execute_planning_apply_transaction(
             reason="apply_target_changed",
         )
     decision_parent = (repo_root / operation.decision_artifact_path).parent
-    if (
-        not decision_parent.is_dir()
-        or decision_parent.is_symlink()
-    ):
+    if not decision_parent.is_dir() or decision_parent.is_symlink():
         return _operation_result(
             operation,
             status="rejected",
@@ -836,10 +802,7 @@ def execute_planning_apply_transaction(
                 status="blocked",
                 reason="managed_state_snapshot_rejected",
             )
-        file_snapshots = {
-            path: snapshot_regular_file(repo_root / path)
-            for path in operation.canonical_target_paths
-        }
+        file_snapshots = {path: snapshot_regular_file(repo_root / path) for path in operation.canonical_target_paths}
         file_snapshots[operation.companion_target_path] = companion_snapshot
         decision_path = repo_root / operation.decision_artifact_path
         decision_snapshot = snapshot_regular_file(decision_path)
@@ -937,10 +900,7 @@ def execute_planning_apply_transaction(
                 for relative in operation.canonical_target_paths
                 if (repo_root / relative).read_bytes() != file_snapshots[relative].data
             )
-        if (
-            operation.replacement_companion is not None
-            and not companion_snapshot.existed
-        ):
+        if operation.replacement_companion is not None and not companion_snapshot.existed:
             expected_paths.add(operation.companion_target_path)
         changed = _changed_paths(repo_root)
         untracked = _git_text(
@@ -1014,14 +974,12 @@ def execute_planning_apply_transaction(
         committed = True
         _write_private_no_replace(
             commit_record,
-            _canonical_json_bytes(
-                {
-                    "operation_id": operation.operation_id,
-                    "local_commit": local_commit,
-                    "local_tree": local_tree,
-                    "decision": operation.decision,
-                }
-            ),
+            _canonical_json_bytes({
+                "operation_id": operation.operation_id,
+                "local_commit": local_commit,
+                "local_tree": local_tree,
+                "decision": operation.decision,
+            }),
         )
         _set_operation_state(operation_dir, operation, "COMMITTED")
         if fault_hook is not None:
@@ -1267,8 +1225,7 @@ def _resume_publication(
         commit = json.loads(commit_bytes)
         if (
             not isinstance(commit, dict)
-            or set(commit)
-            != {"operation_id", "local_commit", "local_tree", "decision"}
+            or set(commit) != {"operation_id", "local_commit", "local_tree", "decision"}
             or commit.get("operation_id") != operation.operation_id
             or not isinstance(commit.get("local_commit"), str)
             or not isinstance(commit.get("local_tree"), str)
@@ -1377,10 +1334,7 @@ def _expected_operation_commit_paths(
     if operation.mode == "archive-candidate" and operation.decision == "approved":
         for relative in operation.canonical_target_paths:
             filename = PurePosixPath(relative).name
-            if (
-                operation.replacement_documents.get(filename)
-                != operation.pre_apply_document_bytes.get(filename)
-            ):
+            if operation.replacement_documents.get(filename) != operation.pre_apply_document_bytes.get(filename):
                 paths.add(relative)
     if operation.decision == "approved":
         reviewed_companion = _git_text(
@@ -1426,14 +1380,12 @@ def _record_publication(
     local_tree: str,
 ) -> None:
     path = operation_dir / "publication.json"
-    data = _canonical_json_bytes(
-        {
-            "operation_id": operation.operation_id,
-            "local_commit": local_commit,
-            "local_tree": local_tree,
-            "remote_commit": local_commit,
-        }
-    )
+    data = _canonical_json_bytes({
+        "operation_id": operation.operation_id,
+        "local_commit": local_commit,
+        "local_tree": local_tree,
+        "remote_commit": local_commit,
+    })
     if path.exists():
         if path.read_bytes() != data:
             raise PlanningApplyOutputRejected("publication evidence collision")
@@ -1467,15 +1419,13 @@ def _persist_transaction_backup(
     ):
         backup_name = f"{hashlib.sha256(relative.encode()).hexdigest()}.bin"
         _write_private_no_replace(files_dir / backup_name, snapshot.data)
-        entries.append(
-            {
-                "path": relative,
-                "backup": backup_name,
-                "existed": snapshot.existed,
-                "mode": snapshot.mode,
-                "sha256": snapshot.sha256,
-            }
-        )
+        entries.append({
+            "path": relative,
+            "backup": backup_name,
+            "existed": snapshot.existed,
+            "mode": snapshot.mode,
+            "sha256": snapshot.sha256,
+        })
     manifest = {
         "operation_id": operation.operation_id,
         "index": {
@@ -1497,20 +1447,16 @@ def _persist_transaction_backup(
     ):
         backup_name = f"{hashlib.sha256(relative.encode()).hexdigest()}.bin"
         backup_data = (
-            managed_entry.data
-            if managed_entry.kind == "file"
-            else (managed_entry.target or "").encode("utf-8")
+            managed_entry.data if managed_entry.kind == "file" else (managed_entry.target or "").encode("utf-8")
         )
         _write_private_no_replace(managed_dir / backup_name, backup_data)
-        managed_entries.append(
-            {
-                "path": relative,
-                "backup": backup_name,
-                "kind": managed_entry.kind,
-                "mode": managed_entry.mode,
-                "sha256": hashlib.sha256(backup_data).hexdigest(),
-            }
-        )
+        managed_entries.append({
+            "path": relative,
+            "backup": backup_name,
+            "kind": managed_entry.kind,
+            "mode": managed_entry.mode,
+            "sha256": hashlib.sha256(backup_data).hexdigest(),
+        })
     _write_private_no_replace(
         transaction / "backup-manifest.json",
         _canonical_json_bytes(manifest),
@@ -1584,10 +1530,7 @@ def _load_transaction_backup(
             or value["path"] not in allowed_file_paths
             or value["path"] in file_snapshots
             or not isinstance(value.get("existed"), bool)
-            or (
-                value["path"] in operation.canonical_target_paths
-                and value["existed"] is not True
-            )
+            or (value["path"] in operation.canonical_target_paths and value["existed"] is not True)
             or isinstance(value.get("mode"), bool)
             or not isinstance(value.get("mode"), int)
             or not isinstance(value.get("sha256"), str)
@@ -1684,9 +1627,7 @@ def _load_transaction_backup(
 
 
 def _managed_path_is_allowed(value: str) -> bool:
-    return value in _MANAGED_SYNC_FILES or value == _MANAGED_SYNC_TREE or value.startswith(
-        f"{_MANAGED_SYNC_TREE}/"
-    )
+    return value in _MANAGED_SYNC_FILES or value == _MANAGED_SYNC_TREE or value.startswith(f"{_MANAGED_SYNC_TREE}/")
 
 
 def _remove_transaction_backup(operation_dir: Path) -> None:
@@ -1745,11 +1686,7 @@ def restore_managed_sync_state(
     for relative in _MANAGED_SYNC_FILES:
         _remove_any(repo_root / relative)
     _remove_any(repo_root / _MANAGED_SYNC_TREE)
-    directories = [
-        (relative, entry)
-        for relative, entry in snapshot.items()
-        if entry.kind == "directory"
-    ]
+    directories = [(relative, entry) for relative, entry in snapshot.items() if entry.kind == "directory"]
     for relative, entry in sorted(
         directories,
         key=lambda item: (len(PurePosixPath(item[0]).parts), item[0].encode()),

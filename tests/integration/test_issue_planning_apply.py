@@ -9,9 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 
@@ -41,16 +39,7 @@ def _repository(tmp_path: Path) -> tuple[Path, Path, str, tuple[str, str, str]]:
     _git(repo, "config", "user.name", "Tester")
     _git(repo, "config", "user.email", "tester@example.com")
     _git(repo, "remote", "add", "origin", origin.as_posix())
-    issue = (
-        repo
-        / "spec-dock"
-        / "initiatives"
-        / "init-one"
-        / "epics"
-        / "epic-one"
-        / "issues"
-        / "iss-one"
-    )
+    issue = repo / "spec-dock" / "initiatives" / "init-one" / "epics" / "epic-one" / "issues" / "iss-one"
     (issue / "artifacts").mkdir(parents=True)
     relative: list[str] = []
     for name in ("design.md", "plan.md", "requirement.md"):
@@ -84,12 +73,8 @@ def _operation(
         ],
     )
     companion = b"onboarding companion\n"
-    companion_relative = (
-        "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
-    )
-    companion_target = (
-        Path(targets[0]).parent / companion_relative
-    ).as_posix()
+    companion_relative = "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
+    companion_target = (Path(targets[0]).parent / companion_relative).as_posix()
     companion_binding = contracts.OnboardingCompanionBindingV1(
         path=companion_relative,
         sha256=hashlib.sha256(companion).hexdigest(),
@@ -136,15 +121,10 @@ def _operation(
         )
     blobs = {path: _git(repo, "rev-parse", f"{head}:{path}") for path in targets}
     issue_dir = Path(targets[0]).parent
-    artifact = issue_dir / (
-        "artifacts/20260728t000000z-planning-human-decision-placeholder.json"
-    )
+    artifact = issue_dir / ("artifacts/20260728t000000z-planning-human-decision-placeholder.json")
     replacements = {}
     if mode == "archive-candidate" and decision == "approved":
-        replacements = {
-            Path(path).name: f"new {Path(path).name}\n".encode()
-            for path in targets
-        }
+        replacements = {Path(path).name: f"new {Path(path).name}\n".encode() for path in targets}
     human_decision_bytes = f'{{"decision":"{decision}"}}'.encode()
     return module.PlanningApplyOperation.create(
         issue_id="iss-00003",
@@ -161,9 +141,7 @@ def _operation(
         pre_apply_target_blob_oids=blobs,
         candidate_identity=candidate,
         git_bound_operation_binding_sha256=(
-            None
-            if mode == "archive-candidate"
-            else identity.git_bound_operation_binding.binding_sha256
+            None if mode == "archive-candidate" else identity.git_bound_operation_binding.binding_sha256
         ),
         companion_target_path=companion_target,
         companion_sha256=companion_binding.sha256,
@@ -171,9 +149,7 @@ def _operation(
         human_decision_bytes=human_decision_bytes,
         replacement_documents=replacements,
         replacement_companion=companion if decision == "approved" else None,
-        pre_apply_document_bytes={
-            Path(path).name: (repo / path).read_bytes() for path in targets
-        },
+        pre_apply_document_bytes={Path(path).name: (repo / path).read_bytes() for path in targets},
     )
 
 
@@ -237,8 +213,7 @@ def test_git_bound_apply_accepts_exact_existing_companion_as_noop(
     module = _module()
     repo, origin, _, targets = _repository(tmp_path)
     companion_target = (
-        Path(targets[0]).parent
-        / "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
+        Path(targets[0]).parent / "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
     )
     (repo / companion_target).write_bytes(b"onboarding companion\n")
     _git(repo, "add", "--", companion_target.as_posix())
@@ -268,9 +243,7 @@ def test_git_bound_apply_accepts_exact_existing_companion_as_noop(
     assert (result.status, result.reason) == ("ready", "adoption_published")
     assert {path: (repo / path).read_bytes() for path in targets} == before
     assert (repo / companion_target).read_bytes() == b"onboarding companion\n"
-    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == _git(
-        repo, "rev-parse", "HEAD"
-    )
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == _git(repo, "rev-parse", "HEAD")
 
 
 def test_precommit_failure_restores_documents_decision_and_raw_index(tmp_path: Path) -> None:
@@ -605,9 +578,7 @@ def test_same_operation_retry_accepts_already_published_commit(tmp_path: Path) -
     kwargs = {
         "repo_root": repo,
         "output_dir": output,
-        "validation_runner": lambda: type(
-            "V", (), {"report": type("R", (), {"errors": []})()}
-        )(),
+        "validation_runner": lambda: type("V", (), {"report": type("R", (), {"errors": []})()})(),
         "sync_runner": lambda: type(
             "S",
             (),
@@ -794,11 +765,7 @@ def test_recovery_required_retains_private_transaction_backup(
         "recovery_required",
         "restore_mismatch",
     )
-    transaction = (
-        output
-        / f"planning-apply-{operation.operation_id}"
-        / "transaction"
-    )
+    transaction = output / f"planning-apply-{operation.operation_id}" / "transaction"
     assert transaction.is_dir()
     assert transaction.stat().st_mode & 0o777 == 0o700
     assert (transaction / "git-index.bin").stat().st_mode & 0o777 == 0o600
@@ -913,10 +880,7 @@ def test_application_retry_reaches_same_operation_publication(
             "design.md": b"new design.md\n",
             "plan.md": b"new plan.md\n",
             "requirement.md": b"new requirement.md\n",
-            (
-                "artifacts/"
-                "20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
-            ): b"onboarding companion\n",
+            ("artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"): b"onboarding companion\n",
         },
         source_baseline={
             "canonical_issue_paths": list(targets),
@@ -925,10 +889,7 @@ def test_application_retry_reaches_same_operation_publication(
         },
         zip_bytes=b"candidate",
         onboarding_companion=contracts.OnboardingCompanionBindingV1(
-            path=(
-                "artifacts/"
-                "20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
-            ),
+            path=("artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"),
             sha256=hashlib.sha256(b"onboarding companion\n").hexdigest(),
         ),
     )

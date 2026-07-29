@@ -6,9 +6,7 @@ import sys
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
@@ -198,13 +196,14 @@ def test_reviewed_identity_closes_archive_and_git_bound_modes() -> None:
     archive = _archive_identity()
     git_bound = _git_identity()
     assert ReviewedPlanningIdentity.from_dict(archive.to_dict()).sha256 == archive.sha256
-    assert ReviewedPlanningIdentity.from_dict(
-        git_bound.to_dict(),
-        expected_canonical_target_paths=PATHS,
-    ).sha256 == git_bound.sha256
-    assert archive.sha256 == ReviewedPlanningIdentity.from_dict(
-        dict(reversed(list(archive.to_dict().items())))
-    ).sha256
+    assert (
+        ReviewedPlanningIdentity.from_dict(
+            git_bound.to_dict(),
+            expected_canonical_target_paths=PATHS,
+        ).sha256
+        == git_bound.sha256
+    )
+    assert archive.sha256 == ReviewedPlanningIdentity.from_dict(dict(reversed(list(archive.to_dict().items())))).sha256
 
 
 def test_reviewed_identity_rejects_mode_mismatch() -> None:
@@ -250,7 +249,7 @@ def test_git_bound_identity_rejects_cross_issue_canonical_tuple() -> None:
     [
         b'{"issue_id":"iss-00003","issue_id":"iss-00004"}',
         b'{"value":NaN}',
-        b'[]',
+        b"[]",
     ],
 )
 def test_strict_json_rejects_duplicates_nonstandard_numbers_and_non_object_roots(payload) -> None:
@@ -508,10 +507,13 @@ def test_human_decision_binds_identity_and_exact_review_bytes() -> None:
         "implementation_start": True,
         "decided_at": "2026-07-28T12:00:00Z",
     }
-    assert PlanningHumanDecisionV1.from_json_bytes(
-        _json_bytes(payload),
-        review_result_bytes=review_bytes,
-    ).decision == "approved"
+    assert (
+        PlanningHumanDecisionV1.from_json_bytes(
+            _json_bytes(payload),
+            review_result_bytes=review_bytes,
+        ).decision
+        == "approved"
+    )
     with pytest.raises(ValueError, match="raw bytes"):
         PlanningHumanDecisionV1.from_json_bytes(
             _json_bytes(payload),
@@ -837,9 +839,7 @@ def test_s10_ct_p01_git_bound_operation_binding_canonical_fixture() -> None:
     candidate = _candidate(
         candidate_id="iss-00003-v1-20260729t120000z",
         logical_filename="20260729t120000z-iss-00003-issue-planning-candidate-v1.zip",
-        observed_transport_filename=(
-            "20260729t120000z-iss-00003-issue-planning-candidate-v1.zip"
-        ),
+        observed_transport_filename=("20260729t120000z-iss-00003-issue-planning-candidate-v1.zip"),
         internal_root="20260729t120000z-iss-00003-issue-planning-candidate-v1",
     )
     binding = contracts.GitBoundOperationBindingV1.create(
@@ -849,18 +849,13 @@ def test_s10_ct_p01_git_bound_operation_binding_canonical_fixture() -> None:
         source_head=HEAD,
         candidate_identity=candidate,
         onboarding_companion=contracts.OnboardingCompanionBindingV1(
-            path=(
-                "artifacts/"
-                "20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
-            ),
+            path=("artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"),
             sha256="c" * 64,
         ),
     )
 
     assert len(binding.preimage_bytes) == 888
-    assert binding.binding_sha256 == (
-        "fa3640fd9a5aaab6f261297a94bece94845e8749c2acb497ccd3568c74e91ad1"
-    )
+    assert binding.binding_sha256 == ("fa3640fd9a5aaab6f261297a94bece94845e8749c2acb497ccd3568c74e91ad1")
     assert len(contracts._canonical_json_bytes(binding.to_dict())) == 972
     assert contracts.GitBoundOperationBindingV1.from_dict(binding.to_dict()) == binding
 

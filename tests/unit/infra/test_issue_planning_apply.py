@@ -9,9 +9,7 @@ import sys
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
@@ -130,9 +128,7 @@ def test_operation_identity_is_canonical_and_excludes_private_bytes() -> None:
 
 def test_decision_artifact_path_is_deterministic_from_operation_id() -> None:
     operation = _operation()
-    assert operation.decision_artifact_path.endswith(
-        f"-planning-human-decision-{operation.operation_id[:16]}.json"
-    )
+    assert operation.decision_artifact_path.endswith(f"-planning-human-decision-{operation.operation_id[:16]}.json")
     assert not Path(operation.decision_artifact_path).is_absolute()
 
 

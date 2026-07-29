@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 import hashlib
 import io
@@ -5,14 +7,18 @@ import json
 import os
 from pathlib import Path
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import zipfile
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+if TYPE_CHECKING:
+    from spec_dock_runtime.application.issue_planning_prompt import (
+        PlanningPromptAttachment,
+        SynthesizedPlanningPrompt,
+    )
+
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application.issue_planning import resolve_existing_issue_target  # noqa: E402
@@ -49,16 +55,7 @@ def _record(path: Path, *, node_id: str = "iss-00003", kind: str = "issue") -> S
 
 
 def _issue_tree(repo_root: Path) -> Path:
-    issue_dir = (
-        repo_root
-        / "spec-dock"
-        / "initiatives"
-        / "init-one"
-        / "epics"
-        / "epic-one"
-        / "issues"
-        / "iss-one"
-    )
+    issue_dir = repo_root / "spec-dock" / "initiatives" / "init-one" / "epics" / "epic-one" / "issues" / "iss-one"
     issue_dir.mkdir(parents=True)
     for filename in ("requirement.md", "design.md", "plan.md"):
         (issue_dir / filename).write_text(filename, encoding="utf-8")
@@ -100,9 +97,7 @@ def _planning_tree(repo_root: Path) -> Path:
     return issue_dir
 
 
-DEFAULT_COMPANION_PATH = (
-    "artifacts/20260728t120000z-guide-new-member-chatgpt-first-issue-planning.md"
-)
+DEFAULT_COMPANION_PATH = "artifacts/20260728t120000z-guide-new-member-chatgpt-first-issue-planning.md"
 
 
 def _onboarding_companion() -> bytes:
@@ -113,14 +108,7 @@ def _onboarding_companion() -> bytes:
         "implementation roadmap",
     )
     blocks = "\n\n".join(
-        "```plantuml\n"
-        "@startuml\n"
-        f"title {title}\n"
-        "actor Human\n"
-        "component SpecDock\n"
-        "Human --> SpecDock\n"
-        "@enduml\n"
-        "```"
+        f"```plantuml\n@startuml\ntitle {title}\nactor Human\ncomponent SpecDock\nHuman --> SpecDock\n@enduml\n```"
         for title in diagrams
     )
     return (
@@ -162,9 +150,7 @@ def _planner_payload(
             filename: (documents or {}).get(filename, _planning_document(filename))
             for filename in ("requirement.md", "design.md", "plan.md")
         }
-        payloads[companion_path] = (
-            companion if companion is not None else _onboarding_companion()
-        )
+        payloads[companion_path] = companion if companion is not None else _onboarding_companion()
         for relative_path in sorted(payloads, key=lambda value: value.encode()):
             info = zipfile.ZipInfo(
                 f"{root}/{relative_path}",
@@ -194,9 +180,7 @@ def _successful_transport(
         upstream="origin/feature/issue",
         local_head="a" * 40,
         remote_head="a" * 40,
-        source_manifest_hash=(
-            source_manifest_hash or empty_source_manifest().source_manifest_hash
-        ),
+        source_manifest_hash=(source_manifest_hash or empty_source_manifest().source_manifest_hash),
         snapshot_id="b" * 64,
         remote_head_disposition="fetched_remote_tracking_ref",
     )
@@ -513,9 +497,7 @@ def test_transport_rejects_source_mutation_after_preflight_before_backend(tmp_pa
         repo_slug_resolver=lambda root: "owner/repo",
         prompt_synthesizer=mutate_then_synthesize,
         backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
-        onboarding_companion_path=(
-            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
-        ),
+        onboarding_companion_path=("artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"),
     )
     assert (result.status, result.reason) == ("blocked", "git_preflight_blocked")
     assert result.details == ("source_snapshot_mismatch",)
@@ -543,9 +525,7 @@ def test_transport_sensitive_git_identity_rejection_does_not_leak_source_evidenc
         ),
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
-        onboarding_companion_path=(
-            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
-        ),
+        onboarding_companion_path=("artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"),
     )
     assert (result.status, result.reason) == ("rejected", "sensitive_input_rejected")
     assert result.source_evidence is None
@@ -585,9 +565,7 @@ def test_transport_with_transcript_marker_mentions_reaches_backend_once(tmp_path
         preflight_runner=lambda request: _preflight(source_manifest=manifest),
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=backend,
-        onboarding_companion_path=(
-            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
-        ),
+        onboarding_companion_path=("artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"),
     )
 
     assert result is backend_result
@@ -619,9 +597,7 @@ def test_transport_with_structured_transcript_stops_before_backend_without_leaka
         preflight_runner=lambda request: _preflight(source_manifest=manifest),
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
-        onboarding_companion_path=(
-            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
-        ),
+        onboarding_companion_path=("artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"),
     )
 
     assert (result.status, result.reason) == ("rejected", "sensitive_input_rejected")
@@ -697,16 +673,14 @@ def test_create_rejects_post_oracle_source_drift_before_publication(
     output.mkdir()
     target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], repo)
     manifest = build_source_manifest(repo, target.canonical_issue_paths)
-    preflights = iter(
-        (
-            _preflight(source_manifest=manifest),
-            _preflight(
-                branch="feature/other",
-                upstream="origin/feature/other",
-                source_manifest=manifest,
-            ),
-        )
-    )
+    preflights = iter((
+        _preflight(source_manifest=manifest),
+        _preflight(
+            branch="feature/other",
+            upstream="origin/feature/other",
+            source_manifest=manifest,
+        ),
+    ))
     publisher_calls: list[object] = []
     module = __import__(
         "spec_dock_runtime.application.issue_planning",
@@ -749,10 +723,7 @@ def test_onboarding_companion_path_uses_one_utc_operation_instant() -> None:
             46,
             tzinfo=timezone(offset=timedelta(hours=9)),
         )
-    ) == (
-        "artifacts/20260729t044600z-"
-        "guide-new-member-chatgpt-first-issue-planning.md"
-    )
+    ) == ("artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md")
 
 
 def test_create_rejects_transient_payload_digest_mismatch(tmp_path: Path) -> None:
@@ -834,9 +805,7 @@ def test_create_success_output_has_only_safe_keys(tmp_path: Path) -> None:
         "git_bound_operation_binding_sha256",
         "zip_byte_count",
     }
-    assert result.output["candidate_path"] == str(
-        output / result.output["candidate_identity"]["logical_filename"]
-    )
+    assert result.output["candidate_path"] == str(output / result.output["candidate_identity"]["logical_filename"])
     assert _onboarding_companion().decode() not in str(result.to_dict())
 
 
@@ -974,7 +943,7 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     candidate = candidate_output / created.output["candidate_identity"]["logical_filename"]
-    calls: list[object] = []
+    calls: list[SynthesizedPlanningPrompt] = []
     mutate_candidate = [False]
 
     def review_transport(**kwargs):
@@ -1009,9 +978,7 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
         if mutate_candidate[0]:
             candidate.write_bytes(b"changed after Reviewer invocation")
         identity_bytes = next(
-            item.content
-            for item in synthesized.exact_attachments
-            if item.name == "reviewed-identity.json"
+            item.content for item in synthesized.exact_attachments if item.name == "reviewed-identity.json"
         )
         identity = contracts.ReviewedPlanningIdentity.from_json_bytes(identity_bytes)
         supplied_identity_digest = next(
@@ -1116,7 +1083,7 @@ def test_git_bound_review_has_exact_three_documents_and_companion_targets(
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     candidate = candidates / created.output["candidate_identity"]["logical_filename"]
-    captured: list[object] = []
+    captured: list[PlanningPromptAttachment] = []
 
     def transport(**kwargs):
         contracts = __import__(
@@ -1143,9 +1110,7 @@ def test_git_bound_review_has_exact_three_documents_and_companion_targets(
             upstream="origin/feature/issue",
             remote_head="a" * 40,
         )
-        captured.extend(
-            item for item in synthesized.exact_attachments if item.classification == "review-target"
-        )
+        captured.extend(item for item in synthesized.exact_attachments if item.classification == "review-target")
         identity_bytes = next(
             item.content for item in synthesized.exact_attachments if item.name == "reviewed-identity.json"
         )
@@ -1273,11 +1238,7 @@ def test_git_bound_review_rejects_transient_exact_target_bytes_before_backend(
         return original_read_bytes(path)
 
     def transient_open(path, flags, *args, **kwargs):
-        if (
-            path == transient_target.name
-            and kwargs.get("dir_fd") is not None
-            and transient_reads[0] == 0
-        ):
+        if path == transient_target.name and kwargs.get("dir_fd") is not None and transient_reads[0] == 0:
             transient_reads[0] += 1
             backup = transient_target.with_suffix(".original")
             transient_target.rename(backup)
@@ -1644,9 +1605,7 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
         repo_root=repo,
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: None,
-        transport_runner=lambda **kwargs: _successful_transport(
-            source_manifest_hash=source_hash
-        ),
+        transport_runner=lambda **kwargs: _successful_transport(source_manifest_hash=source_hash),
         preflight_runner=lambda _request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
@@ -1696,7 +1655,7 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
         ),
         encoding="utf-8",
     )
-    calls: list[object] = []
+    calls: list[SynthesizedPlanningPrompt] = []
 
     def semantic_transport(**kwargs):
         target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], repo)
@@ -1722,10 +1681,7 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
         calls.append(synthesized)
         return _successful_transport(
             _planner_payload(
-                companion_path=(
-                    "artifacts/20260728t160000z-"
-                    "guide-new-member-chatgpt-first-issue-planning.md"
-                )
+                companion_path=("artifacts/20260728t160000z-guide-new-member-chatgpt-first-issue-planning.md")
             ),
             source_manifest_hash=source_hash,
         )
@@ -1832,11 +1788,7 @@ def test_review_rejects_malformed_wrong_identity_digest_verdict_and_authority_ou
             remote_head="a" * 40,
         )
         runtime_identity = contracts.ReviewedPlanningIdentity.from_json_bytes(
-            next(
-                item.content
-                for item in synthesized.exact_attachments
-                if item.name == "reviewed-identity.json"
-            )
+            next(item.content for item in synthesized.exact_attachments if item.name == "reviewed-identity.json")
         )
         supplied_identity_digest = next(
             item.content.decode("ascii").strip()
@@ -1936,9 +1888,7 @@ def _semantic_revision_setup(tmp_path: Path) -> dict[str, Any]:
         repo_root=repo,
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: None,
-        transport_runner=lambda **kwargs: _successful_transport(
-            source_manifest_hash=source_hash
-        ),
+        transport_runner=lambda **kwargs: _successful_transport(source_manifest_hash=source_hash),
         preflight_runner=lambda _request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
@@ -2028,10 +1978,7 @@ def test_revision_without_explicit_evidence_uses_exact_review_sibling(
         backend_invoker=lambda **kwargs: None,
         transport_runner=lambda **kwargs: _successful_transport(
             source_manifest_hash=setup["source_hash"],
-            companion_path=(
-                "artifacts/20260728t121000z-"
-                "guide-new-member-chatgpt-first-issue-planning.md"
-            ),
+            companion_path=("artifacts/20260728t121000z-guide-new-member-chatgpt-first-issue-planning.md"),
         ),
         preflight_runner=lambda request: _preflight(),
         clock=lambda: "2026-07-28T12:10:00+00:00",
@@ -2293,9 +2240,8 @@ def test_revision_request_transient_swap_is_nonblocking_and_rejected(
 
     def swap_before_open(path, flags, *args, **kwargs):
         if (
-            (Path(path) == request_path or (path == request_path.name and kwargs.get("dir_fd") is not None))
-            and not swapped[0]
-        ):
+            Path(path) == request_path or (path == request_path.name and kwargs.get("dir_fd") is not None)
+        ) and not swapped[0]:
             swapped[0] = True
             request_path.unlink()
             if swap_kind == "fifo":
