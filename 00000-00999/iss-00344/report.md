@@ -129,7 +129,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 |---|---|---|---|---|---|---|
 | requirement | 親 Epic requirement/design/plan、provider source、package config、relevant tests、ChatGPT authoring/review Artifacts | F-001〜F-007 を canonical docs に反映。final ChatGPT review は blocking finding なし | adopted | passed | no | promote |
 | design | approved requirement、parent Epic、provider source、current copy / package contracts、ChatGPT planning candidate / design reviews | B-001〜B-006、NB-001/NB-002をcanonical designへ修正し、post-B-006 fresh ChatGPT reviewとfresh `spec-reviewer` reviewで新規findingなし | adopted | passed | no | promote |
-| plan | approved requirement/design、ChatGPT planning candidate、Standard assurance obligations、current provider/build/test seams、Issue plan authoring規約、delivery-boundary amendment analysis | prior findings B-001〜B-008-R1/B-005-R1、ChatGPT-First amendment F-001〜F-004、delivery amendment I344-AMEND-001〜003を解消済み | adopted | passed | no | assurance再分類・verify後にS02 admission |
+| plan | approved requirement/design、ChatGPT planning candidate、Standard assurance obligations、current provider/build/test seams、Issue plan authoring規約、delivery-boundary amendment analysis | prior findings B-001〜B-008-R1/B-005-R1、ChatGPT-First amendment F-001〜F-004、delivery amendment I344-AMEND-001〜003を解消済み | adopted | passed | no | execute approved plan |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -351,8 +351,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 |---|---|---|---|---|---|---|---|
 | plan amendment / S01 admission | ChatGPT-First plan amendment review | spec-reviewer | fresh | passed | no | execute approved plan | ChatGPT-Use reviewed exact commit `a0b99765f7fac5ad384f4f81c85b50990f017fc9`; finding 0。backendはChatGPT-Use、role名は責務契約 |
 | S01 | implementation candidate review | code-reviewer | fresh | passed | no | proceed to evidence-only closure commit | ChatGPT-Use reviewed exact candidate `a62ae20d5ad587563bf09de77b1f85d75a64c4ec`; finding 0、scope creepなし、不要な抽象化なし。review backendはChatGPT-Use、role名は責務契約 |
-| delivery amendment | Issue-local PR boundary review | spec-reviewer | fresh | failed | no | bounded fix and re-review | ChatGPT-Use reviewed exact commit `59737280c085977d714797709ef0d9a6ade4412d`; major 3件をEAL-032として全採用。新SHAへのre-review前はS02 admission不可 |
-| delivery amendment re-review | Issue-local PR boundary review | spec-reviewer | fresh | passed | no | approve amended plan and admit S02 after assurance verify | ChatGPT-Use reviewed exact commit `7ae8a957b67805294d6716b19a18e2b45808c3dc`; finding 0、scope expansionなし |
+| delivery amendment | Issue-local PR boundary review | spec-reviewer | superseded | failed | no | bounded fix and re-review | ChatGPT-Use reviewed exact commit `59737280c085977d714797709ef0d9a6ade4412d`; major 3件をEAL-032として全採用。新SHAへのre-review前はS02 admission不可 |
+| delivery amendment re-review | Issue-local PR boundary review | spec-reviewer | fresh | passed | no | execute approved plan after assurance verify | ChatGPT-Use reviewed exact commit `7ae8a957b67805294d6716b19a18e2b45808c3dc`; finding 0、scope expansionなし |
 | S02 | implementation candidate re-review | code-reviewer | fresh | passed | no | proceed to evidence-only closure commit | exact candidate `2917610b04a6bcb59c7b316f47d4281c8844b63a`をreview。CR-S02-001/002 closed、finding 0、scope expansion/不要抽象化なし |
 | S03 | implementation candidate review | code-reviewer | fresh | passed | no | proceed to evidence-only closure commit | exact candidate `59d4fdf64333a537484af233ecef0138c9368aaf`をreview。blocking/major 0、minor enum 1件採用、D-011 `valid_s95_handoff` |
 
