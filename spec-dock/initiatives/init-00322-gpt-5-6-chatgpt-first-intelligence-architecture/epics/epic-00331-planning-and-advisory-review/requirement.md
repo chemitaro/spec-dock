@@ -5,7 +5,7 @@ ID: "epic-00331"
 関連GitHub: ["chemitaro/spec-dock#331"]
 状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-23"
+最終更新: "2026-07-29"
 親: ["init-00322"]
 candidate_semantic_key: "planning-and-advisory-review"
 canonical_path: "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/requirement.md"
@@ -74,6 +74,7 @@ MainとHumanが、Goalまたは既存Scope Seedから、review済みのPlanning 
 | E1-REQ-027 | Issue Planning Review PASSだけを`execution-ready`とみなさない。archive modeはexact logical filename／ZIP SHAへのHuman approval、deterministic canonical adoption、candidate-to-canonical parity、required validation／planning publicationを正のgateとする。git-bound modeはexact reviewed HEAD／exact target pathsへのHuman approval、exact reviewed-content canonical／commit parity、required validation／planning publicationを正のgateとする。wrong identity、source drift、semantic adoption diff、parity failure、validation／publication failureをfail closedで拒否する。 `PA-NF-01` archive Review PASS only、`PA-NF-02` git-bound Review PASS only、`PA-NF-03` Human Gate only、`PA-NF-04` parity only、`PA-NF-05` wrong logical Candidate filename／Candidate SHA、`PA-NF-06` wrong reviewed HEAD／exact target paths、`PA-NF-07` source drift、`PA-NF-08` semantic mutation during adoption、`PA-NF-09` parity failure、`PA-NF-10` validation／planning-publication failureを相互に独立した必須negative fixtureとして拒否し、どれか1件でも該当する場合は`execution-ready`／Executor startを禁止する。 E1-I1 producerは10／10 PASS、violations 0を必要とする。 |
 | E1-REQ-028 | Candidate Reviewはlogical filenameとobserved transport filenameを分離し、closed`(N)`transport aliasだけをcontent identityと照合して許可する。Human approval Evidenceへlogical／transport filenameとSHAを保存する。 |
 | E1-REQ-029 | placeholder verificationは`PLACEHOLDER-ORACLE-MAP.json`のdynamic file／tokenだけを対象とし、static exact-hash documentのliteral examplesを未解決bindingとみなさない。 |
+| E1-REQ-030 | SpecDockのPlanning／Review Workflowが外部実行依存として許可するのは、`PATH`で解決されたローカルOracle本体の`oracle` commandだけとする。SpecDockはprovider-owned Oracle adapter／wrapperを配布し、`chatgpt-use`等の個人Skill、個人wrapper、user-specific absolute path、個人ChatGPT Project URL、個人browser profile／host setupを製品依存として参照してはならない。個人wrapperはread-onlyの参考実装またはoperator-local toolとしてのみ扱い、SpecDockの実行contract、fallback policy、配布parityを所有しない。 |
 
 ## 6. Acceptance Criteria
 
@@ -103,6 +104,7 @@ MainとHumanが、Goalまたは既存Scope Seedから、review済みのPlanning 
 | E1-AC-022 | archive／git-boundの両Issue Planning fixtureで、Review PASSのみ、Human Gateのみ、parityのみ、wrong Candidate SHA／reviewed HEAD／target paths、source drift、semantic adoption change、parity failure、validation／planning-publication failureからの`execution-ready`遷移を拒否する。archiveではpositive Human Gate＋canonical adoption＋candidate-to-canonical parity＋required validation／planning publication、git-boundではpositive Human Gate＋exact reviewed-content canonical／commit parity＋required validation／planning publicationの全条件後だけ許可する。 `PA-NF-01` archive Review PASS only、`PA-NF-02` git-bound Review PASS only、`PA-NF-03` Human Gate only、`PA-NF-04` parity only、`PA-NF-05` wrong logical Candidate filename／Candidate SHA、`PA-NF-06` wrong reviewed HEAD／exact target paths、`PA-NF-07` source drift、`PA-NF-08` semantic mutation during adoption、`PA-NF-09` parity failure、`PA-NF-10` validation／planning-publication failureを相互に独立した必須negative fixtureとして拒否し、どれか1件でも該当する場合は`execution-ready`／Executor startを禁止する。 E1-I1 producerは10／10 PASS、violations 0を必要とする。 |
 | E1-AC-023 | upload名にclosed`(N)`suffixが付いてもlogical filenameへ機械正規化し、SHA／root／MANIFEST一致時だけReview継続できる。fuzzy rename／different extension／hash mismatchは`insufficient-evidence`となり、Human approval Evidenceは両filenameを保持する。 |
 | E1-AC-024 | Placeholder Oracleがdynamic undeclared／remaining tokenを拒否し、static ADR 13のliteral placeholder examplesをexact hash一致時に受理する。 |
+| E1-AC-025 | provider／wheel／sdist／fresh init／update／dogfoodで、provider-owned adapterが`PATH`上のfake／real Oracleを同一contractでdirect argv起動できる。shipped source、installed assets、dogfood projection、product contract testsのscoped scanで、個人home、`chatgpt-use` Skill、`oracle-chatgpt` wrapperへの必須依存が0件であり、Oracle欠落時は個人wrapperへfallbackせずfail closedする。 |
 
 ## 7. Risks
 
@@ -112,5 +114,6 @@ MainとHumanが、Goalまたは既存Scope Seedから、review済みのPlanning 
 - Prompt／Relayからのcredential leakageまたはshell injection: sensitive-data preflight、redaction、direct argv、exception review、injection tests、rollback drill。
 - Planning Workflow実装IssueがPlanning活動そのものと誤解される: `Implement ... Workflow` title、明示Non-goals、implementation-centered acceptance evidence、ADR 17。
 - Issue Planning walking skeletonがgeneric foundationへ膨張: 最初の実Issue完走をDoDとし、未使用surfaceを作らない。
+- 個人Skill／wrapperのoperational convenienceが製品dependencyへ混入する: `PATH` Oracle allowlist、provider-owned adapter、personal-path denylist、wheel／fresh-install fixtureで境界を固定する。
 - Review mode／Revision lane誤分類: closed selection matrix、ambiguity時Semantic lane、mandatory fresh Review。
 - ZIP PASSとcanonical Git stateの乖離: closed binding、Candidate-to-canonical parity、Candidate外diff 0、drift時Git-bound re-review。

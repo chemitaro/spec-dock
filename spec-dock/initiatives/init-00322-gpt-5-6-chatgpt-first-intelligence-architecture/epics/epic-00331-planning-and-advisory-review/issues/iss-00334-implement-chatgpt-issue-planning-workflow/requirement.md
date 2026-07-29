@@ -4,7 +4,7 @@ ID: "iss-00334"
 タイトル: "Implement ChatGPT Issue Planning Workflow"
 状態: "approved"
 作成者: "Blue Team / Codex Main"
-最終更新: "2026-07-27"
+最終更新: "2026-07-29"
 親: ["epic-00331", "init-00322"]
 ---
 
@@ -48,7 +48,7 @@ ChatGPTの出力はadvisory evidenceであり、Humanの採用権限を代替し
 - official Skillからrepo-local `spec-dock-chatgpt`を呼ぶ経路。
 - `planning create`、`planning revise`、`review planning`、`planning apply`。
 - existing Issue、親Epic／Initiative、依存、関連source、repository／branch／HEADの解決。
-- provider-managed PromptとChatGPT UseによるPlanner／Reviewer起動。
+- provider-managed Promptとprovider-owned Oracle adapterによるPlanner／Reviewer起動。
 - complete三文書とcontrol filesを含むIssue Candidate ZIP。
 - `archive-candidate`をdefault、`git-bound`を明示的fallbackとするReview。
 - Semantic revisionとMechanical revision。
@@ -205,6 +205,12 @@ provider authorityを`src/spec_dock/assets/`に置き、installed／dogfood proj
 
 hermetic tests完了後、Humanが選んだeligible Issue一件でcreate→Review→Human Gate→applyを実行する。live mutation範囲、worktree／branch、evidence destinationをHumanが承認するまでcanonical writeやpushを開始しない。
 
+### REQ-015 Oracle Product Dependency Boundary
+
+Issue Planningの外部実行依存は、`PATH`で解決されたローカルOracle本体の`oracle` commandだけとする。RuntimeはSpecDockがprovider authorityとして配布するOracle adapter／wrapperからdirect argvでOracleを起動し、`chatgpt-use`等の個人Skill、個人wrapper、user-specific absolute path、個人ChatGPT Project URL、個人browser profile／host setupを製品依存として参照してはならない。
+
+個人wrapperはOracle運用知見を得るためのread-only参考実装またはoperator-local toolに限定する。Oracle欠落、version／capability不一致、browser／account state不成立時に個人wrapper、任意backend、APIへsilent fallbackしない。
+
 ## 5. Acceptance Criteria
 
 | ID | Acceptance Criteria |
@@ -223,6 +229,7 @@ hermetic tests完了後、Humanが選んだeligible Issue一件でcreate→Revie
 | AC-012 | wheel／sdist、fresh init、update、dogfood projectionでcommand／Skill／Prompt parityが成立する |
 | AC-013 | Human承認済みeligible Issue一件でJIT dogfoodを完走し、scope外mutationが0である |
 | AC-014 | one Issue／one branch／one Delivery PRで実装し、mergeはHumanへhandoffする |
+| AC-015 | provider／wheel／sdist／fresh init／update／dogfoodでprovider-owned adapterが`PATH`上のfake／real Oracleを同一contractで起動し、shipped product surfaceに個人home、`chatgpt-use` Skill、`oracle-chatgpt` wrapperへの必須依存が0件である |
 
 ## 6. Error and Stop Conditions
 
