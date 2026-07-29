@@ -148,6 +148,7 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 | S08 | per-step defect-only implementation review | fresh ChatGPT Pro read-only reviewer | fresh for pushed HEAD `cdfb47171d921ff9f5e28c675de75b2ae52921da` | failed | no | 5 P1をsame bounded dev-coderへ戻し、new immutable HEADでfresh re-review | recovery executable identity、metadata invalid／nonterminal分類、ancestor symlink race、parser exception正規化、ZIP decompression bound。`artifacts/20260729t070100z-s08-chatgpt-fresh-code-review-fail.md` |
 | S08 | first fresh closure review | fresh ChatGPT Pro read-only reviewer | fresh for pushed HEAD `2f2b35f10d5480a328581fcf31c857d84f3a4937` | failed | no | open 2件だけをsame workerへ戻し、new immutable HEADで別fresh closure review | P1-001／003／005 closed、新規finding 0。P1-002はmetadata JSON `RecursionError`、P1-004は制御文字rootによるtyped constructor `ValueError`がopen。`artifacts/20260729t074000z-s08-chatgpt-fresh-closure-review-fail.md` |
 | S08 | final fresh closure review | fresh ChatGPT Pro read-only reviewer | fresh for pushed HEAD `a297cda42fb356e91dd5c537010a83d66e199932` | passed | no | S08をcloseし、S09のJIT concretizationへ進む | P1-001〜005 closed、新規P0／P1 0、confidence high。GitHub connectorでexact branch／HEADのahead 0／behind 0とdefault branch fallback 0を確認。`artifacts/20260729t081648z-s08-chatgpt-final-closure-review-pass.md` |
+| S09 | implementation and local verification | bounded dev-coder / Codex Main | current uncommitted 13-path S09 diff | pending fresh review | no | commit／push後、指定`chatgpt-use` wrapperでexact-HEAD defect-only review | Planner／Semantic Revision ZIP expectation、fresh Reviewer JSON、exact current branch hard failure、reference-only attachment、onboarding companion、post-run source gateを実装。focused＋S08 regression 266 passed、ruff、mypy、validate pass |
 
 ## Assurance記録
 
@@ -563,7 +564,14 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - ChatGPTはcurrent S08 adapter／typed output／artifact reader、Prompt composer、managed resources、application drift gates、focused testsをsource上で照合し、S09だけを9 production/resource paths＋5 tests、21 Red cases、12 stop conditionsへ限定して`GO`とした。S10 Candidate／ZIP parsing、S11 projection、S12+、public command、canonical amendmentは明示的に除外した。
 - concrete execution inputを`artifacts/20260729t084028z-s09-chatgpt-implementation-work-packet.md`へ保存した。source transcriptのtrailing spaceをMarkdown hygieneとして除去したrepository artifact SHA-256は`21f02add7bc395053f52f94d7a4d33048cac0ff0207ee5617ba6cd5f33f8ffd5`。artifact自体のreviewはHuman指示により不要である。
 - work packetをcommit `9c8e7e58e0f422ce1b53f324cced0b07dbbd69db`としてoriginへpushし、local／remote parity 0／0とclean worktreeを確認した。
-- 次は本Report evidenceをcommit／pushし、work packetのbounded dev-coder instructionをS09実装へ委任する。
+- Report input commit `70b52fc790063ea0ee9c5b241d60b7f7713f743c`をoriginへpushし、work packetのbounded instructionを`dev-coder`へ渡した。
+- workerは最初のRedとして未実装`PlanningOutputExpectation`の`ImportError`を確認し、13-path allowlist内だけでPlanner／Semantic Revision／Reviewerの閉じたoutput expectation、Prompt本文の`@GitHub` exact branch／HEAD gate、default branch fallback禁止、reference-only transport pack、exact `repository access failed` sentinel、Planner post-run source recheckを実装した。
+- Planner／Semantic Revisionはexact logical filename／internal root／4-entry inventoryをPrompt expectationとして受け、Reviewerはread-only defect-only closed JSONを受ける。S09はZIP entry extraction／exact inventory validationを行わず、PlanどおりS10へ保持した。
+- onboarding companionは三文書へ従属し、canonical precedence、direct Oracleとoperator-local `chatgpt-use`の境界、Human gate、4種類のPlantUML roleをPrompt本文で必須化した。
+- 親独立検証はS09 focused 224件とS08／CLI regression 42件の計266件がpassした。worker検証ではruff、mypy、`validate` nodes=223、legacy active-contract scan、`git diff --check`もpassした。
+- full unit laneは`1045 passed, 552 skipped, 2 failed`である。1件はprovider prompt resourceとS09 allowlist外のdogfooding `.agents/...` parity差、もう1件は既知のS11-owned `classify_transport_frame` integration importであり、S09ではprojectionや旧frame APIを先取り修正しない。
+- `ruff format --check`は変更対象を含む既存ファイル全体のbaseline整形差分を検出した。無関係な大量整形は行わず、ruff checkと`git diff --check`をpassさせた。
+- 次は実装と本Reportをcommit／pushし、指定`chatgpt-use` wrapperだけを用いたfresh exact-HEAD defect-only reviewを行う。
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
