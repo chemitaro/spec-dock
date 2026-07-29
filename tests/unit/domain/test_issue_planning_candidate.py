@@ -64,19 +64,57 @@ def _companion() -> bytes:
 This guide is subordinate to requirement.md, design.md, and plan.md. Those canonical
 documents have precedence. It covers the init-00001, epic-00002, and iss-00003 lineage.
 
+## Initiative, Epic, and Issue lineage
+
+The init-00001, epic-00002, and iss-00003 lineage establishes the planning target.
+
 ## Purpose and scope
 
-Purpose and authority responsibilities for the current architecture and target architecture.
+Purpose and scope define the bounded onboarding material.
 
-## ChatGPT First workflow
+## System context
 
-The planning lifecycle uses Oracle directly; chatgpt-use is reference-only. Candidate,
-Review, Human approval, and apply use the exact current branch.
+The system context identifies the planning actors and boundaries.
+
+## Authority and responsibility boundary
+
+Authority and responsibility remain with the Human and deterministic Runtime.
+
+## Current architecture and target architecture
+
+Current architecture and target architecture describe the bounded transition.
+
+## ChatGPT First planning lifecycle
+
+ChatGPT First governs the planning lifecycle.
+
+## Direct Oracle and reference-only chatgpt-use
+
+The Runtime uses Oracle directly; chatgpt-use is reference-only.
+
+## Candidate, Review, Human, and apply lifecycle
+
+Candidate, Review, Human approval, and apply form the controlled lifecycle.
+
+## Exact current branch gate
+
+The exact current branch is mandatory.
 
 ## Roadmap and operations
 
-S01 through S07 are complete. S08 through S14 remain. Provider authority precedes
-projection. Failure modes and the first-day checklist are documented.
+S01 through S07 are complete. S08 through S14 remain.
+
+## Provider authority and projection
+
+Provider authority precedes projection.
+
+## Failure modes
+
+Failure modes stop closed.
+
+## First-day checklist
+
+The first-day checklist directs the new member.
 
 ```plantuml
 @startuml
@@ -307,6 +345,13 @@ def test_s10_current_v4_guide_satisfies_completeness_contract() -> None:
         )
         guide = archive.read(guide_name)
     _candidate().validate_onboarding_companion(COMPANION_PATH, guide)
+
+
+def test_s10_guide_rejects_token_complete_content_without_required_sections() -> None:
+    payload = _companion().replace(b"## ", b"")
+
+    with pytest.raises(ValueError, match="onboarding companion"):
+        _candidate().validate_onboarding_companion(COMPANION_PATH, payload)
 
 
 @pytest.mark.parametrize(

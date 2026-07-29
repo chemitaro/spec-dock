@@ -256,6 +256,7 @@ def _run(
     request_changes: dict[str, object] | None = None,
     identity: ReviewedPlanningIdentity | None = None,
     candidate: VerifiedIssueCandidate | None = None,
+    candidate_after_preflight: VerifiedIssueCandidate | None = None,
     preflight: object | None = None,
     execution: tuple[str, str] = ("ready", "adoption_published"),
 ):
@@ -285,6 +286,7 @@ def _run(
         **(request_changes or {}),
     )
     calls: list[object] = []
+    current_candidate = [candidate or default_candidate]
 
     def transaction_runner(operation, **kwargs):
         calls.append(operation)
@@ -316,6 +318,11 @@ def _run(
             },
         )
 
+    def run_preflight(_request):
+        if candidate_after_preflight is not None:
+            current_candidate[0] = candidate_after_preflight
+        return preflight or _preflight()
+
     result = issue_planning.run_issue_planning_apply(
         request=request,
         records=[record],
@@ -326,8 +333,8 @@ def _run(
             artifact_failure=None,
             state=SimpleNamespace(deps_preflight_error=None),
         ),
-        preflight_runner=lambda _request: preflight or _preflight(),
-        candidate_loader=lambda _path, _root: candidate or default_candidate,
+        preflight_runner=run_preflight,
+        candidate_loader=lambda _path, _root: current_candidate[0],
         expected_target_loader=expected_target_loader,
         resume_probe=lambda _operation, **_kwargs: False,
         transaction_runner=transaction_runner,
@@ -594,6 +601,30 @@ def test_archive_review_skip_rejects_candidate_identity_drift(
         candidate=_verified_candidate(_candidate_identity(zip_sha256="d" * 64)),
     )
     _assert_not_ready(result, ("stale", "apply_target_changed"))
+    assert calls == []
+
+
+def test_git_bound_apply_rejects_candidate_swap_during_final_preflight(
+    tmp_path: Path,
+) -> None:
+    replacement = _verified_candidate(
+        _candidate_identity(
+            candidate_id="cand-2",
+            version=2,
+            logical_filename="iss-00003-planning-candidate-v2.zip",
+            observed_transport_filename="iss-00003-planning-candidate-v2.zip",
+            internal_root="iss-00003-planning-candidate-v2",
+            zip_sha256="d" * 64,
+        )
+    )
+
+    result, calls, _, _ = _run(
+        tmp_path,
+        mode="git-bound",
+        candidate_after_preflight=replacement,
+    )
+
+    _assert_not_ready(result, ("rejected", "operation_binding_mismatch"))
     assert calls == []
 
 

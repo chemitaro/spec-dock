@@ -155,24 +155,33 @@ def validate_onboarding_companion(path: str, payload: bytes) -> None:
     except UnicodeDecodeError as error:
         raise ValueError("onboarding companion must be strict UTF-8") from error
     lowered = text.casefold()
-    required_groups = (
-        ("init-", "epic-", "iss-"),
-        ("purpose", "目的"),
-        ("authority", "権限", "責務"),
-        ("current architecture", "現行", "target architecture", "目標"),
-        ("chatgpt first", "planning lifecycle", "workflow"),
-        ("oracle", "chatgpt-use"),
-        ("candidate", "review", "human", "apply"),
-        ("exact current branch", "exact branch"),
-        ("s01",),
-        ("s07",),
-        ("s08",),
-        ("s14",),
-        ("provider", "projection"),
-        ("failure", "障害"),
-        ("first-day", "first day", "初日"),
+    sections = _markdown_sections(text)
+    required_section_concepts = (
+        (("init-",), ("epic-",), ("iss-",)),
+        (("purpose", "目的"), ("scope", "対象", "範囲")),
+        (("system context",),),
+        (("authority", "権限"), ("responsibility", "責務")),
+        (("current architecture", "現行"), ("target architecture", "目標")),
+        (("chatgpt first",), ("planning lifecycle", "planning workflow")),
+        (("oracle",), ("reference-only", "参照専用"), ("chatgpt-use",)),
+        (("candidate",), ("review",), ("human",), ("apply",)),
+        (("exact current branch", "exact branch"),),
+        (("s01",), ("s07",), ("s08",), ("s14",)),
+        (("provider authority", "provider"), ("projection",)),
+        (("failure mode", "failure", "障害"),),
+        (("first-day checklist", "first day checklist", "初日"),),
     )
-    if any(not any(token in lowered for token in group) for group in required_groups):
+    if any(
+        not any(
+            body.strip()
+            and all(
+                any(token in section for token in alternatives)
+                for alternatives in concepts
+            )
+            for section, body in sections
+        )
+        for concepts in required_section_concepts
+    ):
         raise ValueError("onboarding companion required section is missing")
     if not all(name in text for name in DOCUMENT_NAMES):
         raise ValueError("onboarding companion canonical authority is incomplete")
@@ -195,6 +204,25 @@ def validate_onboarding_companion(path: str, payload: bytes) -> None:
         raise ValueError("onboarding companion PlantUML role is missing")
     if any(block.count("@startuml") != 1 or block.count("@enduml") != 1 for block in blocks):
         raise ValueError("onboarding companion PlantUML framing is invalid")
+
+
+def _markdown_sections(text: str) -> tuple[tuple[str, str], ...]:
+    lines = text.splitlines()
+    headings: list[tuple[int, int, str]] = []
+    for index, line in enumerate(lines):
+        match = re.fullmatch(r"(#{2,6})[ \t]+(.+?)[ \t]*#*[ \t]*", line)
+        if match is not None:
+            headings.append((index, len(match.group(1)), match.group(2).casefold()))
+    sections: list[tuple[str, str]] = []
+    for position, (line_index, level, title) in enumerate(headings):
+        end = len(lines)
+        for next_line, next_level, _next_title in headings[position + 1 :]:
+            if next_level <= level:
+                end = next_line
+                break
+        body = "\n".join(lines[line_index + 1 : end]).strip()
+        sections.append((f"{title}\n{body.casefold()}", body))
+    return tuple(sections)
 
 
 def validate_issue_authoring_files(
