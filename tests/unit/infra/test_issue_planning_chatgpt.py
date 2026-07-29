@@ -295,7 +295,10 @@ def test_recovery_revalidates_path_identity_before_harvest(
     assert result.transient_payload is None
 
 
-@pytest.mark.parametrize("invalid_metadata", ["wrong-session", "wrong-mode", "malformed"])
+@pytest.mark.parametrize(
+    "invalid_metadata",
+    ["wrong-session", "wrong-mode", "malformed", "deep-nesting"],
+)
 def test_invalid_session_metadata_is_rejected_without_harvest(
     monkeypatch,
     tmp_path: Path,
@@ -318,6 +321,9 @@ def test_invalid_session_metadata_is_rejected_without_harvest(
             session.mkdir(parents=True, exist_ok=True)
             if invalid_metadata == "malformed":
                 (session / "meta.json").write_bytes(b'{"id":')
+            elif invalid_metadata == "deep-nesting":
+                depth = 20_000
+                (session / "meta.json").write_bytes(b'{"x":' * depth + b"0" + b"}" * depth)
             else:
                 _write_metadata(
                     session,
@@ -336,6 +342,33 @@ def test_invalid_session_metadata_is_rejected_without_harvest(
     assert sum("--prompt" in argv for argv in calls) == 1
     assert sum("--harvest" in argv for argv in calls) == 0
     assert "oracle-home" not in repr(result)
+
+
+def test_public_adapter_normalizes_unsafe_planner_root_constructor_failure(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("candidate\t/requirement.md", "body\n")
+
+    def fake_run(argv, **kwargs):
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        _write_planner_session(kwargs["env"], argv, zip_bytes=buffer.getvalue())
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path)
+
+    assert (result.status, result.reason) == ("rejected", "oracle_artifact_rejected")
+    assert result.transient_payload is None
+    assert "candidate" not in repr(result)
 
 
 @pytest.mark.parametrize("invalid_json", [b'{"verdict":"pass","verdict":"fail"}', b'{"score":NaN}'])

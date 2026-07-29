@@ -89,14 +89,17 @@ def snapshot_authoring_zip(
         raise OracleArtifactError("oracle_artifact_rejected")
     expected = f"{match.group('stem')}.zip"
     internal_root = _zip_internal_root(payload)
-    return OracleAuthoringZipSnapshot(
-        expected_logical_filename=expected,
-        observed_transport_filename=observed,
-        internal_root=internal_root,
-        size_bytes=len(payload),
-        sha256=hashlib.sha256(payload).hexdigest(),
-        zip_bytes=payload,
-    )
+    try:
+        return OracleAuthoringZipSnapshot(
+            expected_logical_filename=expected,
+            observed_transport_filename=observed,
+            internal_root=internal_root,
+            size_bytes=len(payload),
+            sha256=hashlib.sha256(payload).hexdigest(),
+            zip_bytes=payload,
+        )
+    except ValueError:
+        raise OracleArtifactError("oracle_artifact_rejected") from None
 
 
 def snapshot_review_json(
@@ -153,7 +156,7 @@ def _read_metadata(
     )
     try:
         value = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
         raise OracleArtifactError("oracle_artifact_rejected") from None
     if not isinstance(value, dict) or value.get("id") != session_id:
         raise OracleArtifactError("oracle_artifact_rejected")
@@ -470,7 +473,14 @@ def _zip_internal_root(payload: bytes) -> str:
             total_uncompressed = 0
             for info in infos:
                 path = PurePosixPath(info.filename)
-                if path.is_absolute() or "\\" in info.filename or any(part in ("", ".", "..") for part in path.parts):
+                if (
+                    path.is_absolute()
+                    or "\\" in info.filename
+                    or any(part in ("", ".", "..") for part in path.parts)
+                    or any(
+                        any(ord(character) < 32 or ord(character) == 127 for character in part) for part in path.parts
+                    )
+                ):
                     raise OracleArtifactError("oracle_artifact_rejected")
                 if (
                     info.flag_bits & 0x1
