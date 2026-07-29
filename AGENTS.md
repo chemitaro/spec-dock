@@ -127,17 +127,22 @@ Do not collapse new work back into monolithic command files when a layer-specifi
 ## Build, Test, and Development Commands
 
 ```bash
-# Daily local unit suite
+# Ordinary test commands run the fast lane. They retain the usual pytest
+# interface and policy-skip selected full-regression tests.
+uv run pytest
 uv run pytest tests/unit
 
-# Optional integration suite for real external boundaries
-uv run pytest tests/integration
+# Focused pytest commands follow the same default policy.
+uv run pytest tests/unit/path_to_test.py
 
-# Runtime / CLI regression lane
-uv run pytest tests/cli_runtime
+# Marker selection alone is diagnostic; it does not permit full-regression bodies.
+uv run pytest -m full_regression
 
-# Full baseline
-uv run pytest
+# Explicit full-regression permission.
+uv run pytest --run-full-regression
+
+# Explicit heavy-only execution.
+uv run pytest --run-full-regression -m full_regression
 
 # Run installer locally from the current checkout
 uvx --from . spec-dock init /tmp/target-repo
@@ -150,6 +155,28 @@ spec-dock update .
 # Module entrypoint
 python -m spec_dock.cli init /tmp/target-repo
 ```
+
+`full_regression test is disabled by default; use --run-full-regression to run
+it` is the stable policy skip reason. Do not use `-m full_regression` alone as
+an execution permission.
+
+For pull requests, `Provider CI` / `provider-tests` is the merge-blocking fast
+gate and runs `make lint` plus ordinary `uv run pytest`. `Provider Full
+Regression` is an independent post-merge validation that runs on `main` push
+or `workflow_dispatch`; it is not a PR merge blocker, and this repository has
+no scheduled or cron full-regression trigger.
+
+On a post-merge full-regression failure, the repository maintainer checks the
+SHA, failed tests, logs, duration, and summary, then normally forward-fixes or
+reruns the workflow. Reproduce the same SHA locally with `uv run pytest
+--run-full-regression` when necessary. Do not add automatic rollback or
+automatic Issue creation. If a selector omission, missing required check, or
+unacceptable escape is found, stop the next merge decision, restore the PR
+workflow command to `uv run pytest --run-full-regression`, and disable the
+default conditional policy skip if it is unsafe. Preserve markers, the manual
+full command, the post-merge workflow, and measurement evidence; only
+reintroduce the fast gate after fresh review. Agents must stop at a
+merge-ready PR: a human performs the merge.
 
 ## Testing Guidelines
 

@@ -1,7 +1,6 @@
 name: Provider CI
 
 on:
-  push:
   pull_request:
 
 jobs:

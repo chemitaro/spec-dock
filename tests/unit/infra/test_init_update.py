@@ -1163,6 +1163,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00149-issue-finish-synthetic-approval-closeout-bug/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00157-reduce-test-suite-runtime/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00160-reduce-test-runtime-followup/.meta.json",
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00342-reduce-unit-test-and-provider-ci-runtime/.meta.json",
         "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
@@ -1377,6 +1378,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00149-issue-finish-synthetic-approval-closeout-bug/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00157-reduce-test-suite-runtime/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00160-reduce-test-runtime-followup/.meta.json": [],
+        "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00342-reduce-unit-test-and-provider-ci-runtime/.meta.json": [],
         "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json": [],
@@ -10788,31 +10790,127 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         assert "python3 ./spec-dock/scripts/spec-dock validate" in workflow_text
 
     def test_issue_68_provider_only_workflow_is_not_shipped_via_install_root(self) -> None:
-        repo_root_provider_workflow = Path(".github/workflows/provider-ci.yml")
-        install_root_provider_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/provider-ci.yml"
+        repo_root = Path(__file__).resolve().parents[3]
+        provider_workflow_paths = {
+            "fast": repo_root / ".github/workflows/provider-ci.yml",
+            "full": repo_root / ".github/workflows/provider-full-regression.yml",
+        }
+        install_root_workflow_paths = {
+            name: repo_root / "src/spec_dock/assets/install_root" / path.relative_to(repo_root)
+            for name, path in provider_workflow_paths.items()
+        }
 
-        assert repo_root_provider_workflow.is_file(), (
-            f"missing repo-root provider-only workflow: {repo_root_provider_workflow}"
-        )
-        assert not install_root_provider_workflow.exists(), (
-            "provider-only workflow must not be shipped in install_root managed assets: "
-            f"{install_root_provider_workflow}"
-        )
-        workflow_text = repo_root_provider_workflow.read_text(encoding="utf-8")
-        assert "python -m pip install uv" in workflow_text
-        workflow_lines = workflow_text.splitlines()
-        step_index = workflow_lines.index("      - name: Run provider pytest suite")
-        provider_pytest_run = None
-        for line in workflow_lines[step_index + 1 :]:
-            if line.startswith("      - "):
-                break
-            if line.startswith("        run: "):
-                provider_pytest_run = line.removeprefix("        run: ")
-                break
+        for name, workflow_path in provider_workflow_paths.items():
+            assert workflow_path.is_file(), (
+                f"missing repo-root provider-only workflow: name={name}, path={workflow_path}"
+            )
+            assert not install_root_workflow_paths[name].exists(), (
+                "provider-only workflow must not be shipped in install_root managed assets: "
+                f"{install_root_workflow_paths[name]}"
+            )
 
-        assert provider_pytest_run == "uv run pytest"
+        workflow_texts = {name: path.read_text(encoding="utf-8") for name, path in provider_workflow_paths.items()}
+        workflow_lines = {name: text.splitlines() for name, text in workflow_texts.items()}
+
+        def section_keys(lines: list[str], header: str) -> set[str]:
+            section_index = lines.index(header)
+            keys: set[str] = set()
+            for line in lines[section_index + 1 :]:
+                if line and not line.startswith(" "):
+                    break
+                match = re.fullmatch(r"  ([A-Za-z0-9_-]+):.*", line)
+                if match is not None:
+                    keys.add(match.group(1))
+            return keys
+
+        fast_triggers = section_keys(workflow_lines["fast"], "on:")
+        full_triggers = section_keys(workflow_lines["full"], "on:")
+        assert fast_triggers == {"pull_request"}
+        assert full_triggers == {"push", "workflow_dispatch"}
+
+        full_push_index = workflow_lines["full"].index("  push:")
+        full_push_block: list[str] = []
+        for line in workflow_lines["full"][full_push_index + 1 :]:
+            if re.fullmatch(r"  [A-Za-z0-9_-]+:.*", line):
+                break
+            full_push_block.append(line)
+        full_push_is_main_only = "    branches: [main]" in full_push_block
+        assert full_push_is_main_only
+
+        observed_event_matrix = {
+            "pull_request": (
+                "pull_request" in fast_triggers,
+                "pull_request" in full_triggers,
+            ),
+            "non-main push": (
+                "push" in fast_triggers,
+                "push" in full_triggers and not full_push_is_main_only,
+            ),
+            "main push": (
+                "push" in fast_triggers,
+                "push" in full_triggers and full_push_is_main_only,
+            ),
+            "workflow_dispatch": (
+                "workflow_dispatch" in fast_triggers,
+                "workflow_dispatch" in full_triggers,
+            ),
+            "schedule": (
+                "schedule" in fast_triggers,
+                "schedule" in full_triggers,
+            ),
+        }
+        assert observed_event_matrix == {
+            "pull_request": (True, False),
+            "non-main push": (False, False),
+            "main push": (False, True),
+            "workflow_dispatch": (False, True),
+            "schedule": (False, False),
+        }
+
+        assert "name: Provider CI" in workflow_lines["fast"]
+        assert section_keys(workflow_lines["fast"], "jobs:") == {"provider-tests"}
+        assert section_keys(workflow_lines["full"], "jobs:") == {"provider-full-regression"}
+        assert "python -m pip install uv" in workflow_texts["fast"]
+        assert "        run: make lint" in workflow_lines["fast"]
+        assert workflow_lines["fast"].count("        run: uv run pytest") == 1
+        assert "--run-full-regression" not in workflow_texts["fast"]
+        assert workflow_lines["full"].count("        run: uv run pytest --run-full-regression") == 1
+        assert "continue-on-error:" not in workflow_texts["full"]
+
+        for name, workflow_text in workflow_texts.items():
+            assert re.search(r"(?m)^\s*permissions:", workflow_text) is None, name
+            assert re.search(r"(?m)^\s*secrets:", workflow_text) is None, name
+            assert "secrets." not in workflow_text, name
+
+        concurrency_index = workflow_lines["full"].index("concurrency:")
+        concurrency_lines: list[str] = []
+        for line in workflow_lines["full"][concurrency_index + 1 :]:
+            if line and not line.startswith(" "):
+                break
+            concurrency_lines.append(line)
+        group_line = next(line for line in concurrency_lines if line.startswith("  group: "))
+        cancel_line = next(line for line in concurrency_lines if line.startswith("  cancel-in-progress: "))
+        assert "github.event_name == 'push'" in group_line
+        assert "github.ref" in group_line
+        assert "github.run_id" in group_line
+        assert "github.event_name == 'push'" in cancel_line
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            generated_workflow_paths = {
+                name: target / path.relative_to(repo_root) for name, path in provider_workflow_paths.items()
+            }
+
+            assert main(["init", str(target)]) == 0
+            for path in generated_workflow_paths.values():
+                assert not path.exists(), f"provider-only workflow must not be generated by init: {path}"
+
+            assert main(["update", str(target)]) == 0
+            for path in generated_workflow_paths.values():
+                assert not path.exists(), f"provider-only workflow must not be generated by update: {path}"
+
         legacy_runner = "python -m " + "unit" + "test discover"
-        assert legacy_runner not in workflow_text
+        assert legacy_runner not in workflow_texts["fast"]
 
     def test_issue_68_legacy_codex_skills_tree_is_retired(self) -> None:
         legacy_root = self._ISSUE_68_RETIRED_LEGACY_ROOT
