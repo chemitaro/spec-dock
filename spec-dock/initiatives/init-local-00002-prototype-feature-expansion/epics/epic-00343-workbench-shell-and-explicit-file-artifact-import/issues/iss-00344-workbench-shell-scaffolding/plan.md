@@ -3,7 +3,7 @@
 ID: "iss-00344"
 タイトル: "Workbench Shell Scaffolding"
 関連GitHub: ["#344"]
-状態: "approved"
+状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-29"
 依存: ["requirement.md", "design.md"]
@@ -47,6 +47,52 @@ ID: "iss-00344"
 - [x] `setup.py` custom `build_py` post-build pruneが既知の変更面に含まれる。
 - [x] report evidence destinationがある。
 - [x] 本計画のChatGPT reviewとfresh `spec-reviewer` reviewがPASSするまでは実装へ進まない。
+
+### 1.1 ChatGPT-First execution overlay
+
+本Issueの実装では、ユーザーの2026-07-29の明示指示により、各stepへ次の追加順序を適用する。このoverlayはrequirement、design、step scope、locked expectation、closure id、実装順序を変更せず、実装前の具体化とreview backendだけを置き換える。
+
+1. step開始前にworktreeをcleanにし、現在branchをGitHubへpushする。
+2. SpecDock `authoring preflight github-sync` でlocal/remote HEAD一致を確認する。
+3. ChatGPT-Useへexact commit、approved specs、step contract、current source/testsを参照させ、最小実装方針、Red/Green、具体テストケース、過剰実装回避、stop conditionをMarkdownで具体化させる。
+4. 完全回答を`artifact import chatgpt-output`でIssue Artifactへ保存し、main orchestratorがapproved specsとlocal sourceに照らして採否を記録する。
+5. 採用したArtifactとstep contractを`dev-coder`へ共有してbounded implementationを委任する。
+6. 実装、focused verification、report統合、milestone commitを完了し、branchをGitHubへpushする。
+7. planに記載された`code-reviewer`、`spec-reviewer`、`qa-reviewer`はreview責務契約として維持し、その責務をSub-agentではなくChatGPT-Useへプロンプトとして渡す。ChatGPT-Useはpush済みexact commitだけをreviewする。
+8. ChatGPT-Useのreview結果は次のJSON形で受け取る。`review_status=pass`はblocking findingがなく、review対象commitがexact一致し、main orchestratorがfindingをlocal sourceとtestsで検証した場合だけstep gateへ採用する。
+
+```json
+{
+  "review_status": "pass | fail",
+  "reviewed_commit": "40-character commit SHA",
+  "review_scope": "step and responsibility contract",
+  "findings": [
+    {
+      "id": "stable finding id",
+      "severity": "blocking | material | non_blocking",
+      "location": "path or contract section",
+      "summary": "concise finding",
+      "evidence": "source-grounded evidence",
+      "recommended_action": "smallest sufficient action"
+    }
+  ],
+  "overreach_check": {
+    "scope_expansion_requested": false,
+    "unnecessary_abstraction_requested": false,
+    "reason": "brief reason"
+  },
+  "residual_risks": [],
+  "next_action": "proceed | bounded_fix_and_rereview | return_to_planning"
+}
+```
+
+Reviewの運用条件:
+
+- ChatGPT出力はadvisory evidenceであり、main orchestratorが各findingを`adopted`、`partially_adopted`、`rejected`、`deferred`のいずれかへ分類する。
+- requirement/design/plan外の機能、sibling Issueの責務、新framework、将来拡張だけを理由とする抽象化は、blocking defectの根拠がない限り採用しない。
+- finding修正は同じstepのallowed pathsとclosure contractに限定し、必要なら同じ`dev-coder`へbounded follow-upとして戻す。
+- canonical contract変更が必要なfindingは実装で吸収せず、planning amendmentへ戻る。
+- review Artifact、採否、修正、再review、final verdictを`report.md`へ記録する。
 
 ## 2. 実装戦略（Implementation Strategy）
 
