@@ -201,21 +201,52 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
 ## Testing
 
 ```bash
-# Daily local unit suite
+# Ordinary local test commands: run the fast lane. Selected full-regression
+# tests are skipped with a stable policy reason.
+uv run pytest
 uv run pytest tests/unit
+
+# Focused pytest commands use the same default policy.
+uv run pytest tests/unit/path_to_test.py
+
+# Inspect the full-regression selection only. This does not grant permission
+# to run its test bodies.
+uv run pytest -m full_regression
+
+# Intentional full regression: the only local command that permits all test bodies.
+uv run pytest --run-full-regression
 
 # Local static-analysis gate: Ruff check, Ruff format check, and mypy
 make lint
-
-# Optional integration suite for real external boundaries
-uv run pytest tests/integration
-
-# Runtime / CLI regression lane
-uv run pytest tests/cli_runtime
-
-# Full regression fallback
-uv run pytest
 ```
+
+The policy skip reason is `full_regression test is disabled by default; use
+--run-full-regression to run it`. Add `--run-full-regression` to a marker
+selection when deliberately running only the heavy lane, for example
+`uv run pytest --run-full-regression -m full_regression`.
+
+### Provider test workflows and post-merge operation
+
+`Provider CI` / `provider-tests` runs on pull requests and remains the merge
+blocker. It runs `make lint` and the ordinary `uv run pytest` command only; it
+does not run the full regression. `Provider Full Regression` is an independent
+workflow that runs `uv run pytest --run-full-regression` after a push to `main`
+or when started with `workflow_dispatch`. It is post-merge validation, not a
+retroactive merge blocker. No scheduled or cron execution is configured.
+
+If `Provider Full Regression` fails, the repository maintainer checks the
+run's SHA, failed tests, logs, duration, and summary. Reproduce the same SHA
+locally with `uv run pytest --run-full-regression` when needed, then normally
+apply a forward fix or rerun the GitHub Actions workflow. The workflow does
+not automatically roll back a merge or create an Issue.
+
+If a selector omission, missing required check, or unacceptable escape is
+found, stop the next merge decision and return the PR test command in
+`.github/workflows/provider-ci.yml` to `uv run pytest --run-full-regression`.
+If the default policy skip itself is unsafe, disable that conditional skip.
+Keep the markers, explicit full command, full workflow, and measurement
+evidence; reintroduce the fast gate only after a fresh review. A merge-ready
+PR still requires a human to perform the merge.
 
 ---
 
