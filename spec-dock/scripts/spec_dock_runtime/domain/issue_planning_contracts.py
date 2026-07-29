@@ -378,18 +378,11 @@ class OracleAuthoringZipSnapshot:
             field_name="observed_transport_filename",
         )
         logical_stem = expected.removesuffix(".zip")
-        alias_pattern = re.compile(
-            rf"{re.escape(logical_stem)} \([1-9][0-9]*\)\.zip"
-        )
+        alias_pattern = re.compile(rf"{re.escape(logical_stem)} \([1-9][0-9]*\)\.zip")
         if observed != expected and alias_pattern.fullmatch(observed) is None:
-            raise ValueError(
-                "observed_transport_filename is not a closed transport alias"
-            )
+            raise ValueError("observed_transport_filename is not a closed transport alias")
         internal_root = _safe_relative_path(self.internal_root, field_name="internal_root")
-        if (
-            len(PurePosixPath(internal_root).parts) != 1
-            or internal_root != logical_stem
-        ):
+        if len(PurePosixPath(internal_root).parts) != 1 or internal_root != logical_stem:
             raise ValueError("internal_root must equal the logical filename stem")
         if not isinstance(self.zip_bytes, bytes):
             raise ValueError("zip_bytes must be bytes")
@@ -553,9 +546,7 @@ class IssueCandidateIdentity:
             field_name="observed_transport_filename",
         )
         logical_path = PurePosixPath(logical)
-        alias_pattern = re.compile(
-            rf"^{re.escape(logical_path.stem)} \([1-9][0-9]*\){re.escape(logical_path.suffix)}$"
-        )
+        alias_pattern = re.compile(rf"^{re.escape(logical_path.stem)} \([1-9][0-9]*\){re.escape(logical_path.suffix)}$")
         if observed != logical and not alias_pattern.fullmatch(observed):
             raise ValueError("observed_transport_filename is not a closed transport alias")
         object.__setattr__(self, "logical_filename", logical)
@@ -630,11 +621,7 @@ class OnboardingCompanionBindingV1:
     def __post_init__(self) -> None:
         path = _safe_relative_path(self.path, field_name="onboarding_companion.path")
         parsed = PurePosixPath(path)
-        if (
-            len(parsed.parts) != 2
-            or parsed.parts[0] != "artifacts"
-            or parsed.suffix != ".md"
-        ):
+        if len(parsed.parts) != 2 or parsed.parts[0] != "artifacts" or parsed.suffix != ".md":
             raise ValueError("onboarding companion path must be artifacts/<safe-markdown>.md")
         object.__setattr__(self, "path", path)
         object.__setattr__(
@@ -834,9 +821,7 @@ class ReviewedPlanningIdentity:
                 or self.canonical_target_paths is None
                 or self.git_bound_operation_binding is None
             ):
-                raise ValueError(
-                    "git-bound identity requires canonical_target_paths and operation binding"
-                )
+                raise ValueError("git-bound identity requires canonical_target_paths and operation binding")
             object.__setattr__(
                 self,
                 "canonical_target_paths",
@@ -883,8 +868,7 @@ class ReviewedPlanningIdentity:
         if mode == "git-bound":
             _closed_object(
                 value,
-                required=common
-                | {"canonical_target_paths", "git_bound_operation_binding"},
+                required=common | {"canonical_target_paths", "git_bound_operation_binding"},
                 contract="ReviewedPlanningIdentity",
             )
             binding_raw = value["git_bound_operation_binding"]
@@ -897,9 +881,7 @@ class ReviewedPlanningIdentity:
                 branch=value["branch"],
                 source_head=value["source_head"],
                 canonical_target_paths=_canonical_paths(value["canonical_target_paths"]),
-                git_bound_operation_binding=GitBoundOperationBindingV1.from_dict(
-                    binding_raw
-                ),
+                git_bound_operation_binding=GitBoundOperationBindingV1.from_dict(binding_raw),
                 expected_canonical_target_paths=expected_canonical_target_paths,
             )
             return identity
@@ -932,9 +914,7 @@ class ReviewedPlanningIdentity:
             assert self.canonical_target_paths is not None
             assert self.git_bound_operation_binding is not None
             base["canonical_target_paths"] = list(self.canonical_target_paths)
-            base["git_bound_operation_binding"] = (
-                self.git_bound_operation_binding.to_dict()
-            )
+            base["git_bound_operation_binding"] = self.git_bound_operation_binding.to_dict()
         return base
 
     @property
@@ -1212,15 +1192,13 @@ class PlanningRevisionRequestV1:
             payload["finding_ids"] = list(self.finding_ids)
             payload["review_result_sha256"] = self.review_result_sha256
         else:
-            payload.update(
-                {
-                    "target_file": self.target_file,
-                    "old_text": self.old_text,
-                    "new_text": self.new_text,
-                    "meaning_invariant": self.meaning_invariant,
-                    "diff_budget": self.diff_budget,
-                }
-            )
+            payload.update({
+                "target_file": self.target_file,
+                "old_text": self.old_text,
+                "new_text": self.new_text,
+                "meaning_invariant": self.meaning_invariant,
+                "diff_budget": self.diff_budget,
+            })
         return payload
 
 
@@ -1256,14 +1234,8 @@ class PlanningHumanDecisionV1:
         )
         if not isinstance(self.plan_adoption, bool) or not isinstance(self.implementation_start, bool):
             raise ValueError("Human decision flags must be booleans")
-        valid = (
-            self.decision == "approved"
-            and self.plan_adoption
-            and self.implementation_start
-        ) or (
-            self.decision == "rejected"
-            and not self.plan_adoption
-            and not self.implementation_start
+        valid = (self.decision == "approved" and self.plan_adoption and self.implementation_start) or (
+            self.decision == "rejected" and not self.plan_adoption and not self.implementation_start
         )
         if not valid:
             raise ValueError("Human decision truth table violation")
@@ -1356,8 +1328,7 @@ class PlanningCommandResult:
             raise ValueError("reason must be lower snake_case")
         pair = (self.status, reason)
         if (
-            self.status in ("ok", "ready")
-            or reason in {item[1] for item in _SUCCESS_PAIRS}
+            self.status in ("ok", "ready") or reason in {item[1] for item in _SUCCESS_PAIRS}
         ) and pair not in _SUCCESS_PAIRS:
             raise ValueError("invalid status/reason success pair")
         object.__setattr__(self, "issue_id", _issue_id(self.issue_id))

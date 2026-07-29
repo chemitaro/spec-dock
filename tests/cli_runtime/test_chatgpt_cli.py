@@ -7,9 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 CHATGPT_EXECUTABLE = RUNTIME_SCRIPTS_DIR / "spec-dock-chatgpt"
 CORE_EXECUTABLE = RUNTIME_SCRIPTS_DIR / "spec-dock"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
@@ -144,24 +142,20 @@ def test_chatgpt_app_full_tracer_uses_existing_dispatch_and_injected_use_case(mo
     monkeypatch.setattr(
         chatgpt_app,
         "build_runtime",
-        lambda _specdock_dir, repo_root: SimpleNamespace(
-            use_cases=_use_cases(planning_create)
-        ),
+        lambda _specdock_dir, repo_root: SimpleNamespace(use_cases=_use_cases(planning_create)),
     )
     stdout = io.StringIO()
     with contextlib.redirect_stdout(stdout):
-        exit_code = chatgpt_app.main(
-            [
-                "planning",
-                "create",
-                "--issue",
-                "iss-00003",
-                "--output",
-                "/tmp/out",
-                "--format",
-                "json",
-            ]
-        )
+        exit_code = chatgpt_app.main([
+            "planning",
+            "create",
+            "--issue",
+            "iss-00003",
+            "--output",
+            "/tmp/out",
+            "--format",
+            "json",
+        ])
     assert exit_code == 0
     assert len(calls) == 1
     assert '"status":"ok"' in stdout.getvalue()
@@ -267,9 +261,7 @@ def test_build_runtime_configures_all_issue_planning_use_cases(
             reviewed_head="a" * 40,
         )
     )
-    use_cases.planning_revise(
-        PlanningReviseRequest(tmp_path / "candidate.zip", tmp_path / "request.json", tmp_path)
-    )
+    use_cases.planning_revise(PlanningReviseRequest(tmp_path / "candidate.zip", tmp_path / "request.json", tmp_path))
     use_cases.planning_apply(
         PlanningApplyRequest(
             issue_id="iss-00003",

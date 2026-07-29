@@ -97,17 +97,14 @@ def _invoke_backend_core(
         _write_summary(request.output_dir, result)
         return result, BackendStreamCapture()
 
+    cwd = str(request.working_dir.resolve(strict=True)) if request.working_dir is not None else None
     try:
         completed = subprocess.run(
             list(invocation_argv),
             check=False,
             capture_output=True,
             timeout=request.timeout_seconds if request.timeout_seconds and request.timeout_seconds > 0 else None,
-            **(
-                {"cwd": str(request.working_dir.resolve(strict=True))}
-                if request.working_dir is not None
-                else {}
-            ),
+            cwd=cwd,
         )
     except FileNotFoundError:
         result = _result(

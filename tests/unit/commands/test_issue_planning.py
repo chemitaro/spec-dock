@@ -5,9 +5,7 @@ import sys
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application.contracts import UseCases  # noqa: E402
@@ -323,25 +321,26 @@ def test_text_and_json_dispatch_share_result_semantics() -> None:
     registry = build_registry()
     outputs = []
     for output_format in ("text", "json"):
-        namespace = build_parser(registry).parse_args(
-            [
-                "planning",
-                "create",
-                "--issue",
-                "iss-00003",
-                "--output",
-                "/tmp/out",
-                "--format",
-                output_format,
-            ]
-        )
+        namespace = build_parser(registry).parse_args([
+            "planning",
+            "create",
+            "--issue",
+            "iss-00003",
+            "--output",
+            "/tmp/out",
+            "--format",
+            output_format,
+        ])
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            assert dispatch(
-                namespace,
-                registry,
-                _use_cases(planning_create=lambda _request: result),
-            ) == 1
+            assert (
+                dispatch(
+                    namespace,
+                    registry,
+                    _use_cases(planning_create=lambda _request: result),
+                )
+                == 1
+            )
         outputs.append(stdout.getvalue())
     assert "status: blocked" in outputs[0]
     assert '"status":"blocked"' in outputs[1]

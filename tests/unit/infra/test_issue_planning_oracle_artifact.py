@@ -57,28 +57,24 @@ def test_exact_repository_access_failure_detection(
 ) -> None:
     session = _session(tmp_path)
     transcript = session / "artifacts" / "transcript.md"
-    transcript.write_bytes(
-        b"# Oracle Browser Transcript\n## Prompt\nprivate\n## Answer\n"
-        + answer
-        + b"\n"
-    )
+    transcript.write_bytes(b"# Oracle Browser Transcript\n## Prompt\nprivate\n## Answer\n" + answer + b"\n")
     _write_metadata(session, [_artifact("transcript", transcript)])
 
-    assert artifact_reader.has_exact_repository_access_failure(
-        session,
-        session_id=session.name,
-        oracle_version="0.16.1",
-        staging_dir=tmp_path / "staging",
-    ) is expected
+    assert (
+        artifact_reader.has_exact_repository_access_failure(
+            session,
+            session_id=session.name,
+            oracle_version="0.16.1",
+            staging_dir=tmp_path / "staging",
+        )
+        is expected
+    )
 
 
 def test_repository_access_failure_with_zip_is_contradictory(tmp_path: Path) -> None:
     session = _session(tmp_path)
     transcript = session / "artifacts" / "transcript.md"
-    transcript.write_bytes(
-        b"# Oracle Browser Transcript\n## Prompt\nprivate\n## Answer\n"
-        b"repository access failed\n"
-    )
+    transcript.write_bytes(b"# Oracle Browser Transcript\n## Prompt\nprivate\n## Answer\nrepository access failed\n")
     zip_path = session / "artifacts" / "candidate.zip"
     _write_zip(zip_path)
     _write_metadata(
@@ -128,7 +124,9 @@ def test_metadata_identity_and_integrity_fail_closed(tmp_path: Path, failure: st
     _write_zip(zip_path)
     entry = _artifact("file", zip_path)
     if failure == "size":
-        entry["sizeBytes"] += 1
+        size_bytes = entry["sizeBytes"]
+        assert isinstance(size_bytes, int)
+        entry["sizeBytes"] = size_bytes + 1
     elif failure == "sha":
         entry["sha256"] = "0" * 64
     _write_metadata(session, [entry])

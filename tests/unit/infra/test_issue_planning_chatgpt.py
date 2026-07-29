@@ -599,13 +599,7 @@ def test_authoring_zip_with_repository_access_failure_near_match_is_rejected(
         monkeypatch,
         tmp_path,
         role=role,
-        transcript_payloads=(
-            b"# Oracle Browser Transcript\n"
-            b"## Prompt\nprivate prompt\n"
-            b"## Answer\n"
-            + answer
-            + b"\n",
-        ),
+        transcript_payloads=(b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\n## Answer\n" + answer + b"\n",),
     )
     assert (result.status, result.reason) == (
         "rejected",
@@ -624,10 +618,8 @@ def test_authoring_zip_with_repository_access_failure_near_match_is_rejected(
             b"## Answer\ncandidate ready\n## Answer\ncandidate ready\n",
         ),
         (
-            b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\n"
-            b"## Answer\ncandidate ready\n",
-            b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\n"
-            b"## Answer\ncandidate ready\n",
+            b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\n## Answer\ncandidate ready\n",
+            b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\n## Answer\ncandidate ready\n",
         ),
     ],
 )
@@ -656,11 +648,7 @@ def test_authoring_zip_with_normal_success_transcript_is_accepted(
     result = _invoke_with_authoring_transcripts(
         monkeypatch,
         tmp_path,
-        transcript_payloads=(
-            b"# Oracle Browser Transcript\n"
-            b"## Prompt\nprivate prompt\n"
-            b"## Answer\ncandidate ready\n",
-        ),
+        transcript_payloads=(b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\n## Answer\ncandidate ready\n",),
     )
     assert (result.status, result.reason) == ("pass", "transport_received")
     assert result.authoring_zip is not None
@@ -750,11 +738,7 @@ def _invoke(
             role=role,
             prompt=prompt,
             attachments=(("source.md", "safe context"),),
-            output_expectation=(
-                _review_expectation()
-                if role == "reviewer"
-                else _authoring_expectation()
-            ),
+            output_expectation=(_review_expectation() if role == "reviewer" else _authoring_expectation()),
         ),
         timeout_seconds=timeout_seconds,
     )
@@ -805,9 +789,7 @@ def _write_planner_session(
 ) -> None:
     resolved_id = session_id or _session_id(argv)
     session = _session_dir(env, resolved_id)
-    artifact = session / "artifacts" / (
-        filename or "iss-00003-issue-planning-documents.zip"
-    )
+    artifact = session / "artifacts" / (filename or "iss-00003-issue-planning-documents.zip")
     artifact.parent.mkdir(parents=True, exist_ok=True)
     if zip_bytes is None:
         with zipfile.ZipFile(artifact, "w") as archive:
@@ -863,9 +845,7 @@ def _authoring_expectation() -> PlanningOutputExpectation:
             "plan.md",
             "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md",
         ),
-        onboarding_companion_path=(
-            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
-        ),
+        onboarding_companion_path=("artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"),
     )
 
 

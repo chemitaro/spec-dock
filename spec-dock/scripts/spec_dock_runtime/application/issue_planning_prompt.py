@@ -70,14 +70,17 @@ class PlanningOutputExpectation:
             return
         if self.kind != "review_json":
             raise ValueError("planning output expectation kind is invalid")
-        if any(
-            value is not None
-            for value in (
-                self.logical_filename,
-                self.internal_root,
-                self.onboarding_companion_path,
+        if (
+            any(
+                value is not None
+                for value in (
+                    self.logical_filename,
+                    self.internal_root,
+                    self.onboarding_companion_path,
+                )
             )
-        ) or self.exact_inventory:
+            or self.exact_inventory
+        ):
             raise ValueError("Reviewer expectation must not carry ZIP fields")
         if self.closed_json_top_level_keys != (
             "reviewed_identity",
@@ -118,12 +121,7 @@ class PlanningPromptAttachment:
 
     def __post_init__(self) -> None:
         for value, field_name in ((self.name, "name"), (self.source_label, "source_label")):
-            if (
-                not isinstance(value, str)
-                or not value
-                or "\\" in value
-                or is_credential_like_path(value)
-            ):
+            if not isinstance(value, str) or not value or "\\" in value or is_credential_like_path(value):
                 raise ValueError(f"planning attachment {field_name} is unsafe")
             path = PurePosixPath(value)
             if path.is_absolute() or any(part in ("", ".", "..") or part.startswith(".") for part in path.parts):
@@ -268,14 +266,11 @@ def synthesize_planning_evidence_prompt(
     resource_name = "reviewer-prompt.md" if role == "reviewer" else "revision-prompt.md"
     role_prompt = (resources / resource_name).read_text(encoding="utf-8")
     transport = (resources / "transport-output-contract.md").read_text(encoding="utf-8")
-    expectation = output_expectation or (
-        _review_expectation() if role == "reviewer" else None
-    )
+    expectation = output_expectation or (_review_expectation() if role == "reviewer" else None)
     if expectation is None:
         raise ValueError("authoring output expectation is required")
     index = "\n".join(
-        f"- {item.name}: classification={item.classification}; "
-        f"source_label={item.source_label}; sha256={item.sha256}"
+        f"- {item.name}: classification={item.classification}; source_label={item.source_label}; sha256={item.sha256}"
         for item in exact_attachments
     )
     instruction_block = "\n".join(f"- {item}" for item in instructions) or "- none"
@@ -410,8 +405,7 @@ def _provider_resource_root() -> Path:
     )
     for candidate in candidates:
         if all(
-            (candidate / name).is_file() and not (candidate / name).is_symlink()
-            for name in _REQUIRED_RESOURCE_NAMES
+            (candidate / name).is_file() and not (candidate / name).is_symlink() for name in _REQUIRED_RESOURCE_NAMES
         ):
             return candidate
     raise FileNotFoundError("managed Issue Planning prompt resources are incomplete")

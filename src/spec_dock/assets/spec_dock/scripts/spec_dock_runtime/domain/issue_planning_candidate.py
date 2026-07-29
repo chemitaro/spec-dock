@@ -118,9 +118,7 @@ def candidate_paths(companion_path: str) -> tuple[str, ...]:
 
 
 def checksum_paths(companion_path: str) -> tuple[str, ...]:
-    return tuple(
-        path for path in candidate_paths(companion_path) if path != "CHECKSUMS.sha256"
-    )
+    return tuple(path for path in candidate_paths(companion_path) if path != "CHECKSUMS.sha256")
 
 
 def validate_onboarding_companion_path(path: str) -> None:
@@ -188,8 +186,7 @@ def validate_onboarding_companion(path: str, payload: bytes) -> None:
     )
     normalized_blocks = tuple(block.casefold() for block in blocks)
     if any(
-        not any(any(role in block for role in alternatives) for block in normalized_blocks)
-        for alternatives in roles
+        not any(any(role in block for role in alternatives) for block in normalized_blocks) for alternatives in roles
     ):
         raise ValueError("onboarding companion PlantUML role is missing")
     if any(block.count("@startuml") != 1 or block.count("@enduml") != 1 for block in blocks):
@@ -223,11 +220,7 @@ def _has_distinct_required_sections(
         tuple(
             section_index
             for section_index, (section, body) in enumerate(sections)
-            if body.strip()
-            and all(
-                any(token in section for token in alternatives)
-                for alternatives in concepts
-            )
+            if body.strip() and all(any(token in section for token in alternatives) for alternatives in concepts)
         )
         for concepts in required_concepts
     )
@@ -389,11 +382,7 @@ def build_candidate_material(
     )
     if _SHA256_RE.fullmatch(source_payload_sha256) is None:
         raise ValueError("source payload SHA-256 is invalid")
-    if (
-        isinstance(source_payload_size, bool)
-        or not isinstance(source_payload_size, int)
-        or source_payload_size < 0
-    ):
+    if isinstance(source_payload_size, bool) or not isinstance(source_payload_size, int) or source_payload_size < 0:
         raise ValueError("source payload size is invalid")
     instant = _as_utc(operation_time).replace(microsecond=0)
     normalized = normalize_planner_documents(planner_documents, baseline, instant)
@@ -403,33 +392,29 @@ def build_candidate_material(
     logical_filename = f"{stem}.zip"
     candidate_id = f"{baseline.issue_id}-v{version}-{timestamp_token}"
 
-    source_baseline = canonical_control_json_bytes(
-        {
-            "canonical_issue_paths": list(context.canonical_issue_paths),
-            "dependency_ids": list(context.dependency_summary),
-            "issue_id": baseline.issue_id,
-            "parent_epic_id": context.parent_epic_id,
-            "parent_initiative_id": context.parent_initiative_id,
-            "planner_payload_sha256": source_payload_sha256,
-            "planner_payload_size": source_payload_size,
-            "relevant_paths": list(context.relevant_source_paths),
-            "remote_head": source_evidence.remote_head,
-            "remote_head_disposition": source_evidence.remote_head_disposition,
-            "schema_version": "spec-dock.issue-candidate-source-baseline.v1",
-            "snapshot_id": source_evidence.snapshot_id,
-            "source_branch": source_evidence.branch,
-            "source_head": source_evidence.local_head,
-            "source_manifest_hash": source_evidence.source_manifest_hash,
-            "source_repository": source_evidence.repository,
-            "upstream": source_evidence.upstream,
-        }
-    )
-    placeholder_map = canonical_control_json_bytes(
-        {
-            "files": [],
-            "schema_version": "spec-dock.issue-candidate-placeholder-map.v1",
-        }
-    )
+    source_baseline = canonical_control_json_bytes({
+        "canonical_issue_paths": list(context.canonical_issue_paths),
+        "dependency_ids": list(context.dependency_summary),
+        "issue_id": baseline.issue_id,
+        "parent_epic_id": context.parent_epic_id,
+        "parent_initiative_id": context.parent_initiative_id,
+        "planner_payload_sha256": source_payload_sha256,
+        "planner_payload_size": source_payload_size,
+        "relevant_paths": list(context.relevant_source_paths),
+        "remote_head": source_evidence.remote_head,
+        "remote_head_disposition": source_evidence.remote_head_disposition,
+        "schema_version": "spec-dock.issue-candidate-source-baseline.v1",
+        "snapshot_id": source_evidence.snapshot_id,
+        "source_branch": source_evidence.branch,
+        "source_head": source_evidence.local_head,
+        "source_manifest_hash": source_evidence.source_manifest_hash,
+        "source_repository": source_evidence.repository,
+        "upstream": source_evidence.upstream,
+    })
+    placeholder_map = canonical_control_json_bytes({
+        "files": [],
+        "schema_version": "spec-dock.issue-candidate-placeholder-map.v1",
+    })
     paths = candidate_paths(onboarding_companion_path)
     entries = [
         {
@@ -449,24 +434,22 @@ def build_candidate_material(
         }
         for path in paths
     ]
-    manifest = canonical_control_json_bytes(
-        {
-            "candidate": {
-                "candidate_id": candidate_id,
-                "created_at_utc": created_at_utc,
-                "internal_root": stem,
-                "issue_id": baseline.issue_id,
-                "logical_filename": logical_filename,
-                "version": version,
-            },
-            "checksum_algorithm": "sha256",
-            "checksum_file": "CHECKSUMS.sha256",
-            "entries": entries,
-            "placeholder_oracle_map_sha256": hashlib.sha256(placeholder_map).hexdigest(),
-            "schema_version": "spec-dock.issue-candidate-manifest.v1",
-            "source_baseline_sha256": hashlib.sha256(source_baseline).hexdigest(),
-        }
-    )
+    manifest = canonical_control_json_bytes({
+        "candidate": {
+            "candidate_id": candidate_id,
+            "created_at_utc": created_at_utc,
+            "internal_root": stem,
+            "issue_id": baseline.issue_id,
+            "logical_filename": logical_filename,
+            "version": version,
+        },
+        "checksum_algorithm": "sha256",
+        "checksum_file": "CHECKSUMS.sha256",
+        "entries": entries,
+        "placeholder_oracle_map_sha256": hashlib.sha256(placeholder_map).hexdigest(),
+        "schema_version": "spec-dock.issue-candidate-manifest.v1",
+        "source_baseline_sha256": hashlib.sha256(source_baseline).hexdigest(),
+    })
     covered: dict[str, bytes] = {
         "MANIFEST.json": manifest,
         "PLACEHOLDER-ORACLE-MAP.json": placeholder_map,
@@ -475,8 +458,7 @@ def build_candidate_material(
         onboarding_companion_path: onboarding_companion_bytes,
     }
     checksums = "".join(
-        f"{hashlib.sha256(covered[path]).hexdigest()}  {path}\n"
-        for path in checksum_paths(onboarding_companion_path)
+        f"{hashlib.sha256(covered[path]).hexdigest()}  {path}\n" for path in checksum_paths(onboarding_companion_path)
     ).encode("ascii")
     files = MappingProxyType({"CHECKSUMS.sha256": checksums, **covered})
     return CandidateMaterial(
@@ -507,9 +489,7 @@ def derive_candidate_identity(
         internal_root=material.internal_root,
         source_repository=cast(
             "str",
-            parse_canonical_control_json(material.files["SOURCE-BASELINE.json"])[
-                "source_repository"
-            ],
+            parse_canonical_control_json(material.files["SOURCE-BASELINE.json"])["source_repository"],
         ),
         source_branch=cast(
             "str",
@@ -584,12 +564,7 @@ def verify_issue_candidate_files(
         return ("invalid_control_json",)
     entries = manifest.get("entries")
     companion_entries = (
-        [
-            entry
-            for entry in entries
-            if isinstance(entry, dict)
-            and entry.get("role") == "onboarding-companion"
-        ]
+        [entry for entry in entries if isinstance(entry, dict) and entry.get("role") == "onboarding-companion"]
         if isinstance(entries, list)
         else []
     )
@@ -672,9 +647,7 @@ def verify_issue_candidate_files(
         or manifest.get("checksum_file") != "CHECKSUMS.sha256"
     ):
         findings.append("manifest_identity_mismatch")
-    if hashlib.sha256(files["SOURCE-BASELINE.json"]).hexdigest() != manifest.get(
-        "source_baseline_sha256"
-    ):
+    if hashlib.sha256(files["SOURCE-BASELINE.json"]).hexdigest() != manifest.get("source_baseline_sha256"):
         findings.append("source_baseline_hash_mismatch")
     if hashlib.sha256(files["PLACEHOLDER-ORACLE-MAP.json"]).hexdigest() != manifest.get(
         "placeholder_oracle_map_sha256"
@@ -691,8 +664,7 @@ def verify_issue_candidate_files(
             for declaration in placeholder_files
             if isinstance(declaration, dict) and isinstance(declaration.get("path"), str)
         }
-        if isinstance(placeholder_files, list)
-        and "invalid_placeholder_map" not in placeholder_findings
+        if isinstance(placeholder_files, list) and "invalid_placeholder_map" not in placeholder_findings
         else set()
     )
     expected_entries = [
@@ -716,8 +688,7 @@ def verify_issue_candidate_files(
     if entries != expected_entries:
         findings.append("manifest_inventory_mismatch")
     expected_checksums = "".join(
-        f"{hashlib.sha256(files[path]).hexdigest()}  {path}\n"
-        for path in checksum_paths(cast("str", companion_path))
+        f"{hashlib.sha256(files[path]).hexdigest()}  {path}\n" for path in checksum_paths(cast("str", companion_path))
     ).encode("ascii")
     if files["CHECKSUMS.sha256"] != expected_checksums:
         findings.append("checksum_mismatch")
@@ -735,8 +706,7 @@ def _valid_source_baseline(value: Mapping[str, Any]) -> bool:
         isinstance(canonical_paths, list)
         and len(canonical_paths) == 3
         and all(isinstance(path, str) for path in canonical_paths)
-        and [path.rsplit("/", 1)[-1] for path in canonical_paths]
-        == ["design.md", "plan.md", "requirement.md"]
+        and [path.rsplit("/", 1)[-1] for path in canonical_paths] == ["design.md", "plan.md", "requirement.md"]
         and canonical_paths == sorted(canonical_paths, key=lambda item: item.encode("utf-8"))
         and _sorted_unique_strings(dependency_ids)
         and _sorted_unique_strings(relevant_paths)
@@ -817,9 +787,7 @@ def apply_mechanical_revision(
 ) -> Mapping[str, bytes]:
     validate_onboarding_companion_path(onboarding_companion_path)
     expected = (*DOCUMENT_NAMES, onboarding_companion_path)
-    if tuple(payloads) != expected or any(
-        not isinstance(value, bytes) for value in payloads.values()
-    ):
+    if tuple(payloads) != expected or any(not isinstance(value, bytes) for value in payloads.values()):
         raise ValueError("mechanical payload inventory is invalid")
     if target_file not in expected:
         raise ValueError("mechanical target file is not allowed")
@@ -838,7 +806,7 @@ def apply_mechanical_revision(
     if target_file in DOCUMENT_NAMES:
         fields, body = _parse_document(target_file, source)
         del fields
-        prefix = source[:-len(body)]
+        prefix = source[: -len(body)]
     else:
         body = source
         prefix = b""
@@ -919,8 +887,10 @@ def _validate_completeness(body: bytes, baseline: IssueFrontMatterBaseline) -> N
     lines = text.splitlines()
     nonblank = [line for line in lines if line.strip()]
     expected_h1_tokens = (baseline.issue_id, baseline.title)
-    if not nonblank or not nonblank[0].startswith("# ") or any(
-        token not in nonblank[0] for token in expected_h1_tokens
+    if (
+        not nonblank
+        or not nonblank[0].startswith("# ")
+        or any(token not in nonblank[0] for token in expected_h1_tokens)
     ):
         raise ValueError("document completeness requires an identity H1")
     if sum(line.startswith("# ") for line in lines) != 1:

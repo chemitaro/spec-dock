@@ -4,9 +4,7 @@ import sys
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.domain.issue_planning_contracts import PlanningCommandResult  # noqa: E402

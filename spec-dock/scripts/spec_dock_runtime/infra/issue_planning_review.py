@@ -64,9 +64,8 @@ def publish_planning_review_evidence(
     operation_time: datetime,
 ) -> PublishedPlanningReview:
     guard = validate_candidate_output_directory(output_dir, repo_root)
-    if (
-        len(reviewed_identity_sha256) != 64
-        or any(character not in "0123456789abcdef" for character in reviewed_identity_sha256)
+    if len(reviewed_identity_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in reviewed_identity_sha256
     ):
         raise ValueError("reviewed identity SHA-256 is invalid")
     if len(review_result_bytes) > MAX_REVIEW_RESULT_BYTES:

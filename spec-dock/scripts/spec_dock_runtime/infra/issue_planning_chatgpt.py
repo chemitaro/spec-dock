@@ -524,7 +524,4 @@ def _invocation_contract_is_valid(
     if synthesized.role != role or expectation is None:
         return False
     expected_kind = "review_json" if role == "reviewer" else "authoring_zip"
-    return (
-        role in {"planner", "semantic_revision", "reviewer"}
-        and expectation.kind == expected_kind
-    )
+    return role in {"planner", "semantic_revision", "reviewer"} and expectation.kind == expected_kind

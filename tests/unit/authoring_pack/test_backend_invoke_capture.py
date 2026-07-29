@@ -3,9 +3,7 @@ import shlex
 import subprocess
 import sys
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application.authoring_pack import backend_invoke  # noqa: E402
@@ -40,9 +38,13 @@ def test_capture_entrypoint_uses_direct_argv_verified_cwd_and_keeps_streams_tran
     assert result.status == "pass"
     assert streams.stdout == b"payload"
     assert streams.stderr == b"diagnostic"
-    assert captured["argv"][0] == "/fixed/wrapper"
-    assert captured["kwargs"]["cwd"] == str(tmp_path.resolve())
-    assert "shell" not in captured["kwargs"]
+    captured_argv = captured["argv"]
+    captured_kwargs = captured["kwargs"]
+    assert isinstance(captured_argv, list)
+    assert isinstance(captured_kwargs, dict)
+    assert captured_argv[0] == "/fixed/wrapper"
+    assert captured_kwargs["cwd"] == str(tmp_path.resolve())
+    assert "shell" not in captured_kwargs
     assert "payload" not in str(result.to_dict())
 
 

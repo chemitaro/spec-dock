@@ -125,12 +125,7 @@ def validate_candidate_output_directory(output_dir: Path, repo_root: Path) -> Ou
 
 def load_verified_issue_candidate(candidate_path: Path, repo_root: Path) -> VerifiedIssueCandidate:
     lexical = candidate_path.absolute()
-    if (
-        not lexical.exists()
-        or not lexical.is_file()
-        or _has_symlink_component(lexical)
-        or lexical.suffix != ".zip"
-    ):
+    if not lexical.exists() or not lexical.is_file() or _has_symlink_component(lexical) or lexical.suffix != ".zip":
         raise CandidateArchiveRejected(("unsafe_candidate_path",))
     try:
         candidate = lexical.resolve(strict=True)
@@ -145,20 +140,12 @@ def load_verified_issue_candidate(candidate_path: Path, repo_root: Path) -> Veri
             names = tuple(info.filename for info in archive.infolist())
     except (OSError, zipfile.BadZipFile) as error:
         raise CandidateArchiveRejected(("archive_unreadable",)) from error
-    roots = {
-        name.partition("/")[0]
-        for name in names
-        if "/" in name and name.partition("/")[0]
-    }
+    roots = {name.partition("/")[0] for name in names if "/" in name and name.partition("/")[0]}
     if len(roots) != 1:
         raise CandidateArchiveRejected(("root_mismatch",))
     internal_root = next(iter(roots))
     prefix = f"{internal_root}/"
-    relative_names = {
-        name[len(prefix) :]
-        for name in names
-        if name.startswith(prefix) and not name.endswith("/")
-    }
+    relative_names = {name[len(prefix) :] for name in names if name.startswith(prefix) and not name.endswith("/")}
     possible_companions = relative_names - {
         "CHECKSUMS.sha256",
         "MANIFEST.json",
@@ -184,8 +171,7 @@ def load_verified_issue_candidate(candidate_path: Path, repo_root: Path) -> Veri
     try:
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
             files = {
-                relative: archive.read(f"{internal_root}/{relative}")
-                for relative in candidate_paths(companion_path)
+                relative: archive.read(f"{internal_root}/{relative}") for relative in candidate_paths(companion_path)
             }
         manifest = parse_canonical_control_json(files["MANIFEST.json"])
         source = parse_canonical_control_json(files["SOURCE-BASELINE.json"])
@@ -262,8 +248,7 @@ def load_validated_issue_authoring_payload(
     try:
         with zipfile.ZipFile(io.BytesIO(snapshot.zip_bytes)) as archive:
             payloads = {
-                path: archive.read(f"{expected_root}/{path}")
-                for path in (*DOCUMENT_NAMES, expected_companion_path)
+                path: archive.read(f"{expected_root}/{path}") for path in (*DOCUMENT_NAMES, expected_companion_path)
             }
         return ValidatedIssueAuthoringPayload(
             expected_logical_filename=snapshot.expected_logical_filename,
@@ -271,9 +256,7 @@ def load_validated_issue_authoring_payload(
             internal_root=snapshot.internal_root,
             zip_sha256=snapshot.sha256,
             zip_size_bytes=snapshot.size_bytes,
-            documents=MappingProxyType(
-                {name: payloads[name] for name in DOCUMENT_NAMES}
-            ),
+            documents=MappingProxyType({name: payloads[name] for name in DOCUMENT_NAMES}),
             onboarding_companion_path=expected_companion_path,
             onboarding_companion_bytes=payloads[expected_companion_path],
         )
@@ -505,9 +488,7 @@ def build_and_publish_candidate(
         published = True
         companion = OnboardingCompanionBindingV1(
             path=material.onboarding_companion_path,
-            sha256=hashlib.sha256(
-                material.files[material.onboarding_companion_path]
-            ).hexdigest(),
+            sha256=hashlib.sha256(material.files[material.onboarding_companion_path]).hexdigest(),
         )
         return PublishedCandidate(
             identity=identity,

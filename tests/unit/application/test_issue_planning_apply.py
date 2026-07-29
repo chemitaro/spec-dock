@@ -9,9 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application import issue_planning  # noqa: E402
@@ -36,16 +34,7 @@ COMPANION_SHA = hashlib.sha256(COMPANION_BYTES).hexdigest()
 
 
 def _issue_tree(repo: Path) -> tuple[Path, StoredMetaRecord]:
-    issue_dir = (
-        repo
-        / "spec-dock"
-        / "initiatives"
-        / "init-one"
-        / "epics"
-        / "epic-one"
-        / "issues"
-        / "iss-one"
-    )
+    issue_dir = repo / "spec-dock" / "initiatives" / "init-one" / "epics" / "epic-one" / "issues" / "iss-one"
     issue_dir.mkdir(parents=True)
     for name in ("requirement.md", "design.md", "plan.md"):
         (issue_dir / name).write_bytes(f"old {name}\n".encode())
@@ -128,7 +117,7 @@ def _evidence_files(
     verdict: str = "pass",
     decision: str = "approved",
 ) -> tuple[Path, Path]:
-    findings = ()
+    findings: tuple[PlanningReviewFinding, ...] = ()
     if verdict == "fail":
         findings = (
             PlanningReviewFinding(
@@ -186,9 +175,7 @@ def _preflight(
         status=status,
         local_head=head,
         remote_head=head,
-        blockers=blockers if blockers is not None else (
-            () if status == "pass" else ("source_hash_mismatch",)
-        ),
+        blockers=blockers if blockers is not None else (() if status == "pass" else ("source_hash_mismatch",)),
         repository=SimpleNamespace(
             normalized_origin="https://github.com/owner/repo.git",
             branch="feature/issue",
@@ -237,9 +224,7 @@ def _request(
         "expected_head": HEAD,
         "output_dir": output,
         "candidate_path": output / "iss-00003-planning-candidate-v1.zip",
-        "logical_filename": "iss-00003-planning-candidate-v1.zip"
-        if mode == "archive-candidate"
-        else None,
+        "logical_filename": "iss-00003-planning-candidate-v1.zip" if mode == "archive-candidate" else None,
         "zip_sha256": ZIP_SHA if mode == "archive-candidate" else None,
         "reviewed_head": HEAD if mode == "git-bound" else None,
     }
@@ -301,10 +286,7 @@ def _run(
         )
 
     def expected_target_loader(root, _expected_head, canonical_paths):
-        documents = {
-            PurePath(path).name: (root / path).read_bytes()
-            for path in canonical_paths
-        }
+        documents = {PurePath(path).name: (root / path).read_bytes() for path in canonical_paths}
         return SimpleNamespace(
             documents=documents,
             blob_oids={
@@ -432,9 +414,10 @@ def test_pa_nf_06_wrong_review_identity_is_rejected(tmp_path: Path, kind: str) -
     repo.mkdir()
     _issue_dir, record = _issue_tree(repo)
     paths = issue_planning.resolve_existing_issue_target("iss-00003", [record], repo).canonical_issue_paths
+    changes: dict[str, object] = {}
     if kind == "head":
         identity = _identity("git-bound", target_paths=paths, source_head="d" * 40)
-        changes = {"reviewed_head": "d" * 40}
+        changes["reviewed_head"] = "d" * 40
     else:
         wrong_paths = tuple(path.replace("/iss-one/", "/iss-other/") for path in paths)
         identity = ReviewedPlanningIdentity(
@@ -457,7 +440,6 @@ def test_pa_nf_06_wrong_review_identity_is_rejected(tmp_path: Path, kind: str) -
             ),
             expected_canonical_target_paths=wrong_paths,  # type: ignore[arg-type]
         )
-        changes = {}
     result, calls, _, _ = _run(
         tmp_path / "case",
         mode="git-bound",
@@ -470,16 +452,22 @@ def test_pa_nf_06_wrong_review_identity_is_rejected(tmp_path: Path, kind: str) -
 
 @pytest.mark.parametrize("kind", ["source", "candidate", "target"])
 def test_pa_nf_07_apply_target_drift_is_stale(tmp_path: Path, kind: str) -> None:
-    kwargs: dict[str, object] = {}
-    mode = "archive-candidate"
+    mode: str = "archive-candidate"
+    preflight: object | None = None
+    candidate: VerifiedIssueCandidate | None = None
     if kind == "source":
-        kwargs["preflight"] = _preflight(head="d" * 40)
+        preflight = _preflight(head="d" * 40)
     elif kind == "candidate":
-        kwargs["candidate"] = _verified_candidate(_candidate_identity(zip_sha256="d" * 64))
+        candidate = _verified_candidate(_candidate_identity(zip_sha256="d" * 64))
     else:
         mode = "git-bound"
-        kwargs["preflight"] = _preflight(head="d" * 40)
-    result, calls, _, _ = _run(tmp_path, mode=mode, **kwargs)
+        preflight = _preflight(head="d" * 40)
+    result, calls, _, _ = _run(
+        tmp_path,
+        mode=mode,
+        preflight=preflight,
+        candidate=candidate,
+    )
     _assert_not_ready(result, ("stale", "apply_target_changed"))
     assert calls == []
 

@@ -6,9 +6,7 @@ import sys
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 
@@ -156,9 +154,7 @@ def test_review_publication_never_renames_through_swapped_output_path(
         if revalidations[0] != 2:
             return
         temporary_name = next(
-            child.name
-            for child in output.iterdir()
-            if child.name.startswith(".spec-dock-planning-review-")
+            child.name for child in output.iterdir() if child.name.startswith(".spec-dock-planning-review-")
         )
         output.rename(backup)
         output.symlink_to(repo, target_is_directory=True)
@@ -166,9 +162,7 @@ def test_review_publication_never_renames_through_swapped_output_path(
         malicious_source.mkdir()
         (malicious_source / "attacker-controlled").write_bytes(b"not review evidence")
         repo_baseline.extend(
-            (str(path.relative_to(repo)), path.read_bytes())
-            for path in repo.rglob("*")
-            if path.is_file()
+            (str(path.relative_to(repo)), path.read_bytes()) for path in repo.rglob("*") if path.is_file()
         )
 
     monkeypatch.setattr(review, "_revalidate_output_guard", swap_after_final_revalidation)
@@ -182,9 +176,7 @@ def test_review_publication_never_renames_through_swapped_output_path(
             operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
         )
     assert [
-        (str(path.relative_to(repo)), path.read_bytes())
-        for path in repo.rglob("*")
-        if path.is_file()
+        (str(path.relative_to(repo)), path.read_bytes()) for path in repo.rglob("*") if path.is_file()
     ] == repo_baseline
     assert not any(path.name.startswith("review-") for path in repo.iterdir())
     assert list(backup.iterdir()) == []
@@ -210,9 +202,8 @@ def test_external_review_result_transient_swap_is_nonblocking_and_rejected(
 
     def swap_before_open(path, flags, *args, **kwargs):
         if (
-            (Path(path) == result_path or (path == result_path.name and kwargs.get("dir_fd") is not None))
-            and not swapped[0]
-        ):
+            Path(path) == result_path or (path == result_path.name and kwargs.get("dir_fd") is not None)
+        ) and not swapped[0]:
             swapped[0] = True
             result_path.unlink()
             if swap_kind == "fifo":

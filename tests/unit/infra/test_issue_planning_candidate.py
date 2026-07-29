@@ -7,13 +7,15 @@ import os
 from pathlib import Path
 import shutil
 import sys
+from typing import TYPE_CHECKING
 import zipfile
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+if TYPE_CHECKING:
+    from spec_dock_runtime.domain.issue_planning_contracts import IssueCandidateIdentity
+
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 
@@ -33,15 +35,11 @@ def _files() -> dict[str, bytes]:
         "design.md": b"design\n",
         "plan.md": b"plan\n",
         "requirement.md": b"requirement\n",
-        "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md": (
-            b"guide\n"
-        ),
+        "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md": (b"guide\n"),
     }
 
 
-COMPANION_PATH = (
-    "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
-)
+COMPANION_PATH = "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
 
 
 def _companion() -> bytes:
@@ -108,15 +106,7 @@ The first-day checklist directs onboarding.
         "planning sequence",
         "implementation roadmap",
     )
-    blocks = "".join(
-        "\n```plantuml\n"
-        "@startuml\n"
-        f"title {role}\n"
-        "actor Human\n"
-        "@enduml\n"
-        "```\n"
-        for role in roles
-    )
+    blocks = "".join(f"\n```plantuml\n@startuml\ntitle {role}\nactor Human\n@enduml\n```\n" for role in roles)
     return (preface + blocks).encode()
 
 
@@ -186,7 +176,7 @@ def _valid_candidate(
     tmp_path: Path,
     *,
     body: str = "Substantive content.",
-) -> tuple[Path, Path, object]:
+) -> tuple[Path, Path, "IssueCandidateIdentity"]:
     domain = __import__(
         "spec_dock_runtime.domain.issue_planning_candidate",
         fromlist=["build_candidate_material"],
@@ -346,18 +336,12 @@ def test_load_verified_candidate_rejects_invalid_companion_binding(
         companion_name = f"{root}/{COMPANION_PATH}"
         if damage in {"zero-role", "multiple-role"}:
             manifest = json.loads(entries[manifest_name])
-            companion_entry = next(
-                entry
-                for entry in manifest["entries"]
-                if entry["path"] == COMPANION_PATH
-            )
+            companion_entry = next(entry for entry in manifest["entries"] if entry["path"] == COMPANION_PATH)
             companion_entry["role"] = "artifact"
             if damage == "multiple-role":
-                next(
-                    entry
-                    for entry in manifest["entries"]
-                    if entry["path"] == "design.md"
-                )["role"] = "onboarding-companion"
+                next(entry for entry in manifest["entries"] if entry["path"] == "design.md")["role"] = (
+                    "onboarding-companion"
+                )
             entries[manifest_name] = (
                 json.dumps(
                     manifest,
@@ -491,10 +475,9 @@ def test_load_verified_candidate_fifo_swap_is_nonblocking_and_rejected(
     swapped = [False]
 
     def swap_before_open(path, flags, *args, **kwargs):
-        if (
-            (Path(path) == candidate or (path == candidate.name and kwargs.get("dir_fd") is not None))
-            and not swapped[0]
-        ):
+        if (Path(path) == candidate or (path == candidate.name and kwargs.get("dir_fd") is not None)) and not swapped[
+            0
+        ]:
             swapped[0] = True
             candidate.unlink()
             os.mkfifo(candidate)
