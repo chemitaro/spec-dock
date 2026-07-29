@@ -373,7 +373,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S90 test lane | test-only candidate review | code-reviewer | superseded | failed | no | bounded fix and fresh re-review | exact candidate `74e4362ac16508c3d6db21eb62d6289ece1d4379`をreview。CR-S90-TEST-001 blocking 1件を採用 |
 | S90 test lane R1 | test-only candidate re-review | code-reviewer | superseded | failed | no | second bounded fix and fresh re-review | exact candidate `c043bad10e42d9c023f84bb0fc29dacaf8614863`をreview。CR-S90-TEST-001 open、CR-S90-TEST-R1-001 blocking 1件を採用 |
 | S90 test lane R2 | test-only candidate second re-review | code-reviewer | fresh | passed | no | admit docs lane | exact candidate `a084cea911ef61524b9b24a52b7e0b22e182716e`をreview。prior 2件closed、finding 0、blocking/major/minor 0 |
-| S90 docs lane | docs candidate review | spec-reviewer | fresh | passed | no | proceed to evidence-only closure commit | exact candidate `5b5033068cb10af222ce820df9c4eec4a17d69e3`をreview。全境界correct、finding 0 |
+| S90 docs lane | docs candidate review | spec-reviewer | fresh | passed | no | execute approved plan; proceed to evidence-only closure commit | exact candidate `5b5033068cb10af222ce820df9c4eec4a17d69e3`をreview。全境界correct、finding 0 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
