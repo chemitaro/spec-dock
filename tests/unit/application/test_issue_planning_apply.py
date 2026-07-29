@@ -16,7 +16,9 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application import issue_planning  # noqa: E402
 from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
+    GitBoundOperationBindingV1,
     IssueCandidateIdentity,
+    OnboardingCompanionBindingV1,
     PlanningHumanDecisionV1,
     PlanningReviewFinding,
     PlanningReviewResult,
@@ -28,6 +30,9 @@ from spec_dock_runtime.infra.issue_planning_candidate import VerifiedIssueCandid
 HEAD = "a" * 40
 ZIP_SHA = "b" * 64
 SOURCE_HASH = "c" * 64
+COMPANION_PATH = "artifacts/20260729t000000z-guide-new-member.md"
+COMPANION_BYTES = b"onboarding companion\n"
+COMPANION_SHA = hashlib.sha256(COMPANION_BYTES).hexdigest()
 
 
 def _issue_tree(repo: Path) -> tuple[Path, StoredMetaRecord]:
@@ -92,6 +97,11 @@ def _identity(
             candidate_identity=candidate or _candidate_identity(source_head=source_head),
         )
     assert target_paths is not None
+    candidate_identity = candidate or _candidate_identity(source_head=source_head)
+    companion = OnboardingCompanionBindingV1(
+        path=COMPANION_PATH,
+        sha256=COMPANION_SHA,
+    )
     return ReviewedPlanningIdentity(
         mode="git-bound",
         issue_id="iss-00003",
@@ -99,6 +109,14 @@ def _identity(
         branch="feature/issue",
         source_head=source_head,
         canonical_target_paths=target_paths,
+        git_bound_operation_binding=GitBoundOperationBindingV1.create(
+            issue_id="iss-00003",
+            repository="owner/repo",
+            branch="feature/issue",
+            source_head=source_head,
+            candidate_identity=candidate_identity,
+            onboarding_companion=companion,
+        ),
         expected_canonical_target_paths=target_paths,
     )
 
@@ -188,6 +206,7 @@ def _verified_candidate(identity: IssueCandidateIdentity | None = None) -> Verif
             "requirement.md": b"new requirement\n",
             "design.md": b"new design\n",
             "plan.md": b"new plan\n",
+            COMPANION_PATH: COMPANION_BYTES,
         },
         source_baseline={
             "source_manifest_hash": SOURCE_HASH,
@@ -195,6 +214,10 @@ def _verified_candidate(identity: IssueCandidateIdentity | None = None) -> Verif
             "relevant_paths": [],
         },
         zip_bytes=b"zip",
+        onboarding_companion=OnboardingCompanionBindingV1(
+            path=COMPANION_PATH,
+            sha256=COMPANION_SHA,
+        ),
     )
 
 
@@ -213,9 +236,7 @@ def _request(
         "human_decision_path": human,
         "expected_head": HEAD,
         "output_dir": output,
-        "candidate_path": output / "iss-00003-planning-candidate-v1.zip"
-        if mode == "archive-candidate"
-        else None,
+        "candidate_path": output / "iss-00003-planning-candidate-v1.zip",
         "logical_filename": "iss-00003-planning-candidate-v1.zip"
         if mode == "archive-candidate"
         else None,
@@ -244,7 +265,12 @@ def _run(
     output = tmp_path / "output"
     output.mkdir()
     target = issue_planning.resolve_existing_issue_target("iss-00003", [record], repo)
-    reviewed = identity or _identity(mode, target_paths=target.canonical_issue_paths)
+    default_candidate = _verified_candidate()
+    reviewed = identity or _identity(
+        mode,
+        target_paths=target.canonical_issue_paths,
+        candidate=default_candidate.identity,
+    )
     review_path, human_path = _evidence_files(
         output,
         reviewed,
@@ -301,7 +327,7 @@ def _run(
             state=SimpleNamespace(deps_preflight_error=None),
         ),
         preflight_runner=lambda _request: preflight or _preflight(),
-        candidate_loader=lambda _path, _root: candidate or _verified_candidate(),
+        candidate_loader=lambda _path, _root: candidate or default_candidate,
         expected_target_loader=expected_target_loader,
         resume_probe=lambda _operation, **_kwargs: False,
         transaction_runner=transaction_runner,
@@ -411,6 +437,17 @@ def test_pa_nf_06_wrong_review_identity_is_rejected(tmp_path: Path, kind: str) -
             branch="feature/issue",
             source_head=HEAD,
             canonical_target_paths=wrong_paths,  # type: ignore[arg-type]
+            git_bound_operation_binding=GitBoundOperationBindingV1.create(
+                issue_id="iss-00003",
+                repository="owner/repo",
+                branch="feature/issue",
+                source_head=HEAD,
+                candidate_identity=_candidate_identity(),
+                onboarding_companion=OnboardingCompanionBindingV1(
+                    path=COMPANION_PATH,
+                    sha256=COMPANION_SHA,
+                ),
+            ),
             expected_canonical_target_paths=wrong_paths,  # type: ignore[arg-type]
         )
         changes = {}
