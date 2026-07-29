@@ -3,7 +3,7 @@
 ID: "iss-00344"
 タイトル: "Workbench Shell Scaffolding"
 関連GitHub: ["#344"]
-状態: "review-pending"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-29"
 依存: ["requirement.md", "design.md"]
@@ -1061,16 +1061,17 @@ Final exit:
 ## 18. Plan Approval Checklist
 
 - [x] AC-344-001〜010がClosure Indexへ対応する。
-- [ ] AC-344-011がTC-344-011 / S95 / S99へ対応し、fresh reviewで承認される。
+- [x] AC-344-011がTC-344-011 / S95 / S99へ対応し、fresh reviewで承認される。
 - [x] DES-344-001〜009がMilestone/Behaviorへ対応する。
-- [ ] DES-344-010がS95/S99へ対応し、fresh reviewで承認される。
+- [x] DES-344-010がS95/S99へ対応し、fresh reviewで承認される。
 - [x] 3つのvertical micro-batchが独立検証可能である。
 - [x] Active TDD CycleはB-002のfresh-init vertical tracerだけに限定される。
 - [x] Red、Minimal Green、Refactor guardrailがある。
 - [x] allowed/read-only/forbidden pathが区別される。
 - [x] `setup.py` post-build pruneがM3に含まれる。
 - [x] report evidence destinationとstop conditionがある。
-- [ ] Issue 344のready PR deliveryとIssue 346への残余integration handoff、人間merge境界がfresh reviewされる。
+- [x] Issue 344のready PR deliveryとIssue 346への残余integration handoff、人間merge境界がfresh reviewされる。
+- [x] delivery amendmentのpush済みexact commit `7ae8a957b67805294d6716b19a18e2b45808c3dc`に対するfresh `spec-reviewer`責務re-reviewがPASSし、finding 0である。
 - [x] prior ChatGPT plan review PASS（ChatGPT-First amendmentによりstale）。
 - [x] prior fresh `spec-reviewer` plan review PASS（ChatGPT-First amendmentによりstale）。
 - [x] ChatGPT-First amendment後のpush済みexact commit `a0b99765f7fac5ad384f4f81c85b50990f017fc9`に対するfresh `spec-reviewer`責務review PASS。

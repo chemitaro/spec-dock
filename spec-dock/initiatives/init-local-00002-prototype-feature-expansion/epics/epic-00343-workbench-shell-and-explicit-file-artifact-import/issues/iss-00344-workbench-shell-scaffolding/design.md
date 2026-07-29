@@ -3,7 +3,7 @@
 ID: "iss-00344"
 タイトル: "Workbench Shell Scaffolding"
 関連GitHub: ["#344"]
-状態: "review-pending"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-29"
 依存: ["requirement.md"]
