@@ -245,6 +245,7 @@ class PlanningContext:
     canonical_issue_paths: tuple[str, str, str]
     relevant_source_paths: tuple[str, ...]
     operator_context: tuple[str, ...]
+    onboarding_companion_path: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "issue_id", _issue_id(self.issue_id))
@@ -278,9 +279,18 @@ class PlanningContext:
             "operator_context",
             _string_tuple(self.operator_context, field_name="operator_context"),
         )
+        if self.onboarding_companion_path is not None:
+            object.__setattr__(
+                self,
+                "onboarding_companion_path",
+                _safe_relative_path(
+                    self.onboarding_companion_path,
+                    field_name="onboarding_companion_path",
+                ),
+            )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        value = {
             "issue_id": self.issue_id,
             "repository": self.repository,
             "branch": self.branch,
@@ -292,6 +302,9 @@ class PlanningContext:
             "relevant_source_paths": list(self.relevant_source_paths),
             "operator_context": list(self.operator_context),
         }
+        if self.onboarding_companion_path is not None:
+            value["onboarding_companion_path"] = self.onboarding_companion_path
+        return value
 
 
 @dataclass(frozen=True)
@@ -447,6 +460,7 @@ class PlanningInvocationResult:
             "backend_response_malformed",
             "oracle_unavailable",
             "oracle_capability_unsupported",
+            "github_exact_branch_unavailable",
             "oracle_session_recovery_required",
             "oracle_artifact_missing",
             "oracle_artifact_ambiguous",
@@ -459,6 +473,7 @@ class PlanningInvocationResult:
         oracle_reason_status = {
             "oracle_unavailable": "blocked",
             "oracle_capability_unsupported": "blocked",
+            "github_exact_branch_unavailable": "blocked",
             "oracle_session_recovery_required": "blocked",
             "oracle_artifact_missing": "rejected",
             "oracle_artifact_ambiguous": "rejected",

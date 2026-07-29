@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
@@ -117,7 +117,7 @@ def _planner_payload() -> bytes:
 def _successful_transport(
     payload: bytes | None = None,
     *,
-    source_manifest_hash: str = "c" * 64,
+    source_manifest_hash: str | None = None,
 ):
     contracts = __import__(
         "spec_dock_runtime.domain.issue_planning_contracts",
@@ -130,7 +130,9 @@ def _successful_transport(
         upstream="origin/feature/issue",
         local_head="a" * 40,
         remote_head="a" * 40,
-        source_manifest_hash=source_manifest_hash,
+        source_manifest_hash=(
+            source_manifest_hash or empty_source_manifest().source_manifest_hash
+        ),
         snapshot_id="b" * 64,
         remote_head_disposition="fetched_remote_tracking_ref",
     )
@@ -377,6 +379,9 @@ def test_transport_rejects_source_mutation_after_preflight_before_backend(tmp_pa
         repo_slug_resolver=lambda root: "owner/repo",
         prompt_synthesizer=mutate_then_synthesize,
         backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+        onboarding_companion_path=(
+            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
+        ),
     )
     assert (result.status, result.reason) == ("blocked", "git_preflight_blocked")
     assert result.details == ("source_snapshot_mismatch",)
@@ -404,6 +409,9 @@ def test_transport_sensitive_git_identity_rejection_does_not_leak_source_evidenc
         ),
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+        onboarding_companion_path=(
+            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
+        ),
     )
     assert (result.status, result.reason) == ("rejected", "sensitive_input_rejected")
     assert result.source_evidence is None
@@ -443,6 +451,9 @@ def test_transport_with_transcript_marker_mentions_reaches_backend_once(tmp_path
         preflight_runner=lambda request: _preflight(source_manifest=manifest),
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=backend,
+        onboarding_companion_path=(
+            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
+        ),
     )
 
     assert result is backend_result
@@ -474,6 +485,9 @@ def test_transport_with_structured_transcript_stops_before_backend_without_leaka
         preflight_runner=lambda request: _preflight(source_manifest=manifest),
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+        onboarding_companion_path=(
+            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
+        ),
     )
 
     assert (result.status, result.reason) == ("rejected", "sensitive_input_rejected")
@@ -539,6 +553,74 @@ def test_create_maps_s02_nonpass_without_candidate_work(tmp_path: Path) -> None:
     assert publisher_calls == []
 
 
+def test_create_rejects_post_oracle_source_drift_before_publication(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "output"
+    output.mkdir()
+    target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], repo)
+    manifest = build_source_manifest(repo, target.canonical_issue_paths)
+    preflights = iter(
+        (
+            _preflight(source_manifest=manifest),
+            _preflight(
+                branch="feature/other",
+                upstream="origin/feature/other",
+                source_manifest=manifest,
+            ),
+        )
+    )
+    publisher_calls: list[object] = []
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    )
+
+    def backend(**kwargs):
+        assert kwargs["synthesized"].role == "planner"
+        return _successful_transport(
+            source_manifest_hash=manifest.source_manifest_hash,
+        )
+
+    result = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", output),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda _root: "owner/repo",
+        backend_invoker=backend,
+        preflight_runner=lambda _request: next(preflights),
+        publisher=lambda **kwargs: publisher_calls.append(kwargs),
+        clock=lambda: "2026-07-29T04:46:00+00:00",
+    )
+
+    assert (result.status, result.reason) == ("stale", "planning_source_stale")
+    assert publisher_calls == []
+    assert list(output.iterdir()) == []
+
+
+def test_onboarding_companion_path_uses_one_utc_operation_instant() -> None:
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["_resolve_onboarding_companion_path"],
+    )
+    assert module._resolve_onboarding_companion_path(
+        datetime(
+            2026,
+            7,
+            29,
+            13,
+            46,
+            tzinfo=timezone(offset=timedelta(hours=9)),
+        )
+    ) == (
+        "artifacts/20260729t044600z-"
+        "guide-new-member-chatgpt-first-issue-planning.md"
+    )
+
+
 def test_create_rejects_transient_payload_digest_mismatch(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -582,6 +664,7 @@ def test_create_returns_ok_candidate_created_only_after_atomic_publication(
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
         transport_runner=lambda **kwargs: _successful_transport(),
+        preflight_runner=lambda _request: _preflight(),
         clock=lambda: datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc).isoformat(),
     )
     assert (result.status, result.reason) == ("ok", "candidate_created")
@@ -608,6 +691,7 @@ def test_create_success_output_has_only_safe_keys(tmp_path: Path) -> None:
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
         transport_runner=lambda **kwargs: _successful_transport(),
+        preflight_runner=lambda _request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     assert set(result.output) == {"candidate_identity", "zip_byte_count"}
@@ -644,6 +728,7 @@ def test_unsupported_atomic_publication_leaves_final_absent(
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: None,
         transport_runner=lambda **kwargs: _successful_transport(),
+        preflight_runner=lambda _request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     assert (result.status, result.reason) == ("blocked", "candidate_publication_failed")
@@ -667,6 +752,7 @@ def test_atomic_publication_collision_preserves_existing_candidate_bytes(tmp_pat
         "repo_slug_resolver": lambda root: "owner/repo",
         "backend_invoker": lambda **kwargs: None,
         "transport_runner": lambda **kwargs: _successful_transport(),
+        "preflight_runner": lambda _request: _preflight(),
         "clock": lambda: "2026-07-28T12:00:00+00:00",
     }
     first = module.run_issue_planning_create(**arguments)
@@ -711,6 +797,7 @@ def test_create_uses_one_dependency_snapshot_for_transport_and_source_baseline(
         backend_invoker=lambda **kwargs: None,
         dependency_loader=changing_loader,
         transport_runner=transport_runner,
+        preflight_runner=lambda _request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     candidate = output / result.output["candidate_identity"]["logical_filename"]
@@ -742,6 +829,7 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
         transport_runner=lambda **kwargs: _successful_transport(),
+        preflight_runner=lambda _request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     candidate = candidate_output / created.output["candidate_identity"]["logical_filename"]
@@ -1193,6 +1281,7 @@ def test_mechanical_revision_requires_blocking_review_and_publishes_v2(
         transport_runner=lambda **kwargs: _successful_transport(
             source_manifest_hash=snapshot.repository.source_manifest.source_manifest_hash
         ),
+        preflight_runner=lambda _request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     contracts = __import__(
@@ -1294,6 +1383,7 @@ def test_p2_only_review_blocks_revision_without_backend_or_candidate(
         transport_runner=lambda **kwargs: _successful_transport(
             source_manifest_hash=snapshot.repository.source_manifest.source_manifest_hash
         ),
+        preflight_runner=lambda _request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     contracts = __import__(
@@ -1392,6 +1482,7 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
         transport_runner=lambda **kwargs: _successful_transport(
             source_manifest_hash=source_hash
         ),
+        preflight_runner=lambda _request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     contracts = __import__(
@@ -1681,6 +1772,7 @@ def _semantic_revision_setup(tmp_path: Path) -> dict[str, Any]:
         transport_runner=lambda **kwargs: _successful_transport(
             source_manifest_hash=source_hash
         ),
+        preflight_runner=lambda _request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     contracts = __import__(

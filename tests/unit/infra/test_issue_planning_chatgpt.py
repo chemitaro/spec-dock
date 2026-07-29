@@ -13,6 +13,7 @@ RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" 
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application.issue_planning_prompt import (  # noqa: E402
+    PlanningOutputExpectation,
     PlanningPromptAttachment,
     SynthesizedPlanningPrompt,
 )
@@ -114,6 +115,32 @@ def test_missing_or_invalid_oracle_starts_no_process(monkeypatch, tmp_path: Path
     )
     result = _invoke(tmp_path)
     assert (result.status, result.reason) == ("blocked", "oracle_unavailable")
+
+
+def test_role_expectation_mismatch_starts_no_process(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        issue_planning_chatgpt.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("invalid contract must not start Oracle"),
+    )
+    result = issue_planning_chatgpt.invoke_issue_planning_chatgpt(
+        repo_root=tmp_path,
+        role="reviewer",
+        source_evidence=_source_evidence(),
+        synthesized=SynthesizedPlanningPrompt(
+            role="reviewer",
+            prompt="fixed",
+            attachments=(),
+            output_expectation=_authoring_expectation(),
+        ),
+    )
+    assert (result.status, result.reason) == (
+        "rejected",
+        "planning_context_rejected",
+    )
 
 
 @pytest.mark.parametrize("kind", ["directory", "fifo", "broken-link", "loop", "non-executable"])
@@ -450,7 +477,7 @@ def test_public_adapter_rejects_zip_entry_count_overflow(
     assert result.transient_payload is None
 
 
-@pytest.mark.parametrize("role", ["planner", "reviewer"])
+@pytest.mark.parametrize("role", ["planner", "semantic_revision", "reviewer"])
 def test_cross_kind_output_is_rejected(monkeypatch, tmp_path: Path, role: str) -> None:
     executable = _fake_executable(tmp_path)
 
@@ -461,7 +488,7 @@ def test_cross_kind_output_is_rejected(monkeypatch, tmp_path: Path, role: str) -
             return _completed(argv, stdout=_root_help())
         if argv[1:] == ["session", "--help"]:
             return _completed(argv, stdout=_session_help())
-        if role == "planner":
+        if role in {"planner", "semantic_revision"}:
             _write_reviewer_session(kwargs["env"], argv)
         else:
             _write_planner_session(kwargs["env"], argv)
@@ -487,10 +514,66 @@ def test_prompt_pack_preserves_exact_binary_attachment_bytes(tmp_path: Path) -> 
                 content=candidate,
             ),
         ),
+        output_expectation=_review_expectation(),
     )
     pack = tmp_path / "pack"
     issue_planning_chatgpt._write_transport_pack(pack, synthesized, _source_evidence())
     assert (pack / "target-candidate.zip").read_bytes() == candidate
+    assert not (pack / "prompt.md").exists()
+    assert not (pack / "expected-output-contract.md").exists()
+    assert not (pack / "safe-output-constraints.md").exists()
+
+
+@pytest.mark.parametrize("mismatch", ["logical-filename", "internal-root"])
+def test_planner_rejects_wrong_expected_zip_identity(
+    monkeypatch,
+    tmp_path: Path,
+    mismatch: str,
+) -> None:
+    executable = _fake_executable(tmp_path)
+
+    def fake_run(argv, **kwargs):
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        filename = "other.zip" if mismatch == "logical-filename" else None
+        root = "other-root" if mismatch == "internal-root" else None
+        _write_planner_session(kwargs["env"], argv, filename=filename, internal_root=root)
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path)
+    assert (result.status, result.reason) == ("rejected", "oracle_artifact_rejected")
+
+
+@pytest.mark.parametrize("role", ["planner", "reviewer"])
+def test_exact_repository_access_failure_is_blocked(
+    monkeypatch,
+    tmp_path: Path,
+    role: str,
+) -> None:
+    executable = _fake_executable(tmp_path)
+
+    def fake_run(argv, **kwargs):
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        _write_reviewer_session(kwargs["env"], argv, answer=b"repository access failed")
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path, role=role)
+    assert (result.status, result.reason) == (
+        "blocked",
+        "github_exact_branch_unavailable",
+    )
+    assert result.transient_payload is None
 
 
 def test_typed_planner_zip_fails_closed_in_legacy_application_before_publication(
@@ -536,7 +619,7 @@ def test_typed_planner_zip_fails_closed_in_legacy_application_before_publication
         publisher=lambda **kwargs: publisher_calls.append(kwargs),
     )
 
-    assert (result.status, result.reason) == ("rejected", "planner_response_rejected")
+    assert (result.status, result.reason) == ("stale", "planning_source_stale")
     assert publisher_calls == []
     assert list(output.iterdir()) == []
 
@@ -577,6 +660,11 @@ def _invoke(
             role=role,
             prompt=prompt,
             attachments=(("source.md", "safe context"),),
+            output_expectation=(
+                _review_expectation()
+                if role == "reviewer"
+                else _authoring_expectation()
+            ),
         ),
         timeout_seconds=timeout_seconds,
     )
@@ -621,17 +709,60 @@ def _write_planner_session(
     *,
     session_id: str | None = None,
     zip_bytes: bytes | None = None,
+    filename: str | None = None,
+    internal_root: str | None = None,
 ) -> None:
     resolved_id = session_id or _session_id(argv)
     session = _session_dir(env, resolved_id)
-    artifact = session / "artifacts" / "iss-00003-issue-planning-documents.zip"
+    artifact = session / "artifacts" / (
+        filename or "iss-00003-issue-planning-documents.zip"
+    )
     artifact.parent.mkdir(parents=True, exist_ok=True)
     if zip_bytes is None:
         with zipfile.ZipFile(artifact, "w") as archive:
-            archive.writestr("iss-00003-issue-planning-documents/requirement.md", "body\n")
+            archive.writestr(
+                f"{internal_root or 'iss-00003-issue-planning-documents'}/requirement.md",
+                "body\n",
+            )
     else:
         artifact.write_bytes(zip_bytes)
     _write_metadata(session, resolved_id, "completed", [_artifact("file", artifact)])
+
+
+def _authoring_expectation() -> PlanningOutputExpectation:
+    return PlanningOutputExpectation(
+        kind="authoring_zip",
+        logical_filename="iss-00003-issue-planning-documents.zip",
+        internal_root="iss-00003-issue-planning-documents",
+        exact_inventory=(
+            "requirement.md",
+            "design.md",
+            "plan.md",
+            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md",
+        ),
+        onboarding_companion_path=(
+            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
+        ),
+    )
+
+
+def _review_expectation() -> PlanningOutputExpectation:
+    return PlanningOutputExpectation(
+        kind="review_json",
+        closed_json_top_level_keys=(
+            "reviewed_identity",
+            "reviewed_identity_sha256",
+            "verdict",
+            "findings",
+        ),
+        closed_json_finding_keys=(
+            "id",
+            "severity",
+            "exact_location",
+            "violated_requirement_or_contradiction",
+            "concrete_impact",
+        ),
+    )
 
 
 def _write_reviewer_session(
