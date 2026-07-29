@@ -1,0 +1,168 @@
+{
+"review_status": "PASS",
+"reviewed_identity": {
+"candidate_id": "iss-00334-onboarding-companion-planning-amendment-v4",
+"logical_filename": "20260729t-iss-00334-onboarding-companion-planning-amendment-v4.zip",
+"zip_sha256": "b344117988ef6e7f71bfcabb6caf39e07adc6509d3379a57a80cbd783e64b103",
+"zip_size_bytes": 82330,
+"internal_root": "20260729t-iss-00334-onboarding-companion-planning-amendment-v4",
+"manifest_sha256": "725ce4ec0571a133ca53280930e0c70231d9909f072a814ea2c77eee59ef5d2c",
+"checksums_sha256": "1cd9e76d2a87a6dcf7137a11e545a85da199e677815162d96d81513ab7851d72",
+"source_repository": "chemitaro/spec-dock",
+"source_branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+"source_head": "bf9bc26c00664795842731f665def63a16a7b78c",
+"github_branch_head_verified": true,
+"default_branch_fallback_used": false
+},
+"findings": [],
+"counts": {
+"P0": 0,
+"P1": 0,
+"P2": 0,
+"P3": 0,
+"total": 0
+},
+"evidence_checked": {
+"github": {
+"repository_access": "verified",
+"exact_branch_access": "verified",
+"requested_head_access": "verified",
+"branch_comparison_status": "identical",
+"branch_head": "bf9bc26c00664795842731f665def63a16a7b78c",
+"fallback_used": false,
+"canonical_source_blobs": {
+"epic/requirement.md": "4ea6c8a974bc55d91581d299a6c175da9befa1e6",
+"epic/design.md": "5984b74fbd9108eb8a7512df4808907bcc45189d",
+"issue/requirement.md": "898721d4d6c6b0d6c630510bdf8510a0d60db97b",
+"issue/design.md": "4b1657618a97e31c02c4c13c30e6396b6f6127d8",
+"issue/plan.md": "49845c89dd8e35b0b08d48f4ceaa442a55e6cc1c"
+}
+},
+"archive": {
+"single_internal_root": true,
+"regular_file_count": 8,
+"exact_inventory": [
+"MANIFEST.json",
+"CHECKSUMS.sha256",
+"epic/requirement.md",
+"epic/design.md",
+"issue/requirement.md",
+"issue/design.md",
+"issue/plan.md",
+"issue/artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
+],
+"duplicate_entries": 0,
+"symlinks": 0,
+"special_files": 0,
+"path_escape_entries": 0,
+"encrypted_entries": 0,
+"crc_errors": 0,
+"utf8_validation": "passed",
+"line_endings": "LF-only"
+},
+"integrity": {
+"external_zip_sha256_matches": true,
+"zip_comment_identity_matches": true,
+"manifest_json_valid": true,
+"manifest_duplicate_keys": 0,
+"manifest_inventory_matches_archive": true,
+"checksums_all_passed": true,
+"checksums_self_exclusion_explicit": true,
+"checksums_payload_projection_sha256": "a85b01a11a95b624c3233e1b87d0abd3dc7e2f725563a970836ee6ef93446d9a"
+},
+"canonical_documents": {
+"epic_requirement_checked": true,
+"epic_design_checked": true,
+"issue_requirement_checked": true,
+"issue_design_checked": true,
+"issue_plan_checked": true,
+"front_matter_valid": true,
+"authority_and_status_contradictions": 0
+},
+"append_only_plan": {
+"source_prefix_bytes": 38126,
+"source_prefix_sha256": "71646bb452e1e77dddf1b908f80c73ebde217e17e70df1da1c78095cb57c6d86",
+"source_prefix_git_blob_sha1": "49845c89dd8e35b0b08d48f4ceaa442a55e6cc1c",
+"source_prefix_matches_exact_github_plan": true,
+"historical_v3_prefix_bytes": 55059,
+"historical_v3_prefix_sha256": "7dcb0e3dbd630737df28d03f8ea9169f8f88243772f52cd75885b05609cd367f",
+"candidate_plan_sha256": "3948deda169b155ea94fe2691b07add4671e5c5c5bbac13c7436c021040e3125",
+"append_only_defects": 0
+},
+"binding_contract": {
+"schema": "GitBoundOperationBindingV1",
+"canonical_top_level_repository_key": "repository",
+"canonical_top_level_branch_key": "branch",
+"candidate_source_repository_key": "source_repository",
+"candidate_source_branch_key": "source_branch",
+"single_canonical_top_level_key_set_across_epic_issue_plan": true,
+"candidate_source_mapping_explicit": true,
+"reviewed_identity_mapping_explicit": true,
+"top_level_source_aliases_rejected": true,
+"dual_key_sets_rejected": true,
+"unknown_keys_rejected": true,
+"binding_digest_deterministic": true,
+"digest_rules": {
+"self_field_excluded": true,
+"encoding": "UTF-8",
+"ensure_ascii": false,
+"keys_sorted": true,
+"separators": [
+",",
+":"
+],
+"non_finite_numbers_rejected": true,
+"trailing_lf": false,
+"hash": "SHA-256"
+}
+},
+"exact_github_gates": {
+"count": 3,
+"consistent_across_manifest_epic_issue_plan_and_guide": true,
+"gates": [
+"local-git-preflight",
+"chatgpt-exact-current-branch-check",
+"post-run-source-revalidation"
+],
+"formal_result_requires_all_three": true,
+"default_or_alternate_branch_fallback_prohibited": true
+},
+"onboarding_guide": {
+"path": "issue/artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md",
+"sha256": "664bd6647104142a298d4f8ec2e9cbed5ab6c67acf85328ff1c5bbfc276f0f78",
+"authority": "subordinate-explanatory-artifact",
+"canonical_precedence_explicit": true,
+"current_and_target_architecture_present": true,
+"oracle_and_reference_only_chatgpt_use_boundary_present": true,
+"lifecycle_and_evidence_model_present": true,
+"status_and_roadmap_consistent": true,
+"human_authorization_boundary_preserved": true
+},
+"plantuml": {
+"total_blocks_checked": 8,
+"guide_blocks_checked": 4,
+"required_guide_roles_present": true,
+"balanced_start_and_end_markers": true,
+"balanced_grouping_constructs": true,
+"structural_syntax_errors": 0,
+"validation_method": "source-level structural validation"
+}
+},
+"prior_findings_closure": {
+"P1-001": {
+"status": "closed",
+"summary": "GitBoundOperationBindingV1 now uses exactly one canonical top-level repository/branch key set across Epic, Issue, and append-only Plan amendments. Candidate identity retains source_repository/source_branch only in the nested Candidate source identity, the mapping to binding and reviewed identity is explicit, aliases and dual key sets are rejected, and canonical serialization defines a deterministic binding digest."
+},
+"P2-001": {
+"status": "closed",
+"summary": "The local Git preflight, ChatGPT exact-current-branch check, and post-run source revalidation are consistently defined as three independent mandatory gates across MANIFEST, Epic, Issue, append-only Plan, and onboarding guide."
+}
+},
+"scope_statement": "Fresh read-only defect-only review of the directly attached immutable Candidate against chemitaro/spec-dock branch iss-00334-implement-chatgpt-issue-planning-workflow at exact HEAD bf9bc26c00664795842731f665def63a16a7b78c. No default-branch fallback, repository mutation, implementation-completion claim, test-completion claim, publication claim, approval claim, merge claim, or Issue-finish claim was made.",
+"confidence": {
+"level": "high",
+"score": 0.98,
+"basis": "Exact GitHub branch-to-HEAD identity, archive identity and safety, complete inventory, MANIFEST and CHECKSUMS integrity, canonical documents, append-only byte prefixes, binding contract, three-gate consistency, onboarding authority, and all PlantUML source blocks were inspected.",
+"residual_uncertainty": "PlantUML validity was checked structurally from source; a local PlantUML 1.2026.6 compiler execution was not available. No concrete PlantUML defect was identified."
+}
+}

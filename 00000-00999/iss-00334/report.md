@@ -93,6 +93,9 @@ correction snapshot `ec801c374038e7e5ad4f31b3919440aa9b79eeaa`への別fresh clo
 | requirement — Oracle boundary amendment | current adapter／tests、親Epic、Oracle境界調査、ChatGPT生成ZIP | productはOracle直接依存、計画operatorは`chatgpt-use`利用可と分離 | Epic／Issue requirementへ採用 | passed | no | design／plan amendmentを有効化 |
 | design — Oracle boundary amendment | provider-first source、PATH Oracle、session file artifact、exact branch、Prompt/reference、ZIP contract | 個人wrapper知見はreference-only、製品fallbackにはしない | Epic／Issue designへ採用 | passed | no | S08以降の実装へhandoff |
 | plan — Oracle boundary amendment | existing plan 16,178 bytes／SHA `de7690f…`と生成prefix、S01〜S07実施履歴 | 旧計画は改稿せずEOFへS08〜S14を追記 | append-only amendmentとして採用 | passed | no | S08から順に実装 |
+| requirement — onboarding companion amendment | Human decision、current canonical三文書、v2〜v4 Candidate、exact GitHub source | guideはFormal Candidate payloadだが第四のcanonical specificationではない | Epic／Issue requirementへv4を採用 | passed、v4 findings 0 | no | design／plan contractを有効化 |
+| design — onboarding companion amendment | direct Oracle boundary、same-Candidate operation binding、fresh Review findings | `repository/branch`をbinding authority、`source_repository/source_branch`をCandidate source identityへ限定 | Epic／Issue designへv4を採用 | passed、v4 findings 0 | no | S08以降で実装 |
+| plan — onboarding companion amendment | 38,126／47,800／55,059-byte prefix chain、v4 Plan、PlantUML 1.2026.6 | 旧計画を改稿せず、companion／binding correctionをEOFへ追記 | append-only v4 amendmentとして採用 | passed、v4 findings 0 | no | S08から順に実装 |
 
 過去のFAILは当時のsnapshotに対する履歴として保持する。current rebaselineの判定には流用せず、new exact HEADを別fresh reviewerが限定scopeで判定する。
 
@@ -138,9 +141,9 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 - `./spec-dock/scripts/spec-dock assurance classify --stage requirement --issue iss-00334 --format json`: valid。`authorized_profile=standard`、`status=provisional`としてrebaseline後の三文書へ再束縛した。
 - `./spec-dock/scripts/spec-dock assurance verify --issue iss-00334 --format json`: valid。
 - source binding:
-  - Requirement SHA-256: `ef826fe8b127ba996b414621ddb1194ea1b0d19e7721617cd6c0c95b1fa76665`
-  - Design SHA-256: `15b61bb9c58eb4d6cc714df7342d29ac2d4ce95b0ee19ec2e05f6d4069bcabf9`
-  - Plan SHA-256: `71646bb452e1e77dddf1b908f80c73ebde217e17e70df1da1c78095cb57c6d86`
+  - Requirement SHA-256: `aa349869f03953fbc57c587db9eb306e131b2cfa6889713e16f795642449901b`
+  - Design SHA-256: `ef344a10f0e89b87b6cdb63fa18bc5faadacd6ab4d7b8e9e40352f6e434a967a`
+  - Plan SHA-256: `3948deda169b155ea94fe2691b07add4671e5c5c5bbac13c7436c021040e3125`
 - current profileは`standard`であり、archive safety、transaction fault、public contract、live mutationは各owner milestoneのfocused testとrequired reviewで扱う。独立したstrict overlayや重複closure graphは設けない。
 
 ## 実装記録（セッションログ） (必須)
@@ -529,3 +532,50 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 
 - 今回の例外は、ユーザーがCodex Mainによるcanonical planning repairを直接承認したことだけである。製品実装のdelegation、review、Human-only live mutation gateは省略しない。
 - 現行product `spec-dock-chatgpt`は今回修正対象の個人wrapper依存を含むため、このamendment authoringではユーザー指定のoperator-local `chatgpt-use`を使用した。これは製品runtime contractの例外や依存として採用しない。
+
+## 2026-07-29 — onboarding companion authoring contract amendment
+
+### Human decision and authority
+
+- Humanは、正確で詳細なcanonical `requirement.md`／`design.md`／`plan.md`を維持しつつ、本日加入する新メンバーが短時間で理解できるPlantUML付き説明資料を、今後のIssue Planningで毎回生成するFormal Candidate artifactへ追加するよう指示した。
+- 説明資料は第四のcanonical specificationではなく、三文書に従属する`onboarding-companion`である。矛盾時は三文書を優先し、矛盾自体をdefect-only Reviewの対象とする。
+- Epic `plan.md`は変更していない。Issue `plan.md`は各Candidateの直前版をbyte-identical prefixとして保持し、追加作業だけを末尾へ追記した。
+- operator-side authoringにはHuman指定の`chatgpt-use`を使用した。製品runtimeはprovider-owned adapterからPATH-resolved Oracleをdirect argvで利用し、個人wrapper／Project／profile／absolute pathへ依存しない。
+
+### GitHub-synced authoring evidence
+
+- repository: `chemitaro/spec-dock`
+- branch: `iss-00334-implement-chatgpt-issue-planning-workflow`
+- source HEAD: `bf9bc26c00664795842731f665def63a16a7b78c`
+- local／upstream／GitHub branch HEAD一致をauthoring前に確認した。全Promptはexact current branchを必須とし、default branch fallbackを禁止した。
+- 最初の単独guide session `iss-00334-new-member-guide`はHumanの要件訂正により停止し、不採用とした。
+- Blue Teamは前回Planning amendmentの継続conversationを使用した。v2／v3／v4 follow-upのselector evidenceは`resolved=(unavailable)`／`verified=no`。各fresh Reviewは`requested=Pro`、`resolved=Pro`、`verified=yes`。
+
+### Immutable Candidate and fresh Review history
+
+| version | Candidate ID | ZIP SHA-256 | fresh Review | disposition |
+|---|---|---|---|---|
+| v2 | `iss-00334-onboarding-companion-planning-amendment-v2` | `d202bf4b4d3da4d6411099fbb250c6400e34cf099cfd8b1378365b30ca37b0d8` | FAIL、P1 2件 | superseded |
+| v3 | `iss-00334-onboarding-companion-planning-amendment-v3` | `95675c4a56b8c6fb43bdc8da6a1d761463615b5e84fd87002391e4823a90b279` | FAIL、P1 1件／P2 1件 | superseded |
+| v4 | `iss-00334-onboarding-companion-planning-amendment-v4` | `b344117988ef6e7f71bfcabb6caf39e07adc6509d3379a57a80cbd783e64b103` | PASS、findings 0、confidence 0.98 | adopted |
+
+- v2 Planはcurrent canonical Plan 38,126 bytes／SHA-256 `71646bb452e1e77dddf1b908f80c73ebde217e17e70df1da1c78095cb57c6d86`をprefixとして保持した。
+- v3 Planはv2 Plan 47,800 bytes／SHA-256 `c320b82299a54ebaf8f1bf9f17bae3eb8efade3dce508fcddd8392192b575e05`をprefixとして保持した。
+- v4 Planはv3 Plan 55,059 bytes／SHA-256 `7dcb0e3dbd630737df28d03f8ea9169f8f88243772f52cd75885b05609cd367f`をprefixとして保持した。
+- 各ZIPのsingle root、exact 8-file inventory、CRC、MANIFEST、CHECKSUMS、source identityを検証した。v4の全PlantUMLはPlantUML 1.2026.6 `-checkonly`をPASSした。
+
+### Evidence Adoption Ledger
+
+| ID | adoption_status | source | target | rationale | reviewer | next_action |
+|---|---|---|---|---|---|---|
+| EAL-20260729-ONBOARDING-V2 | superseded | v2 Candidate／fresh Review | none | Reviewer Oracle boundaryとgit-bound companion bindingにP1 | FAIL | v3へ置換済み |
+| EAL-20260729-ONBOARDING-V3 | superseded | v3 Candidate／fresh Review | none | binding canonical key集合とgate数表記に矛盾 | FAIL | v4へ置換済み |
+| EAL-20260729-ONBOARDING-V4 | adopted | Human decision、v4 Candidate、local validation | Epic Requirement／Design、Issue Requirement／Design／Plan、Issue artifact | subordinate guide、same-Candidate binding、PlantUML obligationをexact sourceへbind | PASS、findings 0 | S08以降で実装 |
+
+### Canonical and artifact placement
+
+- whole-file replacement: Epic `requirement.md`／`design.md`、Issue `requirement.md`／`design.md`／`plan.md`。
+- managed companion: `artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md`。
+- immutable evidence: v2／v3／v4 ZIP、`20260729t034100z-review-onboarding-companion-v2-fail.json`、`20260729t044500z-review-onboarding-companion-v3-fail.json`、`20260729t052300z-review-onboarding-companion-v4-pass.json`。
+- canonical placement fresh `spec-reviewer`: PASS、P0/P1 0、P2 2件はReportの現行assurance hashとphase promotion記録へ反映済み。`artifacts/20260729t053100z-review-onboarding-canonical-placement-pass.json`。
+- Planning amendmentはPASS and adopted。製品実装はS08以降であり、`execution-ready`、Issue finish、PR merge、Epic completionを本amendmentでは主張しない。

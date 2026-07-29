@@ -120,3 +120,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 省略/例外メモ (必須)
 - operator planningではユーザー指定の`chatgpt-use`を利用したが、product runtime dependencyとしては採用していない。
+
+## 2026-07-29 — onboarding companion contract
+
+- Human decisionにより、Issue Planning Candidateはcanonical三文書に加えてexactly-one `onboarding-companion` artifactを生成する。guideはMANIFEST／CHECKSUMS／Review／Human decision／managed applyの対象だが、第四のcanonical specificationではない。
+- ChatGPT Blue Teamのv2／v3はfresh defect-only ReviewでFAILし、immutable履歴としてiss-00334 `artifacts/`へ保持した。
+- Candidate v4 `iss-00334-onboarding-companion-planning-amendment-v4`、ZIP SHA-256 `b344117988ef6e7f71bfcabb6caf39e07adc6509d3379a57a80cbd783e64b103`はfresh Review PASS、findings 0、confidence 0.98。
+- Epic `requirement.md`／`design.md`へcontractを採用した。Epic `plan.md`は変更していない。Issueの追加実装はiss-00334 append-only PlanのS08以降が所有する。
+- current first companionはiss-00334 `artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md`。PlantUML 1.2026.6 syntax checkをPASSした。
+- operator-side `chatgpt-use`はauthoring手段に限定し、product runtimeはprovider-owned adapterからPATH Oracleを直接利用する。
+- 本変更はplanning amendmentであり、product implementation、execution-ready、Issue finish、PR merge、Epic completionを主張しない。

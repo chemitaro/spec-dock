@@ -1,0 +1,103 @@
+{
+"review_status": "fail",
+"reviewed_identity": {
+"candidate_id": "iss-00334-onboarding-companion-planning-amendment-v2",
+"logical_filename": "20260729t-iss-00334-onboarding-companion-planning-amendment-v2.zip",
+"zip_sha256": "d202bf4b4d3da4d6411099fbb250c6400e34cf099cfd8b1378365b30ca37b0d8",
+"internal_root": "20260729t-iss-00334-onboarding-companion-planning-amendment-v2",
+"source_repository": "chemitaro/spec-dock",
+"source_branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+"source_head": "bf9bc26c00664795842731f665def63a16a7b78c",
+"manifest_sha256": "cbf53f08389a1b3b241d59f5be976dd37ac49ee4d079ed2eb9d563aa6902e81a",
+"checksums_sha256": "b33d1176585060335500f942f04486250334247ec4a1e93cf94f39c5bb42152f",
+"payload_file_count": 8
+},
+"findings": [
+{
+"severity": "P1",
+"location": "issue/artifacts/20260729t022500z-guide-new-member-chatgpt-first-issue-planning.md §§3 and 5, especially the responsibility-boundary and planning-sequence PlantUML diagrams",
+"defect": "The onboarding guide depicts the formal Reviewer path as Runtime-to-Reviewer/ChatGPT directly, disconnected from the provider-owned Oracle adapter and PATH-resolved Oracle process, and the sequence omits the fresh Reviewer conversation's independent exact-current-branch GitHub check. This contradicts the accepted Blue Team transport and source-authority boundary.",
+"evidence": "The guide's responsibility diagram has `Runtime --> Reviewer : exact identity` while the adapter is shown as a separate unconnected invocation, and the sequence diagram has `Runtime -> ChatGPT : fresh defect only review`. The Candidate's own Issue requirement REQ-018 and Issue design §§2, 5.3, 5.4, and 5.6 require every formal Planner, Semantic Revision, archive Reviewer, and git-bound Reviewer run to traverse Runtime -> provider-owned Oracle adapter -> PATH Oracle -> ChatGPT, with the fresh Reviewer independently opening the exact repository/current branch through GitHub. AC-024 expressly treats wrong direct-Oracle, exact-branch, or Human-authority guidance as a defect. A new member following the required onboarding diagram could bypass the adapter and branch gate.",
+"required_correction": "Correct the guide diagrams so the Reviewer path explicitly traverses Runtime -> provider-owned Oracle adapter -> PATH-resolved Oracle -> fresh ChatGPT Reviewer, includes the Reviewer's independent exact-current-branch GitHub check, and returns only the closed Review JSON through the same adapter boundary. Preserve the existing Blue Team architecture and all Human authority boundaries."
+},
+{
+"severity": "P1",
+"location": "issue/requirement.md REQ-022, REQ-023, AC-005, AC-009, AC-025; issue/design.md §§2, 3.1, 3.5, 4.1, 8.2; issue/plan.md existing §10 git-bound positive chain and amendment §§28.1(1), 28.2(3), 28.2(5); epic/requirement.md E1-AC-033",
+"defect": "The git-bound lifecycle requires an exact operation-generated onboarding companion path/blob to be bound through Review and apply, but the closed command and identity flow provides no authoritative input or deterministic resolver that carries that path from `planning create` into the separate git-bound Review and apply commands.",
+"evidence": "The amendment requires Runtime to compute the timestamped companion path once and pass the same value to the Prompt, authoring-ZIP validator, Candidate MANIFEST, Review identity, and apply target. It also requires git-bound Reviewed identity to carry the companion path/blob separately from the canonical three-path tuple, and git-bound apply to verify those existing bytes while adding only the Human decision artifact. However, the specified public git-bound Review and apply surfaces accept only the Issue identity and `--reviewed-head`; they accept neither a Candidate nor a companion path/operation identity. The exact source HEAD has the same closed request shape. The unchanged plan still requires a positive `create -> git-bound Review -> approved apply -> ready` chain, while pre-Human repository mutation, arbitrary `--target`, operator manual fill, and a new persistent registry are forbidden. Because timestamped guides can be absent or multiple, the required exact path cannot be uniquely reconstructed under the stated contract. Implementing AC-005, AC-009, AC-025, and E1-AC-033 would therefore require hidden state, an unapproved input, or pre-approval mutation.",
+"required_correction": "Close the existing git-bound contract by specifying an authoritative, deterministic, and ambiguity-rejecting way for the separate Review and apply operations to receive or resolve the exact companion path/blob produced for that planning operation, without merging it into the canonical three-path tuple, introducing operator manual fill, or mutating the repository before Human approval. Align the public/request contract, Reviewed identity construction, apply verification, milestone work, and positive/negative acceptance fixtures to that one closed rule."
+}
+],
+"counts": {
+"P0": 0,
+"P1": 2,
+"P2": 0,
+"P3": 0,
+"total": 2
+},
+"evidence_checked": {
+"repository_connector": {
+"repository": "chemitaro/spec-dock",
+"branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+"required_head": "bf9bc26c00664795842731f665def63a16a7b78c",
+"result": "The exact branch was opened through the GitHub connector and compared identical to the required HEAD; no default-branch fallback was used."
+},
+"candidate_archive": {
+"attachment_available": true,
+"observed_zip_sha256": "d202bf4b4d3da4d6411099fbb250c6400e34cf099cfd8b1378365b30ca37b0d8",
+"root_matches": true,
+"unsafe_entries_found": 0,
+"inventory_matches_manifest": true,
+"files": [
+"CHECKSUMS.sha256",
+"MANIFEST.json",
+"epic/design.md",
+"epic/requirement.md",
+"issue/artifacts/20260729t022500z-guide-new-member-chatgpt-first-issue-planning.md",
+"issue/design.md",
+"issue/plan.md",
+"issue/requirement.md"
+]
+},
+"control_files": {
+"manifest_identity_matches_request": true,
+"all_declared_checksums_match_bytes": true,
+"archive_comment_manifest_hash_matches": true,
+"archive_comment_checksums_hash_matches": true
+},
+"plan_append_only": {
+"verified": true,
+"source_prefix_length_bytes": 38126,
+"source_prefix_sha256": "71646bb452e1e77dddf1b908f80c73ebde217e17e70df1da1c78095cb57c6d86",
+"candidate_prefix_matches_exact_source_plan": true,
+"amendment_starts_after_preserved_prefix": true
+},
+"documents_reviewed": [
+"epic/requirement.md",
+"epic/design.md",
+"issue/requirement.md",
+"issue/design.md",
+"issue/plan.md",
+"issue/artifacts/20260729t022500z-guide-new-member-chatgpt-first-issue-planning.md"
+],
+"plantuml": {
+"guide_block_count": 4,
+"required_roles_present": [
+"system context",
+"responsibility boundary",
+"planning sequence",
+"implementation roadmap"
+],
+"start_end_balanced": true,
+"structural_syntax_review": "No malformed or missing PlantUML block was identified; the blocking guide finding is architectural content, not PlantUML grammar."
+},
+"current_source_status": {
+"S01_through_S06": "Verified as implemented/closed in the exact source evidence.",
+"S07": "Verified as stopped at the Human gate for live mutation.",
+"oracle_boundary_repair": "Verified as planned in S08 and later, not yet implemented at the exact source HEAD.",
+"current_transport": "Verified to retain the personal chatgpt-use path, wrapper-specific --write-output, and legacy framed text transport that the amendment is intended to replace."
+}
+},
+"scope_statement": "Fresh read-only, defect-only review of the exact immutable Candidate ZIP against the exact GitHub branch and HEAD. The accepted Blue Team architecture was treated as fixed. Review covered only concrete authority, requirement, implementation-status, traceability, feasibility, ambiguity, append-only, identity/inventory, and PlantUML defects; no optional improvements, scope expansion, stylistic rewrites, repository changes, or replacement Candidate were proposed.",
+"confidence": 0.97
+}

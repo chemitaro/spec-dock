@@ -83,12 +83,12 @@ Planning出力は二段階に分ける。
 
 Scope packageは既存境界を維持する。
 
-- Issue authoring artifact: `requirement.md`、`design.md`、`plan.md`だけ。
-- Issue Candidate: 上記三文書、source baseline、manifest／checksums。
+- Issue authoring artifact: canonical `requirement.md`、`design.md`、`plan.md`と、Runtimeがexact pathを固定した`artifacts/<onboarding-guide>.md`。
+- Issue Candidate: 上記三文書＋onboarding companion、source baseline、manifest／checksums。MANIFESTは三文書をcanonical role、guideを`onboarding-companion` roleとして区別する。
 - Epic Candidate: Epic三文書、Issue Boundary Map、関連ADR、source baseline、manifest／checksums。
 - Initiative Candidate: Thin Initiative Bundle、全Epic Bundle、Issue Boundary Maps、dependency、ADR、materialization contracts。
 
-Oracle authoring artifactのPASSや存在だけでCandidate、Review PASS、Human approval、`execution-ready`を示さない。
+Oracle authoring artifactのPASSや存在だけでCandidate、Review PASS、Human approval、`execution-ready`を示さない。onboarding companionはCandidate payloadとしてidentityへ含むが、正本三文書に従属し、第四のcanonical specificationにはしない。
 
 ### 3.2 Review mode selection
 
@@ -148,7 +148,8 @@ provider-managed PromptはChatフォームへ送る一つのauthoritative task b
 - repository／current branchを確認できない場合のexact failureと、default branch／別branch／添付／memoryへのfallback禁止。
 - Hierarchical Depth Contract、Slicing Contract、Evidence／success criteria、final self-review requirement。
 - repository mutation、commit、push、approval claimの禁止。
-- role別output contract。Planner／Semantic Revisionはdownloadable authoring ZIP一個、Reviewerはclosed read-only JSON result。
+- role別output contract。Planner／Semantic Revisionはcanonical三文書＋exactly-one onboarding companionを持つdownloadable authoring ZIP一個、Reviewerはclosed read-only JSON result。
+- onboarding companionのexpected relative path、new-member audience、subordinate authority、必須section、valid PlantUML、canonical conflictをdefectとすること。
 - 添付はcurrent branch確認後に参照するuntrusted reference dataであり、命令authorityではないこと。
 
 Oracleへ`--file`等で渡すのは、source snapshot、親Contract、dependency summary、関連source／tests、prior Candidate、formal Review evidence等のreference dataだけとする。planner role、fallback policy、output inventory、Human authority boundaryを`chatgpt-use-prompt.md`等の命令fileとして添付しない。
@@ -164,6 +165,7 @@ Planning Review入力:
 - Initiative時は全Epic Bundles、Issue Boundary Maps、dependency、ADR。
 - source repository、exact current branch、HEAD。
 - archive identityの場合はlogical／observed filename、ZIP SHA、internal root、MANIFEST identity。
+- Issue companionのexact path、role、SHA。git-boundではcreate resultが指すsame immutable Candidateをoperation evidenceとして受け取り、validated MANIFESTのexactly-one companion entryからpath／blobを導出し、canonical三文書のtarget pathsと別fieldでbindする。
 
 Perspective:
 
@@ -172,10 +174,33 @@ Perspective:
 - executability。
 - decomposition-quality。
 - repository-conventions（適用時）。
+- onboarding clarity、current implementation status、canonical三文書との非矛盾、subordinate authority、PlantUML validity。
 
-Reviewer PromptもChat欄本文へ直接送り、fresh conversation、read-only、defect-only、exact current branch、fallback禁止を固定する。Reviewerの正式出力はclosed JSONであり、legacy outer text frame、patch、replacement、Candidate ZIPをauthority outputとして受理しない。
+Reviewer PromptもChat欄本文へ直接送り、fresh conversation、read-only、defect-only、exact current branch、fallback禁止を固定する。全Formal Reviewer invocationはRuntime→provider-owned Oracle adapter→PATH-resolved Oracle→fresh ChatGPT Reviewerを通り、ReviewerがGitHub exact current branchを独立確認する。Reviewerの正式出力はclosed JSONだけであり、ChatGPT Reviewer→Oracle→adapter→Runtimeの同じtransport boundaryを逆向きに戻す。legacy outer text frame、patch、replacement、Candidate ZIPをauthority outputとして受理しない。
 
-archive Planning Reviewはlogical Candidate filename、observed transport filename、Candidate ZIP SHA、internal root、MANIFEST identity、exact source HEAD snapshotへbindする。closed`(N)`aliasだけをnormalizeできる。git-bound Planning Reviewはreviewed HEAD、target paths、必要なsemantic BASEへbindする。exact content identityまたはGitHub exact current branchを検査できない場合は`insufficient-evidence`とし、同じFormal identityのままdefault branch、別transport、添付だけへsilent fallbackしない。Dynamic placeholderは`PLACEHOLDER-ORACLE-MAP.json`だけをauthorityとし、static fileのliteral exampleはexact hashで扱う。
+archive Planning Reviewはlogical Candidate filename、observed transport filename、Candidate ZIP SHA、internal root、MANIFEST identity、exact source HEAD snapshotへbindし、Candidate内のonboarding companionを三文書と同じFormal Review対象に含める。closed`(N)`aliasだけをnormalizeできる。git-bound Planning Reviewはreviewed HEAD、canonical三文書のtarget paths、createが生成したsame immutable Candidateから導出した`GitBoundOperationBindingV1`、必要なsemantic BASEへbindする。companion path／blobはCandidate MANIFESTのexactly-one `onboarding-companion` roleから機械導出し、canonical tupleと別fieldで保持する。exact content identity、same Candidate、またはGitHub exact current branchを検査できない場合は`insufficient-evidence`とし、同じFormal identityのままdefault branch、directory auto-selection、operator-supplied path、別transport、添付だけへsilent fallbackしない。guideが正本と矛盾する場合は正本を優先し、その差異をactual defectとして報告する。Dynamic placeholderは`PLACEHOLDER-ORACLE-MAP.json`だけをauthorityとし、static fileのliteral exampleはexact hashで扱う。
+
+### 5.1 Git-bound operation binding
+
+`planning create`のstructured resultはimmutable Candidate path／identityを返し、official Skillがそのexact pathをgit-bound Reviewとapplyの既存`--candidate` optionへ引き継ぐ。RuntimeはCandidate全体を再検証し、次のcanonical valueを生成する。
+
+```text
+GitBoundOperationBindingV1
+- schema_version
+- issue_id
+- repository
+- branch
+- source_head
+- candidate_identity
+- onboarding_companion
+  - path
+  - sha256
+- binding_sha256
+```
+
+`GitBoundOperationBindingV1`のtop-level canonical keyは`repository`と`branch`だけをauthorityとする。`repository`は`ReviewedPlanningIdentity.repository`と同じnormalized owner/name、`branch`は`ReviewedPlanningIdentity.branch`と同じexact branch stringである。Candidate／source identityは従来どおり`candidate_identity.source_repository`と`candidate_identity.source_branch`を使用し、Runtimeは`binding.repository == candidate_identity.source_repository == reviewed_identity.repository`および`binding.branch == candidate_identity.source_branch == reviewed_identity.branch`を検証してからbindingを構築する。top-levelの`source_repository`／`source_branch`、両命名系の併記、alias normalization、値不一致はunknown／ambiguous schemaとして拒否する。
+
+`binding_sha256`は自己fieldを除くclosed objectをUTF-8、`ensure_ascii=false`、key昇順、separator `,`／`:`、非有限number禁止、末尾LFなしでcanonical serializationしたbytesのSHA-256である。この一つのkey集合とserializationだけをEpic、Issue、Plan、Runtime、Review／Human evidenceで使用する。Candidate MANIFESTに`onboarding-companion` roleが0件または複数、path／CHECKSUMS／actual bytesが不一致、Candidate source identityがreviewed HEADと不一致ならbindingを生成しない。git-bound `ReviewedPlanningIdentity`はexisting canonical 3-path tupleを変更せず、このbindingを別fieldに持つ。Review JSON、Human decision、applyはsame digestを必要とし、apply時にsame Candidate bytesを再検証する。CLIは`--companion-path`、`--companion-sha`、arbitrary `--target`を公開せず、output directoryのscan／latest選択、repository registry、custom Git refを行わない。
 
 ## 6. Skill／Oracle Adapter Boundary
 
@@ -218,7 +243,7 @@ Runtime --> Human : Candidate / Review evidence
 
 ### 6.2 Exact GitHub branch gate
 
-正式runは二つの独立gateを必要とする。
+正式runは三つの独立gateを必要とする。
 
 1. Runtimeがcurrent local branch、`origin/<same-branch>`、local／fetched remote HEAD equality、clean treeを確認する。
 2. ChatGPT Promptが`@GitHub`で同一repositoryのexact current branchを直接開き、source HEADへbindする。current branchを開けない場合はfailureを返し、default branch、別branch、添付だけから継続しない。
@@ -239,12 +264,16 @@ iss-00334-issue-planning-documents.zip
 └── iss-00334-issue-planning-documents/
     ├── requirement.md
     ├── design.md
-    └── plan.md
+    ├── plan.md
+    └── artifacts/
+        └── <expected-onboarding-guide-filename>.md
 ```
 
-Runtimeはexactly-one expected downloadable ZIPだけを受け入れる。observed browser download名のclosed`(N)`aliasは、expected basenameへの機械正規化、same root、same exact inventory、recomputed SHAが成立する場合だけ許可する。inline本文、marker frame、patch、extra fileをauthoring inputにしない。
+Runtimeはexactly-one expected downloadable ZIPだけを受け入れる。observed browser download名のclosed`(N)`aliasは、expected basenameへの機械正規化、same root、same exact inventory、recomputed SHAが成立する場合だけ許可する。Issue inventoryは三つのcanonical文書とexactly-one onboarding companion pathで閉じ、inline本文、marker frame、patch、undeclared extra fileをauthoring inputにしない。
 
-検証済み三文書から、Runtimeが既存contractどおりsource baseline、MANIFEST、CHECKSUMS、placeholder map、Candidate ID／version／ZIP SHAを持つ別のimmutable Candidate ZIPを生成する。ChatGPTへCandidate control filesを生成させない。
+Runtimeはoperation identityとIssue slugからguideのexpected relative pathを先に決め、Prompt、output expectation、validator、MANIFESTへ同じ値を渡す。guideはstrict UTF-8／LF、authority note、new-member向け必須section、PlantUML fenced blocksを持つ。PlantUML syntaxはacceptance toolchainで1.2026.6に対して検証し、Runtime product dependencyへ個人toolを追加しない。
+
+検証済み三文書とguideから、Runtimeが既存contractどおりsource baseline、全payloadを列挙するMANIFEST、CHECKSUMS、placeholder map、Candidate ID／version／ZIP SHAを持つ別のimmutable Candidate ZIPを生成する。ChatGPTへCandidate control filesを生成させない。
 
 ### 6.5 Oracle file-artifact retrieval
 
@@ -274,6 +303,8 @@ Oracle sessionからのartifact retrievalはprovider-owned adapterへ隔離す�
 参考実装の呼出しやcopyを製品依存にせず、有用な手順だけをSpecDock versioning、tests、distributionの下へ移す。
 
 ## 7. Materialization
+
+Issue archive applyはapproved Candidateからcanonical三文書をwhole-file replacementし、onboarding companionをIssue `artifacts/`配下のmanaged artifactとして同一staging／backup／rollback transactionへ含める。canonical authorityは三文書だけに残し、guideの存在や読みやすさでHuman Gate、implementation start、canonical parityを代替しない。git-bound applyはsame Candidateから`GitBoundOperationBindingV1`を再導出し、reviewed HEADのcanonical三文書blobを検証した後、Human approval後だけCandidate内companionをexact managed pathへwriteまたはexact-byte no-opとする。Candidate／binding／destinationの不一致はmutation前に拒否し、canonical三文書tupleを変更しない。
 
 Portfolio materialization uses one Candidate-SHA ledger and the following explicit subcontracts:
 
@@ -310,6 +341,7 @@ Remote Issue bindings use link-existing recovery; valid local Nodes are never re
 - Prompt submit前のfailure: safe precondition修正後に新runを開始できる。
 - Prompt submit後のtimeout／disconnect: same-session status／reattach／harvestだけを行う。session終端を確認するまでnew submissionを禁止する。
 - file artifact missing／multiple／wrong filename／wrong root／unsafe entry／metadata hash mismatch: Candidateを生成せずrejectedまたは`insufficient-evidence`。inline textを代替payloadにしない。
+- onboarding companion missing／wrong path／duplicate／manifest or checksum mismatch／required section欠落: Candidate 0。canonical三文書との矛盾、誤ったstatus、authority誤記、invalid PlantUMLはfresh defect-only Reviewでblocking findingとなり得る。
 - ZIP semantic failure: non-formal diagnostic後に新しい完全authoring ZIPとfresh Formal Reviewへ戻る。
 - Review P0/P1: Semantic findingはChatGPT complete authoring ZIP revision、closed mechanical findingはdeterministic local revision。いずれもnew Candidate identity／fresh Review。
 - Human rejection: feedback→new authoring ZIP／Candidate→fresh Review。
@@ -325,7 +357,8 @@ wheel／sdist／fresh init／update／dogfoodは次を同じcontractで証明す
 - PATH fake／real Oracleへのdirect argv。
 - exact current branch、no-default-fallback Prompt。
 - Prompt bodyとreference attachmentの分離。
-- Planner／Semantic RevisionのZIP-only outputとsafe artifact snapshot。
+- Planner／Semantic Revisionのcanonical三文書＋onboarding companion ZIP-only outputとsafe artifact snapshot。
+- companionのdistinct MANIFEST role、checksum／identity、archive Review binding、same Candidate由来`GitBoundOperationBindingV1`、managed apply／rollback、PlantUML 1.2026.6 validation。
 - Candidate／Review／Human Gate／applyの既存parity。
 - shipped runtimeから個人home、`chatgpt-use`、`oracle-chatgpt`、personal Project／profile／host、legacy `--write-output` text-frame dependencyが除去されていること。
 
@@ -337,9 +370,11 @@ reference-only fixture、research artifact、denylist testの文字列は製品r
 |---|---|
 | existing `spec-dock-chatgpt` command familyとCandidate／apply contractを維持 | transport defectだけを最小修復し、完了済みwalking skeletonを再設計しない |
 | provider-owned Python adapterからPATH Oracleを直接起動 | personal wrapperとarbitrary backend commandを製品境界から除外する |
-| local Git gate＋ChatGPT connector exact-branch gate | wrong source branchからのauthoringを二重にfail closedにする |
+| local Git preflight＋ChatGPT connector exact-branch check＋post-run source revalidation | wrong source branchまたはrun中driftからのauthoringを三重にfail closedにする |
 | task instructionはPrompt本文、attachmentはreference only | authorityとdataを分離し、Human可視性を上げる |
 | authoring ZIPとCandidate ZIPを分離 | ChatGPTのmulti-file artifact能力とRuntimeのidentity／safety authorityを両立する |
 | Oracle session readerをversioned infra boundaryへ隔離 | first-class export未確認の実装結合を局所化し、unsupported versionで停止できる |
 | same-session recovery、no duplicate submit | long-running browser transportの二重authoringとidentity ambiguityを防ぐ |
 | operator-local `chatgpt-use`はreference／external work surfaceのみ | この仕様策定手段と配布製品依存を明確に分ける |
+| onboarding companionはFormal Candidate payload、canonical三文書は唯一のspec authority | 新メンバーの理解容易性を上げつつ、正本の精度、traceability、Human Gateを弱めない |
+| git-bound identityはcanonical target pathsとCandidate-derived operation bindingを分離 | same create Candidateからguide path／blobをambiguityなくReview／applyへcarryし、manual target、hidden state、pre-Human mutationなしで第四のcanonical specification化を防ぐ |

@@ -707,3 +707,191 @@ exact pushed SHAをfresh read-only reviewersが再検査し、zero blockerの場
 - Human authorizationなしにlive repository mutation／commit／pushが必要になる。
 
 上記は実装で暗黙吸収せず、Requirement／Design／Plan amendmentへ戻す。private helper名、supported-version allowlist、test parameter、Prompt wordingのnon-semantic調整はReportへ記録し、observable contractを変更しない限り再amendmentを要求しない。
+
+
+## 27. 2026-07-29 Onboarding Companion Planning Amendment
+
+### 27.1 Baseline and append-only authority
+
+- amendment source: repository `chemitaro/spec-dock`、branch `iss-00334-implement-chatgpt-issue-planning-workflow`、HEAD `bf9bc26c00664795842731f665def63a16a7b78c`。
+- 本sectionより前の38,126 bytesはSHA-256 `71646bb452e1e77dddf1b908f80c73ebde217e17e70df1da1c78095cb57c6d86`のauthoritative prefixとして完全保持する。削除、改稿、並べ替え、改行正規化を行わない。
+- S01〜S07は既存walking skeletonの実施履歴として保持する。S01〜S06はcommitted／reviewed、S07はexecution packetとread-only preflightまで到達し、live mutationはHuman Gateで停止している。旧personal-wrapper transport evidenceをS08以降またはonboarding companionのPASSへ流用しない。
+- 本amendmentはpublic command family、direct PATH Oracle boundary、exact current branch、Review modes、Human decision、Candidate controls、apply／publication semanticsを再設計せず、Issue authoring payloadへsubordinate onboarding companionを一件追加する。
+- 本文書は実装、repository mutation、commit、push、Review PASS、merge-readyを実施済みとは主張しない。
+
+### 27.2 Existing remaining sequence and admission
+
+§17のremaining sequence `S08 → S09 → S10 → S11 → S12 → S13 → S14`は変更しない。新しいmilestone IDは追加せず、まだ未実施のS09〜S12へ以下のonboarding obligationを加える。
+
+- S09 closureはcompanionのexact path、new-member audience、subordinate authority、required sections、少なくとも四つのrequired diagram roleをPrompt本文とrole output expectationへ固定した証拠を必要とする。
+- S10 closureはguide-inclusive authoring ZIP、Candidate identity／MANIFEST／CHECKSUMS、completeness、Review／Human binding、managed apply／rollbackを必要とする。
+- S11 closureはprovider authority、installed assets、wheel／sdist、fresh init／update、dogfood projection、docs／testsを同じcompanion contractへ同期した証拠を必要とする。
+- S12以降は上記変更を含むexact sourceを検証・commit・reviewする。各stepは既存のfresh reviewer、actual commitまたはevidence-qualified approved-no-op、clean、close state、Result Approval gateを維持し、S13はmandatory actual commit／push、S14はHuman-only merge handoffを維持する。
+
+## 28. Additive Implementation Work by Existing Milestone
+
+### 28.1 S09 addition — Prompt and output expectation
+
+1. `PlanningContext`またはrole output expectationへRuntime-determined `onboarding_companion_path`を追加する。operation instantとIssue slugからexact pathを一度だけ決め、Prompt、authoring ZIP validator、Candidate MANIFEST、Review identity、apply targetへ同じ値を渡す。現行first artifact pathは`artifacts/20260729t022500z-guide-new-member-chatgpt-first-issue-planning.md`である。
+2. Planner／Semantic Revision Prompt本文を、canonical `requirement.md`／`design.md`／`plan.md`＋exactly-one companionのclosed ZIP inventoryへ更新する。guideのnew-member audience、subordinate authority、canonical precedence、required sections、PlantUML obligationをChat本文へ入れ、attachment instructionには戻さない。
+3. Reviewer Promptへ、canonical contradiction、wrong current status、direct Oracle／exact branch／Human authorityの誤記、required content／invalid PlantUMLだけをactual defectとする規則を追加する。style preference、任意再設計、文体改善だけでFAILにしない。
+4. fake Oracle captured-Prompt testsでexact path、authority、inventory、required diagram rolesを確認し、reference attachment内instruction file 0を証明する。
+
+### 28.2 S10 addition — Candidate, Review identity, and managed apply
+
+1. authoring ZIP validatorとCandidate builderをcanonical三文書＋companion payloadへ最小拡張する。MANIFESTはcanonical rolesと`onboarding-companion` roleを区別し、CHECKSUMS、source binding、Candidate ID／ZIP SHAがguide bytesを覆う。
+2. missing／wrong-path／duplicate／extra／unmanifested／checksum-mismatched guideをCandidate 0で拒否する。guideはstrict UTF-8、LF終端、subordinate authority note、required headings、system context／responsibility boundary／planning sequence／implementation roadmapを含む少なくとも四つの`plantuml` fenced blocksを必要とする。
+3. archive ReviewはCandidate内guideを同じFormal Review対象へ含める。git-bound `ReviewedPlanningIdentity`はcanonical三文書tupleを維持し、exact companion path／blob digestを別fieldへ追加する。guideを第四のcanonical targetへ昇格させない。
+4. Semantic Revisionは三文書＋guideのcomplete replacement ZIPを返す。Mechanical Revisionはexact companion pathをclosed target allowlistへ追加し、ambiguous／semantic changeを拒否する。
+5. archive apply transactionへcompanion destinationのbackup、managed write、Candidate-to-managed-target parity、reverse-order rollbackを追加する。git-bound applyはcompanion blob driftを`stale`として拒否する。Human decision前のtracked tree／index／HEAD／guide destination mutationは0を維持する。
+6. positive／negative testsはguide-inclusive Candidate、fresh Review、Human decision、apply、rollback、PA-NF non-regressionを個別に閉じる。
+
+### 28.3 S11 addition — Provider, projection, and distribution parity
+
+1. provider-managed Prompt、domain／application／infra、CLI result details、installer inventory、official Skill／workflow docsを同一companion contractへ更新する。
+2. `src/spec_dock/assets/`をimplementation authorityとし、official init／updateでinstalled assetsとroot `spec-dock/` dogfood projectionを再生成する。projectionを先に直接修正しない。
+3. provider／wheel／sdist／fresh init／update／dogfoodでPrompt bytes、expected inventory、guide validation、managed target、testsのparityを確認する。個人`chatgpt-use`、Project、profile、config、wrapper callへのproduct dependencyは0を維持する。
+
+### 28.4 S12 addition — Full verification and first guide evidence
+
+1. 本Candidateのfirst guideをexact path、source HEAD、required sections、subordinate authority、canonical non-contradiction、S01〜S07 status、remaining S08〜S14 roadmap、provider／projection、failure mode、first-day checklistについてfresh defect-only Reviewする。
+2. guideから全`plantuml` fenced blocksを抽出し、PlantUML 1.2026.6 `-checkonly`相当をPASSさせる。PlantUML toolはtest／acceptance environmentだけでpinし、provider runtime、wheel、installed assets、dogfood runtimeへ同梱・hard-codeしない。
+3. full focused／integration／distribution／static suiteとHuman-approved new-boundary dogfoodは三文書＋companionのZIP、Candidate、Review、Human Gate、apply／rollbackを含む。旧wrapper runをPASS evidenceへ流用しない。
+
+### 28.5 S13 and S14 closure additions
+
+- S13のmandatory repair commitはguide-inclusive provider／projection／tests／docsとfirst managed guideを含むapproved scopeだけをstageし、non-force push、remote HEAD／tree parity、post-push cleanを証明する。
+- S14のfresh spec／code／QA Reviewはexact pushed SHAでRequirement／Design／append-only Plan、first guide、implementation、tests、distribution evidenceを照合する。guideの存在だけでPASSせず、zero blocker時だけHumanへmerge-ready handoffする。
+
+## 29. Onboarding Amendment Traceability and Verification
+
+| Requirement／Acceptance | Existing milestone owner |
+|---|---|
+| REQ-017〜019、REQ-022、E1-REQ-032〜033、E1-REQ-037〜038 | S09 Prompt／output expectation |
+| REQ-004〜009、REQ-020〜023、AC-005〜006、AC-019〜021、AC-024〜025、E1-REQ-035、E1-REQ-039、E1-AC-032〜033 | S10 Candidate／Review／apply |
+| REQ-013、AC-012、AC-022、E1-REQ-013、E1-AC-031 | S11 provider／projection／distribution |
+| AC-023、E1-AC-034、full regression／live dogfood | S12 verification |
+| commit／remote parity | S13 mandatory commit／push |
+| exact-SHA zero-blocker review／Human handoff | S14 final reviews |
+
+```bash
+uv run pytest tests/unit/domain tests/unit/application
+uv run pytest tests/unit/infra/test_issue_planning_chatgpt.py
+uv run pytest tests/cli_runtime
+uv run pytest tests/integration/test_issue_planning_e2e.py
+uv run pytest tests/integration
+uv run pytest
+uv build
+java -jar plantuml-1.2026.6.jar -checkonly <extracted-companion-diagrams>
+./spec-dock/scripts/spec-dock validate
+git diff --check
+git status --short
+```
+
+Additional stop／review rules:
+
+- guideを第四のcanonical specification、独立Human Gate、別Planning databaseとして扱わなければ実装できない場合はamendmentへ戻る。
+- canonical三文書tupleへguideを混入しないとgit-bound identityを実装できない場合は停止する。
+- missing guideをoperator手作業、inline response、添付内既存guide、default branch copyで補完しない。
+- guideと正本の差異は正本を自動変更して解消せず、guide defectまたはmaterial specification gapとしてfresh Reviewへ分類する。
+- guide path、role、SHA、reviewed identity、Human decision、apply targetのどれかが不一致ならfail closedとする。
+- public command family、Human decision、publication semanticsの全面再設計、PlantUML executableのproduct dependency化、provider authorityより先のprojection直接編集が必要ならscope amendmentへ戻る。
+
+
+## 30. 2026-07-29 Formal Review P1 Correction Amendment v3
+
+### 30.1 Immutable prefix and correction scope
+
+- 本sectionより前の47,800 bytesはv2 Issue planのauthoritative prefixであり、SHA-256は`c320b82299a54ebaf8f1bf9f17bae3eb8efade3dce508fcddd8392192b575e05`である。削除、置換、再整列、改行正規化を行わない。
+- immutable v2 Candidateは上書きせず、本v3はformal fresh ReviewのP1二件だけを修正するcomplete replacement Candidateである。
+- accepted direct PATH Oracle boundary、provider authority、exact current branch、Human Gate、canonical三文書authority、S01〜S07履歴、S08→S14 admission orderは変更しない。
+- v2 prefix内の`artifacts/20260729t022500z-guide-new-member-chatgpt-first-issue-planning.md`はhistorical v2 identityとして保持する。v3 current guide pathは`artifacts/20260729t034200z-guide-new-member-chatgpt-first-issue-planning.md`であり、S09〜S12のcurrent evidenceはv3 pathへbindする。
+
+### 30.2 S09 correction — Formal Reviewer transport and guide diagrams
+
+1. Plannerだけでなくarchive／git-bound Reviewerも、application／Runtime→provider-owned `issue_planning_chatgpt` adapter→PATH-resolved `oracle`→fresh ChatGPT Reviewerの同一direct-argv boundaryを必ず通す。
+2. Reviewer Prompt本文へrepository、exact current branch、source HEAD、default／other branch fallback禁止を固定し、fresh Reviewer自身がGitHub connectorでexact current branchを独立確認する。local Git preflightだけで代替しない。
+3. Reviewer formal outputはclosed JSONだけとし、ChatGPT Reviewer→Oracle→adapter→Runtimeの同一boundaryを逆向きに戻す。Runtime→Reviewer direct call、legacy text frame、replacement ZIPを許可しない。
+4. v3 onboarding guideのresponsibility boundaryとplanning sequence PlantUMLを上記pathへ修正し、少なくとも`Runtime→Adapter→Oracle→Fresh Reviewer→GitHub exact branch`と`closed Review JSON→Oracle→Adapter→Runtime`を明示する。
+5. captured fake-Oracle testはReviewer argv、fresh role、exact-branch Prompt、reference attachment、closed JSON returnを個別にassertする。guide defect fixtureはadapter bypass、Reviewer branch check欠落、JSON return boundary欠落をP1として検出する。
+
+### 30.3 S10 correction — Candidate-derived Git-bound operation binding
+
+既存immutable Candidate ZIPをgit-bound operation evidenceの唯一のcarrierとして再利用し、新しいpersistent state／arbitrary targetを追加しない。
+
+```text
+planning create
+  -> structured result(candidate_path, candidate_identity)
+  -> official Skill forwards same --candidate
+  -> review planning --mode git-bound --reviewed-head <sha> --candidate <zip>
+  -> planning apply --mode git-bound --reviewed-head <sha> --candidate <same zip>
+```
+
+1. public command familyは維持し、git-bound Reviewとapplyのmode-specific required optionへ既存`--candidate <zip>`を追加する。`--companion-path`、`--companion-sha`、arbitrary `--target`は追加しない。
+2. official Skillは`planning create`のstructured resultからexact Candidate pathを後続Review／applyへ渡す。Runtimeはoutput directoryをscanせず、latest Candidateを推測せず、operator manual fill、repository registry、database、custom Git ref、hidden session stateを使わない。
+3. RuntimeはCandidate全体を既存validatorで再検証し、MANIFESTのroleが`onboarding-companion`であるentryをexactly one抽出する。declared path／SHA、CHECKSUMS、actual bytes、Candidate identity、source repository／branch／HEADの全一致後にだけ次のcanonical valueを生成する。
+
+```text
+GitBoundOperationBindingV1
+- schema_version
+- issue_id
+- repository
+- branch
+- source_head
+- candidate_identity
+- onboarding_companion.path
+- onboarding_companion.sha256
+- binding_sha256
+```
+
+4. `binding_sha256`は自己fieldを除くcanonical JSON bytesのSHA-256とする。git-bound `ReviewedPlanningIdentity`はexisting canonical `design.md`／`plan.md`／`requirement.md` 3-path tupleを変更せず、`GitBoundOperationBindingV1`を別fieldへ保持する。
+5. git-bound Reviewはcanonical三文書をreviewed HEADから読み、companion bytesだけをsame Candidateから取得する。Candidate内三文書をgit-bound canonical targetへ流用しない。Review JSONはCandidate identity、binding digest、companion path／SHAを含むReviewed identityへbindする。
+6. Human decisionは同Reviewed identity／Review bytesへbindする。git-bound applyはsame Candidateを再検証してbindingを再導出し、Review／Human evidenceとexact一致しなければmutation前に拒否する。
+7. approved applyはcanonical三文書blobの不変を確認し、Human approval後だけCandidate内companionをbindingのmanaged pathへwriteする。destination absentはwrite、exact bytesはevidence-qualified no-op、different bytes／symlink／ambiguous pathは`stale`または`rejected`とする。canonical三文書tupleは変更しない。
+8. companion writeとHuman decision artifactをexisting staging／backup／rollback transactionへ含め、commit前failureではprior／absent guide stateとindexをreverse-order restoreする。Human decision前のtracked tree／index／HEAD／guide destination mutationは0を維持する。
+
+### 30.4 Positive and negative fixtures
+
+| ID | Fixture | Expected |
+|---|---|---|
+| `GB-OB-P01` | create resultのsame Candidate→git-bound fresh Review→approved apply | binding一致、canonical 3-path tuple不変、companion managed parity、全gate後`ready` |
+| `GB-OB-NF01` | Review／applyでCandidate未指定 | `rejected/operation_candidate_required`、mutation 0 |
+| `GB-OB-NF02` | wrong Candidate、wrong SHA、source HEAD mismatch | `rejected/operation_binding_mismatch`または`stale`、mutation 0 |
+| `GB-OB-NF03` | companion role 0／複数、path／CHECKSUMS／actual blob mismatch | `rejected/operation_binding_rejected`、mutation 0 |
+| `GB-OB-NF04` | Review後にCandidate差替え、binding digest mismatch | apply拒否、mutation 0 |
+| `GB-OB-NF05` | directory scan／latest選択、manual companion path／digest、arbitrary target | request／implementation contract拒否、mutation 0 |
+
+S10 closureは上記6 fixture、existing archive／git-bound positive、PA-NF-01〜10B、Human decision、rollback、publication retryがGreenであることを必要とする。S11はprovider／installed／wheel／sdist／fresh init／update／dogfoodへsame CLI／binding contractを投影し、S12はv3 guideと全PlantUML、Reviewer transport、GB-OB suiteをfresh defect-only／QA evidenceとして閉じる。
+
+### 30.5 Stop rules
+
+- same CandidateをReview／applyへ明示的にcarryできず、directory scan、operator manual fill、pre-Human repository write、canonical 3-path tuple拡張、persistent registryが必要になる場合は停止してamendmentへ戻る。
+- Reviewerをadapter／PATH Oracle boundaryから迂回させる、またはReviewer exact-current-branch確認をlocal preflightで代替する実装は不適合とする。
+- v2 Candidate、v2 plan prefix、S01〜S07履歴を変更して修正を成立させてはならない。
+
+
+## 31. 2026-07-29 Formal P1-001／P2-001 Schema Alignment Amendment
+
+### 31.1 Immutable v3 prefix and bounded scope
+
+- 本sectionより前の55,059 bytesはv3 Issue planのauthoritative prefixであり、SHA-256は`7dcb0e3dbd630737df28d03f8ea9169f8f88243772f52cd75885b05609cd367f`である。削除、置換、並べ替え、改行正規化を行わない。
+- v3 Candidateは上書きしない。本v4はformal Review `P1-001`と隣接するconcrete `P2-001`だけを修正し、accepted architecture、Human authority、direct provider-owned Oracle adapter、exact current branch、onboarding companion、既存S08以降の順序を変更しない。
+- v3 prefix内の`artifacts/20260729t034200z-guide-new-member-chatgpt-first-issue-planning.md`はhistorical identityとして保持する。v4 current guide pathは`artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md`である。
+
+### 31.2 S10 correction — one canonical GitBoundOperationBindingV1 key set
+
+1. `GitBoundOperationBindingV1`のtop-level closed schemaは`repository`と`branch`だけをauthority keyとする。top-level `source_repository`／`source_branch`、両命名系の併記、alias normalization、unknown keyを受理しない。
+2. Candidate／source identityでは従来どおり`candidate_identity.source_repository`と`candidate_identity.source_branch`を使用する。Runtimeは次のmappingを必須検証し、一致後にtop-level `repository`／`branch`だけをbindingへserializeする。
+
+```text
+binding.repository == candidate_identity.source_repository == reviewed_identity.repository
+binding.branch     == candidate_identity.source_branch     == reviewed_identity.branch
+```
+
+3. `binding_sha256`は自己fieldを除くclosed objectをUTF-8、`ensure_ascii=false`、key昇順、separator `,`／`:`、非有限number禁止、末尾LFなしでcanonical serializationしたbytesに対するSHA-256とする。Epic Design、Issue Design、domain builder／parser、Review result、Human decision、applyが同じbytesを使用する。
+4. positive fixtureは同一Candidate／Reviewed identityから全層で同一digestを得る。negative fixtureはtop-level `source_repository`、top-level `source_branch`、両命名系、repository／branch mismatch、Candidate source identity mismatchをそれぞれpre-Oracle／pre-mutationで拒否する。canonical三文書tuple、companion resolver、public optionは変更しない。
+
+### 31.3 P2-001 documentation correction — three exact-GitHub gates
+
+- Epic DesignのExact GitHub branch gateは、(1) pre-invocation local Git preflight、(2) fresh ChatGPT roleによるGitHub exact current-branch確認、(3) Oracle output受領後のlocal branch／HEAD／source-manifest再検証、の**三つ**である。二つと記す旧表現を三つへ訂正する。
+- focused specification assertionは上記三条件とcount 3を照合する。挙動、failure semantics、default-branch fallback禁止は変更しない。

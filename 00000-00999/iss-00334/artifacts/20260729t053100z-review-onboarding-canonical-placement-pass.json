@@ -1,0 +1,39 @@
+{
+  "review_status": "pass",
+  "review_status_reason": "blockingなP0/P1は確認されなかった。v4 Candidate bytesは採用済みcanonical docsとguideに一致し、append-only Plan、authority、status、binding、PlantUMLに具体的な欠陥はない。",
+  "findings": [
+    {
+      "severity": "P2",
+      "location": "report.md Assurance記録",
+      "defect": "旧source binding hashが現行値として残っていた。",
+      "resolution": "現行.assurance.jsonのRequirement、Design、Plan SHA-256へ更新した。"
+    },
+    {
+      "severity": "P2",
+      "location": "report.md Spec Authoring Gate",
+      "defect": "onboarding amendmentのrequirement、design、plan promotion行が未記録だった。",
+      "resolution": "v4 Candidateとfresh PASSへbindしたphase別promotion行を追加した。"
+    }
+  ],
+  "counts": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 2,
+    "P3": 0
+  },
+  "review_scope": [
+    "epic requirement/design/report",
+    "issue requirement/design/plan/report/.assurance.json",
+    "immutable v2-v4 Candidate and review artifacts",
+    "final onboarding companion"
+  ],
+  "verified": {
+    "v4_candidate_canonical_byte_parity": true,
+    "plan_append_only_prefix": true,
+    "human_authority": true,
+    "binding_schema": true,
+    "three_exact_github_gates": true,
+    "plantuml_roles": 4
+  },
+  "confidence": 0.98
+}
