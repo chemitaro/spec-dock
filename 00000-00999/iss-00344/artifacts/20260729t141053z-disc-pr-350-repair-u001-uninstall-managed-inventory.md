@@ -106,15 +106,18 @@ reflected_to: []
 
 ## Commit Evidence
 
-- candidate commit pending。
+- candidate commit `0a26ec4183229c8f0a38ce244114d2b28896dec8`をpush済み。
+- exact-head aggregateはfocused `11 passed`、heavy `11 passed`、node/copy `52 passed`、uninstall aggregate `46 passed`、CLI uninstall `8 passed`、`make lint` pass、default `672 passed / 2051 skipped`。
+- fresh ChatGPT-Use spec/QA/code reviewsはすべてPASS、P0/P1 0。code reviewのP2 historical provenanceはcurrent PRを変更しないfuture compatibility riskとしてdefer。
 
 ## Re-observation Result
 
-- pending.
+- mandatory evidence-only final commit後のnew exact headでpending。
 
 ## Residual Risk / Follow-up
 
-- cleanup orderingとempty directory/retry marker除去をfocused regressionで確認する。
+- cleanup ordering、empty directory、retry marker idempotencyはfocused regressionで確認済み。
+- older-version READMEはcurrent exact bytesと異なる場合に保守的に保存され得る。historical-hash inventoryまたはinstallation provenanceは必要なら別Issueで検討する。
 - bare opt-in full regressionとcandidate-wheel consumer E2EはIssue 346所有のまま。
 
 ## ADR Triage
