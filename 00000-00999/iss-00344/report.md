@@ -119,6 +119,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-044 | adopted | S90 docs lane Green candidate | S90 docs review candidate | `doc-writer`がallowed 4 provider docsだけを更新し、Workbench shell/README-only tracking/no-backfill/security/authority/checkout/manual copy/root exclusion/source-wins/automation/Issue 345/346境界をrole-proportionalに記録した。exact semantic assertionとcanonical asset testは`2 passed`、deprecated 3句は0 hit、canonical Workbench README diffなし、`git diff --check` pass。skills/workflow semantic changeは不要、dogfood projectionはS95所有 | provider docs 3件と`templates/README.md`; `TC-344-007C/010`; EVD-008/010 candidate evidence | commit/push後にexact candidateへfresh ChatGPT-Use `spec-reviewer`責務review |
 | EAL-045 | adopted | ChatGPT-Use S90 docs candidate review (`PASS`, advisory) | S90 docs review gate | GitHub connectorでexact candidate `5b5033068cb10af222ce820df9c4eec4a17d69e3`を確認したfresh `spec-reviewer`責務review。finding 0、blocking/major/minor 0。authority/security/copy/worktree/Issue 345/346の全境界がcorrect、scope expansionなし、`next_action=proceed`。4 canonical READMEはcandidate diff外でblob identity同一 | `artifacts/20260729t100020z-chatgpt-output-s90-docs-spec-review-5b503306.md`; SHA-256 `debe4cdf627bea28b1e9f1d239afa52acd62d0bc9958dc2b353fb36367d0bc7d`; 1,649 bytes; reviewed commit `5b5033068cb10af222ce820df9c4eec4a17d69e3` | evidence-only closure commit、clean/push確認、S90 Result Approval |
 | EAL-046 | partially_adopted | ChatGPT-Use S95 implementation/test concretization (`advisory`) | S95 projection handoff | GitHub connectorでsource commit `2b4601f6e74053f3513f5fe66334c9999bf71c8b`を確認した回答から、exact 10 mirror paths、direct provider/mirror byte parity、initiatives/full Workbench filesystem snapshot、untracked direct README preflight、formal update 1回、existing parity/no-backfill nodes、`make lint`、default `uv run pytest`、failure classification、EVD-012 templateを採用した。raw path manifest/backupはrepository外・非公開とする。回答後のArtifact/report commitによりexecution headは更新されるため、`2b4601f6`固定は採用せず、実行直前のclean/pushed/local=remote headをauthorityとしprovider/expected ten-path content不変を確認する。optional test-map追加、manual fallback copy、rollback commandは必要時のdisposition候補でありprimary pathには採用しない | `artifacts/20260729t102224z-chatgpt-output-s95-implementation-test-concretization-2b4601f6.md`; SHA-256 `77c014b14524eac13473238ff2c3a211ae74991d5076c56163212790e2e1db72`; 46,210 bytes; source commit `2b4601f6e74053f3513f5fe66334c9999bf71c8b` | Artifactとapproved S95 contractを`dev-coder`へ共有し、preflight/snapshot後にformal updateを一度だけ実行 |
+| EAL-047 | adopted | S95 provider-first projection candidate | S95 review candidate | execution head `06092c7df6181384548732c7462b6da558b037b4`でclean/pushed/local=remoteとguidance `ready`を確認し、external snapshot後にprovider-first updateを実行した。sandbox内の初回はexact 10 mirrorを投影後、`.agents/host-adapters/meta.json`への`EPERM`でrc=1となりworkerは契約どおり停止した。親はprotected snapshot一致、exact allowlist、`.agents` Git deltaなしを確認し、同一head/stateで権限付き環境回復retryを1回だけ許可してrc=0を得た。手動copy、provider/test repair、rollbackは行っていない。exact 10 direct byte parity、focused 5 tests、`make lint`、default `uv run pytest`、final protected snapshotsはすべてpassした | `/private/tmp/spec-dock-s95.zEFQKMQB`（repository外、非公開）; initiatives `3165` rows SHA-256 `2888087e8095dfe21a74d5d8724ed10465f1dbda550f895f0b75ed82f2e343d9`; Workbench `255` rows SHA-256 `4480ea5f9d7ef612c76adf3b1b566d97157c8af2c3e94a9894c40f9189bd3b2f`; focused `5 passed`; default `672 passed, 2047 skipped` | exact candidateをcommit/pushし、fresh ChatGPT-Use `code-reviewer`責務review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -185,6 +186,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - provider/fallback ignoreをREADME-only trackingの3-rule contractへ更新し、generic scaffolderはrender後bytesが不変なUTF-8 fileをpath非依存でexact-copyするようにした。package/build/docs/dogfood projectionは変更していない。
 - S02で、Workbench semantic opacity、linked checkoutとmanual payload copy、identical/divergent README source-wins、既存failure/atomicityをtest-onlyで固定した。
 - S03で、package-data、custom `build_py`、custom `sdist`をexact five-path allowlistへ揃え、source/wheel/normalized sdist/isolated installed resourcesのinventoryと4 Workbench README bytesを検証した。
+- S95で、providerのmanaged assetsをdogfooding mirrorのexact 10 pathsへ投影し、既存Initiative/Workbenchを変更せず、default test laneをGreen化した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -242,6 +244,15 @@ git diff --check
 # pass
 ```
 
+#### S95 実施内容 / 結果
+- 実行前headは`06092c7df6181384548732c7462b6da558b037b4`でlocal=remote、worktree clean、guidance `ready` / `may_execute_approved_plan=true`。
+- preflightでWorkbench roots `218`（present `2` / missing `216`）、direct untracked README conflict `0`を確認した。
+- sandbox内のformal updateはexact 10 mirrorを投影後に`.agents/host-adapters/meta.json`の`Operation not permitted`でrc=1となり、`dev-coder`は直ちに停止した。protected snapshot、exact allowlist、`.agents` Git deltaなしを確認後、親が同一head/stateで権限付き環境回復retryを1回だけ実行しrc=0を得た。
+- 投影後の差分はapproved exact 10 mirror pathsのみ。provider/mirror direct byte parityは10組すべてpassし、4 Workbench READMEは共通SHA-256 `58300883820e1dfd173ab90a8205dcc44f83f29313b1bca84ad1955733cd8490`。
+- Initiative snapshotは`3165` rows、SHA-256 `2888087e8095dfe21a74d5d8724ed10465f1dbda550f895f0b75ed82f2e343d9`、Workbench snapshotは`255` rows、SHA-256 `4480ea5f9d7ef612c76adf3b1b566d97157c8af2c3e94a9894c40f9189bd3b2f`でpre/final完全一致。
+- focused parity/no-backfill testsは`5 passed`、`make lint`はRuff check/format/Mypyすべてpass、default `uv run pytest`は`672 passed, 2047 skipped`。
+- raw manifest/logは`/private/tmp/spec-dock-s95.zEFQKMQB`に置き、repositoryへ追加していない。
+
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
@@ -254,6 +265,7 @@ git diff --check
 | S03 | 赤フェーズ（Red） | TC-344-008のpackage/prune gapをactual buildで検出 | production変更前にprune snapshotの`template_readmes_before_prune`欠落、wheel inventoryが`README.md` 1件だけ | 2 exact nodesを`--run-full-regression`で実行 | pass | collection/helper failureではなくpackaging/prune contract由来の`2 failed` |
 | S03 | 緑フェーズ（Green） | exact five-pathを4 surfaceで成立させstale nested READMEを除去 | pre-prune 6、post-prune 5、source/wheel/sdist/installed exact 5、4 Workbench bytes一致、Issue 69 related nodes含む`6 passed` | S03 exact 2、Issue 69 related 4、parent exact 2 rerun、EAL-038 fresh review | pass | full installerのmirror parity 2 failureは`valid_s95_handoff`としてS95へowner維持 |
 | S03 | リファクタリング（Refactor） | existing build frameworkを維持 | existing Issue 69 build/install helpersを再利用し、setupの既存build_py/sdistを局所拡張。production allowlistをtest expectedへimportしていない | diff inspection、Ruff、format、Mypy、diff-check | pass | new backend/dependency/generic frameworkなし |
+| S95 | 統合クロージャ（Integration Green） | TC-344-011のprovider-first projection、既存local state保護、default lane Green | exact 10 mirror、direct parity、focused `5 passed`、lint pass、default `672 passed / 2047 skipped`、protected snapshots一致 | formal update、external manifests、direct parity、focused/default tests、static quality | pass | sandbox rc=1は同一stateの権限付き環境回復retry rc=0で閉鎖。実装fallbackや手動copyなし |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
@@ -265,6 +277,7 @@ git diff --check
 | S02 | ordinary CLI suiteが高速lane policyで全skip | test policy observation | required evidenceは`--run-full-regression`で取得し、ordinary skipも別記録 | TC-344-007A/B/C/009 | no | ordinary `18 skipped`; full `18 passed` |
 | S02 | empty-source fixtureがmissing target creationを観測せず、通常Markdownがmixed fixtureに未収載 | fresh ChatGPT-Use code review | source existing-empty / target missingのpreconditionをassertし、unit/CLI mixed fixtureへ通常Markdownを追加 | TC-344-006/009 | no | EAL-035; parent rerun unit `6 passed` / full CLI `18 passed`; EAL-036 fresh re-review PASS |
 | S03 | required full installer fileのdogfood mirror parity 2 failure | dev-coder / parent rerun | S03 forbidden pathでは修正せず、approved S95 provider-first projection後にfull file/default suiteを再実行 | TC-344-011 / S95 | no | D-011; exact failuresは`spec-dock/.gitignore`と`spec-dock/templates/**` |
+| S95 | managed mirror投影後のhost-adapter refreshがsandbox権限で`EPERM` | dev-coder formal update | workerは即停止。親がsnapshot/allowlist/`.agents` deltaを検証し、同一head/stateで権限付き環境回復retryを1回だけ実行 | TC-344-011 | no | 初回rc=1、回復retry rc=0。protected manifests before/final一致、manual fallbackなし |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
@@ -272,6 +285,7 @@ git diff --check
 | S01 | TC-344-001、002A/B、003、004、005 | focused tests、fresh review、candidate commit/push、evidence-only closure commit、clean、Result Approval | focused tests完了、candidate `a62ae20d5ad587563bf09de77b1f85d75a64c4ec` push済み、fresh ChatGPT-Use review `PASS` / finding 0。EAL-030と本reportをevidence-only closure commitへ含める | pass | closure commit後のactual SHAとclean確認は自己参照を避けて外部引き渡し証跡へ記録する |
 | S02 | TC-344-006、007A/B/C、009 | test-only diff、full two suites、fresh review、candidate/evidence commits、clean、Result Approval | candidate `2917610b04a6bcb59c7b316f47d4281c8844b63a` push済み。parent verification unit `6 passed` / full CLI `18 passed` / Ruff/format pass。fresh ChatGPT-Use re-review `PASS` / finding 0、prior major 2件closed。EAL-036と本reportをevidence-only closure commitへ含める | pass | production変更なし。closure commit後のactual SHAとclean確認は自己参照を避けて外部引き渡し証跡へ記録する |
 | S03 | TC-344-008、static quality、Issue 346 handoff | dual prune/exclude、4-surface exact inventory/bytes、stale removal、full installer、fresh review、candidate/evidence commits、clean、Result Approval | candidate `59d4fdf64333a537484af233ecef0138c9368aaf` push済み。exact `2 passed`; related `6 passed`; Ruff/format/Mypy/diff pass。fresh review `PASS`、minor enum findingをevidence-only修正、D-011は`valid_s95_handoff`。EAL-038と本reportをclosure commitへ含める | pass | allowed 3 implementation pathsのみ。S95はmirror/default laneを必ずgreenにする |
+| S95 | TC-344-011、EVD-012 | provider-first update、exact 10 allowlist、direct parity、protected snapshot equality、focused/default/static Green、fresh review、candidate/evidence commits | exact 10 projection、snapshot equality、focused `5 passed`、lint pass、default `672 passed / 2047 skipped`まで完了。EAL-047をcandidateへ含める | pending review | candidate commit/push後のfresh ChatGPT-Use review待ち |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -288,6 +302,7 @@ git diff --check
 | TC-344-007C | S02 | yes | covered-existing | existing selector rejection | unpublished/root options + invalid scope nodes | pass | 5 collected cases。EAL-036 fresh PASS |
 | TC-344-009 | S02 | yes | covered-existing + characterization | full CLI baseline fixture 8 failure | repaired full CLI + reusable regressions | pass | full CLI 18、reusable 6、root rejection 5、missing target creation。EAL-036 fresh PASS |
 | TC-344-008 | S03 | yes | red-required | pre-prune observation欠落、wheel inventory `README.md` 1件 | exact two build nodes、Issue 69 related regression、4-surface raw bytes | pass | pre 6 / post 5、wheel/sdist `0.2.3` artifacts、canonical SHA-256 `58300883820e1dfd173ab90a8205dcc44f83f29313b1bca84ad1955733cd8490`、EAL-038 fresh PASS |
+| TC-344-011 | S95 | yes | integration-required | S03/full default laneのmirror parity 2 failure | provider-first update、exact 10 direct parity、focused 5 nodes、`make lint`、default `uv run pytest`、external protected snapshots | pass | focused `5 passed`; default `672 passed, 2047 skipped`; Initiative/Workbench before=final一致。fresh review待ち |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -307,6 +322,7 @@ git diff --check
 | TC-344-009 | S02 | EVD-006 | pass | full existing copy suite and failure/atomicity、fresh review PASS |
 | TC-344-008 | S03 | EVD-007 | pass | source/wheel/sdist/installed exact 5、4 raw-byte parity、stale removal、fresh review PASS |
 | TC-344-010 | S90 | EVD-008 | pass | exact semantic assertion `1 passed`、deprecated wording 0 hit、fresh spec review PASS |
+| TC-344-011 | S95 | EVD-012 | pass | exact 10 provider/mirror parity、focused/default/static Green、protected state unchanged。fresh review待ち |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -334,7 +350,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S03 | delegated | package config、custom build/sdist、real wheel/sdist/installを跨ぐbounded distribution work | dev-coder | approved plan S03、EAL-037、D-010 | approved specs、S01/S02 evidence、`pyproject.toml`、`setup.py`、Issue 69 helpers | `pyproject.toml`、`setup.py`、`tests/unit/infra/test_init_update.py`のみ | runtime、docs、dogfood、dependency、generic import、new backend/framework、canonical docs直接編集 | Red exact 2、Green exact/related/full installer、Ruff/format/Mypy/diff、allowed paths、repo artifact absence | network、wheelhouse不足、新backend/dependency、five-path変更、allowed path外変更、unclassified regression | Red/Green、artifact names、4 inventories、hash/bytes、pre/post、stale absence、static results、EVD-007/010/011 summary、Ledger Note | pass: exact/related/static Green。full installer 2 failureをD-011として親がS95へowner維持しreview candidateへ統合 |
 | S90 test lane | delegated | shipped guidanceのsemantic boundaryをdocs変更前に一つの観測可能なRedへ固定するbounded test work | dev-coder | approved plan S90とEAL-039の採用部分 | approved specs、canonical Workbench README、4 provider docs、S01〜S03 evidence | `tests/unit/infra/test_init_update.py`のexact test methodのみ | production、4 docs、canonical README、package、dogfood、canonical specs直接編集 | exact node `--run-full-regression` Red、canonical asset test、Ruff check/format、`git diff --check`、one-file allowlist | path/decoding/helper/canonical precondition起因のRed、allowed path外変更、runtime behavior変更が必要 | aggregate Red diagnostics、commands/results、closure status、risk、Ledger Note | pass: documentation-specific 38件だけでvalid Red。fresh review finding 2件を閉じてPASS |
 | S90 docs lane | delegated | accepted semantic assertionを4 shipped operator docsの最小差分でGreen化するbounded documentation work | doc-writer | approved plan S90、EAL-039/043、accepted test | approved specs、canonical Workbench README、4 provider docs、S01〜S03 observed evidence | provider docs 3件と`templates/README.md`のみ | Python test、runtime/installer/package、canonical README/spec/report/artifact、dogfood、Issue 345/346 implementation | exact semantic assertion Green、canonical asset test、deprecated wording inspection、docs diff、canonical terminology、four-file allowlist | runtime/canonical wording変更が必要、approved meaning不明、allowed path外変更 | changed docs、Green、inspection、unresolved wording、EVD-008/010 summary、Ledger Note | pass: exact 2 tests Green、deprecated 0 hit、canonical diffなし。fresh spec review pending |
-| S95 | delegated | provider-first managed mirror projectionと既存local state保護を一つのauditable transactionで閉じるbounded integration work | dev-coder | approved plan S95、EAL-046の採用部分 | approved specs、S01〜S90 evidence、provider/mirror paths、local filesystem state | exact 10 checked-in mirror pathsのみ。test-only repairは親の事前dispositionがある場合だけ | provider source、initiatives、existing Workbench、canonical specs/report/artifact、Issue 345/346、candidate wheel、bare full regression、second update | clean/pushed/local=remote、untracked README preflight、external snapshots、one formal update、exact allowlist、direct/parity/no-backfill tests、lint/default pytest、final snapshots | protected mismatch、allowlist mismatch、unexpected update noise、unrelated failure、second update必要、provider inversion | EVD-012 summary、snapshot counts/hashes/equality、update logs/hash、ten paths、tests/lint/default results、classification、Ledger Note | pending: concretization Artifactをcommit/push後にdev-coderへ共有 |
+| S95 | delegated | provider-first managed mirror projectionと既存local state保護を一つのauditable transactionで閉じるbounded integration work | dev-coder | approved plan S95、EAL-046の採用部分 | approved specs、S01〜S90 evidence、provider/mirror paths、local filesystem state | exact 10 checked-in mirror pathsのみ。test-only repairは親の事前dispositionがある場合だけ | provider source、initiatives、existing Workbench、canonical specs/report/artifact、Issue 345/346、candidate wheel、bare full regression、second update | clean/pushed/local=remote、untracked README preflight、external snapshots、one formal update、exact allowlist、direct/parity/no-backfill tests、lint/default pytest、final snapshots | protected mismatch、allowlist mismatch、unexpected update noise、unrelated failure、second update必要、provider inversion | EVD-012 summary、snapshot counts/hashes/equality、update logs/hash、ten paths、tests/lint/default results、classification、Ledger Note | pass with environment recovery: workerはsandbox rc=1で停止。親の権限付きretry rc=0後、exact 10、snapshot equality、focused/default/static Greenを確認。fresh review待ち |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
@@ -344,6 +360,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S03 | dev-coder | explicit hidden package-data、shared exact five-path build/sdist predicate、pre-prune inventory、4-surface exact inventory/raw bytesを既存Issue 69 frameworkで実装 | `pyproject.toml`; `setup.py`; `tests/unit/infra/test_init_update.py` | Red exact `2 failed`; Green exact `2 passed`; related `6 passed`; full installer `3 passed / 554 skipped / 2 failed`; Ruff/format/Mypy/diff pass。親exact `2 passed`、full/static同結果を再確認 | fresh ChatGPT-Use review `PASS`; blocking/major 0、minor enum 1件をclosure reportで解消、D-011 `valid_s95_handoff` | mirror parity 2 failureはapproved S95 ownership | accepted; proceed to evidence-only closure commit |
 | S90 test lane | dev-coder | provider 4文書のshared/role-specific guidanceを一つのsemantic assertionへ集約し、canonical READMEをread-only preconditionとしてvalid Redを固定 | `tests/unit/infra/test_init_update.py` | final exact node `1 failed`（stale semantics 38件のみ）、canonical asset `1 passed`、Ruff/format/diff-check pass。default lane `1 skipped`はpolicyどおり | initial/R1 fresh review `FAIL`後、exact `a084cea911ef61524b9b24a52b7e0b22e182716e`へfresh `PASS`; prior 2件closed、finding 0 | Issue 345/346 availability変更時はdocsとtestの同時更新が必要 | accepted; docs lane admitted |
 | S90 docs lane | doc-writer | 4 provider docsをshell/README-only tracking/security/authority/worktree copy/root/sibling Issue境界へ更新 | provider docs 3件、`templates/README.md` | exact docs + canonical asset `2 passed`; deprecated 3句 0 hit; canonical README diffなし; diff-check pass | exact `5b5033068cb10af222ce820df9c4eec4a17d69e3`へfresh ChatGPT-Use `spec-reviewer` PASS、finding 0 | unresolved wordingなし。dogfood projectionはS95所有 | accepted; proceed to evidence-only closure commit |
+| S95 | dev-coder | external snapshotとexact allowlistを準備し、formal updateを実行。sandbox `EPERM`で即停止し、protected state一致とpartial exact 10 deltaを報告 | exact 10 dogfooding mirror paths | preflight、initial/failure snapshots、allowlist pass。親の環境回復後にdirect parity、focused `5 passed`、lint、default `672 passed / 2047 skipped`、final snapshots一致 | fresh ChatGPT-Use review pending | 実装リスクなし。環境回復retryをEAL-047へ明示 | accepted with bounded environment recovery; review candidateへ統合 |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -353,6 +370,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S03 | not applicable: dev-coder delegation succeeded | risk accepted: no | none | none | none | exact/full/Ruff/format/Mypy/diff/allowed pathsを親が再検証 | fresh ChatGPT-Use code-reviewer責務review required | parent implementation exception未使用。D-011はS95 owner handoffでありfinal risk waiverではない |
 | S90 test lane | not applicable: dev-coder delegation succeeded | risk accepted: no | none | none | none | valid Red、canonical precondition、Ruff/format/diff/allowed pathを親が確認 | fresh ChatGPT-Use code-reviewer責務review required | parent implementation exception未使用 |
 | S90 docs lane | not applicable: doc-writer delegation succeeded | risk accepted: no | none | none | none | exact Green、deprecated wording、canonical diff、four-file boundaryを親が確認 | fresh ChatGPT-Use spec-reviewer責務review required | parent implementation exception未使用 |
+| S95 | dev-coderはsandbox `EPERM` stop conditionで完遂不可。親だけが同一head/stateの正式updateを権限付きで回復実行 | user request内の通常実装操作。scope expansion/risk waiverなし | approved exact 10 mirror paths。`.agents`はmanaged updateの副作用だがGit deltaなし | `uv run spec-dock update .`環境回復retry 1回のみ。手動copy/repairなし | protected mismatchまたはallowlist外差分ならrollbackして停止 | exact 10 direct parity、focused/default/static Green、Initiative/Workbench snapshot一致、`.agents` Git deltaなし | fresh ChatGPT-Use code-reviewer責務review required | host conflictを隠さずEAL-047へ記録。初回rc=1と回復retry rc=0を別試行として保持 |
 
 #### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
@@ -374,6 +392,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S90 test lane R1 | test-only candidate re-review | code-reviewer | superseded | failed | no | second bounded fix and fresh re-review | exact candidate `c043bad10e42d9c023f84bb0fc29dacaf8614863`をreview。CR-S90-TEST-001 open、CR-S90-TEST-R1-001 blocking 1件を採用 |
 | S90 test lane R2 | test-only candidate second re-review | code-reviewer | fresh | passed | no | admit docs lane | exact candidate `a084cea911ef61524b9b24a52b7e0b22e182716e`をreview。prior 2件closed、finding 0、blocking/major/minor 0 |
 | S90 docs lane | docs candidate review | spec-reviewer | fresh | passed | no | execute approved plan; proceed to evidence-only closure commit | exact candidate `5b5033068cb10af222ce820df9c4eec4a17d69e3`をreview。全境界correct、finding 0 |
+| S95 | projection candidate review | code-reviewer | pending | pending | no | commit/push then fresh review | exact 10 mirror projection、environment recovery、snapshot/parity/focused/default/static evidenceをreview対象にする |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -383,6 +402,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S03 | committed | package/build/test implementation、D-010/D-011、delegation/verification/review evidence | review target `59d4fdf64333a537484af233ecef0138c9368aaf`; EAL-038と本reportはpost-review evidence-only closure commit | closure commit後に外部引き渡し証跡で確認 | not applicable | not applicable | not applicable | not applicable |
 | S90 test lane | committed | exact aggregate semantic test、EAL-040〜043、delegation/Red/review evidence | accepted review target `a084cea911ef61524b9b24a52b7e0b22e182716e` | clean / pushed、local=remote確認済み | not applicable | not applicable | not applicable | not applicable |
 | S90 docs lane | committed | provider docs 4件、EAL-044/045、Green/delegation/review evidence | review target `5b5033068cb10af222ce820df9c4eec4a17d69e3`; closure head `e8df32e913d4774ab9d5a970cc3d34886bccfc4e` | clean / pushed / local=remote確認済み | not applicable | not applicable | not applicable | not applicable |
+| S95 | candidate pending | exact 10 dogfooding mirror paths、EAL-047、projection/verification/recovery evidence | commit/push後にreview targetを記録 | pending | not applicable | not applicable | not applicable | not applicable |
 
 #### Step / Milestone Result Approval
 
@@ -392,6 +412,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S02 | committed | `9a5c08a5e33c0458cbdb0db9eb103e7f35513b39`; clean / pushed / local=remote確認済み | EAL-036 fresh PASS、prior major 2件closed | approved | S03 admitted |
 | S03 | committed | `0efe3055860706a9f4b68ae1ddaa767371079b03`; clean / pushed / local=remote確認済み | EAL-038 fresh PASS、minor enum findingをclosure reportで解消 | approved | S90 admitted |
 | S90 | committed | `e8df32e913d4774ab9d5a970cc3d34886bccfc4e`; clean / pushed / local=remote確認済み | EAL-043 code-review PASS、EAL-045 spec-review PASS、prior blocking 2件closed | approved | S95 admitted |
+| S95 | candidate pending | exact 10 projectionとEAL-047をcommit/push予定 | fresh ChatGPT-Use code-review pending | pending | S99 not admitted |
 
 #### 変更したファイル
 - `src/spec_dock/cli.py` - pre-mutation freshness、fresh root copy、installer README allowlist、fallback ignore
@@ -408,12 +429,14 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - `tests/unit/infra/test_init_update.py` - S90 aggregate docs semantic assertion
 - `src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,reference_worktree.md}` - Workbench shell/operator境界
 - `src/spec_dock/assets/spec_dock/templates/README.md` - fresh/future shell、README-only tracking、no-backfill境界
+- `spec-dock/.gitignore`、`spec-dock/docs/{README.md,guide.md,reference_worktree.md}`、`spec-dock/scripts/spec_dock_runtime/infra/template_scaffolder.py`、`spec-dock/templates/README.md`、`spec-dock/templates/{root,initiative,epic,issue}/.workbench/README.md` - provider assetsのdogfooding mirror projection
 
 #### コミット
 - S01 review target / closure head: `a62ae20d5ad587563bf09de77b1f85d75a64c4ec` / `cc17c25530f8778b52b006b878c780dafeccf57f`
 - S02 review target / closure head: `2917610b04a6bcb59c7b316f47d4281c8844b63a` / `9a5c08a5e33c0458cbdb0db9eb103e7f35513b39`
 - S03 review target / closure head: `59d4fdf64333a537484af233ecef0138c9368aaf` / `0efe3055860706a9f4b68ae1ddaa767371079b03`
 - S90 test review target / docs review target / closure head: `a084cea911ef61524b9b24a52b7e0b22e182716e` / `5b5033068cb10af222ce820df9c4eec4a17d69e3` / `e8df32e913d4774ab9d5a970cc3d34886bccfc4e`
+- S95 review target: candidate commit後に記録
 
 #### メモ
 - `No material implementation decisions beyond the approved plan.`
@@ -446,8 +469,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: S95 formal updateがmanaged mirror投影後、sandbox内の`.agents/host-adapters/meta.json`書き込みで`EPERM`となった。
+  - 解決: workerは即停止し、親がprotected snapshot一致、exact allowlist、`.agents` Git deltaなしを確認した。同一head/stateで権限付き環境回復retryを1回だけ行いrc=0を得た後、全必須検証を実行した。
 
 ## 学んだこと (任意)
 - ...
