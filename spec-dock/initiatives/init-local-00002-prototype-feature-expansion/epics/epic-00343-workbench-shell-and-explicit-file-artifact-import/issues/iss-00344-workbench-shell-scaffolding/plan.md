@@ -3,7 +3,7 @@
 ID: "iss-00344"
 タイトル: "Workbench Shell Scaffolding"
 関連GitHub: ["#344"]
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-29"
 依存: ["requirement.md", "design.md"]
@@ -997,7 +997,7 @@ Final exit:
 - [x] Issue 346へのdeferred deliveryとhuman-only merge境界がある。
 - [x] prior ChatGPT plan review PASS（ChatGPT-First amendmentによりstale）。
 - [x] prior fresh `spec-reviewer` plan review PASS（ChatGPT-First amendmentによりstale）。
-- [ ] ChatGPT-First amendment後のpush済みexact commitに対するfresh `spec-reviewer`責務review PASS。
+- [x] ChatGPT-First amendment後のpush済みexact commit `a0b99765f7fac5ad384f4f81c85b50990f017fc9`に対するfresh `spec-reviewer`責務review PASS。
 
 ## 19. 変更履歴
 
