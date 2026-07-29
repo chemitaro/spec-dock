@@ -21,7 +21,7 @@ ID: "iss-00334"
 Humanがofficial `spec-dock-issue-planning` Skillを起点として、次の一連の操作を実行できる。
 
 1. 既存Issueとcurrent GitHub branch／HEADを特定する。
-2. ChatGPT Plannerから完全な三文書を取得し、immutableなIssue Candidate ZIPを生成する。
+2. ChatGPT Plannerからexactly-one downloadable authoring ZIPを取得し、安全検証した三文書からimmutableなIssue Candidate ZIPを生成する。
 3. CandidateまたはGitHub上の正本三文書をfresh ChatGPT Reviewerへ渡す。
 4. 指摘が実在する場合だけCandidateをrevisionする。
 5. exact reviewed identityへbindしたHuman承認後に正本へ採用し、validate、commit、pushを行う。
@@ -34,10 +34,11 @@ Humanがofficial `spec-dock-issue-planning` Skillを起点として、次の一�
 | Human | Plan採用、実装開始、mergeの最終判断 |
 | `spec-dock-issue-planning` Skill | Human向け入口、mode／revision laneの選択、必要な文脈の収集 |
 | Codex Main | repository確認、外部出力の検証、正本反映、証跡統合 |
-| `spec-dock-chatgpt` | Git preflight、ChatGPT起動、result取得、Candidate／Review／apply処理のCLI |
+| `spec-dock-chatgpt` | Git preflight、provider-owned Oracle adapterの起動、result取得、Candidate／Review／apply処理のCLI |
 | ChatGPT Planner | 三文書の新規作成または完全置換 |
 | ChatGPT Reviewer | read-only review。Candidate、正本、repositoryを変更しない |
-| Core Runtime | Candidate検証、identity、採用transaction、validation、publicationの決定的処理 |
+| provider-owned Oracle adapter | PATH Oracleのdirect argv起動、exact prompt／reference attachment、same-session recovery、file-artifact snapshot |
+| Core Runtime | authoring ZIP／Candidate検証、identity、採用transaction、validation、publicationの決定的処理 |
 
 ChatGPTの出力はadvisory evidenceであり、Humanの採用権限を代替しない。
 
@@ -48,7 +49,9 @@ ChatGPTの出力はadvisory evidenceであり、Humanの採用権限を代替し
 - official Skillからrepo-local `spec-dock-chatgpt`を呼ぶ経路。
 - `planning create`、`planning revise`、`review planning`、`planning apply`。
 - existing Issue、親Epic／Initiative、依存、関連source、repository／branch／HEADの解決。
-- provider-managed Promptとprovider-owned Oracle adapterによるPlanner／Reviewer起動。
+- provider-managed Chat promptとprovider-owned Oracle adapterによるPlanner／Reviewer起動。
+- exact current GitHub branch gate、reference-only attachment、Planner／Semantic RevisionのZIP-only authoring output。
+- Oracle session file artifactのidentity／inventory／checksum検証とprivate staging snapshot。
 - complete三文書とcontrol filesを含むIssue Candidate ZIP。
 - `archive-candidate`をdefault、`git-bound`を明示的fallbackとするReview。
 - Semantic revisionとMechanical revision。
@@ -64,6 +67,9 @@ ChatGPTの出力はadvisory evidenceであり、Humanの採用権限を代替し
 - Initiative／Epic Planningや汎用Review frameworkの実装。
 - arbitrary Prompt、任意backend、永続的なPlanning database／authority registryの追加。
 - 本Issueでshared delivery／lifecycle policyを変更すること。
+- `chatgpt-use`、個人wrapper、個人Project／profile／host／configを配布または製品fallbackとして採用すること。
+- Oracle本体の改造、Oracle public artifact-export APIの新設、browser account／Chrome hostの構築。
+- public command family、Review mode、Human decision、Candidate control files、apply transactionをゼロから再設計すること。
 
 ### 3.3 Seedの扱い
 
@@ -88,11 +94,25 @@ Core `spec-dock` lifecycle commandとは分離する。
 
 ### REQ-003 Exact Git Binding
 
-ChatGPTを使用する正式runはcurrent repository、named branch、HEAD、upstreamを取得し、local HEADとremote branch HEADの一致を確認する。不一致、detached HEAD、upstream欠落、dirty treeではChatGPT起動またはrepository mutation前に停止する。
+ChatGPTを使用する正式runはcurrent repository、named branch、HEAD、upstreamを取得し、clean symbolic branch、`origin/<same-branch>`、local HEADとfetched remote branch HEADの一致をOracle起動前に確認する。不一致、detached HEAD、upstream欠落、dirty treeではbackend call 0で停止する。
+
+さらにChat promptは`@GitHub` connectorで同一repositoryのexact current branchを直接開き、source HEADへbindすることを必須とする。repository／current branchを開けない、connectorが利用できない、HEAD bindingを確認できない場合はfail closedとし、default branch、別branch、添付、prompt context、memoryを代替sourceとして使用しない。Oracle output受領後、Candidate／Review publication前に同じlocal branch／HEAD／source manifestを再検証し、run中driftは`stale`として拒否する。
 
 ### REQ-004 Complete Issue Candidate
 
-`planning create`と`planning revise`の成功結果は、次を含むimmutable ZIPとする。
+Planner／Semantic Revisionのformal authoring outputと、RuntimeのIssue Candidateを分離する。
+
+Oracle authoring ZIPは次のtransient content-only packageとする。
+
+```text
+<issue-id>-issue-planning-documents.zip
+└── <issue-id>-issue-planning-documents/
+    ├── requirement.md
+    ├── design.md
+    └── plan.md
+```
+
+RuntimeがこのZIPを安全検証した後、`planning create`とSemantic `planning revise`の成功結果として次を含むimmutable Candidate ZIPを生成する。
 
 - `requirement.md`
 - `design.md`
@@ -102,7 +122,7 @@ ChatGPTを使用する正式runはcurrent repository、named branch、HEAD、ups
 - `CHECKSUMS.sha256`
 - `PLACEHOLDER-ORACLE-MAP.json`
 
-CandidateはIssue ID、Candidate ID、version、logical filename、observed transport filename、internal root、source repository／branch／HEAD、ZIP SHA-256で識別する。closed`(N)`transport suffixだけをlogical filenameへ正規化でき、それ以外のrenameは拒否する。Human decision evidenceはlogical／transport filenameとSHAを保持する。不完全な三文書、control file不整合、既存output衝突時はfinal ZIPを残さない。
+CandidateはIssue ID、Candidate ID、version、logical filename、observed transport filename、internal root、source repository／branch／HEAD、ZIP SHA-256で識別する。closed`(N)`transport suffixだけをlogical filenameへ正規化でき、それ以外のrenameは拒否する。Human decision evidenceはlogical／transport filenameとSHAを保持する。不完全な三文書、control file不整合、既存output衝突時はfinal Candidate ZIPを残さない。
 
 placeholder verificationは`PLACEHOLDER-ORACLE-MAP.json`がdynamicとして宣言したfile／tokenだけを対象とする。static exact-hash document内のliteral exampleを未解決placeholderとして拒否しない。
 
@@ -117,7 +137,7 @@ modeはSkillまたはHumanが明示し、silent fallback、別modeのPASS流用�
 
 ### REQ-006 Read-only Fresh Review
 
-ReviewはCandidateまたはtracked treeを変更せず、resultを明示されたrepository外outputへ保存する。Candidate versionまたはgit-bound reviewed HEADごとにfresh reviewer conversationを使用する。
+ReviewはCandidateまたはtracked treeを変更せず、closed JSON resultを明示されたrepository外outputへ保存する。Candidate versionまたはgit-bound reviewed HEADごとにfresh reviewer conversationを使用する。Reviewerにもexact current GitHub branch gateを適用し、legacy outer text frameやreplacement ZIPをformal resultにしない。
 
 Reviewは現在の設計を前提として、実在する欠落、矛盾、重複、path／identity／ownerのずれ、具体的な実装不能、安全性またはHuman authority違反だけをfindingとする。改善提案や再設計案だけでFAILにしない。
 
@@ -127,7 +147,7 @@ P0／P1だけをblocking findingとする。P2／P3はnon-blocking observation�
 
 `planning revise`は`--request <json>`を必須とし、Skillが選んだlaneと修正対象を明示する。
 
-- Semantic: 対象Candidate identity、採用するP0／P1 review finding IDs、維持すべき設計前提を渡し、完全な三文書replacementを要求する。
+- Semantic: 対象Candidate identity、採用するP0／P1 review finding IDs、維持すべき設計前提を渡し、完全な三文書を収録したdownloadable authoring ZIP一個を要求する。
 - Mechanical: 対象Candidate identity、target file、old text、new text、meaning invariant、diff budgetを渡し、指定箇所以外のsemantic changeを禁止する。一意に適用できないrequestはSemantic laneへ暗黙fallbackせず拒否する。
 
 Revision request validatorはP2／P3 finding IDを修正triggerとして受理しない。旧Candidateは上書きせず、P0／P1 revision成功後は新version／Candidate ID／ZIP SHAを持つcomplete Candidateを生成し、fresh Reviewへ戻す。
@@ -191,15 +211,30 @@ commit後のpush失敗ではcommitをreset／amendせず、同じoperation ident
 | PA-NF-10A | validation／sync failure、restore成功 | `rolled_back` |
 | PA-NF-10B | commit後push／remote確認失敗 | `publication_pending` |
 
+Oracle boundaryのclosed outcomeは次を基本とし、既存status setを増やさない。
+
+| Condition | status | reason |
+|---|---|---|
+| PATH Oracleなし／unsupported capability | `blocked` | `oracle_unavailable`／`oracle_capability_unsupported` |
+| exact current GitHub branchを確認不能 | `blocked` | `github_exact_branch_unavailable` |
+| submitted sessionの回収が未確定 | `blocked` | `oracle_session_recovery_required` |
+| authoring artifactなし／複数／wrong identity | `rejected` | `oracle_artifact_missing`／`oracle_artifact_ambiguous`／`oracle_artifact_rejected` |
+| authoring artifactのunsafe ZIP／hash不一致 | `rejected` | `archive_rejected` |
+
+Prompt submit後のtimeout／disconnectを新runとして自動再試行してはならない。same-session recoveryがterminalに失敗した場合だけ、Humanへblocked resultを返す。
+
+
 ### REQ-012 Security and Data Handling
 
-Prompt、operator context、Candidate、Review resultへsecret、token、cookie、credential、`.env`、private customer dataを含めない。process起動はdirect argvを使用し、untrusted inputをshell文字列へ補間しない。
+Prompt、operator context、reference attachment、authoring ZIP、Candidate、Review resultへsecret、token、cookie、credential、`.env`、private customer dataを含めない。Oracle、status、reattach、harvestを含む全process起動はdirect argvを使用し、untrusted inputをshell文字列へ補間しない。
 
-ZIPは既存authoring-pack安全primitiveを再利用し、path traversal、absolute／ambiguous path、special file、collision、encryption、nested archive、executable／binary、CRC／inventory／checksum不整合、resource limit超過をfail closedで拒否する。
+adapterはAPI key環境を引き継いでAPIへfallbackせず、個人Project URL、browser host／profile、LaunchAgent、home absolute pathをproduct argv／configへ固定しない。Oracle session path、raw transcript、cookie、private absolute pathをformal resultへ保存しない。
+
+Oracle authoring ZIPとCandidate ZIPは既存authoring-pack安全primitiveを再利用し、path traversal、absolute／ambiguous path、special file、symlink、collision、encryption、nested archive、executable／binary、CRC／inventory／checksum不整合、resource limit超過をfail closedで拒否する。
 
 ### REQ-013 Provider-first and Compatibility
 
-provider authorityを`src/spec_dock/assets/`に置き、installed／dogfood projectionを生成して同じcommand、Skill、Promptを利用できるようにする。existing Core CLI、authoring-pack、Issue lifecycleを破壊しない。
+provider authorityを`src/spec_dock/assets/`に置き、installed／dogfood projectionを生成して同じcommand、Skill、Prompt、Oracle adapter、artifact contractを利用できるようにする。root `spec-dock/` projectionを直接authoring authorityにしない。existing Core CLI、authoring-pack、Issue lifecycleを破壊しない。
 
 ### REQ-014 JIT Dogfood
 
@@ -207,9 +242,44 @@ hermetic tests完了後、Humanが選んだeligible Issue一件でcreate→Revie
 
 ### REQ-015 Oracle Product Dependency Boundary
 
-Issue Planningの外部実行依存は、`PATH`で解決されたローカルOracle本体の`oracle` commandだけとする。RuntimeはSpecDockがprovider authorityとして配布するOracle adapter／wrapperからdirect argvでOracleを起動し、`chatgpt-use`等の個人Skill、個人wrapper、user-specific absolute path、個人ChatGPT Project URL、個人browser profile／host setupを製品依存として参照してはならない。
+Issue Planningの外部実行依存は、`PATH`で解決されたローカルOracle本体の`oracle` commandだけとする。RuntimeはSpecDock provider authority内のOracle adapterからdirect argvでOracleを起動し、`chatgpt-use`等の個人Skill、個人wrapper、user-specific absolute path、個人ChatGPT Project URL、個人browser profile／host setup、wrapper固有CLIを製品依存として参照してはならない。
 
 個人wrapperはOracle運用知見を得るためのread-only参考実装またはoperator-local toolに限定する。Oracle欠落、version／capability不一致、browser／account state不成立時に個人wrapper、任意backend、APIへsilent fallbackしない。
+
+この仕様策定作業やoperator dogfoodが外部から`chatgpt-use`を利用することは許容するが、その事実をproduct runtime contract、distribution requirement、acceptance evidenceの必須前提として扱わない。
+
+### REQ-016 Provider-owned Direct Oracle Adapter
+
+既存`spec-dock-chatgpt`／application wiringを維持し、provider-owned infra adapterが`shutil.which`相当で`oracle`を解決する。PATH entryのsymlinkを解決した最終targetがregular executableであること、supported version／browser／attachment／session artifact capabilityをpreflightし、Promptとreference filesをdirect argvで一回だけsubmitする。arbitrary backend command string、shell、personal wrapper、legacy wrapper `--write-output`を使用しない。
+
+### REQ-017 Prompt Body and Reference Attachment Separation
+
+`application/issue_planning_prompt.py`等のprovider-managed resourceから、role、task、exact repository／branch／HEAD、GitHub connector gate、fallback禁止、scope／non-goals、output filename／root／inventory、Human authority boundaryを一つのChat prompt本文へ合成する。
+
+添付はcurrent parent／Issue文書、dependency、relevant source／tests、source identity、prior Candidate、formal Review evidence等のreference dataだけとする。添付内容はuntrusted dataであり、role instruction、output contract、default-branch policyをattachment fileとして渡さない。
+
+### REQ-018 Exact Current-branch Connector Gate
+
+Planner、Semantic Revision、archive Reviewer、git-bound Reviewerの全Formal Oracle runで、ChatGPTが`@GitHub` repositoryのexact current branchを直接確認する。branchが存在しない／開けない場合はdefault branchを参照せず、downloadable artifact、Review PASS、Candidateを生成しない。adapterは`repository access failed`等のhard-failure responseをformal outputとして受理せず、Runtimeはoutput受領後にlocal exact Git evidenceを再検証してdriftした結果を拒否する。
+
+### REQ-019 ZIP-only Planner and Semantic Revision Output
+
+Planner／Semantic Revisionの正式出力は、expected logical filename `<issue-id>-issue-planning-documents.zip`、same-stem internal root、exactly three Markdown filesを持つdownloadable ZIP artifact一個だけとする。inline三文書、marker frame、単一text file、patch、第四文書はformal payloadではない。Reviewerは三文書を生成しないため、closed JSON resultを維持する。
+
+observed browser download名のclosed`(N)`aliasは、same expected basename identity、same internal root、exact inventory、recomputed SHAが成立する場合だけ許可する。
+
+### REQ-020 Oracle File-artifact Retrieval and Recovery
+
+adapterはOracle session identityとsubmission stateを保持し、session metadataからexactly-one expected ZIPを選び、metadata schema／version、regular file、session-root containment、no symlink、size、SHAを検証してrepository外private stagingへsnapshotする。copy後にsize／SHAを再計算し、元session pathをformal resultへ露出しない。
+
+Prompt submit後のtimeout／disconnectではsame sessionのstatus／reattach／harvestだけを許可し、new submissionを行わない。first-class artifact exportが利用できないOracle versionとの結合は一つのversioned infra readerへ隔離し、unsupported／ambiguous状態ではfail closedする。Human Relayを使う場合もsame identityのOracle-produced artifactを同じvalidatorへ通す。
+
+### REQ-021 Preserve Candidate and Adoption Safety Boundaries
+
+検証済みauthoring ZIPだけをdocument mapへ変換し、既存Runtime Candidate builderへ渡す。Candidate control files、source binding、identity、atomic publish、Review result、Human decision、staging、rollback、validation、commit／push、remote parityの既存contractを変更しない。
+
+Planner／Reviewer／Oracle adapterはcanonical Issue、index、HEADを変更しない。Humanのapproved decisionと`planning apply`開始前のrepository mutationは0件とする。旧text transportで得たdogfood evidenceは履歴として保持してよいが、新Oracle boundaryのAcceptance Evidenceとして再利用しない。
+
 
 ## 5. Acceptance Criteria
 
@@ -230,11 +300,21 @@ Issue Planningの外部実行依存は、`PATH`で解決されたローカルOra
 | AC-013 | Human承認済みeligible Issue一件でJIT dogfoodを完走し、scope外mutationが0である |
 | AC-014 | one Issue／one branch／one Delivery PRで実装し、mergeはHumanへhandoffする |
 | AC-015 | provider／wheel／sdist／fresh init／update／dogfoodでprovider-owned adapterが`PATH`上のfake／real Oracleを同一contractで起動し、shipped product surfaceに個人home、`chatgpt-use` Skill、`oracle-chatgpt` wrapperへの必須依存が0件である |
+| AC-016 | PATH上のfake Oracleがdirect argvで一回だけ起動され、browser-only／reference-file contractを記録する。Oracle欠落ではprocess start 0、unsupported capabilityではChat prompt submit 0でblockedとなり、個人wrapper、arbitrary backend、APIへのfallbackが0件である |
+| AC-017 | local Git preflightとChatGPT connector promptが同一repository／exact current branch／HEADへbindする。missing current branch、connector unavailable、default-branch-only accessではauthoring ZIP、Review PASS、Candidate、repository mutationが0件である。Oracle run中のbranch／HEAD／source manifest driftはpublication前に`stale`となる |
+| AC-018 | captured invocationのPrompt本文にrole、task、branch gate、fallback禁止、output filename／root／inventory、Human authority boundaryが存在し、attachment inventoryはreference dataだけである。attached instruction fileとlegacy text-frame contractは0件である |
+| AC-019 | Planner／Semantic Revisionのexactly-one expected authoring ZIPからCandidateを生成でき、inline-only、legacy marker frame、ZIPなし／複数、wrong filename／root、missing／extra file、unsafe entryでCandidate 0となる |
+| AC-020 | Oracle metadataのsize／SHA／safe pathとsnapshot bytesが一致するpositive fixture、およびsymlink、path escape、metadata mismatch、unsupported schemaのnegative fixtureが成立する。timeout／disconnect recoveryではsame-session harvestのみ、duplicate submit 0である |
+| AC-021 | verified authoring ZIPから生成したCandidateのMANIFEST／CHECKSUMS／source bindingが既存contractと一致し、create／revise／review／Human Gate／applyの既存positive／negative suiteがGreen、Human decision前のtracked tree／index／HEAD mutationが0件である |
+| AC-022 | provider／wheel／sdist／fresh init／update／dogfoodでdirect Oracle、exact-branch Prompt、reference-only attachments、ZIP-only authoring contractが同一であり、product runtimeにpersonal path／Project／profile／wrapper call／legacy `--write-output` dependencyが0件である |
+
 
 ## 6. Error and Stop Conditions
 
 - Issue未存在、Seedの直接指定、dirty／detached／unpublished Git state。
-- backend unavailable、timeout、nonzero、complete response欠落。
+- Oracle unavailable／unsupported capability、timeout／disconnect、same-session recovery不成立。
+- GitHub connectorでexact current branchを確認不能、default branch fallbackの要求／検出。
+- authoring ZIPなし／複数、wrong filename／root／inventory、unsafe artifact、metadata size／SHA不一致、inline-only response。
 - Candidate identity、manifest、checksums、Review result、Human decisionの不一致。
 - Review後のCandidate／HEAD／target drift。
 - unsafe archive、unsafe destination、secret検出。
@@ -245,4 +325,4 @@ Issue Planningの外部実行依存は、`PATH`で解決されたローカルOra
 
 ## 7. Completion Boundary
 
-本Issueの完了には、AC-001〜AC-014の実装証拠、focused tests、full relevant regression、JIT dogfood、provider／installed／dogfood parity、required code／QA review、Delivery PRのmerge-ready handoffが必要である。Planning文書の承認だけでは完了しない。
+本Issueの完了には、AC-001〜AC-022の実装証拠、focused tests、full relevant regression、新Oracle boundaryでのHuman-approved JIT dogfood、provider／installed／dogfood parity、required spec／code／QA review、Delivery PRのmerge-ready handoffが必要である。Planning文書の承認、旧personal-wrapper transportの成功、authoring ZIP取得だけでは完了しない。

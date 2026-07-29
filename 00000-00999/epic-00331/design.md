@@ -5,7 +5,7 @@ ID: "epic-00331"
 関連GitHub: ["chemitaro/spec-dock#331"]
 状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-23"
+最終更新: "2026-07-29"
 依存: ["requirement.md"]
 親: ["init-00322"]
 candidate_semantic_key: "planning-and-advisory-review"
@@ -62,7 +62,8 @@ Dogfood Planningは、実装したWorkflowのAcceptance Evidenceであり、Issu
 
 ```text
 Scope Planning output
-→ Scope-minimal immutable Candidate
+→ exact downloadable authoring artifact
+→ Runtime validation／scope-minimal immutable Candidate
 → Skill chooses archive-candidate or git-bound Review
 → fresh Reviewer
 → P0／P1: Skill chooses Semantic or Mechanical Revision lane
@@ -75,9 +76,19 @@ Scope Planning output
 
 ### 3.1 Scope packages
 
-- Issue Candidate: `requirement.md`、`design.md`、`plan.md`、source baseline、manifest／checksums。
+Planning出力は二段階に分ける。
+
+1. **Oracle authoring artifact**: ChatGPTが生成するdownloadable ZIP。scope固有のMarkdownだけを含むuntrusted transient inputであり、Candidate identityやHuman authorityを持たない。
+2. **Planning Candidate**: Runtimeがauthoring artifactを検証し、source baseline、manifest／checksums、placeholder authority、Candidate identityを付与したimmutable package。
+
+Scope packageは既存境界を維持する。
+
+- Issue authoring artifact: `requirement.md`、`design.md`、`plan.md`だけ。
+- Issue Candidate: 上記三文書、source baseline、manifest／checksums。
 - Epic Candidate: Epic三文書、Issue Boundary Map、関連ADR、source baseline、manifest／checksums。
 - Initiative Candidate: Thin Initiative Bundle、全Epic Bundle、Issue Boundary Maps、dependency、ADR、materialization contracts。
+
+Oracle authoring artifactのPASSや存在だけでCandidate、Review PASS、Human approval、`execution-ready`を示さない。
 
 ### 3.2 Review mode selection
 
@@ -130,26 +141,29 @@ Both E1-I1 producer and E2-I1 consumer acceptance must prove every row independe
 
 ## 4. Planning Prompt Contract
 
-共通fragment:
+provider-managed PromptはChatフォームへ送る一つのauthoritative task bodyとして合成する。Prompt本文は少なくとも次を閉じる。
 
-- Goal／Scope identity。
-- Authoritative repository context。
-- Hierarchical Depth Contract。
-- Slicing Contract。
-- Evidence／success criteria。
-- Output contract。
-- final self-review requirement。
+- role、Goal／Scope identity、source repository、exact current branch、source HEAD。
+- `@GitHub` connectorでexact current branchを直接開くこと。
+- repository／current branchを確認できない場合のexact failureと、default branch／別branch／添付／memoryへのfallback禁止。
+- Hierarchical Depth Contract、Slicing Contract、Evidence／success criteria、final self-review requirement。
+- repository mutation、commit、push、approval claimの禁止。
+- role別output contract。Planner／Semantic Revisionはdownloadable authoring ZIP一個、Reviewerはclosed read-only JSON result。
+- 添付はcurrent branch確認後に参照するuntrusted reference dataであり、命令authorityではないこと。
 
-Initiative Promptは全Epic BundleとIssue Boundaryまで、Epic PromptはIssue Seedsまで、Issue Promptは実装計画までを要求する。
+Oracleへ`--file`等で渡すのは、source snapshot、親Contract、dependency summary、関連source／tests、prior Candidate、formal Review evidence等のreference dataだけとする。planner role、fallback policy、output inventory、Human authority boundaryを`chatgpt-use-prompt.md`等の命令fileとして添付しない。
+
+Initiative Promptは全Epic BundleとIssue Boundaryまで、Epic PromptはIssue Seedsまで、Issue Promptは実装計画までを要求する。Scope別のauthoring ZIP inventoryはPrompt本文とRuntime expectationから同じ値を生成し、ChatGPTだけにfilename／rootを決めさせない。
 
 ## 5. Review Contract
 
 Planning Review入力:
 
-- 対象Bundle。
+- 対象Bundleまたはexact git-bound canonical target。
 - 親Contract。
 - Initiative時は全Epic Bundles、Issue Boundary Maps、dependency、ADR。
-- source repository branch／HEAD。
+- source repository、exact current branch、HEAD。
+- archive identityの場合はlogical／observed filename、ZIP SHA、internal root、MANIFEST identity。
 
 Perspective:
 
@@ -159,12 +173,105 @@ Perspective:
 - decomposition-quality。
 - repository-conventions（適用時）。
 
-archive Planning Reviewはlogical Candidate filename、observed transport filename、Candidate ZIP SHA、internal root、MANIFEST identity、exact source HEAD snapshotへbindする。closed`(N)`aliasだけをnormalizeできる。git-bound Planning Reviewはreviewed HEAD、target paths、必要なsemantic BASEへbindする。Reviewerはどちらのmodeでも変更せずfindingとverdictだけを返す。exact content identityを検査できない場合は`insufficient-evidence`とし、同じFormal identityのまま別transportへsilent fallbackしない。Dynamic placeholderは`PLACEHOLDER-ORACLE-MAP.json`だけをauthorityとし、static fileのliteral exampleはexact hashで扱う。
+Reviewer PromptもChat欄本文へ直接送り、fresh conversation、read-only、defect-only、exact current branch、fallback禁止を固定する。Reviewerの正式出力はclosed JSONであり、legacy outer text frame、patch、replacement、Candidate ZIPをauthority outputとして受理しない。
 
+archive Planning Reviewはlogical Candidate filename、observed transport filename、Candidate ZIP SHA、internal root、MANIFEST identity、exact source HEAD snapshotへbindする。closed`(N)`aliasだけをnormalizeできる。git-bound Planning Reviewはreviewed HEAD、target paths、必要なsemantic BASEへbindする。exact content identityまたはGitHub exact current branchを検査できない場合は`insufficient-evidence`とし、同じFormal identityのままdefault branch、別transport、添付だけへsilent fallbackしない。Dynamic placeholderは`PLACEHOLDER-ORACLE-MAP.json`だけをauthorityとし、static fileのliteral exampleはexact hashで扱う。
 
-## 6. Skill／Wrapper Boundary
+## 6. Skill／Oracle Adapter Boundary
 
-Planning SkillはScope package、Review mode、Revision lane、Human Gateを判断する。Oracle wrapper／scriptはrepository context injection、file attachment、SHA、safe extraction、result retrieval、parityを決定的に実行する。wrapperへsemantic materiality classifierを持たせない。
+Planning SkillはScope package、Review mode、Revision lane、Human Gateを判断する。SpecDock Runtimeはexact Git preflight、Prompt synthesis、authoring artifact validation、Candidate identity、Review／Human evidence、safe applyを所有する。provider-owned Oracle adapterはOracle processとsession file-artifact retrievalだけを決定的に仲介し、semantic materiality classifier、Human decision、canonical mutationを所有しない。
+
+本仕様策定作業またはoperator-local dogfoodが`chatgpt-use`を利用することは、外部作業面として許容される。しかし、そのSkill／script／Project／profile／configは以下の製品data flowに含めない。
+
+```plantuml
+@startuml
+title Provider-owned Oracle boundary
+left to right direction
+actor Human
+component "Planning Skill\nsemantic decisions" as Skill
+component "SpecDock Runtime\nidentity and safety" as Runtime
+component "Provider-owned\nOracle Adapter" as Adapter
+component "oracle\nresolved from PATH" as Oracle
+component "ChatGPT Browser" as ChatGPT
+cloud "GitHub\nexact current branch" as GitHub
+artifact "Authoring ZIP\nor Review JSON" as Output
+
+Human --> Skill
+Skill --> Runtime
+Runtime --> Adapter : prompt + reference files + expectation
+Adapter --> Oracle : direct argv
+Oracle --> ChatGPT
+ChatGPT --> GitHub
+ChatGPT --> Output
+Adapter --> Runtime : verified snapshot / closed JSON
+Runtime --> Human : Candidate / Review evidence
+@enduml
+```
+
+### 6.1 Oracle executable and process contract
+
+- adapterは`PATH`から`oracle`を解決し、PATH entryのsymlinkを解決した最終targetがregular executableであることとsupported version／capabilityをpreflightする。
+- processはshellを介さないdirect argvで起動する。Promptは一つのargument、reference filesは個別argumentとし、pathやPromptをcommand stringへ補間しない。
+- browser engineを製品境界とし、API credential環境を継承してAPIへsilent fallbackしない。
+- 個人ChatGPT Project URL、個人Chrome host／profile、LaunchAgent、home absolute pathをargv、config、test fixtureへ固定しない。browser／account setupはOracleのoperator preconditionでありSpecDock authorityではない。
+- arbitrary backend command、operator wrapper path、wrapper固有`--write-output`をpublic／private product contractへ残さない。
+
+### 6.2 Exact GitHub branch gate
+
+正式runは二つの独立gateを必要とする。
+
+1. Runtimeがcurrent local branch、`origin/<same-branch>`、local／fetched remote HEAD equality、clean treeを確認する。
+2. ChatGPT Promptが`@GitHub`で同一repositoryのexact current branchを直接開き、source HEADへbindする。current branchを開けない場合はfailureを返し、default branch、別branch、添付だけから継続しない。
+3. Oracle output受領後、Candidate／Review evidenceのpublication前にRuntimeがsame branch／HEAD／source manifestを再検証する。
+
+三つのgateのどれか一つだけの成功ではPlanning／ReviewをFormal resultへ昇格させない。
+
+### 6.3 Prompt and reference attachments
+
+provider-managed role fragment、branch gate、output inventory、Human authority boundaryはRuntimeがChat prompt bodyへ合成する。添付はsource／evidenceのbyte snapshotであり、instruction fileとして解釈させない。attachment manifestはname、source label、SHA、reference purposeを持つが、Prompt authorityを持たない。
+
+### 6.4 Planner authoring ZIP and Candidate ZIP
+
+Issue Planner／Semantic Revisionのformal output例:
+
+```text
+iss-00334-issue-planning-documents.zip
+└── iss-00334-issue-planning-documents/
+    ├── requirement.md
+    ├── design.md
+    └── plan.md
+```
+
+Runtimeはexactly-one expected downloadable ZIPだけを受け入れる。observed browser download名のclosed`(N)`aliasは、expected basenameへの機械正規化、same root、same exact inventory、recomputed SHAが成立する場合だけ許可する。inline本文、marker frame、patch、extra fileをauthoring inputにしない。
+
+検証済み三文書から、Runtimeが既存contractどおりsource baseline、MANIFEST、CHECKSUMS、placeholder map、Candidate ID／version／ZIP SHAを持つ別のimmutable Candidate ZIPを生成する。ChatGPTへCandidate control filesを生成させない。
+
+### 6.5 Oracle file-artifact retrieval
+
+Oracle sessionからのartifact retrievalはprovider-owned adapterへ隔離する。
+
+- submissionは一回だけ行い、session identityとsubmission stateを保持する。
+- artifact metadataのschema／version、file type、expected／observed basename、session root内safe path、regular-file／no-symlink、size、SHAを検査する。
+- exactly-one matching ZIPをprivate non-symlink stagingへsnapshotし、copy後にsize／SHAを再計算する。Oracleの元path、cookie、raw transcriptをresultへ保存しない。
+- timeout／disconnect後は同じsessionのstatus、reattach、harvestだけを許可し、Promptを再submitしない。
+- Oracleがfirst-class caller destinationを提供しない期間はversioned metadata readerを一つのinfra boundaryへ隔離する。unsupported version、metadata ambiguity、artifact不在ではtext outputへfallbackせずfail closedする。
+- explicit Human Relayを用いる場合も、same formal identityへbindされたexact Oracle-produced artifactを同じvalidatorへ通し、自動fallbackや再authoringとして扱わない。
+
+### 6.6 Reference implementation knowledge
+
+| Reference-only `chatgpt-use` knowledge | Product treatment |
+|---|---|
+| `oracle`のPATH resolution | provider-owned adapterへ再実装する |
+| browser-only execution、API credential sanitization | product security policyとして適応する |
+| one prompt＋multiple file attachments | prompt／reference boundaryへ適応する |
+| GitHub context injection | exact current branch onlyへ狭めて再実装する |
+| long wait、status、same-session reattach／harvest | duplicate-submit禁止付きで再実装する |
+| downloadable artifact detection、size／SHA | versioned safe snapshotへ適応する |
+| 個人wrapper path／CLI、Project URL、Chrome host／profile、LaunchAgent | 製品から排除する |
+| default branch fallback | 明示的に禁止する |
+| wrapper固有`--write-output`、custom text frame | formal output contractから排除する |
+
+参考実装の呼出しやcopyを製品依存にせず、有用な手順だけをSpecDock versioning、tests、distributionの下へ移す。
 
 ## 7. Materialization
 
@@ -189,25 +296,50 @@ Remote Issue bindings use link-existing recovery; valid local Nodes are never re
 
 ## 8. Sensitive Data and Process Invocation
 
-- Planner／Reviewer Prompt、Operator Context、GitHub外file、Oracle／Human Relay package、Workbench、Candidate ZIP、Artifactへsensitive dataを含めない。Humanが必要と判断した情報は最小redacted subsetだけを使う。
-- Oracle wrapper、backend、helperのprocess launchはdirect argvをdefaultとし、Prompt／pathをshell command stringへ補間しない。
-- shell semanticsが不可避な例外は、Human-approved Design、固定command template、untrusted input拒否／encoding、injection regression test、明示的rollback mechanism／trigger、tested rollback evidenceをすべて必要とする。
-- secret fixture、`.env` path、shell metacharacterを含むPrompt／pathを使ったnegative testsと、shell exception rollback drill／evidence checkをE1-I1のacceptance evidenceへ含める。
+- Planner／Reviewer Prompt、Operator Context、GitHub外file、Oracle／Human Relay package、Workbench、authoring ZIP、Candidate ZIP、Artifactへsensitive dataを含めない。Humanが必要と判断した情報は最小redacted subsetだけを使う。
+- Oracle adapter、backend helper、session status／harvestの全process launchはdirect argvとし、Prompt／pathをshell command stringへ補間しない。
+- adapterはAPI provider key、cookie path、個人Project／profile／host override等のenvironment couplingを引き継がず、browser-only capabilityが成立しない場合はfail closedする。
+- Oracle session path、raw transcript、cookie、credential、private home pathはformal result、diagnostic、Candidate control fileへ書かない。
+- shell semanticsが不可避な例外は、Human-approved Design、固定command template、untrusted input拒否／encoding、injection regression test、明示的rollback mechanism／trigger、tested rollback evidenceをすべて必要とする。ただしIssue Planning Oracle adapterにはその例外を設けない。
+- secret fixture、`.env` path、shell metacharacter、symlink artifact、metadata hash mismatchを使ったnegative testsをE1-I1のacceptance evidenceへ含める。
 
 ## 9. Error and Recovery
 
-- GitHub access failure: fail closed。
-- Oracle transport failure: session recovery／Human Relay。
-- ZIP semantic failure: `insufficient-evidence`。non-formal diagnostic後に新しい完全ZIPとfresh Formal Reviewへ戻る。
-- Review P0/P1: Semantic findingはChatGPT complete revision、closed mechanical findingはdeterministic local revision。いずれもnew identity／fresh Review。
-- Human rejection: feedback→new ZIP→fresh Review。
-- Runtime `pre_github_fail`: precondition修正後に同createをretry。
-- `post_github_remote_only_fail`: remote numberをledgerへbindし、`--github-issue`でresumeまたはverified close後にbinding clear。
-- post-GitHub local／cleanup failure: `doctor`でlocal stateを分類し、valid Nodeならno-rerun、absentならlink-existing、partialならHuman-approved bounded cleanupまたはblocked investigation。
-- post-sync failure: valid Node bindingを保持し`sync`からresume。createし直さない。
-- dependency／Bundle placement failure: existing edge／hashを照合しmissing／absentだけをresumeする。
-- どのmaterialization failureでもcommit／pushせず、Candidate ZIPとWorkbench ledgerを保持する。
+- local Git preflight failureまたはGitHub exact current-branch access failure: authoring／Review outputをFormal resultにせずfail closed。default branchへfallbackしない。
+- Oracle executable missing／capability mismatch／browser precondition failure: personal wrapper、arbitrary backend、APIへfallbackせずblocked。
+- Prompt submit前のfailure: safe precondition修正後に新runを開始できる。
+- Prompt submit後のtimeout／disconnect: same-session status／reattach／harvestだけを行う。session終端を確認するまでnew submissionを禁止する。
+- file artifact missing／multiple／wrong filename／wrong root／unsafe entry／metadata hash mismatch: Candidateを生成せずrejectedまたは`insufficient-evidence`。inline textを代替payloadにしない。
+- ZIP semantic failure: non-formal diagnostic後に新しい完全authoring ZIPとfresh Formal Reviewへ戻る。
+- Review P0/P1: Semantic findingはChatGPT complete authoring ZIP revision、closed mechanical findingはdeterministic local revision。いずれもnew Candidate identity／fresh Review。
+- Human rejection: feedback→new authoring ZIP／Candidate→fresh Review。
+- explicit Human Relay: exact Oracle session identityとartifact bytesを保持し、同じsnapshot／ZIP validatorへ通す。identity不明の手動ZIPはFormal resultにしない。
+- Runtime `pre_github_fail`、post-GitHub failure、post-sync failure、dependency／Bundle placement failureの既存recovery contractは変更しない。どのmaterialization failureでも無断commit／pushせず、CandidateとWorkbench ledgerを保持する。
 
 ## 10. Distribution
 
-同一Issueでprovider、installed、dogfood projection、tests、docsを更新する。projectionだけの独立Issueを作らない。E1-I3はplanning-specific legacy surfaceだけをmutation対象とし、remaining shared／execution／delivery surfaceはEpic 3へ明示的に委譲する。
+同一Issueでprovider runtime、provider-managed Prompt resources、installed assets、dogfood projection、tests、docsを更新する。implementation authorityは`src/spec_dock/assets/`であり、root `spec-dock/` projectionを直接authoring authorityにしない。
+
+wheel／sdist／fresh init／update／dogfoodは次を同じcontractで証明する。
+
+- PATH fake／real Oracleへのdirect argv。
+- exact current branch、no-default-fallback Prompt。
+- Prompt bodyとreference attachmentの分離。
+- Planner／Semantic RevisionのZIP-only outputとsafe artifact snapshot。
+- Candidate／Review／Human Gate／applyの既存parity。
+- shipped runtimeから個人home、`chatgpt-use`、`oracle-chatgpt`、personal Project／profile／host、legacy `--write-output` text-frame dependencyが除去されていること。
+
+reference-only fixture、research artifact、denylist testの文字列は製品runtime dependencyではないため、scoped static checkはexecutable／provider runtime／managed resourcesとnegative-test allowlistを区別する。projectionだけの独立Issueを作らない。E1-I3はplanning-specific legacy surfaceだけをmutation対象とし、remaining shared／execution／delivery surfaceはEpic 3へ明示的に委譲する。
+
+## 11. Boundary Decisions
+
+| Decision | Rationale |
+|---|---|
+| existing `spec-dock-chatgpt` command familyとCandidate／apply contractを維持 | transport defectだけを最小修復し、完了済みwalking skeletonを再設計しない |
+| provider-owned Python adapterからPATH Oracleを直接起動 | personal wrapperとarbitrary backend commandを製品境界から除外する |
+| local Git gate＋ChatGPT connector exact-branch gate | wrong source branchからのauthoringを二重にfail closedにする |
+| task instructionはPrompt本文、attachmentはreference only | authorityとdataを分離し、Human可視性を上げる |
+| authoring ZIPとCandidate ZIPを分離 | ChatGPTのmulti-file artifact能力とRuntimeのidentity／safety authorityを両立する |
+| Oracle session readerをversioned infra boundaryへ隔離 | first-class export未確認の実装結合を局所化し、unsupported versionで停止できる |
+| same-session recovery、no duplicate submit | long-running browser transportの二重authoringとidentity ambiguityを防ぐ |
+| operator-local `chatgpt-use`はreference／external work surfaceのみ | この仕様策定手段と配布製品依存を明確に分ける |
