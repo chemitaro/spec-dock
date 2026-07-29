@@ -1,8 +1,10 @@
 import hashlib
+import io
 import json
 from pathlib import Path
 import subprocess
 import sys
+from typing import cast
 import zipfile
 
 RUNTIME_SCRIPTS_DIR = (
@@ -25,10 +27,19 @@ from spec_dock_runtime.domain.authoring_pack.source_manifest import (  # noqa: E
     build_source_manifest,
     empty_source_manifest,
 )
+from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
+    OracleAuthoringZipSnapshot,
+    OracleReviewJsonPayload,
+    PlanningInvocationResult,
+    PlanningSourceEvidence,
+)
 from spec_dock_runtime.infra.contracts import DirectDependencyResolution, StoredMetaRecord  # noqa: E402
 from spec_dock_runtime.infra.issue_planning_chatgpt import (  # noqa: E402
-    classify_transport_frame,
     resolve_issue_planning_github_repository,
+)
+
+DEFAULT_COMPANION_PATH = (
+    "artifacts/20260728t120000z-guide-new-member-chatgpt-first-issue-planning.md"
 )
 
 
@@ -52,6 +63,13 @@ def test_synced_source_to_transport_tracer_preserves_identity_and_is_not_lifecyc
         meta_path=(issue_dir / ".meta.json").as_posix(),
     )
     invoked: list[object] = []
+
+    def backend(**kwargs: object) -> PlanningInvocationResult:
+        invoked.append(kwargs)
+        return _transport_result(
+            source_evidence=cast("PlanningSourceEvidence", kwargs["source_evidence"]),
+        )
+
     run = issue_planning.run_issue_planning_transport
     result = run(
         issue="iss-00003",
@@ -65,7 +83,8 @@ def test_synced_source_to_transport_tracer_preserves_identity_and_is_not_lifecyc
             source_manifest=build_source_manifest(tmp_path, request.source_paths)
         ),
         repo_slug_resolver=lambda root: "owner/repo",
-        backend_invoker=lambda **kwargs: invoked.append(kwargs) or _transport_result(),
+        backend_invoker=backend,
+        onboarding_companion_path=DEFAULT_COMPANION_PATH,
     )
     assert len(invoked) == 1
     assert (result.status, result.reason) == ("pass", "transport_received")
@@ -107,14 +126,20 @@ def test_real_preflight_clean_synced_github_branch_invokes_backend_once(tmp_path
         meta_path=(issue_dir / ".meta.json").as_posix(),
     )
     backend_calls: list[object] = []
+
+    def backend(**kwargs: object) -> PlanningInvocationResult:
+        backend_calls.append(kwargs)
+        return _transport_result(
+            source_evidence=cast("PlanningSourceEvidence", kwargs["source_evidence"]),
+        )
+
     result = issue_planning.run_issue_planning_transport(
         issue="iss-00003",
         records=[record],
         repo_root=tmp_path,
         role="planner",
         repo_slug_resolver=resolve_issue_planning_github_repository,
-        backend_invoker=lambda **kwargs: backend_calls.append(kwargs)
-        or _transport_result(source_evidence=kwargs["source_evidence"]),
+        backend_invoker=backend,
         preflight_runner=lambda request: run_github_sync_preflight(
             request,
             fetch_executor=lambda fetch_request: GitProcessOutcome(
@@ -125,6 +150,7 @@ def test_real_preflight_clean_synced_github_branch_invokes_backend_once(tmp_path
                 duration_ms=1,
             ),
         ),
+        onboarding_companion_path=DEFAULT_COMPANION_PATH,
     )
     assert len(backend_calls) == 1
     assert (result.status, result.reason) == ("pass", "transport_received")
@@ -143,7 +169,7 @@ def test_fake_transport_to_candidate_preserves_source_and_payload_binding(tmp_pa
     output = tmp_path / "output"
     output.mkdir()
     record = _record(issue_dir)
-    payload = _planner_payload(documents)
+    payload = _authoring_zip(documents)
     result = issue_planning.run_issue_planning_create(
         request=issue_planning.PlanningCreateRequest("iss-00003", output),
         records=[record],
@@ -151,6 +177,7 @@ def test_fake_transport_to_candidate_preserves_source_and_payload_binding(tmp_pa
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: None,
         transport_runner=lambda **kwargs: _transport_result(payload=payload),
+        preflight_runner=lambda request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     assert (result.status, result.reason) == ("ok", "candidate_created")
@@ -161,9 +188,41 @@ def test_fake_transport_to_candidate_preserves_source_and_payload_binding(tmp_pa
     assert baseline["source_repository"] == "owner/repo"
     assert baseline["source_head"] == "a" * 40
     assert baseline["planner_payload_sha256"] == hashlib.sha256(payload).hexdigest()
+    assert baseline["planner_payload_size"] == len(payload)
 
 
-def test_fake_backend_partial_or_fourth_document_leaves_final_zero(tmp_path: Path) -> None:
+def test_typed_authoring_zip_rejects_stale_source_before_candidate(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = repo / "spec-dock/initiatives/i/epics/e/issues/x"
+    issue_dir.mkdir(parents=True)
+    documents = {
+        name: _planning_document(name)
+        for name in ("requirement.md", "design.md", "plan.md")
+    }
+    for name, content in documents.items():
+        (issue_dir / name).write_bytes(content)
+    output = tmp_path / "output"
+    output.mkdir()
+    result = issue_planning.run_issue_planning_create(
+        request=issue_planning.PlanningCreateRequest("iss-00003", output),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        transport_runner=lambda **kwargs: _transport_result(
+            payload=_authoring_zip(documents)
+        ),
+        preflight_runner=lambda request: _preflight(
+            source_manifest=build_source_manifest(repo, request.source_paths)
+        ),
+        clock=lambda: "2026-07-28T12:00:00+00:00",
+    )
+    assert (result.status, result.reason) == ("stale", "planning_source_stale")
+    assert list(output.iterdir()) == []
+
+
+def test_authoring_zip_extra_entry_leaves_final_zero(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     issue_dir = repo / "spec-dock/initiatives/i/epics/e/issues/x"
@@ -173,7 +232,10 @@ def test_fake_backend_partial_or_fourth_document_leaves_final_zero(tmp_path: Pat
         (issue_dir / name).write_bytes(content)
     output = tmp_path / "output"
     output.mkdir()
-    payload = _planner_payload(documents) + b"fourth document"
+    payload = _authoring_zip(
+        documents,
+        extra_entries={"fourth.md": b"fourth document"},
+    )
     result = issue_planning.run_issue_planning_create(
         request=issue_planning.PlanningCreateRequest("iss-00003", output),
         records=[_record(issue_dir)],
@@ -181,47 +243,11 @@ def test_fake_backend_partial_or_fourth_document_leaves_final_zero(tmp_path: Pat
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: None,
         transport_runner=lambda **kwargs: _transport_result(payload=payload),
-    )
-    assert (result.status, result.reason) == ("rejected", "planner_response_rejected")
-    assert list(output.iterdir()) == []
-
-
-def test_real_outer_frame_extraction_feeds_exact_inner_candidate_grammar(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    issue_dir = repo / "spec-dock/initiatives/i/epics/e/issues/x"
-    issue_dir.mkdir(parents=True)
-    documents = {name: _planning_document(name) for name in ("requirement.md", "design.md", "plan.md")}
-    for name, content in documents.items():
-        (issue_dir / name).write_bytes(content)
-    output = tmp_path / "output"
-    output.mkdir()
-    payload = _planner_payload(documents)
-    evidence = _transport_result(payload=payload).source_evidence
-    outer = (
-        b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-        + b"a" * 40
-        + b">>>\n"
-        + payload
-        + b"\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n"
-    )
-    transport = classify_transport_frame(
-        outer,
-        role="planner",
-        source_head="a" * 40,
-        source_evidence=evidence,
-    )
-    assert transport.transient_payload == payload
-    result = issue_planning.run_issue_planning_create(
-        request=issue_planning.PlanningCreateRequest("iss-00003", output),
-        records=[_record(issue_dir)],
-        repo_root=repo,
-        repo_slug_resolver=lambda root: "owner/repo",
-        backend_invoker=lambda **kwargs: None,
-        transport_runner=lambda **kwargs: transport,
+        preflight_runner=lambda request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
-    assert (result.status, result.reason) == ("ok", "candidate_created")
+    assert (result.status, result.reason) == ("rejected", "archive_rejected")
+    assert list(output.iterdir()) == []
 
 
 def test_semantic_revise_to_fresh_review_chain(tmp_path: Path) -> None:
@@ -257,8 +283,9 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
         repo_slug_resolver=lambda root: "owner/repo",
         backend_invoker=lambda **kwargs: None,
         transport_runner=lambda **kwargs: _transport_result(
-            payload=_planner_payload(documents)
+            payload=_authoring_zip(documents)
         ),
+        preflight_runner=lambda request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
     contracts = __import__(
@@ -323,7 +350,7 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
             sort_keys=True,
             separators=(",", ":"),
         ).encode()
-        return _transport_result(payload=payload)
+        return _review_transport_result(payload=payload)
 
     first_identity = contracts.IssueCandidateIdentity.from_dict(
         created.output["candidate_identity"]
@@ -396,7 +423,12 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
             upstream="origin/feature/issue",
             remote_head="a" * 40,
         )
-        return _transport_result(payload=_planner_payload(documents))
+        return _transport_result(
+            payload=_authoring_zip(
+                documents,
+                companion_path=kwargs["onboarding_companion_path"],
+            )
+        )
 
     revision = issue_planning.run_issue_planning_revise(
         request=issue_planning.PlanningReviseRequest(
@@ -477,12 +509,12 @@ def _preflight(*, source_manifest=None) -> PreflightResult:
     )
 
 
-def _transport_result(*, source_evidence=None, payload: bytes = b"body"):
-    contracts = __import__(
-        "spec_dock_runtime.domain.issue_planning_contracts",
-        fromlist=["PlanningInvocationResult"],
-    )
-    evidence = source_evidence or contracts.PlanningSourceEvidence(
+def _transport_result(
+    *,
+    source_evidence: PlanningSourceEvidence | None = None,
+    payload: bytes = b"body",
+) -> PlanningInvocationResult:
+    evidence = source_evidence or PlanningSourceEvidence(
         repository="owner/repo",
         branch="feature/issue",
         upstream="origin/feature/issue",
@@ -492,13 +524,37 @@ def _transport_result(*, source_evidence=None, payload: bytes = b"body"):
         snapshot_id="b" * 64,
         remote_head_disposition="fetched_remote_tracking_ref",
     )
-    return contracts.PlanningInvocationResult(
+    authoring_zip = OracleAuthoringZipSnapshot(
+        expected_logical_filename="iss-00003-issue-planning-documents.zip",
+        observed_transport_filename="iss-00003-issue-planning-documents.zip",
+        internal_root="iss-00003-issue-planning-documents",
+        size_bytes=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+        zip_bytes=payload,
+    )
+    return PlanningInvocationResult(
         status="pass",
         reason="transport_received",
         source_evidence=evidence,
         response_bytes=len(payload),
-        response_sha256=hashlib.sha256(payload).hexdigest(),
-        transient_payload=payload,
+        response_sha256=authoring_zip.sha256,
+        authoring_zip=authoring_zip,
+    )
+
+
+def _review_transport_result(payload: bytes) -> PlanningInvocationResult:
+    review_json = OracleReviewJsonPayload(
+        size_bytes=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+        json_bytes=payload,
+    )
+    return PlanningInvocationResult(
+        status="pass",
+        reason="transport_received",
+        source_evidence=_transport_result().source_evidence,
+        response_bytes=len(payload),
+        response_sha256=review_json.sha256,
+        review_json=review_json,
     )
 
 
@@ -545,15 +601,73 @@ def _planning_document(filename: str) -> bytes:
     ).encode()
 
 
-def _planner_payload(documents: dict[str, bytes]) -> bytes:
-    names = ("requirement.md", "design.md", "plan.md")
-    return b"".join(
-        f"<<<SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={name}>>>\n".encode()
-        + documents[name]
-        + f"<<<END-SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={name}>>>".encode()
-        + (b"\n" if index < len(names) - 1 else b"")
-        for index, name in enumerate(names)
+def _authoring_zip(
+    documents: dict[str, bytes],
+    *,
+    companion_path: str = DEFAULT_COMPANION_PATH,
+    extra_entries: dict[str, bytes] | None = None,
+) -> bytes:
+    root = "iss-00003-issue-planning-documents"
+    payloads = {
+        **documents,
+        companion_path: _onboarding_companion(),
+        **(extra_entries or {}),
+    }
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
+        for relative_path in sorted(payloads, key=lambda value: value.encode()):
+            info = zipfile.ZipInfo(
+                f"{root}/{relative_path}",
+                date_time=(2026, 7, 28, 12, 0, 0),
+            )
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            info.compress_type = zipfile.ZIP_STORED
+            archive.writestr(info, payloads[relative_path])
+    return output.getvalue()
+
+
+def _onboarding_companion() -> bytes:
+    diagrams = "\n\n".join(
+        "```plantuml\n"
+        "@startuml\n"
+        f"title {title}\n"
+        "actor Human\n"
+        "component SpecDock\n"
+        "Human --> SpecDock\n"
+        "@enduml\n"
+        "```"
+        for title in (
+            "system context",
+            "responsibility boundary",
+            "planning sequence",
+            "implementation roadmap",
+        )
     )
+    return (
+        "# First-day onboarding guide\n\n"
+        "This subordinate guide defers to requirement.md, design.md, and plan.md.\n\n"
+        "## Initiative, Epic, and Issue lineage\n\n"
+        "The planning target is init-00001, epic-00002, and iss-00003.\n\n"
+        "## Purpose and scope\n\nPurpose and scope are bounded to onboarding.\n\n"
+        "## System context\n\nThe system context identifies the actors.\n\n"
+        "## Authority and responsibility boundary\n\n"
+        "Authority and responsibility remain deterministic.\n\n"
+        "## Current architecture and target architecture\n\n"
+        "Current architecture and target architecture define the transition.\n\n"
+        "## ChatGPT First planning lifecycle\n\n"
+        "ChatGPT First governs the planning lifecycle.\n\n"
+        "## Direct Oracle and reference-only chatgpt-use\n\n"
+        "Oracle is direct and chatgpt-use is reference-only.\n\n"
+        "## Candidate, Review, Human, and apply lifecycle\n\n"
+        "Candidate creation, Review, Human decision, and apply are controlled.\n\n"
+        "## Exact current branch gate\n\nThe exact current branch is required.\n\n"
+        "## Implementation roadmap\n\nS01 through S07 are complete; S08 through S14 remain.\n\n"
+        "## Provider authority and projection\n\nProvider authority precedes projection.\n\n"
+        "## Failure modes\n\nFailure handling stops closed.\n\n"
+        "## First-day checklist\n\nThe first-day checklist directs onboarding.\n\n"
+        f"{diagrams}\n"
+    ).encode()
 
 
 def _git(repo_root: Path, *args: str) -> str:

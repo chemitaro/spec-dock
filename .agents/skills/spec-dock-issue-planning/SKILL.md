@@ -25,13 +25,17 @@ Codex owns:
 
 ChatGPT may produce:
 
-- Issue requirement/design/plan candidates;
-- review focus notes;
-- risk and test strategy notes;
-- optional supporting artifacts;
+- exactly one Planner or Semantic Revision authoring ZIP containing canonical `requirement.md`, `design.md`, and `plan.md` plus exactly one runtime-selected onboarding companion;
+- closed Reviewer JSON;
 - `information_insufficient` with missing information and questions.
 
-Candidate and Review output are evidence only. They do not grant canonical adoption, execution-ready, PR-ready, merge-ready, Issue finish, Epic completion, or PR delivery. Only `planning apply` with exact PASS Review evidence and exact Human approval may adopt the planning documents, and only its `ready` result completes the planning lifecycle.
+The onboarding companion is subordinate evidence, not a fourth canonical specification. Candidate and Review output are evidence only. They do not grant canonical adoption, execution-ready, PR-ready, merge-ready, Issue finish, Epic completion, or PR delivery. Only `planning apply` with exact PASS Review evidence and exact Human approval may make managed writes and adopt the planning documents, and only its `ready` result completes the planning lifecycle.
+
+## Execution Boundary
+
+Use only the repo-local `./spec-dock/scripts/spec-dock-chatgpt` entrypoint. It resolves `oracle` through `PATH` as its only external product execution dependency. Missing or unsupported Oracle blocks the run; do not use a personal wrapper, arbitrary backend, or API fallback.
+
+Before a formal run, verify the exact current repository, named branch, and HEAD through GitHub. Do not substitute a default branch, attachment, prompt context, or memory when that exact branch verification is unavailable.
 
 ## Read First
 
@@ -51,7 +55,7 @@ Issue Planning has one workflow. Use these labels only to frame the prompt and a
 - `draft-heavy`: draft requirement/design/plan artifacts already exist; formalization, refresh, consistency repair, and adoption review are the main work.
 - `context-heavy`: discussion, artifacts, ADRs, code, tests, or background context are the strongest inputs; requirement extraction and boundary definition are the main work.
 
-The required output is always canonical Issue `requirement.md`, `design.md`, and `plan.md`, or `information_insufficient`. Do not create separate workflow modes from these labels.
+The required Planner/Semantic Revision output is exactly one authoring ZIP containing canonical Issue `requirement.md`, `design.md`, and `plan.md` plus exactly one runtime-selected onboarding companion, or `information_insufficient`. Do not create separate workflow modes from these labels.
 
 ## Operating Spine
 
@@ -71,7 +75,7 @@ The required output is always canonical Issue `requirement.md`, `design.md`, and
      --candidate <candidate.zip> --output <external-review-dir>
    ```
 
-   Use `--mode git-bound --reviewed-head <sha>` only as the explicit fallback when the current canonical three documents must be reviewed. Do not silently reuse a PASS across modes or Candidate versions.
+   Use the same Candidate with `--mode git-bound --candidate <candidate.zip> --reviewed-head <sha>` only as the explicit fallback when the current canonical three documents must be reviewed. Do not silently reuse a PASS across modes or Candidate versions.
 4. Consume only the exact published `planning-review-result.json`. When P0/P1 findings exist, write the closed `planning-revision-request.json` beside that exact Review result and run:
 
    ```bash
@@ -95,7 +99,7 @@ The required output is always canonical Issue `requirement.md`, `design.md`, and
      --logical-filename <logical-filename> --zip-sha256 <sha256>
    ```
 
-   For git-bound mode, use `--reviewed-head <sha>` instead of the three archive identity options.
+   For git-bound mode, retain `--candidate <candidate.zip>` and use `--reviewed-head <sha>` instead of the three archive identity options. The git-bound Review and apply must use the exact same Candidate created by `planning create`.
 7. Accept the implementation handoff only when the result is `ready/adoption_published`. Candidate creation and Review completion return evidence-only `ok` results.
 8. Treat live dogfood, PR creation, Issue finish, and merge as separate downstream work; Issue Planning does not imply any of them.
 

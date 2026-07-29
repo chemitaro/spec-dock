@@ -16,3 +16,9 @@ Return exactly one JSON object and no prose or Markdown. The object must contain
 
 Allowed severities are `p0`, `p1`, `p2`, and `p3`. Do not return a patch, replacement, ZIP,
 approval, adoption decision, implementation-start decision, or authority output.
+
+For an onboarding companion, report only actual canonical contradiction, wrong current status,
+wrong direct-Oracle/exact-branch/Human-authority statement, missing mandatory section or diagram
+role, invalid or materially misleading PlantUML, Runtime-to-Reviewer adapter bypass, missing fresh
+exact-branch inspection, or missing closed-JSON return boundary. Style preferences, optional
+rewording, aesthetics, and unsolicited redesign are not defects and cannot independently fail review.

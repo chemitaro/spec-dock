@@ -40133,3 +40133,431 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert self._read_active_pointer_text(target, "initiative", "README.md") == placeholder.read_text(
                 encoding="utf-8"
             )
+
+
+_ISSUE_334_SKILL_RELATIVE_PATHS = (
+    ".agents/skills/spec-dock-issue-planning/SKILL.md",
+    ".agents/skills/spec-dock-issue-planning/resources/planner-prompt.md",
+    ".agents/skills/spec-dock-issue-planning/resources/reviewer-prompt.md",
+    ".agents/skills/spec-dock-issue-planning/resources/revision-prompt.md",
+    ".agents/skills/spec-dock-issue-planning/resources/transport-output-contract.md",
+)
+
+_ISSUE_334_SPECDOCK_RELATIVE_PATHS = (
+    "docs/README.md",
+    "docs/workflow_issue.md",
+    "scripts/spec-dock-chatgpt",
+    "scripts/spec_dock_runtime/application/issue_planning.py",
+    "scripts/spec_dock_runtime/application/issue_planning_prompt.py",
+    "scripts/spec_dock_runtime/commands/issue_planning.py",
+    "scripts/spec_dock_runtime/domain/authoring_pack/authority_boundary.py",
+    "scripts/spec_dock_runtime/domain/authoring_pack/zip_contract.py",
+    "scripts/spec_dock_runtime/domain/issue_planning_candidate.py",
+    "scripts/spec_dock_runtime/domain/issue_planning_contracts.py",
+    "scripts/spec_dock_runtime/infra/issue_planning_apply.py",
+    "scripts/spec_dock_runtime/infra/issue_planning_candidate.py",
+    "scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py",
+    "scripts/spec_dock_runtime/infra/issue_planning_oracle_artifact.py",
+    "scripts/spec_dock_runtime/infra/issue_planning_review.py",
+    "scripts/spec_dock_runtime/presentation/issue_planning.py",
+)
+
+_ISSUE_334_RUNTIME_RELATIVE_PATHS = tuple(
+    path for path in _ISSUE_334_SPECDOCK_RELATIVE_PATHS if path.startswith("scripts/")
+)
+
+
+def _issue_334_provider_path(repo_root: Path, managed_relative_path: str) -> Path:
+    if managed_relative_path.startswith(".agents/"):
+        return repo_root / "src/spec_dock/assets/install_root" / managed_relative_path
+    return repo_root / "src/spec_dock/assets/spec_dock" / managed_relative_path.removeprefix("spec-dock/")
+
+
+def _issue_334_provider_managed_paths() -> tuple[str, ...]:
+    return _ISSUE_334_SKILL_RELATIVE_PATHS + tuple(
+        f"spec-dock/{relative_path}" for relative_path in _ISSUE_334_SPECDOCK_RELATIVE_PATHS
+    )
+
+
+def _issue_334_tree_snapshot(
+    root: Path,
+    relative_paths: tuple[str, ...],
+) -> dict[str, tuple[bytes, int]]:
+    snapshot: dict[str, tuple[bytes, int]] = {}
+    for relative_path in relative_paths:
+        path = root / relative_path
+        assert path.is_file(), f"missing S11 managed file: {path}"
+        snapshot[relative_path] = (path.read_bytes(), path.stat().st_mode & 0o777)
+    return snapshot
+
+
+def _issue_334_assert_skill_contract(skill_text: str, *, surface: str) -> None:
+    required_fragments = (
+        "./spec-dock/scripts/spec-dock-chatgpt",
+        "`oracle` through `PATH`",
+        "only external product execution dependency",
+        "exact current repository",
+        "named branch",
+        "HEAD",
+        "Do not substitute a default branch",
+        "exactly one Planner or Semantic Revision authoring ZIP",
+        "canonical `requirement.md`, `design.md`, and `plan.md`",
+        "exactly one runtime-selected onboarding companion",
+        "closed Reviewer JSON",
+        "subordinate evidence, not a fourth canonical specification",
+        "exact same Candidate created by `planning create`",
+        "exact Human approval may make managed writes",
+    )
+    for fragment in required_fragments:
+        assert fragment in skill_text, f"{surface} official Skill is missing S11 contract fragment: {fragment}"
+
+    forbidden_fragments = (
+        "/Users/",
+        ".agents/skills/chatgpt-use",
+        "oracle-chatgpt",
+        "SPECDOCK_CHATGPT_COMMAND",
+        "invoke_backend_with_capture",
+        "--write-output",
+        "SPECDOCK-ISSUE-PLANNING-RESPONSE-V1",
+        "SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1",
+    )
+    for fragment in forbidden_fragments:
+        assert fragment not in skill_text, f"{surface} official Skill retains forbidden active dependency: {fragment}"
+
+    if "chatgpt-use" in skill_text:
+        normalized = skill_text.lower()
+        assert any(
+            qualifier in normalized
+            for qualifier in (
+                "reference-only",
+                "operator-local",
+                "not a product dependency",
+                "not a shipped dependency",
+            )
+        ), f"{surface} official Skill mentions chatgpt-use without a reference-only qualifier"
+
+
+def _issue_334_artifact_member_bytes(
+    *,
+    artifact_path: Path,
+    artifact_kind: str,
+    package_relative_paths: tuple[str, ...],
+) -> dict[str, bytes]:
+    if artifact_kind == "wheel":
+        with zipfile.ZipFile(artifact_path) as archive:
+            return {relative_path: archive.read(relative_path) for relative_path in package_relative_paths}
+
+    assert artifact_kind == "sdist"
+    members: dict[str, bytes] = {}
+    with tarfile.open(artifact_path, "r:gz") as archive:
+        by_relative_path: dict[str, tarfile.TarInfo] = {}
+        for member in archive.getmembers():
+            _, separator, relative_path = member.name.partition("/")
+            if separator and member.isfile():
+                by_relative_path[relative_path] = member
+        for package_relative_path in package_relative_paths:
+            source_relative_path = f"src/{package_relative_path}"
+            member = by_relative_path.get(source_relative_path)
+            assert member is not None, f"sdist is missing S11 member: {source_relative_path}"
+            extracted = archive.extractfile(member)
+            assert extracted is not None
+            members[package_relative_path] = extracted.read()
+    return members
+
+
+def _issue_334_install_artifact_and_init(
+    *,
+    harness: TestInitUpdate,
+    repo_root: Path,
+    artifact_path: Path,
+    environment_root: Path,
+) -> Path:
+    venv_result = subprocess.run(
+        [sys.executable, "-m", "venv", str(environment_root)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert venv_result.returncode == 0, (
+        f"S11 isolated environment creation failed:\nstdout:\n{venv_result.stdout}\nstderr:\n{venv_result.stderr}"
+    )
+    venv_python = harness._issue_69_venv_python(environment_root)
+    wheelhouse = harness._issue_69_resolve_wheelhouse(repo_root)
+    harness._issue_69_install_target_packages(
+        python_executable=venv_python,
+        target_dir=harness._issue_69_site_packages_dir(environment_root),
+        requirements=list(harness._ISSUE_69_BUILD_BACKEND_REQUIREMENTS),
+        wheelhouse=wheelhouse,
+    )
+    harness._issue_69_install_target_packages(
+        python_executable=venv_python,
+        target_dir=harness._issue_69_site_packages_dir(environment_root),
+        requirements=[str(artifact_path)],
+        wheelhouse=wheelhouse,
+    )
+    spec_dock_command = harness._issue_69_ensure_spec_dock_wrapper(venv_python)
+    target = environment_root.parent / f"{environment_root.name}-target"
+    target.mkdir()
+    harness._issue_69_run_subprocess_capture(
+        [str(spec_dock_command), "init", str(target)],
+        cwd=environment_root.parent,
+        env=harness._issue_69_runtime_env_without_checkout_fallback(),
+    )
+    return target
+
+
+@pytest.fixture(scope="module")
+def _issue_334_distribution_surfaces(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
+    repo_root = Path(__file__).resolve().parents[3]
+    temp_root = tmp_path_factory.mktemp("issue-334-distribution")
+    build_context = temp_root / "build-context"
+    wheel_dir = temp_root / "wheel"
+    sdist_dir = temp_root / "sdist"
+    harness = TestInitUpdate()
+    harness._issue_69_prepare_build_context(repo_root, build_context)
+    wheel_path, sdist_path, _ = harness._issue_69_build_artifacts_with_local_wheelhouse(
+        repo_root=repo_root,
+        build_context=build_context,
+        wheel_dir=wheel_dir,
+        sdist_dir=sdist_dir,
+    )
+    wheel_target = _issue_334_install_artifact_and_init(
+        harness=harness,
+        repo_root=repo_root,
+        artifact_path=wheel_path,
+        environment_root=temp_root / "wheel-venv",
+    )
+    sdist_target = _issue_334_install_artifact_and_init(
+        harness=harness,
+        repo_root=repo_root,
+        artifact_path=sdist_path,
+        environment_root=temp_root / "sdist-venv",
+    )
+    return {
+        "repo_root": repo_root,
+        "wheel_path": wheel_path,
+        "sdist_path": sdist_path,
+        "wheel_target": wheel_target,
+        "sdist_target": sdist_target,
+    }
+
+
+def test_issue_334_s11_provider_and_dogfood_selected_assets_are_byte_exact() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    for managed_relative_path in _issue_334_provider_managed_paths():
+        provider_path = _issue_334_provider_path(repo_root, managed_relative_path)
+        dogfood_path = repo_root / managed_relative_path
+        assert provider_path.is_file(), f"missing S11 provider authority: {provider_path}"
+        assert dogfood_path.is_file(), f"missing S11 dogfood projection: {dogfood_path}"
+        assert dogfood_path.read_bytes() == provider_path.read_bytes(), (
+            f"S11 provider/dogfood byte parity failed: {managed_relative_path}"
+        )
+
+    provider_executable = repo_root / "src/spec_dock/assets/spec_dock/scripts/spec-dock-chatgpt"
+    dogfood_executable = repo_root / "spec-dock/scripts/spec-dock-chatgpt"
+    assert provider_executable.stat().st_mode & 0o111
+    assert dogfood_executable.stat().st_mode & 0o111
+
+
+def test_issue_334_s11_built_inventory_and_fresh_init_match_provider(
+    _issue_334_distribution_surfaces: dict[str, object],
+) -> None:
+    repo_root = _issue_334_distribution_surfaces["repo_root"]
+    assert isinstance(repo_root, Path)
+    package_relative_paths = tuple(
+        (
+            f"spec_dock/assets/install_root/{managed_relative_path}"
+            if managed_relative_path.startswith(".agents/")
+            else f"spec_dock/assets/spec_dock/{managed_relative_path.removeprefix('spec-dock/')}"
+        )
+        for managed_relative_path in _issue_334_provider_managed_paths()
+    )
+
+    for artifact_kind in ("wheel", "sdist"):
+        artifact_path = _issue_334_distribution_surfaces[f"{artifact_kind}_path"]
+        target = _issue_334_distribution_surfaces[f"{artifact_kind}_target"]
+        assert isinstance(artifact_path, Path)
+        assert isinstance(target, Path)
+        artifact_members = _issue_334_artifact_member_bytes(
+            artifact_path=artifact_path,
+            artifact_kind=artifact_kind,
+            package_relative_paths=package_relative_paths,
+        )
+        assert set(artifact_members) == set(package_relative_paths)
+
+        for managed_relative_path, package_relative_path in zip(
+            _issue_334_provider_managed_paths(),
+            package_relative_paths,
+            strict=True,
+        ):
+            provider_bytes = _issue_334_provider_path(repo_root, managed_relative_path).read_bytes()
+            assert artifact_members[package_relative_path] == provider_bytes, (
+                f"{artifact_kind} bytes differ from provider authority: {managed_relative_path}"
+            )
+            assert (target / managed_relative_path).read_bytes() == provider_bytes, (
+                f"{artifact_kind} fresh init differs from provider authority: {managed_relative_path}"
+            )
+
+        assert os.access(target / "spec-dock/scripts/spec-dock-chatgpt", os.X_OK)
+        assert not (target / "unmanaged-user-file.txt").exists()
+
+
+def test_issue_334_s11_update_migrates_stale_assets_and_second_update_is_noop(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    target = tmp_path / "target"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+
+    user_spec = target / "spec-dock/initiatives/user-owned/specification.md"
+    user_spec.parent.mkdir(parents=True)
+    user_spec.write_bytes(b"user specification\n")
+    unmanaged = target / "unmanaged-user-file.txt"
+    unmanaged.write_bytes(b"unmanaged\n")
+    stale_files = {
+        ".agents/skills/spec-dock-issue-planning/resources/planner-prompt.md": (
+            b"SPECDOCK-ISSUE-PLANNING-RESPONSE-V1\n"
+        ),
+        ".agents/skills/spec-dock-issue-planning/resources/transport-output-contract.md": (
+            b"SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1\n"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py": (
+            b"/Users/example/.agents/skills/chatgpt-use/scripts/oracle-chatgpt --write-output\n"
+        ),
+    }
+    for relative_path, stale_bytes in stale_files.items():
+        (target / relative_path).write_bytes(stale_bytes)
+
+    assert main(["update", str(target)]) == 0
+    for relative_path in stale_files:
+        assert (target / relative_path).read_bytes() == _issue_334_provider_path(
+            repo_root,
+            relative_path,
+        ).read_bytes()
+    assert user_spec.read_bytes() == b"user specification\n"
+    assert unmanaged.read_bytes() == b"unmanaged\n"
+
+    managed_snapshot = _issue_334_tree_snapshot(target, _issue_334_provider_managed_paths())
+    assert main(["update", str(target)]) == 0
+    assert _issue_334_tree_snapshot(target, _issue_334_provider_managed_paths()) == managed_snapshot
+    assert user_spec.read_bytes() == b"user specification\n"
+    assert unmanaged.read_bytes() == b"unmanaged\n"
+
+
+def test_issue_334_s11_official_skill_contract_matches_all_distribution_surfaces(
+    _issue_334_distribution_surfaces: dict[str, object],
+    tmp_path: Path,
+) -> None:
+    repo_root = _issue_334_distribution_surfaces["repo_root"]
+    assert isinstance(repo_root, Path)
+    source_skill = repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
+    update_target = tmp_path / "update-target"
+    update_target.mkdir()
+    assert main(["init", str(update_target)]) == 0
+    (update_target / ".agents/skills/spec-dock-issue-planning/SKILL.md").write_bytes(b"stale\n")
+    assert main(["update", str(update_target)]) == 0
+
+    surfaces = {
+        "provider": source_skill,
+        "dogfood": repo_root / ".agents/skills/spec-dock-issue-planning/SKILL.md",
+        "wheel fresh init": Path(_issue_334_distribution_surfaces["wheel_target"])
+        / ".agents/skills/spec-dock-issue-planning/SKILL.md",
+        "sdist fresh init": Path(_issue_334_distribution_surfaces["sdist_target"])
+        / ".agents/skills/spec-dock-issue-planning/SKILL.md",
+        "update target": update_target / ".agents/skills/spec-dock-issue-planning/SKILL.md",
+    }
+    for surface, skill_path in surfaces.items():
+        assert skill_path.read_bytes() == source_skill.read_bytes(), f"{surface} Skill bytes differ from provider"
+        _issue_334_assert_skill_contract(skill_path.read_text(encoding="utf-8"), surface=surface)
+
+
+def test_issue_334_s11_active_dependency_denylist_covers_distribution_surfaces(
+    _issue_334_distribution_surfaces: dict[str, object],
+) -> None:
+    repo_root = _issue_334_distribution_surfaces["repo_root"]
+    assert isinstance(repo_root, Path)
+    runtime_managed_paths = tuple(f"spec-dock/{path}" for path in _ISSUE_334_RUNTIME_RELATIVE_PATHS)
+    resource_managed_paths = tuple(path for path in _ISSUE_334_SKILL_RELATIVE_PATHS if "/resources/" in path)
+    scanned_managed_paths = runtime_managed_paths + resource_managed_paths
+    package_relative_paths = tuple(
+        (
+            f"spec_dock/assets/install_root/{managed_relative_path}"
+            if managed_relative_path.startswith(".agents/")
+            else f"spec_dock/assets/spec_dock/{managed_relative_path.removeprefix('spec-dock/')}"
+        )
+        for managed_relative_path in scanned_managed_paths
+    )
+    surface_texts: dict[str, dict[str, str]] = {
+        "provider": {
+            path: _issue_334_provider_path(repo_root, path).read_text(encoding="utf-8")
+            for path in scanned_managed_paths
+        },
+        "dogfood": {path: (repo_root / path).read_text(encoding="utf-8") for path in scanned_managed_paths},
+    }
+    for artifact_kind in ("wheel", "sdist"):
+        artifact_path = _issue_334_distribution_surfaces[f"{artifact_kind}_path"]
+        target = _issue_334_distribution_surfaces[f"{artifact_kind}_target"]
+        assert isinstance(artifact_path, Path)
+        assert isinstance(target, Path)
+        artifact_members = _issue_334_artifact_member_bytes(
+            artifact_path=artifact_path,
+            artifact_kind=artifact_kind,
+            package_relative_paths=package_relative_paths,
+        )
+        surface_texts[artifact_kind] = {
+            managed_relative_path: artifact_members[package_relative_path].decode("utf-8")
+            for managed_relative_path, package_relative_path in zip(
+                scanned_managed_paths,
+                package_relative_paths,
+                strict=True,
+            )
+        }
+        surface_texts[f"{artifact_kind} fresh init"] = {
+            path: (target / path).read_text(encoding="utf-8") for path in scanned_managed_paths
+        }
+
+    update_target = Path(_issue_334_distribution_surfaces["wheel_target"])
+    assert main(["update", str(update_target)]) == 0
+    surface_texts["update target"] = {
+        path: (update_target / path).read_text(encoding="utf-8") for path in scanned_managed_paths
+    }
+
+    forbidden_literals = (
+        "/Users/",
+        ".agents/skills/chatgpt-use",
+        "oracle-chatgpt",
+        "SPECDOCK_CHATGPT_COMMAND",
+        "invoke_backend_with_capture",
+        "--write-output",
+        "SPECDOCK-ISSUE-PLANNING-RESPONSE-V1",
+        "SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1",
+    )
+    runtime_only_forbidden_literals = (
+        "--project",
+        "--profile",
+        "--host",
+        "LaunchAgent",
+        "arbitrary backend command",
+    )
+    negative_security_literals = {
+        (
+            "spec-dock/scripts/spec_dock_runtime/domain/authoring_pack/authority_boundary.py",
+            "/Users/",
+        ),
+    }
+    for surface, files in surface_texts.items():
+        for relative_path, text in files.items():
+            for forbidden_literal in forbidden_literals:
+                if (relative_path, forbidden_literal) in negative_security_literals:
+                    continue
+                assert forbidden_literal not in text, (
+                    f"S11 active dependency denylist failed: "
+                    f"surface={surface} path={relative_path} literal={forbidden_literal}"
+                )
+            if relative_path in runtime_managed_paths:
+                for forbidden_literal in runtime_only_forbidden_literals:
+                    assert forbidden_literal not in text, (
+                        f"S11 runtime argv denylist failed: "
+                        f"surface={surface} path={relative_path} literal={forbidden_literal}"
+                    )

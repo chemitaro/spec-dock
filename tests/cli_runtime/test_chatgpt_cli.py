@@ -185,6 +185,50 @@ def test_issue_planning_revise_help_states_review_sibling_contract() -> None:
     assert "same directory" in result.stdout.lower()
 
 
+@pytest.mark.parametrize(
+    "args",
+    [
+        (
+            "review",
+            "planning",
+            "--issue",
+            "iss-00003",
+            "--mode",
+            "git-bound",
+            "--reviewed-head",
+            "a" * 40,
+            "--output",
+            "/tmp/out",
+        ),
+        (
+            "planning",
+            "apply",
+            "--issue",
+            "iss-00003",
+            "--mode",
+            "git-bound",
+            "--review-result",
+            "/tmp/review.json",
+            "--human-decision",
+            "/tmp/decision.json",
+            "--expected-head",
+            "a" * 40,
+            "--reviewed-head",
+            "a" * 40,
+            "--output",
+            "/tmp/out",
+        ),
+    ],
+)
+def test_git_bound_review_and_apply_require_candidate_argument(
+    args: tuple[str, ...],
+) -> None:
+    result = _run_help(*args)
+
+    assert result.returncode == 1
+    assert "reason: operation_candidate_required" in result.stdout
+
+
 def test_build_runtime_configures_all_issue_planning_use_cases(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -215,7 +259,13 @@ def test_build_runtime_configures_all_issue_planning_use_cases(
     use_cases = bootstrap.build_runtime(specdock_dir, repo_root=tmp_path).use_cases
     use_cases.planning_create(PlanningCreateRequest("iss-00003", tmp_path))
     use_cases.planning_review(
-        PlanningReviewRequest("iss-00003", "git-bound", tmp_path, reviewed_head="a" * 40)
+        PlanningReviewRequest(
+            "iss-00003",
+            "git-bound",
+            tmp_path,
+            candidate_path=tmp_path / "candidate.zip",
+            reviewed_head="a" * 40,
+        )
     )
     use_cases.planning_revise(
         PlanningReviseRequest(tmp_path / "candidate.zip", tmp_path / "request.json", tmp_path)
@@ -228,6 +278,7 @@ def test_build_runtime_configures_all_issue_planning_use_cases(
             human_decision_path=tmp_path / "decision.json",
             expected_head="a" * 40,
             output_dir=tmp_path,
+            candidate_path=tmp_path / "candidate.zip",
             reviewed_head="a" * 40,
         )
     )
