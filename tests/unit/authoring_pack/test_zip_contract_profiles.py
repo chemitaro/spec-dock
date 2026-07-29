@@ -20,16 +20,29 @@ def _zip_contract():
     )
 
 
+COMPANION_PATH = (
+    "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
+)
+CANDIDATE_INVENTORY = (
+    "CHECKSUMS.sha256",
+    "MANIFEST.json",
+    "PLACEHOLDER-ORACLE-MAP.json",
+    "SOURCE-BASELINE.json",
+    COMPANION_PATH,
+    "design.md",
+    "plan.md",
+    "requirement.md",
+)
+AUTHORING_INVENTORY = (
+    COMPANION_PATH,
+    "design.md",
+    "plan.md",
+    "requirement.md",
+)
+
+
 def _zip(path: Path, root: str = "candidate", *, names: tuple[str, ...] | None = None) -> None:
-    inventory = names or (
-        "CHECKSUMS.sha256",
-        "MANIFEST.json",
-        "PLACEHOLDER-ORACLE-MAP.json",
-        "SOURCE-BASELINE.json",
-        "design.md",
-        "plan.md",
-        "requirement.md",
-    )
+    inventory = names or CANDIDATE_INVENTORY
     with zipfile.ZipFile(path, "w") as archive:
         for name in inventory:
             info = zipfile.ZipInfo(f"{root}/{name}")
@@ -44,24 +57,78 @@ def test_issue_candidate_profile_accepts_exact_generated_zip(tmp_path: Path) -> 
     module = _zip_contract()
     profile = module.issue_candidate_v1_profile(
         expected_root="candidate",
+        expected_companion_path=COMPANION_PATH,
         cross_file_validator=lambda files, root: (),
     )
     assert module.review_pack_input(path, profile=profile).status == "pass"
+
+
+def test_s10_issue_authoring_profile_accepts_exact_four_file_zip(tmp_path: Path) -> None:
+    path = tmp_path / "authoring.zip"
+    _zip(path, "authoring", names=AUTHORING_INVENTORY)
+    module = _zip_contract()
+    profile = module.issue_authoring_v1_profile(
+        expected_root="authoring",
+        expected_companion_path=COMPANION_PATH,
+        cross_file_validator=lambda files, root: (),
+    )
+    result = module.review_pack_input(path, profile=profile)
+    assert result.status == "pass"
+    assert tuple(sorted(result.reviewed_files)) == tuple(sorted(AUTHORING_INVENTORY))
+
+
+@pytest.mark.parametrize(
+    ("names", "finding"),
+    [
+        ((COMPANION_PATH, "design.md", "requirement.md"), "inventory_mismatch"),
+        ((*AUTHORING_INVENTORY, "notes.md"), "inventory_mismatch"),
+        ((*AUTHORING_INVENTORY, "architecture.md"), "inventory_mismatch"),
+        ((COMPANION_PATH,), "inventory_mismatch"),
+    ],
+)
+def test_s10_issue_authoring_profile_rejects_missing_extra_fourth_spec_and_partial_inventory(
+    tmp_path: Path,
+    names: tuple[str, ...],
+    finding: str,
+) -> None:
+    path = tmp_path / "authoring.zip"
+    _zip(path, "authoring", names=names)
+    module = _zip_contract()
+    profile = module.issue_authoring_v1_profile(
+        expected_root="authoring",
+        expected_companion_path=COMPANION_PATH,
+        cross_file_validator=lambda files, root: (),
+    )
+    result = module.review_pack_input(path, profile=profile)
+    assert result.status == "rejected"
+    assert finding in result.findings
+
+
+def test_s10_issue_authoring_profile_rejects_directory_entry(tmp_path: Path) -> None:
+    path = tmp_path / "authoring.zip"
+    with zipfile.ZipFile(path, "w") as archive:
+        for name in AUTHORING_INVENTORY:
+            info = zipfile.ZipInfo(f"authoring/{name}")
+            info.create_system = 3
+            info.external_attr = (stat.S_IFREG | 0o644) << 16
+            archive.writestr(info, "text\n")
+        archive.writestr("authoring/extra/", b"")
+    module = _zip_contract()
+    profile = module.issue_authoring_v1_profile(
+        expected_root="authoring",
+        expected_companion_path=COMPANION_PATH,
+        cross_file_validator=lambda files, root: (),
+    )
+    result = module.review_pack_input(path, profile=profile)
+    assert result.status == "rejected"
+    assert "directory_entry" in result.findings
 
 
 def test_issue_candidate_profile_accepts_transcript_marker_mentions_without_turn_pairs(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "candidate.zip"
-    required = (
-        "CHECKSUMS.sha256",
-        "MANIFEST.json",
-        "PLACEHOLDER-ORACLE-MAP.json",
-        "SOURCE-BASELINE.json",
-        "design.md",
-        "plan.md",
-        "requirement.md",
-    )
+    required = CANDIDATE_INVENTORY
     marker_content = {
         "design.md": "# Raw transcript vocabulary\n\nThe term raw transcript names an evidence class.\n",
         "plan.md": "- ChatGPT transcript、credential、private absolute pathを保存しない。\n",
@@ -85,27 +152,20 @@ def test_issue_candidate_profile_accepts_transcript_marker_mentions_without_turn
     module = _zip_contract()
     profile = module.issue_candidate_v1_profile(
         expected_root="candidate",
+        expected_companion_path=COMPANION_PATH,
         cross_file_validator=validate,
     )
     result = module.review_pack_input(path, profile=profile)
 
     assert result.status == "pass"
-    assert tuple(sorted(Path(name).name for name in result.reviewed_files)) == tuple(sorted(required))
+    assert tuple(sorted(result.reviewed_files)) == tuple(sorted(required))
     assert validator_calls == [(tuple(sorted(required)), "candidate")]
 
 
 def test_issue_candidate_profile_rejects_structured_transcript_payload(tmp_path: Path) -> None:
     path = tmp_path / "candidate.zip"
     transcript = "# Oracle Browser Transcript\n## Prompt\nprivate requirement body\n## Answer\nprivate response body\n"
-    required = (
-        "CHECKSUMS.sha256",
-        "MANIFEST.json",
-        "PLACEHOLDER-ORACLE-MAP.json",
-        "SOURCE-BASELINE.json",
-        "design.md",
-        "plan.md",
-        "requirement.md",
-    )
+    required = CANDIDATE_INVENTORY
     with zipfile.ZipFile(path, "w") as archive:
         for name in required:
             info = zipfile.ZipInfo(f"candidate/{name}")
@@ -115,6 +175,7 @@ def test_issue_candidate_profile_rejects_structured_transcript_payload(tmp_path:
     module = _zip_contract()
     profile = module.issue_candidate_v1_profile(
         expected_root="candidate",
+        expected_companion_path=COMPANION_PATH,
         cross_file_validator=lambda files, root: (),
     )
     result = module.review_pack_input(path, profile=profile)
@@ -129,6 +190,7 @@ def test_issue_candidate_profile_rejects_tree_input(tmp_path: Path) -> None:
     module = _zip_contract()
     profile = module.issue_candidate_v1_profile(
         expected_root="candidate",
+        expected_companion_path=COMPANION_PATH,
         cross_file_validator=lambda files, root: (),
     )
     assert module.review_pack_input(tmp_path, profile=profile).findings == ("zip_input_required",)
@@ -154,6 +216,7 @@ def test_issue_candidate_profile_rejects_unsafe_archive_class(
     module = _zip_contract()
     profile = module.issue_candidate_v1_profile(
         expected_root="candidate",
+        expected_companion_path=COMPANION_PATH,
         cross_file_validator=lambda files, root: (),
     )
     result = module.review_pack_input(path, profile=profile)
@@ -187,15 +250,7 @@ def test_issue_candidate_profile_rejects_entry_type_collision_and_binary_classes
     finding: str,
 ) -> None:
     path = tmp_path / "candidate.zip"
-    required = (
-        "CHECKSUMS.sha256",
-        "MANIFEST.json",
-        "PLACEHOLDER-ORACLE-MAP.json",
-        "SOURCE-BASELINE.json",
-        "design.md",
-        "plan.md",
-        "requirement.md",
-    )
+    required = CANDIDATE_INVENTORY
     with zipfile.ZipFile(path, "w") as archive:
         for name in required:
             info = zipfile.ZipInfo(f"candidate/{name}")
@@ -229,6 +284,7 @@ def test_issue_candidate_profile_rejects_entry_type_collision_and_binary_classes
     module = _zip_contract()
     profile = module.issue_candidate_v1_profile(
         expected_root="candidate",
+        expected_companion_path=COMPANION_PATH,
         cross_file_validator=lambda files, root: (),
     )
     result = module.review_pack_input(path, profile=profile)
@@ -243,6 +299,7 @@ def test_issue_candidate_profile_enforces_resource_limits(tmp_path: Path) -> Non
     profile = replace(
         module.issue_candidate_v1_profile(
             expected_root="candidate",
+            expected_companion_path=COMPANION_PATH,
             cross_file_validator=lambda files, root: (),
         ),
         max_entry_bytes=1,
@@ -261,15 +318,7 @@ def test_issue_candidate_profile_findings_do_not_echo_sensitive_values_or_absolu
     path = tmp_path / "candidate.zip"
     secret = "token=abc123secret"
     with zipfile.ZipFile(path, "w") as archive:
-        for name in (
-            "CHECKSUMS.sha256",
-            "MANIFEST.json",
-            "PLACEHOLDER-ORACLE-MAP.json",
-            "SOURCE-BASELINE.json",
-            "design.md",
-            "plan.md",
-            "requirement.md",
-        ):
+        for name in CANDIDATE_INVENTORY:
             info = zipfile.ZipInfo(f"candidate/{name}")
             info.create_system = 3
             info.external_attr = (stat.S_IFREG | 0o644) << 16
@@ -277,6 +326,7 @@ def test_issue_candidate_profile_findings_do_not_echo_sensitive_values_or_absolu
     module = _zip_contract()
     profile = module.issue_candidate_v1_profile(
         expected_root="candidate",
+        expected_companion_path=COMPANION_PATH,
         cross_file_validator=lambda files, root: (),
     )
     result = module.review_pack_input(path, profile=profile)
@@ -299,15 +349,7 @@ def test_issue_candidate_profile_rejects_encryption_crc_and_compression_ratio(
     finding: str,
 ) -> None:
     path = tmp_path / "candidate.zip"
-    required = (
-        "CHECKSUMS.sha256",
-        "MANIFEST.json",
-        "PLACEHOLDER-ORACLE-MAP.json",
-        "SOURCE-BASELINE.json",
-        "design.md",
-        "plan.md",
-        "requirement.md",
-    )
+    required = CANDIDATE_INVENTORY
     compression = zipfile.ZIP_DEFLATED if mode == "ratio" else zipfile.ZIP_STORED
     with zipfile.ZipFile(path, "w", compression=compression) as archive:
         for name in required:
@@ -324,6 +366,7 @@ def test_issue_candidate_profile_rejects_encryption_crc_and_compression_ratio(
     module = _zip_contract()
     profile = module.issue_candidate_v1_profile(
         expected_root="candidate",
+        expected_companion_path=COMPANION_PATH,
         cross_file_validator=lambda files, root: (),
     )
     result = module.review_pack_input(path, profile=profile)

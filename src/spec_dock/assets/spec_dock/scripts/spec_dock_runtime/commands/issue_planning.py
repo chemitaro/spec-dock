@@ -114,7 +114,10 @@ def _add_revise_arguments(parser: argparse.ArgumentParser) -> None:
 def _add_review_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--issue", required=True, help="Existing Issue ID")
     parser.add_argument("--mode", required=True, choices=("archive-candidate", "git-bound"))
-    parser.add_argument("--candidate", help="Candidate ZIP path (archive-candidate only)")
+    parser.add_argument(
+        "--candidate",
+        help="Candidate ZIP path (required by archive-candidate and git-bound modes)",
+    )
     parser.add_argument("--reviewed-head", help="Reviewed Git HEAD (git-bound only)")
     parser.add_argument("--output", required=True, help="Existing external output directory")
     _add_format(parser)
@@ -127,7 +130,10 @@ def _add_apply_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--human-decision", required=True, help="PlanningHumanDecisionV1 JSON path")
     parser.add_argument("--expected-head", required=True, help="Expected current Git HEAD")
     parser.add_argument("--output", required=True, help="Existing external output directory")
-    parser.add_argument("--candidate", help="Candidate ZIP path (archive-candidate only)")
+    parser.add_argument(
+        "--candidate",
+        help="Candidate ZIP path (required by archive-candidate and git-bound modes)",
+    )
     parser.add_argument("--logical-filename", help="Candidate logical filename (archive-candidate only)")
     parser.add_argument("--zip-sha256", help="Candidate ZIP SHA-256 (archive-candidate only)")
     parser.add_argument("--reviewed-head", help="Reviewed Git HEAD (git-bound only)")
@@ -217,8 +223,8 @@ def _validate_mode_options(
         return
     if reviewed_head is None:
         raise RuntimeError("git-bound mode requires --reviewed-head")
-    if candidate is not None or any(value is not None for value in archive_extras):
-        raise RuntimeError("git-bound mode forbids archive identity options")
+    if any(value is not None for value in archive_extras):
+        raise RuntimeError("git-bound mode forbids archive-only identity options")
 
 
 def _run_create(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:

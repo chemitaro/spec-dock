@@ -12,7 +12,9 @@ RUNTIME_SCRIPTS_DIR = (
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
+    GitBoundOperationBindingV1,
     IssueCandidateIdentity,
+    OnboardingCompanionBindingV1,
     PlanningCommandResult,
     PlanningContext,
     PlanningHumanDecisionV1,
@@ -60,7 +62,24 @@ def _archive_identity(candidate=None):
     )
 
 
+def _git_binding(**overrides):
+    values = {
+        "issue_id": "iss-00003",
+        "repository": "owner/repo",
+        "branch": "feature/issue",
+        "source_head": HEAD,
+        "candidate_identity": _candidate(),
+        "onboarding_companion": OnboardingCompanionBindingV1(
+            path="artifacts/guide.md",
+            sha256="c" * 64,
+        ),
+    }
+    values.update(overrides)
+    return GitBoundOperationBindingV1.create(**values)
+
+
 def _git_identity():
+    binding = _git_binding()
     return ReviewedPlanningIdentity(
         mode="git-bound",
         issue_id="iss-00003",
@@ -68,6 +87,7 @@ def _git_identity():
         branch="feature/issue",
         source_head=HEAD,
         canonical_target_paths=PATHS,
+        git_bound_operation_binding=binding,
         expected_canonical_target_paths=PATHS,
     )
 
@@ -211,6 +231,7 @@ def test_reviewed_identity_rejects_mode_mismatch() -> None:
 
 def test_git_bound_identity_rejects_cross_issue_canonical_tuple() -> None:
     other_issue_paths = tuple(path.replace("iss-one", "iss-other") for path in PATHS)
+    binding = _git_identity().git_bound_operation_binding
     with pytest.raises(ValueError, match="canonical target"):
         ReviewedPlanningIdentity(
             mode="git-bound",
@@ -219,6 +240,7 @@ def test_git_bound_identity_rejects_cross_issue_canonical_tuple() -> None:
             branch="feature/issue",
             source_head=HEAD,
             canonical_target_paths=other_issue_paths,
+            git_bound_operation_binding=binding,
             expected_canonical_target_paths=PATHS,
         )
 
@@ -665,7 +687,7 @@ def test_non_success_result_maps_to_exit_one() -> None:
     assert result.is_ready is False
 
 
-def test_source_evidence_and_transport_result_are_closed_and_payload_is_transient() -> None:
+def test_source_evidence_and_transport_result_are_closed_and_typed_only() -> None:
     contracts = __import__(
         "spec_dock_runtime.domain.issue_planning_contracts",
         fromlist=["PlanningSourceEvidence", "PlanningInvocationResult"],
@@ -696,8 +718,7 @@ def test_source_evidence_and_transport_result_are_closed_and_payload_is_transien
     )
     serialized = result.to_dict()
     assert serialized["source_evidence"]["repository"] == "owner/repo"
-    assert result.transient_payload == b"{}"
-    assert "transient_payload" not in serialized
+    assert not hasattr(result, "transient_payload")
     assert "json_bytes" not in serialized
     assert b"{}" not in repr(result).encode()
 
@@ -746,7 +767,7 @@ def test_planning_invocation_pass_requires_exactly_one_typed_output() -> None:
         json_bytes=b"{}",
     )
 
-    with pytest.raises(ValueError, match="exactly one output authority"):
+    with pytest.raises(ValueError, match="exactly one typed output authority"):
         contracts.PlanningInvocationResult(
             status="pass",
             reason="transport_received",
@@ -772,41 +793,22 @@ def test_planning_invocation_pass_requires_exactly_one_typed_output() -> None:
         )
 
 
-def test_planning_invocation_legacy_payload_is_private_and_strictly_bounded() -> None:
+def test_planning_invocation_rejects_legacy_and_cross_kind_payloads() -> None:
     contracts = __import__(
         "spec_dock_runtime.domain.issue_planning_contracts",
         fromlist=["OracleReviewJsonPayload", "PlanningInvocationResult"],
     )
-    payload = b"legacy-private"
-    digest = contracts.raw_bytes_sha256(payload)
-    result = contracts.PlanningInvocationResult(
-        status="pass",
-        reason="transport_received",
-        response_bytes=len(payload),
-        response_sha256=digest,
-        transient_payload=payload,
-    )
-    assert result.transient_payload == payload
-    assert "legacy-private" not in repr(result)
-    assert "transient_payload" not in result.to_dict()
-    field = contracts.PlanningInvocationResult.__dataclass_fields__["transient_payload"]
-    assert field.repr is False
-    assert field.compare is False
-    with pytest.raises(FrozenInstanceError):
-        result.transient_payload = b"changed"
-
     review = contracts.OracleReviewJsonPayload(
         size_bytes=2,
         sha256=contracts.raw_bytes_sha256(b"{}"),
         json_bytes=b"{}",
     )
-    with pytest.raises(ValueError, match="mutually exclusive"):
+    with pytest.raises(TypeError, match="transient_payload"):
         contracts.PlanningInvocationResult(
             status="pass",
             reason="transport_received",
             response_bytes=2,
             response_sha256=review.sha256,
-            review_json=review,
             transient_payload=b"{}",
         )
     with pytest.raises(ValueError, match="multiple typed outputs"):
@@ -825,27 +827,129 @@ def test_planning_invocation_legacy_payload_is_private_and_strictly_bounded() ->
             ),
             review_json=review,
         )
-    with pytest.raises(ValueError, match="must not carry output payload"):
-        contracts.PlanningInvocationResult(
-            status="blocked",
-            reason="oracle_unavailable",
-            transient_payload=payload,
-        )
-    with pytest.raises(ValueError, match="response_bytes"):
-        contracts.PlanningInvocationResult(
-            status="pass",
-            reason="transport_received",
-            response_bytes=len(payload) + 1,
-            response_sha256=digest,
-            transient_payload=payload,
-        )
-    with pytest.raises(ValueError, match="response_sha256"):
-        contracts.PlanningInvocationResult(
-            status="pass",
-            reason="transport_received",
-            response_bytes=len(payload),
-            response_sha256="0" * 64,
-            transient_payload=payload,
+
+
+def test_s10_ct_p01_git_bound_operation_binding_canonical_fixture() -> None:
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["GitBoundOperationBindingV1", "OnboardingCompanionBindingV1"],
+    )
+    candidate = _candidate(
+        candidate_id="iss-00003-v1-20260729t120000z",
+        logical_filename="20260729t120000z-iss-00003-issue-planning-candidate-v1.zip",
+        observed_transport_filename=(
+            "20260729t120000z-iss-00003-issue-planning-candidate-v1.zip"
+        ),
+        internal_root="20260729t120000z-iss-00003-issue-planning-candidate-v1",
+    )
+    binding = contracts.GitBoundOperationBindingV1.create(
+        issue_id="iss-00003",
+        repository="owner/repo",
+        branch="feature/issue",
+        source_head=HEAD,
+        candidate_identity=candidate,
+        onboarding_companion=contracts.OnboardingCompanionBindingV1(
+            path=(
+                "artifacts/"
+                "20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
+            ),
+            sha256="c" * 64,
+        ),
+    )
+
+    assert len(binding.preimage_bytes) == 888
+    assert binding.binding_sha256 == (
+        "fa3640fd9a5aaab6f261297a94bece94845e8749c2acb497ccd3568c74e91ad1"
+    )
+    assert len(contracts._canonical_json_bytes(binding.to_dict())) == 972
+    assert contracts.GitBoundOperationBindingV1.from_dict(binding.to_dict()) == binding
+
+
+@pytest.mark.parametrize(
+    "extra",
+    (
+        {"unexpected": "value"},
+        {"source_repository": "owner/repo"},
+        {"source_branch": "feature/issue"},
+        {
+            "source_repository": "owner/repo",
+            "source_branch": "feature/issue",
+        },
+    ),
+)
+def test_s10_binding_rejects_unknown_and_legacy_top_level_keys(extra) -> None:
+    value = _git_binding().to_dict()
+    value.update(extra)
+    with pytest.raises(ValueError, match="unknown keys"):
+        GitBoundOperationBindingV1.from_dict(value)
+
+
+def test_s10_binding_rejects_alias_nonfinite_and_wrong_digest() -> None:
+    value = _git_binding().to_dict()
+    value["candidate_identity"]["observed_transport_filename"] = "candidate copy.zip"
+    with pytest.raises(ValueError):
+        GitBoundOperationBindingV1.from_dict(value)
+
+    value = _git_binding().to_dict()
+    value["schema_version"] = float("nan")
+    with pytest.raises(ValueError):
+        GitBoundOperationBindingV1.from_dict(value)
+
+    value = _git_binding().to_dict()
+    value["binding_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="digest mismatch"):
+        GitBoundOperationBindingV1.from_dict(value)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("issue_id", "iss-00004"),
+        ("repository", "owner/other"),
+        ("branch", "other"),
+        ("source_head", "d" * 40),
+    ),
+)
+def test_s10_binding_rejects_candidate_source_mismatch(field, value) -> None:
+    overrides = {field: value}
+    with pytest.raises(ValueError, match="Candidate source identity"):
+        _git_binding(**overrides)
+
+
+def test_s10_review_and_human_decision_reject_different_nested_binding() -> None:
+    identity = _git_identity()
+    review_bytes = _json_bytes(_review(identity=identity).to_dict())
+    altered_identity = ReviewedPlanningIdentity(
+        mode="git-bound",
+        issue_id=identity.issue_id,
+        repository=identity.repository,
+        branch=identity.branch,
+        source_head=identity.source_head,
+        canonical_target_paths=PATHS,
+        git_bound_operation_binding=_git_binding(
+            onboarding_companion=OnboardingCompanionBindingV1(
+                path="artifacts/other-guide.md",
+                sha256="d" * 64,
+            )
+        ),
+        expected_canonical_target_paths=PATHS,
+    )
+    decision = {
+        "schema_version": 1,
+        "issue_id": altered_identity.issue_id,
+        "reviewed_identity": altered_identity.to_dict(),
+        "reviewed_identity_sha256": altered_identity.sha256,
+        "review_result_sha256": hashlib.sha256(review_bytes).hexdigest(),
+        "decision": "approved",
+        "plan_adoption": True,
+        "implementation_start": True,
+        "decided_at": "2026-07-28T12:00:00Z",
+    }
+    with pytest.raises(ValueError, match="Review identity"):
+        PlanningHumanDecisionV1.from_json_bytes(
+            _json_bytes(decision),
+            review_result_bytes=review_bytes,
+            expected_canonical_target_paths=PATHS,
         )
 
 

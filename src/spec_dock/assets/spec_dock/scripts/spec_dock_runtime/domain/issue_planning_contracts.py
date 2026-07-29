@@ -377,9 +377,20 @@ class OracleAuthoringZipSnapshot:
             self.observed_transport_filename,
             field_name="observed_transport_filename",
         )
+        logical_stem = expected.removesuffix(".zip")
+        alias_pattern = re.compile(
+            rf"{re.escape(logical_stem)} \([1-9][0-9]*\)\.zip"
+        )
+        if observed != expected and alias_pattern.fullmatch(observed) is None:
+            raise ValueError(
+                "observed_transport_filename is not a closed transport alias"
+            )
         internal_root = _safe_relative_path(self.internal_root, field_name="internal_root")
-        if len(PurePosixPath(internal_root).parts) != 1:
-            raise ValueError("internal_root must be one safe path segment")
+        if (
+            len(PurePosixPath(internal_root).parts) != 1
+            or internal_root != logical_stem
+        ):
+            raise ValueError("internal_root must equal the logical filename stem")
         if not isinstance(self.zip_bytes, bytes):
             raise ValueError("zip_bytes must be bytes")
         if self.size_bytes != len(self.zip_bytes):
@@ -438,11 +449,6 @@ class PlanningInvocationResult:
         repr=False,
         compare=False,
     )
-    transient_payload: bytes | None = field(
-        default=None,
-        repr=False,
-        compare=False,
-    )
 
     def __post_init__(self) -> None:
         allowed_reasons = {
@@ -485,16 +491,11 @@ class PlanningInvocationResult:
         if self.status == "pass" and self.reason != "transport_received":
             raise ValueError("pass requires transport_received")
         typed_outputs = tuple(item for item in (self.authoring_zip, self.review_json) if item is not None)
-        if self.transient_payload is not None and not isinstance(self.transient_payload, bytes):
-            raise ValueError("transient_payload must be bytes")
-        legacy_output = self.transient_payload is not None
         if len(typed_outputs) > 1:
             raise ValueError("result must not carry multiple typed outputs")
-        if typed_outputs and legacy_output:
-            raise ValueError("typed output and legacy transient payload are mutually exclusive")
-        if self.status == "pass" and len(typed_outputs) + int(legacy_output) != 1:
-            raise ValueError("pass requires exactly one output authority")
-        if self.status != "pass" and (typed_outputs or legacy_output):
+        if self.status == "pass" and len(typed_outputs) != 1:
+            raise ValueError("pass requires exactly one typed output authority")
+        if self.status != "pass" and typed_outputs:
             raise ValueError("blocked or rejected result must not carry output payload")
         if self.response_bytes < 0:
             raise ValueError("response_bytes must be non-negative")
@@ -510,17 +511,6 @@ class PlanningInvocationResult:
                 raise ValueError("response_bytes must match typed output")
             if self.response_sha256 != typed.sha256:
                 raise ValueError("response_sha256 must match typed output")
-            object.__setattr__(
-                self,
-                "transient_payload",
-                typed.zip_bytes if isinstance(typed, OracleAuthoringZipSnapshot) else typed.json_bytes,
-            )
-        elif legacy_output:
-            assert self.transient_payload is not None
-            if self.response_bytes != len(self.transient_payload):
-                raise ValueError("response_bytes must match transient_payload")
-            if self.response_sha256 != raw_bytes_sha256(self.transient_payload):
-                raise ValueError("response_sha256 must match transient_payload")
         object.__setattr__(
             self,
             "details",
@@ -632,6 +622,167 @@ class IssueCandidateIdentity:
         }
 
 
+@dataclass(frozen=True)
+class OnboardingCompanionBindingV1:
+    path: str
+    sha256: str
+
+    def __post_init__(self) -> None:
+        path = _safe_relative_path(self.path, field_name="onboarding_companion.path")
+        parsed = PurePosixPath(path)
+        if (
+            len(parsed.parts) != 2
+            or parsed.parts[0] != "artifacts"
+            or parsed.suffix != ".md"
+        ):
+            raise ValueError("onboarding companion path must be artifacts/<safe-markdown>.md")
+        object.__setattr__(self, "path", path)
+        object.__setattr__(
+            self,
+            "sha256",
+            _sha(self.sha256, length=64, field_name="onboarding_companion.sha256"),
+        )
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> OnboardingCompanionBindingV1:
+        required = {"path", "sha256"}
+        _closed_object(value, required=required, contract="OnboardingCompanionBindingV1")
+        return cls(path=value["path"], sha256=value["sha256"])
+
+    def to_dict(self) -> dict[str, str]:
+        return {"path": self.path, "sha256": self.sha256}
+
+
+@dataclass(frozen=True)
+class GitBoundOperationBindingV1:
+    schema_version: int
+    issue_id: str
+    repository: str
+    branch: str
+    source_head: str
+    candidate_identity: IssueCandidateIdentity
+    onboarding_companion: OnboardingCompanionBindingV1
+    binding_sha256: str
+
+    def __post_init__(self) -> None:
+        if isinstance(self.schema_version, bool) or self.schema_version != 1:
+            raise ValueError("schema_version must be integer 1")
+        object.__setattr__(self, "issue_id", _issue_id(self.issue_id))
+        object.__setattr__(
+            self,
+            "repository",
+            _repository(self.repository, field_name="repository"),
+        )
+        object.__setattr__(self, "branch", _non_empty(self.branch, field_name="branch"))
+        object.__setattr__(
+            self,
+            "source_head",
+            _sha(self.source_head, length=40, field_name="source_head"),
+        )
+        if not isinstance(self.candidate_identity, IssueCandidateIdentity):
+            raise ValueError("candidate_identity must be IssueCandidateIdentity")
+        if not isinstance(self.onboarding_companion, OnboardingCompanionBindingV1):
+            raise ValueError("onboarding_companion must be OnboardingCompanionBindingV1")
+        if (
+            self.issue_id != self.candidate_identity.issue_id
+            or self.repository != self.candidate_identity.source_repository
+            or self.branch != self.candidate_identity.source_branch
+            or self.source_head != self.candidate_identity.source_head
+        ):
+            raise ValueError("operation binding does not match Candidate source identity")
+        digest = _sha(
+            self.binding_sha256,
+            length=64,
+            field_name="binding_sha256",
+        )
+        if digest != hashlib.sha256(self.preimage_bytes).hexdigest():
+            raise ValueError("operation binding digest mismatch")
+        object.__setattr__(self, "binding_sha256", digest)
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        issue_id: str,
+        repository: str,
+        branch: str,
+        source_head: str,
+        candidate_identity: IssueCandidateIdentity,
+        onboarding_companion: OnboardingCompanionBindingV1,
+    ) -> GitBoundOperationBindingV1:
+        preimage = {
+            "branch": branch,
+            "candidate_identity": candidate_identity.to_dict(),
+            "issue_id": issue_id,
+            "onboarding_companion": onboarding_companion.to_dict(),
+            "repository": repository,
+            "schema_version": 1,
+            "source_head": source_head,
+        }
+        return cls(
+            schema_version=1,
+            issue_id=issue_id,
+            repository=repository,
+            branch=branch,
+            source_head=source_head,
+            candidate_identity=candidate_identity,
+            onboarding_companion=onboarding_companion,
+            binding_sha256=hashlib.sha256(_canonical_json_bytes(preimage)).hexdigest(),
+        )
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> GitBoundOperationBindingV1:
+        required = {
+            "binding_sha256",
+            "branch",
+            "candidate_identity",
+            "issue_id",
+            "onboarding_companion",
+            "repository",
+            "schema_version",
+            "source_head",
+        }
+        _closed_object(value, required=required, contract="GitBoundOperationBindingV1")
+        candidate = value["candidate_identity"]
+        companion = value["onboarding_companion"]
+        if not isinstance(candidate, dict) or not isinstance(companion, dict):
+            raise ValueError("operation binding nested values must be objects")
+        return cls(
+            schema_version=value["schema_version"],
+            issue_id=value["issue_id"],
+            repository=value["repository"],
+            branch=value["branch"],
+            source_head=value["source_head"],
+            candidate_identity=IssueCandidateIdentity.from_dict(candidate),
+            onboarding_companion=OnboardingCompanionBindingV1.from_dict(companion),
+            binding_sha256=value["binding_sha256"],
+        )
+
+    @property
+    def preimage_bytes(self) -> bytes:
+        return _canonical_json_bytes({
+            "branch": self.branch,
+            "candidate_identity": self.candidate_identity.to_dict(),
+            "issue_id": self.issue_id,
+            "onboarding_companion": self.onboarding_companion.to_dict(),
+            "repository": self.repository,
+            "schema_version": self.schema_version,
+            "source_head": self.source_head,
+        })
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "binding_sha256": self.binding_sha256,
+            "branch": self.branch,
+            "candidate_identity": self.candidate_identity.to_dict(),
+            "issue_id": self.issue_id,
+            "onboarding_companion": self.onboarding_companion.to_dict(),
+            "repository": self.repository,
+            "schema_version": self.schema_version,
+            "source_head": self.source_head,
+        }
+
+
 def _zip_basename(value: Any, *, field_name: str) -> str:
     text = _non_empty(value, field_name=field_name)
     path = PurePosixPath(text)
@@ -649,6 +800,7 @@ class ReviewedPlanningIdentity:
     source_head: str
     candidate_identity: IssueCandidateIdentity | None = None
     canonical_target_paths: tuple[str, str, str] | None = None
+    git_bound_operation_binding: GitBoundOperationBindingV1 | None = None
     expected_canonical_target_paths: InitVar[tuple[str, str, str] | None] = None
 
     def __post_init__(
@@ -662,7 +814,11 @@ class ReviewedPlanningIdentity:
         object.__setattr__(self, "branch", _non_empty(self.branch, field_name="branch"))
         object.__setattr__(self, "source_head", _sha(self.source_head, length=40, field_name="source_head"))
         if self.mode == "archive-candidate":
-            if self.candidate_identity is None or self.canonical_target_paths is not None:
+            if (
+                self.candidate_identity is None
+                or self.canonical_target_paths is not None
+                or self.git_bound_operation_binding is not None
+            ):
                 raise ValueError("archive-candidate identity requires only candidate_identity")
             candidate = self.candidate_identity
             if (
@@ -673,8 +829,14 @@ class ReviewedPlanningIdentity:
             ):
                 raise ValueError("archive candidate identity does not match reviewed identity")
         else:
-            if self.candidate_identity is not None or self.canonical_target_paths is None:
-                raise ValueError("git-bound identity requires only canonical_target_paths")
+            if (
+                self.candidate_identity is not None
+                or self.canonical_target_paths is None
+                or self.git_bound_operation_binding is None
+            ):
+                raise ValueError(
+                    "git-bound identity requires canonical_target_paths and operation binding"
+                )
             object.__setattr__(
                 self,
                 "canonical_target_paths",
@@ -683,6 +845,14 @@ class ReviewedPlanningIdentity:
             if expected_canonical_target_paths is None:
                 raise ValueError("git-bound identity requires expected canonical target paths")
             self.validate_canonical_target_paths(expected_canonical_target_paths)
+            binding = self.git_bound_operation_binding
+            if (
+                binding.issue_id != self.issue_id
+                or binding.repository != self.repository
+                or binding.branch != self.branch
+                or binding.source_head != self.source_head
+            ):
+                raise ValueError("operation binding does not match reviewed identity")
 
     @classmethod
     def from_dict(
@@ -713,9 +883,13 @@ class ReviewedPlanningIdentity:
         if mode == "git-bound":
             _closed_object(
                 value,
-                required=common | {"canonical_target_paths"},
+                required=common
+                | {"canonical_target_paths", "git_bound_operation_binding"},
                 contract="ReviewedPlanningIdentity",
             )
+            binding_raw = value["git_bound_operation_binding"]
+            if not isinstance(binding_raw, dict):
+                raise ValueError("git_bound_operation_binding must be an object")
             identity = cls(
                 mode="git-bound",
                 issue_id=value["issue_id"],
@@ -723,6 +897,9 @@ class ReviewedPlanningIdentity:
                 branch=value["branch"],
                 source_head=value["source_head"],
                 canonical_target_paths=_canonical_paths(value["canonical_target_paths"]),
+                git_bound_operation_binding=GitBoundOperationBindingV1.from_dict(
+                    binding_raw
+                ),
                 expected_canonical_target_paths=expected_canonical_target_paths,
             )
             return identity
@@ -753,7 +930,11 @@ class ReviewedPlanningIdentity:
             base["candidate_identity"] = self.candidate_identity.to_dict()
         else:
             assert self.canonical_target_paths is not None
+            assert self.git_bound_operation_binding is not None
             base["canonical_target_paths"] = list(self.canonical_target_paths)
+            base["git_bound_operation_binding"] = (
+                self.git_bound_operation_binding.to_dict()
+            )
         return base
 
     @property
@@ -904,8 +1085,9 @@ class PlanningRevisionRequestV1:
     new_text: str | None = None
     meaning_invariant: str | None = None
     diff_budget: int | None = None
+    expected_companion_path: InitVar[str | None] = None
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, expected_companion_path: str | None) -> None:
         if isinstance(self.schema_version, bool) or self.schema_version != 1:
             raise ValueError("schema_version must be integer 1")
         if self.lane not in ("semantic", "mechanical"):
@@ -942,7 +1124,15 @@ class PlanningRevisionRequestV1:
         else:
             if self.finding_ids or self.review_result_sha256 is not None:
                 raise ValueError("mechanical revision contains semantic fields")
-            if self.target_file not in ("requirement.md", "design.md", "plan.md"):
+            allowed_targets = {"requirement.md", "design.md", "plan.md"}
+            if expected_companion_path is not None:
+                allowed_targets.add(
+                    _safe_relative_path(
+                        expected_companion_path,
+                        field_name="expected_companion_path",
+                    )
+                )
+            if self.target_file not in allowed_targets:
                 raise ValueError("mechanical target_file is not allowed")
             old_text = _non_empty(self.old_text, field_name="old_text")
             new_text = _non_empty(self.new_text, field_name="new_text")
@@ -959,7 +1149,12 @@ class PlanningRevisionRequestV1:
                 raise ValueError("diff_budget must be a positive integer")
 
     @classmethod
-    def from_json_bytes(cls, data: bytes) -> PlanningRevisionRequestV1:
+    def from_json_bytes(
+        cls,
+        data: bytes,
+        *,
+        expected_companion_path: str | None = None,
+    ) -> PlanningRevisionRequestV1:
         value = _strict_json_object(data)
         lane = value.get("lane")
         common = {"schema_version", "lane", "candidate_identity", "preserve_assumptions"}
@@ -979,6 +1174,7 @@ class PlanningRevisionRequestV1:
             lane=lane,
             candidate_identity=IssueCandidateIdentity.from_dict(candidate_raw),
             preserve_assumptions=_string_tuple(value["preserve_assumptions"], field_name="preserve_assumptions"),
+            expected_companion_path=expected_companion_path,
             **kwargs,
         )
 

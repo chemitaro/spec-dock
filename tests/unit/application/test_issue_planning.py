@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -99,31 +100,82 @@ def _planning_tree(repo_root: Path) -> Path:
     return issue_dir
 
 
-def _planner_payload() -> bytes:
-    chunks: list[bytes] = []
-    filenames = ("requirement.md", "design.md", "plan.md")
-    for index, filename in enumerate(filenames):
-        chunks.extend(
-            (
-                f"<<<SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={filename}>>>\n".encode(),
-                _planning_document(filename),
-                f"<<<END-SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={filename}>>>".encode()
-                + (b"\n" if index < len(filenames) - 1 else b""),
-            )
+DEFAULT_COMPANION_PATH = (
+    "artifacts/20260728t120000z-guide-new-member-chatgpt-first-issue-planning.md"
+)
+
+
+def _onboarding_companion() -> bytes:
+    diagrams = (
+        "system context",
+        "responsibility boundary",
+        "planning sequence",
+        "implementation roadmap",
+    )
+    blocks = "\n\n".join(
+        "```plantuml\n"
+        "@startuml\n"
+        f"title {title}\n"
+        "actor Human\n"
+        "component SpecDock\n"
+        "Human --> SpecDock\n"
+        "@enduml\n"
+        "```"
+        for title in diagrams
+    )
+    return (
+        "# First-day onboarding guide\n\n"
+        "Purpose and authority: this subordinate guide explains the current architecture "
+        "and target architecture for init-00001, epic-00002, and iss-00003.\n\n"
+        "The ChatGPT First planning lifecycle and workflow use Oracle directly, not "
+        "chatgpt-use. Candidate creation, review, Human decision, and apply are bound "
+        "to the exact current branch. Canonical authority remains requirement.md, "
+        "design.md, and plan.md.\n\n"
+        "Provider and projection responsibilities are separate. Failure handling is "
+        "covered by the S01, S07, S08, and S14 implementation steps.\n\n"
+        f"{blocks}\n"
+    ).encode()
+
+
+def _planner_payload(
+    *,
+    companion_path: str = DEFAULT_COMPANION_PATH,
+    documents: dict[str, bytes] | None = None,
+    companion: bytes | None = None,
+) -> bytes:
+    root = "issue-planning-authoring"
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
+        payloads = {
+            filename: (documents or {}).get(filename, _planning_document(filename))
+            for filename in ("requirement.md", "design.md", "plan.md")
+        }
+        payloads[companion_path] = (
+            companion if companion is not None else _onboarding_companion()
         )
-    return b"".join(chunks)
+        for relative_path in sorted(payloads, key=lambda value: value.encode()):
+            info = zipfile.ZipInfo(
+                f"{root}/{relative_path}",
+                date_time=(2026, 7, 28, 12, 0, 0),
+            )
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            info.compress_type = zipfile.ZIP_STORED
+            archive.writestr(info, payloads[relative_path])
+    return output.getvalue()
 
 
 def _successful_transport(
     payload: bytes | None = None,
     *,
     source_manifest_hash: str | None = None,
+    companion_path: str = DEFAULT_COMPANION_PATH,
 ):
     contracts = __import__(
         "spec_dock_runtime.domain.issue_planning_contracts",
         fromlist=["PlanningInvocationResult", "PlanningSourceEvidence"],
     )
-    value = payload or _planner_payload()
+    value = payload or _planner_payload(companion_path=companion_path)
     evidence = contracts.PlanningSourceEvidence(
         repository="owner/repo",
         branch="feature/issue",
@@ -136,13 +188,51 @@ def _successful_transport(
         snapshot_id="b" * 64,
         remote_head_disposition="fetched_remote_tracking_ref",
     )
+    authoring = contracts.OracleAuthoringZipSnapshot(
+        expected_logical_filename="issue-planning-authoring.zip",
+        observed_transport_filename="issue-planning-authoring.zip",
+        internal_root="issue-planning-authoring",
+        size_bytes=len(value),
+        sha256=hashlib.sha256(value).hexdigest(),
+        zip_bytes=value,
+    )
     return contracts.PlanningInvocationResult(
         status="pass",
         reason="transport_received",
         source_evidence=evidence,
         response_bytes=len(value),
         response_sha256=hashlib.sha256(value).hexdigest(),
-        transient_payload=value,
+        authoring_zip=authoring,
+    )
+
+
+def _successful_review_transport(payload: bytes, *, source_manifest_hash: str = "b" * 64):
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["OracleReviewJsonPayload", "PlanningInvocationResult", "PlanningSourceEvidence"],
+    )
+    evidence = contracts.PlanningSourceEvidence(
+        repository="owner/repo",
+        branch="feature/issue",
+        upstream="origin/feature/issue",
+        local_head="a" * 40,
+        remote_head="a" * 40,
+        source_manifest_hash=source_manifest_hash,
+        snapshot_id="c" * 64,
+        remote_head_disposition="fetched_remote_tracking_ref",
+    )
+    review = contracts.OracleReviewJsonPayload(
+        size_bytes=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+        json_bytes=payload,
+    )
+    return contracts.PlanningInvocationResult(
+        status="pass",
+        reason="transport_received",
+        source_evidence=evidence,
+        response_bytes=len(payload),
+        response_sha256=review.sha256,
+        review_json=review,
     )
 
 
@@ -162,6 +252,37 @@ def test_resolve_existing_issue_returns_parents_and_exact_three_paths(tmp_path: 
 def test_git_bound_identity_accepts_exact_resolver_tuple(tmp_path: Path) -> None:
     issue_dir = _issue_tree(tmp_path)
     target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], tmp_path)
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=[
+            "GitBoundOperationBindingV1",
+            "IssueCandidateIdentity",
+            "OnboardingCompanionBindingV1",
+        ],
+    )
+    candidate = contracts.IssueCandidateIdentity(
+        issue_id=target.issue_id,
+        candidate_id="iss-00003-v1",
+        version=1,
+        logical_filename="candidate.zip",
+        observed_transport_filename="candidate.zip",
+        internal_root="candidate",
+        source_repository="owner/repo",
+        source_branch="feature/issue",
+        source_head="a" * 40,
+        zip_sha256="b" * 64,
+    )
+    binding = contracts.GitBoundOperationBindingV1.create(
+        issue_id=target.issue_id,
+        repository="owner/repo",
+        branch="feature/issue",
+        source_head="a" * 40,
+        candidate_identity=candidate,
+        onboarding_companion=contracts.OnboardingCompanionBindingV1(
+            path=DEFAULT_COMPANION_PATH,
+            sha256="c" * 64,
+        ),
+    )
     identity = ReviewedPlanningIdentity(
         mode="git-bound",
         issue_id=target.issue_id,
@@ -169,6 +290,7 @@ def test_git_bound_identity_accepts_exact_resolver_tuple(tmp_path: Path) -> None
         branch="feature/issue",
         source_head="a" * 40,
         canonical_target_paths=target.canonical_issue_paths,
+        git_bound_operation_binding=binding,
         expected_canonical_target_paths=target.canonical_issue_paths,
     )
     identity.validate_canonical_target_paths(target.canonical_issue_paths)
@@ -694,9 +816,16 @@ def test_create_success_output_has_only_safe_keys(tmp_path: Path) -> None:
         preflight_runner=lambda _request: _preflight(),
         clock=lambda: "2026-07-28T12:00:00+00:00",
     )
-    assert set(result.output) == {"candidate_identity", "zip_byte_count"}
-    assert str(output) not in str(result.to_dict())
-    assert _planner_payload().decode() not in str(result.to_dict())
+    assert set(result.output) == {
+        "candidate_identity",
+        "candidate_path",
+        "git_bound_operation_binding_sha256",
+        "zip_byte_count",
+    }
+    assert result.output["candidate_path"] == str(
+        output / result.output["candidate_identity"]["logical_filename"]
+    )
+    assert _onboarding_companion().decode() not in str(result.to_dict())
 
 
 def test_unsupported_atomic_publication_leaves_final_absent(
@@ -903,13 +1032,9 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
             snapshot_id="b" * 64,
             remote_head_disposition="fetched_remote_tracking_ref",
         )
-        return contracts.PlanningInvocationResult(
-            status="pass",
-            reason="transport_received",
-            source_evidence=evidence,
-            response_bytes=len(payload),
-            response_sha256=hashlib.sha256(payload).hexdigest(),
-            transient_payload=payload,
+        return _successful_review_transport(
+            payload,
+            source_manifest_hash=evidence.source_manifest_hash,
         )
 
     result = module.run_issue_planning_review(
@@ -954,16 +1079,31 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
     assert len(calls) == 2
 
 
-def test_git_bound_review_has_exact_three_targets(tmp_path: Path) -> None:
+def test_git_bound_review_has_exact_three_documents_and_companion_targets(
+    tmp_path: Path,
+) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     issue_dir = _planning_tree(repo)
+    candidates = tmp_path / "candidates"
+    candidates.mkdir()
     output = tmp_path / "reviews"
     output.mkdir()
     module = __import__(
         "spec_dock_runtime.application.issue_planning",
         fromlist=["run_issue_planning_review"],
     )
+    created = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", candidates),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda _root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        transport_runner=lambda **kwargs: _successful_transport(),
+        preflight_runner=lambda _request: _preflight(),
+        clock=lambda: "2026-07-28T12:00:00+00:00",
+    )
+    candidate = candidates / created.output["candidate_identity"]["logical_filename"]
     captured: list[object] = []
 
     def transport(**kwargs):
@@ -1020,13 +1160,9 @@ def test_git_bound_review_has_exact_three_targets(tmp_path: Path) -> None:
             snapshot_id="b" * 64,
             remote_head_disposition="fetched_remote_tracking_ref",
         )
-        return contracts.PlanningInvocationResult(
-            status="pass",
-            reason="transport_received",
-            source_evidence=evidence,
-            response_bytes=len(payload),
-            response_sha256=hashlib.sha256(payload).hexdigest(),
-            transient_payload=payload,
+        return _successful_review_transport(
+            payload,
+            source_manifest_hash=evidence.source_manifest_hash,
         )
 
     result = module.run_issue_planning_review(
@@ -1034,6 +1170,7 @@ def test_git_bound_review_has_exact_three_targets(tmp_path: Path) -> None:
             issue_id="iss-00003",
             mode="git-bound",
             output_dir=output,
+            candidate_path=candidate,
             reviewed_head="a" * 40,
         ),
         records=[_record(issue_dir)],
@@ -1049,6 +1186,7 @@ def test_git_bound_review_has_exact_three_targets(tmp_path: Path) -> None:
         "target-design.md",
         "target-plan.md",
         "target-requirement.md",
+        "target-onboarding-companion.md",
     ]
     before_directories = tuple(output.iterdir())
     stale = module.run_issue_planning_review(
@@ -1056,6 +1194,7 @@ def test_git_bound_review_has_exact_three_targets(tmp_path: Path) -> None:
             issue_id="iss-00003",
             mode="git-bound",
             output_dir=output,
+            candidate_path=candidate,
             reviewed_head="a" * 40,
         ),
         records=[_record(issue_dir)],
@@ -1086,12 +1225,25 @@ def test_git_bound_review_rejects_transient_exact_target_bytes_before_backend(
     repo = tmp_path / "repo"
     repo.mkdir()
     issue_dir = _planning_tree(repo)
+    candidates = tmp_path / "candidates"
+    candidates.mkdir()
     output = tmp_path / "reviews"
     output.mkdir()
     module = __import__(
         "spec_dock_runtime.application.issue_planning",
         fromlist=["run_issue_planning_review"],
     )
+    created = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", candidates),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda _root: "owner/repo",
+        backend_invoker=lambda **kwargs: None,
+        transport_runner=lambda **kwargs: _successful_transport(),
+        preflight_runner=lambda _request: _preflight(),
+        clock=lambda: "2026-07-28T12:00:00+00:00",
+    )
+    candidate = candidates / created.output["candidate_identity"]["logical_filename"]
     target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], repo)
     manifest = build_source_manifest(repo, target.canonical_issue_paths)
     transient_target = repo / target.canonical_issue_paths[0]
@@ -1152,7 +1304,7 @@ def test_git_bound_review_rejects_transient_exact_target_bytes_before_backend(
             findings=(),
         )
         payload = json.dumps(review.to_dict(), sort_keys=True, separators=(",", ":")).encode()
-        return _successful_transport(
+        return _successful_review_transport(
             payload,
             source_manifest_hash=manifest.source_manifest_hash,
         )
@@ -1164,6 +1316,7 @@ def test_git_bound_review_rejects_transient_exact_target_bytes_before_backend(
             issue_id="iss-00003",
             mode="git-bound",
             output_dir=output,
+            candidate_path=candidate,
             reviewed_head="a" * 40,
         ),
         records=[_record(issue_dir)],
@@ -1556,7 +1709,12 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
         )
         calls.append(synthesized)
         return _successful_transport(
-            _planner_payload(),
+            _planner_payload(
+                companion_path=(
+                    "artifacts/20260728t160000z-"
+                    "guide-new-member-chatgpt-first-issue-planning.md"
+                )
+            ),
             source_manifest_hash=source_hash,
         )
 
@@ -1585,7 +1743,6 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
 @pytest.mark.parametrize(
     "mutation",
     [
-        "malformed_json",
         "wrong_identity",
         "wrong_attachment_digest",
         "verdict_mismatch",
@@ -1628,9 +1785,13 @@ def test_review_rejects_malformed_wrong_identity_digest_verdict_and_authority_ou
         fromlist=["VerifiedIssueCandidate"],
     ).VerifiedIssueCandidate(
         identity=identity,
-        files={},
+        files={DEFAULT_COMPANION_PATH: _onboarding_companion()},
         source_baseline={},
         zip_bytes=b"candidate",
+        onboarding_companion=contracts.OnboardingCompanionBindingV1(
+            path=DEFAULT_COMPANION_PATH,
+            sha256=hashlib.sha256(_onboarding_companion()).hexdigest(),
+        ),
     )
     publisher_calls: list[object] = []
 
@@ -1683,20 +1844,18 @@ def test_review_rejects_malformed_wrong_identity_digest_verdict_and_authority_ou
             "verdict": "fail",
             "findings": [finding],
         }
-        if mutation == "malformed_json":
-            payload = b"{"
+        if mutation == "wrong_identity":
+            value["reviewed_identity"] = {
+                **runtime_identity.to_dict(),
+                "candidate_identity": {
+                    **identity.to_dict(),
+                    "candidate_id": "iss-00003-v1-other",
+                },
+            }
+            other = contracts.ReviewedPlanningIdentity.from_dict(value["reviewed_identity"])
+            value["reviewed_identity_sha256"] = other.sha256
         else:
-            if mutation == "wrong_identity":
-                value["reviewed_identity"] = {
-                    **runtime_identity.to_dict(),
-                    "candidate_identity": {
-                        **identity.to_dict(),
-                        "candidate_id": "iss-00003-v1-other",
-                    },
-                }
-                other = contracts.ReviewedPlanningIdentity.from_dict(value["reviewed_identity"])
-                value["reviewed_identity_sha256"] = other.sha256
-            elif mutation == "wrong_attachment_digest":
+            if mutation == "wrong_attachment_digest":
                 value["reviewed_identity_sha256"] = "e" * 64
             elif mutation == "verdict_mismatch":
                 value["verdict"] = "pass"
@@ -1706,7 +1865,7 @@ def test_review_rejects_malformed_wrong_identity_digest_verdict_and_authority_ou
                 value["findings"][0]["concrete_impact"] = "token=abc123secret"
             else:
                 value["findings"][0]["exact_location"] = "/Users/alice/private/spec.md"
-            payload = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        payload = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
         evidence = contracts.PlanningSourceEvidence(
             repository="owner/repo",
             branch="feature/issue",
@@ -1717,13 +1876,9 @@ def test_review_rejects_malformed_wrong_identity_digest_verdict_and_authority_ou
             snapshot_id="c" * 64,
             remote_head_disposition="fetched_remote_tracking_ref",
         )
-        return contracts.PlanningInvocationResult(
-            status="pass",
-            reason="transport_received",
-            source_evidence=evidence,
-            response_bytes=len(payload),
-            response_sha256=hashlib.sha256(payload).hexdigest(),
-            transient_payload=payload,
+        return _successful_review_transport(
+            payload,
+            source_manifest_hash=evidence.source_manifest_hash,
         )
 
     result = module.run_issue_planning_review(
@@ -1861,6 +2016,10 @@ def test_revision_without_explicit_evidence_uses_exact_review_sibling(
         backend_invoker=lambda **kwargs: None,
         transport_runner=lambda **kwargs: _successful_transport(
             source_manifest_hash=setup["source_hash"],
+            companion_path=(
+                "artifacts/20260728t121000z-"
+                "guide-new-member-chatgpt-first-issue-planning.md"
+            ),
         ),
         preflight_runner=lambda request: _preflight(),
         clock=lambda: "2026-07-28T12:10:00+00:00",

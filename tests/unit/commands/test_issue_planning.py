@@ -92,6 +92,25 @@ def _use_cases(**planning):
         ),
         (
             [
+                "review",
+                "planning",
+                "--issue",
+                "iss-00003",
+                "--mode",
+                "git-bound",
+                "--candidate",
+                "/tmp/candidate.zip",
+                "--reviewed-head",
+                "a" * 40,
+                "--output",
+                "/tmp/out",
+            ],
+            "planning_review",
+            PlanningReviewRequest,
+            "review_completed",
+        ),
+        (
+            [
                 "planning",
                 "apply",
                 "--issue",
@@ -112,6 +131,31 @@ def _use_cases(**planning):
                 "candidate.zip",
                 "--zip-sha256",
                 "b" * 64,
+            ],
+            "planning_apply",
+            PlanningApplyRequest,
+            "adoption_published",
+        ),
+        (
+            [
+                "planning",
+                "apply",
+                "--issue",
+                "iss-00003",
+                "--mode",
+                "git-bound",
+                "--review-result",
+                "/tmp/review.json",
+                "--human-decision",
+                "/tmp/decision.json",
+                "--expected-head",
+                "a" * 40,
+                "--output",
+                "/tmp/out",
+                "--reviewed-head",
+                "a" * 40,
+                "--candidate",
+                "/tmp/candidate.zip",
             ],
             "planning_apply",
             PlanningApplyRequest,
@@ -158,20 +202,6 @@ def test_each_leaf_dispatches_exactly_one_typed_request(argv, use_case_name, req
             "/tmp/out",
         ],
         [
-            "review",
-            "planning",
-            "--issue",
-            "iss-00003",
-            "--mode",
-            "git-bound",
-            "--candidate",
-            "/tmp/candidate.zip",
-            "--reviewed-head",
-            "a" * 40,
-            "--output",
-            "/tmp/out",
-        ],
-        [
             "planning",
             "apply",
             "--issue",
@@ -190,26 +220,6 @@ def test_each_leaf_dispatches_exactly_one_typed_request(argv, use_case_name, req
             "/tmp/candidate.zip",
             "--logical-filename",
             "candidate.zip",
-        ],
-        [
-            "planning",
-            "apply",
-            "--issue",
-            "iss-00003",
-            "--mode",
-            "git-bound",
-            "--review-result",
-            "/tmp/review.json",
-            "--human-decision",
-            "/tmp/decision.json",
-            "--expected-head",
-            "a" * 40,
-            "--output",
-            "/tmp/out",
-            "--reviewed-head",
-            "a" * 40,
-            "--candidate",
-            "/tmp/candidate.zip",
         ],
     ],
 )
@@ -232,6 +242,76 @@ def test_cross_mode_or_partial_identity_options_fail_before_use_case(argv) -> No
     assert exit_code == 1
     assert calls == []
     assert "error:" in stderr.getvalue()
+
+
+@pytest.mark.parametrize(
+    ("argv", "use_case_name"),
+    [
+        (
+            [
+                "review",
+                "planning",
+                "--issue",
+                "iss-00003",
+                "--mode",
+                "git-bound",
+                "--reviewed-head",
+                "a" * 40,
+                "--output",
+                "/tmp/out",
+            ],
+            "planning_review",
+        ),
+        (
+            [
+                "planning",
+                "apply",
+                "--issue",
+                "iss-00003",
+                "--mode",
+                "git-bound",
+                "--review-result",
+                "/tmp/review.json",
+                "--human-decision",
+                "/tmp/decision.json",
+                "--expected-head",
+                "a" * 40,
+                "--output",
+                "/tmp/out",
+                "--reviewed-head",
+                "a" * 40,
+            ],
+            "planning_apply",
+        ),
+    ],
+)
+def test_git_bound_missing_candidate_reaches_use_case_for_structured_rejection(
+    argv,
+    use_case_name,
+) -> None:
+    calls = []
+
+    def fake(request):
+        calls.append(request)
+        assert request.candidate_path is None
+        return PlanningCommandResult(
+            status="rejected",
+            reason="operation_candidate_required",
+            issue_id="iss-00003",
+        )
+
+    registry = build_registry()
+    namespace = build_parser(registry).parse_args(argv)
+    stdout = io.StringIO()
+    with contextlib.redirect_stdout(stdout):
+        exit_code = dispatch(
+            namespace,
+            registry,
+            _use_cases(**{use_case_name: fake}),
+        )
+    assert exit_code == 1
+    assert len(calls) == 1
+    assert "operation_candidate_required" in stdout.getvalue()
 
 
 def test_text_and_json_dispatch_share_result_semantics() -> None:
