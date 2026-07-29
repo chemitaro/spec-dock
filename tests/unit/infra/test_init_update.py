@@ -4003,9 +4003,8 @@ class TestInitUpdate(CliRuntimeHarness):
                 "Workbench-context optional status",
                 (
                     ("Workbench is optional",),
-                    ("Workbench は optional",),
-                    ("Workbench の存在は optional",),
-                    ("Workbench は任意",),
+                    ("Workbench は任意です",),
+                    ("Workbench は任意である",),
                 ),
             )
             require(path, "temporary status", (("temporary",), ("一時",)))
@@ -4096,8 +4095,12 @@ class TestInitUpdate(CliRuntimeHarness):
                     "root is excluded",
                 ),
                 (
-                    "Initiative / Epic / Issue の ignored payload は明示的な manual one-shot copy の対象",
-                    "root は対象外",
+                    "Initiative / Epic / Issue の ignored payload は明示的な manual one-shot copy の対象です",
+                    "root は対象外です",
+                ),
+                (
+                    "Initiative / Epic / Issue の ignored payload は明示的な manual one-shot copy の対象である",
+                    "root は対象外である",
                 ),
             ),
         )
@@ -4110,8 +4113,12 @@ class TestInitUpdate(CliRuntimeHarness):
                     "without a README-specific filter",
                 ),
                 (
-                    "source-wins は destination-only entries を保持",
+                    "source-wins は destination-only entries を保持する",
                     "README-specific filter は適用しない",
+                ),
+                (
+                    "source-wins は destination-only entries を保持します",
+                    "README-specific filter は適用しません",
                 ),
             ),
         )
