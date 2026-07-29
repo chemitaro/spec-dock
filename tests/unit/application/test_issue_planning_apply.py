@@ -457,7 +457,7 @@ def test_pa_nf_06_wrong_review_identity_is_rejected(tmp_path: Path, kind: str) -
         identity=identity,
         request_changes=changes,
     )
-    _assert_not_ready(result, ("rejected", "review_identity_rejected"))
+    _assert_not_ready(result, ("rejected", "review_result_rejected" if kind == "paths" else "review_identity_rejected"))
     assert calls == []
 
 
