@@ -50,16 +50,18 @@ ID: "iss-00344"
 
 ### 1.1 ChatGPT-First execution overlay
 
-本Issueの実装では、ユーザーの2026-07-29の明示指示により、各stepへ次の追加順序を適用する。このoverlayはrequirement、design、step scope、locked expectation、closure id、実装順序を変更せず、実装前の具体化とreview backendだけを置き換える。
+本Issueの実装では、ユーザーの2026-07-29の明示指示により、各stepへ次のcheckpoint順序を適用する。このoverlayはrequirement、design、step scope、locked expectation、closure id、step間の依存順序を変更しない。各step内のreview / commit順序はこのsectionを正本とし、後続のstep gateはこの順序を具体化する。
 
 1. step開始前にworktreeをcleanにし、現在branchをGitHubへpushする。
 2. SpecDock `authoring preflight github-sync` でlocal/remote HEAD一致を確認する。
 3. ChatGPT-Useへexact commit、approved specs、step contract、current source/testsを参照させ、最小実装方針、Red/Green、具体テストケース、過剰実装回避、stop conditionをMarkdownで具体化させる。
 4. 完全回答を`artifact import chatgpt-output`でIssue Artifactへ保存し、main orchestratorがapproved specsとlocal sourceに照らして採否を記録する。
-5. 採用したArtifactとstep contractを`dev-coder`へ共有してbounded implementationを委任する。
-6. 実装、focused verification、report統合、milestone commitを完了し、branchをGitHubへpushする。
-7. planに記載された`code-reviewer`、`spec-reviewer`、`qa-reviewer`はreview責務契約として維持し、その責務をSub-agentではなくChatGPT-Useへプロンプトとして渡す。ChatGPT-Useはpush済みexact commitだけをreviewする。
-8. ChatGPT-Useのreview結果は次のJSON形で受け取る。`review_status=pass`はblocking findingがなく、review対象commitがexact一致し、main orchestratorがfindingをlocal sourceとtestsで検証した場合だけstep gateへ採用する。
+5. 採用したArtifactとstep contractを、そのstepの実装担当へ共有してbounded implementationを委任する。S01/S02/S03は`dev-coder`、S90はtest laneを`dev-coder`、docs laneを`doc-writer`が担当する。
+6. 実装、focused verification、pre-review report統合を完了し、review candidate commitを作成してbranchをGitHubへpushする。このcommitを`review_target_sha`とする。
+7. planに記載された`code-reviewer`、`spec-reviewer`、`qa-reviewer`はreview責務契約として維持し、その責務をSub-agentではなくChatGPT-Useへプロンプトとして渡す。ChatGPT-Useはpush済み`review_target_sha`だけをreviewする。
+8. blocking / major findingを採用した場合は同じstepの担当へbounded fixを戻し、新しいcandidate commitをpushして、その新しいSHAへfresh re-reviewを行う。
+9. PASS後にreview Artifact、採否、final verdictを`report.md`へ記録し、Issue Artifactと`report.md`だけのpost-review evidence commitを作る。このcommitを`closure_head_sha`とする。`closure_head_sha`はreview済み実装を変更してはならず、main orchestratorがallowed path、diff、validation、clean状態を確認する。evidence-only commitを再reviewして新しいArtifactを作る循環は行わない。
+10. ChatGPT-Useのreview結果は次のJSON形で受け取る。`review_status=pass`はblocking / major findingがともに0件で、`reviewed_commit`が`review_target_sha`とexact一致し、required responsibility scopeを満たし、採用した修正へのfresh re-reviewが完了し、main orchestratorがfindingをlocal sourceとtestsで検証した場合だけstep gateへ採用する。
 
 ```json
 {
@@ -69,7 +71,7 @@ ID: "iss-00344"
   "findings": [
     {
       "id": "stable finding id",
-      "severity": "blocking | material | non_blocking",
+      "severity": "blocking | major | minor",
       "location": "path or contract section",
       "summary": "concise finding",
       "evidence": "source-grounded evidence",
@@ -92,7 +94,8 @@ Reviewの運用条件:
 - requirement/design/plan外の機能、sibling Issueの責務、新framework、将来拡張だけを理由とする抽象化は、blocking defectの根拠がない限り採用しない。
 - finding修正は同じstepのallowed pathsとclosure contractに限定し、必要なら同じ`dev-coder`へbounded follow-upとして戻す。
 - canonical contract変更が必要なfindingは実装で吸収せず、planning amendmentへ戻る。
-- review Artifact、採否、修正、再review、final verdictを`report.md`へ記録する。
+- review Artifact、採否、修正、再review、`review_target_sha`、`closure_head_sha`、final verdictを`report.md`へ記録する。
+- `major`は従来の`material`と同じ実行ブロッカーとして扱う。`minor`だけを残したPASSは、非ブロック理由と採否をreportへ記録した場合に限る。
 
 ## 2. 実装戦略（Implementation Strategy）
 
@@ -454,13 +457,15 @@ Planned contract:
 
 S01 step gate:
 
-1. `dev-coder` がRed/Green/refactor、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
-2. main orchestratorがworker outputを検証し、delegation evidenceとclosure deltaをcanonical `report.md`へ統合する。
-3. fresh `code-reviewer` のblocking findingを閉じる。
-4. milestone actual commit `feat(workbench): Workbench README shellを生成` を作成する。差分が本当にない場合だけ、no-op確認対象、diff-clean command、read-only confirmationをreportへ記録して`approved-no-op`とする。
-5. commit後またはapproved-no-op確定後に`git status --short`を実行し、意図しないstaged/unstaged changeがないことを確認してclose stateを`committed`または`approved-no-op`へ確定する。
-6. main orchestratorがStep / Milestone Result Approvalを与える。
-7. Result Approval前はS02のimplementation、review、commitを開始しない。S03以降はS02以降の各Result Approvalを順に待つ。
+1. Section 1.1のpre-step clean / push / sync、具体化Artifact、採否を完了し、採用内容を`dev-coder`へ共有する。
+2. `dev-coder` がRed/Green/refactor、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
+3. main orchestratorがworker outputを検証し、delegation evidenceとclosure deltaをcanonical `report.md`へ統合する。
+4. review candidate commit `feat(workbench): Workbench README shellを生成` を作成してpushし、exact `review_target_sha`へChatGPT-Useがfresh `code-reviewer`責務reviewを行う。差分が本当にない場合も、no-op確認対象、diff-clean command、read-only confirmationをreportへ記録したpush済みSHAをreview対象とする。
+5. blocking / major findingを閉じ、修正時は新しいcandidate commitをpushしてfresh re-reviewする。
+6. PASS後にreview Artifact、採否、`review_target_sha`を統合し、Artifactとreportだけのpost-review evidence commitを`closure_head_sha`として作成する。
+7. `git status --short`とevidence-only diff boundaryを確認してclose stateを`committed`または`approved-no-op`へ確定する。
+8. main orchestratorがStep / Milestone Result Approvalを与える。
+9. Result Approval前はS02のimplementation、review、commitを開始しない。S03以降はS02以降の各Result Approvalを順に待つ。
 
 ### M2 / S02 — Semantic opacity、linked-worktree positioning、copy compatibility
 
@@ -561,13 +566,15 @@ Planned contract:
 
 S02 step gate:
 
-1. `dev-coder` がcharacterization/Red/Green、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
-2. main orchestratorがworker outputを検証し、delegation evidenceとclosure deltaをcanonical `report.md`へ統合する。
-3. fresh `code-reviewer` のblocking findingを閉じる。
-4. milestone actual commit `test(workbench): README shellのopacityとcopy互換を固定` を作成する。差分が本当にない場合だけ、production no-op、確認対象、diff-clean command、read-only confirmationをreportへ記録して`approved-no-op`とする。
-5. commit後またはapproved-no-op確定後に`git status --short`を実行し、意図しないstaged/unstaged changeがないことを確認してclose stateを`committed`または`approved-no-op`へ確定する。
-6. main orchestratorがStep / Milestone Result Approvalを与える。
-7. Result Approval前はS03のimplementation、review、commitを開始しない。S90以降はS03以降の各Result Approvalを順に待つ。
+1. Section 1.1のpre-step clean / push / sync、具体化Artifact、採否を完了し、採用内容を`dev-coder`へ共有する。
+2. `dev-coder` がcharacterization/Red/Green、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
+3. main orchestratorがworker outputを検証し、delegation evidenceとclosure deltaをcanonical `report.md`へ統合する。
+4. review candidate commit `test(workbench): README shellのopacityとcopy互換を固定` を作成してpushし、exact `review_target_sha`へChatGPT-Useがfresh `code-reviewer`責務reviewを行う。差分が本当にない場合もpush済みSHAをreview対象とする。
+5. blocking / major findingを閉じ、修正時は新しいcandidate commitをpushしてfresh re-reviewする。
+6. PASS後にreview Artifact、採否、`review_target_sha`を統合し、Artifactとreportだけのpost-review evidence commitを`closure_head_sha`として作成する。
+7. `git status --short`とevidence-only diff boundaryを確認してclose stateを`committed`または`approved-no-op`へ確定する。
+8. main orchestratorがStep / Milestone Result Approvalを与える。
+9. Result Approval前はS03のimplementation、review、commitを開始しない。S90以降はS03以降の各Result Approvalを順に待つ。
 
 ### M3 / S03 — Packaging、focused distribution evidence、deferred handoff
 
@@ -694,13 +701,15 @@ Planned contract:
 
 S03 step gate:
 
-1. `dev-coder` がRed/Green/build/static、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
-2. main orchestratorがworker outputを検証し、delegation evidenceとclosure deltaをcanonical `report.md`へ統合する。
-3. fresh `code-reviewer` のblocking findingを閉じる。
-4. milestone actual commit `build(workbench): README assetsの配布契約を固定` を作成する。差分が本当にない場合だけ、exact distribution evidence、diff-clean command、read-only confirmationをreportへ記録して`approved-no-op`とする。
-5. commit後またはapproved-no-op確定後に`git status --short`を実行し、意図しないstaged/unstaged changeがないことを確認してclose stateを`committed`または`approved-no-op`へ確定する。
-6. main orchestratorがStep / Milestone Result Approvalを与える。
-7. Result Approval前はS90のimplementation、review、commitを開始しない。S99はS90 Result Approvalを待つ。
+1. Section 1.1のpre-step clean / push / sync、具体化Artifact、採否を完了し、採用内容を`dev-coder`へ共有する。
+2. `dev-coder` がRed/Green/build/static、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
+3. main orchestratorがworker outputを検証し、delegation evidenceとclosure deltaをcanonical `report.md`へ統合する。
+4. review candidate commit `build(workbench): README assetsの配布契約を固定` を作成してpushし、exact `review_target_sha`へChatGPT-Useがfresh `code-reviewer`責務reviewを行う。差分が本当にない場合もpush済みSHAをreview対象とする。
+5. blocking / major findingを閉じ、修正時は新しいcandidate commitをpushしてfresh re-reviewする。
+6. PASS後にreview Artifact、採否、`review_target_sha`を統合し、Artifactとreportだけのpost-review evidence commitを`closure_head_sha`として作成する。
+7. `git status --short`とevidence-only diff boundaryを確認してclose stateを`committed`または`approved-no-op`へ確定する。
+8. main orchestratorがStep / Milestone Result Approvalを与える。
+9. Result Approval前はS90のimplementation、review、commitを開始しない。S99はS90 Result Approvalを待つ。
 
 ### S90 — Docs / Template Impact Resolution
 
@@ -772,14 +781,14 @@ S90は同じvertical slice内で、test contractとdocs変更の責務を次の�
 
 S90 step gate:
 
-1. `dev-coder` がexact semantic assertion testだけを追加し、期待どおりのRed、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
-2. main orchestratorがworker outputを検証し、Red evidenceをcanonical `report.md`へ統合する。
-3. fresh `code-reviewer` がtest contractをPASSするまでtest findingを修正・再レビューする。
+1. Section 1.1のpre-step clean / push / sync、具体化Artifact、採否を完了する。test laneの採用内容は`dev-coder`、docs laneの採用内容は`doc-writer`へ共有する。
+2. `dev-coder` がexact semantic assertion testだけを追加し、期待どおりのRed、changed files、unresolved risks、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
+3. main orchestratorがRed evidenceを`report.md`へ統合し、test review candidate commitをpushする。ChatGPT-Useがexact `review_target_sha`へfresh `code-reviewer`責務reviewを行い、blocking / major findingを閉じ、修正時は新SHAへfresh re-reviewする。
 4. `doc-writer` がdocs 4件だけを変更してexact assertionをGreenにし、docs inspection、changed files、unresolved wording、EVD転記用summary、Ledger Noteまたはno-decision declarationをmain orchestratorへ返す。
-5. main orchestratorがworker outputを検証し、Green/delegation/closure delta evidenceをcanonical `report.md`へ統合する。
-6. fresh `spec-reviewer` がdocs/spec contractをPASSするまでdocs findingを修正・再レビューする。
-7. milestone actual commit `docs(workbench): README shellの運用境界を更新` を作成する。差分が本当にない場合だけ、semantic assertion、diff-clean command、read-only confirmationをreportへ記録して`approved-no-op`とするが、test contractのreviewは省略しない。
-8. commit後またはapproved-no-op確定後に`git status --short`を実行し、意図しないstaged/unstaged changeがないことを確認してclose stateを`committed`または`approved-no-op`へ確定する。
+5. main orchestratorがGreen/delegation/closure delta evidenceを`report.md`へ統合し、docs review candidate commit `docs(workbench): README shellの運用境界を更新` をpushする。差分が本当にない場合もsemantic assertionとno-op evidenceを含むpush済みSHAをreview対象とする。
+6. ChatGPT-Useがexact `review_target_sha`へfresh `spec-reviewer`責務reviewを行い、blocking / major findingを閉じ、修正時は新SHAへfresh re-reviewする。
+7. 両PASS後にreview Artifacts、採否、各`review_target_sha`を統合し、Artifactとreportだけのpost-review evidence commitを`closure_head_sha`として作成する。
+8. `git status --short`とevidence-only diff boundaryを確認してclose stateを`committed`または`approved-no-op`へ確定する。
 9. main orchestratorが両reviewを含むStep / Milestone Result Approvalを与える。
 10. Result Approval前はS99のimplementation、review、commitを開始しない。
 
@@ -787,7 +796,7 @@ S90 step gate:
 
 - TC-344-001〜010をreport evidenceへ対応づける。
 - S01〜S03 focused suiteを同じrevisionで再実行する。
-- fresh `code-reviewer`、`qa-reviewer`、`spec-reviewer` のblocking findingを閉じる。
+- fresh `code-reviewer`、`qa-reviewer`、`spec-reviewer` のblocking / major findingを閉じる。
 - final commit前にreport ledger、commit scope、post-commit external evidence destination、Issue 346 handoffを記録し、commit後のclean statusとHEAD SHAは外部引き渡し証跡にのみ記録する。
 - PR作成、merge preparation、Issue finishは行わない。
 
@@ -815,7 +824,7 @@ Planned contract:
 - input docs: approved requirement/design/plan、report、S01〜S90 commits/evidence、aggregate diff、exact command outputs。
 - allowed paths: read-only review。修正はfinding採用後に該当stepの`dev-coder`/`doc-writer`へ戻す。
 - forbidden changes: reviewer自身のsource/spec edit、waiver/provisional pass、PR/merge/finish、Issue 346 evidenceの先取り。
-- acceptance criteria: 全required closureとstep gateがclosed、blocking finding 0、handoff complete。
+- acceptance criteria: 全required closureとstep gateがclosed、blocking / major finding 0、handoff complete。
 - required verification: Section 16 exact final gateとreviewer mapping。
 - reviewer focus: QA=test sufficiency、code=aggregate implementation、spec=requirement/design/plan/report alignment。
 - stop conditions: missing report evidence、stale review、failure、dirty/uncommitted implementation、assurance invalid。
@@ -834,7 +843,7 @@ Planned contract:
 - `tc-s99-002` governance: reviewとdeferred delivery境界を閉じる
   - 前提: aggregate evidenceとIssue 346 dependency edgeが存在する。
   - 操作: fresh QA/code/spec reviewを行い、reportのhandoff/no-PR/human-only fieldsをinspectionする。
-  - 期待結果: blocking finding 0、delivery ownerがIssue 346、per-Issue PR/merge/finish claimなし。
+  - 期待結果: blocking / major finding 0、delivery ownerがIssue 346、per-Issue PR/merge/finish claimなし。
   - 失敗検出: stale reviewer、missing handoff、premature delivery/completion claimを検出する。
   - 検証方法: EVD-009/010とGit/dependency status inspection。
   - 関連 closure id: TC-344-001〜010。
@@ -842,7 +851,7 @@ Planned contract:
 #### S99 step closure contract
 
 - required: TC-344-001〜010、EVD-001〜011、S01/S02/S03/S90 step gate。
-- close condition:全exact verification PASS、fresh QA/code/spec reviewer blocking finding 0、report/handoff complete。
+- close condition:全exact verification PASS、fresh QA/code/spec reviewer blocking / major finding 0、report/handoff complete。
 - evidence: report Step Contract Closure、Test Contract Closure、reviewer gate、EVD-009/010、final commit scope、post-commit external evidence destination、ready/blocked。実際のHEAD SHAとclean resultは外部引き渡し証跡とする。
 - commit候補: final report/review evidence commit。実装差分を混在させない。
 
@@ -952,7 +961,7 @@ S90未解決のままS99へ進まない。
 | Distribution | M3の2 exact `TestInitUpdate` node | pass |
 | Static/diff | M3のscoped Ruff check/format、Mypy、`git diff --check` | pass |
 | Docs/templates | semantic assertions、4-byte parity | pass |
-| Reviews | fresh code/QA/spec reviewer | blocking finding 0 |
+| Reviews | fresh code/QA/spec reviewer | blocking / major finding 0 |
 | Milestone admission | S01/S02/S03/S90 report gateとGit evidence | 各stepが`committed`または正当な`approved-no-op`、post-commit/no-op clean、Result Approval済み |
 | Handoff | report EVD-010 | Issue 346 owner/deps明記 |
 
@@ -961,7 +970,7 @@ Final exit:
 - [ ] 全Closure完了。
 - [ ] M1〜M3、S90、S99完了。
 - [ ] S01/S02/S03/S90が`committed`または正当な`approved-no-op`、clean、Result Approval済み。
-- [ ] unresolved blocking findingなし。
+- [ ] unresolved blocking / major findingなし。
 - [ ] reportに実測evidenceと未実施理由を記録。
 - [ ] Issue 345/346 scopeを実装していない。
 - [ ] per-Issue PR、merge、finishを行っていない。
@@ -986,8 +995,9 @@ Final exit:
 - [x] `setup.py` post-build pruneがM3に含まれる。
 - [x] report evidence destinationとstop conditionがある。
 - [x] Issue 346へのdeferred deliveryとhuman-only merge境界がある。
-- [x] ChatGPT plan review PASS。
-- [x] fresh `spec-reviewer` plan review PASS。
+- [x] prior ChatGPT plan review PASS（ChatGPT-First amendmentによりstale）。
+- [x] prior fresh `spec-reviewer` plan review PASS（ChatGPT-First amendmentによりstale）。
+- [ ] ChatGPT-First amendment後のpush済みexact commitに対するfresh `spec-reviewer`責務review PASS。
 
 ## 19. 変更履歴
 
