@@ -106,7 +106,7 @@ correction snapshot `ec801c374038e7e5ad4f31b3919440aa9b79eeaa`への別fresh clo
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Codex Main | iss-00334 planning rebaseline | `artifacts/20260727t070853z-chatgpt-defect-only-closure-review-pass.json` | `requirement.md`; `design.md`; `plan.md`; parent Epic; prior Evidence Adoption Ledger | `requirement.md`; `design.md`; `plan.md` | adopted | `requirement.md`; `design.md`; `plan.md`; `.assurance.json`; `report.md` | `git diff --check`、`spec-dock validate`、assurance verify successful | manual authoring integration | review-derived overgrowth | none | passed | execute approved plan |
-| ChatGPT Pro Blue Team | iss-00334 planning amendment and parent epic boundary | `artifacts/20260729t-iss-00334-oracle-boundary-planning-amendment-v1.zip` | current Epic／Issue docs、Oracle境界調査、relevant source／tests、reference-only `chatgpt-use` skill／wrapper | Epic `requirement.md`／`design.md`; Issue `requirement.md`／`design.md`／`plan.md` | adopted | Epic／Issue canonical docs、`.assurance.json`、本Report | ZIP SHA／inventory／UTF-8、Plan prefix SHA／cmp、PlantUML 1.2026.6、`spec-dock validate`、`git diff --check` pass | whole-file integration for four docs and append-only Plan adoption | inline transcript、個人環境値、default branch fallback、実装済みclaim | none | fresh defect-only spec review passed | S08 execution handoff |
+| ChatGPT Pro Blue Team | iss-00334 planning amendment and parent epic boundary | `artifacts/20260729t-iss-00334-oracle-boundary-planning-amendment-v1.zip` | current Epic／Issue docs、Oracle境界調査、relevant source／tests、reference-only `chatgpt-use` skill／wrapper | Epic `requirement.md`／`design.md`; Issue `requirement.md`／`design.md`／`plan.md` | adopted | Epic／Issue canonical docs、`.assurance.json`、本Report | ZIP SHA／inventory／UTF-8、Plan prefix SHA／cmp、PlantUML 1.2026.6、`spec-dock validate`、`git diff --check` pass | whole-file integration for four docs and append-only Plan adoption | inline transcript、個人環境値、default branch fallback、実装済みclaim | none | passed | execute approved plan |
 
 S01 ChatGPT work packetはcanonical authoring draftではなく、Human指示に基づくreview不要のstep execution inputである。したがってDelegated Draft Evidenceへは分類せず、`EAL-20260728-S01-PACKET`とImplementation Delegation Gateで追跡する。
 
@@ -568,8 +568,8 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 
 | ID | adoption_status | source | target | rationale | reviewer | next_action |
 |---|---|---|---|---|---|---|
-| EAL-20260729-ONBOARDING-V2 | superseded | v2 Candidate／fresh Review | none | Reviewer Oracle boundaryとgit-bound companion bindingにP1 | FAIL | v3へ置換済み |
-| EAL-20260729-ONBOARDING-V3 | superseded | v3 Candidate／fresh Review | none | binding canonical key集合とgate数表記に矛盾 | FAIL | v4へ置換済み |
+| EAL-20260729-ONBOARDING-V2 | rejected | v2 Candidate／fresh Review | none | Reviewer Oracle boundaryとgit-bound companion bindingにP1 | FAIL | v3へ置換済み |
+| EAL-20260729-ONBOARDING-V3 | rejected | v3 Candidate／fresh Review | none | binding canonical key集合とgate数表記に矛盾 | FAIL | v4へ置換済み |
 | EAL-20260729-ONBOARDING-V4 | adopted | Human decision、v4 Candidate、local validation | Epic Requirement／Design、Issue Requirement／Design／Plan、Issue artifact | subordinate guide、same-Candidate binding、PlantUML obligationをexact sourceへbind | PASS、findings 0 | S08以降で実装 |
 
 ### Canonical and artifact placement
