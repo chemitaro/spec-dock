@@ -5,7 +5,7 @@ ID: "iss-00334"
 関連GitHub: ["#334"]
 状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-27"
+最終更新: "2026-07-29"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00331", "init-00322"]
 ---
@@ -45,6 +45,7 @@ correction snapshot `ec801c374038e7e5ad4f31b3919440aa9b79eeaa`への別fresh clo
 | D-20260728-S05-JIT | resolved | implementation | Human JIT contract / ChatGPT Pro | S05のdual authorization、whole-file adoption、decision-only rejection、transaction rollback、planning-only commit、publication retryを実装可能な一つの境界へ具体化する必要があった | generic Git lifecycle拡張; canonical amendment; S05-local orchestration／transaction adapter | 既存S01〜S04 contractsを変更せず、application orchestrationとS05-local infra adapter、exact 5-path allowlistで閉じる | ChatGPT ProがGitHub connectorでexact remote HEADを照合し、product-contract gapなし、GO／review-waivedと判定した | applied as execution input | `artifacts/20260728t055016z-s05-chatgpt-implementation-work-packet.md`; source HEAD `2e0589e1e4ce1b123cd30d14c338d07038ed1429` | artifact／Reportをcommit・push後、bounded dev-coderへ渡す |
 | D-20260728-S06-JIT | resolved | implementation | Human JIT contract / ChatGPT Pro | S01〜S05のprovider実装を実bootstrap、installed resource、init／update、配布物、dogfood projection、full fake E2Eへ接続する具体化が必要だった | 新public contract; generic DI; S06-local projection／integration closure | public CLI／schema／canonical三文書を変更せず、4 planning callableの実bootstrap配線、closed two-layout resource解決、fixed-sibling Review evidence、実行権限修復、provider-first projectionで閉じる | ChatGPT ProがGitHub connectorでexact remote HEADを照合し、4件のimplementation-local integration defectとclosed allowlistを特定してimplementation-ready／review-waivedと判定した | applied as execution input | `artifacts/20260728t075945z-s06-chatgpt-implementation-work-packet.md`; source HEAD `2ab5fedc7117218e2189d26eff8684455aadf33d` | artifact／Reportをcommit・push後、bounded dev-coderへ渡す |
 | D-20260728-S07-JIT | blocked at Human gate | operation | Human JIT contract / ChatGPT Pro | real Issue dogfoodとDeliveryを、既完成planning docsの循環上書きや権限推定なしで実行する必要がある | archive self-adoption; git-bound decision-only adoption; live run省略 | `iss-00334`はgit-bound限定で条件付きeligible。archive applyは禁止し、initial live-run authorizationと後段exact Human decisionを別gateにする | ChatGPT ProがGitHub connectorでexact remote HEADを確認し、target／worktree／mode／evidence root／mutation scope／decisionが未固定のため`STOP_AT_HUMAN_GATE`と判定した | execution input recorded; live mutation blocked | `artifacts/20260728t100524z-s07-chatgpt-execution-work-packet.md`; source HEAD `3bc0b8bada9b07ebc85f8cf29e15e361bd204f12` | packet／Reportをcommit・pushし、read-only preflight後にHuman authorization recordを求める |
+| D-20260729-OB013 | resolved | architecture boundary | Human / ChatGPT Pro / Codex Main | 現行product adapterが個人`chatgpt-use` wrapper絶対パスとwrapper固有text outputへ依存し、exact branch／Prompt／ZIP outputの製品境界を満たしていなかった | 個人wrapper依存を維持; Oracle本体を改造; provider-owned adapterからPATH Oracleをdirect argvで利用 | 計画作業ではoperator-local `chatgpt-use`を利用してよいが、製品runtimeはPATH上のOracle本体だけへ依存する。参考wrapperの知見は再実装できるが、個人path／Project／profile／config／wrapper ABIを製品契約へ持ち込まない | 配布可能性、exact source binding、複数Markdown ZIP出力を同時に満たし、既存Candidate／Review／Human Gate／apply安全境界を維持できる | applied | `artifacts/20260729t004625z-research-oracle-dependency-boundary-current-and-target-state.md`; `artifacts/20260729t-iss-00334-oracle-boundary-planning-amendment-v1.zip`; ChatGPT conversation `6a6953e8-aef0-83ee-8517-63d364bb710a` | S08以降の追加計画を順に実装する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -73,12 +74,14 @@ correction snapshot `ec801c374038e7e5ad4f31b3919440aa9b79eeaa`への別fresh clo
 | EAL-20260728-S05-PACKET | adopted | ChatGPT Pro with GitHub connector | S05 bounded implementation input | remote branchとexact HEAD `2e0589e1e4ce1b123cd30d14c338d07038ed1429`のidentical／ahead 0／behind 0を確認し、existing S01〜S04 contractsを維持したdual authorization、safe apply transaction、retryと5-path allowlistへ具体化した | `artifacts/20260728t055016z-s05-chatgpt-implementation-work-packet.md`; SHA-256 `472e956b65277a92f53e9b85c348c0f47203f56a83b4e725d84afa9984471d51`; Oracle session `iss00334-s05-implementa-brief` | artifact／Reportをcommit・push後、bounded dev-coderへ渡す |
 | EAL-20260728-S06-PACKET | adopted | ChatGPT Pro with GitHub connector | S06 bounded implementation input | remote branchとexact HEAD `2ab5fedc7117218e2189d26eff8684455aadf33d`のidentical／ahead 0／behind 0を確認し、provider projection、real bootstrap wiring、distribution／installed parity、3 full fake chainsをpublic contract拡張なしで具体化した | `artifacts/20260728t075945z-s06-chatgpt-implementation-work-packet.md`; SHA-256 `5899b5120b1c975d38262f8c86e929af8998133aa49747d6c7f04af029fd1bf0`; Oracle session `iss00334-s06-implementa-brief` | exact production／test allowlistとmechanical dogfood projectionをbounded dev-coderへ渡す |
 | EAL-20260728-S07-PACKET | adopted | ChatGPT Pro with GitHub connector | S07 bounded execution input | remote branchとexact HEAD `3bc0b8bada9b07ebc85f8cf29e15e361bd204f12`のidentical／ahead 0／behind 0、Issue #334 open、existing PRなしを確認し、safe preflight、initial Human authorization、git-bound create／Review、exact decision／apply、Delivery境界を分離した | `artifacts/20260728t100524z-s07-chatgpt-execution-work-packet.md`; SHA-256 `7419cb1a285762edf3d442f62d118d3ced7021da5fdc8c871188b13ef0433ca4`; Oracle session `iss00334-s07-implementa-brief` | read-only preflightだけを実施し、live commandsはHuman gateで停止する |
+| EAL-20260729-ORACLE-BOUNDARY | adopted | ChatGPT Pro Blue Team authoring through operator-local `chatgpt-use` | Epic Requirement／Design、Issue Requirement／Design、Issue Plan amendment | GitHub connectorでbranch `iss-00334-implement-chatgpt-issue-planning-workflow`、source HEAD `a68eefa6881440d276c2bbfe415e01417a964128`を確認し、product dependencyとplanning operator toolを分離した5文書ZIPを生成した。Mainがexact inventory、ZIP SHA、Issue Plan prefix、scope、PlantUML、SpecDock validationを独立確認した | `artifacts/20260729t-iss-00334-oracle-boundary-planning-amendment-v1.zip`; ZIP SHA-256 `9fc16cc1bc2e5ee45576a64e863448c9c1247e0ec31cce0a8d5912881ef2d552`; conversation `6a6953e8-aef0-83ee-8517-63d364bb710a`; `artifacts/20260729t020725z-review-oracle-boundary-planning-pass.json` | S08以降だけを未実施作業として扱い、S01〜S07の実施履歴を保持する |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
 | canonical planning rebaseline | create→revise→review→Human Gate→apply→publicationのwalking skeletonをREQ-001〜REQ-014で定義する | exact Git binding、immutable Candidate、read-only review、safe transaction、provider parity、JIT dogfoodを保持する | medium。簡潔化で必要contractを落とす可能性があるため、実在欠陥だけを対象にfresh reviewする | current rebaselineは未レビュー。commit／push後にdefect-only fresh reviewが必要 |
+| Oracle boundary amendment | 個人wrapper依存を除去し、PATH Oracle direct adapter、exact current branch、Prompt/reference分離、Planner ZIP outputを製品契約へ固定する | S01〜S07履歴、Candidate／Review／Human Gate／apply／publication contractを保持する | low。追加作業を既存計画末尾へ限定し、改善提案による再設計をfresh reviewの対象外とした | fresh defect-only `spec-reviewer` PASS、findings 0 |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -87,6 +90,9 @@ correction snapshot `ec801c374038e7e5ad4f31b3919440aa9b79eeaa`への別fresh clo
 | requirement | approved parent scope、current repository facts、P1-01を照合 | P0／P1だけをrevision trigger、P2／P3-onlyはCandidate不変 | REQ-001〜014へ再基準化しP1-01を修正 | passed | no | execute approved plan |
 | design | existing primitives、provider ownership、P1-01を照合 | Review severityとRevisionRequest validationのownerを確定 | 14 design sectionsへ再基準化しP1-01を修正 | passed | no | execute approved plan |
 | plan | Requirement／Design、P1-01を照合 | S04とS07でP2／P3 revision 0を検証 | S01〜S07へ再基準化しP1-01を修正 | passed | no | execute approved plan |
+| requirement — Oracle boundary amendment | current adapter／tests、親Epic、Oracle境界調査、ChatGPT生成ZIP | productはOracle直接依存、計画operatorは`chatgpt-use`利用可と分離 | Epic／Issue requirementへ採用 | passed | no | design／plan amendmentを有効化 |
+| design — Oracle boundary amendment | provider-first source、PATH Oracle、session file artifact、exact branch、Prompt/reference、ZIP contract | 個人wrapper知見はreference-only、製品fallbackにはしない | Epic／Issue designへ採用 | passed | no | S08以降の実装へhandoff |
+| plan — Oracle boundary amendment | existing plan 16,178 bytes／SHA `de7690f…`と生成prefix、S01〜S07実施履歴 | 旧計画は改稿せずEOFへS08〜S14を追記 | append-only amendmentとして採用 | passed | no | S08から順に実装 |
 
 過去のFAILは当時のsnapshotに対する履歴として保持する。current rebaselineの判定には流用せず、new exact HEADを別fresh reviewerが限定scopeで判定する。
 
@@ -97,6 +103,7 @@ correction snapshot `ec801c374038e7e5ad4f31b3919440aa9b79eeaa`への別fresh clo
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Codex Main | iss-00334 planning rebaseline | `artifacts/20260727t070853z-chatgpt-defect-only-closure-review-pass.json` | `requirement.md`; `design.md`; `plan.md`; parent Epic; prior Evidence Adoption Ledger | `requirement.md`; `design.md`; `plan.md` | adopted | `requirement.md`; `design.md`; `plan.md`; `.assurance.json`; `report.md` | `git diff --check`、`spec-dock validate`、assurance verify successful | manual authoring integration | review-derived overgrowth | none | passed | execute approved plan |
+| ChatGPT Pro Blue Team | iss-00334 planning amendment and parent epic boundary | `artifacts/20260729t-iss-00334-oracle-boundary-planning-amendment-v1.zip` | current Epic／Issue docs、Oracle境界調査、relevant source／tests、reference-only `chatgpt-use` skill／wrapper | Epic `requirement.md`／`design.md`; Issue `requirement.md`／`design.md`／`plan.md` | adopted | Epic／Issue canonical docs、`.assurance.json`、本Report | ZIP SHA／inventory／UTF-8、Plan prefix SHA／cmp、PlantUML 1.2026.6、`spec-dock validate`、`git diff --check` pass | whole-file integration for four docs and append-only Plan adoption | inline transcript、個人環境値、default branch fallback、実装済みclaim | none | fresh defect-only spec review passed | S08 execution handoff |
 
 S01 ChatGPT work packetはcanonical authoring draftではなく、Human指示に基づくreview不要のstep execution inputである。したがってDelegated Draft Evidenceへは分類せず、`EAL-20260728-S01-PACKET`とImplementation Delegation Gateで追跡する。
 
@@ -107,6 +114,7 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
 | standard | system-architect and implementation-planner | used | prior specialist artifacts、current三文書、`artifacts/20260727t070853z-chatgpt-defect-only-closure-review-pass.json` | passed | execute approved plan |
+| standard — Oracle boundary amendment | ChatGPT Pro Blue Team authoring＋fresh defect-only `spec-reviewer` | used | `artifacts/20260729t-iss-00334-oracle-boundary-planning-amendment-v1.zip`; `artifacts/20260729t020725z-review-oracle-boundary-planning-pass.json` | passed | S08から追加実装可 |
 
 ## レビューゲート状態（Reviewer Gate Status）
 
@@ -123,15 +131,16 @@ Assurance classifierのauthorityは`standard`である。Issue-local overlayと�
 | S05 | per-step defect-only code re-review | code-reviewer | fresh for first corrected S05 diff | failed | no | 2 P1をsame dev-coderへ戻す | application入口でH1 retryがH0 preflightに遮断され、pre-commit interruption backupが復旧されないことを指摘 |
 | S05 | transaction recovery closure review | code-reviewer | fresh for final uncommitted S05 diff | passed | no | S05 commit候補へ進む | prior P1 4件closed、findings 0、confidence 0.97。同じS05契約への明確なP0／P1回帰なし |
 | S06 | per-step defect-only code review | code-reviewer | fresh for final uncommitted S06 41-path diff | passed | no | S06 commit候補へ進む | findings 0、confidence 0.96。既知baselineを除き、provider-first projection、real bootstrap、fixed-sibling evidence、installer、installed fake E2EにP0／P1なし |
+| Oracle boundary planning amendment | defect-only canonical spec review | fresh `spec-reviewer` | fresh for current uncommitted five-doc amendment | passed | no | authoring gate pass。S08以降へ進める | findings 0、confidence 0.99。4契約とPlan 16,178-byte prefixを確認。`artifacts/20260729t020725z-review-oracle-boundary-planning-pass.json` |
 
 ## Assurance記録
 
 - `./spec-dock/scripts/spec-dock assurance classify --stage requirement --issue iss-00334 --format json`: valid。`authorized_profile=standard`、`status=provisional`としてrebaseline後の三文書へ再束縛した。
 - `./spec-dock/scripts/spec-dock assurance verify --issue iss-00334 --format json`: valid。
 - source binding:
-  - Requirement SHA-256: `989d5961d9dd059b7a1295e5b598a72341b6cf19ba1ae4b8c8b1960a2d826fe6`
-  - Design SHA-256: `b71c266d9db87c5de7c1d56921a2e0113509ea9ffd030f6b39ecc81af8d911a7`
-  - Plan SHA-256: `de7690f04a67a24695bf9051a0353861accf30605f5b84b7fc1439abe1061aaf`
+  - Requirement SHA-256: `ef826fe8b127ba996b414621ddb1194ea1b0d19e7721617cd6c0c95b1fa76665`
+  - Design SHA-256: `15b61bb9c58eb4d6cc714df7342d29ac2d4ce95b0ee19ec2e05f6d4069bcabf9`
+  - Plan SHA-256: `71646bb452e1e77dddf1b908f80c73ebde217e17e70df1da1c78095cb57c6d86`
 - current profileは`standard`であり、archive safety、transaction fault、public contract、live mutationは各owner milestoneのfocused testとrequired reviewで扱う。独立したstrict overlayや重複closure graphは設けない。
 
 ## 実装記録（セッションログ） (必須)
@@ -445,6 +454,19 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - merge、auto-merge、branch delete、Issue close、`issue finish`はHuman-onlyでありS07でも実行しない。
 - No material implementation decisions beyond the approved plan.
 
+### セッションログ（2026-07-29 — Oracle product boundary planning amendment）
+
+- source repository／branch／HEADは`chemitaro/spec-dock`、`iss-00334-implement-chatgpt-issue-planning-workflow`、`a68eefa6881440d276c2bbfe415e01417a964128`で、local／upstream／GitHub remote parityとclean treeを確認してからChatGPTへ渡した。
+- operator planning作業はユーザーの補足どおり`chatgpt-use`を利用した。製品runtimeは`chatgpt-use`へ依存せずPATH上のOracleをprovider-owned adapterからdirect argvで利用する、という境界をPromptで明示した。
+- inputは現行Epic／Issue docs、Oracle境界調査、relevant source／tests、reference-onlyの`chatgpt-use` Skill／wrapperを一つのreference ZIPへ束ねた。instructionはChatフォーム本文へ送り、exact current branchを開けない場合のdefault branch fallbackを禁止した。
+- 初回session `issue-planning-amendment`は2添付の同時uploadが5分以内に完了せず、`Attachments did not finish uploading before timeout.`で終了した。prompt重複送信は行わず、2資料を一つのZIPへ統合してfresh sessionへ切り替えた。
+- fresh session `issue-planning-amendment-retry`／conversation `6a6953e8-aef0-83ee-8517-63d364bb710a`は43分06秒で完了し、model selectionは`requested=Pro`、`resolved=Pro`、`verified=yes`だった。回答はZIP link一件だけで、Oracle session file artifactとして保存された。
+- output ZIP `artifacts/20260729t-iss-00334-oracle-boundary-planning-amendment-v1.zip`はSHA-256 `9fc16cc1bc2e5ee45576a64e863448c9c1247e0ec31cce0a8d5912881ef2d552`、内部root `iss-00334-oracle-boundary-planning-amendment-v1/`、exact five Markdown inventoryである。
+- Issue Planは旧16,178 bytes／SHA-256 `de7690f04a67a24695bf9051a0353861accf30605f5b84b7fc1439abe1061aaf`と生成prefixがbyte-identicalで、変更はEOFの§16／S08〜S14追記だけである。
+- Mainは個人絶対パス混入0、product／operator boundary、exact branch、Prompt/reference分離、ZIP-only Planner出力、実施済み履歴保持を確認してcanonical docsへ採用した。
+- `spec-dock validate`は222 nodesでpass、`git diff --check`、assurance classify／verify、PlantUML 1.2026.6 `-checkonly`はpassした。
+- fresh defect-only `spec-reviewer`はfindings 0、`review_status: pass`、confidence 0.99。改善提案やarchitecture再設計はreview scope外とした。
+
 | `chatgpt-use --followup iss00334-blue-planning-correction-r5` | same Blue conversationでauthoring継続。GitHub exact HEAD確認、replacement-ready blocks取得。follow-up selector evidenceは`resolved=(unavailable); verified=no` |
 | `./spec-dock/scripts/spec-dock validate` | pass。222 nodesを検証 |
 | `git diff --check` | pass |
@@ -472,6 +494,7 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 | S06 packet | committed and published | S06 ChatGPT work packetとReport execution-input evidence | packet review waived。GitHub connectorでexact source HEAD照合済み | commits `a1c9fe124626416e5659c8796d4722e8a320945d`／`82902e2b7dd515c85931127dcb0b6e99c39e22a4`、origin push成功、artifact SHA-256 `5899b5120b1c975d38262f8c86e929af8998133aa49747d6c7f04af029fd1bf0` | bounded dev-coderへ委任済み |
 | S06 implementation | committed | S06 provider／tests／mechanical dogfood 41 pathsとReport execution evidence | fresh code-reviewer pass、findings 0、confidence 0.96 | commit `9206ab28d205b654603c8ecac2db7f89ee53bdeb`、origin push成功、`git show --check`、post-commit clean、local／remote parity | S06 closed。S07 ChatGPT work packetへ進む |
 | S07 packet | committed and published | S07 ChatGPT execution packetとReport Human-gate evidence | packet review waived。GitHub connectorでexact source HEAD照合済み | commits `f820980560f1acf2efcb9ab0fa4a25facd617846`／`c9fe243680d35b148a5c5bc4cc8c3339f61be819`、origin push成功、artifact SHA-256 `7419cb1a285762edf3d442f62d118d3ced7021da5fdc8c871188b13ef0433ca4` | read-only preflight pass。Report-only preflight evidence commit後のactual pushed HEADでHuman authorization recordを取得 |
+| Oracle boundary planning amendment | authoring and review complete; commit pending | Epic Requirement／Design、Issue Requirement／Design／append-only Plan、Assurance、Report、source ZIP、fresh review JSON | fresh defect-only `spec-reviewer` pass、findings 0、confidence 0.99 | ZIP／prefix／PlantUML／SpecDock／assurance validation pass | focused commit／push後にS08 implementationへ進む |
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
 
@@ -481,6 +504,7 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 | Final QA | issue-wide obligation coverage | not started | S90後にfresh qa-reviewer |
 | Final Code Review | integrated code and tests | not started | step-local review後にfresh issue-wide code-reviewer |
 | Final Spec Review | Requirement、Design、Plan、Report、implementation、tests、docs alignment | failed | latest: `artifacts/20260727t033431z-chatgpt-fresh-canonical-review-fail.md` against exact published HEAD `3fc0e61ef8425abc0b4a5488d51e7060b0ed03cc`; bounded correction後にnew exact HEADで別fresh review |
+| Planning Amendment Spec Review | Oracle boundary amendmentのEpic／Issue五文書 | passed | `artifacts/20260729t020725z-review-oracle-boundary-planning-pass.json`。これは実装後のFinal Spec Reviewを代替しない |
 | Final Commit | final report ledger and issue-wide closure | blocked | S99とfresh final reviewsのpass後に実施 |
 
 ## 遭遇した問題と解決
@@ -504,3 +528,4 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 ## 省略/例外メモ (必須)
 
 - 今回の例外は、ユーザーがCodex Mainによるcanonical planning repairを直接承認したことだけである。製品実装のdelegation、review、Human-only live mutation gateは省略しない。
+- 現行product `spec-dock-chatgpt`は今回修正対象の個人wrapper依存を含むため、このamendment authoringではユーザー指定のoperator-local `chatgpt-use`を使用した。これは製品runtime contractの例外や依存として採用しない。

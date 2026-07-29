@@ -2,9 +2,9 @@
 種別: レポート（Epic）
 ID: "epic-00331"
 タイトル: "ChatGPT Planning and Advisory Review"
-状態: "draft | approved"
+状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-23"
+最終更新: "2026-07-29"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["init-00322"]
 ---
@@ -15,11 +15,12 @@ ID: "epic-00331"
 
 ## 進捗サマリー (必須)
 - 現在地（何が完了し、何が未完か）:
-  - ...
+  - Oracle製品依存境界をEpic Requirement／Designへ反映し、fresh defect-only spec reviewをPASSした。
+  - iss-00334のS01〜S07実施履歴は保持し、修復実装はS08以降として未実施である。
 - 次のマイルストーン:
-  - ...
+  - iss-00334 S08 Provider-owned Direct Oracle Adapter。
 - ブロッカー:
-  - ...
+  - なし。実装後のissue-wide final review／Deliveryは別ゲートとして残る。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -33,7 +34,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-20260729-ORACLE-BOUNDARY | adopted | Human指示、ChatGPT Pro Blue Team、Codex Main検証、fresh `spec-reviewer` | Epic `requirement.md`／`design.md`とiss-00334 amendment | 製品runtimeは個人`chatgpt-use`ではなくPATH Oracle本体へ依存し、operator planning toolとproduct dependencyを分離する必要がある。exact branch、Prompt/reference分離、ZIP-only Planner出力をEpic backboneとして閉じた | iss-00334 `artifacts/20260729t-iss-00334-oracle-boundary-planning-amendment-v1.zip`; `artifacts/20260729t020725z-review-oracle-boundary-planning-pass.json`; ZIP SHA-256 `9fc16cc1bc2e5ee45576a64e863448c9c1247e0ec31cce0a8d5912881ef2d552` | iss-00334 S08以降で実装し、sibling Issueの境界を変更しない |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -41,7 +42,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| Oracle product dependency boundary | 配布可能なChatGPT-first Planning／Review workflowはprovider-owned adapterからPATH Oracleを直接利用する | operator-local `chatgpt-use`の既存知見はreference-onlyで再利用可能 | low。個人wrapperの便利さをproduct contractへ混入させない | pass。fresh defect-only `spec-reviewer` findings 0 |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -49,7 +50,9 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement — Oracle boundary amendment | current Epic／Issue docs、provider source／tests、Oracle境界調査、ChatGPT ZIP | planning作業は`chatgpt-use`利用可、product dependencyはOracle本体のみ | Epic requirementへ採用 | passed | no | design／iss-00334 implementationへhandoff |
+| design — Oracle boundary amendment | PATH executable、direct argv、exact branch、Prompt/reference、Oracle file artifact／ZIP contract | 個人wrapperの知見は再実装可能だがruntime依存は禁止 | Epic designへ採用 | passed | no | iss-00334 S08から実装 |
+| plan | current Epic plan | 今回はIssue実装計画への追加作業だけを要求 | no change | not rerun | no | existing Epic planを維持 |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -77,7 +80,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| ChatGPT Pro Blue Team | epic-00331／iss-00334 | iss-00334 `artifacts/20260729t-iss-00334-oracle-boundary-planning-amendment-v1.zip` | current Epic／Issue docs、Oracle境界調査、source／tests、reference-only `chatgpt-use` Skill／wrapper | Epic Requirement／Design、Issue Requirement／Design／Plan | adopted | Epic Requirement／Design、Issue canonical planning、Issue Report | ZIP SHA／inventory、Plan prefix、PlantUML、SpecDock validate、assurance verify pass | Mainが検証済みclaimsだけをwhole-file統合 | transcript、個人環境値、default branch fallback、実装済みclaim | none | fresh defect-only `spec-reviewer` pass | iss-00334 S08 implementationへhandoff |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -94,16 +97,14 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（reviewer gate evidence） | ineligible |
 
 ## 決定事項（ADRリンク） (必須)
-- adr-xxxx-...: <1行要約>
-- ...
+- 新規ADRなし。今回の判断はepic-00331とiss-00334のPlanning／Review実装境界に閉じる。
 
 ## 完了した Issue / PR / Release (必須)
-- iss-xxxx-...: Done（PR: ...）
-- ...
+- なし。iss-00334はOracle境界修復S08以降が未実施。
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
-- E-AC-001: Pass / Fail（証拠: ...）
-- E-AC-002: ...
+- Oracle直接依存／個人wrapper非依存の仕様化: Pass（Epic Requirement／Design、fresh spec review）。
+- 製品実装とdistribution evidence: Pending（iss-00334 S08〜S14）。
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
@@ -114,8 +115,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
   - ...
 
 ## フォローアップ（別Issue化） (必須)
-- iss-xxxx-...:
-  - ...
+- iss-00334:
+  - S08以降でprovider-owned Oracle adapter、Prompt／reference分離、ZIP artifact、projection／testsを実装する。
 
 ## 省略/例外メモ (必須)
-- 該当なし
+- operator planningではユーザー指定の`chatgpt-use`を利用したが、product runtime dependencyとしては採用していない。
