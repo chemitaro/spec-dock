@@ -21,7 +21,7 @@ reflected_to: []
 - Repository: `chemitaro/spec-dock`
 - Base branch: `main`
 - Head branch: `iss-00344-workbench-shell-scaffolding`
-- Latest head SHA: `7bac5ee606e235df52c3a23be433fba3cdbf491a`
+- Latest reviewed implementation head SHA: `0a26ec4183229c8f0a38ce244114d2b28896dec8`
 - Observation command: fixed `wait_pr_observation.sh` for PR 350 and exact head
 - Observation final JSON / evidence: trigger comment `5118793199`; review `4809194073`; review comment `3675040563`; thread `PRRT_kwDOQ99OK86UyP0v`
 - Observation status: `human_gate` / CI `passed` / review `unresolved`
@@ -29,9 +29,9 @@ reflected_to: []
 - Trigger created_at: `2026-07-29T14:01:35Z`
 - Trigger boundary: exact head `7bac5ee606e235df52c3a23be433fba3cdbf491a`
 - Resume metadata: not applicable; branch-changing repair requires a new exact-head trigger
-- New trigger approved: no
+- New trigger approved: yes, after mandatory evidence-only final commit
 - Observation limitation: none; one current-boundary P1 finding is present
-- Batch status: implementation complete / candidate commit pending
+- Batch status: implementation/review complete / final evidence commit pending
 
 ## Batch Purpose
 
@@ -229,7 +229,7 @@ they are directly and unavoidably covered by the same `P0`/`P1` root-cause fix.
 
 | unit_id | source_batch | family_id | covered_items | decided_priority | merge_blocking | disposition | repair_unit_disc | status | implementation_plan | quality_gate | commit_evidence | re_observation_result | residual_risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| U001 | 20260729t141008z-pr-repair-batch | F001 | R001 | P1 | yes | fix-now | `artifacts/20260729t141053z-disc-pr-350-repair-u001-uninstall-managed-inventory.md` | implemented | one exact target/source mapping; 4 focused Red/Green cases; retry marker preserved | G001-G003 pass / G004 pending | candidate commit pending | pending | current-byte exact ownership conservatively preserves older-version README |
+| U001 | 20260729t141008z-pr-repair-batch | F001 | R001 | P1 | yes | fix-now | `artifacts/20260729t141053z-disc-pr-350-repair-u001-uninstall-managed-inventory.md` | implemented | one exact target/source mapping; 4 focused Red/Green cases; retry marker preserved | G001-G003 pass / G004 pending | candidate `0a26ec4183229c8f0a38ce244114d2b28896dec8`; fresh spec/QA/code PASS | pending exact-head re-observation after evidence commit | current-byte exact ownership conservatively preserves older-version README |
 
 ## Non-Blocking Follow-up Register
 
