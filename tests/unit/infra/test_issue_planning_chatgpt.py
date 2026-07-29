@@ -1,438 +1,393 @@
+import hashlib
+import io
+import json
 import os
 from pathlib import Path
-import shlex
+import subprocess
 import sys
+import zipfile
 
 import pytest
 
-RUNTIME_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-)
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
-from spec_dock_runtime.application.authoring_pack.backend_invoke import validate_prompt_pack  # noqa: E402
-from spec_dock_runtime.application.issue_planning_prompt import SynthesizedPlanningPrompt  # noqa: E402
-from spec_dock_runtime.domain.authoring_pack.backend_invoke_contract import (  # noqa: E402
-    BackendStreamCapture,
+from spec_dock_runtime.application.issue_planning_prompt import (  # noqa: E402
+    PlanningPromptAttachment,
+    SynthesizedPlanningPrompt,
 )
-from spec_dock_runtime.domain.issue_planning_contracts import PlanningSourceEvidence  # noqa: E402
+from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
+    OracleAuthoringZipSnapshot,
+    PlanningInvocationResult,
+    PlanningSourceEvidence,
+)
 from spec_dock_runtime.infra import issue_planning_chatgpt  # noqa: E402
+from spec_dock_runtime.infra.contracts import StoredMetaRecord  # noqa: E402
 
 
-@pytest.mark.parametrize(
-    ("stdout", "expected"),
-    [
-        (b"", ("blocked", "backend_output_missing")),
-        (
-            b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-            + b"a" * 40
-            + b">>>\nbody",
-            ("blocked", "backend_response_partial"),
-        ),
-        (
-            b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-            + b"a" * 40
-            + b">>>\n\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n",
-            ("blocked", "backend_response_partial"),
-        ),
-        (
-            b"outside\n<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-            + b"a" * 40
-            + b">>>\nbody\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n",
-            ("rejected", "backend_response_malformed"),
-        ),
-        (
-            b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=reviewer source_head="
-            + b"a" * 40
-            + b">>>\nbody\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n",
-            ("rejected", "backend_response_malformed"),
-        ),
-    ],
-)
-def test_classify_transport_frame_negative_cases(stdout: bytes, expected: tuple[str, str]) -> None:
-    classify = issue_planning_chatgpt.classify_transport_frame
-    result = classify(stdout, role="planner", source_head="a" * 40)
-    assert (result.status, result.reason) == expected
-    assert result.transient_payload is None
-
-
-def test_classify_transport_frame_accepts_exact_frame_without_serializing_payload() -> None:
-    classify = issue_planning_chatgpt.classify_transport_frame
-    result = classify(
-        b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-        + b"a" * 40
-        + b">>>\nbody\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n",
-        role="planner",
-        source_head="a" * 40,
-    )
-    assert (result.status, result.reason) == ("pass", "transport_received")
-    assert result.transient_payload == b"body"
-    assert b"body" not in repr(result).encode()
-    assert "body" not in str(result.to_dict())
-
-
-def test_complete_frame_with_secret_is_rejected_without_leakage() -> None:
-    classify = issue_planning_chatgpt.classify_transport_frame
-    secret = "token=abc123secret"
-    result = classify(
-        (
-            "<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-            + "a" * 40
-            + f">>>\n{secret}\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n"
-        ).encode(),
-        role="planner",
-        source_head="a" * 40,
-    )
-    assert (result.status, result.reason) == ("rejected", "sensitive_input_rejected")
-    assert secret not in repr(result)
-    assert secret not in str(result.to_dict())
-
-
-def test_complete_frame_with_transcript_marker_mentions_is_accepted() -> None:
-    classify = issue_planning_chatgpt.classify_transport_frame
-    payload = (
-        "# Raw transcript vocabulary\n\n"
-        "The term raw transcript names an evidence class.\n"
-        "- ChatGPT transcript、credential、private absolute pathを保存しない。\n"
-        "The runtime must not persist a browser transcript."
-    ).encode()
-    result = classify(
-        b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-        + b"a" * 40
-        + b">>>\n"
-        + payload
-        + b"\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n",
-        role="planner",
-        source_head="a" * 40,
-    )
-
-    assert (result.status, result.reason) == ("pass", "transport_received")
-    assert result.transient_payload == payload
-    assert payload not in repr(result).encode()
-    assert payload.decode() not in str(result.to_dict())
-
-
-def test_complete_frame_with_structured_transcript_is_rejected_without_leakage() -> None:
-    classify = issue_planning_chatgpt.classify_transport_frame
-    payload = "# Oracle Browser Transcript\n## Prompt\nprivate requirement body\n## Answer\nprivate response body"
-    result = classify(
-        (
-            "<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-            + "a" * 40
-            + f">>>\n{payload}\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n"
-        ).encode(),
-        role="planner",
-        source_head="a" * 40,
-    )
-
-    assert (result.status, result.reason) == ("rejected", "sensitive_input_rejected")
-    assert result.transient_payload is None
-    assert "private requirement body" not in repr(result)
-    assert "private response body" not in str(result.to_dict())
-
-
-def test_fixed_adapter_classifies_only_ephemeral_final_output(
+def test_path_oracle_direct_argv_environment_and_planner_snapshot(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    final_frame = (
-        b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-        + b"a" * 40
-        + b">>>\nbody\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n"
-    )
-    diagnostic_prefix = b"d" * 3_737
-    diagnostic_suffix = b"f" * 78
-    stderr_sentinel = b"private diagnostic sentinel"
-    captured_output_path: list[Path] = []
+    executable = _fake_executable(tmp_path, symlink=True)
+    calls: list[tuple[list[str], dict[str, str], bool]] = []
 
-    def fake_invoke(request, *, env):
-        output_path = _output_path_from_request(request)
-        captured_output_path.append(output_path)
-        assert not output_path.exists()
-        output_path.write_bytes(final_frame)
-        return (
-            type(
-                "Result",
-                (),
-                {"blockers": (), "exit_code": 0, "status": "pass"},
-            )(),
-            BackendStreamCapture(
-                stdout=diagnostic_prefix + final_frame + diagnostic_suffix,
-                stderr=stderr_sentinel,
-            ),
-        )
+    def fake_run(argv, **kwargs):
+        calls.append((list(argv), dict(kwargs["env"]), kwargs["shell"]))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        assert argv.count("--prompt") == 1
+        assert argv[argv.index("--prompt") + 1] == 'literal $(touch nope); "quoted"'
+        assert "--write-output" not in argv
+        _write_planner_session(kwargs["env"], argv)
+        return _completed(argv)
 
-    monkeypatch.setattr(issue_planning_chatgpt, "invoke_backend_with_capture", fake_invoke)
-    result = _invoke_fixed_adapter(tmp_path)
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    original_result_type = issue_planning_chatgpt.PlanningInvocationResult
+    constructor_calls: list[dict[str, object]] = []
+
+    def result_spy(**kwargs):
+        constructor_calls.append(dict(kwargs))
+        return original_result_type(**kwargs)
+
+    monkeypatch.setattr(issue_planning_chatgpt, "PlanningInvocationResult", result_spy)
+    result = _invoke(tmp_path, role="planner", prompt='literal $(touch nope); "quoted"')
 
     assert (result.status, result.reason) == ("pass", "transport_received")
-    assert result.transient_payload == b"body"
-    assert result.response_bytes == len(final_frame)
-    assert captured_output_path
-    assert not captured_output_path[0].exists()
+    assert result.authoring_zip is not None
+    assert result.review_json is None
+    submit_calls = [call for call in calls if "--prompt" in call[0]]
+    assert len(submit_calls) == 1
+    argv, child_env, shell = submit_calls[0]
+    assert Path(argv[0]) == executable.resolve()
+    assert shell is False
+    assert child_env["PATH"] == os.environ["PATH"]
+    assert child_env["LANG"] == "ja_JP.UTF-8"
+    assert "OPENAI_API_KEY" not in child_env
+    assert "AZURE_OPENAI_API_KEY" not in child_env
+    assert "SPECDOCK_CHATGPT_COMMAND" not in child_env
     serialized = str(result.to_dict())
-    assert diagnostic_prefix.decode() not in repr(result)
-    assert diagnostic_suffix.decode() not in serialized
-    assert stderr_sentinel.decode() not in serialized
-    assert str(captured_output_path[0]) not in serialized
+    assert "sessions" not in serialized
+    assert "oracle-home" not in serialized
+    assert result.authoring_zip.zip_bytes not in repr(result).encode()
+    assert constructor_calls
+    assert all("transient_payload" not in kwargs for kwargs in constructor_calls)
 
 
-def test_fixed_adapter_does_not_fall_back_to_valid_stdout(
+def test_reviewer_returns_typed_closed_json_without_private_transcript(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    valid_frame = (
-        b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-        + b"a" * 40
-        + b">>>\nbody\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n"
+    executable = _fake_executable(tmp_path)
+
+    def fake_run(argv, **kwargs):
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        _write_reviewer_session(kwargs["env"], argv)
+        return _completed(argv, stdout=b"private oracle diagnostic")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path, role="reviewer")
+
+    assert (result.status, result.reason) == ("pass", "transport_received")
+    assert result.review_json is not None
+    assert result.review_json.json_bytes == b'{"verdict":"pass"}'
+    assert result.authoring_zip is None
+    assert "private prompt" not in repr(result)
+    assert "private oracle diagnostic" not in str(result.to_dict())
+
+
+def test_missing_or_invalid_oracle_starts_no_process(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(issue_planning_chatgpt.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(
+        issue_planning_chatgpt.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("Oracle process must not start"),
     )
-
-    def fake_invoke(request, *, env):
-        _output_path_from_request(request)
-        return (
-            type(
-                "Result",
-                (),
-                {"blockers": (), "exit_code": 0, "status": "pass"},
-            )(),
-            BackendStreamCapture(stdout=valid_frame),
-        )
-
-    monkeypatch.setattr(issue_planning_chatgpt, "invoke_backend_with_capture", fake_invoke)
-    result = _invoke_fixed_adapter(tmp_path)
-
-    assert (result.status, result.reason) == ("blocked", "backend_output_missing")
-    assert result.transient_payload is None
+    result = _invoke(tmp_path)
+    assert (result.status, result.reason) == ("blocked", "oracle_unavailable")
 
 
-@pytest.mark.parametrize(
-    ("final_output", "expected"),
-    [
-        (
-            b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-            + b"a" * 40
-            + b">>>\nbody",
-            ("blocked", "backend_response_partial"),
-        ),
-        (
-            b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-            + b"a" * 40
-            + b">>>\n\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n",
-            ("blocked", "backend_response_partial"),
-        ),
-        (
-            b"outside\n<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-            + b"a" * 40
-            + b">>>\nbody\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n",
-            ("rejected", "backend_response_malformed"),
-        ),
-        (
-            b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-            + b"a" * 40
-            + b">>>\nbody\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\noutside",
-            ("rejected", "backend_response_malformed"),
-        ),
-        (
-            b"<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-            + b"a" * 40
-            + b">>>\nbody\n<<<SPECDOCK-ISSUE-PLANNING-RESPONSE-V1 role=planner source_head="
-            + b"a" * 40
-            + b">>>\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>",
-            ("rejected", "backend_response_malformed"),
-        ),
-        (b"\xff", ("rejected", "backend_response_malformed")),
-    ],
-)
-def test_fixed_adapter_retains_strict_frame_validation_for_final_output(
+@pytest.mark.parametrize("kind", ["directory", "fifo", "broken-link", "loop", "non-executable"])
+def test_invalid_path_entries_are_unavailable(
     monkeypatch,
     tmp_path: Path,
-    final_output: bytes,
-    expected: tuple[str, str],
+    kind: str,
 ) -> None:
-    def fake_invoke(request, *, env):
-        _output_path_from_request(request).write_bytes(final_output)
-        return (
-            type(
-                "Result",
-                (),
-                {"blockers": (), "exit_code": 0, "status": "pass"},
-            )(),
-            BackendStreamCapture(stdout=b"arbitrary diagnostic output"),
-        )
-
-    monkeypatch.setattr(issue_planning_chatgpt, "invoke_backend_with_capture", fake_invoke)
-    result = _invoke_fixed_adapter(tmp_path)
-
-    assert (result.status, result.reason) == expected
-    assert result.transient_payload is None
-
-
-@pytest.mark.parametrize("output_kind", ["absent", "empty", "directory", "symlink", "fifo", "unreadable"])
-def test_fixed_adapter_rejects_missing_or_unsafe_final_output(
-    monkeypatch,
-    tmp_path: Path,
-    output_kind: str,
-) -> None:
-    def fake_invoke(request, *, env):
-        output_path = _output_path_from_request(request)
-        if output_kind == "empty":
-            output_path.write_bytes(b"")
-        elif output_kind == "directory":
-            output_path.mkdir()
-        elif output_kind == "symlink":
-            target = output_path.with_name("target.txt")
-            target.write_text("private response", encoding="utf-8")
-            output_path.symlink_to(target)
-        elif output_kind == "fifo":
-            os.mkfifo(output_path)
-        elif output_kind == "unreadable":
-            output_path.write_text("private response", encoding="utf-8")
-            output_path.chmod(0)
-        return (
-            type(
-                "Result",
-                (),
-                {"blockers": (), "exit_code": 0, "status": "pass"},
-            )(),
-            BackendStreamCapture(stdout=b"valid-looking diagnostic"),
-        )
-
-    monkeypatch.setattr(issue_planning_chatgpt, "invoke_backend_with_capture", fake_invoke)
-    result = _invoke_fixed_adapter(tmp_path)
-
-    assert (result.status, result.reason) == ("blocked", "backend_output_missing")
-    assert result.transient_payload is None
-
-
-def test_fixed_adapter_rejects_preexisting_final_output_before_backend(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    private_root = tmp_path / "private-root"
-    private_root.mkdir()
-    (private_root / "final-assistant-message.txt").write_text(
-        "unexpected preexisting output",
-        encoding="utf-8",
+    candidate = tmp_path / "oracle"
+    if kind == "directory":
+        candidate.mkdir()
+    elif kind == "fifo":
+        os.mkfifo(candidate)
+    elif kind == "broken-link":
+        candidate.symlink_to(tmp_path / "missing")
+    elif kind == "loop":
+        candidate.symlink_to(candidate)
+    else:
+        candidate.write_text("#!/bin/sh\n", encoding="utf-8")
+        candidate.chmod(0o600)
+    monkeypatch.setattr(issue_planning_chatgpt.shutil, "which", lambda _name: str(candidate))
+    monkeypatch.setattr(
+        issue_planning_chatgpt.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("invalid Oracle must not start"),
     )
+    result = _invoke(tmp_path)
+    assert (result.status, result.reason) == ("blocked", "oracle_unavailable")
 
-    class FixedTemporaryDirectory:
-        def __init__(self, *, prefix: str) -> None:
-            assert prefix == "specdock-issue-planning-"
 
-        def __enter__(self) -> str:
-            return str(private_root)
+@pytest.mark.parametrize("preflight_failure", ["version", "root-help", "session-help"])
+def test_unsupported_version_or_capability_submits_no_prompt(
+    monkeypatch,
+    tmp_path: Path,
+    preflight_failure: str,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
 
-        def __exit__(self, *args) -> None:
-            return None
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            version = b"0.16.2\n" if preflight_failure == "version" else b"0.16.1\n"
+            return _completed(argv, stdout=version)
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=b"missing flags" if preflight_failure == "root-help" else _root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(
+                argv,
+                stdout=b"missing flags" if preflight_failure == "session-help" else _session_help(),
+            )
+        pytest.fail("prompt must not be submitted")
 
-    def unexpected_invoke(request, *, env):
-        pytest.fail("backend must not run when the private output path already exists")
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path)
+    assert (result.status, result.reason) == ("blocked", "oracle_capability_unsupported")
+    assert not any("--prompt" in argv for argv in calls)
 
-    monkeypatch.setattr(issue_planning_chatgpt, "TemporaryDirectory", FixedTemporaryDirectory)
-    monkeypatch.setattr(issue_planning_chatgpt, "invoke_backend_with_capture", unexpected_invoke)
-    result = _invoke_fixed_adapter(tmp_path)
 
-    assert (result.status, result.reason) == ("rejected", "planning_context_rejected")
+def test_executable_identity_change_before_submit_starts_no_prompt(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+    identities = iter([(1, 2, 3, 4), (1, 2, 3, 5)])
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        pytest.fail("changed executable must not receive a prompt")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    monkeypatch.setattr(issue_planning_chatgpt, "_executable_identity", lambda _path: next(identities))
+    result = _invoke(tmp_path)
+
+    assert (result.status, result.reason) == ("blocked", "oracle_unavailable")
+    assert not any("--prompt" in argv for argv in calls)
+
+
+def test_timeout_recovers_same_session_without_duplicate_submit(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        if "--prompt" in argv:
+            _write_metadata_only(kwargs["env"], argv, status="running")
+            raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+        assert argv[1] == "session"
+        assert "--harvest" in argv and "--no-recover" in argv
+        _write_planner_session(kwargs["env"], argv, session_id=argv[2])
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path, timeout_seconds=0.1)
+    assert result.status == "pass"
+    assert sum("--prompt" in argv for argv in calls) == 1
+    assert sum("--harvest" in argv for argv in calls) == 1
+
+
+def test_timeout_with_unknown_terminal_state_requires_human_recovery(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        if "--prompt" in argv:
+            _write_metadata_only(kwargs["env"], argv, status="running")
+            raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+        return _completed(argv, returncode=1, stderr=b"token=private")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path, timeout_seconds=0.1)
+    assert (result.status, result.reason) == (
+        "blocked",
+        "oracle_session_recovery_required",
+    )
+    assert sum("--prompt" in argv for argv in calls) == 1
+    assert "private" not in repr(result)
+
+
+@pytest.mark.parametrize("role", ["planner", "reviewer"])
+def test_cross_kind_output_is_rejected(monkeypatch, tmp_path: Path, role: str) -> None:
+    executable = _fake_executable(tmp_path)
+
+    def fake_run(argv, **kwargs):
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        if role == "planner":
+            _write_reviewer_session(kwargs["env"], argv)
+        else:
+            _write_planner_session(kwargs["env"], argv)
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path, role=role)
+    assert (result.status, result.reason) == ("rejected", "oracle_artifact_missing")
     assert result.transient_payload is None
 
 
-@pytest.mark.parametrize(
-    ("blockers", "exit_code", "stdout", "write_output", "expected"),
-    [
-        (
-            ("backend_command_not_found",),
-            None,
-            b"",
-            True,
-            ("blocked", "backend_unavailable"),
+def test_prompt_pack_preserves_exact_binary_attachment_bytes(tmp_path: Path) -> None:
+    candidate = b"PK\x03\x04\x00\xffexact"
+    synthesized = SynthesizedPlanningPrompt(
+        role="reviewer",
+        prompt="fixed prompt",
+        attachments=(),
+        exact_attachments=(
+            PlanningPromptAttachment(
+                name="target-candidate.zip",
+                classification="review-target",
+                source_label="candidate.zip",
+                content=candidate,
+            ),
         ),
-        (
-            ("backend_timeout",),
-            None,
-            b"partial secret",
-            True,
-            ("blocked", "backend_timeout"),
-        ),
-        (("backend_exit_code:7",), 7, b"", True, ("blocked", "backend_nonzero")),
-        ((), 0, b"", False, ("blocked", "backend_output_missing")),
-    ],
-)
-def test_fixed_adapter_classifies_backend_failures_without_stream_leakage(
-    monkeypatch,
+    )
+    pack = tmp_path / "pack"
+    issue_planning_chatgpt._write_transport_pack(pack, synthesized, _source_evidence())
+    assert (pack / "target-candidate.zip").read_bytes() == candidate
+
+
+def test_typed_planner_zip_fails_closed_in_legacy_application_before_publication(
     tmp_path: Path,
-    blockers: tuple[str, ...],
-    exit_code: int | None,
-    stdout: bytes,
-    write_output: bool,
-    expected: tuple[str, str],
 ) -> None:
-    captured_request: list[object] = []
-    captured_output_path: list[Path] = []
-    file_sentinel = "private final output sentinel"
-
-    def fake_invoke(request, *, env):
-        captured_request.append(request)
-        output_path = _output_path_from_request(request)
-        captured_output_path.append(output_path)
-        if write_output:
-            output_path.write_text(file_sentinel, encoding="utf-8")
-        assert validate_prompt_pack(request.prompt_pack).status == "pass"
-        status = "pass" if not blockers else "blocked"
-        return (
-            type(
-                "Result",
-                (),
-                {"blockers": blockers, "exit_code": exit_code, "status": status},
-            )(),
-            BackendStreamCapture(stdout=stdout, stderr=b"private diagnostic"),
-        )
-
-    monkeypatch.setattr(issue_planning_chatgpt, "invoke_backend_with_capture", fake_invoke)
-    result = issue_planning_chatgpt.invoke_issue_planning_chatgpt(
-        repo_root=tmp_path,
-        role="planner",
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "output"
+    output.mkdir()
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as archive:
+        archive.writestr("candidate/requirement.md", "not a legacy marker frame")
+    zip_bytes = zip_buffer.getvalue()
+    snapshot = OracleAuthoringZipSnapshot(
+        expected_logical_filename="candidate.zip",
+        observed_transport_filename="candidate.zip",
+        internal_root="candidate",
+        size_bytes=len(zip_bytes),
+        sha256=hashlib.sha256(zip_bytes).hexdigest(),
+        zip_bytes=zip_bytes,
+    )
+    transport = PlanningInvocationResult(
+        status="pass",
+        reason="transport_received",
         source_evidence=_source_evidence(),
-        synthesized=SynthesizedPlanningPrompt(
-            role="planner",
-            prompt="fixed prompt",
-            attachments=(("source.md", "$(touch sentinel); token words are inert data"),),
-        ),
+        response_bytes=snapshot.size_bytes,
+        response_sha256=snapshot.sha256,
+        authoring_zip=snapshot,
     )
-    assert (result.status, result.reason) == expected
-    assert len(captured_request) == 1
-    request = captured_request[0]
-    assert shlex.split(request.backend_command)[0] == issue_planning_chatgpt._FIXED_CHATGPT_USE
-    assert request.working_dir == tmp_path
-    assert captured_output_path
-    assert not captured_output_path[0].exists()
-    assert "private diagnostic" not in repr(result)
-    assert "partial secret" not in repr(result)
-    assert file_sentinel not in repr(result)
-    assert str(captured_output_path[0]) not in str(result.to_dict())
+    publisher_calls: list[object] = []
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["PlanningCreateRequest", "run_issue_planning_create"],
+    )
+    result = module.run_issue_planning_create(
+        request=module.PlanningCreateRequest("iss-00003", output),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda _root: "owner/repo",
+        backend_invoker=lambda **_kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=lambda **_kwargs: transport,
+        publisher=lambda **kwargs: publisher_calls.append(kwargs),
+    )
+
+    assert (result.status, result.reason) == ("rejected", "planner_response_rejected")
+    assert publisher_calls == []
+    assert list(output.iterdir()) == []
 
 
-def _output_path_from_request(request) -> Path:
-    argv = shlex.split(request.backend_command)
-    assert argv[0] == issue_planning_chatgpt._FIXED_CHATGPT_USE
-    assert argv.count("--write-output") == 1
-    option_index = argv.index("--write-output")
-    assert option_index + 1 < len(argv)
-    output_path = Path(argv[option_index + 1])
-    assert output_path.is_absolute()
-    assert output_path.parent == request.prompt_pack.parent
-    return output_path
+def _patch_runtime(monkeypatch, tmp_path: Path, executable: Path, fake_run) -> None:
+    monkeypatch.setattr(issue_planning_chatgpt.shutil, "which", lambda _name: str(executable))
+    monkeypatch.setattr(issue_planning_chatgpt.subprocess, "run", fake_run)
+    monkeypatch.setenv("ORACLE_HOME_DIR", str(tmp_path / "oracle-home"))
+    monkeypatch.setenv("LANG", "ja_JP.UTF-8")
+    monkeypatch.setenv("OPENAI_API_KEY", "private")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "private")
+    monkeypatch.setenv("SPECDOCK_CHATGPT_COMMAND", "private-wrapper")
 
 
-def _invoke_fixed_adapter(tmp_path: Path):
+def _fake_executable(tmp_path: Path, *, symlink: bool = False) -> Path:
+    target = tmp_path / "oracle-real"
+    target.write_text("#!/bin/sh\n", encoding="utf-8")
+    target.chmod(0o700)
+    if not symlink:
+        return target
+    alias = tmp_path / "oracle"
+    alias.symlink_to(target)
+    return alias
+
+
+def _invoke(
+    tmp_path: Path,
+    *,
+    role: str = "planner",
+    prompt: str = "fixed prompt",
+    timeout_seconds: float | None = None,
+):
     return issue_planning_chatgpt.invoke_issue_planning_chatgpt(
         repo_root=tmp_path,
-        role="planner",
+        role=role,
         source_evidence=_source_evidence(),
         synthesized=SynthesizedPlanningPrompt(
-            role="planner",
-            prompt="fixed prompt",
+            role=role,
+            prompt=prompt,
             attachments=(("source.md", "safe context"),),
         ),
+        timeout_seconds=timeout_seconds,
     )
 
 
@@ -449,26 +404,128 @@ def _source_evidence() -> PlanningSourceEvidence:
     )
 
 
-def test_prompt_pack_preserves_exact_binary_attachment_bytes(tmp_path: Path) -> None:
-    prompt_module = __import__(
-        "spec_dock_runtime.application.issue_planning_prompt",
-        fromlist=["PlanningPromptAttachment"],
+def _completed(argv, *, stdout: bytes = b"", stderr: bytes = b"", returncode: int = 0):
+    return subprocess.CompletedProcess(argv, returncode, stdout=stdout, stderr=stderr)
+
+
+def _root_help() -> bytes:
+    return b"--engine --file --slug --wait --prompt --browser-attachments"
+
+
+def _session_help() -> bytes:
+    return b"--harvest --no-recover"
+
+
+def _session_dir(env: dict[str, str], session_id: str) -> Path:
+    return Path(env["ORACLE_HOME_DIR"]) / "sessions" / session_id
+
+
+def _session_id(argv: list[str]) -> str:
+    return argv[argv.index("--slug") + 1]
+
+
+def _write_planner_session(
+    env: dict[str, str],
+    argv: list[str],
+    *,
+    session_id: str | None = None,
+) -> None:
+    resolved_id = session_id or _session_id(argv)
+    session = _session_dir(env, resolved_id)
+    artifact = session / "artifacts" / "iss-00003-issue-planning-documents.zip"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(artifact, "w") as archive:
+        archive.writestr("iss-00003-issue-planning-documents/requirement.md", "body\n")
+    _write_metadata(session, resolved_id, "completed", [_artifact("file", artifact)])
+
+
+def _write_reviewer_session(env: dict[str, str], argv: list[str]) -> None:
+    session_id = _session_id(argv)
+    session = _session_dir(env, session_id)
+    transcript = session / "artifacts" / "transcript.md"
+    transcript.parent.mkdir(parents=True, exist_ok=True)
+    transcript.write_bytes(b'# Oracle Browser Transcript\n## Prompt\nprivate prompt\n## Answer\n{"verdict":"pass"}\n')
+    _write_metadata(session, session_id, "completed", [_artifact("transcript", transcript)])
+
+
+def _write_metadata_only(env: dict[str, str], argv: list[str], *, status: str) -> None:
+    session_id = _session_id(argv)
+    session = _session_dir(env, session_id)
+    session.mkdir(parents=True, exist_ok=True)
+    _write_metadata(session, session_id, status, [])
+
+
+def _artifact(kind: str, path: Path) -> dict[str, object]:
+    contents = path.read_bytes()
+    return {
+        "kind": kind,
+        "path": str(path),
+        "sizeBytes": len(contents),
+        "sha256": hashlib.sha256(contents).hexdigest(),
+        "validation": {"type": "zip" if kind == "file" else "generic", "ok": True},
+    }
+
+
+def _write_metadata(
+    session: Path,
+    session_id: str,
+    status: str,
+    artifacts: list[dict[str, object]],
+) -> None:
+    session.mkdir(parents=True, exist_ok=True)
+    (session / "meta.json").write_text(
+        json.dumps({
+            "id": session_id,
+            "status": status,
+            "mode": "browser",
+            "artifacts": artifacts,
+        }),
+        encoding="utf-8",
     )
-    candidate = b"PK\x03\x04\x00\xffexact"
-    synthesized = SynthesizedPlanningPrompt(
-        role="reviewer",
-        prompt="fixed prompt",
-        attachments=(),
-        exact_attachments=(
-            prompt_module.PlanningPromptAttachment(
-                name="target-candidate.zip",
-                classification="review-target",
-                source_label="candidate.zip",
-                content=candidate,
-            ),
-        ),
+
+
+def _planning_tree(repo_root: Path) -> Path:
+    issue_dir = repo_root / "spec-dock" / "initiatives" / "init-one" / "epics" / "epic-one" / "issues" / "iss-one"
+    issue_dir.mkdir(parents=True)
+    dependencies = {
+        "requirement.md": "",
+        "design.md": '依存: ["requirement.md"]\n',
+        "plan.md": '依存: ["requirement.md", "design.md"]\n',
+    }
+    kinds = {
+        "requirement.md": "要件定義書（Issue）",
+        "design.md": "設計書（Issue）",
+        "plan.md": "実装計画書（Issue）",
+    }
+    for filename in ("requirement.md", "design.md", "plan.md"):
+        (issue_dir / filename).write_text(
+            "---\n"
+            f"種別: {kinds[filename]}\n"
+            'ID: "iss-00003"\n'
+            'タイトル: "Issue"\n'
+            '状態: "approved"\n'
+            '作成者: "Author"\n'
+            '最終更新: "2026-07-27"\n'
+            f"{dependencies[filename]}"
+            '親: ["epic-00002", "init-00001"]\n'
+            "---\n\n"
+            "# iss-00003 Issue\n\n"
+            "Substantive content.\n",
+            encoding="utf-8",
+        )
+    return issue_dir
+
+
+def _record(path: Path) -> StoredMetaRecord:
+    return StoredMetaRecord(
+        kind="issue",
+        id="iss-00003",
+        title="Issue",
+        slug="issue",
+        path=path.as_posix(),
+        parent_id="epic-00002",
+        initiative_id="init-00001",
+        epic_id="epic-00002",
+        github_issue_number=3,
+        meta_path=(path / ".meta.json").as_posix(),
     )
-    pack = tmp_path / "pack"
-    issue_planning_chatgpt._write_transport_pack(pack, synthesized, _source_evidence())
-    assert (pack / "target-candidate.zip").read_bytes() == candidate
-    assert validate_prompt_pack(pack).status == "pass"

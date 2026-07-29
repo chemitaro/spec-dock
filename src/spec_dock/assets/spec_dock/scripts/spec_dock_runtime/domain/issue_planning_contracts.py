@@ -347,6 +347,66 @@ class PlanningSourceEvidence:
 
 
 @dataclass(frozen=True)
+class OracleAuthoringZipSnapshot:
+    expected_logical_filename: str
+    observed_transport_filename: str
+    internal_root: str
+    size_bytes: int
+    sha256: str
+    zip_bytes: bytes = field(repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        expected = _zip_basename(
+            self.expected_logical_filename,
+            field_name="expected_logical_filename",
+        )
+        observed = _zip_basename(
+            self.observed_transport_filename,
+            field_name="observed_transport_filename",
+        )
+        internal_root = _safe_relative_path(self.internal_root, field_name="internal_root")
+        if len(PurePosixPath(internal_root).parts) != 1:
+            raise ValueError("internal_root must be one safe path segment")
+        if not isinstance(self.zip_bytes, bytes):
+            raise ValueError("zip_bytes must be bytes")
+        if self.size_bytes != len(self.zip_bytes):
+            raise ValueError("size_bytes must match zip_bytes")
+        digest = raw_bytes_sha256(self.zip_bytes)
+        if self.sha256 != digest:
+            raise ValueError("sha256 must match zip_bytes")
+        object.__setattr__(self, "expected_logical_filename", expected)
+        object.__setattr__(self, "observed_transport_filename", observed)
+        object.__setattr__(self, "internal_root", internal_root)
+        object.__setattr__(
+            self,
+            "sha256",
+            _sha(self.sha256, length=64, field_name="sha256"),
+        )
+
+
+@dataclass(frozen=True)
+class OracleReviewJsonPayload:
+    size_bytes: int
+    sha256: str
+    json_bytes: bytes = field(repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.json_bytes, bytes):
+            raise ValueError("json_bytes must be bytes")
+        _strict_json_object(self.json_bytes)
+        if self.size_bytes != len(self.json_bytes):
+            raise ValueError("size_bytes must match json_bytes")
+        digest = raw_bytes_sha256(self.json_bytes)
+        if self.sha256 != digest:
+            raise ValueError("sha256 must match json_bytes")
+        object.__setattr__(
+            self,
+            "sha256",
+            _sha(self.sha256, length=64, field_name="sha256"),
+        )
+
+
+@dataclass(frozen=True)
 class PlanningInvocationResult:
     status: PlanningInvocationStatus
     reason: str
@@ -355,7 +415,21 @@ class PlanningInvocationResult:
     response_bytes: int = 0
     response_sha256: str | None = None
     details: tuple[str, ...] = ()
-    transient_payload: bytes | None = field(default=None, repr=False, compare=False)
+    authoring_zip: OracleAuthoringZipSnapshot | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
+    review_json: OracleReviewJsonPayload | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
+    transient_payload: bytes | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         allowed_reasons = {
@@ -371,13 +445,42 @@ class PlanningInvocationResult:
             "backend_output_missing",
             "backend_response_partial",
             "backend_response_malformed",
+            "oracle_unavailable",
+            "oracle_capability_unsupported",
+            "oracle_session_recovery_required",
+            "oracle_artifact_missing",
+            "oracle_artifact_ambiguous",
+            "oracle_artifact_rejected",
         }
         if self.status not in {"pass", "blocked", "rejected"}:
             raise ValueError("invalid planning invocation status")
         if self.reason not in allowed_reasons:
             raise ValueError("invalid planning invocation reason")
+        oracle_reason_status = {
+            "oracle_unavailable": "blocked",
+            "oracle_capability_unsupported": "blocked",
+            "oracle_session_recovery_required": "blocked",
+            "oracle_artifact_missing": "rejected",
+            "oracle_artifact_ambiguous": "rejected",
+            "oracle_artifact_rejected": "rejected",
+        }
+        expected_status = oracle_reason_status.get(self.reason)
+        if expected_status is not None and self.status != expected_status:
+            raise ValueError("Oracle reason does not match status")
         if self.status == "pass" and self.reason != "transport_received":
             raise ValueError("pass requires transport_received")
+        typed_outputs = tuple(item for item in (self.authoring_zip, self.review_json) if item is not None)
+        if self.transient_payload is not None and not isinstance(self.transient_payload, bytes):
+            raise ValueError("transient_payload must be bytes")
+        legacy_output = self.transient_payload is not None
+        if len(typed_outputs) > 1:
+            raise ValueError("result must not carry multiple typed outputs")
+        if typed_outputs and legacy_output:
+            raise ValueError("typed output and legacy transient payload are mutually exclusive")
+        if self.status == "pass" and len(typed_outputs) + int(legacy_output) != 1:
+            raise ValueError("pass requires exactly one output authority")
+        if self.status != "pass" and (typed_outputs or legacy_output):
+            raise ValueError("blocked or rejected result must not carry output payload")
         if self.response_bytes < 0:
             raise ValueError("response_bytes must be non-negative")
         if self.response_sha256 is not None:
@@ -386,8 +489,23 @@ class PlanningInvocationResult:
                 "response_sha256",
                 _sha(self.response_sha256, length=64, field_name="response_sha256"),
             )
-        if self.transient_payload is not None and not isinstance(self.transient_payload, bytes):
-            raise ValueError("transient_payload must be bytes")
+        if typed_outputs:
+            typed = typed_outputs[0]
+            if self.response_bytes != typed.size_bytes:
+                raise ValueError("response_bytes must match typed output")
+            if self.response_sha256 != typed.sha256:
+                raise ValueError("response_sha256 must match typed output")
+            object.__setattr__(
+                self,
+                "transient_payload",
+                typed.zip_bytes if isinstance(typed, OracleAuthoringZipSnapshot) else typed.json_bytes,
+            )
+        elif legacy_output:
+            assert self.transient_payload is not None
+            if self.response_bytes != len(self.transient_payload):
+                raise ValueError("response_bytes must match transient_payload")
+            if self.response_sha256 != raw_bytes_sha256(self.transient_payload):
+                raise ValueError("response_sha256 must match transient_payload")
         object.__setattr__(
             self,
             "details",

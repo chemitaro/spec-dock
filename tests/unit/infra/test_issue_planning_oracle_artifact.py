@@ -1,0 +1,227 @@
+import hashlib
+import json
+import os
+from pathlib import Path
+import sys
+import zipfile
+
+import pytest
+
+RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
+
+from spec_dock_runtime.infra import issue_planning_oracle_artifact as artifact_reader  # noqa: E402
+
+
+def test_snapshots_exact_oracle_zip_and_review_json(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    zip_path = session / "artifacts" / "iss-00003-issue-planning-documents (2).zip"
+    _write_zip(zip_path)
+    _write_metadata(session, [_artifact("file", zip_path)])
+
+    snapshot = artifact_reader.snapshot_authoring_zip(
+        session,
+        session_id=session.name,
+        oracle_version="0.16.1",
+        staging_dir=tmp_path / "staging-zip",
+    )
+    assert snapshot.expected_logical_filename == "iss-00003-issue-planning-documents.zip"
+    assert snapshot.observed_transport_filename.endswith(" (2).zip")
+    assert snapshot.internal_root == "iss-00003-issue-planning-documents"
+
+    transcript = session / "artifacts" / "transcript.md"
+    transcript.write_bytes(b'# Oracle Browser Transcript\n## Prompt\nprivate\n## Answer\n{"verdict":"pass"}\n')
+    _write_metadata(session, [_artifact("transcript", transcript)])
+    review = artifact_reader.snapshot_review_json(
+        session,
+        session_id=session.name,
+        oracle_version="0.16.1",
+        staging_dir=tmp_path / "staging-json",
+    )
+    assert review.json_bytes == b'{"verdict":"pass"}'
+    assert "private" not in repr(review)
+
+
+@pytest.mark.parametrize("count", [0, 2])
+def test_zip_inventory_requires_exactly_one_match(tmp_path: Path, count: int) -> None:
+    session = _session(tmp_path)
+    artifacts = []
+    for index in range(count):
+        path = session / "artifacts" / f"candidate-{index}.zip"
+        _write_zip(path)
+        artifacts.append(_artifact("file", path))
+    _write_metadata(session, artifacts)
+
+    expected = "oracle_artifact_missing" if count == 0 else "oracle_artifact_ambiguous"
+    with pytest.raises(artifact_reader.OracleArtifactError, match=expected):
+        artifact_reader.snapshot_authoring_zip(
+            session,
+            session_id=session.name,
+            oracle_version="0.16.1",
+            staging_dir=tmp_path / "staging",
+        )
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["wrong-session", "unsupported-version", "unsupported-mode", "size", "sha"],
+)
+def test_metadata_identity_and_integrity_fail_closed(tmp_path: Path, failure: str) -> None:
+    session = _session(tmp_path)
+    zip_path = session / "artifacts" / "candidate.zip"
+    _write_zip(zip_path)
+    entry = _artifact("file", zip_path)
+    if failure == "size":
+        entry["sizeBytes"] += 1
+    elif failure == "sha":
+        entry["sha256"] = "0" * 64
+    _write_metadata(session, [entry])
+    if failure == "unsupported-mode":
+        metadata_path = session / "meta.json"
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        metadata["mode"] = "api"
+        metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    session_id = "other-session" if failure == "wrong-session" else session.name
+    version = "0.16.2" if failure == "unsupported-version" else "0.16.1"
+    with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+        artifact_reader.snapshot_authoring_zip(
+            session,
+            session_id=session_id,
+            oracle_version=version,
+            staging_dir=tmp_path / "staging",
+        )
+
+
+@pytest.mark.parametrize("failure", ["source-mutation", "staging-rehash"])
+def test_snapshot_rejects_mutation_or_staging_rehash(
+    monkeypatch,
+    tmp_path: Path,
+    failure: str,
+) -> None:
+    session = _session(tmp_path)
+    zip_path = session / "artifacts" / "candidate.zip"
+    _write_zip(zip_path)
+    _write_metadata(session, [_artifact("file", zip_path)])
+
+    if failure == "source-mutation":
+        original_read_fd = artifact_reader._read_fd_bounded
+
+        def mutate_after_read(descriptor: int, limit: int) -> bytes:
+            payload = original_read_fd(descriptor, limit)
+            if limit == artifact_reader.MAX_ARTIFACT_BYTES:
+                current = zip_path.stat().st_mtime_ns
+                os.utime(zip_path, ns=(current + 1, current + 1))
+            return payload
+
+        monkeypatch.setattr(artifact_reader, "_read_fd_bounded", mutate_after_read)
+    else:
+        original_read_file = artifact_reader._read_bounded_regular_file
+
+        def corrupt_staging(path: Path, limit: int) -> bytes:
+            payload = original_read_file(path, limit)
+            return b"corrupt" if path.name == "oracle-artifact.snapshot" else payload
+
+        monkeypatch.setattr(artifact_reader, "_read_bounded_regular_file", corrupt_staging)
+
+    with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+        artifact_reader.snapshot_authoring_zip(
+            session,
+            session_id=session.name,
+            oracle_version="0.16.1",
+            staging_dir=tmp_path / "staging",
+        )
+
+
+@pytest.mark.parametrize(
+    "unsafe_kind",
+    ["outside", "relative-escape", "parent-symlink", "file-symlink", "directory", "fifo"],
+)
+def test_artifact_path_must_be_contained_regular_and_symlink_free(
+    tmp_path: Path,
+    unsafe_kind: str,
+) -> None:
+    session = _session(tmp_path)
+    safe = session / "artifacts" / "candidate.zip"
+    _write_zip(safe)
+    target = safe
+    if unsafe_kind == "outside":
+        target = tmp_path / "outside.zip"
+        _write_zip(target)
+    elif unsafe_kind == "relative-escape":
+        target = Path("../outside.zip")
+        _write_zip(session.parent / "outside.zip")
+    elif unsafe_kind == "parent-symlink":
+        real = session / "real"
+        real.mkdir()
+        target = real / "candidate.zip"
+        _write_zip(target)
+        alias = session / "alias"
+        alias.symlink_to(real, target_is_directory=True)
+        target = alias / "candidate.zip"
+    elif unsafe_kind == "file-symlink":
+        real = session / "artifacts" / "real.zip"
+        _write_zip(real)
+        safe.unlink()
+        safe.symlink_to(real)
+    elif unsafe_kind == "directory":
+        safe.unlink()
+        safe.mkdir()
+    elif unsafe_kind == "fifo":
+        safe.unlink()
+        os.mkfifo(safe)
+    _write_metadata(
+        session,
+        [
+            {
+                "kind": "file",
+                "path": str(target),
+                "sizeBytes": 1,
+                "sha256": "0" * 64,
+                "validation": {"type": "zip", "ok": True},
+            }
+        ],
+    )
+
+    with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+        artifact_reader.snapshot_authoring_zip(
+            session,
+            session_id=session.name,
+            oracle_version="0.16.1",
+            staging_dir=tmp_path / "staging",
+        )
+
+
+def _session(tmp_path: Path) -> Path:
+    session = tmp_path / "oracle-home" / "sessions" / "specdock-issue-abc123"
+    (session / "artifacts").mkdir(parents=True)
+    return session
+
+
+def _write_zip(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("iss-00003-issue-planning-documents/requirement.md", "body\n")
+
+
+def _artifact(kind: str, path: Path) -> dict[str, object]:
+    contents = path.read_bytes()
+    return {
+        "kind": kind,
+        "path": str(path),
+        "sizeBytes": len(contents),
+        "sha256": hashlib.sha256(contents).hexdigest(),
+        "validation": {"type": "zip" if kind == "file" else "generic", "ok": True},
+    }
+
+
+def _write_metadata(session: Path, artifacts: list[dict[str, object]]) -> None:
+    (session / "meta.json").write_text(
+        json.dumps({
+            "id": session.name,
+            "status": "completed",
+            "mode": "browser",
+            "artifacts": artifacts,
+        }),
+        encoding="utf-8",
+    )

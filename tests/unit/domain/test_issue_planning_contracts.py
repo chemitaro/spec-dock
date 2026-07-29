@@ -680,20 +680,173 @@ def test_source_evidence_and_transport_result_are_closed_and_payload_is_transien
         snapshot_id="c" * 64,
         remote_head_disposition="fetched_remote_tracking_ref",
     )
+    review_payload = contracts.OracleReviewJsonPayload(
+        size_bytes=2,
+        sha256=contracts.raw_bytes_sha256(b"{}"),
+        json_bytes=b"{}",
+    )
     result = contracts.PlanningInvocationResult(
         status="pass",
         reason="transport_received",
         source_evidence=evidence,
         backend_exit_code=0,
-        response_bytes=6,
-        response_sha256="d" * 64,
-        transient_payload=b"secret",
+        response_bytes=2,
+        response_sha256=contracts.raw_bytes_sha256(b"{}"),
+        review_json=review_payload,
     )
     serialized = result.to_dict()
     assert serialized["source_evidence"]["repository"] == "owner/repo"
+    assert result.transient_payload == b"{}"
     assert "transient_payload" not in serialized
-    assert "secret" not in repr(result)
-    assert "secret" not in str(serialized)
+    assert "json_bytes" not in serialized
+    assert b"{}" not in repr(result).encode()
+
+
+def test_authoring_zip_snapshot_validates_bytes_and_stays_private() -> None:
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["OracleAuthoringZipSnapshot"],
+    )
+    payload = b"PK\x03\x04private"
+    snapshot = contracts.OracleAuthoringZipSnapshot(
+        expected_logical_filename="iss-00003-issue-planning-documents.zip",
+        observed_transport_filename="iss-00003-issue-planning-documents (2).zip",
+        internal_root="iss-00003-issue-planning-documents",
+        size_bytes=len(payload),
+        sha256=contracts.raw_bytes_sha256(payload),
+        zip_bytes=payload,
+    )
+
+    assert snapshot.zip_bytes == payload
+    assert "private" not in repr(snapshot)
+
+    with pytest.raises(ValueError, match="size_bytes"):
+        contracts.OracleAuthoringZipSnapshot(
+            expected_logical_filename="iss-00003-issue-planning-documents.zip",
+            observed_transport_filename="iss-00003-issue-planning-documents.zip",
+            internal_root="iss-00003-issue-planning-documents",
+            size_bytes=len(payload) + 1,
+            sha256=contracts.raw_bytes_sha256(payload),
+            zip_bytes=payload,
+        )
+
+
+def test_planning_invocation_pass_requires_exactly_one_typed_output() -> None:
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=[
+            "OracleAuthoringZipSnapshot",
+            "OracleReviewJsonPayload",
+            "PlanningInvocationResult",
+        ],
+    )
+    review = contracts.OracleReviewJsonPayload(
+        size_bytes=2,
+        sha256=contracts.raw_bytes_sha256(b"{}"),
+        json_bytes=b"{}",
+    )
+
+    with pytest.raises(ValueError, match="exactly one output authority"):
+        contracts.PlanningInvocationResult(
+            status="pass",
+            reason="transport_received",
+            response_bytes=2,
+            response_sha256=contracts.raw_bytes_sha256(b"{}"),
+        )
+    with pytest.raises(ValueError, match="must not carry output payload"):
+        contracts.PlanningInvocationResult(
+            status="blocked",
+            reason="oracle_session_recovery_required",
+            review_json=review,
+        )
+    with pytest.raises(ValueError, match="does not match status"):
+        contracts.PlanningInvocationResult(
+            status="rejected",
+            reason="oracle_unavailable",
+        )
+    with pytest.raises(ValueError, match="JSON root must be an object"):
+        contracts.OracleReviewJsonPayload(
+            size_bytes=2,
+            sha256=contracts.raw_bytes_sha256(b"[]"),
+            json_bytes=b"[]",
+        )
+
+
+def test_planning_invocation_legacy_payload_is_private_and_strictly_bounded() -> None:
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["OracleReviewJsonPayload", "PlanningInvocationResult"],
+    )
+    payload = b"legacy-private"
+    digest = contracts.raw_bytes_sha256(payload)
+    result = contracts.PlanningInvocationResult(
+        status="pass",
+        reason="transport_received",
+        response_bytes=len(payload),
+        response_sha256=digest,
+        transient_payload=payload,
+    )
+    assert result.transient_payload == payload
+    assert "legacy-private" not in repr(result)
+    assert "transient_payload" not in result.to_dict()
+    field = contracts.PlanningInvocationResult.__dataclass_fields__["transient_payload"]
+    assert field.repr is False
+    assert field.compare is False
+    with pytest.raises(FrozenInstanceError):
+        result.transient_payload = b"changed"
+
+    review = contracts.OracleReviewJsonPayload(
+        size_bytes=2,
+        sha256=contracts.raw_bytes_sha256(b"{}"),
+        json_bytes=b"{}",
+    )
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        contracts.PlanningInvocationResult(
+            status="pass",
+            reason="transport_received",
+            response_bytes=2,
+            response_sha256=review.sha256,
+            review_json=review,
+            transient_payload=b"{}",
+        )
+    with pytest.raises(ValueError, match="multiple typed outputs"):
+        contracts.PlanningInvocationResult(
+            status="pass",
+            reason="transport_received",
+            response_bytes=2,
+            response_sha256=review.sha256,
+            authoring_zip=contracts.OracleAuthoringZipSnapshot(
+                expected_logical_filename="candidate.zip",
+                observed_transport_filename="candidate.zip",
+                internal_root="candidate",
+                size_bytes=2,
+                sha256=contracts.raw_bytes_sha256(b"{}"),
+                zip_bytes=b"{}",
+            ),
+            review_json=review,
+        )
+    with pytest.raises(ValueError, match="must not carry output payload"):
+        contracts.PlanningInvocationResult(
+            status="blocked",
+            reason="oracle_unavailable",
+            transient_payload=payload,
+        )
+    with pytest.raises(ValueError, match="response_bytes"):
+        contracts.PlanningInvocationResult(
+            status="pass",
+            reason="transport_received",
+            response_bytes=len(payload) + 1,
+            response_sha256=digest,
+            transient_payload=payload,
+        )
+    with pytest.raises(ValueError, match="response_sha256"):
+        contracts.PlanningInvocationResult(
+            status="pass",
+            reason="transport_received",
+            response_bytes=len(payload),
+            response_sha256="0" * 64,
+            transient_payload=payload,
+        )
 
 
 @pytest.mark.parametrize(
