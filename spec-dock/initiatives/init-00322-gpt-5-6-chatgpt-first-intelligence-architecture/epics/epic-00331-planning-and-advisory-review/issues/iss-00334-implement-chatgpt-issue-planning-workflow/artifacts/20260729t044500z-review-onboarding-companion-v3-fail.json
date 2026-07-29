@@ -1,0 +1,210 @@
+{
+"review_status": "FAIL",
+"reviewed_identity": {
+"repository": "chemitaro/spec-dock",
+"branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+"requested_source_head": "bf9bc26c00664795842731f665def63a16a7b78c",
+"verified_branch_head": "bf9bc26c00664795842731f665def63a16a7b78c",
+"github_comparison": {
+"status": "identical",
+"ahead_by": 0,
+"behind_by": 0,
+"fallback_used": false
+},
+"candidate_id": "iss-00334-onboarding-companion-planning-amendment-v3",
+"logical_filename": "20260729t-iss-00334-onboarding-companion-planning-amendment-v3.zip",
+"observed_filename": "20260729t-iss-00334-onboarding-companion-planning-amendment-v3.zip",
+"zip_sha256_expected": "95675c4a56b8c6fb43bdc8da6a1d761463615b5e84fd87002391e4823a90b279",
+"zip_sha256_observed": "95675c4a56b8c6fb43bdc8da6a1d761463615b5e84fd87002391e4823a90b279",
+"internal_root": "20260729t-iss-00334-onboarding-companion-planning-amendment-v3"
+},
+"findings": [
+{
+"id": "P1-001",
+"severity": "P1",
+"category": "identity_contract_contradiction",
+"title": "同名のGitBoundOperationBindingV1が二つの非互換なJSON key集合を定義している",
+"locations": [
+{
+"path": "epic/design.md",
+"lines": "188-198",
+"evidence": "GitBoundOperationBindingV1はsource_repositoryとsource_branchを持つ"
+},
+{
+"path": "issue/design.md",
+"lines": "216-226",
+"evidence": "同じGitBoundOperationBindingV1はrepositoryとbranchを持つ"
+},
+{
+"path": "issue/plan.md",
+"lines": "835-844",
+"evidence": "実装計画もrepositoryとbranchを持つschemaを要求する"
+}
+],
+"violated_contracts": [
+"E1-REQ-039",
+"REQ-005",
+"REQ-008",
+"REQ-023"
+],
+"defect": "三文書はbinding_sha256を自己field以外のcanonical JSON bytesから計算すると定義しているため、source_repository/source_branchとrepository/branchは単なる表示名の差ではなくdigest入力bytesの差になる。alias、正規化規則、またはどちらをauthoritativeとするかの規則はCandidate内にない。",
+"concrete_impact": "Epic準拠実装とIssue／Plan準拠実装は同じCandidate、repository、branch、HEAD、companionを入力しても異なるbinding_sha256を生成する。結果としてReview JSON、Human decision、applyのexact digest一致を一意に実装できず、正しいoperationがbinding mismatchで拒否されるか、層ごとに異なるidentityを受理する。prior P1のdeterministic same-Candidate binding classは未閉鎖である。"
+},
+{
+"id": "P2-001",
+"severity": "P2",
+"category": "internal_count_contradiction",
+"title": "Exact GitHub branch gateの個数が同一section内で二つと三つに分かれている",
+"locations": [
+{
+"path": "epic/design.md",
+"lines": "244-250",
+"evidence": "冒頭は二つの独立gateと記載する一方、直後に3項目を列挙し、末尾では三つのgateと記載する"
+}
+],
+"violated_contracts": [
+"E1-REQ-031"
+],
+"defect": "gate countの記述が自己矛盾している。",
+"concrete_impact": "列挙された三条件と他文書の三重gate記述により実装対象自体は判別できるためnon-blockingだが、親Designのtraceability表現は不正確である。"
+}
+],
+"counts": {
+"P0": 0,
+"P1": 1,
+"P2": 1,
+"P3": 0,
+"blocking": 1,
+"non_blocking": 1,
+"total": 2
+},
+"evidence_checked": {
+"github_connector": {
+"repository_access": "verified",
+"exact_branch_access": "verified",
+"exact_commit_access": "verified",
+"branch_to_commit_comparison": "identical",
+"main_or_other_branch_fallback": false
+},
+"archive": {
+"sha256_match": true,
+"single_root_match": true,
+"entry_count": 8,
+"duplicate_entries": 0,
+"path_traversal_or_absolute_entries": 0,
+"backslash_entries": 0,
+"symlink_or_special_entries": 0
+},
+"control_files": {
+"manifest_raw_sha256": "656379b4a6fd72a22b0e670e63712fe3ec741dbbf1cec29a8159efcc26c3f827",
+"checksums_raw_sha256": "f7f84caa07d851fb6289b3abb17ecd3a27be891d5aa41844553abed62b043aa2",
+"archive_comment_candidate_id_match": true,
+"archive_comment_manifest_sha256_match": true,
+"archive_comment_checksums_sha256_match": true,
+"checksum_lines_verified": 7,
+"checksum_failures": 0,
+"payload_checksum_projection_verified": "08023121def69c20c97d582396aeff9294559ab57e44596e57c7e06752d59978"
+},
+"canonical_documents": {
+"epic/requirement.md": "41bc0384cd07497c592b7f6b1d777b432e677b2081bed7cb6761c82719366ad8",
+"epic/design.md": "ed676442449ce59741e728c8e6ec815fd6a0341bf2e653d9308202dc508910bd",
+"issue/requirement.md": "d3892c9eb9a9850d670a9a8eee32ec0f23c25c598bb8422406e2bc1a67f69dff",
+"issue/design.md": "19ccd9a61061fb49a6c8aaf2c510c3e613ef4255f944a04c33a8c4f566ef59c5",
+"issue/plan.md": "7dcb0e3dbd630737df28d03f8ea9169f8f88243772f52cd75885b05609cd367f"
+},
+"append_only_plan": {
+"source_prefix_bytes": 38126,
+"source_prefix_sha256": "71646bb452e1e77dddf1b908f80c73ebde217e17e70df1da1c78095cb57c6d86",
+"source_prefix_matches_exact_HEAD_report_binding": true,
+"v2_prefix_bytes": 47800,
+"v2_prefix_sha256": "c320b82299a54ebaf8f1bf9f17bae3eb8efade3dce508fcddd8392192b575e05",
+"v3_section_starts_after_exact_v2_prefix": true,
+"backfill_detected": false
+},
+"onboarding_companion": {
+"path": "issue/artifacts/20260729t034200z-guide-new-member-chatgpt-first-issue-planning.md",
+"sha256": "47bb1b1c3c6a820a7ddda672a23a0cb69760c9e08ab9e21b4f2aa573a4c98337",
+"source_identity_match": true,
+"subordinate_authority_declared": true,
+"required_sections_present": true,
+"plantuml_block_count": 4,
+"required_diagram_roles_present": [
+"system-context",
+"responsibility-boundary",
+"planning-sequence",
+"implementation-roadmap"
+],
+"reviewer_adapter_oracle_exact_branch_closed_json_path_present": true,
+"current_status_matches_exact_HEAD_report": true
+},
+"repository_feasibility_context": {
+"current_reviewed_identity_fields": [
+"repository",
+"branch",
+"source_head"
+],
+"current_candidate_identity_fields": [
+"source_repository",
+"source_branch",
+"source_head"
+],
+"relevance": "exact HEADの現行domain contractも二つの命名系を区別しており、Candidate内の同名binding schema不一致はcanonical digestに実害を持つ"
+}
+},
+"prior_findings_closure": {
+"P1-reviewer-path-through-provider-oracle-boundary": {
+"status": "CLOSED",
+"evidence": [
+"epic/requirement.md E1-REQ-026 and E1-REQ-031",
+"epic/design.md 179-181",
+"issue/requirement.md 143-147",
+"issue/design.md 385-402",
+"issue/plan.md 810-816",
+"onboarding companion responsibility-boundary and planning-sequence diagrams"
+],
+"confirmed_properties": [
+"全Formal Reviewer runがRuntimeからprovider-owned adapter、PATH Oracle、fresh ChatGPT Reviewerを通る",
+"Reviewer自身がGitHub exact current branchを独立確認する",
+"closed Review JSONがOracle、adapterを逆向きに通ってRuntimeへ戻る",
+"direct Runtime-to-Reviewer bypass、default branch fallback、legacy text frameを禁止する"
+]
+},
+"P1-candidate-derived-git-bound-operation-binding": {
+"status": "NOT_CLOSED",
+"blocking_findings": [
+"P1-001"
+],
+"closed_subproperties": [
+"git-bound Reviewとapplyの双方でcreate由来same Candidateを必須化",
+"canonical design.md/plan.md/requirement.md 3-path tupleを不変化",
+"companion path/SHAのmanual fill、directory scan、latest selection、persistent registry、hidden session stateを禁止",
+"Human approval前のtracked tree、index、HEAD、guide destination mutationを0に固定",
+"Review、Human decision、applyでbinding digest一致を要求"
+],
+"remaining_defect": "GitBoundOperationBindingV1のcanonical JSON key集合が親Epic DesignとIssue Design／Planで一致しないため、authoritative deterministic digestが一意でない。"
+}
+},
+"scope_statement": {
+"mode": "fresh_read_only_defect_only",
+"primary_target": "directly attached immutable Candidate ZIP",
+"repository_use": "exact branch/HEAD identity、approved baseline、current source feasibilityの確認のみ",
+"excluded": [
+"improvement proposals",
+"redesign",
+"feature requests",
+"stylistic rewrites",
+"patches or replacement files",
+"implementation, test, PR, merge, or Issue-completion claims"
+],
+"repository_mutation_performed": false,
+"fallback_to_main_performed": false
+},
+"confidence": {
+"score": 0.97,
+"level": "high",
+"limitations": [
+"PlantUML 1.2026.6 executableはこのreview環境で実行していない。全8 fenced blockを抽出し、開始終了、nested alt/end、宣言alias、使用構文を静的検査し、具体的なsyntax defectは確認しなかった。",
+"MANIFESTのcanonical-manifest-identity-projection-v1はprojection algorithmがCandidate内で定義されていないため独立再計算していない。ただしraw MANIFEST、raw CHECKSUMS、payload checksum projection、全payload hash、full ZIP SHAのintegrity chainは独立検証した。"
+]
+}
+}
