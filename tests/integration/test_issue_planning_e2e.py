@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -184,9 +185,16 @@ def _backend_fake(issue_dir: Path, review_verdicts: list[str]):
             + payload
             + b"\n<<<END-SPECDOCK-ISSUE-PLANNING-RESPONSE-V1>>>\n"
         )
+        argv = shlex.split(request.backend_command)
+        assert argv.count("--write-output") == 1
+        output_index = argv.index("--write-output")
+        assert output_index + 1 < len(argv)
+        final_output = Path(argv[output_index + 1])
+        assert final_output.is_absolute()
+        final_output.write_bytes(framed)
         return (
             SimpleNamespace(status="pass", blockers=(), exit_code=0),
-            SimpleNamespace(stdout=framed, stderr=b""),
+            SimpleNamespace(stdout=b"fake backend diagnostic", stderr=b""),
         )
 
     return invoke

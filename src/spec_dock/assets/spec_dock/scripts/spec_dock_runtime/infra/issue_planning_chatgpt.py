@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
+import shlex
+import stat
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Literal
 
@@ -139,12 +142,22 @@ def invoke_issue_planning_chatgpt(
         temp_root = Path(raw_temp)
         pack = temp_root / "prompt-pack"
         output = temp_root / "output"
+        final_output = temp_root / "final-assistant-message.txt"
         _write_transport_pack(pack, synthesized, source_evidence)
-        result, streams = invoke_backend_with_capture(
+        if final_output.exists() or final_output.is_symlink():
+            return _result("rejected", "planning_context_rejected", source_evidence, None, 0)
+        backend_command = shlex.join(
+            (
+                _FIXED_CHATGPT_USE,
+                "--write-output",
+                str(final_output),
+            )
+        )
+        result, _streams = invoke_backend_with_capture(
             BackendInvokeRequest(
                 prompt_pack=pack,
                 output_dir=output,
-                backend_command=_FIXED_CHATGPT_USE,
+                backend_command=backend_command,
                 prompt="Use only the attached Issue Planning transport pack.",
                 slug=(
                     f"specdock-{role}-{source_evidence.snapshot_id[:12]}-"
@@ -160,16 +173,48 @@ def invoke_issue_planning_chatgpt(
         if "backend_timeout" in result.blockers:
             return _result("blocked", "backend_timeout", source_evidence, None, 0)
         if result.exit_code not in (None, 0):
-            return _result("blocked", "backend_nonzero", source_evidence, result.exit_code, len(streams.stdout))
+            return _result("blocked", "backend_nonzero", source_evidence, result.exit_code, 0)
         if result.status != "pass":
             return _result("rejected", "planning_context_rejected", source_evidence, result.exit_code, 0)
+        final_output_bytes = _read_regular_file_bytes(final_output)
+        if not final_output_bytes:
+            return _result(
+                "blocked",
+                "backend_output_missing",
+                source_evidence,
+                result.exit_code,
+                0,
+            )
         return classify_transport_frame(
-            streams.stdout,
+            final_output_bytes,
             role=role,
             source_head=source_evidence.local_head,
             source_evidence=source_evidence,
             backend_exit_code=result.exit_code,
         )
+
+
+def _read_regular_file_bytes(path: Path) -> bytes | None:
+    try:
+        if not stat.S_ISREG(path.lstat().st_mode):
+            return None
+        flags = os.O_RDONLY
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        descriptor = os.open(path, flags)
+    except OSError:
+        return None
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            return None
+        with os.fdopen(descriptor, "rb", closefd=False) as handle:
+            return handle.read()
+    except OSError:
+        return None
+    finally:
+        os.close(descriptor)
 
 
 def _result(
