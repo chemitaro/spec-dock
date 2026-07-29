@@ -31,7 +31,7 @@ reflected_to: []
 - Resume metadata: not applicable; branch-changing repair requires a new exact-head trigger
 - New trigger approved: no
 - Observation limitation: none; one current-boundary P1 finding is present
-- Batch status: triaged / consultation pending
+- Batch status: implementation complete / candidate commit pending
 
 ## Batch Purpose
 
@@ -160,10 +160,10 @@ hypothesis, coupling, and prior result. Recurrence alone is not a stop reason.
 - prior_strategy_id: none
 - strategy_delta: initial exact-path ownership repair。特殊削除ではなく既存exact-match inventoryへ生成assetを対称登録する。
 - bounded_scope: installer uninstall source inventory、focused tests、Issue-local repair evidence
-- validation_plan: Red reproduction、exact-match removal、mismatch preservation、retry cleanup、Issue 344 aggregate、lint/default pytest
+- validation_plan: Red reproduction、exact-match removal、modified READMEとarbitrary payload preservation、retry marker persistence/idempotent rerun、Issue 344 aggregate、lint/default pytest
 - rollback_plan: bounded commitをrevertし、P1 human gateへ戻す
 - re_observation_plan: push後の新exact HEADで固定`wait_pr_observation.sh`をpost-once実行
-- residual_risk: consultationでtest seamとcleanup orderingを確認する
+- residual_risk: current shipped bytesとのexact-match ownershipはolder-version READMEを保守的に保存し得る
 
 The strategy must be bounded, in scope, supported by current evidence, and
 materially different from an ineffective prior strategy. Renaming or repeating
@@ -173,17 +173,17 @@ the same strategy is not a strategy delta.
 
 - consultation_required: yes
 - consultation_required_reason: P1 blocking repair will mutate the PR branch
-- consultation_status: stale
-- consultation_id: pending formal ChatGPT-Use wrapper execution
-- consulted_at: pending
-- bound_head_sha: pending batch-evidence commit
+- consultation_status: fresh
+- consultation_id: `iss-00344-pr350-u001-consultati`
+- consulted_at: `2026-07-29`
+- bound_head_sha: `818a48303f7a59b625d10681e6a2182767828279`
 - bound_observation_status: `human_gate` / F001
 - bound_family_ids: F001
 - bound_strategy_context: S350-001 exact-path ownership repair
 - input_summary_ref: this batch and U001 discussion
-- recommendation_summary_ref: pending imported ChatGPT Artifact
+- recommendation_summary_ref: `artifacts/20260729t142442z-chatgpt-output-pr-350-u001-blocking-repair-consultation-818a4830.md`; SHA-256 `acac05832884e9702aec9b192a0f0287656e52b26969a6c6565f1712061a5eb7`; 8,759 bytes
 - freshness_invalidators: head, inventory, family grouping, or strategy change
-- open_risks: removal/preservation symmetry and retry cleanup
+- open_risks: exact-match provenance blindness、older-version README under-delete、symlink/non-regular/read-error preservation
 - fallback_approval_status: not_requested
 - fallback_invocation_id: N/A
 - fallback_approved_by: N/A
@@ -193,7 +193,7 @@ the same strategy is not a strategy delta.
 - fallback_expires_when: N/A
 - fallback_manual_analysis_ref: N/A
 - fallback_consumed_at: N/A
-- orchestrator_disposition_summary: pending consultation
+- orchestrator_disposition_summary: REC-001をpartial-use。exact-path inventory repairと4 focused casesを採用し、retry marker削除は既存idempotent rerun契約を破壊するためreject。
 
 Use only sanitized, repository-relative evidence references.
 Do not paste raw model conversation, secrets, tokens, or absolute host paths. ChatGPT output is
@@ -215,7 +215,7 @@ before any bounded worker handoff.
 
 | recommendation_id | orchestrator_disposition | rationale | evidence_refs | scope_effect | resulting_strategy_id | residual_risk |
 | --- | --- | --- | --- | --- | --- | --- |
-| pending | human-gate | formal consultation not yet completed | this batch | no implementation delegation yet | S350-001 | consultation freshness pending |
+| REC-001 | partial-use | core P1はvalid。既存exact-match seamを再利用する。retry marker残存はintentionalでF001原因ではないためmarker削除だけreject | consultation Artifact、`src/spec_dock/cli.py`、existing rerun test | `src/spec_dock/cli.py`とfocused uninstall testsだけ。marker lifecycle変更なし | S350-001 | older-version READMEはcurrent bytes mismatchで保存され得る |
 
 Allowed dispositions are `use`, `partial-use`, `reject`, `defer`, and
 `human-gate`. Only the orchestrator may turn dispositioned recommendations into
@@ -229,7 +229,7 @@ they are directly and unavoidably covered by the same `P0`/`P1` root-cause fix.
 
 | unit_id | source_batch | family_id | covered_items | decided_priority | merge_blocking | disposition | repair_unit_disc | status | implementation_plan | quality_gate | commit_evidence | re_observation_result | residual_risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| U001 | 20260729t141008z-pr-repair-batch | F001 | R001 | P1 | yes | fix-now | `artifacts/20260729t141053z-disc-pr-350-repair-u001-uninstall-managed-inventory.md` | unit-created | pending fresh consultation | G001-G004 | pending | pending | existing mismatch-preservation must remain |
+| U001 | 20260729t141008z-pr-repair-batch | F001 | R001 | P1 | yes | fix-now | `artifacts/20260729t141053z-disc-pr-350-repair-u001-uninstall-managed-inventory.md` | implemented | one exact target/source mapping; 4 focused Red/Green cases; retry marker preserved | G001-G003 pass / G004 pending | candidate commit pending | pending | current-byte exact ownership conservatively preserves older-version README |
 
 ## Non-Blocking Follow-up Register
 
@@ -250,9 +250,9 @@ Define family-level gates, not comment-level checks.
 
 | gate_id | family_id | command_or_check | expected_result | covers_items | required_before_push |
 | --- | --- | --- | --- | --- | --- |
-| G001 | F001 | focused Red/Green uninstall exact node(s) | unchanged root Workbench README removed with `--remove-specs` | R001 | yes |
-| G002 | F001 | mismatch preservation regression | modified root README remains preserved/unmanaged | R001 | yes |
-| G003 | F001 | Issue 344 aggregate + `make lint` + default pytest | all required lanes pass | R001 | yes |
+| G001 | F001 | focused Red/Green uninstall exact node(s) | pass: Red `4 failed` by unmanaged classification; Green `4 passed` | R001 | yes |
+| G002 | F001 | mismatch/payload preservation and retry regression | pass: selected `3 passed`; root Workbench `4 passed`; aggregate `46 passed`; CLI uninstall full `8 passed` | R001 | yes |
+| G003 | F001 | Issue 344 aggregate + `make lint` + default pytest | pass: focused `11 passed`; node/copy `52 passed`; lint pass; default `672 passed / 2051 skipped` | R001 | yes |
 | G004 | F001 | fixed exact-head PR observation | CI passes and no P0/P1 remains | R001 | yes |
 
 ## Re-observation Plan
@@ -271,7 +271,7 @@ Define family-level gates, not comment-level checks.
 
 | iteration_index | head_sha | observation_status | family_ids | recurrence_class | prior_strategy_id | proposed_strategy_id | strategy_delta | consultation_id/status | orchestrator_disposition | action_taken | fix_commit | re_observation_result | continuation_decision | stop_reason |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `7bac5ee606e235df52c3a23be433fba3cdbf491a` | human_gate / P1 | F001 | first-observed | none | S350-001 | exact generated assetを既存uninstall inventoryへ対称登録 | pending / stale | pending | triage and evidence preparation | pending | pending | obtain fresh consultation | none |
+| 1 | `7bac5ee606e235df52c3a23be433fba3cdbf491a` | human_gate / P1 | F001 | first-observed | none | S350-001 | exact generated assetを既存uninstall inventoryへ対称登録し、marker契約を分離 | `iss-00344-pr350-u001-consultati` / fresh at `818a4830` | REC-001 partial-use | U001 implemented and locally verified | pending | pending | create/push candidate, rerun fresh gates | none |
 
 `iteration_index` is telemetry only; it does not authorize continuation or
 stopping. Each row records the evidence-driven semantic decision for that
