@@ -576,6 +576,91 @@ def test_exact_repository_access_failure_is_blocked(
     assert result.transient_payload is None
 
 
+@pytest.mark.parametrize("role", ["planner", "semantic_revision"])
+@pytest.mark.parametrize(
+    "answer",
+    [
+        b"repository access failed: using main instead",
+        b"additional prose before repository access failed",
+    ],
+)
+def test_authoring_zip_with_repository_access_failure_near_match_is_rejected(
+    monkeypatch,
+    tmp_path: Path,
+    role: str,
+    answer: bytes,
+) -> None:
+    result = _invoke_with_authoring_transcripts(
+        monkeypatch,
+        tmp_path,
+        role=role,
+        transcript_payloads=(
+            b"# Oracle Browser Transcript\n"
+            b"## Prompt\nprivate prompt\n"
+            b"## Answer\n"
+            + answer
+            + b"\n",
+        ),
+    )
+    assert (result.status, result.reason) == (
+        "rejected",
+        "oracle_artifact_rejected",
+    )
+    assert result.authoring_zip is None
+    assert result.transient_payload is None
+
+
+@pytest.mark.parametrize(
+    "transcript_payloads",
+    [
+        (b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\nmalformed answer\n",),
+        (
+            b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\n"
+            b"## Answer\ncandidate ready\n## Answer\ncandidate ready\n",
+        ),
+        (
+            b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\n"
+            b"## Answer\ncandidate ready\n",
+            b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\n"
+            b"## Answer\ncandidate ready\n",
+        ),
+    ],
+)
+def test_authoring_zip_rejects_malformed_or_multiple_transcript_state(
+    monkeypatch,
+    tmp_path: Path,
+    transcript_payloads: tuple[bytes, ...],
+) -> None:
+    result = _invoke_with_authoring_transcripts(
+        monkeypatch,
+        tmp_path,
+        transcript_payloads=transcript_payloads,
+    )
+    assert (result.status, result.reason) == (
+        "rejected",
+        "oracle_artifact_rejected",
+    )
+    assert result.authoring_zip is None
+    assert result.transient_payload is None
+
+
+def test_authoring_zip_with_normal_success_transcript_is_accepted(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    result = _invoke_with_authoring_transcripts(
+        monkeypatch,
+        tmp_path,
+        transcript_payloads=(
+            b"# Oracle Browser Transcript\n"
+            b"## Prompt\nprivate prompt\n"
+            b"## Answer\ncandidate ready\n",
+        ),
+    )
+    assert (result.status, result.reason) == ("pass", "transport_received")
+    assert result.authoring_zip is not None
+
+
 def test_typed_planner_zip_fails_closed_in_legacy_application_before_publication(
     tmp_path: Path,
 ) -> None:
@@ -711,6 +796,7 @@ def _write_planner_session(
     zip_bytes: bytes | None = None,
     filename: str | None = None,
     internal_root: str | None = None,
+    transcript_payloads: tuple[bytes, ...] = (),
 ) -> None:
     resolved_id = session_id or _session_id(argv)
     session = _session_dir(env, resolved_id)
@@ -726,7 +812,39 @@ def _write_planner_session(
             )
     else:
         artifact.write_bytes(zip_bytes)
-    _write_metadata(session, resolved_id, "completed", [_artifact("file", artifact)])
+    artifacts = [_artifact("file", artifact)]
+    for index, payload in enumerate(transcript_payloads):
+        transcript = session / "artifacts" / f"transcript-{index}.md"
+        transcript.write_bytes(payload)
+        artifacts.append(_artifact("transcript", transcript))
+    _write_metadata(session, resolved_id, "completed", artifacts)
+
+
+def _invoke_with_authoring_transcripts(
+    monkeypatch,
+    tmp_path: Path,
+    *,
+    transcript_payloads: tuple[bytes, ...],
+    role: str = "planner",
+) -> PlanningInvocationResult:
+    executable = _fake_executable(tmp_path)
+
+    def fake_run(argv, **kwargs):
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        _write_planner_session(
+            kwargs["env"],
+            argv,
+            transcript_payloads=transcript_payloads,
+        )
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    return _invoke(tmp_path, role=role)
 
 
 def _authoring_expectation() -> PlanningOutputExpectation:

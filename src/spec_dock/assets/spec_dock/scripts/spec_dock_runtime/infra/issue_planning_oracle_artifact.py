@@ -149,7 +149,10 @@ def has_exact_repository_access_failure(
     metadata = _read_metadata(session_root, session_id=session_id, oracle_version=oracle_version)
     artifacts = _artifact_inventory(metadata)
     transcripts = [item for item in artifacts if item.get("kind") == "transcript"]
+    has_file_artifact = any(item.get("kind") == "file" for item in artifacts)
     if len(transcripts) != 1:
+        if transcripts and has_file_artifact:
+            raise OracleArtifactError("oracle_artifact_rejected")
         return False
     transcript = _snapshot_artifact(
         session_root,
@@ -158,13 +161,17 @@ def has_exact_repository_access_failure(
     )
     marker_index = transcript.find(_ANSWER_MARKER)
     if marker_index < 0 or transcript.find(_ANSWER_MARKER, marker_index + 1) >= 0:
+        if has_file_artifact:
+            raise OracleArtifactError("oracle_artifact_rejected")
         return False
     answer = transcript[marker_index + len(_ANSWER_MARKER) :].strip()
-    if answer != b"repository access failed":
-        return False
-    if any(item.get("kind") == "file" for item in artifacts):
+    if answer == b"repository access failed":
+        if has_file_artifact:
+            raise OracleArtifactError("oracle_artifact_rejected")
+        return True
+    if b"repository access failed" in answer and has_file_artifact:
         raise OracleArtifactError("oracle_artifact_rejected")
-    return True
+    return False
 
 
 def _read_metadata(
