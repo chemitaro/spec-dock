@@ -3998,7 +3998,16 @@ class TestInitUpdate(CliRuntimeHarness):
 
         # Minimal common identity and Git boundary in every shipped document.
         for path in doc_paths:
-            require(path, "optional status", (("optional",),))
+            require(
+                path,
+                "Workbench-context optional status",
+                (
+                    ("Workbench is optional",),
+                    ("Workbench は optional",),
+                    ("Workbench の存在は optional",),
+                    ("Workbench は任意",),
+                ),
+            )
             require(path, "temporary status", (("temporary",), ("一時",)))
             require(path, "worktree-local status", (("worktree-local",),))
             require(path, "disposable status", (("disposable",), ("破棄可能",)))
@@ -4056,12 +4065,20 @@ class TestInitUpdate(CliRuntimeHarness):
             require(
                 path,
                 "Git ignore is not a security boundary",
-                (("Git ignore", "security boundary"),),
+                (
+                    ("Git ignore is not a security boundary",),
+                    ("Git ignore は security boundary ではない",),
+                    ("Git ignore は security boundary ではありません",),
+                ),
             )
             require(
                 path,
                 "read/import authorization is evidence-only, not canonical",
-                (("read / import", "evidence-only", "canonical"),),
+                (
+                    ("read / import authorization is evidence-only, not canonical adoption",),
+                    ("read / import authorization は evidence-only であり、canonical adoption ではない",),
+                    ("read / import authorization は evidence-only であり、canonical adoption ではありません",),
+                ),
             )
 
         # Worktree reference owns detailed checkout/copy mechanics.
@@ -4075,25 +4092,37 @@ class TestInitUpdate(CliRuntimeHarness):
             "node-only one-shot copy with root excluded",
             (
                 (
-                    "Initiative",
-                    "Epic",
-                    "Issue",
-                    "ignored payload",
-                    "one-shot",
-                    "root",
-                    "対象外",
+                    "Only Initiative/Epic/Issue ignored payload uses explicit manual one-shot copy",
+                    "root is excluded",
+                ),
+                (
+                    "Initiative / Epic / Issue の ignored payload は明示的な manual one-shot copy の対象",
+                    "root は対象外",
                 ),
             ),
         )
         require(
             "docs/reference_worktree.md",
             "opaque source-wins behavior preserving destination-only entries",
-            (("source-wins", "destination-only", "README", "filter"),),
+            (
+                (
+                    "source-wins preserves destination-only entries",
+                    "without a README-specific filter",
+                ),
+                (
+                    "source-wins は destination-only entries を保持",
+                    "README-specific filter は適用しない",
+                ),
+            ),
         )
         require(
             "docs/reference_worktree.md",
             "no hook/watch/sync/copy-back",
-            (("automatic hook", "watch", "sync", "copy-back"),),
+            (
+                ("no automatic hook, watch, sync, or copy-back",),
+                ("automatic hook / watch / sync / copy-back はない",),
+                ("automatic hook、watch、sync、copy-back はありません",),
+            ),
         )
 
         # The docs entrance owns the transitional sibling-Issue availability note.
