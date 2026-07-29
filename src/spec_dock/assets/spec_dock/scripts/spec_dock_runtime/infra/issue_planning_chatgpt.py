@@ -23,13 +23,17 @@ from spec_dock_runtime.infra.git_cli import origin_github_repo_slug
 from spec_dock_runtime.infra.issue_planning_oracle_artifact import (
     SUPPORTED_ORACLE_VERSION,
     OracleArtifactError,
+    has_exact_repository_access_failure,
     read_session_status,
     snapshot_authoring_zip,
     snapshot_review_json,
 )
 
 if TYPE_CHECKING:
-    from spec_dock_runtime.application.issue_planning_prompt import SynthesizedPlanningPrompt
+    from spec_dock_runtime.application.issue_planning_prompt import (
+        PlanningOutputExpectation,
+        SynthesizedPlanningPrompt,
+    )
 
 _PREFLIGHT_TIMEOUT_SECONDS = 10.0
 _DEFAULT_RUN_TIMEOUT_SECONDS = 2 * 60 * 60
@@ -62,11 +66,14 @@ def resolve_issue_planning_github_repository(repo_root: Path) -> str | None:
 def invoke_issue_planning_chatgpt(
     *,
     repo_root: Path,
-    role: Literal["planner", "reviewer"],
+    role: Literal["planner", "semantic_revision", "reviewer"],
     source_evidence: PlanningSourceEvidence,
     synthesized: SynthesizedPlanningPrompt,
     timeout_seconds: float | None = None,
 ) -> PlanningInvocationResult:
+    expectation = synthesized.output_expectation
+    if not _invocation_contract_is_valid(role, synthesized, expectation):
+        return _result("rejected", "planning_context_rejected", source_evidence, None)
     executable = _resolve_oracle_executable()
     if executable is None:
         return _result("blocked", "oracle_unavailable", source_evidence, None)
@@ -168,6 +175,7 @@ def invoke_issue_planning_chatgpt(
                 )
         return _collect_typed_result(
             role=role,
+            expectation=expectation,
             session_root=session_root,
             session_id=session_id,
             staging=staging,
@@ -319,7 +327,8 @@ def _session_state(session_root: Path, *, session_id: str) -> _SessionState:
 
 def _collect_typed_result(
     *,
-    role: Literal["planner", "reviewer"],
+    role: Literal["planner", "semantic_revision", "reviewer"],
+    expectation: PlanningOutputExpectation,
     session_root: Path,
     session_id: str,
     staging: Path,
@@ -327,13 +336,30 @@ def _collect_typed_result(
     exit_code: int | None,
 ) -> PlanningInvocationResult:
     try:
-        if role == "planner":
+        if has_exact_repository_access_failure(
+            session_root,
+            session_id=session_id,
+            oracle_version=SUPPORTED_ORACLE_VERSION,
+            staging_dir=staging / "branch-gate",
+        ):
+            return _result(
+                "blocked",
+                "github_exact_branch_unavailable",
+                source_evidence,
+                exit_code,
+            )
+        if role in {"planner", "semantic_revision"}:
             authoring_zip = snapshot_authoring_zip(
                 session_root,
                 session_id=session_id,
                 oracle_version=SUPPORTED_ORACLE_VERSION,
                 staging_dir=staging,
             )
+            if (
+                authoring_zip.expected_logical_filename != expectation.logical_filename
+                or authoring_zip.internal_root != expectation.internal_root
+            ):
+                raise OracleArtifactError("oracle_artifact_rejected")
             return _pass_result(
                 source_evidence=source_evidence,
                 exit_code=exit_code,
@@ -418,7 +444,7 @@ def _oracle_home(child_env: dict[str, str]) -> Path:
 
 
 def _new_session_id(
-    role: Literal["planner", "reviewer"],
+    role: Literal["planner", "semantic_revision", "reviewer"],
     source_evidence: PlanningSourceEvidence,
 ) -> str:
     return f"specdock-{role}-{source_evidence.snapshot_id[:6]}-{secrets.token_hex(4)}"
@@ -447,15 +473,6 @@ def _write_transport_pack(
             raise OSError("exact planning attachment changed while writing prompt pack")
         attachment_names.append(attachment.name)
         exact_source_hashes[attachment.source_label] = attachment.sha256
-    (pack / "prompt.md").write_text(synthesized.prompt, encoding="utf-8")
-    (pack / "expected-output-contract.md").write_text(
-        "The role-specific formal output contract in the prompt body is required.\n",
-        encoding="utf-8",
-    )
-    (pack / "safe-output-constraints.md").write_text(
-        "Evidence only. No repository mutation, credential, or private host path.\n",
-        encoding="utf-8",
-    )
     manifest = {
         "schema_version": 2,
         "generated_by": "spec-dock-issue-planning",
@@ -496,4 +513,18 @@ def _write_json(path: Path, payload: object) -> None:
     path.write_text(
         json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
         encoding="utf-8",
+    )
+
+
+def _invocation_contract_is_valid(
+    role: str,
+    synthesized: SynthesizedPlanningPrompt,
+    expectation: PlanningOutputExpectation | None,
+) -> bool:
+    if synthesized.role != role or expectation is None:
+        return False
+    expected_kind = "review_json" if role == "reviewer" else "authoring_zip"
+    return (
+        role in {"planner", "semantic_revision", "reviewer"}
+        and expectation.kind == expected_kind
     )

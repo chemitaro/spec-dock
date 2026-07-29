@@ -42,6 +42,62 @@ def test_snapshots_exact_oracle_zip_and_review_json(tmp_path: Path) -> None:
     assert "private" not in repr(review)
 
 
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        (b"repository access failed", True),
+        (b"repository access failed: using main instead", False),
+        (b"prefix repository access failed", False),
+    ],
+)
+def test_exact_repository_access_failure_detection(
+    tmp_path: Path,
+    answer: bytes,
+    expected: bool,
+) -> None:
+    session = _session(tmp_path)
+    transcript = session / "artifacts" / "transcript.md"
+    transcript.write_bytes(
+        b"# Oracle Browser Transcript\n## Prompt\nprivate\n## Answer\n"
+        + answer
+        + b"\n"
+    )
+    _write_metadata(session, [_artifact("transcript", transcript)])
+
+    assert artifact_reader.has_exact_repository_access_failure(
+        session,
+        session_id=session.name,
+        oracle_version="0.16.1",
+        staging_dir=tmp_path / "staging",
+    ) is expected
+
+
+def test_repository_access_failure_with_zip_is_contradictory(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    transcript = session / "artifacts" / "transcript.md"
+    transcript.write_bytes(
+        b"# Oracle Browser Transcript\n## Prompt\nprivate\n## Answer\n"
+        b"repository access failed\n"
+    )
+    zip_path = session / "artifacts" / "candidate.zip"
+    _write_zip(zip_path)
+    _write_metadata(
+        session,
+        [_artifact("transcript", transcript), _artifact("file", zip_path)],
+    )
+
+    with pytest.raises(
+        artifact_reader.OracleArtifactError,
+        match="oracle_artifact_rejected",
+    ):
+        artifact_reader.has_exact_repository_access_failure(
+            session,
+            session_id=session.name,
+            oracle_version="0.16.1",
+            staging_dir=tmp_path / "staging",
+        )
+
+
 @pytest.mark.parametrize("count", [0, 2])
 def test_zip_inventory_requires_exactly_one_match(tmp_path: Path, count: int) -> None:
     session = _session(tmp_path)

@@ -33,6 +33,9 @@ def _context(**changes: object) -> PlanningContext:
         ),
         "relevant_source_paths": ("src/example.py",),
         "operator_context": ("preserve approved scope",),
+        "onboarding_companion_path": (
+            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
+        ),
     }
     values.update(changes)
     return PlanningContext(**values)  # type: ignore[arg-type]
@@ -258,7 +261,7 @@ def test_synthesize_prompt_scans_complete_dynamic_identity_block(tmp_path: Path)
         )
 
 
-def test_planner_prompt_contains_exact_inner_document_contract(tmp_path: Path) -> None:
+def test_planner_prompt_contains_exact_zip_and_connector_contract(tmp_path: Path) -> None:
     _write_context_files(tmp_path)
     prompt = issue_planning_prompt.synthesize_issue_planning_prompt(
         role="planner",
@@ -267,16 +270,30 @@ def test_planner_prompt_contains_exact_inner_document_contract(tmp_path: Path) -
         upstream="origin/feature/issue",
         remote_head="a" * 40,
     ).prompt
-    filenames = ("requirement.md", "design.md", "plan.md")
-    positions: list[int] = []
-    for filename in filenames:
-        start = f"<<<SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={filename}>>>"
-        end = f"<<<END-SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={filename}>>>"
-        assert prompt.count(start) == 1
-        assert prompt.count(end) == 1
-        positions.append(prompt.index(start))
-    assert positions == sorted(positions)
-    assert "no prose" in prompt.lower()
+    assert "@GitHub" in prompt
+    assert "owner/repo" in prompt
+    assert "feature/issue" in prompt
+    assert "a" * 40 in prompt
+    assert "repository access failed" in prompt
+    assert "default branch" in prompt
+    assert "iss-00003-issue-planning-documents.zip" in prompt
+    assert "iss-00003-issue-planning-documents" in prompt
+    for filename in (
+        "requirement.md",
+        "design.md",
+        "plan.md",
+        "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md",
+    ):
+        assert prompt.count(filename) >= 1
+    assert "SPECDOCK-ISSUE-PLANNING-RESPONSE-V1" not in prompt
+    assert "SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1" not in prompt
+    for diagram_role in (
+        "system-context",
+        "responsibility-boundary",
+        "planning-sequence",
+        "implementation-roadmap",
+    ):
+        assert diagram_role in prompt
 
 
 def test_review_prompt_classifies_exact_targets_and_formal_evidence() -> None:
@@ -311,7 +328,7 @@ def test_review_prompt_classifies_exact_targets_and_formal_evidence() -> None:
 def test_semantic_revision_prompt_is_self_contained_without_session_locator() -> None:
     attachment = issue_planning_prompt.PlanningPromptAttachment
     synthesized = issue_planning_prompt.synthesize_planning_evidence_prompt(
-        role="planner",
+        role="semantic_revision",
         source_head="a" * 40,
         repository="owner/repo",
         branch="feature/issue",
@@ -330,10 +347,17 @@ def test_semantic_revision_prompt_is_self_contained_without_session_locator() ->
             ),
         ),
         instructions=("selected finding: F-1", "preserve assumption: boundary"),
+        output_expectation=issue_planning_prompt.authoring_output_expectation(
+            "iss-00003",
+            "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md",
+        ),
     )
     assert "selected finding: F-1" in synthesized.prompt
     assert "preserve assumption: boundary" in synthesized.prompt
     assert "session_locator" not in synthesized.prompt
+    assert synthesized.role == "semantic_revision"
+    assert "complete replacement" in synthesized.prompt.lower()
+    assert "patch" in synthesized.prompt.lower()
 
 
 def test_installed_runtime_resolves_managed_issue_planning_resources(

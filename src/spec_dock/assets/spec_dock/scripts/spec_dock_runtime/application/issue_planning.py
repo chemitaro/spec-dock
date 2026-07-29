@@ -15,6 +15,7 @@ from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (
 )
 from spec_dock_runtime.application.issue_planning_prompt import (
     PlanningPromptAttachment,
+    authoring_output_expectation,
     synthesize_issue_planning_prompt,
     synthesize_planning_evidence_prompt,
 )
@@ -628,7 +629,7 @@ def run_issue_planning_transport(
     issue: str,
     records: Sequence[StoredMetaRecord],
     repo_root: Path,
-    role: Literal["planner", "reviewer"],
+    role: Literal["planner", "semantic_revision", "reviewer"],
     repo_slug_resolver: Callable[[Path], str | None],
     backend_invoker: Callable[..., PlanningInvocationResult],
     dependency_loader: Callable[[str], Sequence[DirectDependencyResolution]] | None = None,
@@ -637,6 +638,7 @@ def run_issue_planning_transport(
     timeout_seconds: float | None = None,
     preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult] = run_github_sync_preflight,
     prompt_synthesizer: Callable[..., Any] = synthesize_issue_planning_prompt,
+    onboarding_companion_path: str | None = None,
 ) -> PlanningInvocationResult:
     target = resolve_existing_issue_target(issue, records, repo_root)
     relevant = tuple(sorted(set(relevant_source_paths), key=lambda value: value.encode("utf-8")))
@@ -714,6 +716,7 @@ def run_issue_planning_transport(
         operator_context=tuple(
             sorted(set(operator_context), key=lambda value: value.encode("utf-8"))
         ),
+        onboarding_companion_path=onboarding_companion_path,
     )
     try:
         synthesized = prompt_synthesizer(
@@ -804,6 +807,16 @@ def run_issue_planning_create(
             issue_id=target.issue_id,
         )
 
+    try:
+        operation_time = datetime.fromisoformat(clock().replace("Z", "+00:00"))
+        onboarding_companion_path = _resolve_onboarding_companion_path(operation_time)
+    except (TypeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="planning_context_rejected",
+            issue_id=target.issue_id,
+        )
+
     dependency_snapshot: tuple[DirectDependencyResolution, ...] | None = None
 
     def load_dependency_snapshot(issue_id: str) -> tuple[DirectDependencyResolution, ...]:
@@ -827,6 +840,7 @@ def run_issue_planning_create(
         timeout_seconds=timeout_seconds,
         preflight_runner=preflight_runner,
         prompt_synthesizer=prompt_synthesizer,
+        onboarding_companion_path=onboarding_companion_path,
     )
     if transport.status != "pass":
         return PlanningCommandResult(
@@ -848,6 +862,18 @@ def run_issue_planning_create(
             reason="planner_response_rejected",
             issue_id=target.issue_id,
         )
+    if not _source_evidence_is_current(
+        target=target,
+        relevant_source_paths=relevant_source_paths,
+        repo_root=repo_root,
+        evidence=transport.source_evidence,
+        preflight_runner=preflight_runner,
+    ):
+        return PlanningCommandResult(
+            status="stale",
+            reason="planning_source_stale",
+            issue_id=target.issue_id,
+        )
     try:
         planner_documents = parse_planner_payload(payload)
     except (UnicodeError, ValueError):
@@ -856,7 +882,6 @@ def run_issue_planning_create(
             reason="planner_response_rejected",
             issue_id=target.issue_id,
         )
-    operation_time = datetime.fromisoformat(clock().replace("Z", "+00:00"))
     try:
         dependencies = load_dependency_snapshot(target.issue_id)
         context = PlanningContext(
@@ -879,6 +904,7 @@ def run_issue_planning_create(
             operator_context=tuple(
                 sorted(set(operator_context), key=lambda value: value.encode("utf-8"))
             ),
+            onboarding_companion_path=onboarding_companion_path,
         )
         material = build_candidate_material(
             planner_documents=planner_documents,
@@ -1327,6 +1353,7 @@ def run_issue_planning_revise(
         return source
     context, source_evidence = source
     operation_time = datetime.fromisoformat(clock().replace("Z", "+00:00"))
+    onboarding_companion_path = _resolve_onboarding_companion_path(operation_time)
     try:
         baseline = parse_current_front_matter_baseline(
             {name: candidate.files[name] for name in DOCUMENT_NAMES}
@@ -1369,7 +1396,17 @@ def run_issue_planning_revise(
                 or runtime_context.source_head != candidate.identity.source_head
             ):
                 raise ValueError("semantic revision source changed")
-            base = synthesize_issue_planning_prompt(**kwargs)
+            expectation = authoring_output_expectation(
+                issue_id,
+                onboarding_companion_path,
+            )
+            base = synthesize_issue_planning_prompt(
+                **{
+                    **kwargs,
+                    "role": "semantic_revision",
+                    "output_expectation": expectation,
+                }
+            )
             attachments = [
                 PlanningPromptAttachment(
                     name="prior-candidate.zip",
@@ -1401,20 +1438,21 @@ def run_issue_planning_revise(
                 *(f"preserve assumption: {item}" for item in revision.preserve_assumptions),
             )
             return synthesize_planning_evidence_prompt(
-                role="planner",
+                role="semantic_revision",
                 source_head=runtime_context.source_head,
                 repository=runtime_context.repository,
                 branch=runtime_context.branch,
                 exact_attachments=tuple(attachments),
                 instructions=instructions,
                 supplemental_attachments=base.attachments,
+                output_expectation=expectation,
             )
 
         transport = transport_runner(
             issue=issue_id,
             records=records,
             repo_root=repo_root,
-            role="planner",
+            role="semantic_revision",
             repo_slug_resolver=repo_slug_resolver,
             backend_invoker=backend_invoker,
             relevant_source_paths=tuple(
@@ -1424,6 +1462,7 @@ def run_issue_planning_revise(
             timeout_seconds=timeout_seconds,
             preflight_runner=preflight_runner,
             prompt_synthesizer=revision_prompt_synthesizer,
+            onboarding_companion_path=onboarding_companion_path,
         )
         if transport.status != "pass":
             return PlanningCommandResult(
@@ -1651,6 +1690,56 @@ def _revision_source_state(
             issue_id=candidate.identity.issue_id,
         )
     return context, evidence
+
+
+def _resolve_onboarding_companion_path(operation_time: datetime) -> str:
+    if operation_time.tzinfo is None:
+        raise ValueError("operation time must be timezone-aware")
+    timestamp = operation_time.astimezone(timezone.utc).strftime("%Y%m%dt%H%M%Sz")
+    return (
+        f"artifacts/{timestamp}-"
+        "guide-new-member-chatgpt-first-issue-planning.md"
+    )
+
+
+def _source_evidence_is_current(
+    *,
+    target: ExistingIssueTarget,
+    relevant_source_paths: Sequence[str],
+    repo_root: Path,
+    evidence: PlanningSourceEvidence,
+    preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult],
+) -> bool:
+    source_paths = tuple(
+        sorted(
+            {*target.canonical_issue_paths, *relevant_source_paths},
+            key=lambda value: value.encode("utf-8"),
+        )
+    )
+    try:
+        preflight = preflight_runner(
+            GitHubSyncPreflightRequest(
+                repo_root=repo_root,
+                ref=None,
+                allow_default_branch_fallback=False,
+                source_paths=source_paths,
+                expected_source_hash=evidence.source_manifest_hash,
+            )
+        )
+    except (OSError, ValueError):
+        return False
+    if preflight.status != "pass" or preflight.repository is None:
+        return False
+    repository = preflight.repository
+    return (
+        repository.branch == evidence.branch
+        and repository.upstream == evidence.upstream
+        and repository.local_head == evidence.local_head
+        and repository.remote_head == evidence.remote_head
+        and repository.remote_head_disposition == evidence.remote_head_disposition
+        and repository.source_manifest.source_manifest_hash
+        == evidence.source_manifest_hash
+    )
 
 
 def _read_external_bounded_file(path: Path, *, repo_root: Path) -> bytes:

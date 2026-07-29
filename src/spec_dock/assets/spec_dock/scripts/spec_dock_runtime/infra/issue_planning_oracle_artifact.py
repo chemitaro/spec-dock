@@ -138,6 +138,35 @@ def snapshot_review_json(
         raise OracleArtifactError("oracle_artifact_rejected") from None
 
 
+def has_exact_repository_access_failure(
+    session_root: Path,
+    *,
+    session_id: str,
+    oracle_version: str,
+    staging_dir: Path,
+) -> bool:
+    """Recognize only the exact terminal connector-failure sentinel."""
+    metadata = _read_metadata(session_root, session_id=session_id, oracle_version=oracle_version)
+    artifacts = _artifact_inventory(metadata)
+    transcripts = [item for item in artifacts if item.get("kind") == "transcript"]
+    if len(transcripts) != 1:
+        return False
+    transcript = _snapshot_artifact(
+        session_root,
+        artifact=transcripts[0],
+        staging_dir=staging_dir,
+    )
+    marker_index = transcript.find(_ANSWER_MARKER)
+    if marker_index < 0 or transcript.find(_ANSWER_MARKER, marker_index + 1) >= 0:
+        return False
+    answer = transcript[marker_index + len(_ANSWER_MARKER) :].strip()
+    if answer != b"repository access failed":
+        return False
+    if any(item.get("kind") == "file" for item in artifacts):
+        raise OracleArtifactError("oracle_artifact_rejected")
+    return True
+
+
 def _read_metadata(
     session_root: Path,
     *,
