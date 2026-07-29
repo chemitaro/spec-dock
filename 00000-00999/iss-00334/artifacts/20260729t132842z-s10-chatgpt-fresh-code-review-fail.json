@@ -1,0 +1,28 @@
+{
+  "verdict": "FAIL",
+  "exact_head_verified": true,
+  "p0": [],
+  "p1": [
+    {
+      "id": "S10-P1-001",
+      "title": "Onboarding companion completeness validation accepts guides missing mandatory S10 content",
+      "evidence": "In src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/issue_planning_candidate.py:160-177, each required_groups tuple is evaluated with any(...). Consequently, the groups (\"init-\", \"epic-\", \"iss-\"), (\"current architecture\", \"現行\", \"target architecture\", \"目標\"), (\"oracle\", \"chatgpt-use\"), (\"candidate\", \"review\", \"human\", \"apply\"), and (\"provider\", \"projection\") require only one token from each group rather than every separately mandatory concept. Lines 183-199 only require four fenced PlantUML blocks and the presence of role words somewhere among those blocks; they do not require the contracted Markdown sections or non-empty section bodies. Lines 202-228 use this validator as the authoring-ZIP acceptance gate. A concrete payload containing only init-, current architecture, oracle, candidate, and provider, together with the singleton tokens, canonical filenames, subordinate wording, and four framed PlantUML blocks, can therefore pass while omitting Epic and Issue lineage, target architecture, the chatgpt-use distinction, Review/Human/apply, projection, and the required section structure. This violates the approved S10 work packet section 8.2 guide-completeness contract.",
+      "impact": "An incomplete onboarding companion can be accepted into the immutable Candidate and can subsequently reach Review and Human-approved managed apply despite failing the deterministic S10 completeness obligations. This breaks a central guide-inclusive Candidate acceptance boundary and makes correctness dependent on the Reviewer detecting omissions that the runtime is explicitly required to reject.",
+      "required_fix": "Represent every mandatory concept as an independent requirement, using alternatives only for equivalent language variants; require all lineage, architecture, lifecycle, provider/projection, and Oracle/chatgpt-use concepts separately. Parse the Markdown section structure and require non-empty bodies for each S10-mandated section, while enforcing the contracted PlantUML role coverage. Add a negative regression using a syntactically valid, token-minimal guide that currently passes but omits those mandatory concepts and sections."
+    },
+    {
+      "id": "S10-P1-002",
+      "title": "Apply does not revalidate the explicit Candidate after preflight and before transaction mutation",
+      "evidence": "In src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning.py, run_issue_planning_apply loads the Candidate at lines 383-385 for archive mode or lines 411-413 for git-bound mode and derives the binding and PlanningApplyOperation from that snapshot. On the normal path, source preflight then runs at lines 569-608 and transaction_runner is invoked directly at lines 614-619. There is no second candidate_loader call or binding rederivation between preflight and transaction start. A concrete test path can replace request.candidate_path from reviewed Candidate A to another valid Candidate B inside a passing preflight_runner; transaction_runner is still invoked and may mutate the repository using the earlier A snapshot. The approved S10 packet lines 925-927 explicitly require rederivation or reload immediately before transaction start, and GB-OB-NF04 requires a Candidate replaced after Review to be rejected before mutation.",
+      "impact": "At the mutation boundary, the command can no longer prove that the operator-supplied --candidate path still identifies the Candidate bound to Review and the Human decision. Apply can complete even though the explicit operation evidence has drifted, violating the same-Candidate and fail-closed identity contract.",
+      "required_fix": "After the final source preflight and immediately before starting a new apply transaction, reload the external Candidate as an immutable snapshot and compare its identity, ZIP digest or exact ZIP bytes, companion path/SHA, and rederived GitBoundOperationBindingV1 with the initially accepted Candidate and reviewed identity. Return the existing stale or operation-binding mismatch outcome before transaction_runner on any change or unreadable replacement. Add a regression whose preflight_runner swaps the Candidate and assert that transaction_runner and repository mutation are both zero."
+    }
+  ],
+  "excluded_observations": [
+    "The report.md-recorded provider/dogfood projection parity failure and obsolete classify_transport_frame integration import are S11-owned and were excluded.",
+    "The one-line expectation repair in commit 28155c618f04bb0dc5830b1d206eb10303baf770 correctly reflects strict PlanningReviewResult parsing before reviewed-identity comparison and is not a defect.",
+    "Potential non-blocking result-reason and formatting observations were excluded because they remain fail-closed or do not meet the requested P0/P1 threshold.",
+    "No test commands were executed through the read-only GitHub connector; the findings are based on exact-HEAD source, test, specification, report, work-packet, and concrete injectable execution-path inspection."
+  ],
+  "confidence": "high"
+}
