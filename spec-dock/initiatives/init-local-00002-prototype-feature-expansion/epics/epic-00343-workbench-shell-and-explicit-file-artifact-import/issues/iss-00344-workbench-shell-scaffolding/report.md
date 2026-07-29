@@ -380,7 +380,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S02 | committed | test-only implementation、D-008/D-009、failed/PASS review Artifacts、bounded fixture fix | review target `2917610b04a6bcb59c7b316f47d4281c8844b63a`; closure head `9a5c08a5e33c0458cbdb0db9eb103e7f35513b39` | clean / pushed、local=remoteをS03 admission前に確認 | not applicable | not applicable | not applicable | not applicable |
 | S03 | committed | package/build/test implementation、D-010/D-011、delegation/verification/review evidence | review target `59d4fdf64333a537484af233ecef0138c9368aaf`; EAL-038と本reportはpost-review evidence-only closure commit | closure commit後に外部引き渡し証跡で確認 | not applicable | not applicable | not applicable | not applicable |
 | S90 test lane | committed | exact aggregate semantic test、EAL-040〜043、delegation/Red/review evidence | accepted review target `a084cea911ef61524b9b24a52b7e0b22e182716e` | clean / pushed、local=remote確認済み | not applicable | not applicable | not applicable | not applicable |
-| S90 docs lane | reviewed | provider docs 4件、EAL-044/045、Green/delegation/review evidence | review target `5b5033068cb10af222ce820df9c4eec4a17d69e3`; post-review evidence-only closure commit pending | pending | not applicable | not applicable | not applicable | not applicable |
+| S90 docs lane | committed | provider docs 4件、EAL-044/045、Green/delegation/review evidence | review target `5b5033068cb10af222ce820df9c4eec4a17d69e3`; closure head `e8df32e913d4774ab9d5a970cc3d34886bccfc4e` | clean / pushed / local=remote確認済み | not applicable | not applicable | not applicable | not applicable |
 
 #### Step / Milestone Result Approval
 
@@ -389,6 +389,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S01 | committed | `cc17c25530f8778b52b006b878c780dafeccf57f`; clean / pushed確認済み | EAL-030 fresh PASS | approved | S02 admitted |
 | S02 | committed | `9a5c08a5e33c0458cbdb0db9eb103e7f35513b39`; clean / pushed / local=remote確認済み | EAL-036 fresh PASS、prior major 2件closed | approved | S03 admitted |
 | S03 | committed | `0efe3055860706a9f4b68ae1ddaa767371079b03`; clean / pushed / local=remote確認済み | EAL-038 fresh PASS、minor enum findingをclosure reportで解消 | approved | S90 admitted |
+| S90 | committed | `e8df32e913d4774ab9d5a970cc3d34886bccfc4e`; clean / pushed / local=remote確認済み | EAL-043 code-review PASS、EAL-045 spec-review PASS、prior blocking 2件closed | approved | S95 admitted |
 
 #### 変更したファイル
 - `src/spec_dock/cli.py` - pre-mutation freshness、fresh root copy、installer README allowlist、fallback ignore
@@ -402,11 +403,15 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - `pyproject.toml` - 4 hidden Workbench README package-dataとbroad exclusion解消
 - `setup.py` - exact five-path build/sdist pruneとpre-prune observation
 - `tests/unit/infra/test_init_update.py` - build prune、4-surface inventory/raw-byte、isolated installed-resource tests
+- `tests/unit/infra/test_init_update.py` - S90 aggregate docs semantic assertion
+- `src/spec_dock/assets/spec_dock/docs/{README.md,guide.md,reference_worktree.md}` - Workbench shell/operator境界
+- `src/spec_dock/assets/spec_dock/templates/README.md` - fresh/future shell、README-only tracking、no-backfill境界
 
 #### コミット
 - S01 review target / closure head: `a62ae20d5ad587563bf09de77b1f85d75a64c4ec` / `cc17c25530f8778b52b006b878c780dafeccf57f`
 - S02 review target / closure head: `2917610b04a6bcb59c7b316f47d4281c8844b63a` / `9a5c08a5e33c0458cbdb0db9eb103e7f35513b39`
 - S03 review target / closure head: `59d4fdf64333a537484af233ecef0138c9368aaf` / `0efe3055860706a9f4b68ae1ddaa767371079b03`
+- S90 test review target / docs review target / closure head: `a084cea911ef61524b9b24a52b7e0b22e182716e` / `5b5033068cb10af222ce820df9c4eec4a17d69e3` / `e8df32e913d4774ab9d5a970cc3d34886bccfc4e`
 
 #### メモ
 - `No material implementation decisions beyond the approved plan.`
