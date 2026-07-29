@@ -3574,9 +3574,11 @@ class TestInitUpdate(CliRuntimeHarness):
             interview_text = (discussions_templates_dir / "interview.md").read_text(encoding="utf-8")
             for label in _INTERVIEW_REQUIRED_LABELS:
                 assert label in interview_text
-            assert list(initiative_templates_dir.rglob("README.md")) == []
-            assert list(epic_templates_dir.rglob("README.md")) == []
-            assert list(issue_templates_dir.rglob("README.md")) == []
+            assert list(initiative_templates_dir.rglob("README.md")) == [
+                initiative_templates_dir / ".workbench" / "README.md"
+            ]
+            assert list(epic_templates_dir.rglob("README.md")) == [epic_templates_dir / ".workbench" / "README.md"]
+            assert list(issue_templates_dir.rglob("README.md")) == [issue_templates_dir / ".workbench" / "README.md"]
 
             design_text = (issue_templates_dir / "design.md").read_text(encoding="utf-8")
             assert "artifact_state: awaiting-assurance-compose" in design_text
@@ -3786,6 +3788,216 @@ class TestInitUpdate(CliRuntimeHarness):
                 )
                 assert near_name_result.returncode == 1, near_name_result.stdout + near_name_result.stderr
 
+    def test_workbench_readme_assets_are_byte_identical_and_complete(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        templates_dir = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "templates"
+        assets = tuple(
+            templates_dir / scope / ".workbench" / "README.md" for scope in ("root", "initiative", "epic", "issue")
+        )
+
+        payloads = [asset.read_bytes() for asset in assets]
+
+        assert len(set(payloads)) == 1
+        payload = payloads[0]
+        assert payload.startswith(b"# Workbench\n")
+        assert payload.endswith(b"\n")
+        assert not payload.endswith(b"\n\n")
+        assert b"\r" not in payload
+        text = payload.decode("utf-8")
+        for fragment in (
+            "worktree-local",
+            "non-canonical",
+            "Git ignore は security boundary",
+            "./spec-dock/scripts/spec-dock artifact import file ...",
+            "./spec-dock/scripts/spec-dock workbench copy --scope <full-id> --to <linked-worktree>",
+            "canonical adoption",
+            "automatic hook",
+        ):
+            assert fragment in text
+
+    def test_fresh_init_creates_only_tracked_root_workbench_readme(self) -> None:
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self._run_git(target, ["init"])
+            assert main(["init", str(target)]) == 0
+
+            provider = (
+                Path(__file__).resolve().parents[3]
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "spec_dock"
+                / "templates"
+                / "root"
+                / ".workbench"
+                / "README.md"
+            )
+            readme = target / "spec-dock" / ".workbench" / "README.md"
+            assert readme.read_bytes() == provider.read_bytes()
+            assert not (readme.parent / ".gitkeep").exists()
+
+            payloads = (
+                readme.parent / "draft.txt",
+                readme.parent / "nested" / "note.md",
+            )
+            for payload in payloads:
+                payload.parent.mkdir(parents=True, exist_ok=True)
+                payload.write_text("scratch\n", encoding="utf-8")
+
+            readme_ignore = self._run_git(
+                target,
+                ["check-ignore", "--no-index", readme.relative_to(target).as_posix()],
+                check=False,
+            )
+            assert readme_ignore.returncode == 1, readme_ignore.stdout + readme_ignore.stderr
+            for payload in payloads:
+                ignored = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", payload.relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert ignored.returncode == 0, ignored.stdout + ignored.stderr
+            status = self._run_git(target, ["status", "--short", "--untracked-files=all"]).stdout
+            assert "?? spec-dock/.workbench/README.md" in status
+            assert "draft.txt" not in status
+            assert "nested/note.md" not in status
+
+    def test_update_and_force_init_do_not_backfill_workbench_readme(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            readme = target / "spec-dock" / ".workbench" / "README.md"
+            readme.unlink()
+
+            assert main(["update", str(target)]) == 0
+            assert not readme.exists()
+            assert main(["init", str(target), "--force"]) == 0
+            assert not readme.exists()
+
+            readme.parent.mkdir(exist_ok=True)
+            readme.write_bytes(b"user-owned\r\n")
+            before_mtime = readme.lstat().st_mtime_ns
+            assert main(["update", str(target)]) == 0
+            assert main(["init", str(target), "--force"]) == 0
+            assert readme.read_bytes() == b"user-owned\r\n"
+            assert readme.lstat().st_mtime_ns == before_mtime
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            specdock_dir = target / "spec-dock"
+            specdock_dir.mkdir()
+
+            assert main(["init", str(target), "--force"]) == 0
+            assert not (specdock_dir / ".workbench" / "README.md").exists()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            specdock_entry = target / "spec-dock"
+            specdock_entry.write_bytes(b"existing-file\r\n")
+            before_mtime = specdock_entry.lstat().st_mtime_ns
+
+            assert main(["init", str(target), "--force"]) == 1
+            assert specdock_entry.is_file()
+            assert specdock_entry.read_bytes() == b"existing-file\r\n"
+            assert specdock_entry.lstat().st_mtime_ns == before_mtime
+            assert not (specdock_entry / ".workbench" / "README.md").exists()
+
+        with tempfile.TemporaryDirectory() as capability_tmp:
+            symlink_supported = self._can_create_symlink(Path(capability_tmp))
+        if symlink_supported:
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                specdock_entry = target / "spec-dock"
+                specdock_entry.symlink_to("missing-spec-dock")
+                before_target = specdock_entry.readlink()
+                before_mtime = specdock_entry.lstat().st_mtime_ns
+
+                assert main(["init", str(target), "--force"]) == 1
+                assert specdock_entry.is_symlink()
+                assert specdock_entry.readlink() == before_target
+                assert specdock_entry.lstat().st_mtime_ns == before_mtime
+                assert not (specdock_entry / ".workbench" / "README.md").exists()
+
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                symlink_target = target / "existing-spec-dock"
+                symlink_target.mkdir()
+                specdock_entry = target / "spec-dock"
+                specdock_entry.symlink_to(symlink_target, target_is_directory=True)
+                before_target = specdock_entry.readlink()
+                before_mtime = specdock_entry.lstat().st_mtime_ns
+
+                assert main(["init", str(target), "--force"]) == 0
+                assert specdock_entry.is_symlink()
+                assert specdock_entry.readlink() == before_target
+                assert specdock_entry.lstat().st_mtime_ns == before_mtime
+                assert not (specdock_entry / ".workbench" / "README.md").exists()
+
+    def test_workbench_gitignore_tracks_only_top_level_readme(self) -> None:
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._run_git(target, ["init"])
+            self._run_git(target, ["config", "core.ignorecase", "false"])
+            workbench = target / "spec-dock" / ".workbench"
+            probes = {
+                "tracked": workbench / "README.md",
+                "nested": workbench / "nested" / "README.md",
+                "case": workbench / "readme.md",
+                "backup": workbench / "README.md.bak",
+                "payload": workbench / "payload.bin",
+                "near": target / "spec-dock" / ".workbench-notes" / "file.md",
+                "descendant": (
+                    target / "spec-dock" / "initiatives" / "directory-probe" / ".workbench" / "README.md" / "child.txt"
+                ),
+            }
+            probes["tracked"].unlink()
+            for label, path in probes.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"{label}\n", encoding="utf-8")
+            probes["tracked"].unlink()
+            probes["tracked"].write_text("tracked\n", encoding="utf-8")
+
+            for label in ("tracked", "near"):
+                result = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", probes[label].relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert result.returncode == 1, f"{label}: {result.stdout}{result.stderr}"
+            for label in ("nested", "case", "backup", "payload", "descendant"):
+                result = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", probes[label].relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert result.returncode == 0, f"{label}: {result.stdout}{result.stderr}"
+
+            if self._can_create_symlink(target):
+                symlink_target = target / "symlink-target.txt"
+                symlink_target.write_text("target\n", encoding="utf-8")
+                symlink_readme = target / "spec-dock" / "initiatives" / "symlink-probe" / ".workbench" / "README.md"
+                symlink_readme.parent.mkdir(parents=True)
+                symlink_readme.symlink_to(symlink_target)
+                result = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", symlink_readme.relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert result.returncode == 1, result.stdout + result.stderr
+
+            status = self._run_git(target, ["status", "--short", "--untracked-files=all"]).stdout
+            assert "spec-dock/.workbench/README.md" in status
+            assert "spec-dock/.workbench-notes/file.md" in status
+            for ignored_name in ("nested/README.md", "readme.md", "README.md.bak", "payload.bin", "child.txt"):
+                assert ignored_name not in status
+
     def test_init_gitignore_fallback_ignores_exact_workbench_directories(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -3801,7 +4013,11 @@ class TestInitUpdate(CliRuntimeHarness):
 
             assert code == 0, stderr
             gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
-            assert ".workbench/" in gitignore.splitlines()
+            assert tuple(line for line in gitignore.splitlines() if ".workbench" in line) == (
+                "**/.workbench/*",
+                "!**/.workbench/README.md",
+                "**/.workbench/README.md/**",
+            )
 
     def test_update_preserves_opaque_workbenches_while_refreshing_managed_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -39155,7 +39371,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             )
             (real_issue / "requirement.md").write_text("scratch requirement\n", encoding="utf-8")
             workbench_link = specdock_dir / ".workbench" / "issue-link"
-            workbench_link.parent.mkdir()
+            workbench_link.parent.mkdir(exist_ok=True)
             workbench_link.symlink_to(real_issue, target_is_directory=True)
 
             issue_link = active_dir / "issue"

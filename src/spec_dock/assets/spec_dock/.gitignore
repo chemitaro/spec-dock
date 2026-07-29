@@ -3,8 +3,10 @@
 .agent/
 # legacy v2 name (kept ignored for safe upgrades)
 .work/
-# local disposable work areas (reserved exact directory name at any scope)
-.workbench/
+# local disposable work areas (README is the only tracking-eligible path)
+**/.workbench/*
+!**/.workbench/README.md
+**/.workbench/README.md/**
 active/
 /adrs/
 tree-all.puml
