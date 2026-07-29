@@ -23,6 +23,11 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = ["--strict-markers"]
+markers = [
+    "fast: default provider test lane used during development and pull requests",
+    "full_regression: long-running provider regression excluded from the default lane",
+]
 
 [tool.ruff]
 target-version = "py310"
