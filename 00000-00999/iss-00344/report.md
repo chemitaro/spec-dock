@@ -56,6 +56,7 @@ Disposition ごとの必須証跡:
 | D-005 | resolved | scope | ChatGPT requirement third review F-007 | root と node の共通 README が `workbench copy` の root support を示唆する | root route 追加; guidance 分離; helper scope 明示 | tracked README は root/node とも checkout、helper は Initiative/Epic/Issue の node-scoped ignored payload のみ、root ignored payload は対象外と固定 | existing CLI と親 Epic の compatibility ownership に一致する | applied | `artifacts/20260728t162105z-chatgpt-output-chatgpt-issue-00344-requirement-third-review.md`; `requirement.md#I344-RQ-007`; `requirement.md#AC-344-007C` | fresh re-review |
 | D-006 | resolved | deviation | user | 通常のSub-agent reviewerではなく、各stepの前後でChatGPT-Useを全面活用する実行方法が指定された | 通常Sub-agent reviewer; ChatGPT advisoryだけ追加; reviewer責務をChatGPT-Useで実行 | reviewer名を責務契約として維持し、push済みexact commitをChatGPT-UseがJSON reviewするoverlayをplanへ追加する | 実装scopeとclosure contractを変えず、ユーザー指定の高深度reviewと過剰実装抑制を両立できる | promoted_to_plan | `plan.md#11-chatgpt-first-execution-overlay`; user instruction on 2026-07-29 | F-001〜F-004を限定修正し、新exact commitへfresh reviewする |
 | D-007 | resolved | scope | user / ChatGPT-Use delivery-boundary analysis | ユーザーがIssue 344の全実装完了とmerge可能なPRを要求した一方、旧planはdogfood projection/default lane/PRをIssue 346へ一括deferしていた | 旧deferを維持; Issue 346を前倒し; Issue 344へ自身のrelease closureだけを移す | Issue 344はchanged managed assetsのprovider-first projection、default PR lane、ready PR、exact-head observationを所有し、candidate wheel/integrated dogfood/opt-in full regression/Epic-wide review/残余Epic PRはIssue 346へ残す | default suiteの既知mirror parity failureをIssue 344自身で閉じつつ、generic importとEpic integrationのvertical ownershipを維持できる | promoted_to_plan | `artifacts/20260729t052200z-chatgpt-output-issue-344-delivery-boundary-amendment-analysis.md`; `requirement.md#I344-RQ-011`; `design.md#DES-344-010`; `plan.md#s95--provider-first-dogfood-projection--default-pr-lane`; parent `../../plan.md#11-issue-344-delivery-amendment` | canonical amendmentをcommit/pushし、fresh ChatGPT-Use `spec-reviewer`責務reviewで承認する |
+| D-008 | resolved | test-strategy | dev-coder / parent orchestrator | S02 baselineのfull CLI laneで8 failure。S01後はfuture nodeに`.workbench/README.md`が存在するため、旧fixtureの`.workbench`不存在前提がsetup段階で失敗した | 即時STOP; production変更; assertion緩和; allowed test内のfixture修復 | missing/empty/malformed Workbenchをtemporary fixture内で明示的に再構成し、既存error shape・atomicity・source-wins assertionを維持したtest-only repairを採用する | failureはproduction path到達前のstale fixtureで、S01のapproved shell contractとS02の既存compatibility contractを両立する最小修正である | applied | `tests/cli_runtime/test_workbench.py`; baseline `8 passed / 8 failed`; repaired full lane `18 passed`; parent rerun `18 passed` | production failureが現れた場合はfixture repairを戻しplan/designへ戻る。現時点では追加follow-upなし |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -230,6 +231,9 @@ git diff --check
 | S01 | 赤フェーズ（Red） | asset/root/node未生成とCRLF rewriteを対象assertionで検出 | 4 asset `FileNotFoundError`、fresh root README missing、future 3 nodeのactual `[]`、CRLF `b'first\nsecond\n' != b'first\r\nsecond\r\n'` | production変更前のexact pytest nodes | pass | collection error、fixture不足、policy skipではない |
 | S01 | 緑フェーズ（Green） | TC-344-001〜005のfocused closure | scaffolder 3、installer 4、new-doc 34、public lifecycle 2、workbench/readme 9がPASS | 上記exact commands | pass | selected heavy nodesだけ`--run-full-regression`でde-skip |
 | S01 | リファクタリング（Refactor） | README/path-specific abstractionを追加しない | productionは既存`_copy_file`、generic template recursion、render後bytes比較を利用。test helperだけ局所追加 | diff inspection、Ruff、format、diff-check | pass | node-kind dispatch、新frameworkなし |
+| S02 | baseline / characterization | production変更前のopacity/copy contractを確認 | unit `6 passed`。ordinary CLIはpolicyで`16 skipped`。full CLIは`8 passed / 8 failed`で、8件すべてがS01後のREADME存在によるfixture setup failure | `uv run pytest tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py`; `uv run pytest [--run-full-regression] tests/cli_runtime/test_workbench.py` | pass with bounded fixture repair | D-008としてtest defectを分類。production failureではない |
+| S02 | 緑フェーズ（Green） | TC-344-006/007A/B/C/009のtest-only closure | mixed opacity、linked checkout/manual payload、identical no-diff、divergent source-winsがGreen。full CLI `18 passed` | new/extended exact nodes、full two suites、reusable/root rejection regressions | pass | production変更なし |
+| S02 | リファクタリング（Refactor） | productionにREADME-aware branchや新excludeを追加しない | 2 allowed test filesだけを変更。helperはkeyword-only/default-preserving、stale fixtureは期待値を緩めず再構成 | diff inspection、Ruff、format、diff-check | pass | inode/mtime/raw whole-repo equalityを追加していない |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
@@ -237,11 +241,14 @@ git diff --check
 | S01 | pre-existing rootのregular file、dangling symlink、directory symlink証跡不足 | parent implementation review | bounded test-only follow-upでentry type、bytes/link target、mtime、README非生成を追加 | TC-344-001 | no | affected exact node 1 passed |
 | S01 | existing Workbench snapshotにempty directory/symlinkが不足 | parent implementation review | 4 scope fixtureへempty directoryとsupported環境のsymlinkを追加 | TC-344-005 | no | affected exact node 1 passed |
 | S01 | default fast suiteでdogfood mirror parity 2件がFAIL | parent verification | S01では修正せずdeferred。provider-firstかつdogfood projectionはIssue 346 ownership | deferred Issue 346 | no | 670 passed、2042 skipped、2 failed。失敗pathは`spec-dock/.gitignore`と`spec-dock/templates/**` |
+| S02 | S01後に既存CLI fixtureの`.workbench`不存在前提がstale | dev-coder baseline / parent disposition | missing/empty/malformed状態をtemporary fixture内で明示し、error/atomicity assertionは維持 | TC-344-009 | no | D-008; repaired full CLI `18 passed` |
+| S02 | ordinary CLI suiteが高速lane policyで全skip | test policy observation | required evidenceは`--run-full-regression`で取得し、ordinary skipも別記録 | TC-344-007A/B/C/009 | no | ordinary `18 skipped`; full `18 passed` |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
 | S01 | TC-344-001、002A/B、003、004、005 | focused tests、fresh review、candidate commit/push、evidence-only closure commit、clean、Result Approval | focused tests完了、candidate `a62ae20d5ad587563bf09de77b1f85d75a64c4ec` push済み、fresh ChatGPT-Use review `PASS` / finding 0。EAL-030と本reportをevidence-only closure commitへ含める | pass | closure commit後のactual SHAとclean確認は自己参照を避けて外部引き渡し証跡へ記録する |
+| S02 | TC-344-006、007A/B/C、009 | test-only diff、full two suites、fresh review、candidate/evidence commits、clean、Result Approval | implementationと親verification完了。candidate commit/pushとfresh review待ち | pending | production変更なし。review PASS後にclosureを確定する |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -252,6 +259,11 @@ git diff --check
 | TC-344-003 | S01 | yes | red-required | 4 asset missing | asset parity + node/root output | pass | common SHA-256 `58300883820e1dfd173ab90a8205dcc44f83f29313b1bca84ad1955733cd8490` |
 | TC-344-004 | S01 | yes | red-required | READMEもignore | real Git matrix | pass | regular/symlink/directory/nested/case/backup/payload/near-name |
 | TC-344-005 | S01 | yes | red-required | all-trigger snapshot test missing | exact installer + lifecycle nodes | pass | 4 scopeのentry/type/bytes/link target/mtime不変、新childだけ生成 |
+| TC-344-006 | S02 | yes | characterization-first | unit baseline `6 passed`; mixed fixture不足 | unit opacity + CLI mixed opacity | pass pending review | README/fake metadata/ADR/dependency/binary/invalid UTF-8、active stable fields |
+| TC-344-007A | S02 | yes | red-required connection | checkout/manual copy接続testなし | linked worktree identical README/payload test | pass pending review | checkout直後targetはREADMEだけ、copy後payload追加、tracked diffなし |
+| TC-344-007B | S02 | yes | characterization-first | low-level source-winsのみ | public CLI divergent README test | pass pending review | target after hashがsource beforeと一致 |
+| TC-344-007C | S02 | yes | covered-existing | existing selector rejection | unpublished/root options + invalid scope nodes | pass pending review | 5 collected cases |
+| TC-344-009 | S02 | yes | covered-existing + characterization | full CLI baseline fixture 8 failure | repaired full CLI + reusable regressions | pass pending review | full CLI 18、reusable 6、root rejection 5 |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -264,6 +276,11 @@ git diff --check
 | TC-344-003 | S01 | EVD-003 | pass | 4 asset/content/output parity |
 | TC-344-004 | S01 | EVD-004 | pass | real Git pathname matrix |
 | TC-344-005 | S01 | EVD-001/EVD-002 | pass | all-trigger preservation |
+| TC-344-006 | S02 | EVD-005 | pass pending review | mixed unit/CLI semantic opacity |
+| TC-344-007A | S02 | EVD-006 | pass pending review | checkout/manual copy/identical no-diff |
+| TC-344-007B | S02 | EVD-006 | pass pending review | divergent README source-wins |
+| TC-344-007C | S02 | EVD-006 | pass pending review | root/unpublished selector rejection |
+| TC-344-009 | S02 | EVD-006 | pass pending review | full existing copy suite and failure/atomicity |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -287,17 +304,19 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | shipped scaffold、installer、generic runtime primitive、real Gitを跨ぐbounded implementation | dev-coder | approved plan S01とEAL-029の採用部分 | `spec-dock/active/issue/{requirement,design,plan}.md`、provider source | S01 allowed pathsだけ。4 README assets、`cli.py`、provider `.gitignore`、generic scaffolder、指定tests | create_node/workbench/fs adapters、generic import、root copy route、package/build/docs/dogfood、canonical docs直接編集 | Red assertion failure、focused exact nodes、real Git matrix、Ruff check/format、`git diff --check`、allowed-path diff | allowed path外変更、canonical gap、unexpected Red、S01 test skip、existing Workbench mutation、S03/Issue 345/346責務が必要 | worker summary、changed files、Red/Green/refactor、commands/results、risks、EVD-001〜004 summary、Ledger Noteまたはno-decision declaration | pass: bounded implementationとtest-only follow-up完了。親統合とfresh ChatGPT-Use review `PASS`を確認 |
-| S02 | delegated | semantic opacity、Git checkout、manual copy、README source-winsをproduction変更なしで一続きに固定するbounded test work | dev-coder | approved plan S02とEAL-034の採用部分 | `spec-dock/active/issue/{requirement,design,plan}.md`、S01 evidence、2 allowed tests、read-only copy/opacity source | `tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py`、`tests/cli_runtime/test_workbench.py`のみ | production、docs、package、dogfood、generic import、canonical docs直接編集、README filter/root route/new exclusion | baseline 2 suites、new/extended exact nodes、full 2 suites、reusable selected regressions、root rejection、`git diff --check`、allowed-path diff | production変更が必要、unexpected regression、S01 contract不成立、allowed path外変更、over-specified inode/mtime/raw snapshot | worker summary、characterization/Red/Green分類、inventories/hashes/Git observations、commands/results、risks、EVD-005/006 summary、Ledger Noteまたはno-decision declaration | pending worker return |
+| S02 | delegated | semantic opacity、Git checkout、manual copy、README source-winsをproduction変更なしで一続きに固定するbounded test work | dev-coder | approved plan S02とEAL-034の採用部分 | `spec-dock/active/issue/{requirement,design,plan}.md`、S01 evidence、2 allowed tests、read-only copy/opacity source | `tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py`、`tests/cli_runtime/test_workbench.py`のみ | production、docs、package、dogfood、generic import、canonical docs直接編集、README filter/root route/new exclusion | baseline 2 suites、new/extended exact nodes、full 2 suites、reusable selected regressions、root rejection、`git diff --check`、allowed-path diff | production変更が必要、unexpected regression、S01 contract不成立、allowed path外変更、over-specified inode/mtime/raw snapshot | worker summary、characterization/Red/Green分類、inventories/hashes/Git observations、commands/results、risks、EVD-005/006 summary、Ledger Noteまたはno-decision declaration | pass: worker returnを親が検証しreview candidateへ統合 |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder | fresh-only root/node Workbench shell、README-only ignore、generic byte-stable exact-copyを実装。親findingでroot/workbench symlink・empty directory coverageをtest-only follow-up | provider production 7 path、tests 4 path | focused installer/scaffolder/new-doc/lifecycle、Ruff、format、diff-check pass | ChatGPT-Use fresh `code-reviewer` PASS、finding 0 | default fast suiteのdogfood mirror parity 2件はIssue 346へdeferred | accepted; proceed to evidence-only closure commit |
+| S02 | dev-coder | mixed semantic opacity、linked checkout/manual payload copy、identical README no-diff、divergent README source-winsをtest-onlyで固定し、S01後にstaleとなったmissing/empty/malformed fixtureを契約維持のまま修復 | `tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py`; `tests/cli_runtime/test_workbench.py` | unit `6 passed`; ordinary CLI `18 skipped`（policy）; full CLI `18 passed`; reusable selected `6 passed`; root rejection `5 passed`; Ruff/format/diff-check pass。親再実行もunit `6 passed` / full CLI `18 passed` / Ruff/format/diff-check pass | pending fresh ChatGPT-Use `code-reviewer` responsibility review | ordinary CLIは高速lane policyでskipされるためfull検証に`--run-full-regression`が必要 | accepted into review candidate |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | not applicable: dev-coder delegation succeeded | risk accepted: no | none | none | none | delegated worker evidenceを親が再検証 | fresh ChatGPT-Use code-reviewer責務review required | parent implementation exception未使用 |
+| S02 | not applicable: dev-coder delegation succeeded | risk accepted: no | none | none | none | delegated worker evidenceを親がunit/full CLI/Ruff/format/diff-checkで再検証 | fresh ChatGPT-Use code-reviewer責務review required | parent implementation exception未使用 |
 
 #### グレード別専門家証跡ゲート（Grade Specialist Evidence Gate）
 Lite は specialist / fallback evidence を必須化しないが、not applicable / skip reason を記録する。Standard は specialist evidence、skip reason、または manual fallback を記録する。Strict / Critical は specialist evidence または明示的な manual fallback を記録し、skip reason だけでは readiness evidence にしない。
@@ -313,11 +332,13 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S01 | implementation candidate review | code-reviewer | fresh | passed | no | proceed to evidence-only closure commit | ChatGPT-Use reviewed exact candidate `a62ae20d5ad587563bf09de77b1f85d75a64c4ec`; finding 0、scope creepなし、不要な抽象化なし。review backendはChatGPT-Use、role名は責務契約 |
 | delivery amendment | Issue-local PR boundary review | spec-reviewer | fresh | failed | no | bounded fix and re-review | ChatGPT-Use reviewed exact commit `59737280c085977d714797709ef0d9a6ade4412d`; major 3件をEAL-032として全採用。新SHAへのre-review前はS02 admission不可 |
 | delivery amendment re-review | Issue-local PR boundary review | spec-reviewer | fresh | passed | no | approve amended plan and admit S02 after assurance verify | ChatGPT-Use reviewed exact commit `7ae8a957b67805294d6716b19a18e2b45808c3dc`; finding 0、scope expansionなし |
+| S02 | implementation candidate review | code-reviewer | pending | blocked | no | candidate commit/push後にreview | test-only diff、fixture repair classification、TC-344-006/007A/B/C/009をexact pushed SHAでreviewする |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | provider implementation、S01 tests、pre-review report | review target `a62ae20d5ad587563bf09de77b1f85d75a64c4ec`; EAL-030と本reportはpost-review evidence-only closure commit | closure commit後に外部引き渡し証跡で確認 | not applicable | not applicable | not applicable | not applicable |
+| S02 | review-candidate | test-only implementation、D-008、delegation/verification evidence | candidate commit作成後にexact SHAをreview Artifact/EALへ記録 | candidate push後に確認 | not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
 - `src/spec_dock/cli.py` - pre-mutation freshness、fresh root copy、installer README allowlist、fallback ignore
