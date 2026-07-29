@@ -1,0 +1,1 @@
+{"reviewer":"qa-reviewer","review_status":"pass","reviewed_commit":"332ffcff82d10342900b24605346a89d3f5dd583","findings":[],"coverage":{"required":["TC-344-001..011","EVD-001..013"],"unverified":[]},"independence":{"fresh_context":true,"other_final_verdicts_received":false},"residual_risks":[],"next_action":"proceed"}
