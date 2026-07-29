@@ -175,3 +175,16 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ## 省略/例外メモ (必須)
 - S90はfresh spec-reviewer passed/promote後、`672cb23e`でcommit/push/clean済み。S99 QA/code/spec r2もpassed/promoteし、C319-12はfull pass。S100前のterminal項目とEpic completionはself-passしない。
 - EAL-022だけがdeferred。S100 Phase Aは完了したがexternal observationとterminal closureは未完了であり、no-merge契約を維持する。
+
+---
+
+## 2026-07-28 Workbench / Artifact import 再計画のrouting
+
+- ユーザー確認により、今後の中心要件は次の三点へ再定義された。
+  1. fresh rootおよび今後作成するInitiative / Epic / Issueへのoptional Workbench shell自動生成。
+  2. Workbench内外、repository内外の明示single fileをroot / Initiative / Epic / Issue Artifactへimportするgeneric command。
+  3. `workbench copy`はlinked worktree間で必要な場合だけ手動実行するone-shot補助機能として維持。
+- ChatGPT ProへGitHub-synced commit `1aa5fd8e7f3cf899bfefa6e1cedb864c2de3dba0`を共有し、Markdown authoring pack ZIPを取得した。修正版ZIPはSpecDock review / stage / `epic-issue-candidates` validationを通過した。詳細は`artifacts/20260728t080013z-research-chatgpt-pro-epic-replanning-zip-evidence.md`に記録する。
+- fresh requirement reviewでは、この新機能scopeが親Initiative `init-local-00003`の「operator-facing feature expansionは別Initiativeへrouteする」という明示契約と衝突すると判定された。
+- このため、旧requirement / design / planはhistorical contractとして保持し、新しい実行契約はfeature expansion authorityを持つ`init-local-00002`配下の後継Epic `epic-00343`（GitHub #343）で再構成する。
+- `epic-00312`の旧Issue、PR、未完了terminal deliveryは、新Epicの完了証拠へ自動流用しない。新Epicのrequirement / design / planが各fresh reviewを通過し、人間がIssue sliceを承認するまで新Issue nodeを作成しない。

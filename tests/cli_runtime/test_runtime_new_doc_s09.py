@@ -2,6 +2,7 @@ import contextlib
 import importlib
 from pathlib import Path
 import re
+import shutil
 import sys
 import tempfile
 import threading
@@ -1578,6 +1579,83 @@ class TestRuntimeNewDocS09:
             assert result.node.kind == "issue"
             assert result.node.parent_id == "epic-local-00001"
             assert (result.node.path / "README.md").exists()
+
+    def test_new_node_workbench_readme_matrix(self) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_create_node,
+            app_ports,
+            _new_commands,
+            _infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        template_scaffolder = importlib.import_module("spec_dock_runtime.infra.template_scaffolder")
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            provider_templates = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "templates"
+            )
+            for kind in ("initiative", "epic", "issue"):
+                shutil.copytree(provider_templates / kind, specdock_dir / "templates" / kind)
+                rules_dir = specdock_dir / "docs" / "rules" / kind
+                rules_dir.mkdir(parents=True)
+                for name in (
+                    ("epics.md", "artifacts.md")
+                    if kind == "initiative"
+                    else ("issues.md", "artifacts.md")
+                    if kind == "epic"
+                    else ("artifacts.md",)
+                ):
+                    (rules_dir / name).write_text(f"{kind} {name}\n", encoding="utf-8")
+
+            node_repo = _StubNodeRepo([])
+            ports = app_ports.Ports(
+                node_reader=_DummyNodeReader(),
+                node_repo=node_repo,
+                template_scaffolder=template_scaffolder,
+                issue_gateway=_StubIssueGateway(),
+                git_gateway=_StubGitGateway(),
+                clock=_StubClock(),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+            )
+            parent_id = None
+            results = []
+            for kind, issue_number, create_fn in (
+                ("initiative", 1, app_create_node.create_initiative),
+                ("epic", 2, app_create_node.create_epic),
+                ("issue", 3, app_create_node.create_issue),
+            ):
+                request = app_contracts.CreateNodeRequest(
+                    title=f"{kind} title",
+                    slug=None,
+                    parent_id=parent_id,
+                    github_mode="link_existing",
+                    github_issue_number=issue_number,
+                )
+                graph = app_create_node.load_graph(ports, validate=False)
+                plan = app_create_node.plan_node_creation(
+                    request,
+                    graph,
+                    kind=kind,
+                    specdock_dir=specdock_dir,
+                    today="2026-03-12",
+                    current_repo_slug="example/repo",
+                )
+                expected_readme = plan.dest_dir / ".workbench" / "README.md"
+                assert plan.planned_paths.count(expected_readme) == 1
+
+                result = create_fn(request, ports)
+
+                assert result.created_paths.count(expected_readme) == 1
+                assert expected_readme.is_file()
+                assert not (expected_readme.parent / ".gitkeep").exists()
+                results.append(expected_readme.read_bytes())
+                parent_id = result.node.id
+
+            assert len(set(results)) == 1
 
     def test_new_artifact_renderer_text_regression(self) -> None:
         (
