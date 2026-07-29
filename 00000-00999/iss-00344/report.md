@@ -97,6 +97,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-027 | adopted | ChatGPT-Use fresh plan amendment review (`FAIL`, advisory) | `plan.md`, `report.md` | commit `41073c582575d6af70a60a95a56203a63b07064d`をGitHub同期後にreview。F-001〜F-003をblocking/majorとして採用し、candidate review commit→fresh review→evidence-only closure commitの非循環順序、S90のrole分離、blocking/major 0のPASS条件へ限定修正した。F-004も採用し、旧PASSをstaleとしてcurrent readinessをblockedへ同期した | `artifacts/20260729t032949z-chatgpt-output-chatgpt-first-plan-review-41073c58.md`; SHA-256 `8715545fe690431dc5d9e1dc43023283a8d07e75a7e9979cff39ae8455f4f4c0`; reviewed commit `41073c582575d6af70a60a95a56203a63b07064d` | 修正をcommit/pushし、新exact SHAへfresh ChatGPT-Use `spec-reviewer`責務review |
 | EAL-028 | adopted | ChatGPT-Use fresh plan amendment re-review (`PASS`, advisory) | `plan.md`, `report.md` | GitHub同期後のexact commit `a0b99765f7fac5ad384f4f81c85b50990f017fc9`をreviewし、finding 0件。F-001〜F-004の解消、非循環SHA境界、S90 role分離、blocking/major 0のPASS条件、prior PASS stale/current blocked同期、機能scopeとIssue 345/346境界不変を確認した | `artifacts/20260729t034457z-chatgpt-output-chatgpt-first-plan-rereview-a0b99765.md`; SHA-256 `9abadebc2beed093c34e399527ba3f57711154123cba1c4dbfbdc729721283f3`; reviewed commit `a0b99765f7fac5ad384f4f81c85b50990f017fc9` | planをapprovedへ戻し、assurance再分類、S01 admission |
 | EAL-029 | partially_adopted | ChatGPT-Use S01 implementation/test concretization (`advisory`) | S01 implementation handoff | GitHub同期済みexact commit `f1446111ac52c6cfc1783f513ea679dbd72ab1ae`から、pre-mutation freshness、4 canonical assets、installer prune、provider/fallback 3-rule ignore、render後bytes同一時のpath-agnostic exact-copy、既存node recursion利用、Red/Green/verification観点を採用した。提示された個別test名は新規候補であり、10 caseをそのまま必須本数にはせず、approved TC-344-001/002A/B/003/004/005を最小本数で閉じる。Issue 346所有のbare full regression、package E2E、PR deliveryは採用しない | `artifacts/20260729t042156z-chatgpt-output-s01-implementation-test-concretization-f1446111.md`; SHA-256 `4830ec0323a5f87667ce0bcc35fa13974d4efcd97fe7b3bfa33e60c3d2e1e920`; source commit `f1446111ac52c6cfc1783f513ea679dbd72ab1ae` | Artifactとapproved S01 contractを`dev-coder`へ共有し、allowed paths内でRed→Green→focused verificationを実行する |
+| EAL-030 | adopted | ChatGPT-Use S01 implementation review (`PASS`, advisory) | S01 review gate | GitHub同期済みexact candidate commit `a62ae20d5ad587563bf09de77b1f85d75a64c4ec`を`code-reviewer`責務でreviewし、finding 0件、scope creepなし、不要な抽象化なし、`next_action=proceed`を確認した。default fast suiteのmirror parity 2 failureはS01 defectではなくIssue 346へのdeferred integration factとして採用した | `artifacts/20260729t045553z-chatgpt-output-s01-implementation-code-review-a62ae20d.md`; SHA-256 `5bda9e6c613e7e4b6796e90569b2d84fdca019d0d1da8c8fadc52f4d12ec1f56`; reviewed commit `a62ae20d5ad587563bf09de77b1f85d75a64c4ec` | evidence-only closure commit、clean確認、S01 Result Approval |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -164,7 +165,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装記録（セッションログ） (必須)
 
-### セッションログ（2026-07-29 12:51 - 13:35）
+### セッションログ（2026-07-29 12:51 - 13:55）
 
 #### 対象
 - Step: S01
@@ -177,6 +178,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - GitHub同期済みcommit `f1446111ac52c6cfc1783f513ea679dbd72ab1ae`をChatGPT-Useで具体化し、EAL-029として採用境界を固定した。
 - `dev-coder`へS01 allowed pathsだけを委任し、4 README assets、fresh-only root copy、installer prune allowlist、provider/fallback ignore、generic byte-stable exact-copyと最小testsを実装した。
 - 親が差分、allowed paths、focused tests、Ruff、default fast suiteを再確認した。default fast suiteの2 failureは、S01で禁止されたdogfood projectionがprovider assetsへ未追随である既知のdeferred差分であり、Issue 346へ残す。
+- candidate commit `a62ae20d5ad587563bf09de77b1f85d75a64c4ec`をpushし、ChatGPT-Useのfresh `code-reviewer`責務reviewでfinding 0件の`PASS`を得た。生のJSON回答をEAL-030のIssue Artifactとして保存した。
 
 #### 実行コマンド / 結果
 ```bash
@@ -234,7 +236,7 @@ git diff --check
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | TC-344-001、002A/B、003、004、005 | focused tests、fresh review、candidate commit/push、evidence-only closure commit、clean、Result Approval | implementation/focused testsは完了。review candidate commit前 | blocked | ChatGPT-Use fresh `code-reviewer`責務review待ち |
+| S01 | TC-344-001、002A/B、003、004、005 | focused tests、fresh review、candidate commit/push、evidence-only closure commit、clean、Result Approval | focused tests完了、candidate `a62ae20d5ad587563bf09de77b1f85d75a64c4ec` push済み、fresh ChatGPT-Use review `PASS` / finding 0。EAL-030と本reportをevidence-only closure commitへ含める | pass | closure commit後のactual SHAとclean確認は自己参照を避けて外部引き渡し証跡へ記録する |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -261,7 +263,7 @@ git diff --check
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none | TC-344-001〜005 | plan記載のexact test nodes | TC-344-001〜005 | approved closureの変更なし | no | yes: S01 candidate commitへfresh code review |
+| none | TC-344-001〜005 | plan記載のexact test nodes | TC-344-001〜005 | approved closureの変更なし | no | no: candidate `a62ae20d5ad587563bf09de77b1f85d75a64c4ec`へのfresh code reviewがPASS |
 
 #### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 `workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
@@ -272,19 +274,19 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | 許可元（authorization source） | リポジトリ / worktree（repo/worktree） | 対象課題（active issue） | セッション（session） | 指名ロール（named roles） | 境界（boundary） | 期限 / 無効化条件（expires / invalidation condition） | 拒否 / 利用不可 / host conflict 理由（denied / unavailable / host conflict reason） | 次アクション（next action） |
 |---|---|---|---|---|---|---|---|---|
-| user request to execute Issue 344 with ChatGPT-First authoring/review | `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/692d/spec-dock` | iss-00344 | current session | dev-coder; doc-writer (S90 only); ChatGPT-Use executing code-reviewer / spec-reviewer / qa-reviewer responsibility contracts | active repo/worktree、active Issue、current session、approved step scope。merge、Issue 345/346、scope expansionは含めない | Issue 344 execution終了 / session end / scope change / user revocation | none | S01 review candidate commitをpushし、ChatGPT-Use fresh code reviewを行う |
+| user request to execute Issue 344 with ChatGPT-First authoring/review | `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/692d/spec-dock` | iss-00344 | current session | dev-coder; doc-writer (S90 only); ChatGPT-Use executing code-reviewer / spec-reviewer / qa-reviewer responsibility contracts | active repo/worktree、active Issue、current session、approved step scope。merge、Issue 345/346、scope expansionは含めない | Issue 344 execution終了 / session end / scope change / user revocation | none | S01 evidence-only closure commit、clean確認、Result Approval |
 
 #### 実装委任ゲート（Implementation Delegation Gate）
 `workflow_issue.md` is the policy source for delegation, reviewer gates, waiver, unavailable, denied, and host-conflict semantics. This report records observed evidence only.
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated | shipped scaffold、installer、generic runtime primitive、real Gitを跨ぐbounded implementation | dev-coder | approved plan S01とEAL-029の採用部分 | `spec-dock/active/issue/{requirement,design,plan}.md`、provider source | S01 allowed pathsだけ。4 README assets、`cli.py`、provider `.gitignore`、generic scaffolder、指定tests | create_node/workbench/fs adapters、generic import、root copy route、package/build/docs/dogfood、canonical docs直接編集 | Red assertion failure、focused exact nodes、real Git matrix、Ruff check/format、`git diff --check`、allowed-path diff | allowed path外変更、canonical gap、unexpected Red、S01 test skip、existing Workbench mutation、S03/Issue 345/346責務が必要 | worker summary、changed files、Red/Green/refactor、commands/results、risks、EVD-001〜004 summary、Ledger Noteまたはno-decision declaration | pass: bounded implementationとtest-only follow-up完了。親統合済み、review待ち |
+| S01 | delegated | shipped scaffold、installer、generic runtime primitive、real Gitを跨ぐbounded implementation | dev-coder | approved plan S01とEAL-029の採用部分 | `spec-dock/active/issue/{requirement,design,plan}.md`、provider source | S01 allowed pathsだけ。4 README assets、`cli.py`、provider `.gitignore`、generic scaffolder、指定tests | create_node/workbench/fs adapters、generic import、root copy route、package/build/docs/dogfood、canonical docs直接編集 | Red assertion failure、focused exact nodes、real Git matrix、Ruff check/format、`git diff --check`、allowed-path diff | allowed path外変更、canonical gap、unexpected Red、S01 test skip、existing Workbench mutation、S03/Issue 345/346責務が必要 | worker summary、changed files、Red/Green/refactor、commands/results、risks、EVD-001〜004 summary、Ledger Noteまたはno-decision declaration | pass: bounded implementationとtest-only follow-up完了。親統合とfresh ChatGPT-Use review `PASS`を確認 |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder | fresh-only root/node Workbench shell、README-only ignore、generic byte-stable exact-copyを実装。親findingでroot/workbench symlink・empty directory coverageをtest-only follow-up | provider production 7 path、tests 4 path | focused installer/scaffolder/new-doc/lifecycle、Ruff、format、diff-check pass | implementation review pending | default fast suiteのdogfood mirror parity 2件はIssue 346へdeferred | accepted after bounded follow-up |
+| S01 | dev-coder | fresh-only root/node Workbench shell、README-only ignore、generic byte-stable exact-copyを実装。親findingでroot/workbench symlink・empty directory coverageをtest-only follow-up | provider production 7 path、tests 4 path | focused installer/scaffolder/new-doc/lifecycle、Ruff、format、diff-check pass | ChatGPT-Use fresh `code-reviewer` PASS、finding 0 | default fast suiteのdogfood mirror parity 2件はIssue 346へdeferred | accepted; proceed to evidence-only closure commit |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -302,12 +304,12 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | plan amendment / S01 admission | ChatGPT-First plan amendment review | spec-reviewer | fresh | passed | no | execute approved plan | ChatGPT-Use reviewed exact commit `a0b99765f7fac5ad384f4f81c85b50990f017fc9`; finding 0。backendはChatGPT-Use、role名は責務契約 |
-| S01 | implementation candidate review | code-reviewer | stale | failed | no | follow-up required | candidate commit/push前。commit後にChatGPT-Useでfresh reviewする |
+| S01 | implementation candidate review | code-reviewer | fresh | passed | no | proceed to evidence-only closure commit | ChatGPT-Use reviewed exact candidate `a62ae20d5ad587563bf09de77b1f85d75a64c4ec`; finding 0、scope creepなし、不要な抽象化なし。review backendはChatGPT-Use、role名は責務契約 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | review-pending | provider implementation、S01 tests、pre-review report | review candidate commit pending | candidate commit後に確認 | not applicable | not applicable | not applicable | not applicable |
+| S01 | committed | provider implementation、S01 tests、pre-review report | review target `a62ae20d5ad587563bf09de77b1f85d75a64c4ec`; EAL-030と本reportはpost-review evidence-only closure commit | closure commit後に外部引き渡し証跡で確認 | not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
 - `src/spec_dock/cli.py` - pre-mutation freshness、fresh root copy、installer README allowlist、fallback ignore
@@ -320,7 +322,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - `tests/cli_runtime/test_new.py` - README allowlist expectationとall-trigger no-backfill
 
 #### コミット
-- review candidate commit: pending
+- review target SHA: `a62ae20d5ad587563bf09de77b1f85d75a64c4ec`
+- closure head SHA: 本reportとEAL-030を含むpost-review evidence-only commit。actual SHAは自己参照を避けてcommit後の外部引き渡し証跡へ記録する。
 
 #### メモ
 - `No material implementation decisions beyond the approved plan.`
