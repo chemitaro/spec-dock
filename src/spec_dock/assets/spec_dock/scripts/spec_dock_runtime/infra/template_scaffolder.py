@@ -51,11 +51,16 @@ def copy_scaffolded_tree(src_dir: Path, dest_dir: Path, replacements: dict[str, 
     for src_path, target_path in zip(template_files, target_paths, strict=True):
         target_path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            text = src_path.read_text(encoding="utf-8")
+            source_bytes = src_path.read_bytes()
+            text = source_bytes.decode("utf-8")
         except UnicodeDecodeError:
             shutil.copy2(src_path, target_path)
         else:
-            target_path.write_text(render_text(text, replacements), encoding="utf-8")
+            rendered_bytes = render_text(text, replacements).encode("utf-8")
+            if rendered_bytes == source_bytes:
+                shutil.copy2(src_path, target_path)
+            else:
+                target_path.write_bytes(rendered_bytes)
             if text.startswith("#!"):
                 with contextlib.suppress(OSError):
                     target_path.chmod(target_path.stat().st_mode | 0o111)

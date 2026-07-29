@@ -5,7 +5,7 @@ ID: "init-local-00002"
 関連GitHub: []
 状態: "approved"
 作成者: "Codex CLI"
-最終更新: "2026-04-15"
+最終更新: "2026-07-28"
 依存: ["requirement.md", "design.md"]
 ---
 
@@ -107,6 +107,19 @@ ID: "init-local-00002"
   - 実行方針:
     - requirement / design / plan の spec authoring gate を通してから issue 分割する。
     - command core、bootstrap/output/docs parity、dogfooding verification の順で閉じる。
+- epic-00343-workbench-shell-and-explicit-file-artifact-import:
+  - 目的:
+    - fresh root / future Initiative・Epic・IssueにoptionalなWorkbench shellを自動配置し、明示したsingle fileをrootまたはnodeのArtifactへ安全にimportできるoperator-facing capabilityを追加する。
+  - deliverable:
+    - Git追跡可能なshell markerと内容をignoreするWorkbench contract、repository内外の明示single-file import、既存`workbench copy`のmanual helper互換。
+  - metric link:
+    - Metric-001
+    - Metric-002
+  - depends on:
+    - current runtime baseline
+    - `init-local-00003`のarchitecture guardrailに抵触しないこと
+  - 状態:
+    - designはpass済み、canonical planはfresh review中。人間承認前のためIssue nodeは未作成である。
 - epic-0003-operator-value-expansion:
   - 目的:
     - operator が日常運用で得られる feature value を広げる。
@@ -136,6 +149,8 @@ ID: "init-local-00002"
   - `epic-00074` は `epic-00048` の completed baseline を拡張し、host-native config / subagent managed deployment を concrete feature epic として進める。
   - `epic-00074` は `epic-00067` の authority cleanup を再所有せず、feature initiative 側では利用価値としての multi-host setup 拡張に限定する。
   - `epic-00107` は `epic-00054` と同じく runtime command を拡張するが、close/delete/update の lifecycle completion ではなく、並行開発用 worktree provisioning を扱うため独立 epic とする。
+  - `epic-00343` は既存root/nodeをbackfillせず、fresh Workbench shellとexplicit single-file Artifact importを追加する独立のfeature epicとして、このportfolioへ登録する。`epic-00107`のlinked worktree provisioningとはmanual `workbench copy`互換だけを共有し、実装順序のhard dependencyは置かない。
+  - `epic-00343`はdesign / planのfresh reviewと人間承認を通過するまでIssueを作成せず、既存Epicの着手順を再構成しない。
   - post-prototype 候補は current initiative の出口を曖昧にしないよう最後に整理する。
 - parallelizable:
   - `epic-00054` と epic-0003 は並行検討できる。

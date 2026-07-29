@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00346",
+  "title": "Integration Distribution And Final Quality",
+  "slug": "integration-distribution-and-final-quality",
+  "created_at": "2026-07-29T00:07:15+09:00",
+  "updated_at": "2026-07-29T00:07:30+09:00",
+  "parent_id": "epic-00343",
+  "initiative_id": "init-local-00002",
+  "epic_id": "epic-00343",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 346,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "depends_on": [
+    "iss-00344",
+    "iss-00345"
+  ]
+}
