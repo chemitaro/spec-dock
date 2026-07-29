@@ -48,13 +48,59 @@ def _companion() -> bytes:
     preface = """
 # First-day onboarding
 
-Purpose and authority for init-00001, epic-00002, and iss-00003.
-This subordinate guide explains the current architecture and target architecture.
-ChatGPT First planning lifecycle workflow uses Oracle, not chatgpt-use.
-Candidate, Review, Human decision, and apply use the exact current branch.
-S01 through S07, S08, and S14 describe the provider and projection roadmap.
-Failure handling is documented for the first day.
-Canonical authority remains requirement.md, design.md, and plan.md.
+This subordinate guide defers to requirement.md, design.md, and plan.md.
+
+## Initiative, Epic, and Issue lineage
+
+The target is init-00001, epic-00002, and iss-00003.
+
+## Purpose and scope
+
+Purpose and scope are bounded to onboarding.
+
+## System context
+
+The system context identifies the actors.
+
+## Authority and responsibility boundary
+
+Authority and responsibility remain deterministic.
+
+## Current architecture and target architecture
+
+Current architecture and target architecture define the transition.
+
+## ChatGPT First planning lifecycle
+
+ChatGPT First governs the planning lifecycle.
+
+## Direct Oracle and reference-only chatgpt-use
+
+Oracle is direct and chatgpt-use is reference-only.
+
+## Candidate, Review, Human, and apply lifecycle
+
+Candidate, Review, Human decision, and apply are controlled.
+
+## Exact current branch gate
+
+The exact current branch is required.
+
+## Implementation roadmap
+
+S01 through S07 are complete; S08 through S14 remain.
+
+## Provider authority and projection
+
+Provider authority precedes projection.
+
+## Failure modes
+
+Failure handling stops closed.
+
+## First-day checklist
+
+The first-day checklist directs onboarding.
 """
     roles = (
         "system context",

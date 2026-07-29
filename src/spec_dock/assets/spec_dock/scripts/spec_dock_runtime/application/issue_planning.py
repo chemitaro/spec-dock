@@ -609,6 +609,59 @@ def run_issue_planning_apply(
             reason="apply_target_changed",
             issue_id=issue_id,
         )
+    assert request.candidate_path is not None
+    try:
+        current_candidate = candidate_loader(request.candidate_path, repo_root)
+    except CandidateArchiveRejected:
+        return PlanningCommandResult(
+            status="stale" if request.mode == "archive-candidate" else "rejected",
+            reason=(
+                "apply_target_changed"
+                if request.mode == "archive-candidate"
+                else "operation_binding_mismatch"
+            ),
+            issue_id=issue_id,
+        )
+    if (
+        verified_candidate is None
+        or current_candidate.identity != verified_candidate.identity
+        or current_candidate.zip_bytes != verified_candidate.zip_bytes
+        or current_candidate.files != verified_candidate.files
+        or current_candidate.source_baseline != verified_candidate.source_baseline
+        or current_candidate.onboarding_companion
+        != verified_candidate.onboarding_companion
+    ):
+        return PlanningCommandResult(
+            status="stale" if request.mode == "archive-candidate" else "rejected",
+            reason=(
+                "apply_target_changed"
+                if request.mode == "archive-candidate"
+                else "operation_binding_mismatch"
+            ),
+            issue_id=issue_id,
+        )
+    if request.mode == "git-bound":
+        try:
+            current_binding = GitBoundOperationBindingV1.create(
+                issue_id=issue_id,
+                repository=identity.repository,
+                branch=identity.branch,
+                source_head=identity.source_head,
+                candidate_identity=current_candidate.identity,
+                onboarding_companion=current_candidate.onboarding_companion,
+            )
+        except ValueError:
+            return PlanningCommandResult(
+                status="rejected",
+                reason="operation_binding_mismatch",
+                issue_id=issue_id,
+            )
+        if identity.git_bound_operation_binding != current_binding:
+            return PlanningCommandResult(
+                status="rejected",
+                reason="operation_binding_mismatch",
+                issue_id=issue_id,
+            )
     execution = transaction_runner(
         operation,
         repo_root=repo_root,
