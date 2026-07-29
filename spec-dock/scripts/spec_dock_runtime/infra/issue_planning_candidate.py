@@ -18,17 +18,26 @@ import zipfile
 
 from spec_dock_runtime.domain.authoring_pack.zip_contract import (
     PackReviewResult,
+    issue_authoring_v1_profile,
     issue_candidate_v1_profile,
     review_pack_input,
 )
 from spec_dock_runtime.domain.issue_planning_candidate import (
-    CANDIDATE_PATHS,
+    DOCUMENT_NAMES,
     CandidateMaterial,
+    ValidatedIssueAuthoringPayload,
+    candidate_paths,
     derive_candidate_identity,
     parse_canonical_control_json,
+    validate_issue_authoring_files,
+    validate_onboarding_companion_path,
     verify_issue_candidate_files,
 )
-from spec_dock_runtime.domain.issue_planning_contracts import IssueCandidateIdentity
+from spec_dock_runtime.domain.issue_planning_contracts import (
+    IssueCandidateIdentity,
+    OnboardingCompanionBindingV1,
+    OracleAuthoringZipSnapshot,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -71,6 +80,8 @@ class OutputDirectoryGuard:
 class PublishedCandidate:
     identity: IssueCandidateIdentity
     zip_byte_count: int
+    candidate_path: Path
+    onboarding_companion: OnboardingCompanionBindingV1
 
 
 @dataclass(frozen=True)
@@ -79,6 +90,7 @@ class VerifiedIssueCandidate:
     files: Mapping[str, bytes]
     source_baseline: Mapping[str, object]
     zip_bytes: bytes
+    onboarding_companion: OnboardingCompanionBindingV1
 
 
 def validate_candidate_output_directory(output_dir: Path, repo_root: Path) -> OutputDirectoryGuard:
@@ -141,10 +153,31 @@ def load_verified_issue_candidate(candidate_path: Path, repo_root: Path) -> Veri
     if len(roots) != 1:
         raise CandidateArchiveRejected(("root_mismatch",))
     internal_root = next(iter(roots))
+    prefix = f"{internal_root}/"
+    relative_names = {
+        name[len(prefix) :]
+        for name in names
+        if name.startswith(prefix) and not name.endswith("/")
+    }
+    possible_companions = relative_names - {
+        "CHECKSUMS.sha256",
+        "MANIFEST.json",
+        "PLACEHOLDER-ORACLE-MAP.json",
+        "SOURCE-BASELINE.json",
+        *DOCUMENT_NAMES,
+    }
+    if len(possible_companions) != 1:
+        raise CandidateArchiveRejected(("companion_role_mismatch",))
+    companion_path = next(iter(possible_companions))
+    try:
+        validate_onboarding_companion_path(companion_path)
+    except ValueError as error:
+        raise CandidateArchiveRejected(("companion_path_mismatch",)) from error
     review = _review_candidate_snapshot(
         zip_bytes,
         repo_root=repository,
         internal_root=internal_root,
+        companion_path=companion_path,
     )
     if review.status != "pass":
         raise CandidateArchiveRejected(review.findings)
@@ -152,7 +185,7 @@ def load_verified_issue_candidate(candidate_path: Path, repo_root: Path) -> Veri
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
             files = {
                 relative: archive.read(f"{internal_root}/{relative}")
-                for relative in CANDIDATE_PATHS
+                for relative in candidate_paths(companion_path)
             }
         manifest = parse_canonical_control_json(files["MANIFEST.json"])
         source = parse_canonical_control_json(files["SOURCE-BASELINE.json"])
@@ -171,6 +204,10 @@ def load_verified_issue_candidate(candidate_path: Path, repo_root: Path) -> Veri
             source_head=source["source_head"],
             zip_sha256=hashlib.sha256(zip_bytes).hexdigest(),
         )
+        companion = OnboardingCompanionBindingV1(
+            path=companion_path,
+            sha256=hashlib.sha256(files[companion_path]).hexdigest(),
+        )
     except (KeyError, OSError, TypeError, ValueError, zipfile.BadZipFile) as error:
         raise CandidateArchiveRejected(("candidate_identity_mismatch",)) from error
     return VerifiedIssueCandidate(
@@ -178,7 +215,70 @@ def load_verified_issue_candidate(candidate_path: Path, repo_root: Path) -> Veri
         files=MappingProxyType(files),
         source_baseline=MappingProxyType(source),
         zip_bytes=zip_bytes,
+        onboarding_companion=companion,
     )
+
+
+def load_validated_issue_authoring_payload(
+    snapshot: OracleAuthoringZipSnapshot,
+    *,
+    expected_companion_path: str,
+    repo_root: Path,
+) -> ValidatedIssueAuthoringPayload:
+    expected_root = snapshot.expected_logical_filename.removesuffix(".zip")
+    if snapshot.internal_root != expected_root:
+        raise CandidateArchiveRejected(("root_mismatch",))
+    try:
+        validate_onboarding_companion_path(expected_companion_path)
+        repository = repo_root.resolve(strict=True)
+    except (OSError, ValueError) as error:
+        raise CandidateArchiveRejected(("authoring_identity_mismatch",)) from error
+    temporary_root = Path(tempfile.gettempdir()).resolve(strict=True)
+    if temporary_root == repository or temporary_root.is_relative_to(repository):
+        raise CandidateArchiveRejected(("unsafe_candidate_path",))
+    with tempfile.TemporaryDirectory(
+        prefix="specdock-authoring-snapshot-",
+        dir=temporary_root,
+    ) as raw:
+        archive_path = Path(raw) / snapshot.expected_logical_filename
+        with archive_path.open("xb") as stream:
+            stream.write(snapshot.zip_bytes)
+            stream.flush()
+            os.fsync(stream.fileno())
+        review = review_pack_input(
+            archive_path,
+            profile=issue_authoring_v1_profile(
+                expected_root=expected_root,
+                expected_companion_path=expected_companion_path,
+                cross_file_validator=lambda files, root: validate_issue_authoring_files(
+                    files,
+                    root,
+                    expected_companion_path=expected_companion_path,
+                ),
+            ),
+        )
+    if review.status != "pass":
+        raise CandidateArchiveRejected(review.findings)
+    try:
+        with zipfile.ZipFile(io.BytesIO(snapshot.zip_bytes)) as archive:
+            payloads = {
+                path: archive.read(f"{expected_root}/{path}")
+                for path in (*DOCUMENT_NAMES, expected_companion_path)
+            }
+        return ValidatedIssueAuthoringPayload(
+            expected_logical_filename=snapshot.expected_logical_filename,
+            observed_transport_filename=snapshot.observed_transport_filename,
+            internal_root=snapshot.internal_root,
+            zip_sha256=snapshot.sha256,
+            zip_size_bytes=snapshot.size_bytes,
+            documents=MappingProxyType(
+                {name: payloads[name] for name in DOCUMENT_NAMES}
+            ),
+            onboarding_companion_path=expected_companion_path,
+            onboarding_companion_bytes=payloads[expected_companion_path],
+        )
+    except (KeyError, OSError, ValueError, zipfile.BadZipFile) as error:
+        raise CandidateArchiveRejected(("archive_unreadable",)) from error
 
 
 def _read_candidate_snapshot(candidate: Path) -> bytes:
@@ -282,6 +382,7 @@ def _review_candidate_snapshot(
     *,
     repo_root: Path,
     internal_root: str,
+    companion_path: str,
 ) -> PackReviewResult:
     temporary_root = Path(tempfile.gettempdir()).resolve(strict=True)
     if temporary_root == repo_root or temporary_root.is_relative_to(repo_root):
@@ -296,6 +397,7 @@ def _review_candidate_snapshot(
             snapshot,
             profile=issue_candidate_v1_profile(
                 expected_root=internal_root,
+                expected_companion_path=companion_path,
                 cross_file_validator=verify_issue_candidate_files,
             ),
         )
@@ -376,6 +478,7 @@ def build_and_publish_candidate(
             raise CandidateBuildFailed("Candidate ZIP construction failed") from error
         profile = issue_candidate_v1_profile(
             expected_root=material.internal_root,
+            expected_companion_path=material.onboarding_companion_path,
             cross_file_validator=verify_issue_candidate_files,
         )
         review = review_pack_input(staged, profile=profile)
@@ -400,7 +503,18 @@ def build_and_publish_candidate(
         except (NotImplementedError, OSError) as error:
             raise CandidatePublicationFailed("Candidate publication failed") from error
         published = True
-        return PublishedCandidate(identity=identity, zip_byte_count=len(zip_bytes))
+        companion = OnboardingCompanionBindingV1(
+            path=material.onboarding_companion_path,
+            sha256=hashlib.sha256(
+                material.files[material.onboarding_companion_path]
+            ).hexdigest(),
+        )
+        return PublishedCandidate(
+            identity=identity,
+            zip_byte_count=len(zip_bytes),
+            candidate_path=final_path,
+            onboarding_companion=companion,
+        )
     finally:
         if temporary_dir is not None:
             if published:

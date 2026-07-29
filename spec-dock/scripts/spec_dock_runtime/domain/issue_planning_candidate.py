@@ -26,15 +26,6 @@ CONTROL_NAMES = (
     "PLACEHOLDER-ORACLE-MAP.json",
     "SOURCE-BASELINE.json",
 )
-CANDIDATE_PATHS = tuple(sorted((*CONTROL_NAMES, *DOCUMENT_NAMES), key=lambda value: value.encode("utf-8")))
-CHECKSUM_PATHS = tuple(path for path in CANDIDATE_PATHS if path != "CHECKSUMS.sha256")
-
-_START_MARKER = "<<<SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={name}>>>\n"
-_END_MARKER = "<<<END-SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={name}>>>"
-_RESERVED_MARKER_PREFIXES = (
-    b"<<<SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1",
-    b"<<<END-SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1",
-)
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _TOKEN_RE = re.compile(rb"\{\{SPECDOCK_[A-Z][A-Z0-9_]{0,63}\}\}")
@@ -92,47 +83,197 @@ class CandidateMaterial:
     internal_root: str
     created_at_utc: str
     operation_time: datetime
+    onboarding_companion_path: str
     files: Mapping[str, bytes]
 
 
-def parse_planner_payload(payload: bytes) -> Mapping[str, bytes]:
-    if not isinstance(payload, bytes):
-        raise ValueError("planner payload must be bytes")
-    if b"\xef\xbb\xbf" in payload or b"\0" in payload or b"\r" in payload:
-        raise ValueError("planner payload contains forbidden bytes")
-    try:
-        payload.decode("utf-8", errors="strict")
-    except UnicodeDecodeError as error:
-        raise ValueError("planner payload must be strict UTF-8") from error
+@dataclass(frozen=True)
+class ValidatedIssueAuthoringPayload:
+    expected_logical_filename: str
+    observed_transport_filename: str
+    internal_root: str
+    zip_sha256: str
+    zip_size_bytes: int
+    documents: Mapping[str, bytes]
+    onboarding_companion_path: str
+    onboarding_companion_bytes: bytes
 
-    cursor = 0
-    documents: dict[str, bytes] = {}
-    for index, name in enumerate(DOCUMENT_NAMES):
-        start = _START_MARKER.format(name=name).encode()
-        end = _END_MARKER.format(name=name).encode()
-        if not payload.startswith(start, cursor):
-            raise ValueError("planner payload document order or start marker is invalid")
-        body_start = cursor + len(start)
-        body_end = payload.find(end, body_start)
-        if body_end < 0:
-            raise ValueError("planner payload end marker is missing")
-        body = payload[body_start:body_end]
-        if not body.endswith(b"\n"):
-            raise ValueError("planner document body must end with LF")
-        if any(
-            line.startswith(_RESERVED_MARKER_PREFIXES)
-            for line in body.splitlines()
-        ):
-            raise ValueError("planner document body contains a reserved marker")
-        documents[name] = body
-        cursor = body_end + len(end)
-        if index < len(DOCUMENT_NAMES) - 1:
-            if not payload.startswith(b"\n", cursor):
-                raise ValueError("planner payload markers must be line-delimited")
-            cursor += 1
-    if cursor != len(payload):
-        raise ValueError("planner payload contains extra or reordered content")
-    return MappingProxyType(documents)
+    def __post_init__(self) -> None:
+        _require_document_inventory(self.documents)
+        validate_onboarding_companion(
+            self.onboarding_companion_path,
+            self.onboarding_companion_bytes,
+        )
+        object.__setattr__(self, "documents", MappingProxyType(dict(self.documents)))
+
+
+def candidate_paths(companion_path: str) -> tuple[str, ...]:
+    validate_onboarding_companion_path(companion_path)
+    return tuple(
+        sorted(
+            (*CONTROL_NAMES, *DOCUMENT_NAMES, companion_path),
+            key=lambda value: value.encode("utf-8"),
+        )
+    )
+
+
+def checksum_paths(companion_path: str) -> tuple[str, ...]:
+    return tuple(
+        path for path in candidate_paths(companion_path) if path != "CHECKSUMS.sha256"
+    )
+
+
+def validate_onboarding_companion_path(path: str) -> None:
+    if not isinstance(path, str):
+        raise ValueError("onboarding companion path must be a string")
+    parts = path.split("/")
+    if (
+        len(parts) != 2
+        or parts[0] != "artifacts"
+        or not parts[1]
+        or parts[1].startswith(".")
+        or not parts[1].endswith(".md")
+        or "\\" in path
+        or any(part in {"", ".", ".."} for part in parts)
+    ):
+        raise ValueError("onboarding companion path is invalid")
+
+
+def validate_onboarding_companion(path: str, payload: bytes) -> None:
+    validate_onboarding_companion_path(path)
+    if (
+        not isinstance(payload, bytes)
+        or not payload
+        or payload.startswith(b"\xef\xbb\xbf")
+        or b"\0" in payload
+        or b"\r" in payload
+        or not payload.endswith(b"\n")
+    ):
+        raise ValueError("onboarding companion bytes are invalid")
+    try:
+        text = payload.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as error:
+        raise ValueError("onboarding companion must be strict UTF-8") from error
+    lowered = text.casefold()
+    sections = _markdown_sections(text)
+    required_section_concepts = (
+        (("init-",), ("epic-",), ("iss-",)),
+        (("purpose", "目的"), ("scope", "対象", "範囲")),
+        (("system context",),),
+        (("authority", "権限"), ("responsibility", "責務")),
+        (("current architecture", "現行"), ("target architecture", "目標")),
+        (("chatgpt first",), ("planning lifecycle", "planning workflow")),
+        (("oracle",), ("reference-only", "参照専用"), ("chatgpt-use",)),
+        (("candidate",), ("review",), ("human",), ("apply",)),
+        (("exact current branch", "exact branch"),),
+        (("s01",), ("s07",), ("s08",), ("s14",)),
+        (("provider authority", "provider"), ("projection",)),
+        (("failure mode", "failure", "障害"),),
+        (("first-day checklist", "first day checklist", "初日"),),
+    )
+    if not _has_distinct_required_sections(sections, required_section_concepts):
+        raise ValueError("onboarding companion required section is missing")
+    if not all(name in text for name in DOCUMENT_NAMES):
+        raise ValueError("onboarding companion canonical authority is incomplete")
+    if not any(token in lowered for token in ("subordinate", "従属", "補助")):
+        raise ValueError("onboarding companion subordinate authority is missing")
+    blocks = re.findall(r"```plantuml\n(.*?)```", text, flags=re.DOTALL)
+    if len(blocks) < 4:
+        raise ValueError("onboarding companion requires four PlantUML blocks")
+    roles = (
+        ("system context",),
+        ("responsibility", "authority boundary"),
+        ("planning sequence", "issue planning sequence"),
+        ("implementation roadmap", "remaining implementation roadmap"),
+    )
+    normalized_blocks = tuple(block.casefold() for block in blocks)
+    if any(
+        not any(any(role in block for role in alternatives) for block in normalized_blocks)
+        for alternatives in roles
+    ):
+        raise ValueError("onboarding companion PlantUML role is missing")
+    if any(block.count("@startuml") != 1 or block.count("@enduml") != 1 for block in blocks):
+        raise ValueError("onboarding companion PlantUML framing is invalid")
+
+
+def _markdown_sections(text: str) -> tuple[tuple[str, str], ...]:
+    lines = text.splitlines()
+    headings: list[tuple[int, int, str]] = []
+    for index, line in enumerate(lines):
+        match = re.fullmatch(r"(#{2,6})[ \t]+(.+?)[ \t]*#*[ \t]*", line)
+        if match is not None:
+            headings.append((index, len(match.group(1)), match.group(2).casefold()))
+    sections: list[tuple[str, str]] = []
+    for position, (line_index, level, title) in enumerate(headings):
+        end = len(lines)
+        for next_line, next_level, _next_title in headings[position + 1 :]:
+            if next_level <= level:
+                end = next_line
+                break
+        body = "\n".join(lines[line_index + 1 : end]).strip()
+        sections.append((f"{title}\n{body.casefold()}", body))
+    return tuple(sections)
+
+
+def _has_distinct_required_sections(
+    sections: tuple[tuple[str, str], ...],
+    required_concepts: tuple[tuple[tuple[str, ...], ...], ...],
+) -> bool:
+    candidates = tuple(
+        tuple(
+            section_index
+            for section_index, (section, body) in enumerate(sections)
+            if body.strip()
+            and all(
+                any(token in section for token in alternatives)
+                for alternatives in concepts
+            )
+        )
+        for concepts in required_concepts
+    )
+    section_owners: dict[int, int] = {}
+
+    def assign(concept_index: int, visited: set[int]) -> bool:
+        for section_index in candidates[concept_index]:
+            if section_index in visited:
+                continue
+            visited.add(section_index)
+            owner = section_owners.get(section_index)
+            if owner is None or assign(owner, visited):
+                section_owners[section_index] = concept_index
+                return True
+        return False
+
+    return all(assign(concept_index, set()) for concept_index in range(len(candidates)))
+
+
+def validate_issue_authoring_files(
+    files: Mapping[str, bytes],
+    _internal_root: str,
+    *,
+    expected_companion_path: str,
+) -> tuple[str, ...]:
+    if set(files) != {*DOCUMENT_NAMES, expected_companion_path}:
+        return ("inventory_mismatch",)
+    try:
+        for name in DOCUMENT_NAMES:
+            payload = files[name]
+            if (
+                not payload
+                or payload.startswith(b"\xef\xbb\xbf")
+                or b"\0" in payload
+                or b"\r" in payload
+                or not payload.endswith(b"\n")
+            ):
+                raise ValueError("authoring document framing is invalid")
+            _parse_document(name, files[name])
+        validate_onboarding_companion(
+            expected_companion_path,
+            files[expected_companion_path],
+        )
+    except (KeyError, UnicodeError, ValueError):
+        return ("authoring_payload_invalid",)
+    return ()
 
 
 def parse_current_front_matter_baseline(
@@ -227,16 +368,33 @@ def parse_canonical_control_json(data: bytes) -> dict[str, Any]:
 def build_candidate_material(
     *,
     planner_documents: Mapping[str, bytes],
+    onboarding_companion_path: str,
+    onboarding_companion_bytes: bytes,
     baseline: IssueFrontMatterBaseline,
     context: PlanningContext,
     source_evidence: PlanningSourceEvidence,
-    planner_payload: bytes,
+    source_payload_sha256: str,
+    source_payload_size: int,
     operation_time: datetime,
     version: int = 1,
 ) -> CandidateMaterial:
     if isinstance(version, bool) or not isinstance(version, int) or version < 1:
         raise ValueError("Candidate version must be a positive integer")
     _validate_source_binding(context, source_evidence, baseline)
+    if context.onboarding_companion_path != onboarding_companion_path:
+        raise ValueError("onboarding companion path does not match Planning context")
+    validate_onboarding_companion(
+        onboarding_companion_path,
+        onboarding_companion_bytes,
+    )
+    if _SHA256_RE.fullmatch(source_payload_sha256) is None:
+        raise ValueError("source payload SHA-256 is invalid")
+    if (
+        isinstance(source_payload_size, bool)
+        or not isinstance(source_payload_size, int)
+        or source_payload_size < 0
+    ):
+        raise ValueError("source payload size is invalid")
     instant = _as_utc(operation_time).replace(microsecond=0)
     normalized = normalize_planner_documents(planner_documents, baseline, instant)
     timestamp_token = instant.strftime("%Y%m%dt%H%M%Sz")
@@ -252,8 +410,8 @@ def build_candidate_material(
             "issue_id": baseline.issue_id,
             "parent_epic_id": context.parent_epic_id,
             "parent_initiative_id": context.parent_initiative_id,
-            "planner_payload_sha256": hashlib.sha256(planner_payload).hexdigest(),
-            "planner_payload_size": len(planner_payload),
+            "planner_payload_sha256": source_payload_sha256,
+            "planner_payload_size": source_payload_size,
             "relevant_paths": list(context.relevant_source_paths),
             "remote_head": source_evidence.remote_head,
             "remote_head_disposition": source_evidence.remote_head_disposition,
@@ -272,6 +430,7 @@ def build_candidate_material(
             "schema_version": "spec-dock.issue-candidate-placeholder-map.v1",
         }
     )
+    paths = candidate_paths(onboarding_companion_path)
     entries = [
         {
             "checksum_covered": path != "CHECKSUMS.sha256",
@@ -285,9 +444,10 @@ def build_candidate_material(
                 "design.md": "design",
                 "plan.md": "plan",
                 "requirement.md": "requirement",
+                onboarding_companion_path: "onboarding-companion",
             }[path],
         }
-        for path in CANDIDATE_PATHS
+        for path in paths
     ]
     manifest = canonical_control_json_bytes(
         {
@@ -312,9 +472,11 @@ def build_candidate_material(
         "PLACEHOLDER-ORACLE-MAP.json": placeholder_map,
         "SOURCE-BASELINE.json": source_baseline,
         **normalized,
+        onboarding_companion_path: onboarding_companion_bytes,
     }
     checksums = "".join(
-        f"{hashlib.sha256(covered[path]).hexdigest()}  {path}\n" for path in CHECKSUM_PATHS
+        f"{hashlib.sha256(covered[path]).hexdigest()}  {path}\n"
+        for path in checksum_paths(onboarding_companion_path)
     ).encode("ascii")
     files = MappingProxyType({"CHECKSUMS.sha256": checksums, **covered})
     return CandidateMaterial(
@@ -325,6 +487,7 @@ def build_candidate_material(
         internal_root=stem,
         created_at_utc=created_at_utc,
         operation_time=instant,
+        onboarding_companion_path=onboarding_companion_path,
         files=files,
     )
 
@@ -410,7 +573,7 @@ def verify_issue_candidate_files(
     internal_root: str,
 ) -> tuple[str, ...]:
     findings: list[str] = []
-    if tuple(sorted(files, key=lambda value: value.encode("utf-8"))) != CANDIDATE_PATHS:
+    if any(path not in files for path in (*CONTROL_NAMES, *DOCUMENT_NAMES)):
         findings.append("inventory_mismatch")
         return tuple(findings)
     try:
@@ -419,6 +582,34 @@ def verify_issue_candidate_files(
         placeholder = parse_canonical_control_json(files["PLACEHOLDER-ORACLE-MAP.json"])
     except ValueError:
         return ("invalid_control_json",)
+    entries = manifest.get("entries")
+    companion_entries = (
+        [
+            entry
+            for entry in entries
+            if isinstance(entry, dict)
+            and entry.get("role") == "onboarding-companion"
+        ]
+        if isinstance(entries, list)
+        else []
+    )
+    if len(companion_entries) != 1:
+        return ("companion_role_mismatch",)
+    companion_path = companion_entries[0].get("path")
+    try:
+        validate_onboarding_companion_path(cast("str", companion_path))
+    except (TypeError, ValueError):
+        return ("companion_path_mismatch",)
+    expected_paths = candidate_paths(cast("str", companion_path))
+    if tuple(sorted(files, key=lambda value: value.encode("utf-8"))) != expected_paths:
+        return ("inventory_mismatch",)
+    try:
+        validate_onboarding_companion(
+            cast("str", companion_path),
+            files[cast("str", companion_path)],
+        )
+    except (KeyError, UnicodeError, ValueError):
+        findings.append("companion_content_mismatch")
     candidate = manifest.get("candidate")
     if (
         set(manifest)
@@ -504,7 +695,6 @@ def verify_issue_candidate_files(
         and "invalid_placeholder_map" not in placeholder_findings
         else set()
     )
-    entries = manifest.get("entries")
     expected_entries = [
         {
             "checksum_covered": path != "CHECKSUMS.sha256",
@@ -518,14 +708,16 @@ def verify_issue_candidate_files(
                 "design.md": "design",
                 "plan.md": "plan",
                 "requirement.md": "requirement",
+                cast("str", companion_path): "onboarding-companion",
             }[path],
         }
-        for path in CANDIDATE_PATHS
+        for path in expected_paths
     ]
     if entries != expected_entries:
         findings.append("manifest_inventory_mismatch")
     expected_checksums = "".join(
-        f"{hashlib.sha256(files[path]).hexdigest()}  {path}\n" for path in CHECKSUM_PATHS
+        f"{hashlib.sha256(files[path]).hexdigest()}  {path}\n"
+        for path in checksum_paths(cast("str", companion_path))
     ).encode("ascii")
     if files["CHECKSUMS.sha256"] != expected_checksums:
         findings.append("checksum_mismatch")
@@ -608,24 +800,6 @@ def _valid_candidate_naming(candidate: Mapping[str, Any], internal_root: str) ->
     )
 
 
-def render_planner_payload(documents: Mapping[str, bytes]) -> bytes:
-    _require_document_inventory(documents)
-    chunks: list[bytes] = []
-    for index, name in enumerate(DOCUMENT_NAMES):
-        chunks.extend(
-            (
-                _START_MARKER.format(name=name).encode(),
-                documents[name],
-                _END_MARKER.format(name=name).encode()
-                + (b"\n" if index < len(DOCUMENT_NAMES) - 1 else b""),
-            )
-        )
-    payload = b"".join(chunks)
-    if parse_planner_payload(payload) != documents:
-        raise ValueError("rendered planner payload is not self-consistent")
-    return payload
-
-
 def mechanical_replacement_cost(old_text: str, new_text: str) -> int:
     if not isinstance(old_text, str) or not isinstance(new_text, str):
         raise ValueError("mechanical replacement text must be strings")
@@ -633,15 +807,21 @@ def mechanical_replacement_cost(old_text: str, new_text: str) -> int:
 
 
 def apply_mechanical_revision(
-    documents: Mapping[str, bytes],
+    payloads: Mapping[str, bytes],
     *,
     target_file: str,
+    onboarding_companion_path: str,
     old_text: str,
     new_text: str,
     diff_budget: int,
 ) -> Mapping[str, bytes]:
-    _require_document_inventory(documents)
-    if target_file not in DOCUMENT_NAMES:
+    validate_onboarding_companion_path(onboarding_companion_path)
+    expected = (*DOCUMENT_NAMES, onboarding_companion_path)
+    if tuple(payloads) != expected or any(
+        not isinstance(value, bytes) for value in payloads.values()
+    ):
+        raise ValueError("mechanical payload inventory is invalid")
+    if target_file not in expected:
         raise ValueError("mechanical target file is not allowed")
     if (
         not old_text
@@ -654,19 +834,28 @@ def apply_mechanical_revision(
         raise ValueError("mechanical revision request is invalid")
     if mechanical_replacement_cost(old_text, new_text) > diff_budget:
         raise ValueError("mechanical revision exceeds diff budget")
-    fields, body = _parse_document(target_file, documents[target_file])
-    del fields
+    source = payloads[target_file]
+    if target_file in DOCUMENT_NAMES:
+        fields, body = _parse_document(target_file, source)
+        del fields
+        prefix = source[:-len(body)]
+    else:
+        body = source
+        prefix = b""
     old_bytes = old_text.encode("utf-8")
     new_bytes = new_text.encode("utf-8")
     if body.count(old_bytes) != 1:
         raise ValueError("mechanical old text must match exactly one body occurrence")
-    revised = dict(documents)
-    revised[target_file] = documents[target_file][:-len(body)] + body.replace(
+    revised = dict(payloads)
+    revised[target_file] = prefix + body.replace(
         old_bytes,
         new_bytes,
         1,
     )
-    _parse_document(target_file, revised[target_file])
+    if target_file in DOCUMENT_NAMES:
+        _parse_document(target_file, revised[target_file])
+    else:
+        validate_onboarding_companion(target_file, revised[target_file])
     return MappingProxyType(revised)
 
 
