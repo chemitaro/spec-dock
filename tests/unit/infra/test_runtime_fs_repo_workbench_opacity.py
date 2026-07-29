@@ -44,6 +44,7 @@ def test_workbench_readme_and_payloads_remain_semantically_opaque(tmp_path: Path
     (workbench / "legacy" / "meta.json").write_text("not json\n", encoding="utf-8")
     (workbench / "decisions").mkdir()
     (workbench / "decisions" / "adr-999.md").write_text("# Fake ADR\n", encoding="utf-8")
+    (workbench / "notes.md").write_text("# Ordinary notes\n", encoding="utf-8")
     (workbench / "binary.bin").write_bytes(b"\x00\x01\x02\xff")
     (workbench / "invalid-utf8.bin").write_bytes(b"\xff\xfe\x80")
 

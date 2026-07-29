@@ -215,8 +215,14 @@ class TestCliWorkbench(CliRuntimeHarness):
     def test_workbench_copy_accepts_empty_source_workbench(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             source, target, scope_id, source_scope, target_scope = self._prepare_linked_worktrees(Path(tmp))
-            (source_scope / ".workbench" / "README.md").unlink()
-            (target_scope / ".workbench" / "README.md").unlink()
+            source_workbench = source_scope / ".workbench"
+            target_workbench = target_scope / ".workbench"
+            (source_workbench / "README.md").unlink()
+            shutil.rmtree(target_workbench)
+            assert source_workbench.exists()
+            assert source_workbench.is_dir()
+            assert list(source_workbench.iterdir()) == []
+            assert not target_workbench.exists()
 
             result = self._run_runtime_capture(
                 source,
@@ -224,8 +230,8 @@ class TestCliWorkbench(CliRuntimeHarness):
             )
 
             assert result.returncode == 0, result.stderr
-            assert (target_scope / ".workbench").is_dir()
-            assert list((target_scope / ".workbench").iterdir()) == []
+            assert target_workbench.is_dir()
+            assert list(target_workbench.iterdir()) == []
 
     @pytest.mark.parametrize(
         ("side", "kind"), [("source", "file"), ("target", "file"), ("source", "symlink"), ("target", "symlink")]
@@ -294,6 +300,7 @@ class TestCliWorkbench(CliRuntimeHarness):
                 "fake-node/.meta.json": b"not valid node metadata\n",
                 "legacy/meta.json": b"not valid legacy metadata\n",
                 "decisions/adr-999.md": b"# fake ADR secret body\n",
+                "notes.md": b"# ordinary Markdown notes\n",
                 "dependency.yml": b"depends_on: [iss-99999]\n",
                 "binary.bin": b"\x00\x01\x02\xff",
                 "invalid-utf8.bin": b"\xff\xfe\x80",
