@@ -1022,11 +1022,29 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/spec_dock/templates/issue/discussions/_template.md",
         "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",
         "spec_dock/assets/spec_dock/templates/epic/issues/new-issue",
-        "spec_dock/assets/spec_dock/templates/*/**/README.md",
         "spec_dock/assets/spec_dock/templates/design.md",
         "spec_dock/assets/spec_dock/templates/plan.md",
         "spec_dock/assets/spec_dock/templates/report.md",
         "spec_dock/assets/spec_dock/templates/requirement.md",
+    )
+    _WORKBENCH_TEMPLATE_README_PATHS = (
+        "README.md",
+        "root/.workbench/README.md",
+        "initiative/.workbench/README.md",
+        "epic/.workbench/README.md",
+        "issue/.workbench/README.md",
+    )
+    _WORKBENCH_README_PATHS = (
+        "root/.workbench/README.md",
+        "initiative/.workbench/README.md",
+        "epic/.workbench/README.md",
+        "issue/.workbench/README.md",
+    )
+    _WORKBENCH_PACKAGE_DATA_PATHS = (
+        "assets/spec_dock/templates/root/.workbench/README.md",
+        "assets/spec_dock/templates/initiative/.workbench/README.md",
+        "assets/spec_dock/templates/epic/.workbench/README.md",
+        "assets/spec_dock/templates/issue/.workbench/README.md",
     )
     _ISSUE_69_PYTHON_CACHE_EXCLUSION_PATTERNS = (
         "**/__pycache__/**",
@@ -3157,6 +3175,124 @@ class TestInitUpdate(CliRuntimeHarness):
                 inventory.add(relative_member.removeprefix("src/"))
         return inventory
 
+    def _collect_source_template_readme_payloads(self, repo_root: Path) -> dict[str, bytes]:
+        template_root = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "templates"
+        return {
+            candidate.relative_to(template_root).as_posix(): candidate.read_bytes()
+            for candidate in template_root.rglob("README.md")
+            if candidate.is_file()
+        }
+
+    def _collect_wheel_template_readme_payloads(self, wheel_path: Path) -> dict[str, bytes]:
+        template_prefix = "spec_dock/assets/spec_dock/templates/"
+        with zipfile.ZipFile(wheel_path) as wheel_zip:
+            members = [
+                member
+                for member in wheel_zip.infolist()
+                if not member.is_dir()
+                and member.filename.startswith(template_prefix)
+                and Path(member.filename).name == "README.md"
+            ]
+            normalized_paths = [member.filename.removeprefix(template_prefix) for member in members]
+            assert len(normalized_paths) == len(set(normalized_paths)), (
+                f"wheel contains duplicate template README paths: {normalized_paths}"
+            )
+            return {
+                normalized_path: wheel_zip.read(member)
+                for member, normalized_path in zip(members, normalized_paths, strict=True)
+            }
+
+    def _collect_sdist_template_readme_payloads(self, sdist_path: Path) -> dict[str, bytes]:
+        template_prefix = "src/spec_dock/assets/spec_dock/templates/"
+        with tarfile.open(sdist_path, "r:gz") as sdist_tar:
+            members = [member for member in sdist_tar.getmembers() if member.isfile()]
+            archive_roots = {member.name.partition("/")[0] for member in members if "/" in member.name}
+            assert len(archive_roots) == 1, f"sdist must have one archive root: {sorted(archive_roots)}"
+            payloads: dict[str, bytes] = {}
+            normalized_paths: list[str] = []
+            for member in members:
+                _, separator, relative_member = member.name.partition("/")
+                if (
+                    not separator
+                    or not relative_member.startswith(template_prefix)
+                    or Path(relative_member).name != "README.md"
+                ):
+                    continue
+                normalized_path = relative_member.removeprefix(template_prefix)
+                normalized_paths.append(normalized_path)
+                extracted = sdist_tar.extractfile(member)
+                assert extracted is not None, f"sdist README could not be read: {member.name}"
+                payloads[normalized_path] = extracted.read()
+            assert len(normalized_paths) == len(set(normalized_paths)), (
+                f"sdist contains duplicate template README paths: {normalized_paths}"
+            )
+            return payloads
+
+    def _collect_isolated_installed_template_readme_snapshot(
+        self,
+        *,
+        venv_python: Path,
+        repo_root: Path,
+        cwd: Path,
+    ) -> dict[str, object]:
+        repo_root_literal = json.dumps(str(repo_root.resolve()))
+        script = (
+            "import importlib.resources as resources\n"
+            "import json\n"
+            "import sys\n"
+            "from pathlib import Path\n"
+            "import spec_dock\n"
+            f"repo_root = Path({repo_root_literal})\n"
+            "def _is_under_repo(path_text: str) -> bool:\n"
+            "    if not path_text:\n"
+            "        return False\n"
+            "    try:\n"
+            "        Path(path_text).resolve().relative_to(repo_root)\n"
+            "        return True\n"
+            "    except Exception:\n"
+            "        return False\n"
+            "def _collect(root, parts=()):\n"
+            "    payloads = {}\n"
+            "    for child in root.iterdir():\n"
+            "        child_parts = parts + (child.name,)\n"
+            "        if child.is_dir():\n"
+            "            payloads.update(_collect(child, child_parts))\n"
+            "        elif child.is_file() and child.name == 'README.md':\n"
+            "            payloads['/'.join(child_parts)] = child.read_bytes().hex()\n"
+            "    return payloads\n"
+            "package_root = resources.files('spec_dock')\n"
+            "template_root = package_root.joinpath('assets', 'spec_dock', 'templates')\n"
+            "payload = {\n"
+            "    'spec_dock_file': str(Path(spec_dock.__file__).resolve()),\n"
+            "    'assets_dir': str(Path(str(package_root.joinpath('assets'))).resolve()),\n"
+            "    'sys_path_has_repo_root': any(_is_under_repo(path_text) for path_text in sys.path if path_text),\n"
+            "    'template_readmes': _collect(template_root),\n"
+            "}\n"
+            "print(json.dumps(payload))\n"
+        )
+        result = self._issue_69_run_subprocess_capture(
+            [str(venv_python), "-c", script],
+            cwd=cwd,
+            env=self._issue_69_runtime_env_without_checkout_fallback(),
+        )
+        output_lines = [line for line in result.stdout.splitlines() if line.strip()]
+        assert output_lines, "installed template README snapshot produced no JSON output"
+        snapshot = json.loads(output_lines[-1])
+        assert isinstance(snapshot, dict), "installed template README snapshot must be a JSON object"
+        return snapshot
+
+    def _extract_setup_workbench_template_readme_allowlist(self, setup_text: str) -> tuple[str, ...]:
+        parsed_module = ast.parse(setup_text, filename="setup.py")
+        for statement in parsed_module.body:
+            if not isinstance(statement, ast.Assign):
+                continue
+            for target in statement.targets:
+                if isinstance(target, ast.Name) and target.id == "_DISTRIBUTABLE_TEMPLATE_README_PATHS":
+                    extracted = ast.literal_eval(statement.value)
+                    assert isinstance(extracted, tuple)
+                    return tuple(str(item) for item in extracted)
+        pytest.fail("setup.py is missing _DISTRIBUTABLE_TEMPLATE_README_PATHS")
+
     def _issue_69_extract_pyproject_stale_exclusion_patterns(self, pyproject_text: str) -> tuple[str, ...]:
         section_header = "[tool.setuptools.exclude-package-data]"
         assert section_header in pyproject_text, "missing setuptools exclude-package-data section"
@@ -4983,6 +5119,105 @@ class TestInitUpdate(CliRuntimeHarness):
                     f"issue-69 wheel build unexpectedly shipped seeded stale wrapper-era output: {stale_artifact_path}"
                 )
 
+    def test_workbench_readme_build_prune_preserves_allowlist_and_removes_stale_nested_readme(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+            pre_prune_snapshot = temp_root / "wheel-pre-prune-snapshot.json"
+
+            self._issue_69_prepare_build_context(repo_root, build_context)
+            build_env = os.environ.copy()
+            build_env[self._ISSUE_69_SETUP_SEED_STALE_FIXTURES_ENV] = "1"
+            build_env[self._ISSUE_69_SETUP_PRE_PRUNE_SNAPSHOT_ENV] = str(pre_prune_snapshot)
+
+            wheel_path, _, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+                build_env=build_env,
+            )
+
+            snapshot_payload = json.loads(pre_prune_snapshot.read_text(encoding="utf-8"))
+            expected_seeded_fixtures = set(self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
+            expected_readmes_before_prune = {
+                *self._WORKBENCH_TEMPLATE_README_PATHS,
+                "issue/legacy/README.md",
+            }
+            assert set(snapshot_payload.get("expected_seeded_stale_fixture_paths", [])) == expected_seeded_fixtures
+            assert set(snapshot_payload.get("present_before_prune", [])) == expected_seeded_fixtures
+            assert set(snapshot_payload.get("template_readmes_before_prune", [])) == expected_readmes_before_prune
+
+            wheel_payloads = self._collect_wheel_template_readme_payloads(wheel_path)
+            assert set(wheel_payloads) == set(self._WORKBENCH_TEMPLATE_README_PATHS)
+            assert "issue/legacy/README.md" not in wheel_payloads
+
+    def test_workbench_readme_distribution_inventory_and_bytes_match_all_surfaces(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        source_payloads = self._collect_source_template_readme_payloads(repo_root)
+        expected_inventory = set(self._WORKBENCH_TEMPLATE_README_PATHS)
+        assert set(source_payloads) == expected_inventory
+        canonical_workbench_bytes = source_payloads[self._WORKBENCH_README_PATHS[0]]
+        assert all(source_payloads[path] == canonical_workbench_bytes for path in self._WORKBENCH_README_PATHS)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir()
+            self._issue_69_prepare_build_context(repo_root, build_context)
+
+            wheel_path, sdist_path, venv_python = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+            )
+            self._issue_69_install_target_packages(
+                python_executable=venv_python,
+                target_dir=self._issue_69_site_packages_dir(self._issue_69_env_root(venv_python)),
+                requirements=[str(wheel_path)],
+                wheelhouse=self._issue_69_resolve_wheelhouse(repo_root),
+            )
+
+            wheel_payloads = self._collect_wheel_template_readme_payloads(wheel_path)
+            sdist_payloads = self._collect_sdist_template_readme_payloads(sdist_path)
+            installed_snapshot = self._collect_isolated_installed_template_readme_snapshot(
+                venv_python=venv_python,
+                repo_root=repo_root,
+                cwd=isolated_cwd,
+            )
+            self._issue_69_assert_runtime_snapshot_uses_installed_package(
+                snapshot=installed_snapshot,
+                repo_root=repo_root,
+            )
+            installed_hex_payloads = installed_snapshot.get("template_readmes", {})
+            assert isinstance(installed_hex_payloads, dict)
+            installed_payloads = {
+                str(path): bytes.fromhex(str(payload)) for path, payload in installed_hex_payloads.items()
+            }
+
+        surfaces = {
+            "source": source_payloads,
+            "wheel": wheel_payloads,
+            "sdist": sdist_payloads,
+            "installed": installed_payloads,
+        }
+        for surface_name, payloads in surfaces.items():
+            assert set(payloads) == expected_inventory, (
+                f"{surface_name} template README inventory mismatch: {sorted(payloads)}"
+            )
+        for workbench_path in self._WORKBENCH_README_PATHS:
+            assert all(payloads[workbench_path] == canonical_workbench_bytes for payloads in surfaces.values()), (
+                f"Workbench README bytes differ across distribution surfaces: {workbench_path}"
+            )
+
     def test_issue_69_sdist_build_excludes_seeded_stale_wrapper_era_outputs(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
 
@@ -5038,6 +5273,13 @@ class TestInitUpdate(CliRuntimeHarness):
         )
         assert set(setup_cache_patterns) == set(self._ISSUE_69_SETUP_PYTHON_CACHE_EXCLUSION_PATTERNS), (
             "issue-69 setup Python cache exclusions must stay aligned to the approved exact pattern set"
+        )
+        pyproject_data = tomllib.loads(pyproject_text)
+        package_data_paths = set(pyproject_data["tool"]["setuptools"]["package-data"]["spec_dock"])
+        assert set(self._WORKBENCH_PACKAGE_DATA_PATHS).issubset(package_data_paths)
+        assert "assets/spec_dock/templates/*/**/README.md" not in pyproject_patterns
+        assert set(self._extract_setup_workbench_template_readme_allowlist(setup_text)) == set(
+            self._WORKBENCH_TEMPLATE_README_PATHS
         )
 
     def test_issue_69_wheel_and_sdist_exclude_python_cache_from_source_build_context(self) -> None:
