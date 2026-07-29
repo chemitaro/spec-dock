@@ -133,6 +133,161 @@ def test_snapshot_rejects_mutation_or_staging_rehash(
         )
 
 
+def test_descriptor_rooted_open_rejects_artifact_parent_swap(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    session = _session(tmp_path)
+    safe = session / "artifacts" / "candidate.zip"
+    _write_zip(safe)
+    safe_bytes = safe.read_bytes()
+    _write_metadata(session, [_artifact("file", safe)])
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    outside_file = outside / "candidate.zip"
+    outside_file.write_bytes(safe_bytes)
+    original = session / "artifacts-original"
+    swapped = False
+
+    def swap_parent(_parent_fd: int, leaf_name: str) -> None:
+        nonlocal swapped
+        if leaf_name != "candidate.zip" or swapped:
+            return
+        (session / "artifacts").rename(original)
+        (session / "artifacts").symlink_to(outside, target_is_directory=True)
+        swapped = True
+
+    monkeypatch.setattr(artifact_reader, "_before_leaf_open", swap_parent, raising=False)
+    with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected") as error:
+        artifact_reader.snapshot_authoring_zip(
+            session,
+            session_id=session.name,
+            oracle_version="0.16.1",
+            staging_dir=tmp_path / "staging",
+        )
+    assert swapped is True
+    assert str(outside) not in str(error.value)
+    assert safe_bytes not in repr(error.value).encode()
+
+
+def test_descriptor_rooted_open_rejects_session_root_swap_for_metadata(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    session = _session(tmp_path)
+    zip_path = session / "artifacts" / "candidate.zip"
+    _write_zip(zip_path)
+    _write_metadata(session, [_artifact("file", zip_path)])
+    replacement = tmp_path / "replacement-session"
+    replacement.mkdir()
+    (replacement / "meta.json").write_bytes((session / "meta.json").read_bytes())
+    original = session.with_name(f"{session.name}-original")
+    swapped = False
+
+    def swap_root(_parent_fd: int, leaf_name: str) -> None:
+        nonlocal swapped
+        if leaf_name != "meta.json" or swapped:
+            return
+        session.rename(original)
+        session.symlink_to(replacement, target_is_directory=True)
+        swapped = True
+
+    monkeypatch.setattr(artifact_reader, "_before_leaf_open", swap_root)
+    with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+        artifact_reader.snapshot_authoring_zip(
+            session,
+            session_id=session.name,
+            oracle_version="0.16.1",
+            staging_dir=tmp_path / "staging",
+        )
+    assert swapped is True
+
+
+def test_descriptor_rooted_open_fails_closed_without_openat_support(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    session = _session(tmp_path)
+    zip_path = session / "artifacts" / "candidate.zip"
+    _write_zip(zip_path)
+    _write_metadata(session, [_artifact("file", zip_path)])
+    monkeypatch.setattr(artifact_reader.os, "supports_dir_fd", frozenset())
+
+    with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+        artifact_reader.snapshot_authoring_zip(
+            session,
+            session_id=session.name,
+            oracle_version="0.16.1",
+            staging_dir=tmp_path / "staging",
+        )
+
+
+@pytest.mark.parametrize(
+    "overflow",
+    ["entry-count", "entry-size", "total-size", "compression-ratio"],
+)
+def test_zip_central_directory_bounds_reject_before_entry_read(
+    monkeypatch,
+    tmp_path: Path,
+    overflow: str,
+) -> None:
+    session = _session(tmp_path)
+    zip_path = session / "artifacts" / "candidate.zip"
+    compression = zipfile.ZIP_DEFLATED if overflow == "compression-ratio" else zipfile.ZIP_STORED
+    with zipfile.ZipFile(zip_path, "w", compression=compression) as archive:
+        if overflow == "entry-count":
+            for index in range(2049):
+                archive.writestr(f"candidate/{index}.md", "")
+        elif overflow == "entry-size":
+            archive.writestr("candidate/large.md", b"")
+        else:
+            if overflow == "total-size":
+                for index in range(5):
+                    archive.writestr(f"candidate/{index}.md", b"")
+            else:
+                archive.writestr("candidate/high-ratio.md", b"x" * 1024 * 1024)
+    if overflow == "entry-size":
+        _patch_central_sizes(zip_path, [16 * 1024 * 1024 + 1])
+    elif overflow == "total-size":
+        _patch_central_sizes(zip_path, [16 * 1024 * 1024] * 5)
+    _write_metadata(session, [_artifact("file", zip_path)])
+    monkeypatch.setattr(
+        zipfile.ZipFile,
+        "testzip",
+        lambda *_args, **_kwargs: pytest.fail("testzip must not run"),
+    )
+    monkeypatch.setattr(
+        zipfile.ZipExtFile,
+        "read",
+        lambda *_args, **_kwargs: pytest.fail("entry bytes must not be read"),
+    )
+
+    with pytest.raises(artifact_reader.OracleArtifactError, match="oracle_artifact_rejected"):
+        artifact_reader.snapshot_authoring_zip(
+            session,
+            session_id=session.name,
+            oracle_version="0.16.1",
+            staging_dir=tmp_path / "staging",
+        )
+
+
+def _patch_central_sizes(path: Path, sizes: list[int]) -> None:
+    payload = bytearray(path.read_bytes())
+    positions: list[int] = []
+    start = 0
+    while True:
+        position = payload.find(b"PK\x01\x02", start)
+        if position < 0:
+            break
+        positions.append(position)
+        start = position + 4
+    assert len(positions) == len(sizes)
+    for position, size in zip(positions, sizes, strict=True):
+        payload[position + 20 : position + 24] = size.to_bytes(4, "little")
+        payload[position + 24 : position + 28] = size.to_bytes(4, "little")
+    path.write_bytes(payload)
+
+
 @pytest.mark.parametrize(
     "unsafe_kind",
     ["outside", "relative-escape", "parent-symlink", "file-symlink", "directory", "fifo"],
