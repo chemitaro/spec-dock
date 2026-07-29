@@ -3951,6 +3951,225 @@ class TestInitUpdate(CliRuntimeHarness):
         ):
             assert fragment in text
 
+    def test_shipped_docs_describe_workbench_readme_boundary(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        provider_root = repo_root / "src" / "spec_dock" / "assets" / "spec_dock"
+
+        doc_paths = (
+            "docs/README.md",
+            "docs/guide.md",
+            "docs/reference_worktree.md",
+            "templates/README.md",
+        )
+        texts = {
+            relative_path: (provider_root / relative_path).read_text(encoding="utf-8") for relative_path in doc_paths
+        }
+        canonical_text = (provider_root / "templates" / "root" / ".workbench" / "README.md").read_text(encoding="utf-8")
+
+        failures: list[str] = []
+
+        def matches(
+            text: str,
+            alternatives: tuple[tuple[str, ...], ...],
+        ) -> bool:
+            return any(all(fragment in text for fragment in alternative) for alternative in alternatives)
+
+        def require(
+            path: str,
+            concept: str,
+            alternatives: tuple[tuple[str, ...], ...],
+        ) -> None:
+            if not matches(texts[path], alternatives):
+                failures.append(f"{path}: missing {concept}")
+
+        def forbid(path: str, concept: str, fragment: str) -> None:
+            if fragment in texts[path]:
+                failures.append(f"{path}: deprecated {concept}: {fragment!r}")
+
+        artifact_import_command = "./spec-dock/scripts/spec-dock artifact import file ..."
+        workbench_copy_command = "./spec-dock/scripts/spec-dock workbench copy --scope <full-id> --to <linked-worktree>"
+
+        # Canonical README is a read-only S90 precondition, not an S90 edit target.
+        for fragment in (artifact_import_command, workbench_copy_command):
+            assert fragment in canonical_text, (
+                "canonical Workbench README changed; return to planning instead "
+                f"of repairing shipped docs around missing fragment: {fragment!r}"
+            )
+
+        # Minimal common identity and Git boundary in every shipped document.
+        for path in doc_paths:
+            require(path, "optional status", (("optional",),))
+            require(path, "temporary status", (("temporary",), ("一時",)))
+            require(path, "worktree-local status", (("worktree-local",),))
+            require(path, "disposable status", (("disposable",), ("破棄可能",)))
+            require(path, "non-canonical status", (("non-canonical",),))
+            require(
+                path,
+                "direct README tracked / other payload ignored boundary",
+                (
+                    (
+                        ".workbench/README.md",
+                        "README-only tracking",
+                        "ignored payload",
+                    ),
+                    (
+                        ".workbench/README.md",
+                        "direct",
+                        "Git tracking",
+                        "ignore",
+                    ),
+                ),
+            )
+
+        # Shell generation and compatibility belong in overview/guide/template docs.
+        for path in ("docs/README.md", "docs/guide.md", "templates/README.md"):
+            require(
+                path,
+                "fresh root, future nodes, optional presence, and no-backfill",
+                (
+                    (
+                        "fresh root",
+                        "future",
+                        "Initiative",
+                        "Epic",
+                        "Issue",
+                        "no-backfill",
+                    ),
+                    (
+                        "fresh",
+                        "future",
+                        "Initiative",
+                        "Epic",
+                        "Issue",
+                        "existing",
+                        "追加しない",
+                    ),
+                ),
+            )
+
+        # Security and authority must be visible on operator-facing surfaces.
+        for path in (
+            "docs/README.md",
+            "docs/guide.md",
+            "docs/reference_worktree.md",
+        ):
+            require(
+                path,
+                "Git ignore is not a security boundary",
+                (("Git ignore", "security boundary"),),
+            )
+            require(
+                path,
+                "read/import authorization is evidence-only, not canonical",
+                (("read / import", "evidence-only", "canonical"),),
+            )
+
+        # Worktree reference owns detailed checkout/copy mechanics.
+        require(
+            "docs/reference_worktree.md",
+            "tracked README checkout versus manual ignored-payload copy",
+            (("linked worktree", "tracked", "README.md", "Git checkout"),),
+        )
+        require(
+            "docs/reference_worktree.md",
+            "node-only one-shot copy with root excluded",
+            (
+                (
+                    "Initiative",
+                    "Epic",
+                    "Issue",
+                    "ignored payload",
+                    "one-shot",
+                    "root",
+                    "対象外",
+                ),
+            ),
+        )
+        require(
+            "docs/reference_worktree.md",
+            "opaque source-wins behavior preserving destination-only entries",
+            (("source-wins", "destination-only", "README", "filter"),),
+        )
+        require(
+            "docs/reference_worktree.md",
+            "no hook/watch/sync/copy-back",
+            (("automatic hook", "watch", "sync", "copy-back"),),
+        )
+
+        # The docs entrance owns the transitional sibling-Issue availability note.
+        require(
+            "docs/README.md",
+            "Issue #345 planned and unimplemented generic file import",
+            (
+                (
+                    artifact_import_command,
+                    "Issue #345",
+                    "planned",
+                    "unimplemented",
+                ),
+                (
+                    artifact_import_command,
+                    "iss-00345",
+                    "計画",
+                    "未実装",
+                ),
+            ),
+        )
+        require(
+            "docs/README.md",
+            "repo-local generic import is not a global-installer dispatch",
+            (
+                ("repo-local runtime", "global installer", "not available"),
+                ("repo-local runtime", "global installer", "dispatch はない"),
+                ("repo-local runtime", "global installer", "未提供"),
+            ),
+        )
+        require(
+            "docs/README.md",
+            "Issue #346 consumer E2E and full-regression handoff",
+            (
+                (
+                    "Issue #346",
+                    "consumer E2E",
+                    "full regression",
+                    "deferred",
+                ),
+                (
+                    "iss-00346",
+                    "consumer E2E",
+                    "full regression",
+                    "責務",
+                ),
+            ),
+        )
+        require(
+            "docs/reference_worktree.md",
+            "root durable-file route remains planned under Issue #345",
+            (
+                (artifact_import_command, "Issue #345", "unimplemented"),
+                (artifact_import_command, "iss-00345", "未実装"),
+            ),
+        )
+
+        # Context-specific migration guards, not a global ban on these words.
+        forbid(
+            "docs/README.md",
+            "whole Workbench described as Git-untracked",
+            "Workbench は experimental、Git 管理外",
+        )
+        forbid(
+            "docs/guide.md",
+            "whole Workbench described as Git-untracked",
+            "Git 管理外の disposable な一時作業場",
+        )
+        forbid(
+            "templates/README.md",
+            "ambiguous claim that future nodes receive no README",
+            "新規ノードにはテンプレ由来の `README.md` は生成されません。",
+        )
+
+        assert not failures, "shipped Workbench documentation boundary mismatch:\n- " + "\n- ".join(failures)
+
     def test_fresh_init_creates_only_tracked_root_workbench_readme(self) -> None:
         if shutil.which("git") is None:
             pytest.skip("git not available")
