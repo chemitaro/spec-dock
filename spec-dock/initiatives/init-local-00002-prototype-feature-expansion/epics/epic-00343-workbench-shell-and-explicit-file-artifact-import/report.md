@@ -24,10 +24,12 @@ ID: "epic-00343"
   - README amendment後のrequirement、design、planはそれぞれfresh reviewで`pass`した。4 templateのtracked guidance、README以外のignore、no-backfill、evidence-only authority、package distribution contractが確定した。
   - team onboarding ArtifactもREADME contractへ更新した。
   - ユーザーが3 slicesを採用し、`iss-00344` / `iss-00345` / `iss-00346`をGitHub Issue #344 / #345 / #346として作成した。`iss-00346`から`iss-00344` / `iss-00345`へのdirect dependencyをruntime commandで登録した。
+  - `iss-00344`のChatGPT-first Issue planningとfresh reviewを完了し、S01を実装・focused検証・fresh review・Result Approvalまで閉じた。
+  - ユーザーのIssue-local PR要求を反映するdelivery amendmentを作成し、first fresh reviewの3件を限定修正中である。
 - 次のマイルストーン:
-  - dependency-readyな`iss-00344`をstartし、ChatGPT-first Issue planningとfresh reviewを完了する。
+  - delivery amendmentのfresh re-reviewを通過し、`iss-00344`のS02へ進む。
 - ブロッカー:
-  - Epic authoring / Issue creation blockerなし。`iss-00344`のIssue planningは未着手。
+  - `iss-00344` delivery amendmentはfirst fresh reviewのmajor finding 3件を修正中であり、re-review PASSまではS02 admissionを止める。Epic authoring / Issue creation blockerはない。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -79,6 +81,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-036 | adopted | Epic plan adoption and Issue creation approval | user | reviewed requirement / design / planとexactly 3 vertical slicesを採用し、3 Issue作成・dependency登録・Issue 1 planningを依頼 | `plan.md`; created Issue nodes; `report.md` | Issue handoff / approval gate | 人間承認をIssue creation authorityとして採用 | primary | 2026-07-29 user instruction in current session | main orchestrator | runtime verification pending | no | 3 Issueを作成しdependencyを登録 |
 | EAL-037 | adopted | Issue creation and dependency commands | SpecDock runtime | `iss-00344` / `iss-00345` / `iss-00346`作成、`iss-00346 -> iss-00344, iss-00345`登録 | `plan.md`; Issue nodes; `report.md` | progress / handoff | GitHub-linked runtime-owned node creationとdirect edge登録を実測し、`validate` nodes=216、`iss-00344` / `iss-00345` ready、`iss-00346` blockers=2を確認 | command evidence | `new issue`; `deps add`; `deps check`; `validate` outputs | main orchestrator | local verification passed | no | scaffold commit / push後に`iss-00344`をstart |
 | EAL-038 | partially_adopted | Issue 344 delivery-boundary amendment analysis | ChatGPT-Use advisory | Issue 344自身のprovider-first projection/default lane/ready PR/observationと、Issue 346の残余integration境界 | `plan.md`; Issue 344 canonical docs/report | Candidate 1 / 3 delivery、G2、rollout、final handoff | Candidate 1のIssue-local release closureを採用し、candidate wheel/integrated dogfood/opt-in full regression/Epic-wide review/残余Epic PRをCandidate 3へ維持。Issue 346 placeholder docsの先行編集は行わない | corroborated advisory | `issues/iss-00344-workbench-shell-scaffolding/artifacts/20260729t052200z-chatgpt-output-issue-344-delivery-boundary-amendment-analysis.md`; SHA-256 `db258ca6f56e4b0ba7803ddda3f10cfdf8d4b3b620465b58e75a7d2becdfbf82` | main orchestrator | fresh amendment spec review pending | yes | amendment commit/push後にIssue 344 docsと親planを同一exact SHAでreview |
+| EAL-039 | adopted | Issue 344 delivery-boundary first fresh review | ChatGPT-Use `spec-reviewer` responsibility | S90 dependency bypass、post-PR repair後のreview freshness、Epic progress summary drift | Issue 344 `plan.md`; this `report.md` | Candidate 1 S95/S99、current progress | major 3件をすべて限定採用し、S90→S95、branch mutation時のhead-bound gate再実行、S01 closed/amendment pending表示へ修正 | connected GitHub exact-commit review | Issue Artifact `artifacts/20260729t054516z-chatgpt-output-delivery-amendment-spec-review-59737280.md`; reviewed commit `59737280c085977d714797709ef0d9a6ade4412d` | main orchestrator | fresh re-review pending | yes | bounded fix commit/push後にre-review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
