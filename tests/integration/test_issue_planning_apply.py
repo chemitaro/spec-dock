@@ -76,7 +76,23 @@ def _operation(
     module = _module()
     contracts = __import__(
         "spec_dock_runtime.domain.issue_planning_contracts",
-        fromlist=["ReviewedPlanningIdentity", "IssueCandidateIdentity"],
+        fromlist=[
+            "GitBoundOperationBindingV1",
+            "OnboardingCompanionBindingV1",
+            "ReviewedPlanningIdentity",
+            "IssueCandidateIdentity",
+        ],
+    )
+    companion = b"onboarding companion\n"
+    companion_relative = (
+        "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
+    )
+    companion_target = (
+        Path(targets[0]).parent / companion_relative
+    ).as_posix()
+    companion_binding = contracts.OnboardingCompanionBindingV1(
+        path=companion_relative,
+        sha256=hashlib.sha256(companion).hexdigest(),
     )
     candidate = contracts.IssueCandidateIdentity(
         issue_id="iss-00003",
@@ -100,6 +116,14 @@ def _operation(
             candidate_identity=candidate,
         )
     else:
+        operation_binding = contracts.GitBoundOperationBindingV1.create(
+            issue_id="iss-00003",
+            repository="owner/repo",
+            branch="feature/issue",
+            source_head=head,
+            candidate_identity=candidate,
+            onboarding_companion=companion_binding,
+        )
         identity = contracts.ReviewedPlanningIdentity(
             mode=mode,
             issue_id="iss-00003",
@@ -107,6 +131,7 @@ def _operation(
             branch="feature/issue",
             source_head=head,
             canonical_target_paths=targets,
+            git_bound_operation_binding=operation_binding,
             expected_canonical_target_paths=targets,
         )
     blobs = {path: _git(repo, "rev-parse", f"{head}:{path}") for path in targets}
@@ -120,6 +145,7 @@ def _operation(
             Path(path).name: f"new {Path(path).name}\n".encode()
             for path in targets
         }
+    human_decision_bytes = f'{{"decision":"{decision}"}}'.encode()
     return module.PlanningApplyOperation.create(
         issue_id="iss-00003",
         mode=mode,
@@ -129,14 +155,22 @@ def _operation(
         reviewed_identity=identity,
         reviewed_identity_sha256=identity.sha256,
         review_result_sha256="c" * 64,
-        human_decision_sha256="d" * 64,
+        human_decision_sha256=hashlib.sha256(human_decision_bytes).hexdigest(),
         decision=decision,
         canonical_target_paths=targets,
         pre_apply_target_blob_oids=blobs,
-        candidate_identity=candidate if mode == "archive-candidate" else None,
+        candidate_identity=candidate,
+        git_bound_operation_binding_sha256=(
+            None
+            if mode == "archive-candidate"
+            else identity.git_bound_operation_binding.binding_sha256
+        ),
+        companion_target_path=companion_target,
+        companion_sha256=companion_binding.sha256,
         decision_artifact_path=artifact.as_posix(),
-        human_decision_bytes=f'{{"decision":"{decision}"}}'.encode(),
+        human_decision_bytes=human_decision_bytes,
         replacement_documents=replacements,
+        replacement_companion=companion if decision == "approved" else None,
         pre_apply_document_bytes={
             Path(path).name: (repo / path).read_bytes() for path in targets
         },
@@ -164,6 +198,7 @@ def test_apply_against_local_bare_remote(
     output.mkdir()
     operation = _operation(repo, head, targets, mode=mode, decision=decision)
     before = {path: (repo / path).read_bytes() for path in targets}
+    companion_path = repo / operation.companion_target_path
     result = module.execute_planning_apply_transaction(
         operation,
         repo_root=repo,
@@ -189,7 +224,53 @@ def test_apply_against_local_bare_remote(
         assert any((repo / path).read_bytes() != before[path] for path in targets)
     else:
         assert {path: (repo / path).read_bytes() for path in targets} == before
+    if decision == "approved":
+        assert companion_path.read_bytes() == operation.replacement_companion
+    else:
+        assert not companion_path.exists()
     assert result.is_ready is (decision == "approved")
+
+
+def test_git_bound_apply_accepts_exact_existing_companion_as_noop(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, _, targets = _repository(tmp_path)
+    companion_target = (
+        Path(targets[0]).parent
+        / "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
+    )
+    (repo / companion_target).write_bytes(b"onboarding companion\n")
+    _git(repo, "add", "--", companion_target.as_posix())
+    _git(repo, "commit", "-qm", "existing companion")
+    _git(repo, "push", "-q", "origin", "feature/issue")
+    head = _git(repo, "rev-parse", "HEAD")
+    operation = _operation(repo, head, targets, mode="git-bound")
+    before = {path: (repo / path).read_bytes() for path in targets}
+    output = tmp_path / "output"
+    output.mkdir()
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: SimpleNamespace(
+            report=SimpleNamespace(errors=[]),
+        ),
+        sync_runner=lambda: SimpleNamespace(
+            artifact_failure=None,
+            state=SimpleNamespace(deps_preflight_error=None),
+            write_result=None,
+            active_update=None,
+        ),
+    )
+
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert {path: (repo / path).read_bytes() for path in targets} == before
+    assert (repo / companion_target).read_bytes() == b"onboarding companion\n"
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == _git(
+        repo, "rev-parse", "HEAD"
+    )
 
 
 def test_precommit_failure_restores_documents_decision_and_raw_index(tmp_path: Path) -> None:
@@ -222,6 +303,7 @@ def test_precommit_failure_restores_documents_decision_and_raw_index(tmp_path: P
     )
     assert (result.status, result.reason) == ("rolled_back", "planning_commit_failed")
     assert {path: (repo / path).read_bytes() for path in targets} == before
+    assert not (repo / operation.companion_target_path).exists()
     assert not (repo / operation.decision_artifact_path).exists()
     assert module.snapshot_git_index(repo) == index_before
     assert _git(repo, "rev-parse", "HEAD") == head
@@ -240,7 +322,7 @@ def test_push_failure_keeps_local_commit_for_same_operation_retry(
     real_run = module._run_git
     fail = [True]
 
-    def run_git(repo_root: Path, argv: tuple[str, ...], *, check: bool = True):
+    def run_git(repo_root: Path, argv: tuple[str, ...], *, check: bool = False):
         if argv and argv[0] == "push" and fail[0]:
             fail[0] = False
             return module.GitCommandResult(returncode=1, stdout=b"", stderr=b"hidden")
@@ -435,6 +517,8 @@ def test_validation_and_sync_failures_restore_exact_baseline(
         "after_requirement_replace",
         "after_design_replace",
         "after_plan_replace",
+        "after_companion_write",
+        "after_companion_parity",
         "after_canonical_proof",
         "after_validation",
         "after_sync",
@@ -474,6 +558,7 @@ def test_each_precommit_fault_checkpoint_rolls_back(
     )
     assert result.status == "rolled_back"
     assert {path: (repo / path).read_bytes() for path in targets} == before
+    assert not (repo / operation.companion_target_path).exists()
     assert not (repo / operation.decision_artifact_path).exists()
     assert _git(repo, "rev-parse", "HEAD") == head
     assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
@@ -561,7 +646,7 @@ def test_retry_remote_divergence_is_blocked_without_force(
     real_run = module._run_git
     fail = [True]
 
-    def run_git(repo_root: Path, argv: tuple[str, ...], *, check: bool = True):
+    def run_git(repo_root: Path, argv: tuple[str, ...], *, check: bool = False):
         if argv and argv[0] == "push" and fail[0]:
             fail[0] = False
             return module.GitCommandResult(returncode=1, stdout=b"", stderr=b"hidden")
@@ -828,6 +913,10 @@ def test_application_retry_reaches_same_operation_publication(
             "design.md": b"new design.md\n",
             "plan.md": b"new plan.md\n",
             "requirement.md": b"new requirement.md\n",
+            (
+                "artifacts/"
+                "20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
+            ): b"onboarding companion\n",
         },
         source_baseline={
             "canonical_issue_paths": list(targets),
@@ -835,6 +924,13 @@ def test_application_retry_reaches_same_operation_publication(
             "source_manifest_hash": "c" * 64,
         },
         zip_bytes=b"candidate",
+        onboarding_companion=contracts.OnboardingCompanionBindingV1(
+            path=(
+                "artifacts/"
+                "20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
+            ),
+            sha256=hashlib.sha256(b"onboarding companion\n").hexdigest(),
+        ),
     )
     record = infra_contracts.StoredMetaRecord(
         kind="issue",
@@ -862,7 +958,7 @@ def test_application_retry_reaches_same_operation_publication(
     real_run = module._run_git
     fail_push = [True]
 
-    def run_git(repo_root: Path, argv: tuple[str, ...], *, check: bool = True):
+    def run_git(repo_root: Path, argv: tuple[str, ...], *, check: bool = False):
         if argv and argv[0] == "push" and fail_push[0]:
             fail_push[0] = False
             return module.GitCommandResult(returncode=1, stdout=b"", stderr=b"hidden")
@@ -919,6 +1015,7 @@ def test_application_retry_reaches_same_operation_publication(
         "after_operation_recorded",
         "after_decision_write",
         "after_plan_replace",
+        "after_companion_write",
         "after_index_stage",
     ],
 )
@@ -970,6 +1067,7 @@ def test_interrupted_precommit_transaction_retry_restores_durable_backup(
         "planning_commit_failed",
     )
     assert {path: (repo / path).read_bytes() for path in targets} == documents_before
+    assert not (repo / operation.companion_target_path).exists()
     assert module.snapshot_git_index(repo) == index_before
     assert module.snapshot_managed_sync_state(repo) == managed_before
     assert not (repo / operation.decision_artifact_path).exists()

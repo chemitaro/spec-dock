@@ -20,6 +20,12 @@ from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
 )
 
 HEAD = "a" * 40
+COMPANION = b"onboarding companion\n"
+COMPANION_SHA = hashlib.sha256(COMPANION).hexdigest()
+COMPANION_TARGET = (
+    "spec-dock/initiatives/i/epics/e/issues/x/artifacts/"
+    "20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
+)
 
 
 def _module():
@@ -55,6 +61,7 @@ def _identity() -> ReviewedPlanningIdentity:
 def _operation(**changes: object):
     module = _module()
     identity = _identity()
+    human_decision_bytes = b'{"decision":"approved"}'
     values: dict[str, object] = {
         "issue_id": "iss-00003",
         "mode": "archive-candidate",
@@ -64,7 +71,7 @@ def _operation(**changes: object):
         "reviewed_identity": identity,
         "reviewed_identity_sha256": identity.sha256,
         "review_result_sha256": "c" * 64,
-        "human_decision_sha256": "d" * 64,
+        "human_decision_sha256": hashlib.sha256(human_decision_bytes).hexdigest(),
         "decision": "approved",
         "canonical_target_paths": (
             "spec-dock/initiatives/i/epics/e/issues/x/design.md",
@@ -77,16 +84,20 @@ def _operation(**changes: object):
             "spec-dock/initiatives/i/epics/e/issues/x/requirement.md": "3" * 40,
         },
         "candidate_identity": identity.candidate_identity,
+        "git_bound_operation_binding_sha256": None,
+        "companion_target_path": COMPANION_TARGET,
+        "companion_sha256": COMPANION_SHA,
         "decision_artifact_path": (
             "spec-dock/initiatives/i/epics/e/issues/x/artifacts/"
             "20260728t000000z-planning-human-decision-placeholder.json"
         ),
-        "human_decision_bytes": b'{"decision":"approved"}',
+        "human_decision_bytes": human_decision_bytes,
         "replacement_documents": {
             "design.md": b"new design\n",
             "plan.md": b"new plan\n",
             "requirement.md": b"new requirement\n",
         },
+        "replacement_companion": COMPANION,
         "pre_apply_document_bytes": {
             "design.md": b"old design\n",
             "plan.md": b"old plan\n",
@@ -112,6 +123,8 @@ def test_operation_identity_is_canonical_and_excludes_private_bytes() -> None:
     assert payload.endswith(b"\n")
     assert b"human_decision_bytes" not in payload
     assert b"replacement_documents" not in payload
+    assert b"onboarding companion" not in payload
+    assert b'"replacement_companion_present":true' in payload
     assert hashlib.sha256(payload).hexdigest() == first.operation_id
 
 
@@ -181,6 +194,33 @@ def test_restore_mismatch_is_detected(tmp_path: Path, monkeypatch: pytest.Monkey
     monkeypatch.setattr(module, "_atomic_write_exact", corrupt)
     with pytest.raises(module.PlanningApplyRestoreMismatch):
         module.restore_regular_file(target, snapshot)
+
+
+def test_absent_companion_snapshot_restores_exact_absence(tmp_path: Path) -> None:
+    module = _module()
+    target = tmp_path / "companion.md"
+    snapshot = module.snapshot_regular_file(target)
+    assert snapshot.existed is False
+    target.write_bytes(COMPANION)
+    module.restore_regular_file(target, snapshot)
+    assert not target.exists()
+
+
+@pytest.mark.parametrize("kind", ["symlink", "directory"])
+def test_unsafe_companion_destination_is_rejected_before_mutation(
+    tmp_path: Path,
+    kind: str,
+) -> None:
+    module = _module()
+    target = tmp_path / "companion.md"
+    if kind == "symlink":
+        destination = tmp_path / "destination.md"
+        destination.write_bytes(b"outside\n")
+        target.symlink_to(destination)
+    else:
+        target.mkdir()
+    with pytest.raises(ValueError, match="regular non-symlink"):
+        module.snapshot_regular_file(target)
 
 
 def test_git_index_snapshot_uses_raw_bytes(tmp_path: Path) -> None:

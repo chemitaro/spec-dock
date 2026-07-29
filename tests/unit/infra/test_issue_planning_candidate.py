@@ -1,5 +1,8 @@
+from collections.abc import Callable
 from datetime import datetime, timezone
 import hashlib
+import io
+import json
 import os
 from pathlib import Path
 import shutil
@@ -30,7 +33,45 @@ def _files() -> dict[str, bytes]:
         "design.md": b"design\n",
         "plan.md": b"plan\n",
         "requirement.md": b"requirement\n",
+        "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md": (
+            b"guide\n"
+        ),
     }
+
+
+COMPANION_PATH = (
+    "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
+)
+
+
+def _companion() -> bytes:
+    preface = """
+# First-day onboarding
+
+Purpose and authority for init-00001, epic-00002, and iss-00003.
+This subordinate guide explains the current architecture and target architecture.
+ChatGPT First planning lifecycle workflow uses Oracle, not chatgpt-use.
+Candidate, Review, Human decision, and apply use the exact current branch.
+S01 through S07, S08, and S14 describe the provider and projection roadmap.
+Failure handling is documented for the first day.
+Canonical authority remains requirement.md, design.md, and plan.md.
+"""
+    roles = (
+        "system context",
+        "responsibility authority boundary",
+        "planning sequence",
+        "implementation roadmap",
+    )
+    blocks = "".join(
+        "\n```plantuml\n"
+        "@startuml\n"
+        f"title {role}\n"
+        "actor Human\n"
+        "@enduml\n"
+        "```\n"
+        for role in roles
+    )
+    return (preface + blocks).encode()
 
 
 def test_zip_bytes_are_reproducible_for_fixed_inputs_and_timestamp(tmp_path: Path) -> None:
@@ -134,7 +175,8 @@ def _valid_candidate(
             ("plan.md", "実装計画書（Issue）"),
         )
     }
-    payload = domain.render_planner_payload(documents)
+    companion = _companion()
+    source_payload = b"exact four-file Oracle authoring ZIP"
     context = contracts.PlanningContext(
         issue_id="iss-00003",
         repository="owner/repo",
@@ -150,6 +192,7 @@ def _valid_candidate(
         ),
         relevant_source_paths=(),
         operator_context=(),
+        onboarding_companion_path=COMPANION_PATH,
     )
     source = contracts.PlanningSourceEvidence(
         repository="owner/repo",
@@ -163,10 +206,13 @@ def _valid_candidate(
     )
     material = domain.build_candidate_material(
         planner_documents=documents,
+        onboarding_companion_path=COMPANION_PATH,
+        onboarding_companion_bytes=companion,
         baseline=domain.parse_current_front_matter_baseline(documents),
         context=context,
         source_evidence=source,
-        planner_payload=payload,
+        source_payload_sha256=hashlib.sha256(source_payload).hexdigest(),
+        source_payload_size=len(source_payload),
         operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
     )
     repo = tmp_path / "repo"
@@ -178,7 +224,114 @@ def _valid_candidate(
         repo_root=repo,
         material=material,
     )
+    with zipfile.ZipFile(output / published.identity.logical_filename) as archive:
+        assert len(archive.namelist()) == 8
+    assert published.onboarding_companion.path == COMPANION_PATH
+    assert published.onboarding_companion.sha256 == hashlib.sha256(companion).hexdigest()
     return repo, output / published.identity.logical_filename, published.identity
+
+
+def _rewrite_candidate(
+    candidate: Path,
+    mutate: Callable[[dict[str, bytes]], None],
+) -> None:
+    original = candidate.read_bytes()
+    with zipfile.ZipFile(io.BytesIO(original)) as source:
+        entries = {name: source.read(name) for name in source.namelist()}
+    mutate(entries)
+    with zipfile.ZipFile(candidate, "w") as destination:
+        for name, payload in entries.items():
+            destination.writestr(name, payload)
+
+
+def test_load_validated_authoring_zip_accepts_exact_four_file_inventory_and_alias(
+    tmp_path: Path,
+) -> None:
+    repo, candidate, _ = _valid_candidate(tmp_path)
+    root = "20260729t120000z-iss-00003-issue-planning-authoring-v1"
+    logical = f"{root}.zip"
+    authoring = tmp_path / logical
+    with zipfile.ZipFile(candidate) as source:
+        candidate_root = source.namelist()[0].split("/", 1)[0]
+        files = {
+            path: source.read(f"{candidate_root}/{path}")
+            for path in ("design.md", "plan.md", "requirement.md", COMPANION_PATH)
+        }
+    _infra().build_deterministic_zip(
+        authoring,
+        root,
+        files,
+        datetime(2026, 7, 29, 12, 0, tzinfo=timezone.utc),
+    )
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["OracleAuthoringZipSnapshot"],
+    )
+    payload = authoring.read_bytes()
+    snapshot = contracts.OracleAuthoringZipSnapshot(
+        expected_logical_filename=logical,
+        observed_transport_filename=f"{root} (2).zip",
+        internal_root=root,
+        size_bytes=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+        zip_bytes=payload,
+    )
+    loaded = _infra().load_validated_issue_authoring_payload(
+        snapshot,
+        expected_companion_path=COMPANION_PATH,
+        repo_root=repo,
+    )
+    assert set(loaded.documents) == {"design.md", "plan.md", "requirement.md"}
+    assert loaded.onboarding_companion_path == COMPANION_PATH
+    assert loaded.onboarding_companion_bytes == files[COMPANION_PATH]
+
+
+@pytest.mark.parametrize("damage", ["zero-role", "multiple-role", "checksum", "blob"])
+def test_load_verified_candidate_rejects_invalid_companion_binding(
+    tmp_path: Path,
+    damage: str,
+) -> None:
+    repo, candidate, _ = _valid_candidate(tmp_path)
+
+    def mutate(entries: dict[str, bytes]) -> None:
+        root = candidate.stem
+        manifest_name = f"{root}/MANIFEST.json"
+        checksums_name = f"{root}/CHECKSUMS.sha256"
+        companion_name = f"{root}/{COMPANION_PATH}"
+        if damage in {"zero-role", "multiple-role"}:
+            manifest = json.loads(entries[manifest_name])
+            companion_entry = next(
+                entry
+                for entry in manifest["entries"]
+                if entry["path"] == COMPANION_PATH
+            )
+            companion_entry["role"] = "artifact"
+            if damage == "multiple-role":
+                next(
+                    entry
+                    for entry in manifest["entries"]
+                    if entry["path"] == "design.md"
+                )["role"] = "onboarding-companion"
+            entries[manifest_name] = (
+                json.dumps(
+                    manifest,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+                + b"\n"
+            )
+        elif damage == "checksum":
+            entries[checksums_name] = entries[checksums_name].replace(
+                hashlib.sha256(entries[companion_name]).hexdigest().encode(),
+                b"0" * 64,
+            )
+        else:
+            entries[companion_name] += b"tampered\n"
+
+    _rewrite_candidate(candidate, mutate)
+    with pytest.raises(_infra().CandidateArchiveRejected):
+        _infra().load_verified_issue_candidate(candidate, repo)
 
 
 @pytest.mark.parametrize("renamed", ["candidate-copy.zip", "candidate (0).zip", "candidate.zip.bak"])

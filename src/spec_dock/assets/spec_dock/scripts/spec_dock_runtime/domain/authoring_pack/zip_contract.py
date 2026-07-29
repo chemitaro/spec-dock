@@ -95,25 +95,63 @@ class ZipReviewProfile:
 def issue_candidate_v1_profile(
     *,
     expected_root: str,
+    expected_companion_path: str,
     cross_file_validator: Callable[[Mapping[str, bytes], str], tuple[str, ...]],
 ) -> ZipReviewProfile:
-    required = (
-        "CHECKSUMS.sha256",
-        "MANIFEST.json",
-        "PLACEHOLDER-ORACLE-MAP.json",
-        "SOURCE-BASELINE.json",
-        "design.md",
-        "plan.md",
-        "requirement.md",
+    required = tuple(
+        sorted(
+            (
+                "CHECKSUMS.sha256",
+                "MANIFEST.json",
+                "PLACEHOLDER-ORACLE-MAP.json",
+                "SOURCE-BASELINE.json",
+                "design.md",
+                "plan.md",
+                "requirement.md",
+                expected_companion_path,
+            ),
+            key=lambda value: value.encode("utf-8"),
+        )
     )
     return ZipReviewProfile(
         name="issue-planning-candidate-v1",
         expected_root=expected_root,
         required_paths=required,
         allowed_suffixes=frozenset({".md", ".json", ".sha256"}),
-        max_file_count=7,
+        max_file_count=8,
         max_entry_bytes=2_000_000,
         max_total_bytes=10_000_000,
+        max_entry_compression_ratio=100,
+        max_total_compression_ratio=100,
+        cross_file_validator=cross_file_validator,
+    )
+
+
+def issue_authoring_v1_profile(
+    *,
+    expected_root: str,
+    expected_companion_path: str,
+    cross_file_validator: Callable[[Mapping[str, bytes], str], tuple[str, ...]],
+) -> ZipReviewProfile:
+    required = tuple(
+        sorted(
+            (
+                "design.md",
+                "plan.md",
+                "requirement.md",
+                expected_companion_path,
+            ),
+            key=lambda value: value.encode("utf-8"),
+        )
+    )
+    return ZipReviewProfile(
+        name="issue-planning-authoring-v1",
+        expected_root=expected_root,
+        required_paths=required,
+        allowed_suffixes=frozenset({".md"}),
+        max_file_count=4,
+        max_entry_bytes=2_000_000,
+        max_total_bytes=8_000_000,
         max_entry_compression_ratio=100,
         max_total_compression_ratio=100,
         cross_file_validator=cross_file_validator,

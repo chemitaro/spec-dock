@@ -319,7 +319,6 @@ def test_recovery_revalidates_path_identity_before_harvest(
     assert sum("--harvest" in argv for argv in calls) == 0
     assert result.authoring_zip is None
     assert result.review_json is None
-    assert result.transient_payload is None
 
 
 @pytest.mark.parametrize(
@@ -394,7 +393,8 @@ def test_public_adapter_normalizes_unsafe_planner_root_constructor_failure(
     result = _invoke(tmp_path)
 
     assert (result.status, result.reason) == ("rejected", "oracle_artifact_rejected")
-    assert result.transient_payload is None
+    assert result.authoring_zip is None
+    assert result.review_json is None
     assert "candidate" not in repr(result)
 
 
@@ -420,7 +420,8 @@ def test_public_adapter_normalizes_strict_reviewer_json_failures(
     result = _invoke(tmp_path, role="reviewer")
 
     assert (result.status, result.reason) == ("rejected", "oracle_artifact_rejected")
-    assert result.transient_payload is None
+    assert result.authoring_zip is None
+    assert result.review_json is None
     assert invalid_json.decode() not in repr(result)
 
 
@@ -447,7 +448,8 @@ def test_public_adapter_normalizes_unsupported_zip_features(
     result = _invoke(tmp_path)
 
     assert (result.status, result.reason) == ("rejected", "oracle_artifact_rejected")
-    assert result.transient_payload is None
+    assert result.authoring_zip is None
+    assert result.review_json is None
     assert "requirement.md" not in repr(result)
 
 
@@ -474,7 +476,8 @@ def test_public_adapter_rejects_zip_entry_count_overflow(
     _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
     result = _invoke(tmp_path)
     assert (result.status, result.reason) == ("rejected", "oracle_artifact_rejected")
-    assert result.transient_payload is None
+    assert result.authoring_zip is None
+    assert result.review_json is None
 
 
 @pytest.mark.parametrize("role", ["planner", "semantic_revision", "reviewer"])
@@ -497,7 +500,8 @@ def test_cross_kind_output_is_rejected(monkeypatch, tmp_path: Path, role: str) -
     _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
     result = _invoke(tmp_path, role=role)
     assert (result.status, result.reason) == ("rejected", "oracle_artifact_missing")
-    assert result.transient_payload is None
+    assert result.authoring_zip is None
+    assert result.review_json is None
 
 
 def test_prompt_pack_preserves_exact_binary_attachment_bytes(tmp_path: Path) -> None:
@@ -573,7 +577,8 @@ def test_exact_repository_access_failure_is_blocked(
         "blocked",
         "github_exact_branch_unavailable",
     )
-    assert result.transient_payload is None
+    assert result.authoring_zip is None
+    assert result.review_json is None
 
 
 @pytest.mark.parametrize("role", ["planner", "semantic_revision"])
@@ -607,7 +612,7 @@ def test_authoring_zip_with_repository_access_failure_near_match_is_rejected(
         "oracle_artifact_rejected",
     )
     assert result.authoring_zip is None
-    assert result.transient_payload is None
+    assert result.review_json is None
 
 
 @pytest.mark.parametrize(
@@ -641,7 +646,7 @@ def test_authoring_zip_rejects_malformed_or_multiple_transcript_state(
         "oracle_artifact_rejected",
     )
     assert result.authoring_zip is None
-    assert result.transient_payload is None
+    assert result.review_json is None
 
 
 def test_authoring_zip_with_normal_success_transcript_is_accepted(

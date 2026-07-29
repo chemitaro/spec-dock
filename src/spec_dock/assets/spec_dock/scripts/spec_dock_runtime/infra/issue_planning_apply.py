@@ -13,6 +13,8 @@ import tempfile
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Literal
 
+from spec_dock_runtime.domain.issue_planning_candidate import DOCUMENT_NAMES
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
@@ -163,9 +165,13 @@ class PlanningApplyOperation:
     canonical_target_paths: tuple[str, str, str]
     pre_apply_target_blob_oids: Mapping[str, str]
     candidate_identity: IssueCandidateIdentity | None
+    git_bound_operation_binding_sha256: str | None
+    companion_target_path: str
+    companion_sha256: str
     decision_artifact_path: str
     human_decision_bytes: bytes = field(repr=False)
     replacement_documents: Mapping[str, bytes] = field(repr=False)
+    replacement_companion: bytes | None = field(repr=False)
     pre_apply_document_bytes: Mapping[str, bytes] = field(repr=False)
 
     @classmethod
@@ -185,9 +191,13 @@ class PlanningApplyOperation:
         canonical_target_paths: tuple[str, str, str],
         pre_apply_target_blob_oids: Mapping[str, str],
         candidate_identity: IssueCandidateIdentity | None,
+        git_bound_operation_binding_sha256: str | None,
+        companion_target_path: str | None,
+        companion_sha256: str | None,
         decision_artifact_path: str,
         human_decision_bytes: bytes,
         replacement_documents: Mapping[str, bytes],
+        replacement_companion: bytes | None,
         pre_apply_document_bytes: Mapping[str, bytes],
     ) -> PlanningApplyOperation:
         if mode not in ("archive-candidate", "git-bound"):
@@ -205,12 +215,71 @@ class PlanningApplyOperation:
                 raise ValueError("planning apply digest must be lowercase SHA-256")
         if reviewed_identity.sha256 != reviewed_identity_sha256:
             raise ValueError("reviewed identity digest mismatch")
+        if candidate_identity is None:
+            raise ValueError("planning apply requires Candidate identity")
+        if (
+            reviewed_identity.mode != mode
+            or reviewed_identity.issue_id != issue_id
+            or reviewed_identity.repository != repository
+            or reviewed_identity.branch != branch
+            or reviewed_identity.source_head != expected_head
+        ):
+            raise ValueError("reviewed identity does not match apply target")
         if tuple(sorted(canonical_target_paths, key=lambda value: value.encode())) != tuple(
             canonical_target_paths
         ):
             raise ValueError("canonical target paths must be byte-sorted")
         for path in canonical_target_paths:
             _safe_repo_relative(path)
+        if companion_target_path is None or companion_sha256 is None:
+            raise ValueError("planning apply requires companion evidence")
+        companion_path = _safe_repo_relative(companion_target_path).as_posix()
+        issue_dir = PurePosixPath(canonical_target_paths[0]).parent
+        if (
+            PurePosixPath(companion_path).parent != issue_dir / "artifacts"
+            or PurePosixPath(companion_path).suffix != ".md"
+        ):
+            raise ValueError("companion target must be beneath the Issue artifacts directory")
+        if _SHA256.fullmatch(companion_sha256) is None:
+            raise ValueError("companion SHA must be lowercase SHA-256")
+        if mode == "git-bound":
+            binding = reviewed_identity.git_bound_operation_binding
+            if (
+                git_bound_operation_binding_sha256 is None
+                or _SHA256.fullmatch(git_bound_operation_binding_sha256) is None
+                or binding is None
+                or binding.binding_sha256
+                != git_bound_operation_binding_sha256
+                or binding.candidate_identity != candidate_identity
+                or binding.onboarding_companion.path
+                != PurePosixPath(companion_path).relative_to(issue_dir).as_posix()
+                or binding.onboarding_companion.sha256 != companion_sha256
+                or reviewed_identity.canonical_target_paths != canonical_target_paths
+            ):
+                raise ValueError("git-bound operation binding mismatch")
+        elif (
+            git_bound_operation_binding_sha256 is not None
+            or reviewed_identity.candidate_identity != candidate_identity
+        ):
+            raise ValueError("archive apply Candidate identity mismatch")
+        if (
+            set(pre_apply_target_blob_oids) != set(canonical_target_paths)
+            or set(pre_apply_document_bytes) != set(DOCUMENT_NAMES)
+            or any(_SHA40.fullmatch(value) is None for value in pre_apply_target_blob_oids.values())
+            or hashlib.sha256(human_decision_bytes).hexdigest()
+            != human_decision_sha256
+        ):
+            raise ValueError("planning apply preimage evidence mismatch")
+        expected_documents = set(DOCUMENT_NAMES) if decision == "approved" and mode == "archive-candidate" else set()
+        if set(replacement_documents) != expected_documents:
+            raise ValueError("replacement document inventory does not match apply mode")
+        if (replacement_companion is not None) != (decision == "approved"):
+            raise ValueError("replacement companion does not match Human decision")
+        if (
+            replacement_companion is not None
+            and hashlib.sha256(replacement_companion).hexdigest() != companion_sha256
+        ):
+            raise ValueError("replacement companion SHA mismatch")
         core: dict[str, object] = {
             "schema_version": _OPERATION_SCHEMA,
             "issue_id": issue_id,
@@ -230,6 +299,10 @@ class PlanningApplyOperation:
             "candidate_identity": (
                 None if candidate_identity is None else candidate_identity.to_dict()
             ),
+            "git_bound_operation_binding_sha256": git_bound_operation_binding_sha256,
+            "companion_target_path": companion_path,
+            "companion_sha256": companion_sha256,
+            "replacement_companion_present": replacement_companion is not None,
         }
         core_bytes = _canonical_json_bytes(core)
         operation_id = hashlib.sha256(core_bytes).hexdigest()
@@ -258,9 +331,15 @@ class PlanningApplyOperation:
             canonical_target_paths=canonical_target_paths,
             pre_apply_target_blob_oids=MappingProxyType(dict(pre_apply_target_blob_oids)),
             candidate_identity=candidate_identity,
+            git_bound_operation_binding_sha256=git_bound_operation_binding_sha256,
+            companion_target_path=companion_path,
+            companion_sha256=companion_sha256,
             decision_artifact_path=deterministic_artifact,
             human_decision_bytes=bytes(human_decision_bytes),
             replacement_documents=MappingProxyType(dict(replacement_documents)),
+            replacement_companion=(
+                None if replacement_companion is None else bytes(replacement_companion)
+            ),
             pre_apply_document_bytes=MappingProxyType(dict(pre_apply_document_bytes)),
         )
 
@@ -717,6 +796,25 @@ def execute_planning_apply_transaction(
         return _operation_result(operation, status="stale", reason="apply_target_changed")
     if _git_bound_targets_are_stale(operation, repo_root):
         return _operation_result(operation, status="stale", reason="apply_target_changed")
+    companion_path = repo_root / operation.companion_target_path
+    try:
+        companion_snapshot = snapshot_regular_file(companion_path)
+    except (OSError, ValueError):
+        return _operation_result(
+            operation,
+            status="rejected",
+            reason="apply_output_rejected",
+        )
+    if (
+        operation.replacement_companion is not None
+        and companion_snapshot.existed
+        and companion_snapshot.data != operation.replacement_companion
+    ):
+        return _operation_result(
+            operation,
+            status="stale",
+            reason="apply_target_changed",
+        )
     decision_parent = (repo_root / operation.decision_artifact_path).parent
     if (
         not decision_parent.is_dir()
@@ -742,6 +840,7 @@ def execute_planning_apply_transaction(
             path: snapshot_regular_file(repo_root / path)
             for path in operation.canonical_target_paths
         }
+        file_snapshots[operation.companion_target_path] = companion_snapshot
         decision_path = repo_root / operation.decision_artifact_path
         decision_snapshot = snapshot_regular_file(decision_path)
         if decision_snapshot.existed:
@@ -793,6 +892,21 @@ def execute_planning_apply_transaction(
                 filename = PurePosixPath(relative).name
                 if (repo_root / relative).read_bytes() != operation.replacement_documents[filename]:
                     raise _ApplyFailure("candidate_parity_failed")
+        if operation.replacement_companion is not None:
+            if not companion_snapshot.existed:
+                _atomic_write_exact(
+                    companion_path,
+                    operation.replacement_companion,
+                    mode=0o644,
+                )
+            if fault_hook is not None:
+                fault_hook("after_companion_write")
+            if companion_path.read_bytes() != operation.replacement_companion:
+                raise _ApplyFailure("candidate_parity_failed")
+            if fault_hook is not None:
+                fault_hook("after_companion_parity")
+        if _git_bound_targets_are_stale(operation, repo_root):
+            raise _ApplyFailure("apply_target_changed")
         if fault_hook is not None:
             fault_hook("after_canonical_proof")
 
@@ -823,6 +937,11 @@ def execute_planning_apply_transaction(
                 for relative in operation.canonical_target_paths
                 if (repo_root / relative).read_bytes() != file_snapshots[relative].data
             )
+        if (
+            operation.replacement_companion is not None
+            and not companion_snapshot.existed
+        ):
+            expected_paths.add(operation.companion_target_path)
         changed = _changed_paths(repo_root)
         untracked = _git_text(
             repo_root,
@@ -1115,6 +1234,10 @@ def _restore_transaction(
     if fault_hook is not None:
         fault_hook("during_restore")
     restore_managed_sync_state(repo_root, managed_snapshot)
+    restore_regular_file(
+        repo_root / operation.companion_target_path,
+        file_snapshots[operation.companion_target_path],
+    )
     for relative in reversed(operation.canonical_target_paths):
         restore_regular_file(repo_root / relative, file_snapshots[relative])
     restore_regular_file(repo_root / operation.decision_artifact_path, decision_snapshot)
@@ -1170,7 +1293,7 @@ def _resume_publication(
         local_commit,
     )
     trailer = _git_text(repo_root, "show", "-s", "--format=%B", local_commit)
-    expected_paths = _expected_operation_commit_paths(operation)
+    expected_paths = _expected_operation_commit_paths(operation, repo_root)
     decision_path = repo_root / operation.decision_artifact_path
     if (
         _SHA40.fullmatch(local_commit) is None
@@ -1246,7 +1369,10 @@ def _resume_publication(
     )
 
 
-def _expected_operation_commit_paths(operation: PlanningApplyOperation) -> set[str]:
+def _expected_operation_commit_paths(
+    operation: PlanningApplyOperation,
+    repo_root: Path,
+) -> set[str]:
     paths = {operation.decision_artifact_path}
     if operation.mode == "archive-candidate" and operation.decision == "approved":
         for relative in operation.canonical_target_paths:
@@ -1256,6 +1382,14 @@ def _expected_operation_commit_paths(operation: PlanningApplyOperation) -> set[s
                 != operation.pre_apply_document_bytes.get(filename)
             ):
                 paths.add(relative)
+    if operation.decision == "approved":
+        reviewed_companion = _git_text(
+            repo_root,
+            "rev-parse",
+            f"{operation.expected_head}:{operation.companion_target_path}",
+        )
+        if reviewed_companion is None:
+            paths.add(operation.companion_target_path)
     return paths
 
 
@@ -1274,6 +1408,13 @@ def _operation_documents_match_committed_state(
             if (repo_root / relative).read_bytes() != expected:
                 return False
         except OSError:
+            return False
+    if operation.decision == "approved":
+        try:
+            companion = (repo_root / operation.companion_target_path).read_bytes()
+        except OSError:
+            return False
+        if hashlib.sha256(companion).hexdigest() != operation.companion_sha256:
             return False
     return True
 
@@ -1431,14 +1572,22 @@ def _load_transaction_backup(
     file_snapshots: dict[str, FileSnapshot] = {}
     expected_file_backups: set[str] = set()
     files_dir = transaction / "files"
+    allowed_file_paths = {
+        *operation.canonical_target_paths,
+        operation.companion_target_path,
+    }
     for value in file_values:
         if (
             not isinstance(value, dict)
             or set(value) != {"path", "backup", "existed", "mode", "sha256"}
             or not isinstance(value.get("path"), str)
-            or value["path"] not in operation.canonical_target_paths
+            or value["path"] not in allowed_file_paths
             or value["path"] in file_snapshots
-            or value.get("existed") is not True
+            or not isinstance(value.get("existed"), bool)
+            or (
+                value["path"] in operation.canonical_target_paths
+                and value["existed"] is not True
+            )
             or isinstance(value.get("mode"), bool)
             or not isinstance(value.get("mode"), int)
             or not isinstance(value.get("sha256"), str)
@@ -1456,13 +1605,13 @@ def _load_transaction_backup(
             raise ValueError("transaction file backup mismatch")
         expected_file_backups.add(expected_backup)
         file_snapshots[value["path"]] = FileSnapshot(
-            existed=True,
+            existed=value["existed"],
             data=data,
             mode=value["mode"],
             sha256=value["sha256"],
         )
     if (
-        set(file_snapshots) != set(operation.canonical_target_paths)
+        set(file_snapshots) != allowed_file_paths
         or not _owned_private_directory(files_dir)
         or {path.name for path in files_dir.iterdir()} != expected_file_backups
     ):

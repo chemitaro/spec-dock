@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -29,10 +29,9 @@ from spec_dock_runtime.domain.issue_planning_candidate import (
     apply_mechanical_revision,
     build_candidate_material,
     parse_current_front_matter_baseline,
-    parse_planner_payload,
-    render_planner_payload,
 )
 from spec_dock_runtime.domain.issue_planning_contracts import (
+    GitBoundOperationBindingV1,
     PlanningCommandResult,
     PlanningContext,
     PlanningHumanDecisionV1,
@@ -61,6 +60,7 @@ from spec_dock_runtime.infra.issue_planning_candidate import (
     PublishedCandidate,
     VerifiedIssueCandidate,
     build_and_publish_candidate,
+    load_validated_issue_authoring_payload,
     load_verified_issue_candidate,
     open_safe_directory_descriptor,
     read_bounded_regular_file,
@@ -244,6 +244,12 @@ def run_issue_planning_apply(
             issue_id=issue_id,
         )
     issue_id = target.issue_id
+    if request.mode == "git-bound" and request.candidate_path is None:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="operation_candidate_required",
+            issue_id=issue_id,
+        )
     if not _apply_mode_options_are_closed(request):
         return PlanningCommandResult(
             status="rejected",
@@ -304,11 +310,12 @@ def run_issue_planning_apply(
             reason="human_decision_rejected",
             issue_id=issue_id,
         )
-    expected_paths = _review_expected_paths_for_parse(review_bytes, request.mode)
     try:
         review = PlanningReviewResult.from_json_bytes(
             review_bytes,
-            expected_canonical_target_paths=expected_paths,
+            expected_canonical_target_paths=(
+                target.canonical_issue_paths if request.mode == "git-bound" else None
+            ),
         )
     except ValueError:
         return PlanningCommandResult(
@@ -399,6 +406,37 @@ def run_issue_planning_apply(
                 reason="review_identity_rejected",
                 issue_id=issue_id,
             )
+        assert request.candidate_path is not None
+        try:
+            verified_candidate = candidate_loader(request.candidate_path, repo_root)
+        except CandidateArchiveRejected as error:
+            return PlanningCommandResult(
+                status="rejected",
+                reason="operation_binding_rejected",
+                issue_id=issue_id,
+                details=error.findings,
+            )
+        try:
+            binding = GitBoundOperationBindingV1.create(
+                issue_id=issue_id,
+                repository=identity.repository,
+                branch=identity.branch,
+                source_head=identity.source_head,
+                candidate_identity=verified_candidate.identity,
+                onboarding_companion=verified_candidate.onboarding_companion,
+            )
+        except ValueError:
+            return PlanningCommandResult(
+                status="rejected",
+                reason="operation_binding_mismatch",
+                issue_id=issue_id,
+            )
+        if identity.git_bound_operation_binding != binding:
+            return PlanningCommandResult(
+                status="rejected",
+                reason="operation_binding_mismatch",
+                issue_id=issue_id,
+            )
 
     repository = repo_slug_resolver(repo_root)
     if repository is None or repository != identity.repository:
@@ -455,6 +493,16 @@ def run_issue_planning_apply(
             name: verified_candidate.files[name]
             for name in DOCUMENT_NAMES
         }
+    companion_target_path: str | None = None
+    companion_bytes: bytes | None = None
+    if verified_candidate is not None:
+        companion_target_path = (
+            issue_dir / verified_candidate.onboarding_companion.path
+        ).as_posix()
+        if human.decision == "approved":
+            companion_bytes = verified_candidate.files[
+                verified_candidate.onboarding_companion.path
+            ]
     try:
         operation = PlanningApplyOperation.create(
             issue_id=issue_id,
@@ -472,9 +520,21 @@ def run_issue_planning_apply(
             candidate_identity=(
                 None if verified_candidate is None else verified_candidate.identity
             ),
+            git_bound_operation_binding_sha256=(
+                identity.git_bound_operation_binding.binding_sha256
+                if identity.git_bound_operation_binding is not None
+                else None
+            ),
+            companion_target_path=companion_target_path,
+            companion_sha256=(
+                verified_candidate.onboarding_companion.sha256
+                if verified_candidate is not None
+                else None
+            ),
             decision_artifact_path=decision_path,
             human_decision_bytes=human_bytes,
             replacement_documents=replacements,
+            replacement_companion=companion_bytes,
             pre_apply_document_bytes=expected_targets.documents,
         )
     except ValueError:
@@ -589,34 +649,13 @@ def _apply_mode_options_are_closed(request: PlanningApplyRequest) -> bool:
         )
     if request.mode == "git-bound":
         return (
-            request.candidate_path is None
+            request.candidate_path is not None
             and request.logical_filename is None
             and request.zip_sha256 is None
             and request.reviewed_head is not None
             and re.fullmatch(r"[0-9a-f]{40}", request.reviewed_head) is not None
         )
     return False
-
-
-def _review_expected_paths_for_parse(
-    review_bytes: bytes,
-    mode: object,
-) -> tuple[str, str, str] | None:
-    if mode != "git-bound":
-        return None
-    try:
-        value = json.loads(review_bytes)
-        identity = value["reviewed_identity"]
-        paths = identity["canonical_target_paths"]
-        if (
-            isinstance(paths, list)
-            and len(paths) == 3
-            and all(isinstance(item, str) for item in paths)
-        ):
-            return (paths[0], paths[1], paths[2])
-    except (KeyError, TypeError, json.JSONDecodeError):
-        pass
-    return None
 
 
 def _git_blob_oid(content: bytes) -> str:
@@ -775,6 +814,7 @@ def run_issue_planning_create(
     preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult] = run_github_sync_preflight,
     prompt_synthesizer: Callable[..., Any] = synthesize_issue_planning_prompt,
     transport_runner: Callable[..., PlanningInvocationResult] = run_issue_planning_transport,
+    authoring_loader: Callable[..., Any] = load_validated_issue_authoring_payload,
     publisher: Callable[..., PublishedCandidate] = build_and_publish_candidate,
     clock: Callable[[], str] = now_iso,
 ) -> PlanningCommandResult:
@@ -849,13 +889,14 @@ def run_issue_planning_create(
             issue_id=target.issue_id,
             details=transport.details,
         )
-    payload = transport.transient_payload
+    authoring_zip = transport.authoring_zip
     if (
         transport.reason != "transport_received"
         or transport.source_evidence is None
-        or payload is None
+        or authoring_zip is None
+        or transport.review_json is not None
         or transport.response_sha256 is None
-        or hashlib.sha256(payload).hexdigest() != transport.response_sha256
+        or authoring_zip.sha256 != transport.response_sha256
     ):
         return PlanningCommandResult(
             status="rejected",
@@ -875,12 +916,17 @@ def run_issue_planning_create(
             issue_id=target.issue_id,
         )
     try:
-        planner_documents = parse_planner_payload(payload)
-    except (UnicodeError, ValueError):
+        authoring = authoring_loader(
+            authoring_zip,
+            expected_companion_path=onboarding_companion_path,
+            repo_root=repo_root,
+        )
+    except (CandidateArchiveRejected, UnicodeError, ValueError) as error:
         return PlanningCommandResult(
             status="rejected",
-            reason="planner_response_rejected",
+            reason="archive_rejected",
             issue_id=target.issue_id,
+            details=error.findings if isinstance(error, CandidateArchiveRejected) else (),
         )
     try:
         dependencies = load_dependency_snapshot(target.issue_id)
@@ -907,11 +953,14 @@ def run_issue_planning_create(
             onboarding_companion_path=onboarding_companion_path,
         )
         material = build_candidate_material(
-            planner_documents=planner_documents,
+            planner_documents=authoring.documents,
+            onboarding_companion_path=authoring.onboarding_companion_path,
+            onboarding_companion_bytes=authoring.onboarding_companion_bytes,
             baseline=baseline,
             context=context,
             source_evidence=transport.source_evidence,
-            planner_payload=payload,
+            source_payload_sha256=authoring.zip_sha256,
+            source_payload_size=authoring.zip_size_bytes,
             operation_time=operation_time,
         )
     except (UnicodeError, ValueError):
@@ -957,12 +1006,22 @@ def run_issue_planning_create(
             reason="candidate_output_rejected",
             issue_id=target.issue_id,
         )
+    binding = GitBoundOperationBindingV1.create(
+        issue_id=target.issue_id,
+        repository=published.identity.source_repository,
+        branch=published.identity.source_branch,
+        source_head=published.identity.source_head,
+        candidate_identity=published.identity,
+        onboarding_companion=published.onboarding_companion,
+    )
     return PlanningCommandResult(
         status="ok",
         reason="candidate_created",
         issue_id=target.issue_id,
         output={
+            "candidate_path": str(published.candidate_path),
             "candidate_identity": published.identity.to_dict(),
+            "git_bound_operation_binding_sha256": binding.binding_sha256,
             "zip_byte_count": published.zip_byte_count,
         },
     )
@@ -984,6 +1043,12 @@ def run_issue_planning_review(
     publisher: Callable[..., PublishedPlanningReview] = publish_planning_review_evidence,
     clock: Callable[[], str] = now_iso,
 ) -> PlanningCommandResult:
+    if request.mode == "git-bound" and request.candidate_path is None:
+        return PlanningCommandResult(
+            status="rejected",
+            reason="operation_candidate_required",
+            issue_id=request.issue_id,
+        )
     repository_descriptor: int | None = None
     try:
         target = resolve_existing_issue_target(request.issue_id, records, repo_root)
@@ -995,18 +1060,24 @@ def run_issue_planning_review(
             if candidate.identity.issue_id != target.issue_id:
                 raise ValueError("Candidate Issue does not match Review target")
         elif request.mode == "git-bound":
-            if request.candidate_path is not None or request.reviewed_head is None:
-                raise ValueError("git-bound Review requires only reviewed_head")
+            if request.candidate_path is None or request.reviewed_head is None:
+                raise ValueError("git-bound Review requires Candidate and reviewed_head")
             if re.fullmatch(r"[0-9a-f]{40}", request.reviewed_head) is None:
                 raise ValueError("reviewed_head is invalid")
-            candidate = None
+            candidate = candidate_loader(request.candidate_path, repo_root)
+            if candidate.identity.issue_id != target.issue_id:
+                raise ValueError("Candidate Issue does not match Review target")
         else:
             raise ValueError("Review mode is invalid")
         repository_descriptor = open_safe_directory_descriptor(repo_root.resolve(strict=True))
     except CandidateArchiveRejected as error:
         return PlanningCommandResult(
             status="rejected",
-            reason="archive_rejected",
+            reason=(
+                "operation_binding_rejected"
+                if request.mode == "git-bound"
+                else "archive_rejected"
+            ),
             issue_id=request.issue_id,
             details=error.findings,
         )
@@ -1041,9 +1112,18 @@ def run_issue_planning_review(
             )
         else:
             assert request.reviewed_head is not None
+            assert candidate is not None
             assert repository_descriptor is not None
             if context.source_head != request.reviewed_head:
                 raise ValueError("reviewed HEAD does not match synchronized source")
+            binding = GitBoundOperationBindingV1.create(
+                issue_id=target.issue_id,
+                repository=context.repository,
+                branch=context.branch,
+                source_head=context.source_head,
+                candidate_identity=candidate.identity,
+                onboarding_companion=candidate.onboarding_companion,
+            )
             identity = ReviewedPlanningIdentity(
                 mode="git-bound",
                 issue_id=target.issue_id,
@@ -1051,9 +1131,10 @@ def run_issue_planning_review(
                 branch=context.branch,
                 source_head=context.source_head,
                 canonical_target_paths=target.canonical_issue_paths,
+                git_bound_operation_binding=binding,
                 expected_canonical_target_paths=target.canonical_issue_paths,
             )
-            targets = tuple(
+            canonical_targets = tuple(
                 PlanningPromptAttachment(
                     name=f"target-{Path(path).name}",
                     classification="review-target",
@@ -1065,6 +1146,15 @@ def run_issue_planning_review(
                     ),
                 )
                 for path in target.canonical_issue_paths
+            )
+            targets = (
+                *canonical_targets,
+                PlanningPromptAttachment(
+                    name="target-onboarding-companion.md",
+                    classification="review-target",
+                    source_label=candidate.onboarding_companion.path,
+                    content=candidate.files[candidate.onboarding_companion.path],
+                ),
             )
         identity_bytes = _canonical_json_bytes(identity.to_dict())
         assert repository_descriptor is not None
@@ -1130,12 +1220,14 @@ def run_issue_planning_review(
             issue_id=target.issue_id,
             details=transport.details,
         )
-    payload = transport.transient_payload
+    review_json = transport.review_json
+    payload = None if review_json is None else review_json.json_bytes
     if (
         transport.reason != "transport_received"
         or transport.source_evidence is None
         or payload is None
-        or transport.response_sha256 != hashlib.sha256(payload).hexdigest()
+        or transport.authoring_zip is not None
+        or transport.response_sha256 != review_json.sha256
         or len(captured_identity) != 1
     ):
         return PlanningCommandResult(
@@ -1236,6 +1328,15 @@ def run_issue_planning_review(
             "review_summary_file": published.review_summary_file,
             "review_result_sha256": published.review_result_sha256,
             "reviewed_identity_sha256": identity.sha256,
+            **(
+                {
+                    "git_bound_operation_binding_sha256": (
+                        identity.git_bound_operation_binding.binding_sha256
+                    )
+                }
+                if identity.git_bound_operation_binding is not None
+                else {}
+            ),
             "verdict": parsed.verdict,
         },
     )
@@ -1253,6 +1354,7 @@ def run_issue_planning_revise(
     preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult] = run_github_sync_preflight,
     transport_runner: Callable[..., PlanningInvocationResult] = run_issue_planning_transport,
     candidate_loader: Callable[[Path, Path], VerifiedIssueCandidate] = load_verified_issue_candidate,
+    authoring_loader: Callable[..., Any] = load_validated_issue_authoring_payload,
     publisher: Callable[..., PublishedCandidate] = build_and_publish_candidate,
     clock: Callable[[], str] = now_iso,
 ) -> PlanningCommandResult:
@@ -1263,7 +1365,10 @@ def run_issue_planning_revise(
         target = resolve_existing_issue_target(issue_id, records, repo_root)
         output_guard = validate_candidate_output_directory(request.output_dir, repo_root)
         request_bytes = _read_external_bounded_file(request.request_path, repo_root=repo_root)
-        revision = PlanningRevisionRequestV1.from_json_bytes(request_bytes)
+        revision = PlanningRevisionRequestV1.from_json_bytes(
+            request_bytes,
+            expected_companion_path=candidate.onboarding_companion.path,
+        )
         if revision.candidate_identity != candidate.identity:
             raise ValueError("revision Candidate identity mismatch")
     except CandidateArchiveRejected as error:
@@ -1353,7 +1458,15 @@ def run_issue_planning_revise(
         return source
     context, source_evidence = source
     operation_time = datetime.fromisoformat(clock().replace("Z", "+00:00"))
-    onboarding_companion_path = _resolve_onboarding_companion_path(operation_time)
+    onboarding_companion_path = (
+        candidate.onboarding_companion.path
+        if revision.lane == "mechanical"
+        else _resolve_onboarding_companion_path(operation_time)
+    )
+    context = replace(
+        context,
+        onboarding_companion_path=onboarding_companion_path,
+    )
     try:
         baseline = parse_current_front_matter_baseline(
             {name: candidate.files[name] for name in DOCUMENT_NAMES}
@@ -1366,15 +1479,33 @@ def run_issue_planning_revise(
         )
     if revision.lane == "mechanical":
         try:
-            revised_documents = apply_mechanical_revision(
-                {name: candidate.files[name] for name in DOCUMENT_NAMES},
+            revised_payloads = apply_mechanical_revision(
+                {
+                    **{name: candidate.files[name] for name in DOCUMENT_NAMES},
+                    candidate.onboarding_companion.path: candidate.files[
+                        candidate.onboarding_companion.path
+                    ],
+                },
                 target_file=cast("str", revision.target_file),
+                onboarding_companion_path=candidate.onboarding_companion.path,
                 old_text=cast("str", revision.old_text),
                 new_text=cast("str", revision.new_text),
                 diff_budget=cast("int", revision.diff_budget),
             )
-            payload = render_planner_payload(revised_documents)
-            planner_documents = parse_planner_payload(payload)
+            planner_documents = {
+                name: revised_payloads[name] for name in DOCUMENT_NAMES
+            }
+            onboarding_companion_bytes = revised_payloads[
+                candidate.onboarding_companion.path
+            ]
+            source_payload_sha256 = cast(
+                "str",
+                candidate.source_baseline["planner_payload_sha256"],
+            )
+            source_payload_size = cast(
+                "int",
+                candidate.source_baseline["planner_payload_size"],
+            )
         except (UnicodeError, ValueError):
             return PlanningCommandResult(
                 status="rejected",
@@ -1471,10 +1602,11 @@ def run_issue_planning_revise(
                 issue_id=issue_id,
                 details=transport.details,
             )
-        payload = transport.transient_payload
+        authoring_zip = transport.authoring_zip
         if (
-            payload is None
-            or transport.response_sha256 != hashlib.sha256(payload).hexdigest()
+            authoring_zip is None
+            or transport.review_json is not None
+            or transport.response_sha256 != authoring_zip.sha256
             or transport.source_evidence is None
         ):
             return PlanningCommandResult(
@@ -1484,8 +1616,16 @@ def run_issue_planning_revise(
             )
         source_evidence = transport.source_evidence
         try:
-            planner_documents = parse_planner_payload(payload)
-        except (UnicodeError, ValueError):
+            authoring = authoring_loader(
+                authoring_zip,
+                expected_companion_path=onboarding_companion_path,
+                repo_root=repo_root,
+            )
+            planner_documents = authoring.documents
+            onboarding_companion_bytes = authoring.onboarding_companion_bytes
+            source_payload_sha256 = authoring.zip_sha256
+            source_payload_size = authoring.zip_size_bytes
+        except (CandidateArchiveRejected, UnicodeError, ValueError):
             return PlanningCommandResult(
                 status="rejected",
                 reason="planner_response_rejected",
@@ -1494,10 +1634,13 @@ def run_issue_planning_revise(
     try:
         material = build_candidate_material(
             planner_documents=planner_documents,
+            onboarding_companion_path=onboarding_companion_path,
+            onboarding_companion_bytes=onboarding_companion_bytes,
             baseline=baseline,
             context=context,
             source_evidence=source_evidence,
-            planner_payload=payload,
+            source_payload_sha256=source_payload_sha256,
+            source_payload_size=source_payload_size,
             operation_time=operation_time,
             version=candidate.identity.version + 1,
         )
@@ -1559,12 +1702,22 @@ def run_issue_planning_revise(
             reason="candidate_publication_failed",
             issue_id=issue_id,
         )
+    binding = GitBoundOperationBindingV1.create(
+        issue_id=issue_id,
+        repository=published.identity.source_repository,
+        branch=published.identity.source_branch,
+        source_head=published.identity.source_head,
+        candidate_identity=published.identity,
+        onboarding_companion=published.onboarding_companion,
+    )
     return PlanningCommandResult(
         status="ok",
         reason="candidate_revised",
         issue_id=issue_id,
         output={
+            "candidate_path": str(published.candidate_path),
             "candidate_identity": published.identity.to_dict(),
+            "git_bound_operation_binding_sha256": binding.binding_sha256,
             "zip_byte_count": published.zip_byte_count,
         },
     )

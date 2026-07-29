@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+import zipfile
 
 import pytest
 
@@ -15,8 +16,13 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 def _candidate():
     return __import__(
         "spec_dock_runtime.domain.issue_planning_candidate",
-        fromlist=["parse_planner_payload"],
+        fromlist=["build_candidate_material"],
     )
+
+
+COMPANION_PATH = (
+    "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
+)
 
 
 def _document(filename: str, *, body: str | None = None, changes: dict[str, str] | None = None) -> bytes:
@@ -52,20 +58,54 @@ def _documents() -> dict[str, bytes]:
     return {name: _document(name) for name in ("requirement.md", "design.md", "plan.md")}
 
 
-def _payload(documents: dict[str, bytes] | None = None) -> bytes:
-    docs = documents or _documents()
-    chunks: list[bytes] = []
-    names = ("requirement.md", "design.md", "plan.md")
-    for index, name in enumerate(names):
-        chunks.extend(
-            (
-                f"<<<SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={name}>>>\n".encode(),
-                docs[name],
-                f"<<<END-SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name={name}>>>".encode()
-                + (b"\n" if index < len(names) - 1 else b""),
-            )
-        )
-    return b"".join(chunks)
+def _companion() -> bytes:
+    return b"""# New-member guide
+
+This guide is subordinate to requirement.md, design.md, and plan.md. Those canonical
+documents have precedence. It covers the init-00001, epic-00002, and iss-00003 lineage.
+
+## Purpose and scope
+
+Purpose and authority responsibilities for the current architecture and target architecture.
+
+## ChatGPT First workflow
+
+The planning lifecycle uses Oracle directly; chatgpt-use is reference-only. Candidate,
+Review, Human approval, and apply use the exact current branch.
+
+## Roadmap and operations
+
+S01 through S07 are complete. S08 through S14 remain. Provider authority precedes
+projection. Failure modes and the first-day checklist are documented.
+
+```plantuml
+@startuml
+title System Context
+actor Human
+@enduml
+```
+
+```plantuml
+@startuml
+title Responsibility Boundary
+actor Human
+@enduml
+```
+
+```plantuml
+@startuml
+title Planning Sequence
+actor Human
+@enduml
+```
+
+```plantuml
+@startuml
+title Implementation Roadmap
+actor Human
+@enduml
+```
+"""
 
 
 def _source():
@@ -88,6 +128,7 @@ def _source():
         ),
         relevant_source_paths=("src/example.py",),
         operator_context=(),
+        onboarding_companion_path=COMPANION_PATH,
     )
     evidence = contracts.PlanningSourceEvidence(
         repository="owner/repo",
@@ -107,13 +148,16 @@ def _material():
     documents = _documents()
     baseline = module.parse_current_front_matter_baseline(documents)
     context, evidence = _source()
-    payload = _payload(documents)
+    payload = b"exact authoring zip bytes"
     return module.build_candidate_material(
-        planner_documents=module.parse_planner_payload(payload),
+        planner_documents=documents,
+        onboarding_companion_path=COMPANION_PATH,
+        onboarding_companion_bytes=_companion(),
         baseline=baseline,
         context=context,
         source_evidence=evidence,
-        planner_payload=payload,
+        source_payload_sha256=hashlib.sha256(payload).hexdigest(),
+        source_payload_size=len(payload),
         operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
     )
 
@@ -123,13 +167,16 @@ def test_revision_candidate_uses_prior_version_plus_one() -> None:
     documents = _documents()
     baseline = module.parse_current_front_matter_baseline(documents)
     context, evidence = _source()
-    payload = _payload(documents)
+    payload = b"exact authoring zip bytes"
     material = module.build_candidate_material(
-        planner_documents=module.parse_planner_payload(payload),
+        planner_documents=documents,
+        onboarding_companion_path=COMPANION_PATH,
+        onboarding_companion_bytes=_companion(),
         baseline=baseline,
         context=context,
         source_evidence=evidence,
-        planner_payload=payload,
+        source_payload_sha256=hashlib.sha256(payload).hexdigest(),
+        source_payload_size=len(payload),
         operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
         version=2,
     )
@@ -145,14 +192,17 @@ def test_candidate_version_rejects_zero_and_bool(version: object) -> None:
     documents = _documents()
     baseline = module.parse_current_front_matter_baseline(documents)
     context, evidence = _source()
-    payload = _payload(documents)
+    payload = b"exact authoring zip bytes"
     with pytest.raises(ValueError, match="version"):
         module.build_candidate_material(
-            planner_documents=module.parse_planner_payload(payload),
+            planner_documents=documents,
+            onboarding_companion_path=COMPANION_PATH,
+            onboarding_companion_bytes=_companion(),
             baseline=baseline,
             context=context,
             source_evidence=evidence,
-            planner_payload=payload,
+            source_payload_sha256=hashlib.sha256(payload).hexdigest(),
+            source_payload_size=len(payload),
             operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
             version=version,
         )
@@ -164,9 +214,11 @@ def test_mechanical_revision_replaces_one_target_body_match_with_utf8_budget() -
     old = "Substantive"
     new = "具体的"
     cost = len(old.encode()) + len(new.encode())
+    payloads = {**documents, COMPANION_PATH: _companion()}
     revised = module.apply_mechanical_revision(
-        documents,
+        payloads,
         target_file="plan.md",
+        onboarding_companion_path=COMPANION_PATH,
         old_text=old,
         new_text=new,
         diff_budget=cost,
@@ -177,8 +229,9 @@ def test_mechanical_revision_replaces_one_target_body_match_with_utf8_budget() -
     assert revised["design.md"] == documents["design.md"]
     with pytest.raises(ValueError, match="budget"):
         module.apply_mechanical_revision(
-            documents,
+            payloads,
             target_file="plan.md",
+            onboarding_companion_path=COMPANION_PATH,
             old_text=old,
             new_text=new,
             diff_budget=cost - 1,
@@ -196,59 +249,93 @@ def test_mechanical_revision_rejects_zero_or_multiple_body_matches(old_text: str
         )
     with pytest.raises(ValueError, match="exactly one"):
         module.apply_mechanical_revision(
-            documents,
+            {**documents, COMPANION_PATH: _companion()},
             target_file="plan.md",
+            onboarding_companion_path=COMPANION_PATH,
             old_text=old_text,
             new_text="replacement",
             diff_budget=100,
         )
 
 
-def test_parse_planner_payload_accepts_exact_three_document_grammar() -> None:
-    parsed = _candidate().parse_planner_payload(_payload())
-    assert tuple(parsed) == ("requirement.md", "design.md", "plan.md")
-    assert parsed == _documents()
-
-
-@pytest.mark.parametrize("mutation", ["missing", "duplicate", "extra", "unknown", "reordered"])
-def test_parse_planner_payload_rejects_missing_duplicate_extra_and_reordered_documents(
-    mutation: str,
-) -> None:
-    payload = _payload()
-    requirement = (
-        b"<<<SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name=requirement.md>>>\n"
-        + _documents()["requirement.md"]
-        + b"<<<END-SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name=requirement.md>>>\n"
+def test_s10_authoring_payload_accepts_exact_four_file_inventory() -> None:
+    files = {**_documents(), COMPANION_PATH: _companion()}
+    assert (
+        _candidate().validate_issue_authoring_files(
+            files,
+            "authoring",
+            expected_companion_path=COMPANION_PATH,
+        )
+        == ()
     )
-    if mutation == "missing":
-        payload = payload.replace(requirement, b"")
-    elif mutation == "duplicate":
-        payload = requirement + payload
-    elif mutation == "extra":
-        payload += b"outside"
-    elif mutation == "unknown":
-        payload = payload.replace(b"name=requirement.md", b"name=notes.md", 1)
-    else:
-        payload = payload.replace(requirement, b"") + requirement
-    with pytest.raises(ValueError, match="planner"):
-        _candidate().parse_planner_payload(payload)
+
+
+@pytest.mark.parametrize("mutation", ["empty", "bom", "nul", "cr", "no_lf", "invalid_utf8"])
+def test_s10_authoring_payload_rejects_invalid_text_framing(mutation: str) -> None:
+    files = {**_documents(), COMPANION_PATH: _companion()}
+    payload = files["design.md"]
+    files["design.md"] = {
+        "empty": b"",
+        "bom": b"\xef\xbb\xbf" + payload,
+        "nul": payload + b"\0",
+        "cr": payload.replace(b"\n", b"\r\n", 1),
+        "no_lf": payload.rstrip(b"\n"),
+        "invalid_utf8": b"\xff\n",
+    }[mutation]
+    assert (
+        _candidate().validate_issue_authoring_files(
+            files,
+            "authoring",
+            expected_companion_path=COMPANION_PATH,
+        )
+        == ("authoring_payload_invalid",)
+    )
+
+
+def test_s10_current_v4_guide_satisfies_completeness_contract() -> None:
+    repository_root = Path(__file__).resolve().parents[3]
+    pack = (
+        repository_root
+        / "spec-dock/active/issue/artifacts/"
+        "20260729t-iss-00334-onboarding-companion-planning-amendment-v4.zip"
+    )
+    with zipfile.ZipFile(pack) as archive:
+        guide_name = next(
+            name
+            for name in archive.namelist()
+            if name.endswith(f"issue/{COMPANION_PATH}")
+        )
+        guide = archive.read(guide_name)
+    _candidate().validate_onboarding_companion(COMPANION_PATH, guide)
 
 
 @pytest.mark.parametrize(
-    "payload",
+    ("path", "mutation"),
     [
-        b"\xef\xbb\xbf" + _payload(),
-        _payload().replace(b"\n", b"\r\n", 1),
-        _payload() + b"\0",
-        b"\xff",
-        _payload().replace(b"Substantive content.", b"<<<SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 nope"),
+        ("guide.md", "none"),
+        (COMPANION_PATH, "authority"),
+        (COMPANION_PATH, "section"),
+        (COMPANION_PATH, "steps"),
+        (COMPANION_PATH, "fewer_blocks"),
+        (COMPANION_PATH, "wrong_fence"),
+        (COMPANION_PATH, "missing_role"),
+        (COMPANION_PATH, "unbalanced"),
     ],
 )
-def test_parse_planner_payload_rejects_bom_cr_nul_invalid_utf8_and_reserved_marker_body(
-    payload: bytes,
-) -> None:
-    with pytest.raises(ValueError, match="planner"):
-        _candidate().parse_planner_payload(payload)
+def test_s10_guide_rejects_wrong_path_and_incomplete_contract(path: str, mutation: str) -> None:
+    payload = _companion()
+    replacements = {
+        "none": payload,
+        "authority": payload.replace(b"subordinate", b"additional"),
+        "section": payload.replace(b"Failure modes", b"Incidents"),
+        "steps": payload.replace(b"S08 through S14", b"later steps"),
+        "fewer_blocks": payload.rsplit(b"```plantuml", 1)[0],
+        "wrong_fence": payload.replace(b"```plantuml", b"```puml", 1),
+        "missing_role": payload.replace(b"Implementation Roadmap", b"Future"),
+        "unbalanced": payload.replace(b"@enduml", b"@end", 1),
+    }
+    with pytest.raises(ValueError, match="onboarding companion"):
+        _candidate().validate_onboarding_companion(path, replacements[mutation])
 
 
 def test_current_front_matter_baseline_is_closed_and_consistent() -> None:
@@ -349,7 +436,7 @@ def test_source_baseline_binds_exact_s02_source_evidence_context_and_payload() -
     material = _material()
     baseline = json.loads(material.files["SOURCE-BASELINE.json"])
     context, evidence = _source()
-    payload = _payload()
+    payload = b"exact authoring zip bytes"
     assert len(baseline) == 17
     assert baseline["canonical_issue_paths"] == list(context.canonical_issue_paths)
     assert baseline["remote_head_disposition"] == evidence.remote_head_disposition
@@ -367,12 +454,23 @@ def test_v1_naming_uses_one_utc_second_instant() -> None:
     assert material.internal_root == material.logical_filename.removesuffix(".zip")
 
 
-def test_manifest_has_exact_seven_sorted_entries() -> None:
+def test_s10_manifest_has_exact_eight_sorted_entries_and_one_companion_role() -> None:
     material = _material()
     manifest = json.loads(material.files["MANIFEST.json"])
     paths = [entry["path"] for entry in manifest["entries"]]
     assert paths == sorted(material.files, key=lambda value: value.encode())
-    assert len(paths) == 7
+    assert len(paths) == 8
+    companion_entries = [
+        entry for entry in manifest["entries"] if entry["role"] == "onboarding-companion"
+    ]
+    assert companion_entries == [
+        {
+            "checksum_covered": True,
+            "content_mode": "static",
+            "path": COMPANION_PATH,
+            "role": "onboarding-companion",
+        }
+    ]
 
 
 def test_manifest_does_not_contain_external_zip_sha_or_observed_filename() -> None:
@@ -502,7 +600,8 @@ def test_candidate_verifier_rejects_boolean_manifest_version() -> None:
 
 
 def _checksums(module, files: dict[str, bytes]) -> bytes:
+    companion = next(path for path in files if path.startswith("artifacts/"))
     return "".join(
         f"{hashlib.sha256(files[path]).hexdigest()}  {path}\n"
-        for path in module.CHECKSUM_PATHS
+        for path in module.checksum_paths(companion)
     ).encode("ascii")
