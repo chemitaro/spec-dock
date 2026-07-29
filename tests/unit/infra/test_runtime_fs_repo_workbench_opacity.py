@@ -29,20 +29,25 @@ def _write_meta(path: Path, *, node_id: str = "init-00001") -> None:
     )
 
 
-def test_node_metadata_discovery_ignores_all_metadata_below_exact_workbench(tmp_path: Path) -> None:
+def test_workbench_readme_and_payloads_remain_semantically_opaque(tmp_path: Path) -> None:
     fs_repo = _runtime_fs_repo()
     specdock_dir = tmp_path / "spec-dock"
     initiative_dir = specdock_dir / "initiatives" / "init-00001-platform"
     _write_meta(initiative_dir / ".meta.json")
+    baseline = fs_repo.load_node_records(specdock_dir)
 
     workbench = initiative_dir / ".workbench"
+    workbench.mkdir()
+    (workbench / "README.md").write_text("# Workbench\n", encoding="utf-8")
     _write_meta(workbench / "fake-node" / ".meta.json")
     (workbench / "legacy" / "meta.json").parent.mkdir(parents=True, exist_ok=True)
     (workbench / "legacy" / "meta.json").write_text("not json\n", encoding="utf-8")
+    (workbench / "decisions").mkdir()
+    (workbench / "decisions" / "adr-999.md").write_text("# Fake ADR\n", encoding="utf-8")
+    (workbench / "binary.bin").write_bytes(b"\x00\x01\x02\xff")
+    (workbench / "invalid-utf8.bin").write_bytes(b"\xff\xfe\x80")
 
-    records = fs_repo.load_node_records(specdock_dir)
-
-    assert [record.id for record in records] == ["init-00001"]
+    assert fs_repo.load_node_records(specdock_dir) == baseline
 
 
 @pytest.mark.parametrize("metadata_name", [".meta.json", "meta.json"])
