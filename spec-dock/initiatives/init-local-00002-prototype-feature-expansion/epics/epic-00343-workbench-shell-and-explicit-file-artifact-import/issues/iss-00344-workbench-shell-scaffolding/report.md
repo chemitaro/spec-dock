@@ -111,6 +111,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-036 | adopted | ChatGPT-Use S02 implementation re-review (`PASS`, advisory) | S02 review gate | GitHub同期済みexact candidate `2917610b04a6bcb59c7b316f47d4281c8844b63a`をfresh `code-reviewer`責務でre-reviewし、CR-S02-001/002は両方closed、finding 0、scope expansionなし、不要な抽象化なし、`next_action=proceed`を確認した | `artifacts/20260729t070400z-chatgpt-output-s02-code-rereview-2917610b.md`; SHA-256 `18ecbbce292d2af0b44423549b085a1d4eb63d472cde7020e514dbd1ba784688`; 2,287 bytes; reviewed commit `2917610b04a6bcb59c7b316f47d4281c8844b63a` | evidence-only closure commit、clean確認、S02 Result Approval |
 | EAL-037 | partially_adopted | ChatGPT-Use S03 implementation/test concretization (`advisory`) | S03 implementation handoff | GitHub同期済みexact source `9a5c08a5e33c0458cbdb0db9eb103e7f35513b39`から、explicit 4 hidden package-data、broad README exclusion削除、shared exact five-path build/sdist predicate、pre-prune observed six-path inventory、4-surface exact inventory/raw-byte parity、isolated installed-resource observation、existing Issue 69 helper再利用、Red/Green/verification順を採用した。提案されたhelper名/最大数は候補であり、3 allowed files内の最小局所形へ実装者が調整できる。generic framework、新backend、consumer E2E、dogfood、docs、production constantをtest expectedへimportする案は採用しない | `artifacts/20260729t072457z-chatgpt-output-s03-implementation-test-concretization-9a5c08a5.md`; SHA-256 `02e64abd7b44bb335ec744f6d569bad6f8f605c9aebfae09549ec3d9ad1c12c0`; 21,719 bytes; source commit `9a5c08a5e33c0458cbdb0db9eb103e7f35513b39` | Artifact、D-010、approved S03 contractを`dev-coder`へ共有し、3 allowed paths内でRed→Green→focused/full/static verificationを実行する |
 | EAL-038 | adopted | ChatGPT-Use S03 implementation review (`PASS`, advisory) | S03 review gate | GitHub同期済みexact candidate `59d4fdf64333a537484af233ecef0138c9368aaf`を`code-reviewer`責務でreviewし、blocking/major 0、minor 1件、scope expansionなし、不要な抽象化なし、`next_action=proceed`を確認した。full installer 2 failureは`valid_s95_handoff`と判定された。CR-S03-001はreport enumだけのevidence-only修正として採用し、D-009〜011をdeclared Type/Dispositionへ正規化した | `artifacts/20260729t074802z-chatgpt-output-s03-code-review-59d4fdf6.md`; SHA-256 `8daf2ddc5d779e7de05559c31ccc031ced55956b0718b4ab8a98334dc9dab9a6`; 2,970 bytes; reviewed commit `59d4fdf64333a537484af233ecef0138c9368aaf` | evidence-only closure commit、clean確認、S03 Result Approval |
+| EAL-039 | partially_adopted | ChatGPT-Use S90 implementation/test concretization (`advisory`) | S90 test/docs handoff | GitHub connectorでexact source `0efe3055860706a9f4b68ae1ddaa767371079b03`を確認した回答から、provider sourceを読む単一aggregate semantic assertion、canonical README read-only precondition、shared/role-specific guidance分離、valid Red条件、4文書の最小差分、deprecated wording disposition、Issue 345/346 availability boundaryを採用した。提案コードは参考形であり、exact prose snapshotや全4文書への同一長文強制は採用しない。canonical README内のgeneric import wordingとの過渡的緊張はS90で改変せず、shipped docsでplanned/unimplementedを明示する | `artifacts/20260729t090443z-chatgpt-output-s90-implementation-test-concretization-0efe3055.md`; SHA-256 `a0d8dbfefc933613fc6938c5de260d72eda69c820a10467bc21ab0e5e33ff20b`; 30,568 bytes; source commit `0efe3055860706a9f4b68ae1ddaa767371079b03` | Artifactとapproved S90 contractをtest lane `dev-coder`へ共有し、test-only valid Redを作成してcommit/push後にfresh ChatGPT-Use `code-reviewer`責務review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -368,6 +369,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 |---|---|---|---|---|---|
 | S01 | committed | `cc17c25530f8778b52b006b878c780dafeccf57f`; clean / pushed確認済み | EAL-030 fresh PASS | approved | S02 admitted |
 | S02 | committed | `9a5c08a5e33c0458cbdb0db9eb103e7f35513b39`; clean / pushed / local=remote確認済み | EAL-036 fresh PASS、prior major 2件closed | approved | S03 admitted |
+| S03 | committed | `0efe3055860706a9f4b68ae1ddaa767371079b03`; clean / pushed / local=remote確認済み | EAL-038 fresh PASS、minor enum findingをclosure reportで解消 | approved | S90 admitted |
 
 #### 変更したファイル
 - `src/spec_dock/cli.py` - pre-mutation freshness、fresh root copy、installer README allowlist、fallback ignore
@@ -385,7 +387,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 #### コミット
 - S01 review target / closure head: `a62ae20d5ad587563bf09de77b1f85d75a64c4ec` / `cc17c25530f8778b52b006b878c780dafeccf57f`
 - S02 review target / closure head: `2917610b04a6bcb59c7b316f47d4281c8844b63a` / `9a5c08a5e33c0458cbdb0db9eb103e7f35513b39`
-- S03 review target: `59d4fdf64333a537484af233ecef0138c9368aaf`。closure headはEAL-038とminor enum修正を含むevidence-only commit。
+- S03 review target / closure head: `59d4fdf64333a537484af233ecef0138c9368aaf` / `0efe3055860706a9f4b68ae1ddaa767371079b03`
 
 #### メモ
 - `No material implementation decisions beyond the approved plan.`
