@@ -171,17 +171,7 @@ def validate_onboarding_companion(path: str, payload: bytes) -> None:
         (("failure mode", "failure", "障害"),),
         (("first-day checklist", "first day checklist", "初日"),),
     )
-    if any(
-        not any(
-            body.strip()
-            and all(
-                any(token in section for token in alternatives)
-                for alternatives in concepts
-            )
-            for section, body in sections
-        )
-        for concepts in required_section_concepts
-    ):
+    if not _has_distinct_required_sections(sections, required_section_concepts):
         raise ValueError("onboarding companion required section is missing")
     if not all(name in text for name in DOCUMENT_NAMES):
         raise ValueError("onboarding companion canonical authority is incomplete")
@@ -223,6 +213,38 @@ def _markdown_sections(text: str) -> tuple[tuple[str, str], ...]:
         body = "\n".join(lines[line_index + 1 : end]).strip()
         sections.append((f"{title}\n{body.casefold()}", body))
     return tuple(sections)
+
+
+def _has_distinct_required_sections(
+    sections: tuple[tuple[str, str], ...],
+    required_concepts: tuple[tuple[tuple[str, ...], ...], ...],
+) -> bool:
+    candidates = tuple(
+        tuple(
+            section_index
+            for section_index, (section, body) in enumerate(sections)
+            if body.strip()
+            and all(
+                any(token in section for token in alternatives)
+                for alternatives in concepts
+            )
+        )
+        for concepts in required_concepts
+    )
+    section_owners: dict[int, int] = {}
+
+    def assign(concept_index: int, visited: set[int]) -> bool:
+        for section_index in candidates[concept_index]:
+            if section_index in visited:
+                continue
+            visited.add(section_index)
+            owner = section_owners.get(section_index)
+            if owner is None or assign(owner, visited):
+                section_owners[section_index] = concept_index
+                return True
+        return False
+
+    return all(assign(concept_index, set()) for concept_index in range(len(candidates)))
 
 
 def validate_issue_authoring_files(

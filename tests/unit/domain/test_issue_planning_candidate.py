@@ -354,6 +354,13 @@ def test_s10_guide_rejects_token_complete_content_without_required_sections() ->
         _candidate().validate_onboarding_companion(COMPANION_PATH, payload)
 
 
+def test_s10_guide_rejects_all_required_concepts_consolidated_in_one_section() -> None:
+    payload = b"## Everything\n\n" + _companion().replace(b"## ", b"")
+
+    with pytest.raises(ValueError, match="onboarding companion"):
+        _candidate().validate_onboarding_companion(COMPANION_PATH, payload)
+
+
 @pytest.mark.parametrize(
     ("path", "mutation"),
     [
