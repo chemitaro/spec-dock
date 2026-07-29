@@ -5,7 +5,7 @@ ID: "iss-00342"
 関連GitHub: ["#342"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-28"
+最終更新: "2026-07-29"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00080", "init-00079"]
 ---
@@ -18,7 +18,7 @@ ID: "iss-00342"
 
 `report.md` は実装中・文書更新中に発生した material な仕様解釈、判断、plan 逸脱、tradeoff、open question、promotion / follow-up を記録する audit trail でもある。worker の raw note や作業 transcript を貼る場所ではなく、orchestrator が source docs、diff、tests、reviewer output と照合して issue-level の canonical entry に統合する。
 
-Materialな判断がない場合はno-decisionを明示する。本IssueではD-001〜D-006がcurrent decision ledgerである。
+Materialな判断がない場合はno-decisionを明示する。本IssueではD-001〜D-007がcurrent decision ledgerである。
 
 Ledger entry は次の契約値を使う。
 
@@ -52,6 +52,7 @@ Disposition ごとの必須証跡:
 | D-004 | resolved | test-strategy | user / ChatGPT authoring | 旧設計のdefault `-m fast`とmandatory Make facadeが、通常pytestをそのまま使いたいowner intentと矛盾した | default marker selection; permanent skip; environment `skipif`; pytest option-controlled conditional policy skip | direct ordinary pytestを維持し、`--run-full-regression`だけを明示permissionにする。`-m full_regression` aloneはpermissionにせず、flagなしselected heavyへsession-local policy skipを追加する | selectionとexecution permissionを分離し、focused longをreason付きskipにしながらlegitimate skipを解除しない | promoted_to_adr | `artifacts/20260728t105349z-03-adr-use-direct-pytest-commands-with-explicit-full-regression-opt-in.md`; ChatGPT ZIP SHA-256 `511b81980c67da9d7e6b9290c20e59959e7d0835496aecee86f170bdc4402212` | canonical amendmentとfresh review |
 | D-005 | resolved | interpretation | dev-coder / orchestrator | S00のread-only characterization中、必須の`guidance issue-execution`がignored generated runbook projectionをrefreshした | filesystem writeを理由にS00をfailする; tracked/canonical差分をwrite境界として扱う | generated runbookはcanonical authorityではなく、source/test/config/workflow/docs/reportのtracked差分がなく実行前後cleanであるため、S00のread-only契約は満たす | skillがguidance実行を必須とし、projectionをauthorityとして扱わないことを明記している。実装対象とcanonical docsには変更がない | no_action | S00 worker evidence; `git status --short`実行前後clean; generated projectionはignored | issue-localな実行証跡解釈であり、product contractや将来の設計判断を変更しない |
 | D-006 | resolved | test-strategy | dev-coder / orchestrator | S05 Pair 1 fullがcurrent Issue `.meta.json`未収載のdogfooding static snapshotでexit 1。修正後のnew 3-pairには通算4回目fullが必要 | Pair 2/3を継続; Redを既存扱い; snapshot correction後に3-pairを再開; Issueをblocked終了 | Redを保持してPair 2/3を停止する。snapshotへcurrent path/empty dependsをbounded追加しfresh review、S04を再実行後、new SHAでGreen 3-pairを取得する。pre-merge full総上限4、5回目禁止 | failureは同一node/同一assertionで再現し、actual 213とexpected 212の差分はcurrent Issue 1件のみ。AC-008はGreen 3組を要求し、Redの読み替えは不可 | promoted_to_plan | S05 Pair 1: fast 8.98s/exit0、full 1590.76s/exit1、focused 0.45s/exit1、manifest `54f041...d609`; `plan.md` §2.2.1/S05 amendment | fresh spec-review後、origin snapshot fix、fresh S04、new 3-pair |
+| D-007 | resolved | test-strategy | S120 Actions / user / orchestrator | merged `main`のautomatic fullで、固定`requested_ref: main`を不一致と仮定したtestがexit 0となり、1 failed/2628 passed/76 skippedでIssue finishをblockした | failureをflaky扱い; productionを変更; testをskip/除外; test内でcurrent ref/HEADと異なる値を構成 | S120 Redを保持し、test-only S121でbranch-independent mismatchを構成する。修正候補SHAのformal fullは最大1回、fresh final reviews後にlatest `main`から新PRをmerge-readyにする | productionはrequested refがobserved ref/HEADと一致すればpassする正しいcontractであり、問題はtest fixtureのenvironment assumptionだけ。ユーザーは旧branch再利用・skip/xfail・agent merge/closeを禁止し、forward-fix PRを明示承認した | promoted_to_plan | Actions run `30403117215`; job `90422356172`; failed node `test_requested_ref_mismatch_is_stale`; `plan.md` S121-S124 recovery amendment | fresh amendment review後、delegated test-only fix、bounded full 1回、新PR merge-preparation |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -94,6 +95,14 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-027 | `adopted` | fresh command-interface amendment review | `requirement.md` / `design.md` / `plan.md` / `report.md` / ADR | selection/permission分離、conditional policy skip、legitimate skip保全、focused safety、event matrix、role/path ownership、closure traceability、ADR/EAL authorityをcurrent bytesで照合した | fresh `spec-reviewer`; findings `[]`; `review_status=pass`; confidence `0.99`; reviewed requirement `d6c4d2eb518500a94e5bc13fecbac9b9a9c703334f967b9798cd2aff3aa4e665`; design `0a0d94483981244d522e4555cf174fffd51b808b4f5e9d7a5b59e927a1b2cc03`; plan `d8c6d411e6f4821ac0b393faf42a7d631f42854bb954f5d380e06780bbcf080c`; report `d8be20793e8e7ebc9e809850fa5658a47f3c58041a116111e56e989e5caf81d3`; ADR `de1af0daf42f1cd6f279dc106f1aee16012bcbe69488b2544105e42fdc6192e7` | canonical docsをapprovedへpromoteしapproved bytesをassuranceへ再bind |
 | EAL-028 | `adopted` | approved amendment assurance and planning guidance | requirement / design / plan source bindingとplanning gate | fresh review後のapproved bytesをauthorized Standard profileへ再bindし、計画handoff可能状態を確認した | classify dry-run/write/verify `valid`; hard triggers `[]`; requirement `1bb239d591b88f27e0672ca259639c29b0b43ab135db8257f27534dea55142cb`; design `c9df294d5c0bc62830fff231bc7b6ab343fcf24c73457e254705fc7f54487f30`; plan `21239b0b45255fcf838b9b6d774c4163c716779cefb6121c607283f88cba6eca`; validate `nodes=213`; guidance state `ready`, next action `planning-ready`, reason `assurance-valid`, `may_execute_approved_plan=false` | planning完了。Issue execution admissionは別workflowで確認する |
 | EAL-029 | `adopted` | S05 recovery amendment review | `plan.md` / `report.md` | S05-F1 Redを保持し、S05R exact path/role/Red-Green/review/commit、S04R、new 3-pair、pre-merge full総上限4を直列化した | fresh `spec-reviewer` R1はrecovery mutation contract欠落でfail、S05R追加後R2 findings `[]` / pass / confidence 0.99。plan SHA-256 `5ecc615bfe95dbbd1cab4565ede908658dede1210f88c63f0bd7d4e7ae3f16c7`、classify dry-run/write、assurance verify、validate `nodes=213` pass | approved planへ昇格しassurance source bindingをrefresh済み |
+| EAL-030 | `adopted` | S120 post-merge regression recovery amendment review | `plan.md` / `report.md` | external Red、single-test allowed path、branch/main/detached invariant、focused/module/lint、fix SHA full最大1回、fresh final reviews、新PR/human merge境界を直列化した | fresh `spec-reviewer`; findings `[]`; `review_status=pass`; confidence 0.99; reviewed plan `fe030aef23df83078107fff79fbcc45bf1eea0b5a95a0839bb77ca08a4730ae5`; reviewed report `f359fabfaab419570621efaeb1c4792a501704e38d6b01e0ed49e1b973ae27da`; assurance classify dry-run/write `valid`、authorized `standard`、plan binding `fe030aef...a4730ae5`; verify pass; validate `nodes=213` | S121 delegated test-only implementation |
+| EAL-031 | `adopted` | S121 test-only implementation and code review | `tests/manual_tests/test_prepare_chatgpt_authoring_pack.py` | current ref/HEADの双方と異なる`requested_ref`をtest内で動的に構成し、feature branch、`main`、detached HEADのいずれでも本来のref不一致を検証する。production、workflow、fixture、marker、skip policyは変更しない | focused 1 passed、module body 81 passed、ruff check/format pass、diff check pass。fresh `code-reviewer`; findings `[]`; `review_status=pass`; confidence 0.99。test-only commit `1c14d5fb3d03395e7991d704dc0a1f4f6e30e233` | S122 integrated verification |
+| EAL-032 | `adopted` | S122 bounded integrated verification and QA review | recovery fix SHA / full regression | S120 external Redを保持し、修正SHAでfocused、module、lint、validate、assurance、test-relevant manifest、唯一のroot fullを確認した | focused 1 passed、module body 81 passed、`make lint` pass、validate `nodes=213`、assurance verify pass。manifest tracked 445 / aggregate `350b279b6692fce8791ec31f0d3d5cabd239841c099de8b84ac8d7ba49cc2d86`、説明可能deltaは対象testのみ。`uv run pytest --run-full-regression` exactly 1回: 2705 collected = 2629 passed + 76 legitimate skipped、policy skip 0、warnings 2、1636.38s、対象node pass。fresh `qa-reviewer`; findings `[]`; `review_status=pass`; confidence 0.99 | S123 final quality reviews and report-only commit |
+| EAL-033 | `adopted` | S123 final code-review finding and remediation amendment | `plan.md` / target test | branch名をrequested refへ埋め込むと、合法なbranch名にmetadata禁止語が含まれる環境でref mismatchより先にvalidationが拒否するP1を検出した | fresh `code-reviewer`; P1 1件; `review_status=fail`; confidence 0.98。HEAD hex由来のsafe fixed-format mismatch、single allowed test path、focused/module/lint、fresh re-review、second full禁止をplanへ追加 | fresh amendment spec review後にbounded test-only remediation |
+| EAL-034 | `adopted` | S123 remediation amendment spec review R1 | `plan.md` / pytest lane policy | safe mismatchとsecond root full禁止は整合したが、focused/moduleにexplicit full permissionとpassed/policy-skip acceptanceがなく、既定skipによる偽Green余地を検出した | fresh `spec-reviewer`; P1 1件; `review_status=fail`; confidence 0.99。focused 1 passed / policy skip 0、module 81 passed / policy skip 0となるexact `--run-full-regression` commandsをplanへ追加 | fresh amendment spec re-review |
+| EAL-035 | `adopted` | S123 remediation amendment spec review R2 | `plan.md` / `report.md` | R1で不足したexplicit full permission、passed件数、policy skip 0をfocused/moduleのexact commandsへ追加した | fresh `spec-reviewer`; findings `[]`; `review_status=pass`; confidence 0.99; reviewed plan `b518b30a130cdbde7ff806c1e6c44120c9d1d6251952e8f53a8dc7552a779080`; reviewed report `a438a4b48dc869a063d7b35f203a7aa455ebc5dab82252635ea4ec59f986e884`; assurance refresh/verify pass、validate `nodes=213` | bounded test-only remediation |
+| EAL-036 | `adopted` | S123 bounded remediation and code re-review | target test / test-only commit | branch名を入力から除き、40桁lowercase HEAD hex由来のsafe a/b候補からobserved refと異なる値を選択した。diagnostics observed refはraw値または既存contractの`<redacted>`だけを許可する | focused 1 passed / policy skip 0、module 81 passed / policy skip 0、`make lint`、diff check pass。code review R1はdiagnostics redactionのP1 1件 / fail / confidence 0.99、assertion修正後R2 findings `[]` / pass / confidence 0.99。test-only commit `11f18775f340cf77e8065a4541dfded9c142fc78` | final issue-wide QA/code/spec reviews |
+| EAL-037 | `adopted` | S123 final issue-wide quality reviews | current integrated diff / final report | origin/main以降の4-path差分、S122 full evidenceの合成的再利用、S123 remediation、current ledger/summary、S124/S130 pending境界をfreshに照合した | final `code-reviewer`: findings `[]` / pass / confidence 0.99。final `qa-reviewer`: findings `[]` / pass / confidence 0.99、second full不要・S122 evidence再利用可。final `spec-reviewer` R1: stale summary P1 + ledger range P2 / fail、report-only修正後R2 findings `[]` / pass / confidence 0.99、reviewed report `51e9deca342f40d46850e088b464d0958c162ab2fc98e6965ae5b407ab89c802` | report-only final commit後にS124 new PR delivery |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -159,7 +168,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 実装サマリー (任意)
 - S00 baseline characterizationを完了し、current SHAでcollection 2,696件、required-fast 7件、known flaky候補1件を変更なしで再確認した。
-- S01以降の実装は未着手であり、この時点ではsource、test、config、workflow、contributor docsに変更はない。
+- S01〜S123の実装・検証を完了した。post-merge Redに対する最終変更は対象testだけで、production、workflow、fixture、marker、skip/xfail、selectorは変更していない。
+- S124の新PR delivery / merge preparationと、human merge後のlatest `main` automatic fullおよびS130 lifecycle closeoutは未完了である。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -1056,6 +1066,39 @@ Summary: pre-delivery `pass=15`、`pending_external=7`、その他のpending/unr
 
 ## 省略/例外メモ (必須)
 - 該当なし
+
+---
+
+## Post-merge Recovery Cycle（S120R）
+
+- Human merge: PR #347、merge commit `0ca0eb29c170767f9646d3527a9a1c3d9c3b562d`。
+- External Red: automatic `Provider Full Regression` run `30403117215`、job `90422356172`、37m17s。
+- Result: `1 failed, 2628 passed, 76 skipped, 2 warnings in 2224.32s`。
+- Failed node: `tests/manual_tests/test_prepare_chatgpt_authoring_pack.py::test_requested_ref_mismatch_is_stale`。
+- Observed cause: fixtureの`requested_ref`が`main`固定で、`main`上ではobserved refと一致しexit 0になる。production contract defectやapproved known flakyではない。
+- External evidence authority: Issue #342 anchor comment `IC_kwDOQ99OK88AAAABMHi6Ng`。S120 Red、owner、forward-fix、rollbackなし、Issue finish blockedをreadback済み。
+- User authorization: latest `main`から新branch/新PRを作り、test-only minimal fix、required tests/lint/reviews、CI/Codex/conflict観測、merge-readyでhumanへ返す。agent merge/auto-merge/Issue closeは禁止。
+- Planning disposition: D-007を`plan.md` S121-S124へ昇格。fresh spec-review前はimplementation未開始。
+- Fresh amendment review: findings 0 / pass / confidence 0.99。reviewed plan `fe030aef...a4730ae5`、report `f359fabf...3ae27da`。
+- Runtime guidance note: `report-spec-review-missing`は既存S99-Spec2 fresh passと矛盾するnon-canonical projection。canonical recovery amendmentのfresh reviewを新たに取得し、implementation admissionをfail-closedで再確立する。
+- S121 delegated test-only fix: `tests/manual_tests/test_prepare_chatgpt_authoring_pack.py`だけを変更し、current ref/HEADから衝突しない`requested_ref`を動的に構成した。production、workflow、fixture、marker、skip policyの変更はない。
+- S121 verification: focused 1 passed、explicit module body 81 passed、ruff check/format、diff check pass。fresh code reviewはfindings 0 / pass / confidence 0.99。
+- S121 commit: `1c14d5fb3d03395e7991d704dc0a1f4f6e30e233`、post-commit clean。
+- S122 preflight: focused 1 passed、module body 81 passed、`make lint`、validate `nodes=213`、assurance verifyがpass。
+- S122 test-relevant manifest: tracked 445、aggregate `350b279b6692fce8791ec31f0d3d5cabd239841c099de8b84ac8d7ba49cc2d86`。previous accepted manifestからのdeltaは対象testだけで、unexplained drift 0。
+- S122 sole root full: `uv run pytest --run-full-regression`をexactly 1回実行しexit 0。2705 collected = 2629 passed + 76 legitimate skipped、policy skip 0、warnings 2、1636.38s。修正対象module/nodeは通過し、second recovery fullは未実行。
+- S122 fresh QA review: findings 0 / pass / confidence 0.99。external Red保持、test sensitivity、環境独立性、test weakeningなし、exactly-one full policy、unexpected regression 0を確認した。
+- Docs impact: inspect-only。通常command、full permission、workflow routing、運用contractは変更せず、既存`README.md`/`AGENTS.md`の説明に追加変更は不要。
+- S123 final code review R1: P1 1件 / fail / confidence 0.98。branch名にmetadata禁止語が含まれる場合、S121のrequested refがref mismatchより先に拒否される同一環境依存bug classを検出した。
+- S123 remediation disposition: branch名をrequested refへ含めず、observed HEADのsafe hexから必ず異なる固定形式を構成する。対象test以外を変更せず、focused/module/lintとfresh re-reviewを必須とし、S122のsole root fullは再実行しない。
+- S123 amendment review: R1はexplicit full permission/passed件数/policy skip acceptance欠落をP1として検出。exact focused/module commandsへ追加し、R2 findings 0 / pass / confidence 0.99。plan `b518b30a...779080`、report `a438a4b4...6e884`、assurance refresh/verify、validate `nodes=213`。
+- S123 remediation implementation: branch名を入力から除き、40桁lowercase HEAD hexだけからsafe a/b候補を作り、observed refと異なる候補を選択した。diagnostics observed refはraw値または既存redaction contractの`<redacted>`だけを許可する。
+- S123 remediation verification: exact focused 1 passed / policy skip 0、exact module 81 passed / policy skip 0、`make lint`、diff check pass。root fullは再実行していない。
+- S123 code re-review: R1はdiagnostics observed ref redaction未考慮をP1として検出。assertion修正後R2 findings 0 / pass / confidence 0.99。
+- S123 remediation commit: `11f18775f340cf77e8065a4541dfded9c142fc78`、対象test 1 fileのみ、post-commit clean。current test-relevant manifest tracked 445 / aggregate `9db332e0bf4f1a514228ae204d3dfb224e2f829fd2ac16ef47f0e5508c60747d`、S122 full manifestからのdeltaは対象test input/assertionだけ。
+- S123 final code review: findings 0 / pass / confidence 0.99。origin/main以降の統合差分にblocking code findingなし。
+- S123 final QA review: findings 0 / pass / confidence 0.99。S122 full後のdeltaは対象testだけで、final focused/moduleがbodyを実行したためfull evidenceの合成的再利用は妥当、second full不要と判定した。
+- S123 final spec review: R1はstale implementation summary P1とDecision Ledger range P2を検出。report-only修正後R2 findings 0 / pass / confidence 0.99。S124、human merge、latest `main` automatic full、S130は未完了のまま保持した。
 
 <!-- spec-dock:managed-section begin id="report.step-evidence" -->
 ## Step Evidence

@@ -860,6 +860,81 @@ S99はpre-delivery readiness gateであり、S111/S120でしか観測できな�
   - 検証方法: Actions evidenceと必要時のincident reproductionをS98 anchorの`EVD-TL-007` slotへ追記しreadbackする。
   - 関連 closure id: `CLOS-TL-AC-004`,`CLOS-TL-AC-010`,`CLOS-TL-BH-004`,`CLOS-TL-BH-007`
 
+### S121 Post-merge ref-mismatch regression recovery
+
+#### Recovery amendment contract
+
+2026-07-29のS120 automatic fullは、`main`上で
+`tests/manual_tests/test_prepare_chatgpt_authoring_pack.py::test_requested_ref_mismatch_is_stale`
+が固定値`requested_ref: main`を不一致refとして扱えず、期待したexit 3ではなくexit 0となって失敗した。このfailureはapproved known flakyではなく、S130をblockするenvironment-dependent test regressionとして保持する。
+
+| Field | Contract |
+|---|---|
+| Behavior goal | feature branchと`main`のどちらでも、テストが現在ref/HEADと異なる`requested_ref`を自ら構成し、本来のstale contractを検証する |
+| Planned obligation / evidence level | `red-required`; S120 run `30403117215`をexternal Redとして保持し、skip/xfail/delete/selector除外なしでMinimal Greenにする |
+| Delegated role | `dev-coder` |
+| Source of truth | user-approved recovery request、S120 Actions log、approved requirement/design/plan、`scripts/authoring-pack/prepare_chatgpt_authoring_pack.py`のref mismatch contract |
+| Allowed paths | `tests/manual_tests/test_prepare_chatgpt_authoring_pack.py`のみ |
+| Forbidden changes | production code、fixture共通契約、workflow、pytest config、markers、skip/xfail、test deletion/rename、unrelated refactor |
+| Pre-implementation evidence | S120: 1 failed/2628 passed/76 skipped、対象test expected 3 / actual 0。fixture `requested_ref`は`main`、productionはrequested refがobserved refまたはHEADと一致すればpassする |
+| Red | S120 automatic main run `30403117215`のexact failureをRedとし、feature branchで偶然Greenになる現行testをRedの代替にしない |
+| Minimal Green | test内でfixtureをcopyし、現在ref/HEADのいずれとも異なるdeterministic requested refを設定して一時configを実行する。diagnosticsのrequested/observed refも動的値へ合わせてassertする |
+| Required verification | focused exact node、`tests/manual_tests/test_prepare_chatgpt_authoring_pack.py` module、対象fileのruff check/format check、`git diff --check` |
+| Reviewer focus | fresh `code-reviewer`: branch/main invariant、production unchanged、test sensitivity、skip/xfail/selection weakening 0 |
+| Stop conditions | allowed path外変更、production fixが必要、focused/module failure、現在ref/HEADとrequested refの不一致を証明できない、unrelated failure |
+| Output required | changed files、Red/Green、exact commands/results、risk、`No material implementation decisions beyond the approved plan.`またはLedger Note |
+| Commit boundary | reviewer pass後にtest-only commitを作り、post-commit cleanを確認する |
+| Report destination | recovery cycle delegation/worker/reviewer/commit evidence。S100後のexternal valuesはS98 anchorを参照し、repoへ複製しない |
+
+#### 具体テストケース一覧
+
+- `tc-s121-001` regression: branch-independent ref mismatchを構成する
+  - 前提: current refがfeature branch、`main`、またはdetached HEADのいずれでもよい。
+  - 操作: current ref/HEADと異なるrequested refを一時configへ設定し、prepare scriptを実行する。
+  - 期待結果: exit 3、`status=stale`、requested ref mismatch error、requested refがobserved ref/HEADと不一致。
+  - 失敗検出: `main`固定、branch名依存、exit 0、skip/xfail/selection weakeningを検出する。
+  - 検証方法: focused test、module test、diff inspection。
+  - 関連 closure id: `CLOS-TL-AC-007`,`CLOS-TL-AC-010`,`CLOS-TL-BH-007`,`CLOS-TL-CON-004`
+
+### S122 Recovery integrated verification
+
+#### Verification contract
+
+- Owner: `dev-coder` read-only verification。
+- Precondition: S121 test-only commit、fresh code review pass、clean worktree。
+- Required fast checks: focused exact node、manual test module、`make lint`、`./spec-dock/scripts/spec-dock validate`、`./spec-dock/scripts/spec-dock assurance verify`。
+- Formal full authorization: fix candidate SHAで`uv run pytest --run-full-regression`をexactly 1回だけ実行する。Greenなら採用し、nonzeroなら追加fullを自動実行せず停止する。
+- Acceptance: full exit 0、全2705 nodesを実行対象として2629 passed/76 legitimate skipped、policy skip 0、修正対象node pass、test-relevant manifest deltaはS121のtest-only変更として説明可能。
+- Reviewer focus: fresh `qa-reviewer`がS120 Red保持、S121 sensitivity、exactly-one full、counts、unexpected failure 0を確認する。
+- Forbidden: second recovery full、workflow dispatch、failureのknown flaky読み替え、source/test修正。
+- Output: SHA、manifest、commands/exits/counts/elapsed、log evidence、risk、no-material decision。
+
+### S123 Recovery final quality / final commit
+
+- Precondition: S121 code review pass、S122 QA pass、formal full Green。
+- S123 code reviewで、branch名にmetadata禁止語が含まれる場合はS121の`requested_ref`がref mismatchより先に拒否される同一環境依存bug classを検出した場合、次のbounded remediationだけを許可する。
+  - Allowed path: `tests/manual_tests/test_prepare_chatgpt_authoring_pack.py`のみ。
+  - `requested_ref`はbranch名を含めず、Gitが返す40桁hexのobserved HEADからsafe fixed-formatで構成し、observed ref/HEADの双方と異なることをassertする。
+  - focused nodeは`uv run pytest --run-full-regression -q -p no:cacheprovider tests/manual_tests/test_prepare_chatgpt_authoring_pack.py::test_requested_ref_mismatch_is_stale`で1 passed / policy skip 0を確認する。
+  - module bodyは`uv run pytest --run-full-regression -q -p no:cacheprovider tests/manual_tests/test_prepare_chatgpt_authoring_pack.py`でexpected 81 passed / policy skip 0を確認する。
+  - `make lint`、`git diff --check`を実行し、fresh `code-reviewer`を取得してtest-only remediation commitを作る。
+  - production、workflow、fixture、marker、skip/xfail、selectorは変更しない。
+  - S122 fullは再実行しない。formal full後のdeltaが上記test input構成だけであることをmanifest/diffで固定し、final `qa-reviewer`がS122 fullの再利用可能性とsecond-full禁止を確認する。
+- Required fresh reviewers: issue-wide `code-reviewer`、`qa-reviewer`、`spec-reviewer`。
+- Docs impact: command/workflow/operation contractは変えないためinspect-only。更新が必要というfindingがあれば`doc-writer`へ戻す。
+- Main orchestratorはrecovery evidence、review verdict、closure delta、external anchor destinationだけを`report.md`へ統合する。
+- Final commitはreport-only recovery ledgerをtest-only commitの後に作成し、clean worktreeを確認する。
+- S100 non-circular boundaryは新しいreviewed fix SHAで再確立する。以後のPR evidenceは既存S98 anchorへ記録する。
+
+### S124 Recovery PR delivery / merge preparation
+
+- latest `main`から作成した新branchを使い、旧PR branchの再利用・force-pushを禁止する。
+- `github-pr-merge-preparer`によりnew PR、base/head/linkage、CI、Codex review、conflict、rollback、latest head SHAを観測する。
+- Acceptance: PR OPEN/ready、headはS123 reviewed SHA、required Actions success、blocking review 0、unresolved thread 0、conflict 0、merge-prepared。
+- S98 anchorへS120 recovery PR URL、reviewed SHA、checks/review、merge-prepared evidenceを追記する。
+- Agentはmerge、auto-merge、Issue closeを行わず、human merge boundaryで停止する。
+- Human merge後は新しいlatest `main` automatic fullをS120として1件観測し、Green後にS130へ進む。
+
 ### S130 Required sync / Issue lifecycle finish
 
 #### Lifecycle closeout contract
@@ -1107,3 +1182,5 @@ Rollback:
 | 2026-07-28 | plan-R4 remediation | dev-coderが禁止されるconfig/workflow mutationをbounded utility-workerへpath分離し、test-first順とreview routingを固定 | iwasawayuuta |
 | 2026-07-28 | plan-R5 approval | fresh spec-reviewer findings 0 / pass（confidence 0.99）を受け、reviewer-passed executable planとしてapprovedへ昇格 | iwasawayuuta |
 | 2026-07-29 | S05 failed-attempt recovery amendment | current Issue snapshot欠落によるformal full Redを保持し、bounded snapshot correction、fresh S04、repaired SHAのnew 3-pair batch、pre-merge総上限4を定義 | iwasawayuuta |
+| 2026-07-29 | S120 post-merge regression recovery amendment | `main`固定のref-mismatch test Redを保持し、test-only S121、fix SHAのfull最大1回、fresh final reviews、新PR merge-preparationを定義 | iwasawayuuta |
+| 2026-07-29 | S123 final-review remediation amendment | branch名由来のmetadata拒否を同一環境依存bug classとして閉じ、HEAD hex由来のsafe mismatch、focused/module/lint、fresh review、second full禁止を定義 | iwasawayuuta |
