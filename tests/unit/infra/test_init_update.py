@@ -37598,6 +37598,100 @@ esac
             assert stderr == ""
             assert self._relative_file_snapshot(target) == before
 
+    def test_uninstall_dry_run_classifies_fresh_root_workbench_readme_as_scaffold_managed_exact_match(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            payload = self._uninstall_json_payload(target)
+            readme_actions = [
+                action
+                for action in payload["actions"]  # type: ignore[index]
+                if action["path"] == "spec-dock/.workbench/README.md"
+            ]
+
+            assert len(readme_actions) == 1
+            readme_action = readme_actions[0]
+            assert readme_action["category"] == "scaffold_managed"
+            assert readme_action["status"] == "would_remove"
+            assert readme_action["reason"] == "current shipped asset exact match"
+
+    def test_uninstall_apply_remove_specs_removes_unchanged_root_workbench_readme_and_empty_workbench_dir(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            workbench = target / "spec-dock" / ".workbench"
+            retry_marker = target / "spec-dock" / ".uninstall-retry.json"
+
+            first_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            first_actions = self._actions_by_path(first_payload)
+
+            assert first_payload["status"] == "completed"
+            assert first_actions["spec-dock/.workbench/README.md"]["status"] == "removed"
+            assert not workbench.exists()
+            assert json.loads(retry_marker.read_text(encoding="utf-8")) == {
+                "managed_by": "spec-dock",
+                "purpose": "uninstall-rerun",
+                "schema_version": 1,
+            }
+
+            second_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            second_actions = self._actions_by_path(second_payload)
+
+            assert second_payload["status"] == "completed"
+            assert second_actions["spec-dock/.workbench/README.md"]["status"] == "already_removed"
+            assert second_payload["summary"]["failed"] == 0  # type: ignore[index]
+
+    def test_uninstall_apply_remove_specs_preserves_modified_root_workbench_readme(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            readme = target / "spec-dock" / ".workbench" / "README.md"
+            modified_bytes = readme.read_bytes() + b"\nuser change\n"
+            readme.write_bytes(modified_bytes)
+
+            payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            readme_action = self._actions_by_path(payload)["spec-dock/.workbench/README.md"]
+
+            assert payload["status"] == "completed"
+            assert readme_action["category"] == "scaffold_managed"
+            assert readme_action["status"] == "preserved"
+            assert readme_action["reason"] == "content mismatch; manual review required"
+            assert readme.read_bytes() == modified_bytes
+
+    def test_uninstall_apply_remove_specs_removes_only_managed_readme_and_preserves_arbitrary_workbench_payload(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            workbench = target / "spec-dock" / ".workbench"
+            readme = workbench / "README.md"
+            payload_file = workbench / "nested" / "opaque.bin"
+            payload_bytes = b"\x00\xffopaque-workbench-payload\n"
+            payload_file.parent.mkdir()
+            payload_file.write_bytes(payload_bytes)
+
+            payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            actions = self._actions_by_path(payload)
+
+            assert payload["status"] == "completed"
+            assert actions["spec-dock/.workbench/README.md"]["status"] == "removed"
+            assert actions["spec-dock/.workbench/nested/opaque.bin"] == {
+                "path": "spec-dock/.workbench/nested/opaque.bin",
+                "category": "unmanaged",
+                "status": "preserved",
+                "reason": "unmanaged file under managed boundary root",
+                "error": None,
+            }
+            assert not readme.exists()
+            assert payload_file.read_bytes() == payload_bytes
+            assert workbench.is_dir()
+
     def test_uninstall_apply_without_specs_mode_fails_before_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

@@ -1232,6 +1232,8 @@ def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, byt
     else:
         gitignore_bytes = _DEFAULT_SPEC_DOCK_GITIGNORE.encode("utf-8")
     sources.append((Path("spec-dock/.gitignore"), gitignore_bytes))
+    root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
+    sources.append((Path("spec-dock/.workbench/README.md"), root_workbench_readme.read_bytes()))
     sources.append((Path("spec-dock/spec-dock.version"), f"{_tool_version()}\n".encode()))
     return tuple(sources)
 

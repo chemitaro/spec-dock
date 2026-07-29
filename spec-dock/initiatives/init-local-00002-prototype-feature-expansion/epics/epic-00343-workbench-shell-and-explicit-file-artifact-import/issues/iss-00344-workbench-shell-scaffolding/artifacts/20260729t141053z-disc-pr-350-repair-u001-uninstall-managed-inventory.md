@@ -71,19 +71,42 @@ reflected_to: []
 
 ## Validation Plan
 
-- fresh init + `uninstall --apply --remove-specs`でunchanged root README、Workbench directory、retry markerが残らない。
+- fresh init + `uninstall --apply --remove-specs`でunchanged root READMEとempty Workbench directoryが残らず、retry markerは有効なままsecond rerunが成功する。
 - modified root READMEはpreserved/unmanagedとして残る。
 - existing retry/idempotencyとbounded cleanup testsがpassする。
 - Issue 344 aggregate、`make lint`、default `uv run pytest`がpassする。
 - push後のnew exact headへfixed PR observationをpost-onceで実行する。
 
+## ChatGPT Consultation / Orchestrator Disposition
+
+- consultation_status: fresh
+- consultation_id: `iss-00344-pr350-u001-consultati`
+- bound_head_sha: `818a48303f7a59b625d10681e6a2182767828279`
+- evidence: `artifacts/20260729t142442z-chatgpt-output-pr-350-u001-blocking-repair-consultation-818a4830.md`
+- validity: partially-valid
+- REC-001 disposition: partial-use
+- adopted:
+  - exact target/source mappingを既存uninstall inventoryへ追加する。
+  - unchanged removal、modified preservation、payload preservation、dry-run classificationの4 cases。
+  - existing exact-match helperとbounded empty-directory cleanupを再利用する。
+- rejected:
+  - retry markerをF001で削除またはreorderする。marker persistenceは既存idempotent rerun契約であり、root README inventory gapの原因ではない。
+- strategy_delta:
+  - S350-001をgeneration/uninstall inventory symmetryだけへ限定し、markerは有効なままsecond remove-specs rerunを成功させる。
+
 ## Implementation Result
 
-- pending fresh consultation and bounded worker.
+- `src/spec_dock/cli.py`へprovider root Workbench READMEのexact target/source mappingを2行で追加した。
+- `tests/unit/infra/test_init_update.py`へ4 focused casesを追加した。
+- Red: 4 casesすべて`unmanaged` / `preserved`分類で`4 failed`。
+- Green: focused `4 passed`、selected retry/cleanup/symlink `3 passed`、existing root Workbench `4 passed`。
+- Aggregate: installer selection `46 passed / 518 deselected`、CLI uninstall full `8 passed`、Issue focused `11 passed`、node/copy `52 passed`。
+- Static/default: `make lint` pass、default `672 passed / 2051 skipped`、diff-check pass。
+- retry marker lifecycle/order、symlink/non-regular/read-error preservation、payload opacityは変更していない。
 
 ## Commit Evidence
 
-- pending.
+- candidate commit pending。
 
 ## Re-observation Result
 
