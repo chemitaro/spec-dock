@@ -222,7 +222,7 @@ M2はM1のtracked READMEを、M3はM1の4 assetとM2のoperator contractを前�
 | S01 | fresh root/future nodesへtracked README shellを生成 | RQ-001〜005 / AC-001〜005 | none | S02 |
 | S02 | Workbench opacityとcheckout/manual copy互換を観測 | RQ-006/007/009 / AC-006、007A/B/C、009 | S01 Result Approval | S03 |
 | S03 | exact five-path distributionを4 surfacesで観測 | RQ-008 / AC-008 | S02 Result Approval | S90 |
-| S90 | shipped operator docsを実挙動へ整合 | RQ-003/007/010 / AC-007C、010 | S03 Result Approval | S99 |
+| S90 | shipped operator docsを実挙動へ整合 | RQ-003/007/010 / AC-007C、010 | S03 Result Approval | S95 |
 | S95 | changed managed assetsをprovider-first投影しdefault laneをgreenにする | RQ-011 / AC-011 | S90 Result Approval | S99 |
 | S99 | 全AC/TC、review、ready PR、observationを同一HEADで閉じる | RQ-001〜011 / 全AC | S01〜S95 | human merge / Issue 346 handoff |
 
@@ -928,7 +928,7 @@ S99 step gate:
 4. final report/review evidence commitを作成する。S99ではapproved-no-opを認めない。
 5. commit後に`git rev-parse HEAD`と`git status --short`を実行し、HEAD SHAとclean resultを確認する。
 6. 実際のHEAD SHAとclean resultを確認し、base `main`、本文`Closes #344` / `Refs #343`のready PRを作成する。`#345` / `#346`はcloseしない。
-7. exact headに対してPR observationを実行する。blocking P0/P1、CI failure、conflictがあればfresh ChatGPT consultation後にbounded repairへ戻し、新headをpushして再観測する。P2/P3だけなら採否を記録し、不要なbranch mutationを行わない。
+7. exact headに対してPR observationを実行する。blocking P0/P1、CI failure、conflictがあればfresh ChatGPT consultation後にbounded repairへ戻す。branch-changing repairは、それ以前のhead-bound S99 evidence、aggregate verification、fresh QA/code/spec review、final evidence commitをすべてstaleにする。修正をowner stepへ戻し、影響するlocal gateとS99 aggregate verification、三者fresh review、new evidence-only closure commitを新headで再実行してからpush / re-observationする。P2/P3だけなら採否を記録し、不要なbranch mutationを行わない。
 8. main orchestratorがPR observation、external HEAD SHA/clean evidence、`committed` close stateを確認し、merge-preparedのStep / Milestone Result Approvalを与える。
 9. merge、auto-merge、branch削除、Issue finishを実行せず、human merge前で停止する。Issue 345はhuman merge後のupdated `main`から開始する。
 
