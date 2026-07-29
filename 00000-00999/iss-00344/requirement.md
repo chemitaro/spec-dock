@@ -3,7 +3,7 @@
 ID: "iss-00344"
 タイトル: "Workbench Shell Scaffolding"
 関連GitHub: ["#344"]
-状態: "approved"
+状態: "review-pending"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-29"
 親: ["epic-00343", "init-local-00002"]
@@ -15,7 +15,7 @@ ID: "iss-00344"
 
 この文書は、fresh な SpecDock root と今後作成される Initiative、Epic、Issue に optional Workbench shell を提供するための、観測可能な成果、境界、受け入れ条件を定義する。
 
-実装方法、変更ファイル、テスト実行順序は `design.md` と `plan.md` で扱う。generic single-file Artifact import は `iss-00345`、candidate wheel を使った統合 E2E、dogfood projection、full regression、Epic 全体の最終レビューと PR 送達は `iss-00346` の責務とする。
+実装方法、変更ファイル、テスト実行順序は `design.md` と `plan.md` で扱う。generic single-file Artifact import は `iss-00345`、candidate wheel を使った統合 E2E、generic import を含む integrated dogfood、opt-in full regression、Epic 全体の最終レビューと残余 Epic PR 送達は `iss-00346` の責務とする。本 Issue は、自身が変更した provider managed assets の checked-in dogfood projection、default PR lane、Issue-local PR delivery / observation を所有する。
 
 ## 1. 目的と観測可能な成果
 
@@ -35,6 +35,9 @@ Workbench は一時的、worktree-local、破棄可能、non-canonical であり
 6. ignored な作業ファイルは checkout だけでは別 worktree へ移らない。Initiative / Epic / Issue の node-scoped Workbench だけは、必要な場合に明示的な `workbench copy` で移せる。root Workbench は同 helper の対象外である。
 7. source tree、wheel、sdist、installed package resources のすべてに4つの Workbench README asset が収録される。
 8. shipped docs が Workbench shell、Git 境界、manual copy、evidence-only authority を一貫して説明する。
+9. 本 Issue が変更した provider managed assets が、provider-first update 経路で checked-in dogfood mirror へ投影され、provider / mirror parity が成立する。
+10. `make lint` と default `uv run pytest` が成功し、Issue-local ready PR の head が local final SHA と一致する。
+11. `main` 向け ready PR の Actions、current-head review、thread、merge-conflict 状態が観測され、blocking finding のない `merge-prepared` 状態に到達する。
 
 ### 1.3 完了後に観測できてはいけないこと
 
@@ -45,7 +48,8 @@ Workbench は一時的、worktree-local、破棄可能、non-canonical であり
 - README または Workbench 内容を node、Artifact、ADR、dependency、authoring source として解釈する挙動。
 - `.workbench/.gitkeep` の生成。
 - `iss-00345` が所有する generic import 実装。
-- `iss-00346` が所有する dogfood projection、full regression、PR 作成または merge。
+- `iss-00345` / `iss-00346` が所有する generic import implementation、candidate-wheel consumer E2E、generic import を含む integrated dogfood、opt-in full regression、Epic-wide review、残余 Epic PR の先取り。
+- merge、auto-merge、branch deletion、Issue close、`issue finish`。
 
 ### 1.4 この Issue の種類
 
@@ -120,7 +124,7 @@ Workbench は一時的、worktree-local、破棄可能、non-canonical であり
 - Workbench copy の automatic lifecycle。
 - canonical adoption workflow。
 - Epic の Issue 分割と dependency 方向。
-- PR Delivery Gate と Merge Preparation Gate の最終所有者。
+- Issue #346 が所有する残余 Epic integration PR、Epic-wide review、merge の authority。
 
 ## 4. 関係者と代表シナリオ
 
@@ -199,7 +203,10 @@ Workbench は一時的、worktree-local、破棄可能、non-canonical であり
 - source、wheel、sdist、installed resource の exact README inventory。
 - provider-first docs。
 - Issue-local focused tests と evidence destination。
-- `iss-00346` への deferred PR delivery record。
+- Issue #344 changed managed assets の provider-first checked-in dogfood projection。
+- `make lint` と default `uv run pytest` による local PR-equivalent gate。
+- Issue-local ready PR の作成、Actions / current-head review / thread / merge-conflict observation、merge preparation。
+- `iss-00346` への残余 integrated delivery handoff。
 
 ### 5.2 Out of scope
 
@@ -213,10 +220,10 @@ Workbench は一時的、worktree-local、破棄可能、non-canonical であり
 - Workbench content classifier、retention、expiration、cleanup。
 - Workbench を canonical source にする変更。
 - candidate wheel を使った full end-to-end product verification。
-- dogfood `spec-dock/**` への正式 projection。
-- full test suite closure。
+- generic import を含む integrated dogfood projection。
+- opt-in `uv run pytest --run-full-regression` 全 suite の closure。
 - Epic-wide final QA / code / spec review。
-- push、PR 作成、merge preparation、merge。
+- 残余 Epic integration PR、merge、auto-merge、branch deletion、Issue close、`issue finish`。
 
 ### 5.3 変更しないもの
 
@@ -325,6 +332,18 @@ README の import command は repository root から実行する repo-local runt
 
 generic import の実装は `iss-00345` の責務であることも明記する。
 
+### I344-RQ-011 Provider-first dogfood projection and Issue-local PR delivery
+
+本 Issue が変更した provider managed assets は、S90 完了後に正式な update 経路で checked-in dogfood mirror へ一度だけ投影し、default PR lane を green にしなければならない。
+
+- dogfood file の手編集を primary implementation path にしてはならない。
+- projection は `spec-dock/initiatives/**`、existing root / node Workbench、Workbench payload、Issue 345 / 346 implementation、unrelated managed driftを変更してはならない。
+- provider / dogfood docs parity、template inventory / bytes parity、no-backfillを検証しなければならない。
+- local `make lint`、default `uv run pytest`、validate、sync、diff / clean checkを成功させなければならない。
+- `main` 向け ready PR を作成し、exact pushed head に対する Actions、current-head review、thread、merge-conflict、platform requirementを観測しなければならない。
+- branch mutationはrequired CI failure、P0/P1 review finding、visible merge conflict、branch protection blocker、または本 Issue scope内の修正に限定する。
+- merge、auto-merge、branch deletion、Issue close、`issue finish`は人間または後続 lifecycle の責務として実行しない。
+
 ## 7. 受け入れ条件
 
 | ID | 対応要件 | 受け入れ条件 |
@@ -341,6 +360,7 @@ generic import の実装は `iss-00345` の責務であることも明記する�
 | `AC-344-008` | `I344-RQ-008` | source / wheel / sdist / installed inventory が exact allowlist と一致し、4 README bytes が一致する |
 | `AC-344-009` | `I344-RQ-009` | current `workbench copy` と existing workspace の focused regression が通る |
 | `AC-344-010` | `I344-RQ-010` | shipped docs が shell、Git、copy、security、authority、Issue 境界を矛盾なく説明する |
+| `AC-344-011` | `I344-RQ-011` | provider-first projection後にchecked-in docs / templates parity、no-backfill、`make lint`、default `uv run pytest`、validate / syncが通り、exact final headのready PRがcurrent-head observationで`merge-prepared`となる |
 
 ## 8. 例外・境界条件
 
@@ -388,16 +408,18 @@ generic import の実装は `iss-00345` の責務であることも明記する�
 | `RS-344-003` | Workbench 内容が discovery / validation 結果を変えた | semantic opacity 回帰として修正する |
 | `RS-344-004` | source にはあるが wheel / sdist / installed resource にない | package-data を修正し全 surface を再検証する |
 | `RS-344-005` | README を得るために manual copy が必要と説明された | Git checkout と manual copy の役割分担を修正する |
-| `RS-344-006` | Issue 345 / 346 の責務を実装または完了主張した | scope を戻し parent dependency に defer する |
+| `RS-344-006` | generic import、candidate-wheel consumer E2E、integrated dogfood、opt-in full regression、Epic-wide reviewを本 Issueへ吸収した | Issue 345 / 346 の責務へ戻す。approved Issue-local projection / PR deliveryは違反としない |
+| `RS-344-007` | provider-first projectionでunrelated managed path、`spec-dock/initiatives/**`、existing Workbenchが変化した | projectionを採用せず停止し、exact diff inventoryと原因をreviewする |
 
 ## 11. 完了条件
 
-- `AC-344-001` から `AC-344-006`、`AC-344-007A`、`AC-344-007B`、`AC-344-007C`、`AC-344-008` から `AC-344-010` がすべて Issue-local evidence で満たされる。
+- `AC-344-001` から `AC-344-006`、`AC-344-007A`、`AC-344-007B`、`AC-344-007C`、`AC-344-008` から `AC-344-011` がすべて Issue-local evidence で満たされる。
 - requirement、design、plan が fresh `spec-reviewer` の pass を得る。
 - focused implementation / QA / code / spec review gate が pass する。
-- Issue report に実行済みの証跡、未実施事項、`iss-00346` への deferred delivery record が記録される。
+- Issue report に実行済みの証跡、未実施事項、`iss-00346` への残余 integrated delivery handoff が記録される。
 - `iss-00346 -> iss-00344` dependency が維持される。
-- 本 Issue では PR-ready、merge-ready、Issue finish、Epic completion を主張しない。
+- `make lint`、default `uv run pytest`、validate、syncが成功し、Issue-local ready PRがexact final headで`merge-prepared`となる。
+- merge、auto-merge、branch deletion、Issue close、`issue finish`、Epic completionは主張または実行しない。
 
 ## 12. 仮定と未確定事項
 

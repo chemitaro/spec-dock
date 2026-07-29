@@ -21,7 +21,7 @@ ID: "epic-00343"
 2. **Generic Single-File Artifact Import**
    - Workbench内外、repository内外の明示single file一件を、root / Initiative / Epic / IssueのArtifactへ安全にimportできるCLI capabilityを提供する。
 3. **Integration Distribution And Final Quality**
-   - 上記二能力をcandidate wheel、fresh / updated consumer、dogfood、full regression、Epic-wide review、mergeable PR deliveryまで統合する。
+   - 上記二能力をcandidate wheel、fresh / updated consumer、generic importを含むintegrated dogfood、opt-in full regression、Epic-wide review、残余Epic integration PR deliveryまで統合する。
 
 layer別Issueへは分割しない。Candidate 1と2は各々CLI / installer / application / domain / infra / presentation / tests / docsの必要部分を含むvertical sliceとする。Candidate 3はreview-onlyではなく、配布された利用者環境で両能力が成立することと、Epic全体の最終品質・PR送達を所有する必須final-quality Issueとする。
 
@@ -31,6 +31,15 @@ layer別Issueへは分割しない。Candidate 1と2は各々CLI / installer / a
 - Issue nodes: `iss-00344`, `iss-00345`, `iss-00346`
 - canonical Issue docs: runtime scaffold created。各Issueのjust-in-time planningで正式化する。
 - merge: human-only。計画上の最終到達点はmergeable PR preparationであり、mergeは行わない。
+
+### 1.1 Issue 344 delivery amendment
+
+ユーザーの2026-07-29の明示指示により、Candidate 1は自身が変更したmanaged assetsのchecked-in dogfood projection、default PR lane、Issue-local ready PR作成とexact-head observationまでを所有する。これはCandidate 3の最終統合責務を削除しない。
+
+- Candidate 1 / `iss-00344`: provider-first projection、no-backfill、`make lint`、default `uv run pytest`、ready PR (`Closes #344`, `Refs #343`) とPR observation。
+- Candidate 3 / `iss-00346`: candidate wheel consumer E2E、Candidate 2のgeneric importを含むintegrated dogfood、opt-in full regression、cross-feature repair、Epic-wide QA/code/spec/decision review、残余Epic integration PR。
+- Candidate 1 PRはhuman merge前で停止する。Candidate 2はそのhuman merge後のupdated `main`から開始する。
+- dependency metadata `iss-00346 -> iss-00344, iss-00345` は変更しない。
 
 ## 2. Scope / Non-scope
 
@@ -127,6 +136,7 @@ Candidate 2 / 3はaccepted ADRを再判断しない。`--` family、full destina
   - installer → provider assets/templates → runtime node creation → Git observation → focused tests → docs。
   - README本文にpurpose、temporary/worktree-local/noncanonical、README-only tracking、explicit import、manual copy、secret注意、evidence-only authorityを含むguidance。
   - source / wheel / sdist / installed resourcesのexact README allowlistと4 asset byte parity evidence。
+  - changed managed assetsのprovider-first checked-in dogfood projection、no-backfill、default PR lane、ready PR作成とexact-head observation。
 - focused verification:
 
 ```bash
@@ -214,7 +224,7 @@ uv run pytest tests/cli_runtime/test_artifact_import_chatgpt_output.py tests/cli
   - Candidate 1 / 2のcross-feature integration repair。
   - wheel inventory / candidate wheel。
   - fresh consumer、pre-feature existing consumer update/no-backfill、post-update future node。
-  - dogfood provider-first projection。
+  - Candidate 1が投影したshell mirrorとCandidate 2のgeneric importを含むintegrated dogfood再検証。
   - manual external-file root/node scenario。
   - full regression、docs parity、Epic report trace。
   - final QA / code / spec review、Epic-wide pre-PR review、push、PR preparation。
@@ -266,7 +276,7 @@ Candidate 2 Generic Import ──────┘
 ./spec-dock/scripts/spec-dock sync
 ```
 
-Candidate 1 / 2はreview済みlocal milestone commitまで閉じ、per-Issue PRを作らない。各reportはdeferred PR deliveryとしてCandidate 3の実ID、dependency edge、no-per-Issue-PR理由、未完のPR Delivery / Merge Preparation Gateを記録する。Candidate 3はdeferred PR deliveryを使用しない。
+Candidate 1はreview済みmilestone、provider-first projection、default lane、ready PR、exact-head observationまで閉じ、人間merge前で停止する。Candidate 2はreview済みlocal milestone commitまで閉じ、per-Issue PRを作らない。各reportはCandidate 3の実ID、dependency edge、残余integration gateを記録する。Candidate 3はEpic全体の残余integration PRを所有する。
 
 ## 6. Integration checkpoints / quality gates
 
@@ -289,6 +299,7 @@ Candidate 1 / 2はreview済みlocal milestone commitまで閉じ、per-Issue PR�
 - runtime / CLI / infra / tests / scaffoldは`dev-coder`、shipped docsは`doc-writer`へ委任する。
 - code/runtime/test変更はfresh `code-reviewer`、test qualityは必要に応じ`qa-reviewer`、docs/spec alignmentはfresh `spec-reviewer`を通す。
 - 各Issueはfocused test、compatibility evidence、commit candidate、post-commit clean checkを持つ。
+- Candidate 1だけは追加でprovider-first checked-in projection、default PR lane、ready PR、exact-head observationを閉じる。
 
 ### G3 Distribution / dogfood gate
 
@@ -350,11 +361,12 @@ Candidate 1 / 2はreview済みlocal milestone commitまで閉じ、per-Issue PR�
 
 ### Rollout
 
-1. Candidate 1 / 2を各focused gateまで完了する。
-2. Candidate 3でcandidate wheelをbuildし、fresh / existing consumerへ適用する。
-3. existing consumerはno-backfillを確認し、その後のnew nodeからshellを得る。
-4. dogfoodはprovider-first update経路でprojectionする。
-5. full quality / PR gate後にmergeable PRを引き渡す。
+1. Candidate 1をfocused gate、provider-first projection、default lane、Issue-local ready PRまで完了し、人間merge後にupdated `main`へ反映する。
+2. Candidate 2をfocused gateまで完了する。
+3. Candidate 3でcandidate wheelをbuildし、fresh / existing consumerへ適用する。
+4. existing consumerはno-backfillを確認し、その後のnew nodeからshellを得る。
+5. integrated dogfoodでshellとgeneric importを再検証する。
+6. full quality /残余Epic PR gate後にmergeable PRを引き渡す。
 
 ### Rollback invariants
 
@@ -387,4 +399,4 @@ Candidate 1 / 2はreview済みlocal milestone commitまで閉じ、per-Issue PR�
 - Issue nodes:
   - `iss-00344`、`iss-00345`、`iss-00346`。
 - next action:
-  - dependency-readyな`iss-00344`をstartし、ChatGPT-first Issue planningを行う。
+  - `iss-00344`のdelivery amendmentをfresh reviewし、残るS02→S03→S90→S95→S99を実行してIssue-local ready PRを作成する。

@@ -3,7 +3,7 @@
 ID: "iss-00344"
 タイトル: "Workbench Shell Scaffolding"
 関連GitHub: ["#344"]
-状態: "approved"
+状態: "review-pending"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-29"
 依存: ["requirement.md", "design.md"]
@@ -19,16 +19,17 @@ ID: "iss-00344"
 - `assurance_profile: standard`
 - `execution_style: spec-locked-micro-batch-tdd`
 - `provider_first: true`
-- `per_issue_pr: false`
-- `delivery_owner: iss-00346`
+- `per_issue_pr: true`
+- `issue_pr_delivery_owner: iss-00344`
+- `epic_integration_delivery_owner: iss-00346`
 
 ## 0. 文書の位置づけ
 
 - 本計画はIssue 344のWorkbench shellだけを実装する。
-- generic single-file Artifact importはIssue 345、candidate wheel consumer E2E・dogfood projection・full regression・PR deliveryはIssue 346が所有する。
+- generic single-file Artifact importはIssue 345が所有する。本Issueは、自身が変更したmanaged assetsのchecked-in dogfood projection、default PR lane、Issue-local ready PRとexact-head observationを所有する。candidate wheel consumer E2E、generic importを含むintegrated dogfood、opt-in full regression、Epic-wide review、残余Epic integration PRはIssue 346が所有する。
 - provider sourceを先に変更し、consumer側 `spec-dock/**` を実装正本として手編集しない。
 - 実装開始後も、requirement/designのnormative contractをworker判断で変更しない。
-- merge、Issue finish、Epic completionは本計画の自動実行範囲外である。
+- merge、auto-merge、branch削除、Issue finish、Epic completionは本計画の自動実行範囲外である。
 
 ## 1. 計画開始条件（Plan Readiness）
 
@@ -56,7 +57,7 @@ ID: "iss-00344"
 2. SpecDock `authoring preflight github-sync` でlocal/remote HEAD一致を確認する。
 3. ChatGPT-Useへexact commit、approved specs、step contract、current source/testsを参照させ、最小実装方針、Red/Green、具体テストケース、過剰実装回避、stop conditionをMarkdownで具体化させる。
 4. 完全回答を`artifact import chatgpt-output`でIssue Artifactへ保存し、main orchestratorがapproved specsとlocal sourceに照らして採否を記録する。
-5. 採用したArtifactとstep contractを、そのstepの実装担当へ共有してbounded implementationを委任する。S01/S02/S03は`dev-coder`、S90はtest laneを`dev-coder`、docs laneを`doc-writer`が担当する。
+5. 採用したArtifactとstep contractを、そのstepの実装担当へ共有してbounded implementationを委任する。S01/S02/S03/S95は`dev-coder`、S90はtest laneを`dev-coder`、docs laneを`doc-writer`が担当する。
 6. 実装、focused verification、pre-review report統合を完了し、review candidate commitを作成してbranchをGitHubへpushする。このcommitを`review_target_sha`とする。
 7. planに記載された`code-reviewer`、`spec-reviewer`、`qa-reviewer`はreview責務契約として維持し、その責務をSub-agentではなくChatGPT-Useへプロンプトとして渡す。ChatGPT-Useはpush済み`review_target_sha`だけをreviewする。
 8. blocking / major findingを採用した場合は同じstepの担当へbounded fixを戻し、新しいcandidate commitをpushして、その新しいSHAへfresh re-reviewを行う。
@@ -99,11 +100,14 @@ Reviewの運用条件:
 
 ## 2. 実装戦略（Implementation Strategy）
 
-3つのmicro-batchを順番に実行する。
+3つのmicro-batchと2つのrelease closure stepを順番に実行する。
 
 1. S01: fresh rootとfuture nodeを同じREADME shellで生成し、README-only trackingを成立させる。
 2. S02: semantic opacityとlinked-worktree時のcheckout/manual copy境界を同一観測で閉じる。
-3. S03: installer pruneとbuild pruneを含むdistribution exact allowlistを成立させ、Issue 346へ証跡を引き渡す。
+3. S03: installer pruneとbuild pruneを含むdistribution exact allowlistを成立させる。
+4. S90: shipped operator docsを実挙動へ整合させる。
+5. S95: provider-first dogfood projection、default PR lane、no-backfillを閉じる。
+6. S99: Issue-wide review、ready PR作成、exact-head observationを閉じ、human merge前で停止する。
 
 各micro-batchは次の順序を守る。
 
@@ -166,8 +170,10 @@ Red方針:
 | automatic hook/watch/sync/copy-back | manual-only契約違反 | 親Epicへ再提案 |
 | existing nodeへのbackfill/migration | no-backfill違反 | 別migration Issue |
 | Workbench semantic parser/discovery | opacity違反 | requirement amendment |
-| dogfood `spec-dock/**` implementation projection | Issue 346 ownership | Issue 346でcandidate wheelから反映 |
-| per-Issue PR/merge/finish | delivery boundary違反 | Issue 346/human gate |
+| dogfood `spec-dock/**` manual-first edit | provider-first違反 | S95の正式なupdate経路だけを使う |
+| `spec-dock/initiatives/**` / existing Workbench mutation | no-backfill / evidence保全違反 | 即時停止してplanningへ戻す |
+| candidate wheel / integrated dogfood / opt-in full regression / Epic-wide review | Issue 346 ownership | Issue 346へ残す |
+| merge/auto-merge/branch削除/finish | human boundary違反 | human gate |
 
 ## 4. 実行概要（Execution Overview）
 
@@ -177,7 +183,8 @@ Red方針:
 | M2 / S02 | opacity、checkout/manual copy | B-005〜B-006 | opacity/copy focused suite | planned |
 | M3 / S03 | source/wheel/sdist/installed exact inventory | B-008〜B-009 | custom build prune + distribution suite | planned |
 | S90 | docs/template impact resolution | B-007 | semantic assertionとdeprecated wording inspection | planned |
-| S99 | Issue-local final quality | all | closure、focused regression、review、handoff | planned |
+| S95 | provider-first projection / default PR lane | B-010 | allowlist、mirror parity、no-backfill、lint/default suite | planned |
+| S99 | Issue-local final quality / PR observation | all | closure、review、ready PR、exact-head observation | planned |
 
 ```plantuml
 @startuml
@@ -187,6 +194,7 @@ start
 :M2 opacity / worktree / copy compatibility;
 :M3 packaging / distribution;
 :S90 docs impact resolution;
+:S95 dogfood projection / default PR lane;
 :S99 final Issue-local quality gate;
 stop
 @enduml
@@ -196,7 +204,7 @@ M2はM1のtracked READMEを、M3はM1の4 assetとM2のoperator contractを前�
 
 ### 4.4 この計画で満たす要件ID
 
-`I344-RQ-001`〜`I344-RQ-010`、`AC-344-001`〜`AC-344-006`、`AC-344-007A/B/C`、`AC-344-008`〜`AC-344-010`をすべて対象とする。
+`I344-RQ-001`〜`I344-RQ-011`、`AC-344-001`〜`AC-344-006`、`AC-344-007A/B/C`、`AC-344-008`〜`AC-344-011`をすべて対象とする。
 
 ### 4.5 依存関係から導く実装順序
 
@@ -204,7 +212,8 @@ M2はM1のtracked READMEを、M3はM1の4 assetとM2のoperator contractを前�
 2. S02でS01の生成物を使い、semantic opacityとlinked-worktree copy compatibilityをcharacterizeする。
 3. S03でS01のprovider assetsをpackage surfaceへ配布し、S02 regressionを同revisionで再確認する。
 4. S90でS01/S02の実測contractをoperator docsへ反映する。
-5. S99で全stepのevidenceとreviewを同一HEADに収束させる。
+5. S95でprovider-first projectionとdefault PR laneを同一HEADで閉じる。
+6. S99で全stepのevidenceとreviewを同一HEADに収束させ、ready PRを作成・観測する。
 
 ### 4.6 ステップ一覧と要件 ↔ ステップ対応
 
@@ -214,7 +223,8 @@ M2はM1のtracked READMEを、M3はM1の4 assetとM2のoperator contractを前�
 | S02 | Workbench opacityとcheckout/manual copy互換を観測 | RQ-006/007/009 / AC-006、007A/B/C、009 | S01 Result Approval | S03 |
 | S03 | exact five-path distributionを4 surfacesで観測 | RQ-008 / AC-008 | S02 Result Approval | S90 |
 | S90 | shipped operator docsを実挙動へ整合 | RQ-003/007/010 / AC-007C、010 | S03 Result Approval | S99 |
-| S99 | 全AC/TC、review、handoffを同一HEADで閉じる | RQ-001〜010 / 全AC | S01〜S90 | Issue 346 |
+| S95 | changed managed assetsをprovider-first投影しdefault laneをgreenにする | RQ-011 / AC-011 | S90 Result Approval | S99 |
+| S99 | 全AC/TC、review、ready PR、observationを同一HEADで閉じる | RQ-001〜011 / 全AC | S01〜S95 | human merge / Issue 346 handoff |
 
 ## 5. 受け入れ範囲（Acceptance Envelope）
 
@@ -225,6 +235,7 @@ M2はM1のtracked READMEを、M3はM1の4 assetとM2のoperator contractを前�
 | OUT-003 | Workbenchがopaqueで、checkout/manual copyの役割が維持される | AC-344-006、007A/B/C、009 | DES-344-006、007 | EVD-005〜006 |
 | OUT-004 | exact 5 README inventoryと4 asset byte parityが全surfaceで成立する | AC-344-008 | DES-344-008 | EVD-007 |
 | OUT-005 | shipped docsがsecurity/authority/Issue境界を正しく説明する | AC-344-010 | DES-344-009 | EVD-008 |
+| OUT-006 | provider-first projectionとdefault laneをgreenにし、ready PRをexact headで観測する | AC-344-011 | DES-344-010 | EVD-012/013 |
 
 Must not happen:
 
@@ -255,6 +266,7 @@ Must not happen:
 | TC-344-008 | yes | AC-344-008 / DES-344-008 | S03 | source/wheel/sdist/installed template subtree | exact 5 paths、4 bytes一致、stale nested READMEなし | package exclude/prune欠落 | custom build + installed resource | EVD-007 |
 | TC-344-009 | yes | AC-344-009 / DES-344-005/007 | S02 | existing `workbench copy` suite |公開failure/source-wins/atomicity不変 | copy regression | CLI suite | EVD-006 |
 | TC-344-010 | yes | AC-344-010 / DES-344-009 | S90 | shipped docs 4件 | shell/Git/copy/security/authority/sibling境界が一致 | operator誤誘導 | docs semantic assertion | EVD-008 |
+| TC-344-011 | yes | AC-344-011 / DES-344-010 | S95/S99 | provider authority、managed mirror、default lane、ready PR | allowlisted projection、no-backfill、lint/default suite、exact-head observation | manual mirror drift、scope侵食、stale PR review | update diff inspection + tests + PR observation | EVD-012/013 |
 
 ## 7. Behavior Backlog
 
@@ -267,6 +279,7 @@ Must not happen:
 | B-005 | M2 | README/payloadがsemantic observationを変えない | TC-344-006 | B-001 | planned |
 | B-006 | M2 | checkout/manual copy/source-wins/root rejectionを維持 | TC-344-007A/B/C、009 | B-003/004 | planned |
 | B-007 | S90 | shipped docsが新しいoperator boundaryを説明 | TC-344-010 | B-005/006 | planned |
+| B-010 | S95 | changed managed assetsを正式経路で投影しdefault PR laneをgreenにする | TC-344-011 | B-007/008/009 | planned |
 | B-008 | M3 | installer/build pruneがexact 5 pathsだけを保存 | TC-344-008 | B-001 | planned |
 | B-009 | M3 | source/wheel/sdist/installed inventoryとbytesが一致 | TC-344-008 | B-008 | planned |
 
@@ -709,20 +722,20 @@ S03 step gate:
 6. PASS後にreview Artifact、採否、`review_target_sha`を統合し、Artifactとreportだけのpost-review evidence commitを`closure_head_sha`として作成する。
 7. `git status --short`とevidence-only diff boundaryを確認してclose stateを`committed`または`approved-no-op`へ確定する。
 8. main orchestratorがStep / Milestone Result Approvalを与える。
-9. Result Approval前はS90のimplementation、review、commitを開始しない。S99はS90 Result Approvalを待つ。
+9. Result Approval前はS90のimplementation、review、commitを開始しない。S95はS90 Result Approvalを待つ。
 
 ### S90 — Docs / Template Impact Resolution
 
 - provider docs 4件: update required。
 - 4 Workbench README templates: S01-owned implementation。S90ではread-only parity/reference。
 - skills/workflow docs: semantic contract変更なし。変更不要をreportに記録。
-- dogfood workspace: Issue 346でcandidate wheelから検証。直接変更しない。
+- dogfood workspace: S90では変更しない。S95で正式なprovider-first update経路からchanged managed assetsだけを投影する。
 - deprecated wordingはcontext-awareに検索し、blind replacementしない。
 
 #### S90 behavior slice execution
 
 - depends on: S03 Result Approval。
-- unblocks: S99。
+- unblocks: S95。
 - target files: provider docs 3件、`templates/README.md`、`tests/unit/infra/test_init_update.py` のdocs semantic assertion、Issue report。4 canonical `.workbench/README.md` はread-only reference。
 - integration checkpoint: S01/S02のobserved shell/copy boundaryと4 canonical READMEをshipped docsへ照合する。
 - annotation: AFK。canonical README wording変更はHITL design amendment。
@@ -765,9 +778,9 @@ S90は同じvertical slice内で、test contractとdocs変更の責務を次の�
   - 関連 closure id: TC-344-007C、TC-344-010。
 
 - `tc-s90-002` inspect-only: skills/workflow/dogfood影響を誤って変更しない
-  - 前提: changed-path一覧とIssue 346 ownershipを用意する。
-  - 操作: skills/workflow docsのsemantic change不要、dogfood projection deferredをinspectionする。
-  - 期待結果:不要な変更がなく、N/A/deferred根拠がreportへ記録される。
+  - 前提: changed-path一覧とS95/Issue 346 ownershipを用意する。
+  - 操作: skills/workflow docsのsemantic change不要、dogfood projectionがS95まで未実行であることをinspectionする。
+  - 期待結果:不要な変更がなく、N/A/S95 handoff根拠がreportへ記録される。
   - 失敗検出: one-off consumer edit、Issue 345/346 scope侵食を検出する。
   - 検証方法: `git diff --name-only` とEVD-008/010 inspection。
   - 関連 closure id: TC-344-010。
@@ -790,41 +803,93 @@ S90 step gate:
 7. 両PASS後にreview Artifacts、採否、各`review_target_sha`を統合し、Artifactとreportだけのpost-review evidence commitを`closure_head_sha`として作成する。
 8. `git status --short`とevidence-only diff boundaryを確認してclose stateを`committed`または`approved-no-op`へ確定する。
 9. main orchestratorが両reviewを含むStep / Milestone Result Approvalを与える。
-10. Result Approval前はS99のimplementation、review、commitを開始しない。
+10. Result Approval前はS95のimplementation、review、commitを開始しない。
+
+### S95 — Provider-first Dogfood Projection / Default PR Lane
+
+- provider sourceを正本とし、S90までのreview済み変更を正式な `uv run spec-dock update .` でchecked-in dogfood mirrorへ一度だけ投影する。
+- projection前後で`spec-dock/initiatives/**`と既存Workbench stateのexact snapshotを比較し、no-backfillを証明する。
+- changed pathをmanaged mirror allowlistへ限定し、mirror parity、`make lint`、default `uv run pytest`をgreenにする。
+- candidate wheel consumer E2E、generic importを含むintegrated dogfood、opt-in full regression、Epic-wide reviewはIssue 346へ残す。
+
+#### S95 behavior slice execution
+
+- depends on: S90 Result Approval。
+- unblocks: S99。
+- target files: provider変更に対応するchecked-in managed mirror、projection/no-backfill/default-lane tests、Issue report。`spec-dock/initiatives/**`とexisting Workbench contentsはread-only snapshot。
+- integration checkpoint: providerとchecked-in mirrorを同一revisionで照合し、通常PR laneをgreenにする。
+- annotation: AFK。allowlist外のprojection、existing scope mutation、cross-feature failureはHITL planning amendment。
+
+Planned contract:
+
+- scope: TC-344-011のprojection/default-lane部分を閉じる。
+- test obligation: exact before/after snapshot、managed path allowlist、provider/mirror parity、default `uv run pytest`、`make lint`。
+- green verification: `uv run spec-dock update .`、mirror parity nodes、no-backfill snapshot、`make lint`、`uv run pytest`。
+- refactor guardrail: projectionを成立させる最小修正だけを許可し、generic import/candidate wheel/Epic-wide integrationへ広げない。
+- report evidence destination: EVD-012、S95 session log。
+- amendment trigger: `spec-dock/initiatives/**`またはexisting Workbench mutation、allowlist外diff、default failureがIssue 344以外の変更を要求する場合。
+
+#### S95 delegation contract
+
+- delegated role: `dev-coder`。
+- input docs: approved specs、本plan、S01〜S90 evidence、provider/mirror paths、default test contract。
+- allowed paths: checked-in managed mirrorのprovider対応path、Issue 344 tests、Issue report用worker summary。
+- forbidden changes: `spec-dock/initiatives/**`、existing Workbench contents、generic import、candidate wheel、Epic-wide docs/review、canonical docs直接編集。
+- acceptance criteria: TC-344-011のprojection/no-backfill/default-lane部分がpassする。
+- required verification: exact changed-path allowlist、snapshot、parity、lint、default test。
+- stop conditions: unexpected projection、existing state mutation、unrelated default failure、source-of-truth inversion。
+- output required: before/after inventory、update output、changed files、commands/results、unresolved risks、EVD-012 summary、Ledger Noteまたはno-decision declaration。
+
+#### S95 step closure contract
+
+| Closure | Required | Close condition | Planned evidence |
+|---|---|---|---|
+| TC-344-011 projection | yes | provider-first allowlisted projection、no-backfill、mirror parity、lint/default suite PASS | EVD-012 |
+
+S95 step gate:
+
+1. Section 1.1のpre-step clean / push / sync、具体化Artifact、採否を完了し、`dev-coder`へ共有する。
+2. pre-projection snapshotを保存し、`dev-coder`が正式なupdate経路、allowlist inspection、必要最小限のtest/fix、default laneを実行する。
+3. main orchestratorがworker outputとsnapshotを検証し、delegation evidenceとclosure deltaを`report.md`へ統合する。
+4. review candidate commitを作成・pushし、exact `review_target_sha`へChatGPT-Useがfresh `code-reviewer`責務reviewを行う。
+5. blocking / major findingを閉じ、修正時は新SHAへfresh re-reviewする。
+6. PASS後にreview Artifact、採否、`review_target_sha`を統合し、Artifactとreportだけのpost-review evidence commitを作成する。
+7. cleanとevidence-only diff boundaryを確認し、close stateを`committed`へ確定する。
+8. main orchestratorがStep / Milestone Result Approvalを与える。Result Approval前はS99を開始しない。
 
 ### S99 — Final Issue-local Quality Gate
 
-- TC-344-001〜010をreport evidenceへ対応づける。
+- TC-344-001〜011をreport evidenceへ対応づける。
 - S01〜S03 focused suiteを同じrevisionで再実行する。
 - fresh `code-reviewer`、`qa-reviewer`、`spec-reviewer` のblocking / major findingを閉じる。
-- final commit前にreport ledger、commit scope、post-commit external evidence destination、Issue 346 handoffを記録し、commit後のclean statusとHEAD SHAは外部引き渡し証跡にのみ記録する。
-- PR作成、merge preparation、Issue finishは行わない。
+- final evidence commit前にreport ledger、commit scope、post-commit external evidence destination、Issue 346への残余integration handoffを記録し、commit後のclean statusとHEAD SHAはPR/外部引き渡し証跡に記録する。
+- ready PRを作成し、exact headへのPR observationと必要なbounded repairを完了してmerge-preparedで停止する。merge、auto-merge、branch削除、Issue finishは行わない。
 
 #### S99 behavior slice execution
 
-- depends on: S01、S02、S03、S90がすべてResult Approval済み、かつ各close stateが`committed`または正当な`approved-no-op`。S99自身はmandatory final evidence commit後のexternal HEAD SHA/clean確認と`committed` close stateでのみ閉じる。
-- unblocks: Issue 346のdependency admission。Issue 344のfinish/PR/mergeはunblockしない。
+- depends on: S01、S02、S03、S90、S95がすべてResult Approval済み、かつ各close stateが`committed`または正当な`approved-no-op`。S99自身はmandatory final evidence commit、ready PR、exact-head observation後の`committed` close stateでのみ閉じる。
+- unblocks: human merge後のIssue 345 startと、将来のIssue 346 dependency admission。Issue finish/mergeを自動実行しない。
 - target files: Issue reportとreview evidenceのみ。review finding修正はowner stepへ戻す。
 - integration checkpoint: 全exact verificationと三者reviewを同一HEADへ固定する。
 - annotation: HITL result approval。mergeは常にhuman-only。
 
 Planned contract:
 
-- scope: 全TC/EVD、aggregate verification、fresh QA/code/spec review、Issue 346 handoffを閉じる。
+- scope: 全TC/EVD、aggregate verification、fresh QA/code/spec review、Issue 346への残余integration handoff、ready PR、exact-head observationを閉じる。
 - test obligation: 全step gateのsame-revision再実行、stale evidence検出、reviewer independence、clean commit。
 - alternative evidence: review/governance部分はinspect-only、aggregate commandはcovered-existingとして再実行する。
 - green verification: Section 16 exact gates、three fresh reviewer PASS、post-commit `git status --short` empty。
 - refactor guardrail: S99で実装refactorを行わず、findingは該当stepへ戻す。
-- report evidence destination: EVD-009/010、Final Quality Gate、Step/Test Contract Closure、final commit scope、post-commit external evidence destination、ready/blocked。実際のHEAD SHAとclean resultはcommit後の外部引き渡し証跡にのみ記録する。
+- report evidence destination: EVD-009/010/013、Final Quality Gate、Step/Test Contract Closure、final commit scope、post-commit external evidence destination、ready/blocked。実際のHEAD SHAとclean resultはPR/外部引き渡し証跡へ記録する。
 - amendment trigger: required closure変更、new bug class、reviewer scope変更、Issue 346 ownership変更が必要な場合。
 
 #### S99 delegation contract
 
 - delegated role: fresh `qa-reviewer`、issue-wide fresh `code-reviewer`、fresh `spec-reviewer`（全てread-only）。
-- input docs: approved requirement/design/plan、report、S01〜S90 commits/evidence、aggregate diff、exact command outputs。
+- input docs: approved requirement/design/plan、report、S01〜S95 commits/evidence、aggregate diff、exact command outputs。
 - allowed paths: read-only review。修正はfinding採用後に該当stepの`dev-coder`/`doc-writer`へ戻す。
-- forbidden changes: reviewer自身のsource/spec edit、waiver/provisional pass、PR/merge/finish、Issue 346 evidenceの先取り。
-- acceptance criteria: 全required closureとstep gateがclosed、blocking / major finding 0、handoff complete。
+- forbidden changes: reviewer自身のsource/spec edit、waiver/provisional pass、merge/auto-merge/branch削除/finish、Issue 346 evidenceの先取り。
+- acceptance criteria: 全required closureとstep gateがclosed、blocking / major finding 0、handoff complete、ready PRのexact head observation完了。
 - required verification: Section 16 exact final gateとreviewer mapping。
 - reviewer focus: QA=test sufficiency、code=aggregate implementation、spec=requirement/design/plan/report alignment。
 - stop conditions: missing report evidence、stale review、failure、dirty/uncommitted implementation、assurance invalid。
@@ -833,26 +898,26 @@ Planned contract:
 #### S99 具体テストケース一覧
 
 - `tc-s99-001` aggregate verification: 全focused obligationを同revisionで再実行する
-  - 前提: S01〜S90がstep gateを通過しaggregate diffがcommit済み。
+  - 前提: S01〜S95がstep gateを通過しaggregate diffがcommit済み。
   - 操作: Section 16のinstaller/node/exact-copy、opacity/copy、distribution、static/docs commandsを実行する。
   - 期待結果: 全required closureのplanned evidenceが同一HEADでPASSしreportに対応する。
   - 失敗検出: stale/異なるrevisionのevidence、未実施gate、cross-step regressionを検出する。
   - 検証方法: exact commands、HEAD SHA、report closure inspection。
-  - 関連 closure id: TC-344-001〜010。
+  - 関連 closure id: TC-344-001〜011。
 
-- `tc-s99-002` governance: reviewとdeferred delivery境界を閉じる
+- `tc-s99-002` governance: review、Issue-local PR、残余integration境界を閉じる
   - 前提: aggregate evidenceとIssue 346 dependency edgeが存在する。
-  - 操作: fresh QA/code/spec reviewを行い、reportのhandoff/no-PR/human-only fieldsをinspectionする。
-  - 期待結果: blocking / major finding 0、delivery ownerがIssue 346、per-Issue PR/merge/finish claimなし。
+  - 操作: fresh QA/code/spec review、ready PR作成、exact-head PR observationを行い、reportのhandoff/human-only fieldsをinspectionする。
+  - 期待結果: blocking / major finding 0、Issue-local PR delivery ownerがIssue 344、残余Epic integration ownerがIssue 346、merge/finish claimなし。
   - 失敗検出: stale reviewer、missing handoff、premature delivery/completion claimを検出する。
   - 検証方法: EVD-009/010とGit/dependency status inspection。
-  - 関連 closure id: TC-344-001〜010。
+  - 関連 closure id: TC-344-001〜011。
 
 #### S99 step closure contract
 
-- required: TC-344-001〜010、EVD-001〜011、S01/S02/S03/S90 step gate。
-- close condition:全exact verification PASS、fresh QA/code/spec reviewer blocking / major finding 0、report/handoff complete。
-- evidence: report Step Contract Closure、Test Contract Closure、reviewer gate、EVD-009/010、final commit scope、post-commit external evidence destination、ready/blocked。実際のHEAD SHAとclean resultは外部引き渡し証跡とする。
+- required: TC-344-001〜011、EVD-001〜013、S01/S02/S03/S90/S95 step gate。
+- close condition:全exact verification PASS、fresh QA/code/spec reviewer blocking / major finding 0、report/handoff complete、ready PR exact-head observation完了。
+- evidence: report Step Contract Closure、Test Contract Closure、reviewer gate、EVD-009/010/012/013、final commit scope、post-commit external evidence destination、ready/blocked。実際のHEAD SHAとclean resultはPR/外部引き渡し証跡とする。
 - commit候補: final report/review evidence commit。実装差分を混在させない。
 
 S99 step gate:
@@ -862,9 +927,10 @@ S99 step gate:
 3. reviewer verdict/fix commit/採否をreportへ追記し、main orchestratorがfinal evidence commitをauthorizationする。この判断はS99の最終Result Approvalではない。
 4. final report/review evidence commitを作成する。S99ではapproved-no-opを認めない。
 5. commit後に`git rev-parse HEAD`と`git status --short`を実行し、HEAD SHAとclean resultを確認する。
-6. 実際のHEAD SHAとclean resultは、宣言済みの外部引き渡し証跡（final responseとIssue 346 handoffまたはIssue comment）にのみ記録する。final commit後に`report.md`を編集せず、EVD-009/010をpost-commit SHA保存先として扱わない。
-7. main orchestratorが外部HEAD SHA/clean evidenceと`committed` close stateを確認し、S99の最終Step / Milestone Result Approvalを与える。
-8. PR、merge preparation、Issue finishは実行せず、Issue 346 handoffで停止する。
+6. 実際のHEAD SHAとclean resultを確認し、base `main`、本文`Closes #344` / `Refs #343`のready PRを作成する。`#345` / `#346`はcloseしない。
+7. exact headに対してPR observationを実行する。blocking P0/P1、CI failure、conflictがあればfresh ChatGPT consultation後にbounded repairへ戻し、新headをpushして再観測する。P2/P3だけなら採否を記録し、不要なbranch mutationを行わない。
+8. main orchestratorがPR observation、external HEAD SHA/clean evidence、`committed` close stateを確認し、merge-preparedのStep / Milestone Result Approvalを与える。
+9. merge、auto-merge、branch削除、Issue finishを実行せず、human merge前で停止する。Issue 345はhuman merge後のupdated `main`から開始する。
 
 ## 11. Verification Ladder
 
@@ -876,9 +942,9 @@ S99 step gate:
 | L4 | Build/distribution | M3記載の2つのexact `TestInitUpdate` node |
 | L5 | Static/diff | M3記載のscoped Ruff check/format、Mypy、`git diff --check` |
 | L6 | Docs/template | semantic assertions、deprecated wording inspection、4 asset byte equality |
-| L7 | Issue final | focused aggregate、closure inspection、fresh code/QA/spec reviews |
+| L7 | Issue final | focused aggregate、default lane、closure inspection、fresh code/QA/spec reviews、ready PR observation |
 
-full repository regression、candidate wheel consumer E2E、dogfood projection、Epic-wide reviewはIssue 346のL7で実施する。本Issueのfocused failureをIssue 346へ先送りしない。
+default `uv run pytest`とchanged managed assetsのchecked-in projectionはIssue 344 S95で実施する。opt-in full regression、candidate wheel consumer E2E、generic importを含むintegrated dogfood、Epic-wide reviewはIssue 346で実施する。本IssueのfailureをIssue 346へ先送りしない。
 
 ## 12. Delegation Contract
 
@@ -889,6 +955,7 @@ full repository regression、candidate wheel consumer E2E、dogfood projection�
 | B-007 test contract | `dev-coder` | `tests/unit/infra/test_init_update.py`のexact semantic assertionのみ | fresh `code-reviewer`: requirement trace/過剰拘束/Red理由 | S90 |
 | B-007 docs | `doc-writer` | provider docs 4件 | fresh `spec-reviewer`: authority/security/Issue境界 | S90 |
 | B-008〜009 | `dev-coder` | `pyproject.toml`、`setup.py`、distribution tests | dual prune/exclude/exact inventory | M3 session |
+| B-010 | `dev-coder` | checked-in managed mirror、projection/default-lane tests | source authority、allowlist、no-backfill、default lane | S95 |
 | S99 code | fresh `code-reviewer` | read-only | aggregate implementation risks | review gate |
 | S99 QA | fresh `qa-reviewer` | read-only | AC/TC evidence and commands | review gate |
 | S99 spec | fresh `spec-reviewer` | read-only | requirement/design/plan/report alignment | review gate |
@@ -910,6 +977,8 @@ full repository regression、candidate wheel consumer E2E、dogfood projection�
 | EVD-009 | reviews | finding、採否、fix commit、fresh verdict |
 | EVD-010 | handoff | dependency edge、deferred gates、delivery owner |
 | EVD-011 | static quality | scoped Ruff check/format、Mypy、diff checkのexact command/result |
+| EVD-012 | projection/default lane | before/after snapshot、managed diff allowlist、mirror parity、lint/default suite |
+| EVD-013 | PR delivery | PR URL/number、base/head、Closes/Refs、observation head、blocking status、merge-prepared判定 |
 
 planには実測値を書かない。未実施commandをPASSと記録せず、failureと代替確認もreportへ残す。
 
@@ -924,7 +993,8 @@ planには実測値を書かない。未実施commandをPASSと記録せず、fa
 - copy runtime/public CLI変更が必要。
 - exact 5-path contractに新しいdistribution mechanismが必要。
 - semantic opacityを維持するためにdiscovery rule変更が必要。
-- generic import、dogfood projection、PR deliveryを前倒ししないと成立しない。
+- generic import、candidate wheel、integrated dogfood、Epic-wide reviewを前倒ししないと成立しない。
+- S95 projectionが`spec-dock/initiatives/**`またはexisting Workbench stateを変更する。
 - security/privacy影響またはsecret exposureを発見。
 
 対応:
@@ -935,6 +1005,7 @@ planには実測値を書かない。未実施commandをPASSと記録せず、fa
 | requirement ambiguity | requirement amendment + fresh review |
 | normative design変更 | design amendment + ChatGPT/fresh spec review |
 | scope外change | Issue 345/346または新Issue |
+| S95 allowlist / no-backfill違反 | projectionを停止し、provider/source契約とplan amendmentへ戻る |
 | assurance grade不適合 | re-classify / human gate |
 
 ## 15. Docs / Template / Skill Impact Resolution
@@ -946,34 +1017,37 @@ planには実測値を書かない。未実施commandをPASSと記録せず、fa
 | template root README | yes | new node behavior説明を更新 |
 | skills | no known semantic change | S90で再確認しreportへN/A根拠 |
 | workflow docs | no known semantic change | import/copy workflow変更がないことを確認 |
-| dogfood workspace | deferred | Issue 346のcandidate wheel検証 |
+| changed managed dogfood assets | yes | S95でprovider-first update経路から投影 |
+| integrated dogfood / candidate wheel | deferred | Issue 346で検証 |
 
-S90未解決のままS99へ進まない。
+S90未解決のままS95へ進まず、S95未解決のままS99へ進まない。
 
 ## 16. Final Quality Gate
 
 | Check | Command / Evidence | Expected |
 |---|---|---|
-| Requirement closure | TC-344-001〜010とreport照合 | all closed |
-| Design compliance | DES-344-001〜009とdiff照合 | deviationなし |
+| Requirement closure | TC-344-001〜011とreport照合 | all closed |
+| Design compliance | DES-344-001〜010とdiff照合 | deviationなし |
 | Installer/node/exact-copy/no-backfill | `uv run pytest tests/unit/infra/test_init_update.py tests/unit/infra/test_runtime_template_scaffolder.py tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/test_new.py::TestCliNew::test_workbench_no_backfill_preserves_existing_scopes_across_all_triggers` | pass |
 | Opacity/copy | `uv run pytest tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py tests/cli_runtime/test_workbench.py` | pass |
 | Distribution | M3の2 exact `TestInitUpdate` node | pass |
 | Static/diff | M3のscoped Ruff check/format、Mypy、`git diff --check` | pass |
 | Docs/templates | semantic assertions、4-byte parity | pass |
+| Projection/default lane | provider-first update diff allowlist、no-backfill snapshot、mirror parity、`make lint`、default `uv run pytest` | pass |
 | Reviews | fresh code/QA/spec reviewer | blocking / major finding 0 |
-| Milestone admission | S01/S02/S03/S90 report gateとGit evidence | 各stepが`committed`または正当な`approved-no-op`、post-commit/no-op clean、Result Approval済み |
-| Handoff | report EVD-010 | Issue 346 owner/deps明記 |
+| Milestone admission | S01/S02/S03/S90/S95 report gateとGit evidence | 各stepが`committed`または正当な`approved-no-op`、post-commit/no-op clean、Result Approval済み |
+| Handoff | report EVD-010 | Issue 346の残余integration owner/deps明記 |
+| PR delivery | EVD-013 | ready PR、exact-head observation、merge-prepared、人間merge前 |
 
 Final exit:
 
 - [ ] 全Closure完了。
-- [ ] M1〜M3、S90、S99完了。
-- [ ] S01/S02/S03/S90が`committed`または正当な`approved-no-op`、clean、Result Approval済み。
+- [ ] M1〜M3、S90、S95、S99完了。
+- [ ] S01/S02/S03/S90/S95が`committed`または正当な`approved-no-op`、clean、Result Approval済み。
 - [ ] unresolved blocking / major findingなし。
 - [ ] reportに実測evidenceと未実施理由を記録。
 - [ ] Issue 345/346 scopeを実装していない。
-- [ ] per-Issue PR、merge、finishを行っていない。
+- [ ] ready PRを作成・exact-head観測し、merge/auto-merge/branch削除/finishを行っていない。
 - [ ] final commit前のreportにcommit scopeとpost-commit external evidence destinationを記録し、commit後のHEAD SHAとclean statusを外部引き渡し証跡に記録。
 
 ## 17. Follow-up Candidates
@@ -981,20 +1055,22 @@ Final exit:
 | ID | 内容 | 推奨先 |
 |---|---|---|
 | FU-001 | generic one-file Artifact import | iss-00345 |
-| FU-002 | candidate wheel consumer E2E、dogfood projection、full regression、Epic-wide review、PR delivery | iss-00346 |
+| FU-002 | candidate wheel consumer E2E、generic importを含むintegrated dogfood、opt-in full regression、Epic-wide review、残余Epic integration PR | iss-00346 |
 | FU-003 | root Workbench copy routeが将来必要になった場合の新しい公開契約 | separate Issue / Epic amendment |
 
 ## 18. Plan Approval Checklist
 
 - [x] AC-344-001〜010がClosure Indexへ対応する。
+- [ ] AC-344-011がTC-344-011 / S95 / S99へ対応し、fresh reviewで承認される。
 - [x] DES-344-001〜009がMilestone/Behaviorへ対応する。
+- [ ] DES-344-010がS95/S99へ対応し、fresh reviewで承認される。
 - [x] 3つのvertical micro-batchが独立検証可能である。
 - [x] Active TDD CycleはB-002のfresh-init vertical tracerだけに限定される。
 - [x] Red、Minimal Green、Refactor guardrailがある。
 - [x] allowed/read-only/forbidden pathが区別される。
 - [x] `setup.py` post-build pruneがM3に含まれる。
 - [x] report evidence destinationとstop conditionがある。
-- [x] Issue 346へのdeferred deliveryとhuman-only merge境界がある。
+- [ ] Issue 344のready PR deliveryとIssue 346への残余integration handoff、人間merge境界がfresh reviewされる。
 - [x] prior ChatGPT plan review PASS（ChatGPT-First amendmentによりstale）。
 - [x] prior fresh `spec-reviewer` plan review PASS（ChatGPT-First amendmentによりstale）。
 - [x] ChatGPT-First amendment後のpush済みexact commit `a0b99765f7fac5ad384f4f81c85b50990f017fc9`に対するfresh `spec-reviewer`責務review PASS。
@@ -1004,3 +1080,4 @@ Final exit:
 | Date | Change | Reason | Author |
 |---|---|---|---|
 | 2026-07-29 | Standard plan初稿 | ChatGPT planning candidateをapproved requirement/designとB-006修正へ正規化 | Codex orchestrator |
+| 2026-07-29 | Issue-local PR delivery amendment | ユーザーのIssue完了・mergeable PR要求を、provider-first projection/default laneとIssue 346の残余integration境界へ正規化 | Codex orchestrator |

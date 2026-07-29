@@ -3,7 +3,7 @@
 ID: "iss-00344"
 タイトル: "Workbench Shell Scaffolding"
 関連GitHub: ["#344"]
-状態: "approved"
+状態: "review-pending"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-29"
 依存: ["requirement.md"]
@@ -51,7 +51,7 @@ assurance_profile: "standard"
 
 | 種別 | パス / ID | 意味 |
 |---|---|---|
-| Issue requirement | `requirement.md` | `I344-RQ-001`〜`I344-RQ-010`, `AC-344-*` |
+| Issue requirement | `requirement.md` | `I344-RQ-001`〜`I344-RQ-011`, `AC-344-*` |
 | Epic requirement | `../../requirement.md` | shell、optional、no-backfill、opacity、copy compatibility |
 | Epic design | `../../design.md` | provider-first、freshness、ignore、package、manual copy |
 | Epic plan | `../../plan.md` | Issue 344 / 345 / 346 の vertical ownership |
@@ -76,6 +76,7 @@ assurance_profile: "standard"
 | `I344-RQ-008`, `AC-344-008` | `DES-344-008` |
 | `I344-RQ-009`, `AC-344-009` | `DES-344-005`, `DES-344-007` |
 | `I344-RQ-010`, `AC-344-010` | `DES-344-009` |
+| `I344-RQ-011`, `AC-344-011` | `DES-344-010` |
 
 ## 3. 設計意図と非目標
 
@@ -241,6 +242,14 @@ provider と installer fallback の ignore contract を同一にする。
 - `[N]` shell / optional / no-backfill / README-only tracking / semantic opacity / security / Git checkout / node-scoped copy / root exclusion / evidence-only import を一貫して説明する。
 - `[N]` generic import は Issue 345 の未実装機能として位置づけ、実装済みと書かない。
 
+### DES-344-010 Issue-local dogfood projection and PR delivery
+
+- `[N]` provider sourceを実装正本とし、S01〜S90のprovider変更後、S95で正式な `uv run spec-dock update .` を一度だけ実行して、変更対象のmanaged assetsをchecked-in dogfood mirrorへ投影する。
+- `[N]` dogfood側を先に、または手作業で修正しない。projection diffはprovider変更に由来する既知のmanaged pathだけに限定し、`spec-dock/initiatives/**`、active node、既存Workbench stateを変更してはならない。
+- `[N]` S95はmirror parity、no-backfill、`make lint`、default `uv run pytest`を同一candidate revisionでgreenにする。Issue 344自身のready PRを作成し、exact headへのPR observationを完了してhuman merge前で停止する。
+- `[E]` candidate wheel consumer E2E、generic importを含むintegrated dogfood、opt-in full regression、cross-feature repair、Epic-wide QA/code/spec/decision review、残余Epic integration PRは`iss-00346`に残す。
+- `[N]` Issue 344 PRの本文は`Closes #344`と`Refs #343`を持ち、`#345` / `#346`をcloseしない。merge、auto-merge、branch削除、Issue finishは人間境界の外側に置く。
+
 ## 6. 視覚的な設計概要
 
 ```plantuml
@@ -321,7 +330,8 @@ Copy -[#red,dashed]-> RootPayload : unsupported
 | `setup.py` | custom `build_py` post-build pruneをexact allowlist-awareにし、4 Workbench READMEを保存しつつallowlist外のstale nested READMEを除去 |
 | provider docs 4件 | operator contract |
 | installer/runtime tests | fresh/existing、node paths、ignore、opacity、copy、distribution |
-| dogfood `spec-dock/**` | primary implementationにしない。Issue 346でprojectionを扱う |
+| changed managed dogfood assets | S95でprovider-first `uv run spec-dock update .`から一度だけ投影する。`spec-dock/initiatives/**`と既存Workbench stateは変更しない |
+| integrated dogfood / candidate wheel | Issue 346でgeneric importを含む統合検証を扱う |
 
 ## 10. 検証設計
 
@@ -339,6 +349,7 @@ Copy -[#red,dashed]-> RootPayload : unsupported
 | `TC-344-008` | custom `build_py` post-build pruneを実際に通し、4 allowlisted hidden READMEが残り、allowlist外のstale nested READMEが除去され、source/wheel/normalized sdist/installed resourcesのexact inventory / bytesが一致することを `tests/unit/infra/test_init_update.py` で検証 |
 | `TC-344-009` | existing `workbench copy` focused suite |
 | `TC-344-010` | shipped docs semantic assertions |
+| `TC-344-011` | provider-first projection allowlist、mirror parity、no-backfill、default PR lane、exact-head PR observation |
 
 ## 11. Rollback
 
@@ -350,8 +361,8 @@ Copy -[#red,dashed]-> RootPayload : unsupported
 ## 12. sibling handoff
 
 - `iss-00345`: repo-local generic single-file Artifact import、root/node destination、naming、privacy。
-- `iss-00346`: candidate wheel consumer E2E、dogfood projection、full regression、Epic-wide final review、PR delivery。
-- Issue 344 は focused package evidence を残すが final distribution closure を主張しない。
+- `iss-00346`: candidate wheel consumer E2E、generic importを含むintegrated dogfood、opt-in full regression、cross-feature repair、Epic-wide final review、残余Epic integration PR。
+- Issue 344 は自身が変更したmanaged assetsのprovider-first projection、default PR lane、Issue-local ready PRとexact-head observationを所有するが、Epic全体のdistribution closureは主張しない。
 
 ## 13. Open questions
 
