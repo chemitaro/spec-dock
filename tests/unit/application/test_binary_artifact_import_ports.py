@@ -42,3 +42,43 @@ def test_binary_artifact_publisher_adapter_satisfies_narrow_application_ports(tm
     assert publish_request.source is source_request
     assert wired.workbench_source_guard is publisher
     assert wired.binary_artifact_publisher is publisher
+
+
+def test_explicit_file_guard_and_publisher_use_separate_narrow_ports(tmp_path):
+    contracts, ports, publisher_type = _runtime_modules()
+    publisher = publisher_type()
+    source = tmp_path / "opaque.bin"
+    source.write_bytes(b"\x00\xffopaque")
+    destination_dir = tmp_path / "spec-dock" / "artifacts"
+    destination_dir.mkdir(parents=True)
+    guarded = publisher.guard_explicit_file_source(
+        contracts.ExplicitFileSourcePreflightRequest(
+            repo_root=tmp_path,
+            source_path=Path("opaque.bin"),
+        )
+    )
+    wired = ports.Ports(
+        node_reader=_NodeReader(),
+        repo_root=tmp_path,
+        explicit_file_source_guard=publisher,
+        explicit_file_artifact_publisher=publisher,
+    )
+
+    try:
+        result = wired.explicit_file_artifact_publisher.publish_explicit_file(
+            contracts.ExplicitFileArtifactPublishRequest(
+                repo_root=tmp_path,
+                guarded_source=guarded,
+                destination_path=destination_dir / "20260730t010203z--opaque.bin",
+            )
+        )
+    finally:
+        guarded.close()
+
+    assert wired.explicit_file_source_guard is publisher
+    assert result.committed is True
+    assert result.source_visibility == "repo_relative"
+    assert result.source_display == "opaque.bin"
+    assert result.destination_path.read_bytes() == b"\x00\xffopaque"
+    assert not hasattr(result, "destination_sha256")
+    assert not hasattr(result, "destination_byte_count")

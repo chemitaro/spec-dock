@@ -46,6 +46,61 @@ class ArtifactFilename:
     artifact_id: str
 
 
+@dataclass(frozen=True)
+class GenericImportedArtifactFilename:
+    timestamp: str
+    suffix: int | None
+    original_basename: str
+    artifact_id: str
+
+
+_GENERIC_IMPORTED_ARTIFACT_FILENAME_RE = re.compile(
+    r"^(?P<ts>[0-9]{8}t[0-9]{6}z)(?:-(?P<nn>0[1-9]|[1-9][0-9]))?--(?P<basename>.+)$"
+)
+
+
+def normalize_generic_artifact_basename(name: str) -> str:
+    if name in ("", ".", "..") or "\x00" in name or "/" in name or "\\" in name:
+        raise RuntimeError("Invalid generic artifact basename")
+    return name
+
+
+def format_generic_imported_artifact_filename(
+    *,
+    timestamp: str,
+    original_basename: str,
+    suffix: int | None = None,
+) -> str:
+    normalized = normalize_generic_artifact_basename(original_basename)
+    prefix = timestamp if suffix is None else f"{timestamp}-{suffix:02d}"
+    filename = f"{prefix}--{normalized}"
+    if parse_generic_imported_artifact_filename(filename) is None:
+        raise RuntimeError("Invalid generic artifact identity")
+    return filename
+
+
+def parse_generic_imported_artifact_filename(name: str) -> GenericImportedArtifactFilename | None:
+    if name == "rules.md":
+        return None
+    matched = _GENERIC_IMPORTED_ARTIFACT_FILENAME_RE.fullmatch(name)
+    if matched is None:
+        return None
+    original_basename = str(matched.group("basename"))
+    try:
+        normalize_generic_artifact_basename(original_basename)
+    except RuntimeError:
+        return None
+    timestamp = str(matched.group("ts"))
+    suffix_raw = matched.group("nn")
+    suffix = int(suffix_raw) if suffix_raw is not None else None
+    return GenericImportedArtifactFilename(
+        timestamp=timestamp,
+        suffix=suffix,
+        original_basename=original_basename,
+        artifact_id=name,
+    )
+
+
 def is_supported_artifact_type(artifact_type: str) -> bool:
     return artifact_type in SUPPORTED_ARTIFACT_TYPES
 
@@ -124,6 +179,8 @@ def is_malformed_artifact_candidate(path: Path) -> bool:
     if path.suffix != ".md":
         return False
     if is_grandfathered_legacy_artifact_filename(path.name):
+        return False
+    if parse_generic_imported_artifact_filename(path.name) is not None:
         return False
     if parse_artifact_filename(path.name) is not None:
         return False
