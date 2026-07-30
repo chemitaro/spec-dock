@@ -504,7 +504,7 @@ cooperative concurrent imports と non-cooperative destination race の両方で
 
 ### I345-AC-010 Source race detection
 
-same-size mutation、replace、unlink、ancestor symlink retarget が commit 前に検知され、formal destination が存在しない。`I345-RQ-003`, `I345-RQ-008`, `I345-EC-013` を閉じる。
+staging 中から最終 source reread / identity / path 検証までに観測可能な same-size mutation、replace、unlink、ancestor symlink retarget は検知され、formal destination が存在しない。最終 source 検証後から FD-bound commit syscall までの非協調的な same-inode in-place writeと、destination parent の最終 identity check 後の非協調的な parent replacementは親 Epicのthreat modelどおり保証対象外とする。この除外は、staged bytesの完全性、formal destinationのno-overwrite、commit stateの機械判定を緩和しない。`I345-RQ-003`, `I345-RQ-008`, `I345-EC-013` を閉じる。
 
 ### I345-AC-011 Cross-filesystem / capability
 
@@ -578,11 +578,12 @@ result/docs は `canonical=false` と evidence-only boundary を保持し、本 
 
 ## 15. Rollback expectations
 
-- command leaf、generic use case/contracts/ports、generic parser/normalizer/ledger、explicit publisher entry、generic renderers、root rules/docs、testsを Issue commit単位で revert できること。
+- generic Artifact がまだ作成されておらずpublic filename contractも利用されていないpre-rolloutでは、command leaf、generic use case/contracts/ports、generic parser/normalizer/ledger、explicit publisher entry、generic renderers、root rules/docs、testsを Issue commit単位で全面revertできること。
+- rollout後またはgeneric Artifact作成後は、write commandと新規作成経路をdisable/revertできること。ただしgrandfathered evidenceとの互換性に必要な最小generic filename recognizer、validation/sync互換、semantic-opacity handling、typed/blank/genericのshared-slot reservationは残すこと。
 - existing `artifact import chatgpt-output`、typed/blank data、existing Artifact filenamesを migration/rewriteしないこと。
-- rollback 後も既に committed された generic Artifact は user evidence として保持し、自動 rename/delete/reclassifyしないこと。
+- post-rollout disablement後も既に committed された generic Artifact は user evidence として保持し、自動 rename/delete/reclassifyしないこと。
 - retained owned temp がある場合は identity-confirmed cleanup procedureだけを使用し、unowned entryを削除しないこと。
-- rollback 後は focused compatibility、`validate`、`sync --no-github`、provider/dogfood parityを再確認すること。
+- rollbackまたはpost-rollout disablement後は、選択した経路に応じたfocused compatibility、`validate`、`sync --no-github`、provider/dogfood parityを再確認すること。
 - public filename contract または commit/retry semanticsが既に利用者に公開された後の変更は、Issue-local rollbackで再定義せず Epic/ADR amendmentへ戻すこと。
 
 ## 16. Unknowns, assumptions, and source conflicts

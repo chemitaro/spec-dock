@@ -50,6 +50,8 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | interpretation | orchestrator / ChatGPT authoring evidence | runtime guidance の `authorized_profile=strict` と親 Epic の `critical` 推奨が一致しない | 本文で一方を選択する; 差分を未解決入力として保持する | 本 Issue 文書は authority を変更せず、`strict` を観測値、`critical` を高リスク設計入力として併記する | assurance classification は runtime-owned であり、ChatGPT生成物や本文が変更してはならない。一方、filename identity、外部 path privacy、no-overwrite publication、retry disposition は `critical` 相当の検討密度を必要とする | applied | `artifacts/20260730t000929z-01-disc-issue-345-clarification-chatgpt-authoring-handoff.md`; ChatGPT Pro authoring pack | fresh review後に runtime-owned classification を実行する |
+| D-002 | resolved | scope | ChatGPT Pro requirement review | `I345-AC-010` がsource raceをcommit直前まで無条件に検知すると読め、親 Epic D-008のthreat-model除外を越えていた | ACを維持; 観測可能期間と除外窓を明示 | stagingから最終source検証までを保証し、その後の非協調的same-inode writeと最終check後のdestination-parent replacementを除外する。staged-byte integrity/no-overwrite/commit-state保証は維持する | 親設計と現publisherの観測境界に一致させるため | applied | ChatGPT Pro fresh requirement review at `b96b8b8ad9a362d3c8a97cea899e7cadc218a439`; `requirement.md` I345-AC-010 | corrected requirementを再レビュー |
+| D-003 | resolved | compatibility | ChatGPT Pro requirement review | rollout後にgeneric parserまでrevertすると、保持したgeneric Markdownがmalformedとなりvalidate/sync互換を失う | 全面revertのみ; pre/post rolloutを分離 | データ生成前は全面revert可。生成後はwrite pathを停止できるが、recognizer、validation/sync、semantic opacity、shared-slot reservationを互換層として残す | accepted ADRのgrandfathered evidence保持とruntime validator事実を同時に満たすため | applied | ChatGPT Pro fresh requirement review at `b96b8b8ad9a362d3c8a97cea899e7cadc218a439`; `requirement.md` §15 | corrected requirementを再レビュー |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -81,7 +83,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | active Issue / parent Epic R/D/P / accepted ADR / provider source / existing tests / clarification artifacts / ChatGPT Pro draft | 利用者確認事項なし。assurance grade差分はD-001として保持 | partially_adopted | pending | yes | repository補正後に fresh review |
+| requirement | active Issue / parent Epic R/D/P / accepted ADR / provider source / existing tests / clarification artifacts / ChatGPT Pro draft | 利用者確認事項なし。assurance grade差分はD-001として保持 | partially_adopted | failed at `b96b8b8ad9a362d3c8a97cea899e7cadc218a439`（P1×2） | yes | D-002/D-003を反映し再レビュー |
 | design | requirement trace / provider layered architecture / existing publisher・allocator・parser / ChatGPT Pro draft | requirement review完了前はpromotion不可 | partially_adopted | pending | yes | requirement gate後に compose・補正・fresh review |
 | plan | requirement/design trace / test surfaces / Issue 346 ownership / ChatGPT Pro draft | design review完了前はpromotion不可 | partially_adopted | pending | yes | design gate後に補正・fresh review |
 
