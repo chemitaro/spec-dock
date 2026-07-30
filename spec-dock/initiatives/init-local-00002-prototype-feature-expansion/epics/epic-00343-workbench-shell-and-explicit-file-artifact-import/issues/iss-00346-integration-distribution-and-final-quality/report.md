@@ -3,9 +3,9 @@
 ID: "iss-00346"
 タイトル: "Integration Distribution And Final Quality"
 関連GitHub: ["#346"]
-状態: "draft | approved"
+状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-29"
+最終更新: "2026-07-31"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00343", "init-local-00002"]
 ---
@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | interpretation | orchestrator | `pre-feature existing consumer`を歴史的revisionに固定すべきか不明瞭 | READMEなしvalid synthetic fixture; historical SHA固定 | 標準はREADMEなしvalid synthetic fixtureとし、歴史的revisionを使う場合だけfeature非搭載の実証とexact SHAを要求する | 親Epic E-AC-004とCandidate 3 verificationは観測対象の状態を規定し、特定revisionを必須化していない | promoted_to_plan | clarification research §4、`requirement.md` I346-ASM-002 / I346-ASM-003 / I346-RQ-004 / I346-AC-004、`design.md` §7.3、`plan.md` S02 | plan fresh reviewでclosureを確認 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +63,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | `adopted` | `research`: Issue 346 source-grounded clarification | `requirement.md`全体、`design.md` fixture/platform boundary、`plan.md` closure boundary | 親Epic、Issue 344/345、accepted ADR、現行testsを照合したIssue-local evidenceであり、追加のowner判断を必要としない | `artifacts/20260730t155742z-research-issue-346-requirement-clarification-source-grounded-synthesis.md`; adopter: main orchestrator; reviewer: fresh `spec-reviewer`; blocking: no | canonical R/D/Pへの反映とphase review完了。実装時は判断D-001を維持 |
+| EAL-002 | `partially_adopted` | external ChatGPT Pro github-synced planning evidence | `requirement.md`、`design.md`、`plan.md`、オンボーディングartifact | GitHub planning baseline `2217889c31e1a8a83732c446264dec00dde77be6`を参照した4資料を、ローカルsourceとworkflow contractに照合して採用した。安定ID、scope、scenario、検証観点、説明構造は採用し、候補用frontmatter、evidence-only自己claim、candidate revisionをplanning baselineへ固定する記述、曖昧pathは不採用 | `artifacts/20260730t173917z--specdock-iss-00346-authoring-pack-corrected.zip`; onboarding `artifacts/20260730t182546z-research-issue-346-onboarding-guide-for-new-team-members.md`; pack review `pass`; tree SHA-256 `7b01a12ac95b13bcfdf4a3a60774d16c3dc666d49152658b95c2435e112b1e12`; adopter: main orchestrator; reviewer: fresh `spec-reviewer`; reflected_to: [`requirement.md`, `design.md`, `plan.md`, onboarding artifact]; blocking: no | implementation時はcanonical R/D/Pをauthorityとし、ZIPはadvisory evidenceとして保持 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +72,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | candidate wheelをfresh/update/dogfoodへ流し、Workbench shellとgeneric importの配布統合を閉じる | privacy、opaque lifecycle、既存command互換、platform boundary、docs/review/delivery | low。副次的platform検証が新機能実装へ膨張しないよう最小integration repair境界を固定 | final planning review `pass` |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,11 +80,14 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | 親Epic R/D/P、Issue 344/345 report、accepted ADR 3件、clarification research、ChatGPT ZIP、現行code/tests | なし | clarificationをadopted、ChatGPT requirement候補をpartially_adopted | final verdict `(pass)`; fresh `iss346_requirement_final_rereview`; findings 0 | no | designへ昇格 `(promote)` |
+| design | review済みrequirement、accepted ADR 3件、ChatGPT design候補、現行provider/build/update/runtime/test surface | なし | ChatGPT候補の責務分割・trace・test strategyをpartially_adopted。候補frontmatterと固定planning baseline表現は不採用 | final verdict `(pass)`; fresh `iss346_design_final_rereview`; findings 0 | no | planへ昇格 `(promote)` |
+| plan | review済みrequirement/design、ChatGPT plan候補、現行workflow/assurance/test command surface | なし | ChatGPT候補のS01〜S04/S90/S99、closure index、test cardsをpartially_adopted。候補frontmatter、固定planning baseline、曖昧path、省略されたreview-evidence境界は不採用 | final verdict `(pass)`; fresh `iss346_planning_final_gate_review`; findings 0 | no | execute approved plan |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
-  - used / not used
+  - SpecDock named delegated authoring subagent: not used
+  - external ChatGPT authoring evidence: used
 - 未使用の場合:
   - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
 - lifecycle state（契約値）:
@@ -107,7 +111,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| external-chatgpt-authoring | iss-00346 | `artifacts/20260730t173917z--specdock-iss-00346-authoring-pack-corrected.zip` | GitHub-synced repository/branch/planning baseline、clarification artifact、parent/upstream specs | `requirement.md`, `design.md`, `plan.md`, onboarding artifact | `partially_integrated` | [`requirement.md`, `design.md`, `plan.md`, `artifacts/20260730t182546z-research-issue-346-onboarding-guide-for-new-team-members.md`] | pack review `pass`; tree SHA-256 `7b01a12ac95b13bcfdf4a3a60774d16c3dc666d49152658b95c2435e112b1e12` | main orchestratorがローカルsourceと照合して4資料へ段階統合 | candidate用frontmatter、evidence-only自己claim、planning baselineへのcandidate固定、曖昧path | none | pass | execute approved plan |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -214,15 +218,12 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 | グレード（Grade） | 必要な専門家 / 代替（required specialist / fallback） | 使用状況（usage） | 証跡（evidence） | 鮮度 spec-reviewer 判定（fresh spec-reviewer verdict） | 実行可否（execution readiness） |
 |---|---|---|---|---|---|
-| `lite` | `not applicable` | `not applicable` | ライト該当なし理由（lite not applicable reason） | `pass / fail / blocked` | `ready / blocked` |
-| `standard` | `system-architect / implementation-planner / manual fallback` | `used / skipped / unavailable / denied` | `artifacts/...` / manual evidence / skip reason: ... | `pass / fail / blocked` | `ready / blocked` |
-| `strict` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / manual fallback evidence | `pass / fail / blocked` | `ready / blocked` |
-| `critical` | `system-architect / implementation-planner / manual fallback` | `used / unavailable / denied` | `artifacts/...` / explicit approval and risk acceptance | `pass / fail / blocked` | `ready / blocked` |
+| `standard` | `system-architect / implementation-planner / manual fallback` | manual fallback used; named `system-architect` / `implementation-planner` not used | 既存parent Epic architecture、Issue 344/345 approved R/D/P/report、accepted ADR 3件、provider/build/update/runtime/test sourceをmain orchestratorが照合し、external ChatGPT Pro planning ZIPをadvisory draftとして採用した。新architectureを決めず既存patternを統合検証するIssueであるためnamed architecture specialistを省略。fresh `spec-reviewer` findingsはmain orchestratorが正本修正した | final verdict `(pass)`; findings 0 | ready |
 
 #### レビューゲート状態（Reviewer Gate Status）
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| S01 | step reviewer / final reviewer | code-reviewer / spec-reviewer / qa-reviewer | fresh / stale | passed / failed / unavailable / denied / waived / provisional | yes / no / N/A | proceed / blocked / incomplete / follow-up required | ... |
+| planning | final deliverables gate | spec-reviewer | fresh | pass | no | execute approved plan | `iss346_final_deliverables_rereview`; findings 0; canonical R/D/P/report and completed onboarding reviewed |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
