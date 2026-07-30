@@ -275,7 +275,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
-| S01 | pending | `feat(artifact): 汎用単一ファイル import の縦切りを追加` | pending | pending | not applicable | not applicable | not applicable | not applicable |
+| S01 | committed | provider runtime/root rules/S01 tests/report; `feat(artifact): 汎用単一ファイル import の縦切りを追加` | `79687a7acc6ac513cad3e6909d932dfed8a13a2c` | `git status --short` clean | not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
 - provider runtime: `application`, `cli`, `commands`, `domain`, `infra`, `presentation`のS01対象10 files
