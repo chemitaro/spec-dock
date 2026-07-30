@@ -343,7 +343,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S04 | step code review | code-reviewer | historical | fail | no | bounded test-evidence fix / fresh rereview | P1×2: material updated_atを隠すnormalization、validate/deps/contextのdeny guard不足。限定修正済み。confidence `0.99` |
 | S04 | step code rereview | code-reviewer | fresh | pass | no | close S04 after focused commit | findings `[]`; confidence `0.99`。material provenance保持と全consumer deny guardを確認 |
 | S90 | docs/spec review | spec-reviewer | historical | pass with P2 | no | bounded link-target fix / fresh rereview | P2×1: privacy/stateをnaming referenceだけへ案内。guideへ分離修正。confidence `0.98` |
-| S90 | docs/spec rereview | spec-reviewer | fresh | pass | no | close S90 after focused commit | findings `[]`; confidence `0.99`。provider/managed6 files一致とlink契約を確認 |
+| S90 | docs/spec rereview | spec-reviewer | fresh | pass | no | promote | findings `[]`; confidence `0.99`。provider/managed6 files一致とlink契約を確認し、S90 closureへ昇格 |
+| S99 | final spec rereview | spec-reviewer | fresh | pass | no | promote | findings `[]`; confidence `0.99`。Option A、macOS限定境界、Issue 346 defer、S99 closure、Decision/Evidence ledgerの整合を確認し、Issue closureへ昇格 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
