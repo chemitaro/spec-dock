@@ -41,7 +41,7 @@
 - `new/import {initiative,epic,issue}` の `--slug` は kebab-case（小文字英数字 + `-`）です。`--slug` 省略時は `--title` から合成されます（詳細は `spec-dock/docs/reference_naming.md`）。
 - 各ノードの子スコープ配下には canonical guidance への `rules.md` symlink が含まれます。`rules.md` は入口/ナビゲーション用です。
 - 作成/運用ルールの詳細参照先は `spec-dock/docs/rules/**` です。runtime command はサポートされた実行経路です。
-- 新規ノードにはテンプレ由来の `README.md` は生成されません。
+- Workbench は任意です。optional、temporary、worktree-local、disposable、non-canonical な作業領域です。`.workbench/README.md` は direct child の README-only tracking surface で、その他の Workbench entry は ignored payload として Git に ignore されます。fresh root と future Initiative / Epic / Issue の shell にはこの Workbench README が生成されますが、existing scope には no-backfill です。Workbench は任意であり、不在でも workspace は valid です。新規ノードの node-root `README.md` は生成されません。
 
 更新:
 - 導入済み repo の managed files/docs/templates/scripts/skills は repo root から `./spec-dock/scripts/spec-dock update [path]` で更新します。

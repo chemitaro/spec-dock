@@ -1576,15 +1576,110 @@ class TestCliNew(CliRuntimeHarness):
             assert "Unknown artifact type: unknown" in p.stderr
             assert "invalid choice" not in p.stderr
 
-    def test_new_nodes_do_not_generate_readme_files(self) -> None:
+    def test_new_nodes_generate_only_workbench_readmes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
             init_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
-            readmes = list(init_dir.rglob("README.md"))
-            assert readmes == []
+            readmes = sorted(path.relative_to(init_dir) for path in init_dir.rglob("README.md"))
+            assert readmes == [
+                Path(".workbench/README.md"),
+                Path("epics/epic-00002-jwt-auth/.workbench/README.md"),
+                Path("epics/epic-00002-jwt-auth/issues/iss-00003-add-refresh-token/.workbench/README.md"),
+            ]
+            readme_bytes = {(init_dir / relative_path).read_bytes() for relative_path in readmes}
+            assert len(readme_bytes) == 1
+            assert list(init_dir.rglob(".gitkeep")) == []
+
+    def test_workbench_no_backfill_preserves_existing_scopes_across_all_triggers(self) -> None:
+        def _snapshot(path: Path) -> tuple[tuple[str, str, bytes | str, int], ...]:
+            entries: list[tuple[str, str, bytes | str, int]] = []
+            for entry in sorted(path.rglob("*"), key=lambda item: item.as_posix()):
+                relative = entry.relative_to(path).as_posix()
+                stat = entry.lstat()
+                if entry.is_symlink():
+                    entries.append((relative, "symlink", str(entry.readlink()), stat.st_mtime_ns))
+                elif entry.is_dir():
+                    entries.append((relative, "dir", "", stat.st_mtime_ns))
+                else:
+                    entries.append((relative, "file", entry.read_bytes(), stat.st_mtime_ns))
+            return tuple(entries)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+
+            init_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
+            epic_dir = init_dir / "epics" / "epic-00002-jwt-auth"
+            issue_dir = epic_dir / "issues" / "iss-00003-add-refresh-token"
+            workbenches = (
+                target / "spec-dock" / ".workbench",
+                init_dir / ".workbench",
+                epic_dir / ".workbench",
+                issue_dir / ".workbench",
+            )
+            for index, workbench in enumerate(workbenches):
+                (workbench / "README.md").unlink()
+                nested = workbench / "nested"
+                nested.mkdir()
+                payload = nested / f"payload-{index}.bin"
+                payload.write_bytes(bytes((0, 255, index, 10, 13)))
+                (workbench / "empty").mkdir()
+                if self._can_create_symlink(target):
+                    (workbench / "payload-link").symlink_to(payload.relative_to(workbench))
+
+            expected = {workbench: _snapshot(workbench) for workbench in workbenches}
+
+            operations = (
+                ("force init", lambda: main(["init", str(target), "--force"])),
+                ("update", lambda: main(["update", str(target)])),
+                ("validate", lambda: self._run_runtime(target, ["validate"])),
+                ("sync", lambda: self._run_runtime(target, ["sync", "--no-github", "--no-update-active"])),
+                ("active", lambda: self._run_runtime(target, ["active", "set", "--id", "iss-00003"])),
+                (
+                    "artifact",
+                    lambda: self._run_runtime(
+                        target,
+                        ["new", "artifact", "blank", "--issue", "iss-00003", "--title", "Working Notes"],
+                    ),
+                ),
+                (
+                    "adr",
+                    lambda: self._run_runtime(
+                        target,
+                        ["new", "artifact", "adr", "--issue", "iss-00003", "--title", "Decision One"],
+                    ),
+                ),
+            )
+            for label, operation in operations:
+                result = operation()
+                if isinstance(result, int):
+                    assert result == 0, label
+                for workbench in workbenches:
+                    assert _snapshot(workbench) == expected[workbench], label
+                    assert not (workbench / "README.md").exists(), label
+
+            self._run_runtime(
+                target,
+                [
+                    "new",
+                    "issue",
+                    "--epic",
+                    "2",
+                    "--title",
+                    "Future child",
+                    "--github-issue",
+                    "4",
+                ],
+            )
+            child_readme = epic_dir / "issues" / "iss-00004-future-child" / ".workbench" / "README.md"
+            assert child_readme.is_file()
+            for workbench in workbenches:
+                assert _snapshot(workbench) == expected[workbench]
+                assert not (workbench / "README.md").exists()
 
     def test_new_no_github_is_parser_error_and_does_not_invoke_gh(self) -> None:
         if os.name == "nt":

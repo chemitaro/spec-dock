@@ -1136,11 +1136,29 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec_dock/assets/spec_dock/templates/issue/discussions/_template.md",
         "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",
         "spec_dock/assets/spec_dock/templates/epic/issues/new-issue",
-        "spec_dock/assets/spec_dock/templates/*/**/README.md",
         "spec_dock/assets/spec_dock/templates/design.md",
         "spec_dock/assets/spec_dock/templates/plan.md",
         "spec_dock/assets/spec_dock/templates/report.md",
         "spec_dock/assets/spec_dock/templates/requirement.md",
+    )
+    _WORKBENCH_TEMPLATE_README_PATHS = (
+        "README.md",
+        "root/.workbench/README.md",
+        "initiative/.workbench/README.md",
+        "epic/.workbench/README.md",
+        "issue/.workbench/README.md",
+    )
+    _WORKBENCH_README_PATHS = (
+        "root/.workbench/README.md",
+        "initiative/.workbench/README.md",
+        "epic/.workbench/README.md",
+        "issue/.workbench/README.md",
+    )
+    _WORKBENCH_PACKAGE_DATA_PATHS = (
+        "assets/spec_dock/templates/root/.workbench/README.md",
+        "assets/spec_dock/templates/initiative/.workbench/README.md",
+        "assets/spec_dock/templates/epic/.workbench/README.md",
+        "assets/spec_dock/templates/issue/.workbench/README.md",
     )
     _ISSUE_69_PYTHON_CACHE_EXCLUSION_PATTERNS = (
         "**/__pycache__/**",
@@ -3318,6 +3336,124 @@ class TestInitUpdate(CliRuntimeHarness):
                 inventory.add(relative_member.removeprefix("src/"))
         return inventory
 
+    def _collect_source_template_readme_payloads(self, repo_root: Path) -> dict[str, bytes]:
+        template_root = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "templates"
+        return {
+            candidate.relative_to(template_root).as_posix(): candidate.read_bytes()
+            for candidate in template_root.rglob("README.md")
+            if candidate.is_file()
+        }
+
+    def _collect_wheel_template_readme_payloads(self, wheel_path: Path) -> dict[str, bytes]:
+        template_prefix = "spec_dock/assets/spec_dock/templates/"
+        with zipfile.ZipFile(wheel_path) as wheel_zip:
+            members = [
+                member
+                for member in wheel_zip.infolist()
+                if not member.is_dir()
+                and member.filename.startswith(template_prefix)
+                and Path(member.filename).name == "README.md"
+            ]
+            normalized_paths = [member.filename.removeprefix(template_prefix) for member in members]
+            assert len(normalized_paths) == len(set(normalized_paths)), (
+                f"wheel contains duplicate template README paths: {normalized_paths}"
+            )
+            return {
+                normalized_path: wheel_zip.read(member)
+                for member, normalized_path in zip(members, normalized_paths, strict=True)
+            }
+
+    def _collect_sdist_template_readme_payloads(self, sdist_path: Path) -> dict[str, bytes]:
+        template_prefix = "src/spec_dock/assets/spec_dock/templates/"
+        with tarfile.open(sdist_path, "r:gz") as sdist_tar:
+            members = [member for member in sdist_tar.getmembers() if member.isfile()]
+            archive_roots = {member.name.partition("/")[0] for member in members if "/" in member.name}
+            assert len(archive_roots) == 1, f"sdist must have one archive root: {sorted(archive_roots)}"
+            payloads: dict[str, bytes] = {}
+            normalized_paths: list[str] = []
+            for member in members:
+                _, separator, relative_member = member.name.partition("/")
+                if (
+                    not separator
+                    or not relative_member.startswith(template_prefix)
+                    or Path(relative_member).name != "README.md"
+                ):
+                    continue
+                normalized_path = relative_member.removeprefix(template_prefix)
+                normalized_paths.append(normalized_path)
+                extracted = sdist_tar.extractfile(member)
+                assert extracted is not None, f"sdist README could not be read: {member.name}"
+                payloads[normalized_path] = extracted.read()
+            assert len(normalized_paths) == len(set(normalized_paths)), (
+                f"sdist contains duplicate template README paths: {normalized_paths}"
+            )
+            return payloads
+
+    def _collect_isolated_installed_template_readme_snapshot(
+        self,
+        *,
+        venv_python: Path,
+        repo_root: Path,
+        cwd: Path,
+    ) -> dict[str, object]:
+        repo_root_literal = json.dumps(str(repo_root.resolve()))
+        script = (
+            "import importlib.resources as resources\n"
+            "import json\n"
+            "import sys\n"
+            "from pathlib import Path\n"
+            "import spec_dock\n"
+            f"repo_root = Path({repo_root_literal})\n"
+            "def _is_under_repo(path_text: str) -> bool:\n"
+            "    if not path_text:\n"
+            "        return False\n"
+            "    try:\n"
+            "        Path(path_text).resolve().relative_to(repo_root)\n"
+            "        return True\n"
+            "    except Exception:\n"
+            "        return False\n"
+            "def _collect(root, parts=()):\n"
+            "    payloads = {}\n"
+            "    for child in root.iterdir():\n"
+            "        child_parts = parts + (child.name,)\n"
+            "        if child.is_dir():\n"
+            "            payloads.update(_collect(child, child_parts))\n"
+            "        elif child.is_file() and child.name == 'README.md':\n"
+            "            payloads['/'.join(child_parts)] = child.read_bytes().hex()\n"
+            "    return payloads\n"
+            "package_root = resources.files('spec_dock')\n"
+            "template_root = package_root.joinpath('assets', 'spec_dock', 'templates')\n"
+            "payload = {\n"
+            "    'spec_dock_file': str(Path(spec_dock.__file__).resolve()),\n"
+            "    'assets_dir': str(Path(str(package_root.joinpath('assets'))).resolve()),\n"
+            "    'sys_path_has_repo_root': any(_is_under_repo(path_text) for path_text in sys.path if path_text),\n"
+            "    'template_readmes': _collect(template_root),\n"
+            "}\n"
+            "print(json.dumps(payload))\n"
+        )
+        result = self._issue_69_run_subprocess_capture(
+            [str(venv_python), "-c", script],
+            cwd=cwd,
+            env=self._issue_69_runtime_env_without_checkout_fallback(),
+        )
+        output_lines = [line for line in result.stdout.splitlines() if line.strip()]
+        assert output_lines, "installed template README snapshot produced no JSON output"
+        snapshot = json.loads(output_lines[-1])
+        assert isinstance(snapshot, dict), "installed template README snapshot must be a JSON object"
+        return snapshot
+
+    def _extract_setup_workbench_template_readme_allowlist(self, setup_text: str) -> tuple[str, ...]:
+        parsed_module = ast.parse(setup_text, filename="setup.py")
+        for statement in parsed_module.body:
+            if not isinstance(statement, ast.Assign):
+                continue
+            for target in statement.targets:
+                if isinstance(target, ast.Name) and target.id == "_DISTRIBUTABLE_TEMPLATE_README_PATHS":
+                    extracted = ast.literal_eval(statement.value)
+                    assert isinstance(extracted, tuple)
+                    return tuple(str(item) for item in extracted)
+        pytest.fail("setup.py is missing _DISTRIBUTABLE_TEMPLATE_README_PATHS")
+
     def _issue_69_extract_pyproject_stale_exclusion_patterns(self, pyproject_text: str) -> tuple[str, ...]:
         section_header = "[tool.setuptools.exclude-package-data]"
         assert section_header in pyproject_text, "missing setuptools exclude-package-data section"
@@ -3735,9 +3871,11 @@ class TestInitUpdate(CliRuntimeHarness):
             interview_text = (discussions_templates_dir / "interview.md").read_text(encoding="utf-8")
             for label in _INTERVIEW_REQUIRED_LABELS:
                 assert label in interview_text
-            assert list(initiative_templates_dir.rglob("README.md")) == []
-            assert list(epic_templates_dir.rglob("README.md")) == []
-            assert list(issue_templates_dir.rglob("README.md")) == []
+            assert list(initiative_templates_dir.rglob("README.md")) == [
+                initiative_templates_dir / ".workbench" / "README.md"
+            ]
+            assert list(epic_templates_dir.rglob("README.md")) == [epic_templates_dir / ".workbench" / "README.md"]
+            assert list(issue_templates_dir.rglob("README.md")) == [issue_templates_dir / ".workbench" / "README.md"]
 
             design_text = (issue_templates_dir / "design.md").read_text(encoding="utf-8")
             assert "artifact_state: awaiting-assurance-compose" in design_text
@@ -3947,6 +4085,471 @@ class TestInitUpdate(CliRuntimeHarness):
                 )
                 assert near_name_result.returncode == 1, near_name_result.stdout + near_name_result.stderr
 
+    def test_workbench_readme_assets_are_byte_identical_and_complete(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        templates_dir = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "templates"
+        assets = tuple(
+            templates_dir / scope / ".workbench" / "README.md" for scope in ("root", "initiative", "epic", "issue")
+        )
+
+        payloads = [asset.read_bytes() for asset in assets]
+
+        assert len(set(payloads)) == 1
+        payload = payloads[0]
+        assert payload.startswith(b"# Workbench\n")
+        assert payload.endswith(b"\n")
+        assert not payload.endswith(b"\n\n")
+        assert b"\r" not in payload
+        text = payload.decode("utf-8")
+        for fragment in (
+            "worktree-local",
+            "non-canonical",
+            "Git ignore は security boundary",
+            "./spec-dock/scripts/spec-dock artifact import file ...",
+            "./spec-dock/scripts/spec-dock workbench copy --scope <full-id> --to <linked-worktree>",
+            "canonical adoption",
+            "automatic hook",
+        ):
+            assert fragment in text
+
+    def test_shipped_docs_describe_workbench_readme_boundary(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        provider_root = repo_root / "src" / "spec_dock" / "assets" / "spec_dock"
+
+        doc_paths = (
+            "docs/README.md",
+            "docs/guide.md",
+            "docs/reference_worktree.md",
+            "templates/README.md",
+        )
+        texts = {
+            relative_path: (provider_root / relative_path).read_text(encoding="utf-8") for relative_path in doc_paths
+        }
+        canonical_text = (provider_root / "templates" / "root" / ".workbench" / "README.md").read_text(encoding="utf-8")
+
+        failures: list[str] = []
+
+        def matches(
+            text: str,
+            alternatives: tuple[tuple[str, ...], ...],
+        ) -> bool:
+            return any(all(fragment in text for fragment in alternative) for alternative in alternatives)
+
+        def require(
+            path: str,
+            concept: str,
+            alternatives: tuple[tuple[str, ...], ...],
+        ) -> None:
+            if not matches(texts[path], alternatives):
+                failures.append(f"{path}: missing {concept}")
+
+        def forbid(path: str, concept: str, fragment: str) -> None:
+            if fragment in texts[path]:
+                failures.append(f"{path}: deprecated {concept}: {fragment!r}")
+
+        artifact_import_command = "./spec-dock/scripts/spec-dock artifact import file ..."
+        workbench_copy_command = "./spec-dock/scripts/spec-dock workbench copy --scope <full-id> --to <linked-worktree>"
+
+        # Canonical README is a read-only S90 precondition, not an S90 edit target.
+        for fragment in (artifact_import_command, workbench_copy_command):
+            assert fragment in canonical_text, (
+                "canonical Workbench README changed; return to planning instead "
+                f"of repairing shipped docs around missing fragment: {fragment!r}"
+            )
+
+        # Minimal common identity and Git boundary in every shipped document.
+        for path in doc_paths:
+            require(
+                path,
+                "Workbench-context optional status",
+                (
+                    ("Workbench is optional",),
+                    ("Workbench は任意です",),
+                    ("Workbench は任意である",),
+                ),
+            )
+            require(path, "temporary status", (("temporary",), ("一時",)))
+            require(path, "worktree-local status", (("worktree-local",),))
+            require(path, "disposable status", (("disposable",), ("破棄可能",)))
+            require(path, "non-canonical status", (("non-canonical",),))
+            require(
+                path,
+                "direct README tracked / other payload ignored boundary",
+                (
+                    (
+                        ".workbench/README.md",
+                        "README-only tracking",
+                        "ignored payload",
+                    ),
+                    (
+                        ".workbench/README.md",
+                        "direct",
+                        "Git tracking",
+                        "ignore",
+                    ),
+                ),
+            )
+
+        # Shell generation and compatibility belong in overview/guide/template docs.
+        for path in ("docs/README.md", "docs/guide.md", "templates/README.md"):
+            require(
+                path,
+                "fresh root, future nodes, optional presence, and no-backfill",
+                (
+                    (
+                        "fresh root",
+                        "future",
+                        "Initiative",
+                        "Epic",
+                        "Issue",
+                        "no-backfill",
+                    ),
+                    (
+                        "fresh",
+                        "future",
+                        "Initiative",
+                        "Epic",
+                        "Issue",
+                        "existing",
+                        "追加しない",
+                    ),
+                ),
+            )
+
+        # Security and authority must be visible on operator-facing surfaces.
+        for path in (
+            "docs/README.md",
+            "docs/guide.md",
+            "docs/reference_worktree.md",
+        ):
+            require(
+                path,
+                "Git ignore is not a security boundary",
+                (
+                    ("Git ignore is not a security boundary",),
+                    ("Git ignore は security boundary ではない",),
+                    ("Git ignore は security boundary ではありません",),
+                ),
+            )
+            require(
+                path,
+                "read/import authorization is evidence-only, not canonical",
+                (
+                    ("read / import authorization is evidence-only, not canonical adoption",),
+                    ("read / import authorization は evidence-only であり、canonical adoption ではない",),
+                    ("read / import authorization は evidence-only であり、canonical adoption ではありません",),
+                ),
+            )
+
+        # Worktree reference owns detailed checkout/copy mechanics.
+        require(
+            "docs/reference_worktree.md",
+            "tracked README checkout versus manual ignored-payload copy",
+            (("linked worktree", "tracked", "README.md", "Git checkout"),),
+        )
+        require(
+            "docs/reference_worktree.md",
+            "node-only one-shot copy with root excluded",
+            (
+                (
+                    "Only Initiative/Epic/Issue ignored payload uses explicit manual one-shot copy",
+                    "root is excluded",
+                ),
+                (
+                    "Initiative / Epic / Issue の ignored payload は明示的な manual one-shot copy の対象です",
+                    "root は対象外です",
+                ),
+                (
+                    "Initiative / Epic / Issue の ignored payload は明示的な manual one-shot copy の対象である",
+                    "root は対象外である",
+                ),
+            ),
+        )
+        require(
+            "docs/reference_worktree.md",
+            "opaque source-wins behavior preserving destination-only entries",
+            (
+                (
+                    "source-wins preserves destination-only entries",
+                    "without a README-specific filter",
+                ),
+                (
+                    "source-wins は destination-only entries を保持する",
+                    "README-specific filter は適用しない",
+                ),
+                (
+                    "source-wins は destination-only entries を保持します",
+                    "README-specific filter は適用しません",
+                ),
+            ),
+        )
+        require(
+            "docs/reference_worktree.md",
+            "no hook/watch/sync/copy-back",
+            (
+                ("no automatic hook, watch, sync, or copy-back",),
+                ("automatic hook / watch / sync / copy-back はない",),
+                ("automatic hook、watch、sync、copy-back はありません",),
+            ),
+        )
+
+        # The docs entrance owns the transitional sibling-Issue availability note.
+        require(
+            "docs/README.md",
+            "Issue #345 planned and unimplemented generic file import",
+            (
+                (
+                    artifact_import_command,
+                    "Issue #345",
+                    "planned",
+                    "unimplemented",
+                ),
+                (
+                    artifact_import_command,
+                    "iss-00345",
+                    "計画",
+                    "未実装",
+                ),
+            ),
+        )
+        require(
+            "docs/README.md",
+            "repo-local generic import is not a global-installer dispatch",
+            (
+                ("repo-local runtime", "global installer", "not available"),
+                ("repo-local runtime", "global installer", "dispatch はない"),
+                ("repo-local runtime", "global installer", "未提供"),
+            ),
+        )
+        require(
+            "docs/README.md",
+            "Issue #346 consumer E2E and full-regression handoff",
+            (
+                (
+                    "Issue #346",
+                    "consumer E2E",
+                    "full regression",
+                    "deferred",
+                ),
+                (
+                    "iss-00346",
+                    "consumer E2E",
+                    "full regression",
+                    "責務",
+                ),
+            ),
+        )
+        require(
+            "docs/reference_worktree.md",
+            "root durable-file route remains planned under Issue #345",
+            (
+                (artifact_import_command, "Issue #345", "unimplemented"),
+                (artifact_import_command, "iss-00345", "未実装"),
+            ),
+        )
+
+        # Context-specific migration guards, not a global ban on these words.
+        forbid(
+            "docs/README.md",
+            "whole Workbench described as Git-untracked",
+            "Workbench は experimental、Git 管理外",
+        )
+        forbid(
+            "docs/guide.md",
+            "whole Workbench described as Git-untracked",
+            "Git 管理外の disposable な一時作業場",
+        )
+        forbid(
+            "templates/README.md",
+            "ambiguous claim that future nodes receive no README",
+            "新規ノードにはテンプレ由来の `README.md` は生成されません。",
+        )
+
+        assert not failures, "shipped Workbench documentation boundary mismatch:\n- " + "\n- ".join(failures)
+
+    def test_fresh_init_creates_only_tracked_root_workbench_readme(self) -> None:
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            self._run_git(target, ["init"])
+            assert main(["init", str(target)]) == 0
+
+            provider = (
+                Path(__file__).resolve().parents[3]
+                / "src"
+                / "spec_dock"
+                / "assets"
+                / "spec_dock"
+                / "templates"
+                / "root"
+                / ".workbench"
+                / "README.md"
+            )
+            readme = target / "spec-dock" / ".workbench" / "README.md"
+            assert readme.read_bytes() == provider.read_bytes()
+            assert not (readme.parent / ".gitkeep").exists()
+
+            payloads = (
+                readme.parent / "draft.txt",
+                readme.parent / "nested" / "note.md",
+            )
+            for payload in payloads:
+                payload.parent.mkdir(parents=True, exist_ok=True)
+                payload.write_text("scratch\n", encoding="utf-8")
+
+            readme_ignore = self._run_git(
+                target,
+                ["check-ignore", "--no-index", readme.relative_to(target).as_posix()],
+                check=False,
+            )
+            assert readme_ignore.returncode == 1, readme_ignore.stdout + readme_ignore.stderr
+            for payload in payloads:
+                ignored = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", payload.relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert ignored.returncode == 0, ignored.stdout + ignored.stderr
+            status = self._run_git(target, ["status", "--short", "--untracked-files=all"]).stdout
+            assert "?? spec-dock/.workbench/README.md" in status
+            assert "draft.txt" not in status
+            assert "nested/note.md" not in status
+
+    def test_update_and_force_init_do_not_backfill_workbench_readme(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            readme = target / "spec-dock" / ".workbench" / "README.md"
+            readme.unlink()
+
+            assert main(["update", str(target)]) == 0
+            assert not readme.exists()
+            assert main(["init", str(target), "--force"]) == 0
+            assert not readme.exists()
+
+            readme.parent.mkdir(exist_ok=True)
+            readme.write_bytes(b"user-owned\r\n")
+            before_mtime = readme.lstat().st_mtime_ns
+            assert main(["update", str(target)]) == 0
+            assert main(["init", str(target), "--force"]) == 0
+            assert readme.read_bytes() == b"user-owned\r\n"
+            assert readme.lstat().st_mtime_ns == before_mtime
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            specdock_dir = target / "spec-dock"
+            specdock_dir.mkdir()
+
+            assert main(["init", str(target), "--force"]) == 0
+            assert not (specdock_dir / ".workbench" / "README.md").exists()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            specdock_entry = target / "spec-dock"
+            specdock_entry.write_bytes(b"existing-file\r\n")
+            before_mtime = specdock_entry.lstat().st_mtime_ns
+
+            assert main(["init", str(target), "--force"]) == 1
+            assert specdock_entry.is_file()
+            assert specdock_entry.read_bytes() == b"existing-file\r\n"
+            assert specdock_entry.lstat().st_mtime_ns == before_mtime
+            assert not (specdock_entry / ".workbench" / "README.md").exists()
+
+        with tempfile.TemporaryDirectory() as capability_tmp:
+            symlink_supported = self._can_create_symlink(Path(capability_tmp))
+        if symlink_supported:
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                specdock_entry = target / "spec-dock"
+                specdock_entry.symlink_to("missing-spec-dock")
+                before_target = specdock_entry.readlink()
+                before_mtime = specdock_entry.lstat().st_mtime_ns
+
+                assert main(["init", str(target), "--force"]) == 1
+                assert specdock_entry.is_symlink()
+                assert specdock_entry.readlink() == before_target
+                assert specdock_entry.lstat().st_mtime_ns == before_mtime
+                assert not (specdock_entry / ".workbench" / "README.md").exists()
+
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp)
+                symlink_target = target / "existing-spec-dock"
+                symlink_target.mkdir()
+                specdock_entry = target / "spec-dock"
+                specdock_entry.symlink_to(symlink_target, target_is_directory=True)
+                before_target = specdock_entry.readlink()
+                before_mtime = specdock_entry.lstat().st_mtime_ns
+
+                assert main(["init", str(target), "--force"]) == 0
+                assert specdock_entry.is_symlink()
+                assert specdock_entry.readlink() == before_target
+                assert specdock_entry.lstat().st_mtime_ns == before_mtime
+                assert not (specdock_entry / ".workbench" / "README.md").exists()
+
+    def test_workbench_gitignore_tracks_only_top_level_readme(self) -> None:
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._run_git(target, ["init"])
+            self._run_git(target, ["config", "core.ignorecase", "false"])
+            workbench = target / "spec-dock" / ".workbench"
+            probes = {
+                "tracked": workbench / "README.md",
+                "nested": workbench / "nested" / "README.md",
+                "case": workbench / "readme.md",
+                "backup": workbench / "README.md.bak",
+                "payload": workbench / "payload.bin",
+                "near": target / "spec-dock" / ".workbench-notes" / "file.md",
+                "descendant": (
+                    target / "spec-dock" / "initiatives" / "directory-probe" / ".workbench" / "README.md" / "child.txt"
+                ),
+            }
+            probes["tracked"].unlink()
+            for label, path in probes.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"{label}\n", encoding="utf-8")
+            probes["tracked"].unlink()
+            probes["tracked"].write_text("tracked\n", encoding="utf-8")
+
+            for label in ("tracked", "near"):
+                result = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", probes[label].relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert result.returncode == 1, f"{label}: {result.stdout}{result.stderr}"
+            for label in ("nested", "case", "backup", "payload", "descendant"):
+                result = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", probes[label].relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert result.returncode == 0, f"{label}: {result.stdout}{result.stderr}"
+
+            if self._can_create_symlink(target):
+                symlink_target = target / "symlink-target.txt"
+                symlink_target.write_text("target\n", encoding="utf-8")
+                symlink_readme = target / "spec-dock" / "initiatives" / "symlink-probe" / ".workbench" / "README.md"
+                symlink_readme.parent.mkdir(parents=True)
+                symlink_readme.symlink_to(symlink_target)
+                result = self._run_git(
+                    target,
+                    ["check-ignore", "--no-index", symlink_readme.relative_to(target).as_posix()],
+                    check=False,
+                )
+                assert result.returncode == 1, result.stdout + result.stderr
+
+            status = self._run_git(target, ["status", "--short", "--untracked-files=all"]).stdout
+            assert "spec-dock/.workbench/README.md" in status
+            assert "spec-dock/.workbench-notes/file.md" in status
+            for ignored_name in ("nested/README.md", "readme.md", "README.md.bak", "payload.bin", "child.txt"):
+                assert ignored_name not in status
+
     def test_init_gitignore_fallback_ignores_exact_workbench_directories(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -3962,7 +4565,11 @@ class TestInitUpdate(CliRuntimeHarness):
 
             assert code == 0, stderr
             gitignore = (target / "spec-dock" / ".gitignore").read_text(encoding="utf-8")
-            assert ".workbench/" in gitignore.splitlines()
+            assert tuple(line for line in gitignore.splitlines() if ".workbench" in line) == (
+                "**/.workbench/*",
+                "!**/.workbench/README.md",
+                "**/.workbench/README.md/**",
+            )
 
     def test_update_preserves_opaque_workbenches_while_refreshing_managed_assets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -4928,6 +5535,105 @@ class TestInitUpdate(CliRuntimeHarness):
                     f"issue-69 wheel build unexpectedly shipped seeded stale wrapper-era output: {stale_artifact_path}"
                 )
 
+    def test_workbench_readme_build_prune_preserves_allowlist_and_removes_stale_nested_readme(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+            pre_prune_snapshot = temp_root / "wheel-pre-prune-snapshot.json"
+
+            self._issue_69_prepare_build_context(repo_root, build_context)
+            build_env = os.environ.copy()
+            build_env[self._ISSUE_69_SETUP_SEED_STALE_FIXTURES_ENV] = "1"
+            build_env[self._ISSUE_69_SETUP_PRE_PRUNE_SNAPSHOT_ENV] = str(pre_prune_snapshot)
+
+            wheel_path, _, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+                build_env=build_env,
+            )
+
+            snapshot_payload = json.loads(pre_prune_snapshot.read_text(encoding="utf-8"))
+            expected_seeded_fixtures = set(self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
+            expected_readmes_before_prune = {
+                *self._WORKBENCH_TEMPLATE_README_PATHS,
+                "issue/legacy/README.md",
+            }
+            assert set(snapshot_payload.get("expected_seeded_stale_fixture_paths", [])) == expected_seeded_fixtures
+            assert set(snapshot_payload.get("present_before_prune", [])) == expected_seeded_fixtures
+            assert set(snapshot_payload.get("template_readmes_before_prune", [])) == expected_readmes_before_prune
+
+            wheel_payloads = self._collect_wheel_template_readme_payloads(wheel_path)
+            assert set(wheel_payloads) == set(self._WORKBENCH_TEMPLATE_README_PATHS)
+            assert "issue/legacy/README.md" not in wheel_payloads
+
+    def test_workbench_readme_distribution_inventory_and_bytes_match_all_surfaces(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        source_payloads = self._collect_source_template_readme_payloads(repo_root)
+        expected_inventory = set(self._WORKBENCH_TEMPLATE_README_PATHS)
+        assert set(source_payloads) == expected_inventory
+        canonical_workbench_bytes = source_payloads[self._WORKBENCH_README_PATHS[0]]
+        assert all(source_payloads[path] == canonical_workbench_bytes for path in self._WORKBENCH_README_PATHS)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_context = temp_root / "build-context"
+            wheel_dir = temp_root / "wheelhouse"
+            sdist_dir = temp_root / "sdist"
+            isolated_cwd = temp_root / "isolated-cwd"
+            isolated_cwd.mkdir()
+            self._issue_69_prepare_build_context(repo_root, build_context)
+
+            wheel_path, sdist_path, venv_python = self._issue_69_build_artifacts_with_local_wheelhouse(
+                repo_root=repo_root,
+                build_context=build_context,
+                wheel_dir=wheel_dir,
+                sdist_dir=sdist_dir,
+            )
+            self._issue_69_install_target_packages(
+                python_executable=venv_python,
+                target_dir=self._issue_69_site_packages_dir(self._issue_69_env_root(venv_python)),
+                requirements=[str(wheel_path)],
+                wheelhouse=self._issue_69_resolve_wheelhouse(repo_root),
+            )
+
+            wheel_payloads = self._collect_wheel_template_readme_payloads(wheel_path)
+            sdist_payloads = self._collect_sdist_template_readme_payloads(sdist_path)
+            installed_snapshot = self._collect_isolated_installed_template_readme_snapshot(
+                venv_python=venv_python,
+                repo_root=repo_root,
+                cwd=isolated_cwd,
+            )
+            self._issue_69_assert_runtime_snapshot_uses_installed_package(
+                snapshot=installed_snapshot,
+                repo_root=repo_root,
+            )
+            installed_hex_payloads = installed_snapshot.get("template_readmes", {})
+            assert isinstance(installed_hex_payloads, dict)
+            installed_payloads = {
+                str(path): bytes.fromhex(str(payload)) for path, payload in installed_hex_payloads.items()
+            }
+
+        surfaces = {
+            "source": source_payloads,
+            "wheel": wheel_payloads,
+            "sdist": sdist_payloads,
+            "installed": installed_payloads,
+        }
+        for surface_name, payloads in surfaces.items():
+            assert set(payloads) == expected_inventory, (
+                f"{surface_name} template README inventory mismatch: {sorted(payloads)}"
+            )
+        for workbench_path in self._WORKBENCH_README_PATHS:
+            assert all(payloads[workbench_path] == canonical_workbench_bytes for payloads in surfaces.values()), (
+                f"Workbench README bytes differ across distribution surfaces: {workbench_path}"
+            )
+
     def test_issue_69_sdist_build_excludes_seeded_stale_wrapper_era_outputs(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
 
@@ -4983,6 +5689,13 @@ class TestInitUpdate(CliRuntimeHarness):
         )
         assert set(setup_cache_patterns) == set(self._ISSUE_69_SETUP_PYTHON_CACHE_EXCLUSION_PATTERNS), (
             "issue-69 setup Python cache exclusions must stay aligned to the approved exact pattern set"
+        )
+        pyproject_data = tomllib.loads(pyproject_text)
+        package_data_paths = set(pyproject_data["tool"]["setuptools"]["package-data"]["spec_dock"])
+        assert set(self._WORKBENCH_PACKAGE_DATA_PATHS).issubset(package_data_paths)
+        assert "assets/spec_dock/templates/*/**/README.md" not in pyproject_patterns
+        assert set(self._extract_setup_workbench_template_readme_allowlist(setup_text)) == set(
+            self._WORKBENCH_TEMPLATE_README_PATHS
         )
 
     def test_issue_69_wheel_and_sdist_exclude_python_cache_from_source_build_context(self) -> None:
@@ -37157,6 +37870,100 @@ esac
             assert stderr == ""
             assert self._relative_file_snapshot(target) == before
 
+    def test_uninstall_dry_run_classifies_fresh_root_workbench_readme_as_scaffold_managed_exact_match(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            payload = self._uninstall_json_payload(target)
+            readme_actions = [
+                action
+                for action in payload["actions"]  # type: ignore[index]
+                if action["path"] == "spec-dock/.workbench/README.md"
+            ]
+
+            assert len(readme_actions) == 1
+            readme_action = readme_actions[0]
+            assert readme_action["category"] == "scaffold_managed"
+            assert readme_action["status"] == "would_remove"
+            assert readme_action["reason"] == "current shipped asset exact match"
+
+    def test_uninstall_apply_remove_specs_removes_unchanged_root_workbench_readme_and_empty_workbench_dir(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            workbench = target / "spec-dock" / ".workbench"
+            retry_marker = target / "spec-dock" / ".uninstall-retry.json"
+
+            first_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            first_actions = self._actions_by_path(first_payload)
+
+            assert first_payload["status"] == "completed"
+            assert first_actions["spec-dock/.workbench/README.md"]["status"] == "removed"
+            assert not workbench.exists()
+            assert json.loads(retry_marker.read_text(encoding="utf-8")) == {
+                "managed_by": "spec-dock",
+                "purpose": "uninstall-rerun",
+                "schema_version": 1,
+            }
+
+            second_payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            second_actions = self._actions_by_path(second_payload)
+
+            assert second_payload["status"] == "completed"
+            assert second_actions["spec-dock/.workbench/README.md"]["status"] == "already_removed"
+            assert second_payload["summary"]["failed"] == 0  # type: ignore[index]
+
+    def test_uninstall_apply_remove_specs_preserves_modified_root_workbench_readme(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            readme = target / "spec-dock" / ".workbench" / "README.md"
+            modified_bytes = readme.read_bytes() + b"\nuser change\n"
+            readme.write_bytes(modified_bytes)
+
+            payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            readme_action = self._actions_by_path(payload)["spec-dock/.workbench/README.md"]
+
+            assert payload["status"] == "completed"
+            assert readme_action["category"] == "scaffold_managed"
+            assert readme_action["status"] == "preserved"
+            assert readme_action["reason"] == "content mismatch; manual review required"
+            assert readme.read_bytes() == modified_bytes
+
+    def test_uninstall_apply_remove_specs_removes_only_managed_readme_and_preserves_arbitrary_workbench_payload(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            workbench = target / "spec-dock" / ".workbench"
+            readme = workbench / "README.md"
+            payload_file = workbench / "nested" / "opaque.bin"
+            payload_bytes = b"\x00\xffopaque-workbench-payload\n"
+            payload_file.parent.mkdir()
+            payload_file.write_bytes(payload_bytes)
+
+            payload = self._uninstall_json_payload(target, "--apply", "--remove-specs")
+            actions = self._actions_by_path(payload)
+
+            assert payload["status"] == "completed"
+            assert actions["spec-dock/.workbench/README.md"]["status"] == "removed"
+            assert actions["spec-dock/.workbench/nested/opaque.bin"] == {
+                "path": "spec-dock/.workbench/nested/opaque.bin",
+                "category": "unmanaged",
+                "status": "preserved",
+                "reason": "unmanaged file under managed boundary root",
+                "error": None,
+            }
+            assert not readme.exists()
+            assert payload_file.read_bytes() == payload_bytes
+            assert workbench.is_dir()
+
     def test_uninstall_apply_without_specs_mode_fails_before_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -39427,7 +40234,7 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             )
             (real_issue / "requirement.md").write_text("scratch requirement\n", encoding="utf-8")
             workbench_link = specdock_dir / ".workbench" / "issue-link"
-            workbench_link.parent.mkdir()
+            workbench_link.parent.mkdir(exist_ok=True)
             workbench_link.symlink_to(real_issue, target_is_directory=True)
 
             issue_link = active_dir / "issue"
