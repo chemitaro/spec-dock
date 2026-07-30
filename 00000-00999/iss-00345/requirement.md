@@ -1,832 +1,620 @@
 ---
 種別: 要件定義書（Issue）
 ID: "iss-00345"
-タイトル: "Generic Single File Artifact Import"
-関連GitHub: ["#345"]
-状態: "draft | approved"
+タイトル: "Generic Single-File Artifact Import"
+状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-29"
+最終更新: "2026-07-30"
 親: ["epic-00343", "init-local-00002"]
+関連GitHub: ["#345"]
+関連: ["iss-00344", "iss-00346", "20260728t100038z-adr", "20260730t085831z-adr", "20260730t102747z-adr"]
+authorized_profile_observed: "standard"
+parent_recommended_grade: "critical"
+classification_status: "runtime_classified"
 ---
 
-# iss-00345 Generic Single File Artifact Import — Issue 要件定義
-
-この文書は、Issueで実現すべき **観測可能な成果、制約、受け入れ条件、リスク信号** を定義する。
-
-この文書では、実装方法、クラス設計、メソッド設計、TDDの実行順序を決定しない。
-それらは `design.md` と `plan.md` で扱う。
-
----
+# iss-00345 Generic Single-File Artifact Import — Issue 要件定義
 
 ## 0. 文書の位置づけ
 
-### この文書が定義すること
+本書は Issue `iss-00345` の approved canonical requirement である。親 Epic、accepted ADR、現行 provider 実装、既存テスト、clarification evidence、ChatGPT Pro authoring evidenceをリポジトリ事実と照合して統合している。
 
-- このIssueで何を実現するか
-- なぜこのIssueが必要か
-- 誰または何が影響を受けるか
-- 完了後に外部から何を観測できるか
-- 何を変更対象に含めるか
-- 何を変更対象に含めないか
-- どの受け入れ条件を満たす必要があるか
-- どの失敗・例外・境界条件を考慮する必要があるか
-- どのIssue gradeの設計書・実装計画書を使うべきかを判断する材料
+本書が canonical path に存在することだけでは reviewer pass、assurance mutation、execution-ready、PR-ready、merge-ready、Issue finish、Epic completion、PR delivery を意味しない。assurance classification、fresh review、実装開始判断は runtime と main orchestrator の後続 workflow に残る。
 
-### この文書が定義しないこと
+SpecDock runtimeの`assurance classify --stage requirement`は`authorized_profile=standard`を記録している。親EpicのCandidate 2推奨`critical`はclassification authorityではなくreview focusとして保持する。本書はruntime判定を選択または変更せず、不可逆なfilename identity、外部path privacy、no-overwrite publication、retry dispositionに対して`critical`推奨に耐える安全性、failure mode、rollback、observability、test detailを維持する。
 
-- Aggregate、Entity、Value Objectの具体設計
-- Application Service、Repository、Port、Adapterの具体設計
-- API、Event、DB Migrationの詳細設計
-- テストケースの実装順序
-- Red-Green-Refactorの具体サイクル
-- 変更ファイル一覧
-- privateメソッドや内部ヘルパーの構造
+## 1. 目的
 
----
+### I345-OBJ-001 利用者価値
 
-## 1. 概要
+利用者が明示した任意の readable regular file 一件を、内容形式に依存せず、SpecDock root、Initiative、Epic、Issue のいずれかの Artifact 領域へ保存できるようにする。
 
-### 1.1 目的
+### I345-OBJ-002 安全性
 
-このIssueで達成したい目的を1〜3文で記述する。
+import は source を変更せず、opaque bytes を保持し、既存 Artifact を上書きせず、公開前 failure と公開後 warning を機械判定可能にする。
 
-- 目的:
-  - ...
+### I345-OBJ-003 意味論と privacy の分離
 
-### 1.2 観測可能な成果
+generic imported file を typed Artifact、ADR、canonical specification として自動解釈せず、repository 外 source の位置と内容由来情報を通常出力および tracked provenance へ漏らさない。
 
-このIssueが完了したとき、利用者、外部システム、開発者、またはテストから何が観測できるかを記述する。
+## 2. 背景と現状
 
-コード要素ではなく、振る舞い・状態・契約・出力・証拠として書く。
+SpecDock には既に `artifact import chatgpt-output` がある。この command は approved Workbench 内の lowercase `.md` を、`--title` / `--slug` に基づく blank Artifact identity へ byte-preserving import する専用経路である。現行実装は `commands/artifact_import.py`、`application/import_artifact.py`、`FilesystemBinaryArtifactPublisher`、`presentation/cli_text.py` にまたがり、destination-side staging、source revalidation、FD-bound no-replace publication を備える。
 
-- 完了後に観測できること:
-  - ...
-- 完了後に観測できてはいけないこと:
-  - ...
+しかし、既存 command は次の理由で arbitrary single-file import の代替にならない。
 
-### 1.3 このIssueの種類
+- Workbench 内かつ lowercase `.md` に限定される。
+- title / slug と blank Markdown naming grammar を要求する。
+- 現行 result contract は source path、SHA-256、byte count を公開する。
+- ancestor symlink を拒否する。
+- root を Artifact target として扱わない。
+- binary、archive、画像、PDF、invalid UTF-8、extensionless file を generic identity で扱う契約を持たない。
 
-該当するものに印を付ける。
+そのため、本 Issue は既存 command を一般化せず、独立した additive command `artifact import file` を追加する。
 
-- [ ] 新規振る舞いの追加
-- [ ] 既存振る舞いの変更
-- [ ] 既存振る舞いの不具合修正
-- [ ] 仕様・文書の明確化
-- [ ] テンプレート変更
-- [ ] CLI / script 挙動変更
-- [ ] workflow / skill / agent導線の変更
-- [ ] metadata / sync / validate / lifecycle の変更
-- [ ] migration / compatibility を伴う変更
-- [ ] セキュリティ・プライバシー（security / privacy） / authorization に関係する変更
-- [ ] その他:
-  - ...
+## 3. 用語
 
----
+| 用語 | 本書での意味 |
+|---|---|
+| SpecDock root | repository 内の `spec-dock/` directory。graph node ではないが、本機能では明示 Artifact target になる。 |
+| node | Initiative、Epic、Issue のいずれか。`.meta.json` により graph へ参加する。 |
+| Artifact | root または node の `artifacts/` 直下に保存される evidence file。保存されたこと自体は canonical adoption を意味しない。 |
+| typed Artifact | filename grammar に artifact type token を持つ既存 Markdown Artifact。 |
+| blank Artifact | type token を持たない既存 Markdown Artifact。`chatgpt-output` はこの family を使う。 |
+| generic Artifact | 本 Issue の `--` delimiter を持ち、original basename を中心に識別される opaque file。拡張子や body の意味分類をしない。 |
+| slot | 同一 timestamp 内の標準 slot または `01..99` suffix slot。typed、blank、generic が共有する。 |
+| Workbench | `.workbench/` の一時的・non-canonical・原則 Git 管理外の作業領域。Issue `iss-00344` の shell premise を前提とする。 |
+| opaque bytes | text decode、MIME 判定、format 変換を行わず、そのまま保存する byte sequence。 |
+| commit point | destination-side staged file を FD-bound no-replace primitive で正式 basename に公開した瞬間。 |
+| external source | repository root の外側に解決される明示 source file。 |
 
-## 2. 背景・現状
+## 4. Actors と triggers
 
-### 2.1 現在の状態
+### 4.1 Actors
 
-- 現在の挙動:
-  - ...
-- 現在の制約:
-  - ...
-- 現在の問題:
-  - ...
-
-### 2.2 問題が発生する状況
-
-再現可能な場合は、手順と観測点を書く。
-
-- 再現手順:
-  1. ...
-  2. ...
-  3. ...
-
-- 観測点:
-  - UI:
-    - ...
-  - CLI:
-    - ...
-  - ファイル:
-    - ...
-  - GitHub:
-    - ...
-  - DB:
-    - ...
-  - ログ:
-    - ...
-  - テスト:
-    - ...
-  - その他:
-    - ...
-
-### 2.3 根拠・情報源
-
-このIssueの根拠となる情報源を列挙する。
-
-- 上位要件:
-  - ...
-- 上位設計:
-  - ...
-- 関連Issue:
-  - ...
-- 関連ADR:
-  - ...
-- 関連PR:
-  - ...
-- 関連コード:
-  - ...
-- 関連テンプレート:
-  - ...
-- 関連docs:
-  - ...
-- 作業成果物・議論（artifacts / discussions） / research:
-  - ...
-- その他:
-  - ...
-
----
-
-## 3. 親スコープと継承条件
-
-このIssueが属する上位スコープを記述する。
-
-### 3.1 親Initiative
-
-- Initiative ID:
-  - ...
-- 関連するInitiative requirement IDs:
-  - ...
-- 関連するInitiative design IDs:
-  - ...
-- このIssueが継承する戦略的制約:
-  - ...
-
-### 3.2 親Epic
-
-- Epic ID:
-  - ...
-- 関連するEpic requirement IDs:
-  - ...
-- 関連するEpic design IDs:
-  - ...
-- このIssueが継承するモデル・境界・契約:
-  - ...
-
-### 3.3 このIssueで再定義してはいけないもの
-
-上位設計または既存仕様により、このIssueでは変更しないものを明示する。
-
-- 変更しない境界:
-  - ...
-- 変更しない契約:
-  - ...
-- 変更しない責任分担:
-  - ...
-- 変更しないワークフロー:
-  - ...
-- 変更しない既存挙動:
-  - ...
-
----
-
-## 4. 関係者・開始条件・利用シナリオ（Actor / Trigger）
-
-### 4.1 主な関係者（Actor）
-
-このIssueの振る舞いに関与する人、外部システム、agent、CLI利用者、workflow上の役割を記述する。
-
-| 関係者（Actor） | 役割 | このIssueとの関係 |
+| Actor | 役割 | 必要な観測 |
 |---|---|---|
-| ... | ... | ... |
+| SpecDock 利用者 | source file と target を明示する | 保存先 identity、commit state、retry 要否を privacy-safe に確認できる |
+| 自動化 agent | text または JSON result を機械処理する | stable token と publication state を利用し、warning 後の重複 retry を避ける |
+| reviewer | requirement、implementation、tests を照合する | parent trace、privacy、no-overwrite、opaque lifecycle、互換性を確認できる |
+| maintainer | platform capability と fault を診断する | public output を汚染せず、test/internal evidence で原因を切り分けられる |
 
-### 4.2 開始条件（Trigger）
+### 4.2 Triggers
 
-このIssueの対象となる振る舞いが何によって開始されるかを記述する。
+- 利用者が repository 内または外の明示 file 一件を durable evidence として残したい。
+- source が Markdown に限らず、PDF、画像、ZIP、binary、invalid UTF-8、extensionless file である。
+- Workbench の temporary state とは分離して Artifact として残したい。
+- typed Artifact / ADR semantics を付与せず original basename を維持したい。
 
-- [ ] 人間の操作
-- [ ] CLIコマンド
-- [ ] GitHub Issue / PR 操作
-- [ ] agent skill 実行
-- [ ] script 実行
-- [ ] template scaffold
-- [ ] sync / validate / lifecycle 操作
-- [ ] event / webhook / 外部入力
-- [ ] その他:
-  - ...
+## 5. 継承する上位契約
 
-### 4.3 代表シナリオ
+### 5.1 親 Initiative / repository 契約
 
-#### シナリオ SC-001:
+- provider 実装 authority は `src/spec_dock/`、特に shipped runtime は `src/spec_dock/assets/spec_dock/` にある。
+- `spec-dock/` は generated consumer workspace、dogfooding、active specification の面であり、一次実装 authority ではない。
+- provider を先に変更し、必要な generated dogfood projection を後続確認する。
+- Artifact 保存と canonical adoption、review、assurance を混同しない。
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+### 5.2 親 Epic requirement / design / plan
 
-#### シナリオ SC-002:
+本 Issue は `E-RQ-008`〜`E-RQ-025` の Candidate 2 ownership、`E-AC-008`〜`E-AC-018` の focused closure、`D-003`〜`D-009`、Candidate 2 の vertical slice を継承する。
 
-- Actor:
-  - ...
-- 前提:
-  - ...
-- 操作 / 開始条件（Trigger）:
-  - ...
-- 期待される結果:
-  - ...
-- 観測点:
-  - ...
+`E-AC-019` distribution と `E-AC-020` Epic final closure は Issue `iss-00346` が所有する。本 Issue は candidate-wheel consumer E2E、integrated dogfood、opt-in full regression、Epic-wide final review、残余 Epic integration PR を先取りしない。
 
-#### シナリオ SC-XXX:
+### 5.3 accepted ADR
 
-- 必要に応じて `SC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+accepted ADR `20260728t100038z-adr-generic-imported-file-identity-and-privacy-boundary.md` が、generic family、full destination basename identity、shared slot、minimal normalization、external basename-only visibility、opaque lifecycle、FD-bound commit point、post-commit retry 不要を固定する。本 Issue 内でこれらを再判断しない。
 
----
+accepted ADR `20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md` は、macOS clone-capable / cross-filesystem successを維持し、named staging cleanupの最終FD/path identity check後から`unlink` syscallまでに行われる意図的なsame-UID pathname replacementだけを保証対象外とする。この限定は包括的same-UID waiverではない。最終checkまでに観測できるreplacement、missing、unexpected type、stat/open failureその他ownership uncertaintyではunlinkせずretainし、formal destination no-replace、source bytes / non-mutation / privacy、destination parent identityを維持する。
 
-## 5. スコープ
+accepted ADR `20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md` は、Linuxでsame-UID cleanup waiverを受容せず、destination filesystem上のlinkable `O_TMPFILE` anonymous stagingを必須化する。held FDから`/proc/self/fd/<fd>`と`linkat(..., AT_SYMLINK_FOLLOW)`によるno-replace publicationへ進み、pre-commit abort/failureではFDをcloseするだけでpathname `unlink`を行わない。filesystem / kernel / procfs / link / durability capabilityが不足する場合はformal destination作成前に`publication_unsupported` / `not_committed` / `safe_after_remediation`でfail closedし、named-temp fallbackを使わない。original sourceが別filesystemにあるsuccess laneは維持する。
 
-### 5.1 対象範囲（In 対象範囲（Scope））
+## 6. Scope
 
-このIssueで必ず実現することを列挙する。
+### 6.1 In scope
 
-- ...
-- ...
+- additive command `artifact import file`。
+- required `--file <path>` と、exactly one の `--root` / `--initiative <id>` / `--epic <id>` / `--issue <id>`。
+- repository-root-relative path、absolute path、`..` を含む明示 external relative path。
+- readable regular leaf file 一件。
+- leaf symlink reject、ancestor symlink allow with identity verification。
+- opaque byte preservation と source non-mutation。
+- root / Initiative / Epic / Issue の Artifact destination resolution。
+- generic filename parser、minimal basename normalizer、shared slot ledger。
+- destination-side staging、source stability verification、FD-bound no-replace publication、capability fail-closed。
+- privacy-safe text / JSON / diagnostic contract。
+- generic body を読まない validate / sync / dependency / context-pack / ADR mirror / authoring discovery。
+- 既存 `chatgpt-output` / typed / blank Artifact behavior の regression protection。
+- focused/default test lane、fault injection、provider-first docs/runtime change、必要な checked-in dogfood projection。
 
-### 5.2 対象外（Out of 対象範囲（Scope））
+### 6.2 Out of scope
 
-このIssueでは実現しないことを列挙する。
+- directory、glob、bulk、recursive、watch、automatic sync、copy-back。
+- source move、delete、rename、write-back。
+- title、slug、typed `file` token。
+- MIME、encoding、content type、archive、Markdown semantics の classifier。
+- archive extraction、format conversion、preview、catalog、persistent source provenance。
+- source body、hash、byte count、MIME、encoding、absolute path、parent path の public 出力。
+- root を graph node として追加すること。
+- canonical docs、report、ADR、assurance の自動更新。
+- Issue `iss-00344` の Workbench shell 再実装。
+- candidate wheel、fresh/updated consumer E2E、integrated dogfood、opt-in full regression、Epic-wide final review、残余 Epic PR。これらは `iss-00346`。
+- merge、Issue close、`issue finish`、PR delivery。
 
-- ...
-- ...
+### 6.3 Unchanged behavior
 
-### 5.3 変更しないもの（Unchanged / Must Not Change）
+- `artifact import chatgpt-output` は Workbench-only、lowercase `.md`、`--title` required、optional `--slug`、blank identity、既存 source/hash/count result contract を維持する。
+- `new artifact` の typed / blank grammar と result contract を維持する。
+- existing Artifact を rename、migrate、reclassify しない。
+- `workbench copy`、Workbench opacity、no-backfill premise を変更しない。
+- root 以外の graph topology、node ID resolution、dependency model を変更しない。
 
-関連はあるが、このIssueで変更してはいけないものを列挙する。
+## 7. Issue-level requirements
 
-- ...
-- ...
+### I345-RQ-001 Additive command と target selection
 
-### 5.4 判断が必要な境界
+`./spec-dock/scripts/spec-dock artifact import file --file <path>` を追加し、`--root`、`--initiative <id>`、`--epic <id>`、`--issue <id>` の exactly one を要求する。zero または multiple selector は source open、Artifact setup、formal destination creation より前に拒否する。
 
-このIssueに含めるか、上位上位文書（Epic・Initiative・ADR）へ昇格すべきか判断が必要なものを列挙する。
+- Parent trace: `E-RQ-008`, `E-RQ-009`; `D-003`, `D-004`。
+- ADR trace: root は ADR の対象 family を受けるが graph node にはしない。
 
-| 項目 | 現時点の扱い | 昇格先候補 | 備考 |
-|---|---|---|---|
-| ... | 含める / 除外する / 不明（include / exclude / unknown） | 上位文書（Epic・Initiative・ADR） | ... |
+### I345-RQ-002 Source path resolution と explicit authorization
 
----
+relative source path は process current directory ではなく repository root を基準に lexical normalization する。`..` により repository 外 file を明示する path と absolute path を受け付け、追加 allow flag や parent directory enumeration を要求しない。explicit path はその leaf file 一件だけを読む authorization とする。
 
-## 6. 要求される振る舞い
+- Parent trace: `E-RQ-010`, `E-RQ-012`; `D-005`。
+- ADR trace: Decision 5。
 
-このIssueで成立させたい振る舞いを、Given / When / Thenに近い形で記述する。
+### I345-RQ-003 Eligible source と identity guard
 
-### 振る舞い BH-001:
+source は readable regular leaf file 一件でなければならない。missing、directory、leaf symlink、FIFO、socket、device、unreadable file は content-free error で拒否する。ancestor symlink は許容するが、open descriptor、leaf path、device/inode/mode、および stage 後の source stability が一致する場合だけ成功させる。
 
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
+- Parent trace: `E-RQ-011`, `E-RQ-013`; `D-005`。
 
-### 振る舞い BH-002:
+### I345-RQ-004 Opaque byte / source preservation
 
-- Given:
-  - ...
-- When:
-  - ...
-- Then:
-  - ...
-- And:
-  - ...
-- 観測点:
-  - ...
+source を text decode、newline normalization、MIME 判定、format conversion せず bounded-memory stream で destination-side temp へ copy する。empty、NUL、invalid UTF-8、binary、PDF、image、ZIP、large file を同じ契約で扱う。成功・失敗・warning の全経路で source file を write、move、rename、delete しない。
 
-### 振る舞い BH-XXX:
+- Parent trace: `E-RQ-013`, `E-RQ-020`; `D-005`, `D-009`。
+- ADR trace: Consequences の opaque byte contract。
 
-- 必要に応じて `BH-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+### I345-RQ-005 Generic public filename identity
 
----
+標準 basename は `<timestamp>--<safe-original-basename>`、同 timestamp slot が使用済みなら `<timestamp>-<nn>--<safe-original-basename>` とする。`nn` は `01..99`。`--` は generic family delimiter であり typed `file` token ではない。generic `artifact_id` は full destination basename とする。
 
-## 7. 受け入れ条件
+- Parent trace: `E-RQ-014`; `D-006`。
+- ADR trace: Decision 1〜3。
 
-各受け入れ条件にはIDを付与する。
-後続の `design.md`、`plan.md`、`report.md` から参照できる粒度にする。
+### I345-RQ-006 Minimal `NAME_MAX`-safe normalization
 
-### 受け入れ条件 AC-001:
+normalizer は path safety と destination component length に必要な変更だけを行う。original basename の extension chain、case、spaces、Unicode を可能な限り保持し、title、slug、MIME、content から filename を生成しない。UTF-8 byte budget を超える場合は code point boundary で deterministic に短縮し、最大 suffix prefix を含めても filesystem `NAME_MAX` を超えない。
 
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
+- Parent trace: `E-RQ-015`; `D-007`。
+- ADR trace: Decision 4。
 
-### 受け入れ条件 AC-002:
+### I345-RQ-007 Shared slot ledger と no-overwrite concurrency
 
-- 説明:
-  - ...
-- Actor / 開始条件（Trigger）:
-  - ...
-- 前提:
-  - ...
-- 操作:
-  - ...
-- 期待結果:
-  - ...
-- 観測点:
-  - ...
-- 関連する振る舞い:
-  - `BH-...`
-- 関連する制約:
-  - `CON-...`
+typed、blank、generic family は `(timestamp, optional suffix)` slot ledger を共有する。allocator は destination `artifacts/` の direct child names だけを読み、body を読まない。cooperative process は existing create lock を共有し、non-cooperative race は FD-bound no-replace commit で上書きを防ぐ。`01..99` が全て使用済みなら mutation-free exhaustion error とする。
 
-### 受け入れ条件 AC-XXX:
+- Parent trace: `E-RQ-014`, `E-RQ-016`; `D-006`。
+- ADR trace: Decision 3, 8。
 
-- 必要に応じて `AC-003` 以降を連番で追加する。`XXX` は実IDへ置換するか削除する。
+### I345-RQ-008 Destination-side publication と platform capability
 
----
+source filesystem に依存せず、destination filesystem 内にowned staging FDを作る。copy、file fsync、staged hash/count verification、source revalidation、destination parent identity verification の後、opened staging FD に結び付いた no-replace primitive で formal basename を公開する。Linux / macOS の supported primitive が利用できない場合、fallback overwrite や mutable-path rename を使わず fail closed とする。source と destination が別 filesystem でも成功可能でなければならない。
 
-## 8. 例外・エッジケース
+Linux stagingはvisible pathnameを持たないlinkable `O_TMPFILE` anonymous inodeとする。formal candidate syscall前のnon-mutating preflightはanonymous staging作成、FD regularity、`/proc/self/fd/<fd>` reference availability、directory durabilityに限定し、visible probe entryを作らない。held-FD linkabilityはformal candidateへのactual no-replace commit syscallで初めて確認し、formal entryを作らずcapability/policy理由で失敗した場合は個別errnoをpublic contractへ漏らさず`publication_unsupported` / `not_committed`へ正規化する。`EEXIST`は既存destination collisionとしてbounded retryへ返す。pre-commit abort/failureではstaging FDをcloseするだけであり、pathname cleanup、named-temp fallback、Linuxへのsame-UID cleanup waiverを禁止する。
 
-正常系だけでなく、拒否、未対応、重複、競合、不正入力、部分失敗などを記述する。
+macOS named stagingはhigh-entropy internal name、`O_CREAT | O_EXCL | O_NOFOLLOW`相当、held staging FD、cleanup直前のFD/path identityとregular-file type確認を必須とする。replacement、missing、unexpected type、stat/open failureその他ownership uncertaintyを最終checkまでに観測した場合はunlinkせず`cleanup_state=retained`へ落とす。capability probeは別のraceable pathnameを作成・削除せず、owned staged tempに対するnon-mutating no-replace確認を使う。
 
-### 例外・エッジケース EC-001:
+- Parent trace: `E-RQ-013`, `E-RQ-016`, `E-RQ-017`; `D-005`。
+- ADR trace: `20260728t100038z-adr` Decision 8、`20260730t085831z-adr` Decision / mandatory mitigations、`20260730t102747z-adr` Option A / Linux anonymous-staging boundary。
 
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
+### I345-RQ-009 Publication state と retry disposition
 
-### 例外・エッジケース EC-002:
+public state は次の三つを区別する。
 
-- 条件:
-  - ...
-- 期待される扱い:
-  - ...
-- 状態変更:
-  - あり / なし / unknown
-- 観測点:
-  - ...
-- 関連する受け入れ条件:
-  - `AC-...`
+1. `not_committed`: commit point 前に失敗。`committed=false`。formal destination は作られない。修復後の retry は許容される。
+2. `committed`: commit point と必要な durability / cleanup が完了。`committed=true`。retry 不要。
+3. `committed_with_warning`: commit point 後に directory durability または owned-temp / create-lock cleanup warning。`committed=true`。retry は `not_needed`。
 
----
+post-commit warning を command failure に変換して重複 import を誘発してはならない。
 
-## 9. 入力・出力・契約の例
+- Parent trace: `E-RQ-017`; `D-005`, `D-008`。
+- ADR trace: Decision 8。
 
-該当する場合のみ記述する。
-ここでは正確なAPI / Event / Schema設計を固定しすぎない。
-公開契約になる場合、詳細は `design.md` で定義する。
+### I345-RQ-010 Privacy-safe public contract
 
-### 例 EX-001: 入力例
+repository 外 source について、text、JSON、error、warning、diagnostic、tracked provenance へ出してよい source identity は original basename だけとする。absolute path、parent component、body、hash、byte count、MIME、encoding、content-derived count/value、raw exception を出さない。repository 内 source は repository-relative path のみ許可する。text outputの動的fieldは改行/C0/DEL/ESC/bidi controlを生で出さないreversibleな単一行quote/escapeを使用し、source名からkey/value構造やstate tokenを偽装できないようにする。JSONは標準JSON string escapingを使用する。pre-commit error は source field と destination fieldを持たず、unexpected exception も stable `runtime_failed` へ正規化する。
+
+- Parent trace: `E-RQ-018`; `D-008`。
+- ADR trace: Decision 6。
+
+### I345-RQ-011 Opaque semantic lifecycle
+
+generic filename は専用 parser で認識する。generic `.md` を含め、body を typed Artifact、ADR、requirement、design、plan、report、delegated draft として解釈しない。default `validate`、`sync`、dependency collection、context-pack、ADR mirror、authoring discovery は generic body を open / read / decode しない。
+
+- Parent trace: `E-RQ-019`, `E-RQ-020`; `D-009`。
+- ADR trace: Decision 7。
+
+### I345-RQ-012 Root Artifact setup
+
+`--root` は `spec-dock/` を target path、`root` を public target id として解決し、`spec-dock/artifacts/` を使用する。root を `SpecGraph` または `.meta.json` node として追加しない。必要な root rules source `spec-dock/docs/rules/root/artifacts.md` と `spec-dock/artifacts/rules.md` setup は node setup と同じ安全条件を満たし、invalid target/source の前処理で不用意に作成しない。
+
+- Parent trace: `E-RQ-009`, `E-RQ-025`; `D-004`。
+
+### I345-RQ-013 Compatibility isolation
+
+新 command は既存 `artifact import chatgpt-output`、`new artifact`、typed / blank parser、Workbench shell / copy の public contract を変更しない。generic の result DTO、renderer、source guard、parser を既存 command と分離し、既存 tests を characterization / regression gate として維持する。
+
+- Parent trace: `E-RQ-021`, `E-RQ-022`, `E-RQ-023`; `D-003`, `D-009`。
+- ADR trace: Migration consequence。
+
+### I345-RQ-014 Provider-first projection と documentation
+
+runtime、docs、rules は `src/spec_dock/assets/spec_dock/` を先に更新し、必要な managed projection を `spec-dock/` へ反映して provider / dogfood parity を確認する。public docs は command、target、source policy、naming、privacy、publication state、authority boundary、Issue `iss-00346` handoff を説明する。
+
+- Parent trace: `E-RQ-024`, `E-RQ-025`; Candidate 2 plan。
+
+### I345-RQ-015 Authority / grade boundary
+
+import は evidence storage だけを行い、canonical adoption、review、assurance、readiness を変更しない。本requirementはruntime-owned `standard` classificationを記録し、parent `critical` recommendationをreview focusとして保持するが、import実行がclassificationを変更することはない。
+
+- Parent trace: `E-RQ-019`; workflow authoring grade matrix。
+- ADR trace: Decision 7。
+
+## 8. Observable behaviors
+
+### I345-BH-001 Targeted success
+
+利用者が valid file と exactly one target を指定すると、target の `artifacts/` に一つの generic Artifact が作成され、source は残る。
+
+### I345-BH-002 Root success
+
+`--root` は `spec-dock/artifacts/` を使用し、graph node count、node metadata、dependency topology を変えない。
+
+### I345-BH-003 Content-agnostic success
+
+同じ command contract で text、binary、invalid UTF-8、empty、archive、image、PDF を保存できる。
+
+### I345-BH-004 Collision-safe identity
+
+同じ second の typed / blank / generic import が重なっても異なる shared slot を得て、既存 file は変わらない。
+
+### I345-BH-005 Privacy-safe external result
+
+external source の success result は basename だけを示し、failure result は source location を示さない。
+
+### I345-BH-006 Honest warning
+
+commit 後の durability / cleanup fault は exit success と `committed_with_warning` を返し、retry が不要であることを明示する。
+
+### I345-BH-007 Semantic opacity
+
+generic `.md` の body が ADR-like frontmatter や malformed UTF-8 を含んでも、default lifecycle は読まず、typed mirror / projectionsを増減させない。
+
+### I345-BH-008 Existing command compatibility
+
+同じ revision で `artifact import chatgpt-output` の help、source eligibility、filename、result fields、warning behavior が既存 characterization test と一致する。
+
+## 9. Inputs and outputs
+
+### 9.1 CLI input
 
 ```text
-...
+./spec-dock/scripts/spec-dock artifact import file \
+  --file <path> \
+  (--root | --initiative <id> | --epic <id> | --issue <id>) \
+  [--json]
 ```
 
-### 例 EX-002: 出力例
+許可しない option: `--title`、`--slug`、`--type`、`--mime`、`--encoding`、`--directory`、`--glob`、`--recursive`、`--move`、`--delete-source`、`--overwrite`、external allow flag。
 
-```text
-...
-```
+### 9.2 Success / warning output contract
 
-### 例 EX-003: エラー例
+| Field | 値 / 制約 |
+|---|---|
+| `status` | `ok` |
+| `import_kind` | `file` |
+| `storage_identity` | `generic` |
+| `target_kind` | `root` / `initiative` / `epic` / `issue` |
+| `target_id` | root は `root`、node は canonical node id |
+| `artifact_id` | full destination basename |
+| `source_visibility` | `repo_relative` / `basename_only` |
+| `source` | repository 内は repo-relative path、外部は basename のみ |
+| `destination` | repository-relative destination path |
+| `committed` | `true` |
+| `publication_state` | `committed` / `committed_with_warning` |
+| `cleanup_state` | stable cleanup token |
+| `warning_codes` | content-free stable tokens |
+| `retry_disposition` | `not_needed` |
+| `canonical` | `false` |
 
-```text
-...
-```
+禁止 fields: hash、byte count、MIME、encoding、absolute path、parent path、content preview、raw exception。
 
-### 契約上の注意
+### 9.3 Pre-commit error output contract
 
-- 公開APIに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- CLI contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Template contractに影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Metadata / generated index に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
-- Event / message contract に影響する:
-  - はい / いいえ / 不明（yes / no / unknown）
+| Field | 値 / 制約 |
+|---|---|
+| `status` | `error` |
+| `import_kind` | `file` |
+| `storage_identity` | `generic` |
+| `code` | stable content-free error token |
+| `committed` | `false` |
+| `publication_state` | `not_committed` |
+| `cleanup_state` | stable cleanup token |
+| `retry_disposition` | `safe_after_remediation` |
+| `canonical` | `false` |
 
----
+error output は source、destination、basename、hash、byte count、MIME、encoding、raw exception を含めない。
 
-## 10. 非機能要求・品質要求
+## 10. Privacy and security requirements
 
-このIssueに固有の品質要求のみ記述する。
-システム全体の一般原則は上位文書を参照する。
+### I345-CON-001 Least authorization
 
-### 10.1 互換性
+explicit source path はその leaf file 一件だけの read authorization であり、parent directory listing、sibling traversal、recursive discovery をしない。
 
-- 後方互換性が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 既存workspaceへの影響:
-  - ...
-- 既存Issue / Epic / Initiativeへの影響:
-  - ...
-- 既存CLI利用者への影響:
-  - ...
-- 既存テンプレート利用者への影響:
-  - ...
+### I345-CON-002 No path disclosure
 
-### 10.2 移行性
+external source の directory identity を public/tracked surface に残さない。test sentinel を text / JSON / warning / stderr / exception string へ出さない。
 
-- 移行（migration）が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 移行対象:
-  - ...
-- 既存データ / 既存ファイルへの影響:
-  - ...
-- 旧形式との共存が必要:
-  - はい / いいえ / 不明（yes / no / unknown）
+### I345-CON-003 No content disclosure
 
-### 10.3 可観測性
+body と content-derived metadata は public/tracked surface に出さない。hash / byte count は infra 内 verification と test evidence だけに限定する。
 
-- 追加・変更すべきログ:
-  - ...
-- 追加・変更すべき検証出力:
-  - ...
-- 追加・変更すべきreport証跡（report evidence）:
-  - ...
-- 追加・変更すべきdiagnostic:
-  - ...
+### I345-CON-004 No overwrite
 
-### 10.4 性能・スケール
+formal destination の既存 entry を置換しない。symlink、directory、special entry が candidate generic name を占有する場合も fail closed とする。
 
-- 実行時間への影響:
-  - ...
-- 大量ファイル / 大量Issueでの影響:
-  - ...
-- GitHub API / 外部I/Oへの影響:
-  - ...
+### I345-CON-005 Bounded memory
 
-### 10.5 セキュリティ・プライバシー
+copy と verification は configurable fixed-size chunk で行い、file 全体を memory へ読み込まない。
 
-- 認証・認可への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- secret / token / credentialsへの影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- 個人情報・機微情報への影響:
-  - はい / いいえ / 不明（yes / no / unknown）
-- ログやreportに出してはいけない情報:
-  - ...
+### I345-CON-006 TOCTOU resistance
 
----
+source FD identity、path identity、metadata、hash/count を stage 前後で照合し、destination parent と temp FD を descriptor-bound に扱う。
 
-## 11. 制約
+### I345-CON-007 Platform fail-closed
 
-### 制約 CON-001:
+安全な no-replace capability が確認できない platform/filesystem では代替 rename/copy overwrite を使わない。
 
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
+### I345-CON-008 Semantic opacity
 
-### 制約 CON-002:
+name parser 以外の理由で generic body を開かない。generic body に authority-bearing text があっても効力を与えない。
 
-- 種別:
-  - business / domain / architecture / compatibility / security / operation / other
-- 内容:
-  - ...
-- 根拠:
-  - ...
-- 変更可能性:
-  - fixed / negotiable / unknown
+### I345-CON-009 Provider-first
 
----
+implementation と shipped docs は provider path が authority。dogfood projection の直接手修正を一次実装にしない。
 
-## 12. 依存関係
+### I345-CON-010 Scope boundary
 
-### 12.1 前提となるIssue / PR / 作業
+Issue `iss-00346` の distribution / integrated final-quality obligationsを本 Issue の closure として要求しない。
 
-| 種別 | 識別子・リンク（ID / Link） | 必要な理由 | 状態 |
+### I345-CON-011 Evidence-only authority
+
+本 requirement、import receipt、Artifact presence は review、readiness、delivery の証明ではない。
+
+## 11. Edge cases
+
+### I345-EC-001 Zero / multiple target
+
+zero または multiple selector は argument/application boundary で拒否し、source open と destination mutation を行わない。
+
+### I345-EC-002 Repository-root-relative nested invocation
+
+command を nested current directory から実行しても、relative source は repository root 基準で解決する。
+
+### I345-EC-003 Explicit external relative path
+
+`../evidence/report.PDF` のような path は explicit external file として扱い、basename `report.PDF` 以外の location を公開しない。
+
+### I345-EC-004 Leaf / ancestor symlink
+
+leaf symlink は拒否する。ancestor symlink は descriptor/path identity が安定しているときだけ許容し、retarget race は `source_changed` 相当で失敗する。
+
+### I345-EC-005 Special / unreadable source
+
+missing、directory、FIFO、socket、device、permission-denied regular file は formal destination なしで失敗する。
+
+### I345-EC-006 Empty / binary / invalid UTF-8
+
+empty、NUL、invalid UTF-8、PDF、image、ZIP、large payload は decode error なく byte-identical に保存される。
+
+### I345-EC-007 Basename variants
+
+no extension、multi-suffix、dotfile、uppercase extension、spaces、combining characters、CJK、emoji、case-sensitive variantsを content classification せず扱う。
+
+### I345-EC-008 Unsafe / reserved basename
+
+separator、control、NUL 相当、platform-reserved component、trailing unsafe component を deterministic に最小正規化し、空または `.` / `..` にはしない。
+
+### I345-EC-009 `NAME_MAX`
+
+標準 prefix と最大 `-99` prefix のどちらでも component byte limit を超えず、Unicode code point を途中で切らない。
+
+### I345-EC-010 Cross-family collision
+
+同一 timestamp の typed、blank、generic existing entry が標準または suffix slot を占める場合、次の空き suffix を使う。
+
+### I345-EC-011 Exhaustion
+
+`01..99` 全 slot 使用済みなら、既存 entry/source を変えず `not_committed` で失敗する。
+
+### I345-EC-012 Cooperative / non-cooperative race
+
+create lock を使う同時処理と、lock を使わず destination を作る race の両方で overwrite せず、一つの formal identityだけが各 commit に対応する。
+
+### I345-EC-013 Source mutation
+
+stage 中の same-size rewrite、replace、unlink、ancestor symlink retarget を検知し、formal destination を作らない。
+
+### I345-EC-014 Cross-filesystem source
+
+source device と destination device が異なっても、source を move/link せず destination-side stage により成功する。
+
+### I345-EC-015 Unsupported publication capability
+
+Linuxのlinkable `O_TMPFILE`、`/proc/self/fd` link、directory durability、またはmacOS descriptor cloneの必要 capabilityがない場合、formal destinationを作らず`publication_unsupported` / `not_committed` / `safe_after_remediation`で失敗する。Linuxではnamed-temp fallbackを行わない。
+
+### I345-EC-016 Post-commit warning
+
+directory fsync、owned-temp cleanup、create-lock release が commit 後に失敗しても、formal destination は committed として報告し、retry 不要とする。
+
+### I345-EC-017 Generic ADR-looking Markdown
+
+basename/body が ADR に見えても generic family のままで、ADR mirror、canonical docs、authoring discovery に入らない。
+
+### I345-EC-018 Root setup
+
+fresh root に `artifacts/` / `rules.md` がない場合、valid import の locked setup で作成する。broken/wrong rules entry は上書きせず fail closed。
+
+### I345-EC-019 Existing `chatgpt-output`
+
+lowercase `.md` / Workbench / title / slug / blank identity / existing hash-count result を維持し、generic external policy を混入させない。
+
+## 12. Acceptance criteria
+
+### I345-AC-001 Command and selector
+
+`artifact import file` help に `--file`, `--root`, `--initiative`, `--epic`, `--issue`, `--json` だけが該当 public option として現れ、exactly one target が必須である。`--title` / `--slug` 等は受け付けない。`I345-RQ-001`, `I345-EC-001` を閉じる。
+
+### I345-AC-002 Target resolution
+
+root、Initiative、Epic、Issue の四 target で destination が正しく解決され、kind mismatch / missing node は mutation-free で拒否される。root は graph node count/metadataを増やさない。`I345-RQ-001`, `I345-RQ-012`, `I345-EC-018` を閉じる。
+
+### I345-AC-003 Path resolution
+
+nested invocation、repo-relative、absolute、`..` external relative が repository-root-based contractで解決され、external location は basename 以外公開されない。`I345-RQ-002`, `I345-EC-002`, `I345-EC-003` を閉じる。
+
+### I345-AC-004 Source eligibility
+
+regular leaf と stable ancestor symlink path は受け付け、missing、directory、leaf symlink、FIFO、socket、device、unreadable は source/destination mutation 前に content-free error となる。`I345-RQ-003`, `I345-EC-004`, `I345-EC-005` を閉じる。
+
+### I345-AC-005 Byte/source preservation
+
+empty、NUL、invalid UTF-8、binary、PDF、image、ZIP、large stream の source/destination bytes が一致し、command は source を write、move、rename、delete、chmod、chown、または明示的に timestamp 更新しない。source path と content は保持される。読み取りに伴う access time の扱いは filesystem / mount policy に従い、本 command の mutation contract には含めない。`I345-RQ-004`, `I345-EC-006` を閉じる。
+
+### I345-AC-006 Generic naming
+
+標準 / collision filename が fixed grammar に一致し、artifact identity は full destination basename である。generic parser は typed/blank parser と意味的に分離される。`I345-RQ-005` を閉じる。
+
+### I345-AC-007 Minimal normalization
+
+case、spaces、Unicode、extension chain を可能な限り保持し、unsafe basename と `NAME_MAX` 超過だけを deterministic に正規化する。最大 suffixでも component limit を超えず code point を分断しない。`I345-RQ-006`, `I345-EC-007`〜`I345-EC-009` を閉じる。
+
+### I345-AC-008 Shared ledger / exhaustion
+
+typed、blank、generic の standard/suffix slot が一つの ledger で衝突回避され、`01..99` exhaustion は source/既存 entry を変えず `not_committed` になる。`I345-RQ-007`, `I345-EC-010`, `I345-EC-011` を閉じる。
+
+### I345-AC-009 Concurrency / no overwrite
+
+cooperative concurrent imports と non-cooperative destination race の両方で既存 file を上書きせず、success result ごとに一意な committed basename が存在する。`I345-RQ-007`, `I345-CON-004`, `I345-CON-006`, `I345-EC-012` を閉じる。
+
+### I345-AC-010 Source race detection
+
+staging 中から最終 source reread / identity / path 検証までに観測可能な same-size mutation、replace、unlink、ancestor symlink retarget は検知され、formal destination が存在しない。最終 source 検証後から FD-bound commit syscall までの非協調的な same-inode in-place writeと、destination parent の最終 identity check 後の非協調的な parent replacementは親 Epicのthreat modelどおり保証対象外とする。この除外は、staged bytesの完全性、formal destinationのno-overwrite、commit stateの機械判定を緩和しない。`I345-RQ-003`, `I345-RQ-008`, `I345-EC-013` を閉じる。
+
+### I345-AC-011 Cross-filesystem / capability
+
+original source が destination と別 filesystem でも destination-side staging で成功する。安全 primitive が unavailable/unsupported の場合は formal destination なしで fail closed となる。`I345-RQ-008`, `I345-CON-007`, `I345-EC-014`, `I345-EC-015` を閉じる。
+
+Linux supported laneではlinkable `O_TMPFILE` anonymous stagingからheld FD-bound no-replace commitへ進み、pre-commit abort/failureでpathname `unlink`を呼ばない。anonymous staging、procfs、link、directory durabilityのcapability不足はformal destinationなしの`publication_unsupported` / `not_committed` / `safe_after_remediation`となり、named-temp cleanupやsame-UID waiverへfallbackしない。
+
+macOS named staging cleanupでは、final FD/path identity checkまでに観測できるreplacement、missing、unexpected type、stat/open failureその他ownership uncertaintyをretainし、unlinkしない。final check後から`unlink`までの意図的same-UID replacementだけはaccepted ADR `20260730t085831z-adr`の限定された保証対象外であり、完全防御をpass条件として主張しない。
+
+### I345-AC-012 Publication state
+
+fault injection が pre-commit failure を `not_committed` / exit failure、post-commit durability/cleanup fault を `committed_with_warning` / exit success / retry `not_needed` として区別する。`I345-RQ-009`, `I345-EC-016` を閉じる。
+
+### I345-AC-013 External privacy
+
+external source の success text/JSON は basename のみを含み、failure/warning/unexpected error は absolute path、parent sentinel、body sentinel、hash、byte count、MIME、encoding、raw exceptionを含まない。textの動的fieldは一行のreversible quote/escape、JSONは標準JSON escapingを使用し、control/bidi文字がraw構造を注入しない。tracked provenance にも同じ制約が成立する。`I345-RQ-010`, `I345-CON-001`〜`I345-CON-003` を閉じる。
+
+### I345-AC-014 Opaque lifecycle
+
+generic Markdown/binary を配置して `validate`, `sync --no-github`, dependency checks, context-pack, ADR mirror, authoring discovery を実行しても generic body open/decode がなく、typed projections/mirrorsが変わらない。`I345-RQ-011`, `I345-CON-008`, `I345-EC-017` を閉じる。
+
+### I345-AC-015 Root setup safety
+
+root rules source と `spec-dock/artifacts/rules.md` が provider-firstに用意され、valid root importでのみ安全に setup される。wrong/broken/symlinked destination setup を上書きしない。`I345-RQ-012`, `I345-EC-018` を閉じる。
+
+### I345-AC-016 Existing command compatibility
+
+既存 `artifact import chatgpt-output` の current focused testsが変更なしまたは意図を維持した更新で通り、lowercase `.md`、Workbench guard、title/slug、blank identity、既存 fieldsを保持する。`I345-RQ-013`, `I345-EC-019` を閉じる。
+
+### I345-AC-017 Typed / blank compatibility
+
+`new artifact` と existing typed/blank parsing、duplicate detection、ADR mirror behaviorが維持され、generic entry導入前の既存 Artifact を rename/migrateしない。`I345-RQ-013` を閉じる。
+
+### I345-AC-018 Provider/docs/local quality
+
+provider files、必要な managed dogfood projection、public docs、CLI help が一致し、Issue 345 focused/default lane と static checksが計画どおり検証される。candidate-wheel / integrated dogfood / opt-in full regression / Epic-wide review / residual PR は `iss-00346` handoffとして残る。`I345-RQ-014`, `I345-CON-009`, `I345-CON-010` を閉じる。
+
+### I345-AC-019 Authority boundary
+
+result/docs は `canonical=false` と evidence-only boundary を保持し、本 requirementと import receiptが assurance、review、readiness、delivery を変更しない。`I345-RQ-015`, `I345-CON-011` を閉じる。
+
+## 13. Requirement traceability
+
+| Issue requirement | Parent Epic requirement | Parent design | Accepted ADR / workflow evidence |
 |---|---|---|---|
-| 課題（Issue） | ... | ... | ... |
-| PR | ... | ... | ... |
-| ADR（意思決定記録） | ... | ... | ... |
-| 文書（Docs） | ... | ... | ... |
+| `I345-RQ-001` | `E-RQ-008`, `E-RQ-009` | `D-003`, `D-004` | additive generic boundary |
+| `I345-RQ-002` | `E-RQ-010`, `E-RQ-012` | `D-005` | ADR Decision 5 |
+| `I345-RQ-003` | `E-RQ-011`, `E-RQ-013` | `D-005` | explicit leaf authorization |
+| `I345-RQ-004` | `E-RQ-013`, `E-RQ-020` | `D-005`, `D-009` | ADR opaque-byte consequence |
+| `I345-RQ-005` | `E-RQ-014` | `D-006` | ADR Decision 1〜3 |
+| `I345-RQ-006` | `E-RQ-015` | `D-007` | ADR Decision 4 |
+| `I345-RQ-007` | `E-RQ-014`, `E-RQ-016` | `D-006` | ADR Decision 3, 8 |
+| `I345-RQ-008` | `E-RQ-013`, `E-RQ-016`, `E-RQ-017` | `D-005` | ADR Decision 8、`20260730t102747z-adr` |
+| `I345-RQ-009` | `E-RQ-017` | `D-005`, `D-008` | ADR Decision 8 |
+| `I345-RQ-010` | `E-RQ-018` | `D-008` | ADR Decision 6 |
+| `I345-RQ-011` | `E-RQ-019`, `E-RQ-020` | `D-009` | ADR Decision 7 |
+| `I345-RQ-012` | `E-RQ-009`, `E-RQ-025` | `D-004` | root is explicit, not a node |
+| `I345-RQ-013` | `E-RQ-021`〜`E-RQ-023` | `D-003`, `D-009` | ADR migration consequence |
+| `I345-RQ-014` | `E-RQ-024`, `E-RQ-025` | Candidate 2 delivery design | `AGENTS.md` provider-first rule |
+| `I345-RQ-015` | `E-RQ-019` | authority isolation | authoring grade matrix / ADR Decision 7 |
 
-### 12.2 後続作業
+## 14. Risks and mitigations
 
-このIssueが完了した後に必要になる可能性がある作業を記述する。
-
-| 種別 | 内容 | 理由 | 必須 / 任意 |
+| Risk ID | Risk | Impact | Required mitigation |
 |---|---|---|---|
-| ... | ... | ... | ... |
+| `I345-RISK-001` | path or content-derived metadata leak | external privacy breach | separate public DTO/renderers; sentinel tests across all exits; no raw exception rendering |
+| `I345-RISK-002` | mutable path / overwrite race | evidence loss or identity corruption | descriptor-bound source/destination, shared lock, no-replace final primitive, race tests |
+| `I345-RISK-003` | post-commit warning treated as failure | duplicate retry/import | explicit publication state and retry disposition; exit-success warning tests |
+| `I345-RISK-004` | generic Markdown parsed as ADR/spec | authority confusion and decode failures | separate parser; name-only lifecycle filters; body-open spies |
+| `I345-RISK-005` | `NAME_MAX` truncation destroys extension or Unicode | unstable public identity | deterministic byte-budget normalizer and boundary matrix |
+| `I345-RISK-006` | generic changes regress `chatgpt-output` | existing workflow breakage | separate use case/contract/renderer/guard; unchanged focused regression tests |
+| `I345-RISK-007` | unsupported filesystem silently falls back | non-atomic publication | capability probe and fail-closed token; no rename/copy fallback |
+| `I345-RISK-008` | provider/dogfood drift | shipped behavior differs from repo observation | provider-first update, managed projection diff, parity checks |
+| `I345-RISK-009` | runtime standardとparent critical推奨の関係を誤表現する | authority violation | runtime standardを現在値、criticalをreview focusとして記録し、importによるmutationを主張しない |
+| `I345-RISK-010` | macOS named-staging cleanupの限定除外が包括的same-UID waiverとして扱われる | 観測可能なreplacementやownership uncertaintyで非所有entryを削除する | accepted ADRのactor / pathname / time-window限定、final identity/type check、uncertainty時retain、sentinel回帰テスト |
 
-### 12.3 ブロッカー
+## 15. Rollback expectations
 
-- ...
-- ...
+- generic Artifact がまだ作成されておらずpublic filename contractも利用されていないpre-rolloutでは、command leaf、generic use case/contracts/ports、generic parser/normalizer/ledger、explicit publisher entry、generic renderers、root rules/docs、testsを Issue commit単位で全面revertできること。
+- rollout後またはgeneric Artifact作成後は、write commandと新規作成経路をdisable/revertできること。ただしgrandfathered evidenceとの互換性に必要な最小generic filename recognizer、validation/sync互換、semantic-opacity handling、typed/blank/genericのshared-slot reservationは残すこと。
+- existing `artifact import chatgpt-output`、typed/blank data、existing Artifact filenamesを migration/rewriteしないこと。
+- post-rollout disablement後も既に committed された generic Artifact は user evidence として保持し、自動 rename/delete/reclassifyしないこと。
+- retained owned temp がある場合は identity-confirmed cleanup procedureだけを使用し、unowned entryを削除しないこと。macOSのaccepted ADRで除外された最終check後のsame-UID deliberate replacementを越えて保証を拡張する場合は、Issue-local cleanupを追加せずEpic/ADRへ戻すこと。
+- rollbackまたはpost-rollout disablement後は、選択した経路に応じたfocused compatibility、`validate`、`sync --no-github`、provider/dogfood parityを再確認すること。
+- public filename contract または commit/retry semanticsが既に利用者に公開された後の変更は、Issue-local rollbackで再定義せず Epic/ADR amendmentへ戻すこと。
 
----
+## 16. Unknowns, assumptions, and source conflicts
 
-## 13. 等級（Grade）判定材料
+### 16.1 Pending classification input
 
-このセクションは、どのIssue gradeの `design.md` / `plan.md` テンプレートを使うかを判断するための材料である。
+runtime-owned classificationは`standard`として記録済みである。parent EpicのCandidate 2 recommendation `critical`は判定値を上書きせず、high-risk review focusとして残す。再分類が必要なmaterial changeは本文で推測せず、SpecDock assurance runtimeへ戻す。
 
-内部profile名は `lite / standard / strict / critical` を使用する。
+### 16.2 Historical pre-implementation snapshot
 
-### 13.1 推奨 Issue 等級（Issue Grade）
+以下は実装開始前の inspected revision `f8db4fd206bf11e6ca7b396914b7cfb52d13040b` に対する記録であり、現在のknown gapではない。
 
-現時点の推奨を一つ選ぶ。
+指定 HEAD には `src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md` と `spec-dock/docs/rules/root/artifacts.md` が存在しない。また親 plan が列挙する generic import専用 test filesの一部も未作成である。これらは実装済み事実ではなく、本 Issueで追加する予定成果物である。
 
-- [ ] `lite`
-- [ ] `standard`
-- [ ] `strict`
-- [ ] `critical`
-- [ ] 未判断
+### 16.3 Attachment format conflict
 
-### 13.2 推奨理由
+補助 attachment `expected-output-contract.md` は generic `specdock-authoring-pack/` treeを要求する一方、本タスクの complete authoring requestは exact four-file ZIP treeを明示する。本成果物は task-specificかつ後発の exact ZIP contractを優先する。この判断は製品仕様ではなく今回の配送形式だけに適用する。
 
-- 推奨grade:
-  - ...
-- 理由:
-  - ...
-- gradeを上げる可能性がある条件:
-  - ...
-- gradeを下げられる条件:
-  - ...
+### 16.4 No user-intent blocker
 
-### 13.3 リスク事実（Risk Facts）
-
-値は `true / false / unknown` のいずれかで記述する。
-`unknown` が残る場合、原則として軽量gradeへ寄せない。
-
-| リスク事実（Risk Fact） | 値（Value） | 理由（Reason） |
-|---|---|---|
-| `docs_only_change` | 不明（unknown） | ... |
-| `explicit_lite_opt_in` | 偽（false） | ... |
-| `lite_evidence_gate_passed` | 偽（false） | ... |
-| `runtime_behavior_change` | 不明（unknown） | ... |
-| `public_contract_change` | 不明（unknown） | ... |
-| `migration_or_persistence_change` | 不明（unknown） | ... |
-| `rollback_difficulty_high` | 不明（unknown） | ... |
-| `security_or_privacy_sensitive` | 不明（unknown） | ... |
-
-### 13.4 等級引き上げ条件（Grade Escalation Triggers）
-
-#### `strict` 以上を検討する条件
-
-- [ ] 公開CLI挙動を変更する
-- [ ] 公開API / Event / Schema / generated metadata を変更する
-- [ ] テンプレート契約（template contract） を変更する
-- [ ] ワークスペース scaffold結果を変更する
-- [ ] sync / validate / active / lifecycle 挙動を変更する
-- [ ] migrationまたは既存ファイル変換が必要
-- [ ] 既存workspaceとの互換性が必要
-- [ ] rollbackが難しい
-- [ ] 複数Issue / 複数Epicに影響する
-- [ ] agent skill / workflow policy を変更する
-- [ ] その他:
-  - ...
-
-#### `critical` を検討する条件
-
-- [ ] セキュリティ・プライバシー（security / privacy） / secret / credential に関係する
-- [ ] 破壊的変更またはデータ損失リスクがある
-- [ ] GitHub上の状態変更を伴う
-- [ ] 既存workspace layoutを移行する
-- [ ] 大量ファイルの自動更新を伴う
-- [ ] 手動確認なしで進めると危険
-- [ ] rollback不能またはforward-only migrationになる
-- [ ] その他:
-  - ...
-
-#### `lite` を検討できる条件
-
-すべて満たす場合のみ `lite` を検討できる。
-
-- [ ] 文書のみ（docs-only） または非runtime変更である
-- [ ] 公開contractを変更しない
-- [ ] migration / persistence変更がない
-- [ ] 切り戻し（rollback）が容易である
-- [ ] セキュリティ・プライバシー（security / privacy） に影響しない
-- [ ] 実行時挙動を変更しない
-- [ ] liteを明示的に選ぶ理由がある
-- [ ] lite evidence gateを満たせる
-
----
-
-## 14. 設計への引き渡し
-
-このセクションは `design.md` を作成するための入力である。
-ここでは設計を決定しすぎず、設計で検討すべき論点を整理する。
-
-### 14.1 設計で必ず扱うべき論点
-
-- ...
-- ...
-
-### 14.2 責任所有者が未確定のもの
-
-| 論点 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.3 境界が未確定のもの
-
-| 境界 | 候補 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.4 契約影響が未確定のもの
-
-| 契約 | 影響の可能性 | 未確定理由 |
-|---|---|---|
-| ... | ... | ... |
-
-### 14.5 上位へ昇格すべき可能性がある判断
-
-| 判断 | 昇格先候補 | 理由 |
-|---|---|---|
-| ... | 上位文書（Epic・Initiative・ADR） | ... |
-
----
-
-## 15. 実装計画への引き渡し
-
-このセクションは `plan.md` を作成するための入力である。
-ここでは実装順序を固定せず、計画で分解すべき成果・検証対象を整理する。
-
-### 15.1 計画で分解すべき成果
-
-- ...
-- ...
-
-### 15.2 検証が必要な観測点
-
-- テスト:
-  - ...
-- CLI実行:
-  - ...
-- ファイル生成:
-  - ...
-- 文書・テンプレート（docs / template）:
-  - ...
-- sync / validate:
-  - ...
-- GitHub連携:
-  - ...
-- 手動確認:
-  - ...
-
-### 15.3 TDDが必要な振る舞い候補
-
-振る舞い変更がある場合のみ記述する。
-
-| 候補識別子（ID） | 振る舞い | 関連AC | 備考 |
-|---|---|---|---|
-| B-CAND-001 | ... | `AC-...` | ... |
-| B-CAND-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | `AC-...` | ... |
-
-### 15.4 TDD不要または限定的でよい理由
-
-文書のみ（docs-only）やtemplate-onlyなど、TDDを限定してよい場合に記述する。
-
-- ...
-- ...
-
----
-
-## 16. 文書・作業成果物（docs / artifacts）影響
-
-### 16.1 更新が必要な正本文書（正本（canonical） docs）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.2 更新が必要なテンプレート（templates）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.3 更新が必要なスキル・ワークフロー（skills / workflow）
-
-| パス（Path） | 更新理由 | 必須 / 任意 |
-|---|---|---|
-| ... | ... | ... |
-
-### 16.4 参照すべき作業成果物・議論（artifacts / discussions）
-
-| パス（Path） | 用途 | 正本（canonical）へ昇格する必要 |
-|---|---|---|
-| ... | ... | はい / いいえ / 不明（yes / no / unknown） |
-
----
-
-## 17. 用語
-
-このIssueで使う用語を定義する。
-上位文書に定義済みの場合は参照する。
-
-| 識別子（ID） | 用語 | 定義 | 備考 |
-|---|---|---|---|
-| TERM-001 | ... | ... | ... |
-| TERM-XXX | 必要に応じて連番で追加する。`XXX` は実IDへ置換するか削除する。 | ... | ... |
-
----
-
-## 18. 未確定事項
-
-未確定事項は、実装計画で吸収しない。
-要件、設計、計画のどの段階で解決すべきかを明示する。
-
-### 未確定事項 Q-001:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
-### 未確定事項 Q-002:
-
-- 質問:
-  - ...
-- 選択肢:
-  - A:
-    - ...
-  - B:
-    - ...
-- 推奨案:
-  - ...
-- 影響範囲:
-  - requirement / design / plan / implementation / test / release
-- 解決期限:
-  - before design / before plan / before implementation / can defer
-- 解決者:
-  - ...
-
----
-
-## 19. 要件承認チェック
-
-`approved` にする前に確認する。
-
-- [ ] 目的が1〜3文で明確に説明されている
-- [ ] 観測可能な成果が書かれている
-- [ ] 対象範囲（In 対象範囲（Scope）） / 対象外（Out of 対象範囲（Scope）） / Unchanged が区別されている
-- [ ] 受け入れ条件にIDが付いている
-- [ ] 主要な例外・エッジケースが記載されている
-- [ ] 上位Initiative / Epicとの関係が記載されている
-- [ ] 変更してはいけない上位制約が明示されている
-- [ ] grade判定材料が記載されている
-- [ ] `unknown` のrisk factが残っている場合、その理由が書かれている
-- [ ] 設計で扱うべき論点が整理されている
-- [ ] 実装計画で分解すべき成果が整理されている
-- [ ] 未確定事項の解決段階が明示されている
-- [ ] Issue内で決めるべきでない判断が上位へ昇格されている
-- [ ] 要件定義書に実装手順やTDDサイクルを書き込んでいない
-
----
-
-## 20. 変更履歴
-
-| 日付（Date） | 変更（Change） | 理由（Reason） | 作成者（Author） |
-|---|---|---|---|
-| 2026-07-29 | 初稿（Initial draft） | ... | ... |
+filename、privacy、commit point、retry、semantic opacity、scope splitはparent Epicとaccepted ADRで固定済みであり、現時点で追加の利用者意図質問はない。実装中に accepted boundary変更が必要と判明した場合は、推測で補わず stop-and-escalateする。

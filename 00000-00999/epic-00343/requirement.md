@@ -175,6 +175,8 @@ Workbenchはcanonical stateではなく、存在しなくてもrepositoryはvali
   - publish前failureはformal destinationを残さない。
   - publish後のdurability / cleanup warningは、committed destinationが存在する部分成功状態として、通常成功および未commit failureと機械判定可能に区別する。
   - callerが再実行不要と判断できるobservable stateを返し、自動retryで重複を作らない。exact status / exit / field名はdesignで固定する。
+  - Linuxのstagingはanonymous `O_TMPFILE` inodeとし、same-UID cleanup waiverを受容しない。filesystem / kernel / procfs / held-FD no-replace publication capabilityが不足するときは、formal destination作成前に`publication_unsupported`、`not_committed`、`safe_after_remediation`でfail closedする。original sourceがdestinationと別filesystemにあるsuccess laneは維持するが、supported Linux filesystemはこのcapabilityを満たすlaneに限る。詳細はaccepted ADR `20260730t102747z-adr`を正本とする。
+  - macOSのnamed staging cleanupでは、同一UIDでdestination directoryを変更でき、high-entropy internal staging nameを発見・監視し、最終FD/path identity check後から`unlink` syscallまでにそのpathnameを意図的に別entryへ置換するactorだけを保証対象外とする。この限定は包括的same-UID waiverではない。偶発collision、最終checkまでに観測可能なreplacement、formal destinationのno-replace、source bytes / non-mutation / privacy、destination parent identity、mismatchまたはuncertainty時にunlinkせずretainする義務は維持する。詳細はaccepted ADR `20260730t085831z-adr`を正本とする。
 - E-RQ-018 Privacy / content-free output:
   - repository内sourceはrepo-relative pathを返せる。
   - repository外sourceはbasenameだけを返し、absolute path、body、content-derived valueを成功、preflight failure、publication failure、post-publication warningの全user-visible text / JSON / diagnosticとtracked provenanceへ含めない。
@@ -249,6 +251,8 @@ Workbenchはcanonical stateではなく、存在しなくてもrepositoryはvali
   - external actorによるsource mutation、hash mismatch、write / publish failure、post-publish durability / cleanup warningをfault injectionし、E-RQ-013、016〜017のobservable boundaryを満たす。
   - command自身がsourceへwrite / delete / move / renameを行わないことをfilesystem observationで確認する。
   - post-publish warningはcommitted destination、再試行不要、warningありをtext / JSON / process outcomeから機械判定できる。
+  - Linux supported filesystemではanonymous `O_TMPFILE` stagingからheld FD-bound no-replace commitへ進み、pre-commit abort/failureがpathname unlinkを行わない。`O_TMPFILE`、procfs、link、directory durability capabilityの不足はformal destinationなしの`publication_unsupported` / `not_committed` / `safe_after_remediation`となる。cross-filesystem original source successを維持する。
+  - macOS named staging cleanupについて、final FD/path identity checkまでに観測できるreplacement、missing、special entry、stat/open failureではunlinkせずreplacement sentinelを残す。final check後から`unlink`までの意図的same-UID replacementは、E-RQ-017の限定された保証対象外であり、完全防御のpass条件としては主張しない。
 - E-AC-016 Privacy / authority:
   - external absolute path、body、content-derived valueを、成功、target preflight failure、source preflight failure、allocation / collision exhaustion、source mutation、publication failure、post-publication warning、unexpected runtime failureの全text / JSON / diagnosticとtracked provenanceへ出さない。
   - importによるcanonical docs / report / ADR / assurance mutationがない。
@@ -276,6 +280,8 @@ Workbenchはcanonical stateではなく、存在しなくてもrepositoryはvali
 | allocation | collision exhaustion、invalid current Artifact state | existing fileを変更せず失敗 |
 | publication | write / verify / publish failure | successを返さず、不完全formal fileなし |
 | post-publication | durability / cleanup warning | committed部分成功を通常成功・未commit failureから機械判定可能にし、自動retryしない |
+| Linux anonymous staging | `O_TMPFILE` / procfs / link / durability capability不足 | formal destinationを作らず`publication_unsupported`、`not_committed`、`safe_after_remediation`でfail closed。unsafe named-temp cleanupへfallbackしない |
+| macOS named-staging cleanup | final check後からunlinkまでの意図的same-UID pathname replacement | E-RQ-017で限定した保証対象外。その他のmismatch / uncertaintyはunlinkせずretain |
 
 ## 9. 非機能要件
 
@@ -286,7 +292,7 @@ Workbenchはcanonical stateではなく、存在しなくてもrepositoryはvali
 - Compatibility:
   - existing commands、old Artifact families、existing root / nodeのWorkbench README有無を変更しない。
 - Portability:
-  - supported platformで同じobservable guaranteeを満たす。具体的filesystem primitiveはdesignで決定する。
+  - supported platformで同じobservable guaranteeを満たす。Linuxはanonymous `O_TMPFILE` stagingとheld-FD publication capabilityを満たすfilesystemだけをsupportedとし、不足時はformal destination前にfail closedする。macOS named staging cleanupの限定されたsame-UID final-window boundaryはaccepted ADR `20260730t085831z-adr`に従う。具体的filesystem primitiveはdesignで決定する。
 - Maintainability:
   - provider-firstとcurrent layered architectureを維持する。
 - Performance:
