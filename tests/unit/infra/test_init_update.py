@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
@@ -57,6 +58,36 @@ def _raise(exc: BaseException):
         raise exc
 
     return _raiser
+
+
+def _run_bounded_process(
+    argv: list[str],
+    *,
+    env: dict[str, str],
+    stdin: int | None = None,
+    timeout_seconds: float = 5.0,
+) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(
+        argv,
+        env=env,
+        stdin=stdin,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        os.killpg(process.pid, signal.SIGTERM)
+        try:
+            process.communicate(timeout=1)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.communicate()
+        pytest.fail(f"subprocess timed out after {timeout_seconds}s: {argv!r}")
+        raise AssertionError("unreachable") from exc
+    return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)
 
 
 def _managed_tree_bytes(root: Path) -> dict[str, bytes]:
@@ -1155,6 +1186,16 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00160-reduce-test-runtime-followup/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00342-reduce-unit-test-and-provider-ci-runtime/.meta.json",
         "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00334-implement-chatgpt-issue-planning-workflow/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00335-implement-initiative-epic-portfolio-planning-workflow/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00336-implement-targeted-review-and-planning-surface-cutover/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00332-issue-execution-and-per-issue-delivery/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00332-issue-execution-and-per-issue-delivery/issues/iss-00337-analysis-guided-issue-execution-and-per-issue-delivery/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/issues/iss-00338-multi-issue-epic-coordination-and-finish/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/issues/iss-00339-official-global-cutover-and-rollback-activation/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/issues/iss-00340-post-cutover-evaluation-release-and-closure/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json",
@@ -1370,6 +1411,33 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00160-reduce-test-runtime-followup/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00342-reduce-unit-test-and-provider-ci-runtime/.meta.json": [],
         "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/.meta.json": [],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/.meta.json": [],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00334-implement-chatgpt-issue-planning-workflow/.meta.json": [],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00335-implement-initiative-epic-portfolio-planning-workflow/.meta.json": [
+            "iss-00334",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00336-implement-targeted-review-and-planning-surface-cutover/.meta.json": [
+            "iss-00334",
+            "iss-00335",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00332-issue-execution-and-per-issue-delivery/.meta.json": [
+            "epic-00331",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00332-issue-execution-and-per-issue-delivery/issues/iss-00337-analysis-guided-issue-execution-and-per-issue-delivery/.meta.json": [
+            "epic-00331",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/.meta.json": [
+            "epic-00332",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/issues/iss-00338-multi-issue-epic-coordination-and-finish/.meta.json": [
+            "epic-00332",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/issues/iss-00339-official-global-cutover-and-rollback-activation/.meta.json": [
+            "iss-00338",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/issues/iss-00340-post-cutover-evaluation-release-and-closure/.meta.json": [
+            "iss-00339",
+        ],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json": [],
@@ -1812,6 +1880,12 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00317": ["iss-00315"],
         "iss-00318": ["iss-00317"],
         "iss-00319": ["iss-00315", "iss-00316", "iss-00317", "iss-00318"],
+        "iss-00335": ["iss-00334"],
+        "iss-00336": ["iss-00334", "iss-00335"],
+        "iss-00337": ["iss-00334", "iss-00335", "iss-00336"],
+        "iss-00338": ["iss-00337"],
+        "iss-00339": ["iss-00337", "iss-00338"],
+        "iss-00340": ["iss-00337", "iss-00339"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'
@@ -14387,19 +14461,130 @@ exit 44
                 ),
                 ("--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40, "--endpoint", "x"),
             )
-            for args in invalid_wait_args:
-                with _case(args=args):
-                    if gh_log.exists():
-                        gh_log.unlink()
-                    result = subprocess.run(
-                        [str(wait_script_path), *args],
+            wait_usage = """usage: wait_pr_observation.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA [options]
+
+Options:
+  --timeout-seconds NUMBER
+  --poll-interval-seconds NUMBER
+  --quiet-seconds NUMBER
+  --same-fingerprint-count NUMBER
+  --zero-check-grace-polls NUMBER
+  --trigger-mode post-once|resume
+  --trigger-comment-id NUMBER
+  --trigger-created-at ISO8601
+  --body-mode none|trigger-window-truncated|trigger-window-full|out-only
+  --progress stderr-summary|none
+  --out DIR
+
+The script accepts only the fixed PR observation contract. It does not accept
+caller-provided endpoints, methods, GraphQL queries, headers, bodies, jq
+expressions, or raw gh arguments.
+"""
+            stdin_modes = (("inherited", None), ("devnull", subprocess.DEVNULL))
+            for stdin_name, stdin in stdin_modes:
+                with _case(stdin=stdin_name, args=("--help",)):
+                    result = _run_bounded_process(
+                        [str(wait_script_path), "--help"],
                         env=env,
-                        capture_output=True,
-                        text=True,
-                        check=False,
+                        stdin=stdin,
+                    )
+                    assert result.returncode == 0, result.stdout + result.stderr
+                    assert result.stdout == ""
+                    assert result.stderr == wait_usage
+                    assert not gh_log.exists()
+
+                for args in invalid_wait_args:
+                    with _case(stdin=stdin_name, args=args):
+                        if gh_log.exists():
+                            gh_log.unlink()
+                        result = _run_bounded_process(
+                            [str(wait_script_path), *args],
+                            env=env,
+                            stdin=stdin,
+                        )
+                        assert result.returncode == 64, result.stdout + result.stderr
+                        assert result.stdout == ""
+                        assert result.stderr == wait_usage
+                        assert not gh_log.exists(), "unsafe wait input reached fake gh api"
+
+    def test_issue_75_pr_observation_wait_engine_rejects_invalid_environment_before_helpers(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        engine_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py"
+        )
+        usage_line = "usage: wait_pr_observation.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA [options]"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            trigger_log = tmp_path / "trigger.log"
+            snapshot_log = tmp_path / "snapshot.log"
+            out_dir = tmp_path / "out"
+            trigger_script = tmp_path / "trigger.sh"
+            snapshot_script = tmp_path / "snapshot.sh"
+            trigger_script.write_text(
+                '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$TRIGGER_FAKE_LOG"\nexit 44\n',
+                encoding="utf-8",
+            )
+            snapshot_script.write_text(
+                '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$SNAPSHOT_FAKE_LOG"\nexit 44\n',
+                encoding="utf-8",
+            )
+            trigger_script.chmod(0o755)
+            snapshot_script.chmod(0o755)
+
+            base_env = {
+                **os.environ,
+                "OBS_SNAPSHOT_SCRIPT": str(snapshot_script),
+                "OBS_TRIGGER_SCRIPT": str(trigger_script),
+                "OBS_REPO": "owner/repo",
+                "OBS_PR": "13",
+                "OBS_HEAD_SHA": "a" * 40,
+                "OBS_TIMEOUT_SECONDS": "30",
+                "OBS_POLL_INTERVAL_SECONDS": "1",
+                "OBS_QUIET_SECONDS": "1",
+                "OBS_SAME_FINGERPRINT_COUNT": "1",
+                "OBS_ZERO_CHECK_GRACE_POLLS": "1",
+                "OBS_TRIGGER_MODE": "post-once",
+                "OBS_TRIGGER_COMMENT_ID": "",
+                "OBS_TRIGGER_CREATED_AT": "",
+                "OBS_BODY_MODE": "trigger-window-truncated",
+                "OBS_PROGRESS": "none",
+                "OBS_OUT_DIR": str(out_dir),
+                "TRIGGER_FAKE_LOG": str(trigger_log),
+                "SNAPSHOT_FAKE_LOG": str(snapshot_log),
+            }
+            invalid_cases = (
+                ("head-sha", {"OBS_HEAD_SHA": "not-a-sha"}),
+                ("pr", {"OBS_PR": "0"}),
+                ("progress", {"OBS_PROGRESS": "verbose"}),
+                ("timeout", {"OBS_TIMEOUT_SECONDS": "0"}),
+                (
+                    "trigger-created-at",
+                    {
+                        "OBS_TRIGGER_MODE": "resume",
+                        "OBS_TRIGGER_COMMENT_ID": "1",
+                        "OBS_TRIGGER_CREATED_AT": "2026-06-08T01:02:03not-iso",
+                    },
+                ),
+            )
+            for case_name, overrides in invalid_cases:
+                with _case(case_name=case_name):
+                    trigger_log.unlink(missing_ok=True)
+                    snapshot_log.unlink(missing_ok=True)
+                    shutil.rmtree(out_dir, ignore_errors=True)
+                    result = _run_bounded_process(
+                        [sys.executable, str(engine_path)],
+                        env={**base_env, **overrides},
                     )
                     assert result.returncode == 64, result.stdout + result.stderr
-                    assert not gh_log.exists(), "unsafe wait input reached fake gh api"
+                    assert result.stdout == ""
+                    assert usage_line in result.stderr
+                    assert not trigger_log.exists()
+                    assert not snapshot_log.exists()
+                    assert not out_dir.exists()
 
     def _issue_176_write_trigger_fake_gh(
         self,
@@ -15363,37 +15548,37 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
-python3 - "$trigger_id" "$trigger_created_at" <<'PY'
-import json
-import sys
-
-trigger_id = int(sys.argv[1]) if sys.argv[1] else None
-trigger_created_at = sys.argv[2] or None
-payload = {
-    "script": "fetch_pr_observation_snapshot.sh",
-    "status": "failed",
-    "overall_status": "failed",
-    "normalized_status": "failed",
-    "observation_complete": False,
-    "repo": "owner/repo",
-    "pr": 13,
-    "expected_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "current_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "head_matches_expected": True,
-    "summary": {"ci": "failed", "review": "none", "head": "match"},
-    "limitations": [],
-    "recommended_next_action": "fix_ci",
-    "ci": {
-        "status": "failed",
-        "failures": [{"name": "test"}],
-        "check_runs": {"total": 1, "success": 0, "skipped": 0, "neutral": 0, "failed": 1, "running": 0, "pending": 0, "other": 0, "stale": 0},
-    },
-    "review": {"status": "none", "signals": [], "review_requests": [], "threads": {"total": 0, "unresolved": 0}},
-    "trigger": {"source": "explicit", "comment_id": trigger_id, "created_at": trigger_created_at},
-    "artifacts": {},
-}
-print(json.dumps(payload, separators=(",", ":")))
-PY
+builtin printf -v python_source '%s\\n' \\
+  'import json' \\
+  'import sys' \\
+  '' \\
+  'trigger_id = int(sys.argv[1]) if sys.argv[1] else None' \\
+  'trigger_created_at = sys.argv[2] or None' \\
+  'payload = {' \\
+  '    "script": "fetch_pr_observation_snapshot.sh",' \\
+  '    "status": "failed",' \\
+  '    "overall_status": "failed",' \\
+  '    "normalized_status": "failed",' \\
+  '    "observation_complete": False,' \\
+  '    "repo": "owner/repo",' \\
+  '    "pr": 13,' \\
+  '    "expected_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",' \\
+  '    "current_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",' \\
+  '    "head_matches_expected": True,' \\
+  '    "summary": {"ci": "failed", "review": "none", "head": "match"},' \\
+  '    "limitations": [],' \\
+  '    "recommended_next_action": "fix_ci",' \\
+  '    "ci": {' \\
+  '        "status": "failed",' \\
+  '        "failures": [{"name": "test"}],' \\
+  '        "check_runs": {"total": 1, "success": 0, "skipped": 0, "neutral": 0, "failed": 1, "running": 0, "pending": 0, "other": 0, "stale": 0},' \\
+  '    },' \\
+  '    "review": {"status": "none", "signals": [], "review_requests": [], "threads": {"total": 0, "unresolved": 0}},' \\
+  '    "trigger": {"source": "explicit", "comment_id": trigger_id, "created_at": trigger_created_at},' \\
+  '    "artifacts": {},' \\
+  '}' \\
+  'print(json.dumps(payload, separators=(",", ":")))'
+python3 -c "$python_source" "$trigger_id" "$trigger_created_at"
 """,
             encoding="utf-8",
         )
@@ -21202,9 +21387,8 @@ esac
             checks_script = lib_dir / "fetch_pr_checks_snapshot.sh"
             checks_script.write_text(
                 """#!/usr/bin/env bash
-cat <<'JSON'
-{"ci":{"status":"passed","progress_status":"passed","checks":[],"failures":[],"required_check_state":{"available":false,"collection_policy":"forbidden"},"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}]}},"limitations":[],"decision":{"status":"passed","recommended_next_action":"merge_prepared","observation_complete":true}}
-JSON
+builtin printf '%s\\n' \\
+  '{"ci":{"status":"passed","progress_status":"passed","checks":[],"failures":[],"required_check_state":{"available":false,"collection_policy":"forbidden"},"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}]}},"limitations":[],"decision":{"status":"passed","recommended_next_action":"merge_prepared","observation_complete":true}}'
 """,
                 encoding="utf-8",
             )
@@ -21294,9 +21478,8 @@ esac
             snapshot_script = script_dir / "fetch_pr_observation_snapshot.sh"
             snapshot_script.write_text(
                 """#!/usr/bin/env bash
-cat <<'JSON'
-{"script":"fetch_pr_observation_snapshot.sh","status":"running","overall_status":"running","normalized_status":"running","observation_complete":false,"repo":"owner/repo","pr":13,"expected_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","current_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","head_matches_expected":true,"fingerprint":"issue-187-running","summary":{"ci":"running","review":"pending","head":"matched"},"limitations":[],"recommended_next_action":"wait","ci":{"status":"running","progress_status":"running","required_check_state":{"available":false,"collection_policy":"forbidden"},"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}]}},"review":{"status":"pending","signals":[]},"decision":{"status":"running","status_reason":"ci_pending","recommended_next_action":"wait","observation_complete":false}}
-JSON
+builtin printf '%s\\n' \\
+  '{"script":"fetch_pr_observation_snapshot.sh","status":"running","overall_status":"running","normalized_status":"running","observation_complete":false,"repo":"owner/repo","pr":13,"expected_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","current_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","head_matches_expected":true,"fingerprint":"issue-187-running","summary":{"ci":"running","review":"pending","head":"matched"},"limitations":[],"recommended_next_action":"wait","ci":{"status":"running","progress_status":"running","required_check_state":{"available":false,"collection_policy":"forbidden"},"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}]}},"review":{"status":"pending","signals":[]},"decision":{"status":"running","status_reason":"ci_pending","recommended_next_action":"wait","observation_complete":false}}'
 """,
                 encoding="utf-8",
             )
@@ -27198,9 +27381,7 @@ JSON
             review_script = lib_dir / "fetch_pr_review_snapshot.sh"
             review_script.write_text(
                 f"""#!/usr/bin/env bash
-cat <<'JSON'
-{json.dumps(review_wrapper_payload, sort_keys=True, separators=(",", ":"))}
-JSON
+builtin printf '%s\\n' {shlex.quote(json.dumps(review_wrapper_payload, sort_keys=True, separators=(",", ":")))}
 """,
                 encoding="utf-8",
             )
@@ -28373,11 +28554,9 @@ case "$*" in
 JSON
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
-    cat <<'JSON'
-[{"id":201,"user":{"login":"alice"},"state":"CHANGES_REQUESTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"please fix this old-trigger-free review body"},{"id":202,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:07:00Z","body":"codex review comment body """
+    builtin printf '%s\\n' '[{"id":201,"user":{"login":"alice"},"state":"CHANGES_REQUESTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"please fix this old-trigger-free review body"},{"id":202,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:07:00Z","body":"codex review comment body """
                 + ("x" * 12050)
-                + """"}]
-JSON
+                + """"}]'
     ;;
   "api repos/owner/repo/pulls/13/comments --paginate")
     cat <<'JSON'
@@ -28390,9 +28569,7 @@ JSON
 JSON
     ;;
   api\\ graphql*)
-    cat <<'JSON'
-{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_kw_unresolved","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_1","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:08:00Z","body":"thread body should not duplicate old bodies"}]}},{"id":"RT_kw_resolved","isResolved":true,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T01:09:00Z","body":"resolved thread body"}]}},{"id":"RT_kw_outdated","isResolved":false,"isOutdated":true,"comments":{"nodes":[{"id":"RTC_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T01:10:00Z","body":"outdated thread body"}]}}]}}}}}
-JSON
+    builtin printf '%s\\n' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_kw_unresolved","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_1","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:08:00Z","body":"thread body should not duplicate old bodies"}]}},{"id":"RT_kw_resolved","isResolved":true,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T01:09:00Z","body":"resolved thread body"}]}},{"id":"RT_kw_outdated","isResolved":false,"isOutdated":true,"comments":{"nodes":[{"id":"RTC_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T01:10:00Z","body":"outdated thread body"}]}}]}}}}}'
     ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
@@ -30959,9 +31136,7 @@ JSON
 JSON
     ;;
   api\\ graphql*)
-    cat <<'JSON'
-{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_human","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_human","databaseId":777,"author":{"login":"alice"},"createdAt":"2026-06-08T01:06:00Z","body":"human unresolved thread"}]}},{"id":"RT_codex_unrelated","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_302","databaseId":302,"author":{"login":"codex"},"createdAt":"2026-06-08T01:07:00Z","body":"unrelated codex thread"}]}}]}}}}}
-JSON
+    builtin printf '%s\\n' '{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_human","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_human","databaseId":777,"author":{"login":"alice"},"createdAt":"2026-06-08T01:06:00Z","body":"human unresolved thread"}]}},{"id":"RT_codex_unrelated","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_302","databaseId":302,"author":{"login":"codex"},"createdAt":"2026-06-08T01:07:00Z","body":"unrelated codex thread"}]}}]}}}}}'
     ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
@@ -32193,9 +32368,7 @@ esac
 printf '%s\n' "$*" >> "$GH_FAKE_LOG"
 if [[ "$*" == api\\ graphql* ]]; then
   if [[ "$*" == *"comments(last: 100)"* ]]; then
-    cat <<'JSON'
-{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_more_than_20_comments","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_old_1","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T00:01:00Z","updatedAt":"2026-06-08T00:01:00Z","body":"old pre-trigger thread comment 1"},{"id":"RTC_old_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T00:02:00Z","updatedAt":"2026-06-08T00:02:00Z","body":"old pre-trigger thread comment 2"},{"id":"RTC_old_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T00:03:00Z","updatedAt":"2026-06-08T00:03:00Z","body":"old pre-trigger thread comment 3"},{"id":"RTC_old_4","databaseId":304,"author":{"login":"alice"},"createdAt":"2026-06-08T00:04:00Z","updatedAt":"2026-06-08T00:04:00Z","body":"old pre-trigger thread comment 4"},{"id":"RTC_old_5","databaseId":305,"author":{"login":"alice"},"createdAt":"2026-06-08T00:05:00Z","updatedAt":"2026-06-08T00:05:00Z","body":"old pre-trigger thread comment 5"},{"id":"RTC_old_6","databaseId":306,"author":{"login":"alice"},"createdAt":"2026-06-08T00:06:00Z","updatedAt":"2026-06-08T00:06:00Z","body":"old pre-trigger thread comment 6"},{"id":"RTC_old_7","databaseId":307,"author":{"login":"alice"},"createdAt":"2026-06-08T00:07:00Z","updatedAt":"2026-06-08T00:07:00Z","body":"old pre-trigger thread comment 7"},{"id":"RTC_old_8","databaseId":308,"author":{"login":"alice"},"createdAt":"2026-06-08T00:08:00Z","updatedAt":"2026-06-08T00:08:00Z","body":"old pre-trigger thread comment 8"},{"id":"RTC_old_9","databaseId":309,"author":{"login":"alice"},"createdAt":"2026-06-08T00:09:00Z","updatedAt":"2026-06-08T00:09:00Z","body":"old pre-trigger thread comment 9"},{"id":"RTC_old_10","databaseId":310,"author":{"login":"alice"},"createdAt":"2026-06-08T00:10:00Z","updatedAt":"2026-06-08T00:10:00Z","body":"old pre-trigger thread comment 10"},{"id":"RTC_old_11","databaseId":311,"author":{"login":"alice"},"createdAt":"2026-06-08T00:11:00Z","updatedAt":"2026-06-08T00:11:00Z","body":"old pre-trigger thread comment 11"},{"id":"RTC_old_12","databaseId":312,"author":{"login":"alice"},"createdAt":"2026-06-08T00:12:00Z","updatedAt":"2026-06-08T00:12:00Z","body":"old pre-trigger thread comment 12"},{"id":"RTC_old_13","databaseId":313,"author":{"login":"alice"},"createdAt":"2026-06-08T00:13:00Z","updatedAt":"2026-06-08T00:13:00Z","body":"old pre-trigger thread comment 13"},{"id":"RTC_old_14","databaseId":314,"author":{"login":"alice"},"createdAt":"2026-06-08T00:14:00Z","updatedAt":"2026-06-08T00:14:00Z","body":"old pre-trigger thread comment 14"},{"id":"RTC_old_15","databaseId":315,"author":{"login":"alice"},"createdAt":"2026-06-08T00:15:00Z","updatedAt":"2026-06-08T00:15:00Z","body":"old pre-trigger thread comment 15"},{"id":"RTC_old_16","databaseId":316,"author":{"login":"alice"},"createdAt":"2026-06-08T00:16:00Z","updatedAt":"2026-06-08T00:16:00Z","body":"old pre-trigger thread comment 16"},{"id":"RTC_old_17","databaseId":317,"author":{"login":"alice"},"createdAt":"2026-06-08T00:17:00Z","updatedAt":"2026-06-08T00:17:00Z","body":"old pre-trigger thread comment 17"},{"id":"RTC_old_18","databaseId":318,"author":{"login":"alice"},"createdAt":"2026-06-08T00:18:00Z","updatedAt":"2026-06-08T00:18:00Z","body":"old pre-trigger thread comment 18"},{"id":"RTC_old_19","databaseId":319,"author":{"login":"alice"},"createdAt":"2026-06-08T00:19:00Z","updatedAt":"2026-06-08T00:19:00Z","body":"old pre-trigger thread comment 19"},{"id":"RTC_old_20","databaseId":320,"author":{"login":"alice"},"createdAt":"2026-06-08T00:20:00Z","updatedAt":"2026-06-08T00:20:00Z","body":"old pre-trigger thread comment 20"},{"id":"RTC_latest_21","databaseId":321,"author":{"login":"bob"},"createdAt":"2026-06-08T01:30:00Z","updatedAt":"2026-06-08T01:31:00Z","body":"latest reply after trigger"}]}}]}}}}}
-JSON
+    builtin printf '%s\\n' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_more_than_20_comments","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_old_1","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T00:01:00Z","updatedAt":"2026-06-08T00:01:00Z","body":"old pre-trigger thread comment 1"},{"id":"RTC_old_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T00:02:00Z","updatedAt":"2026-06-08T00:02:00Z","body":"old pre-trigger thread comment 2"},{"id":"RTC_old_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T00:03:00Z","updatedAt":"2026-06-08T00:03:00Z","body":"old pre-trigger thread comment 3"},{"id":"RTC_old_4","databaseId":304,"author":{"login":"alice"},"createdAt":"2026-06-08T00:04:00Z","updatedAt":"2026-06-08T00:04:00Z","body":"old pre-trigger thread comment 4"},{"id":"RTC_old_5","databaseId":305,"author":{"login":"alice"},"createdAt":"2026-06-08T00:05:00Z","updatedAt":"2026-06-08T00:05:00Z","body":"old pre-trigger thread comment 5"},{"id":"RTC_old_6","databaseId":306,"author":{"login":"alice"},"createdAt":"2026-06-08T00:06:00Z","updatedAt":"2026-06-08T00:06:00Z","body":"old pre-trigger thread comment 6"},{"id":"RTC_old_7","databaseId":307,"author":{"login":"alice"},"createdAt":"2026-06-08T00:07:00Z","updatedAt":"2026-06-08T00:07:00Z","body":"old pre-trigger thread comment 7"},{"id":"RTC_old_8","databaseId":308,"author":{"login":"alice"},"createdAt":"2026-06-08T00:08:00Z","updatedAt":"2026-06-08T00:08:00Z","body":"old pre-trigger thread comment 8"},{"id":"RTC_old_9","databaseId":309,"author":{"login":"alice"},"createdAt":"2026-06-08T00:09:00Z","updatedAt":"2026-06-08T00:09:00Z","body":"old pre-trigger thread comment 9"},{"id":"RTC_old_10","databaseId":310,"author":{"login":"alice"},"createdAt":"2026-06-08T00:10:00Z","updatedAt":"2026-06-08T00:10:00Z","body":"old pre-trigger thread comment 10"},{"id":"RTC_old_11","databaseId":311,"author":{"login":"alice"},"createdAt":"2026-06-08T00:11:00Z","updatedAt":"2026-06-08T00:11:00Z","body":"old pre-trigger thread comment 11"},{"id":"RTC_old_12","databaseId":312,"author":{"login":"alice"},"createdAt":"2026-06-08T00:12:00Z","updatedAt":"2026-06-08T00:12:00Z","body":"old pre-trigger thread comment 12"},{"id":"RTC_old_13","databaseId":313,"author":{"login":"alice"},"createdAt":"2026-06-08T00:13:00Z","updatedAt":"2026-06-08T00:13:00Z","body":"old pre-trigger thread comment 13"},{"id":"RTC_old_14","databaseId":314,"author":{"login":"alice"},"createdAt":"2026-06-08T00:14:00Z","updatedAt":"2026-06-08T00:14:00Z","body":"old pre-trigger thread comment 14"},{"id":"RTC_old_15","databaseId":315,"author":{"login":"alice"},"createdAt":"2026-06-08T00:15:00Z","updatedAt":"2026-06-08T00:15:00Z","body":"old pre-trigger thread comment 15"},{"id":"RTC_old_16","databaseId":316,"author":{"login":"alice"},"createdAt":"2026-06-08T00:16:00Z","updatedAt":"2026-06-08T00:16:00Z","body":"old pre-trigger thread comment 16"},{"id":"RTC_old_17","databaseId":317,"author":{"login":"alice"},"createdAt":"2026-06-08T00:17:00Z","updatedAt":"2026-06-08T00:17:00Z","body":"old pre-trigger thread comment 17"},{"id":"RTC_old_18","databaseId":318,"author":{"login":"alice"},"createdAt":"2026-06-08T00:18:00Z","updatedAt":"2026-06-08T00:18:00Z","body":"old pre-trigger thread comment 18"},{"id":"RTC_old_19","databaseId":319,"author":{"login":"alice"},"createdAt":"2026-06-08T00:19:00Z","updatedAt":"2026-06-08T00:19:00Z","body":"old pre-trigger thread comment 19"},{"id":"RTC_old_20","databaseId":320,"author":{"login":"alice"},"createdAt":"2026-06-08T00:20:00Z","updatedAt":"2026-06-08T00:20:00Z","body":"old pre-trigger thread comment 20"},{"id":"RTC_latest_21","databaseId":321,"author":{"login":"bob"},"createdAt":"2026-06-08T01:30:00Z","updatedAt":"2026-06-08T01:31:00Z","body":"latest reply after trigger"}]}}]}}}}}'
   else
     cat <<'JSON'
 {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_more_than_20_comments","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_old_1","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T00:01:00Z","updatedAt":"2026-06-08T00:01:00Z","body":"old pre-trigger thread comment 1"},{"id":"RTC_old_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T00:02:00Z","updatedAt":"2026-06-08T00:02:00Z","body":"old pre-trigger thread comment 2"},{"id":"RTC_old_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T00:03:00Z","updatedAt":"2026-06-08T00:03:00Z","body":"old pre-trigger thread comment 3"},{"id":"RTC_old_4","databaseId":304,"author":{"login":"alice"},"createdAt":"2026-06-08T00:04:00Z","updatedAt":"2026-06-08T00:04:00Z","body":"old pre-trigger thread comment 4"},{"id":"RTC_old_5","databaseId":305,"author":{"login":"alice"},"createdAt":"2026-06-08T00:05:00Z","updatedAt":"2026-06-08T00:05:00Z","body":"old pre-trigger thread comment 5"},{"id":"RTC_old_6","databaseId":306,"author":{"login":"alice"},"createdAt":"2026-06-08T00:06:00Z","updatedAt":"2026-06-08T00:06:00Z","body":"old pre-trigger thread comment 6"},{"id":"RTC_old_7","databaseId":307,"author":{"login":"alice"},"createdAt":"2026-06-08T00:07:00Z","updatedAt":"2026-06-08T00:07:00Z","body":"old pre-trigger thread comment 7"},{"id":"RTC_old_8","databaseId":308,"author":{"login":"alice"},"createdAt":"2026-06-08T00:08:00Z","updatedAt":"2026-06-08T00:08:00Z","body":"old pre-trigger thread comment 8"},{"id":"RTC_old_9","databaseId":309,"author":{"login":"alice"},"createdAt":"2026-06-08T00:09:00Z","updatedAt":"2026-06-08T00:09:00Z","body":"old pre-trigger thread comment 9"},{"id":"RTC_old_10","databaseId":310,"author":{"login":"alice"},"createdAt":"2026-06-08T00:10:00Z","updatedAt":"2026-06-08T00:10:00Z","body":"old pre-trigger thread comment 10"},{"id":"RTC_old_11","databaseId":311,"author":{"login":"alice"},"createdAt":"2026-06-08T00:11:00Z","updatedAt":"2026-06-08T00:11:00Z","body":"old pre-trigger thread comment 11"},{"id":"RTC_old_12","databaseId":312,"author":{"login":"alice"},"createdAt":"2026-06-08T00:12:00Z","updatedAt":"2026-06-08T00:12:00Z","body":"old pre-trigger thread comment 12"},{"id":"RTC_old_13","databaseId":313,"author":{"login":"alice"},"createdAt":"2026-06-08T00:13:00Z","updatedAt":"2026-06-08T00:13:00Z","body":"old pre-trigger thread comment 13"},{"id":"RTC_old_14","databaseId":314,"author":{"login":"alice"},"createdAt":"2026-06-08T00:14:00Z","updatedAt":"2026-06-08T00:14:00Z","body":"old pre-trigger thread comment 14"},{"id":"RTC_old_15","databaseId":315,"author":{"login":"alice"},"createdAt":"2026-06-08T00:15:00Z","updatedAt":"2026-06-08T00:15:00Z","body":"old pre-trigger thread comment 15"},{"id":"RTC_old_16","databaseId":316,"author":{"login":"alice"},"createdAt":"2026-06-08T00:16:00Z","updatedAt":"2026-06-08T00:16:00Z","body":"old pre-trigger thread comment 16"},{"id":"RTC_old_17","databaseId":317,"author":{"login":"alice"},"createdAt":"2026-06-08T00:17:00Z","updatedAt":"2026-06-08T00:17:00Z","body":"old pre-trigger thread comment 17"},{"id":"RTC_old_18","databaseId":318,"author":{"login":"alice"},"createdAt":"2026-06-08T00:18:00Z","updatedAt":"2026-06-08T00:18:00Z","body":"old pre-trigger thread comment 18"},{"id":"RTC_old_19","databaseId":319,"author":{"login":"alice"},"createdAt":"2026-06-08T00:19:00Z","updatedAt":"2026-06-08T00:19:00Z","body":"old pre-trigger thread comment 19"},{"id":"RTC_old_20","databaseId":320,"author":{"login":"alice"},"createdAt":"2026-06-08T00:20:00Z","updatedAt":"2026-06-08T00:20:00Z","body":"old pre-trigger thread comment 20"}]}}]}}}}}
@@ -32907,27 +33080,19 @@ esac
                 """#!/usr/bin/env bash
 case "$*" in
   "api repos/owner/repo/issues/13/comments --paginate")
-    cat <<'JSON'
-[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
-JSON
+    builtin printf '%s\\n' '[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]'
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
     printf '[]\\n'
     ;;
   "api repos/owner/repo/pulls/13/comments --paginate")
-    cat <<'JSON'
-[{"id":301,"user":{"login":"alice"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"resolved inline body"},{"id":302,"user":{"login":"bob"},"pull_request_review_id":202,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:07:00Z","path":"app.py","line":13,"body":"outdated inline body"}]
-JSON
+    builtin printf '%s\\n' '[{"id":301,"user":{"login":"alice"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"resolved inline body"},{"id":302,"user":{"login":"bob"},"pull_request_review_id":202,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:07:00Z","path":"app.py","line":13,"body":"outdated inline body"}]'
     ;;
   "api repos/owner/repo/pulls/13 --paginate")
-    cat <<'JSON'
-{"requested_reviewers":[],"requested_teams":[]}
-JSON
+    builtin printf '%s\\n' '{"requested_reviewers":[],"requested_teams":[]}'
     ;;
   api\\ graphql*)
-    cat <<'JSON'
-{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_resolved","isResolved":true,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T01:06:00Z","updatedAt":"2026-06-08T01:06:00Z","body":"resolved inline body"}]}},{"id":"RT_outdated","isResolved":false,"isOutdated":true,"comments":{"nodes":[{"id":"RTC_302","databaseId":302,"author":{"login":"bob"},"createdAt":"2026-06-08T01:07:00Z","updatedAt":"2026-06-08T01:07:00Z","body":"outdated inline body"}]}}]}}}}}
-JSON
+    builtin printf '%s\\n' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_resolved","isResolved":true,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T01:06:00Z","updatedAt":"2026-06-08T01:06:00Z","body":"resolved inline body"}]}},{"id":"RT_outdated","isResolved":false,"isOutdated":true,"comments":{"nodes":[{"id":"RTC_302","databaseId":302,"author":{"login":"bob"},"createdAt":"2026-06-08T01:07:00Z","updatedAt":"2026-06-08T01:07:00Z","body":"outdated inline body"}]}}]}}}}}'
     ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2

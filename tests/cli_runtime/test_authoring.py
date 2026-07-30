@@ -2668,7 +2668,7 @@ class TestAuthoringCli(CliRuntimeHarness):
             assert "secret_like_payload:token" in payload["findings"]
             assert "secret_like_payload:api_key" in payload["findings"]
             assert "secret_like_payload:private key" in payload["findings"]
-            assert "raw_transcript:raw transcript" in payload["findings"]
+            assert not any(finding.startswith("raw_transcript:") for finding in payload["findings"])
 
     def test_authoring_pack_review_redacts_sensitive_findings_in_report_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

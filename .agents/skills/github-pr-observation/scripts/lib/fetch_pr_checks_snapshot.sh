@@ -2,20 +2,19 @@
 set -euo pipefail
 
 usage() {
-  cat >&2 <<'USAGE'
-usage: fetch_pr_checks_snapshot.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA
-
-Historical compatibility entrypoint for an Actions-only CI snapshot for the
-expected PR head SHA. The name is retained for compatibility and does not imply
-GitHub Checks API usage. The script observes GitHub Actions workflow runs/jobs
-only; it does not use GitHub Checks API, commit statuses, PR status rollup,
-gh pr checks, or equivalent check-rollup surfaces. External/non-Actions checks
-are intentionally unobserved and may require GitHub UI or external CI
-confirmation when branch protection depends on them.
-
-The script accepts only this fixed read-only contract and does not accept
-caller-provided gh api arguments.
-USAGE
+  builtin printf '%s\n' \
+    'usage: fetch_pr_checks_snapshot.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA' \
+    '' \
+    'Historical compatibility entrypoint for an Actions-only CI snapshot for the' \
+    'expected PR head SHA. The name is retained for compatibility and does not imply' \
+    'GitHub Checks API usage. The script observes GitHub Actions workflow runs/jobs' \
+    'only; it does not use GitHub Checks API, commit statuses, PR status rollup,' \
+    'gh pr checks, or equivalent check-rollup surfaces. External/non-Actions checks' \
+    'are intentionally unobserved and may require GitHub UI or external CI' \
+    'confirmation when branch protection depends on them.' \
+    '' \
+    'The script accepts only this fixed read-only contract and does not accept' \
+    'caller-provided gh api arguments.' >&2
 }
 
 fail_usage() {
