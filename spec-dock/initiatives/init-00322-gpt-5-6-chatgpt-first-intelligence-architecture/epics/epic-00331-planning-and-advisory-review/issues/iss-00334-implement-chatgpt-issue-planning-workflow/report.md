@@ -937,3 +937,12 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - Main再検証はCandidate infra `34 passed, 1 skipped`、application apply `36 passed`、Apply unit `22 passed`、明示full-regression Apply integration `68 passed`、通常fast lane `1161 passed, 2153 skipped`、`make lint`（Ruff／418 files format／mypy 281 files）、provider／dogfood 5対byte parity、validate `nodes=227`、`git diff --check`がPASSした。
 - fresh S008 Spec／Code／QA reviewersは各P0／P1 0、PASS。正式local closure evidenceは`artifacts/20260730t163933z-review-pr-351-s008-local-closure-pass.md`である。
 - P2 `apply-post-commit-record-gap`はnon-blocking follow-upとして保持し、この指摘だけを理由にbranch mutationや再レビューを行わない。commit／push、exact code HEADへのfresh ChatGPT defect-only review、最終evidence HEADへのfixed PR observationを残存gateとする。
+
+## 2026-07-30 — S008 exact code review PASSとlatest main統合
+
+- S007／S008 implementation、tests、evidenceはcommit `7cc387201a48f5bd758c25fafa4df8cb20728df6`としてpushし、local／remote parity `0/0`を確認した。
+- exact pushed code HEADへfresh ChatGPT Pro defect-only Reviewを実行した。session `iss00334-s008-final-review`は`requested=Pro`／`resolved=Pro`／`verified=yes`で、GitHub connectorからexact repository／branch／HEADを確認し、default branch substitution 0、P0 0、P1 0、`PASS`を返した。正式artifactは`artifacts/20260730t165620z-pr-351-s008-final-chatgpt-review-pass.md`である。
+- Review後、PRが`CONFLICTING`へ変化していることを検出した。`origin/main`は先行確認後に28 commits進み、latest mainは`da38dc58693e5e4193ca31a60b9fe41ae35248e1`だった。
+- latest mainをmergeし、provider／dogfoodの`application/ports.py`と`cli/bootstrap.py`の4 conflictだけを解消した。すべて加算競合であり、Issue Planning dependencies／portとmainのexplicit-file artifact import dependencies／portを両方保持した。runtime contractの削除や優先順位変更はない。
+- merge commitは`99374214ebf943ceb70dc186bf782993784eb481`。merge後の検証はfast lane `1271 passed, 2167 skipped`、明示full-regression Apply integration `68 passed`、`make lint`（Ruff／425 files format／mypy 287 files）、provider／dogfood 5対byte parity、validate `nodes=227`、`git diff --check`がPASSした。
+- Linux real-syscall assertionはunprivileged Provider CIでのPASSを必須とする。最終evidence publicationをcommit／pushし、exact final HEADへfixed PR observationを一度だけ行う。merge、auto-merge、branch deletion、Issue close、`issue finish`は実施しない。
