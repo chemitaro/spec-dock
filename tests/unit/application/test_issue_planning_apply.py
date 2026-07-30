@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import hashlib
 import json
+import os
 from pathlib import Path, PurePath
 import sys
 from types import SimpleNamespace
@@ -13,8 +14,10 @@ RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" 
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application import issue_planning  # noqa: E402
-from spec_dock_runtime.application.ports import IssuePlanningDependencies  # noqa: E402
-from spec_dock_runtime.cli.bootstrap import _Clock, _IssuePlanningGateway  # noqa: E402
+from spec_dock_runtime.application.ports import (  # noqa: E402
+    IssuePlanningCandidateArchiveRejected,
+    IssuePlanningDependencies,
+)
 from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
     GitBoundOperationBindingV1,
     IssueCandidateIdentity,
@@ -24,8 +27,6 @@ from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
     PlanningReviewResult,
     ReviewedPlanningIdentity,
 )
-from spec_dock_runtime.infra.contracts import StoredMetaRecord  # noqa: E402
-from spec_dock_runtime.infra.issue_planning_candidate import VerifiedIssueCandidate  # noqa: E402
 
 HEAD = "a" * 40
 ZIP_SHA = "b" * 64
@@ -33,15 +34,120 @@ SOURCE_HASH = "c" * 64
 COMPANION_PATH = "artifacts/20260729t000000z-guide-new-member.md"
 COMPANION_BYTES = b"onboarding companion\n"
 COMPANION_SHA = hashlib.sha256(COMPANION_BYTES).hexdigest()
-PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_Clock(), gateway=_IssuePlanningGateway())
 
 
-def _issue_tree(repo: Path) -> tuple[Path, StoredMetaRecord]:
+@dataclass(frozen=True)
+class _StoredMetaRecord:
+    kind: str
+    id: str
+    title: str
+    slug: str
+    path: str
+    parent_id: str | None
+    initiative_id: str | None
+    epic_id: str | None
+    github_issue_number: int | None
+    meta_path: str
+
+
+@dataclass(frozen=True)
+class _VerifiedIssueCandidate:
+    identity: IssueCandidateIdentity
+    files: dict[str, bytes]
+    source_baseline: dict[str, object]
+    zip_bytes: bytes
+    onboarding_companion: OnboardingCompanionBindingV1
+
+
+@dataclass(frozen=True)
+class _PlanningApplyExecution:
+    status: str
+    reason: str
+    operation_id: str
+    decision_artifact_path: str | None = None
+    local_commit: str | None = None
+    local_tree: str | None = None
+    remote_commit: str | None = None
+    details: tuple[str, ...] = ()
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "operation_id": self.operation_id,
+            "decision_artifact_path": self.decision_artifact_path,
+            "local_commit": self.local_commit,
+            "local_tree": self.local_tree,
+            "remote_commit": self.remote_commit,
+        }
+
+
+class _FakeClock:
+    def now_iso(self) -> str:
+        return "2026-07-28T12:00:00+00:00"
+
+    def today(self) -> str:
+        return "2026-07-28"
+
+
+class _FakeIssuePlanningGateway:
+    def validate_candidate_output_directory(self, output_dir: Path, repo_root: Path) -> Path:
+        output = output_dir.resolve(strict=True)
+        repository = repo_root.resolve(strict=True)
+        if not output.is_dir() or output == repository or output.is_relative_to(repository):
+            raise ValueError("candidate output is unsafe")
+        return output
+
+    def read_bounded_regular_file(self, path: Path, *, max_bytes: int) -> bytes:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            data = os.read(descriptor, max_bytes + 1)
+        finally:
+            os.close(descriptor)
+        if len(data) > max_bytes:
+            raise ValueError("bounded input exceeded")
+        return data
+
+    def load_verified_issue_candidate(self, candidate_path: Path, repo_root: Path) -> _VerifiedIssueCandidate:
+        raise AssertionError(f"unexpected Candidate load: {candidate_path} from {repo_root}")
+
+    def load_expected_planning_targets(
+        self,
+        repo_root: Path,
+        expected_head: str,
+        canonical_target_paths: tuple[str, str, str],
+    ) -> object:
+        raise AssertionError(f"unexpected target load: {repo_root} {expected_head} {canonical_target_paths}")
+
+    def planning_apply_resume_available(self, operation: object, *, output_dir: Path) -> bool:
+        raise AssertionError(f"unexpected resume probe: {operation} in {output_dir}")
+
+    def create_planning_apply_operation(self, **kwargs: object) -> SimpleNamespace:
+        operation_id = hashlib.sha256(
+            json.dumps(
+                {
+                    "issue_id": kwargs["issue_id"],
+                    "mode": kwargs["mode"],
+                    "reviewed_identity_sha256": kwargs["reviewed_identity_sha256"],
+                    "human_decision_sha256": kwargs["human_decision_sha256"],
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        return SimpleNamespace(operation_id=operation_id, **kwargs)
+
+    def __getattr__(self, name: str) -> object:
+        raise AssertionError(f"unexpected Issue Planning gateway call: {name}")
+
+
+PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_FakeClock(), gateway=_FakeIssuePlanningGateway())
+
+
+def _issue_tree(repo: Path) -> tuple[Path, _StoredMetaRecord]:
     issue_dir = repo / "spec-dock" / "initiatives" / "init-one" / "epics" / "epic-one" / "issues" / "iss-one"
     issue_dir.mkdir(parents=True)
     for name in ("requirement.md", "design.md", "plan.md"):
         (issue_dir / name).write_bytes(f"old {name}\n".encode())
-    return issue_dir, StoredMetaRecord(
+    return issue_dir, _StoredMetaRecord(
         kind="issue",
         id="iss-00003",
         title="Issue",
@@ -189,8 +295,8 @@ def _preflight(
     )
 
 
-def _verified_candidate(identity: IssueCandidateIdentity | None = None) -> VerifiedIssueCandidate:
-    return VerifiedIssueCandidate(
+def _verified_candidate(identity: IssueCandidateIdentity | None = None) -> _VerifiedIssueCandidate:
+    return _VerifiedIssueCandidate(
         identity=identity or _candidate_identity(),
         files={
             "requirement.md": b"new requirement\n",
@@ -243,8 +349,9 @@ def _run(
     decision: str = "approved",
     request_changes: dict[str, object] | None = None,
     identity: ReviewedPlanningIdentity | None = None,
-    candidate: VerifiedIssueCandidate | None = None,
-    candidate_after_preflight: VerifiedIssueCandidate | None = None,
+    candidate: _VerifiedIssueCandidate | None = None,
+    candidate_after_preflight: _VerifiedIssueCandidate | None = None,
+    candidate_error: IssuePlanningCandidateArchiveRejected | None = None,
     preflight: object | None = None,
     execution: tuple[str, str] = ("ready", "adoption_published"),
 ):
@@ -278,11 +385,7 @@ def _run(
 
     def transaction_runner(operation, **kwargs):
         calls.append(operation)
-        apply_module = __import__(
-            "spec_dock_runtime.infra.issue_planning_apply",
-            fromlist=["PlanningApplyExecution"],
-        )
-        return apply_module.PlanningApplyExecution(
+        return _PlanningApplyExecution(
             status=execution[0],
             reason=execution[1],
             operation_id=operation.operation_id,
@@ -308,6 +411,11 @@ def _run(
             current_candidate[0] = candidate_after_preflight
         return preflight or _preflight()
 
+    def load_candidate(_path: Path, _root: Path) -> _VerifiedIssueCandidate:
+        if candidate_error is not None:
+            raise candidate_error
+        return current_candidate[0]
+
     result = issue_planning.run_issue_planning_apply(
         dependencies=PLANNING_DEPENDENCIES,
         request=request,
@@ -320,12 +428,26 @@ def _run(
             state=SimpleNamespace(deps_preflight_error=None),
         ),
         preflight_runner=run_preflight,
-        candidate_loader=lambda _path, _root: current_candidate[0],
+        candidate_loader=load_candidate,
         expected_target_loader=expected_target_loader,
         resume_probe=lambda _operation, **_kwargs: False,
         transaction_runner=transaction_runner,
     )
     return result, calls, request, record
+
+
+def test_archive_apply_preserves_candidate_archive_findings_in_result_details(
+    tmp_path: Path,
+) -> None:
+    findings = ("unsafe_entry_symlink", "checksum_mismatch")
+    result, calls, _, _ = _run(
+        tmp_path,
+        candidate_error=IssuePlanningCandidateArchiveRejected(findings),
+    )
+
+    assert (result.status, result.reason) == ("rejected", "archive_rejected")
+    assert result.details == findings
+    assert calls == []
 
 
 def _assert_not_ready(result, expected: tuple[str, str]) -> None:
@@ -462,7 +584,7 @@ def test_pa_nf_06_wrong_review_identity_is_rejected(tmp_path: Path, kind: str) -
 def test_pa_nf_07_apply_target_drift_is_stale(tmp_path: Path, kind: str) -> None:
     mode: str = "archive-candidate"
     preflight: object | None = None
-    candidate: VerifiedIssueCandidate | None = None
+    candidate: _VerifiedIssueCandidate | None = None
     if kind == "source":
         preflight = _preflight(head="d" * 40)
     elif kind == "candidate":

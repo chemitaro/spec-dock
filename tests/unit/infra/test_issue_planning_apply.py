@@ -219,6 +219,22 @@ def test_unsafe_companion_destination_is_rejected_before_mutation(
         module.snapshot_regular_file(target)
 
 
+def test_dangling_symlink_destination_is_rejected_before_mutation_and_preserved(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    target = tmp_path / "companion.md"
+    target.symlink_to("missing-destination.md")
+    original_link = target.readlink()
+
+    with pytest.raises(ValueError, match="regular non-symlink"):
+        module.snapshot_regular_file(target)
+
+    assert target.is_symlink()
+    assert target.readlink() == original_link
+    assert not (tmp_path / "missing-destination.md").exists()
+
+
 def test_git_index_snapshot_uses_raw_bytes(tmp_path: Path) -> None:
     module = _module()
     repo = tmp_path / "repo"

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
 import io
 import json
 import os
 from pathlib import Path
+import stat
 import sys
-from typing import TYPE_CHECKING, Any
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, cast
 import zipfile
 
 import pytest
@@ -22,8 +25,12 @@ RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" 
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application.issue_planning import resolve_existing_issue_target  # noqa: E402
-from spec_dock_runtime.application.ports import IssuePlanningDependencies  # noqa: E402
-from spec_dock_runtime.cli.bootstrap import _Clock, _IssuePlanningGateway  # noqa: E402
+from spec_dock_runtime.application.ports import (  # noqa: E402
+    IssuePlanningCandidateArchiveRejected,
+    IssuePlanningCandidateCollision,
+    IssuePlanningCandidatePublicationFailed,
+    IssuePlanningDependencies,
+)
 from spec_dock_runtime.domain.authoring_pack.preflight_contract import (  # noqa: E402
     FetchSummary,
     FreshnessEvidence,
@@ -34,17 +41,297 @@ from spec_dock_runtime.domain.authoring_pack.source_manifest import (  # noqa: E
     build_source_manifest,
     empty_source_manifest,
 )
-from spec_dock_runtime.domain.issue_planning_contracts import ReviewedPlanningIdentity  # noqa: E402
-from spec_dock_runtime.infra.contracts import (  # noqa: E402
-    DirectDependencyResolution,
-    StoredMetaRecord,
+from spec_dock_runtime.domain.issue_planning_candidate import (  # noqa: E402
+    CandidateMaterial,
+    derive_candidate_identity,
+)
+from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
+    IssueCandidateIdentity,
+    OnboardingCompanionBindingV1,
+    OracleAuthoringZipSnapshot,
+    ReviewedPlanningIdentity,
 )
 
-PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_Clock(), gateway=_IssuePlanningGateway())
+
+@dataclass(frozen=True)
+class _StoredMetaRecord:
+    kind: str
+    id: str
+    title: str
+    slug: str
+    path: str
+    parent_id: str | None
+    initiative_id: str | None
+    epic_id: str | None
+    github_issue_number: int | None
+    meta_path: str
 
 
-def _record(path: Path, *, node_id: str = "iss-00003", kind: str = "issue") -> StoredMetaRecord:
-    return StoredMetaRecord(
+@dataclass(frozen=True)
+class _DirectDependencyResolution:
+    raw_ref: str
+    resolved_node_id: str
+
+
+@dataclass(frozen=True)
+class _VerifiedIssueCandidate:
+    identity: IssueCandidateIdentity
+    files: dict[str, bytes]
+    source_baseline: dict[str, object]
+    zip_bytes: bytes
+    onboarding_companion: OnboardingCompanionBindingV1
+
+
+@dataclass(frozen=True)
+class _PublishedCandidate:
+    identity: IssueCandidateIdentity
+    zip_byte_count: int
+    candidate_path: Path
+    onboarding_companion: OnboardingCompanionBindingV1
+
+
+@dataclass(frozen=True)
+class _PublishedPlanningReview:
+    review_result_file: str
+    review_summary_file: str
+    review_result_sha256: str
+
+
+class _FakeClock:
+    def now_iso(self) -> str:
+        return "2026-07-28T12:00:00+00:00"
+
+    def today(self) -> str:
+        return "2026-07-28"
+
+
+class _FakeIssuePlanningGateway:
+    def __init__(self, *, publication_supported: bool = True) -> None:
+        self._candidates: dict[Path, _VerifiedIssueCandidate] = {}
+        self._descriptor_roots: dict[int, Path] = {}
+        self._publication_supported = publication_supported
+
+    def validate_candidate_output_directory(self, output_dir: Path, repo_root: Path) -> Path:
+        output = output_dir.resolve(strict=True)
+        repository = repo_root.resolve(strict=True)
+        if not output.is_dir() or output == repository or output.is_relative_to(repository):
+            raise ValueError("candidate output is unsafe")
+        return output
+
+    def load_validated_issue_authoring_payload(
+        self,
+        snapshot: object,
+        *,
+        expected_companion_path: str,
+        repo_root: Path,
+    ) -> SimpleNamespace:
+        del repo_root
+        authoring_snapshot = cast("OracleAuthoringZipSnapshot", snapshot)
+        zip_bytes = authoring_snapshot.zip_bytes
+        internal_root = authoring_snapshot.internal_root
+        try:
+            if len(zip_bytes) < 22 or zip_bytes[-22:-18] != b"PK\x05\x06":
+                raise ValueError("authoring archive has trailing or missing data")
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
+                expected_names = {
+                    f"{internal_root}/{name}"
+                    for name in (
+                        "requirement.md",
+                        "design.md",
+                        "plan.md",
+                        expected_companion_path,
+                    )
+                }
+                if set(archive.namelist()) != expected_names:
+                    raise ValueError("authoring archive inventory mismatch")
+                documents = {
+                    name: archive.read(f"{internal_root}/{name}") for name in ("requirement.md", "design.md", "plan.md")
+                }
+                companion = archive.read(f"{internal_root}/{expected_companion_path}")
+        except (KeyError, ValueError, zipfile.BadZipFile) as error:
+            raise IssuePlanningCandidateArchiveRejected(("authoring_archive_rejected",)) from error
+        return SimpleNamespace(
+            documents=documents,
+            onboarding_companion_path=expected_companion_path,
+            onboarding_companion_bytes=companion,
+            zip_sha256=hashlib.sha256(zip_bytes).hexdigest(),
+            zip_size_bytes=len(zip_bytes),
+        )
+
+    def build_and_publish_candidate(
+        self,
+        *,
+        output_guard: Path,
+        repo_root: Path,
+        material: object,
+    ) -> _PublishedCandidate:
+        del repo_root
+        candidate_material = cast("CandidateMaterial", material)
+        if not self._publication_supported:
+            raise IssuePlanningCandidatePublicationFailed("publication unsupported")
+        final = output_guard / candidate_material.logical_filename
+        if final.exists():
+            raise IssuePlanningCandidateCollision(final.name)
+        output = io.BytesIO()
+        internal_root = candidate_material.internal_root
+        files = dict(candidate_material.files)
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
+            for relative_path in sorted(files, key=lambda value: value.encode()):
+                archive.writestr(f"{internal_root}/{relative_path}", files[relative_path])
+        zip_bytes = output.getvalue()
+        final.write_bytes(zip_bytes)
+        identity = derive_candidate_identity(
+            candidate_material,
+            zip_bytes,
+            observed_transport_filename=final.name,
+        )
+        companion = OnboardingCompanionBindingV1(
+            path=candidate_material.onboarding_companion_path,
+            sha256=hashlib.sha256(files[candidate_material.onboarding_companion_path]).hexdigest(),
+        )
+        source_baseline = json.loads(files["SOURCE-BASELINE.json"].decode("utf-8"))
+        self._candidates[final.resolve()] = _VerifiedIssueCandidate(
+            identity=identity,
+            files=files,
+            source_baseline=source_baseline,
+            zip_bytes=zip_bytes,
+            onboarding_companion=companion,
+        )
+        return _PublishedCandidate(identity, len(zip_bytes), final, companion)
+
+    def load_verified_issue_candidate(self, candidate_path: Path, repo_root: Path) -> _VerifiedIssueCandidate:
+        del repo_root
+        path = candidate_path.resolve(strict=True)
+        try:
+            candidate = self._candidates[path]
+        except KeyError as error:
+            raise IssuePlanningCandidateArchiveRejected(("unregistered_candidate",)) from error
+        current_bytes = path.read_bytes()
+        if current_bytes == candidate.zip_bytes:
+            return candidate
+        return _VerifiedIssueCandidate(
+            identity=candidate.identity,
+            files=candidate.files,
+            source_baseline=candidate.source_baseline,
+            zip_bytes=current_bytes,
+            onboarding_companion=candidate.onboarding_companion,
+        )
+
+    def open_safe_directory_descriptor(self, path: Path) -> int:
+        descriptor = os.open(path, os.O_RDONLY)
+        self._descriptor_roots[descriptor] = path
+        return descriptor
+
+    def read_bounded_regular_file_at(
+        self,
+        root_descriptor: int,
+        relative_path: str,
+        *,
+        max_bytes: int,
+    ) -> bytes:
+        data = (self._descriptor_roots[root_descriptor] / relative_path).read_bytes()
+        if len(data) > max_bytes:
+            raise ValueError("bounded input exceeded")
+        return data
+
+    def read_bounded_regular_file(self, path: Path, *, max_bytes: int) -> bytes:
+        directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path.anchor, directory_flags)
+        try:
+            for part in path.parent.parts[1:]:
+                next_descriptor = os.open(part, directory_flags, dir_fd=descriptor)
+                os.close(descriptor)
+                descriptor = next_descriptor
+            file_descriptor = os.open(
+                path.name,
+                os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=descriptor,
+            )
+            try:
+                if not stat.S_ISREG(os.fstat(file_descriptor).st_mode):
+                    raise ValueError("bounded input must be a regular file")
+                return self._read_descriptor(file_descriptor, max_bytes=max_bytes)
+            finally:
+                os.close(file_descriptor)
+        except OSError as error:
+            raise ValueError("bounded input is unsafe") from error
+        finally:
+            os.close(descriptor)
+
+    @staticmethod
+    def _read_descriptor(descriptor: int, *, max_bytes: int) -> bytes:
+        chunks: list[bytes] = []
+        size = 0
+        while True:
+            chunk = os.read(descriptor, min(64 * 1024, max_bytes + 1 - size))
+            if not chunk:
+                return b"".join(chunks)
+            chunks.append(chunk)
+            size += len(chunk)
+            if size > max_bytes:
+                raise ValueError("bounded input exceeded")
+
+    def read_external_review_result(
+        self,
+        path: Path,
+        *,
+        repo_root: Path,
+        expected_sha256: str,
+    ) -> bytes:
+        del repo_root
+        data = self.read_bounded_regular_file(path, max_bytes=1024 * 1024)
+        if hashlib.sha256(data).hexdigest() != expected_sha256:
+            raise ValueError("review digest mismatch")
+        return data
+
+    def publish_planning_review_evidence(
+        self,
+        *,
+        output_dir: Path,
+        repo_root: Path,
+        reviewed_identity_sha256: str,
+        review_result_bytes: bytes,
+        summary_bytes: bytes,
+        operation_time: datetime,
+    ) -> _PublishedPlanningReview:
+        del repo_root
+        timestamp = operation_time.astimezone(timezone.utc).strftime("%Y%m%dt%H%M%Sz")
+        result_name = f"{timestamp}-planning-review-result.json"
+        summary_name = f"{timestamp}-planning-review-summary.md"
+        result_path = output_dir / result_name
+        summary_path = output_dir / summary_name
+        if result_path.exists() or summary_path.exists():
+            raise FileExistsError(result_name)
+        result_path.write_bytes(review_result_bytes)
+        summary_path.write_bytes(summary_bytes)
+        return _PublishedPlanningReview(
+            review_result_file=result_name,
+            review_summary_file=summary_name,
+            review_result_sha256=hashlib.sha256(review_result_bytes).hexdigest(),
+        )
+
+    def __getattr__(self, name: str) -> object:
+        raise AssertionError(f"unexpected Issue Planning gateway call: {name}")
+
+
+PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_FakeClock(), gateway=_FakeIssuePlanningGateway())
+
+
+def test_application_issue_planning_unit_tests_use_application_owned_test_doubles_only() -> None:
+    forbidden = (
+        "spec_dock_runtime.cli." + "bootstrap",
+        "spec_dock_runtime." + "infra.",
+    )
+    for path in (
+        Path(__file__),
+        Path(__file__).with_name("test_issue_planning_apply.py"),
+    ):
+        source = path.read_text(encoding="utf-8")
+        assert all(token not in source for token in forbidden), path
+
+
+def _record(path: Path, *, node_id: str = "iss-00003", kind: str = "issue") -> _StoredMetaRecord:
+    return _StoredMetaRecord(
         kind=kind,
         id=node_id,
         title="Issue",
@@ -821,28 +1108,22 @@ def test_create_success_output_has_only_safe_keys(tmp_path: Path) -> None:
 
 def test_unsupported_atomic_publication_leaves_final_absent(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     issue_dir = _planning_tree(repo)
     output = tmp_path / "output"
     output.mkdir()
-    infra = __import__(
-        "spec_dock_runtime.infra.issue_planning_candidate",
-        fromlist=["atomic_publish_no_replace"],
+    dependencies = IssuePlanningDependencies(
+        clock=_FakeClock(),
+        gateway=_FakeIssuePlanningGateway(publication_supported=False),
     )
-
-    def unsupported(source: Path, destination: Path) -> None:
-        raise NotImplementedError
-
-    monkeypatch.setattr(infra, "atomic_publish_no_replace", unsupported)
     module = __import__(
         "spec_dock_runtime.application.issue_planning",
         fromlist=["run_issue_planning_create"],
     )
     result = module.run_issue_planning_create(
-        dependencies=PLANNING_DEPENDENCIES,
+        dependencies=dependencies,
         request=module.PlanningCreateRequest("iss-00003", output),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -896,10 +1177,10 @@ def test_create_uses_one_dependency_snapshot_for_transport_and_source_baseline(
     loader_calls: list[str] = []
     transport_dependencies: list[str] = []
 
-    def changing_loader(issue_id: str) -> list[DirectDependencyResolution]:
+    def changing_loader(issue_id: str) -> list[_DirectDependencyResolution]:
         loader_calls.append(issue_id)
         resolved = "iss-00001" if len(loader_calls) == 1 else "iss-00002"
-        return [DirectDependencyResolution(raw_ref=resolved, resolved_node_id=resolved)]
+        return [_DirectDependencyResolution(raw_ref=resolved, resolved_node_id=resolved)]
 
     def transport_runner(**kwargs):
         dependencies = kwargs["dependency_loader"]("iss-00003")
@@ -1775,10 +2056,7 @@ def test_review_rejects_malformed_wrong_identity_digest_verdict_and_authority_ou
         source_head="a" * 40,
         zip_sha256="d" * 64,
     )
-    candidate = __import__(
-        "spec_dock_runtime.infra.issue_planning_candidate",
-        fromlist=["VerifiedIssueCandidate"],
-    ).VerifiedIssueCandidate(
+    candidate = _VerifiedIssueCandidate(
         identity=identity,
         files={DEFAULT_COMPANION_PATH: _onboarding_companion()},
         source_baseline={},
@@ -2149,10 +2427,13 @@ def test_semantic_partial_extra_wrong_issue_or_scope_escape_publishes_zero(
     identity = setup["identity"]
     payload = _planner_payload()
     if mutation == "partial":
-        payload = payload.split(
-            b"<<<SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1 name=plan.md>>>",
-            1,
-        )[0]
+        source = zipfile.ZipFile(io.BytesIO(payload))
+        output = io.BytesIO()
+        with source, zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
+            for info in source.infolist():
+                if not info.filename.endswith("/plan.md"):
+                    archive.writestr(info, source.read(info.filename))
+        payload = output.getvalue()
     elif mutation == "extra":
         payload += b"\nextra"
     elif mutation == "wrong_issue":

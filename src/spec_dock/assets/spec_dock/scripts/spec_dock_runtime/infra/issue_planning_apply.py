@@ -361,10 +361,11 @@ def validate_planning_git_argv(argv: tuple[str, ...]) -> None:
 
 
 def snapshot_regular_file(path: Path) -> FileSnapshot:
-    if not path.exists():
+    try:
+        opened = path.stat(follow_symlinks=False)
+    except FileNotFoundError:
         return FileSnapshot(existed=False, data=b"", mode=0, sha256=hashlib.sha256(b"").hexdigest())
-    opened = path.stat(follow_symlinks=False)
-    if not stat.S_ISREG(opened.st_mode) or path.is_symlink():
+    if not stat.S_ISREG(opened.st_mode):
         raise ValueError("transaction target must be a regular non-symlink file")
     data = path.read_bytes()
     return FileSnapshot(
