@@ -314,6 +314,15 @@ def _ensure_artifacts_setup(*, scope: SpecNode, specdock_dir: Path, artifacts_di
 
 
 def _ensure_artifacts_setup_for_target(*, target: ArtifactSetupTarget, specdock_dir: Path) -> None:
+    _preflight_artifacts_setup_for_target(target=target, specdock_dir=specdock_dir)
+    source = specdock_dir / "docs" / "rules" / target.rules_kind / "artifacts.md"
+    link_path = target.artifacts_dir / "rules.md"
+    target.artifacts_dir.mkdir(parents=True, exist_ok=True)
+    if not os.path.lexists(link_path):
+        link_path.symlink_to(os.path.relpath(source, start=target.artifacts_dir))
+
+
+def _preflight_artifacts_setup_for_target(*, target: ArtifactSetupTarget, specdock_dir: Path) -> None:
     _preflight_artifacts_dir(target.artifacts_dir)
     source = specdock_dir / "docs" / "rules" / target.rules_kind / "artifacts.md"
     if source.is_symlink() or not source.is_file():
@@ -326,9 +335,6 @@ def _ensure_artifacts_setup_for_target(*, target: ArtifactSetupTarget, specdock_
             raise RuntimeError(f"Broken artifact rules symlink: {link_path}")
         if link_path.resolve() != source.resolve():
             raise RuntimeError(f"Artifact rules symlink points to wrong target: {link_path}")
-    target.artifacts_dir.mkdir(parents=True, exist_ok=True)
-    if not os.path.lexists(link_path):
-        link_path.symlink_to(os.path.relpath(source, start=target.artifacts_dir))
 
 
 def _artifact_replacements(

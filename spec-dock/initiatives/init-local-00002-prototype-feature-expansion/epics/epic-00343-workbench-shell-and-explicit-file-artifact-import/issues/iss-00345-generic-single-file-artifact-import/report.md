@@ -214,6 +214,9 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 | S02 | Red | red-required per fault class | S01 baselineとisolated negative controlsでsource-kind、ancestor-retarget、cross-FS、capability/ownership、close、postcommit warning、privacy/control、precommit mappingの失敗感度を実測 | `/private/tmp` isolated baseline/mutants; 下記Red Evidence Matrix | pass | temporary baseline/mutantsは実行後削除 |
 | S02 | Green | §9.6 focused verification | publisher95 passed/2 skipped、関連unit29 passed、Linux security matrix7 passed/1 skipped、infra focused65 passed/1 skipped、application focused9 passed、presentation4 passed、CLI generic5 passed、S04 compatibility20 passed、lint/format/mypy/diff-check pass | §9.6 + publisher full unit + `--run-full-regression` CLI/S04 + Docker Linux actual capability | pass | macOS host上のskipはLinux real-capability 1件と既存Linux-only linkat race 1件。Docker Linux通常権限でO_TMPFILE publication/cross-filesystem source importを実証。fresh code review待ち |
 | S02 | Refactor | legacy ancestry/public DTO/unsafe fallbackを不変に保つ | shared staging core、phase mapping、control-safe rendererをreview対象に限定 | diff inspection + legacy/S04 compatibility | pass | S03/S04の命名・lifecycle実装は先取りしない |
+| S03 | Red | `tc-s03-001`〜`007` red-required | parser characterization1 pass、未実装domain12 fail、cooperative/non-cooperative application2 fail | isolated pre-implementation tests | pass | normalizer、shared ledger/allocator、race retryの欠落を検出 |
+| S03 | Green | §10.6 focused verification | touched unit54、CLI full-regression46、full unit767/561 skip、focused32、typed/blank6、lint/format/mypy/diff-check pass | §10.6 + full touched files + full unit | pass | fresh code review待ち |
+| S03 | Refactor | existing family/Artifact migrationなし | name-only scanner、shared slot projection、bounded retry/cleanup mergeへ整理 | diff inspection + legacy tests | pass | existing Artifact rename/migration 0 |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
@@ -231,6 +234,8 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 | S02 | platform共通named-temp cleanupによりLinuxでもfinal pathname check後からunlinkまでの置換で非所有entryを削除し得る | fresh code-reviewer | userがOption Aを採用し、Epic ADR/R/D/Pのfresh review pass後、IssueへLinux anonymous staging/no-waiver/fail-closed契約と`tc-s02-012`を下降反映した | `I345-RQ-008`, `I345-AC-011`, `CL-AC-011`, `CL-CON-006`, `tc-s02-012` | no | Epic/Issue fresh spec reviewはいずれも`pass`。Issue最終再レビュー findings `[]`、confidence `0.99`。bounded実装修正前はS02 blockedを維持 |
 | S02 | macOS named-stage `capability_probe` testがLinuxにも同じfault seam通過を要求し、Option Aのformal-commit-first契約と矛盾 | fresh code-reviewer | testをmacOS固有名へ変更し`sys.platform != "darwin"`で理由付きskip。Linuxは匿名staging/formal-commit security matrixで検証 | `tc-s02-012`, `CL-AC-011`, `CL-CON-006` | no | focused1 pass、Linux security matrix7 pass/1 skip、publisher95 pass/2 skip、diff-check pass。fresh rereview待ち |
 | S02 | authoring/closure行がspec review pending・Linux evidence未完了の旧状態を残して最新Greenと矛盾 | fresh code-reviewer | final spec pass、assurance valid、Red/Green、Docker Linux capability evidenceへ各台帳を同期 | `tc-s02-012`、§9.2 closures | no | report限定修正済み。fresh rereview待ち |
+| S03 | fresh targetのtentative limit取得後に同じ`PC_NAME_MAX`の別directoryへ置換されるとidentity mismatchを検出できない | fresh code-reviewer | target FD相対setup、target/artifacts dev/ino/mode保持、作成直後と各publish直前のvisible/parent-relative binding検証を追加 | `LC-345-010`, `CL-AC-007`, `CL-EC-009`, `CL-CON-006`, `tc-s03-003`, `tc-s03-007` | no | genuine Red後、application21/domain13/lint/diff-check Green。fresh rereview待ち |
+| S03 | full extension chain不収容時にrightmost extensionだけへ飛び、保持可能な中間chainを捨てる | fresh code-reviewer | 各`.`境界を評価し、stemを1 code point以上残せる最長の連続extension chainを選択 | `I345-AC-007`, `tc-s03-003`, `CL-AC-007`, `CL-EC-008`, `CL-EC-009` | no | `stem.long.mid.gz` budget12のRed/Green、domain243、lint/diff-check pass。fresh rereview待ち |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
@@ -243,6 +248,7 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 |---|---|---|---|---|---|---|---|
 | `tc-s01-001`〜`tc-s01-005` | S01 | yes | red-required | missing CLI leaf/module/DTO/portのRedを保存 | §8.7 focused unit 25 passed、CLI full-regression slice 4 passed | pass | success path、mutation-free rejection、root graph/dependency不変を確認 |
 | `tc-s02-001`〜`tc-s02-012` | S02 | yes | red-required per fault class | `tc-s02-001`〜`011`はS01 baseline + isolated mutants、Option A cleanup genuine Red 6件、precommit OSError genuine Red 2件。`tc-s02-012`は旧Linux named stagingの`cleanup_state=removed`をgenuine Redで検出 | publisher95 passed/2 skipped、関連unit29、Linux security matrix7 passed/1 skipped、infra focused65 passed/1 skipped、application9、presentation4、CLI5、S04互換20。Docker LinuxでO_TMPFILE publication/cross-filesystem success | pass | Linux anonymous create/held-FD commit/no-pathname-unlink/unsupported fail-closedはGreen。fresh code rereview findings `[]` |
+| `tc-s03-001`〜`tc-s03-007` | S03 | yes | red-required | domain12 fail、application race2 fail、parser characterization1 pass、extension-chain境界1 fail | touched unit54、CLI46、full unit767/561 skip、domain243、focused32、typed/blank6、lint pass | pass | parser/NAME_MAX/shared ledger/exhaustion/cooperative/non-cooperative raceと最長extension chainはGreen。final rereview findings `[]` |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -251,6 +257,7 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 |---|---|---|---|---|
 | §8.2 listed closures | S01 | `tc-s01-001`〜`tc-s01-005`、legacy regressions、lint、fresh code re-review | pass | initial P1をtest補強し、fresh re-review findings `[]`。closure deltaなし |
 | §9.2 listed closures | S02 | `tc-s02-001`〜`tc-s02-012`、Red matrix、publisher full unit、CLI/S04 compatibility、lint/format/mypy | pass | tc-s02-012 Red/Green、Linux capability evidence、Linux CI test分岐修正、fresh code rereview findings `[]` |
+| §10.2 listed closures | S03 | `tc-s03-001`〜`tc-s03-007`、naming/slot/race matrix、legacy/new artifact regressions、lint | pass | final fresh rereview findings `[]`; confidence `0.99` |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -283,6 +290,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S01 | dev-coder | generic file importをCLIからFSまで縦に通し、rootをnon-nodeのまま4 targetとopaque bytesを実装。初回review findingに対しtest evidenceを補強 | §8.4のprovider runtime/root rulesと新規S01 testsの16 files | required unit25/CLI4/legacy/full-unit/lint pass | pass | S02〜S04の計画済み範囲のみ | fresh re-review findings `[]`; confidence `0.98`; accepted for commit |
 | S02 | dev-coder | Option A cleanupをfinal pathname re-statまで狭め、precommit OSError/fault evidenceとportable socket fixtureを補完 | application/command/infra 3 filesとS02 tests 6 files | targeted17、publisher88/1 skip、関連unit29、CLI5、S04互換20、lint/format/mypy/diff-check pass | fail | Linux named-temp cleanupはmacOS限定Option Aの範囲外 | return to planning / parent decision routing |
 | S02 Linux amendment | dev-coder | Linux generic importをlinkable O_TMPFILE匿名ステージングへ変更し、visible staging/probe pathname・named fallback・pathname unlink・same-UID waiverを排除 | `infra/binary_artifact_publisher.py`、`test_binary_artifact_publisher.py`（既存S02候補9 files全体をreview） | Red 1 failed、publisher95/2 skip、関連unit29、security matrix7/1 skip、infra65/1 skip、application9、presentation4、CLI5、S04互換20、Docker Linux actual capability×2、lint/diff-check pass | pass | none within S02 scope | final rereview findings `[]`; confidence `0.99`; accept for commit |
+| S03 | dev-coder | basename最小正規化、NAME_MAX、全family共有slot、bounded race retry/cleanup mergeを実装 | domain/application 3 files、tests 4 files | Red domain12/app2、unit54、CLI46、full unit767/561 skip、focused32、typed/blank6、lint/diff-check pass | pending fresh | Linux primitiveはS02で検証済み、S03 raceはpublisher seam | fresh code reviewへ |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -310,6 +318,9 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S02 amendment second review | planning spec review | spec-reviewer | historical | fail | no | superseded by final fresh pass | P1×1: `I345-RQ-008`のheld-FD linkability確認時点が古いpreflight表現。non-mutating preflightとactual formal commitへ分離 |
 | S02 Linux amendment implementation | step code review | code-reviewer | historical | fail | no | bounded test/report fix / fresh rereview | P1×2: Linux CIでmacOS probe seamを誤要求、authoring/closure台帳の旧pending状態。両方を限定修正。confidence `0.99` |
 | S02 Linux amendment implementation | step code rereview | code-reviewer | fresh | pass | no | close S02 after focused commit | findings `[]`; confidence `0.99`。Linux anonymous/no-path cleanup/fail-closed/EEXISTとmacOS/legacy非回帰を確認 |
+| S03 | step code review | code-reviewer | historical | fail | no | bounded identity fix / fresh rereview | P1×1: fresh targetのsame-NAME_MAX directory replacementをidentityで検出できない。target-relative setupとbinding recheckを追加。confidence `0.98` |
+| S03 | step code rereview | code-reviewer | historical | pass with P2 | no | bounded extension-chain fix / fresh rereview | P1解消。P2×1: 保持可能な中間extension chainを最大保持していない。限定修正済み。confidence `0.98` |
+| S03 | final step code rereview | code-reviewer | fresh | pass | no | close S03 after focused commit | findings `[]`; confidence `0.99`。identity fix維持と最長extension-chain保持を確認 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -423,6 +434,25 @@ spec-dock validate -> ok, nodes=217
 - Linux amendmentで旧実装のvisible named staging / `cleanup_state=removed`をgenuine Red（`1 failed, 89 deselected`）として観測し、linkable `O_TMPFILE`、procfs FD identity、directory durability、formal candidateへの最初のno-replace commitへ置換した。
 - 最新Greenはpublisher `95 passed, 2 skipped`、関連unit `29 passed`、Linux security matrix `7 passed, 1 skipped`、infra focused `65 passed, 1 skipped`、application focused `9 passed`、presentation `4 passed`、CLI generic `5 passed`、S04 compatibility `20 passed`。`make lint`と`git diff --check`もpass。
 - macOS hostのLinux real-capability testと既存Linux-only linkat race testは理由付きskip。Docker Linux通常権限で`linux_o_tmpfile_success`と`linux_cross_filesystem_o_tmpfile_success`を確認した。
+
+### Naming and Slot Ledger Matrix
+
+| 観点 | 結果 | 証跡 |
+|---|---|---|
+| basename preservation | case、space、Unicode、extension chain、POSIX backslashを安全な範囲で保持 | `tc-s03-002`, `tc-s03-003` |
+| byte budget | 最大prefixを差し引きUTF-8 code pointを壊さず`PC_NAME_MAX`内へ正規化 | domain normalizer matrix |
+| shared slot | typed / blank / genericをstandard、`01..99`の単一ledgerへ投影 | `tc-s03-004` |
+| exhaustion | 100候補で停止し`artifact_slot_exhausted`、mutationなし | `tc-s03-005` |
+| migration | 既存Artifactのrename/body read/migrationなし | diff inspection + legacy tests |
+
+### Concurrency Evidence
+
+| シナリオ | 結果 | 証跡 |
+|---|---|---|
+| cooperative 3並列 | distinct slot、各destination payload一致、overwriteなし | deterministic barrier test |
+| non-cooperative candidate race | sentinel保持、rescan後next slotへ一度だけcommit | `tc-s03-007` |
+| 100 candidate race exhaustion | 100回で停止、`cleanup_state=retained`、lease close 1回 | bounded retry test |
+| cleanup aggregation | `retained > removed > not_created`をretry間で単調保持 | application exact-state assertions |
 
 ---
 
