@@ -185,6 +185,23 @@ validation / allocation の扱い:
 
 Import先basenameはblank grammarと既存collision allocationを使い、slugだけに`chatgpt-output-` prefixを含めます。Source本文、encoding、改行、frontmatterは変更せず、source fileも削除しません。FilenameがArtifact規則へ適合することと、imported bodyがcanonical authorityを持つことは別です。
 
+### 4.6 `artifact import file` の generic identity
+
+`artifact import file --file <path>` は `--root`、`--initiative`、`--epic`、`--issue` の一つを destination として指定し、title / slug / type token を受け取りません。一件の explicit regular file の basename から runtime が generic identity を生成します。
+
+- standard: `<ts>--<normalized-basename>`
+- same-second collision: `<ts>-<nn>--<normalized-basename>`
+- `ts` と `nn` は 4.2 と同じ UTC timestamp / `01..99` の shared slot contract を使います。typed、blank、generic は同じ `artifacts/` directory の slot を共有します。
+- generic `artifact_id` は slugless artifact doc identity ではなく、保存先の generic filename 全体です。
+- `normalized-basename` は source basename を基礎にし、path separator、NUL、control / format character、platform で unsafe な basename character を `_` に置換します。component byte limit を超える場合は extension chain をできるだけ保持して短縮します。caller は保存先名を手組みせず command result の `artifact_id` / `destination` を使います。
+
+例:
+
+- source `Report FINAL.PDF` → `20260730t010203z--Report FINAL.PDF`
+- 同一 timestamp slot の collision → `20260730t010203z-01--Report FINAL.PDF`
+
+generic identity は typed / blank Artifact grammar と別であり、拡張子、Markdown、本文 encoding、frontmatter を要求しません。`rules.md` は generic Artifact ではありません。generic filename が valid であることは、body が canonical authority、review 済み、または採用済みであることを意味しません。
+
 ---
 
 ## 5. `issue start` / `active set --checkout` のブランチ命名（日本語ブランチを避ける）
