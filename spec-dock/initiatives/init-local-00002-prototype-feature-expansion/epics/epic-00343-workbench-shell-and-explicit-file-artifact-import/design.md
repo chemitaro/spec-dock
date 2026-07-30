@@ -159,7 +159,7 @@ Publication capability matrix:
 | Environment | Supported capability | Probe / outcome |
 |---|---|---|
 | Linux | mounted `/proc`がcurrent-process FD linkを公開し、通常権限callerがdestination directory内のnamed owned temp FDから同directoryへ`linkat(..., AT_SYMLINK_FOLLOW)` hard linkとdirectory `fsync`を実行できる | import前にdestination directory内のowned tempでcapability probeする。未対応またはpolicy拒否は`publication_unsupported`でformal destination作成前にfail closed。`CAP_DAC_READ_SEARCH`を要求しない通常権限testを必須にする |
-| macOS | destination directory内のnamed owned tempとformal destinationが同じclone-capable filesystemにあり、`fclonefileat` no-replace cloneとdirectory `fsync`を許可する | import前にdestination directory内のowned tempでcapability probeする。clone非対応volumeまたはpolicy拒否は`publication_unsupported`でformal destination作成前にfail closed |
+| macOS | destination directory内のnamed owned tempとformal destinationが同じclone-capable filesystemにあり、`fclonefileat` no-replace cloneとdirectory `fsync`を許可する | import前にdestination directory内のowned tempでcapability probeする。cleanupはhigh-entropy name、held FD、final FD/path identity check、uncertainty時retainを必須とする。最終check後から`unlink`までの意図的same-UID replacementだけはaccepted ADR `20260730t085831z-adr`の限定保証対象外。clone非対応volumeまたはpolicy拒否は`publication_unsupported`でformal destination作成前にfail closed |
 | その他 | leaf no-follow、FD identity、FD-bound no-replace commit、directory durabilityの同等primitiveをproviderが明示実装した場合だけsupported | primitive未実装時は`source_guard_unsupported`または`publication_unsupported` |
 
 original sourceはrepository外volumeを含む任意のreadable filesystemに置ける。bytesはdestination directory内のowned staged tempへstream copyするため、publication primitiveのsame-filesystem制約は**staged tempとformal destinationの間だけ**に適用し、original sourceとdestinationがcross-filesystemでもsuccess laneである。
@@ -247,8 +247,11 @@ Threat modelは、shared create lockに従うSpecDock process間のcollision、i
 - 最終source再読とidentity検証が完了した後からFD-bound commit syscallまでの間に、別processが同じsource inodeへin-place writeすること。
 - last visible-parent identity checkとFD-bound commit syscallの間に、別processがrepository directory自体をrename / replaceすること。
 - commit後にrepository write権限を持つactorがArtifactを変更すること。
+- macOS named staging cleanupの最終FD/path identity check後から`unlink` syscallまでに、同一UIDでdestination directoryを変更でき、internal staging nameを発見・監視するactorがそのpathnameを意図的に別entryへ置換すること。
 
 この境界でもcommand自身はsourceを変更せず、staged bytesのhash / countとformal destinationのbytesは一致する。E-RQ-013の「検知したsource変更はsuccess公開しない」は最終source再読/identity検証までを検出境界とし、T3は境界の直前と直後を別fixtureで固定する。この除外はdestination file collisionまたはSpecDock同士のconcurrencyを除外しない。
+
+macOS cleanupの除外は包括的same-UID waiverではない。偶発collision、final checkまでに観測可能なreplacement、formal destination no-replace、source bytes / non-mutation / privacy、destination parent identity、mismatchまたはuncertainty時にunlinkせずretainする義務は対象内に残る。根拠、必須mitigation、rollback / revisit条件はaccepted ADR `20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md`を正本とする。
 
 ### D-009 Opaque lifecycle
 
@@ -583,6 +586,7 @@ package contractは「\`templates/README.md\`と上記4 Workbench READMEだけ�
 - command起因failure時source stat/bytes不変。本commandがformal destinationを作成しないことを確認し、`destination_exists` fixtureでは競合actor所有entryが保持されることも確認する。
 - Linux success時はformal destinationとverified tempが同一device/inode、macOS success時はFD-bound clone結果がverified source bytesと一致し、generic pathにdestination mismatch warningが存在しないことを確認する。
 - 通常権限Linuxの`/proc/self/fd` + `AT_SYMLINK_FOLLOW` hard-link対応filesystemとmacOS clone-capable filesystemのsuccess、clone非対応 / policy拒否の`publication_unsupported`、probe cleanupを確認する。original sourceがdestinationとは別filesystemでも、destination directory内stagingによりsuccessすることを実volumeまたはmount fixtureで確認する。
+- macOS named stagingのfinal identity checkまでに観測できるreplacement、missing、special entry、stat/open failureではunlinkせずretainし、replacement sentinelが残ることを確認する。final check後からunlinkまでの意図的same-UID replacementはaccepted ADR `20260730t085831z-adr`で限定された非保証であり、完全防御のpass条件として扱わない。
 
 ### T4 Privacy / state
 
@@ -618,6 +622,11 @@ Accepted ADR: **Generic imported-file Artifact identity and privacy boundary**
 - real tradeoff: yes。既存typed grammarへの統合より、semantic isolationとprivacyを優先する。
 - Decision record: `artifacts/20260728t100038z-adr-generic-imported-file-identity-and-privacy-boundary.md`をauthorityとし、D-006/D-008およびplanのIssue ownershipから参照する。
 
+Accepted ADR: **macOS generic import staging cleanup trust boundary**
+
+- Decision record: `artifacts/20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md`をauthorityとし、macOS clone-capable successを維持しながら、named staging cleanupの同一UID final-window replacementだけを限定除外する。
+- Mandatory mitigations: destination-parent FD identity、high-entropy `O_EXCL` / no-follow staging、held staging FD、final FD/path identity check、uncertainty時retain、non-mutating probe、commit-state保持、content-free resultを維持する。
+
 Workbench shellのfresh-only/no-backfillはrequirementで十分に固定され、独立ADRは不要である。
 
 ## 14. Risks
@@ -637,6 +646,7 @@ Workbench shellのfresh-only/no-backfillはrequirementで十分に固定され�
 | scanner範囲拡大 | artifact directoryが大きい場合の遅延 | direct child name/statだけ、body/MIME/archiveを読まない |
 | rollback後Workbench露出 | untracked scratchが`git status`へ出る | ignore rule先行rollback、user content非削除 |
 | filesystem capability不足 | supported OSでもimportが常時fail | OS名でなくFD-bound no-replace / directory durability capabilityをprobeし、supported matrixのsuccess laneとfail-closed laneを配布testで固定 |
+| macOS named-staging cleanup final-window race | 同一UIDの意図的actorが別entryをunlinkさせ得る | accepted ADRでactor / pathname / time windowを限定し、high-entropy name、held FD、final identity check、uncertainty時retainを維持。untrusted same-UID共有directoryを正式supportする場合はOption B/Cを再判断 |
 
 ## 15. Requirement Clarification Requests
 
