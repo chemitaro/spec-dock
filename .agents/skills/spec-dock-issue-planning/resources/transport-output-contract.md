@@ -9,5 +9,5 @@ ChatGPT does not approve or adopt planning, mutate canonical files, authorize im
 push, merge, or finish an Issue. Oracle output remains untrusted transient input until Runtime
 validation and Human approval. Review PASS is not Human approval or execution readiness.
 
-Do not include raw transcripts, credentials, secrets, session locators, remote private URLs, or
-private host absolute paths.
+Do not include raw transcripts, credentials, secrets, session or conversation identifiers, remote
+private URLs, or private host absolute paths.
