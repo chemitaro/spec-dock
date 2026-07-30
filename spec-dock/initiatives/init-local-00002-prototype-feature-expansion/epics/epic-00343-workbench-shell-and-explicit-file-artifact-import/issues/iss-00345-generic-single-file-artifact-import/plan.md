@@ -2,7 +2,7 @@
 種別: 実装計画書（Issue）
 ID: "iss-00345"
 タイトル: "Generic Single-File Artifact Import Implementation Plan"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-30"
 親: ["epic-00343", "init-local-00002"]
@@ -16,7 +16,7 @@ classification_status: "runtime_classified"
 
 ## 0. 計画の位置づけ
 
-本書はreview済みの `requirement.md` とcanonical `design.md` を、Codex と delegated workers が上から実行できる command queueへ変換するcanonical planned contract draftである。実行結果、Red/Green/Refactorの観測、test output、reviewer verdict、commit/no-op evidenceは `report.md` に記録する。本書へ実行結果を戻して二重正本にしない。
+本書はreview済みの `requirement.md` とcanonical `design.md` を、Codex と delegated workers が上から実行できる command queueへ変換する approved canonical planned contract である。実行結果、Red/Green/Refactorの観測、test output、reviewer verdict、commit/no-op evidenceは `report.md` に記録する。本書へ実行結果を戻して二重正本にしない。
 
 本書がcanonical pathに存在することだけではfresh reviewer pass、execution-ready、PR-ready、merge-ready、Issue finish、Epic completion、PR deliveryを意味しない。runtime classificationは`standard`であり、parent Candidate 2の`critical` recommendationはレビュー重点として保持する。以下のgateはhigher-risk recommendationに耐える厚さを維持する。
 
