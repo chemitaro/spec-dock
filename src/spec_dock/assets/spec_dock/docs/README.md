@@ -83,9 +83,17 @@ Core runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...`�
 ./spec-dock/scripts/spec-dock validate
 ./spec-dock/scripts/spec-dock sync
 
-# experimental: one-shot scoped Workbench copy / byte-preserving ChatGPT Markdown import
+# experimental: one-shot scoped Workbench copy
 ./spec-dock/scripts/spec-dock workbench copy --scope <initiative|epic|issue-id> --to <linked-worktree>
+
+# specialized Workbench Markdown evidence import
 ./spec-dock/scripts/spec-dock artifact import chatgpt-output --issue <issue-id> --file <workbench-file.md> --title "..."
+
+# generic opaque evidence import: one explicit regular file, no Workbench requirement
+./spec-dock/scripts/spec-dock artifact import file --root --file <path>
+./spec-dock/scripts/spec-dock artifact import file --initiative <initiative-id> --file <path>
+./spec-dock/scripts/spec-dock artifact import file --epic <epic-id> --file <path>
+./spec-dock/scripts/spec-dock artifact import file --issue <issue-id> --file <path> [--json]
 
 # 管理対象 files/docs/templates/scripts/skills の更新（refresh）
 ./spec-dock/scripts/spec-dock update
@@ -119,7 +127,9 @@ Core runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...`�
 - Workbench は任意です。optional、temporary、worktree-local、disposable、non-canonical な作業場であり、fresh root と future Initiative / Epic / Issue の shell に `.workbench/README.md` が生成されますが、existing scope には no-backfill です。presence は任意であり、不在でも workspace は valid です
 - `.workbench/README.md` は direct child の README-only tracking surface です。その他の Workbench entry は ignored payload として Git に ignore されます。Git ignore は security boundary ではありません。secret、credential、private customer data を置かないでください
 - Workbench content の read / import authorization は evidence-only であり、canonical adoption ではありません。`artifact import chatgpt-output` は approved Workbench の単一 Markdown を source/bytes 不変で blank Artifact へ copy する実装済み specialized lane です。`chatgpt-output` typed token は予約せず、`new artifact` と共存します。imported ChatGPT output は evidence-only であり、canonical 採用には Evidence Adoption Ledger の採否、canonical docs への再記述、fresh reviewer gate が必要です
-- `./spec-dock/scripts/spec-dock artifact import file ...` は Issue #345 で planned、unimplemented の generic file import です。これは repo-local runtime の予定であり、global installer dispatch は not available です。candidate-wheel consumer E2E と full regression は deferred で、Issue #346 の責務です
+- `artifact import file` は Workbench と `chatgpt-output` から独立した generic lane です。`--root` / `--initiative` / `--epic` / `--issue` のいずれか一つと `--file` を指定し、一件の明示 regular file を opaque generic Artifact として保存します。source は変更・削除しません。generic result は source content、hash、byte count、repository 外 absolute path を出さず、repository 内 source は repo-relative、その他は basename のみを表示します
+- generic import の成功は `committed=true` です。`publication_state=committed` または commit 後 warning の `committed_with_warning` は `retry_disposition=not_needed`、commit 前 failure は `not_committed` と `safe_after_remediation` です。保存した generic Artifact は常に `canonical=false` であり、Evidence Adoption Ledger、canonical docs、accepted ADR、fresh reviewer gate を経ない自動採用はしません。filename と collision は [reference_naming.md](reference_naming.md)、scope ごとの利用ルールは対象 `artifacts/rules.md` を参照してください
+- candidate-wheel consumer E2E と full regression は generic command の可用性とは別に Issue #346 へ deferred です
 - root `spec-dock/.workbench/` は日付 bucket と必要 file の手動選択だけを使い、root 一括 copy command は持ちません。Initiative / Epic / Issue scope の copy は、同一 repository の linked worktree へ明示実行する source-wins の one-shot copy であり、自動 sync も copy-back も行いません。Workbench copy は directory をそのまま扱い、言語、拡張子、MIME、内容による file classifier を持ちません。update は既存 Workbench を unmanaged local content として保持し、migration、normalize、delete、promotion しません
 - Issue plan は agent-native / behavior-slice based execution contract を持つが、cadence policy の detail/reference は `workflow_issue.md`
 - naming 制約、GitHub 副作用、deps / sync の詳細は `reference_*.md` を参照する

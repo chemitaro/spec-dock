@@ -6,7 +6,7 @@ ID: "epic-00343"
 状態: "draft"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-28"
-依存: ["requirement.md", "design.md", "artifacts/20260728t100038z-adr-generic-imported-file-identity-and-privacy-boundary.md"]
+依存: ["requirement.md", "design.md", "artifacts/20260728t100038z-adr-generic-imported-file-identity-and-privacy-boundary.md", "artifacts/20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md", "artifacts/20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md"]
 親: ["init-local-00002"]
 ---
 
@@ -109,8 +109,10 @@ layer別Issueへは分割しない。Candidate 1と2は各々CLI / installer / a
 | D-008 publication state / privacy result | Candidate 2 |
 | D-009 opaque lifecycle | Candidate 2、Candidate 3 final integration |
 | accepted ADR `20260728t100038z-adr` | Candidate 2 implementation contract、Candidate 3 non-regression gate |
+| accepted ADR `20260730t085831z-adr` | Candidate 2 macOS named-staging cleanup contract、Candidate 3 platform / residual-risk verification |
+| accepted ADR `20260730t102747z-adr` | Candidate 2 Linux anonymous-staging implementation contract、Candidate 3 no-named-temp-fallback / capability fail-closed non-regression |
 
-Candidate 2 / 3はaccepted ADRを再判断しない。`--` family、full destination basename identity、external basename-only visibility、content-derived metadata非公開、FD-bound commit point、postcommit retry不要を変更する必要が出た場合は、Issue内で仮定せずEpic design / ADR amendmentへ戻す。
+Candidate 2 / 3はaccepted ADRを再判断しない。`--` family、full destination basename identity、external basename-only visibility、content-derived metadata非公開、FD-bound commit point、postcommit retry不要、macOS named-staging cleanupの限定threat boundary、またはLinux anonymous-staging / no-named-temp-fallback boundaryを変更する必要が出た場合は、Issue内で仮定せずEpic design / ADR amendmentへ戻す。
 
 ## 4. Issue一覧と実施順序
 
@@ -172,7 +174,7 @@ uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py tests/cli_runtime/te
   - additive CLI / request / result / error / use case / bootstrap。
   - explicit root / node target resolverとroot Artifact setup。
   - source guard、ancestor symlink許容、leaf symlink拒否。
-  - stream staging、source revalidation、FD-bound no-replace publication、capability probe。
+  - Linux anonymous `O_TMPFILE` staging、source revalidation、held FD-bound no-replace publication、capability probe。Linux capability不足時はformal destination前の`publication_unsupported` fail-closedであり、named-temp cleanup waiverへfallbackしない。
   - generic `--` filename parser、minimal normalizer、全family共有slot ledger。
   - content-free success/error/warning text / JSON。
   - bodyを読まないvalidate / sync / ADR mirror / deps / context。
@@ -197,7 +199,8 @@ uv run pytest tests/cli_runtime/test_artifact_import_chatgpt_output.py tests/cli
   - regular、ancestor symlink、missing、directory、leaf symlink、FIFO/socket/device、unreadable、source mutation。
   - Markdown / `.MD` / PDF / image / ZIP / multi-suffix / no-extension / empty / invalid UTF-8 / NUL / large stream。
   - Unicode / space / case / NAME_MAX、typed / blank / generic shared slot、concurrency、01..99 exhaustion。
-  - Linux通常権限 / macOS clone-capable success、unsupported capability fail closed。
+  - Linux通常権限anonymous-staging success、cross-filesystem original source success、visible probe pathnameなし、`O_TMPFILE` / procfs / durability preflight不足のformal destination前fail-closed、formal candidateへの最初のFD-bound commitでの`EEXIST` allocation retry、formal entry未作成のcapability / policy failureのcontent-free `publication_unsupported` / `not_committed`、pre-commit abort/failureでpathname unlinkなし。macOS clone-capable successとaccepted ADR `20260730t085831z-adr`の限定boundaryは不変。
+  - macOS named staging cleanupで、final FD/path identity checkまでに観測できるreplacement、missing、special entry、stat/open failureはunlinkせずretainしreplacement sentinelを残す。accepted ADR `20260730t085831z-adr`で限定されたfinal-windowの意図的same-UID replacementを完全防御済みとして主張しない。
   - precommit failure、postcommit warning、retry disposition、external sentinel非漏洩。
   - body-open spyによるvalidate / sync / deps / context / ADR mirror isolation。
 - rollback:
@@ -207,7 +210,7 @@ uv run pytest tests/cli_runtime/test_artifact_import_chatgpt_output.py tests/cli
 - forbidden boundary:
   - typed `file` token、content classification、external absolute path漏洩、source mutation、fallback overwrite、mutable-path commit。
 - escalation:
-  - accepted ADR変更、supported platform guarantee縮小、新しいdata-loss / overwrite riskはEpic design / ADRへ戻す。
+  - accepted ADR変更、supported platform guarantee縮小、新しいdata-loss / overwrite risk、Linux named-temp fallback、またはmacOS final-window exclusionを越えるcleanup riskはEpic design / ADRへ戻す。
 
 ### Candidate 3 — Integration Distribution And Final Quality
 
@@ -240,7 +243,8 @@ uv run pytest
   - candidate wheelをtemporary Git repositoryへinstallし、fresh root / future node shellとroot / node generic importを通常権限で実測する。
   - READMEなしpre-feature consumerをupdateし、existing root / nodeをbackfillせず、その後のnew nodeだけREADMEを得る。
   - destinationと別filesystemのexternal sourceを成功importし、external path/body/hash/count sentinelがoutput / provenanceへ漏れない。
-  - unsupported filesystem capabilityはformal destination作成前にfail closedとなる。
+  - Linux anonymous staging preflightとmacOS clone capabilityを含むunsupported filesystem capabilityはformal destination作成前にfail closedとなる。Linux preflightはvisible probe pathnameを作らず、formal candidateへの最初のFD-bound commitでのみlinkabilityを確認する。Linuxではnamed-temp / visible-probe / pathname-cleanup fallbackへ移行しない。
+  - macOS clone-capable laneでnormal cleanupと対象内のmismatch / uncertainty retainを再確認し、accepted ADR `20260730t085831z-adr`の限定外をpass主張へ混入させない。
   - dogfood update後もexisting `epic-00343`へREADMEをbackfillせず、validate / sync / deps / contextがpassする。
 - repair boundary:
   - integration failureの最小修正は許可する。
@@ -299,6 +303,7 @@ Candidate 1はreview済みmilestone、provider-first projection、default lane�
 - runtime / CLI / infra / tests / scaffoldは`dev-coder`、shipped docsは`doc-writer`へ委任する。
 - code/runtime/test変更はfresh `code-reviewer`、test qualityは必要に応じ`qa-reviewer`、docs/spec alignmentはfresh `spec-reviewer`を通す。
 - 各Issueはfocused test、compatibility evidence、commit candidate、post-commit clean checkを持つ。
+- Candidate 2はaccepted ADR `20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md`をIssueへ継承し、Epic / Issueのfresh spec reviewをpassしてから実装を再開する。実装後のfresh code reviewはLinux preflightがvisible probe pathnameを作らないこと、formal candidate以外へanonymous FDをlinkしないこと、named-temp / pathname-cleanup fallbackがないこと、unsupported capabilityがformal destination前にfail closedすることを確認する。
 - Candidate 1だけは追加でprovider-first checked-in projection、default PR lane、ready PR、exact-head observationを閉じる。
 
 ### G3 Distribution / dogfood gate
@@ -311,6 +316,9 @@ Candidate 1はreview済みmilestone、provider-first projection、default lane�
 
 - E-RQ-001〜025 / E-AC-001〜020のclosure mapをEpic reportへ記録する。
 - unresolved `blocked` / `stale` EAL、open decision、blocking findingを残さない。
+- macOS named-staging cleanupのaccepted ADR boundary、required mitigations、対象内test / 明示除外がCandidate 2 / 3 evidenceで一貫していることを確認する。
+- accepted ADR `20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md`のno-waiver boundary、supported filesystem lane縮小、capability不足時のpre-commit fail-closed、cross-filesystem source successがCandidate 2 / 3 evidenceで一貫していることを確認する。
+- Linux gateは二段階で確認する。`O_TMPFILE`、FD regularity、procfs reference、directory durabilityなどnon-mutating preflightのcapability不足はformal candidate syscall前にfail closedする一方、`linkat`固有のcapability / policy failureはvisible probeで先取りせず、最初のactual formal-candidate commitで検出する。formal entry未作成なら`publication_unsupported` / `not_committed`へ正規化し、visible probeやnamed-temp fallbackを要求しない。
 - full `uv run pytest`、manual scenario、fresh QA review、Epic base/head aggregate diff全体のfresh code review、fresh spec review、Epic-wide decision reviewをpassさせる。
 - final commit / clean check / push / PR Delivery Gate / Merge Preparation Gateを閉じる。
 - mergeable PRを作成し、人間merge前で停止する。
@@ -319,11 +327,11 @@ Candidate 1はreview済みmilestone、provider-first projection、default lane�
 
 ### Path index
 
-| Candidate | Issue node | draft-requirement | draft-design | draft-plan |
-|---|---|---|---|---|
-| Candidate 1 | `issues/iss-00344-workbench-shell-scaffolding/` | `not_created` | `not_created` | `not_created` |
-| Candidate 2 | `issues/iss-00345-generic-single-file-artifact-import/` | `not_created` | `not_created` | `not_created` |
-| Candidate 3 | `issues/iss-00346-integration-distribution-and-final-quality/` | `not_created` | `not_created` | `not_created` |
+| Candidate | Issue node | canonical requirement / design / plan | Current status |
+|---|---|---|---|
+| Candidate 1 | `issues/iss-00344-workbench-shell-scaffolding/` | present | completed / GitHub Issue #344 closed、PR #350 merged |
+| Candidate 2 | `issues/iss-00345-generic-single-file-artifact-import/` | present | S02 / S03 / S04 / S90 implemented, reviewed, and committed; fresh code / QA / final spec rereviews pass（final spec confidence 0.99）。S99 local closure pass。final report ledger commit、push、PR gateが残る |
+| Candidate 3 | `issues/iss-00346-integration-distribution-and-final-quality/` | present | planned / not started |
 
 ### Handoff-ready
 
@@ -396,7 +404,9 @@ Candidate 1はreview済みmilestone、provider-first projection、default lane�
 - design amendment blocker: none。third fresh README design review `pass`、confidence 0.92。
 - plan amendment blocker: none。second fresh README plan review `pass`、confidence 0.99。
 - Issue creation blocker: none。人間承認済み、3 Issueとdependency edgeを作成済み。
+- Candidate 2 implementation blocker: none。fresh code review / QA rereviewはpass。
+- Candidate 2 closure blocker: none（S99 local closure pass、fresh final spec rereview `pass`、confidence 0.99）。final report ledger commit、push、PR gateが残る。
 - Issue nodes:
   - `iss-00344`、`iss-00345`、`iss-00346`。
 - next action:
-  - `iss-00344`のdelivery amendmentをfresh reviewし、残るS02→S03→S90→S95→S99を実行してIssue-local ready PRを作成する。
+  - `iss-00345`のfinal report ledgerをcommitし、push後にPR gateへ進める。

@@ -13,9 +13,13 @@ if TYPE_CHECKING:
         BinaryArtifactPublishRequest,
         BinaryArtifactPublishResult,
         BootstrapResult,
+        ExplicitFileArtifactPublishRequest,
+        ExplicitFileArtifactPublishResult,
+        ExplicitFileSourcePreflightRequest,
         GitHubCapabilityDiagnostic,
         GitHubCapabilityProbeRequest,
         GitWorktreeRecord,
+        GuardedExplicitFileSource,
         GuardedWorkbenchSource,
         SyncCommandResult,
         SyncRequest,
@@ -197,6 +201,20 @@ class WorkbenchSourceGuard(Protocol):
 
 class BinaryArtifactPublisher(Protocol):
     def publish(self, request: BinaryArtifactPublishRequest) -> BinaryArtifactPublishResult: ...
+
+
+class ExplicitFileSourceGuard(Protocol):
+    def guard_explicit_file_source(
+        self,
+        request: ExplicitFileSourcePreflightRequest,
+    ) -> GuardedExplicitFileSource: ...
+
+
+class ExplicitFileArtifactPublisher(Protocol):
+    def publish_explicit_file(
+        self,
+        request: ExplicitFileArtifactPublishRequest,
+    ) -> ExplicitFileArtifactPublishResult: ...
 
 
 class EnvironmentGateway(Protocol):
@@ -426,3 +444,5 @@ class Ports:
     workbench_source_guard: WorkbenchSourceGuard | None = None
     binary_artifact_publisher: BinaryArtifactPublisher | None = None
     issue_planning: IssuePlanningDependencies | None = None
+    explicit_file_source_guard: ExplicitFileSourceGuard | None = None
+    explicit_file_artifact_publisher: ExplicitFileArtifactPublisher | None = None

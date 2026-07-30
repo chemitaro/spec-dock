@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
+import os
 from typing import TYPE_CHECKING, Literal
 
 from spec_dock_runtime.domain.models import SpecNode  # noqa: TC001 - runtime re-export used by CLI/runtime callers.
@@ -525,6 +527,114 @@ class ArtifactImportError(RuntimeError):
         super().__init__(f"artifact import failed: {code}")
 
 
+FileArtifactTargetKind = Literal["root", "initiative", "epic", "issue"]
+FileArtifactSourceVisibility = Literal["repo_relative", "basename_only"]
+FileArtifactPublicationState = Literal["not_committed", "committed", "committed_with_warning"]
+FileArtifactRetryDisposition = Literal["safe_after_remediation", "not_needed"]
+FileArtifactStorageIdentity = Literal["generic"]
+FileArtifactImportWarning = Literal[
+    "create_lock_release_failed",
+    "directory_fsync_failed",
+    "temp_cleanup_retained",
+]
+
+
+@dataclass(frozen=True)
+class FileArtifactImportRequest:
+    target_kind: FileArtifactTargetKind
+    target_value: str | None
+    source_path: Path
+
+
+@dataclass(frozen=True)
+class FileArtifactImportResult:
+    import_kind: Literal["file"]
+    storage_identity: FileArtifactStorageIdentity
+    target_kind: FileArtifactTargetKind
+    target_id: str
+    artifact_id: str
+    source_visibility: FileArtifactSourceVisibility
+    source: str
+    destination: Path
+    committed: bool
+    publication_state: FileArtifactPublicationState
+    cleanup_state: BinaryArtifactCleanupState
+    warning_codes: tuple[FileArtifactImportWarning, ...]
+    retry_disposition: FileArtifactRetryDisposition
+    canonical: bool
+
+
+class FileArtifactImportError(RuntimeError):
+    """Stable content-free failure for generic explicit-file import."""
+
+    def __init__(self, *, code: str, cleanup_state: BinaryArtifactCleanupState) -> None:
+        self.code = code
+        self.publication_state: FileArtifactPublicationState = "not_committed"
+        self.committed = False
+        self.cleanup_state = cleanup_state
+        self.retry_disposition: FileArtifactRetryDisposition = "safe_after_remediation"
+        self.canonical = False
+        super().__init__(f"file artifact import failed: {code}")
+
+
+@dataclass(frozen=True)
+class ExplicitFileSourcePreflightRequest:
+    repo_root: Path
+    source_path: Path
+
+
+class GuardedExplicitFileSource:
+    """Opaque, application-owned source lease borrowed by the publisher."""
+
+    def __init__(
+        self,
+        *,
+        source_path: Path,
+        descriptor: int,
+        initial_status: object,
+        source_visibility: FileArtifactSourceVisibility,
+        source_display: str,
+    ) -> None:
+        self._source_path = source_path
+        self._descriptor = descriptor
+        self._initial_status = initial_status
+        self.source_visibility = source_visibility
+        self.source_display = source_display
+        self._closed = False
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        with contextlib.suppress(OSError):
+            os.close(self._descriptor)
+        self._closed = True
+
+    def __enter__(self) -> GuardedExplicitFileSource:
+        if self._closed:
+            raise RuntimeError("explicit file source lease is closed")
+        return self
+
+    def __exit__(self, _exc_type: object, _exc: object, _traceback: object) -> None:
+        self.close()
+
+
+@dataclass(frozen=True)
+class ExplicitFileArtifactPublishRequest:
+    repo_root: Path
+    guarded_source: GuardedExplicitFileSource
+    destination_path: Path
+
+
+@dataclass(frozen=True)
+class ExplicitFileArtifactPublishResult:
+    source_visibility: FileArtifactSourceVisibility
+    source_display: str
+    destination_path: Path
+    committed: bool
+    cleanup_state: BinaryArtifactCleanupState
+    warning_codes: tuple[FileArtifactImportWarning, ...] = ()
+
+
 @dataclass(frozen=True)
 class WorkbenchCopyResult:
     scope_id: str
@@ -1018,6 +1128,9 @@ class UseCases:
     import_artifact: Callable[[ArtifactImportRequest], ArtifactImportResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("import_artifact is not configured")
     )
+    import_file_artifact: Callable[[FileArtifactImportRequest], FileArtifactImportResult] = lambda _req: (
+        _ for _ in ()
+    ).throw(RuntimeError("import_file_artifact is not configured"))
     show_assurance: Callable[[ShowAssuranceRequest], AssuranceResult] = lambda _req: (_ for _ in ()).throw(
         RuntimeError("show_assurance is not configured")
     )

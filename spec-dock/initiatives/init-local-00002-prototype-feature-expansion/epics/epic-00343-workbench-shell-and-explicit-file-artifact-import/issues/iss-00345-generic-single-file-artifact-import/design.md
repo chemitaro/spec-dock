@@ -1,21 +1,1101 @@
 ---
 種別: 設計書（Issue）
 ID: "iss-00345"
-タイトル: "Generic Single File Artifact Import"
-関連GitHub: ["#345"]
-状態: "draft"
+タイトル: "Generic Single-File Artifact Import Design"
+状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-29"
-依存: ["requirement.md"]
+最終更新: "2026-07-30"
+依存: ["requirement.md", "epic-00343/design.md", "20260728t100038z-adr", "20260730t085831z-adr", "20260730t102747z-adr"]
 親: ["epic-00343", "init-local-00002"]
-artifact_state: awaiting-assurance-compose
+authorized_profile_observed: "standard"
+parent_recommended_grade: "critical"
+classification_status: "runtime_classified"
 ---
 
-# iss-00345 Generic Single File Artifact Import — 設計 placeholder
+# iss-00345 Generic Single-File Artifact Import — Issue 設計書（Standard）
 
-このファイルはまだ合成されていません。
+## 0. 設計の位置づけ
 
-先に `requirement.md` を具体化し、`assurance classify --stage requirement` を実行してください。
-その後、`assurance compose --artifact all` を実行して、この Issue の分類に応じた設計書テンプレートを合成してください。
+本書は `requirement.md` の `I345-RQ-*` / `I345-AC-*` を実装可能な責務、interface、state、failure mapping、test seam へ落とす approved canonical design である。runtime classification は `standard` であり、本書の承認とfresh reviewer passを実装開始判断の入力にする。
 
-この状態のまま設計本文を書き始めないでください。
+設計根拠は、current provider source、parent Epic `D-003`〜`D-009`、accepted ADR `20260728t100038z-adr` / `20260730t085831z-adr` / `20260730t102747z-adr`、review済みのcanonical requirement、Issue authoring workflowである。
+
+## 1. 設計目標
+
+### DES-345-001 独立した public use case
+
+`artifact import file` を既存 `artifact import chatgpt-output` から独立した request/result/error/use-case/rendererとして追加する。既存 commandの Workbench、lowercase `.md`、title/slug、blank identity、hash/count outputを一般化または削除しない。
+
+- Trace: `I345-RQ-001`, `I345-RQ-013`; `I345-AC-001`, `I345-AC-016`。
+
+### DES-345-002 Root と node の明示 target
+
+rootを fake `SpecNode` にせず、application-local `ArtifactTarget` として node targetと同じ downstream interfaceへ束ねる。
+
+- Trace: `I345-RQ-001`, `I345-RQ-012`; `I345-AC-002`, `I345-AC-015`。
+
+### DES-345-003 Name-only generic identity
+
+original basenameをminimal normalizeし、separate generic parserとtyped/blank/generic shared slot ledgerでdestination identityを決める。bodyをidentityやclassificationに使わない。
+
+- Trace: `I345-RQ-005`〜`I345-RQ-007`, `I345-RQ-011`; `I345-AC-006`〜`I345-AC-009`, `I345-AC-014`。
+
+### DES-345-004 Descriptor-bound publication
+
+current `FilesystemBinaryArtifactPublisher` の destination-side staging、bounded stream copy、hash/count internal verification、source stability check、destination parent FD、no-replace commitを再利用する。ただしgeneric use caseを`workbench_source_guard`へ結合しない。
+
+- Trace: `I345-RQ-003`, `I345-RQ-004`, `I345-RQ-008`, `I345-RQ-009`; `I345-AC-004`, `I345-AC-005`, `I345-AC-010`〜`I345-AC-012`。
+
+### DES-345-005 Privacy by contract
+
+raw source pathとinternal verification metadataをpresentationへ到達させない。external sourceはbasenameのみ、pre-commit failureはsource/destination fieldなし、unexpected exceptionはstable tokenへ変換する。
+
+- Trace: `I345-RQ-010`; `I345-AC-013`。
+
+### DES-345-006 Opaque lifecycle and compatibility
+
+validate/sync/deps/context/ADR mirror/authoring discoveryはgeneric bodyをopen/decodeしない。existing typed/blank/chatgpt-output behaviorをcharacterization testsで固定する。
+
+- Trace: `I345-RQ-011`, `I345-RQ-013`; `I345-AC-014`, `I345-AC-016`, `I345-AC-017`。
+
+### DES-345-007 Provider-first delivery boundary
+
+provider runtime/docs/rulesを一次変更面とし、managed dogfood projectionを別観測点として扱う。Issue 346 ownershipを越えない。
+
+- Trace: `I345-RQ-014`, `I345-RQ-015`; `I345-AC-018`, `I345-AC-019`。
+
+## 2. Fixed accepted decisions と Issue-local choices
+
+### 2.1 変更禁止の accepted boundary
+
+| Fixed decision | Authority | 本設計の扱い |
+|---|---|---|
+| commandは`artifact import file` | Parent `E-RQ-008`, ADR context | parser/handlerをadditiveに追加 |
+| exactly one root/Initiative/Epic/Issue | `E-RQ-009`, `D-004` | CLI mutexに加えapplicationでも再検証 |
+| repo-root-relative、external explicit path可 | `E-RQ-010`, ADR Decision 5 | `repo_root / raw_path`のlexical normalization |
+| regular leaf、leaf symlink reject、ancestor symlink allow | `E-RQ-011`, `D-005` | explicit guardでFD/path identity検証 |
+| opaque bytes/source unchanged | `E-RQ-013`, ADR consequence | staging coreを再利用 |
+| `<ts>--<basename>` / `<ts>-<nn>--<basename>` | ADR Decision 1 | generic formatterを固定 |
+| `--`はtyped tokenでない | ADR Decision 2 | separate parserに限定 |
+| full destination basename identity / shared slots | ADR Decision 3 | result `artifact_id`とledgerへ反映 |
+| minimal normalization | ADR Decision 4 | content/title/slugを使わない |
+| external basename-only / no content-derived output | ADR Decision 6 | public DTOとrendererで構造的に遮断 |
+| generic bodyはsemantic inputでない | ADR Decision 7 | lifecycle scannersをname-only化 |
+| FD-bound no-replaceがcommit point | ADR Decision 8 | state machineの唯一のcommit transition |
+| post-commit warningはretry不要 | ADR Decision 8 | exit success + `committed_with_warning` |
+| macOS named-staging cleanupの限定threat boundary | `20260730t085831z-adr` | final identity checkまでに観測可能なreplacement / missing / unexpected type / uncertaintyはretainし、check後からunlinkまでの意図的same-UID replacementだけを保証対象外とする |
+| Linux anonymous-staging no-waiver boundary | `20260730t102747z-adr` | linkable `O_TMPFILE`、held-FD publication、pre-commit FD-close-only cleanupを必須化し、capability不足をformal destination前にfail closedとする |
+| `chatgpt-output`不変 | `E-RQ-021` | current classes/renderers/portを維持 |
+| Issue 346 delivery boundary | Parent Candidate 3 | integrated/distribution/final reviewをdefer |
+
+### 2.2 Issue-local implementation choices
+
+次はaccepted decisionの実現方法であり、Issue-localに具体化する。reviewで不適合なら同じfixed boundary内で修正できる。
+
+| Choice ID | Choice | Rationale |
+|---|---|---|
+| `LC-345-001` | `FileArtifactImportRequest/Result/Error`をexisting `ArtifactImport*`から分離 | generic privacy fieldsとlegacy hash/count fieldsの混入を型で防ぐ |
+| `LC-345-002` | `UseCases.import_file_artifact`を追加し、current `import_artifact`はchatgpt-output専用のまま | compatibilityとcall-site clarity |
+| `LC-345-003` | `Ports.explicit_file_artifact_publisher`を追加し、same adapter instanceがlegacy/new portsを実装可能 | staging core再利用とguard分離を両立 |
+| `LC-345-004` | `application/import_file_artifact.py`を新設 | existing use caseへのconditional accumulationを避ける |
+| `LC-345-005` | root/nodeを`ArtifactTarget(kind,id,path,rules_kind)`に正規化 | rootをgraph nodeにせずsetup helperを共有 |
+| `LC-345-006` | generic slot scannerは`os.scandir()`でdirect child name/typeだけを見る | extension-agnostic、body-open防止、symlink/type fail-closed |
+| `LC-345-007` | public warning allowlistを`directory_fsync_failed`, `temp_cleanup_retained`, `create_lock_release_failed`に限定 | parent designのdurability/owned cleanup semanticsに一致 |
+| `LC-345-008` | pre-commit errorはsource/destination fieldを持たない専用DTO | path leakをrenderer disciplineだけに依存させない |
+| `LC-345-009` | root rules sourceを`docs/rules/root/artifacts.md`とする | parent `D-004`のexact pathを採用 |
+| `LC-345-010` | existing artifacts directoryはopened directory FD、fresh targetはsecurely opened target parent FDから`PC_NAME_MAX`を取得し、作成後のartifacts FDで再確認する。取得不能/不正値/identity不一致はfail closed | platform limitを推測せず、fresh childが同一filesystemに作られたことを検証 |
+| `LC-345-011` | `_cleanup_temp`はheld FDとpathnameのidentityに加えて双方のregular-file typeを確認し、missing / mismatch / unexpected type / stat・open failureを全て`retained`としてunlinkしない | Option Aの対象内mitigationをコード上で直接表現し、`FileNotFoundError`を誤って`removed`扱いしない |
+| `LC-345-012` | Linux generic publicationは`O_EXCL`を伴わないlinkable `O_TMPFILE` anonymous inodeをdestination parent FD相対で作り、held FDから既存の`/proc/self/fd/<fd>` no-replace linkへ進む。abort/failureはFD closeのみで、visible staging pathnameやpathname cleanupを持たない | Linuxのcleanup raceをsame-UID waiverではなく構造的に除去し、unsupported filesystemは`publication_unsupported`へfail closedする |
+
+## 3. Architecture context
+
+次の図は、利用者入力がlayer boundaryを通り、bodyをsemantic consumerへ渡さずformal destinationへ到達する流れを示す。矢印は依存方向であり、infraやpresentationからdomain/applicationへ逆流させない。
+
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+actor User
+component "CLI parser\ncli/parser.py" as Parser
+component "Command handler\ncommands/artifact_import.py" as Command
+component "Generic import use case\napplication/import_file_artifact.py" as UseCase
+component "Contracts / Ports\napplication/contracts.py\napplication/ports.py" as Contracts
+component "Naming + slot ledger\ndomain/artifacts.py" as Domain
+component "Explicit-file adapter\ninfra/binary_artifact_publisher.py" as Infra
+component "Text / JSON renderers\npresentation/cli_text.py" as Presentation
+folder "root/node artifacts/" as Destination
+component "validate / sync / deps / context / ADR / authoring" as Lifecycle
+
+User --> Parser : artifact import file
+Parser --> Command : ArtifactImportFileArgs
+Command --> UseCase : FileArtifactImportRequest
+UseCase --> Domain : normalize / parse / allocate
+UseCase --> Contracts : port request
+Contracts --> Infra : publish_explicit_file
+Infra --> Destination : stage + no-replace commit
+Infra --> UseCase : internal publish outcome
+UseCase --> Command : privacy-safe result/error
+Command --> Presentation
+Presentation --> User
+Lifecycle ..> Destination : names only
+note right of Lifecycle
+Generic body is never opened
+by default lifecycle consumers.
+end note
+@enduml
+```
+
+## 4. Layer responsibilities and interfaces
+
+### 4.1 CLI layer
+
+#### Files
+
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py`
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py`（registryがcommand specsを自動収集する現行構造の確認・必要時のみ変更）
+
+#### Responsibilities
+
+- `artifact import` subtreeへ`file` leafをadditiveに追加する。
+- argparse mutually exclusive groupで`--root`, `--initiative`, `--epic`, `--issue`のexactly oneを要求する。
+- `--file`をrequired、`--json`をoptionalにする。
+- title/slug/type/encoding/move/overwrite等を登録しない。
+- parse failureはexit code 2でuse caseを呼ばない。
+
+#### Proposed symbol
+
+- command registry key: `artifact_import_file`
+
+### 4.2 Command handler layer
+
+#### File
+
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/artifact_import.py`
+
+#### Proposed symbols
+
+| Symbol | Contract |
+|---|---|
+| `ArtifactImportFileArgs` | `target_kind`, `target_value`, `source_path`, `json`だけを持つfrozen args |
+| `_add_file_arguments` | generic command専用arg registration |
+| `_file_args_factory` | selectorを`root|initiative|epic|issue`へ正規化 |
+| `_run_file` | `UseCases.import_file_artifact`を呼び、generic専用rendererを選択 |
+
+#### Error boundary
+
+- `FileArtifactImportError`だけをknown errorとしてrenderする。
+- command handlerはunknown `Exception`からpublication stateを推測しない。`runtime_failed / not_committed`をrenderできるのは、applicationがcommit point未到達を確認して生成した`FileArtifactImportError`だけとする。
+- application/publisherのphase-aware finalizerは、commit前のunknown faultだけをprivacy-safeな`runtime_failed / not_committed`へ変換する。
+- commit後にpublic stateへ影響し得るfallible operationは`directory_fsync`、identity-confirmed owned-temp cleanup、create-lock releaseの三つだけで、それぞれ既定のwarning codeへ変換する。result identity、source display、destination display、JSON/text用fieldはcommit前に構築・検証し、commit後にpath resolutionや汎用result constructionを行わない。
+- source lease、staged-temp FD、destination-parent FD等のdescriptor closeがcommit後に不可避な場合は`close_noexcept`相当のno-throw finalizationを使い、close errorをinternal diagnostic/fault-injection evidenceにだけ残す。close errorはcommitted resultを置換せず、新しいpublic warning codeも追加しない。
+- この三seam以外のexception escapeはinternal contract violationであり、新しいgeneric post-commit warningへ丸めない。command layerはraw message/contextをredactするが、`not_committed`やretry safetyを捏造しない。新しいpost-commit fault classが必要ならrequirement/ADR amendmentへ戻す。
+- post-commit warning resultをexceptionへ変えない。
+- current `ArtifactImportChatGptOutputArgs`, `_run`, renderer callsは既存契約のまま保持する。
+
+### 4.3 Application contracts
+
+#### File
+
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py`
+
+#### Proposed value vocabulary
+
+```text
+FileArtifactTargetKind = root | initiative | epic | issue
+FileArtifactSourceVisibility = repo_relative | basename_only
+FileArtifactPublicationState = not_committed | committed | committed_with_warning
+FileArtifactRetryDisposition = safe_after_remediation | not_needed
+FileArtifactStorageIdentity = generic
+```
+
+#### Request
+
+| Field | Type / rule |
+|---|---|
+| `target_kind` | root/initiative/epic/issue |
+| `target_value` | rootは`None`または内部固定値、nodeはraw id input |
+| `source_path` | raw `Path`; public resultへ直接転記しない |
+
+applicationはCLIに依存しないため、request construction後もzero/multiple/invalid target stateを表現できないshapeにする。それでもtype bypass/test doubleを想定して`target_kind`と`target_value`整合を検証する。
+
+#### Public result
+
+`FileArtifactImportResult` は requirement §9.2のfieldsだけを持つ。hash、byte count、absolute source pathをfieldとして持たない。`artifact_id`はdestination basenameと等しい。
+
+#### Public error
+
+`FileArtifactImportError` は次だけを持つ。
+
+- `code`
+- `publication_state="not_committed"`
+- `committed=False`
+- `cleanup_state`
+- `retry_disposition="safe_after_remediation"`
+
+source path、destination path、basename、raw cause、hash、countを持たない。internal exception chainingはlogger/debug test面で利用しても、public DTOへ格納しない。
+
+#### Internal publish contracts
+
+`ExplicitFileSourcePreflightRequest`:
+
+- `repo_root`
+- `source_path`
+
+`GuardedExplicitFileSource`:
+
+- applicationがretry loop全体を通じてcontext-managed leaseとして所有するopaque handle
+- opened source FDとleaf/path identityを束ね、applicationからinode、absolute path、hash/countを観測できない
+- `source_visibility`とprivacy-safeな`source_display`だけを公開result構築用に持つ
+- publisherは各attemptでleaseをborrowし、FDを先頭へrewindしてstage/最終reread/path identity検証を行うがcloseしない
+- application finalizerがsuccess、pre-publication failure、setup failure、slot exhaustion、destination race exhaustionを含む全exit pathで一度だけcloseする
+- destination race retryでsourceをreopenせず、同一FD/identity leaseを再利用する。close済みleaseの再利用はcontract violation
+
+`ExplicitFileArtifactPublishRequest`:
+
+- `repo_root`
+- `guarded_source`
+- `destination_path`
+
+`ExplicitFileArtifactPublishResult`:
+
+- `source_visibility`
+- `source_display`（repo-relative pathまたはbasenameだけ）
+- `destination_path`
+- `committed=True`
+- `cleanup_state`
+- `warning_codes`
+
+hash/count/inodeはadapter内部のverification recordとして一時利用し、application/public resultへ返さない。testはsource/destination bytesを直接比較する。
+
+### 4.4 Application use case
+
+#### New file and symbol
+
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_file_artifact.py`
+- `import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileArtifactImportResult`
+
+#### Responsibilities
+
+1. `repo_root`, `specdock_dir`, `clock`, `explicit_file_source_guard`, `explicit_file_artifact_publisher` availabilityを確認する。
+2. targetを`ArtifactTarget`へ解決する。
+3. original source basenameをraw explicit pathのleafから得て、空/`.`/`..`を拒否する。
+4. source eligibility preflightを`ExplicitFileSourceGuard` portへ委ね、opaqueな`GuardedExplicitFileSource`を得る。sourceがvalidになる前にroot/node Artifact setupを作らない。
+5. timestampをcurrent `_format_artifact_timestamp`と同一UTC grammarで生成する。
+6. shared create lockを取得する。
+7. target Artifact setupをread-only preflightし、missingなら必要な変更を未適用planとして保持する。broken/wrong entryはここで拒否する。
+8. existing directory、または未作成directoryをempty inventoryとしてdirect-child shared slot ledgerをscanし、corruption/exhaustionがないことと空きslotを確立する。
+9. setup planを適用し、作成後のdirectory identity/`PC_NAME_MAX`/ledgerを再確認してから、guarded source leaseをborrowさせてpublisherの`publish_explicit_file`を呼ぶ。
+10. 各publication attemptの`cleanup_state`を`retained > removed > not_created`の順で単調mergeする。
+11. `destination_exists` raceならmerge済みcleanup stateを保持してlock内ledgerを再scanし、bounded retryする。他のpre-commit faultはpublic errorへ変換する。
+12. 後続attemptがcommitしても先行attemptに`retained`があれば`temp_cleanup_retained / committed_with_warning`として残す。最終pre-commit failure/retry exhaustionでも`cleanup_state=retained`を保持する。
+13. lock release failureがcommit前ならerror、commit後なら`committed_with_warning`へmergeする。
+14. internal resultからprivacy-safe public resultだけを構築する。
+
+#### Bounded retry
+
+standard slot + `01..99`の100候補が上限である。cooperative processはcreate lockで直列化される。non-cooperative processがcandidateを占有した場合だけ再scanし、未使用slotへ進む。全slot使用済みは`artifact_slot_exhausted`とし、無限retryしない。retryの成否にかかわらず、全attemptのcleanup stateは単調mergeし、retained owned tempを後続successが隠さない。
+
+### 4.5 Target resolution and Artifact setup
+
+#### Proposed internal model
+
+| Field | Root | Node |
+|---|---|---|
+| `kind` | `root` | `initiative|epic|issue` |
+| `id` | `root` | canonical node id |
+| `path` | `specdock_dir` | graph node path |
+| `artifacts_dir` | `specdock_dir / "artifacts"` | `node.path / "artifacts"` |
+| `rules_kind` | `root` | node kind |
+
+#### Resolution algorithm
+
+- root: graph lookupを行わず`specdock_dir`を使用する。ただし`specdock_dir`がrepository内のreal directoryであることをfail closedで確認する。
+- node: `load_graph(ports, validate=False)`とcurrent `resolve_id_input` semanticsを再利用し、requested kindとresolved node kindを一致させる。
+- rootを`graph.nodes_by_id`へinsertしない。`.meta.json`を作らない。dependency/context node countを変えない。
+
+#### Setup extraction
+
+current `_ensure_artifacts_setup`を、root/node共通のtarget descriptorを受けるprivate helperへ抽出する。existing `create_artifact_doc` call siteはadapter wrapperで互換を維持する。
+
+generic importではhelperを二段階に分ける。
+
+1. `preflight_artifacts_setup(target)`: filesystemを変更せず、existing directory/rules entryのtype・identityを検証し、missing directory/rulesをsetup planとして返す。
+2. existing artifacts directoryではopened directory FDに対して`fpathconf(PC_NAME_MAX)`を行う。fresh targetではsecurely opened target directory FDからfuture childと同じfilesystemのlimitを取得し、tentative normalization/slot allocationに使う。
+3. shared ledgerのcorruption/exhaustionをread-onlyに判定する。directory未作成はempty ledgerとして扱う。
+4. slotが確保可能な場合だけopened target FDにbindしたno-follow/no-replace operationで`apply_artifacts_setup(plan)`を実行する。
+5. 作成後のartifacts directory FDでtarget/device identityと`PC_NAME_MAX`を再確認する。limitがtentative valueと異なる、またはunexpected mount/replacementが観測された場合はpublishせず、owned fresh setupをidentity-confirmed cleanupできる場合だけ戻してfail closedする。
+6. verified limitでbasename/slotを再計算し、ledgerを再検証してからpublicationへ進む。
+
+これにより、all 100 slots occupied、corrupt ledger、unsafe setupではdirectoryや`rules.md`を作成しない。non-cooperative actorがpreflight後に状態を変えた場合はno-replace setup/publicationと再scanでfail closedまたはbounded retryする。
+
+rules source:
+
+```text
+src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md   # provider authority
+spec-dock/docs/rules/root/artifacts.md                        # managed dogfood projection
+spec-dock/artifacts/rules.md                                  # relative symlink when root artifacts is initialized
+```
+
+preflight:
+
+- `artifacts/`がsymlink/non-directoryならfail。
+- `rules.md`がmissingならvalid rules sourceへのrelative symlinkをcreate。
+- existing `rules.md`がnon-symlink、broken、wrong targetなら上書きせずfail。
+- source eligibilityが失敗した場合、fresh root artifacts setupを作らない。
+
+### 4.6 Domain naming, parser, normalizer, and slot ledger
+
+#### File
+
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/artifacts.py`
+
+#### Existing compatibility
+
+- `parse_artifact_filename`のtyped/blank return contractを維持する。
+- existing `ArtifactFilename` semanticsをgenericへ無理に拡張しない。
+- existing typed/blank callersのreturn typeとartifact idを変えない。
+
+#### New generic parser
+
+Proposed model `GenericImportedArtifactFilename`:
+
+| Field | Meaning |
+|---|---|
+| `timestamp` | lowercase UTC timestamp token |
+| `suffix` | `None`または`1..99` |
+| `original_basename` | normalized destination suffix portion |
+| `artifact_id` | full destination basename |
+
+Grammar:
+
+```text
+<timestamp>--<safe-original-basename>
+<timestamp>-<nn>--<safe-original-basename>
+```
+
+Conceptual regex:
+
+```text
+^(?<ts>[0-9]{8}t[0-9]{6}z)(?:-(?<nn>0[1-9]|[1-9][0-9]))?--(?<basename>.+)$
+```
+
+追加validation:
+
+- basenameはsingle component。
+- empty、`.`、`..`、NUL/path separatorを拒否。
+- `rules.md`をgenericとして扱わない。
+- generic `.md`はtyped/blank parserへ渡してsemantic typeを得ない。
+
+#### Shared slot ledger
+
+Proposed model `ArtifactSlot(timestamp, suffix)` と `ArtifactSlotLedger(used_slots)`。
+
+scannerは`artifacts_dir`のdirect childrenを`os.scandir()`で一回走査する。
+
+1. `rules.md`はsetup ruleとして除外する。
+2. typed parserにmatchすればslotを登録する。
+3. blank parserにmatchすればslotを登録する。
+4. generic parserにmatchすればslotを登録する。
+5. recognized modern identityがsymlink/directory/special entryならunsafe destinationとしてfailする。
+6. malformed timestamp-intent nameはexisting validation policyを維持しつつ、valid generic nameをmalformedと誤認しない。
+7. body、extension、frontmatterを読まない。
+8. duplicate `(timestamp,suffix)`が複数family/nameにある場合はcorrupt ledgerとしてfail closedする。
+
+allocator:
+
+- standard `(timestamp,None)`がfreeなら使う。
+- usedなら`1..99`を昇順で選ぶ。
+- exhaustedなら`artifact_slot_exhausted`。
+- candidate exists checkはadvisoryで、final truthはpublisher no-replace commit。
+
+#### Minimal basename normalizer
+
+Proposed symbol:
+
+```text
+normalize_imported_basename(original_basename, *, name_max_bytes, max_prefix_bytes)
+```
+
+Algorithm:
+
+1. raw source argumentのleaf basenameを取得する。resolved target pathの別名から再生成しない。
+2. empty / `.` / `..`を拒否する。
+3. NUL、実行platformのpath separator、非emptyのalternate separator、Unicode control characters、platform-reserved/invalid component charactersだけを`_`へ置換する。Linux/macOSではbackslashはseparatorでもinvalid componentでもないため保持する。連続置換は元の区切り数を隠すためcollapseせず、deterministicに一対一置換する。
+4. platform-reserved basenameは先頭に`_`を付ける。trailing dot/spaceは対応位置を`_`へ置換し、他のspacesは保持する。
+5. Unicode normalization formを勝手に変えない。case foldingしない。
+6. budgetは`PC_NAME_MAX - len(<timestamp>-99--)`のUTF-8 bytesとする。standard nameだけでなく最大suffixでもsafeにする。
+7. fitsならそのまま返す。
+8. overflow時はextension chainを右側から保護し、stemをUTF-8 code point boundaryで切る。少なくとも一つのstem code pointを残せないextension chainは、右端extension segmentを優先しつつ全体をcode point boundaryで縮める。
+9. resultがempty / `.` / `..`またはbudget zeroならcontent-free normalization error。
+10. actual candidate prefixを付けた後もUTF-8 byte lengthを再assertする。
+
+Extension chain rule:
+
+- leading-dot-only name（例 `.env`）は全体をstemとして扱う。
+- `archive.tar.gz`は`.tar.gz`をchainとする。
+- repeated dotやempty suffixは元のbasenameを可能な限り保持し、path semanticsを与えない。
+
+### 4.7 Infra source guard and publication
+
+#### File
+
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py`
+
+#### Existing behavior to preserve
+
+current `FilesystemBinaryArtifactPublisher` は次を持つ。
+
+- Workbench/lowercase `.md` guard。
+- source `O_NOFOLLOW` open とdevice/inode/mode照合。
+- destination-side staging。legacy/macOSはnamed `O_EXCL` temp、Linux genericはlinkable `O_TMPFILE` anonymous inode。
+- bounded chunk copy、stream/staged/source/destination hash/count verification。
+- file fsync。
+- source mutation/replacement/unlink detection。
+- destination parent secure directory FD / identity check。
+- Linux `/proc/self/fd/<fd>` hard-link / macOS `fclonefileat` no-replace commit。
+- directory fsync、owned-temp cleanup、fault injection。
+
+#### Refactoring boundary
+
+adapterを次の三責務へ内部分解する。
+
+1. `guard_workbench_source`: current legacy behavior。ancestor symlink rejectを含めて変更しない。
+2. `guard_explicit_file_source`: generic behavior。repository内外を許可し、leaf symlink reject、ancestor symlink allow、readability/regularity/identityを確認する。
+3. `_stage_verify_and_publish`:両entryから使うprivate core。source FD、destination path/parent FD、fault injectorを受ける。
+
+public application port:
+
+- legacy: `publish(BinaryArtifactPublishRequest)`を維持。
+- generic preflight: `ExplicitFileSourceGuard.guard_explicit_file_source(ExplicitFileSourcePreflightRequest) -> GuardedExplicitFileSource`を追加。
+- generic publication: `ExplicitFileArtifactPublisher.publish_explicit_file(ExplicitFileArtifactPublishRequest)`を追加し、raw pathではなくapplication-owned guarded source leaseをborrowする。publisherはrewind/verifyするがcloseしない。
+
+`import_file_artifact`は`workbench_source_guard`を参照しない。same concrete adapter instanceをbootstrapで両portへwireしても、application dependencyは別Protocolである。
+
+#### Descriptor ownership and close semantics
+
+- source FD / lease: applicationがretry loop全体で所有し、publisherはborrowする。全exit pathでapplication finalizerが一度だけcloseする。
+- staged-temp FD: publisherが所有し、formal commit前に不要ならcommit前にcloseする。Linux generic anonymous stagingは全pre-commit abort/failureでFD closeだけを行い、pathname cleanupを持たない。commit primitiveがopened temp FDを必要とするplatformではcommit後に`close_noexcept`で閉じる。
+- destination-parent FD: publisherがidentity-bound commit/directory fsyncまで所有し、その後`close_noexcept`で閉じる。
+- capability-probe FD: probeがformal commit前に所有・cleanup・closeを完了し、不確実ならpublicationへ進まない。
+- commit後のdescriptor/lease close failureはformal identity、`committed=true`、exit success、retry not-neededを変更しない。public warning allowlistへ追加せず、test-only fault recorderで観測する。
+
+#### Generic source guard
+
+1. relative pathを`repo_root`基準でlexical absoluteへする。`resolve()`でancestor symlink targetやprivate parent pathをpublic identityへ固定しない。
+2. raw leafを`lstat`し、symlinkを含む全non-regular entryをopen前にrejectする。
+3. leafが`lstat`後にFIFO等へ置換されてもblockingしないplatform-safe acquisitionを使う。Linux/macOSのgeneric adapterでは`O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW`相当でopenし、flag/capability unavailableなら`source_guard_unsupported`としてfail closedする。regular FDではnonblocking flagにsemantic effectを与えない。
+4. `fstat`がregular fileであることを最終確認し、raceでFIFO/socket/deviceへ変わっていれば直ちにno-throw closeして`source_ineligible`とする。
+5. open後のleaf `lstat`とFDのdevice/inode/modeを一致させる。
+6. ancestor symlink自体は拒否しない。
+7. stage後にFD hash/count、size/mtime/ctime、leaf path identityを再確認する。ancestor retargetやreplaceは`source_changed`。
+8. source visibility classificationはfail closedに行う。lexical pathとstrict-resolved pathの双方がrepo root内にあり、strict-resolved pathのstat identityがopen FDのdevice/inode/modeと一致する場合だけ`repo_relative`とする。それ以外は`basename_only`とし、resolved absolute pathやparent componentをapplicationへ返さない。
+
+#### Capability probe
+
+capability確認はplatform contractごとに行い、Linuxでは確認用のvisible pathnameを作成・unlinkしない。
+
+Linux preflightは、destination parent FD相対でlinkable `O_TMPFILE` anonymous inodeを作成できること、FDがregular fileであること、current-processの`/proc/self/fd/<fd>`参照とdirectory durability primitiveが利用可能であることをnon-mutatingに確認する。anonymous FDを別のprobe nameへlinkして削除する確認は行わない。formal candidateへの実際のFD-bound no-replace commit syscallを最初のlinkability確認とし、syscallがcapability/policy理由でformal entryを作らず失敗した場合は個別errnoを公開せず`publication_unsupported` / `not_committed`へ正規化する。`EEXIST`は既存destinationを変更しないcollisionとして既存retry契約へ返す。
+
+`O_TMPFILE`定数、filesystem/kernel、procfs、link、durabilityのいずれかがunsupportedまたはpolicy拒否なら、formal destination前にfail closedする。Linux probe/abort/failureでnamed staging、visible probe entry、pathname `unlink`へfallbackしない。
+
+macOS probe cleanup uncertainty、`/proc/self/fd` unavailable、macOS symbol unavailableは`publication_unsupported`でfail closedする。Windows/other platformへunsafe fallbackを追加しない。
+
+macOS named stagingのcapability確認は、別のraceable probe pathnameを作成・unlinkせず、owned staged tempに対するnon-mutating no-replace確認を使う。cleanupはheld FD/path identityとregular-file typeを最終確認し、replacement、missing、unexpected type、stat/open failureその他ownership uncertaintyではunlinkせず`retained`を返す。最終check後からpathname `unlink`までの意図的same-UID replacementだけはaccepted ADR `20260730t085831z-adr`の限定された非保証窓であり、それ以外の対象内failureをこの窓へ拡張しない。
+
+#### Cross-filesystem support
+
+sourceからformal destinationへhard link/renameしない。source bytesをdestination filesystem上のstaging FDへstreamし、そのstaging FDだけをformal nameへcommitするため、source deviceとdestination deviceの違いは成功条件を妨げない。
+
+#### Post-commit warning boundary
+
+commit point後に次をwarningへ変換する。
+
+- `directory_fsync_failed`
+- `temp_cleanup_retained`
+- application lock cleanupの`create_lock_release_failed`
+
+これらは`committed_with_warning`, `committed=true`, `retry_disposition=not_needed`。
+
+current legacy publisherの`destination_read_failed` / `destination_mismatch` warningは`chatgpt-output` compatibility面として残し得るが、generic resultには公開しない。generic commit primitiveとsame-inode/clone contractからdestination mismatchを許容する必要が生じた場合は、silent mappingをせずstop-and-escalateする。
+
+### 4.8 Presentation
+
+#### File
+
+- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py`
+
+#### New renderers
+
+- `render_file_artifact_import_text`
+- `render_file_artifact_import_json`
+- `render_file_artifact_import_error_text`
+- `render_file_artifact_import_error_json`
+
+legacy renderer names/bodiesは変更しない。
+
+#### Field allowlist
+
+rendererはDTOのallowlisted fieldsだけを出す。generic resultにhash/count fieldsが存在しないため、誤ってserializeできない。JSONはexplicit dict constructionを使い、`dataclasses.asdict`や`__dict__`でfuture/internal fieldを漏らさない。
+
+text rendererでは、`source`、`destination`、`artifact_id`、`target_id`等の全動的string fieldをASCII-safeなJSON string literal相当（double quote、`ensure_ascii=True`、backslash/quote/control escape）として一行出力する。space、equals、quote、backslash、LF、CR、tab、ESC、C0/DEL、bidi controls、non-ASCIIをraw key/value構造へ出さず、decode可能なreversible表現にする。固定enum/bool tokenだけをunquotedで出す。JSON modeは標準JSON serializerのstring escapingを使い、値を構造外へ連結しない。
+
+#### Text examples
+
+成功概念形:
+
+```text
+spec-dock: ok (artifact import file) import_kind=file storage_identity=generic target_kind=issue target_id="iss-00345" artifact_id="20260730t010203z--Report FINAL.PDF" source_visibility=basename_only source="Report FINAL.PDF" destination="spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00345-generic-single-file-artifact-import/artifacts/20260730t010203z--Report FINAL.PDF" committed=true publication_state=committed retry_disposition=not_needed canonical=false warning_codes=-
+```
+
+pre-commit failure概念形:
+
+```text
+spec-dock: error (artifact import file) import_kind=file storage_identity=generic code=source_ineligible committed=false publication_state=not_committed cleanup_state=not_created retry_disposition=safe_after_remediation canonical=false
+```
+
+### 4.9 Bootstrap and dependency injection
+
+#### Files
+
+- `application/contracts.py`: `UseCases.import_file_artifact`
+- `application/ports.py`: `ExplicitFileSourceGuard`, `ExplicitFileArtifactPublisher`
+- `cli/bootstrap.py`: application importとport wiring
+
+`build_runtime`はcurrent `FilesystemBinaryArtifactPublisher()` instanceを次へwireする。
+
+- existing `workbench_source_guard`
+- existing `binary_artifact_publisher`
+- new `explicit_file_source_guard`
+- new `explicit_file_artifact_publisher`
+
+同一instanceの共有はfault injector/stateを持たないproduction adapterでは安全だが、Protocolは分離する。testはgeneric use caseがlegacy guard portを参照しないことをfake portで証明する。
+
+### 4.10 Lifecycle consumers
+
+#### Domain validation / duplicate detection
+
+- `domain/artifacts.py`のmalformed candidate判定にvalid generic parserを先行させる。
+- generic `.md`をtimestamp-intent malformed typed artifactとして拒否しない。
+- recognized generic nameのbodyを読まない。
+
+#### `validate`
+
+- graph/meta/canonical docs validationを維持する。
+- Artifact directory inventoryはnames/types/rulesだけを確認する。
+- generic bodyをauthority artifactとして検証しない。
+
+#### `sync` / ADR mirror
+
+current `_collect_adr_mirror_sources`はartifact basenameをtyped parserでfilterしてからfrontmatterを読む。generic parser導入後も、`--` familyはtyped ADR parserへmatchせず、`_parse_required_adr_front_matter`へ進まないことをspy testで固定する。
+
+root `artifacts/`はgraph scopeではないため、ADR mirror source collectionへ追加しない。root generic bodyをdefault projectionへ入れない。
+
+#### Dependency / context-pack
+
+node metadataとcanonical docsだけをsourceにするcurrent flowを維持し、generic Artifact discoveryを追加しない。regression testはgeneric binary/invalid UTF-8追加前後のdeps/context output equivalenceを比較する。
+
+#### Authoring discovery
+
+- generic namesをtyped/blank delegated authoring candidateへ昇格しない。
+- authoring pack explicit file selectionが将来generic fileを選ぶ場合も、別の明示binary-safe pathだけを使い、default discoveryではbodyを読まない。
+
+### 4.11 Public docs and rules
+
+Provider-first targets:
+
+- `src/spec_dock/assets/spec_dock/docs/README.md`
+- `src/spec_dock/assets/spec_dock/docs/guide.md`
+- `src/spec_dock/assets/spec_dock/docs/reference_naming.md`
+- `src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md`（new）
+- 必要なroot/node artifact rules reference
+
+Managed dogfood projection:
+
+- `spec-dock/docs/` 配下の対応する managed files
+- `spec-dock/scripts/spec_dock_runtime/` 配下の generated runtime projection
+
+projectionは`spec-dock update .`またはrepository-approved provider projection flowで行い、consumer filesの手修正をsource of truthにしない。Issue 345はmanaged parity/focused local observationまでを扱い、candidate wheelからのfresh consumer E2EはIssue 346へ残す。
+
+## 5. End-to-end flow
+
+### 5.1 Main sequence
+
+次の図は、selector/source rejection、pre-commit failure、commit、post-commit warningを一つのsequenceで示す。commit pointを越えた後はerror branchへ戻さない。
+
+```plantuml
+@startuml
+actor User
+participant Parser
+participant Command
+participant "ImportFileArtifact" as App
+participant "Target/Naming Domain" as Domain
+participant "ExplicitFilePublisher" as Infra
+participant "Destination FS" as FS
+participant Renderer
+
+User -> Parser : artifact import file --file P\n(--root | --initiative ID | --epic ID | --issue ID)
+alt zero/multiple selector
+  Parser --> User : exit 2; no use case
+else parsed
+  Parser -> Command : ArtifactImportFileArgs
+  Command -> App : FileArtifactImportRequest
+  App -> App : resolve root/node target
+  alt invalid target
+    App --> Command : FileArtifactImportError(not_committed)
+  else target valid
+    App -> Infra : guard_explicit_file_source(P)
+    alt missing/dir/leaf symlink/special/unreadable
+      Infra --> App : source_ineligible
+      App --> Command : not_committed
+    else guarded FD/path identity
+      App -> FS : under create lock, read-only setup preflight
+      App -> Domain : normalize basename + scan shared slots
+      App -> FS : apply setup only after slot is available
+      App -> Infra : publish_explicit_file(candidate)
+      Infra -> FS : destination-side temp + stream + fsync + verify
+      alt source changed / capability unsupported / precommit fault
+        Infra --> App : publish error; committed=false
+        App --> Command : not_committed
+      else destination_exists race
+        Infra --> App : destination_exists
+        App -> Domain : rescan / next suffix
+      else FD-bound no-replace commit
+        Infra -> FS : formal basename becomes visible
+        alt durability or owned cleanup warning
+          Infra --> App : committed + warning codes
+          App --> Command : committed_with_warning; retry not_needed
+        else clean completion
+          Infra --> App : committed
+          App --> Command : committed; retry not_needed
+        end
+      end
+    end
+  end
+  Command -> Renderer : privacy-safe DTO only
+  Renderer --> User : text or JSON
+end
+@enduml
+```
+
+### 5.2 Detailed algorithm
+
+1. CLI parser validates exact selector count.
+2. command constructs a request without resolving source against current working directory.
+3. application resolves `repo_root` and `specdock_dir` from ports.
+4. application resolves target; no directory mutation yet.
+5. infra opens/guards explicit source; no destination mutation yet.
+6. application derives original basename and safe basename.
+7. application computes timestamp and maximum prefix byte budget.
+8. application acquires shared create lock.
+9. application performs read-only setup validation and obtains an unapplied setup plan.
+10. domain scans direct child names (or an empty inventory for a not-yet-created directory), rejects corruption/exhaustion, and allocates a shared slot.
+11. application applies missing `artifacts/` / rules setup only after slot availability is established, then revalidates directory identity、`PC_NAME_MAX`、normalization、ledger.
+12. infra probes publication capability, stages source, verifies source/temp.
+13. infra commits with FD-bound no-replace.
+14. if candidate exists, application repeats ledger allocation within bounded slots.
+15. if commit happened, only directory fsync、owned-temp cleanup、lock release may add their exact warning codes; all other result fields were prepared before commit.
+16. application releases lock and merges post-commit lock warning if needed.
+17. presentation emits only privacy-safe fields.
+
+## 6. State model
+
+このstate diagramは、formal destination visibilityとretry semanticsを結び付ける。`COMMITTED`から`NOT_COMMITTED`への遷移は存在しない。
+
+```plantuml
+@startuml
+[*] --> PRECHECK
+PRECHECK --> NOT_COMMITTED : invalid target/source/name/setup
+PRECHECK --> STAGED : source guarded; temp created
+STAGED --> NOT_COMMITTED : copy/fsync/hash/source/capability failure
+STAGED --> ALLOCATE_NEXT : destination_exists
+ALLOCATE_NEXT --> STAGED : next shared slot
+ALLOCATE_NEXT --> NOT_COMMITTED : suffix exhausted
+STAGED --> COMMITTED : FD-bound no-replace commit
+COMMITTED --> COMMITTED_CLEAN : directory fsync + cleanup ok
+COMMITTED --> COMMITTED_WARNING : durability/owned cleanup warning
+NOT_COMMITTED --> [*] : committed=false\nretry=safe_after_remediation
+COMMITTED_CLEAN --> [*] : committed=true\nretry=not_needed
+COMMITTED_WARNING --> [*] : committed=true\nretry=not_needed
+@enduml
+```
+
+### 6.1 State invariants
+
+| State | Formal destination | Exit status | Retry |
+|---|---|---|---|
+| `not_committed` | absent for this attempt | failure | `safe_after_remediation` |
+| `committed` | present under returned identity | success | `not_needed` |
+| `committed_with_warning` | present under returned identity | success with stable warning | `not_needed` |
+
+## 7. Error and warning mapping
+
+### 7.1 Proposed stable pre-commit codes
+
+| Internal condition | Public code | State | Notes |
+|---|---|---|---|
+| missing/invalid target | `target_invalid` | `not_committed` | no source field |
+| node missing/kind mismatch | `target_invalid` | `not_committed` | do not disclose internal graph path |
+| source missing/dir/symlink/special/unreadable | `source_ineligible` | `not_committed` | one content-free code |
+| source identity/content changed | `source_changed` | `not_committed` | no hash/count |
+| basename cannot be made safe | `basename_invalid` | `not_committed` | no raw basename in error |
+| rules/setup unsafe | `destination_ineligible` | `not_committed` | no destination path in public error |
+| slot corruption/scan failure | `artifact_allocation_failed` | `not_committed` | internal detail not public |
+| all 100 slots unavailable | `artifact_slot_exhausted` | `not_committed` | stable exhaustion token |
+| temp create/copy/file fsync/hash mismatch | current content-free publisher codes | `not_committed` | cleanup state preserved |
+| leaf no-follow / FD identity guard unavailable | `source_guard_unsupported` | `not_committed` | do not degrade to ordinary path open |
+| no safe publication primitive | `publication_unsupported` | `not_committed` | no fallback |
+| non-race publish fault | `publication_failed` | `not_committed` | no raw OSError |
+| bounded destination races exhausted | `artifact_publication_retry_exhausted` | `not_committed` | distinct from ledger exhaustion |
+| unknown exception before commit, application-confirmed | `runtime_failed` | `not_committed` | phase-aware application finalizer; no raw detail |
+
+Exact token names that differ from existing parent design require fresh spec review before public release; token changes must not alter the three-state/retry/privacy contract。
+
+### 7.2 Post-commit warnings
+
+| Warning | Meaning | Public state |
+|---|---|---|
+| `directory_fsync_failed` | formal name committed; directory durability confirmation failed | `committed_with_warning` |
+| `temp_cleanup_retained` | owned temp cleanup could not be confirmed | `committed_with_warning` |
+| `create_lock_release_failed` | formal file committed; create lock cleanup failed | `committed_with_warning` |
+
+warningにはpath/body/hash/count/raw errorを付けない。operator guidanceはreturned destination identityを保持し、同じsourceをretryしないよう説明する。
+
+fault injectionはcommit後の三つの許可seamを個別に注入し、`directory_fsync_failed`、`temp_cleanup_retained`、`create_lock_release_failed`へのexact mappingと、committed identity、exit success、`retry_disposition=not_needed`を検証する。その他の汎用`post_commit_runtime` warningは追加せず、command handlerが任意exceptionを`not_committed`へ変換する経路も持たない。
+
+source lease、staged-temp FD、destination-parent FDのcommit後close failureも個別に注入するが、これらはno-throw resource finalizationとして扱う。public warning/stateは追加・変更せず、committed resultをそのまま返し、internal test evidenceだけでclose attemptを確認する。
+
+## 8. Concurrency and TOCTOU model
+
+### 8.1 Cooperative writers
+
+- existing create lockをtyped/blank/generic allocatorで共有する。
+- lock内でread-only setup preflight、direct-child scan、candidate selection、必要時だけsetup application、再検証、publish attemptの順に行う。
+- lock token/ownership validationはcurrent implementationを維持する。
+
+### 8.2 Non-cooperative writers
+
+- candidate existence precheckをtrustしない。
+- final operationはopened temp FDとopened destination parent FDを使うno-replace commit。
+- `FileExistsError`はoverwriteせず`destination_exists`としてapplicationへ戻す。
+- applicationはledgerを再scanし次slotへ進む。
+
+### 8.3 Source races
+
+- leaf `lstat` → `open(O_NOFOLLOW)` → `fstat` → leaf `lstat` identityを比較。
+- stage後にsame FDをrewind/hashし、size/mtime/ctimeとpath identityを再確認。
+- source bodyがsame-size rewriteされてもhash mismatchで検知。
+- path replace/unlink/ancestor retargetはpath identity mismatchで検知。
+- source FDからcopyするため、open後のpath retargetから別fileを読むことはない。
+
+### 8.4 Destination races
+
+- destination parentをcomponent-wise `O_DIRECTORY|O_NOFOLLOW`でopenし、visible directory identityをcommit直前に再確認。
+- Linux generic stagingはdestination parent上のlinkable `O_TMPFILE` anonymous inodeとし、visible staging nameを作らない。legacy/macOS named stagingはdestination parentに`O_CREAT|O_EXCL`で作る。
+- formal destinationはno-replace primitiveだけで作る。
+
+## 9. Privacy threat model
+
+### 9.1 Linux anonymous-staging boundary
+
+accepted ADR `20260730t102747z-adr`は、Linuxでnamed-staging cleanupのsame-UID waiverを受容しない。generic stagingはdestination filesystem上のlinkable `O_TMPFILE` anonymous inodeであり、formal commit前にpathnameを持たない。abort/failureはFD closeだけで完了し、pathname `unlink`を呼ばない。anonymous stagingまたはheld-FD publication capabilityが不足するenvironmentはformal destination前に`publication_unsupported`でfail closedし、named-temp fallbackを禁止する。
+
+Linux integration testを実行できないhostでも、syscall seamでanonymous create、held-FD commit、unsupported mapping、no-pathname-unlinkをdeterministicに検証する。supported Linux environmentのsuccess主張は通常権限の実能力テストを必要とし、capability不在をskipからpassへ読み替えない。
+
+### 9.2 macOS named-staging cleanup boundary
+
+accepted ADR `20260730t085831z-adr`は、同一UIDでdestination directoryを変更でき、high-entropy internal staging nameを発見・監視するactorが、cleanupの最終FD/path identity check後から`unlink` syscallまでにpathnameを意図的に別entryへ置換する場合だけを保証対象外とする。これはformal destination、source、privacyの保証や、final checkまでに観測可能なreplacement / missing / unexpected type / uncertaintyを対象外にしない。
+
+実装とreviewは、対象内の観測可能な状態でunlinkを呼ばず`retained`を返しreplacement sentinelを保持することを必須にする。一方、macOS公開APIに存在しないFD-conditional unlinkをIssue-localで実現したと主張しない。
+
+| Threat | Boundary | Design control | Verification |
+|---|---|---|---|
+| external absolute/parent path leak | request → result | public DTOにraw pathなし; safe displayだけ返す | success/failure/warning sentinel tests |
+| body leak via exception | infra → command | content-free error; unknown exception normalization | injected secret exception tests |
+| hash/count leak | internal verification → presentation | generic public contractsにfieldsなし | JSON exact-key assertion |
+| MIME/encoding inference | naming/result | classifierなし; basename only | PDF/ZIP/invalid UTF-8 same result schema |
+| tracked provenance leak | docs/report/artifact metadata | automatic provenance writeなし | worktree diff assertion |
+| generic ADR authority escalation | lifecycle scanner | separate parser; body unopened | frontmatter sentinel/open spy |
+
+Repository内sourceのrepo-relative pathは許可されるが、absolute host pathへ変換して出さない。classification自体がfailした場合はsource fieldを省略し、外部か内部かを推測表示しない。
+
+## 10. Opaque lifecycle design
+
+### 10.1 Name-only admission
+
+lifecycle consumersがgeneric entryを認識する必要がある場合、`parse_generic_imported_artifact_filename(path.name)`だけを使用する。body openは許可しない。
+
+### 10.2 Consumer matrix
+
+| Consumer | Generic name | Generic body | Required behavior |
+|---|---|---|---|
+| `validate` | safe inventory/slot check可 | read/decode禁止 | valid genericをmalformed typedとしない |
+| `sync` index/tree/dashboard | default inclusionなし | read/decode禁止 | projections unchanged |
+| dependency compiler |無視 | read/decode禁止 | graph/deps unchanged |
+| context-pack | default inclusionなし | read/decode禁止 | active context unchanged |
+| ADR mirror | typed ADR parserにmatchしない | frontmatter read禁止 | mirror unchanged |
+| authoring discovery | default candidateにしない | read/decode禁止 | authority unchanged |
+| explicit future binary operation | exact path選択時のみ | operation-specific | 本Issueのdefault lifecycle外 |
+
+### 10.3 Test seam
+
+- `Path.read_text`, `Path.read_bytes`, `open`をgeneric pathに対してspy/denyし、default lifecycleが呼ばないことを確認する。
+- invalid UTF-8 generic `.md`を置いて`validate`/`sync --no-github`がdecode exceptionなしで成功することを確認する。
+- typed accepted ADR mirror baselineのsymlink setをbefore/after比較する。
+
+## 11. Compatibility decisions
+
+### 11.1 `artifact import chatgpt-output`
+
+変更禁止:
+
+- command name/help grammar。
+- Initiative/Epic/Issue only target。
+- approved Workbench/lowercase `.md` guard。
+- `--title` required / optional `--slug`。
+- blank filename / artifact id。
+- source repo-relative、SHA-256、byte countを含むexisting result。
+- current warning codesとcleanup state。
+
+共有してよいもの:
+
+- private staging/verification/no-replace core。
+- create lock primitive。
+- UTC timestamp formatter。
+
+共有してはいけないもの:
+
+- source guard request。
+- public request/result/error DTO。
+- renderer。
+- filename parser/identity。
+
+### 11.2 typed / blank Artifact
+
+- current `parse_artifact_filename`のpublic semanticsを維持。
+- current filenamesをmigrationしない。
+- new shared slot scannerがexisting parser resultsをledgerへ投影するだけにする。
+- `create_artifact_doc`がnew scannerを使う場合、existing allocation/resultのcharacterizationを通す。
+
+### 11.3 Workbench shell / copy
+
+- Issue 344のtracked README/ignored payload premiseを維持。
+- generic importはWorkbench外もexplicitに読めるが、Workbench copy/syncを呼ばない。
+- sourceをWorkbenchへcopy-inする前処理を要求しない。
+
+## 12. Test architecture
+
+### T345-1 Domain/naming
+
+- generic parser/formatter round trip。
+- typed/blank/generic shared slots。
+- unsafe type/symlink/corrupt duplicate。
+- normalization Unicode/space/case/extension/NAME_MAX。
+- POSIX basenameのbackslashを保持し、実platformのseparator/reserved characterだけを置換する。
+- fresh targetはparent FDからtentative `PC_NAME_MAX`を取得し、作成後artifacts FDで一致を再確認する。取得不能、不一致、identity replacementはpublish前にfail closedする。
+- exhaustion。
+
+### T345-2 Application/command
+
+- exact selector validationのdefense-in-depth。
+- four targets/root non-node。
+- privacy-safe request/result/error mapping。
+- explicit source guard portがsetup mutation前に呼ばれ、guarded handleだけがpublisherへ渡る。
+- guarded source leaseはdestination raceをまたいで同一FDを再利用し、successを含む全exit pathで一度だけcloseされる。
+- missing setupとslot exhaustion/corrupt ledgerの併存時にdirectory/rules mutationがない。
+- lock release pre/post commit semantics。
+- directory fsync、owned-temp cleanup、lock releaseの各commit後fault seamがexact warning code、committed identity、exit success、retry not-neededを維持する。
+- destination race retry。
+- destination race attemptでcleanup retained後に後続commitした場合は`temp_cleanup_retained / committed_with_warning`、retry exhaustionでは`cleanup_state=retained`を保持する。
+- generic use caseが`workbench_source_guard`を必要としない。
+
+### T345-3 Infra
+
+- repo-relative/absolute/`..` external/cross-filesystem。
+- regular/special/symlink/unreadable matrix。
+- direct FIFOをopen前に拒否し、regular `lstat`後からopen前のFIFO置換でもblockingせず拒否する。
+- bounded opaque copy。
+- source mutation/ancestor retarget。
+- capability probe/fail-closed。
+- precommit fault and postcommit warning injection。
+- source lease、staged-temp FD、destination-parent FDのpost-commit close faultがcommitted resultを置換せず、新しいpublic warningを増やさない。
+- no-replace concurrency。
+
+### T345-4 Presentation
+
+- text/JSON exact fields。
+- external basename-only。
+- no hash/count/MIME/encoding/path/body/raw error。
+- publication state / retry tokens。
+
+### T345-5 Lifecycle/compatibility
+
+- generic invalid UTF-8 `.md` body-open denial。
+- validate/sync/deps/context/ADR mirror/authoring unchanged。
+- post-rollout write-disable後もgeneric recognizer、shared-slot reservation、grandfathered validation/sync互換が残る。
+- existing chatgpt-output tests。
+- existing typed/blank/new artifact tests。
+
+### T345-6 Delivery boundary
+
+Issue 345:
+
+- provider-focused unit/CLI runtime tests。
+- ordinary/default lane relevant to changed paths。
+- static checks。
+- managed provider/dogfood projection parity。
+- local rollback evidence。
+
+Issue 346:
+
+- candidate wheel consumer E2E。
+- integrated dogfood across Epic slice。
+- opt-in full regression。
+- Epic-wide final spec/code/QA/decision review。
+- residual Epic integration PR and PR delivery。
+
+## 13. Directory / file change plan
+
+### 13.1 Provider runtime — expected changes
+
+| Path | Expected symbols / responsibility |
+|---|---|
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py` | `artifact import file` leaf |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/artifact_import.py` | `ArtifactImportFileArgs`, generic add/factory/run |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py` | file import request/result/error/publish contracts; `UseCases.import_file_artifact` |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py` | `ExplicitFileArtifactPublisher`; new Ports field |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_file_artifact.py` | new use case |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_artifact_doc.py` | target-neutral Artifact setup extraction only if required |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/artifacts.py` | generic parser/normalizer/shared ledger |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py` | explicit source guard; shared staging core; capability probe |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py` | generic text/JSON/error renderers |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py` | use case/port wiring |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py` | only if name filter/body-open proof requires explicit guard |
+| other lifecycle files | only when focused test demonstrates an actual generic body-read path |
+
+### 13.2 Provider docs/rules — expected changes
+
+| Path | Responsibility |
+|---|---|
+| `src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md` | new root Artifact rules |
+| `src/spec_dock/assets/spec_dock/docs/README.md` | command discovery |
+| `src/spec_dock/assets/spec_dock/docs/guide.md` | user flow/privacy/state |
+| `src/spec_dock/assets/spec_dock/docs/reference_naming.md` | generic grammar/shared slot/normalization |
+| relevant node artifact rules | generic opacity/reference if needed |
+
+### 13.3 Tests — expected new/changed surfaces
+
+- `tests/unit/domain/test_artifacts.py`（new if no current equivalent）
+- `tests/unit/application/test_import_file_artifact.py`（new）
+- `tests/unit/application/test_binary_artifact_import_ports.py`
+- `tests/unit/commands/test_artifact_import_file.py`（new）
+- `tests/unit/infra/test_binary_artifact_publisher.py`
+- `tests/unit/presentation/test_artifact_import_file.py`（new）
+- `tests/cli_runtime/test_artifact_import_file.py`（new）
+- existing `tests/unit/commands/test_artifact_import_chatgpt_output.py`
+- existing `tests/unit/presentation/test_artifact_import_chatgpt_output.py`
+- existing `tests/cli_runtime/test_artifact_import_chatgpt_output.py`
+- existing `tests/cli_runtime/test_artifact_import_s04.py`
+- nearest validate/sync/deps/context/authoring tests identified during implementation。
+
+### 13.4 Managed dogfood projection
+
+Corresponding files under `spec-dock/scripts/spec_dock_runtime/` and `spec-dock/docs/` are generated/managed inspection targets, not primary edit targets。
+
+## 14. Observability
+
+### 14.1 Public observability
+
+- stable result/error/warning tokens。
+- target kind/id、destination identity、safe source display。
+- committed/publication state/retry disposition。
+- `canonical=false`。
+
+### 14.2 Internal/test observability
+
+- source/stream/staged hashes/countsのequality。
+- source/staged inode/device identity。
+- commit primitive branch。
+- fault injection point。
+- temp cleanup identity/state。
+
+internal metricsをpublic output/tracked provenanceへ転記しない。loggerを追加する場合もexternal path/body/hash/countをdefault logへ出さない。
+
+### 14.3 Report evidence destinations
+
+implementation時はIssue `report.md`へ次を記録する。
+
+- Spec Interpretation / Decision Ledger。
+- Step Contract Closure。
+- Test Contract Closure。
+- delegated worker evidence。
+- privacy sentinel matrix。
+- fault injection matrix。
+- provider/dogfood projection evidence。
+- rollback rehearsal/evidence。
+- Issue 346 handoff。
+
+## 15. Rollback design
+
+### 15.1 Pre-rollout full revert
+
+generic identityが一件もpublishされずpublic filename contractも利用されていない場合に限り、additive parser/handler/use case/contracts/ports/renderer、generic parser/ledger、root rules/docsをIssue commit単位で全面revertできる。publisher private core refactorはlegacy testsでbehavior equivalenceを確認し、必要ならlegacy-only shapeへ戻す。
+
+### 15.2 Post-rollout disablement
+
+generic identityのpublish後はwrite commandと新規作成経路をdisable/revertできるが、次の互換層を残す。
+
+- minimal generic filename recognizer
+- generic bodyを読まないvalidation/sync/lifecycle exclusion
+- typed/blank/generic shared-slot reservation
+- grandfathered generic Artifactをmalformed typed/blank candidateにしないname-only handling
+
+committed generic filesはgrandfathered evidenceとして保持し、rename/delete/reclassifyしない。root rules/docsもretained evidenceを正しく説明できる最小互換記述を残す。
+
+### 15.3 Common rollback checks
+
+retained temp cleanupはowner identityを確認できるものだけ手動/repair pathで扱う。選択したrollback経路に応じてexisting `chatgpt-output`、typed/blank allocation、generic grandfather compatibility、`validate`、`sync --no-github`、provider/managed parityを再検証する。
+
+## 16. Stop-and-escalate conditions
+
+次の発見があれば、Issue-local workaroundを入れず、parent Epic design/accepted ADR amendmentとfresh reviewへ戻す。
+
+- `--`をtyped tokenへ変える必要がある。
+- full destination basename以外をpublic identityにする必要がある。
+- title/slug/MIME/content classifierが必要になる。
+- external absolute/parent path、hash、byte count、MIME、encodingをpublic/tracked outputへ出す必要がある。
+- sourceをmove/delete/copy-backする必要がある。
+- generic bodyをvalidate/sync/deps/context/ADR/authoringで読む必要がある。
+- safe publicationにmutable-path rename、overwrite、source-side hard linkしか使えない。
+- post-commit warningを`not_committed`/retry requiredへ変える必要がある。
+- rootをgraph nodeにしなければ実装できない。
+- existing `chatgpt-output` contract変更が必要になる。
+- Issue 346のdistribution/final quality scopeをIssue 345へ移す必要がある。
+- `authorized_profile`を本成果物または実装者が選択/書換えなければ進められない。
+- generic pathでdestination mismatchを正常warningとして許容しなければならない。
+- accepted ADR `20260730t085831z-adr`のsame-UID actor / internal staging pathname / final-check-to-unlink time windowを広げる必要、またはこの限定除外を撤回する必要がある。
+- supported platform/capability matrixをparent designと異なる形に広げる必要がある。
+
+## 17. Design traceability
+
+| Design ID | Requirements | Acceptance criteria | Main surfaces |
+|---|---|---|---|
+| `DES-345-001` | `I345-RQ-001`, `I345-RQ-013` | `I345-AC-001`, `I345-AC-016` | parser, command, contracts, renderer |
+| `DES-345-002` | `I345-RQ-001`, `I345-RQ-012` | `I345-AC-002`, `I345-AC-015` | target resolver, setup, root rules |
+| `DES-345-003` | `I345-RQ-005`〜`007`, `011` | `I345-AC-006`〜`009`, `014` | domain parser/normalizer/ledger |
+| `DES-345-004` | `I345-RQ-003`, `004`, `008`, `009` | `I345-AC-004`, `005`, `010`〜`012` | explicit publisher, application |
+| `DES-345-005` | `I345-RQ-010` | `I345-AC-013` | contracts, command, presentation |
+| `DES-345-006` | `I345-RQ-011`, `013` | `I345-AC-014`, `016`, `017` | lifecycle consumers, regression tests |
+| `DES-345-007` | `I345-RQ-014`, `015` | `I345-AC-018`, `019` | docs, projection, report/handoff |
+
+## 18. Historical implementation gaps at pre-implementation HEAD
+
+以下は実装開始前の inspected revision `f8db4fd206bf11e6ca7b396914b7cfb52d13040b` に対するsnapshotであり、現在のknown gapではない。現在状態は`report.md`のStep Contract ClosureとFinal Quality Gateを正本とする。
+
+- generic request/result/error/use case/port/parser/rendererは未実装。
+- root Artifact rules sourceとdogfood projectionは未存在。
+- current publisherはWorkbench guardとstaging coreが同一class/method flowに密結合。
+- current artifact slot scanは`*.md`中心でgeneric extension-agnostic ledgerを持たない。
+- current result contractはchatgpt-output向けにSHA/count/source pathを公開するため再利用不可。
+- parent planで挙げられたgeneric専用test filesの一部は未存在。
+- current lifecycleはgeneric familyを知らないため、generic `.md`がmalformed timestamp candidateと誤認される可能性をfocused testsで閉じる必要がある。
+
+これらは当該revision時点の実装対象であり、現在状態を表さない。

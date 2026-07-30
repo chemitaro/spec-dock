@@ -56,6 +56,14 @@ def build_parser(registry: CommandRegistry) -> argparse.ArgumentParser:
         registry,
         "artifact_import_chatgpt_output",
     )
+    _bind_leaf(
+        artifact_import_sub.add_parser(
+            "file",
+            help="Import one explicit file as an opaque generic Artifact",
+        ),
+        registry,
+        "artifact_import_file",
+    )
 
     p_active = sub.add_parser("active", help="Manage the active pointers")
     active_sub = p_active.add_subparsers(dest="active_cmd", required=True)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import os
 from typing import TYPE_CHECKING, Literal, Protocol
@@ -31,6 +32,13 @@ if TYPE_CHECKING:
 
     from spec_dock_runtime.application.ports import Ports
     from spec_dock_runtime.domain.models import SpecGraph, SpecNode
+
+
+@dataclass(frozen=True)
+class ArtifactSetupTarget:
+    path: Path
+    artifacts_dir: Path
+    rules_kind: str
 
 
 class _AssuranceStoreLike(Protocol):
@@ -295,13 +303,38 @@ def _preflight_artifacts_rules(*, scope: SpecNode, specdock_dir: Path, artifacts
 
 
 def _ensure_artifacts_setup(*, scope: SpecNode, specdock_dir: Path, artifacts_dir: Path) -> None:
-    _preflight_artifacts_dir(artifacts_dir)
-    _preflight_artifacts_rules(scope=scope, specdock_dir=specdock_dir, artifacts_dir=artifacts_dir)
-    artifacts_dir.mkdir(parents=True, exist_ok=True)
-    link_path = artifacts_dir / "rules.md"
+    _ensure_artifacts_setup_for_target(
+        target=ArtifactSetupTarget(
+            path=scope.path,
+            artifacts_dir=artifacts_dir,
+            rules_kind=scope.kind,
+        ),
+        specdock_dir=specdock_dir,
+    )
+
+
+def _ensure_artifacts_setup_for_target(*, target: ArtifactSetupTarget, specdock_dir: Path) -> None:
+    _preflight_artifacts_setup_for_target(target=target, specdock_dir=specdock_dir)
+    source = specdock_dir / "docs" / "rules" / target.rules_kind / "artifacts.md"
+    link_path = target.artifacts_dir / "rules.md"
+    target.artifacts_dir.mkdir(parents=True, exist_ok=True)
     if not os.path.lexists(link_path):
-        source = _rules_source_path(scope=scope, specdock_dir=specdock_dir)
-        link_path.symlink_to(os.path.relpath(source, start=artifacts_dir))
+        link_path.symlink_to(os.path.relpath(source, start=target.artifacts_dir))
+
+
+def _preflight_artifacts_setup_for_target(*, target: ArtifactSetupTarget, specdock_dir: Path) -> None:
+    _preflight_artifacts_dir(target.artifacts_dir)
+    source = specdock_dir / "docs" / "rules" / target.rules_kind / "artifacts.md"
+    if source.is_symlink() or not source.is_file():
+        raise RuntimeError(f"Missing rules source: {source}")
+    link_path = target.artifacts_dir / "rules.md"
+    if os.path.lexists(link_path):
+        if not link_path.is_symlink():
+            raise RuntimeError(f"Destination already exists: {link_path}")
+        if not link_path.exists():
+            raise RuntimeError(f"Broken artifact rules symlink: {link_path}")
+        if link_path.resolve() != source.resolve():
+            raise RuntimeError(f"Artifact rules symlink points to wrong target: {link_path}")
 
 
 def _artifact_replacements(
