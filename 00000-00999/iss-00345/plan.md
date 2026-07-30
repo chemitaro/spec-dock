@@ -6,7 +6,7 @@ ID: "iss-00345"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-30"
 親: ["epic-00343", "init-local-00002"]
-依存: ["requirement.md", "design.md", "20260728t100038z-adr", "20260730t085831z-adr", "iss-00344", "iss-00346"]
+依存: ["requirement.md", "design.md", "20260728t100038z-adr", "20260730t085831z-adr", "20260730t102747z-adr", "iss-00344", "iss-00346"]
 planning_method: "Spec-Locked Micro-Batch TDD"
 authorized_profile_observed: "standard"
 parent_recommended_grade: "critical"
@@ -66,7 +66,7 @@ S01 public tracer bullet
         v
 S02 source/publication/privacy hardening
   external path, eligibility, descriptor identity, cross-FS, capability,
-  pre/post commit states, fault injection
+  Linux anonymous staging, pre/post commit states, fault injection
         |
         v
 S03 shared identity and concurrency completion
@@ -138,8 +138,8 @@ S99 final local quality, rollback evidence, Issue 346 handoff
 | `CL-AC-008` | `I345-AC-008` | shared all-family slots/exhaustion | mixed directory inventory | cross-family overwrite | yes | domain + app | S03 | `tc-s03-004`, `005` |
 | `CL-AC-009` | `I345-AC-009` | cooperative/noncooperative no overwrite | parallel import/barrier | race overwrite/duplicate identity | yes | app + infra | S03 | `tc-s03-006`, `007` |
 | `CL-AC-010` | `I345-AC-010` | source races fail precommit | mutation/replace/unlink/retarget | TOCTOU acceptance | yes | infra | S02 | `tc-s02-005` |
-| `CL-AC-011` | `I345-AC-011` | cross-FS succeeds; unsupported fails closed; observable macOS cleanup uncertainty retains | device difference/capability stub/cleanup sentinel | unsafe fallback or non-owned unlink | yes | infra + CLI | S02 | `tc-s02-006`, `007`, `011` |
-| `CL-AC-012` | `I345-AC-012` | honest three-state/retry and cleanup state | fault injection + missing/type matrix | duplicate retry or false removed state | yes | app + presentation + CLI | S02 | `tc-s02-008`, `009`, `011` |
+| `CL-AC-011` | `I345-AC-011` | cross-FS succeeds; unsupported fails closed; Linux has no cleanup pathname; observable macOS cleanup uncertainty retains | device difference/capability stub/cleanup sentinel | unsafe fallback or non-owned unlink | yes | infra + CLI | S02 | `tc-s02-006`, `007`, `011`, `012` |
+| `CL-AC-012` | `I345-AC-012` | honest three-state/retry and cleanup state | fault injection + missing/type matrix | duplicate retry or false removed state | yes | app + presentation + CLI | S02 | `tc-s02-008`, `009`, `011`, `012` |
 | `CL-AC-013` | `I345-AC-013` | external basename-only/no derived data | secret path/body/hash sentinels | privacy disclosure | yes | presentation + CLI | S02 | `tc-s02-010` |
 | `CL-AC-014` | `I345-AC-014` | body unopened by lifecycle | invalid UTF-8 ADR-like generic | semantic escalation/decode | yes | CLI/runtime | S04 | `tc-s04-001`, `002`, `003` |
 | `CL-AC-015` | `I345-AC-015` | root setup/rules safe/provider-first | fresh/broken/wrong rules | graph pollution/setup overwrite | yes | app + CLI + docs | S01, S90 | `tc-s01-003`, `tc-s90-001` |
@@ -165,8 +165,8 @@ S99 final local quality, rollback evidence, Issue 346 handoff
 | `CL-EC-011` | `I345-EC-011` | 01..99 exhaustion no mutation | prefilled slots | unbounded/overwrite fallback | yes | app | S03 | `tc-s03-005` |
 | `CL-EC-012` | `I345-EC-012` | cooperative/noncooperative race safe | threads/process barrier | overwrite/duplicate result | yes | app + infra | S03 | `tc-s03-006`, `007` |
 | `CL-EC-013` | `I345-EC-013` | source mutation precommit failure | stage barrier mutations | stale FD/path acceptance | yes | infra | S02 | `tc-s02-005` |
-| `CL-EC-014` | `I345-EC-014` | cross-FS source support | different device fixture/seam | EXDEV false failure | yes | infra | S02 | `tc-s02-006` |
-| `CL-EC-015` | `I345-EC-015` | unsupported capability no formal dest | primitive/probe injection | unsafe fallback | yes | infra | S02 | `tc-s02-007` |
+| `CL-EC-014` | `I345-EC-014` | cross-FS source support | different device fixture/seam | EXDEV false failure | yes | infra | S02 | `tc-s02-006`, `012` |
+| `CL-EC-015` | `I345-EC-015` | unsupported capability no formal dest | primitive/probe injection | unsafe fallback | yes | infra | S02 | `tc-s02-007`, `012` |
 | `CL-EC-016` | `I345-EC-016` | postcommit warnings success/no retry | fsync/cleanup/lock faults | misleading failure/retry | yes | app + CLI | S02 | `tc-s02-009` |
 | `CL-EC-017` | `I345-EC-017` | ADR-looking generic remains opaque | `.md` with accepted-like frontmatter | authority/mirror escalation | yes | sync/authoring | S04 | `tc-s04-002`, `003` |
 | `CL-EC-018` | `I345-EC-018` | fresh root setup; unsafe existing entry fail | rules fixtures | overwrite/broken setup | yes | app + CLI | S01, S90 | `tc-s01-003`, `tc-s90-001` |
@@ -181,8 +181,8 @@ S99 final local quality, rollback evidence, Issue 346 handoff
 | `CL-CON-003` | `I345-CON-003` | no body/hash/count/MIME/encoding public | payload and exact JSON keys | content-derived leak | yes | presentation | S02 | `tc-s02-010` |
 | `CL-CON-004` | `I345-CON-004` | formal entry never replaced | preexisting file/symlink/dir/race | evidence loss | yes | infra | S03 | `tc-s03-006`, `007` |
 | `CL-CON-005` | `I345-CON-005` | bounded chunk memory | large/read-size spy | whole-file memory load | yes | infra | S02 | `tc-s02-004` |
-| `CL-CON-006` | `I345-CON-006` | FD/path/source/destination identity guards | mutation/retarget/race | TOCTOU | yes | infra | S02, S03 | `tc-s02-005`, `tc-s03-007` |
-| `CL-CON-007` | `I345-CON-007` | unsupported platform fails closed | capability injection | unsafe fallback | yes | infra | S02 | `tc-s02-007` |
+| `CL-CON-006` | `I345-CON-006` | FD/path/source/destination identity guards; Linux staging has no pathname | mutation/retarget/race | TOCTOU | yes | infra | S02, S03 | `tc-s02-005`, `012`, `tc-s03-007` |
+| `CL-CON-007` | `I345-CON-007` | unsupported platform fails closed | capability injection | unsafe fallback | yes | infra | S02 | `tc-s02-007`, `012` |
 | `CL-CON-008` | `I345-CON-008` | no semantic body read | open/read spy | semantic escalation | yes | runtime | S04 | `tc-s04-001`〜`003` |
 | `CL-CON-009` | `I345-CON-009` | provider-first/projection checked | changed-path parity | dogfood as authority | yes | inspection | S90 | `tc-s90-002` |
 | `CL-CON-010` | `I345-CON-010` | 346 obligations remain deferred | report handoff checklist | scope expansion | yes | inspection | S99 | `tc-s99-003` |
@@ -358,14 +358,14 @@ repository内外の明示regular file一件を、leaf symlink reject / ancestor 
 - Red evidence: `red-required` per fault class; existing publisher tests are `covered-existing` only forlegacy core, notgeneric policy。
 - Green verification: S02 focused commands。
 - Refactor guardrail: internal hash/count verificationを削除しないがpublic DTOへ出さない。ancestor symlink acceptanceをlegacy Workbench guardへ適用しない。
-- Amendment trigger: public privacy relax、commit point変更、unsafe platform fallback、postcommit retry requirement、またはaccepted ADR `20260730t085831z-adr`の限定threat boundary変更。
+- Amendment trigger: public privacy relax、commit point変更、unsafe platform fallback、postcommit retry requirement、accepted ADR `20260730t085831z-adr`の限定threat boundary変更、またはaccepted ADR `20260730t102747z-adr`のLinux anonymous-staging / no-waiver boundary変更。
 
 ### 9.5 Red → Green → Refactor
 
 1. path/source-kind/privacy matrix testsをRedにする。
 2. explicit guardをlegacy guardから分離し、repo-root-relative/absolute/`..`、ancestor symlink、FIFO direct/race nonblocking rejectionをGreenにする。
-3. mutation/cross-FS/capability testsをRedにする。
-4. shared staging coreへFD/source identity/capability probeを完成しGreenにする。
+3. mutation/cross-FS/capability/Linux anonymous-staging testsをRedにする。
+4. shared staging coreへFD/source identity/capability probeを完成し、Linux genericではlinkable `O_TMPFILE`とFD-close-only abortをGreenにする。
 5. precommit fault、三つのpostcommit warning、descriptor close no-throw、race retry cleanup aggregation、macOS named-stagingのobservable replacement / missing / unexpected type retain、public renderingをRedにする。
 6. phase-aware state mapper、attempt cleanup merge、identity/type-confirmed cleanup、allowlist rendererをGreenにする。
 7. fault injector namingとprivate helpersをtidyし、legacy publisher testsを再実行する。
@@ -383,13 +383,13 @@ uv run pytest tests/cli_runtime/test_artifact_import_s04.py
 ### 9.7 Delegation contract
 
 - **delegated role**: `dev-coder` with filesystem/security focus。
-- **input docs**: main workflowで採用・fresh reviewされたcanonical R/D/P、accepted ADR `20260728t100038z-adr` Decision 5/6/8、accepted ADR `20260730t085831z-adr` Decision / mandatory mitigations、current publisher source/tests、S01 diff/evidence、AGENTS testing/security rules。
+- **input docs**: main workflowで採用・fresh reviewされたcanonical R/D/P、accepted ADR `20260728t100038z-adr` Decision 5/6/8、accepted ADR `20260730t085831z-adr` Decision / mandatory mitigations、accepted ADR `20260730t102747z-adr` Option A / Linux anonymous-staging boundary、current publisher source/tests、S01 diff/evidence、AGENTS testing/security rules。
 - **allowed paths**: §9.3 provider files and tests only。
 - **forbidden changes**: public hash/count addition、external path logging/provenance、source move/delete、legacy Workbench ancestry policy、rename/copy overwrite fallback、Issue 346 tests。
 - **acceptance criteria**: S02 closure rows Green; cross-FS supported; unsupported capability no formal dest; warning retry not_needed; sentinel absent across text/JSON/stderr/warnings/diff。
 - **required tests**: §9.6 plus existing full `tests/unit/infra/test_binary_artifact_publisher.py` after focused subset。
-- **reviewer focus**: FD binding、identity/type comparisons、missing / mismatch / unexpected type / uncertainty時のno-unlink retain、non-mutating probe、exception redaction、commit point、cleanup ownership、platform branches、no whole-file reads。final check後からunlinkまでの意図的same-UID replacementだけを限定非保証として扱い、包括的waiverにしない。
-- **stop conditions**: safe primitive unavailable on intended supported platform without parent amendment、postcommit integrity uncertainty、raw path required in public error、source-side link/move required、またはaccepted ADRのactor / pathname / time-window境界を広げる必要。
+- **reviewer focus**: FD binding、Linux anonymous `O_TMPFILE` staging、Linux pre-commit failureでpathname unlinkなし、named-temp fallbackなし、identity/type comparisons、macOS missing / mismatch / unexpected type / uncertainty時のno-unlink retain、non-mutating probe、exception redaction、commit point、cleanup ownership、platform branches、no whole-file reads。macOS final check後からunlinkまでの意図的same-UID replacementだけを限定非保証として扱い、Linuxまたは包括的waiverへ拡張しない。
+- **stop conditions**: accepted ADRで定義したsafe primitiveがsupported laneで実装不能、Linuxでnamed-temp fallbackまたはsame-UID cleanup waiverが必要、postcommit integrity uncertainty、raw path required in public error、source-side link/move required、またはaccepted ADRのactor / pathname / time-window境界を広げる必要。
 - **output required**: changed files、fault matrix、platform notes、Red/Green evidence、privacy sentinel result、unresolved capability risks、Ledger Note、report summary。
 
 ### 9.8 具体テストケース一覧
@@ -443,10 +443,10 @@ uv run pytest tests/cli_runtime/test_artifact_import_s04.py
   - 関連 closure id: `CL-AC-011`, `CL-EC-014`
 
 - `tc-s02-007` negative: unsupported no-replace capability fails closed
-  - 前提: `/proc/self/fd` unavailable、macOS symbol unavailable、probe unsupported、probe cleanup uncertaintyをfault-injectする。
+  - 前提: Linux `O_TMPFILE`定数不在、filesystem/kernel非対応、`/proc/self/fd` unavailable、formal candidateを作らないheld-FD link拒否、directory durability拒否、macOS symbol unavailable、macOS probe unsupported / cleanup uncertaintyをfault-injectする。Linux capability確認ではvisible probe entryを作らない。
   - 操作:formal destinationがない状態でpublishを試みる。
-  - 期待結果: `publication_unsupported`, `not_committed`, formal destinationなし、overwrite/rename fallback callなし。
-  - 失敗検出:unsafe fallbackまたはcapability probe省略を検出する。
+  - 期待結果: `publication_unsupported`, `not_committed`, retry `safe_after_remediation`, formal destinationなし、overwrite/rename/named-temp fallback callなし。
+  - 失敗検出:unsafe fallback、Linux named-temp/visible-probe fallback、probe pathname cleanup、個別errnoのpublic漏洩、またはnon-mutating preflight省略を検出する。
   - 検証方法: syscall spies + fault-injection unit tests。
   - 関連 closure id: `CL-AC-011`, `CL-EC-015`, `CL-CON-007`
 
@@ -481,6 +481,14 @@ uv run pytest tests/cli_runtime/test_artifact_import_s04.py
   - 失敗検出:`FileNotFoundError`を`removed`と誤報する、type/identity uncertainty後にunlinkする、Option Aを包括的same-UID waiverへ拡張する回帰を検出する。
   - 検証方法:`tests/unit/infra/test_binary_artifact_publisher.py`のdeterministic cleanup barrier / stat-type fault testsとapplication/CLI state assertions。
   - 関連 closure id: `CL-AC-011`, `CL-AC-012`, `CL-EC-016`, `CL-CON-006`
+
+- `tc-s02-012` security: Linux anonymous staging has no cleanup pathname
+  - 前提: Linux branchでlinkable `O_TMPFILE` create、held-FD no-replace commit、copy/fsync/hash/source-revalidation/publication failureの各syscall seamを用意し、pathname `unlink`をspyする。実Linux supported filesystemでは通常権限のintegration fixtureも用意する。
+  - 操作:success、pre-commit abort、各pre-commit fault、unsupported capabilityを実行する。
+  - 期待結果:successはanonymous staging FDからformal destinationを一度だけ公開する。abort/faultはformal destinationとvisible staging entryを残さずFD closeだけで終了し、pathname `unlink`は0回。unsupportedは`publication_unsupported` / `not_committed` / `safe_after_remediation`となる。
+  - 失敗検出:Linux named temp作成、cleanup pathname差し替え窓、pathname `unlink`、unsafe fallback、capability不在skipのpass扱いを検出する。
+  - 検証方法:`tests/unit/infra/test_binary_artifact_publisher.py`のdeterministic syscall spies + Linux-only通常権限integration test。host非対応時もunit fault matrixはskipしない。
+  - 関連 closure id: `CL-AC-011`, `CL-AC-012`, `CL-EC-014`, `CL-EC-015`, `CL-CON-006`, `CL-CON-007`
 
 ### 9.9 Step closure contract
 
@@ -1026,7 +1034,7 @@ no-opの場合はcommitを捏造せず、approved-no-op evidenceをreportへ記�
 | Injection point | Expected public state | Formal destination | Retry | Owner step |
 |---|---|---|---|---|
 | source open / eligibility | `not_committed` | absent | safe after remediation | S02 |
-| temp create | `not_committed` | absent | safe after remediation | S02 |
+| Linux anonymous stage / named temp create | `not_committed` | absent | safe after remediation | S02 |
 | copy/write | `not_committed` | absent | safe after remediation | S02 |
 | file fsync | `not_committed` | absent | safe after remediation | S02 |
 | staged hash/read | `not_committed` | absent | safe after remediation | S02 |
@@ -1100,6 +1108,7 @@ Handoff payload:
 - Issue 346 scopeを前倒ししないとclosureできない。
 - authorized profile mutationが必要。
 - platform-specific behaviorがparent supported matrixと矛盾。
+- Linux genericでvisible named staging、pathname cleanup、またはsame-UID cleanup waiverが必要。
 
 ## 19. Final Exit Contract
 
