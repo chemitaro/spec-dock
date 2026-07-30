@@ -1086,7 +1086,9 @@ retained temp cleanupはowner identityを確認できるものだけ手動/repai
 | `DES-345-006` | `I345-RQ-011`, `013` | `I345-AC-014`, `016`, `017` | lifecycle consumers, regression tests |
 | `DES-345-007` | `I345-RQ-014`, `015` | `I345-AC-018`, `019` | docs, projection, report/handoff |
 
-## 18. Known implementation gaps at inspected HEAD
+## 18. Historical implementation gaps at pre-implementation HEAD
+
+以下は実装開始前の inspected revision `f8db4fd206bf11e6ca7b396914b7cfb52d13040b` に対するsnapshotであり、現在のknown gapではない。現在状態は`report.md`のStep Contract ClosureとFinal Quality Gateを正本とする。
 
 - generic request/result/error/use case/port/parser/rendererは未実装。
 - root Artifact rules sourceとdogfood projectionは未存在。
@@ -1096,4 +1098,4 @@ retained temp cleanupはowner identityを確認できるものだけ手動/repai
 - parent planで挙げられたgeneric専用test filesの一部は未存在。
 - current lifecycleはgeneric familyを知らないため、generic `.md`がmalformed timestamp candidateと誤認される可能性をfocused testsで閉じる必要がある。
 
-これらは本設計の実装対象であり、実装済みまたは検証済みとは扱わない。
+これらは当該revision時点の実装対象であり、現在状態を表さない。
