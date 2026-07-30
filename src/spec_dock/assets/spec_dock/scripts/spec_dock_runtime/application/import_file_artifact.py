@@ -43,6 +43,7 @@ class _FileArtifactTarget:
 
 
 _MAX_PUBLICATION_ATTEMPTS = 100
+_RulesLinkIdentity = tuple[int, int, int, int]
 
 
 def import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileArtifactImportResult:
@@ -82,7 +83,7 @@ def import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileAr
     target_directory_identity: tuple[int, int, int] | None = None
     artifacts_directory_fd: int | None = None
     artifacts_directory_identity: tuple[int, int, int] | None = None
-    fresh_rules_identity: tuple[int, int, int] | None = None
+    fresh_rules_identity: _RulesLinkIdentity | None = None
     try:
         try:
             lock_path, lock_token = _acquire_create_lock(specdock_dir)
@@ -422,7 +423,7 @@ def _create_bound_fresh_artifacts_setup(
     specdock_dir: Path,
     target_directory_fd: int,
     target_directory_identity: tuple[int, int, int],
-) -> tuple[int, tuple[int, int, int], int, tuple[int, int, int]]:
+) -> tuple[int, tuple[int, int, int], int, _RulesLinkIdentity]:
     if not _visible_directory_matches(
         target.path,
         target_directory_fd,
@@ -451,7 +452,7 @@ def _create_bound_fresh_artifacts_setup(
             dir_fd=artifacts_directory_fd,
             follow_symlinks=False,
         )
-        rules_identity = (rules_status.st_dev, rules_status.st_ino, rules_status.st_mode)
+        rules_identity = _rules_link_identity(rules_status)
         _validate_bound_rules_link(
             rules_source=rules_source,
             rules_target=rules_target,
@@ -476,9 +477,9 @@ def _ensure_bound_existing_artifacts_setup(
     target: ArtifactSetupTarget,
     specdock_dir: Path,
     artifacts_directory_fd: int,
-) -> tuple[int, int, int] | None:
+) -> _RulesLinkIdentity | None:
     rules_source = specdock_dir / "docs" / "rules" / target.rules_kind / "artifacts.md"
-    created_identity: tuple[int, int, int] | None = None
+    created_identity: _RulesLinkIdentity | None = None
     try:
         try:
             rules_status = os.stat(
@@ -494,17 +495,13 @@ def _ensure_bound_existing_artifacts_setup(
                 dir_fd=artifacts_directory_fd,
                 follow_symlinks=False,
             )
-            created_identity = (rules_status.st_dev, rules_status.st_ino, rules_status.st_mode)
+            created_identity = _rules_link_identity(rules_status)
         _validate_bound_rules_link(
             rules_source=rules_source,
             rules_target=None,
             artifacts_directory_fd=artifacts_directory_fd,
             rules_status=rules_status,
-            expected_rules_identity=(
-                rules_status.st_dev,
-                rules_status.st_ino,
-                rules_status.st_mode,
-            ),
+            expected_rules_identity=_rules_link_identity(rules_status),
         )
         return created_identity
     except BaseException as error:
@@ -525,11 +522,9 @@ def _validate_bound_rules_link(
     rules_target: str | None,
     artifacts_directory_fd: int,
     rules_status: os.stat_result,
-    expected_rules_identity: tuple[int, int, int],
+    expected_rules_identity: _RulesLinkIdentity,
 ) -> None:
-    if (rules_status.st_dev, rules_status.st_ino, rules_status.st_mode) != expected_rules_identity or not stat.S_ISLNK(
-        rules_status.st_mode
-    ):
+    if _rules_link_identity(rules_status) != expected_rules_identity or not stat.S_ISLNK(rules_status.st_mode):
         raise RuntimeError("artifact rules entry is not a symlink")
     source_fd: int | None = None
     linked_fd: int | None = None
@@ -555,7 +550,7 @@ def _validate_bound_rules_link(
             follow_symlinks=False,
         )
         if (
-            (rules_after.st_dev, rules_after.st_ino, rules_after.st_mode) != expected_rules_identity
+            _rules_link_identity(rules_after) != expected_rules_identity
             or not stat.S_ISLNK(rules_after.st_mode)
             or (rules_target is not None and linked_target != rules_target)
             or (
@@ -582,7 +577,7 @@ def _validate_bound_rules_link(
 def _rollback_bound_rules_link(
     *,
     artifacts_directory_fd: int,
-    created_rules_identity: tuple[int, int, int] | None,
+    created_rules_identity: _RulesLinkIdentity | None,
 ) -> None:
     if created_rules_identity is None:
         return
@@ -592,15 +587,15 @@ def _rollback_bound_rules_link(
             dir_fd=artifacts_directory_fd,
             follow_symlinks=False,
         )
-        if (
-            current.st_dev,
-            current.st_ino,
-            current.st_mode,
-        ) != created_rules_identity or not stat.S_ISLNK(current.st_mode):
+        if _rules_link_identity(current) != created_rules_identity or not stat.S_ISLNK(current.st_mode):
             return
         os.unlink("rules.md", dir_fd=artifacts_directory_fd)
     except OSError:
         return
+
+
+def _rules_link_identity(status: os.stat_result) -> _RulesLinkIdentity:
+    return (status.st_dev, status.st_ino, status.st_mode, status.st_ctime_ns)
 
 
 def _open_verified_child_directory(
