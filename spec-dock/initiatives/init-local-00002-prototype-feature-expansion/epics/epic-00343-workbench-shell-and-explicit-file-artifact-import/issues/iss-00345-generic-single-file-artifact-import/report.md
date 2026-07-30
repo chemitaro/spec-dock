@@ -71,6 +71,7 @@ Disposition ごとの必須証跡:
 | D-020 | resolved | compatibility | ChatGPT Pro combined R/D/P review | 動的text fieldに改行/control/bidi/token injectionの境界がなかった | human-readable raw text; reversible one-line quoting | 動的stringをASCII-safeなJSON string literal相当で一行escapeし、JSONは標準escapingを使う。privacyとround-tripをexact testする | CLI構造とログ一行性を保ちつつ任意basenameを可逆表示するため | promoted_to_design | `requirement.md` I345-RQ-010/I345-AC-013; `design.md` §4.8; `plan.md` `tc-s02-010`; combined review at `cdbb5fccd36d6864f9e76fbf479765ac31001c99` | combined fresh re-review |
 | D-021 | resolved | operation | user approval / orchestrator | ChatGPT Pro fresh combined review pass後もcanonical R/D/P front matterが`draft`で、runtime guidanceが`design-not-substantive`としてexecutionをblockした | draftのまま保持; approvedへ昇格 | ユーザーの明示承認を受け、requirement/design/plan/reportの状態を`approved`へ昇格する。内容契約は変更しない | human approval、fresh review pass、runtime preflightの状態を正本上で一致させるため | applied | user approval; ChatGPT Pro pass at `3a2e95b57154108aea260325d5c40829b01ccf4a`; `guidance issue-execution` pre-fix reason `design-not-substantive` | assurance rebind後にexecution guidanceを再判定 |
 | D-022 | resolved | platform / safety | S02 dev-coder stop condition、fresh code-reviewer、ChatGPT Use advisory、repo-analyst、deep-consultant、user decision、fresh Epic spec-review | macOSにはanonymous destination stagingまたはFD-conditional unlinkがなく、same-privilege replacement下でnon-owned deletion禁止・normal cleanup removed・generic import成功を同時に満たせない | Option A: exact same-UID final-window attackをEpic threat model外へ限定; Option B: macOS `publication_unsupported`; Option C: trusted helper; Option D: normal success retained | Option Aを採用。macOS successを維持し、同一UID・internal staging pathname・final identity check後からunlinkまでの意図的replacementだけを限定除外する。その他のobservable uncertaintyはretain/no-unlink | user instruction、accepted Epic ADR、fresh Epic spec rereview `pass` confidence 0.98 | promoted_to_requirement_design_plan | `artifacts/20260730t085614z-disc-macos-staging-cleanup-threat-model-decision.md`; Epic `artifacts/20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md`; Issue R/D/P amendment | fresh Issue spec review後にS02を再委任 |
+| D-023 | resolved | platform / safety | S02 fresh code-reviewer、repo-analyst、consultant、user decision、fresh Epic spec review | platform共通named-temp cleanupによりLinuxでもfinal pathname check後からunlinkまでにnon-owned entryを削除し得るが、macOS ADRの限定waiverはLinuxへ適用できない | Option A: Linux linkable `O_TMPFILE` anonymous staging必須; Option B: Linuxにもsame-UID waiver; Option C: Linux unsupported; Option D: trusted helper | Option Aを採用。Linuxはanonymous stagingからheld-FD no-replace publicationへ進み、pre-commit failureはFD closeのみとする。capability不足はformal destination前にfail closedし、named-temp fallbackを禁止する | cleanup pathname自体をなくしてriskを構造的に除去し、macOSの限定risk acceptanceを拡張しないため | promoted_to_requirement_design_plan | Epic `artifacts/20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md`; fresh Epic review findings `[]`, confidence 0.99; Issue R/D/P amendment | fresh Issue spec review後にS02を再委任 |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -88,6 +89,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-002 | adopted | ChatGPT Pro authoring / repository analysis / combined review | canonical `requirement.md`, `design.md`, `plan.md`; onboarding artifact | 4文書の構造、trace、failure/privacy/test設計を採用し、repository誤記とD-002〜D-020のレビュー指摘を補正した。exact commitへのfresh combined reviewがfindings `[]`で合格した | original ZIP SHA-256 `4c3317e697b7fe68b91bfc04401f36b8407b20631460b8ee4199ebf2c4d20eba`; corrected authoring-pack content digest `4da06f4a19034d6dcf8d0d24550298604a97096c1f2d18d56473297ad76ff573`; final review at `3a2e95b57154108aea260325d5c40829b01ccf4a`; reviewed ZIP SHA-256 `8ac851843f89f04b6403e9594876435ca4b5defa3587557202145afee3566a85` | planning artifactsを実装入力として使用可能 |
 | EAL-003 | rejected | transport-safe repaired pack | canonical prose | ZIP transport validator通過のための可逆HTML数値参照表現は意味内容ではなく搬送上の符号化であり、正本本文には不自然である | corrected authoring-pack provenance の round-trip 記録 | 原文候補を正本へ採用し、digest付きZIPは生成証跡として保持 |
 | EAL-004 | adopted | S02 reviews、ChatGPT Use、repo-analyst、deep-consultant、Issue discussion、user Option A decision、accepted Epic ADR、fresh Epic spec rereview | Epic/Issue canonical R/D/Pとaccepted ADRのplatform/threat contract | userがOption Aを明示採用し、Epic R/D/P / accepted ADRはfresh rereview `pass`。Issue R/D/Pへ限定境界とmandatory mitigationsを下降反映した | `artifacts/20260730t085614z-disc-macos-staging-cleanup-threat-model-decision.md`; Epic `artifacts/20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md`; Issue R/D/P diff | fresh Issue spec reviewを通してS02 execution authorityを回復 |
+| EAL-005 | adopted | S02 fresh code review、repo-analyst、consultant、user Option A decision、accepted Linux ADR、fresh Epic spec review | Epic/Issue canonical R/D/PとLinux platform capability contract | Linuxのsame-UID cleanup waiverを不採用とし、linkable `O_TMPFILE` anonymous staging、held-FD publication、pre-commit FD-close-only cleanup、unsupported fail-closedを下降反映した | Epic `artifacts/20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md`; Epic R/D/P/report diff; fresh Epic review findings `[]`, confidence 0.99; Issue R/D/P diff | fresh Issue spec reviewを通してS02再実装契約を固定 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -107,6 +109,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | design | passed requirement / Standard assurance template / provider layered architecture / existing publisher・allocator・parser / ChatGPT Pro evidence at `3a2e95b57154108aea260325d5c40829b01ccf4a` | D-005〜D-015/D-018/D-020を反映し、runtime profileはstandard | adopted | pass | no | promote |
 | plan | passed requirement / corrected canonical design / Standard assurance template / current test surfaces / Issue 346 ownership / ChatGPT Pro evidence at `3a2e95b57154108aea260325d5c40829b01ccf4a` | repository誤記とD-005〜D-020由来test obligationsを補正済み | adopted | pass | no | promote |
 | Option A amendment | accepted Epic ADR `20260730t085831z-adr`、fresh Epic spec rereview、current S02 code/review evidence、fresh Issue review findings `[]` / confidence 0.98 | missing / unexpected typeを`removed`扱いせずretainするIssue obligationと、限定非保証窓を確定 | adopted | pass | no | assurance reclassify / verify後にS02へ戻る |
+| Linux anonymous-staging amendment | accepted Epic ADR `20260730t102747z-adr`、fresh Epic spec review、current S02 code/review evidence、Linux API capability調査 | Linuxのnamed-temp cleanup waiverを受容しない | linkable `O_TMPFILE`、held-FD publication、pre-commit FD-close-only cleanup、unsupported fail-closed、`tc-s02-012`をIssue正本へ反映 | fresh Issue spec review pending | yes | pass後にassurance verifyしてS02へ戻る |
 
 ### ChatGPT Pro 統合再レビュー証跡
 
@@ -150,6 +153,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | ChatGPT Pro | iss-00345 | `artifacts/20260730t000929z-01-disc-issue-345-clarification-chatgpt-authoring-handoff.md` | active Issue/Epic、accepted ADR、provider source、tests、clarification artifacts、authoring ZIP 4文書 | canonical R/D/P、Issue onboarding artifact | adopted | `requirement.md`, `design.md`, `plan.md`, `artifacts/20260730t014107z-issue-345-generic-single-file-artifact-import-onboarding-guide.md` | pass | repository補正とD-002〜D-020を反映して統合 | transport-only encoded spellings、誤ったtest/CLI/path表現 | none | pass | promote |
 | system-architect | epic-00343 | Epic `artifacts/20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md` | Epic/Issue R/D/P、accepted ADR、Issue report/discussion | Epic R/D/P、Issue R/D/P/report、accepted ADR | adopted | Epic `requirement.md`, `design.md`, `plan.md`, `report.md`; Issue `requirement.md`, `design.md`, `plan.md`, `report.md` | pass | userがOption Aを採用し、Epic正本とaccepted ADRのfresh rereview pass後にIssue正本へ下降反映。Epic/Issue fresh spec review findings `[]`、confidence 0.98 | Option B/Dは不採用、Option Cは別Epic候補として保留 | none | pass | promote |
+| system-architect | epic-00343 / iss-00345 | Epic `artifacts/20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md` | Epic/Issue R/D/P/report、accepted macOS ADR、S02 code review finding | Epic/Issue R/D/P/report、accepted Linux ADR | adopted | Epic `requirement.md`, `design.md`, `plan.md`, `report.md`; Issue `requirement.md`, `design.md`, `plan.md`, `report.md` | pass | userがLinux Option Aを採用。non-mutating preflightと最初のactual formal-candidate commitを分離し、visible probe/named fallbackなしの契約を正本化 | Linux same-UID waiver、visible probe、named-temp fallback、unsupported filesystemでの継続 | none | pass | promote |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -208,7 +212,7 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 | S01 | Green | focused verification required | required unit 25 passed、CLI実体4 passed、legacy command8 passed、publisher47 passed/1 skipped、full unit684 passed/560 skipped、lint pass。mutation-free rejectionとroot non-node evidenceを補強済み | `plan.md` §8.7 + affected regressions | pass | default CLI laneはpolicy skip、`--run-full-regression`で実体確認。fresh再レビュー待ち |
 | S01 | Refactor | bounded guardrail | destination-side staging/no-replace private coreだけを共有し、legacy public contractを維持 | diff inspection + legacy regressions | pass | S02〜S04は未実装 |
 | S02 | Red | red-required per fault class | S01 baselineとisolated negative controlsでsource-kind、ancestor-retarget、cross-FS、capability/ownership、close、postcommit warning、privacy/control、precommit mappingの失敗感度を実測 | `/private/tmp` isolated baseline/mutants; 下記Red Evidence Matrix | pass | temporary baseline/mutantsは実行後削除 |
-| S02 | Green | §9.6 focused verification | publisher75 passed/1 skipped、application/presentation/command/ports27 passed、CLI + S04 compatibility25 passed、lint pass | §9.6 + publisher full unit + parent rerun | pass | skipは既存Linux-only linkat race gateのみ |
+| S02 | Green | §9.6 focused verification | publisher88 passed/1 skipped、application/presentation/command/ports29 passed、fault/cleanup集中17 passed、CLI generic5 passed、S04 compatibility20 passed、lint/format/mypy/diff-check pass | §9.6 + publisher full unit + `--run-full-regression` CLI/S04 | pass | skipは既存Linux-only linkat race gateのみ。fresh reviewでLinux cleanup contract gapを検出したためstep closureは別途blocked |
 | S02 | Refactor | legacy ancestry/public DTO/unsafe fallbackを不変に保つ | shared staging core、phase mapping、control-safe rendererをreview対象に限定 | diff inspection + legacy/S04 compatibility | pass | S03/S04の命名・lifecycle実装は先取りしない |
 
 #### 発見されたテスト / リスク（Discovered Tests）
@@ -219,21 +223,24 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 | S01 | zero/multiple selectorとmissing/mismatched targetのmutation-free拒否、およびroot import前後のgraph/dependency不変証跡が不足 | fresh code-reviewer | dev-coderがtestを補強し、parent focused verificationは25 passed、CLI実体4 passed | `tc-s01-001`〜`tc-s01-005`、§8.2 listed closures | no | 初回review status `fail`; finding P1は修正済み。fresh再レビュー待ち |
 | S02 | Linux実linkat race gateはmacOSでは実行不可 | platform capability | macOS capability/cross-filesystem実証とhermetic fault testsを実行し、既存Linux-only testは理由付きskip | `tc-s02-005`, `tc-s02-007` | no | `actual linkat race gate runs on Linux`; passへ読み替えない |
 | S02 | capability probe pathnameのidentity check後からunlink前に置換されると、非所有fileを削除し得る | fresh code-reviewer re-review | raceable probe pathnameの作成・cleanupを廃止し、owned staged tempの既存nameに対する非変更EEXIST probe + formal commitへ変更 | `tc-s02-007`, `CL-EC-015`, `CL-CON-007` | no | P1修正済み。probe unlink call 0、replacement sentinel survivalのRed/Greenを確認。fresh再レビュー待ち |
-| S02 | staging temp cleanupにもidentity check後からunlink前の置換競合があり、非所有entryを削除し得る | fresh code-reviewer | dev-coderへpathname check→unlinkに依存しないcleanup、または不確実時retainedとなる設計を再委任 | `tc-s02-005`, `tc-s02-008`, `tc-s02-009`, `CL-CON-006` | no | review `fail`; P1。pre/post commit両方のcleanup stateを修正する |
-| S02 | setup/create-lockの`OSError`がprivacy-safe precommit stateへ正規化されずruntime contract violationになる | fresh code-reviewer | applicationのsetup/lock exception boundaryをpublisherと分離し、`runtime_failed/not_committed/safe_after_remediation`へ正規化する | `tc-s02-008`, `CL-AC-012` | no | review `fail`; P1 |
-| S02 | `hash_mismatch`、destination-parent identity、non-race `publication_failed` のRed/Green証跡が不足 | fresh code-reviewer | fault seams/testsとisolated negative controlsを補完する | `tc-s02-008`, `CL-AC-012` | no | review `fail`; P1 |
+| S02 | staging temp cleanupにもidentity check後からunlink前の置換競合があり、非所有entryを削除し得る | fresh code-reviewer / Option A amendment | held FD・pathname stat・reopened FDのidentity/typeを確認し、missing/replacement/unexpected type/stat/fstat/open uncertaintyはretain/no-unlink。final check後の意図的same-UID replacementだけはaccepted ADRの限定非保証 | `tc-s02-011`, `CL-AC-011`, `CL-AC-012`, `CL-CON-006` | no | Red 6件、Green cleanup/fault集中13 passed。fresh code review待ち |
+| S02 | setup/create-lockの`OSError`がprivacy-safe precommit stateへ正規化されずruntime contract violationになる | fresh code-reviewer | publisher未知faultを誤分類せず、publication前と確定するcreate-lock/setup `OSError`だけを`runtime_failed/not_committed/safe_after_remediation`へ正規化 | `tc-s02-008`, `CL-AC-012` | no | Red 2件、Green application tests。fresh code review待ち |
+| S02 | `hash_mismatch`、destination-parent identity、non-race `publication_failed` のRed/Green証跡が不足 | fresh code-reviewer | exact fault seamsとnegative controlsを追加し、EEXIST raceとnon-race publication failureを分離 | `tc-s02-008`, `CL-AC-012` | no | 3 fault classのGreenを確認。fresh code review待ち |
+| S02 | reopened staging FDの`fstat`後にpathnameを再確認しないため、open成功後の置換をOption Aの除外前に見逃す | fresh code-reviewer | reopened FDの`fstat`後にpathnameをno-follow再statし、initial pathname / held FD / reopened FD / final pathnameのidentity/typeが一致する場合だけunlinkする。deterministic barrier回帰を追加 | `tc-s02-011`, `CL-AC-011`, `CL-CON-006` | no | Red `7 passed, 1 failed`、Green targeted `17 passed`。fresh re-review待ち |
+| S02 | Unix socket fixtureが`/private/tmp`固定でLinux CI / restricted sandboxに非portable | fresh code-reviewer | `tempfile.mkdtemp(prefix="sd-s02-")`へ移し、AF_UNIX / bind capability不在時だけ理由付きskipする | `tc-s02-002`, `CL-AC-004` | no | publisher full `88 passed, 1 skipped`。fresh re-review待ち |
+| S02 | platform共通named-temp cleanupによりLinuxでもfinal pathname check後からunlinkまでの置換で非所有entryを削除し得る | fresh code-reviewer | userがOption Aを採用し、Epic ADR/R/D/Pのfresh review pass後、IssueへLinux anonymous staging/no-waiver/fail-closed契約と`tc-s02-012`を下降反映した | `I345-RQ-008`, `I345-AC-011`, `CL-AC-011`, `CL-CON-006`, `tc-s02-012` | no | Epic/Issue fresh spec reviewはいずれも`pass`。Issue最終再レビュー findings `[]`、confidence `0.99`。bounded実装修正前はS02 blockedを維持 |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
 | S01 | §8.2 listed closures | §8.10の全条件 | focused/legacy/full-unit/lint Green、mutation-free rejectionとroot graph/dependency不変、public exact-key snapshot、plan外decisionなしを確認 | pass | fresh code re-review findings `[]`; confidence `0.98`。commit gateのみ未完了 |
-| S02 | §9.2 listed closures | §9.9の全条件 | probe cleanup findingは解消。ただしstaging cleanup race、setup/lock state mapping、3 fault class evidenceが未解消 | blocked | fresh code review `fail`; 修正と再レビューが必要 |
+| S02 | §9.2 listed closures | §9.9の全条件 | Linux anonymous-staging amendmentをR/D/Pへ反映し、fresh Issue spec reviewはpass。bounded implementation/re-reviewは未完了 | blocked | dev-coderへ`tc-s02-012`を含む修正を再委任 |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | `tc-s01-001`〜`tc-s01-005` | S01 | yes | red-required | missing CLI leaf/module/DTO/portのRedを保存 | §8.7 focused unit 25 passed、CLI full-regression slice 4 passed | pass | success path、mutation-free rejection、root graph/dependency不変を確認 |
-| `tc-s02-001`〜`tc-s02-010` | S02 | yes | red-required per fault class | S01 baseline + isolated mutantsで各classのRedを保存 | publisher75 passed/1 skipped、application等27 passed、CLI/S04 25 passed | pass | path/source-kind/opaque/TOCTOU/cross-FS/capability/state/privacyを確認。Linux-only gateは理由付きskip |
+| `tc-s02-001`〜`tc-s02-012` | S02 | yes | red-required per fault class | `tc-s02-001`〜`011`はS01 baseline + isolated mutants、Option A cleanup genuine Red 6件、precommit OSError genuine Red 2件。`tc-s02-012`はamendment後Red未実施 | existing publisher88 passed/1 skipped、関連unit29、fault/cleanup17、CLI5、S04互換20。Linux anonymous-staging verification pending | blocked | 既存matrixはGreenだが、Linux anonymous create/held-FD commit/no-pathname-unlink/unsupported fail-closedは未実装 |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -241,12 +248,13 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
 | §8.2 listed closures | S01 | `tc-s01-001`〜`tc-s01-005`、legacy regressions、lint、fresh code re-review | pass | initial P1をtest補強し、fresh re-review findings `[]`。closure deltaなし |
-| §9.2 listed closures | S02 | `tc-s02-001`〜`tc-s02-010`、Red matrix、publisher full unit、S04 compatibility、lint | blocked | staging cleanup/state mapping/fault evidence P1×3。closure deltaなし |
+| §9.2 listed closures | S02 | `tc-s02-001`〜`tc-s02-012`、Red matrix、publisher full unit、CLI/S04 compatibility、lint/format/mypy | blocked | `tc-s02-012`のRed/Green、Linux capability evidence、fresh code reviewが未完了 |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
 | none | §8.2 listed closures | `tc-s01-001`〜`tc-s01-005` | unchanged | approved expectationsを変更せず実装 | no | no |
+| added | `CL-AC-011`, `CL-AC-012`, `CL-EC-014`, `CL-EC-015`, `CL-CON-006`, `CL-CON-007` | `tc-s02-012` | existing closuresを強化 | accepted Linux ADRをpathname-free stagingのobservable testへ投影 | yes | yes |
 
 #### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 `workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
@@ -265,13 +273,13 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | S01 | delegated | multi-layer provider runtime/testsのvertical tracer | dev-coder | `plan.md` §8 | approved R/D/P、accepted ADR、provider source | §8.4のprovider runtime/root rules/S01 tests | legacy ChatGPT import/Workbench/typed・blank grammar、S02以降、canonical docs | §8.7 focused tests、legacy smoke、diff inspection | root graph化、legacy contract変更、unsafe fallback、allowed path外変更が必要 | changed files、Red/Green/Refactor、tests、risks、ledger note | worker completed; parent verification passed |
-| S02 | delegated | filesystem/security focusのhardening | dev-coder | `plan.md` §9 | approved R/D/P、accepted ADR Decision 5/6/8、S01 committed source | §9.3 provider runtimeとS02 tests | public hash/count、external raw path、source move/delete、legacy Workbench ancestry、unsafe fallback、S03/S04 | §9.6、publisher full unit、S04 compatibility、lint | safe primitive不在、postcommit integrity uncertainty、raw path公開が必要 | changed files、fault/privacy matrix、platform evidence、Red/Green/Refactor、risks | worker completed; parent verification passed |
+| S02 | delegated | filesystem/security focusのhardening | dev-coder | `plan.md` §9 | approved R/D/P、accepted ADR `20260728t100038z` / `20260730t085831z` / `20260730t102747z`、S01 committed source | §9.3 provider runtimeとS02 tests | public hash/count、external raw path、source move/delete、legacy Workbench ancestry、unsafe/named-temp fallback、S03/S04 | §9.6、publisher full unit、S04 compatibility、lint、`tc-s02-012` | Linux anonymous staging実装不能、named-temp fallback/same-UID waiver、postcommit integrity uncertainty、raw path公開が必要 | changed files、fault/privacy matrix、platform evidence、Red/Green/Refactor、risks | prior worker candidate review failed; amendment後のbounded re-delegation pending |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
 | S01 | dev-coder | generic file importをCLIからFSまで縦に通し、rootをnon-nodeのまま4 targetとopaque bytesを実装。初回review findingに対しtest evidenceを補強 | §8.4のprovider runtime/root rulesと新規S01 testsの16 files | required unit25/CLI4/legacy/full-unit/lint pass | pass | S02〜S04の計画済み範囲のみ | fresh re-review findings `[]`; confidence `0.98`; accepted for commit |
-| S02 | dev-coder | explicit source eligibility、descriptor-bound publication、capability/state/privacy hardeningを実装し、Red matrixとnon-mutating capability probeを補強 | application/command/infra 3 filesとS02 tests 6 files | publisher75/1 skip、application等27、CLI/S04 25、lint pass | fail | staging cleanup race、setup/lock state mapping、fault evidence 3 class | return to dev-coder |
+| S02 | dev-coder | Option A cleanupをfinal pathname re-statまで狭め、precommit OSError/fault evidenceとportable socket fixtureを補完 | application/command/infra 3 filesとS02 tests 6 files | targeted17、publisher88/1 skip、関連unit29、CLI5、S04互換20、lint/format/mypy/diff-check pass | fail | Linux named-temp cleanupはmacOS限定Option Aの範囲外 | return to planning / parent decision routing |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -293,7 +301,10 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 |---|---|---|---|---|---|---|---|
 | planning | execution readiness spec review | spec-reviewer | fresh | pass | no | execute approved plan | findings `[]`; confidence `0.99`; R/D/P/report/assuranceとS01契約を確認 |
 | S01 | step code review | code-reviewer | fresh re-review | pass | no | close S01 after focused commit | initial P1をtest補強。re-review findings `[]`; confidence `0.98` |
-| S02 | step code review | code-reviewer | fresh | fail | no | return to dev-coder | P1×3: staging cleanup race、precommit OS fault normalization、fault-class Red/Green不足。confidence `0.99` |
+| S02 | step code review | code-reviewer | fresh re-review | fail | no | return to planning / parent decision routing | prior P1×2とP1×3は解消したが、Linux cleanup競合P1。report count P2は88/1へ統一。confidence `0.98` |
+| S02 amendment | planning spec review | spec-reviewer | fresh | pass | no | execute approved plan | final re-review findings `[]`; confidence `0.99`。preflight/actual formal-candidate commit、failure normalization、EEXIST、closure mapping、親Epic/ADR整合を確認 |
+| S02 amendment first review | planning spec review | spec-reviewer | historical | fail | no | superseded by final fresh pass | P1×2: Linux visible probe cleanup再導入リスク、`tc-s02-012` closure index未登録。両方をdesign/plan/reportへ限定修正 |
+| S02 amendment second review | planning spec review | spec-reviewer | historical | fail | no | superseded by final fresh pass | P1×1: `I345-RQ-008`のheld-FD linkability確認時点が古いpreflight表現。non-mutating preflightとactual formal commitへ分離 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -318,7 +329,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | descriptor close | close hook observation tests | `2 failed` | source/temp/parent close tests Green |
 | postcommit warning | directory fsync warning suppression mutant | `1 failed` | exact warning/retry tests Green |
 | privacy / control | raw dynamic-field renderer mutant | `1 failed` | text round-trip/JSON allowlist/sentinel tests Green |
-| precommit fault mapping | `BinaryArtifactPublishError.committed=True` mutant | `5 failed, 72 deselected` | `5 passed, 72 deselected` |
+| precommit fault mapping | `BinaryArtifactPublishError.committed=True` mutant + create-lock/setup OSError baseline | publisher mapping `5 failed, 72 deselected`; application genuine Red `2 failed` | publisher mapping + application OSError matrix Green |
+| observable staging cleanup uncertainty | missing/replacement/unexpected type/stat/fstat/open uncertainty baseline | genuine Red `6 failed` | no-unlink/retained + pre/postcommit state focused Green |
 
 #### Privacy and Fault Injection Matrix
 | 区分 | 観測結果 | public state / retry | 証跡 |
@@ -329,6 +341,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | capability unsupported / non-mutating probe | Green | `publication_unsupported`; `not_committed` | owned staged tempへのEEXIST確認、probe unlinkなし、formal destinationなし |
 | precommit fault matrix | Green | `not_committed` / `safe_after_remediation` | temp/copy/fsync/hash/parent/publication fault tests |
 | postcommit durability / cleanup warnings | Green | `committed_with_warning` / `not_needed` | directory fsync、temp cleanup、create-lock release |
+| observable staging cleanup uncertainty | Green | precommit `not_committed`; postcommit `committed_with_warning` / `not_needed` | missing/replacement/unexpected type/stat/fstat/open uncertaintyはretain/no-unlink |
 | descriptor close failures | Green | committed resultを維持 | source/temp/destination-parent close no-throw |
 | external privacy / control safety | Green | allowlisted text/JSON only | basename-only、content/hash/count/raw path/errorなし、control-safe quoting |
 
@@ -360,6 +373,33 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 ---
 
+### セッションログ（2026-07-30 — Linux Option A amendment readiness）
+
+#### 対象
+- Step: S02 amendment
+- AC: `I345-AC-011`, `I345-AC-012`
+- 計画上の出典（Planned source）:
+  - `plan.md` section: §9
+  - closure ids: `CL-AC-011`, `CL-AC-012`, `CL-EC-014`, `CL-EC-015`, `CL-CON-006`, `CL-CON-007`
+
+#### 実施内容
+- ユーザー採用のLinux Option Aをaccepted ADR、Epic/Issue R/D/P/reportへ反映した。
+- final fresh spec-reviewはfindings `[]`、`pass`、confidence `0.99`。
+- assuranceを再分類・再検証し、fail-closed状態から実行可能状態へ遷移した。
+
+#### 実行コマンド / 結果
+```text
+assurance classify -> authorized_profile=standard, complexity_tier=normal
+assurance verify --issue iss-00345 -> ok=true, status=valid
+guidance issue-planning -> state=ready, next_action=planning-ready
+guidance issue-execution -> state=ready, next_action=execute-approved-plan, may_execute_approved_plan=true
+spec-dock validate -> ok, nodes=217
+```
+
+#### 判断
+- bounded S02実装修正を再開する。
+- Linuxでvisible staging/probe pathname、named-temp fallback、same-UID cleanup waiverを導入しない。
+
 ### セッションログ（2026-07-30 — S02 implementation）
 
 #### 対象
@@ -373,6 +413,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - 初回code reviewのP1×2に対し、probe ownership token/identity/digest bindingとreplacement survival regressionを追加し、S01 baseline/isolated mutantsでfault classごとのRed evidenceを補完した。
 - 再reviewで残ったcheck→unlink raceに対し、probe専用pathnameの作成・cleanupを廃止し、owned staged tempへのnon-mutating EEXIST probeへ変更した。
 - `git diff --check`と`spec-dock validate`はpassし、plan外のmaterial decisionはない。
+- Option A採用後の再委任で、missing/replacement/unexpected type/stat/fstat/open uncertaintyをretain/no-unlinkへ固定し、create-lock/setup precommit `OSError`正規化と不足3 fault classの証跡を補完した。
+- 当時の再委任直後Greenはpublisher `87 passed, 1 skipped`、関連unit `29 passed`、fault/cleanup集中 `13 passed`、CLI generic `5 passed`、S04 compatibility `20 passed`、lint/format/mypy/diff-check pass。後続のfinal pathname再確認とportable socket fixture追加後の最新値はpublisher `88 passed, 1 skipped`、fault/cleanup集中 `17 passed`であり、Linux anonymous-staging amendment反映後に再検証する。
 
 ---
 
