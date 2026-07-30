@@ -7,7 +7,7 @@ ID: "iss-00345"
 最終更新: "2026-07-30"
 親: ["epic-00343", "init-local-00002"]
 関連GitHub: ["#345"]
-関連: ["iss-00344", "iss-00346", "20260728t100038z-adr", "20260730t085831z-adr"]
+関連: ["iss-00344", "iss-00346", "20260728t100038z-adr", "20260730t085831z-adr", "20260730t102747z-adr"]
 authorized_profile_observed: "standard"
 parent_recommended_grade: "critical"
 classification_status: "runtime_classified"
@@ -107,6 +107,8 @@ accepted ADR `20260728t100038z-adr-generic-imported-file-identity-and-privacy-bo
 
 accepted ADR `20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md` は、macOS clone-capable / cross-filesystem successを維持し、named staging cleanupの最終FD/path identity check後から`unlink` syscallまでに行われる意図的なsame-UID pathname replacementだけを保証対象外とする。この限定は包括的same-UID waiverではない。最終checkまでに観測できるreplacement、missing、unexpected type、stat/open failureその他ownership uncertaintyではunlinkせずretainし、formal destination no-replace、source bytes / non-mutation / privacy、destination parent identityを維持する。
 
+accepted ADR `20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md` は、Linuxでsame-UID cleanup waiverを受容せず、destination filesystem上のlinkable `O_TMPFILE` anonymous stagingを必須化する。held FDから`/proc/self/fd/<fd>`と`linkat(..., AT_SYMLINK_FOLLOW)`によるno-replace publicationへ進み、pre-commit abort/failureではFDをcloseするだけでpathname `unlink`を行わない。filesystem / kernel / procfs / link / durability capabilityが不足する場合はformal destination作成前に`publication_unsupported` / `not_committed` / `safe_after_remediation`でfail closedし、named-temp fallbackを使わない。original sourceが別filesystemにあるsuccess laneは維持する。
+
 ## 6. Scope
 
 ### 6.1 In scope
@@ -199,12 +201,14 @@ typed、blank、generic family は `(timestamp, optional suffix)` slot ledger �
 
 ### I345-RQ-008 Destination-side publication と platform capability
 
-source filesystem に依存せず、destination directory 内に owned temp を作る。copy、file fsync、staged hash/count verification、source revalidation、destination parent identity verification の後、opened temp FD に結び付いた no-replace primitive で formal basename を公開する。Linux / macOS の supported primitive が利用できない場合、fallback overwrite や mutable-path rename を使わず fail closed とする。source と destination が別 filesystem でも成功可能でなければならない。
+source filesystem に依存せず、destination filesystem 内にowned staging FDを作る。copy、file fsync、staged hash/count verification、source revalidation、destination parent identity verification の後、opened staging FD に結び付いた no-replace primitive で formal basename を公開する。Linux / macOS の supported primitive が利用できない場合、fallback overwrite や mutable-path rename を使わず fail closed とする。source と destination が別 filesystem でも成功可能でなければならない。
+
+Linux stagingはvisible pathnameを持たないlinkable `O_TMPFILE` anonymous inodeとする。formal candidate syscall前のnon-mutating preflightはanonymous staging作成、FD regularity、`/proc/self/fd/<fd>` reference availability、directory durabilityに限定し、visible probe entryを作らない。held-FD linkabilityはformal candidateへのactual no-replace commit syscallで初めて確認し、formal entryを作らずcapability/policy理由で失敗した場合は個別errnoをpublic contractへ漏らさず`publication_unsupported` / `not_committed`へ正規化する。`EEXIST`は既存destination collisionとしてbounded retryへ返す。pre-commit abort/failureではstaging FDをcloseするだけであり、pathname cleanup、named-temp fallback、Linuxへのsame-UID cleanup waiverを禁止する。
 
 macOS named stagingはhigh-entropy internal name、`O_CREAT | O_EXCL | O_NOFOLLOW`相当、held staging FD、cleanup直前のFD/path identityとregular-file type確認を必須とする。replacement、missing、unexpected type、stat/open failureその他ownership uncertaintyを最終checkまでに観測した場合はunlinkせず`cleanup_state=retained`へ落とす。capability probeは別のraceable pathnameを作成・削除せず、owned staged tempに対するnon-mutating no-replace確認を使う。
 
 - Parent trace: `E-RQ-013`, `E-RQ-016`, `E-RQ-017`; `D-005`。
-- ADR trace: `20260728t100038z-adr` Decision 8、`20260730t085831z-adr` Decision / mandatory mitigations。
+- ADR trace: `20260728t100038z-adr` Decision 8、`20260730t085831z-adr` Decision / mandatory mitigations、`20260730t102747z-adr` Option A / Linux anonymous-staging boundary。
 
 ### I345-RQ-009 Publication state と retry disposition
 
@@ -450,7 +454,7 @@ source device と destination device が異なっても、source を move/link �
 
 ### I345-EC-015 Unsupported publication capability
 
-Linux `/proc/self/fd` link または macOS descriptor clone の必要 capability がない場合、formal destinationを作らず `not_committed` で失敗する。
+Linuxのlinkable `O_TMPFILE`、`/proc/self/fd` link、directory durability、またはmacOS descriptor cloneの必要 capabilityがない場合、formal destinationを作らず`publication_unsupported` / `not_committed` / `safe_after_remediation`で失敗する。Linuxではnamed-temp fallbackを行わない。
 
 ### I345-EC-016 Post-commit warning
 
@@ -514,6 +518,8 @@ staging 中から最終 source reread / identity / path 検証までに観測可
 
 original source が destination と別 filesystem でも destination-side staging で成功する。安全 primitive が unavailable/unsupported の場合は formal destination なしで fail closed となる。`I345-RQ-008`, `I345-CON-007`, `I345-EC-014`, `I345-EC-015` を閉じる。
 
+Linux supported laneではlinkable `O_TMPFILE` anonymous stagingからheld FD-bound no-replace commitへ進み、pre-commit abort/failureでpathname `unlink`を呼ばない。anonymous staging、procfs、link、directory durabilityのcapability不足はformal destinationなしの`publication_unsupported` / `not_committed` / `safe_after_remediation`となり、named-temp cleanupやsame-UID waiverへfallbackしない。
+
 macOS named staging cleanupでは、final FD/path identity checkまでに観測できるreplacement、missing、unexpected type、stat/open failureその他ownership uncertaintyをretainし、unlinkしない。final check後から`unlink`までの意図的same-UID replacementだけはaccepted ADR `20260730t085831z-adr`の限定された保証対象外であり、完全防御をpass条件として主張しない。
 
 ### I345-AC-012 Publication state
@@ -559,7 +565,7 @@ result/docs は `canonical=false` と evidence-only boundary を保持し、本 
 | `I345-RQ-005` | `E-RQ-014` | `D-006` | ADR Decision 1〜3 |
 | `I345-RQ-006` | `E-RQ-015` | `D-007` | ADR Decision 4 |
 | `I345-RQ-007` | `E-RQ-014`, `E-RQ-016` | `D-006` | ADR Decision 3, 8 |
-| `I345-RQ-008` | `E-RQ-013`, `E-RQ-016`, `E-RQ-017` | `D-005` | ADR Decision 8 |
+| `I345-RQ-008` | `E-RQ-013`, `E-RQ-016`, `E-RQ-017` | `D-005` | ADR Decision 8、`20260730t102747z-adr` |
 | `I345-RQ-009` | `E-RQ-017` | `D-005`, `D-008` | ADR Decision 8 |
 | `I345-RQ-010` | `E-RQ-018` | `D-008` | ADR Decision 6 |
 | `I345-RQ-011` | `E-RQ-019`, `E-RQ-020` | `D-009` | ADR Decision 7 |

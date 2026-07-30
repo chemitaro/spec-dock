@@ -5,7 +5,7 @@ ID: "iss-00345"
 状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-30"
-依存: ["requirement.md", "epic-00343/design.md", "20260728t100038z-adr", "20260730t085831z-adr"]
+依存: ["requirement.md", "epic-00343/design.md", "20260728t100038z-adr", "20260730t085831z-adr", "20260730t102747z-adr"]
 親: ["epic-00343", "init-local-00002"]
 authorized_profile_observed: "standard"
 parent_recommended_grade: "critical"
@@ -18,7 +18,7 @@ classification_status: "runtime_classified"
 
 本書は `requirement.md` の `I345-RQ-*` / `I345-AC-*` を実装可能な責務、interface、state、failure mapping、test seam へ落とす approved canonical design である。runtime classification は `standard` であり、本書の承認とfresh reviewer passを実装開始判断の入力にする。
 
-設計根拠は、current provider source、parent Epic `D-003`〜`D-009`、accepted ADR `20260728t100038z-adr` / `20260730t085831z-adr`、review済みのcanonical requirement、Issue authoring workflowである。
+設計根拠は、current provider source、parent Epic `D-003`〜`D-009`、accepted ADR `20260728t100038z-adr` / `20260730t085831z-adr` / `20260730t102747z-adr`、review済みのcanonical requirement、Issue authoring workflowである。
 
 ## 1. 設計目標
 
@@ -84,6 +84,7 @@ provider runtime/docs/rulesを一次変更面とし、managed dogfood projection
 | FD-bound no-replaceがcommit point | ADR Decision 8 | state machineの唯一のcommit transition |
 | post-commit warningはretry不要 | ADR Decision 8 | exit success + `committed_with_warning` |
 | macOS named-staging cleanupの限定threat boundary | `20260730t085831z-adr` | final identity checkまでに観測可能なreplacement / missing / unexpected type / uncertaintyはretainし、check後からunlinkまでの意図的same-UID replacementだけを保証対象外とする |
+| Linux anonymous-staging no-waiver boundary | `20260730t102747z-adr` | linkable `O_TMPFILE`、held-FD publication、pre-commit FD-close-only cleanupを必須化し、capability不足をformal destination前にfail closedとする |
 | `chatgpt-output`不変 | `E-RQ-021` | current classes/renderers/portを維持 |
 | Issue 346 delivery boundary | Parent Candidate 3 | integrated/distribution/final reviewをdefer |
 
@@ -104,6 +105,7 @@ provider runtime/docs/rulesを一次変更面とし、managed dogfood projection
 | `LC-345-009` | root rules sourceを`docs/rules/root/artifacts.md`とする | parent `D-004`のexact pathを採用 |
 | `LC-345-010` | existing artifacts directoryはopened directory FD、fresh targetはsecurely opened target parent FDから`PC_NAME_MAX`を取得し、作成後のartifacts FDで再確認する。取得不能/不正値/identity不一致はfail closed | platform limitを推測せず、fresh childが同一filesystemに作られたことを検証 |
 | `LC-345-011` | `_cleanup_temp`はheld FDとpathnameのidentityに加えて双方のregular-file typeを確認し、missing / mismatch / unexpected type / stat・open failureを全て`retained`としてunlinkしない | Option Aの対象内mitigationをコード上で直接表現し、`FileNotFoundError`を誤って`removed`扱いしない |
+| `LC-345-012` | Linux generic publicationは`O_EXCL`を伴わないlinkable `O_TMPFILE` anonymous inodeをdestination parent FD相対で作り、held FDから既存の`/proc/self/fd/<fd>` no-replace linkへ進む。abort/failureはFD closeのみで、visible staging pathnameやpathname cleanupを持たない | Linuxのcleanup raceをsame-UID waiverではなく構造的に除去し、unsupported filesystemは`publication_unsupported`へfail closedする |
 
 ## 3. Architecture context
 
@@ -444,7 +446,7 @@ current `FilesystemBinaryArtifactPublisher` は次を持つ。
 
 - Workbench/lowercase `.md` guard。
 - source `O_NOFOLLOW` open とdevice/inode/mode照合。
-- destination-side `O_EXCL` temp。
+- destination-side staging。legacy/macOSはnamed `O_EXCL` temp、Linux genericはlinkable `O_TMPFILE` anonymous inode。
 - bounded chunk copy、stream/staged/source/destination hash/count verification。
 - file fsync。
 - source mutation/replacement/unlink detection。
@@ -471,7 +473,7 @@ public application port:
 #### Descriptor ownership and close semantics
 
 - source FD / lease: applicationがretry loop全体で所有し、publisherはborrowする。全exit pathでapplication finalizerが一度だけcloseする。
-- staged-temp FD: publisherが所有し、formal commit前に不要ならcommit前にcloseする。commit primitiveがopened temp FDを必要とするplatformではcommit後に`close_noexcept`で閉じる。
+- staged-temp FD: publisherが所有し、formal commit前に不要ならcommit前にcloseする。Linux generic anonymous stagingは全pre-commit abort/failureでFD closeだけを行い、pathname cleanupを持たない。commit primitiveがopened temp FDを必要とするplatformではcommit後に`close_noexcept`で閉じる。
 - destination-parent FD: publisherがidentity-bound commit/directory fsyncまで所有し、その後`close_noexcept`で閉じる。
 - capability-probe FD: probeがformal commit前に所有・cleanup・closeを完了し、不確実ならpublicationへ進まない。
 - commit後のdescriptor/lease close failureはformal identity、`committed=true`、exit success、retry not-neededを変更しない。public warning allowlistへ追加せず、test-only fault recorderで観測する。
@@ -489,19 +491,19 @@ public application port:
 
 #### Capability probe
 
-no-replace primitiveはformal destination commit前にdestination parent FDへ対してprobeする。probeはowned hidden namesとopened temp FDを使い、次を確認する。
+capability確認はplatform contractごとに行い、Linuxでは確認用のvisible pathnameを作成・unlinkしない。
 
-- FD-bound operationがsupportedである。
-- existing probe destinationを置換しない。
-- probe entriesをidentity確認後にcleanupできる。
+Linux preflightは、destination parent FD相対でlinkable `O_TMPFILE` anonymous inodeを作成できること、FDがregular fileであること、current-processの`/proc/self/fd/<fd>`参照とdirectory durability primitiveが利用可能であることをnon-mutatingに確認する。anonymous FDを別のprobe nameへlinkして削除する確認は行わない。formal candidateへの実際のFD-bound no-replace commit syscallを最初のlinkability確認とし、syscallがcapability/policy理由でformal entryを作らず失敗した場合は個別errnoを公開せず`publication_unsupported` / `not_committed`へ正規化する。`EEXIST`は既存destinationを変更しないcollisionとして既存retry契約へ返す。
 
-unsupported、probe cleanup uncertainty、`/proc/self/fd` unavailable、macOS symbol unavailableは`publication_unsupported`でfail closedする。Windows/other platformへunsafe fallbackを追加しない。
+`O_TMPFILE`定数、filesystem/kernel、procfs、link、durabilityのいずれかがunsupportedまたはpolicy拒否なら、formal destination前にfail closedする。Linux probe/abort/failureでnamed staging、visible probe entry、pathname `unlink`へfallbackしない。
+
+macOS probe cleanup uncertainty、`/proc/self/fd` unavailable、macOS symbol unavailableは`publication_unsupported`でfail closedする。Windows/other platformへunsafe fallbackを追加しない。
 
 macOS named stagingのcapability確認は、別のraceable probe pathnameを作成・unlinkせず、owned staged tempに対するnon-mutating no-replace確認を使う。cleanupはheld FD/path identityとregular-file typeを最終確認し、replacement、missing、unexpected type、stat/open failureその他ownership uncertaintyではunlinkせず`retained`を返す。最終check後からpathname `unlink`までの意図的same-UID replacementだけはaccepted ADR `20260730t085831z-adr`の限定された非保証窓であり、それ以外の対象内failureをこの窓へ拡張しない。
 
 #### Cross-filesystem support
 
-sourceからformal destinationへhard link/renameしない。source bytesをdestination parent内のtemp FDへstreamし、そのtemp FDだけをformal nameへcommitするため、source deviceとdestination deviceの違いは成功条件を妨げない。
+sourceからformal destinationへhard link/renameしない。source bytesをdestination filesystem上のstaging FDへstreamし、そのstaging FDだけをformal nameへcommitするため、source deviceとdestination deviceの違いは成功条件を妨げない。
 
 #### Post-commit warning boundary
 
@@ -787,12 +789,18 @@ source lease、staged-temp FD、destination-parent FDのcommit後close failure�
 ### 8.4 Destination races
 
 - destination parentをcomponent-wise `O_DIRECTORY|O_NOFOLLOW`でopenし、visible directory identityをcommit直前に再確認。
-- temp fileはdestination parentに`O_CREAT|O_EXCL`で作る。
+- Linux generic stagingはdestination parent上のlinkable `O_TMPFILE` anonymous inodeとし、visible staging nameを作らない。legacy/macOS named stagingはdestination parentに`O_CREAT|O_EXCL`で作る。
 - formal destinationはno-replace primitiveだけで作る。
 
 ## 9. Privacy threat model
 
-### 9.1 macOS named-staging cleanup boundary
+### 9.1 Linux anonymous-staging boundary
+
+accepted ADR `20260730t102747z-adr`は、Linuxでnamed-staging cleanupのsame-UID waiverを受容しない。generic stagingはdestination filesystem上のlinkable `O_TMPFILE` anonymous inodeであり、formal commit前にpathnameを持たない。abort/failureはFD closeだけで完了し、pathname `unlink`を呼ばない。anonymous stagingまたはheld-FD publication capabilityが不足するenvironmentはformal destination前に`publication_unsupported`でfail closedし、named-temp fallbackを禁止する。
+
+Linux integration testを実行できないhostでも、syscall seamでanonymous create、held-FD commit、unsupported mapping、no-pathname-unlinkをdeterministicに検証する。supported Linux environmentのsuccess主張は通常権限の実能力テストを必要とし、capability不在をskipからpassへ読み替えない。
+
+### 9.2 macOS named-staging cleanup boundary
 
 accepted ADR `20260730t085831z-adr`は、同一UIDでdestination directoryを変更でき、high-entropy internal staging nameを発見・監視するactorが、cleanupの最終FD/path identity check後から`unlink` syscallまでにpathnameを意図的に別entryへ置換する場合だけを保証対象外とする。これはformal destination、source、privacyの保証や、final checkまでに観測可能なreplacement / missing / unexpected type / uncertaintyを対象外にしない。
 
