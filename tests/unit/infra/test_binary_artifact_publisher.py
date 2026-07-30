@@ -11,6 +11,10 @@ import tempfile
 import pytest
 
 
+def _explicit_cleanup_state(named_stage_state: str) -> str:
+    return "not_created" if sys.platform.startswith("linux") else named_stage_state
+
+
 def _runtime_modules():
     runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
     sys.path.insert(0, str(runtime_scripts_dir))
@@ -417,7 +421,7 @@ def test_explicit_source_mutation_or_ancestor_retarget_fails_before_commit(tmp_p
         guarded.close()
 
     assert captured.value.code == "source_changed"
-    assert captured.value.cleanup_state == "removed"
+    assert captured.value.cleanup_state == _explicit_cleanup_state("removed")
     assert not destination.exists()
 
 
@@ -1021,6 +1025,8 @@ def test_cleanup_replacement_after_reopen_is_detected_by_final_path_check(tmp_pa
 
 @pytest.mark.parametrize("committed", [False, True])
 def test_cleanup_missing_is_retained_for_precommit_and_postcommit_state(tmp_path, monkeypatch, committed):
+    if sys.platform.startswith("linux"):
+        pytest.skip("Linux explicit import uses anonymous staging without pathname cleanup")
     contracts, publisher_module = _runtime_modules()
     repo_root, _specdock_dir, _scopes, artifacts_dir = _layout(tmp_path)
     source = repo_root / "source.bin"
@@ -1097,7 +1103,7 @@ def test_explicit_destination_parent_identity_failure_is_precommit_and_no_publis
 
     assert captured.value.code == "destination_ineligible"
     assert captured.value.committed is False
-    assert captured.value.cleanup_state == "removed"
+    assert captured.value.cleanup_state == _explicit_cleanup_state("removed")
     assert visible_checks == 1
     assert publish_calls == 0
     assert not destination.exists()
@@ -1129,8 +1135,8 @@ def test_explicit_nonrace_publication_failure_is_precommit_and_no_formal_destina
 
     assert captured.value.code == "publication_failed"
     assert captured.value.committed is False
-    assert captured.value.cleanup_state == "removed"
-    assert commit_calls == 2
+    assert captured.value.cleanup_state == _explicit_cleanup_state("removed")
+    assert commit_calls == (1 if sys.platform.startswith("linux") else 2)
     assert not destination.exists()
 
 
@@ -1166,7 +1172,7 @@ def test_explicit_precommit_faults_are_content_free_and_leave_no_formal_destinat
         guarded.close()
 
     assert captured.value.code == expected_code
-    assert captured.value.cleanup_state == expected_cleanup
+    assert captured.value.cleanup_state == _explicit_cleanup_state(expected_cleanup)
     assert captured.value.committed is False
     assert not destination.exists()
     assert "private raw exception sentinel" not in str(captured.value)
@@ -1215,6 +1221,8 @@ def test_explicit_postcommit_descriptor_close_failure_is_no_throw_without_public
 def test_explicit_postcommit_faults_return_exact_warning_and_committed_identity(
     tmp_path, fault_point, expected_warning, expected_cleanup
 ):
+    if fault_point == "cleanup" and sys.platform.startswith("linux"):
+        pytest.skip("Linux explicit import has no pathname cleanup seam")
     contracts, publisher_module = _runtime_modules()
     repo_root, _specdock_dir, _scopes, artifacts_dir = _layout(tmp_path)
     source = repo_root / "source.bin"
@@ -1239,12 +1247,14 @@ def test_explicit_postcommit_faults_return_exact_warning_and_committed_identity(
         guarded.close()
 
     assert result.committed is True
-    assert result.cleanup_state == expected_cleanup
+    assert result.cleanup_state == _explicit_cleanup_state(expected_cleanup)
     assert result.warning_codes == (expected_warning,)
     assert result.destination_path.read_bytes() == b"source"
 
 
 def test_unexpected_postcommit_oserror_is_not_misclassified_as_not_committed(tmp_path, monkeypatch):
+    if sys.platform.startswith("linux"):
+        pytest.skip("Linux explicit import has no pathname cleanup seam")
     contracts, publisher_module = _runtime_modules()
     repo_root, _specdock_dir, _scopes, artifacts_dir = _layout(tmp_path)
     source = repo_root / "source.bin"

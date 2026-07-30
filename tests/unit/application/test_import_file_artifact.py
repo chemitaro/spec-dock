@@ -892,3 +892,46 @@ def test_fresh_rules_link_replacement_fails_closed_without_deleting_replacement(
     assert (artifacts_dir / "rules.md").readlink() == replacement_target
     assert not list(artifacts_dir.glob("*.bin"))
     assert source.read_bytes() == b"source"
+
+
+def test_rules_link_rollback_preserves_reused_inode_replacement_with_new_ctime(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _contracts, module, _ports_module, _publisher_type = _runtime_modules()
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    replacement_target = tmp_path / "replacement.md"
+    replacement_target.write_text("# Replacement\n", encoding="utf-8")
+    rules_link = artifacts_dir / "rules.md"
+    rules_link.symlink_to(replacement_target)
+    replacement_status = rules_link.lstat()
+    created_status = SimpleNamespace(
+        st_dev=replacement_status.st_dev,
+        st_ino=replacement_status.st_ino,
+        st_mode=replacement_status.st_mode,
+        st_ctime_ns=replacement_status.st_ctime_ns - 1,
+    )
+    created_identity = module._rules_link_identity(created_status)
+    artifacts_directory_fd = os.open(artifacts_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    original_stat = module.os.stat
+
+    def reused_inode_status(path, *args, **kwargs):
+        if (
+            path == "rules.md"
+            and kwargs.get("dir_fd") == artifacts_directory_fd
+            and kwargs.get("follow_symlinks") is False
+        ):
+            return replacement_status
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "stat", reused_inode_status)
+    try:
+        module._rollback_bound_rules_link(
+            artifacts_directory_fd=artifacts_directory_fd,
+            created_rules_identity=created_identity,
+        )
+    finally:
+        os.close(artifacts_directory_fd)
+
+    assert rules_link.readlink() == replacement_target
