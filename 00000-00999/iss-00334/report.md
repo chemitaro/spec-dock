@@ -822,3 +822,15 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - Planner／Semantic Revision resourceへ同一のexact 13-H2／no split-or-merge contractを追加し、Reviewer resourceとvalidatorは変更していない。official updateでprovider／projectionのPlanner SHA-256 `3538b8c8a28dc86c6ff448b0f377e460b41bb484a9b1247f726095c733751051`、Revision `03fd129fc68b2ecc4e95897006b39ac3ae55ad57486cf25672116d3b2d8dc1d2`をbyte-identicalに同期した。
 - RedはPrompt contract不在の2 failures／74 passed。GreenはPrompt＋domain unit 76 passed、Prompt budget 23 passed、full-regression指定integration 4 chains、Ruff／format／mypy、provider／projection parity、`git diff --check`がPASSした。既存character ceilingは増やしていない。
 - Prompt repairをcommit／pushした新しいexact HEADで、新しいformal createを一度だけ実行する。最初のterminal invalid ZIPはimmutable failure evidenceとして保持し、上書きやCandidate化をしない。
+
+## 2026-07-30 — Second live authoring ZIP rejection and PlantUML role-label repair
+
+- 13-H2 Prompt repairをcommit `65e755ef80733ed28f66024bab4e31d8f6e8c427`としてpushし、clean／local-remote identical HEADで新しいformal `planning create`を一度だけ実行した。
+- Oracle session `specdock-planner-a498d2-226aca9a`はmanaged Chrome `127.0.0.1:9223`、fresh conversation／target各1件、`promptSubmitted=true`、`requested=Pro`／`resolved=Pro`／`verified=yes`でterminal `completed`となった。userが削除した旧失敗tabは再利用しておらず、実行中のfresh targetが存在することもCDP一覧で確認した。
+- exactly one `iss-00334-issue-planning-documents.zip`を取得した。ZIP SHA-256は`d16e2774f7a841ea0616c4204ddffbdcde61d8f4fa8f83c3c11bf0b6619b99ee`、single root内はcanonical三文書＋runtime-selected onboarding companionの4 filesである。
+- RuntimeはCandidate publication前に`rejected/archive_rejected`、details `authoring_payload_invalid`で停止した。三文書はすべてparse成功し、companionもexact 13 nonempty distinct H2と4 PlantUML blocksを満たしたが、`onboarding companion PlantUML role is missing`で拒否された。repository mutation、Candidate、Review、Human decision、applyは0件である。
+- 直接原因はPromptがPlantUML roleを`system-context`／`responsibility-boundary`／`planning-sequence`／`implementation-roadmap`と要求する一方、validatorがblock内の空白表記`system context`／`responsibility`または`authority boundary`／`planning sequence`または`issue planning sequence`／`implementation roadmap`または`remaining implementation roadmap`を探索するlexical contract不一致だった。
+- operator-side `chatgpt-use` session `iss00334-plantuml-role-contract`はGitHub connectorでexact branch／HEAD identical、default branch未使用を確認し、`GO_BOUNDED_PROMPT_ROLE_LABEL_REPAIR`と判定した。正式artifactは`artifacts/20260730t062126z-chatgpt-output-s12-plantuml-role-label-repair-work-packet.md`である。
+- Planner／Semantic Revisionのprovider Prompt 2件だけを空白role表記へ厳密置換し、official updateでprojection 2件をbyte-identicalに同期した。Reviewer、validator、character ceiling、Candidate／Review／Human／apply境界は変更していない。
+- RedはPrompt unit 2 failuresでlexical mismatchを再現した。GreenはPrompt unit 23 passed、domain 54 passed、full-regression指定focused integration 4 passed、Ruff check／format、provider／projection parity、`uv build`、validate 227 nodes、`git diff --check`がPASSした。
+- このbounded repairをcommit／pushした新しいclean／local-remote identical HEADで、新しいformal createを一度だけ実行する。二つの拒否済みZIPはimmutable failure evidenceとして保持し、上書きやCandidate化をしない。
