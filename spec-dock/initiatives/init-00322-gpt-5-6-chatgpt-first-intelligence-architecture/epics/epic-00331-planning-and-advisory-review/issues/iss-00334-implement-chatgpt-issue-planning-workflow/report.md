@@ -834,3 +834,24 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - Planner／Semantic Revisionのprovider Prompt 2件だけを空白role表記へ厳密置換し、official updateでprojection 2件をbyte-identicalに同期した。Reviewer、validator、character ceiling、Candidate／Review／Human／apply境界は変更していない。
 - RedはPrompt unit 2 failuresでlexical mismatchを再現した。GreenはPrompt unit 23 passed、domain 54 passed、full-regression指定focused integration 4 passed、Ruff check／format、provider／projection parity、`uv build`、validate 227 nodes、`git diff --check`がPASSした。
 - このbounded repairをcommit／pushした新しいclean／local-remote identical HEADで、新しいformal createを一度だけ実行する。二つの拒否済みZIPはimmutable failure evidenceとして保持し、上書きやCandidate化をしない。
+
+## 2026-07-30 — ChatGPT First時間分析の保存と後続Issue境界
+
+- Human提供の統合時間分析をInitiative artifact `artifacts/20260730t093657z-research-chatgpt-first-time-analysis-and-optimization.md`へ元ファイルからbyte-identicalに保存した。source／repository artifactはともに55,494 bytes、SHA-256 `2a04a1ffb7b39a6633b94bc0334044e91c72708191cb2f2c9f3573199639e8b4`である。
+- 現行Requirement／Design／Plan、provider adapter、Reviewer Prompt、live dogfood evidenceを照合し、bounded ChatGPT Pro consult `iss00334-amend-or-split-decision`でもexact GitHub branch／HEAD `1b9f2c52cb8b61e3c48ec69a981f628720dfe2b5`を確認した。
+- Humanは、`iss-00334`に現行accepted contractを完走不能にする実証済み欠陥だけを残し、Planning Review cross-scope hardeningとrole-based intelligence profileを後続Issueへ分離する方針を採用した。
+- same-session publication raceは`REQ-020`／`AC-020`に直接結び付くため本Issueで修正する。current accepted contractへ直接結び付くP0／P1、S12〜S14、commit／push、merge-ready PRも本Issueで閉じる。
+- general `planning-gap` contract、Pro／High／Extra High routing、tier telemetry、Initiative／Epic／Issue横断policyは本Issueへ追加しない。これらはHuman merge後の最新`main`から独立Issue／branch／PRで実施する。
+- 永続handoffはEpic artifact `artifacts/20260730t093657z-disc-chatgpt-first-review-and-tier-follow-up-handoff.md`に保存した。後続Issue planningはこのartifactとInitiative research artifactをrequired sourceとしてcurrent parent docs、existing Issue seeds、dependency graphを再確認する。
+- same-session recovery work packetはrepository外sourceとIssue Workbench内2 copiesが同じSHA-256 `2d53cbeb95bc5d7e826038ce2e4b30b1e5c6e7ad89f6ca0a1c9f92e9db08dee9`である。`artifact import chatgpt-output`は`source_ineligible`／`committed=false`でno-write拒否されたため、完全sourceをunavailableへ再分類せず、Workbench／external evidenceのままbounded implementation inputに使用する。canonical adoption、reviewer pass、readinessは主張しない。
+- 旧HEADにbindしたauthoring ZIP／Candidate／Reviewは、publication race修正後のfresh current-HEAD Human decision／final assuranceへ流用しない。
+
+## 2026-07-30 — S12 same-session publication race修正
+
+- current HEAD `1b9f2c52cb8b61e3c48ec69a981f628720dfe2b5`ではbounded polling差分が存在しないことを再確認し、`dev-coder`へapproved work packetの積集合だけを再委任した。
+- provider-owned adapterはrecovery全体を一つの`time.monotonic()` deadlineへbindし、harvest前にsame session stateを再読する。harvest timeoutは残り時間を上限とし、prompt最大1回、harvest最大1回、new session 0を維持する。
+- harvestのnonzero、`TimeoutExpired`、`OSError`後もsame exact session metadataだけをpollする。terminal／invalidは即時終了し、deadline時点で未解決の場合だけ既存`blocked/oracle_session_recovery_required`へ接続する。
+- Redはeventual completion 2件、shared deadline 1件、invalid metadata 3件の計6 failures。Greenはadapter unit 77 passed、artifact reader 27 passed、full-regression指定integration 4 passed in 35.45s。
+- worker側で`make lint`のRuff／418 files format／mypy 281 files、provider／projection parity、`git diff --check`がPASSした。Mainもprovider／projection parity、`git diff --check`、上記77／27／4 testsを再実行してPASSを確認した。
+- public command family、Candidate／Review／Human／apply契約、model selector、Prompt contractは変更していない。残存gateは新しいexact pushed HEADでのreal Oracle publication lag、Candidate、fresh Review、exact Human decision、apply／remote parityである。
+- No material implementation decisions beyond the approved plan.

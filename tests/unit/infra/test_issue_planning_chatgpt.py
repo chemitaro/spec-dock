@@ -574,6 +574,183 @@ def test_timeout_recovers_same_session_without_duplicate_submit(
     assert sum("--harvest" in argv for argv in calls) == 1
 
 
+def test_recovery_polls_same_session_after_harvest_until_completed(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+    submitted: tuple[dict[str, str], list[str]] | None = None
+
+    def fake_run(argv, **kwargs):
+        nonlocal submitted
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        if "--prompt" in argv:
+            submitted = (kwargs["env"], list(argv))
+            _write_metadata_only(kwargs["env"], argv, status="running")
+            return _completed(argv, returncode=1)
+        return _completed(argv, returncode=1)
+
+    def complete_same_session(_seconds: float) -> None:
+        assert submitted is not None
+        _write_planner_session(
+            *submitted,
+            transcript_payloads=(
+                b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\n## Answer\ncandidate ready\n",
+            ),
+        )
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    monkeypatch.setattr(issue_planning_chatgpt.time, "sleep", complete_same_session)
+    result = _invoke(tmp_path, timeout_seconds=1.0)
+
+    assert (result.status, result.reason) == ("pass", "transport_received")
+    assert sum("--prompt" in argv for argv in calls) == 1
+    assert sum("--harvest" in argv for argv in calls) == 1
+    prompt_argv = next(argv for argv in calls if "--prompt" in argv)
+    harvest_argv = next(argv for argv in calls if "--harvest" in argv)
+    assert harvest_argv[2] == _session_id(prompt_argv)
+
+
+def test_recovery_polls_after_harvest_timeout_until_completed(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+    submitted: tuple[dict[str, str], list[str]] | None = None
+
+    def fake_run(argv, **kwargs):
+        nonlocal submitted
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        if "--prompt" in argv:
+            submitted = (kwargs["env"], list(argv))
+            _write_metadata_only(kwargs["env"], argv, status="running")
+            return _completed(argv, returncode=1)
+        raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+
+    def complete_same_session(_seconds: float) -> None:
+        assert submitted is not None
+        _write_planner_session(
+            *submitted,
+            transcript_payloads=(
+                b"# Oracle Browser Transcript\n## Prompt\nprivate prompt\n## Answer\ncandidate ready\n",
+            ),
+        )
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    monkeypatch.setattr(issue_planning_chatgpt.time, "sleep", complete_same_session)
+    result = _invoke(tmp_path, timeout_seconds=1.0)
+
+    assert (result.status, result.reason) == ("pass", "transport_received")
+    assert sum("--prompt" in argv for argv in calls) == 1
+    assert sum("--harvest" in argv for argv in calls) == 1
+    prompt_argv = next(argv for argv in calls if "--prompt" in argv)
+    harvest_argv = next(argv for argv in calls if "--harvest" in argv)
+    assert harvest_argv[2] == _session_id(prompt_argv)
+
+
+def test_recovery_poll_uses_one_monotonic_deadline(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+    harvest_timeouts: list[float] = []
+    clock = _FakeMonotonicClock()
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        if "--prompt" in argv:
+            _write_metadata_only(kwargs["env"], argv, status="running")
+            raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+        harvest_timeouts.append(kwargs["timeout"])
+        clock.now += 0.6
+        return _completed(argv, returncode=1)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    monkeypatch.setattr(issue_planning_chatgpt.time, "monotonic", clock.monotonic)
+    monkeypatch.setattr(issue_planning_chatgpt.time, "sleep", clock.sleep)
+    result = _invoke(tmp_path, timeout_seconds=1.0)
+
+    assert (result.status, result.reason) == (
+        "blocked",
+        "oracle_session_recovery_required",
+    )
+    assert harvest_timeouts and 0 < harvest_timeouts[0] <= 1.0
+    assert sum(clock.sleeps) <= 0.4
+    assert clock.now <= 1.0
+    assert sum("--prompt" in argv for argv in calls) == 1
+    assert sum("--harvest" in argv for argv in calls) == 1
+
+
+@pytest.mark.parametrize("invalid_metadata", ["malformed", "wrong-session", "wrong-mode"])
+def test_recovery_poll_rejects_invalid_metadata_without_further_wait(
+    monkeypatch,
+    tmp_path: Path,
+    invalid_metadata: str,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+    sleeps: list[float] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        if "--prompt" in argv:
+            _write_metadata_only(kwargs["env"], argv, status="running")
+            return _completed(argv, returncode=1)
+        session = _session_dir(kwargs["env"], argv[2])
+        if invalid_metadata == "malformed":
+            (session / "meta.json").write_bytes(b'{"id":')
+        else:
+            _write_metadata(
+                session,
+                "wrong-session" if invalid_metadata == "wrong-session" else argv[2],
+                "running",
+                [],
+                mode="api" if invalid_metadata == "wrong-mode" else "browser",
+            )
+        return _completed(argv, returncode=1)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    monkeypatch.setattr(issue_planning_chatgpt.time, "sleep", sleeps.append)
+    result = _invoke(tmp_path, timeout_seconds=1.0)
+
+    assert (result.status, result.reason) == (
+        "rejected",
+        "oracle_artifact_rejected",
+    )
+    assert sleeps == []
+    assert sum("--prompt" in argv for argv in calls) == 1
+    assert sum("--harvest" in argv for argv in calls) == 1
+    assert result.authoring_zip is None
+    assert result.review_json is None
+
+
 def test_timeout_with_unknown_terminal_state_requires_human_recovery(
     monkeypatch,
     tmp_path: Path,
@@ -594,13 +771,18 @@ def test_timeout_with_unknown_terminal_state_requires_human_recovery(
             raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
         return _completed(argv, returncode=1, stderr=b"token=private")
 
+    clock = _FakeMonotonicClock()
     _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    monkeypatch.setattr(issue_planning_chatgpt.time, "monotonic", clock.monotonic)
+    monkeypatch.setattr(issue_planning_chatgpt.time, "sleep", clock.sleep)
     result = _invoke(tmp_path, timeout_seconds=0.1)
     assert (result.status, result.reason) == (
         "blocked",
         "oracle_session_recovery_required",
     )
     assert sum("--prompt" in argv for argv in calls) == 1
+    assert sum("--harvest" in argv for argv in calls) == 1
+    assert sum(clock.sleeps) <= 0.1
     assert "private" not in repr(result)
 
 
@@ -1142,6 +1324,19 @@ class _FakeHttpConnection:
 
     def close(self) -> None:
         return
+
+
+class _FakeMonotonicClock:
+    def __init__(self) -> None:
+        self.now = 0.0
+        self.sleeps: list[float] = []
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.now += seconds
 
 
 def _session_help() -> bytes:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 import hashlib
 import http.client
 import json
@@ -13,6 +14,7 @@ import shutil
 import stat
 import subprocess
 from tempfile import TemporaryDirectory
+import time
 from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlsplit
 
@@ -42,6 +44,7 @@ _PREFLIGHT_TIMEOUT_SECONDS = 10.0
 _MAX_CDP_VERSION_BYTES = 64 * 1024
 _DEFAULT_RUN_TIMEOUT_SECONDS = 2 * 60 * 60
 _DEFAULT_RECOVERY_TIMEOUT_SECONDS = 2 * 60
+_RECOVERY_POLL_INTERVAL_SECONDS = 0.25
 _TERMINAL_STATUSES = frozenset({"completed"})
 _SessionState = Literal["terminal", "nonterminal", "missing", "invalid"]
 _ROOT_CAPABILITIES = (
@@ -354,6 +357,7 @@ def _recover_same_session(
     cwd: Path,
     timeout: float,
 ) -> _SessionState:
+    deadline = time.monotonic() + timeout
     initial_state = _session_state(session_root, session_id=session_id)
     if initial_state in {"terminal", "invalid"}:
         return initial_state
@@ -364,8 +368,14 @@ def _recover_same_session(
         or _executable_identity(recovery_executable) != executable_identity
     ):
         return "nonterminal"
-    try:
-        completed = _run_oracle(
+    pre_harvest_state = _session_state(session_root, session_id=session_id)
+    if pre_harvest_state in {"terminal", "invalid"}:
+        return pre_harvest_state
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return pre_harvest_state
+    with suppress(OSError, subprocess.TimeoutExpired):
+        _run_oracle(
             [
                 str(recovery_executable),
                 "session",
@@ -375,14 +385,29 @@ def _recover_same_session(
             ],
             child_env=child_env,
             cwd=cwd,
-            timeout=timeout,
+            timeout=remaining,
         )
-    except (OSError, subprocess.TimeoutExpired):
-        return "nonterminal"
-    final_state = _session_state(session_root, session_id=session_id)
-    if completed.returncode != 0 and final_state != "invalid":
-        return "nonterminal"
-    return final_state
+    return _poll_same_session_state(
+        session_root,
+        session_id=session_id,
+        deadline=deadline,
+    )
+
+
+def _poll_same_session_state(
+    session_root: Path,
+    *,
+    session_id: str,
+    deadline: float,
+) -> _SessionState:
+    while True:
+        state = _session_state(session_root, session_id=session_id)
+        if state in {"terminal", "invalid"}:
+            return state
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return state
+        time.sleep(min(_RECOVERY_POLL_INTERVAL_SECONDS, remaining))
 
 
 def _session_state(session_root: Path, *, session_id: str) -> _SessionState:

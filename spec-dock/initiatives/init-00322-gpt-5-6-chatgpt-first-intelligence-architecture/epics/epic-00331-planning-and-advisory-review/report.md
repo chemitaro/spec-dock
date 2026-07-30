@@ -130,3 +130,14 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 - current first companionはiss-00334 `artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md`。PlantUML 1.2026.6 syntax checkをPASSした。
 - operator-side `chatgpt-use`はauthoring手段に限定し、product runtimeはprovider-owned adapterからPATH Oracleを直接利用する。
 - 本変更はplanning amendmentであり、product implementation、execution-ready、Issue finish、PR merge、Epic completionを主張しない。
+
+## 2026-07-30 — ChatGPT First Review／tier最適化の後続handoff
+
+- Initiative-level統合分析を`artifacts/20260730t093657z-research-chatgpt-first-time-analysis-and-optimization.md`へbyte-identicalに保存した。SHA-256は`2a04a1ffb7b39a6633b94bc0334044e91c72708191cb2f2c9f3573199639e8b4`。
+- `iss-00334`へ横断的なReview contract／tier routingを追加せず、同Issueはsame-session publication raceとcurrent accepted contractに直接結び付くP0／P1、S12〜S14、merge-ready PRを閉じる。
+- 後続の必須検討事項をEpic artifact `artifacts/20260730t093657z-disc-chatgpt-first-review-and-tier-follow-up-handoff.md`へ記録した。
+- 後続Issue候補は次の二つである。
+  1. 全Planning targetのdefect成立条件、no-redesign、`planning-gap`、Prompt／validator parityを扱うPlanning Review contract hardening。
+  2. Pro／High／Extra Highのselector、no-fallback、recovery、parity、live quality／duration evaluationを扱うrole-based intelligence profile。
+- 後続Issue IDとdependency edgeはHumanによる`iss-00334` merge後、最新`main`、既存`iss-00335`／`iss-00336`、parent docsを確認してmaterializeする。Issueごとにone branch／one PR、fresh Review、Human-only mergeを維持する。
+- High／Extra Highは現時点でevaluation hypothesisであり、live evidence前にRequirementの確定事実として扱わない。generic tier framework、arbitrary configuration、Grade-based routing、個人`chatgpt-use` product dependencyはnon-goalとする。
