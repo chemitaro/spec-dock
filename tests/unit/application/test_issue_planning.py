@@ -22,6 +22,8 @@ RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" 
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application.issue_planning import resolve_existing_issue_target  # noqa: E402
+from spec_dock_runtime.application.ports import IssuePlanningDependencies  # noqa: E402
+from spec_dock_runtime.cli.bootstrap import _Clock, _IssuePlanningGateway  # noqa: E402
 from spec_dock_runtime.domain.authoring_pack.preflight_contract import (  # noqa: E402
     FetchSummary,
     FreshnessEvidence,
@@ -37,6 +39,8 @@ from spec_dock_runtime.infra.contracts import (  # noqa: E402
     DirectDependencyResolution,
     StoredMetaRecord,
 )
+
+PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_Clock(), gateway=_IssuePlanningGateway())
 
 
 def _record(path: Path, *, node_id: str = "iss-00003", kind: str = "issue") -> StoredMetaRecord:
@@ -619,6 +623,7 @@ def test_current_front_matter_inconsistency_short_circuits_backend(tmp_path: Pat
         "spec_dock_runtime.application.issue_planning",
         fromlist=["run_issue_planning_create"],
     ).run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=__import__(
             "spec_dock_runtime.application.issue_planning",
             fromlist=["PlanningCreateRequest"],
@@ -648,6 +653,7 @@ def test_create_maps_s02_nonpass_without_candidate_work(tmp_path: Path) -> None:
         fromlist=["run_issue_planning_create"],
     )
     result = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", output),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -694,6 +700,7 @@ def test_create_rejects_post_oracle_source_drift_before_publication(
         )
 
     result = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", output),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -739,6 +746,7 @@ def test_create_rejects_transient_payload_digest_mismatch(tmp_path: Path) -> Non
         fromlist=["run_issue_planning_create"],
     )
     result = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", output),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -763,6 +771,7 @@ def test_create_returns_ok_candidate_created_only_after_atomic_publication(
         fromlist=["run_issue_planning_create"],
     )
     result = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", output),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -790,6 +799,7 @@ def test_create_success_output_has_only_safe_keys(tmp_path: Path) -> None:
         fromlist=["run_issue_planning_create"],
     )
     result = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", output),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -832,6 +842,7 @@ def test_unsupported_atomic_publication_leaves_final_absent(
         fromlist=["run_issue_planning_create"],
     )
     result = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", output),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -865,10 +876,10 @@ def test_atomic_publication_collision_preserves_existing_candidate_bytes(tmp_pat
         "preflight_runner": lambda _request: _preflight(),
         "clock": lambda: "2026-07-28T12:00:00+00:00",
     }
-    first = module.run_issue_planning_create(**arguments)
+    first = module.run_issue_planning_create(dependencies=PLANNING_DEPENDENCIES, **arguments)
     candidate = output / first.output["candidate_identity"]["logical_filename"]
     before = candidate.read_bytes()
-    second = module.run_issue_planning_create(**arguments)
+    second = module.run_issue_planning_create(dependencies=PLANNING_DEPENDENCIES, **arguments)
     assert (second.status, second.reason) == ("rejected", "output_collision")
     assert candidate.read_bytes() == before
     assert len(list(output.iterdir())) == 1
@@ -900,6 +911,7 @@ def test_create_uses_one_dependency_snapshot_for_transport_and_source_baseline(
         fromlist=["run_issue_planning_create"],
     )
     result = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", output),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -933,6 +945,7 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
         fromlist=["run_issue_planning_review"],
     )
     created = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", candidate_output),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -1017,6 +1030,7 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
         )
 
     result = module.run_issue_planning_review(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviewRequest(
             issue_id="iss-00003",
             mode="archive-candidate",
@@ -1039,6 +1053,7 @@ def test_archive_review_accepts_exact_identity_and_publishes_external_evidence(
     before_directories = tuple(review_output.iterdir())
     mutate_candidate[0] = True
     stale = module.run_issue_planning_review(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviewRequest(
             issue_id="iss-00003",
             mode="archive-candidate",
@@ -1073,6 +1088,7 @@ def test_git_bound_review_has_exact_three_documents_and_companion_targets(
         fromlist=["run_issue_planning_review"],
     )
     created = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", candidates),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -1143,6 +1159,7 @@ def test_git_bound_review_has_exact_three_documents_and_companion_targets(
         )
 
     result = module.run_issue_planning_review(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviewRequest(
             issue_id="iss-00003",
             mode="git-bound",
@@ -1167,6 +1184,7 @@ def test_git_bound_review_has_exact_three_documents_and_companion_targets(
     ]
     before_directories = tuple(output.iterdir())
     stale = module.run_issue_planning_review(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviewRequest(
             issue_id="iss-00003",
             mode="git-bound",
@@ -1211,6 +1229,7 @@ def test_git_bound_review_rejects_transient_exact_target_bytes_before_backend(
         fromlist=["run_issue_planning_review"],
     )
     created = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", candidates),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -1285,6 +1304,7 @@ def test_git_bound_review_rejects_transient_exact_target_bytes_before_backend(
     monkeypatch.setattr(Path, "read_bytes", transient_read)
     monkeypatch.setattr(os, "open", transient_open)
     result = module.run_issue_planning_review(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviewRequest(
             issue_id="iss-00003",
             mode="git-bound",
@@ -1365,6 +1385,7 @@ def test_git_bound_review_target_swap_is_nonblocking_and_rejected_before_backend
     monkeypatch.setattr(os, "open", swap_during_open)
     monkeypatch.setattr(Path, "read_bytes", reject_blocking_pathname_read)
     result = module.run_issue_planning_review(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviewRequest(
             issue_id="iss-00003",
             mode="git-bound",
@@ -1399,6 +1420,7 @@ def test_mechanical_revision_requires_blocking_review_and_publishes_v2(
     snapshot = _preflight()
     assert snapshot.repository is not None
     created = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", candidates),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -1466,6 +1488,7 @@ def test_mechanical_revision_requires_blocking_review_and_publishes_v2(
     candidate_path = candidates / identity.logical_filename
     old_sha = hashlib.sha256(candidate_path.read_bytes()).hexdigest()
     result = module.run_issue_planning_revise(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviseRequest(candidate_path, request_path, revised),
         review_evidence=module.PlanningRevisionEvidenceInput(
             review_path,
@@ -1501,6 +1524,7 @@ def test_p2_only_review_blocks_revision_without_backend_or_candidate(
     snapshot = _preflight()
     assert snapshot.repository is not None
     created = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", candidates),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -1562,6 +1586,7 @@ def test_p2_only_review_blocks_revision_without_backend_or_candidate(
     )
     backend_calls: list[object] = []
     result = module.run_issue_planning_revise(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviseRequest(
             candidates / identity.logical_filename,
             request_path,
@@ -1600,6 +1625,7 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
     assert snapshot.repository is not None
     source_hash = snapshot.repository.source_manifest.source_manifest_hash
     created = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", candidates),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -1687,6 +1713,7 @@ def test_semantic_revision_uses_exact_review_and_complete_replacement(
         )
 
     result = module.run_issue_planning_revise(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviseRequest(
             candidates / identity.logical_filename,
             request_path,
@@ -1846,6 +1873,7 @@ def test_review_rejects_malformed_wrong_identity_digest_verdict_and_authority_ou
         )
 
     result = module.run_issue_planning_review(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviewRequest(
             issue_id="iss-00003",
             mode="archive-candidate",
@@ -1883,6 +1911,7 @@ def _semantic_revision_setup(tmp_path: Path) -> dict[str, Any]:
     assert snapshot.repository is not None
     source_hash = snapshot.repository.source_manifest.source_manifest_hash
     created = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", candidates),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -1967,6 +1996,7 @@ def test_revision_without_explicit_evidence_uses_exact_review_sibling(
     identity = setup["identity"]
 
     result = module.run_issue_planning_revise(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviseRequest(
             setup["candidates"] / identity.logical_filename,
             sibling_request,
@@ -1999,6 +2029,7 @@ def test_revision_does_not_scan_for_review_evidence(tmp_path: Path) -> None:
     identity = setup["identity"]
 
     result = module.run_issue_planning_revise(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviseRequest(
             setup["candidates"] / identity.logical_filename,
             sibling_request,
@@ -2087,6 +2118,7 @@ def test_semantic_revision_rejects_sensitive_external_review_before_backend(
     module = setup["module"]
     identity = setup["identity"]
     result = module.run_issue_planning_revise(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviseRequest(
             setup["candidates"] / identity.logical_filename,
             request_path,
@@ -2160,6 +2192,7 @@ def test_semantic_partial_extra_wrong_issue_or_scope_escape_publishes_zero(
         )
 
     result = module.run_issue_planning_revise(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviseRequest(
             setup["candidates"] / identity.logical_filename,
             setup["request_path"],
@@ -2198,6 +2231,7 @@ def test_semantic_transport_nonpass_preserves_existing_reason(
     identity = setup["identity"]
     contracts = setup["contracts"]
     result = module.run_issue_planning_revise(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningReviseRequest(
             setup["candidates"] / identity.logical_filename,
             setup["request_path"],
@@ -2253,7 +2287,11 @@ def test_revision_request_transient_swap_is_nonblocking_and_rejected(
 
     monkeypatch.setattr(os, "open", swap_before_open)
     with pytest.raises(ValueError):
-        module._read_external_bounded_file(request_path, repo_root=repo)
+        module._read_external_bounded_file(
+            request_path,
+            repo_root=repo,
+            gateway=PLANNING_DEPENDENCIES.gateway,
+        )
     assert swapped == [True]
 
 
@@ -2287,7 +2325,11 @@ def test_revision_request_rejects_oversize_without_pathname_read(
     monkeypatch.setattr(Path, "read_bytes", observe_pathname_read)
     monkeypatch.setattr(os, "read", observe_descriptor_read)
     with pytest.raises(ValueError, match="bounded"):
-        module._read_external_bounded_file(request_path, repo_root=repo)
+        module._read_external_bounded_file(
+            request_path,
+            repo_root=repo,
+            gateway=PLANNING_DEPENDENCIES.gateway,
+        )
     assert pathname_reads == [0]
     assert sum(descriptor_read_requests) <= limit + 1
 
@@ -2338,7 +2380,11 @@ def test_revision_request_parent_swap_never_redirects_into_repo(
 
     monkeypatch.setattr(os, "open", swap_during_open)
     monkeypatch.setattr(Path, "read_bytes", swap_during_pathname_read)
-    data = module._read_external_bounded_file(request_path, repo_root=repo)
+    data = module._read_external_bounded_file(
+        request_path,
+        repo_root=repo,
+        gateway=PLANNING_DEPENDENCIES.gateway,
+    )
     assert data == original_bytes
     assert redirected_bytes not in data
     assert swapped == [True]

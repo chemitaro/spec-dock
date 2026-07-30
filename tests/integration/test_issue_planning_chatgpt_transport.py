@@ -14,6 +14,8 @@ from spec_dock_runtime.application import issue_planning  # noqa: E402
 from spec_dock_runtime.application.authoring_pack.github_sync_preflight import (  # noqa: E402
     run_github_sync_preflight,
 )
+from spec_dock_runtime.application.ports import IssuePlanningDependencies  # noqa: E402
+from spec_dock_runtime.cli.bootstrap import _Clock, _IssuePlanningGateway  # noqa: E402
 from spec_dock_runtime.domain.authoring_pack.preflight_contract import (  # noqa: E402
     FetchSummary,
     FreshnessEvidence,
@@ -37,6 +39,7 @@ from spec_dock_runtime.infra.issue_planning_chatgpt import (  # noqa: E402
 )
 
 DEFAULT_COMPANION_PATH = "artifacts/20260728t120000z-guide-new-member-chatgpt-first-issue-planning.md"
+PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_Clock(), gateway=_IssuePlanningGateway())
 
 
 def test_synced_source_to_transport_tracer_preserves_identity_and_is_not_lifecycle_success(
@@ -167,6 +170,7 @@ def test_fake_transport_to_candidate_preserves_source_and_payload_binding(tmp_pa
     record = _record(issue_dir)
     payload = _authoring_zip(documents)
     result = issue_planning.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=issue_planning.PlanningCreateRequest("iss-00003", output),
         records=[record],
         repo_root=repo,
@@ -198,6 +202,7 @@ def test_typed_authoring_zip_rejects_stale_source_before_candidate(tmp_path: Pat
     output = tmp_path / "output"
     output.mkdir()
     result = issue_planning.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=issue_planning.PlanningCreateRequest("iss-00003", output),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -226,6 +231,7 @@ def test_authoring_zip_extra_entry_leaves_final_zero(tmp_path: Path) -> None:
         extra_entries={"fourth.md": b"fourth document"},
     )
     result = issue_planning.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=issue_planning.PlanningCreateRequest("iss-00003", output),
         records=[_record(issue_dir)],
         repo_root=repo,
@@ -263,6 +269,7 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
     reviews.mkdir()
     record = _record(issue_dir)
     created = issue_planning.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=issue_planning.PlanningCreateRequest("iss-00003", candidates),
         records=[record],
         repo_root=repo,
@@ -334,6 +341,7 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
 
     first_identity = contracts.IssueCandidateIdentity.from_dict(created.output["candidate_identity"])
     first_review = issue_planning.run_issue_planning_review(
+        dependencies=PLANNING_DEPENDENCIES,
         request=issue_planning.PlanningReviewRequest(
             issue_id="iss-00003",
             mode="archive-candidate",
@@ -409,6 +417,7 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
         )
 
     revision = issue_planning.run_issue_planning_revise(
+        dependencies=PLANNING_DEPENDENCIES,
         request=issue_planning.PlanningReviseRequest(
             candidates / first_identity.logical_filename,
             request_path,
@@ -429,6 +438,7 @@ def _run_revision_to_fresh_review_chain(tmp_path: Path, *, lane: str) -> None:
     assert (revision.status, revision.reason) == ("ok", "candidate_revised")
     second_identity = contracts.IssueCandidateIdentity.from_dict(revision.output["candidate_identity"])
     second_review = issue_planning.run_issue_planning_review(
+        dependencies=PLANNING_DEPENDENCIES,
         request=issue_planning.PlanningReviewRequest(
             issue_id="iss-00003",
             mode="archive-candidate",

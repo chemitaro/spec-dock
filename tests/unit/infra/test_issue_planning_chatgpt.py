@@ -17,6 +17,8 @@ from spec_dock_runtime.application.issue_planning_prompt import (  # noqa: E402
     PlanningPromptAttachment,
     SynthesizedPlanningPrompt,
 )
+from spec_dock_runtime.application.ports import IssuePlanningDependencies  # noqa: E402
+from spec_dock_runtime.cli.bootstrap import _Clock, _IssuePlanningGateway  # noqa: E402
 from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
     OracleAuthoringZipSnapshot,
     PlanningInvocationResult,
@@ -24,6 +26,8 @@ from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
 )
 from spec_dock_runtime.infra import issue_planning_chatgpt  # noqa: E402
 from spec_dock_runtime.infra.contracts import StoredMetaRecord  # noqa: E402
+
+PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_Clock(), gateway=_IssuePlanningGateway())
 
 
 def test_path_oracle_direct_argv_environment_and_planner_snapshot(
@@ -688,6 +692,7 @@ def test_typed_planner_zip_fails_closed_in_legacy_application_before_publication
         fromlist=["PlanningCreateRequest", "run_issue_planning_create"],
     )
     result = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
         request=module.PlanningCreateRequest("iss-00003", output),
         records=[_record(issue_dir)],
         repo_root=repo,

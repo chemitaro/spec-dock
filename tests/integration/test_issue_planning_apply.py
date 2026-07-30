@@ -12,6 +12,11 @@ import pytest
 RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
+from spec_dock_runtime.application.ports import IssuePlanningDependencies  # noqa: E402
+from spec_dock_runtime.cli.bootstrap import _Clock, _IssuePlanningGateway  # noqa: E402
+
+PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_Clock(), gateway=_IssuePlanningGateway())
+
 
 def _module():
     return __import__(
@@ -940,6 +945,7 @@ def test_application_retry_reaches_same_operation_publication(
 
     def apply_once():
         return app.run_issue_planning_apply(
+            dependencies=PLANNING_DEPENDENCIES,
             request=request,
             records=[record],
             repo_root=repo,
