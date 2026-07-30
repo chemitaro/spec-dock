@@ -7,7 +7,7 @@ ID: "iss-00345"
 最終更新: "2026-07-30"
 親: ["epic-00343", "init-local-00002"]
 関連GitHub: ["#345"]
-関連: ["iss-00344", "iss-00346", "20260728t100038z-adr"]
+関連: ["iss-00344", "iss-00346", "20260728t100038z-adr", "20260730t085831z-adr"]
 authorized_profile_observed: "standard"
 parent_recommended_grade: "critical"
 classification_status: "runtime_classified"
@@ -105,6 +105,8 @@ SpecDock には既に `artifact import chatgpt-output` がある。この comman
 
 accepted ADR `20260728t100038z-adr-generic-imported-file-identity-and-privacy-boundary.md` が、generic family、full destination basename identity、shared slot、minimal normalization、external basename-only visibility、opaque lifecycle、FD-bound commit point、post-commit retry 不要を固定する。本 Issue 内でこれらを再判断しない。
 
+accepted ADR `20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md` は、macOS clone-capable / cross-filesystem successを維持し、named staging cleanupの最終FD/path identity check後から`unlink` syscallまでに行われる意図的なsame-UID pathname replacementだけを保証対象外とする。この限定は包括的same-UID waiverではない。最終checkまでに観測できるreplacement、missing、unexpected type、stat/open failureその他ownership uncertaintyではunlinkせずretainし、formal destination no-replace、source bytes / non-mutation / privacy、destination parent identityを維持する。
+
 ## 6. Scope
 
 ### 6.1 In scope
@@ -199,8 +201,10 @@ typed、blank、generic family は `(timestamp, optional suffix)` slot ledger �
 
 source filesystem に依存せず、destination directory 内に owned temp を作る。copy、file fsync、staged hash/count verification、source revalidation、destination parent identity verification の後、opened temp FD に結び付いた no-replace primitive で formal basename を公開する。Linux / macOS の supported primitive が利用できない場合、fallback overwrite や mutable-path rename を使わず fail closed とする。source と destination が別 filesystem でも成功可能でなければならない。
 
+macOS named stagingはhigh-entropy internal name、`O_CREAT | O_EXCL | O_NOFOLLOW`相当、held staging FD、cleanup直前のFD/path identityとregular-file type確認を必須とする。replacement、missing、unexpected type、stat/open failureその他ownership uncertaintyを最終checkまでに観測した場合はunlinkせず`cleanup_state=retained`へ落とす。capability probeは別のraceable pathnameを作成・削除せず、owned staged tempに対するnon-mutating no-replace確認を使う。
+
 - Parent trace: `E-RQ-013`, `E-RQ-016`, `E-RQ-017`; `D-005`。
-- ADR trace: Decision 8。
+- ADR trace: `20260728t100038z-adr` Decision 8、`20260730t085831z-adr` Decision / mandatory mitigations。
 
 ### I345-RQ-009 Publication state と retry disposition
 
@@ -510,6 +514,8 @@ staging 中から最終 source reread / identity / path 検証までに観測可
 
 original source が destination と別 filesystem でも destination-side staging で成功する。安全 primitive が unavailable/unsupported の場合は formal destination なしで fail closed となる。`I345-RQ-008`, `I345-CON-007`, `I345-EC-014`, `I345-EC-015` を閉じる。
 
+macOS named staging cleanupでは、final FD/path identity checkまでに観測できるreplacement、missing、unexpected type、stat/open failureその他ownership uncertaintyをretainし、unlinkしない。final check後から`unlink`までの意図的same-UID replacementだけはaccepted ADR `20260730t085831z-adr`の限定された保証対象外であり、完全防御をpass条件として主張しない。
+
 ### I345-AC-012 Publication state
 
 fault injection が pre-commit failure を `not_committed` / exit failure、post-commit durability/cleanup fault を `committed_with_warning` / exit success / retry `not_needed` として区別する。`I345-RQ-009`, `I345-EC-016` を閉じる。
@@ -575,6 +581,7 @@ result/docs は `canonical=false` と evidence-only boundary を保持し、本 
 | `I345-RISK-007` | unsupported filesystem silently falls back | non-atomic publication | capability probe and fail-closed token; no rename/copy fallback |
 | `I345-RISK-008` | provider/dogfood drift | shipped behavior differs from repo observation | provider-first update, managed projection diff, parity checks |
 | `I345-RISK-009` | runtime standardとparent critical推奨の関係を誤表現する | authority violation | runtime standardを現在値、criticalをreview focusとして記録し、importによるmutationを主張しない |
+| `I345-RISK-010` | macOS named-staging cleanupの限定除外が包括的same-UID waiverとして扱われる | 観測可能なreplacementやownership uncertaintyで非所有entryを削除する | accepted ADRのactor / pathname / time-window限定、final identity/type check、uncertainty時retain、sentinel回帰テスト |
 
 ## 15. Rollback expectations
 
@@ -582,7 +589,7 @@ result/docs は `canonical=false` と evidence-only boundary を保持し、本 
 - rollout後またはgeneric Artifact作成後は、write commandと新規作成経路をdisable/revertできること。ただしgrandfathered evidenceとの互換性に必要な最小generic filename recognizer、validation/sync互換、semantic-opacity handling、typed/blank/genericのshared-slot reservationは残すこと。
 - existing `artifact import chatgpt-output`、typed/blank data、existing Artifact filenamesを migration/rewriteしないこと。
 - post-rollout disablement後も既に committed された generic Artifact は user evidence として保持し、自動 rename/delete/reclassifyしないこと。
-- retained owned temp がある場合は identity-confirmed cleanup procedureだけを使用し、unowned entryを削除しないこと。
+- retained owned temp がある場合は identity-confirmed cleanup procedureだけを使用し、unowned entryを削除しないこと。macOSのaccepted ADRで除外された最終check後のsame-UID deliberate replacementを越えて保証を拡張する場合は、Issue-local cleanupを追加せずEpic/ADRへ戻すこと。
 - rollbackまたはpost-rollout disablement後は、選択した経路に応じたfocused compatibility、`validate`、`sync --no-github`、provider/dogfood parityを再確認すること。
 - public filename contract または commit/retry semanticsが既に利用者に公開された後の変更は、Issue-local rollbackで再定義せず Epic/ADR amendmentへ戻すこと。
 

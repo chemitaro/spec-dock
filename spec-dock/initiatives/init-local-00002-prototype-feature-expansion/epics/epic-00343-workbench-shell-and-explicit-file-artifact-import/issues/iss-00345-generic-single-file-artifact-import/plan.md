@@ -6,6 +6,7 @@ ID: "iss-00345"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-30"
 親: ["epic-00343", "init-local-00002"]
+依存: ["requirement.md", "design.md", "20260728t100038z-adr", "20260730t085831z-adr", "iss-00344", "iss-00346"]
 planning_method: "Spec-Locked Micro-Batch TDD"
 authorized_profile_observed: "standard"
 parent_recommended_grade: "critical"
@@ -137,8 +138,8 @@ S99 final local quality, rollback evidence, Issue 346 handoff
 | `CL-AC-008` | `I345-AC-008` | shared all-family slots/exhaustion | mixed directory inventory | cross-family overwrite | yes | domain + app | S03 | `tc-s03-004`, `005` |
 | `CL-AC-009` | `I345-AC-009` | cooperative/noncooperative no overwrite | parallel import/barrier | race overwrite/duplicate identity | yes | app + infra | S03 | `tc-s03-006`, `007` |
 | `CL-AC-010` | `I345-AC-010` | source races fail precommit | mutation/replace/unlink/retarget | TOCTOU acceptance | yes | infra | S02 | `tc-s02-005` |
-| `CL-AC-011` | `I345-AC-011` | cross-FS succeeds; unsupported fails closed | device difference/capability stub | unsafe fallback | yes | infra + CLI | S02 | `tc-s02-006`, `007` |
-| `CL-AC-012` | `I345-AC-012` | honest three-state/retry | fault injection matrix | duplicate retry after commit | yes | app + presentation + CLI | S02 | `tc-s02-008`, `009` |
+| `CL-AC-011` | `I345-AC-011` | cross-FS succeeds; unsupported fails closed; observable macOS cleanup uncertainty retains | device difference/capability stub/cleanup sentinel | unsafe fallback or non-owned unlink | yes | infra + CLI | S02 | `tc-s02-006`, `007`, `011` |
+| `CL-AC-012` | `I345-AC-012` | honest three-state/retry and cleanup state | fault injection + missing/type matrix | duplicate retry or false removed state | yes | app + presentation + CLI | S02 | `tc-s02-008`, `009`, `011` |
 | `CL-AC-013` | `I345-AC-013` | external basename-only/no derived data | secret path/body/hash sentinels | privacy disclosure | yes | presentation + CLI | S02 | `tc-s02-010` |
 | `CL-AC-014` | `I345-AC-014` | body unopened by lifecycle | invalid UTF-8 ADR-like generic | semantic escalation/decode | yes | CLI/runtime | S04 | `tc-s04-001`, `002`, `003` |
 | `CL-AC-015` | `I345-AC-015` | root setup/rules safe/provider-first | fresh/broken/wrong rules | graph pollution/setup overwrite | yes | app + CLI + docs | S01, S90 | `tc-s01-003`, `tc-s90-001` |
@@ -357,7 +358,7 @@ repository内外の明示regular file一件を、leaf symlink reject / ancestor 
 - Red evidence: `red-required` per fault class; existing publisher tests are `covered-existing` only forlegacy core, notgeneric policy。
 - Green verification: S02 focused commands。
 - Refactor guardrail: internal hash/count verificationを削除しないがpublic DTOへ出さない。ancestor symlink acceptanceをlegacy Workbench guardへ適用しない。
-- Amendment trigger: public privacy relax、commit point変更、unsafe platform fallback、postcommit retry requirement。
+- Amendment trigger: public privacy relax、commit point変更、unsafe platform fallback、postcommit retry requirement、またはaccepted ADR `20260730t085831z-adr`の限定threat boundary変更。
 
 ### 9.5 Red → Green → Refactor
 
@@ -365,8 +366,8 @@ repository内外の明示regular file一件を、leaf symlink reject / ancestor 
 2. explicit guardをlegacy guardから分離し、repo-root-relative/absolute/`..`、ancestor symlink、FIFO direct/race nonblocking rejectionをGreenにする。
 3. mutation/cross-FS/capability testsをRedにする。
 4. shared staging coreへFD/source identity/capability probeを完成しGreenにする。
-5. precommit fault、三つのpostcommit warning、descriptor close no-throw、race retry cleanup aggregation、public renderingをRedにする。
-6. phase-aware state mapper、attempt cleanup merge、allowlist rendererをGreenにする。
+5. precommit fault、三つのpostcommit warning、descriptor close no-throw、race retry cleanup aggregation、macOS named-stagingのobservable replacement / missing / unexpected type retain、public renderingをRedにする。
+6. phase-aware state mapper、attempt cleanup merge、identity/type-confirmed cleanup、allowlist rendererをGreenにする。
 7. fault injector namingとprivate helpersをtidyし、legacy publisher testsを再実行する。
 
 ### 9.6 Step-local verification commands
@@ -382,13 +383,13 @@ uv run pytest tests/cli_runtime/test_artifact_import_s04.py
 ### 9.7 Delegation contract
 
 - **delegated role**: `dev-coder` with filesystem/security focus。
-- **input docs**: main workflowで採用・fresh reviewされたcanonical R/D/P、accepted ADR Decision 5/6/8、current publisher source/tests、S01 diff/evidence、AGENTS testing/security rules。
+- **input docs**: main workflowで採用・fresh reviewされたcanonical R/D/P、accepted ADR `20260728t100038z-adr` Decision 5/6/8、accepted ADR `20260730t085831z-adr` Decision / mandatory mitigations、current publisher source/tests、S01 diff/evidence、AGENTS testing/security rules。
 - **allowed paths**: §9.3 provider files and tests only。
 - **forbidden changes**: public hash/count addition、external path logging/provenance、source move/delete、legacy Workbench ancestry policy、rename/copy overwrite fallback、Issue 346 tests。
 - **acceptance criteria**: S02 closure rows Green; cross-FS supported; unsupported capability no formal dest; warning retry not_needed; sentinel absent across text/JSON/stderr/warnings/diff。
 - **required tests**: §9.6 plus existing full `tests/unit/infra/test_binary_artifact_publisher.py` after focused subset。
-- **reviewer focus**: FD binding、identity comparisons、exception redaction、commit point、cleanup ownership、platform branches、no whole-file reads。
-- **stop conditions**: safe primitive unavailable on intended supported platform without parent amendment、postcommit integrity uncertainty、raw path required in public error、source-side link/move required。
+- **reviewer focus**: FD binding、identity/type comparisons、missing / mismatch / unexpected type / uncertainty時のno-unlink retain、non-mutating probe、exception redaction、commit point、cleanup ownership、platform branches、no whole-file reads。final check後からunlinkまでの意図的same-UID replacementだけを限定非保証として扱い、包括的waiverにしない。
+- **stop conditions**: safe primitive unavailable on intended supported platform without parent amendment、postcommit integrity uncertainty、raw path required in public error、source-side link/move required、またはaccepted ADRのactor / pathname / time-window境界を広げる必要。
 - **output required**: changed files、fault matrix、platform notes、Red/Green evidence、privacy sentinel result、unresolved capability risks、Ledger Note、report summary。
 
 ### 9.8 具体テストケース一覧
@@ -472,6 +473,14 @@ uv run pytest tests/cli_runtime/test_artifact_import_s04.py
   - 失敗検出:DTO/renderer/logger/error chainingからのprivacy leak、改行/control injection、quote/backslash/equalsによるtoken境界破壊、非可逆escapeを検出する。
   - 検証方法:exact text assertions、text valueのJSON decoder round-trip、JSON parse + exact-key/value assertions、raw C0/DEL/ESC/bidi scan、combined stdout/stderr/warnings scan、tracked diff scan。
   - 関連 closure id: `CL-AC-013`, `CL-EC-003`, `CL-CON-002`, `CL-CON-003`
+
+- `tc-s02-011` security: observable macOS staging cleanup uncertainty never unlinks and never reports removed
+  - 前提: cleanupの最終checkまでに、staging pathnameをreplacement sentinelへ差し替える、pathnameをmissingにする、unexpected non-regular entryへ置換する、stat/open failureを注入する各fixtureを用意する。pre-commit abortとpost-commit cleanupの双方で実行する。
+  - 操作: held staging FDを維持したまま各fixtureでcleanupを実行し、unlink spy、formal destination、public stateを観測する。
+  - 期待結果:全fixtureでreplacement/sentinelへunlinkせず`cleanup_state=retained`。pre-commitはformal destinationなしの`not_committed`、post-commitはformal destinationを保持した`committed_with_warning` / `temp_cleanup_retained` / retry `not_needed`。final check後からunlinkまでの意図的same-UID replacement完全防御はpass条件に含めない。
+  - 失敗検出:`FileNotFoundError`を`removed`と誤報する、type/identity uncertainty後にunlinkする、Option Aを包括的same-UID waiverへ拡張する回帰を検出する。
+  - 検証方法:`tests/unit/infra/test_binary_artifact_publisher.py`のdeterministic cleanup barrier / stat-type fault testsとapplication/CLI state assertions。
+  - 関連 closure id: `CL-AC-011`, `CL-AC-012`, `CL-EC-016`, `CL-CON-006`
 
 ### 9.9 Step closure contract
 
