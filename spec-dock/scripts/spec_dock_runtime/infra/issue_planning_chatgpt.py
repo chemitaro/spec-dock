@@ -67,6 +67,11 @@ _SAFE_ENVIRONMENT_KEYS = frozenset({
     "TMPDIR",
     "TZ",
 })
+_SESSION_ROLE_SLUGS = {
+    "planner": "planner",
+    "semantic_revision": "semantic-revision",
+    "reviewer": "reviewer",
+}
 
 
 def resolve_issue_planning_github_repository(repo_root: Path) -> str | None:
@@ -544,7 +549,7 @@ def _new_session_id(
     role: Literal["planner", "semantic_revision", "reviewer"],
     source_evidence: PlanningSourceEvidence,
 ) -> str:
-    return f"specdock-{role}-{source_evidence.snapshot_id[:6]}-{secrets.token_hex(4)}"
+    return f"specdock-{_SESSION_ROLE_SLUGS[role]}-{source_evidence.snapshot_id[:6]}-{secrets.token_hex(4)}"
 
 
 def _write_transport_pack(
