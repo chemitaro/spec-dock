@@ -2,7 +2,7 @@
 種別: 設計書（Issue）
 ID: "iss-00345"
 タイトル: "Generic Single-File Artifact Import Design"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-30"
 依存: ["requirement.md", "epic-00343/design.md", "20260728t100038z-adr"]
@@ -16,7 +16,7 @@ classification_status: "runtime_classified"
 
 ## 0. 設計の位置づけ
 
-本書は `requirement.md` の `I345-RQ-*` / `I345-AC-*` を実装可能な責務、interface、state、failure mapping、test seam へ落とす canonical design draft である。runtime classification は `standard` であり、本書がcanonical pathに存在することだけではfresh reviewer passやexecution-readyを意味しない。
+本書は `requirement.md` の `I345-RQ-*` / `I345-AC-*` を実装可能な責務、interface、state、failure mapping、test seam へ落とす approved canonical design である。runtime classification は `standard` であり、本書の承認とfresh reviewer passを実装開始判断の入力にする。
 
 設計根拠は、current provider source、parent Epic `D-003`〜`D-009`、accepted ADR、review済みのcanonical requirement、Issue authoring workflowである。
 
