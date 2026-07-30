@@ -330,7 +330,7 @@ Candidate 1はreview済みmilestone、provider-first projection、default lane�
 | Candidate | Issue node | canonical requirement / design / plan | Current status |
 |---|---|---|---|
 | Candidate 1 | `issues/iss-00344-workbench-shell-scaffolding/` | present | completed / GitHub Issue #344 closed、PR #350 merged |
-| Candidate 2 | `issues/iss-00345-generic-single-file-artifact-import/` | present | Linux anonymous-staging amendment pending fresh Epic / Issue rereview |
+| Candidate 2 | `issues/iss-00345-generic-single-file-artifact-import/` | present | S02 / S03 / S04 / S90 implemented, reviewed, and committed; S99 final review findings are under repair before fresh rereview |
 | Candidate 3 | `issues/iss-00346-integration-distribution-and-final-quality/` | present | planned / not started |
 
 ### Handoff-ready
@@ -407,4 +407,4 @@ Candidate 1はreview済みmilestone、provider-first projection、default lane�
 - Issue nodes:
   - `iss-00344`、`iss-00345`、`iss-00346`。
 - next action:
-  - Linux anonymous-staging Epic amendmentのfresh rereviewを通過し、`iss-00345`へ継承してfresh Issue review後にS02を再開する。
+  - `iss-00345`のS99 final review findingsを限定修正し、fresh S99 rereviewをpassしてIssue closure evidenceを確定する。

@@ -605,7 +605,9 @@ result/docs は `canonical=false` と evidence-only boundary を保持し、本 
 
 runtime-owned classificationは`standard`として記録済みである。parent EpicのCandidate 2 recommendation `critical`は判定値を上書きせず、high-risk review focusとして残す。再分類が必要なmaterial changeは本文で推測せず、SpecDock assurance runtimeへ戻す。
 
-### 16.2 New files that do not yet exist at the inspected revision
+### 16.2 Historical pre-implementation snapshot
+
+以下は実装開始前の inspected revision `f8db4fd206bf11e6ca7b396914b7cfb52d13040b` に対する記録であり、現在のknown gapではない。
 
 指定 HEAD には `src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md` と `spec-dock/docs/rules/root/artifacts.md` が存在しない。また親 plan が列挙する generic import専用 test filesの一部も未作成である。これらは実装済み事実ではなく、本 Issueで追加する予定成果物である。
 
