@@ -1402,6 +1402,36 @@ class TestRuntimeNewDocS09:
                 "20260312t010203z-chatgpt-output-shared-slot.md",
             ]
 
+    def test_new_artifact_reserves_existing_generic_import_slot(self) -> None:
+        app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            specdock_dir = repo_root / "spec-dock"
+            self._prepare_node_templates(specdock_dir)
+            self._prepare_blank_artifact_template(specdock_dir)
+            issue_record = self._issue_scope_record(infra_contracts, specdock_dir=specdock_dir)
+            artifacts_dir = Path(issue_record.path) / "artifacts"
+            artifacts_dir.mkdir(parents=True)
+            rules_source = specdock_dir / "docs" / "rules" / "issue" / "artifacts.md"
+            (artifacts_dir / "rules.md").symlink_to(rules_source)
+            generic = artifacts_dir / "20260312t010203z--opaque.bin"
+            generic.write_bytes(b"generic sentinel")
+            ports = self._ports(app_ports, specdock_dir=specdock_dir, records=[issue_record])
+
+            result = app_create_artifact_doc.create_artifact_doc(
+                app_contracts.CreateArtifactDocRequest(
+                    artifact_type="blank",
+                    scope_node_id="iss-local-00001",
+                    title="Shared Slot",
+                    slug="shared-slot",
+                ),
+                ports,
+            )
+
+            assert result.artifact_id == "20260312t010203z-01"
+            assert result.path.name == "20260312t010203z-01-shared-slot.md"
+            assert generic.read_bytes() == b"generic sentinel"
+
     def test_new_artifact_preserves_typed_blank_suffix_exhaustion_semantics(self) -> None:
         app_create_artifact_doc, app_contracts, app_ports, infra_contracts = _artifact_runtime_modules()
         with tempfile.TemporaryDirectory() as tmp:

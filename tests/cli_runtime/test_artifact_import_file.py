@@ -212,3 +212,71 @@ class TestArtifactImportFile(CliRuntimeHarness):
             assert "byte_count" not in completed.stdout.lower()
             assert (target / payload["destination"]).read_bytes() == body
             assert source.read_bytes() == body
+
+    def test_name_collision_uses_shared_typed_generic_slots_without_overwrite(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._write_runtime_clock(target)
+            source = target / "Report FINAL.PDF"
+            source.write_bytes(b"generic body")
+            artifacts_dir = target / "spec-dock" / "artifacts"
+            artifacts_dir.mkdir()
+            rules_source = target / "spec-dock" / "docs" / "rules" / "root" / "artifacts.md"
+            (artifacts_dir / "rules.md").symlink_to(rules_source)
+            typed = artifacts_dir / "20260730t010203z-adr-existing.md"
+            generic = artifacts_dir / "20260730t010203z-01--existing.bin"
+            typed.write_bytes(b"typed sentinel")
+            generic.write_bytes(b"generic sentinel")
+
+            completed = self._run_runtime_capture(
+                target,
+                ["artifact", "import", "file", "--root", "--file", source.name, "--json"],
+            )
+
+            assert completed.returncode == 0, completed.stdout + completed.stderr
+            payload = json.loads(completed.stdout)
+            assert payload["artifact_id"] == "20260730t010203z-02--Report FINAL.PDF"
+            assert typed.read_bytes() == b"typed sentinel"
+            assert generic.read_bytes() == b"generic sentinel"
+            assert (target / payload["destination"]).read_bytes() == b"generic body"
+
+    def test_shared_slot_exhaustion_is_not_committed_and_preserves_existing_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._write_runtime_clock(target)
+            source = target / "source.bin"
+            source.write_bytes(b"source sentinel")
+            artifacts_dir = target / "spec-dock" / "artifacts"
+            artifacts_dir.mkdir()
+            rules_source = target / "spec-dock" / "docs" / "rules" / "root" / "artifacts.md"
+            (artifacts_dir / "rules.md").symlink_to(rules_source)
+            timestamp = "20260730t010203z"
+            (artifacts_dir / f"{timestamp}-adr-existing.md").write_bytes(b"standard")
+            for suffix in range(1, 100):
+                name = (
+                    f"{timestamp}-{suffix:02d}-existing.md" if suffix % 2 else f"{timestamp}-{suffix:02d}--existing.bin"
+                )
+                (artifacts_dir / name).write_bytes(str(suffix).encode())
+            before = {
+                path.name: (path.readlink() if path.is_symlink() else path.read_bytes())
+                for path in artifacts_dir.iterdir()
+            }
+
+            completed = self._run_runtime_capture(
+                target,
+                ["artifact", "import", "file", "--root", "--file", source.name, "--json"],
+            )
+
+            assert completed.returncode == 1
+            payload = json.loads(completed.stdout)
+            assert payload["code"] == "artifact_slot_exhausted"
+            assert payload["publication_state"] == "not_committed"
+            assert payload["committed"] is False
+            after = {
+                path.name: (path.readlink() if path.is_symlink() else path.read_bytes())
+                for path in artifacts_dir.iterdir()
+            }
+            assert after == before
+            assert source.read_bytes() == b"source sentinel"
