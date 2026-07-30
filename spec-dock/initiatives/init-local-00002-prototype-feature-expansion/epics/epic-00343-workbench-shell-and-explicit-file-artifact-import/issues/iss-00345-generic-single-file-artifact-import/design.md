@@ -280,14 +280,15 @@ hash/count/inodeはadapter内部のverification recordとして一時利用し�
 7. target Artifact setupをread-only preflightし、missingなら必要な変更を未適用planとして保持する。broken/wrong entryはここで拒否する。
 8. existing directory、または未作成directoryをempty inventoryとしてdirect-child shared slot ledgerをscanし、corruption/exhaustionがないことと空きslotを確立する。
 9. setup planを適用し、作成後のdirectory identity/`PC_NAME_MAX`/ledgerを再確認してから、guarded source leaseをborrowさせてpublisherの`publish_explicit_file`を呼ぶ。
-10. `destination_exists` raceならlock内ledgerを再scanし、bounded retryする。他のpre-commit faultはpublic errorへ変換する。
-11. commit後warningをresultへ残す。
-12. lock release failureがcommit前ならerror、commit後なら`committed_with_warning`へmergeする。
-13. internal resultからprivacy-safe public resultだけを構築する。
+10. 各publication attemptの`cleanup_state`を`retained > removed > not_created`の順で単調mergeする。
+11. `destination_exists` raceならmerge済みcleanup stateを保持してlock内ledgerを再scanし、bounded retryする。他のpre-commit faultはpublic errorへ変換する。
+12. 後続attemptがcommitしても先行attemptに`retained`があれば`temp_cleanup_retained / committed_with_warning`として残す。最終pre-commit failure/retry exhaustionでも`cleanup_state=retained`を保持する。
+13. lock release failureがcommit前ならerror、commit後なら`committed_with_warning`へmergeする。
+14. internal resultからprivacy-safe public resultだけを構築する。
 
 #### Bounded retry
 
-standard slot + `01..99`の100候補が上限である。cooperative processはcreate lockで直列化される。non-cooperative processがcandidateを占有した場合だけ再scanし、未使用slotへ進む。全slot使用済みは`artifact_slot_exhausted`とし、無限retryしない。
+standard slot + `01..99`の100候補が上限である。cooperative processはcreate lockで直列化される。non-cooperative processがcandidateを占有した場合だけ再scanし、未使用slotへ進む。全slot使用済みは`artifact_slot_exhausted`とし、無限retryしない。retryの成否にかかわらず、全attemptのcleanup stateは単調mergeし、retained owned tempを後続successが隠さない。
 
 ### 4.5 Target resolution and Artifact setup
 
@@ -414,7 +415,7 @@ Algorithm:
 
 1. raw source argumentのleaf basenameを取得する。resolved target pathの別名から再生成しない。
 2. empty / `.` / `..`を拒否する。
-3. NUL、`/`、`\\`、Unicode control characters、platform-invalid charactersを`_`へ置換する。連続置換は元の区切り数を隠すためcollapseせず、deterministicに一対一置換する。
+3. NUL、実行platformのpath separator、非emptyのalternate separator、Unicode control characters、platform-reserved/invalid component charactersだけを`_`へ置換する。Linux/macOSではbackslashはseparatorでもinvalid componentでもないため保持する。連続置換は元の区切り数を隠すためcollapseせず、deterministicに一対一置換する。
 4. platform-reserved basenameは先頭に`_`を付ける。trailing dot/spaceは対応位置を`_`へ置換し、他のspacesは保持する。
 5. Unicode normalization formを勝手に変えない。case foldingしない。
 6. budgetは`PC_NAME_MAX - len(<timestamp>-99--)`のUTF-8 bytesとする。standard nameだけでなく最大suffixでもsafeにする。
@@ -868,6 +869,7 @@ lifecycle consumersがgeneric entryを認識する必要がある場合、`parse
 - typed/blank/generic shared slots。
 - unsafe type/symlink/corrupt duplicate。
 - normalization Unicode/space/case/extension/NAME_MAX。
+- POSIX basenameのbackslashを保持し、実platformのseparator/reserved characterだけを置換する。
 - fresh targetはparent FDからtentative `PC_NAME_MAX`を取得し、作成後artifacts FDで一致を再確認する。取得不能、不一致、identity replacementはpublish前にfail closedする。
 - exhaustion。
 
@@ -882,6 +884,7 @@ lifecycle consumersがgeneric entryを認識する必要がある場合、`parse
 - lock release pre/post commit semantics。
 - directory fsync、owned-temp cleanup、lock releaseの各commit後fault seamがexact warning code、committed identity、exit success、retry not-neededを維持する。
 - destination race retry。
+- destination race attemptでcleanup retained後に後続commitした場合は`temp_cleanup_retained / committed_with_warning`、retry exhaustionでは`cleanup_state=retained`を保持する。
 - generic use caseが`workbench_source_guard`を必要としない。
 
 ### T345-3 Infra
