@@ -892,3 +892,13 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - `FINAL-P1-003`は、historical pending recordsを保持したままinitial adoption、Review、Human decision、apply、repair、tests、live smoke、remote parityを後続sectionでsupersedeしたためclosed。
 - verdictは`PASS`、新規P0／P1 0、`merge_ready_recommendation=true`。正式artifactは`artifacts/20260730t115302z-s14-fresh-final-closure-review-pass.md`である。
 - 本artifact／Report publication後、ready PRを作成しfixed Codex reviewとGitHub Actionsを観測する。merge、Issue close、branch deletion、`issue finish`はHuman-onlyのまま実行しない。
+
+## 2026-07-30 — PR #351 required-CI failureとbounded U001 repair
+
+- ready PRは`https://github.com/chemitaro/spec-dock/pull/351`、base `main`、head `iss-00334-implement-chatgpt-issue-planning-workflow`、observed HEAD `555dafd6f9e1252ddf8b50cb23c275e20c263266`で作成した。
+- fixed observationはtrigger comment `5130515748`を`2026-07-30T11:57:12Z`に一度だけ投稿したが、required `Provider CI / provider-tests` run `30540472689`、job `90863805552`が先に失敗したため、Codex Reviewはterminal判定前に停止した。
+- failureは`test_s10_current_v4_guide_satisfies_completeness_contract`の1件だけで、fresh checkoutに存在しないGit管理外`spec-dock/active/issue` symlinkからhistorical v4 ZIPを開いて`FileNotFoundError`となった。canonical Issue artifact pathのexact ZIPはtrackedされている。
+- fresh ChatGPT consultation `iss00334-pr351-ci-repair-consult`はexact branch／HEADを確認し、default branchを検査せず、one-test fixture path修正を最小の正しいrepairとして支持した。model evidenceは`requested=Pro`／`resolved=Pro`／`verified=yes`。正式advisoryは`artifacts/20260730t120701z-01-pr-351-required-ci-repair-chatgpt-consultation.md`である。
+- HumanのOracle local configuration boundaryは変更しない。SpecDockはOracleの通常configを尊重し、formal必須値だけをdirect argvで明示する。U001はproduct runtime、Oracle invocation/configuration、canonical docs、ZIP bytes、CI setupを変更しない。
+- dev-coderは`tests/unit/domain/test_issue_planning_candidate.py`の対象testだけを変更した。exact test `1 passed`、module `54 passed`、Main ordinary fast pytest `1141 passed, 2119 skipped`、`make lint`（Ruff／418 files format／mypy 281 files）、validate `nodes=227`、`git diff --check`がPASSした。
+- repair batchは`artifacts/20260730t115808z-pr-repair-batch-pr-351-repair-batch.md`、unitは`artifacts/20260730t120701z-disc-pr-repair-unit-active-pointer-fixture.md`。このrepairをcommit／pushし、新HEADへ新しい`post-once` observationを行う。旧HEADのresume boundaryは再利用しない。

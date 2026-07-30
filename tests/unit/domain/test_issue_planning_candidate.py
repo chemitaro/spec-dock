@@ -423,7 +423,9 @@ def test_s10_authoring_payload_rejects_invalid_text_framing(mutation: str) -> No
 def test_s10_current_v4_guide_satisfies_completeness_contract() -> None:
     repository_root = Path(__file__).resolve().parents[3]
     pack = (
-        repository_root / "spec-dock/active/issue/artifacts/"
+        repository_root / "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/"
+        "epics/epic-00331-planning-and-advisory-review/"
+        "issues/iss-00334-implement-chatgpt-issue-planning-workflow/artifacts/"
         "20260729t-iss-00334-onboarding-companion-planning-amendment-v4.zip"
     )
     with zipfile.ZipFile(pack) as archive:
