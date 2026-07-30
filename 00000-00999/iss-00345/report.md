@@ -220,6 +220,8 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 | S04 | Red / alternative | body-open spy / invalid UTF-8 required | 初回projection比較は揮発timestampでwrong-reason Red。timestamp正規化後、production変更前からno-read契約Green | deterministic projection normalization + deny spy | pass | covered-existing evidence、actual affected provider module 0 |
 | S04 | Green | §11.6 + nearest lifecycle tests | S04 CLI22、ADR/no-read2、domain10、authoring17、context5、deps1、generic lifecycle1、legacy4/8/5、typed/blank4、lint/diff-check pass | full-regression/focused suites | pass | generic body open 0、invalid UTF-8 decode errorなし、projection/mirror/provenance差分0。fresh review待ち |
 | S04 | Refactor | unnecessary production change禁止 | production change 0、test timestamp normalization helperのみ | diff inspection | pass | default explicit-selected authoring pathはscope外 |
+| S90 | Inspect / alternative | docs/root/parity coverage gap | root rulesとchanged docsが既存parity map外、exact symlink/opaque wording test不在を確認 | provider docs inspection + test inventory | pass | implementation済み状態のためbehavioral Redは不採用 |
+| S90 | Green | §12.6 docs/parity verification | root init/update新規node2 pass、docs/runtime parity込み4 pass、provider/docs=managed docs完全一致、runtimeは`__pycache__`以外一致、lint/diff-check pass | `--run-full-regression` focused + `diff -qr` | pass | fresh docs/spec review待ち |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
@@ -255,6 +257,7 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 | `tc-s02-001`〜`tc-s02-012` | S02 | yes | red-required per fault class | `tc-s02-001`〜`011`はS01 baseline + isolated mutants、Option A cleanup genuine Red 6件、precommit OSError genuine Red 2件。`tc-s02-012`は旧Linux named stagingの`cleanup_state=removed`をgenuine Redで検出 | publisher95 passed/2 skipped、関連unit29、Linux security matrix7 passed/1 skipped、infra focused65 passed/1 skipped、application9、presentation4、CLI5、S04互換20。Docker LinuxでO_TMPFILE publication/cross-filesystem success | pass | Linux anonymous create/held-FD commit/no-pathname-unlink/unsupported fail-closedはGreen。fresh code rereview findings `[]` |
 | `tc-s03-001`〜`tc-s03-007` | S03 | yes | red-required | domain12 fail、application race2 fail、parser characterization1 pass、extension-chain境界1 fail | touched unit54、CLI46、full unit767/561 skip、domain243、focused32、typed/blank6、lint pass | pass | parser/NAME_MAX/shared ledger/exhaustion/cooperative/non-cooperative raceと最長extension chainはGreen。final rereview findings `[]` |
 | `tc-s04-001`〜`tc-s04-005` | S04 | yes | red-required / covered-existing | material github.updated_at差分とdeny guard negative controlのRed、existing name gatesのno-read | CLI22、unit78、focused3、ADR2、domain10、authoring17、context5、deps1、legacy4/8/5、typed/blank4 | pass | body open 0、material provenanceを保持したprojection/ADR/deps/context/authoring同値。fresh rereview findings `[]` |
+| `tc-s90-001`〜`tc-s90-004` | S90 | yes | docs structural / alternative | provider/projection/root symlink/parity test coverage gap | new init/update2、parity total4、docs/runtime byte parity、token scan、lint | pass | provider-first update scoped。final docs/spec rereview findings `[]` |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -265,6 +268,7 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 | §9.2 listed closures | S02 | `tc-s02-001`〜`tc-s02-012`、Red matrix、publisher full unit、CLI/S04 compatibility、lint/format/mypy | pass | tc-s02-012 Red/Green、Linux capability evidence、Linux CI test分岐修正、fresh code rereview findings `[]` |
 | §10.2 listed closures | S03 | `tc-s03-001`〜`tc-s03-007`、naming/slot/race matrix、legacy/new artifact regressions、lint | pass | final fresh rereview findings `[]`; confidence `0.99` |
 | §11.2 listed closures | S04 | `tc-s04-001`〜`tc-s04-005`、no-read/projection/legacy matrix、lint | pass | fresh rereview findings `[]`; confidence `0.99` |
+| §12.2 listed closures | S90 | `tc-s90-001`〜`tc-s90-004`、docs/root link/parity/token checks | pass | final docs/spec rereview findings `[]`; confidence `0.99` |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -299,6 +303,7 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S02 Linux amendment | dev-coder | Linux generic importをlinkable O_TMPFILE匿名ステージングへ変更し、visible staging/probe pathname・named fallback・pathname unlink・same-UID waiverを排除 | `infra/binary_artifact_publisher.py`、`test_binary_artifact_publisher.py`（既存S02候補9 files全体をreview） | Red 1 failed、publisher95/2 skip、関連unit29、security matrix7/1 skip、infra65/1 skip、application9、presentation4、CLI5、S04互換20、Docker Linux actual capability×2、lint/diff-check pass | pass | none within S02 scope | final rereview findings `[]`; confidence `0.99`; accept for commit |
 | S03 | dev-coder | basename最小正規化、NAME_MAX、全family共有slot、bounded race retry/cleanup mergeを実装 | domain/application 3 files、tests 4 files | Red domain12/app2、unit54、CLI46、full unit767/561 skip、focused32、typed/blank6、lint/diff-check pass | pending fresh | Linux primitiveはS02で検証済み、S03 raceはpublisher seam | fresh code reviewへ |
 | S04 | dev-coder | generic lifecycle no-read/projection equivalenceを固定し、既存S03 gateでproduction変更不要と実証 | tests 3 files、production 0 | CLI22、ADR2、domain10、authoring17、context5、deps1、legacy4/8/5、typed/blank4、lint/diff-check pass | pending fresh | explicit user-selected authoring sourceはdefault discovery scope外 | fresh code reviewへ |
+| S90 | doc-writer + dev-coder | provider docs/rulesを完成し、managed projectionとinit/update root parity testを追加 | provider docs8、managed docs/runtime、test1 | init/update2、parity4、docs/runtime diff、lint/diff-check pass | pending fresh | `__pycache__`はprojection対象外 | fresh docs/spec reviewへ |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -331,6 +336,8 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S03 | final step code rereview | code-reviewer | fresh | pass | no | close S03 after focused commit | findings `[]`; confidence `0.99`。identity fix維持と最長extension-chain保持を確認 |
 | S04 | step code review | code-reviewer | historical | fail | no | bounded test-evidence fix / fresh rereview | P1×2: material updated_atを隠すnormalization、validate/deps/contextのdeny guard不足。限定修正済み。confidence `0.99` |
 | S04 | step code rereview | code-reviewer | fresh | pass | no | close S04 after focused commit | findings `[]`; confidence `0.99`。material provenance保持と全consumer deny guardを確認 |
+| S90 | docs/spec review | spec-reviewer | historical | pass with P2 | no | bounded link-target fix / fresh rereview | P2×1: privacy/stateをnaming referenceだけへ案内。guideへ分離修正。confidence `0.98` |
+| S90 | docs/spec rereview | spec-reviewer | fresh | pass | no | close S90 after focused commit | findings `[]`; confidence `0.99`。provider/managed6 files一致とlink契約を確認 |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -481,6 +488,27 @@ spec-dock validate -> ok, nodes=217
 | typed / blank new artifact | 4 passed、legacy grammar維持 |
 | existing artifacts | rename / content migration 0 |
 | production lifecycle modules | change 0 |
+
+### S90 Docs Impact Resolution
+
+- provider README/guide/naming/worktree/root・Initiative・Epic・Issue rulesへgeneric file importを反映した。
+- arbitrary file laneとWorkbench Markdown専用`chatgpt-output`を分離して説明した。
+- `canonical=false`、evidence-only、opaque body、privacy-safe state、`committed_with_warning`でretry不要、Issue 346 deferを明記した。
+- root `artifacts/rules.md`は`../docs/rules/root/artifacts.md`へのrelative symlinkで、generic bodyへauthorityを付与しない。
+
+### Provider-Dogfood Projection Evidence
+
+- `uv run spec-dock update .`でprovider-first projectionを実行した。
+- `src/.../docs`と`spec-dock/docs`は完全一致。
+- provider/managed runtimeは生成対象外`__pycache__`を除いて一致。
+- update差分は対応managed docs/runtimeに限定され、active/canonical customer dataは変更していない。
+- P2修正後の再updateは対象docsを投影した後、scope外`.agents/host-adapters/meta.json`で`EPERM`終了した。対象docs/runtimeのbyte parityを再検証してGreenとし、この環境事象を成功扱いで隠していない。
+
+### Authority Wording Self-Check
+
+- import receiptは採用・review・実装ready・mergeを意味しない。
+- generic Artifactはdefault lifecycleでbodyを読まず、ADR/spec/delegated draftへ昇格しない。
+- consumer E2E / integrated dogfood / full regressionはIssue 346へdeferし、本Issueの完了主張へ含めない。
 
 ---
 
