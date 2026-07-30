@@ -8,9 +8,9 @@ ID: "iss-00345"
 親: ["epic-00343", "init-local-00002"]
 関連GitHub: ["#345"]
 関連: ["iss-00344", "iss-00346", "20260728t100038z-adr"]
-authorized_profile_observed: "strict"
+authorized_profile_observed: "standard"
 parent_recommended_grade: "critical"
-classification_status: "pending_runtime_owned_decision"
+classification_status: "runtime_classified"
 ---
 
 # iss-00345 Generic Single-File Artifact Import — Issue 要件定義
@@ -21,7 +21,7 @@ classification_status: "pending_runtime_owned_decision"
 
 本書が canonical path に存在することだけでは reviewer pass、assurance mutation、execution-ready、PR-ready、merge-ready、Issue finish、Epic completion、PR delivery を意味しない。assurance classification、fresh review、実装開始判断は runtime と main orchestrator の後続 workflow に残る。
 
-現行 runtime guidance が示す `authorized_profile=strict` と、親 Epic の Candidate 2 推奨 `critical` は一致していない。本書は authority を選択または変更せず、この差を **pending classification input** として保持する。ただし、不可逆な filename identity、外部 path privacy、no-overwrite publication、retry disposition を扱うため、内容は `critical` 推奨に耐える安全性、failure mode、rollback、observability、test detail を持たせる。
+SpecDock runtimeの`assurance classify --stage requirement`は`authorized_profile=standard`を記録している。親EpicのCandidate 2推奨`critical`はclassification authorityではなくreview focusとして保持する。本書はruntime判定を選択または変更せず、不可逆なfilename identity、外部path privacy、no-overwrite publication、retry dispositionに対して`critical`推奨に耐える安全性、failure mode、rollback、observability、test detailを維持する。
 
 ## 1. 目的
 
@@ -217,7 +217,7 @@ post-commit warning を command failure に変換して重複 import を誘発�
 
 ### I345-RQ-010 Privacy-safe public contract
 
-repository 外 source について、text、JSON、error、warning、diagnostic、tracked provenance へ出してよい source identity は original basename だけとする。absolute path、parent component、body、hash、byte count、MIME、encoding、content-derived count/value、raw exception を出さない。repository 内 source は repository-relative path のみ許可する。pre-commit error は source field と destination fieldを持たず、unexpected exception も stable `runtime_failed` へ正規化する。
+repository 外 source について、text、JSON、error、warning、diagnostic、tracked provenance へ出してよい source identity は original basename だけとする。absolute path、parent component、body、hash、byte count、MIME、encoding、content-derived count/value、raw exception を出さない。repository 内 source は repository-relative path のみ許可する。text outputの動的fieldは改行/C0/DEL/ESC/bidi controlを生で出さないreversibleな単一行quote/escapeを使用し、source名からkey/value構造やstate tokenを偽装できないようにする。JSONは標準JSON string escapingを使用する。pre-commit error は source field と destination fieldを持たず、unexpected exception も stable `runtime_failed` へ正規化する。
 
 - Parent trace: `E-RQ-018`; `D-008`。
 - ADR trace: Decision 6。
@@ -250,7 +250,7 @@ runtime、docs、rules は `src/spec_dock/assets/spec_dock/` を先に更新し�
 
 ### I345-RQ-015 Authority / grade boundary
 
-import は evidence storage だけを行い、canonical adoption、review、assurance、readiness を変更しない。本 requirement は `authorized_profile=strict` と parent `critical` recommendation の差を解決したと主張せず、runtime-owned classification と後続 authoring gate へ戻す。
+import は evidence storage だけを行い、canonical adoption、review、assurance、readiness を変更しない。本requirementはruntime-owned `standard` classificationを記録し、parent `critical` recommendationをreview focusとして保持するが、import実行がclassificationを変更することはない。
 
 - Parent trace: `E-RQ-019`; workflow authoring grade matrix。
 - ADR trace: Decision 7。
@@ -516,7 +516,7 @@ fault injection が pre-commit failure を `not_committed` / exit failure、post
 
 ### I345-AC-013 External privacy
 
-external source の success text/JSON は basename のみを含み、failure/warning/unexpected error は absolute path、parent sentinel、body sentinel、hash、byte count、MIME、encoding、raw exceptionを含まない。tracked provenance にも同じ制約が成立する。`I345-RQ-010`, `I345-CON-001`〜`I345-CON-003` を閉じる。
+external source の success text/JSON は basename のみを含み、failure/warning/unexpected error は absolute path、parent sentinel、body sentinel、hash、byte count、MIME、encoding、raw exceptionを含まない。textの動的fieldは一行のreversible quote/escape、JSONは標準JSON escapingを使用し、control/bidi文字がraw構造を注入しない。tracked provenance にも同じ制約が成立する。`I345-RQ-010`, `I345-CON-001`〜`I345-CON-003` を閉じる。
 
 ### I345-AC-014 Opaque lifecycle
 
@@ -574,7 +574,7 @@ result/docs は `canonical=false` と evidence-only boundary を保持し、本 
 | `I345-RISK-006` | generic changes regress `chatgpt-output` | existing workflow breakage | separate use case/contract/renderer/guard; unchanged focused regression tests |
 | `I345-RISK-007` | unsupported filesystem silently falls back | non-atomic publication | capability probe and fail-closed token; no rename/copy fallback |
 | `I345-RISK-008` | provider/dogfood drift | shipped behavior differs from repo observation | provider-first update, managed projection diff, parity checks |
-| `I345-RISK-009` | assurance grade conflict is silently resolved | authority violation | preserve strict/critical discrepancy as pending input; no mutation claim |
+| `I345-RISK-009` | runtime standardとparent critical推奨の関係を誤表現する | authority violation | runtime standardを現在値、criticalをreview focusとして記録し、importによるmutationを主張しない |
 
 ## 15. Rollback expectations
 
@@ -590,7 +590,7 @@ result/docs は `canonical=false` と evidence-only boundary を保持し、本 
 
 ### 16.1 Pending classification input
 
-`authorized_profile=strict` はユーザー提示の runtime guidanceであり、parent Epicの Candidate 2 recommendationは`critical`である。本書はどちらも変更せず、runtime-owned classification / authoring gateで解決すべき入力として残す。
+runtime-owned classificationは`standard`として記録済みである。parent EpicのCandidate 2 recommendation `critical`は判定値を上書きせず、high-risk review focusとして残す。再分類が必要なmaterial changeは本文で推測せず、SpecDock assurance runtimeへ戻す。
 
 ### 16.2 New files that do not yet exist at the inspected revision
 
