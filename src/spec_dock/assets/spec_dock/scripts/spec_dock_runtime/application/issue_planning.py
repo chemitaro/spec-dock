@@ -368,9 +368,7 @@ def run_issue_planning_apply(
                 status="rejected",
                 reason="archive_rejected",
                 issue_id=issue_id,
-                details=tuple(str(item) for item in error.args[0])
-                if error.args and isinstance(error.args[0], tuple)
-                else (),
+                details=tuple(str(item) for item in error.findings),
             )
         if verified_candidate.identity != candidate_identity:
             return PlanningCommandResult(

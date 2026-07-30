@@ -1239,6 +1239,10 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00143-manage-external-git-worktrees/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00153-worktree-remove-default-full-delete/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00225-configure-ruff-mypy-static-analysis/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00344-workbench-shell-scaffolding/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00345-generic-single-file-artifact-import/.meta.json",
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00346-integration-distribution-and-final-quality/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/.meta.json",
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/issues/iss-00007-child-node-scripts-and-supplements/.meta.json",
@@ -1483,6 +1487,13 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00143-manage-external-git-worktrees/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00153-worktree-remove-default-full-delete/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00225-configure-ruff-mypy-static-analysis/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00344-workbench-shell-scaffolding/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00345-generic-single-file-artifact-import/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00346-integration-distribution-and-final-quality/.meta.json": [
+            "iss-00344",
+            "iss-00345",
+        ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/issues/iss-00007-child-node-scripts-and-supplements/.meta.json": [],
@@ -1904,6 +1915,7 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00338": ["iss-00337"],
         "iss-00339": ["iss-00337", "iss-00338"],
         "iss-00340": ["iss-00337", "iss-00339"],
+        "iss-00346": ["iss-00344", "iss-00345"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
         r'(?m)"(schema_version|projection|nodes|issues|deps|source|updated_at)"\s*:'

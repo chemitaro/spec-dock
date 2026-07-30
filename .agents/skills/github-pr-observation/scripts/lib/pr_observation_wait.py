@@ -1509,10 +1509,8 @@ while True:
     remaining_before_poll = deadline - time.monotonic()
     under_budget_before_poll = latest_payload is not None and remaining_before_poll < next_poll_min_budget_seconds
     if under_budget_before_poll:
-        quiet_elapsed_before_poll = int(max(0, time.monotonic() - latest_change_monotonic))
-        quiet_can_be_evaluated = quiet_elapsed_before_poll >= quiet_seconds or (
-            remaining_before_poll >= max(0, quiet_seconds - quiet_elapsed_before_poll)
-        )
+        quiet_deadline = latest_change_monotonic + quiet_seconds
+        quiet_can_be_evaluated = deadline >= quiet_deadline
         stability_can_be_evaluated = same_count >= same_fingerprint_count or (same_count + 1 >= same_fingerprint_count)
         (
             _,
@@ -1595,7 +1593,6 @@ while True:
     snapshot_timeout_preserved_latest_state = False
     if snapshot_poll_timed_out and latest_payload is not None:
         payload = latest_payload
-        quiet_elapsed_at_timeout = int(max(0, time.monotonic() - latest_change_monotonic))
         (
             _,
             _,
@@ -1607,7 +1604,8 @@ while True:
             poll,
             zero_check_grace_polls,
         )
-        stable_at_timeout = same_count >= same_fingerprint_count and quiet_elapsed_at_timeout >= quiet_seconds
+        quiet_deadline = latest_change_monotonic + quiet_seconds
+        stable_at_timeout = same_count >= same_fingerprint_count and time.monotonic() >= quiet_deadline
         snapshot_timeout_preserved_latest_state = bool(
             terminal_at_timeout or (can_complete_when_stable_at_timeout and stable_at_timeout)
         )
