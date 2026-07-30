@@ -142,6 +142,27 @@ actor Human
 """
 
 
+def _exact_heading_companion() -> bytes:
+    replacements = {
+        b"## Initiative, Epic, and Issue lineage": b"## init-/epic-/iss- lineage",
+        b"## Purpose and scope": b"## Purpose/scope",
+        b"## Authority and responsibility boundary": b"## Authority/responsibility",
+        b"## Current architecture and target architecture": (b"## Current architecture/target architecture"),
+        b"## ChatGPT First planning lifecycle": b"## ChatGPT First planning workflow",
+        b"## Direct Oracle and reference-only chatgpt-use": (
+            b"## Provider-owned direct Oracle/reference-only chatgpt-use"
+        ),
+        b"## Candidate, Review, Human, and apply lifecycle": (b"## Candidate/Review/Human/apply lifecycle"),
+        b"## Exact current branch gate": b"## Exact branch failure",
+        b"## Roadmap and operations": b"## S01/S07/S08/S14 status/roadmap",
+        b"## Provider authority and projection": b"## Provider/projection",
+    }
+    payload = _companion()
+    for old, new in replacements.items():
+        payload = payload.replace(old, new)
+    return payload
+
+
 def _source():
     contracts = __import__(
         "spec_dock_runtime.domain.issue_planning_contracts",
@@ -302,6 +323,72 @@ def test_s10_authoring_payload_accepts_exact_four_file_inventory() -> None:
         )
         == ()
     )
+
+
+def test_s10_onboarding_accepts_exact_thirteen_heading_contract() -> None:
+    files = {**_documents(), COMPANION_PATH: _exact_heading_companion()}
+
+    _candidate().validate_onboarding_companion(COMPANION_PATH, files[COMPANION_PATH])
+    assert (
+        _candidate().validate_issue_authoring_files(
+            files,
+            "authoring",
+            expected_companion_path=COMPANION_PATH,
+        )
+        == ()
+    )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        _exact_heading_companion().replace(
+            b"## Purpose/scope\n\nPurpose and scope define the bounded onboarding material.",
+            (
+                b"## Purpose\n\nPurpose defines the bounded onboarding material.\n\n"
+                b"## Scope\n\nScope defines the bounded onboarding material."
+            ),
+        ),
+        _exact_heading_companion().replace(
+            (
+                b"## Current architecture/target architecture\n\n"
+                b"Current architecture and target architecture describe the bounded transition."
+            ),
+            (
+                b"## Current architecture\n\nCurrent architecture describes the bounded transition.\n\n"
+                b"## Target architecture\n\nTarget architecture describes the bounded transition."
+            ),
+        ),
+        _exact_heading_companion().replace(
+            b"## ChatGPT First planning workflow\n\nChatGPT First governs the planning lifecycle.",
+            b"## ChatGPT First planning sequence\n\nChatGPT First governs the planning sequence.",
+        ),
+        _exact_heading_companion()
+        .replace(
+            b"## System context\n\nThe system context identifies the planning actors and boundaries.\n\n",
+            b"",
+        )
+        .replace(
+            b"## Authority/responsibility",
+            b"## System context and Authority/responsibility",
+        ),
+    ],
+    ids=(
+        "split-purpose-scope",
+        "split-current-target",
+        "planning-sequence-without-workflow-or-lifecycle",
+        "merged-required-sections",
+    ),
+)
+def test_s10_onboarding_rejects_nonassignable_required_sections(payload: bytes) -> None:
+    with pytest.raises(ValueError, match="onboarding companion"):
+        _candidate().validate_onboarding_companion(COMPANION_PATH, payload)
+
+    assert _candidate().validate_issue_authoring_files(
+        {**_documents(), COMPANION_PATH: payload},
+        "authoring",
+        expected_companion_path=COMPANION_PATH,
+    ) == ("authoring_payload_invalid",)
 
 
 @pytest.mark.parametrize("mutation", ["empty", "bom", "nul", "cr", "no_lf", "invalid_utf8"])
