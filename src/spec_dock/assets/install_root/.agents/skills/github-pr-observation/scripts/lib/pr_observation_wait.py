@@ -4,18 +4,101 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import signal
 import subprocess
 import sys
 import time
+from typing import NoReturn
 
 NEXT_SNAPSHOT_BUDGET_FLOOR_SECONDS = 0.25
 NEXT_SNAPSHOT_BUDGET_SLACK_SECONDS = 0.25
+USAGE_LINE = "usage: wait_pr_observation.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA [options]"
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def fail_usage() -> NoReturn:
+    print(USAGE_LINE, file=sys.stderr)
+    raise SystemExit(64)
+
+
+def validate_environment() -> None:
+    required_names = (
+        "OBS_SNAPSHOT_SCRIPT",
+        "OBS_TRIGGER_SCRIPT",
+        "OBS_REPO",
+        "OBS_PR",
+        "OBS_HEAD_SHA",
+        "OBS_TIMEOUT_SECONDS",
+        "OBS_POLL_INTERVAL_SECONDS",
+        "OBS_QUIET_SECONDS",
+        "OBS_SAME_FINGERPRINT_COUNT",
+        "OBS_ZERO_CHECK_GRACE_POLLS",
+        "OBS_TRIGGER_MODE",
+        "OBS_TRIGGER_COMMENT_ID",
+        "OBS_TRIGGER_CREATED_AT",
+        "OBS_BODY_MODE",
+        "OBS_PROGRESS",
+        "OBS_OUT_DIR",
+    )
+    if any(name not in os.environ for name in required_names):
+        fail_usage()
+
+    values = {name: os.environ[name] for name in required_names}
+    if not values["OBS_SNAPSHOT_SCRIPT"] or not values["OBS_TRIGGER_SCRIPT"]:
+        fail_usage()
+    if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", values["OBS_REPO"]) is None:
+        fail_usage()
+    if re.fullmatch(r"[1-9][0-9]*", values["OBS_PR"]) is None:
+        fail_usage()
+    if re.fullmatch(r"[0-9A-Fa-f]{7,64}", values["OBS_HEAD_SHA"]) is None:
+        fail_usage()
+
+    positive_integer_names = (
+        "OBS_TIMEOUT_SECONDS",
+        "OBS_POLL_INTERVAL_SECONDS",
+        "OBS_QUIET_SECONDS",
+        "OBS_SAME_FINGERPRINT_COUNT",
+        "OBS_ZERO_CHECK_GRACE_POLLS",
+    )
+    if any(re.fullmatch(r"[1-9][0-9]*", values[name]) is None for name in positive_integer_names):
+        fail_usage()
+
+    trigger_mode = values["OBS_TRIGGER_MODE"]
+    trigger_comment_id = values["OBS_TRIGGER_COMMENT_ID"]
+    trigger_created_at = values["OBS_TRIGGER_CREATED_AT"]
+    if trigger_mode not in {"post-once", "resume"}:
+        fail_usage()
+    if trigger_comment_id and re.fullmatch(r"[1-9][0-9]*", trigger_comment_id) is None:
+        fail_usage()
+    if trigger_created_at and (
+        re.fullmatch(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})?",
+            trigger_created_at,
+        )
+        is None
+    ):
+        fail_usage()
+    if trigger_mode == "post-once" and (trigger_comment_id or trigger_created_at):
+        fail_usage()
+    if trigger_mode == "resume" and (not trigger_comment_id or not trigger_created_at):
+        fail_usage()
+
+    if values["OBS_BODY_MODE"] not in {
+        "none",
+        "trigger-window-truncated",
+        "trigger-window-full",
+        "out-only",
+    }:
+        fail_usage()
+    if values["OBS_PROGRESS"] not in {"stderr-summary", "none"}:
+        fail_usage()
+    if values["OBS_OUT_DIR"].startswith("-"):
+        fail_usage()
 
 
 def parse_utc_timestamp(value: object) -> datetime | None:
@@ -1302,6 +1385,8 @@ def mark_latest_timeout(
     payload["fingerprint"] = semantic_fingerprint(payload)
     attach_resume_metadata(payload)
 
+
+validate_environment()
 
 snapshot_script = os.environ["OBS_SNAPSHOT_SCRIPT"]
 trigger_script = os.environ["OBS_TRIGGER_SCRIPT"]
