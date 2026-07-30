@@ -16,7 +16,6 @@ from spec_dock_runtime.application.contracts import (
 )
 from spec_dock_runtime.application.create_artifact_doc import (
     ArtifactSetupTarget,
-    _ensure_artifacts_setup_for_target,
     _format_artifact_timestamp,
     _preflight_artifacts_setup_for_target,
 )
@@ -98,18 +97,24 @@ def import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileAr
         artifacts_was_missing = not os.path.lexists(target.artifacts_dir)
         try:
             _preflight_artifacts_setup_for_target(target=setup_target, specdock_dir=specdock_dir)
+            (
+                target_directory_fd,
+                target_directory_identity,
+                target_name_max,
+            ) = _open_verified_directory(target.path)
             if artifacts_was_missing:
-                (
-                    target_directory_fd,
-                    target_directory_identity,
-                    name_max_bytes,
-                ) = _open_verified_directory(target.path)
+                name_max_bytes = target_name_max
             else:
+                assert target_directory_fd is not None
                 (
                     artifacts_directory_fd,
                     artifacts_directory_identity,
                     name_max_bytes,
-                ) = _open_verified_directory(target.artifacts_dir)
+                ) = _open_verified_child_directory(
+                    target_directory_fd,
+                    target.artifacts_dir.name,
+                    target.artifacts_dir,
+                )
             _allocate_generic_destination(
                 artifacts_dir=target.artifacts_dir,
                 timestamp=timestamp,
@@ -140,7 +145,24 @@ def import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileAr
                     raise RuntimeError("artifact target identity changed during setup")
             else:
                 assert artifacts_directory_fd is not None
-                _ensure_artifacts_setup_for_target(target=setup_target, specdock_dir=specdock_dir)
+                assert artifacts_directory_identity is not None
+                created_rules_identity = _ensure_bound_existing_artifacts_setup(
+                    target=setup_target,
+                    specdock_dir=specdock_dir,
+                    artifacts_directory_fd=artifacts_directory_fd,
+                )
+                if not _destination_binding_is_current(
+                    target=target,
+                    target_directory_fd=target_directory_fd,
+                    target_directory_identity=target_directory_identity,
+                    artifacts_directory_fd=artifacts_directory_fd,
+                    artifacts_directory_identity=artifacts_directory_identity,
+                ):
+                    _rollback_bound_rules_link(
+                        artifacts_directory_fd=artifacts_directory_fd,
+                        created_rules_identity=created_rules_identity,
+                    )
+                    raise RuntimeError("artifact target identity changed during setup")
                 verified_name_max = _name_max_for_descriptor(artifacts_directory_fd)
             if verified_name_max != name_max_bytes:
                 if artifacts_was_missing:
@@ -392,6 +414,127 @@ def _create_bound_fresh_artifacts_setup(
         if artifacts_directory_fd is not None:
             _close_descriptor_noexcept(artifacts_directory_fd)
         raise
+
+
+def _ensure_bound_existing_artifacts_setup(
+    *,
+    target: ArtifactSetupTarget,
+    specdock_dir: Path,
+    artifacts_directory_fd: int,
+) -> tuple[int, int, int] | None:
+    rules_source = specdock_dir / "docs" / "rules" / target.rules_kind / "artifacts.md"
+    created_identity: tuple[int, int, int] | None = None
+    try:
+        try:
+            rules_status = os.stat(
+                "rules.md",
+                dir_fd=artifacts_directory_fd,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            rules_target = os.path.relpath(rules_source, start=target.artifacts_dir)
+            os.symlink(rules_target, "rules.md", dir_fd=artifacts_directory_fd)
+            rules_status = os.stat(
+                "rules.md",
+                dir_fd=artifacts_directory_fd,
+                follow_symlinks=False,
+            )
+            created_identity = (rules_status.st_dev, rules_status.st_ino, rules_status.st_mode)
+        _validate_bound_rules_link(
+            rules_source=rules_source,
+            artifacts_directory_fd=artifacts_directory_fd,
+            rules_status=rules_status,
+        )
+        return created_identity
+    except BaseException as error:
+        _rollback_bound_rules_link(
+            artifacts_directory_fd=artifacts_directory_fd,
+            created_rules_identity=created_identity,
+        )
+        if isinstance(error, RuntimeError):
+            raise
+        if isinstance(error, OSError):
+            raise RuntimeError("artifact rules setup failed") from None
+        raise
+
+
+def _validate_bound_rules_link(
+    *,
+    rules_source: Path,
+    artifacts_directory_fd: int,
+    rules_status: os.stat_result,
+) -> None:
+    if not stat.S_ISLNK(rules_status.st_mode):
+        raise RuntimeError("artifact rules entry is not a symlink")
+    source_fd: int | None = None
+    linked_fd: int | None = None
+    try:
+        source_before = rules_source.lstat()
+        source_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        source_fd = os.open(rules_source, source_flags)
+        source_opened = os.fstat(source_fd)
+        source_after = rules_source.lstat()
+        if len({
+            (source_before.st_dev, source_before.st_ino, source_before.st_mode),
+            (source_opened.st_dev, source_opened.st_ino, source_opened.st_mode),
+            (source_after.st_dev, source_after.st_ino, source_after.st_mode),
+        }) != 1 or not stat.S_ISREG(source_opened.st_mode):
+            raise RuntimeError("artifact rules source identity changed")
+        linked_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+        linked_fd = os.open("rules.md", linked_flags, dir_fd=artifacts_directory_fd)
+        linked_status = os.fstat(linked_fd)
+        rules_after = os.stat(
+            "rules.md",
+            dir_fd=artifacts_directory_fd,
+            follow_symlinks=False,
+        )
+        if (
+            (rules_after.st_dev, rules_after.st_ino, rules_after.st_mode)
+            != (rules_status.st_dev, rules_status.st_ino, rules_status.st_mode)
+            or not stat.S_ISLNK(rules_after.st_mode)
+            or (
+                linked_status.st_dev,
+                linked_status.st_ino,
+                linked_status.st_mode,
+            )
+            != (
+                source_opened.st_dev,
+                source_opened.st_ino,
+                source_opened.st_mode,
+            )
+        ):
+            raise RuntimeError("artifact rules link identity changed")
+    except OSError:
+        raise RuntimeError("artifact rules link validation failed") from None
+    finally:
+        if linked_fd is not None:
+            _close_descriptor_noexcept(linked_fd)
+        if source_fd is not None:
+            _close_descriptor_noexcept(source_fd)
+
+
+def _rollback_bound_rules_link(
+    *,
+    artifacts_directory_fd: int,
+    created_rules_identity: tuple[int, int, int] | None,
+) -> None:
+    if created_rules_identity is None:
+        return
+    try:
+        current = os.stat(
+            "rules.md",
+            dir_fd=artifacts_directory_fd,
+            follow_symlinks=False,
+        )
+        if (
+            current.st_dev,
+            current.st_ino,
+            current.st_mode,
+        ) != created_rules_identity or not stat.S_ISLNK(current.st_mode):
+            return
+        os.unlink("rules.md", dir_fd=artifacts_directory_fd)
+    except OSError:
+        return
 
 
 def _open_verified_child_directory(

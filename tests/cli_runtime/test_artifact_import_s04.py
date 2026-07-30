@@ -64,6 +64,17 @@ def _lifecycle_modules():
     )
 
 
+def _post_rollout_modules():
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.commands import artifact_import as artifact_import_commands
+        from spec_dock_runtime.commands.artifact_import import ArtifactImportFileArgs
+    finally:
+        sys.path.pop(0)
+    return artifact_import_commands, ArtifactImportFileArgs
+
+
 class _FixedClock:
     def now_iso(self) -> str:
         return "2026-07-14T01:02:03Z"
@@ -859,3 +870,143 @@ class TestArtifactImportS04(CliRuntimeHarness):
             assert all(path.read_bytes() == body for path, body in existing.items())
             self._run_runtime(target, ["validate"])
             self._run_runtime(target, ["sync", "--no-github"])
+
+    def test_tc_s99_002_post_rollout_write_disable_keeps_generic_compatibility_layer(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            issue_dir = self._prepare_target(target)
+            self._write_runtime_clock(target)
+            specdock_dir = target / "spec-dock"
+            artifacts_dir = issue_dir / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = "20260714t010203z"
+            grandfathered = {
+                artifacts_dir / f"{timestamp}--grandfathered.bin": b"\xff\x00grandfathered-binary",
+                artifacts_dir / f"{timestamp}-01--grandfathered.md": b"# Grandfathered Markdown\n",
+                artifacts_dir / f"{timestamp}-02--adr-looking.md": (
+                    b"---\nauthority: accepted\nmirror_eligible: true\n---\n\n# Must remain opaque\n"
+                ),
+            }
+            existing_typed_and_blank = {
+                artifacts_dir / f"{timestamp}-03-research-existing.md": b"existing typed",
+                artifacts_dir / f"{timestamp}-04-existing-notes.md": b"existing blank",
+            }
+            for path, body in {**grandfathered, **existing_typed_and_blank}.items():
+                path.write_bytes(body)
+            before_names = {path.name for path in artifacts_dir.iterdir()}
+            source = target / "new-generic.bin"
+            source.write_bytes(b"must not be imported")
+
+            (
+                _import_module,
+                _ArtifactImportError,
+                _ArtifactImportRequest,
+                CreateArtifactDocRequest,
+                _Ports,
+                bootstrap,
+                _Publisher,
+            ) = _runtime_modules()
+            (
+                _CheckDepsRequest,
+                SyncRequest,
+                _TargetRef,
+                ValidateTreeRequest,
+                _build_context_pack_text,
+                _load_active_manifest,
+            ) = _lifecycle_modules()
+            artifact_import_commands, ArtifactImportFileArgs = _post_rollout_modules()
+            monkeypatch.setattr(bootstrap.infra_clock, "now_iso", _FixedClock().now_iso)
+            context = bootstrap.build_runtime(specdock_dir, repo_root=target)
+
+            def disabled_import_file_artifact(_request):
+                raise RuntimeError("post-rollout generic creation disabled")
+
+            post_rollout_use_cases = replace(
+                context.use_cases,
+                import_file_artifact=disabled_import_file_artifact,
+            )
+            file_command = artifact_import_commands.command_specs()["artifact_import_file"]
+            with pytest.raises(RuntimeError, match="artifact import file runtime contract violation"):
+                file_command.run(
+                    ArtifactImportFileArgs(
+                        target_kind="issue",
+                        target_value="iss-00317",
+                        source_path=str(source),
+                        json=False,
+                    ),
+                    post_rollout_use_cases,
+                )
+            assert {path.name for path in artifacts_dir.iterdir()} == before_names
+
+            generic_path_set = set(grandfathered)
+            original_open = Path.open
+            original_read_text = Path.read_text
+            original_read_bytes = Path.read_bytes
+            opened_generic: list[Path] = []
+
+            def deny_generic(path: Path) -> None:
+                if path in generic_path_set:
+                    opened_generic.append(path)
+                    raise AssertionError(f"generic body must remain unopened: {path.name}")
+
+            def guarded_open(path: Path, *args, **kwargs):
+                deny_generic(path)
+                return original_open(path, *args, **kwargs)
+
+            def guarded_read_text(path: Path, *args, **kwargs):
+                deny_generic(path)
+                return original_read_text(path, *args, **kwargs)
+
+            def guarded_read_bytes(path: Path):
+                deny_generic(path)
+                return original_read_bytes(path)
+
+            with monkeypatch.context() as lifecycle_guard:
+                lifecycle_guard.setattr(Path, "open", guarded_open)
+                lifecycle_guard.setattr(Path, "read_text", guarded_read_text)
+                lifecycle_guard.setattr(Path, "read_bytes", guarded_read_bytes)
+
+                validation = post_rollout_use_cases.validate_tree(ValidateTreeRequest())
+                sync_result = post_rollout_use_cases.sync(
+                    SyncRequest(
+                        force=False,
+                        github_enabled=False,
+                        issue_limit=10000,
+                        update_active_from_branch=False,
+                    )
+                )
+                blank = post_rollout_use_cases.create_artifact_doc(
+                    CreateArtifactDocRequest(
+                        artifact_type="blank",
+                        scope_node_id="iss-00317",
+                        scope_kind="issue",
+                        title="Post Rollout Notes",
+                        slug=None,
+                    )
+                )
+                typed = post_rollout_use_cases.create_artifact_doc(
+                    CreateArtifactDocRequest(
+                        artifact_type="research",
+                        scope_node_id="iss-00317",
+                        scope_kind="issue",
+                        title="Post Rollout Research",
+                        slug=None,
+                    )
+                )
+
+                assert validation.report.errors == []
+                assert sync_result.artifact_failure is None
+                assert blank.path.name == f"{timestamp}-05-post-rollout-notes.md"
+                assert typed.path.name == f"{timestamp}-06-research-post-rollout-research.md"
+                assert opened_generic == []
+
+            self._run_runtime(target, ["validate"])
+            self._run_runtime(target, ["sync", "--no-github"])
+            assert source.read_bytes() == b"must not be imported"
+            assert {path.name for path in grandfathered} <= {path.name for path in artifacts_dir.iterdir()}
+            assert all(path.read_bytes() == body for path, body in grandfathered.items())
+            assert all(path.read_bytes() == body for path, body in existing_typed_and_blank.items())
+            assert self._adr_mirror_snapshot(specdock_dir) == ()
