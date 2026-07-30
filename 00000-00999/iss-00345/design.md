@@ -5,7 +5,7 @@ ID: "iss-00345"
 状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-30"
-依存: ["requirement.md", "epic-00343/design.md", "20260728t100038z-adr"]
+依存: ["requirement.md", "epic-00343/design.md", "20260728t100038z-adr", "20260730t085831z-adr"]
 親: ["epic-00343", "init-local-00002"]
 authorized_profile_observed: "standard"
 parent_recommended_grade: "critical"
@@ -18,7 +18,7 @@ classification_status: "runtime_classified"
 
 本書は `requirement.md` の `I345-RQ-*` / `I345-AC-*` を実装可能な責務、interface、state、failure mapping、test seam へ落とす approved canonical design である。runtime classification は `standard` であり、本書の承認とfresh reviewer passを実装開始判断の入力にする。
 
-設計根拠は、current provider source、parent Epic `D-003`〜`D-009`、accepted ADR、review済みのcanonical requirement、Issue authoring workflowである。
+設計根拠は、current provider source、parent Epic `D-003`〜`D-009`、accepted ADR `20260728t100038z-adr` / `20260730t085831z-adr`、review済みのcanonical requirement、Issue authoring workflowである。
 
 ## 1. 設計目標
 
@@ -83,6 +83,7 @@ provider runtime/docs/rulesを一次変更面とし、managed dogfood projection
 | generic bodyはsemantic inputでない | ADR Decision 7 | lifecycle scannersをname-only化 |
 | FD-bound no-replaceがcommit point | ADR Decision 8 | state machineの唯一のcommit transition |
 | post-commit warningはretry不要 | ADR Decision 8 | exit success + `committed_with_warning` |
+| macOS named-staging cleanupの限定threat boundary | `20260730t085831z-adr` | final identity checkまでに観測可能なreplacement / missing / unexpected type / uncertaintyはretainし、check後からunlinkまでの意図的same-UID replacementだけを保証対象外とする |
 | `chatgpt-output`不変 | `E-RQ-021` | current classes/renderers/portを維持 |
 | Issue 346 delivery boundary | Parent Candidate 3 | integrated/distribution/final reviewをdefer |
 
@@ -102,6 +103,7 @@ provider runtime/docs/rulesを一次変更面とし、managed dogfood projection
 | `LC-345-008` | pre-commit errorはsource/destination fieldを持たない専用DTO | path leakをrenderer disciplineだけに依存させない |
 | `LC-345-009` | root rules sourceを`docs/rules/root/artifacts.md`とする | parent `D-004`のexact pathを採用 |
 | `LC-345-010` | existing artifacts directoryはopened directory FD、fresh targetはsecurely opened target parent FDから`PC_NAME_MAX`を取得し、作成後のartifacts FDで再確認する。取得不能/不正値/identity不一致はfail closed | platform limitを推測せず、fresh childが同一filesystemに作られたことを検証 |
+| `LC-345-011` | `_cleanup_temp`はheld FDとpathnameのidentityに加えて双方のregular-file typeを確認し、missing / mismatch / unexpected type / stat・open failureを全て`retained`としてunlinkしない | Option Aの対象内mitigationをコード上で直接表現し、`FileNotFoundError`を誤って`removed`扱いしない |
 
 ## 3. Architecture context
 
@@ -495,6 +497,8 @@ no-replace primitiveはformal destination commit前にdestination parent FDへ�
 
 unsupported、probe cleanup uncertainty、`/proc/self/fd` unavailable、macOS symbol unavailableは`publication_unsupported`でfail closedする。Windows/other platformへunsafe fallbackを追加しない。
 
+macOS named stagingのcapability確認は、別のraceable probe pathnameを作成・unlinkせず、owned staged tempに対するnon-mutating no-replace確認を使う。cleanupはheld FD/path identityとregular-file typeを最終確認し、replacement、missing、unexpected type、stat/open failureその他ownership uncertaintyではunlinkせず`retained`を返す。最終check後からpathname `unlink`までの意図的same-UID replacementだけはaccepted ADR `20260730t085831z-adr`の限定された非保証窓であり、それ以外の対象内failureをこの窓へ拡張しない。
+
 #### Cross-filesystem support
 
 sourceからformal destinationへhard link/renameしない。source bytesをdestination parent内のtemp FDへstreamし、そのtemp FDだけをformal nameへcommitするため、source deviceとdestination deviceの違いは成功条件を妨げない。
@@ -788,6 +792,12 @@ source lease、staged-temp FD、destination-parent FDのcommit後close failure�
 
 ## 9. Privacy threat model
 
+### 9.1 macOS named-staging cleanup boundary
+
+accepted ADR `20260730t085831z-adr`は、同一UIDでdestination directoryを変更でき、high-entropy internal staging nameを発見・監視するactorが、cleanupの最終FD/path identity check後から`unlink` syscallまでにpathnameを意図的に別entryへ置換する場合だけを保証対象外とする。これはformal destination、source、privacyの保証や、final checkまでに観測可能なreplacement / missing / unexpected type / uncertaintyを対象外にしない。
+
+実装とreviewは、対象内の観測可能な状態でunlinkを呼ばず`retained`を返しreplacement sentinelを保持することを必須にする。一方、macOS公開APIに存在しないFD-conditional unlinkをIssue-localで実現したと主張しない。
+
 | Threat | Boundary | Design control | Verification |
 |---|---|---|---|
 | external absolute/parent path leak | request → result | public DTOにraw pathなし; safe displayだけ返す | success/failure/warning sentinel tests |
@@ -1053,6 +1063,7 @@ retained temp cleanupはowner identityを確認できるものだけ手動/repai
 - Issue 346のdistribution/final quality scopeをIssue 345へ移す必要がある。
 - `authorized_profile`を本成果物または実装者が選択/書換えなければ進められない。
 - generic pathでdestination mismatchを正常warningとして許容しなければならない。
+- accepted ADR `20260730t085831z-adr`のsame-UID actor / internal staging pathname / final-check-to-unlink time windowを広げる必要、またはこの限定除外を撤回する必要がある。
 - supported platform/capability matrixをparent designと異なる形に広げる必要がある。
 
 ## 17. Design traceability
