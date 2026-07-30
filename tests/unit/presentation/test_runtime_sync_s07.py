@@ -584,6 +584,85 @@ class TestRuntimeSyncS07:
                 "20260312t010213z-adr-accepted-artifact-decision.md",
             }
 
+    def test_tc_s04_001_003_adr_collection_never_opens_generic_artifact_body(self, monkeypatch) -> None:
+        (
+            _runtime_app,
+            app_contracts,
+            app_ports,
+            app_sync_state,
+            _domain_models,
+            _infra_artifact_writer,
+            infra_contracts,
+            _presentation_cli_text,
+        ) = _runtime_modules()
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            specdock_dir = repo_root / "spec-dock"
+            specdock_dir.mkdir(parents=True, exist_ok=True)
+            records = self._records(infra_contracts, repo_root)
+            issue_dir = Path(records[2].path)
+            accepted = self._write_valid_artifact_adr_doc(
+                issue_dir,
+                "20260312t010205z-adr-accepted.md",
+                doc_id="20260312t010205z-adr",
+                scope_id="iss-local-00001",
+                authority="accepted",
+                mirror_eligible=True,
+            )
+            generic_paths: set[Path] = set()
+            for index, record in enumerate(records, start=1):
+                scope_dir = Path(record.path)
+                artifacts_dir = scope_dir / "artifacts"
+                artifacts_dir.mkdir(parents=True, exist_ok=True)
+                generic = artifacts_dir / f"20260730t01020{index}z--accepted-adr-looking.md"
+                generic.write_bytes(b"\xff\xfe---\nauthority: accepted\nmirror_eligible: true\n")
+                generic_paths.add(generic)
+
+            original_open = Path.open
+            original_read_text = Path.read_text
+            original_read_bytes = Path.read_bytes
+            opened_generic: list[Path] = []
+
+            def deny_generic(path: Path) -> None:
+                if path in generic_paths:
+                    opened_generic.append(path)
+                    raise AssertionError(f"generic body must remain unopened: {path.name}")
+
+            def guarded_open(path: Path, *args, **kwargs):
+                deny_generic(path)
+                return original_open(path, *args, **kwargs)
+
+            def guarded_read_text(path: Path, *args, **kwargs):
+                deny_generic(path)
+                return original_read_text(path, *args, **kwargs)
+
+            def guarded_read_bytes(path: Path):
+                deny_generic(path)
+                return original_read_bytes(path)
+
+            monkeypatch.setattr(Path, "open", guarded_open)
+            monkeypatch.setattr(Path, "read_text", guarded_read_text)
+            monkeypatch.setattr(Path, "read_bytes", guarded_read_bytes)
+            ports = app_ports.Ports(
+                node_reader=_StubNodeReader(records),
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                deps_topology_reader=_StubDepsTopologyReader(
+                    infra_contracts,
+                    {"iss-local-00001": [], "iss-local-00002": []},
+                ),
+                derived_state_reader=_StubDerivedStateReader({}),
+                active_state_store=_StubActiveStateStore(infra_contracts, []),
+                git_gateway=_StubGitGateway("main"),
+                clock=_StubClock(),
+            )
+
+            state = app_sync_state.collect_sync_state(self._request(app_contracts), ports)
+            sources = app_sync_state._collect_adr_mirror_sources(state.graph)
+
+            assert [source.source_path for source in sources] == [accepted]
+            assert opened_generic == []
+
     def test_sync_fails_before_write_on_adr_mirror_basename_collision_and_preserves_adrs(self) -> None:
         (
             _runtime_app,

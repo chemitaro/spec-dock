@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 import hashlib
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -39,6 +40,30 @@ def _runtime_modules():
     )
 
 
+def _lifecycle_modules():
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.application.contracts import (
+            CheckDepsRequest,
+            SyncRequest,
+            TargetRef,
+            ValidateTreeRequest,
+        )
+        from spec_dock_runtime.application.set_active import build_context_pack_text
+        from spec_dock_runtime.infra.active_store import load_active_manifest
+    finally:
+        sys.path.pop(0)
+    return (
+        CheckDepsRequest,
+        SyncRequest,
+        TargetRef,
+        ValidateTreeRequest,
+        build_context_pack_text,
+        load_active_manifest,
+    )
+
+
 class _FixedClock:
     def now_iso(self) -> str:
         return "2026-07-14T01:02:03Z"
@@ -48,6 +73,20 @@ class _FixedClock:
 
 
 class TestArtifactImportS04(CliRuntimeHarness):
+    _PROJECTION_PATHS = (
+        ".agent/index-all.json",
+        ".agent/index.json",
+        ".agent/tree-all.json",
+        ".agent/tree.json",
+        ".agent/deps-issues.json",
+        "tree-all.puml",
+        "tree.puml",
+        "deps-issues.puml",
+        "deps-raw.puml",
+        "dashboard.md",
+        "active/context-pack.md",
+    )
+
     def _prepare_target(self, target: Path) -> Path:
         assert main(["init", str(target)]) == 0
         self._create_same_repo_linked_hierarchy(
@@ -61,6 +100,61 @@ class TestArtifactImportS04(CliRuntimeHarness):
         )
         [issue_dir] = list((target / "spec-dock" / "initiatives").rglob("iss-00317-raw-import"))
         return issue_dir
+
+    def _write_runtime_clock(self, target: Path) -> None:
+        runtime_clock = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "clock.py"
+        runtime_clock.write_text(
+            (
+                "from __future__ import annotations\n\n"
+                "def now_iso() -> str:\n    return '2026-07-14T01:02:03+00:00'\n\n"
+                "def today() -> str:\n    return '2026-07-14'\n"
+            ),
+            encoding="utf-8",
+        )
+
+    def _projection_snapshot(self, specdock_dir: Path) -> dict[str, bytes]:
+        snapshot: dict[str, bytes] = {}
+        for relative in self._PROJECTION_PATHS:
+            path = specdock_dir / relative
+            if not path.is_file():
+                continue
+            content = path.read_bytes()
+            if path.suffix == ".json":
+                payload = json.loads(content)
+                if isinstance(payload, dict):
+                    payload.pop("generated_at", None)
+
+                content = json.dumps(
+                    payload,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            snapshot[relative] = content
+        return snapshot
+
+    def _projection_digest(self, snapshot: dict[str, bytes]) -> str:
+        digest = hashlib.sha256()
+        for relative, content in snapshot.items():
+            digest.update(relative.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(content)
+            digest.update(b"\0")
+        return digest.hexdigest()
+
+    def _adr_mirror_snapshot(self, specdock_dir: Path) -> tuple[tuple[str, str], ...]:
+        adrs_dir = specdock_dir / "adrs"
+        if not adrs_dir.is_dir():
+            return ()
+        return tuple(
+            sorted(
+                (
+                    path.name,
+                    f"symlink:{path.readlink()}" if path.is_symlink() else f"bytes:{path.read_bytes()!r}",
+                )
+                for path in adrs_dir.iterdir()
+            )
+        )
 
     def _request(self, contracts, source: Path, *, slug: str = "collision"):
         return contracts(
@@ -556,3 +650,212 @@ class TestArtifactImportS04(CliRuntimeHarness):
             assert result.byte_count == len(body)
             assert (target / result.destination_path).read_bytes() == body
             assert source.read_bytes() == body
+
+    def test_tc_s04_001_002_003_generic_bodies_do_not_change_default_lifecycle_projections(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._write_runtime_clock(target)
+            self._create_same_repo_linked_hierarchy(
+                target,
+                initiative_issue_number=301,
+                epic_issue_number=312,
+                issue_issue_number=317,
+                initiative_title="Architecture",
+                epic_title="Workbench",
+                issue_title="Raw import",
+            )
+            [issue_dir] = list((target / "spec-dock" / "initiatives").rglob("iss-00317-raw-import"))
+            specdock_dir = target / "spec-dock"
+            epic_dir = issue_dir.parents[1]
+            initiative_dir = issue_dir.parents[3]
+            accepted_adr = issue_dir / "artifacts" / "20260713t010203z-adr-baseline.md"
+            accepted_adr.write_text(
+                "\n".join((
+                    "---",
+                    "種別: ADR（Architecture Decision Record）",
+                    'ID: "20260713t010203z-adr"',
+                    'タイトル: "Baseline"',
+                    '状態: "accepted"',
+                    '作成者: "Tester"',
+                    '最終更新: "2026-07-13"',
+                    '親: ["iss-00317"]',
+                    'authority: "accepted"',
+                    "mirror_eligible: true",
+                    "---",
+                    "",
+                    "# Baseline",
+                    "",
+                )),
+                encoding="utf-8",
+            )
+            self._run_runtime(target, ["active", "set", "--id", "iss-00317"])
+            self._run_runtime(target, ["validate"])
+            self._run_runtime(target, ["sync", "--no-github"])
+            baseline_projection = self._projection_snapshot(specdock_dir)
+            baseline_digest = self._projection_digest(baseline_projection)
+            baseline_mirror = self._adr_mirror_snapshot(specdock_dir)
+            baseline_deps = self._run_runtime_capture(
+                target,
+                ["deps", "check", "--id", "iss-00317", "--no-github", "--json"],
+            )
+            assert baseline_deps.returncode == 0, baseline_deps.stdout + baseline_deps.stderr
+
+            generic_paths: list[Path] = []
+            invalid_payload = b"\xff\xfe\x00generic-invalid-utf8"
+            for index, scope_dir in enumerate((specdock_dir, initiative_dir, epic_dir, issue_dir), start=1):
+                artifacts_dir = scope_dir / "artifacts"
+                artifacts_dir.mkdir(parents=True, exist_ok=True)
+                generic = artifacts_dir / f"20260730t01020{index}z--opaque-{index}.md"
+                generic.write_bytes(invalid_payload)
+                generic_paths.append(generic)
+            adr_looking_generic = issue_dir / "artifacts" / "20260730t010205z--accepted-adr-looking.md"
+            adr_looking_generic.write_text(
+                "\n".join((
+                    "---",
+                    "種別: ADR（Architecture Decision Record）",
+                    'ID: "20260730t010205z-adr"',
+                    '親: ["iss-00317"]',
+                    'authority: "accepted"',
+                    "mirror_eligible: true",
+                    "---",
+                    "",
+                    "# Must remain opaque",
+                    "",
+                )),
+                encoding="utf-8",
+            )
+            generic_paths.append(adr_looking_generic)
+
+            (
+                CheckDepsRequest,
+                SyncRequest,
+                TargetRef,
+                ValidateTreeRequest,
+                build_context_pack_text,
+                load_active_manifest,
+            ) = _lifecycle_modules()
+            (
+                _import_module,
+                _ArtifactImportError,
+                _ArtifactImportRequest,
+                _CreateArtifactDocRequest,
+                _Ports,
+                bootstrap,
+                _Publisher,
+            ) = _runtime_modules()
+            context = bootstrap.build_runtime(specdock_dir, repo_root=target)
+            generic_path_set = set(generic_paths)
+            original_open = Path.open
+            original_read_text = Path.read_text
+            original_read_bytes = Path.read_bytes
+            opened_generic: list[Path] = []
+
+            def deny_generic(path: Path) -> None:
+                if path in generic_path_set:
+                    opened_generic.append(path)
+                    raise AssertionError(f"generic body must remain unopened: {path.name}")
+
+            def guarded_open(path: Path, *args, **kwargs):
+                deny_generic(path)
+                return original_open(path, *args, **kwargs)
+
+            def guarded_read_text(path: Path, *args, **kwargs):
+                deny_generic(path)
+                return original_read_text(path, *args, **kwargs)
+
+            def guarded_read_bytes(path: Path):
+                deny_generic(path)
+                return original_read_bytes(path)
+
+            with monkeypatch.context() as lifecycle_guard:
+                lifecycle_guard.setattr(Path, "open", guarded_open)
+                lifecycle_guard.setattr(Path, "read_text", guarded_read_text)
+                lifecycle_guard.setattr(Path, "read_bytes", guarded_read_bytes)
+
+                with pytest.raises(AssertionError, match="generic body must remain unopened"):
+                    generic_paths[0].read_bytes()
+                opened_generic.clear()
+
+                validation = context.use_cases.validate_tree(ValidateTreeRequest())
+                deps = context.use_cases.check_deps(
+                    CheckDepsRequest(
+                        target=TargetRef(kind="node_id", node_id="iss-00317", github_issue_number=None),
+                        use_github=False,
+                        issue_limit=10000,
+                    )
+                )
+                sync_result = context.use_cases.sync(
+                    SyncRequest(
+                        force=False,
+                        github_enabled=False,
+                        issue_limit=10000,
+                        update_active_from_branch=False,
+                    )
+                )
+                active = load_active_manifest(specdock_dir)
+                assert active.manifest is not None
+                context_pack = build_context_pack_text(active.manifest, repo_root=target)
+
+                assert validation.report.errors == []
+                assert deps.target.node_id == "iss-00317"
+                assert sync_result.artifact_failure is None
+                assert "# Context Pack (generated)" in context_pack
+                assert opened_generic == []
+
+            self._run_runtime(target, ["validate"])
+            self._run_runtime(target, ["sync", "--no-github"])
+            after_projection = self._projection_snapshot(specdock_dir)
+            after_digest = self._projection_digest(after_projection)
+            after_mirror = self._adr_mirror_snapshot(specdock_dir)
+            after_deps = self._run_runtime_capture(
+                target,
+                ["deps", "check", "--id", "iss-00317", "--no-github", "--json"],
+            )
+
+            assert after_deps.returncode == 0, after_deps.stdout + after_deps.stderr
+            assert after_projection == baseline_projection
+            assert after_digest == baseline_digest
+            assert after_deps.stdout == baseline_deps.stdout
+            assert after_mirror == baseline_mirror
+            assert baseline_mirror == (("20260713t010203z-adr-baseline.md", baseline_mirror[0][1]),)
+            assert all(path.name not in {name for name, _target in after_mirror} for path in generic_paths)
+            assert all(path.read_bytes() == invalid_payload for path in generic_paths[:-1])
+            assert b"Must remain opaque" in adr_looking_generic.read_bytes()
+
+    def test_tc_s04_005_typed_and_blank_keep_legacy_names_while_generic_reserves_shared_slot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            issue_dir = self._prepare_target(target)
+            self._write_runtime_clock(target)
+            artifacts_dir = issue_dir / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            existing = {
+                artifacts_dir / "20260713t010201z-existing-notes.md": b"existing blank",
+                artifacts_dir / "20260713t010202z-research-existing.md": b"existing typed",
+                artifacts_dir / "20260714t010203z--opaque.bin": b"generic sentinel",
+            }
+            for path, body in existing.items():
+                path.write_bytes(body)
+
+            blank = self._run_runtime_capture(
+                target,
+                ["new", "artifact", "blank", "--issue", "iss-00317", "--title", "Working Notes"],
+            )
+            typed = self._run_runtime_capture(
+                target,
+                ["new", "artifact", "research", "--issue", "iss-00317", "--title", "Research Notes"],
+            )
+
+            assert blank.returncode == 0, blank.stdout + blank.stderr
+            assert typed.returncode == 0, typed.stdout + typed.stderr
+            assert "id=20260714t010203z-01 scope=iss-00317" in blank.stdout
+            assert "id=20260714t010203z-02-research scope=iss-00317" in typed.stdout
+            assert (artifacts_dir / "20260714t010203z-01-working-notes.md").is_file()
+            assert (artifacts_dir / "20260714t010203z-02-research-research-notes.md").is_file()
+            assert all(path.read_bytes() == body for path, body in existing.items())
+            self._run_runtime(target, ["validate"])
+            self._run_runtime(target, ["sync", "--no-github"])
