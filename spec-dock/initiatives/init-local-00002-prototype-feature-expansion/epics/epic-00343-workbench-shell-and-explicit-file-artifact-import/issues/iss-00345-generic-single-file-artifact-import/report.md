@@ -162,7 +162,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー
-- planning artifactsの承認とS01実装開始前readinessを確認済み。実装結果はS01 worker evidence受領後に記録する。
+- planning artifactsの承認とreadiness確認後、S01のgeneric single-file import vertical tracerをprovider runtimeへ実装した。
+- root / Initiative / Epic / Issue、opaque bytes、source survival、full-basename identity、generic result allowlistをfocused testsで確認済み。fresh step code reviewとcommitは未実施。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -177,47 +178,55 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 #### 実施内容
 - ユーザー承認をR/D/P/reportの`approved`状態へ反映し、dependency、assurance、validate、fresh planning reviewを確認した。
+- `dev-coder`へS01だけを委任し、generic専用DTO/use case/ports/renderers、CLI leaf、root rules source、publisher entry、generic filename recognizerとS01 testsを追加した。
+- legacy ChatGPT import / Workbench eligibility / typed・blank grammarは変更せず、S02〜S04のhardening・collision・lifecycle範囲を先取りしなかった。
 
 #### 実行コマンド / 結果
 ```text
 deps check --id iss-00345 -> ready=true, blockers=0
 assurance verify --issue iss-00345 -> ok, standard/normal
 spec-dock validate -> ok, nodes=217
+focused unit tests -> 25 passed
+explicit full-regression CLI slice -> 4 passed
+full unit suite -> 684 passed, 560 skipped
+make lint -> pass
 ```
 
 #### テスト駆動開発証跡（TDD / Red / Green / Refactor Evidence）
 | ステップ（step） | フェーズ（phase） | 計画した証跡要件 | 観測した証跡 | 証跡手段（command / inspection / manual record） | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|---|
-| S01 | Red | red-required | worker evidence pending | `plan.md` §8.6/§8.7 | pending | `dev-coder`委任後に更新 |
-| S01 | Green | focused verification required | worker evidence pending | `plan.md` §8.7 | pending | Red確認後に更新 |
-| S01 | Refactor | bounded guardrail | worker evidence pending | diff inspection | pending | Green後に更新 |
+| S01 | Red | red-required | command `2 failed, 4 passed`; application `2 failed`; ports `1 failed, 1 passed`; presentation `2 failed` | missing CLI leaf/module/DTO/portを各public boundaryで観測 | pass | planned failure sensitivityを確認 |
+| S01 | Green | focused verification required | required unit 25 passed、CLI実体4 passed、legacy command8 passed、publisher47 passed/1 skipped、full unit684 passed/560 skipped、lint pass。mutation-free rejectionとroot non-node evidenceを補強済み | `plan.md` §8.7 + affected regressions | pass | default CLI laneはpolicy skip、`--run-full-regression`で実体確認。fresh再レビュー待ち |
+| S01 | Refactor | bounded guardrail | destination-side staging/no-replace private coreだけを共有し、legacy public contractを維持 | diff inspection + legacy regressions | pass | S02〜S04は未実装 |
 
 #### 発見されたテスト / リスク（Discovered Tests）
 | ステップ（step） | 発見されたテスト / リスク（test / risk） | 起票元（source） | 実施した対応 | クロージャID / 新規ID（closure id / new id） | 計画修正要否（plan amendment required） | 証跡（evidence） |
 |---|---|---|---|---|---|---|
-| S01 | none observed before implementation | readiness inspection | recorded | existing S01 closure ids | no | repo-analysis evidence |
+| S01 | default CLI test commandはpolicy skipになる | implementation | explicit `--run-full-regression`で同一sliceを実行 | existing S01 closure ids | no | `2 skipped`を`2 passed`の実体確認で補完 |
+| S01 | S02〜S04に残るhardening/collision/lifecycleリスク | implementation | approved planどおり後続stepへ保持 | existing downstream closure ids | no | S01 scope外かつ既知 |
+| S01 | zero/multiple selectorとmissing/mismatched targetのmutation-free拒否、およびroot import前後のgraph/dependency不変証跡が不足 | fresh code-reviewer | dev-coderがtestを補強し、parent focused verificationは25 passed、CLI実体4 passed | `tc-s01-001`〜`tc-s01-005`、§8.2 listed closures | no | 初回review status `fail`; finding P1は修正済み。fresh再レビュー待ち |
 
 #### ステップ契約の完了証跡（Step Contract Closure）
 | ステップ（step） | クロージャID（closure ids） | 計画上の close 条件（close condition from plan） | 観測した証跡 | 結果（result） | メモ（notes） |
 |---|---|---|---|---|---|
-| S01 | §8.2 listed closures | §8.10の全条件 | worker evidence pending | pending | 実装後に更新 |
+| S01 | §8.2 listed closures | §8.10の全条件 | focused/legacy/full-unit/lint Green、mutation-free rejectionとroot graph/dependency不変、public exact-key snapshot、plan外decisionなしを確認 | pass | fresh code re-review findings `[]`; confidence `0.98`。commit gateのみ未完了 |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
 |---|---|---|---|---|---|---|---|
-| `tc-s01-001`〜`tc-s01-005` | S01 | yes | red-required | not run | `plan.md` §8.7 | pending | worker evidence待ち |
+| `tc-s01-001`〜`tc-s01-005` | S01 | yes | red-required | missing CLI leaf/module/DTO/portのRedを保存 | §8.7 focused unit 25 passed、CLI full-regression slice 4 passed | pass | success path、mutation-free rejection、root graph/dependency不変を確認 |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
 #### クロージャ網羅（Closure Coverage）
 | クロージャID（closure id） | ステップ（step） | 検証証跡 | 観測結果 | メモ（notes） |
 |---|---|---|---|---|
-| §8.2 listed closures | S01 | `tc-s01-001`〜`tc-s01-005` | pending | focused test output待ち |
+| §8.2 listed closures | S01 | `tc-s01-001`〜`tc-s01-005`、legacy regressions、lint、fresh code re-review | pass | initial P1をtest補強し、fresh re-review findings `[]`。closure deltaなし |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
 |---|---|---|---|---|---|---|
-| none | §8.2 listed closures | `tc-s01-001`〜`tc-s01-005` | unchanged | implementation前の差分なし | no | no |
+| none | §8.2 listed closures | `tc-s01-001`〜`tc-s01-005` | unchanged | approved expectationsを変更せず実装 | no | no |
 
 #### ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 `workflow_issue.md` is the policy source for workflow-scoped authorization. This report records observed authorization source, boundary, expiry, and denied / unavailable / host conflict handling only.
@@ -235,12 +244,12 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 
 | ステップ（step） | 判断（decision） | 必須理由（required reason） | 委任ロール（delegated role） | 委任範囲（delegated scope） | 正本（source of truth） | 許可変更（allowed changes） | 禁止変更（forbidden changes） | 必須検証（required verification） | 停止条件（stop conditions） | 必須出力（output required） | 観測結果（observed result） |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| S01 | delegated | multi-layer provider runtime/testsのvertical tracer | dev-coder | `plan.md` §8 | approved R/D/P、accepted ADR、provider source | §8.4のprovider runtime/root rules/S01 tests | legacy ChatGPT import/Workbench/typed・blank grammar、S02以降、canonical docs | §8.7 focused tests、legacy smoke、diff inspection | root graph化、legacy contract変更、unsafe fallback、allowed path外変更が必要 | changed files、Red/Green/Refactor、tests、risks、ledger note | ready for worker |
+| S01 | delegated | multi-layer provider runtime/testsのvertical tracer | dev-coder | `plan.md` §8 | approved R/D/P、accepted ADR、provider source | §8.4のprovider runtime/root rules/S01 tests | legacy ChatGPT import/Workbench/typed・blank grammar、S02以降、canonical docs | §8.7 focused tests、legacy smoke、diff inspection | root graph化、legacy contract変更、unsafe fallback、allowed path外変更が必要 | changed files、Red/Green/Refactor、tests、risks、ledger note | worker completed; parent verification passed |
 
 #### 委任 worker 証跡（Delegated Worker Evidence）
 | ステップ（step） | 委任ロール（delegated role） | 委任 worker 要約（delegated worker summary） | 変更ファイル（changed files） | 実行 tests または docs-only 検証（tests run or docs-only verification） | レビュアー判定（reviewer verdict） | 未解決リスク（unresolved risks） | 親統合判断（parent integration decision） |
 |---|---|---|---|---|---|---|---|
-| S01 | dev-coder | worker pending | none yet | not run | pending | none observed | pending integration |
+| S01 | dev-coder | generic file importをCLIからFSまで縦に通し、rootをnon-nodeのまま4 targetとopaque bytesを実装。初回review findingに対しtest evidenceを補強 | §8.4のprovider runtime/root rulesと新規S01 testsの16 files | required unit25/CLI4/legacy/full-unit/lint pass | pass | S02〜S04の計画済み範囲のみ | fresh re-review findings `[]`; confidence `0.98`; accepted for commit |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -261,7 +270,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | planning | execution readiness spec review | spec-reviewer | fresh | pass | no | execute approved plan | findings `[]`; confidence `0.99`; R/D/P/report/assuranceとS01契約を確認 |
-| S01 | step code review | code-reviewer | not run | pending | N/A | review after implementation | required before S01 commit |
+| S01 | step code review | code-reviewer | fresh re-review | pass | no | close S01 after focused commit | initial P1をtest補強。re-review findings `[]`; confidence `0.98` |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
@@ -269,7 +278,9 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S01 | pending | `feat(artifact): 汎用単一ファイル import の縦切りを追加` | pending | pending | not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
-- none before implementation
+- provider runtime: `application`, `cli`, `commands`, `domain`, `infra`, `presentation`のS01対象10 files
+- provider root rules: `src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md`
+- tests: command/application/ports/presentation/CLIのS01対象5 files
 
 #### コミット
 - pending
@@ -279,14 +290,16 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 ---
 
-### セッションログ（S01 implementation — pending）
+### セッションログ（2026-07-30 — S01 implementation）
 
 #### 対象
 - Step: S01
 - AC/EC: `plan.md` §8.2
 
 #### 実施内容
-- `dev-coder` evidence受領後に更新する。
+- Red→Green→Refactorをplan §8どおり実行し、親側でもfocused unit 25件とCLI full-regression slice 4件を再実行してpassを確認した。
+- 初回code reviewのP1をtest evidenceだけで修正し、fresh re-reviewはfindings `[]`、`pass`、confidence `0.98`となった。
+- `git diff --check`はpass、変更は§8.4のallowed paths内に限定されている。
 
 ---
 

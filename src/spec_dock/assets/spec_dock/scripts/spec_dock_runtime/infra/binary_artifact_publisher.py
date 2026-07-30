@@ -16,6 +16,10 @@ from spec_dock_runtime.application.contracts import (
     BinaryArtifactPublishRequest,
     BinaryArtifactPublishResult,
     BinaryArtifactPublishWarning,
+    ExplicitFileArtifactPublishRequest,
+    ExplicitFileArtifactPublishResult,
+    ExplicitFileSourcePreflightRequest,
+    GuardedExplicitFileSource,
     GuardedWorkbenchSource,
     WorkbenchSourceGuardRequest,
 )
@@ -94,6 +98,65 @@ class FilesystemBinaryArtifactPublisher:
                 cleanup_state="not_created",
             ) from None
 
+    def guard_explicit_file_source(
+        self,
+        request: ExplicitFileSourcePreflightRequest,
+    ) -> GuardedExplicitFileSource:
+        source_fd: int | None = None
+        try:
+            repo_root = _absolute_lexical(request.repo_root)
+            source_path = _absolute_lexical(request.source_path, relative_to=repo_root)
+            path_status = source_path.lstat()
+            if stat.S_ISLNK(path_status.st_mode) or not stat.S_ISREG(path_status.st_mode):
+                raise _PublishFailure("source_ineligible")
+            if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_NONBLOCK"):
+                raise _PublishFailure("source_guard_unsupported")
+            flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+            if hasattr(os, "O_CLOEXEC"):
+                flags |= os.O_CLOEXEC
+            source_fd = os.open(source_path, flags)
+            opened_status = os.fstat(source_fd)
+            path_status_after = source_path.lstat()
+            expected = (path_status.st_dev, path_status.st_ino, path_status.st_mode)
+            if (
+                not stat.S_ISREG(opened_status.st_mode)
+                or (opened_status.st_dev, opened_status.st_ino, opened_status.st_mode) != expected
+                or (
+                    path_status_after.st_dev,
+                    path_status_after.st_ino,
+                    path_status_after.st_mode,
+                )
+                != expected
+            ):
+                raise _PublishFailure("source_ineligible")
+            source_visibility, source_display = _classify_explicit_source(
+                repo_root,
+                source_path,
+                opened_status,
+            )
+            guarded = GuardedExplicitFileSource(
+                source_path=source_path,
+                descriptor=source_fd,
+                initial_status=opened_status,
+                source_visibility=source_visibility,
+                source_display=source_display,
+            )
+            source_fd = None
+            return guarded
+        except _PublishFailure as exc:
+            raise BinaryArtifactPublishError(
+                code=exc.code,
+                cleanup_state="not_created",
+            ) from None
+        except (FileNotFoundError, OSError, ValueError):
+            raise BinaryArtifactPublishError(
+                code="source_ineligible",
+                cleanup_state="not_created",
+            ) from None
+        finally:
+            if source_fd is not None:
+                os.close(source_fd)
+
     def publish(self, request: BinaryArtifactPublishRequest) -> BinaryArtifactPublishResult:
         guarded = self.guard_source(request.source)
         destination = _absolute_lexical(request.destination_path)
@@ -107,12 +170,73 @@ class FilesystemBinaryArtifactPublisher:
             ) from None
 
         source_fd: int | None = None
+        try:
+            source_fd, initial_status = self._open_guarded_source(guarded)
+            return self._stage_verify_and_publish(
+                repo_root=repo_root,
+                source_path=guarded.source_path,
+                source_fd=source_fd,
+                initial_status=initial_status,
+                destination=destination,
+                confirm_destination=True,
+            )
+        finally:
+            if source_fd is not None:
+                os.close(source_fd)
+
+    def publish_explicit_file(
+        self,
+        request: ExplicitFileArtifactPublishRequest,
+    ) -> ExplicitFileArtifactPublishResult:
+        guarded = request.guarded_source
+        if guarded._closed:
+            raise BinaryArtifactPublishError(code="source_changed", cleanup_state="not_created")
+        destination = _absolute_lexical(request.destination_path)
+        repo_root = _absolute_lexical(request.repo_root)
+        try:
+            _require_contained(repo_root, destination)
+        except (_PublishFailure, ValueError):
+            raise BinaryArtifactPublishError(code="destination_ineligible", cleanup_state="not_created") from None
+        try:
+            os.lseek(guarded._descriptor, 0, os.SEEK_SET)
+        except OSError:
+            raise BinaryArtifactPublishError(code="source_changed", cleanup_state="not_created") from None
+        published = self._stage_verify_and_publish(
+            repo_root=repo_root,
+            source_path=guarded._source_path,
+            source_fd=guarded._descriptor,
+            initial_status=guarded._initial_status,
+            destination=destination,
+            confirm_destination=False,
+        )
+        return ExplicitFileArtifactPublishResult(
+            source_visibility=guarded.source_visibility,
+            source_display=guarded.source_display,
+            destination_path=published.destination_path,
+            committed=published.committed,
+            cleanup_state=published.cleanup_state,
+            warning_codes=tuple(
+                warning
+                for warning in published.warning_codes
+                if warning in ("directory_fsync_failed", "temp_cleanup_retained")
+            ),
+        )
+
+    def _stage_verify_and_publish(
+        self,
+        *,
+        repo_root: Path,
+        source_path: Path,
+        source_fd: int,
+        initial_status: os.stat_result,
+        destination: Path,
+        confirm_destination: bool,
+    ) -> BinaryArtifactPublishResult:
         destination_parent_fd: int | None = None
         destination_parent_identity: tuple[int, int] | None = None
         temp_fd: int | None = None
         temp_name: str | None = None
         try:
-            source_fd, initial_status = self._open_guarded_source(guarded)
             try:
                 self._inject("temp_create")
             except OSError:
@@ -135,7 +259,6 @@ class FilesystemBinaryArtifactPublisher:
                 os.fsync(temp_fd)
             except OSError:
                 raise _PublishFailure("file_fsync_failed") from None
-
             try:
                 self._inject("hash")
                 staged_sha256, staged_count = self._hash_descriptor(temp_fd)
@@ -143,7 +266,6 @@ class FilesystemBinaryArtifactPublisher:
                 raise _PublishFailure("hash_failed") from None
             if (staged_sha256, staged_count) != (stream_sha256, stream_count):
                 raise _PublishFailure("hash_mismatch")
-
             staged_status = os.fstat(temp_fd)
             if not stat.S_ISREG(staged_status.st_mode):
                 raise _PublishFailure("hash_mismatch")
@@ -152,17 +274,15 @@ class FilesystemBinaryArtifactPublisher:
                 initial_status.st_ino,
             ):
                 raise _PublishFailure("source_alias")
-
             if self._stage_barrier is not None:
                 self._stage_barrier()
             source_sha256, source_count = self._verify_source_stability(
                 source_fd,
-                guarded.source_path,
+                source_path,
                 initial_status,
             )
             if (source_sha256, source_count) != (stream_sha256, stream_count):
                 raise _PublishFailure("source_changed")
-
             self._inject("before_publication")
             if not _visible_directory_matches(
                 repo_root,
@@ -170,45 +290,39 @@ class FilesystemBinaryArtifactPublisher:
                 destination_parent_identity,
             ):
                 raise _PublishFailure("destination_ineligible")
-            self._publish_no_replace(
-                temp_fd,
-                destination_parent_fd,
-                destination.name,
-            )
+            self._publish_no_replace(temp_fd, destination_parent_fd, destination.name)
             warning_codes: list[BinaryArtifactPublishWarning] = []
             if not self._fsync_directory(destination_parent_fd):
                 warning_codes.append("directory_fsync_failed")
-            if not _visible_directory_matches(
-                repo_root,
-                destination.parent,
-                destination_parent_identity,
-            ):
-                destination_sha256, destination_count = staged_sha256, staged_count
-                warning_codes.append("destination_read_failed")
-            else:
-                try:
-                    destination_sha256, destination_count = self._hash_published_destination(
-                        destination_parent_fd,
-                        destination.name,
-                    )
-                except _PublishFailure as exc:
-                    if exc.code != "destination_read_failed":
-                        raise
-                    destination_sha256, destination_count = staged_sha256, staged_count
+            destination_sha256, destination_count = staged_sha256, staged_count
+            if confirm_destination:
+                if not _visible_directory_matches(
+                    repo_root,
+                    destination.parent,
+                    destination_parent_identity,
+                ):
                     warning_codes.append("destination_read_failed")
                 else:
-                    if (destination_sha256, destination_count) != (
-                        staged_sha256,
-                        staged_count,
-                    ):
-                        warning_codes.append("destination_mismatch")
+                    try:
+                        destination_sha256, destination_count = self._hash_published_destination(
+                            destination_parent_fd,
+                            destination.name,
+                        )
+                    except _PublishFailure as exc:
+                        if exc.code != "destination_read_failed":
+                            raise
+                        destination_sha256, destination_count = staged_sha256, staged_count
+                        warning_codes.append("destination_read_failed")
+                    else:
+                        if (destination_sha256, destination_count) != (staged_sha256, staged_count):
+                            warning_codes.append("destination_mismatch")
             cleanup_state = self._cleanup_temp(temp_name, temp_fd, destination_parent_fd)
             if cleanup_state == "removed":
                 temp_name = None
             else:
                 warning_codes.append("temp_cleanup_retained")
             return BinaryArtifactPublishResult(
-                source_path=guarded.source_path,
+                source_path=source_path,
                 destination_path=destination,
                 source_sha256=source_sha256,
                 stream_sha256=stream_sha256,
@@ -226,32 +340,16 @@ class FilesystemBinaryArtifactPublisher:
         except BinaryArtifactPublishError:
             raise
         except _PublishFailure as exc:
-            cleanup_state = self._cleanup_after_failure(
-                temp_name,
-                temp_fd,
-                destination_parent_fd,
-            )
-            raise BinaryArtifactPublishError(
-                code=exc.code,
-                cleanup_state=cleanup_state,
-            ) from None
+            cleanup_state = self._cleanup_after_failure(temp_name, temp_fd, destination_parent_fd)
+            raise BinaryArtifactPublishError(code=exc.code, cleanup_state=cleanup_state) from None
         except OSError:
-            cleanup_state = self._cleanup_after_failure(
-                temp_name,
-                temp_fd,
-                destination_parent_fd,
-            )
-            raise BinaryArtifactPublishError(
-                code="filesystem_failed",
-                cleanup_state=cleanup_state,
-            ) from None
+            cleanup_state = self._cleanup_after_failure(temp_name, temp_fd, destination_parent_fd)
+            raise BinaryArtifactPublishError(code="filesystem_failed", cleanup_state=cleanup_state) from None
         finally:
             if temp_fd is not None:
                 os.close(temp_fd)
             if destination_parent_fd is not None:
                 os.close(destination_parent_fd)
-            if source_fd is not None:
-                os.close(source_fd)
 
     def _create_temp(self, destination_parent_fd: int) -> tuple[int, str]:
         flags = os.O_RDWR | os.O_CREAT | os.O_EXCL
@@ -500,6 +598,35 @@ def _is_lexically_contained(root: Path, path: Path) -> bool:
 def _require_contained(root: Path, path: Path) -> None:
     if not root.is_absolute() or not path.is_absolute() or not _is_lexically_contained(root, path):
         raise _PublishFailure("source_ineligible")
+
+
+def _classify_explicit_source(
+    repo_root: Path,
+    source_path: Path,
+    opened_status: os.stat_result,
+) -> tuple[str, str]:
+    try:
+        resolved_root = repo_root.resolve(strict=True)
+        resolved_source = source_path.resolve(strict=True)
+        resolved_status = resolved_source.stat()
+        if (
+            _is_lexically_contained(resolved_root, resolved_source)
+            and (
+                resolved_status.st_dev,
+                resolved_status.st_ino,
+                resolved_status.st_mode,
+            )
+            == (
+                opened_status.st_dev,
+                opened_status.st_ino,
+                opened_status.st_mode,
+            )
+            and _is_lexically_contained(repo_root, source_path)
+        ):
+            return "repo_relative", source_path.relative_to(repo_root).as_posix()
+    except (FileNotFoundError, OSError, ValueError):
+        pass
+    return "basename_only", source_path.name
 
 
 def _guard_directory_ancestry(root: Path, endpoint: Path) -> None:
