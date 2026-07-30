@@ -2,7 +2,7 @@
 種別: 要件定義書（Issue）
 ID: "iss-00345"
 タイトル: "Generic Single-File Artifact Import"
-状態: "draft"
+状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-30"
 親: ["epic-00343", "init-local-00002"]
@@ -17,7 +17,7 @@ classification_status: "runtime_classified"
 
 ## 0. 文書の位置づけ
 
-本書は Issue `iss-00345` の canonical requirement draft である。親 Epic、accepted ADR、現行 provider 実装、既存テスト、clarification evidence、ChatGPT Pro authoring evidenceをリポジトリ事実と照合して統合している。
+本書は Issue `iss-00345` の approved canonical requirement である。親 Epic、accepted ADR、現行 provider 実装、既存テスト、clarification evidence、ChatGPT Pro authoring evidenceをリポジトリ事実と照合して統合している。
 
 本書が canonical path に存在することだけでは reviewer pass、assurance mutation、execution-ready、PR-ready、merge-ready、Issue finish、Epic completion、PR delivery を意味しない。assurance classification、fresh review、実装開始判断は runtime と main orchestrator の後続 workflow に残る。
 
