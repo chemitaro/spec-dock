@@ -354,7 +354,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | S03 | committed | naming/slot/concurrency runtime/tests/report | `113c288c9ad54f54b9639b82cae647d7d19c9247` | clean | not applicable | not applicable | not applicable | not applicable |
 | S04 | committed | opaque lifecycle tests/report | `6524e49b` | clean | not applicable | not applicable | not applicable | not applicable |
 | S90 | committed | provider docs、managed projection/runtime、init/update test、report | `cf15047e27bf9592a8abe403f1106986e838d5b5` | clean | not applicable | not applicable | not applicable | not applicable |
-| S99 | pending final fix | rollback test、final code/docs/report fix | pending final integrated commit | pending | not applicable | not applicable | not applicable | not applicable |
+| S99 | committed / PR remediation | rollback、final code/docs/report、assurance binding、Linux CI remediation | `75024e41`、`7a073da8`、`e001c404`。本台帳同期commitのみ後続 | clean before report update | not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
 - provider runtime: `application`, `cli`, `commands`, `domain`, `infra`, `presentation`のS01対象10 files
@@ -523,9 +523,10 @@ spec-dock validate -> ok, nodes=217
 
 ### Final Local Quality Gate
 
-- exact integrated code/test/docs HEAD: `f9b94d6adb1f99def916c40166e45f8c90103bc4`。未コミット差分は本reportのevidence同期だけで、runtime/test/provider docs差分はない。
-- focused: domain/application/command/publisher/presentation統合 `152 passed, 2 skipped`。CLI ordinary laneはpolicy skip。
-- default: `781 passed, 2065 skipped`、`make lint` pass、`git diff --check` pass。
+- pre-PR baseline: `f9b94d6adb1f99def916c40166e45f8c90103bc4`。focused `152 passed, 2 skipped`、default `781 passed, 2065 skipped`。
+- post-remediation exact implementation/test/docs HEAD: `e001c404ca33bf337255d46b3c16d64fb0df7fdf`。本reportのevidence同期だけが未コミット。
+- post-remediation macOS focused `102 passed, 2 skipped`、default `782 passed, 2065 skipped`。Linux Python 3.11 focused `98 passed, 6 skipped`。PR初回Linux defaultの18 failuresを再現し、修正前のLinux default `777 passed, 2069 skipped`と決定論test追加後のfocused Greenでclosureした。
+- `make lint` pass、`git diff --check` pass。
 - `spec-dock validate`はnodes=217でpass、`sync --no-github`はactive unchangedでprojectionを書き出し、worktree差分なし。
 - opt-in full regressionはIssue 346へdeferし、本Issueでは実行していない。
 
@@ -554,9 +555,9 @@ docker run --rm -v "$REPO_ROOT:/repo:ro" -w /repo python:3.12 python -c 'import 
 
 ### Issue 346 Handoff
 
-- exact integrated SHA: `f9b94d6adb1f99def916c40166e45f8c90103bc4`（final report-only ledger commitは後続）。
-- provider changed-path manifest: `git diff --name-only main...f9b94d6adb1f99def916c40166e45f8c90103bc4 | sort`、64 paths。provider runtime/docs、managed projection、Issue/Epic docs/artifacts、focused testsに限定。
-- focused/default: integrated focused `152 passed, 2 skipped`、ordinary default `781 passed, 2065 skipped`、lint/validate/sync/diff-check pass。
+- exact integrated implementation/test/docs SHA: `e001c404ca33bf337255d46b3c16d64fb0df7fdf`（本report-only ledger commitは後続）。
+- provider changed-path manifest: `git diff --name-only main...e001c404ca33bf337255d46b3c16d64fb0df7fdf | sort`、64 paths、sorted manifest SHA-256 `fd2a52d1b32b72d13b6991174bad0959669a3a440101affcc11ace3d919cddfe`。provider runtime/docs、managed projection、Issue/Epic docs/artifacts、focused testsに限定。
+- focused/default: macOS focused `102 passed, 2 skipped`、ordinary default `782 passed, 2065 skipped`。Linux Python 3.11 focused `98 passed, 6 skipped`。lint/validate/assurance/guidance/diff-check pass。
 - platform capability/skips: macOS hostではLinux real O_TMPFILE/linkat testsを理由付きskip。hermetic syscall testsとDocker Linux通常権限evidenceをS02台帳に保持。
 - unresolved risk/waiver: accepted macOS ADR `20260730t085831z-adr`は、同一UID actorがinternal staging pathnameをfinal identity check後からunlink前に意図的置換する限定windowを保証対象外とする。Linuxへは拡張しない。Issue 346のplatform統合reviewで境界を再確認する。
 - rollback: pre-rollout baseline `f8db4fd206bf11e6ca7b396914b7cfb52d13040b`でlegacy58 pass、post-rollout write-disablement S04 23 pass。
@@ -598,12 +599,14 @@ Issue 345はcandidate-wheel、fresh consumer、integrated dogfood、opt-in full 
 |---|---|---|---|---|
 | qa-reviewer initial | whole issue obligation coverage | fail | P1 exact-HEAD/handoff、P2 Linux再現性。限定修正済み | historical fail |
 | qa-reviewer fresh rereview | whole issue obligation coverage | pass | exact HEAD `f9b94d6...`、handoff/Linux台帳補完、findings `[]`、confidence `0.99` | pass |
+| qa-reviewer PR CI remediation rereview | Linux/macOS platform contractとrules link inode再利用回帰 | pass | Linux focused `98 passed, 6 skipped`、macOS focused `102 passed, 2 skipped`。決定論的ctime差分testを追加後、findings `[]`、confidence `0.99` | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
 | code-reviewer initial | issue-wide integrated diff | P1 rules path mutation/report、P2 undecodable basename。限定修正済み | 0 | historical fail |
 | code-reviewer fresh rereview | exact integrated HEAD + report-only delta | findings `[]`。P2のCLI例を正式な`artifact import file --file <path> ...`構文へ限定修正 | 1 | pass; confidence `0.96` |
+| code-reviewer PR CI remediation rereview | `e001c404`直前のproduction1 + tests2 | Linux anonymous cleanup期待値、ctime世代識別、決定論回帰testを確認。findings `[]` | 1 | pass; confidence `0.98` |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
@@ -616,11 +619,11 @@ Issue 345はcandidate-wheel、fresh consumer、integrated dogfood、opt-in full 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| exact integrated code/test/docs HEAD `f9b94d6...`とfresh final gateを記録済み | Issue report + parent Epic Candidate 2 status-only delta | final response / PR / issue comment | commit pending |
+| final ledger `75024e41`、assurance binding `7a073da8`、PR CI remediation `e001c404`を記録 | 本Issue reportのPR remediation証跡 | PR #352 / final response | report commit pending |
 
 ## 遭遇した問題と解決 (任意)
-- 問題: ...
-  - 解決: ...
+- 問題: PR #352の初回Provider CIはLinuxで`18 failed, 762 passed, 2066 skipped`となった。
+  - 解決: Linux anonymous stagingへnamed-stage cleanup期待値を正しく分岐した。併せてext4のinode即時再利用により第三者の置換`rules.md`をrollbackが誤削除し得る実不具合を発見し、rules link identityへ`st_ctime_ns`を追加した。決定論的なctime差分回帰test、Linux/macOS focused、fresh code/QA rereviewで閉じた。
 
 ## 学んだこと (任意)
 - ...
