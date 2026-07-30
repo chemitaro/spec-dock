@@ -26,6 +26,11 @@ COMPANION_TARGET = (
 )
 
 
+def _blob_oid(content: bytes) -> str:
+    header = f"blob {len(content)}\0".encode("ascii")
+    return hashlib.sha1(header + content).hexdigest()
+
+
 def _module():
     return __import__(
         "spec_dock_runtime.infra.issue_planning_apply",
@@ -60,6 +65,11 @@ def _operation(**changes: object):
     module = _module()
     identity = _identity()
     human_decision_bytes = b'{"decision":"approved"}'
+    pre_apply_document_bytes = {
+        "design.md": b"old design\n",
+        "plan.md": b"old plan\n",
+        "requirement.md": b"old requirement\n",
+    }
     values: dict[str, object] = {
         "issue_id": "iss-00003",
         "mode": "archive-candidate",
@@ -77,9 +87,11 @@ def _operation(**changes: object):
             "spec-dock/initiatives/i/epics/e/issues/x/requirement.md",
         ),
         "pre_apply_target_blob_oids": {
-            "spec-dock/initiatives/i/epics/e/issues/x/design.md": "1" * 40,
-            "spec-dock/initiatives/i/epics/e/issues/x/plan.md": "2" * 40,
-            "spec-dock/initiatives/i/epics/e/issues/x/requirement.md": "3" * 40,
+            "spec-dock/initiatives/i/epics/e/issues/x/design.md": _blob_oid(pre_apply_document_bytes["design.md"]),
+            "spec-dock/initiatives/i/epics/e/issues/x/plan.md": _blob_oid(pre_apply_document_bytes["plan.md"]),
+            "spec-dock/initiatives/i/epics/e/issues/x/requirement.md": _blob_oid(
+                pre_apply_document_bytes["requirement.md"]
+            ),
         },
         "candidate_identity": identity.candidate_identity,
         "git_bound_operation_binding_sha256": None,
@@ -96,11 +108,7 @@ def _operation(**changes: object):
             "requirement.md": b"new requirement\n",
         },
         "replacement_companion": COMPANION,
-        "pre_apply_document_bytes": {
-            "design.md": b"old design\n",
-            "plan.md": b"old plan\n",
-            "requirement.md": b"old requirement\n",
-        },
+        "pre_apply_document_bytes": pre_apply_document_bytes,
     }
     values.update(changes)
     return module.PlanningApplyOperation.create(**values)
@@ -126,6 +134,17 @@ def test_operation_identity_is_canonical_and_excludes_private_bytes() -> None:
     assert hashlib.sha256(payload).hexdigest() == first.operation_id
 
 
+def test_operation_rejects_incoherent_canonical_preimage_evidence() -> None:
+    with pytest.raises(ValueError, match="planning apply preimage evidence mismatch"):
+        _operation(
+            pre_apply_target_blob_oids={
+                "spec-dock/initiatives/i/epics/e/issues/x/design.md": "1" * 40,
+                "spec-dock/initiatives/i/epics/e/issues/x/plan.md": "2" * 40,
+                "spec-dock/initiatives/i/epics/e/issues/x/requirement.md": "3" * 40,
+            }
+        )
+
+
 def test_decision_artifact_path_is_deterministic_from_operation_id() -> None:
     operation = _operation()
     assert operation.decision_artifact_path.endswith(f"-planning-human-decision-{operation.operation_id[:16]}.json")
@@ -145,6 +164,23 @@ def test_operation_evidence_is_private_and_collision_is_rejected(tmp_path: Path)
     manifest.write_bytes(b"{}\n")
     with pytest.raises(module.PlanningApplyOutputRejected):
         module.record_planning_apply_operation(operation, output_dir=tmp_path)
+
+
+def test_load_operation_state_rejects_unknown_durable_state(tmp_path: Path) -> None:
+    module = _module()
+    operation = _operation()
+    operation_dir = module.record_planning_apply_operation(operation, output_dir=tmp_path)
+    state_path = operation_dir / "state.json"
+    state_path.write_bytes(
+        module._canonical_json_bytes({
+            "operation_id": operation.operation_id,
+            "state": "BOGUS",
+        })
+    )
+    state_path.chmod(0o600)
+
+    with pytest.raises(module.PlanningApplyRestoreMismatch, match="operation state is invalid"):
+        module._load_operation_state(operation_dir, operation)
 
 
 @pytest.mark.parametrize(

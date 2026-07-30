@@ -9,11 +9,11 @@ import io
 import os
 from pathlib import Path, PurePosixPath
 import platform
-import shutil
+import secrets
 import stat
 import tempfile
 from types import MappingProxyType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, BinaryIO
 import zipfile
 
 from spec_dock_runtime.domain.authoring_pack.zip_contract import (
@@ -72,6 +72,14 @@ MAX_CANDIDATE_ARCHIVE_BYTES = 16_000_000
 @dataclass(frozen=True)
 class OutputDirectoryGuard:
     path: Path
+    device: int
+    inode: int
+
+
+@dataclass(frozen=True)
+class _OwnedEntry:
+    name: str
+    descriptor: int
     device: int
     inode: int
 
@@ -392,6 +400,21 @@ def build_deterministic_zip(
     files: Mapping[str, bytes],
     operation_time: datetime,
 ) -> None:
+    with destination.open("wb") as stream:
+        _write_deterministic_zip(
+            stream,
+            internal_root,
+            files,
+            operation_time,
+        )
+
+
+def _write_deterministic_zip(
+    destination: BinaryIO,
+    internal_root: str,
+    files: Mapping[str, bytes],
+    operation_time: datetime,
+) -> None:
     date_time = (
         operation_time.year,
         operation_time.month,
@@ -435,52 +458,56 @@ def build_and_publish_candidate(
     material: CandidateMaterial,
 ) -> PublishedCandidate:
     final_path = output_guard.path / material.logical_filename
-    if final_path.exists():
-        raise CandidateCollision(material.logical_filename)
-    temporary_dir: Path | None = None
+    output_descriptor = -1
+    staged: _OwnedEntry | None = None
     published = False
     try:
-        temporary_dir = Path(
-            tempfile.mkdtemp(
-                prefix=".spec-dock-issue-candidate-",
-                dir=output_guard.path,
-            )
-        )
-        Path(temporary_dir).chmod(0o700)
-        staged = temporary_dir / material.logical_filename
+        output_descriptor = _open_guarded_output_directory(output_guard)
+        if _entry_exists_at(output_descriptor, material.logical_filename):
+            raise CandidateCollision(material.logical_filename)
+        staged = _create_private_staged_file(output_descriptor)
         try:
-            build_deterministic_zip(
-                staged,
-                material.internal_root,
-                material.files,
-                material.operation_time,
-            )
-            with staged.open("rb") as stream:
+            with os.fdopen(os.dup(staged.descriptor), "w+b") as stream:
+                _write_deterministic_zip(
+                    stream,
+                    material.internal_root,
+                    material.files,
+                    material.operation_time,
+                )
+                stream.flush()
                 os.fsync(stream.fileno())
+            zip_bytes = _read_regular_file_descriptor(
+                staged.descriptor,
+                max_bytes=MAX_CANDIDATE_ARCHIVE_BYTES,
+            )
         except OSError as error:
             raise CandidateBuildFailed("Candidate ZIP construction failed") from error
-        profile = issue_candidate_v1_profile(
-            expected_root=material.internal_root,
-            expected_companion_path=material.onboarding_companion_path,
-            cross_file_validator=verify_issue_candidate_files,
+        review = _review_candidate_snapshot(
+            zip_bytes,
+            repo_root=repo_root,
+            internal_root=material.internal_root,
+            companion_path=material.onboarding_companion_path,
         )
-        review = review_pack_input(staged, profile=profile)
         if review.status != "pass":
             raise CandidateArchiveRejected(review.findings)
-        try:
-            zip_bytes = staged.read_bytes()
-        except OSError as error:
-            raise CandidateBuildFailed("Candidate ZIP digest read failed") from error
         identity = derive_candidate_identity(
             material,
             zip_bytes,
             observed_transport_filename=material.logical_filename,
         )
-        _revalidate_output_guard(output_guard, repo_root)
-        if final_path.exists():
-            raise CandidateCollision(material.logical_filename)
+        if not _owned_entry_matches(
+            output_descriptor,
+            staged,
+            expected_kind="file",
+        ):
+            raise CandidatePublicationFailed("Candidate publication failed")
         try:
-            atomic_publish_no_replace(staged, final_path)
+            _atomic_publish_no_replace_at(
+                output_descriptor,
+                staged.name,
+                output_descriptor,
+                material.logical_filename,
+            )
         except FileExistsError as error:
             raise CandidateCollision(material.logical_filename) from error
         except (NotImplementedError, OSError) as error:
@@ -497,18 +524,166 @@ def build_and_publish_candidate(
             onboarding_companion=companion,
         )
     finally:
-        if temporary_dir is not None:
-            if published:
+        if staged is not None:
+            if not published and _owned_entry_matches(
+                output_descriptor,
+                staged,
+                expected_kind="file",
+            ):
                 with suppress(OSError):
-                    temporary_dir.rmdir()
-            else:
-                shutil.rmtree(temporary_dir, ignore_errors=True)
+                    os.unlink(staged.name, dir_fd=output_descriptor)
+            with suppress(OSError):
+                os.close(staged.descriptor)
+        if output_descriptor >= 0:
+            with suppress(OSError):
+                os.close(output_descriptor)
 
 
-def _revalidate_output_guard(guard: OutputDirectoryGuard, repo_root: Path) -> None:
-    current = validate_candidate_output_directory(guard.path, repo_root)
-    if (current.device, current.inode) != (guard.device, guard.inode):
-        raise CandidateOutputRejected("candidate output identity changed")
+def _open_guarded_output_directory(guard: OutputDirectoryGuard) -> int:
+    try:
+        descriptor = open_safe_directory_descriptor(guard.path)
+    except ValueError as error:
+        raise CandidateOutputRejected("candidate output cannot be safely opened") from error
+    try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISDIR(opened.st_mode) or (opened.st_dev, opened.st_ino) != (guard.device, guard.inode):
+            raise CandidateOutputRejected("candidate output identity changed")
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _entry_exists_at(directory_descriptor: int, name: str) -> bool:
+    try:
+        os.stat(name, dir_fd=directory_descriptor, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    except OSError as error:
+        raise CandidateOutputRejected("candidate output cannot be safely inspected") from error
+    return True
+
+
+def _create_private_staged_file(output_descriptor: int) -> _OwnedEntry:
+    flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    for _attempt in range(32):
+        name = f".spec-dock-issue-candidate-{secrets.token_hex(16)}.zip"
+        descriptor = -1
+        try:
+            descriptor = os.open(
+                name,
+                flags,
+                0o600,
+                dir_fd=output_descriptor,
+            )
+        except FileExistsError:
+            continue
+        except OSError as error:
+            raise CandidateBuildFailed("Candidate ZIP construction failed") from error
+        try:
+            opened = os.fstat(descriptor)
+            if not stat.S_ISREG(opened.st_mode):
+                raise OSError(errno.EINVAL, "Candidate staged entry is not a regular file")
+            return _OwnedEntry(
+                name=name,
+                descriptor=descriptor,
+                device=opened.st_dev,
+                inode=opened.st_ino,
+            )
+        except OSError as error:
+            if descriptor >= 0:
+                with suppress(OSError):
+                    os.close(descriptor)
+            raise CandidateBuildFailed("Candidate ZIP construction failed") from error
+    raise CandidateBuildFailed("Candidate ZIP construction failed")
+
+
+def _owned_entry_matches(
+    parent_descriptor: int,
+    entry: _OwnedEntry,
+    *,
+    expected_kind: str,
+) -> bool:
+    try:
+        opened = os.fstat(entry.descriptor)
+    except OSError:
+        return False
+    if (opened.st_dev, opened.st_ino) != (entry.device, entry.inode):
+        return False
+    if expected_kind == "directory" and not stat.S_ISDIR(opened.st_mode):
+        return False
+    if expected_kind == "file" and not stat.S_ISREG(opened.st_mode):
+        return False
+    return _entry_matches_identity(
+        parent_descriptor,
+        entry.name,
+        device=entry.device,
+        inode=entry.inode,
+        expected_kind=expected_kind,
+    )
+
+
+def _entry_matches_identity(
+    parent_descriptor: int,
+    name: str,
+    *,
+    device: int,
+    inode: int,
+    expected_kind: str,
+) -> bool:
+    try:
+        current = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+    except OSError:
+        return False
+    if (current.st_dev, current.st_ino) != (device, inode):
+        return False
+    if expected_kind == "directory":
+        return stat.S_ISDIR(current.st_mode)
+    if expected_kind == "file":
+        return stat.S_ISREG(current.st_mode)
+    return False
+
+
+def _read_regular_file_descriptor(descriptor: int, *, max_bytes: int) -> bytes:
+    opened = os.fstat(descriptor)
+    if not stat.S_ISREG(opened.st_mode) or opened.st_size > max_bytes:
+        raise OSError(errno.EFBIG, "Candidate ZIP exceeds bounded size")
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = os.read(descriptor, min(1024 * 1024, max_bytes + 1 - total))
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > max_bytes:
+            raise OSError(errno.EFBIG, "Candidate ZIP exceeds bounded size")
+
+
+def _atomic_publish_no_replace_at(
+    source_descriptor: int,
+    source_name: str,
+    destination_descriptor: int,
+    destination_name: str,
+) -> None:
+    if platform.system() == "Darwin":
+        _rename_exclusive_darwin_at(
+            source_descriptor,
+            source_name,
+            destination_descriptor,
+            destination_name,
+        )
+        return
+    if platform.system() == "Linux":
+        _rename_exclusive_linux_at(
+            source_descriptor,
+            source_name,
+            destination_descriptor,
+            destination_name,
+        )
+        return
+    raise NotImplementedError("atomic no-replace publication is unsupported")
 
 
 def _has_symlink_component(path: Path) -> bool:
@@ -556,3 +731,69 @@ def _rename_exclusive_linux(source: Path, destination: Path) -> None:
     if error_number == errno.EEXIST:
         raise FileExistsError(error_number, os.strerror(error_number), destination)
     raise OSError(error_number, os.strerror(error_number), destination)
+
+
+def _rename_exclusive_darwin_at(
+    source_descriptor: int,
+    source_name: str,
+    destination_descriptor: int,
+    destination_name: str,
+) -> None:
+    library = ctypes.CDLL(None, use_errno=True)
+    rename = getattr(library, "renameatx_np", None)
+    if rename is None:
+        raise NotImplementedError("renameatx_np is unavailable")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    result = rename(
+        source_descriptor,
+        os.fsencode(source_name),
+        destination_descriptor,
+        os.fsencode(destination_name),
+        0x00000004,
+    )
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise FileExistsError(error_number, os.strerror(error_number), destination_name)
+    raise OSError(error_number, os.strerror(error_number), destination_name)
+
+
+def _rename_exclusive_linux_at(
+    source_descriptor: int,
+    source_name: str,
+    destination_descriptor: int,
+    destination_name: str,
+) -> None:
+    library = ctypes.CDLL(None, use_errno=True)
+    rename = getattr(library, "renameat2", None)
+    if rename is None:
+        raise NotImplementedError("renameat2 is unavailable")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    result = rename(
+        source_descriptor,
+        os.fsencode(source_name),
+        destination_descriptor,
+        os.fsencode(destination_name),
+        0x00000001,
+    )
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise FileExistsError(error_number, os.strerror(error_number), destination_name)
+    raise OSError(error_number, os.strerror(error_number), destination_name)

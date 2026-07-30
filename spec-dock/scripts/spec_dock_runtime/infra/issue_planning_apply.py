@@ -64,6 +64,28 @@ _MANAGED_SYNC_FILES = (
 _MANAGED_SYNC_TREE = "spec-dock/adrs"
 _MAX_MANAGED_ENTRIES = 10_000
 _MAX_MANAGED_BYTES = 32_000_000
+_DURABLE_OPERATION_STATES = frozenset({
+    "OPERATION_RECORDED",
+    "BACKED_UP",
+    "MUTATING",
+    "VALIDATED",
+    "SYNCED",
+    "STAGED",
+    "COMMITTED",
+    "PUSHED",
+    "REMOTE_PARITY",
+    "ROLLED_BACK",
+})
+_TRANSACTION_RESTORE_STATES = frozenset({
+    "MUTATING",
+    "VALIDATED",
+    "SYNCED",
+    "STAGED",
+})
+_NO_TRANSACTION_START_STATES = frozenset({
+    "OPERATION_RECORDED",
+    "ROLLED_BACK",
+})
 
 
 class PlanningApplyOutputRejected(ValueError):
@@ -261,6 +283,11 @@ class PlanningApplyOperation:
             set(pre_apply_target_blob_oids) != set(canonical_target_paths)
             or set(pre_apply_document_bytes) != set(DOCUMENT_NAMES)
             or any(_SHA40.fullmatch(value) is None for value in pre_apply_target_blob_oids.values())
+            or any(
+                PurePosixPath(path).name not in pre_apply_document_bytes
+                or _git_blob_oid(pre_apply_document_bytes[PurePosixPath(path).name]) != pre_apply_target_blob_oids[path]
+                for path in canonical_target_paths
+            )
             or hashlib.sha256(human_decision_bytes).hexdigest() != human_decision_sha256
         ):
             raise ValueError("planning apply preimage evidence mismatch")
@@ -587,6 +614,27 @@ def _set_operation_state(
     )
 
 
+def _load_operation_state(
+    operation_dir: Path,
+    operation: PlanningApplyOperation,
+) -> str:
+    path = operation_dir / "state.json"
+    try:
+        state = json.loads(path.read_bytes())
+    except (OSError, ValueError, json.JSONDecodeError):
+        raise PlanningApplyRestoreMismatch("operation state is unreadable") from None
+    if (
+        not isinstance(state, dict)
+        or set(state) != {"operation_id", "state"}
+        or state.get("operation_id") != operation.operation_id
+        or not isinstance(state.get("state"), str)
+        or state.get("state") not in _DURABLE_OPERATION_STATES
+        or _canonical_json_bytes(state) != path.read_bytes()
+    ):
+        raise PlanningApplyRestoreMismatch("operation state is invalid")
+    return state["state"]
+
+
 def _record_operation_attempt(
     operation_dir: Path,
     operation: PlanningApplyOperation,
@@ -674,6 +722,38 @@ def load_expected_planning_targets(
     )
 
 
+def _load_expected_companion_preimage(
+    operation: PlanningApplyOperation,
+    repo_root: Path,
+) -> tuple[bool, bytes, str | None]:
+    relative = operation.companion_target_path
+    listing = _run_git(
+        repo_root,
+        ("ls-tree", "-z", operation.expected_head, "--", relative),
+    )
+    if listing.returncode != 0:
+        raise ValueError("expected companion preimage cannot be proven")
+    if listing.stdout == b"":
+        return False, b"", None
+    try:
+        metadata, observed_path = listing.stdout.removesuffix(b"\0").split(b"\t", 1)
+        mode, object_type, oid_bytes = metadata.split(b" ")
+        oid = oid_bytes.decode("ascii")
+    except (UnicodeDecodeError, ValueError) as error:
+        raise ValueError("expected companion preimage cannot be proven") from error
+    if (
+        mode not in (b"100644", b"100755")
+        or object_type != b"blob"
+        or observed_path != relative.encode("utf-8")
+        or _SHA40.fullmatch(oid) is None
+    ):
+        raise ValueError("expected companion preimage cannot be proven")
+    content = _run_git(repo_root, ("cat-file", "blob", oid))
+    if content.returncode != 0 or _git_blob_oid(content.stdout) != oid:
+        raise ValueError("expected companion preimage cannot be proven")
+    return True, content.stdout, oid
+
+
 def planning_apply_resume_available(
     operation: PlanningApplyOperation,
     *,
@@ -726,6 +806,71 @@ def _operation_result(
     )
 
 
+def _apply_targets_match_snapshots(
+    operation: PlanningApplyOperation,
+    repo_root: Path,
+    file_snapshots: Mapping[str, FileSnapshot],
+) -> bool:
+    if (
+        _git_text(repo_root, "branch", "--show-current") != operation.branch
+        or _git_text(repo_root, "rev-parse", "HEAD") != operation.expected_head
+    ):
+        return False
+    for relative in (*operation.canonical_target_paths, operation.companion_target_path):
+        expected = file_snapshots.get(relative)
+        if expected is None:
+            return False
+        try:
+            if snapshot_regular_file(repo_root / relative) != expected:
+                return False
+        except (OSError, ValueError):
+            return False
+    return True
+
+
+def _finalize_transaction_cleanup(
+    operation_dir: Path,
+    operation: PlanningApplyOperation,
+    *,
+    final_state: str,
+) -> None:
+    transaction = operation_dir / "transaction"
+    _remove_transaction_backup(operation_dir)
+    if transaction.exists() or transaction.is_symlink():
+        raise ValueError("pre-mutation transaction backup was not removed")
+    descriptor = os.open(
+        operation_dir,
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+    )
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    _set_operation_state(operation_dir, operation, final_state)
+
+
+def _discard_pre_mutation_backup(
+    operation_dir: Path,
+    operation: PlanningApplyOperation,
+    *,
+    final_state: str,
+) -> None:
+    _finalize_transaction_cleanup(
+        operation_dir,
+        operation,
+        final_state=final_state,
+    )
+
+
+def _validate_no_transaction_state(
+    operation_dir: Path,
+    operation: PlanningApplyOperation,
+) -> None:
+    state = _load_operation_state(operation_dir, operation)
+    if state not in _NO_TRANSACTION_START_STATES or (operation_dir / "publication.json").exists():
+        raise PlanningApplyRestoreMismatch("operation state cannot start a transaction")
+
+
 def execute_planning_apply_transaction(
     operation: PlanningApplyOperation,
     *,
@@ -743,6 +888,19 @@ def execute_planning_apply_transaction(
             status="rejected",
             reason="apply_output_rejected",
         )
+    commit_record = operation_dir / "commit.json"
+    transaction = operation_dir / "transaction"
+    has_commit = commit_record.exists() or commit_record.is_symlink()
+    has_transaction = transaction.exists() or transaction.is_symlink()
+    if not has_commit and not has_transaction:
+        try:
+            _validate_no_transaction_state(operation_dir, operation)
+        except PlanningApplyRestoreMismatch:
+            return _operation_result(
+                operation,
+                status="recovery_required",
+                reason="restore_mismatch",
+            )
     try:
         _record_operation_attempt(operation_dir, operation)
     except (OSError, PlanningApplyOutputRejected):
@@ -751,10 +909,9 @@ def execute_planning_apply_transaction(
             status="rejected",
             reason="apply_output_rejected",
         )
-    commit_record = operation_dir / "commit.json"
-    if commit_record.exists():
+    if has_commit:
         return _resume_publication(operation, repo_root=repo_root, operation_dir=operation_dir)
-    if (operation_dir / "transaction").exists():
+    if has_transaction:
         return _recover_interrupted_transaction(
             operation,
             repo_root=repo_root,
@@ -766,25 +923,15 @@ def execute_planning_apply_transaction(
         return _operation_result(operation, status="stale", reason="apply_target_changed")
     if _git_bound_targets_are_stale(operation, repo_root):
         return _operation_result(operation, status="stale", reason="apply_target_changed")
-    companion_path = repo_root / operation.companion_target_path
     try:
-        companion_snapshot = snapshot_regular_file(companion_path)
+        expected_companion = _load_expected_companion_preimage(operation, repo_root)
     except (OSError, ValueError):
         return _operation_result(
             operation,
-            status="rejected",
-            reason="apply_output_rejected",
+            status="blocked",
+            reason="git_preflight_blocked",
         )
-    if (
-        operation.replacement_companion is not None
-        and companion_snapshot.existed
-        and companion_snapshot.data != operation.replacement_companion
-    ):
-        return _operation_result(
-            operation,
-            status="stale",
-            reason="apply_target_changed",
-        )
+    companion_path = repo_root / operation.companion_target_path
     decision_parent = (repo_root / operation.decision_artifact_path).parent
     if not decision_parent.is_dir() or decision_parent.is_symlink():
         return _operation_result(
@@ -795,16 +942,58 @@ def execute_planning_apply_transaction(
 
     try:
         index_snapshot = snapshot_git_index(repo_root)
-        try:
-            managed_snapshot = snapshot_managed_sync_state(repo_root)
-        except ValueError:
-            return _operation_result(
-                operation,
-                status="blocked",
-                reason="managed_state_snapshot_rejected",
-            )
+    except (OSError, ValueError):
+        return _operation_result(operation, status="blocked", reason="git_preflight_blocked")
+    try:
+        managed_snapshot = snapshot_managed_sync_state(repo_root)
+    except ValueError:
+        return _operation_result(
+            operation,
+            status="blocked",
+            reason="managed_state_snapshot_rejected",
+        )
+    except OSError:
+        return _operation_result(operation, status="blocked", reason="git_preflight_blocked")
+    try:
         file_snapshots = {path: snapshot_regular_file(repo_root / path) for path in operation.canonical_target_paths}
+        companion_snapshot = snapshot_regular_file(companion_path)
         file_snapshots[operation.companion_target_path] = companion_snapshot
+    except (OSError, ValueError):
+        return _operation_result(
+            operation,
+            status="rejected",
+            reason="apply_output_rejected",
+        )
+    canonical_preimages_match = all(
+        snapshot.existed
+        and snapshot.data == operation.pre_apply_document_bytes[PurePosixPath(path).name]
+        and _git_blob_oid(snapshot.data) == operation.pre_apply_target_blob_oids[path]
+        for path, snapshot in ((path, file_snapshots[path]) for path in operation.canonical_target_paths)
+    )
+    expected_companion_existed, expected_companion_bytes, expected_companion_oid = expected_companion
+    companion_preimage_matches = (
+        companion_snapshot.existed == expected_companion_existed
+        and companion_snapshot.data == expected_companion_bytes
+        and (
+            (not companion_snapshot.existed and expected_companion_oid is None)
+            or (companion_snapshot.existed and _git_blob_oid(companion_snapshot.data) == expected_companion_oid)
+        )
+    )
+    if (
+        not canonical_preimages_match
+        or not companion_preimage_matches
+        or (
+            operation.replacement_companion is not None
+            and companion_snapshot.existed
+            and companion_snapshot.data != operation.replacement_companion
+        )
+    ):
+        return _operation_result(
+            operation,
+            status="stale",
+            reason="apply_target_changed",
+        )
+    try:
         decision_path = repo_root / operation.decision_artifact_path
         decision_snapshot = snapshot_regular_file(decision_path)
         if decision_snapshot.existed:
@@ -833,8 +1022,33 @@ def execute_planning_apply_transaction(
     try:
         if fault_hook is not None:
             fault_hook("after_operation_recorded")
+        if not _apply_targets_match_snapshots(operation, repo_root, file_snapshots):
+            try:
+                _discard_pre_mutation_backup(
+                    operation_dir,
+                    operation,
+                    final_state="OPERATION_RECORDED",
+                )
+            except (OSError, ValueError):
+                return _operation_result(
+                    operation,
+                    status="recovery_required",
+                    reason="restore_mismatch",
+                )
+            return _operation_result(
+                operation,
+                status="stale",
+                reason="apply_target_changed",
+            )
+        try:
+            _set_operation_state(operation_dir, operation, "MUTATING")
+        except (OSError, ValueError):
+            return _operation_result(
+                operation,
+                status="recovery_required",
+                reason="restore_mismatch",
+            )
         mutation_started = True
-        _set_operation_state(operation_dir, operation, "MUTATING")
         _atomic_write_exact(decision_path, operation.human_decision_bytes, mode=0o600)
         if fault_hook is not None:
             fault_hook("after_decision_write")
@@ -1092,7 +1306,18 @@ def execute_planning_apply_transaction(
             status="recovery_required",
             reason="restore_mismatch",
         )
-    _remove_transaction_backup(operation_dir)
+    try:
+        _finalize_transaction_cleanup(
+            operation_dir,
+            operation,
+            final_state="ROLLED_BACK",
+        )
+    except (OSError, ValueError):
+        return _operation_result(
+            operation,
+            status="recovery_required",
+            reason="restore_mismatch",
+        )
     return _operation_result(operation, status="rolled_back", reason=failure_reason)
 
 
@@ -1102,6 +1327,78 @@ def _recover_interrupted_transaction(
     repo_root: Path,
     operation_dir: Path,
 ) -> PlanningApplyExecution:
+    try:
+        state = _load_operation_state(operation_dir, operation)
+    except PlanningApplyRestoreMismatch:
+        return _operation_result(
+            operation,
+            status="recovery_required",
+            reason="restore_mismatch",
+        )
+    if (
+        state not in {"BACKED_UP", *_TRANSACTION_RESTORE_STATES}
+        or (operation_dir / "commit.json").exists()
+        or (operation_dir / "publication.json").exists()
+    ):
+        return _operation_result(
+            operation,
+            status="recovery_required",
+            reason="restore_mismatch",
+        )
+    if state == "BACKED_UP":
+        try:
+            backup = _load_transaction_backup(
+                operation_dir,
+                operation,
+                repo_root=repo_root,
+            )
+        except (OSError, ValueError, PlanningApplyRestoreMismatch):
+            return _operation_result(
+                operation,
+                status="recovery_required",
+                reason="restore_mismatch",
+            )
+        if not _apply_targets_match_snapshots(operation, repo_root, backup.files):
+            try:
+                _discard_pre_mutation_backup(
+                    operation_dir,
+                    operation,
+                    final_state="OPERATION_RECORDED",
+                )
+            except (OSError, ValueError):
+                return _operation_result(
+                    operation,
+                    status="recovery_required",
+                    reason="restore_mismatch",
+                )
+            return _operation_result(
+                operation,
+                status="stale",
+                reason="apply_target_changed",
+            )
+        if _remote_head(repo_root, operation.branch) != operation.expected_head:
+            return _operation_result(
+                operation,
+                status="recovery_required",
+                reason="restore_mismatch",
+            )
+        try:
+            _discard_pre_mutation_backup(
+                operation_dir,
+                operation,
+                final_state="ROLLED_BACK",
+            )
+        except (OSError, ValueError):
+            return _operation_result(
+                operation,
+                status="recovery_required",
+                reason="restore_mismatch",
+            )
+        return _operation_result(
+            operation,
+            status="rolled_back",
+            reason="planning_commit_failed",
+        )
     if (
         _git_text(repo_root, "branch", "--show-current") != operation.branch
         or _git_text(repo_root, "rev-parse", "HEAD") != operation.expected_head
@@ -1134,8 +1431,18 @@ def _recover_interrupted_transaction(
             status="recovery_required",
             reason="restore_mismatch",
         )
-    _remove_transaction_backup(operation_dir)
-    _set_operation_state(operation_dir, operation, "ROLLED_BACK")
+    try:
+        _finalize_transaction_cleanup(
+            operation_dir,
+            operation,
+            final_state="ROLLED_BACK",
+        )
+    except (OSError, ValueError):
+        return _operation_result(
+            operation,
+            status="recovery_required",
+            reason="restore_mismatch",
+        )
     return _operation_result(
         operation,
         status="rolled_back",

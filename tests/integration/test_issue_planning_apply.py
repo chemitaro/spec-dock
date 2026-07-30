@@ -251,6 +251,569 @@ def test_git_bound_apply_accepts_exact_existing_companion_as_noop(
     assert _git(origin, "rev-parse", "refs/heads/feature/issue") == _git(repo, "rev-parse", "HEAD")
 
 
+def test_archive_apply_rejects_canonical_edit_at_transaction_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    changed_target = repo / targets[0]
+    concurrent_bytes = b"concurrent canonical edit\n"
+    real_snapshot = module.snapshot_git_index
+
+    def snapshot(repo_root: Path):
+        changed_target.write_bytes(concurrent_bytes)
+        return real_snapshot(repo_root)
+
+    monkeypatch.setattr(module, "snapshot_git_index", snapshot)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("stale apply must not validate"),
+        sync_runner=lambda: pytest.fail("stale apply must not sync"),
+    )
+
+    assert (result.status, result.reason) == ("stale", "apply_target_changed")
+    assert changed_target.read_bytes() == concurrent_bytes
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert not (output / f"planning-apply-{operation.operation_id}" / "transaction").exists()
+
+
+def test_archive_apply_rejects_absent_companion_create_at_transaction_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    companion_path = repo / operation.companion_target_path
+    concurrent_bytes = b"concurrent companion\n"
+    real_snapshot = module.snapshot_git_index
+
+    def snapshot(repo_root: Path):
+        companion_path.write_bytes(concurrent_bytes)
+        return real_snapshot(repo_root)
+
+    monkeypatch.setattr(module, "snapshot_git_index", snapshot)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("stale apply must not validate"),
+        sync_runner=lambda: pytest.fail("stale apply must not sync"),
+    )
+
+    assert (result.status, result.reason) == ("stale", "apply_target_changed")
+    assert companion_path.read_bytes() == concurrent_bytes
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert not (output / f"planning-apply-{operation.operation_id}" / "transaction").exists()
+
+
+def test_archive_apply_rejects_tracked_companion_change_at_transaction_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, _, targets = _repository(tmp_path)
+    companion_target = (
+        Path(targets[0]).parent / "artifacts/20260729t120000z-guide-new-member-chatgpt-first-issue-planning.md"
+    )
+    companion_path = repo / companion_target
+    companion_path.write_bytes(b"onboarding companion\n")
+    _git(repo, "add", "--", companion_target.as_posix())
+    _git(repo, "commit", "-qm", "existing companion")
+    _git(repo, "push", "-q", "origin", "feature/issue")
+    head = _git(repo, "rev-parse", "HEAD")
+    operation = _operation(repo, head, targets)
+    output = tmp_path / "output"
+    output.mkdir()
+    concurrent_bytes = b"concurrent tracked companion edit\n"
+    real_snapshot = module.snapshot_git_index
+
+    def snapshot(repo_root: Path):
+        companion_path.write_bytes(concurrent_bytes)
+        return real_snapshot(repo_root)
+
+    monkeypatch.setattr(module, "snapshot_git_index", snapshot)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("stale apply must not validate"),
+        sync_runner=lambda: pytest.fail("stale apply must not sync"),
+    )
+
+    assert (result.status, result.reason) == ("stale", "apply_target_changed")
+    assert companion_path.read_bytes() == concurrent_bytes
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert not (output / f"planning-apply-{operation.operation_id}" / "transaction").exists()
+
+
+def test_archive_apply_rechecks_canonical_after_operation_recorded(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    before = {path: (repo / path).read_bytes() for path in targets}
+    changed_target = repo / targets[0]
+    concurrent_bytes = b"concurrent canonical edit after backup\n"
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_operation_recorded":
+            changed_target.write_bytes(concurrent_bytes)
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("stale apply must not validate"),
+        sync_runner=lambda: pytest.fail("stale apply must not sync"),
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == ("stale", "apply_target_changed")
+    assert changed_target.read_bytes() == concurrent_bytes
+    assert all((repo / path).read_bytes() == before[path] for path in targets[1:])
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    assert not (operation_dir / "transaction").exists()
+    assert json.loads((operation_dir / "state.json").read_bytes())["state"] == "OPERATION_RECORDED"
+
+
+def test_archive_apply_rechecks_absent_companion_after_operation_recorded(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    before = {path: (repo / path).read_bytes() for path in targets}
+    companion_path = repo / operation.companion_target_path
+    concurrent_bytes = b"concurrent companion after backup\n"
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_operation_recorded":
+            companion_path.write_bytes(concurrent_bytes)
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("stale apply must not validate"),
+        sync_runner=lambda: pytest.fail("stale apply must not sync"),
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == ("stale", "apply_target_changed")
+    assert companion_path.read_bytes() == concurrent_bytes
+    assert {path: (repo / path).read_bytes() for path in targets} == before
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    assert not (operation_dir / "transaction").exists()
+    assert json.loads((operation_dir / "state.json").read_bytes())["state"] == "OPERATION_RECORDED"
+
+    companion_path.unlink()
+    retry = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: SimpleNamespace(
+            report=SimpleNamespace(errors=[]),
+        ),
+        sync_runner=lambda: SimpleNamespace(
+            artifact_failure=None,
+            state=SimpleNamespace(deps_preflight_error=None),
+            write_result=None,
+            active_update=None,
+        ),
+    )
+    assert (retry.status, retry.reason) == ("ready", "adoption_published")
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == _git(repo, "rev-parse", "HEAD")
+
+
+def test_backed_up_recovery_discards_without_overwriting_concurrent_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    companion_path = repo / operation.companion_target_path
+    concurrent_bytes = b"concurrent companion during cleanup\n"
+    real_remove = module._remove_transaction_backup
+    fail_cleanup = [True]
+
+    def remove(operation_dir: Path) -> None:
+        if fail_cleanup[0]:
+            fail_cleanup[0] = False
+            raise OSError("injected cleanup interruption")
+        real_remove(operation_dir)
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_operation_recorded":
+            companion_path.write_bytes(concurrent_bytes)
+
+    monkeypatch.setattr(module, "_remove_transaction_backup", remove)
+    interrupted = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("stale apply must not validate"),
+        sync_runner=lambda: pytest.fail("stale apply must not sync"),
+        fault_hook=fault,
+    )
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    assert (interrupted.status, interrupted.reason) == (
+        "recovery_required",
+        "restore_mismatch",
+    )
+    assert companion_path.read_bytes() == concurrent_bytes
+    assert (operation_dir / "transaction").is_dir()
+    assert json.loads((operation_dir / "state.json").read_bytes())["state"] == "BACKED_UP"
+
+    monkeypatch.setattr(
+        module,
+        "_restore_transaction",
+        lambda *_args, **_kwargs: pytest.fail("BACKED_UP recovery must not restore"),
+    )
+    recovered = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("BACKED_UP recovery must not validate"),
+        sync_runner=lambda: pytest.fail("BACKED_UP recovery must not sync"),
+    )
+
+    assert (recovered.status, recovered.reason) == ("stale", "apply_target_changed")
+    assert companion_path.read_bytes() == concurrent_bytes
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert not (operation_dir / "transaction").exists()
+    assert json.loads((operation_dir / "state.json").read_bytes())["state"] == "OPERATION_RECORDED"
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_backed_up_no_drift_recovery_discards_without_restore(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    documents_before = {path: (repo / path).read_bytes() for path in targets}
+    index_before = module.snapshot_git_index(repo)
+    managed_before = module.snapshot_managed_sync_state(repo)
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def crash(checkpoint: str) -> None:
+        if checkpoint == "after_operation_recorded":
+            raise ProcessCrash
+
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("crash must precede validation"),
+            sync_runner=lambda: pytest.fail("crash must precede sync"),
+            fault_hook=crash,
+        )
+
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    assert (operation_dir / "transaction").is_dir()
+    assert json.loads((operation_dir / "state.json").read_bytes())["state"] == "BACKED_UP"
+    assert {path: (repo / path).read_bytes() for path in targets} == documents_before
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+
+    monkeypatch.setattr(
+        module,
+        "_restore_transaction",
+        lambda *_args, **_kwargs: pytest.fail("BACKED_UP recovery must not restore"),
+    )
+    recovered = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("BACKED_UP recovery must not validate"),
+        sync_runner=lambda: pytest.fail("BACKED_UP recovery must not sync"),
+    )
+
+    assert (recovered.status, recovered.reason) == (
+        "rolled_back",
+        "planning_commit_failed",
+    )
+    assert {path: (repo / path).read_bytes() for path in targets} == documents_before
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert module.snapshot_git_index(repo) == index_before
+    assert module.snapshot_managed_sync_state(repo) == managed_before
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert not (operation_dir / "transaction").exists()
+    assert json.loads((operation_dir / "state.json").read_bytes())["state"] == "ROLLED_BACK"
+
+
+@pytest.mark.parametrize(
+    ("invalid_state", "invalid_evidence"),
+    [
+        ("BOGUS", None),
+        ("OPERATION_RECORDED", None),
+        ("COMMITTED", None),
+        ("PUSHED", None),
+        ("REMOTE_PARITY", None),
+        ("ROLLED_BACK", None),
+        ("BACKED_UP", "publication.json"),
+    ],
+)
+def test_transaction_recovery_rejects_invalid_durable_state_without_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    invalid_state: str,
+    invalid_evidence: str | None,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    documents_before = {path: (repo / path).read_bytes() for path in targets}
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def crash(checkpoint: str) -> None:
+        if checkpoint == "after_operation_recorded":
+            raise ProcessCrash
+
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("crash must precede validation"),
+            sync_runner=lambda: pytest.fail("crash must precede sync"),
+            fault_hook=crash,
+        )
+
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    state_path = operation_dir / "state.json"
+    state_path.write_bytes(
+        module._canonical_json_bytes({
+            "operation_id": operation.operation_id,
+            "state": invalid_state,
+        })
+    )
+    state_path.chmod(0o600)
+    invalid_state_bytes = state_path.read_bytes()
+    if invalid_evidence is not None:
+        evidence_path = operation_dir / invalid_evidence
+        evidence_path.write_bytes(b"{}\n")
+        evidence_path.chmod(0o600)
+
+    def fail_if_called(*_args, **_kwargs):
+        pytest.fail(f"invalid recovery evidence {invalid_state}/{invalid_evidence} must be retained")
+
+    monkeypatch.setattr(module, "_load_transaction_backup", fail_if_called)
+    monkeypatch.setattr(module, "_restore_transaction", fail_if_called)
+    monkeypatch.setattr(module, "_discard_pre_mutation_backup", fail_if_called)
+    monkeypatch.setattr(module, "_remove_transaction_backup", fail_if_called)
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("invalid recovery must not validate"),
+        sync_runner=lambda: pytest.fail("invalid recovery must not sync"),
+    )
+
+    assert (result.status, result.reason) == (
+        "recovery_required",
+        "restore_mismatch",
+    )
+    assert {path: (repo / path).read_bytes() for path in targets} == documents_before
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert (operation_dir / "transaction").is_dir()
+    assert state_path.read_bytes() == invalid_state_bytes
+    assert state_path.stat().st_mode & 0o777 == 0o600
+    if invalid_evidence is not None:
+        assert (operation_dir / invalid_evidence).read_bytes() == b"{}\n"
+
+
+def test_backed_up_without_transaction_is_fail_closed_before_attempt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    operation_dir = module.record_planning_apply_operation(operation, output_dir=output)
+    companion_path = repo / operation.companion_target_path
+    concurrent_bytes = b"concurrent companion before state failure\n"
+    real_set_state = module._set_operation_state
+
+    def set_state(operation_path: Path, current_operation, state: str) -> None:
+        if state == "OPERATION_RECORDED":
+            raise OSError("injected state write failure")
+        real_set_state(operation_path, current_operation, state)
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_operation_recorded":
+            companion_path.write_bytes(concurrent_bytes)
+
+    monkeypatch.setattr(module, "_set_operation_state", set_state)
+    first = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("stale apply must not validate"),
+        sync_runner=lambda: pytest.fail("stale apply must not sync"),
+        fault_hook=fault,
+    )
+    state_path = operation_dir / "state.json"
+    state_bytes = state_path.read_bytes()
+    attempts_before = tuple((operation_dir / "attempts").iterdir())
+    assert (first.status, first.reason) == (
+        "recovery_required",
+        "restore_mismatch",
+    )
+    assert not (operation_dir / "transaction").exists()
+    assert json.loads(state_bytes)["state"] == "BACKED_UP"
+    assert companion_path.read_bytes() == concurrent_bytes
+
+    def fail_if_called(*_args, **_kwargs):
+        pytest.fail("BACKED_UP without transaction must stop before normal flow")
+
+    monkeypatch.setattr(module, "_record_operation_attempt", fail_if_called)
+    monkeypatch.setattr(module, "_persist_transaction_backup", fail_if_called)
+    monkeypatch.setattr(module, "_restore_transaction", fail_if_called)
+    monkeypatch.setattr(module, "_discard_pre_mutation_backup", fail_if_called)
+    monkeypatch.setattr(module, "_remove_transaction_backup", fail_if_called)
+    monkeypatch.setattr(module, "_run_git", fail_if_called)
+    second = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("invalid retry must not validate"),
+        sync_runner=lambda: pytest.fail("invalid retry must not sync"),
+    )
+
+    assert (second.status, second.reason) == (
+        "recovery_required",
+        "restore_mismatch",
+    )
+    assert state_path.read_bytes() == state_bytes
+    assert tuple((operation_dir / "attempts").iterdir()) == attempts_before
+    assert companion_path.read_bytes() == concurrent_bytes
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+@pytest.mark.parametrize(
+    ("invalid_state", "orphan_publication"),
+    [
+        ("BACKED_UP", False),
+        ("MUTATING", False),
+        ("VALIDATED", False),
+        ("SYNCED", False),
+        ("STAGED", False),
+        ("COMMITTED", False),
+        ("PUSHED", False),
+        ("REMOTE_PARITY", False),
+        ("BOGUS", False),
+        ("OPERATION_RECORDED", True),
+        ("ROLLED_BACK", True),
+    ],
+)
+def test_no_transaction_state_matrix_stops_before_attempt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    invalid_state: str,
+    orphan_publication: bool,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    operation_dir = module.record_planning_apply_operation(operation, output_dir=output)
+    state_path = operation_dir / "state.json"
+    state_path.write_bytes(
+        module._canonical_json_bytes({
+            "operation_id": operation.operation_id,
+            "state": invalid_state,
+        })
+    )
+    state_path.chmod(0o600)
+    if orphan_publication:
+        publication = operation_dir / "publication.json"
+        publication.write_bytes(b"{}\n")
+        publication.chmod(0o600)
+    evidence_before = {path.name: path.read_bytes() for path in operation_dir.iterdir() if path.is_file()}
+
+    def fail_if_called(*_args, **_kwargs):
+        pytest.fail(f"invalid no-transaction state {invalid_state} must stop before attempt")
+
+    monkeypatch.setattr(module, "_record_operation_attempt", fail_if_called)
+    monkeypatch.setattr(module, "_persist_transaction_backup", fail_if_called)
+    monkeypatch.setattr(module, "_restore_transaction", fail_if_called)
+    monkeypatch.setattr(module, "_discard_pre_mutation_backup", fail_if_called)
+    monkeypatch.setattr(module, "_remove_transaction_backup", fail_if_called)
+    monkeypatch.setattr(module, "_run_git", fail_if_called)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("invalid state must not validate"),
+        sync_runner=lambda: pytest.fail("invalid state must not sync"),
+    )
+
+    assert (result.status, result.reason) == (
+        "recovery_required",
+        "restore_mismatch",
+    )
+    assert not tuple((operation_dir / "attempts").iterdir())
+    assert {path.name: path.read_bytes() for path in operation_dir.iterdir() if path.is_file()} == evidence_before
+    assert not (operation_dir / "transaction").exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
 def test_precommit_failure_restores_documents_decision_and_raw_index(tmp_path: Path) -> None:
     module = _module()
     repo, origin, head, targets = _repository(tmp_path)
@@ -486,6 +1049,26 @@ def test_validation_and_sync_failures_restore_exact_baseline(
     assert not (repo / operation.decision_artifact_path).exists()
     assert _git(repo, "rev-parse", "HEAD") == head
     assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    assert not (operation_dir / "transaction").exists()
+    assert json.loads((operation_dir / "state.json").read_bytes())["state"] == "ROLLED_BACK"
+
+    retry = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: SimpleNamespace(
+            report=SimpleNamespace(errors=[]),
+        ),
+        sync_runner=lambda: SimpleNamespace(
+            artifact_failure=None,
+            state=SimpleNamespace(deps_preflight_error=None),
+            write_result=None,
+            active_update=None,
+        ),
+    )
+    assert (retry.status, retry.reason) == ("ready", "adoption_published")
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == _git(repo, "rev-parse", "HEAD")
 
 
 @pytest.mark.parametrize(
@@ -979,7 +1562,6 @@ def test_application_retry_reaches_same_operation_publication(
 @pytest.mark.parametrize(
     "checkpoint",
     [
-        "after_operation_recorded",
         "after_decision_write",
         "after_plan_replace",
         "after_companion_write",
