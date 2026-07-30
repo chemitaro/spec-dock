@@ -30,9 +30,11 @@ from spec_dock_runtime.infra.contracts import StoredMetaRecord  # noqa: E402
 PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_Clock(), gateway=_IssuePlanningGateway())
 
 
+@pytest.mark.parametrize("role", ["planner", "semantic_revision"])
 def test_path_oracle_direct_argv_environment_and_planner_snapshot(
     monkeypatch,
     tmp_path: Path,
+    role: str,
 ) -> None:
     executable = _fake_executable(tmp_path, symlink=True)
     calls: list[tuple[list[str], dict[str, str], bool]] = []
@@ -60,7 +62,7 @@ def test_path_oracle_direct_argv_environment_and_planner_snapshot(
         return original_result_type(**kwargs)
 
     monkeypatch.setattr(issue_planning_chatgpt, "PlanningInvocationResult", result_spy)
-    result = _invoke(tmp_path, role="planner", prompt='literal $(touch nope); "quoted"')
+    result = _invoke(tmp_path, role=role, prompt='literal $(touch nope); "quoted"')
 
     assert (result.status, result.reason) == ("pass", "transport_received")
     assert result.authoring_zip is not None
@@ -72,6 +74,7 @@ def test_path_oracle_direct_argv_environment_and_planner_snapshot(
     assert shell is False
     assert child_env["PATH"] == os.environ["PATH"]
     assert child_env["LANG"] == "ja_JP.UTF-8"
+    assert "SPECDOCK_ORACLE_REMOTE_CHROME" not in child_env
     assert "OPENAI_API_KEY" not in child_env
     assert "AZURE_OPENAI_API_KEY" not in child_env
     assert "SPECDOCK_CHATGPT_COMMAND" not in child_env
@@ -81,6 +84,7 @@ def test_path_oracle_direct_argv_environment_and_planner_snapshot(
     assert result.authoring_zip.zip_bytes not in repr(result).encode()
     assert constructor_calls
     assert all("transient_payload" not in kwargs for kwargs in constructor_calls)
+    _assert_managed_chrome_argv(argv)
 
 
 def test_reviewer_returns_typed_closed_json_without_private_transcript(
@@ -88,8 +92,10 @@ def test_reviewer_returns_typed_closed_json_without_private_transcript(
     tmp_path: Path,
 ) -> None:
     executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
 
     def fake_run(argv, **kwargs):
+        calls.append(list(argv))
         if argv[1:] == ["--version"]:
             return _completed(argv, stdout=b"0.16.1\n")
         if argv[1:] == ["--help"]:
@@ -108,6 +114,301 @@ def test_reviewer_returns_typed_closed_json_without_private_transcript(
     assert result.authoring_zip is None
     assert "private prompt" not in repr(result)
     assert "private oracle diagnostic" not in str(result.to_dict())
+    _assert_managed_chrome_argv(next(argv for argv in calls if "--prompt" in argv))
+
+
+def test_missing_managed_chrome_contract_starts_no_oracle(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    calls: list[object] = []
+    monkeypatch.delenv("SPECDOCK_ORACLE_REMOTE_CHROME", raising=False)
+    monkeypatch.setenv("ORACLE_HOME_DIR", str(tmp_path / "oracle-home"))
+    monkeypatch.setattr(
+        issue_planning_chatgpt.subprocess,
+        "run",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+
+    result = _invoke(tmp_path)
+
+    assert (result.status, result.reason) == ("blocked", "oracle_unavailable")
+    assert calls == []
+    assert not (tmp_path / "oracle-home" / "sessions").exists()
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "http://127.0.0.1:9223",
+        "127.0.0.1",
+        "127.0.0.1:0",
+        "127.0.0.1:65536",
+        "127.0.0.1:not-a-port",
+        "0.0.0.0:9223",
+        "user@127.0.0.1:9223",
+        "127.0.0.1:9223/path",
+        "127.0.0.1:9223 ",
+        "127.0.0.1:9223#fragment",
+    ],
+)
+def test_invalid_managed_chrome_contract_starts_no_oracle(
+    monkeypatch,
+    tmp_path: Path,
+    value: str,
+) -> None:
+    calls: list[object] = []
+    monkeypatch.setenv("SPECDOCK_ORACLE_REMOTE_CHROME", value)
+    monkeypatch.setenv("ORACLE_HOME_DIR", str(tmp_path / "oracle-home"))
+    monkeypatch.setattr(
+        issue_planning_chatgpt.subprocess,
+        "run",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+
+    result = _invoke(tmp_path)
+
+    assert (result.status, result.reason) == ("blocked", "oracle_unavailable")
+    assert calls == []
+    assert not (tmp_path / "oracle-home" / "sessions").exists()
+
+
+@pytest.mark.parametrize(
+    ("failure", "status", "payload"),
+    [
+        ("connection-refused", 200, b"{}"),
+        ("non-200", 503, b"{}"),
+        ("malformed-json", 200, b"{"),
+        ("non-object-json", 200, b"[]"),
+        ("missing-websocket-url", 200, b"{}"),
+        (
+            "wrong-host",
+            200,
+            b'{"webSocketDebuggerUrl":"ws://192.0.2.1:9223/devtools/browser/fake"}',
+        ),
+        (
+            "wrong-port",
+            200,
+            b'{"webSocketDebuggerUrl":"ws://127.0.0.1:9224/devtools/browser/fake"}',
+        ),
+    ],
+)
+def test_unreachable_or_non_cdp_managed_chrome_submits_no_prompt(
+    monkeypatch,
+    tmp_path: Path,
+    failure: str,
+    status: int,
+    payload: bytes,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        pytest.fail("prompt must not be submitted")
+
+    _patch_runtime(
+        monkeypatch,
+        tmp_path,
+        executable,
+        fake_run,
+        patch_managed_chrome=False,
+    )
+    monkeypatch.setattr(
+        issue_planning_chatgpt.http.client,
+        "HTTPConnection",
+        lambda *_args, **_kwargs: _FakeHttpConnection(
+            status=status,
+            payload=payload,
+            fail_request=failure == "connection-refused",
+        ),
+    )
+
+    result = _invoke(tmp_path)
+
+    assert (result.status, result.reason) == ("blocked", "oracle_unavailable")
+    assert not any("--prompt" in argv for argv in calls)
+    assert not (tmp_path / "oracle-home" / "sessions").exists()
+
+
+@pytest.mark.parametrize(
+    ("endpoint", "debugger_url"),
+    [
+        (
+            ("localhost", 9223),
+            b'{"webSocketDebuggerUrl":"ws://127.0.0.1:9223/devtools/browser/fake"}',
+        ),
+        (
+            ("127.0.0.1", 9223),
+            b'{"webSocketDebuggerUrl":"ws://localhost:9223/devtools/browser/fake"}',
+        ),
+    ],
+)
+def test_managed_chrome_preflight_accepts_loopback_host_alias(
+    monkeypatch,
+    endpoint: tuple[str, int],
+    debugger_url: bytes,
+) -> None:
+    monkeypatch.setattr(
+        issue_planning_chatgpt.http.client,
+        "HTTPConnection",
+        lambda *_args, **_kwargs: _FakeHttpConnection(
+            status=200,
+            payload=debugger_url,
+            fail_request=False,
+        ),
+    )
+
+    assert issue_planning_chatgpt._preflight_managed_chrome(endpoint) is True
+
+
+def test_localhost_managed_chrome_contract_normalizes_to_numeric_loopback(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+    preflight_endpoints: list[tuple[str, int]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        _write_planner_session(kwargs["env"], argv)
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    monkeypatch.setenv("SPECDOCK_ORACLE_REMOTE_CHROME", "localhost:9223")
+
+    def preflight(endpoint: tuple[str, int]) -> bool:
+        preflight_endpoints.append(endpoint)
+        return True
+
+    monkeypatch.setattr(issue_planning_chatgpt, "_preflight_managed_chrome", preflight)
+    result = _invoke(tmp_path)
+
+    assert result.status == "pass"
+    assert preflight_endpoints == [("127.0.0.1", 9223)]
+    _assert_managed_chrome_argv(next(argv for argv in calls if "--prompt" in argv))
+
+
+@pytest.mark.parametrize(
+    "missing_flag",
+    [
+        b"--model",
+        b"--browser-model-strategy",
+        b"--remote-chrome",
+    ],
+)
+def test_required_model_and_remote_chrome_capabilities_are_preflighted(
+    monkeypatch,
+    tmp_path: Path,
+    missing_flag: bytes,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help().replace(missing_flag, b""))
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        pytest.fail("prompt must not be submitted")
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path)
+
+    assert (result.status, result.reason) == ("blocked", "oracle_capability_unsupported")
+    assert not any("--prompt" in argv for argv in calls)
+
+
+def test_user_model_config_cannot_override_product_selector(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+    oracle_home = tmp_path / "oracle-home"
+    oracle_home.mkdir()
+    (oracle_home / "config.json").write_text(
+        '{"model":"gpt-5.6-pro"}',
+        encoding="utf-8",
+    )
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        _write_planner_session(kwargs["env"], argv)
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path)
+
+    assert result.status == "pass"
+    argv = next(argv for argv in calls if "--prompt" in argv)
+    _assert_managed_chrome_argv(argv)
+    assert "gpt-5.6-pro" not in argv
+    assert "gpt-5.5-pro" not in argv
+
+
+def test_no_personal_profile_or_wrapper_argument_is_emitted(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = _fake_executable(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:] == ["--version"]:
+            return _completed(argv, stdout=b"0.16.1\n")
+        if argv[1:] == ["--help"]:
+            return _completed(argv, stdout=_root_help())
+        if argv[1:] == ["session", "--help"]:
+            return _completed(argv, stdout=_session_help())
+        _write_planner_session(kwargs["env"], argv)
+        return _completed(argv)
+
+    _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    result = _invoke(tmp_path)
+
+    assert result.status == "pass"
+    argv = next(argv for argv in calls if "--prompt" in argv)
+    forbidden = {
+        "--browser-attach-running",
+        "--browser-manual-login",
+        "--browser-manual-login-profile-dir",
+        "--browser-chrome-profile",
+        "--browser-cookie-path",
+        "--copy-profile",
+        "--browser-port",
+        "--browser-debug-port",
+        "--browser-inline-cookies",
+        "--browser-inline-cookies-file",
+        "--write-output",
+        "oracle-chatgpt",
+        "chatgpt-use",
+    }
+    assert not forbidden.intersection(argv)
 
 
 def test_missing_or_invalid_oracle_starts_no_process(monkeypatch, tmp_path: Path) -> None:
@@ -254,8 +555,21 @@ def test_timeout_recovers_same_session_without_duplicate_submit(
         return _completed(argv)
 
     _patch_runtime(monkeypatch, tmp_path, executable, fake_run)
+    managed_chrome_preflights = 0
+
+    def preflight_managed_chrome(_endpoint) -> bool:
+        nonlocal managed_chrome_preflights
+        managed_chrome_preflights += 1
+        return True
+
+    monkeypatch.setattr(
+        issue_planning_chatgpt,
+        "_preflight_managed_chrome",
+        preflight_managed_chrome,
+    )
     result = _invoke(tmp_path, timeout_seconds=0.1)
     assert result.status == "pass"
+    assert managed_chrome_preflights == 1
     assert sum("--prompt" in argv for argv in calls) == 1
     assert sum("--harvest" in argv for argv in calls) == 1
 
@@ -707,7 +1021,14 @@ def test_typed_planner_zip_fails_closed_in_legacy_application_before_publication
     assert list(output.iterdir()) == []
 
 
-def _patch_runtime(monkeypatch, tmp_path: Path, executable: Path, fake_run) -> None:
+def _patch_runtime(
+    monkeypatch,
+    tmp_path: Path,
+    executable: Path,
+    fake_run,
+    *,
+    patch_managed_chrome: bool = True,
+) -> None:
     monkeypatch.setattr(issue_planning_chatgpt.shutil, "which", lambda _name: str(executable))
     monkeypatch.setattr(issue_planning_chatgpt.subprocess, "run", fake_run)
     monkeypatch.setenv("ORACLE_HOME_DIR", str(tmp_path / "oracle-home"))
@@ -715,6 +1036,13 @@ def _patch_runtime(monkeypatch, tmp_path: Path, executable: Path, fake_run) -> N
     monkeypatch.setenv("OPENAI_API_KEY", "private")
     monkeypatch.setenv("AZURE_OPENAI_API_KEY", "private")
     monkeypatch.setenv("SPECDOCK_CHATGPT_COMMAND", "private-wrapper")
+    monkeypatch.setenv("SPECDOCK_ORACLE_REMOTE_CHROME", "127.0.0.1:9223")
+    if patch_managed_chrome:
+        monkeypatch.setattr(
+            issue_planning_chatgpt,
+            "_preflight_managed_chrome",
+            lambda _endpoint: True,
+        )
 
 
 def _fake_executable(tmp_path: Path, *, symlink: bool = False) -> Path:
@@ -767,7 +1095,53 @@ def _completed(argv, *, stdout: bytes = b"", stderr: bytes = b"", returncode: in
 
 
 def _root_help() -> bytes:
-    return b"--engine --file --slug --wait --prompt --browser-attachments"
+    return (
+        b"--engine --file --slug --wait --prompt --browser-attachments "
+        b"--model --browser-model-strategy --remote-chrome --browser-no-cookie-sync"
+    )
+
+
+def _assert_managed_chrome_argv(argv: list[str]) -> None:
+    assert argv.count("--model") == 1
+    assert argv[argv.index("--model") + 1] == "Pro"
+    assert argv.count("--browser-model-strategy") == 1
+    assert argv[argv.index("--browser-model-strategy") + 1] == "select"
+    assert argv.count("--remote-chrome") == 1
+    assert argv[argv.index("--remote-chrome") + 1] == "127.0.0.1:9223"
+    assert argv.count("--browser-no-cookie-sync") == 1
+    for singleton in ("--prompt", "--file", "--slug"):
+        assert argv.count(singleton) == 1
+
+
+class _FakeHttpResponse:
+    def __init__(self, *, status: int, payload: bytes) -> None:
+        self.status = status
+        self._payload = payload
+
+    def read(self, _limit: int) -> bytes:
+        return self._payload
+
+
+class _FakeHttpConnection:
+    def __init__(
+        self,
+        *,
+        status: int,
+        payload: bytes,
+        fail_request: bool,
+    ) -> None:
+        self._response = _FakeHttpResponse(status=status, payload=payload)
+        self._fail_request = fail_request
+
+    def request(self, *_args, **_kwargs) -> None:
+        if self._fail_request:
+            raise ConnectionRefusedError
+
+    def getresponse(self) -> _FakeHttpResponse:
+        return self._response
+
+    def close(self) -> None:
+        return
 
 
 def _session_help() -> bytes:

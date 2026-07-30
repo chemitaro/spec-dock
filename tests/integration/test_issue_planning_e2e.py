@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import hashlib
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
-from typing import Any
+import threading
+from typing import Any, cast
 import zipfile
+
+import pytest
 
 from spec_dock.cli import main as installer_main
 
@@ -38,6 +42,11 @@ def _prepare_target(tmp_path: Path) -> tuple[Path, Path, Path, dict[str, str]]:
     assert "oracle" in installed_skill
     assert "PATH" in installed_skill
     assert "do not use a personal wrapper" in installed_skill.lower()
+    assert "SPECDOCK_ORACLE_REMOTE_CHROME" in installed_skill
+    assert "loopback" in installed_skill.lower()
+    assert "already-running authenticated" in installed_skill.lower()
+    assert "profile" in installed_skill.lower()
+    assert "cookie" in installed_skill.lower()
     shutil.rmtree(target / "spec-dock/initiatives")
     shutil.copytree(REPO_ROOT / "spec-dock/initiatives", target / "spec-dock/initiatives")
     issue_meta = next(
@@ -207,7 +216,7 @@ if argv == ["--version"]:
     raise SystemExit(0)
 if argv == ["--help"]:
     append_record(home, record)
-    print("--engine --file --slug --wait --prompt --browser-attachments")
+    print("--engine --file --slug --wait --prompt --browser-attachments --model --browser-model-strategy --remote-chrome")
     raise SystemExit(0)
 if argv == ["session", "--help"]:
     append_record(home, record)
@@ -216,6 +225,21 @@ if argv == ["session", "--help"]:
 if argv[:1] == ["session"]:
     append_record(home, record)
     raise SystemExit(0)
+
+required_prefix = [
+    "--engine", "browser",
+    "--model", "Pro",
+    "--browser-model-strategy", "select",
+    "--remote-chrome",
+]
+if argv[:7] != required_prefix:
+    raise SystemExit(92)
+if re.fullmatch(r"127\.0\.0\.1:[1-9][0-9]{0,4}", argv[7]) is None:
+    raise SystemExit(92)
+if argv[8] != "--browser-no-cookie-sync":
+    raise SystemExit(92)
+if "SPECDOCK_ORACLE_REMOTE_CHROME" in os.environ:
+    raise SystemExit(93)
 
 prompt = argv[argv.index("--prompt") + 1]
 pack = Path(argv[argv.index("--file") + 1])
@@ -359,6 +383,7 @@ def _fake_runtime(
     tmp_path: Path,
     git_env: dict[str, str],
     verdicts: list[str],
+    remote_chrome: str,
     *,
     repository_access_failure: bool = False,
 ) -> tuple[dict[str, str], Path, Path]:
@@ -380,6 +405,7 @@ def _fake_runtime(
         "GIT_SSH_COMMAND": git_env["GIT_SSH_COMMAND"],
         "ORACLE_HOME_DIR": str(oracle_home),
         "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', os.defpath)}",
+        "SPECDOCK_ORACLE_REMOTE_CHROME": remote_chrome,
     }
     env.update({key: f"sentinel-{key.lower()}" for key in _API_SENTINELS})
     return env, oracle_home, executable
@@ -412,10 +438,34 @@ def _assert_oracle_submission(
         "--config",
         "--backend",
         "oracle-chatgpt",
+        "chatgpt-use",
+        "--browser-attach-running",
+        "--browser-manual-login",
+        "--browser-manual-login-profile-dir",
+        "--browser-chrome-profile",
+        "--browser-cookie-path",
+        "--copy-profile",
+        "--browser-port",
+        "--browser-debug-port",
+        "--browser-inline-cookies",
+        "--browser-inline-cookies-file",
     }
     assert all(not forbidden.intersection(record["argv"]) for record in records)
     child_environment = prompt_records[0]["environment"]
     assert all(key not in child_environment for key in _API_SENTINELS)
+    assert "SPECDOCK_ORACLE_REMOTE_CHROME" not in child_environment
+    argv = prompt_records[0]["argv"]
+    assert argv[1:10] == [
+        "--engine",
+        "browser",
+        "--model",
+        "Pro",
+        "--browser-model-strategy",
+        "select",
+        "--remote-chrome",
+        env["SPECDOCK_ORACLE_REMOTE_CHROME"],
+        "--browser-no-cookie-sync",
+    ]
     prompt = prompt_records[0]["prompt"]
     head = _run_git(target, "rev-parse", "HEAD", env=env)
     assert '"repository":"chemitaro/spec-dock"' in prompt
@@ -633,14 +683,48 @@ def _forbidden_snapshot(target: Path, issue_dir: Path) -> dict[str, bytes]:
     return snapshot
 
 
+@pytest.fixture
+def fake_cdp_endpoint():
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            if self.path != "/json/version":
+                self.send_error(404)
+                return
+            host, port = cast("tuple[str, int]", self.server.server_address)
+            payload = json.dumps({
+                "webSocketDebuggerUrl": f"ws://{host}:{port}/devtools/browser/fake",
+            }).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = cast("tuple[str, int]", server.server_address)
+    try:
+        yield f"{host}:{port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+
 def test_exact_repository_access_failure_creates_no_candidate_or_mutation(
     tmp_path: Path,
+    fake_cdp_endpoint: str,
 ) -> None:
     target, _bare, issue_dir, env = _prepare_target(tmp_path)
     runtime_env, oracle_home, executable = _fake_runtime(
         tmp_path,
         env,
         [],
+        fake_cdp_endpoint,
         repository_access_failure=True,
     )
     output = tmp_path / "candidate"
@@ -671,9 +755,15 @@ def test_exact_repository_access_failure_creates_no_candidate_or_mutation(
 
 def test_archive_full_fake_chain_reaches_ready(
     tmp_path: Path,
+    fake_cdp_endpoint: str,
 ) -> None:
     target, bare, issue_dir, env = _prepare_target(tmp_path)
-    runtime_env, oracle_home, executable = _fake_runtime(tmp_path, env, ["pass"])
+    runtime_env, oracle_home, executable = _fake_runtime(
+        tmp_path,
+        env,
+        ["pass"],
+        fake_cdp_endpoint,
+    )
     output = tmp_path / "candidate"
     reviews = tmp_path / "reviews"
     operation = tmp_path / "operation"
@@ -758,9 +848,15 @@ def test_archive_full_fake_chain_reaches_ready(
 
 def test_git_bound_full_fake_chain_reaches_ready(
     tmp_path: Path,
+    fake_cdp_endpoint: str,
 ) -> None:
     target, bare, issue_dir, env = _prepare_target(tmp_path)
-    runtime_env, oracle_home, executable = _fake_runtime(tmp_path, env, ["pass"])
+    runtime_env, oracle_home, executable = _fake_runtime(
+        tmp_path,
+        env,
+        ["pass"],
+        fake_cdp_endpoint,
+    )
     output = tmp_path / "candidate"
     reviews = tmp_path / "reviews"
     operation = tmp_path / "operation"
@@ -851,12 +947,14 @@ def test_git_bound_full_fake_chain_reaches_ready(
 
 def test_failed_review_semantic_revision_reaches_fresh_pass(
     tmp_path: Path,
+    fake_cdp_endpoint: str,
 ) -> None:
     target, _bare, issue_dir, env = _prepare_target(tmp_path)
     runtime_env, oracle_home, executable = _fake_runtime(
         tmp_path,
         env,
         ["fail", "pass"],
+        fake_cdp_endpoint,
     )
     candidates = tmp_path / "candidates"
     first_reviews = tmp_path / "first-reviews"

@@ -35,6 +35,8 @@ The onboarding companion is subordinate evidence, not a fourth canonical specifi
 
 Use only the repo-local `./spec-dock/scripts/spec-dock-chatgpt` entrypoint. It resolves `oracle` through `PATH` as its only external product execution dependency. Missing or unsupported Oracle blocks the run; do not use a personal wrapper, arbitrary backend, or API fallback.
 
+Before a formal ChatGPT run, set `SPECDOCK_ORACLE_REMOTE_CHROME` to the loopback CDP endpoint of an already-running authenticated managed Chrome, using only `127.0.0.1:<port>` or `localhost:<port>`. The runtime fails closed when this variable is absent, malformed, unreachable, or not a matching CDP endpoint. Chrome lifecycle and its dedicated persistent profile remain operator-owned: do not pass, copy, or discover a browser profile, cookies, credentials, or API token through SpecDock.
+
 Before a formal run, verify the exact current repository, named branch, and HEAD through GitHub. Do not substitute a default branch, attachment, prompt context, or memory when that exact branch verification is unavailable.
 
 ## Read First
