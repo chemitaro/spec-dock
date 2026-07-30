@@ -809,3 +809,86 @@ def test_fresh_target_same_name_max_identity_replacement_fails_before_publisher(
     displaced = displaced_specdock / "artifacts" if replacement == "target" else displaced_artifacts
     assert not list(displaced.glob("*.bin"))
     assert source.read_bytes() == b"source"
+
+
+@pytest.mark.parametrize("race_point", ["during_create", "after_setup"])
+@pytest.mark.parametrize("replacement_kind", ["wrong", "broken", "alternate"])
+def test_fresh_rules_link_replacement_fails_closed_without_deleting_replacement(
+    tmp_path,
+    monkeypatch,
+    race_point,
+    replacement_kind,
+) -> None:
+    contracts, module, ports_module, _publisher_type = _runtime_modules()
+    configured = _ports(tmp_path)
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"source")
+    artifacts_dir = tmp_path / "spec-dock" / "artifacts"
+    rules_source = tmp_path / "spec-dock" / "docs" / "rules" / "root" / "artifacts.md"
+    wrong_rules = tmp_path / "wrong-rules.md"
+    if replacement_kind == "wrong":
+        wrong_rules.write_text("# Wrong rules\n", encoding="utf-8")
+    replacement_target = rules_source if replacement_kind == "alternate" else wrong_rules
+    original_symlink = os.symlink
+    original_create = module._create_bound_fresh_artifacts_setup
+    publisher_calls = 0
+
+    def replace_rules_link() -> None:
+        rules_link = artifacts_dir / "rules.md"
+        rules_link.unlink()
+        original_symlink(replacement_target, rules_link)
+
+    def replace_during_create(
+        source_value,
+        destination_value,
+        target_is_directory=False,
+        *,
+        dir_fd=None,
+    ):
+        result = original_symlink(
+            source_value,
+            destination_value,
+            target_is_directory=target_is_directory,
+            dir_fd=dir_fd,
+        )
+        if Path(destination_value).name == "rules.md":
+            replace_rules_link()
+        return result
+
+    def replace_after_setup(**kwargs):
+        opened = original_create(**kwargs)
+        replace_rules_link()
+        return opened
+
+    class _UnexpectedPublisher:
+        def publish_explicit_file(self, _request):
+            nonlocal publisher_calls
+            publisher_calls += 1
+            raise AssertionError("publisher must not run after rules.md replacement")
+
+    configured = ports_module.Ports(**{
+        **configured.__dict__,
+        "explicit_file_artifact_publisher": _UnexpectedPublisher(),
+    })
+    if race_point == "during_create":
+        monkeypatch.setattr(os, "symlink", replace_during_create)
+    else:
+        monkeypatch.setattr(module, "_create_bound_fresh_artifacts_setup", replace_after_setup)
+    monkeypatch.setattr(module, "_acquire_create_lock", lambda _specdock_dir: (None, None))
+
+    with pytest.raises(contracts.FileArtifactImportError) as captured:
+        module.import_file_artifact(
+            contracts.FileArtifactImportRequest(
+                target_kind="root",
+                target_value=None,
+                source_path=Path("source.bin"),
+            ),
+            configured,
+        )
+
+    assert captured.value.code == "artifact_setup_failed"
+    assert captured.value.publication_state == "not_committed"
+    assert publisher_calls == 0
+    assert (artifacts_dir / "rules.md").readlink() == replacement_target
+    assert not list(artifacts_dir.glob("*.bin"))
+    assert source.read_bytes() == b"source"

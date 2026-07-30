@@ -82,6 +82,7 @@ def import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileAr
     target_directory_identity: tuple[int, int, int] | None = None
     artifacts_directory_fd: int | None = None
     artifacts_directory_identity: tuple[int, int, int] | None = None
+    fresh_rules_identity: tuple[int, int, int] | None = None
     try:
         try:
             lock_path, lock_token = _acquire_create_lock(specdock_dir)
@@ -129,6 +130,7 @@ def import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileAr
                     artifacts_directory_fd,
                     artifacts_directory_identity,
                     verified_name_max,
+                    fresh_rules_identity,
                 ) = _create_bound_fresh_artifacts_setup(
                     target=setup_target,
                     specdock_dir=specdock_dir,
@@ -142,6 +144,10 @@ def import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileAr
                     artifacts_directory_fd=artifacts_directory_fd,
                     artifacts_directory_identity=artifacts_directory_identity,
                 ):
+                    _rollback_bound_rules_link(
+                        artifacts_directory_fd=artifacts_directory_fd,
+                        created_rules_identity=fresh_rules_identity,
+                    )
                     raise RuntimeError("artifact target identity changed during setup")
             else:
                 assert artifacts_directory_fd is not None
@@ -208,10 +214,41 @@ def import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileAr
                 artifacts_directory_fd=artifacts_directory_fd,
                 artifacts_directory_identity=artifacts_directory_identity,
             ):
+                if artifacts_was_missing:
+                    _rollback_bound_rules_link(
+                        artifacts_directory_fd=artifacts_directory_fd,
+                        created_rules_identity=fresh_rules_identity,
+                    )
                 raise FileArtifactImportError(
                     code="artifact_setup_failed",
                     cleanup_state=retry_cleanup_state,
                 )
+            if artifacts_was_missing:
+                assert fresh_rules_identity is not None
+                rules_source = specdock_dir / "docs" / "rules" / setup_target.rules_kind / "artifacts.md"
+                rules_target = os.path.relpath(rules_source, start=target.artifacts_dir)
+                try:
+                    rules_status = os.stat(
+                        "rules.md",
+                        dir_fd=artifacts_directory_fd,
+                        follow_symlinks=False,
+                    )
+                    _validate_bound_rules_link(
+                        rules_source=rules_source,
+                        rules_target=rules_target,
+                        artifacts_directory_fd=artifacts_directory_fd,
+                        rules_status=rules_status,
+                        expected_rules_identity=fresh_rules_identity,
+                    )
+                except (OSError, RuntimeError):
+                    _rollback_bound_rules_link(
+                        artifacts_directory_fd=artifacts_directory_fd,
+                        created_rules_identity=fresh_rules_identity,
+                    )
+                    raise FileArtifactImportError(
+                        code="artifact_setup_failed",
+                        cleanup_state=retry_cleanup_state,
+                    ) from None
             try:
                 published = publisher.publish_explicit_file(
                     ExplicitFileArtifactPublishRequest(
@@ -385,7 +422,7 @@ def _create_bound_fresh_artifacts_setup(
     specdock_dir: Path,
     target_directory_fd: int,
     target_directory_identity: tuple[int, int, int],
-) -> tuple[int, tuple[int, int, int], int]:
+) -> tuple[int, tuple[int, int, int], int, tuple[int, int, int]]:
     if not _visible_directory_matches(
         target.path,
         target_directory_fd,
@@ -409,7 +446,25 @@ def _create_bound_fresh_artifacts_setup(
         rules_source = specdock_dir / "docs" / "rules" / target.rules_kind / "artifacts.md"
         rules_target = os.path.relpath(rules_source, start=target.artifacts_dir)
         os.symlink(rules_target, "rules.md", dir_fd=artifacts_directory_fd)
-        return artifacts_directory_fd, artifacts_directory_identity, name_max_bytes
+        rules_status = os.stat(
+            "rules.md",
+            dir_fd=artifacts_directory_fd,
+            follow_symlinks=False,
+        )
+        rules_identity = (rules_status.st_dev, rules_status.st_ino, rules_status.st_mode)
+        _validate_bound_rules_link(
+            rules_source=rules_source,
+            rules_target=rules_target,
+            artifacts_directory_fd=artifacts_directory_fd,
+            rules_status=rules_status,
+            expected_rules_identity=rules_identity,
+        )
+        return (
+            artifacts_directory_fd,
+            artifacts_directory_identity,
+            name_max_bytes,
+            rules_identity,
+        )
     except BaseException:
         if artifacts_directory_fd is not None:
             _close_descriptor_noexcept(artifacts_directory_fd)
@@ -442,8 +497,14 @@ def _ensure_bound_existing_artifacts_setup(
             created_identity = (rules_status.st_dev, rules_status.st_ino, rules_status.st_mode)
         _validate_bound_rules_link(
             rules_source=rules_source,
+            rules_target=None,
             artifacts_directory_fd=artifacts_directory_fd,
             rules_status=rules_status,
+            expected_rules_identity=(
+                rules_status.st_dev,
+                rules_status.st_ino,
+                rules_status.st_mode,
+            ),
         )
         return created_identity
     except BaseException as error:
@@ -461,10 +522,14 @@ def _ensure_bound_existing_artifacts_setup(
 def _validate_bound_rules_link(
     *,
     rules_source: Path,
+    rules_target: str | None,
     artifacts_directory_fd: int,
     rules_status: os.stat_result,
+    expected_rules_identity: tuple[int, int, int],
 ) -> None:
-    if not stat.S_ISLNK(rules_status.st_mode):
+    if (rules_status.st_dev, rules_status.st_ino, rules_status.st_mode) != expected_rules_identity or not stat.S_ISLNK(
+        rules_status.st_mode
+    ):
         raise RuntimeError("artifact rules entry is not a symlink")
     source_fd: int | None = None
     linked_fd: int | None = None
@@ -483,15 +548,16 @@ def _validate_bound_rules_link(
         linked_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
         linked_fd = os.open("rules.md", linked_flags, dir_fd=artifacts_directory_fd)
         linked_status = os.fstat(linked_fd)
+        linked_target = os.readlink("rules.md", dir_fd=artifacts_directory_fd)
         rules_after = os.stat(
             "rules.md",
             dir_fd=artifacts_directory_fd,
             follow_symlinks=False,
         )
         if (
-            (rules_after.st_dev, rules_after.st_ino, rules_after.st_mode)
-            != (rules_status.st_dev, rules_status.st_ino, rules_status.st_mode)
+            (rules_after.st_dev, rules_after.st_ino, rules_after.st_mode) != expected_rules_identity
             or not stat.S_ISLNK(rules_after.st_mode)
+            or (rules_target is not None and linked_target != rules_target)
             or (
                 linked_status.st_dev,
                 linked_status.st_ino,
