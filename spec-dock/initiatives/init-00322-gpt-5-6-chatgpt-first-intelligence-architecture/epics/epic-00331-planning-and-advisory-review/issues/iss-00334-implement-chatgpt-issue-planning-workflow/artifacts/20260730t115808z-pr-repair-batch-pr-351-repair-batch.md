@@ -2,7 +2,7 @@
 種別: pr-repair-batch
 ID: "20260730t115808z-pr-repair-batch"
 タイトル: "PR 351 Repair Batch"
-状態: "proposed"
+状態: "archived"
 作成者: "iwasawayuuta"
 最終更新: "2026-07-30"
 親: ["iss-00334"]
@@ -21,17 +21,17 @@ reflected_to: []
 - Repository: `chemitaro/spec-dock`
 - Base branch: `main`
 - Head branch: `iss-00334-implement-chatgpt-issue-planning-workflow`
-- Latest head SHA: `555dafd6f9e1252ddf8b50cb23c275e20c263266`
+- Latest head SHA: `b70f599f1689b2867fc70699c68c3d955d1f18d5`
 - Observation command: `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --pr 351 --trigger-mode post-once`
-- Observation final JSON / evidence: required check `Provider CI / provider-tests`, run `30540472689`, job `90863805552`
-- Observation status: `failed`
-- Trigger comment id: `5130515748`
-- Trigger created_at: `2026-07-30T11:57:12Z`
-- Trigger boundary: `post-once` trigger for head `555dafd6f9e1252ddf8b50cb23c275e20c263266`
-- Resume metadata: old-head resume boundary must not be reused after repair push
-- New trigger approved: yes, after a new repair head is pushed
-- Observation limitation: review observation stopped at the required-CI failure; no terminal Codex review verdict is available for this head
-- Batch status: `implemented`
+- Observation final JSON / evidence: GitHub Actions runs `30541559750`, `30541559745`, `30541556692`; decision fingerprint `aca3dc1928a3abbb4ad97a85fdede23b630b0a9ac11084b6bf99c8f29ccfa2f6`
+- Observation status: `passed`
+- Trigger comment id: `5130652815`
+- Trigger created_at: `2026-07-30T12:12:09Z`
+- Trigger boundary: `post-once` trigger for repair head `b70f599f1689b2867fc70699c68c3d955d1f18d5`
+- Resume metadata: not required; observation completed terminally
+- New trigger approved: no for the same head
+- Observation limitation: none
+- Batch status: `reobserved-pass`
 
 ## Batch Purpose
 
@@ -71,23 +71,23 @@ separate follow-up tracking outside the current PR branch.
 
 | field | value |
 | --- | --- |
-| latest_head_sha | `555dafd6f9e1252ddf8b50cb23c275e20c263266` |
-| observation_status | `failed` |
-| required_ci_status | `failure` |
-| review_status | `not-terminal` |
-| p0_count | `0 observed` |
-| p1_count | `0 observed` |
-| p2_count | `0 observed` |
-| p3_count | `0 observed` |
-| required_ci_failure_count | `1` |
-| merge_blocker_count | `1` |
-| blocking_family_count | `1` |
+| latest_head_sha | `b70f599f1689b2867fc70699c68c3d955d1f18d5` |
+| observation_status | `passed` |
+| required_ci_status | `passed` |
+| review_status | `completed/no-findings` |
+| p0_count | `0` |
+| p1_count | `0` |
+| p2_count | `0` |
+| p3_count | `0` |
+| required_ci_failure_count | `0` |
+| merge_blocker_count | `0` |
+| blocking_family_count | `0 open; 1 repaired` |
 | non_blocking_family_count | `0` |
 | terminal_non_blocking_only | no |
-| branch_mutation_required | yes |
-| ci_rerun_expected | yes |
-| review_clean | unknown |
-| merge_prepared_candidate | no |
+| branch_mutation_required | no |
+| ci_rerun_expected | no |
+| review_clean | yes |
+| merge_prepared_candidate | yes |
 
 ## Raw Intake Inventory
 
@@ -107,7 +107,7 @@ Group inventory items by shared root cause. Do not repair comments one-by-one.
 
 | family_id | root_cause_family | family_title | protected_domain | invariant_or_contract | related_items | max_reported_priority | decided_priority | merge_blocking | disposition | repair_unit | family_status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| F001 | `issue-planning-test.active-pointer-fixture` | S10 companion completeness test depends on a machine-local active pointer | no | Provider CI tests must resolve committed fixtures from a fresh checkout | R001 | CI | required-ci | yes | fix-now | U001 | implemented |
+| F001 | `issue-planning-test.active-pointer-fixture` | S10 companion completeness test depends on a machine-local active pointer | no | Provider CI tests must resolve committed fixtures from a fresh checkout | R001 | CI | required-ci | yes | fix-now | U001 | reobserved-pass |
 
 ## Classification Values
 
@@ -231,7 +231,7 @@ they are directly and unavoidably covered by the same `P0`/`P1` root-cause fix.
 
 | unit_id | source_batch | family_id | covered_items | decided_priority | merge_blocking | disposition | repair_unit_disc | status | implementation_plan | quality_gate | commit_evidence | re_observation_result | residual_risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| U001 | 20260730t115808z-pr-repair-batch | F001 | R001 | required-ci | yes | fix-now | `20260730t120701z-disc-pr-repair-unit-active-pointer-fixture.md` | implemented | replaced only the test fixture path with the tracked canonical Issue ZIP path | exact `1 passed`; module `54 passed`; fast pytest `1141 passed, 2119 skipped`; lint PASS; validate `nodes=227`; diff-check PASS | pending commit | pending new-head observation | historical fixture path coupling only |
+| U001 | 20260730t115808z-pr-repair-batch | F001 | R001 | required-ci | yes | fix-now | `20260730t120701z-disc-pr-repair-unit-active-pointer-fixture.md` | reobserved-pass | replaced only the test fixture path with the tracked canonical Issue ZIP path | exact `1 passed`; module `54 passed`; fast pytest `1141 passed, 2119 skipped`; lint PASS; validate `nodes=227`; diff-check PASS | `b70f599f1689b2867fc70699c68c3d955d1f18d5` | Actions 3 runs PASS; Codex explicit no-findings completion; blockers/threads/limitations 0; `merge_prepared` | historical fixture path coupling only |
 
 ## Non-Blocking Follow-up Register
 

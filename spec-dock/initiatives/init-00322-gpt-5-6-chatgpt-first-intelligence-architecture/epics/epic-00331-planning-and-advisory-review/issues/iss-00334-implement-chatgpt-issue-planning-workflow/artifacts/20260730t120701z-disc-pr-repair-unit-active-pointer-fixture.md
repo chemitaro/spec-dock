@@ -134,4 +134,5 @@ reflected_to:
 - Mainのordinary fast pytestは`1141 passed, 2119 skipped`。
 - `make lint`はRuff check、418 files format、mypy 281 filesがPASS。
 - SpecDock validateは`nodes=227`、`git diff --check`もPASS。
-- commit／push／fresh PR observationは本時点でpending。
+- repair commitは`b70f599f1689b2867fc70699c68c3d955d1f18d5`としてpushした。
+- fresh `post-once` observationはActions 3 runs PASS、Codex explicit no-findings completion、P0〜P3／unresolved threads／limitations 0、`recommended_next_action=merge_prepared`でterminal PASSした。
