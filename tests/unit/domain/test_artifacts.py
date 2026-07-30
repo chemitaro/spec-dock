@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import sys
 
@@ -66,6 +67,18 @@ def test_safe_generic_basename_is_preserved_exactly(basename: str) -> None:
         )
         == basename
     )
+
+
+def test_undecodable_generic_basename_is_rejected_as_domain_error() -> None:
+    artifacts = _artifacts_module()
+    undecodable = os.fsdecode(b"invalid-\xff.bin")
+
+    with pytest.raises(RuntimeError, match="Invalid generic artifact basename"):
+        artifacts.normalize_generic_artifact_basename(
+            undecodable,
+            name_max_bytes=255,
+            max_prefix_bytes=len(b"20260730t010203z-99--"),
+        )
 
 
 def test_unsafe_and_overlong_basename_is_deterministic_utf8_and_name_max_safe() -> None:

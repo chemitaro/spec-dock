@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import sys
 import threading
@@ -92,6 +93,111 @@ def test_source_guard_failure_precedes_root_artifact_setup(tmp_path) -> None:
 
     assert captured.value.code == "source_ineligible"
     assert not (tmp_path / "spec-dock" / "artifacts").exists()
+
+
+def test_existing_artifacts_rules_creation_is_bound_to_opened_directory(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    contracts, module, ports_module, _publisher_type = _runtime_modules()
+    configured = _ports(tmp_path)
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"source")
+    artifacts_dir = tmp_path / "spec-dock" / "artifacts"
+    artifacts_dir.mkdir()
+    displaced_artifacts = tmp_path / "displaced-artifacts"
+    publisher_calls = 0
+    original_symlink = os.symlink
+
+    def replace_visible_artifacts_before_rules_create(
+        source_value,
+        destination_value,
+        target_is_directory=False,
+        *,
+        dir_fd=None,
+    ):
+        if Path(destination_value).name == "rules.md":
+            artifacts_dir.rename(displaced_artifacts)
+            artifacts_dir.mkdir()
+        return original_symlink(
+            source_value,
+            destination_value,
+            target_is_directory=target_is_directory,
+            dir_fd=dir_fd,
+        )
+
+    class _UnexpectedPublisher:
+        def publish_explicit_file(self, _request):
+            nonlocal publisher_calls
+            publisher_calls += 1
+            raise AssertionError("publisher must not run after artifacts replacement")
+
+    configured = ports_module.Ports(**{
+        **configured.__dict__,
+        "explicit_file_artifact_publisher": _UnexpectedPublisher(),
+    })
+    monkeypatch.setattr(os, "symlink", replace_visible_artifacts_before_rules_create)
+    monkeypatch.setattr(module, "_acquire_create_lock", lambda _specdock_dir: (None, None))
+
+    with pytest.raises(contracts.FileArtifactImportError) as captured:
+        module.import_file_artifact(
+            contracts.FileArtifactImportRequest(
+                target_kind="root",
+                target_value=None,
+                source_path=Path("source.bin"),
+            ),
+            configured,
+        )
+
+    assert captured.value.code == "artifact_setup_failed"
+    assert captured.value.publication_state == "not_committed"
+    assert publisher_calls == 0
+    assert not os.path.lexists(artifacts_dir / "rules.md")
+    assert not os.path.lexists(displaced_artifacts / "rules.md")
+    assert source.read_bytes() == b"source"
+
+
+def test_undecodable_source_basename_is_content_free_stable_failure(tmp_path) -> None:
+    contracts, module, ports_module, _publisher_type = _runtime_modules()
+    configured = _ports(tmp_path)
+    close_calls = 0
+
+    class _Lease:
+        source_visibility = "basename_only"
+        source_display = "must-not-be-rendered"
+
+        def close(self):
+            nonlocal close_calls
+            close_calls += 1
+
+    class _Guard:
+        def guard_explicit_file_source(self, _request):
+            return _Lease()
+
+    configured = ports_module.Ports(**{
+        **configured.__dict__,
+        "explicit_file_source_guard": _Guard(),
+    })
+    undecodable = os.fsdecode(b"invalid-\xff.bin")
+
+    with pytest.raises(contracts.FileArtifactImportError) as captured:
+        module.import_file_artifact(
+            contracts.FileArtifactImportRequest(
+                target_kind="root",
+                target_value=None,
+                source_path=Path(undecodable),
+            ),
+            configured,
+        )
+
+    assert captured.value.code == "artifact_allocation_failed"
+    assert captured.value.committed is False
+    assert captured.value.publication_state == "not_committed"
+    assert captured.value.cleanup_state == "not_created"
+    assert captured.value.retry_disposition == "safe_after_remediation"
+    assert "private body sentinel" not in str(captured.value)
+    assert not (tmp_path / "spec-dock" / "artifacts").exists()
+    assert close_calls == 1
 
 
 def test_unknown_source_guard_fault_is_precommit_runtime_failed_without_private_detail(
