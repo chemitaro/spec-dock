@@ -83,7 +83,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
 | EAL-001 | adopted | clarification research / discussion | canonical `requirement.md`, `design.md`, `plan.md` | source-grounding と利用者判断を、任意の単一ファイル、明示 target、generic identity、Workbench非依存、Issue 346境界として採用する | `artifacts/20260730t000929z-research-issue-345-generic-file-import-source-grounding.md`; `artifacts/20260730t000929z-01-disc-issue-345-clarification-chatgpt-authoring-handoff.md` | ChatGPT案との照合後に正本へ反映し fresh review |
-| EAL-002 | partially_adopted | ChatGPT Pro authoring / repository analysis | canonical `requirement.md`, `design.md`, `plan.md`; onboarding artifact | 4文書の構造、trace、failure/privacy/test設計を採用する。既存テストファイルを空とする誤記、非実在の `--target T`、曖昧な artifact path はリポジトリ事実に合わせて補正する | original ZIP SHA-256 `4c3317e697b7fe68b91bfc04401f36b8407b20631460b8ee4199ebf2c4d20eba`; corrected authoring-pack content digest `4da06f4a19034d6dcf8d0d24550298604a97096c1f2d18d56473297ad76ff573`; pack review findings `[]` | 補正採用後に ChatGPT Use で fresh spec review |
+| EAL-002 | adopted | ChatGPT Pro authoring / repository analysis / combined review | canonical `requirement.md`, `design.md`, `plan.md`; onboarding artifact | 4文書の構造、trace、failure/privacy/test設計を採用し、repository誤記とD-002〜D-020のレビュー指摘を補正した。exact commitへのfresh combined reviewがfindings `[]`で合格した | original ZIP SHA-256 `4c3317e697b7fe68b91bfc04401f36b8407b20631460b8ee4199ebf2c4d20eba`; corrected authoring-pack content digest `4da06f4a19034d6dcf8d0d24550298604a97096c1f2d18d56473297ad76ff573`; final review at `3a2e95b57154108aea260325d5c40829b01ccf4a`; reviewed ZIP SHA-256 `8ac851843f89f04b6403e9594876435ca4b5defa3587557202145afee3566a85` | planning artifactsを実装入力として使用可能 |
 | EAL-003 | rejected | transport-safe repaired pack | canonical prose | ZIP transport validator通過のための可逆HTML数値参照表現は意味内容ではなく搬送上の符号化であり、正本本文には不自然である | corrected authoring-pack provenance の round-trip 記録 | 原文候補を正本へ採用し、digest付きZIPは生成証跡として保持 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
@@ -92,7 +92,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | 任意の readable regular file 一件を、root / Initiative / Epic / Issue の明示 targetへopaqueかつno-overwriteで保存する契約 | 新メンバー向け説明資料、PlantUML、ZIP形式のChatGPT生成物 | low | fresh review pending |
+| OAL-001 | 任意の readable regular file 一件を、root / Initiative / Epic / Issue の明示 targetへopaqueかつno-overwriteで保存する契約 | 新メンバー向け説明資料、PlantUML、ZIP形式のChatGPT生成物 | low | ChatGPT Pro fresh combined review `pass` at `3a2e95b57154108aea260325d5c40829b01ccf4a` |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -100,9 +100,23 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| requirement | active Issue / parent Epic R/D/P / accepted ADR / provider source / existing tests / clarification artifacts / ChatGPT Pro draft | 利用者確認事項なし。assurance grade差分はD-001として保持 | adopted | passed at `1323a5a5b4f17850967b4411bfa11e4874a642cf`（findings `[]`） | no | requirement phaseを昇格し、runtime-owned assurance classifyへ進む |
-| design | passed requirement / Standard assurance template / provider layered architecture / existing publisher・allocator・parser / ChatGPT Pro draft | runtime profileはstandard。親critical推奨はD-004のreview inputとして保持 | partially_adopted | combined review failed at `cdbb5fccd36d6864f9e76fbf479765ac31001c99`（cross-artifact P2×2をdesignへ反映） | yes | D-018/D-020を反映し、R/D/Pを同一ChatGPT会話でfresh re-review |
-| plan | passed requirement / corrected canonical design / Standard assurance template / current test surfaces / Issue 346 ownership / ChatGPT Pro draft | repository誤記とD-005〜D-020由来test obligationsを補正済み | partially_adopted | combined review failed at `cdbb5fccd36d6864f9e76fbf479765ac31001c99`（P1×2、P2×1を反映） | yes | D-016/D-017/D-019を反映し、R/D/Pを同一ChatGPT会話でfresh re-review |
+| requirement | active Issue / parent Epic R/D/P / accepted ADR / provider source / existing tests / clarification artifacts / ChatGPT Pro draft | 利用者確認事項なし。runtime-owned assuranceはstandard、親critical推奨はreview focus | adopted | fresh combined review passed at `3a2e95b57154108aea260325d5c40829b01ccf4a`（findings `[]`） | no | requirement phase promoted |
+| design | passed requirement / Standard assurance template / provider layered architecture / existing publisher・allocator・parser / ChatGPT Pro draft | D-005〜D-015/D-018/D-020を反映し、runtime profileはstandard | adopted | fresh combined review passed at `3a2e95b57154108aea260325d5c40829b01ccf4a`（findings `[]`） | no | design phase promoted |
+| plan | passed requirement / corrected canonical design / Standard assurance template / current test surfaces / Issue 346 ownership / ChatGPT Pro draft | repository誤記とD-005〜D-020由来test obligationsを補正済み | adopted | fresh combined review passed at `3a2e95b57154108aea260325d5c40829b01ccf4a`（findings `[]`） | no | plan phase promoted; implementation planning input ready |
+
+### ChatGPT Pro 統合再レビュー証跡
+
+- Session: `iss-00345-final-reviewed-pack`
+- 対象commit: `3a2e95b57154108aea260325d5c40829b01ccf4a`
+- Model evidence: `requested=Pro`, `resolved=Pro`, `verified=yes`
+- 判定: `pass`
+- 前回5指摘: `previous_findings_resolved=true`
+- Findings: `[]`
+- Review Markdown artifact: `artifacts/20260730t054439z-chatgpt-output-combined-final-rereview.md`
+- Review Markdown SHA-256: `2219d397d4d8b957d9821777cd53fa5bb32e37e6f245d1fc13f3f54fd03395ca`
+- Reviewed ZIP: `iss-00345-generic-single-file-artifact-import-reviewed-spec-pack.zip`
+- ZIP SHA-256: `8ac851843f89f04b6403e9594876435ca4b5defa3587557202145afee3566a85`
+- ZIP validation: compressed data errorなし、exact 4 Markdown entries、展開後の各fileはcanonical requirement/design/plan/onboardingとbyte-for-byte一致
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
@@ -130,7 +144,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| ChatGPT Pro | iss-00345 | authoring ZIP内 `requirement.md`, `design.md`, `plan.md`, `onboarding.md` | active Issue/Epic、accepted ADR、provider source、tests、clarification artifacts | canonical R/D/P、Issue onboarding artifact | partially_adopted | `requirement.md`, `design.md`, `plan.md`, `artifacts/20260730t014107z-issue-345-generic-single-file-artifact-import-onboarding-guide.md` | source-grounding review + pack review pass、repository corrections pending | 内容を補正採用 | transport-only encoded spellings、誤ったtest/CLI/path表現 | fresh spec review pending | pending | phase gate順に正本へ昇格 |
+| ChatGPT Pro | iss-00345 | authoring ZIP内 `requirement.md`, `design.md`, `plan.md`, `onboarding.md` | active Issue/Epic、accepted ADR、provider source、tests、clarification artifacts | canonical R/D/P、Issue onboarding artifact | adopted | `requirement.md`, `design.md`, `plan.md`, `artifacts/20260730t014107z-issue-345-generic-single-file-artifact-import-onboarding-guide.md` | source-grounding review + pack review + exact-commit combined re-review pass | repository補正とD-002〜D-020を反映して統合 | transport-only encoded spellings、誤ったtest/CLI/path表現 | none | ChatGPT Pro pass at `3a2e95b57154108aea260325d5c40829b01ccf4a` | requirement/design/plan promoted |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
@@ -295,7 +309,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| ChatGPT Pro（spec-reviewer相当） | planning phaseのrequirement / design / plan / onboarding alignment | 前回P1×2/P2×3を修正し、fresh combined re-review findings `[]` | 1 | pass at `3a2e95b57154108aea260325d5c40829b01ccf4a` |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
