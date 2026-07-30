@@ -491,9 +491,31 @@ def _assert_oracle_submission(
     if '"kind":"authoring_zip"' in prompt:
         assert "13 nonempty distinct H2s, exact labels, no split/merge" in prompt
         assert all(prompt.count(heading) == 1 for heading in onboarding_headings)
+        diagram_contract = (
+            "4+ valid `plantuml` fences: system context/responsibility boundary/"
+            "planning sequence/implementation roadmap."
+        )
+        assert prompt.count(diagram_contract) == 1
+        assert (
+            "4+ valid `plantuml` fences: system-context/responsibility-boundary/"
+            "planning-sequence/implementation-roadmap."
+        ) not in prompt
+        assert all(
+            role in prompt
+            for role in (
+                "system context",
+                "responsibility boundary",
+                "planning sequence",
+                "implementation roadmap",
+            )
+        )
     else:
         assert "13 nonempty distinct H2s, exact labels, no split/merge" not in prompt
         assert all(heading not in prompt for heading in onboarding_headings)
+        assert (
+            "4+ valid `plantuml` fences: system context/responsibility boundary/"
+            "planning sequence/implementation roadmap."
+        ) not in prompt
     assert not any("instruction" in name.lower() for name in prompt_records[0]["pack_files"])
     assert str(oracle_home) not in prompt
 
