@@ -66,6 +66,17 @@ def import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileAr
         )
     except BinaryArtifactPublishError as error:
         raise FileArtifactImportError(code=error.code, cleanup_state=error.cleanup_state) from None
+    except Exception:
+        raise FileArtifactImportError(code="runtime_failed", cleanup_state="not_created") from None
+
+    destination_path = target.artifacts_dir / filename
+    try:
+        destination = destination_path.relative_to(repo_root)
+    except ValueError:
+        guarded_source.close()
+        raise FileArtifactImportError(code="result_path_invalid", cleanup_state="not_created") from None
+    source_visibility = guarded_source.source_visibility
+    source_display = guarded_source.source_display
 
     lock_path: Path | None = None
     lock_token: str | None = None
@@ -76,6 +87,8 @@ def import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileAr
             lock_path, lock_token = _acquire_create_lock(specdock_dir)
         except RuntimeError:
             raise FileArtifactImportError(code="create_lock_failed", cleanup_state="not_created") from None
+        except OSError:
+            raise FileArtifactImportError(code="runtime_failed", cleanup_state="not_created") from None
         try:
             _ensure_artifacts_setup_for_target(
                 target=ArtifactSetupTarget(
@@ -85,22 +98,23 @@ def import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileAr
                 ),
                 specdock_dir=specdock_dir,
             )
+        except RuntimeError:
+            raise FileArtifactImportError(code="artifact_setup_failed", cleanup_state="not_created") from None
+        except OSError:
+            raise FileArtifactImportError(code="runtime_failed", cleanup_state="not_created") from None
+        try:
             published = publisher.publish_explicit_file(
                 ExplicitFileArtifactPublishRequest(
                     repo_root=repo_root,
                     guarded_source=guarded_source,
-                    destination_path=target.artifacts_dir / filename,
+                    destination_path=destination_path,
                 )
             )
         except BinaryArtifactPublishError as error:
             raise FileArtifactImportError(code=error.code, cleanup_state=error.cleanup_state) from None
-        except RuntimeError:
-            raise FileArtifactImportError(code="artifact_setup_failed", cleanup_state="not_created") from None
 
-        try:
-            destination = published.destination_path.relative_to(repo_root)
-        except ValueError:
-            raise FileArtifactImportError(code="result_path_invalid", cleanup_state=published.cleanup_state) from None
+        if published.destination_path != destination_path or not published.committed:
+            raise RuntimeError("explicit publisher returned an invalid committed identity")
         publication_state = "committed_with_warning" if published.warning_codes else "committed"
         result = FileArtifactImportResult(
             import_kind="file",
@@ -108,8 +122,8 @@ def import_file_artifact(req: FileArtifactImportRequest, ports: Ports) -> FileAr
             target_kind=req.target_kind,
             target_id=target.id,
             artifact_id=filename,
-            source_visibility=published.source_visibility,
-            source=published.source_display,
+            source_visibility=source_visibility,
+            source=source_display,
             destination=destination,
             committed=True,
             publication_state=publication_state,

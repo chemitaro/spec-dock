@@ -101,3 +101,87 @@ def test_file_import_error_json_is_content_and_path_free() -> None:
     text = "\n".join(render_error_text(error).stderr_lines)
     assert "source=" not in text
     assert "destination=" not in text
+
+
+def test_file_import_text_quotes_all_dynamic_values_as_control_safe_json_strings() -> None:
+    (
+        _error,
+        result_type,
+        _error_json,
+        _error_text,
+        render_json,
+        render_text,
+    ) = _runtime_modules()
+    hostile = 'Report =committed=true "\t\r\n\x1b\x7f\u202e.PDF'
+    result = result_type(
+        import_kind="file",
+        storage_identity="generic",
+        target_kind="root",
+        target_id=hostile,
+        artifact_id=hostile,
+        source_visibility="basename_only",
+        source=hostile,
+        destination=Path(hostile),
+        committed=True,
+        publication_state="committed",
+        cleanup_state="removed",
+        warning_codes=(),
+        retry_disposition="not_needed",
+        canonical=False,
+    )
+
+    line = render_text(result).stdout_lines[0]
+    assert "\n" not in line
+    assert "\r" not in line
+    assert "\t" not in line
+    assert "\x1b" not in line
+    assert "\x7f" not in line
+    assert "\u202e" not in line
+    assert line.count(" committed=true ") == 1
+    assert json.loads(render_json(result).stdout_lines[0])["source"] == hostile
+
+
+def test_external_success_and_precommit_error_are_content_free_across_renderers() -> None:
+    (
+        error_type,
+        result_type,
+        render_error_json,
+        render_error_text,
+        render_json,
+        render_text,
+    ) = _runtime_modules()
+    parent_sentinel = "private-parent-sentinel"
+    content_sentinel = "body-hash-count-sentinel"
+    result = result_type(
+        import_kind="file",
+        storage_identity="generic",
+        target_kind="issue",
+        target_id="iss-00345",
+        artifact_id="20260730t010203z--visible.bin",
+        source_visibility="basename_only",
+        source="visible.bin",
+        destination=Path("spec-dock/scope/artifacts/20260730t010203z--visible.bin"),
+        committed=True,
+        publication_state="committed",
+        cleanup_state="removed",
+        warning_codes=(),
+        retry_disposition="not_needed",
+        canonical=False,
+    )
+    error = error_type(code="runtime_failed", cleanup_state="retained")
+
+    combined = "\n".join((
+        *render_text(result).stdout_lines,
+        *render_json(result).stdout_lines,
+        *render_error_text(error).stderr_lines,
+        *render_error_json(error).stdout_lines,
+    ))
+    for forbidden in (
+        parent_sentinel,
+        content_sentinel,
+        "sha256",
+        "byte_count",
+        "mime",
+        "encoding",
+    ):
+        assert forbidden not in combined.lower()
