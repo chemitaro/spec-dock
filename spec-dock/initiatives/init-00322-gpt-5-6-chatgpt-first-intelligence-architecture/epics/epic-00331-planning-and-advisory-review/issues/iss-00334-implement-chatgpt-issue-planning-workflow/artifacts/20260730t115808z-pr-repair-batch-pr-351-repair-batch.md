@@ -21,13 +21,13 @@ reflected_to: []
 - Repository: `chemitaro/spec-dock`
 - Base branch: `main`
 - Head branch: `iss-00334-implement-chatgpt-issue-planning-workflow`
-- Latest head SHA: `6c9302ab08c7f352e85a199b65bdeb522376171c`
+- Latest observed head SHA: `91715eecf306bd0c978da922f87193151764cdcd`
 - Observation command: `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --pr 351 --trigger-mode post-once`
-- Observation final JSON / evidence: GitHub Actions runs `30542196314`, `30542196080`, `30542189677`; Review `4818771681`; decision fingerprint `c39fd464126bdf8e871967029a7c08d313d71fc981d8552b2c0ed3d5ca37f71c`
+- Observation final JSON / evidence: `20260730t151634z-pr-351-observation-head-91715eec.json`; Review `4820348714`
 - Observation status: `human_gate/blocker_present`
-- Trigger comment id: `5130741381`
-- Trigger created_at: `2026-07-30T12:21:25Z`
-- Trigger boundary: `post-once` trigger for evidence head `6c9302ab08c7f352e85a199b65bdeb522376171c`
+- Trigger comment id: recorded in the raw observation artifact
+- Trigger created_at: recorded in the raw observation artifact
+- Trigger boundary: `post-once` trigger for evidence head `91715eecf306bd0c978da922f87193151764cdcd`
 - Resume metadata: not applicable; explicit Review completed with current-head findings
 - New trigger approved: yes after a bounded P1 repair is committed and pushed
 - Observation limitation: none; `automation_stalled` reflects repeated stable blocker fingerprints, not missing evidence
@@ -71,18 +71,18 @@ separate follow-up tracking outside the current PR branch.
 
 | field | value |
 | --- | --- |
-| latest_head_sha | `6c9302ab08c7f352e85a199b65bdeb522376171c` |
+| latest_head_sha | `91715eecf306bd0c978da922f87193151764cdcd` |
 | observation_status | `human_gate/blocker_present` |
 | required_ci_status | `passed` |
 | review_status | `completed/findings` |
 | p0_count | `0` |
-| p1_count | `2` |
+| p1_count | `3` |
 | p2_count | `1` |
 | p3_count | `0` |
 | required_ci_failure_count | `0` |
-| merge_blocker_count | `2` |
-| blocking_family_count | `2 open; 1 repaired` |
-| non_blocking_family_count | `1` |
+| merge_blocker_count | `3` |
+| blocking_family_count | `3 locally repaired; awaiting new-head observation` |
+| non_blocking_family_count | `2` |
 | terminal_non_blocking_only | no |
 | branch_mutation_required | yes |
 | ci_rerun_expected | yes |
@@ -101,6 +101,10 @@ priority separate from the final severity decision.
 | R002 | review | comment `3682683838`, Review `4818771681` | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_candidate.py` | 447 | output directory may be renamed and replaced by a symlink after validation; pathname-based staging can write outside the guarded directory before rejection | code-path/contract | `6c9302ab08c7f352e85a199b65bdeb522376171c` | F002 | triaged |
 | R003 | review | comment `3682683856`, Review `4818771681` | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py` | 1164 | archive apply does not revalidate canonical and companion preimages at the mutation boundary, allowing a concurrent edit/create to be overwritten | code-path/contract | `6c9302ab08c7f352e85a199b65bdeb522376171c` | F003 | triaged |
 | R004 | review | comment `3682683844`, Review `4818771681` | P2 | `src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md` | 30 | documented `information_insufficient` output is reduced to `oracle_artifact_missing`, so missing-information questions are not returned through a typed transport | contract | `6c9302ab08c7f352e85a199b65bdeb522376171c` | F004 | triaged |
+| R005 | review | Review `4820348714` | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py` | N/A | validated output-directory identity was not retained through the apply evidence lifecycle | code-path/contract | `91715eecf306bd0c978da922f87193151764cdcd` | F005 | triaged |
+| R006 | review | Review `4820348714` | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py` | N/A | initial and resume push lacked an exact expected-old remote-ref CAS | code-path/contract | `91715eecf306bd0c978da922f87193151764cdcd` | F006 | triaged |
+| R007 | review | Review `4820348714` | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_candidate.py` | N/A | verified staged identity could still be replaced before pathname-based final publication | code-path/contract | `91715eecf306bd0c978da922f87193151764cdcd` | F007 | triaged |
+| R008 | review | Review `4820348714` | P2 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py` | N/A | a crash after Git commit but before durable commit evidence can leave a manual recovery gap | contract | `91715eecf306bd0c978da922f87193151764cdcd` | F008 | triaged |
 
 Do not keep example rows as active inventory.
 
@@ -114,6 +118,10 @@ Group inventory items by shared root cause. Do not repair comments one-by-one.
 | F002 | `issue-planning-candidate.output-directory-toctou` | Candidate staging and publication do not remain bound to the validated directory object | yes | candidate creation must not write outside the validated external output directory, including during detected races | R002 | P1 | P1 | yes | fix-now | U002 | local-pass |
 | F003 | `issue-planning-apply.archive-preimage-revalidation` | Archive apply can overwrite post-preflight document or companion changes | yes | Human approval applies only to the exact preimage; drift before mutation must fail closed without losing concurrent changes | R003 | P1 | P1 | yes | fix-now | U003 | local-pass |
 | F004 | `issue-planning-transport.information-insufficient` | Missing-information questions lack a typed transport result | no | official skill stop condition should be observable by the caller | R004 | P2 | P2 | no | follow-up | N/A | triaged |
+| F005 | `issue-planning-apply.output-directory-identity` | Apply evidence lifecycle can escape the validated output directory object | yes | all operation evidence must remain bound to the validated directory identity | R005 | P1 | P1 | yes | fix-now | U004 | local-pass-awaiting-reobservation |
+| F006 | `issue-planning-apply.remote-ref-cas` | Push can overwrite or recreate a concurrently changed/deleted remote ref | yes | remote publication must compare the exact expected old ref immediately at push | R006 | P1 | P1 | yes | fix-now | U005 | local-pass-awaiting-reobservation |
+| F007 | `issue-planning-candidate.staged-fd-publication` | Candidate final publication can switch away from the verified staged object | yes | final publication must derive from the already verified staged FD without pathname fallback | R007 | P1 | P1 | yes | fix-now | U006 | local-pass-awaiting-reobservation |
+| F008 | `issue-planning-apply.post-commit-record-gap` | Commit evidence can lag a successfully created Git commit | no | recovery should eventually classify a post-commit evidence interruption | R008 | P2 | P2 | no | follow-up | N/A | triaged |
 
 ## Classification Values
 
@@ -301,6 +309,30 @@ hypothesis, coupling, and prior result. Recurrence alone is not a stop reason.
 - re_observation_plan: unchanged; commit/push after S006 final local review pass, followed by one new `post-once` PR observation.
 - residual_risk: same-credential rewrite to a different semantically valid private state remains outside the ownership/permission threat model.
 
+### Current strategy S007
+
+- strategy_id: S007
+- covered_family_ids: F005, F006, F007
+- prior_strategy_id: S006
+- strategy_delta: exact-head Review `4820348714` identified three new object-identity/CAS boundaries after S006 passed local review. S007 retains validated output-directory authority through apply, publishes Candidate directly from the verified staged FD, and makes remote publication an exact expected-old CAS.
+- bounded_scope: provider Candidate/apply infra; application/port/bootstrap guard plumbing; mechanical dogfood projection; deterministic race and CAS tests. Public schema/status/reason, canonical planning docs, Oracle/configuration, and P2 changes are excluded.
+- validation_plan: Candidate OS primitive and staged-name replacement tests; apply output replacement before/after FD capture; initial/resume remote delete/rewind races; exact lease argv and unavailable classification; focused suites; explicit full-regression apply integration; fast tests; lint; provider/projection parity; validate; fresh P0/P1-only review; new-head PR observation.
+- rollback_plan: revert Candidate FD publication, apply evidence FD lifecycle, and exact-old CAS as independent units if any changes public contracts or cannot fail closed.
+- re_observation_plan: commit/push only after fresh local Spec/Code/QA P0/P1 gates pass; then review the exact code HEAD with fresh ChatGPT and run one fixed `post-once` observation on the final evidence head.
+- residual_risk: F008 remains a non-blocking recovery ergonomics gap; it must not cause branch mutation or an additional review cycle by itself.
+
+### Current strategy S008
+
+- strategy_id: S008
+- covered_family_ids: F005, F006, F007
+- prior_strategy_id: S007
+- strategy_delta: fresh local Spec／Code／QA review found three bounded closure gaps in the S007 implementation: capability-gated Linux `AT_EMPTY_PATH`, collapsed absent/unavailable classification at resume entry, and missing application-level guard-identity regression protection. The underlying S007 architecture and public contracts remain unchanged.
+- bounded_scope: Linux `_link_exclusive_linux_at` ABI plus one real non-privileged Linux syscall test; resume-entry three-state classification plus two integration tests; one application object-identity propagation test. No production application redesign, public schema/status/reason change, Oracle/configuration change, canonical planning change, or P2 work.
+- validation_plan: exact new tests; Candidate infra; application apply; apply unit; explicit full-regression apply integration; ordinary fast lane; lint; provider/projection parity; validate; fresh P0/P1-only Spec/Code/QA review; exact-head ChatGPT review after push; fixed PR observation.
+- rollback_plan: revert each of the three independent bounded units if it broadens public behavior or fails its exact platform/race contract.
+- re_observation_plan: unchanged; commit/push only after the S008 local review passes, then obtain fresh ChatGPT defect-only review on the exact code HEAD and one fixed PR observation on the final evidence HEAD.
+- residual_risk: the real Linux primitive is locally skipped on Darwin and must pass on unprivileged Provider CI; missing/inaccessible procfs or unsupported hard links fail closed.
+
 The strategy must be bounded, in scope, supported by current evidence, and
 materially different from an ineffective prior strategy. Renaming or repeating
 the same strategy is not a strategy delta.
@@ -371,6 +403,9 @@ they are directly and unavoidably covered by the same `P0`/`P1` root-cause fix.
 | U001 | 20260730t115808z-pr-repair-batch | F001 | R001 | required-ci | yes | fix-now | `20260730t120701z-disc-pr-repair-unit-active-pointer-fixture.md` | reobserved-pass | replaced only the test fixture path with the tracked canonical Issue ZIP path | exact `1 passed`; module `54 passed`; fast pytest `1141 passed, 2119 skipped`; lint PASS; validate `nodes=227`; diff-check PASS | `b70f599f1689b2867fc70699c68c3d955d1f18d5` | Actions 3 runs PASS; Codex explicit no-findings completion; blockers/threads/limitations 0; `merge_prepared` | historical fixture path coupling only |
 | U002 | 20260730t115808z-pr-repair-batch | F002 | R002 | P1 | yes | fix-now | `20260730t130735z-disc-pr-repair-unit-candidate-output-directory-toctou.md` | unit-created | descriptor-bound candidate staging/publication/cleanup with adversarial rename/symlink test | focused candidate infra tests, platform behavior, full verification, fresh observation | pending | pending | platform-specific directory-descriptor operations |
 | U003 | 20260730t115808z-pr-repair-batch | F003 | R003 | P1 | yes | fix-now | `20260730t130735z-02-disc-pr-repair-unit-archive-preimage-revalidation.md` | unit-created | archive preimage revalidation immediately before mutation with concurrent edit/create tests | focused apply unit/integration tests, full verification, fresh observation | pending | pending | closed failure reason and snapshot ordering |
+| U004 | 20260730t115808z-pr-repair-batch | F005 | R005 | P1 | yes | fix-now | `20260730t155200z-pr-351-s007-p1-repair-chatgpt-concretization.md` | local-pass-awaiting-reobservation | retain `OutputDirectoryGuard` into resume/transaction and use FD-relative operation evidence lifecycle | apply unit/application `57 passed`; explicit full-regression integration `66 passed`; fast/lint/parity/validate PASS | pending | pending | original directory may become pathname-inaccessible after rename but remains authoritative through its FD |
+| U005 | 20260730t115808z-pr-repair-batch | F006 | R006 | P1 | yes | fix-now | `20260730t155200z-pr-351-s007-p1-repair-chatgpt-concretization.md` | local-pass-awaiting-reobservation | one exact-old CAS helper for initial/resume push with pre-push HEAD/parent/tree/branch proof | delete/rewind race and lease-argv tests; apply suites/full verification PASS | pending | pending | failed CAS intentionally leaves the local operation commit for bounded retry |
+| U006 | 20260730t115808z-pr-repair-batch | F007 | R007 | P1 | yes | fix-now | `20260730t155200z-pr-351-s007-p1-repair-chatgpt-concretization.md` | local-pass-awaiting-reobservation | Darwin `fclonefileat`／Linux `linkat(AT_EMPTY_PATH)` publication from verified staged FD, no pathname fallback | Candidate infra `34 passed`; OS primitive, source-swap, collision, backend failure coverage PASS | pending | pending | unsupported descriptor-publication backend fails closed |
 
 ## Non-Blocking Follow-up Register
 
@@ -385,6 +420,7 @@ instead.
 | followup_id | family_id | related_items | priority | rationale_for_no_action | residual_risk | suggested_followup_target |
 | --- | --- | --- | --- | --- | --- | --- |
 | NB001 | F004 | R004 | P2 | non-blocking incomplete-input recovery only; must not expand S002 | missing-information questions remain unavailable through the typed result | separate follow-up Issue after this PR |
+| NB002 | F008 | R008 | P2 | non-blocking recovery gap; branch mutation and another review cycle are prohibited solely for this item | a crash between commit creation and durable commit evidence may require manual recovery | separate follow-up Issue after this PR |
 
 ## Quality Gate Plan
 
@@ -414,6 +450,8 @@ Define family-level gates, not comment-level checks.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `555dafd6f9e1252ddf8b50cb23c275e20c263266` | required CI failed | F001 | first occurrence | none | S001 | canonical tracked fixture path | `iss00334-pr351-ci-repair-consult`/fresh | use | U001 implemented | `b70f599f1689b2867fc70699c68c3d955d1f18d5` | PASS/no findings | continue to evidence publication | none |
 | 2 | `6c9302ab08c7f352e85a199b65bdeb522376171c` | P1=2, P2=1, CI passed | F002,F003,F004 | new families | S001 | S002 | production filesystem safety repairs, not a fixture retry | `iss00334-pr351-s002-p1-repair-2`/fresh | use F002/F003; defer F004 | U002/U003 created | pending | pending | continue bounded implementation | none |
+| 3 | `91715eecf306bd0c978da922f87193151764cdcd` | P1=3, P2=1, CI passed | F005,F006,F007,F008 | new families after S006 | S006 | S007 | descriptor-authoritative Candidate/apply publication and exact-old remote CAS | `iss00334-pr351-s007-p1-repair`/fresh | use F005/F006/F007; defer F008 | U004/U005/U006 locally implemented and verified | pending | pending | continue to fresh local review, commit/push, exact-head review and observation | none |
+| 4 | local S007 worktree after fresh review | local review P1=3 | F005,F006,F007 | bounded residual closure gaps | S007 | S008 | unprivileged Linux primitive, resume absent/unavailable split, application guard identity test | three fresh ChatGPT sessions/verified Pro | use all three bounded work packets | S008 implemented; full local gates and fresh Spec/Code/QA review PASS | pending | pending | continue to commit/push and exact-head assurance | none |
 
 `iteration_index` is telemetry only; it does not authorize continuation or
 stopping. Each row records the evidence-driven semantic decision for that

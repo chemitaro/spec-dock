@@ -241,7 +241,7 @@ def run_issue_planning_apply(
             issue_id=issue_id,
         )
     try:
-        gateway.validate_candidate_output_directory(request.output_dir, repo_root)
+        output_guard = gateway.validate_candidate_output_directory(request.output_dir, repo_root)
     except (IssuePlanningCandidateOutputRejected, OSError, ValueError):
         return PlanningCommandResult(
             status="rejected",
@@ -507,7 +507,7 @@ def run_issue_planning_apply(
     try:
         resume_available = resume_probe(
             operation,
-            output_dir=request.output_dir,
+            output_guard=output_guard,
         )
     except (OSError, IssuePlanningApplyOutputRejected, ValueError):
         return PlanningCommandResult(
@@ -519,7 +519,7 @@ def run_issue_planning_apply(
         execution = transaction_runner(
             operation,
             repo_root=repo_root,
-            output_dir=request.output_dir,
+            output_guard=output_guard,
             validation_runner=validation_runner,
             sync_runner=sync_runner,
         )
@@ -618,7 +618,7 @@ def run_issue_planning_apply(
     execution = transaction_runner(
         operation,
         repo_root=repo_root,
-        output_dir=request.output_dir,
+        output_guard=output_guard,
         validation_runner=validation_runner,
         sync_runner=sync_runner,
     )

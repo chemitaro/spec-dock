@@ -158,6 +158,328 @@ def _operation(
     )
 
 
+def _output_guard(module, output: Path):
+    opened = output.stat()
+    return module.OutputDirectoryGuard(
+        path=output.resolve(),
+        device=opened.st_dev,
+        inode=opened.st_ino,
+    )
+
+
+def _validation_ok():
+    return SimpleNamespace(report=SimpleNamespace(errors=[]))
+
+
+def _sync_ok():
+    return SimpleNamespace(
+        artifact_failure=None,
+        state=SimpleNamespace(deps_preflight_error=None),
+        write_result=None,
+        active_update=None,
+    )
+
+
+def test_output_replacement_before_fd_capture_is_rejected_without_evidence(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    guard = _output_guard(module, output)
+    original = tmp_path / "original-output"
+    redirected = repo / "redirected"
+    redirected.mkdir()
+    output.rename(original)
+    output.symlink_to(redirected, target_is_directory=True)
+    operation = _operation(repo, head, targets)
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_guard=guard,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert (result.status, result.reason) == ("rejected", "apply_output_rejected")
+    assert list(redirected.iterdir()) == []
+    assert list(original.iterdir()) == []
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_output_replacement_after_fd_capture_keeps_evidence_in_original(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, _origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    guard = _output_guard(module, output)
+    original = tmp_path / "original-output"
+    redirected = repo / "redirected"
+    redirected.mkdir()
+    operation = _operation(repo, head, targets)
+
+    def replace(checkpoint: str) -> None:
+        if checkpoint == "after_output_capture":
+            output.rename(original)
+            output.symlink_to(redirected, target_is_directory=True)
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_guard=guard,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+        fault_hook=replace,
+    )
+
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert list(redirected.iterdir()) == []
+    evidence = original / f"planning-apply-{operation.operation_id}"
+    assert (evidence / "operation.json").is_file()
+    assert (evidence / "state.json").is_file()
+    assert len(list((evidence / "attempts").iterdir())) == 1
+    assert (evidence / "commit.json").is_file()
+    assert (evidence / "publication.json").is_file()
+    assert not (evidence / "transaction").exists()
+
+
+@pytest.mark.parametrize("race", ["delete", "rewind"])
+def test_first_publication_remote_delete_or_rewind_is_blocked_by_cas(
+    tmp_path: Path,
+    race: str,
+) -> None:
+    module = _module()
+    repo, origin, _head, targets = _repository(tmp_path)
+    (repo / "second").write_text("second\n")
+    _git(repo, "add", "--", "second")
+    _git(repo, "commit", "-qm", "second")
+    _git(repo, "push", "-q", "origin", "feature/issue")
+    head = _git(repo, "rev-parse", "HEAD")
+    rewind = _git(repo, "rev-parse", f"{head}^")
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+
+    def race_remote(checkpoint: str) -> None:
+        if checkpoint != "before_push":
+            return
+        if race == "delete":
+            _git(origin, "update-ref", "-d", "refs/heads/feature/issue", head)
+        else:
+            _git(origin, "update-ref", "refs/heads/feature/issue", rewind, head)
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+        fault_hook=race_remote,
+    )
+
+    assert (result.status, result.reason) == (
+        "blocked_remote_diverged",
+        "remote_diverged",
+    )
+    remote = _git(origin, "rev-parse", "--verify", "refs/heads/feature/issue", check=False)
+    assert remote == ("" if race == "delete" else rewind)
+    evidence = output / f"planning-apply-{operation.operation_id}"
+    assert (evidence / "commit.json").is_file()
+    assert not (evidence / "publication.json").exists()
+
+
+@pytest.mark.parametrize("race", ["delete", "rewind"])
+def test_resume_publication_remote_delete_or_rewind_is_blocked_by_cas(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    race: str,
+) -> None:
+    module = _module()
+    repo, origin, _head, targets = _repository(tmp_path)
+    (repo / "second").write_text("second\n")
+    _git(repo, "add", "--", "second")
+    _git(repo, "commit", "-qm", "second")
+    _git(repo, "push", "-q", "origin", "feature/issue")
+    head = _git(repo, "rev-parse", "HEAD")
+    rewind = _git(repo, "rev-parse", f"{head}^")
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    real_push = module._push_operation_commit_cas
+    fail_once = [True]
+
+    def fail_first(**kwargs):
+        if fail_once[0]:
+            fail_once[0] = False
+            return module.GitCommandResult(returncode=1, stdout=b"", stderr=b"injected")
+        return real_push(**kwargs)
+
+    monkeypatch.setattr(module, "_push_operation_commit_cas", fail_first)
+    pending = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+
+    def race_remote(checkpoint: str) -> None:
+        if checkpoint != "before_push":
+            return
+        if race == "delete":
+            _git(origin, "update-ref", "-d", "refs/heads/feature/issue", head)
+        else:
+            _git(origin, "update-ref", "refs/heads/feature/issue", rewind, head)
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("resume must not validate"),
+        sync_runner=lambda: pytest.fail("resume must not sync"),
+        fault_hook=race_remote,
+    )
+
+    assert (result.status, result.reason) == (
+        "blocked_remote_diverged",
+        "remote_diverged",
+    )
+    remote = _git(origin, "rev-parse", "--verify", "refs/heads/feature/issue", check=False)
+    assert remote == ("" if race == "delete" else rewind)
+    evidence = output / f"planning-apply-{operation.operation_id}"
+    assert (evidence / "commit.json").is_file()
+    assert not (evidence / "publication.json").exists()
+
+
+def test_resume_publication_remote_deleted_before_resume_is_blocked_without_push(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, _head, targets = _repository(tmp_path)
+    (repo / "second").write_text("second\n")
+    _git(repo, "add", "--", "second")
+    _git(repo, "commit", "-qm", "second")
+    _git(repo, "push", "-q", "origin", "feature/issue")
+    head = _git(repo, "rev-parse", "HEAD")
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    monkeypatch.setattr(
+        module,
+        "_push_operation_commit_cas",
+        lambda **_kwargs: module.GitCommandResult(returncode=1, stdout=b"", stderr=b"injected"),
+    )
+    pending = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+    local_commit = _git(repo, "rev-parse", "HEAD")
+    commit_count = _git(repo, "rev-list", "--count", "HEAD")
+    evidence = output / f"planning-apply-{operation.operation_id}"
+    commit_evidence = (evidence / "commit.json").read_bytes()
+    state_evidence = (evidence / "state.json").read_bytes()
+    _git(origin, "update-ref", "-d", "refs/heads/feature/issue", head)
+
+    monkeypatch.setattr(
+        module,
+        "_push_operation_commit_cas",
+        lambda **_kwargs: pytest.fail("deleted remote must stop before push"),
+    )
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("resume must not validate"),
+        sync_runner=lambda: pytest.fail("resume must not sync"),
+    )
+
+    assert (result.status, result.reason) == (
+        "blocked_remote_diverged",
+        "remote_diverged",
+    )
+    assert _git(origin, "rev-parse", "--verify", "refs/heads/feature/issue", check=False) == ""
+    assert _git(repo, "rev-parse", "HEAD") == local_commit
+    assert _git(repo, "rev-list", "--count", "HEAD") == commit_count
+    assert (evidence / "commit.json").read_bytes() == commit_evidence
+    assert (evidence / "state.json").read_bytes() == state_evidence
+    assert not (evidence / "publication.json").exists()
+
+
+def test_resume_publication_remote_observation_unavailable_stays_pending_without_push(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, _head, targets = _repository(tmp_path)
+    (repo / "second").write_text("second\n")
+    _git(repo, "add", "--", "second")
+    _git(repo, "commit", "-qm", "second")
+    _git(repo, "push", "-q", "origin", "feature/issue")
+    head = _git(repo, "rev-parse", "HEAD")
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    monkeypatch.setattr(
+        module,
+        "_push_operation_commit_cas",
+        lambda **_kwargs: module.GitCommandResult(returncode=1, stdout=b"", stderr=b"injected"),
+    )
+    pending = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+    local_commit = _git(repo, "rev-parse", "HEAD")
+    commit_count = _git(repo, "rev-list", "--count", "HEAD")
+    remote_commit = _git(origin, "rev-parse", "refs/heads/feature/issue")
+    evidence = output / f"planning-apply-{operation.operation_id}"
+    commit_evidence = (evidence / "commit.json").read_bytes()
+    state_evidence = (evidence / "state.json").read_bytes()
+
+    monkeypatch.setattr(
+        module,
+        "_remote_head_observation",
+        lambda _repo, _branch: ("unavailable", None),
+    )
+    monkeypatch.setattr(
+        module,
+        "_push_operation_commit_cas",
+        lambda **_kwargs: pytest.fail("unavailable remote must stop before push"),
+    )
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("resume must not validate"),
+        sync_runner=lambda: pytest.fail("resume must not sync"),
+    )
+
+    assert (result.status, result.reason) == (
+        "publication_pending",
+        "remote_parity_unconfirmed",
+    )
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == remote_commit
+    assert _git(repo, "rev-parse", "HEAD") == local_commit
+    assert _git(repo, "rev-list", "--count", "HEAD") == commit_count
+    assert (evidence / "commit.json").read_bytes() == commit_evidence
+    assert (evidence / "state.json").read_bytes() == state_evidence
+    assert not (evidence / "publication.json").exists()
+
+
 @pytest.mark.parametrize(
     ("mode", "decision", "expected"),
     [
@@ -860,16 +1182,17 @@ def test_push_failure_keeps_local_commit_for_same_operation_retry(
     output = tmp_path / "output"
     output.mkdir()
     operation = _operation(repo, head, targets)
-    real_run = module._run_git
     fail = [True]
 
-    def run_git(repo_root: Path, argv: tuple[str, ...], *, check: bool = False):
-        if argv and argv[0] == "push" and fail[0]:
+    real_push = module._push_operation_commit_cas
+
+    def push_cas(**kwargs):
+        if fail[0]:
             fail[0] = False
             return module.GitCommandResult(returncode=1, stdout=b"", stderr=b"hidden")
-        return real_run(repo_root, argv, check=check)
+        return real_push(**kwargs)
 
-    monkeypatch.setattr(module, "_run_git", run_git)
+    monkeypatch.setattr(module, "_push_operation_commit_cas", push_cas)
     pending = module.execute_planning_apply_transaction(
         operation,
         repo_root=repo,
@@ -1202,16 +1525,17 @@ def test_retry_remote_divergence_is_blocked_without_force(
     output = tmp_path / "output"
     output.mkdir()
     operation = _operation(repo, head, targets)
-    real_run = module._run_git
     fail = [True]
 
-    def run_git(repo_root: Path, argv: tuple[str, ...], *, check: bool = False):
-        if argv and argv[0] == "push" and fail[0]:
+    real_push = module._push_operation_commit_cas
+
+    def push_cas(**kwargs):
+        if fail[0]:
             fail[0] = False
             return module.GitCommandResult(returncode=1, stdout=b"", stderr=b"hidden")
-        return real_run(repo_root, argv, check=check)
+        return real_push(**kwargs)
 
-    monkeypatch.setattr(module, "_run_git", run_git)
+    monkeypatch.setattr(module, "_push_operation_commit_cas", push_cas)
     pending = module.execute_planning_apply_transaction(
         operation,
         repo_root=repo,
@@ -1504,16 +1828,17 @@ def test_application_retry_reaches_same_operation_publication(
         logical_filename=candidate_identity.logical_filename,
         zip_sha256=candidate_identity.zip_sha256,
     )
-    real_run = module._run_git
     fail_push = [True]
 
-    def run_git(repo_root: Path, argv: tuple[str, ...], *, check: bool = False):
-        if argv and argv[0] == "push" and fail_push[0]:
+    real_push = module._push_operation_commit_cas
+
+    def push_cas(**kwargs):
+        if fail_push[0]:
             fail_push[0] = False
             return module.GitCommandResult(returncode=1, stdout=b"", stderr=b"hidden")
-        return real_run(repo_root, argv, check=check)
+        return real_push(**kwargs)
 
-    monkeypatch.setattr(module, "_run_git", run_git)
+    monkeypatch.setattr(module, "_push_operation_commit_cas", push_cas)
 
     def preflight(_request):
         local = _git(repo, "rev-parse", "HEAD")

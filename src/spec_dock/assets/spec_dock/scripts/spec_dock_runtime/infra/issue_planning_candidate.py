@@ -460,6 +460,7 @@ def build_and_publish_candidate(
     final_path = output_guard.path / material.logical_filename
     output_descriptor = -1
     staged: _OwnedEntry | None = None
+    published_entry: _OwnedEntry | None = None
     published = False
     try:
         output_descriptor = _open_guarded_output_directory(output_guard)
@@ -502,12 +503,31 @@ def build_and_publish_candidate(
         ):
             raise CandidatePublicationFailed("Candidate publication failed")
         try:
-            _atomic_publish_no_replace_at(
-                output_descriptor,
-                staged.name,
+            _publish_verified_fd_no_replace_at(
+                staged.descriptor,
                 output_descriptor,
                 material.logical_filename,
             )
+            published_entry = _open_owned_regular_file(
+                output_descriptor,
+                material.logical_filename,
+            )
+            published_bytes = _read_regular_file_descriptor(
+                published_entry.descriptor,
+                max_bytes=len(zip_bytes),
+            )
+            if (
+                len(published_bytes) != len(zip_bytes)
+                or hashlib.sha256(published_bytes).hexdigest() != identity.zip_sha256
+            ):
+                raise OSError(errno.EIO, "Published Candidate identity mismatch")
+            if _owned_entry_matches(
+                output_descriptor,
+                staged,
+                expected_kind="file",
+            ):
+                os.unlink(staged.name, dir_fd=output_descriptor)
+            os.fsync(output_descriptor)
         except FileExistsError as error:
             raise CandidateCollision(material.logical_filename) from error
         except (NotImplementedError, OSError) as error:
@@ -524,8 +544,19 @@ def build_and_publish_candidate(
             onboarding_companion=companion,
         )
     finally:
-        if staged is not None:
+        if published_entry is not None:
             if not published and _owned_entry_matches(
+                output_descriptor,
+                published_entry,
+                expected_kind="file",
+            ):
+                with suppress(OSError):
+                    os.unlink(published_entry.name, dir_fd=output_descriptor)
+                    os.fsync(output_descriptor)
+            with suppress(OSError):
+                os.close(published_entry.descriptor)
+        if staged is not None:
+            if _owned_entry_matches(
                 output_descriptor,
                 staged,
                 expected_kind="file",
@@ -598,6 +629,24 @@ def _create_private_staged_file(output_descriptor: int) -> _OwnedEntry:
     raise CandidateBuildFailed("Candidate ZIP construction failed")
 
 
+def _open_owned_regular_file(parent_descriptor: int, name: str) -> _OwnedEntry:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    descriptor = os.open(name, flags, dir_fd=parent_descriptor)
+    try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode):
+            raise OSError(errno.EINVAL, "Published Candidate is not a regular file")
+        return _OwnedEntry(
+            name=name,
+            descriptor=descriptor,
+            device=opened.st_dev,
+            inode=opened.st_ino,
+        )
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
 def _owned_entry_matches(
     parent_descriptor: int,
     entry: _OwnedEntry,
@@ -661,24 +710,21 @@ def _read_regular_file_descriptor(descriptor: int, *, max_bytes: int) -> bytes:
             raise OSError(errno.EFBIG, "Candidate ZIP exceeds bounded size")
 
 
-def _atomic_publish_no_replace_at(
-    source_descriptor: int,
-    source_name: str,
+def _publish_verified_fd_no_replace_at(
+    staged_descriptor: int,
     destination_descriptor: int,
     destination_name: str,
 ) -> None:
     if platform.system() == "Darwin":
-        _rename_exclusive_darwin_at(
-            source_descriptor,
-            source_name,
+        _clone_exclusive_darwin_at(
+            staged_descriptor,
             destination_descriptor,
             destination_name,
         )
         return
     if platform.system() == "Linux":
-        _rename_exclusive_linux_at(
-            source_descriptor,
-            source_name,
+        _link_exclusive_linux_at(
+            staged_descriptor,
             destination_descriptor,
             destination_name,
         )
@@ -733,30 +779,27 @@ def _rename_exclusive_linux(source: Path, destination: Path) -> None:
     raise OSError(error_number, os.strerror(error_number), destination)
 
 
-def _rename_exclusive_darwin_at(
-    source_descriptor: int,
-    source_name: str,
+def _clone_exclusive_darwin_at(
+    staged_descriptor: int,
     destination_descriptor: int,
     destination_name: str,
 ) -> None:
     library = ctypes.CDLL(None, use_errno=True)
-    rename = getattr(library, "renameatx_np", None)
-    if rename is None:
-        raise NotImplementedError("renameatx_np is unavailable")
-    rename.argtypes = (
+    clone = getattr(library, "fclonefileat", None)
+    if clone is None:
+        raise NotImplementedError("fclonefileat is unavailable")
+    clone.argtypes = (
         ctypes.c_int,
-        ctypes.c_char_p,
         ctypes.c_int,
         ctypes.c_char_p,
         ctypes.c_uint,
     )
-    rename.restype = ctypes.c_int
-    result = rename(
-        source_descriptor,
-        os.fsencode(source_name),
+    clone.restype = ctypes.c_int
+    result = clone(
+        staged_descriptor,
         destination_descriptor,
         os.fsencode(destination_name),
-        0x00000004,
+        0,
     )
     if result == 0:
         return
@@ -766,30 +809,29 @@ def _rename_exclusive_darwin_at(
     raise OSError(error_number, os.strerror(error_number), destination_name)
 
 
-def _rename_exclusive_linux_at(
-    source_descriptor: int,
-    source_name: str,
+def _link_exclusive_linux_at(
+    staged_descriptor: int,
     destination_descriptor: int,
     destination_name: str,
 ) -> None:
     library = ctypes.CDLL(None, use_errno=True)
-    rename = getattr(library, "renameat2", None)
-    if rename is None:
-        raise NotImplementedError("renameat2 is unavailable")
-    rename.argtypes = (
+    link = getattr(library, "linkat", None)
+    if link is None:
+        raise NotImplementedError("linkat is unavailable")
+    link.argtypes = (
         ctypes.c_int,
         ctypes.c_char_p,
         ctypes.c_int,
         ctypes.c_char_p,
-        ctypes.c_uint,
+        ctypes.c_int,
     )
-    rename.restype = ctypes.c_int
-    result = rename(
-        source_descriptor,
-        os.fsencode(source_name),
+    link.restype = ctypes.c_int
+    result = link(
+        -100,
+        os.fsencode(f"/proc/self/fd/{staged_descriptor}"),
         destination_descriptor,
         os.fsencode(destination_name),
-        0x00000001,
+        0x00000400,
     )
     if result == 0:
         return

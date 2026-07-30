@@ -429,11 +429,11 @@ class _IssuePlanningGateway:
             canonical_target_paths,
         )
 
-    def planning_apply_resume_available(self, operation, *, output_dir: Path) -> bool:
+    def planning_apply_resume_available(self, operation, *, output_guard) -> bool:
         try:
             return infra_issue_planning_apply.planning_apply_resume_available(
                 cast("Any", operation),
-                output_dir=output_dir,
+                output_guard=output_guard,
             )
         except infra_issue_planning_apply.PlanningApplyOutputRejected as error:
             raise IssuePlanningApplyOutputRejected(str(error)) from error

@@ -154,12 +154,16 @@ def test_decision_artifact_path_is_deterministic_from_operation_id() -> None:
 def test_operation_evidence_is_private_and_collision_is_rejected(tmp_path: Path) -> None:
     module = _module()
     operation = _operation()
-    path = module.record_planning_apply_operation(operation, output_dir=tmp_path)
+    handle = module.record_planning_apply_operation(operation, output_dir=tmp_path)
+    path = handle.logical_operation_path
     assert stat.S_IMODE(path.stat().st_mode) == 0o700
     manifest = path / "operation.json"
     assert stat.S_IMODE(manifest.stat().st_mode) == 0o600
     assert manifest.read_bytes() == operation.operation_core_bytes
-    assert module.record_planning_apply_operation(operation, output_dir=tmp_path) == path
+    handle.close()
+    resumed = module.record_planning_apply_operation(operation, output_dir=tmp_path)
+    assert resumed.logical_operation_path == path
+    resumed.close()
     manifest.chmod(0o600)
     manifest.write_bytes(b"{}\n")
     with pytest.raises(module.PlanningApplyOutputRejected):
@@ -169,8 +173,8 @@ def test_operation_evidence_is_private_and_collision_is_rejected(tmp_path: Path)
 def test_load_operation_state_rejects_unknown_durable_state(tmp_path: Path) -> None:
     module = _module()
     operation = _operation()
-    operation_dir = module.record_planning_apply_operation(operation, output_dir=tmp_path)
-    state_path = operation_dir / "state.json"
+    handle = module.record_planning_apply_operation(operation, output_dir=tmp_path)
+    state_path = handle.logical_operation_path / "state.json"
     state_path.write_bytes(
         module._canonical_json_bytes({
             "operation_id": operation.operation_id,
@@ -180,7 +184,8 @@ def test_load_operation_state_rejects_unknown_durable_state(tmp_path: Path) -> N
     state_path.chmod(0o600)
 
     with pytest.raises(module.PlanningApplyRestoreMismatch, match="operation state is invalid"):
-        module._load_operation_state(operation_dir, operation)
+        module._load_operation_state(handle, operation)
+    handle.close()
 
 
 @pytest.mark.parametrize(
@@ -188,6 +193,7 @@ def test_load_operation_state_rejects_unknown_durable_state(tmp_path: Path) -> N
     [
         ("git", "push", "--force"),
         ("git", "push", "--force-with-lease"),
+        ("git", "push", f"--force-with-lease=refs/heads/main:{HEAD}"),
         ("git", "reset", "--hard"),
         ("git", "commit", "--amend"),
         ("git", "rebase", "main"),
@@ -198,6 +204,76 @@ def test_prohibited_git_argv_is_rejected(argv: tuple[str, ...]) -> None:
     module = _module()
     with pytest.raises(module.PlanningApplyUnsafeGitCommand):
         module.validate_planning_git_argv(argv)
+
+
+def test_dedicated_push_uses_exact_expected_old_lease(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    local_commit = "c" * 40
+    local_tree = "d" * 40
+    observed: list[tuple[str, ...]] = []
+
+    def git_text(_repo: Path, *argv: str) -> str | None:
+        if argv == ("check-ref-format", "--branch", "feature/issue"):
+            return "feature/issue"
+        if argv == ("rev-parse", "HEAD"):
+            return local_commit
+        if argv == ("rev-parse", f"{local_commit}^"):
+            return HEAD
+        if argv == ("rev-parse", f"{local_commit}^{{tree}}"):
+            return local_tree
+        return None
+
+    def run(argv, **_kwargs):
+        observed.append(tuple(argv))
+        return subprocess.CompletedProcess(argv, 0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr(module, "_git_text", git_text)
+    monkeypatch.setattr(module.subprocess, "run", run)
+    result = module._push_operation_commit_cas(
+        repo_root=tmp_path,
+        branch="feature/issue",
+        expected_remote_head=HEAD,
+        local_commit=local_commit,
+        local_tree=local_tree,
+    )
+
+    assert result.returncode == 0
+    assert observed == [
+        (
+            "git",
+            "-C",
+            tmp_path.as_posix(),
+            "push",
+            f"--force-with-lease=refs/heads/feature/issue:{HEAD}",
+            "origin",
+            f"{local_commit}:refs/heads/feature/issue",
+        )
+    ]
+
+
+def test_cas_failure_with_unavailable_remote_preserves_push_failed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module,
+        "_remote_head_observation",
+        lambda _repo, _branch: ("unavailable", None),
+    )
+
+    result = module._cas_failure_result(
+        _operation(),
+        repo_root=tmp_path,
+        local_commit="c" * 40,
+        local_tree="d" * 40,
+    )
+
+    assert result is not None
+    assert (result.status, result.reason) == ("publication_pending", "push_failed")
 
 
 def test_exact_file_snapshot_restore_preserves_bytes_and_modes(tmp_path: Path) -> None:
