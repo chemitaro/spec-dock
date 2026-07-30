@@ -3,6 +3,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import zipfile
@@ -28,6 +29,21 @@ from spec_dock_runtime.infra import issue_planning_chatgpt  # noqa: E402
 from spec_dock_runtime.infra.contracts import StoredMetaRecord  # noqa: E402
 
 PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_Clock(), gateway=_IssuePlanningGateway())
+
+
+def test_session_ids_are_oracle_0161_normalizer_fixed_points(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(issue_planning_chatgpt.secrets, "token_hex", lambda _size: "0123abcd")
+
+    for role in ("planner", "semantic_revision", "reviewer"):
+        session_id = issue_planning_chatgpt._new_session_id(role, _source_evidence())
+        words = session_id.split("-")
+
+        assert _oracle_0161_normalize_slug(session_id) == session_id
+        assert "_" not in session_id
+        assert 3 <= len(words) <= 5
+        assert all(re.fullmatch(r"[a-z0-9]{1,10}", word) for word in words)
 
 
 @pytest.mark.parametrize("role", ["planner", "semantic_revision"])
@@ -1351,6 +1367,13 @@ def _session_id(argv: list[str]) -> str:
     return argv[argv.index("--slug") + 1]
 
 
+def _oracle_0161_normalize_slug(value: str) -> str:
+    words = [word[:10] for word in re.findall(r"[a-z0-9]+", value.lower())[:5]]
+    if not 3 <= len(words) <= 5:
+        raise ValueError("Oracle custom slug must contain 3 to 5 words")
+    return "-".join(words)
+
+
 def _write_planner_session(
     env: dict[str, str],
     argv: list[str],
@@ -1361,7 +1384,7 @@ def _write_planner_session(
     internal_root: str | None = None,
     transcript_payloads: tuple[bytes, ...] = (),
 ) -> None:
-    resolved_id = session_id or _session_id(argv)
+    resolved_id = session_id or _oracle_0161_normalize_slug(_session_id(argv))
     session = _session_dir(env, resolved_id)
     artifact = session / "artifacts" / (filename or "iss-00003-issue-planning-documents.zip")
     artifact.parent.mkdir(parents=True, exist_ok=True)
@@ -1448,7 +1471,7 @@ def _write_reviewer_session(
     *,
     answer: bytes = b'{"verdict":"pass"}',
 ) -> None:
-    session_id = _session_id(argv)
+    session_id = _oracle_0161_normalize_slug(_session_id(argv))
     session = _session_dir(env, session_id)
     transcript = session / "artifacts" / "transcript.md"
     transcript.parent.mkdir(parents=True, exist_ok=True)
@@ -1457,7 +1480,7 @@ def _write_reviewer_session(
 
 
 def _write_metadata_only(env: dict[str, str], argv: list[str], *, status: str) -> None:
-    session_id = _session_id(argv)
+    session_id = _oracle_0161_normalize_slug(_session_id(argv))
     session = _session_dir(env, session_id)
     session.mkdir(parents=True, exist_ok=True)
     _write_metadata(session, session_id, status, [])
