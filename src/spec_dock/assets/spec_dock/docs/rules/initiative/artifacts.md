@@ -12,6 +12,7 @@
 - `blank` は filename token を使わず、front matter の `template: "blank"` で template identity を示します。
 - Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は artifacts ではありません。canonical docs は main orchestrator single-writer authority です。
 - Artifact は evidence / draft / synthesis / decision candidate の作業面です。採用は canonical docs、accepted ADR、または `report.md` Evidence Adoption Ledger への反映で成立します。
+- `artifact import file --initiative <id> --file <path>` は、Workbench を要求せず、一件の明示 regular file を generic Artifact として保存します。source は変更せず、bytes は opaque evidence のままです。`canonical=false` は自動採用しないことを表します。命名は [reference_naming.md](../../reference_naming.md)、privacy-safe result と publication / retry state は [guide.md](../../guide.md) を参照してください。
 - Legacy `discussions/` は preservation surface です。既存 discussion docs は削除、移動、rename せず grandfathered evidence として扱います。
 - Future `artifacts/` adoption は legacy `discussions/` validation を弱めません。
 - ADR originals may live under future `artifacts/` or legacy `discussions/`; ADR mirror collection must collect both without moving originals.

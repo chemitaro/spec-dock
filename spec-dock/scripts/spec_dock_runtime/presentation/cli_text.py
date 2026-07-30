@@ -18,6 +18,8 @@ if TYPE_CHECKING:
         DeleteNodeResult,
         DepsCheckResult,
         DoctorResult,
+        FileArtifactImportError,
+        FileArtifactImportResult,
         ImportNodeResult,
         IssueFinishResult,
         IssueStartResult,
@@ -234,6 +236,77 @@ def render_artifact_import_error_json(error: ArtifactImportError) -> CliText:
         "code": error.code,
         "committed": False,
         "cleanup_state": error.cleanup_state,
+    }
+    return CliText(stdout_lines=[json.dumps(payload, ensure_ascii=False, indent=2)], stderr_lines=[], warnings=[])
+
+
+def render_file_artifact_import_text(result: FileArtifactImportResult) -> CliText:
+    warning_codes = ",".join(result.warning_codes) if result.warning_codes else "-"
+    dynamic = {
+        "target_id": result.target_id,
+        "artifact_id": result.artifact_id,
+        "source": result.source,
+        "destination": result.destination.as_posix(),
+    }
+    quoted = {key: json.dumps(value, ensure_ascii=True) for key, value in dynamic.items()}
+    line = (
+        "spec-dock: ok (artifact import file) "
+        f"import_kind={result.import_kind} storage_identity={result.storage_identity} "
+        f"target_kind={result.target_kind} target_id={quoted['target_id']} "
+        f"artifact_id={quoted['artifact_id']} source_visibility={result.source_visibility} "
+        f"source={quoted['source']} destination={quoted['destination']} "
+        f"committed={_bool_text(result.committed)} publication_state={result.publication_state} "
+        f"cleanup_state={result.cleanup_state} retry_disposition={result.retry_disposition} "
+        f"canonical={_bool_text(result.canonical)} warning_codes={warning_codes}"
+    )
+    return CliText(stdout_lines=[line], stderr_lines=[], warnings=list(result.warning_codes))
+
+
+def render_file_artifact_import_json(result: FileArtifactImportResult) -> CliText:
+    payload = {
+        "status": "ok",
+        "import_kind": result.import_kind,
+        "storage_identity": result.storage_identity,
+        "target_kind": result.target_kind,
+        "target_id": result.target_id,
+        "artifact_id": result.artifact_id,
+        "source_visibility": result.source_visibility,
+        "source": result.source,
+        "destination": result.destination.as_posix(),
+        "committed": result.committed,
+        "publication_state": result.publication_state,
+        "cleanup_state": result.cleanup_state,
+        "warning_codes": list(result.warning_codes),
+        "retry_disposition": result.retry_disposition,
+        "canonical": result.canonical,
+    }
+    return CliText(stdout_lines=[json.dumps(payload, ensure_ascii=False, indent=2)], stderr_lines=[], warnings=[])
+
+
+def render_file_artifact_import_error_text(error: FileArtifactImportError) -> CliText:
+    return CliText(
+        stdout_lines=[],
+        stderr_lines=[
+            "spec-dock: error (artifact import file) "
+            f"import_kind=file storage_identity=generic code={error.code} "
+            "committed=false publication_state=not_committed "
+            f"cleanup_state={error.cleanup_state} retry_disposition=safe_after_remediation canonical=false"
+        ],
+        warnings=[],
+    )
+
+
+def render_file_artifact_import_error_json(error: FileArtifactImportError) -> CliText:
+    payload = {
+        "status": "error",
+        "import_kind": "file",
+        "storage_identity": "generic",
+        "code": error.code,
+        "committed": False,
+        "publication_state": error.publication_state,
+        "cleanup_state": error.cleanup_state,
+        "retry_disposition": error.retry_disposition,
+        "canonical": error.canonical,
     }
     return CliText(stdout_lines=[json.dumps(payload, ensure_ascii=False, indent=2)], stderr_lines=[], warnings=[])
 

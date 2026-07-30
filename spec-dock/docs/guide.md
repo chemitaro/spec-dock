@@ -48,6 +48,8 @@ Root `spec-dock/.workbench/` は `yyyymmdd` などの粗い日付bucketへ置き
 
 完成したChatGPTの単一Markdownは、`artifact import chatgpt-output --{initiative|epic|issue} <id> --file <workbench-file.md> --title "..."`でsourceを残したままbyte-identicalなblank Artifactへ保存できます。`chatgpt-output`はimport kindでありtyped Artifact tokenではないため、同名typeの予約はせず`new artifact`と共存します。read / import authorization は evidence-only であり、canonical adoption ではありません。Evidence Adoption Ledgerへ採否を記録し、採用した規範的内容だけをcanonical docsへ再記述してfresh reviewer gateを通してください。`update`は既存Workbenchを保持し、migration、normalize、delete、promotionしません。
 
+`artifact import file --file <path>` は別の generic lane です。`--root`、`--initiative <id>`、`--epic <id>`、`--issue <id>` のいずれか一つを明示し、Workbench 内外を問わず一件の regular file を opaque generic Artifact として保存します。source は変更・削除しません。結果には source content、hash、byte count、repository 外 absolute path を出さず、repository 内 source は repo-relative、その他は basename のみを表示します。保存済みは `committed=true` で、通常は `publication_state=committed`、commit 後 warning が残る場合は `committed_with_warning` です。両方とも `retry_disposition=not_needed` であり、commit 前 failure は `not_committed` と `safe_after_remediation` です。generic Artifact は `canonical=false` の evidence-only content で、body は default lifecycle の authority / canonical input になりません。採用には Evidence Adoption Ledger と canonical docs または accepted ADR への明示反映、必要な fresh reviewer gate が必要です。generic filename と collision は [reference_naming.md](reference_naming.md) を参照してください。candidate-wheel consumer E2E と full regression は Issue #346 へ deferred です。
+
 親子関係:
 
 ```text
@@ -147,6 +149,8 @@ spec-dock/
 ./spec-dock/scripts/spec-dock worktree list --json
 ./spec-dock/scripts/spec-dock worktree show <target> --json
 ./spec-dock/scripts/spec-dock worktree remove <target> [--force] [--json]
+./spec-dock/scripts/spec-dock artifact import file --root --file <path>
+./spec-dock/scripts/spec-dock artifact import file --issue <issue-id> --file <path> [--json]
 ./spec-dock/scripts/spec-dock validate
 ./spec-dock/scripts/spec-dock sync
 ```
