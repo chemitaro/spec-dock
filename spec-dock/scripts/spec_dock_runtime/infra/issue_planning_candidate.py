@@ -503,12 +503,8 @@ def build_and_publish_candidate(
         ):
             raise CandidatePublicationFailed("Candidate publication failed")
         try:
-            _publish_verified_fd_no_replace_at(
+            published_entry = _publish_verified_fd_no_replace_at(
                 staged.descriptor,
-                output_descriptor,
-                material.logical_filename,
-            )
-            published_entry = _open_owned_regular_file(
                 output_descriptor,
                 material.logical_filename,
             )
@@ -528,6 +524,11 @@ def build_and_publish_candidate(
             ):
                 os.unlink(staged.name, dir_fd=output_descriptor)
             os.fsync(output_descriptor)
+            _verify_published_candidate_attachment(
+                output_guard,
+                output_descriptor,
+                published_entry,
+            )
         except FileExistsError as error:
             raise CandidateCollision(material.logical_filename) from error
         except (NotImplementedError, OSError) as error:
@@ -545,14 +546,12 @@ def build_and_publish_candidate(
         )
     finally:
         if published_entry is not None:
-            if not published and _owned_entry_matches(
-                output_descriptor,
-                published_entry,
-                expected_kind="file",
-            ):
-                with suppress(OSError):
-                    os.unlink(published_entry.name, dir_fd=output_descriptor)
-                    os.fsync(output_descriptor)
+            if not published:
+                with suppress(OSError, NotImplementedError):
+                    _cleanup_rejected_published_candidate(
+                        output_descriptor,
+                        published_entry,
+                    )
             with suppress(OSError):
                 os.close(published_entry.descriptor)
         if staged is not None:
@@ -583,6 +582,35 @@ def _open_guarded_output_directory(guard: OutputDirectoryGuard) -> int:
     except BaseException:
         os.close(descriptor)
         raise
+
+
+def _verify_published_candidate_attachment(
+    guard: OutputDirectoryGuard,
+    output_descriptor: int,
+    published_entry: _OwnedEntry,
+) -> None:
+    try:
+        captured = os.fstat(output_descriptor)
+    except OSError as error:
+        raise CandidateOutputRejected("candidate output cannot be safely inspected") from error
+    if not stat.S_ISDIR(captured.st_mode) or (captured.st_dev, captured.st_ino) != (guard.device, guard.inode):
+        raise CandidateOutputRejected("candidate output identity changed")
+    visible_descriptor = _open_guarded_output_directory(guard)
+    try:
+        if not _owned_entry_matches(
+            output_descriptor,
+            published_entry,
+            expected_kind="file",
+        ) or not _entry_matches_identity(
+            visible_descriptor,
+            published_entry.name,
+            device=published_entry.device,
+            inode=published_entry.inode,
+            expected_kind="file",
+        ):
+            raise CandidateOutputRejected("candidate output identity changed")
+    finally:
+        os.close(visible_descriptor)
 
 
 def _entry_exists_at(directory_descriptor: int, name: str) -> bool:
@@ -627,6 +655,107 @@ def _create_private_staged_file(output_descriptor: int) -> _OwnedEntry:
                     os.close(descriptor)
             raise CandidateBuildFailed("Candidate ZIP construction failed") from error
     raise CandidateBuildFailed("Candidate ZIP construction failed")
+
+
+def _create_private_cleanup_directory(output_descriptor: int) -> _OwnedEntry:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    output_identity = os.fstat(output_descriptor)
+    for _attempt in range(32):
+        name = f".spec-dock-issue-candidate-cleanup-{secrets.token_hex(16)}"
+        descriptor = -1
+        try:
+            os.mkdir(name, 0o700, dir_fd=output_descriptor)
+            descriptor = os.open(name, flags, dir_fd=output_descriptor)
+            opened = os.fstat(descriptor)
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or stat.S_IMODE(opened.st_mode) != 0o700
+                or opened.st_uid != os.geteuid()
+                or opened.st_dev != output_identity.st_dev
+                or not _entry_matches_identity(
+                    output_descriptor,
+                    name,
+                    device=opened.st_dev,
+                    inode=opened.st_ino,
+                    expected_kind="directory",
+                )
+            ):
+                raise OSError(errno.EINVAL, "Candidate cleanup directory is unsafe")
+            return _OwnedEntry(
+                name=name,
+                descriptor=descriptor,
+                device=opened.st_dev,
+                inode=opened.st_ino,
+            )
+        except FileExistsError:
+            continue
+        except BaseException:
+            if descriptor >= 0:
+                with suppress(OSError):
+                    os.close(descriptor)
+            with suppress(OSError):
+                os.rmdir(name, dir_fd=output_descriptor)
+            raise
+    raise OSError(errno.EEXIST, "Candidate cleanup directory collision")
+
+
+def _cleanup_rejected_published_candidate(
+    output_descriptor: int,
+    published_entry: _OwnedEntry,
+) -> None:
+    if not _owned_entry_matches(
+        output_descriptor,
+        published_entry,
+        expected_kind="file",
+    ):
+        return
+    cleanup = _create_private_cleanup_directory(output_descriptor)
+    retain_cleanup = False
+    try:
+        try:
+            _rename_exclusive_at(
+                output_descriptor,
+                published_entry.name,
+                cleanup.descriptor,
+                published_entry.name,
+            )
+        except (FileNotFoundError, FileExistsError, NotImplementedError, OSError):
+            return
+        os.fsync(output_descriptor)
+        os.fsync(cleanup.descriptor)
+        if _owned_entry_matches(
+            cleanup.descriptor,
+            published_entry,
+            expected_kind="file",
+        ):
+            os.unlink(published_entry.name, dir_fd=cleanup.descriptor)
+            os.fsync(cleanup.descriptor)
+            os.fsync(output_descriptor)
+            return
+        try:
+            _rename_exclusive_at(
+                cleanup.descriptor,
+                published_entry.name,
+                output_descriptor,
+                published_entry.name,
+            )
+            os.fsync(cleanup.descriptor)
+            os.fsync(output_descriptor)
+        except (FileExistsError, NotImplementedError, OSError):
+            retain_cleanup = True
+    finally:
+        with suppress(OSError):
+            os.close(cleanup.descriptor)
+        if not retain_cleanup and _entry_matches_identity(
+            output_descriptor,
+            cleanup.name,
+            device=cleanup.device,
+            inode=cleanup.inode,
+            expected_kind="directory",
+        ):
+            with suppress(OSError):
+                os.rmdir(cleanup.name, dir_fd=output_descriptor)
+                os.fsync(output_descriptor)
 
 
 def _open_owned_regular_file(parent_descriptor: int, name: str) -> _OwnedEntry:
@@ -714,22 +843,110 @@ def _publish_verified_fd_no_replace_at(
     staged_descriptor: int,
     destination_descriptor: int,
     destination_name: str,
+) -> _OwnedEntry:
+    if platform.system() == "Darwin":
+        return _publish_clone_bound_darwin_at(
+            staged_descriptor,
+            destination_descriptor,
+            destination_name,
+        )
+    if platform.system() == "Linux":
+        bound_descriptor = os.dup(staged_descriptor)
+        try:
+            opened = os.fstat(bound_descriptor)
+            if not stat.S_ISREG(opened.st_mode):
+                raise OSError(errno.EINVAL, "Candidate staged entry is not a regular file")
+            bound_entry = _OwnedEntry(
+                name=destination_name,
+                descriptor=bound_descriptor,
+                device=opened.st_dev,
+                inode=opened.st_ino,
+            )
+            _link_exclusive_linux_at(
+                staged_descriptor,
+                destination_descriptor,
+                destination_name,
+            )
+            return bound_entry
+        except BaseException:
+            os.close(bound_descriptor)
+            raise
+    raise NotImplementedError("atomic no-replace publication is unsupported")
+
+
+def _publish_clone_bound_darwin_at(
+    staged_descriptor: int,
+    destination_descriptor: int,
+    destination_name: str,
+) -> _OwnedEntry:
+    for _attempt in range(32):
+        capture_name = f".spec-dock-issue-candidate-capture-{secrets.token_bytes(16).hex()}.zip"
+        try:
+            _clone_exclusive_darwin_at(
+                staged_descriptor,
+                destination_descriptor,
+                capture_name,
+            )
+        except FileExistsError:
+            continue
+        captured: _OwnedEntry | None = None
+        try:
+            captured = _open_owned_regular_file(
+                destination_descriptor,
+                capture_name,
+            )
+            bound_entry = _OwnedEntry(
+                name=destination_name,
+                descriptor=captured.descriptor,
+                device=captured.device,
+                inode=captured.inode,
+            )
+            _rename_exclusive_darwin_at(
+                destination_descriptor,
+                capture_name,
+                destination_descriptor,
+                destination_name,
+            )
+            return bound_entry
+        except BaseException:
+            if captured is not None:
+                if _owned_entry_matches(
+                    destination_descriptor,
+                    captured,
+                    expected_kind="file",
+                ):
+                    with suppress(OSError):
+                        os.unlink(capture_name, dir_fd=destination_descriptor)
+                        os.fsync(destination_descriptor)
+                with suppress(OSError):
+                    os.close(captured.descriptor)
+            raise
+    raise FileExistsError(errno.EEXIST, "Candidate capture name collision", destination_name)
+
+
+def _rename_exclusive_at(
+    source_descriptor: int,
+    source_name: str,
+    destination_descriptor: int,
+    destination_name: str,
 ) -> None:
     if platform.system() == "Darwin":
-        _clone_exclusive_darwin_at(
-            staged_descriptor,
+        _rename_exclusive_darwin_at(
+            source_descriptor,
+            source_name,
             destination_descriptor,
             destination_name,
         )
         return
     if platform.system() == "Linux":
-        _link_exclusive_linux_at(
-            staged_descriptor,
+        _rename_exclusive_linux_at(
+            source_descriptor,
+            source_name,
             destination_descriptor,
             destination_name,
         )
         return
-    raise NotImplementedError("atomic no-replace publication is unsupported")
+    raise NotImplementedError("descriptor-relative no-replace rename is unsupported")
 
 
 def _has_symlink_component(path: Path) -> bool:
@@ -777,6 +994,72 @@ def _rename_exclusive_linux(source: Path, destination: Path) -> None:
     if error_number == errno.EEXIST:
         raise FileExistsError(error_number, os.strerror(error_number), destination)
     raise OSError(error_number, os.strerror(error_number), destination)
+
+
+def _rename_exclusive_darwin_at(
+    source_descriptor: int,
+    source_name: str,
+    destination_descriptor: int,
+    destination_name: str,
+) -> None:
+    library = ctypes.CDLL(None, use_errno=True)
+    rename = getattr(library, "renameatx_np", None)
+    if rename is None:
+        raise NotImplementedError("renameatx_np is unavailable")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    result = rename(
+        source_descriptor,
+        os.fsencode(source_name),
+        destination_descriptor,
+        os.fsencode(destination_name),
+        0x00000004,
+    )
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise FileExistsError(error_number, os.strerror(error_number), destination_name)
+    raise OSError(error_number, os.strerror(error_number), destination_name)
+
+
+def _rename_exclusive_linux_at(
+    source_descriptor: int,
+    source_name: str,
+    destination_descriptor: int,
+    destination_name: str,
+) -> None:
+    library = ctypes.CDLL(None, use_errno=True)
+    rename = getattr(library, "renameat2", None)
+    if rename is None:
+        raise NotImplementedError("renameat2 is unavailable")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    result = rename(
+        source_descriptor,
+        os.fsencode(source_name),
+        destination_descriptor,
+        os.fsencode(destination_name),
+        0x00000001,
+    )
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise FileExistsError(error_number, os.strerror(error_number), destination_name)
+    raise OSError(error_number, os.strerror(error_number), destination_name)
 
 
 def _clone_exclusive_darwin_at(

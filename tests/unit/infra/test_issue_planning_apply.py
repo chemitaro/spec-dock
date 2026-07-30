@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
+import os
 from pathlib import Path
 import stat
 import subprocess
 import sys
+from typing import Any
 
 import pytest
 
@@ -114,6 +117,65 @@ def _operation(**changes: object):
     return module.PlanningApplyOperation.create(**values)
 
 
+def _workspace_intent_fixture(tmp_path: Path):
+    module = _module()
+    operation = _operation()
+    repo = tmp_path / "repo"
+    relative = operation.canonical_target_paths[0]
+    target = repo / relative
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"before\n")
+    target.chmod(0o640)
+    guard = module._RepositoryTargetGuard.capture(repo, (relative,))
+    output = tmp_path / "output"
+    output.mkdir()
+    handle = module.record_planning_apply_operation(operation, output_dir=output)
+    module._mkdir_private_at(handle, "transaction")
+    module._write_private_no_replace_at(
+        handle,
+        "transaction/mutation-ledger.json",
+        module._canonical_json_bytes({
+            "operation_id": operation.operation_id,
+            "workspace_intent": None,
+            "entries": [],
+        }),
+    )
+    return module, operation, repo, relative, target, guard, handle
+
+
+def _absent_workspace_intent_fixture(tmp_path: Path):
+    module = _module()
+    operation = _operation()
+    repo = tmp_path / "repo"
+    relative = operation.decision_artifact_path
+    target = repo / relative
+    target.parent.mkdir(parents=True)
+    guard = module._RepositoryTargetGuard.capture(repo, (relative,))
+    output = tmp_path / "output"
+    output.mkdir()
+    handle = module.record_planning_apply_operation(operation, output_dir=output)
+    module._mkdir_private_at(handle, "transaction")
+    module._write_private_no_replace_at(
+        handle,
+        "transaction/mutation-ledger.json",
+        module._canonical_json_bytes({
+            "operation_id": operation.operation_id,
+            "workspace_intent": None,
+            "entries": [],
+        }),
+    )
+    outer = guard.compare_replace(
+        relative,
+        expected=guard.snapshot(relative),
+        replacement=operation.human_decision_bytes,
+        mode=0o600,
+    )
+    assert outer is not None
+    mutations = [outer]
+    module._persist_target_mutations(handle, operation, mutations)
+    return module, operation, relative, target, guard, handle, outer, mutations
+
+
 def test_operation_identity_is_canonical_and_excludes_private_bytes() -> None:
     first = _operation()
     second = _operation(
@@ -143,6 +205,107 @@ def test_operation_rejects_incoherent_canonical_preimage_evidence() -> None:
                 "spec-dock/initiatives/i/epics/e/issues/x/requirement.md": "3" * 40,
             }
         )
+
+
+def test_expected_staged_blob_oids_are_derived_only_from_operation_authority() -> None:
+    module = _module()
+    approved = _operation()
+    approved_expected = module._expected_staged_blob_oids(
+        approved,
+        expected_companion_oid=None,
+    )
+    for relative in approved.canonical_target_paths:
+        assert approved_expected[relative] == _blob_oid(approved.replacement_documents[Path(relative).name])
+    assert approved_expected[approved.companion_target_path] == _blob_oid(COMPANION)
+    assert approved_expected[approved.decision_artifact_path] == _blob_oid(approved.human_decision_bytes)
+
+    existing_companion_oid = "f" * 40
+    rejected = module.dataclass_replace(
+        approved,
+        decision="rejected",
+        replacement_companion=None,
+    )
+    rejected_expected = module._expected_staged_blob_oids(
+        rejected,
+        expected_companion_oid=existing_companion_oid,
+    )
+    for relative in rejected.canonical_target_paths:
+        assert rejected_expected[relative] == rejected.pre_apply_target_blob_oids[relative]
+    assert rejected_expected[rejected.companion_target_path] == existing_companion_oid
+    assert rejected_expected[rejected.decision_artifact_path] == _blob_oid(rejected.human_decision_bytes)
+    assert (
+        module._expected_staged_blob_oids(
+            rejected,
+            expected_companion_oid=None,
+        )[rejected.companion_target_path]
+        is None
+    )
+
+
+def test_tree_blob_oids_reads_one_closed_tree_inventory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    tree = "d" * 40
+    oid = "e" * 40
+    relatives = ("b.md", "a.md")
+    observed: list[tuple[str, ...]] = []
+
+    def run_git(_repo: Path, argv: tuple[str, ...], *, check: bool = False):
+        assert check is False
+        observed.append(argv)
+        return module.GitCommandResult(
+            returncode=0,
+            stdout=f"100644 blob {oid}\ta.md\0".encode(),
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(module, "_run_git", run_git)
+
+    assert module._tree_blob_oids(tmp_path, tree, relatives) == {
+        "b.md": None,
+        "a.md": oid,
+    }
+    assert observed == [
+        ("ls-tree", "-r", "-z", tree, "--", "a.md", "b.md"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("returncode", "stdout"),
+    [
+        (1, b""),
+        (0, b"100644 blob " + b"e" * 40 + b"\ta.md"),
+        (0, b"malformed\0"),
+        (0, b"100644 blob " + b"e" * 40 + b"\ta-\xff.md\0"),
+        (
+            0,
+            b"100644 blob " + b"e" * 40 + b"\ta.md\0" + b"100644 blob " + b"e" * 40 + b"\ta.md\0",
+        ),
+        (0, b"100644 blob " + b"e" * 40 + b"\tunexpected.md\0"),
+        (0, b"040000 tree " + b"e" * 40 + b"\ta.md\0"),
+        (0, b"100644 blob invalid\ta.md\0"),
+    ],
+)
+def test_tree_blob_oids_fails_closed_for_unprovable_inventory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    returncode: int,
+    stdout: bytes,
+) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module,
+        "_run_git",
+        lambda _repo, _argv: module.GitCommandResult(
+            returncode=returncode,
+            stdout=stdout,
+            stderr=b"",
+        ),
+    )
+
+    assert module._tree_blob_oids(tmp_path, "d" * 40, ("a.md", "b.md")) is None
 
 
 def test_decision_artifact_path_is_deterministic_from_operation_id() -> None:
@@ -204,6 +367,80 @@ def test_prohibited_git_argv_is_rejected(argv: tuple[str, ...]) -> None:
     module = _module()
     with pytest.raises(module.PlanningApplyUnsafeGitCommand):
         module.validate_planning_git_argv(argv)
+
+
+def test_private_index_runner_rejects_update_ref(tmp_path: Path) -> None:
+    module = _module()
+    workspace = tmp_path / "private"
+    workspace.mkdir(mode=0o700)
+
+    with pytest.raises(module.PlanningApplyUnsafeGitCommand):
+        module._run_git_with_private_index(
+            tmp_path,
+            workspace / "index",
+            ("update-ref", "refs/heads/feature/issue", "c" * 40, HEAD),
+        )
+
+
+@pytest.mark.parametrize(
+    ("config_returncode", "config_stdout", "expected_signed"),
+    [
+        (0, b"true\n", True),
+        (0, b"false\n", False),
+        (1, b"", False),
+    ],
+)
+def test_verified_commit_preserves_repository_signing_intent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    config_returncode: int,
+    config_stdout: bytes,
+    expected_signed: bool,
+) -> None:
+    module = _module()
+    operation = _operation()
+    local_tree = "d" * 40
+    local_commit = "c" * 40
+    observed: list[tuple[str, ...]] = []
+
+    def private_git(_repo: Path, _index: Path, argv: tuple[str, ...]):
+        observed.append(argv)
+        stdout = (
+            f"{local_tree}\n".encode()
+            if argv == ("write-tree",)
+            else (f"{local_commit}\n".encode() if argv[0] == "commit-tree" else b"")
+        )
+        return module.GitCommandResult(returncode=0, stdout=stdout, stderr=b"")
+
+    monkeypatch.setattr(module, "_run_git_with_private_index", private_git)
+    monkeypatch.setattr(
+        module,
+        "_run_git",
+        lambda _repo, argv: module.GitCommandResult(
+            returncode=config_returncode,
+            stdout=config_stdout,
+            stderr=b"",
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "_git_text",
+        lambda _repo, *argv: local_tree if argv == ("write-tree",) else None,
+    )
+    monkeypatch.setattr(module, "_operation_commit_is_proven", lambda *_args, **_kwargs: True)
+
+    result = module._create_verified_operation_commit(
+        operation,
+        repo_root=tmp_path,
+        local_tree=local_tree,
+        expected_paths={"decision.json"},
+        subject="subject",
+        fault_hook=None,
+    )
+
+    assert result == local_commit
+    commit_tree_argv = next(argv for argv in observed if argv[0] == "commit-tree")
+    assert (commit_tree_argv[-1] == "-S") is expected_signed
 
 
 def test_dedicated_push_uses_exact_expected_old_lease(
@@ -345,6 +582,1246 @@ def test_dangling_symlink_destination_is_rejected_before_mutation_and_preserved(
     assert target.is_symlink()
     assert target.readlink() == original_link
     assert not (tmp_path / "missing-destination.md").exists()
+
+
+def test_repository_target_parent_walk_rejects_symlink_component(tmp_path: Path) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    external = tmp_path / "external"
+    repo.mkdir()
+    (external / "nested").mkdir(parents=True)
+    (repo / "linked").symlink_to(external, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="directory traversal rejected"):
+        module._RepositoryTargetGuard.capture(
+            repo,
+            ("linked/nested/target.md",),
+        )
+
+    assert not (external / "nested" / "target.md").exists()
+
+
+def test_descriptor_relative_atomic_write_survives_lexical_parent_replacement(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    parent = repo / "parent"
+    parent.mkdir(parents=True)
+    guard = module._RepositoryTargetGuard.capture(repo, ("parent/target.md",))
+    captured = repo / "captured-parent"
+    parent.rename(captured)
+    parent.mkdir()
+    try:
+        mutation = guard.compare_replace(
+            "parent/target.md",
+            expected=module.FileSnapshot(
+                existed=False,
+                data=b"",
+                mode=0,
+                sha256=hashlib.sha256(b"").hexdigest(),
+            ),
+            replacement=b"captured\n",
+            mode=0o644,
+        )
+    finally:
+        guard.close()
+
+    assert mutation is not None
+    assert (captured / "target.md").read_bytes() == b"captured\n"
+    assert not (parent / "target.md").exists()
+
+
+@pytest.mark.parametrize(
+    ("platform", "backend"),
+    [
+        ("linux", "_exchange_entries_linux_at"),
+        ("darwin", "_exchange_entries_darwin_at"),
+    ],
+)
+def test_atomic_exchange_dispatches_verified_descriptor_and_names(
+    monkeypatch: pytest.MonkeyPatch,
+    platform: str,
+    backend: str,
+) -> None:
+    module = _module()
+    observed: list[tuple[int, str, int, str]] = []
+    monkeypatch.setattr(module.sys, "platform", platform)
+    monkeypatch.setattr(
+        module,
+        backend,
+        lambda source_fd, first, destination_fd, second: observed.append((source_fd, first, destination_fd, second)),
+    )
+
+    module._exchange_entries_at(17, ".staged", 23, "target.md")
+
+    assert observed == [(17, ".staged", 23, "target.md")]
+
+
+@pytest.mark.parametrize(
+    ("backend_name", "symbol_name"),
+    [
+        ("_exchange_entries_linux_at", "renameat2"),
+        ("_exchange_entries_darwin_at", "renameatx_np"),
+    ],
+)
+def test_atomic_exchange_backends_pass_parent_descriptor_names_and_swap_flag(
+    monkeypatch: pytest.MonkeyPatch,
+    backend_name: str,
+    symbol_name: str,
+) -> None:
+    module = _module()
+    calls: list[tuple[object, ...]] = []
+
+    class FakeFunction:
+        argtypes = None
+        restype = None
+
+        def __call__(self, *args):
+            calls.append(args)
+            return 0
+
+    class FakeLibrary:
+        pass
+
+    library = FakeLibrary()
+    setattr(library, symbol_name, FakeFunction())
+    monkeypatch.setattr(module.ctypes, "CDLL", lambda *_args, **_kwargs: library)
+
+    getattr(module, backend_name)(17, ".staged", 23, "target.md")
+
+    assert calls == [(17, b".staged", 23, b"target.md", 0x00000002)]
+
+
+@pytest.mark.parametrize(
+    ("backend_name", "symbol_name", "message"),
+    [
+        ("_exchange_entries_linux_at", "renameat2", "renameat2 is unavailable"),
+        ("_exchange_entries_darwin_at", "renameatx_np", "renameatx_np is unavailable"),
+    ],
+)
+def test_atomic_exchange_backends_fail_closed_when_native_symbol_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    backend_name: str,
+    symbol_name: str,
+    message: str,
+) -> None:
+    module = _module()
+
+    class FakeLibrary:
+        pass
+
+    library = FakeLibrary()
+    assert not hasattr(library, symbol_name)
+    monkeypatch.setattr(module.ctypes, "CDLL", lambda *_args, **_kwargs: library)
+
+    with pytest.raises(NotImplementedError, match=message):
+        getattr(module, backend_name)(17, ".staged", 23, "target.md")
+
+
+@pytest.mark.parametrize(
+    ("backend_name", "symbol_name"),
+    [
+        ("_exchange_entries_linux_at", "renameat2"),
+        ("_exchange_entries_darwin_at", "renameatx_np"),
+    ],
+)
+def test_atomic_exchange_backends_preserve_native_errno(
+    monkeypatch: pytest.MonkeyPatch,
+    backend_name: str,
+    symbol_name: str,
+) -> None:
+    module = _module()
+
+    class FakeFunction:
+        argtypes = None
+        restype = None
+
+        def __call__(self, *_args):
+            return -1
+
+    class FakeLibrary:
+        pass
+
+    library = FakeLibrary()
+    setattr(library, symbol_name, FakeFunction())
+    monkeypatch.setattr(module.ctypes, "CDLL", lambda *_args, **_kwargs: library)
+    monkeypatch.setattr(module.ctypes, "get_errno", lambda: errno.EBUSY)
+
+    with pytest.raises(OSError) as captured:
+        getattr(module, backend_name)(17, ".staged", 23, "target.md")
+
+    assert captured.value.errno == errno.EBUSY
+    assert captured.value.filename == "target.md"
+
+
+def test_atomic_exchange_fails_closed_on_unsupported_platform(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module.sys, "platform", "unsupported")
+
+    with pytest.raises(NotImplementedError, match="atomic exchange is unavailable"):
+        module._exchange_entries_at(17, ".staged", 23, "target.md")
+
+
+@pytest.mark.parametrize(
+    ("backend_name", "symbol_name", "expected_flag"),
+    [
+        ("_rename_no_replace_linux_at", "renameat2", 0x00000001),
+        ("_rename_no_replace_darwin_at", "renameatx_np", 0x00000004),
+    ],
+)
+def test_no_replace_backends_pass_distinct_descriptors_names_and_flag(
+    monkeypatch: pytest.MonkeyPatch,
+    backend_name: str,
+    symbol_name: str,
+    expected_flag: int,
+) -> None:
+    module = _module()
+    calls: list[tuple[object, ...]] = []
+
+    class FakeFunction:
+        argtypes = None
+        restype = None
+
+        def __call__(self, *args):
+            calls.append(args)
+            return 0
+
+    class FakeLibrary:
+        pass
+
+    library = FakeLibrary()
+    setattr(library, symbol_name, FakeFunction())
+    monkeypatch.setattr(module.ctypes, "CDLL", lambda *_args, **_kwargs: library)
+
+    getattr(module, backend_name)(17, "source", 23, "destination")
+
+    assert calls == [(17, b"source", 23, b"destination", expected_flag)]
+
+
+@pytest.mark.parametrize(
+    ("backend_name", "symbol_name", "message"),
+    [
+        ("_rename_no_replace_linux_at", "renameat2", "renameat2 is unavailable"),
+        ("_rename_no_replace_darwin_at", "renameatx_np", "renameatx_np is unavailable"),
+    ],
+)
+def test_no_replace_backends_fail_closed_when_native_symbol_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    backend_name: str,
+    symbol_name: str,
+    message: str,
+) -> None:
+    module = _module()
+
+    class FakeLibrary:
+        pass
+
+    library = FakeLibrary()
+    assert not hasattr(library, symbol_name)
+    monkeypatch.setattr(module.ctypes, "CDLL", lambda *_args, **_kwargs: library)
+
+    with pytest.raises(NotImplementedError, match=message):
+        getattr(module, backend_name)(17, "source", 23, "destination")
+
+
+@pytest.mark.parametrize(
+    ("backend_name", "symbol_name"),
+    [
+        ("_rename_no_replace_linux_at", "renameat2"),
+        ("_rename_no_replace_darwin_at", "renameatx_np"),
+    ],
+)
+def test_no_replace_backends_preserve_eexist(
+    monkeypatch: pytest.MonkeyPatch,
+    backend_name: str,
+    symbol_name: str,
+) -> None:
+    module = _module()
+
+    class FakeFunction:
+        argtypes = None
+        restype = None
+
+        def __call__(self, *_args):
+            return -1
+
+    class FakeLibrary:
+        pass
+
+    library = FakeLibrary()
+    setattr(library, symbol_name, FakeFunction())
+    monkeypatch.setattr(module.ctypes, "CDLL", lambda *_args, **_kwargs: library)
+    monkeypatch.setattr(module.ctypes, "get_errno", lambda: errno.EEXIST)
+
+    with pytest.raises(FileExistsError) as captured:
+        getattr(module, backend_name)(17, "source", 23, "destination")
+
+    assert captured.value.errno == errno.EEXIST
+    assert captured.value.filename == "destination"
+
+
+def test_mutation_intent_is_durable_before_namespace_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module, operation, _repo, relative, target, guard, handle = _workspace_intent_fixture(tmp_path)
+    mutations: list[Any] = []
+    observed_entries: list[dict[str, object]] = []
+    real_exchange = module._exchange_entries_at
+
+    def exchange(source_fd: int, first: str, destination_fd: int, second: str) -> None:
+        ledger = json.loads(
+            module._read_private_file_at(
+                handle,
+                "transaction/mutation-ledger.json",
+            )
+        )
+        observed_entries.extend(ledger["entries"])
+        real_exchange(source_fd, first, destination_fd, second)
+
+    monkeypatch.setattr(module, "_exchange_entries_at", exchange)
+    try:
+        module._apply_guarded_mutation(
+            guard,
+            handle,
+            operation,
+            mutations,
+            relative=relative,
+            expected=module.snapshot_regular_file(target),
+            replacement=b"replacement\n",
+            mode=0o644,
+        )
+    finally:
+        guard.close()
+        handle.close()
+
+    assert len(observed_entries) == 1
+    prepared = observed_entries[0]
+    assert prepared["path"] == relative
+    assert prepared["phase"] == "prepared"
+    assert prepared["staged_name"] == "staged"
+    assert isinstance(prepared["workspace_device"], int)
+    assert isinstance(prepared["workspace_inode"], int)
+    assert isinstance(prepared["staged_device"], int)
+    assert isinstance(prepared["staged_inode"], int)
+
+
+def test_prepared_absent_publication_resolves_with_empty_workspace_slot(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    guard = module._RepositoryTargetGuard.capture(repo, ("artifact.md",))
+    prepared: list[Any] = []
+
+    class ProcessCrash(BaseException):
+        pass
+
+    try:
+        with pytest.raises(ProcessCrash):
+            guard.compare_replace(
+                "artifact.md",
+                expected=guard.snapshot("artifact.md"),
+                replacement=b"published\n",
+                mode=0o644,
+                prepare=prepared.append,
+                publish=lambda _mutation: (_ for _ in ()).throw(ProcessCrash),
+            )
+
+        assert len(prepared) == 1
+        resolved = guard.resolve_prepared(prepared[0])
+
+        assert resolved is not None
+        assert resolved.phase == "published"
+        assert guard.snapshot("artifact.md") == resolved.after
+        guard.restore(resolved)
+        assert not (repo / "artifact.md").exists()
+    finally:
+        guard.close()
+
+
+def test_existing_restore_intent_is_durable_before_reverse_exchange(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    target = repo / "target.md"
+    target.write_bytes(b"before\n")
+    target.chmod(0o640)
+    guard = module._RepositoryTargetGuard.capture(repo, ("target.md",))
+    operation = _operation()
+    output = tmp_path / "output"
+    output.mkdir()
+    handle = module.record_planning_apply_operation(operation, output_dir=output)
+    module._mkdir_private_at(handle, "transaction")
+    module._write_private_no_replace_at(
+        handle,
+        "transaction/mutation-ledger.json",
+        module._canonical_json_bytes({
+            "operation_id": operation.operation_id,
+            "workspace_intent": None,
+            "entries": [],
+        }),
+    )
+    outer = guard.compare_replace(
+        "target.md",
+        expected=guard.snapshot("target.md"),
+        replacement=b"after\n",
+        mode=0o600,
+    )
+    assert outer is not None
+    mutations = [outer]
+    module._persist_target_mutations(handle, operation, mutations)
+    observed: dict[str, object] = {}
+    real_exchange = module._exchange_entries_at
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def phase_update(updated) -> None:
+        mutations[0] = updated
+        module._persist_target_mutations(handle, operation, mutations)
+
+    def crash_after_exchange(source_fd: int, first: str, destination_fd: int, second: str) -> None:
+        ledger = json.loads(
+            module._read_private_file_at(
+                handle,
+                "transaction/mutation-ledger.json",
+            )
+        )
+        observed.update(ledger["entries"][0])
+        observed["workspace_identity"] = (
+            os.fstat(source_fd).st_dev,
+            os.fstat(source_fd).st_ino,
+        )
+        staged = os.stat(first, dir_fd=source_fd, follow_symlinks=False)
+        observed["staged_identity"] = (staged.st_dev, staged.st_ino)
+        real_exchange(source_fd, first, destination_fd, second)
+        raise ProcessCrash
+
+    monkeypatch.setattr(module, "_exchange_entries_at", crash_after_exchange)
+    try:
+        with pytest.raises(ProcessCrash):
+            guard.restore(outer, phase_update=phase_update)
+
+        assert observed["phase"] == "rollback-prepared"
+        assert (observed["workspace_device"], observed["workspace_inode"]) == observed["workspace_identity"]
+        assert (observed["staged_device"], observed["staged_inode"]) == observed["staged_identity"]
+        assert (observed["after_device"], observed["after_inode"]) == (
+            outer.after_device,
+            outer.after_inode,
+        )
+        assert observed["after_sha256"] == outer.after.sha256
+        assert mutations[0].before == outer.before
+        assert mutations[0].after == outer.after
+        assert target.read_bytes() == b"before\n"
+        workspace = repo / mutations[0].workspace_name
+        assert (workspace / mutations[0].staged_name).read_bytes() == b"after\n"
+
+        monkeypatch.setattr(module, "_exchange_entries_at", real_exchange)
+        guard.restore(mutations[0], phase_update=phase_update)
+
+        assert target.read_bytes() == b"before\n"
+        assert stat.S_IMODE(target.stat().st_mode) == 0o640
+        assert not workspace.exists()
+    finally:
+        guard.close()
+        handle.close()
+
+
+def test_existing_restore_resume_workspace_slot_swap_preserves_unknown_and_displaced_after(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    target = repo / "target.md"
+    target.write_bytes(b"before\n")
+    guard = module._RepositoryTargetGuard.capture(repo, ("target.md",))
+    outer = guard.compare_replace(
+        "target.md",
+        expected=guard.snapshot("target.md"),
+        replacement=b"after\n",
+        mode=0o600,
+    )
+    assert outer is not None
+    recorded: list[Any] = []
+    real_exchange = module._exchange_entries_at
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def crash_after_exchange(source_fd: int, first: str, destination_fd: int, second: str) -> None:
+        real_exchange(source_fd, first, destination_fd, second)
+        raise ProcessCrash
+
+    monkeypatch.setattr(module, "_exchange_entries_at", crash_after_exchange)
+    try:
+        with pytest.raises(ProcessCrash):
+            guard.restore(outer, phase_update=lambda updated: recorded.append(updated))
+
+        assert len(recorded) == 1
+        rollback = recorded[0]
+        workspace = repo / rollback.workspace_name
+        displaced = workspace / "displaced-after"
+        staged = workspace / rollback.staged_name
+        staged.rename(displaced)
+        staged.write_bytes(b"unknown\n")
+
+        monkeypatch.setattr(module, "_exchange_entries_at", real_exchange)
+        with pytest.raises(module.PlanningApplyRestoreMismatch):
+            guard.restore(rollback)
+
+        assert target.read_bytes() == b"before\n"
+        assert staged.read_bytes() == b"unknown\n"
+        assert displaced.read_bytes() == b"after\n"
+        assert workspace.is_dir()
+    finally:
+        guard.close()
+
+
+def test_workspace_ownership_intent_is_durable_before_forward_mkdir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module, operation, _repo, relative, target, guard, handle = _workspace_intent_fixture(tmp_path)
+    mutations: list[Any] = []
+    observed: dict[str, Any] = {}
+    real_mkdir = module.os.mkdir
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def crash_before_mkdir(path, mode=0o777, *, dir_fd=None) -> None:
+        if isinstance(path, str) and path.startswith(".spec-dock-apply-"):
+            ledger = json.loads(
+                module._read_private_file_at(
+                    handle,
+                    "transaction/mutation-ledger.json",
+                )
+            )
+            observed.update(ledger)
+            observed["mkdir_name"] = path
+            raise ProcessCrash
+        real_mkdir(path, mode=mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(module.os, "mkdir", crash_before_mkdir)
+    try:
+        with pytest.raises(ProcessCrash):
+            module._apply_guarded_mutation(
+                guard,
+                handle,
+                operation,
+                mutations,
+                relative=relative,
+                expected=guard.snapshot(relative),
+                replacement=b"after\n",
+                mode=0o600,
+            )
+
+        intent = observed["workspace_intent"]
+        assert observed["entries"] == []
+        assert intent["path"] == relative
+        assert intent["purpose"] == "forward"
+        assert intent["workspace_name"] == observed["mkdir_name"]
+        assert intent["workspace_device"] is None
+        assert intent["workspace_inode"] is None
+        assert intent["staged_device"] is None
+        assert intent["staged_inode"] is None
+        assert not tuple(target.parent.glob(".spec-dock-apply-*"))
+
+        monkeypatch.setattr(module.os, "mkdir", real_mkdir)
+        module._recover_workspace_intent(guard, handle, operation, mutations)
+        ledger = json.loads(module._read_private_file_at(handle, "transaction/mutation-ledger.json"))
+        assert ledger["workspace_intent"] is None
+        assert target.read_bytes() == b"before\n"
+    finally:
+        guard.close()
+        handle.close()
+
+
+def test_existing_restore_workspace_intent_is_durable_before_reverse_mkdir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module, operation, _repo, relative, target, guard, handle = _workspace_intent_fixture(tmp_path)
+    outer = guard.compare_replace(
+        relative,
+        expected=guard.snapshot(relative),
+        replacement=b"after\n",
+        mode=0o600,
+    )
+    assert outer is not None
+    mutations = [outer]
+    module._persist_target_mutations(handle, operation, mutations)
+    observed: dict[str, Any] = {}
+    real_mkdir = module.os.mkdir
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def update_intent(intent) -> None:
+        module._persist_workspace_intent(handle, operation, mutations, intent)
+
+    def phase_update(updated) -> None:
+        mutations[0] = updated
+        module._persist_target_mutations(handle, operation, mutations)
+
+    def crash_before_mkdir(path, mode=0o777, *, dir_fd=None) -> None:
+        if isinstance(path, str) and path.startswith(".spec-dock-apply-"):
+            ledger = json.loads(
+                module._read_private_file_at(
+                    handle,
+                    "transaction/mutation-ledger.json",
+                )
+            )
+            observed.update(ledger)
+            observed["mkdir_name"] = path
+            raise ProcessCrash
+        real_mkdir(path, mode=mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(module.os, "mkdir", crash_before_mkdir)
+    try:
+        with pytest.raises(ProcessCrash):
+            guard.restore(
+                outer,
+                phase_update=phase_update,
+                workspace_intent_update=update_intent,
+            )
+
+        assert len(observed["entries"]) == 1
+        entry = observed["entries"][0]
+        assert entry["phase"] == "published"
+        assert (entry["after_device"], entry["after_inode"]) == (
+            outer.after_device,
+            outer.after_inode,
+        )
+        intent = observed["workspace_intent"]
+        assert intent["path"] == relative
+        assert intent["purpose"] == "rollback-existing"
+        assert intent["workspace_name"] == observed["mkdir_name"]
+        assert intent["workspace_device"] is None
+        assert intent["staged_device"] is None
+
+        monkeypatch.setattr(module.os, "mkdir", real_mkdir)
+        module._recover_workspace_intent(guard, handle, operation, mutations)
+        guard.restore(
+            outer,
+            phase_update=phase_update,
+            workspace_intent_update=update_intent,
+        )
+        assert target.read_bytes() == b"before\n"
+        assert stat.S_IMODE(target.stat().st_mode) == 0o640
+        assert not tuple(target.parent.glob(".spec-dock-apply-*"))
+    finally:
+        guard.close()
+        handle.close()
+
+
+@pytest.mark.parametrize(
+    "boundary",
+    [
+        "before_mkdir",
+        "after_mkdir_before_workspace_binding",
+        "after_workspace_and_staged_binding",
+    ],
+)
+def test_workspace_intent_recovery_classifies_creation_boundaries(
+    tmp_path: Path,
+    boundary: str,
+) -> None:
+    module, operation, _repo, relative, target, guard, handle = _workspace_intent_fixture(tmp_path)
+    name = ".spec-dock-apply-" + "1" * 32
+    workspace = target.parent / name
+    workspace_device = workspace_inode = staged_device = staged_inode = None
+    if boundary != "before_mkdir":
+        workspace.mkdir(mode=0o700)
+    if boundary == "after_workspace_and_staged_binding":
+        workspace_stat = workspace.stat()
+        workspace_device, workspace_inode = workspace_stat.st_dev, workspace_stat.st_ino
+        staged = workspace / "staged"
+        staged.write_bytes(b"partial")
+        staged_stat = staged.stat()
+        staged_device, staged_inode = staged_stat.st_dev, staged_stat.st_ino
+    intent = module._WorkspaceIntent(
+        relative=relative,
+        purpose="forward",
+        workspace_name=name,
+        workspace_device=workspace_device,
+        workspace_inode=workspace_inode,
+        staged_name="staged",
+        staged_device=staged_device,
+        staged_inode=staged_inode,
+    )
+    try:
+        module._persist_workspace_intent(handle, operation, [], intent)
+        module._recover_workspace_intent(guard, handle, operation, [])
+
+        ledger = json.loads(module._read_private_file_at(handle, "transaction/mutation-ledger.json"))
+        assert ledger["workspace_intent"] is None
+        assert ledger["entries"] == []
+        assert target.read_bytes() == b"before\n"
+        assert not workspace.exists()
+    finally:
+        guard.close()
+        handle.close()
+
+
+@pytest.mark.parametrize(
+    "ambiguity",
+    ["unbound_unknown", "bound_wrong_inode", "bound_extra"],
+)
+def test_workspace_intent_recovery_preserves_ambiguous_nonempty_workspace(
+    tmp_path: Path,
+    ambiguity: str,
+) -> None:
+    module, operation, _repo, relative, target, guard, handle = _workspace_intent_fixture(tmp_path)
+    name = ".spec-dock-apply-" + "2" * 32
+    workspace = target.parent / name
+    workspace.mkdir(mode=0o700)
+    workspace_stat = workspace.stat()
+    workspace_device = workspace_inode = staged_device = staged_inode = None
+    if ambiguity == "unbound_unknown":
+        (workspace / "unknown").write_bytes(b"sentinel")
+    else:
+        workspace_device, workspace_inode = workspace_stat.st_dev, workspace_stat.st_ino
+        staged = workspace / "staged"
+        staged.write_bytes(b"owned")
+        staged_stat = staged.stat()
+        staged_device, staged_inode = staged_stat.st_dev, staged_stat.st_ino
+        if ambiguity == "bound_wrong_inode":
+            staged.rename(workspace / "displaced")
+            staged.write_bytes(b"unknown")
+        else:
+            (workspace / "extra").write_bytes(b"sentinel")
+    intent = module._WorkspaceIntent(
+        relative=relative,
+        purpose="forward",
+        workspace_name=name,
+        workspace_device=workspace_device,
+        workspace_inode=workspace_inode,
+        staged_name="staged",
+        staged_device=staged_device,
+        staged_inode=staged_inode,
+    )
+    before = {path.name: path.read_bytes() for path in workspace.iterdir()}
+    try:
+        module._persist_workspace_intent(handle, operation, [], intent)
+        ledger_before = module._read_private_file_at(handle, "transaction/mutation-ledger.json")
+        with pytest.raises(module.PlanningApplyRestoreMismatch):
+            module._recover_workspace_intent(guard, handle, operation, [])
+
+        assert workspace.is_dir()
+        assert {path.name: path.read_bytes() for path in workspace.iterdir()} == before
+        assert module._read_private_file_at(handle, "transaction/mutation-ledger.json") == ledger_before
+        assert target.read_bytes() == b"before\n"
+    finally:
+        guard.close()
+        handle.close()
+
+
+def test_absent_restore_workspace_intent_is_durable_before_rollback_mkdir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module, operation, relative, target, guard, handle, outer, mutations = _absent_workspace_intent_fixture(tmp_path)
+    observed: dict[str, Any] = {}
+    real_mkdir = module.os.mkdir
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def update_intent(intent) -> None:
+        module._persist_workspace_intent(handle, operation, mutations, intent)
+
+    def phase_update(updated) -> None:
+        mutations[0] = updated
+        module._persist_target_mutations(handle, operation, mutations)
+
+    def crash_before_mkdir(path, mode=0o777, *, dir_fd=None) -> None:
+        if isinstance(path, str) and path.startswith(".spec-dock-apply-"):
+            observed.update(
+                json.loads(
+                    module._read_private_file_at(
+                        handle,
+                        "transaction/mutation-ledger.json",
+                    )
+                )
+            )
+            observed["mkdir_name"] = path
+            raise ProcessCrash
+        real_mkdir(path, mode=mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(module.os, "mkdir", crash_before_mkdir)
+    try:
+        with pytest.raises(ProcessCrash):
+            guard.restore(
+                outer,
+                phase_update=phase_update,
+                workspace_intent_update=update_intent,
+            )
+
+        assert len(observed["entries"]) == 1
+        assert observed["entries"][0]["phase"] == "published"
+        intent = observed["workspace_intent"]
+        assert intent["purpose"] == "rollback-absent"
+        assert intent["path"] == relative
+        assert intent["workspace_name"] == observed["mkdir_name"]
+        assert intent["staged_name"] == "quarantine"
+        assert intent["workspace_device"] is None
+        assert intent["workspace_inode"] is None
+        assert intent["staged_device"] is None
+        assert intent["staged_inode"] is None
+
+        monkeypatch.setattr(module.os, "mkdir", real_mkdir)
+        module._recover_workspace_intent(guard, handle, operation, mutations)
+        assert mutations == [outer]
+        assert target.read_bytes() == operation.human_decision_bytes
+        assert not tuple(target.parent.glob(".spec-dock-apply-*"))
+        guard.restore(
+            outer,
+            phase_update=phase_update,
+            workspace_intent_update=update_intent,
+        )
+        assert not target.exists()
+        assert not tuple(target.parent.glob(".spec-dock-apply-*"))
+    finally:
+        guard.close()
+        handle.close()
+
+
+@pytest.mark.parametrize(
+    "boundary",
+    [
+        "before_mkdir",
+        "after_mkdir_before_bind",
+        "after_workspace_bind",
+        "after_rollback_prepared_handoff",
+    ],
+)
+def test_absent_restore_workspace_intent_recovery_classifies_boundaries(
+    tmp_path: Path,
+    boundary: str,
+) -> None:
+    module, operation, relative, target, guard, handle, outer, mutations = _absent_workspace_intent_fixture(tmp_path)
+    name = ".spec-dock-apply-" + "3" * 32
+    workspace = target.parent / name
+    workspace_device = workspace_inode = staged_device = staged_inode = None
+    if boundary != "before_mkdir":
+        workspace.mkdir(mode=0o700)
+    if boundary in {"after_workspace_bind", "after_rollback_prepared_handoff"}:
+        opened = workspace.stat()
+        workspace_device, workspace_inode = opened.st_dev, opened.st_ino
+        staged_device, staged_inode = outer.after_device, outer.after_inode
+    intent = module._WorkspaceIntent(
+        relative=relative,
+        purpose="rollback-absent",
+        workspace_name=name,
+        workspace_device=workspace_device,
+        workspace_inode=workspace_inode,
+        staged_name="quarantine",
+        staged_device=staged_device,
+        staged_inode=staged_inode,
+    )
+    if boundary == "after_rollback_prepared_handoff":
+        mutations[0] = module.dataclass_replace(
+            outer,
+            phase="rollback-prepared",
+            workspace_name=name,
+            workspace_device=workspace_device,
+            workspace_inode=workspace_inode,
+            staged_name="quarantine",
+            staged_device=outer.after_device,
+            staged_inode=outer.after_inode,
+        )
+        module._persist_target_mutations(handle, operation, mutations)
+    try:
+        module._persist_workspace_intent(handle, operation, mutations, intent)
+        module._recover_workspace_intent(guard, handle, operation, mutations)
+
+        ledger = json.loads(module._read_private_file_at(handle, "transaction/mutation-ledger.json"))
+        assert ledger["workspace_intent"] is None
+        assert target.read_bytes() == operation.human_decision_bytes
+        if boundary == "after_rollback_prepared_handoff":
+            assert workspace.is_dir()
+            guard.restore(mutations[0])
+            assert not target.exists()
+            assert not workspace.exists()
+        else:
+            assert mutations == [outer]
+            assert not workspace.exists()
+    finally:
+        guard.close()
+        handle.close()
+
+
+@pytest.mark.parametrize(
+    "ambiguity",
+    [
+        "unbound_unknown",
+        "bound_quarantine",
+        "bound_extra",
+        "replaced_workspace",
+    ],
+)
+def test_absent_restore_workspace_intent_preserves_ambiguous_nonempty_workspace(
+    tmp_path: Path,
+    ambiguity: str,
+) -> None:
+    module, operation, relative, target, guard, handle, outer, mutations = _absent_workspace_intent_fixture(tmp_path)
+    name = ".spec-dock-apply-" + "4" * 32
+    workspace = target.parent / name
+    workspace.mkdir(mode=0o700)
+    opened = workspace.stat()
+    workspace_device = workspace_inode = staged_device = staged_inode = None
+    if ambiguity == "unbound_unknown":
+        (workspace / "unknown").write_bytes(b"sentinel")
+    else:
+        workspace_device, workspace_inode = opened.st_dev, opened.st_ino
+        staged_device, staged_inode = outer.after_device, outer.after_inode
+        if ambiguity == "bound_quarantine":
+            os.link(target, workspace / "quarantine")
+        elif ambiguity == "bound_extra":
+            (workspace / "extra").write_bytes(b"sentinel")
+        else:
+            workspace.rename(target.parent / "displaced-workspace")
+            workspace.mkdir(mode=0o700)
+            (workspace / "unknown").write_bytes(b"replacement")
+    intent = module._WorkspaceIntent(
+        relative=relative,
+        purpose="rollback-absent",
+        workspace_name=name,
+        workspace_device=workspace_device,
+        workspace_inode=workspace_inode,
+        staged_name="quarantine",
+        staged_device=staged_device,
+        staged_inode=staged_inode,
+    )
+    try:
+        module._persist_workspace_intent(handle, operation, mutations, intent)
+        assert module._load_workspace_intent(handle, operation) == intent
+        ledger_before = module._read_private_file_at(handle, "transaction/mutation-ledger.json")
+        target_before = target.read_bytes()
+        with pytest.raises(module.PlanningApplyRestoreMismatch):
+            module._recover_workspace_intent(guard, handle, operation, mutations)
+
+        assert target.read_bytes() == target_before
+        assert workspace.is_dir()
+        assert module._read_private_file_at(handle, "transaction/mutation-ledger.json") == ledger_before
+        assert mutations == [outer]
+    finally:
+        guard.close()
+        handle.close()
+
+
+def test_compare_replace_mismatch_exchanges_back_and_preserves_current_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    target = repo / "target.md"
+    target.write_bytes(b"before\n")
+    expected = module.snapshot_regular_file(target)
+    guard = module._RepositoryTargetGuard.capture(repo, ("target.md",))
+    real_exchange = module._exchange_entries_at
+    injected = [False]
+
+    def exchange(source_fd: int, first: str, destination_fd: int, second: str) -> None:
+        if not injected[0]:
+            injected[0] = True
+            target.write_bytes(b"concurrent\n")
+        real_exchange(source_fd, first, destination_fd, second)
+
+    monkeypatch.setattr(module, "_exchange_entries_at", exchange)
+    try:
+        with pytest.raises(module._ApplyTargetDrift):
+            guard.compare_replace(
+                "target.md",
+                expected=expected,
+                replacement=b"replacement\n",
+                mode=0o644,
+            )
+    finally:
+        guard.close()
+
+    assert target.read_bytes() == b"concurrent\n"
+    assert not any(path.name.startswith(".target.md.") for path in repo.iterdir())
+
+
+@pytest.mark.parametrize(
+    "editor_bytes",
+    [b"editor replacement\n", b"before\n"],
+    ids=["byte-different", "byte-identical-distinct-inode"],
+)
+def test_compare_replace_atomic_editor_swap_after_open_restores_actual_attachment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    editor_bytes: bytes,
+) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    target = repo / "target.md"
+    target.write_bytes(b"before\n")
+    expected = module.snapshot_regular_file(target)
+    opened_inode = target.stat().st_ino
+    guard = module._RepositoryTargetGuard.capture(repo, ("target.md",))
+    real_exchange = module._exchange_entries_at
+    exchange_count = [0]
+    editor_identity: list[tuple[int, int]] = []
+    prepared: list[Any] = []
+    discarded: list[Any] = []
+
+    def exchange(source_fd: int, first: str, destination_fd: int, second: str) -> None:
+        exchange_count[0] += 1
+        if exchange_count[0] == 1:
+            editor = repo / "editor.tmp"
+            editor.write_bytes(editor_bytes)
+            editor.replace(target)
+            observed = target.stat()
+            editor_identity.append((observed.st_dev, observed.st_ino))
+            assert observed.st_ino != opened_inode
+        real_exchange(source_fd, first, destination_fd, second)
+
+    monkeypatch.setattr(module, "_exchange_entries_at", exchange)
+    try:
+        with pytest.raises(module._ApplyTargetDrift):
+            guard.compare_replace(
+                "target.md",
+                expected=expected,
+                replacement=b"transaction replacement\n",
+                mode=0o644,
+                prepare=prepared.append,
+                discard=discarded.append,
+            )
+    finally:
+        guard.close()
+
+    observed = target.stat()
+    assert exchange_count == [2]
+    assert (observed.st_dev, observed.st_ino) == editor_identity[0]
+    assert target.read_bytes() == editor_bytes
+    assert discarded == prepared
+    assert len(discarded) == 1
+    assert not tuple(repo.glob(".spec-dock-apply-*"))
+
+
+def test_compare_replace_staged_name_swap_before_exchange_preserves_unknown_and_preimage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    target = repo / "target.md"
+    target.write_bytes(b"preimage\n")
+    expected = module.snapshot_regular_file(target)
+    guard = module._RepositoryTargetGuard.capture(repo, ("target.md",))
+    real_exchange = module._exchange_entries_at
+    unknown = b"unknown staged replacement\n"
+    owned_names: list[str] = []
+
+    def exchange(*args) -> None:
+        source_fd, source_name = args[:2]
+        owned_name = f"{source_name}.owned"
+        owned_names.append(owned_name)
+        module.os.rename(
+            source_name,
+            owned_name,
+            src_dir_fd=source_fd,
+            dst_dir_fd=source_fd,
+        )
+        descriptor = module.os.open(
+            source_name,
+            module.os.O_WRONLY | module.os.O_CREAT | module.os.O_EXCL,
+            0o600,
+            dir_fd=source_fd,
+        )
+        try:
+            module.os.write(descriptor, unknown)
+        finally:
+            module.os.close(descriptor)
+        real_exchange(*args)
+
+    monkeypatch.setattr(module, "_exchange_entries_at", exchange)
+    try:
+        with pytest.raises(module.PlanningApplyRestoreMismatch):
+            guard.compare_replace(
+                "target.md",
+                expected=expected,
+                replacement=b"replacement\n",
+                mode=0o644,
+            )
+    finally:
+        guard.close()
+
+    available = [path.read_bytes() for path in repo.rglob("*") if path.is_file()]
+    assert b"preimage\n" in available
+    assert unknown in available
+    assert b"replacement\n" in available
+    assert owned_names
+
+
+def test_reverse_compare_replace_does_not_overwrite_unknown_postmutation_bytes(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    target = repo / "target.md"
+    target.write_bytes(b"before\n")
+    guard = module._RepositoryTargetGuard.capture(repo, ("target.md",))
+    try:
+        mutation = guard.compare_replace(
+            "target.md",
+            expected=module.snapshot_regular_file(target),
+            replacement=b"replacement\n",
+            mode=0o644,
+        )
+        assert mutation is not None
+        unknown = repo / "unknown"
+        unknown.write_bytes(b"unknown\n")
+        unknown.replace(target)
+
+        with pytest.raises(
+            module.PlanningApplyRestoreMismatch,
+            match="transaction-owned target changed",
+        ):
+            guard.restore(mutation)
+    finally:
+        guard.close()
+
+    assert target.read_bytes() == b"unknown\n"
+
+
+def test_target_restore_accepts_exact_already_restored_preimage(tmp_path: Path) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    target = repo / "target.md"
+    target.write_bytes(b"before\n")
+    target.chmod(0o640)
+    guard = module._RepositoryTargetGuard.capture(repo, ("target.md",))
+    try:
+        mutation = guard.compare_replace(
+            "target.md",
+            expected=module.snapshot_regular_file(target),
+            replacement=b"replacement\n",
+            mode=0o644,
+        )
+        assert mutation is not None
+        guard.restore(mutation)
+        guard.restore(mutation)
+    finally:
+        guard.close()
+
+    assert target.read_bytes() == b"before\n"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o640
+
+
+def test_target_restore_accepts_exact_already_restored_absence(tmp_path: Path) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    target = repo / "target.md"
+    guard = module._RepositoryTargetGuard.capture(repo, ("target.md",))
+    try:
+        mutation = guard.compare_replace(
+            "target.md",
+            expected=module.snapshot_regular_file(target),
+            replacement=b"replacement\n",
+            mode=0o644,
+        )
+        assert mutation is not None
+        guard.restore(mutation)
+        guard.restore(mutation)
+    finally:
+        guard.close()
+
+    assert not target.exists()
+
+
+def test_absent_restore_post_verification_swap_preserves_unknown_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    target = repo / "target.md"
+    guard = module._RepositoryTargetGuard.capture(repo, ("target.md",))
+    try:
+        mutation = guard.compare_replace(
+            "target.md",
+            expected=module.snapshot_regular_file(target),
+            replacement=b"transaction-owned\n",
+            mode=0o644,
+        )
+        assert mutation is not None
+        real_snapshot = guard.snapshot
+        swapped = [False]
+        unknown = b"unknown concurrent bytes\n"
+
+        def snapshot(relative: str):
+            observed = real_snapshot(relative)
+            if relative == "target.md" and observed == mutation.after and not swapped[0]:
+                swapped[0] = True
+                target.rename(repo / "transaction-owned-aside")
+                target.write_bytes(unknown)
+            return observed
+
+        monkeypatch.setattr(guard, "snapshot", snapshot)
+        with pytest.raises(module.PlanningApplyRestoreMismatch):
+            guard.restore(mutation)
+    finally:
+        guard.close()
+
+    assert target.read_bytes() == b"unknown concurrent bytes\n"
+    assert (repo / "transaction-owned-aside").read_bytes() == b"transaction-owned\n"
+
+
+def test_absent_restore_missing_native_primitive_preserves_owned_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    target = repo / "target.md"
+    guard = module._RepositoryTargetGuard.capture(repo, ("target.md",))
+    try:
+        mutation = guard.compare_replace(
+            "target.md",
+            expected=module.snapshot_regular_file(target),
+            replacement=b"transaction-owned\n",
+            mode=0o644,
+        )
+        assert mutation is not None
+
+        def unavailable(*_args) -> None:
+            raise NotImplementedError("native primitive unavailable")
+
+        monkeypatch.setattr(
+            module,
+            "_rename_no_replace_at",
+            unavailable,
+        )
+
+        with pytest.raises(NotImplementedError, match="native primitive unavailable"):
+            guard.restore(mutation)
+    finally:
+        guard.close()
+
+    assert target.read_bytes() == b"transaction-owned\n"
 
 
 def test_git_index_snapshot_uses_raw_bytes(tmp_path: Path) -> None:

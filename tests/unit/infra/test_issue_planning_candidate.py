@@ -217,6 +217,331 @@ def test_fd_publication_backends_pass_verified_descriptor_to_os_primitive(
     assert calls == [expected_call]
 
 
+def test_candidate_publication_entry_binding_covers_linux_link(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra = _infra()
+    output = tmp_path / "output"
+    output.mkdir()
+    output_descriptor = os.open(output, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    staged_descriptor = os.open(
+        "staged.zip",
+        os.O_RDWR | os.O_CREAT | os.O_EXCL,
+        0o600,
+        dir_fd=output_descriptor,
+    )
+    staged_bytes = b"linux staged bytes"
+    os.write(staged_descriptor, staged_bytes)
+    published_aside = output / "published-aside.zip"
+    published_inode = [-1]
+    replacement_inode = [-1]
+
+    def link_staged(
+        source_descriptor: int,
+        destination_descriptor: int,
+        destination_name: str,
+    ) -> None:
+        assert source_descriptor == staged_descriptor
+        os.link(
+            "staged.zip",
+            destination_name,
+            src_dir_fd=destination_descriptor,
+            dst_dir_fd=destination_descriptor,
+            follow_symlinks=False,
+        )
+        published_inode[0] = os.stat(
+            destination_name,
+            dir_fd=destination_descriptor,
+            follow_symlinks=False,
+        ).st_ino
+        os.rename(
+            destination_name,
+            published_aside.name,
+            src_dir_fd=destination_descriptor,
+            dst_dir_fd=destination_descriptor,
+        )
+        replacement_descriptor = os.open(
+            destination_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+            dir_fd=destination_descriptor,
+        )
+        try:
+            os.write(replacement_descriptor, staged_bytes)
+            os.fsync(replacement_descriptor)
+            replacement_inode[0] = os.fstat(replacement_descriptor).st_ino
+        finally:
+            os.close(replacement_descriptor)
+
+    monkeypatch.setattr(infra.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(infra, "_link_exclusive_linux_at", link_staged)
+    published_entry = None
+    try:
+        staged_identity = os.fstat(staged_descriptor)
+        published_entry = infra._publish_verified_fd_no_replace_at(
+            staged_descriptor,
+            output_descriptor,
+            "candidate.zip",
+        )
+        final_identity = os.stat(
+            "candidate.zip",
+            dir_fd=output_descriptor,
+            follow_symlinks=False,
+        )
+
+        assert published_entry.name == "candidate.zip"
+        assert (published_entry.device, published_entry.inode) == (
+            staged_identity.st_dev,
+            staged_identity.st_ino,
+        )
+        assert published_aside.stat().st_ino == published_inode[0]
+        assert published_entry.inode == published_inode[0]
+        assert final_identity.st_ino == replacement_inode[0]
+        assert (final_identity.st_dev, final_identity.st_ino) != (
+            published_entry.device,
+            published_entry.inode,
+        )
+        assert final_identity.st_ino != published_inode[0]
+        assert (output / "candidate.zip").read_bytes() == staged_bytes
+        assert published_aside.read_bytes() == staged_bytes
+    finally:
+        if published_entry is not None:
+            os.close(published_entry.descriptor)
+        os.close(staged_descriptor)
+        os.close(output_descriptor)
+
+
+def test_candidate_publication_entry_binding_covers_darwin_clone(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra = _infra()
+    output = tmp_path / "output"
+    output.mkdir()
+    output_descriptor = os.open(output, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    staged_descriptor = os.open(
+        "staged.zip",
+        os.O_RDWR | os.O_CREAT | os.O_EXCL,
+        0o600,
+        dir_fd=output_descriptor,
+    )
+    staged_bytes = b"darwin staged bytes"
+    os.write(staged_descriptor, staged_bytes)
+    published_aside = output / "published-aside.zip"
+    published_inode = [-1]
+    replacement_inode = [-1]
+
+    def clone_to_distinct_inode(
+        source_descriptor: int,
+        destination_descriptor: int,
+        destination_name: str,
+    ) -> None:
+        os.lseek(source_descriptor, 0, os.SEEK_SET)
+        cloned_descriptor = os.open(
+            destination_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+            dir_fd=destination_descriptor,
+        )
+        try:
+            os.write(cloned_descriptor, os.read(source_descriptor, len(staged_bytes)))
+            os.fsync(cloned_descriptor)
+        finally:
+            os.close(cloned_descriptor)
+
+    def rename_capture_no_replace(
+        source_descriptor: int,
+        source_name: str,
+        destination_descriptor: int,
+        destination_name: str,
+    ) -> None:
+        with pytest.raises(FileNotFoundError):
+            os.stat(
+                destination_name,
+                dir_fd=destination_descriptor,
+                follow_symlinks=False,
+            )
+        os.rename(
+            source_name,
+            destination_name,
+            src_dir_fd=source_descriptor,
+            dst_dir_fd=destination_descriptor,
+        )
+        published_inode[0] = os.stat(
+            destination_name,
+            dir_fd=destination_descriptor,
+            follow_symlinks=False,
+        ).st_ino
+        os.rename(
+            destination_name,
+            published_aside.name,
+            src_dir_fd=destination_descriptor,
+            dst_dir_fd=destination_descriptor,
+        )
+        replacement_descriptor = os.open(
+            destination_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+            dir_fd=destination_descriptor,
+        )
+        try:
+            os.write(replacement_descriptor, staged_bytes)
+            os.fsync(replacement_descriptor)
+            replacement_inode[0] = os.fstat(replacement_descriptor).st_ino
+        finally:
+            os.close(replacement_descriptor)
+
+    monkeypatch.setattr(infra.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(infra, "_clone_exclusive_darwin_at", clone_to_distinct_inode)
+    monkeypatch.setattr(infra, "_rename_exclusive_darwin_at", rename_capture_no_replace)
+    published_entry = None
+    try:
+        staged_identity = os.fstat(staged_descriptor)
+        published_entry = infra._publish_verified_fd_no_replace_at(
+            staged_descriptor,
+            output_descriptor,
+            "candidate.zip",
+        )
+        final_identity = os.stat(
+            "candidate.zip",
+            dir_fd=output_descriptor,
+            follow_symlinks=False,
+        )
+
+        assert published_entry.name == "candidate.zip"
+        assert (published_entry.device, published_entry.inode) != (
+            staged_identity.st_dev,
+            staged_identity.st_ino,
+        )
+        assert published_aside.stat().st_ino == published_inode[0]
+        assert published_entry.inode == published_inode[0]
+        assert final_identity.st_ino == replacement_inode[0]
+        assert (final_identity.st_dev, final_identity.st_ino) != (
+            published_entry.device,
+            published_entry.inode,
+        )
+        assert final_identity.st_ino != published_inode[0]
+        assert (output / "candidate.zip").read_bytes() == staged_bytes
+        assert published_aside.read_bytes() == staged_bytes
+    finally:
+        if published_entry is not None:
+            os.close(published_entry.descriptor)
+        os.close(staged_descriptor)
+        os.close(output_descriptor)
+
+
+@pytest.mark.parametrize(
+    ("backend_name", "symbol_name", "expected_call"),
+    [
+        (
+            "_rename_exclusive_linux_at",
+            "renameat2",
+            (11, b"source.zip", 22, b"destination.zip", 0x00000001),
+        ),
+        (
+            "_rename_exclusive_darwin_at",
+            "renameatx_np",
+            (11, b"source.zip", 22, b"destination.zip", 0x00000004),
+        ),
+    ],
+)
+def test_candidate_cleanup_no_replace_backend_arguments(
+    monkeypatch: pytest.MonkeyPatch,
+    backend_name: str,
+    symbol_name: str,
+    expected_call: tuple[object, ...],
+) -> None:
+    infra = _infra()
+    calls: list[tuple[object, ...]] = []
+
+    class FakeFunction:
+        argtypes = None
+        restype = None
+
+        def __call__(self, *args):
+            calls.append(args)
+            return 0
+
+    class FakeLibrary:
+        pass
+
+    library = FakeLibrary()
+    setattr(library, symbol_name, FakeFunction())
+    monkeypatch.setattr(infra.ctypes, "CDLL", lambda *_args, **_kwargs: library)
+
+    getattr(infra, backend_name)(11, "source.zip", 22, "destination.zip")
+
+    assert calls == [expected_call]
+
+
+@pytest.mark.parametrize(
+    ("backend_name", "symbol_name"),
+    [
+        ("_rename_exclusive_linux_at", "renameat2"),
+        ("_rename_exclusive_darwin_at", "renameatx_np"),
+    ],
+)
+def test_candidate_cleanup_no_replace_backend_missing_symbol_is_unsupported(
+    monkeypatch: pytest.MonkeyPatch,
+    backend_name: str,
+    symbol_name: str,
+) -> None:
+    infra = _infra()
+
+    class FakeLibrary:
+        pass
+
+    monkeypatch.setattr(infra.ctypes, "CDLL", lambda *_args, **_kwargs: FakeLibrary())
+
+    with pytest.raises(NotImplementedError, match=f"{symbol_name} is unavailable"):
+        getattr(infra, backend_name)(11, "source.zip", 22, "destination.zip")
+
+
+@pytest.mark.parametrize(
+    ("backend_name", "symbol_name"),
+    [
+        ("_rename_exclusive_linux_at", "renameat2"),
+        ("_rename_exclusive_darwin_at", "renameatx_np"),
+    ],
+)
+@pytest.mark.parametrize(
+    ("error_number", "expected_error"),
+    [
+        (errno.EEXIST, FileExistsError),
+        (errno.EPERM, OSError),
+    ],
+)
+def test_candidate_cleanup_no_replace_backend_maps_native_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    backend_name: str,
+    symbol_name: str,
+    error_number: int,
+    expected_error: type[OSError],
+) -> None:
+    infra = _infra()
+
+    class FakeFunction:
+        argtypes = None
+        restype = None
+
+        def __call__(self, *_args):
+            return -1
+
+    class FakeLibrary:
+        pass
+
+    library = FakeLibrary()
+    setattr(library, symbol_name, FakeFunction())
+    monkeypatch.setattr(infra.ctypes, "CDLL", lambda *_args, **_kwargs: library)
+    monkeypatch.setattr(infra.ctypes, "get_errno", lambda: error_number)
+
+    with pytest.raises(expected_error) as raised:
+        getattr(infra, backend_name)(11, "source.zip", 22, "destination.zip")
+
+    assert raised.value.errno == error_number
+
+
 @pytest.mark.skipif(sys.platform != "linux", reason="Linux linkat contract")
 def test_linux_proc_fd_publication_is_real_unprivileged_descriptor_bound_and_no_replace(
     tmp_path: Path,
@@ -365,9 +690,11 @@ def test_candidate_publish_rejects_pre_capture_path_replacement_before_any_write
     assert list(redirected_output.iterdir()) == []
 
 
-def test_candidate_publish_remains_bound_after_captured_path_is_replaced(
+@pytest.mark.parametrize("replacement_kind", ["symlink", "directory"])
+def test_candidate_publish_rejects_detached_public_path_and_removes_published_entry(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    replacement_kind: str,
 ) -> None:
     infra, repo, output, guard, material = _publish_setup(tmp_path)
     original_output = tmp_path / "original-output"
@@ -381,7 +708,10 @@ def test_candidate_publish_remains_bound_after_captured_path_is_replaced(
             return
         replaced[0] = True
         output.rename(original_output)
-        output.symlink_to(redirected_output, target_is_directory=True)
+        if replacement_kind == "symlink":
+            output.symlink_to(redirected_output, target_is_directory=True)
+        else:
+            output.mkdir()
 
     def open_after_capture(path, flags, *args, **kwargs):
         if (
@@ -395,17 +725,199 @@ def test_candidate_publish_remains_bound_after_captured_path_is_replaced(
 
     monkeypatch.setattr(infra.os, "open", open_after_capture)
 
-    published = infra.build_and_publish_candidate(
-        output_guard=guard,
-        repo_root=repo,
-        material=material,
-    )
+    with pytest.raises(infra.CandidateOutputRejected):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+        )
 
     assert replaced == [True]
-    assert (original_output / material.logical_filename).read_bytes()
+    assert list(original_output.iterdir()) == []
     assert list(redirected_output.iterdir()) == []
-    assert not any(path.name.startswith(".spec-dock-issue-candidate-") for path in original_output.iterdir())
-    assert published.identity.logical_filename == material.logical_filename
+    if replacement_kind == "directory":
+        assert list(output.iterdir()) == []
+
+
+def test_candidate_rejection_cleanup_post_match_swap_preserves_unknown_final(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    final_path = output / material.logical_filename
+    displaced_path = output / "displaced-owned-candidate.zip"
+    unknown_bytes = b"unknown racing final bytes"
+    original_matches = infra._owned_entry_matches
+    swapped = [False]
+
+    def reject_attachment(*_args, **_kwargs) -> None:
+        raise infra.CandidateOutputRejected("forced attachment rejection")
+
+    def match_then_swap(parent_descriptor, entry, *, expected_kind):
+        matched = original_matches(
+            parent_descriptor,
+            entry,
+            expected_kind=expected_kind,
+        )
+        if matched and entry.name == material.logical_filename and not swapped[0]:
+            swapped[0] = True
+            os.rename(
+                material.logical_filename,
+                displaced_path.name,
+                src_dir_fd=parent_descriptor,
+                dst_dir_fd=parent_descriptor,
+            )
+            unknown_descriptor = os.open(
+                material.logical_filename,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+                dir_fd=parent_descriptor,
+            )
+            try:
+                os.write(unknown_descriptor, unknown_bytes)
+                os.fsync(unknown_descriptor)
+            finally:
+                os.close(unknown_descriptor)
+        return matched
+
+    monkeypatch.setattr(infra, "_verify_published_candidate_attachment", reject_attachment)
+    monkeypatch.setattr(infra, "_owned_entry_matches", match_then_swap)
+
+    with pytest.raises(infra.CandidateOutputRejected):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+        )
+
+    assert swapped == [True]
+    assert final_path.read_bytes() == unknown_bytes
+    assert displaced_path.read_bytes() != unknown_bytes
+
+
+def test_candidate_post_publication_pre_capture_same_bytes_replacement_is_preserved(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    final_path = output / material.logical_filename
+    published_aside = output / "published-aside.zip"
+    original_publish = infra._publish_verified_fd_no_replace_at
+    replacement_inode = [-1]
+    published_inode = [-1]
+
+    def publish_then_replace(staged_descriptor, destination_descriptor, destination_name):
+        published_entry = original_publish(
+            staged_descriptor,
+            destination_descriptor,
+            destination_name,
+        )
+        published_bytes = final_path.read_bytes()
+        published_inode[0] = final_path.stat().st_ino
+        os.rename(
+            destination_name,
+            published_aside.name,
+            src_dir_fd=destination_descriptor,
+            dst_dir_fd=destination_descriptor,
+        )
+        replacement_descriptor = os.open(
+            destination_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+            dir_fd=destination_descriptor,
+        )
+        try:
+            os.write(replacement_descriptor, published_bytes)
+            os.fsync(replacement_descriptor)
+            replacement_inode[0] = os.fstat(replacement_descriptor).st_ino
+        finally:
+            os.close(replacement_descriptor)
+        return published_entry
+
+    def reject_attachment(*_args, **_kwargs) -> None:
+        raise infra.CandidateOutputRejected("forced attachment rejection")
+
+    monkeypatch.setattr(infra, "_publish_verified_fd_no_replace_at", publish_then_replace)
+    monkeypatch.setattr(infra, "_verify_published_candidate_attachment", reject_attachment)
+
+    with pytest.raises(infra.CandidateOutputRejected):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+        )
+
+    assert published_inode[0] != replacement_inode[0]
+    assert final_path.read_bytes() == published_aside.read_bytes()
+    assert final_path.stat().st_ino == replacement_inode[0]
+    assert published_aside.stat().st_ino == published_inode[0]
+    assert not any(path.name.startswith(".spec-dock-issue-candidate-cleanup-") for path in output.iterdir())
+
+
+def test_candidate_cleanup_missing_native_primitive_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    final_path = output / material.logical_filename
+    displaced_path = output / "displaced-owned-candidate.zip"
+    unknown_bytes = b"unknown bytes retained without native rename"
+    original_matches = infra._owned_entry_matches
+    original_rename = os.rename
+    swapped = [False]
+
+    def reject_attachment(*_args, **_kwargs) -> None:
+        raise infra.CandidateOutputRejected("forced attachment rejection")
+
+    def match_then_swap(parent_descriptor, entry, *, expected_kind):
+        matched = original_matches(
+            parent_descriptor,
+            entry,
+            expected_kind=expected_kind,
+        )
+        if matched and entry.name == material.logical_filename and not swapped[0]:
+            swapped[0] = True
+            original_rename(
+                material.logical_filename,
+                displaced_path.name,
+                src_dir_fd=parent_descriptor,
+                dst_dir_fd=parent_descriptor,
+            )
+            unknown_descriptor = os.open(
+                material.logical_filename,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+                dir_fd=parent_descriptor,
+            )
+            try:
+                os.write(unknown_descriptor, unknown_bytes)
+                os.fsync(unknown_descriptor)
+            finally:
+                os.close(unknown_descriptor)
+        return matched
+
+    def unavailable_native_rename(*_args, **_kwargs) -> None:
+        raise NotImplementedError("native no-replace rename unavailable")
+
+    monkeypatch.setattr(infra, "_verify_published_candidate_attachment", reject_attachment)
+    monkeypatch.setattr(infra, "_owned_entry_matches", match_then_swap)
+    monkeypatch.setattr(infra, "_rename_exclusive_at", unavailable_native_rename)
+    monkeypatch.setattr(
+        infra.os,
+        "rename",
+        lambda *_args, **_kwargs: pytest.fail("rename fallback must not be used"),
+    )
+
+    with pytest.raises(infra.CandidateOutputRejected):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+        )
+
+    assert swapped == [True]
+    assert final_path.read_bytes() == unknown_bytes
+    assert displaced_path.read_bytes() != unknown_bytes
 
 
 def test_candidate_publish_collision_preserves_existing_entry_and_cleans_private_stage(
