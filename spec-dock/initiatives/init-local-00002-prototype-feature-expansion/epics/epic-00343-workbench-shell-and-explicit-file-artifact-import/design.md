@@ -136,7 +136,7 @@ node_id: null for root; full/normalized id for node
 2. 新規`publish_explicit_file(ExplicitFileArtifactPublishRequest)`:
    - generic explicit-file guardを通し、同じstaging / verification coreを使う。
    - mutableなtemp pathnameをsourceにせず、verified open `temp_fd`とsecurely opened `destination_parent_fd`をpublication primitiveへ渡す。
-   - Linuxは保持中の`temp_fd`を指すcurrent-processの`/proc/self/fd/<temp_fd>`をsourceに、`linkat(..., destination_parent_fd, name, AT_SYMLINK_FOLLOW)`でno-replace hard linkする。`/proc/self/fd`は任意pathnameの再解決ではなく、closeされていないverified FDのkernel-owned handleとしてだけ使う。macOSは`fclonefileat(temp_fd, destination_parent_fd, name, 0)`を使う。いずれもverified FD identityとopened destination directoryへ拘束され、formal nameが既存なら置換しない。
+   - Linuxはdestination filesystem上で`O_TMPFILE`によりlinkable anonymous staging inodeを作り、保持中の`temp_fd`を指すcurrent-processの`/proc/self/fd/<temp_fd>`をsourceに、`linkat(..., destination_parent_fd, name, AT_SYMLINK_FOLLOW)`でno-replace hard linkする。formal nameへのlinkを許すため`O_EXCL`を伴わないanonymous inodeを使う。`/proc/self/fd`は任意pathnameの再解決ではなく、closeされていないverified FDのkernel-owned handleとしてだけ使う。Linuxではvisible named stagingを作らず、pre-commit abort/failureはFD closeだけで完了する。macOSは`fclonefileat(temp_fd, destination_parent_fd, name, 0)`を使う。いずれもverified FD identityとopened destination directoryへ拘束され、formal nameが既存なら置換しない。
    - publication直前にvisible destination parentのdevice/inodeをopened FDと照合する。照合後、FD-bound no-replace primitiveが成功した時点を単一のcommit pointとする。
    - FD-bound no-replace primitiveを提供できないplatformではformal destination作成前に`publication_unsupported`でfail closedにする。
 
@@ -158,13 +158,13 @@ Publication capability matrix:
 
 | Environment | Supported capability | Probe / outcome |
 |---|---|---|
-| Linux | mounted `/proc`がcurrent-process FD linkを公開し、通常権限callerがdestination directory内のnamed owned temp FDから同directoryへ`linkat(..., AT_SYMLINK_FOLLOW)` hard linkとdirectory `fsync`を実行できる | import前にdestination directory内のowned tempでcapability probeする。未対応またはpolicy拒否は`publication_unsupported`でformal destination作成前にfail closed。`CAP_DAC_READ_SEARCH`を要求しない通常権限testを必須にする |
-| macOS | destination directory内のnamed owned tempとformal destinationが同じclone-capable filesystemにあり、`fclonefileat` no-replace cloneとdirectory `fsync`を許可する | import前にdestination directory内のowned tempでcapability probeする。clone非対応volumeまたはpolicy拒否は`publication_unsupported`でformal destination作成前にfail closed |
+| Linux | destination filesystemが通常権限でlinkable `O_TMPFILE` anonymous inodeを作成でき、mounted `/proc`がcurrent-process FD referenceを公開し、directory durability primitiveを実行できる | preflightはvisible probe pathnameを一切作らず、anonymous FDのregularity、`/proc/self/fd/<fd>` reference availability、directory durabilityだけをnon-mutatingに確認する。anonymous FDをprobe nameへlinkして削除しない。`linkat(..., AT_SYMLINK_FOLLOW)`固有のcapability / policyはpreflightで判定せず、formal candidateへの最初のcommit syscallで確認する。`EEXIST`はexisting destination collisionとしてallocation retry、formal entry未作成のcapability / policy failureは個別errnoを公開せず`publication_unsupported`、`not_committed`、`safe_after_remediation`へ正規化する。`CAP_DAC_READ_SEARCH`を要求しない通常権限testを必須にする。supported Linux filesystem laneは縮小され、named-temp / visible-probe / pathname-cleanup fallbackはしない |
+| macOS | destination directory内のnamed owned tempとformal destinationが同じclone-capable filesystemにあり、`fclonefileat` no-replace cloneとdirectory `fsync`を許可する | import前にdestination directory内のowned tempでcapability probeする。cleanupはhigh-entropy name、held FD、final FD/path identity check、uncertainty時retainを必須とする。最終check後から`unlink`までの意図的same-UID replacementだけはaccepted ADR `20260730t085831z-adr`の限定保証対象外。clone非対応volumeまたはpolicy拒否は`publication_unsupported`でformal destination作成前にfail closed |
 | その他 | leaf no-follow、FD identity、FD-bound no-replace commit、directory durabilityの同等primitiveをproviderが明示実装した場合だけsupported | primitive未実装時は`source_guard_unsupported`または`publication_unsupported` |
 
 original sourceはrepository外volumeを含む任意のreadable filesystemに置ける。bytesはdestination directory内のowned staged tempへstream copyするため、publication primitiveのsame-filesystem制約は**staged tempとformal destinationの間だけ**に適用し、original sourceとdestinationがcross-filesystemでもsuccess laneである。
 
-capability probeはcontent-free errorへ正規化し、probe entryをowned temp namespace外へ残さない。candidate wheelのinstalled-consumer testは通常権限Linuxのsupported filesystemとmacOSのclone-capable filesystemをsuccess laneとし、少なくとも一つのunsupported fixtureでfail-closed laneを確認する。OS名だけで成功を保証せず、上表のcapabilityを満たすenvironmentを本Epicのsupported environmentとする。
+Linux preflightはcontent-free errorへ正規化し、visible probe entryを作成しない。anonymous FDをformal candidate以外のpathnameへlinkしない。candidate wheelのinstalled-consumer testは通常権限Linuxのsupported filesystemとmacOSのclone-capable filesystemをsuccess laneとし、少なくとも一つのunsupported fixtureでfail-closed laneを確認する。OS名だけで成功を保証せず、上表のcapabilityを満たすenvironmentを本Epicのsupported environmentとする。
 
 ### D-006 Generic filename family and shared slot ledger
 
@@ -247,8 +247,13 @@ Threat modelは、shared create lockに従うSpecDock process間のcollision、i
 - 最終source再読とidentity検証が完了した後からFD-bound commit syscallまでの間に、別processが同じsource inodeへin-place writeすること。
 - last visible-parent identity checkとFD-bound commit syscallの間に、別processがrepository directory自体をrename / replaceすること。
 - commit後にrepository write権限を持つactorがArtifactを変更すること。
+- macOS named staging cleanupの最終FD/path identity check後から`unlink` syscallまでに、同一UIDでdestination directoryを変更でき、internal staging nameを発見・監視するactorがそのpathnameを意図的に別entryへ置換すること。
 
 この境界でもcommand自身はsourceを変更せず、staged bytesのhash / countとformal destinationのbytesは一致する。E-RQ-013の「検知したsource変更はsuccess公開しない」は最終source再読/identity検証までを検出境界とし、T3は境界の直前と直後を別fixtureで固定する。この除外はdestination file collisionまたはSpecDock同士のconcurrencyを除外しない。
+
+Linuxはanonymous stagingを使うため、named-temp cleanupのsame-UID waiverを持たない。`O_TMPFILE`またはheld-FD publication capabilityが不足するenvironmentでは、visible staging pathnameを作らずformal destination前にfail closedする。根拠、必須mitigation、rollback / revisit条件はaccepted ADR `20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md`を正本とする。
+
+macOS cleanupの除外は包括的same-UID waiverではない。偶発collision、final checkまでに観測可能なreplacement、formal destination no-replace、source bytes / non-mutation / privacy、destination parent identity、mismatchまたはuncertainty時にunlinkせずretainする義務は対象内に残る。根拠、必須mitigation、rollback / revisit条件はaccepted ADR `20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md`を正本とする。
 
 ### D-009 Opaque lifecycle
 
@@ -287,6 +292,11 @@ Threat modelは、shared create lockに従うSpecDock process間のcollision、i
 
 - 利点:node resolverを再利用しやすい。
 - 棄却理由:dependency/status/active projectionへroot概念が漏れ、Artifact importだけのためにgraph contractを拡張する。root targetはapplication-level value objectで十分である。
+
+### F. Linux named staging cleanupのsame-UID waiverを受容する
+
+- 利点: `O_TMPFILE`を持たないLinux filesystemでも現行のnamed staging success laneを維持できる。
+- 棄却理由: macOS専用accepted ADRの限定例外をLinuxへ拡張し、final identity check後のnon-owned entry unlink riskを受容することになる。Linuxはanonymous staging capabilityを必須化し、未対応environmentをfail closedとする。
 
 ## 5. Boundary / Contract Model
 
@@ -367,6 +377,8 @@ presentation/cli_text.py
   - fresh-reviewed `epic-00343/requirement.md`
   - fresh-reviewed canonical `design.md` / `plan.md`
   - `artifacts/20260728t100038z-adr-generic-imported-file-identity-and-privacy-boundary.md`
+  - accepted ADR `artifacts/20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md`
+  - accepted ADR `artifacts/20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md`
 - advisory evidence:
   - 旧`epic-00312` interviews / research / historical design
   - ChatGPT Pro ZIP evidence SHA-256 `ecd4c65a608ee4474fd5e06b0230150ba56106a5eee7418811367c9cbadca371`
@@ -579,10 +591,12 @@ package contractは「\`templates/README.md\`と上記4 Workbench READMEだけ�
 - ancestor symlink inside/outside成功、leaf symlink拒否。
 - missing、directory、FIFO/socket/device、unreadable。
 - empty、invalid UTF-8、NUL、PDF/image/ZIP、large streamのsource=staged=destination bytes/hash。
-- stage中および最終再読中のsource content/identity change、最終source検証直後のnon-cooperating write境界、publication直前までのdestination ancestry swap、hash mismatch、fsync、FD-bound publication unsupported/failure、cleanup fault injection。
+- stage中および最終再読中のsource content/identity change、最終source検証直後のnon-cooperating write境界、publication直前までのdestination ancestry swap、hash mismatch、fsync、FD-bound publication unsupported/failure、platform別cleanup fault injection。
 - command起因failure時source stat/bytes不変。本commandがformal destinationを作成しないことを確認し、`destination_exists` fixtureでは競合actor所有entryが保持されることも確認する。
 - Linux success時はformal destinationとverified tempが同一device/inode、macOS success時はFD-bound clone結果がverified source bytesと一致し、generic pathにdestination mismatch warningが存在しないことを確認する。
-- 通常権限Linuxの`/proc/self/fd` + `AT_SYMLINK_FOLLOW` hard-link対応filesystemとmacOS clone-capable filesystemのsuccess、clone非対応 / policy拒否の`publication_unsupported`、probe cleanupを確認する。original sourceがdestinationとは別filesystemでも、destination directory内stagingによりsuccessすることを実volumeまたはmount fixtureで確認する。
+- Linux: 通常権限でvisible entryを一切作らず、formal candidate以外へanonymous FDをlinkせず、pre-commit failure / abortがFD closeだけでpathname unlinkを0回にする。formal candidateへの最初の`/proc/self/fd` + `AT_SYMLINK_FOLLOW` FD-bound commitで`EEXIST`をcollision retryとし、formal entry未作成のlinkat capability / policy failureを`publication_unsupported`へ正規化する。original sourceがdestinationとは別filesystemでもanonymous destination-side stagingでsuccessすることを実volumeまたはmount fixtureで確認する。
+- macOS: existing named probe / cleanupとclone-capable filesystemのsuccess、clone非対応 / policy拒否の`publication_unsupported`、accepted ADR `20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md`のcleanup boundaryを確認する。Linuxのanonymous FD close-only cleanup契約をmacOS laneへ共有しない。
+- macOS named stagingのfinal identity checkまでに観測できるreplacement、missing、special entry、stat/open failureではunlinkせずretainし、replacement sentinelが残ることを確認する。final check後からunlinkまでの意図的same-UID replacementはaccepted ADR `20260730t085831z-adr`で限定された非保証であり、完全防御のpass条件として扱わない。
 
 ### T4 Privacy / state
 
@@ -618,6 +632,16 @@ Accepted ADR: **Generic imported-file Artifact identity and privacy boundary**
 - real tradeoff: yes。既存typed grammarへの統合より、semantic isolationとprivacyを優先する。
 - Decision record: `artifacts/20260728t100038z-adr-generic-imported-file-identity-and-privacy-boundary.md`をauthorityとし、D-006/D-008およびplanのIssue ownershipから参照する。
 
+Accepted ADR: **macOS generic import staging cleanup trust boundary**
+
+- Decision record: `artifacts/20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md`をauthorityとし、macOS clone-capable successを維持しながら、named staging cleanupの同一UID final-window replacementだけを限定除外する。
+- Mandatory mitigations: destination-parent FD identity、high-entropy `O_EXCL` / no-follow staging、held staging FD、final FD/path identity check、uncertainty時retain、non-mutating probe、commit-state保持、content-free resultを維持する。
+
+Accepted ADR: **Linux generic import anonymous staging trust boundary**
+
+- Decision record: `artifacts/20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md`をauthorityとし、Linuxではsame-UID cleanup waiverを受容せず、linkable `O_TMPFILE` anonymous stagingとheld-FD publicationを必須化する。
+- Mandatory boundary: preflightは`O_TMPFILE`、FD regularity、procfs reference、directory durabilityだけをnon-mutatingに確認する。held-FD `linkat`固有のcapability / policy failureはformal candidateへの最初のactual commitで検出し、formal entry未作成なら`publication_unsupported` / `not_committed` / `safe_after_remediation`へ正規化する。unsafe named-temp fallbackを導入せず、supported filesystem laneの縮小を明示する。
+
 Workbench shellのfresh-only/no-backfillはrequirementで十分に固定され、独立ADRは不要である。
 
 ## 14. Risks
@@ -637,6 +661,7 @@ Workbench shellのfresh-only/no-backfillはrequirementで十分に固定され�
 | scanner範囲拡大 | artifact directoryが大きい場合の遅延 | direct child name/statだけ、body/MIME/archiveを読まない |
 | rollback後Workbench露出 | untracked scratchが`git status`へ出る | ignore rule先行rollback、user content非削除 |
 | filesystem capability不足 | supported OSでもimportが常時fail | OS名でなくFD-bound no-replace / directory durability capabilityをprobeし、supported matrixのsuccess laneとfail-closed laneを配布testで固定 |
+| macOS named-staging cleanup final-window race | 同一UIDの意図的actorが別entryをunlinkさせ得る | accepted ADRでactor / pathname / time windowを限定し、high-entropy name、held FD、final identity check、uncertainty時retainを維持。untrusted same-UID共有directoryを正式supportする場合はOption B/Cを再判断 |
 
 ## 15. Requirement Clarification Requests
 
