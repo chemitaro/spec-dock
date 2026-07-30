@@ -101,7 +101,7 @@ provider runtime/docs/rulesを一次変更面とし、managed dogfood projection
 | `LC-345-007` | public warning allowlistを`directory_fsync_failed`, `temp_cleanup_retained`, `create_lock_release_failed`に限定 | parent designのdurability/owned cleanup semanticsに一致 |
 | `LC-345-008` | pre-commit errorはsource/destination fieldを持たない専用DTO | path leakをrenderer disciplineだけに依存させない |
 | `LC-345-009` | root rules sourceを`docs/rules/root/artifacts.md`とする | parent `D-004`のexact pathを採用 |
-| `LC-345-010` | filename byte budgetはdestination directoryの`PC_NAME_MAX`を取得し、取得不能/不正値はfail closed | platform limitを推測しない |
+| `LC-345-010` | existing artifacts directoryはopened directory FD、fresh targetはsecurely opened target parent FDから`PC_NAME_MAX`を取得し、作成後のartifacts FDで再確認する。取得不能/不正値/identity不一致はfail closed | platform limitを推測せず、fresh childが同一filesystemに作られたことを検証 |
 
 ## 3. Architecture context
 
@@ -180,8 +180,9 @@ end note
 
 - `FileArtifactImportError`だけをknown errorとしてrenderする。
 - command handlerはunknown `Exception`からpublication stateを推測しない。`runtime_failed / not_committed`をrenderできるのは、applicationがcommit point未到達を確認して生成した`FileArtifactImportError`だけとする。
-- application/publisherのphase-aware finalizerは、commit前のunknown faultをprivacy-safeな`runtime_failed / not_committed`へ変換し、commit後のhandled faultをreturned artifact identity付きの`committed_with_warning / retry_disposition=not_needed`へ変換する。
-- finalizer外へunknown exceptionがescapeすることはinternal contract violationであり、command layerはraw message/contextをredactするが、`not_committed`やretry safetyを捏造しない。fault injectionでcommit直後からresult returnまでの各fallible seamを閉じる。
+- application/publisherのphase-aware finalizerは、commit前のunknown faultだけをprivacy-safeな`runtime_failed / not_committed`へ変換する。
+- commit後に許容するfallible operationは`directory_fsync`、identity-confirmed owned-temp cleanup、create-lock releaseの三つだけで、それぞれ既定のwarning codeへ変換する。result identity、source display、destination display、JSON/text用fieldはcommit前に構築・検証し、commit後にpath resolutionや汎用result constructionを行わない。
+- この三seam以外のexception escapeはinternal contract violationであり、新しいgeneric post-commit warningへ丸めない。command layerはraw message/contextをredactするが、`not_committed`やretry safetyを捏造しない。新しいpost-commit fault classが必要ならrequirement/ADR amendmentへ戻す。
 - post-commit warning resultをexceptionへ変えない。
 - current `ArtifactImportChatGptOutputArgs`, `_run`, renderer callsは既存契約のまま保持する。
 
@@ -236,10 +237,12 @@ source path、destination path、basename、raw cause、hash、countを持たな
 
 `GuardedExplicitFileSource`:
 
-- adapter所有のopaque handle
+- applicationがretry loop全体を通じてcontext-managed leaseとして所有するopaque handle
 - opened source FDとleaf/path identityを束ね、applicationからinode、absolute path、hash/countを観測できない
 - `source_visibility`とprivacy-safeな`source_display`だけを公開result構築用に持つ
-- publisherがconsumeし、stage後の最終reread/path identity検証まで同一handleを維持する
+- publisherは各attemptでleaseをborrowし、FDを先頭へrewindしてstage/最終reread/path identity検証を行うがcloseしない
+- application finalizerがsuccess、pre-publication failure、setup failure、slot exhaustion、destination race exhaustionを含む全exit pathで一度だけcloseする
+- destination race retryでsourceをreopenせず、同一FD/identity leaseを再利用する。close済みleaseの再利用はcontract violation
 
 `ExplicitFileArtifactPublishRequest`:
 
@@ -275,7 +278,7 @@ hash/count/inodeはadapter内部のverification recordとして一時利用し�
 6. shared create lockを取得する。
 7. target Artifact setupをread-only preflightし、missingなら必要な変更を未適用planとして保持する。broken/wrong entryはここで拒否する。
 8. existing directory、または未作成directoryをempty inventoryとしてdirect-child shared slot ledgerをscanし、corruption/exhaustionがないことと空きslotを確立する。
-9. setup planを適用し、直後にledgerを再確認してから、guarded sourceを渡してpublisherの`publish_explicit_file`を呼ぶ。
+9. setup planを適用し、作成後のdirectory identity/`PC_NAME_MAX`/ledgerを再確認してから、guarded source leaseをborrowさせてpublisherの`publish_explicit_file`を呼ぶ。
 10. `destination_exists` raceならlock内ledgerを再scanし、bounded retryする。他のpre-commit faultはpublic errorへ変換する。
 11. commit後warningをresultへ残す。
 12. lock release failureがcommit前ならerror、commit後なら`committed_with_warning`へmergeする。
@@ -310,8 +313,11 @@ current `_ensure_artifacts_setup`を、root/node共通のtarget descriptorを受
 generic importではhelperを二段階に分ける。
 
 1. `preflight_artifacts_setup(target)`: filesystemを変更せず、existing directory/rules entryのtype・identityを検証し、missing directory/rulesをsetup planとして返す。
-2. shared ledgerのcorruption/exhaustionをread-onlyに判定する。directory未作成はempty ledgerとして扱う。
-3. slotが確保可能な場合だけ`apply_artifacts_setup(plan)`を実行し、作成後のidentityとledgerを再検証する。
+2. existing artifacts directoryではopened directory FDに対して`fpathconf(PC_NAME_MAX)`を行う。fresh targetではsecurely opened target directory FDからfuture childと同じfilesystemのlimitを取得し、tentative normalization/slot allocationに使う。
+3. shared ledgerのcorruption/exhaustionをread-onlyに判定する。directory未作成はempty ledgerとして扱う。
+4. slotが確保可能な場合だけopened target FDにbindしたno-follow/no-replace operationで`apply_artifacts_setup(plan)`を実行する。
+5. 作成後のartifacts directory FDでtarget/device identityと`PC_NAME_MAX`を再確認する。limitがtentative valueと異なる、またはunexpected mount/replacementが観測された場合はpublishせず、owned fresh setupをidentity-confirmed cleanupできる場合だけ戻してfail closedする。
+6. verified limitでbasename/slotを再計算し、ledgerを再検証してからpublicationへ進む。
 
 これにより、all 100 slots occupied、corrupt ledger、unsafe setupではdirectoryや`rules.md`を作成しない。non-cooperative actorがpreflight後に状態を変えた場合はno-replace setup/publicationと再scanでfail closedまたはbounded retryする。
 
@@ -454,7 +460,7 @@ public application port:
 
 - legacy: `publish(BinaryArtifactPublishRequest)`を維持。
 - generic preflight: `ExplicitFileSourceGuard.guard_explicit_file_source(ExplicitFileSourcePreflightRequest) -> GuardedExplicitFileSource`を追加。
-- generic publication: `ExplicitFileArtifactPublisher.publish_explicit_file(ExplicitFileArtifactPublishRequest)`を追加し、raw pathではなくguarded sourceをconsumeする。
+- generic publication: `ExplicitFileArtifactPublisher.publish_explicit_file(ExplicitFileArtifactPublishRequest)`を追加し、raw pathではなくapplication-owned guarded source leaseをborrowする。publisherはrewind/verifyするがcloseしない。
 
 `import_file_artifact`は`workbench_source_guard`を参照しない。same concrete adapter instanceをbootstrapで両portへwireしても、application dependencyは別Protocolである。
 
@@ -664,11 +670,11 @@ end
 8. application acquires shared create lock.
 9. application performs read-only setup validation and obtains an unapplied setup plan.
 10. domain scans direct child names (or an empty inventory for a not-yet-created directory), rejects corruption/exhaustion, and allocates a shared slot.
-11. application applies missing `artifacts/` / rules setup only after slot availability is established, then revalidates setup and ledger.
+11. application applies missing `artifacts/` / rules setup only after slot availability is established, then revalidates directory identity、`PC_NAME_MAX`、normalization、ledger.
 12. infra probes publication capability, stages source, verifies source/temp.
 13. infra commits with FD-bound no-replace.
 14. if candidate exists, application repeats ledger allocation within bounded slots.
-15. if commit happened, phase-aware finalization always returns committed identity even if later warning/unknown handled fault arises.
+15. if commit happened, only directory fsync、owned-temp cleanup、lock release may add their exact warning codes; all other result fields were prepared before commit.
 16. application releases lock and merges post-commit lock warning if needed.
 17. presentation emits only privacy-safe fields.
 
@@ -735,7 +741,7 @@ Exact token names that differ from existing parent design require fresh spec rev
 
 warningにはpath/body/hash/count/raw errorを付けない。operator guidanceはreturned destination identityを保持し、同じsourceをretryしないよう説明する。
 
-commit後からresult returnまでのunexpected-but-handled faultは専用fault seamで注入し、`committed_with_warning`, committed identity, exit success, `retry_disposition=not_needed`を維持する。command handlerが任意exceptionを`not_committed`へ変換する経路は持たない。
+fault injectionはcommit後の三つの許可seamを個別に注入し、`directory_fsync_failed`、`temp_cleanup_retained`、`create_lock_release_failed`へのexact mappingと、committed identity、exit success、`retry_disposition=not_needed`を検証する。その他の汎用`post_commit_runtime` warningは追加せず、command handlerが任意exceptionを`not_committed`へ変換する経路も持たない。
 
 ## 8. Concurrency and TOCTOU model
 
@@ -851,6 +857,7 @@ lifecycle consumersがgeneric entryを認識する必要がある場合、`parse
 - typed/blank/generic shared slots。
 - unsafe type/symlink/corrupt duplicate。
 - normalization Unicode/space/case/extension/NAME_MAX。
+- fresh targetはparent FDからtentative `PC_NAME_MAX`を取得し、作成後artifacts FDで一致を再確認する。取得不能、不一致、identity replacementはpublish前にfail closedする。
 - exhaustion。
 
 ### T345-2 Application/command
@@ -859,9 +866,10 @@ lifecycle consumersがgeneric entryを認識する必要がある場合、`parse
 - four targets/root non-node。
 - privacy-safe request/result/error mapping。
 - explicit source guard portがsetup mutation前に呼ばれ、guarded handleだけがpublisherへ渡る。
+- guarded source leaseはdestination raceをまたいで同一FDを再利用し、successを含む全exit pathで一度だけcloseされる。
 - missing setupとslot exhaustion/corrupt ledgerの併存時にdirectory/rules mutationがない。
 - lock release pre/post commit semantics。
-- FD-bound commit直後からresult returnまでのfault seamが、committed identity、exit success、retry not-neededを維持する。
+- directory fsync、owned-temp cleanup、lock releaseの各commit後fault seamがexact warning code、committed identity、exit success、retry not-neededを維持する。
 - destination race retry。
 - generic use caseが`workbench_source_guard`を必要としない。
 
