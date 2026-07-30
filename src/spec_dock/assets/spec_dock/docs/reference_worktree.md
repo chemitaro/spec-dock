@@ -154,7 +154,7 @@ tracked `.workbench/README.md` は root / node とも通常の Git checkout で 
 ./spec-dock/scripts/spec-dock workbench copy --scope <initiative|epic|issue-id> --to <target>
 ```
 
-`--to`は`worktree show`と同じstable id、absolute path、またはdirectory basenameで既存linked worktreeを指定します。`--scope`はsource worktreeに存在するfull Initiative / Epic / Issue idです。Initiative / Epic / Issue の ignored payload は明示的な manual one-shot copy の対象です。root は対象外です。Root `spec-dock/.workbench/`で durable に残す file の route は `./spec-dock/scripts/spec-dock artifact import file ...` ですが、Issue #345 で planned、unimplemented です。
+`--to`は`worktree show`と同じstable id、absolute path、またはdirectory basenameで既存linked worktreeを指定します。`--scope`はsource worktreeに存在するfull Initiative / Epic / Issue idです。Initiative / Epic / Issue の ignored payload は明示的な manual one-shot copy の対象です。root は対象外です。Root `spec-dock/.workbench/`で durable に残す一件の file は、`./spec-dock/scripts/spec-dock artifact import file --root --file <path>` で opaque generic Artifact として明示保存できます。これは Workbench copy ではなく、source を変更しない one-file import です。命名と evidence-only boundary は [reference_naming.md](reference_naming.md) および root `artifacts/rules.md` を参照してください。
 
 Copyは明示的なone-shot operationです。Source scope直下の`.workbench/`全体を同じscopeのdestinationへ重ね、source-wins は destination-only entries を保持します。README-specific filter は適用しません。no automatic hook, watch, sync, or copy-back。言語、拡張子、MIME、内容で対象fileを選ぶclassifierもありません。通常file、directory、symlink objectをそのまま扱い、FIFOなどのunsupported special entryやdirectory/non-directory衝突は選別・skipせずcontent-free errorで停止します。Workbenchはnon-canonical、disposableであり、copy成功は永続化やadoptionを意味しません。
 

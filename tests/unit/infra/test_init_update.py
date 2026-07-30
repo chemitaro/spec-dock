@@ -279,6 +279,7 @@ _JAPANESE_PRIMARY_TABLE_ROLE_TOKENS = {
 
 class TestInitUpdate(CliRuntimeHarness):
     _CANONICAL_RULES_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
+        "spec-dock/docs/rules/root/artifacts.md": ("src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md"),
         "spec-dock/docs/rules/initiative/artifacts.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md"
         ),
@@ -404,7 +405,9 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/.gitignore": "src/spec_dock/assets/spec_dock/.gitignore",
         "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
         "spec-dock/scripts/README.md": "src/spec_dock/assets/spec_dock/scripts/README.md",
+        "spec-dock/docs/README.md": "src/spec_dock/assets/spec_dock/docs/README.md",
         "spec-dock/docs/guide.md": "src/spec_dock/assets/spec_dock/docs/guide.md",
+        "spec-dock/docs/reference_naming.md": "src/spec_dock/assets/spec_dock/docs/reference_naming.md",
         "spec-dock/docs/reference_worktree.md": ("src/spec_dock/assets/spec_dock/docs/reference_worktree.md"),
         "spec-dock/docs/phase_requirement.md": ("src/spec_dock/assets/spec_dock/docs/phase_requirement.md"),
         "spec-dock/docs/phase_design.md": "src/spec_dock/assets/spec_dock/docs/phase_design.md",
@@ -437,10 +440,16 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/docs/rules/initiative/discussions.md": (
             "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md"
         ),
+        "spec-dock/docs/rules/initiative/artifacts.md": (
+            "src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md"
+        ),
         "spec-dock/docs/rules/initiative/epics.md": ("src/spec_dock/assets/spec_dock/docs/rules/initiative/epics.md"),
+        "spec-dock/docs/rules/epic/artifacts.md": "src/spec_dock/assets/spec_dock/docs/rules/epic/artifacts.md",
         "spec-dock/docs/rules/epic/discussions.md": ("src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md"),
         "spec-dock/docs/rules/epic/issues.md": "src/spec_dock/assets/spec_dock/docs/rules/epic/issues.md",
+        "spec-dock/docs/rules/issue/artifacts.md": "src/spec_dock/assets/spec_dock/docs/rules/issue/artifacts.md",
         "spec-dock/docs/rules/issue/discussions.md": ("src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md"),
+        "spec-dock/docs/rules/root/artifacts.md": "src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md",
         ".agents/skills/spec-dock-hub/SKILL.md": (
             "src/spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md"
         ),
@@ -4586,6 +4595,50 @@ class TestInitUpdate(CliRuntimeHarness):
             assert not (templates_dir / "initiative" / "deps.json").exists()
             assert not (templates_dir / "epic" / "deps.json").exists()
             assert not (templates_dir / "issue" / "deps.json").exists()
+
+    @pytest.mark.parametrize("install_command", ["init", "update"])
+    def test_init_and_update_ship_root_artifact_rules_and_import_links_them_safely(
+        self,
+        install_command: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+
+            installed_rules = target / "spec-dock" / "docs" / "rules" / "root" / "artifacts.md"
+            if install_command == "update":
+                self._write_text_force(installed_rules, "corrupted root artifact rules\n")
+                assert main(["update", str(target)]) == 0
+
+            repo_root = Path(__file__).resolve().parents[3]
+            provider_rules = repo_root / "src" / "spec_dock" / "assets" / "spec_dock" / "docs" / "rules"
+            provider_rules = provider_rules / "root" / "artifacts.md"
+            assert provider_rules.is_file() and not provider_rules.is_symlink()
+            assert installed_rules.is_file() and not installed_rules.is_symlink()
+            assert installed_rules.read_bytes() == provider_rules.read_bytes()
+
+            rules_text = installed_rules.read_text(encoding="utf-8")
+            for expected_fragment in (
+                "generic Artifact",
+                "opaque evidence",
+                "canonical=false",
+                "本文の正本を node ごとに複製しません",
+            ):
+                assert expected_fragment in rules_text
+
+            source = target / "root-evidence.bin"
+            source.write_bytes(b"opaque-root-evidence")
+            result = self._run_runtime_capture(
+                target,
+                ["artifact", "import", "file", "--root", "--file", source.name, "--json"],
+            )
+            assert result.returncode == 0, f"root import stdout:\n{result.stdout}\nroot import stderr:\n{result.stderr}"
+
+            rules_link = target / "spec-dock" / "artifacts" / "rules.md"
+            assert rules_link.is_symlink()
+            assert rules_link.readlink() == Path("../docs/rules/root/artifacts.md")
+            assert rules_link.resolve() == installed_rules.resolve()
+            assert rules_link.read_bytes() == provider_rules.read_bytes()
 
     def test_init_scaffolds_discussion_guidance_without_legacy_examples_across_asset_set(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
