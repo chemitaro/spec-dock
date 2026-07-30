@@ -49,7 +49,7 @@ Disposition ごとの必須証跡:
 
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D-001 | 未解決 / 解決済み / 置換済み（open / resolved / superseded） | 解釈 / 範囲 / 実装 / 互換性 / テスト戦略 / 運用 / 逸脱 / フォローアップ（interpretation / scope / implementation / compatibility / test-strategy / operation / deviation / follow-up） | 起票元（orchestrator / reviewer / worker source） | 計画の曖昧さ / 実装制約 / レビュー指摘 / 発見リスク（plan ambiguity / implementation constraint / reviewer finding / discovered risk） | 選択肢 A; 選択肢 B; 対応なし（option A; option B; no action） | ... | ... | 採用 / 却下 / design 昇格 / ADR 昇格 / plan 昇格 / follow-up 化 / 延期 / 対応なし / 置換済み（applied / rejected / promoted_to_design / promoted_to_adr / promoted_to_plan / converted_to_followup / deferred / no_action / superseded） | `path` / コマンド / reviewer 指摘 / discussion（path / command / reviewer finding / discussion） | 対象 artifact / issue / discussion / 置換先 entry / 理由付き対応なし（target artifact / issue / discussion / replacement entry / none with reason） |
+| D-001 | resolved | interpretation | orchestrator / ChatGPT authoring evidence | runtime guidance の `authorized_profile=strict` と親 Epic の `critical` 推奨が一致しない | 本文で一方を選択する; 差分を未解決入力として保持する | 本 Issue 文書は authority を変更せず、`strict` を観測値、`critical` を高リスク設計入力として併記する | assurance classification は runtime-owned であり、ChatGPT生成物や本文が変更してはならない。一方、filename identity、外部 path privacy、no-overwrite publication、retry disposition は `critical` 相当の検討密度を必要とする | applied | `artifacts/20260730t000929z-01-disc-issue-345-clarification-chatgpt-authoring-handoff.md`; ChatGPT Pro authoring pack | fresh review後に runtime-owned classification を実行する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -63,7 +63,9 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 識別子（ID） | 採用状態（adoption_status） | 出所（source） | 対象（target） | 判断理由（rationale） | 証跡（evidence） | 次アクション（next_action） |
 |---|---|---|---|---|---|---|
-| EAL-001 | 採用（`adopted`） / 部分採用（`partially_adopted`） / 棄却（`rejected`） / 延期（`deferred`） / stale（`stale`） / blocked（`blocked`） | サブエージェント（`sub-agent`） / レビュアー（`reviewer`） / 議論（`discussion`） / コマンド（`command`） / 調査（`research`） | 成果物（`artifact`） / Issue（`issue`） / フォローアップ（`follow-up`） | ... | `path` / コマンド / レビュアー指摘 | なし / フォローアップ（`follow-up`） / 再レビュー（`re-review`） / 再訪条件（`revisit condition`） |
+| EAL-001 | adopted | clarification research / discussion | canonical `requirement.md`, `design.md`, `plan.md` | source-grounding と利用者判断を、任意の単一ファイル、明示 target、generic identity、Workbench非依存、Issue 346境界として採用する | `artifacts/20260730t000929z-research-issue-345-generic-file-import-source-grounding.md`; `artifacts/20260730t000929z-01-disc-issue-345-clarification-chatgpt-authoring-handoff.md` | ChatGPT案との照合後に正本へ反映し fresh review |
+| EAL-002 | partially_adopted | ChatGPT Pro authoring / repository analysis | canonical `requirement.md`, `design.md`, `plan.md`; onboarding artifact | 4文書の構造、trace、failure/privacy/test設計を採用する。既存テストファイルを空とする誤記、非実在の `--target T`、曖昧な artifact path はリポジトリ事実に合わせて補正する | original ZIP SHA-256 `4c3317e697b7fe68b91bfc04401f36b8407b20631460b8ee4199ebf2c4d20eba`; corrected authoring-pack content digest `4da06f4a19034d6dcf8d0d24550298604a97096c1f2d18d56473297ad76ff573`; pack review findings `[]` | 補正採用後に ChatGPT Use で fresh spec review |
+| EAL-003 | rejected | transport-safe repaired pack | canonical prose | ZIP transport validator通過のための可逆HTML数値参照表現は意味内容ではなく搬送上の符号化であり、正本本文には不自然である | corrected authoring-pack provenance の round-trip 記録 | 原文候補を正本へ採用し、digest付きZIPは生成証跡として保持 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -71,7 +73,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 
 | 対象 | 主要目的の証跡（primary objective evidence） | 副次要件の証跡（secondary requirement evidence） | 逆転リスク（inversion risk） | レビュアー判定（reviewer verdict） |
 |---|---|---|---|---|
-| OAL-001 | ... | ... | なし / 低 / 中 / 高（none / low / medium / high） | 合格 / 不合格 / blocked（pass / fail / blocked） |
+| OAL-001 | 任意の readable regular file 一件を、root / Initiative / Epic / Issue の明示 targetへopaqueかつno-overwriteで保存する契約 | 新メンバー向け説明資料、PlantUML、ZIP形式のChatGPT生成物 | low | fresh review pending |
 
 ## 仕様 authoring ゲート（Spec Authoring Gate / 必須）
 
@@ -79,11 +81,13 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | フェーズ（phase） | 調査証跡（investigated facts） | 未確定事項 / 回答（open questions / answers） | 採用判断（adoption decision） | レビュアー判定（reviewer verdict） | ブロック有無（blocking） | 昇格 / 次アクション（promotion / next_action） |
 |---|---|---|---|---|---|---|
-| 要件 / 設計 / 計画（requirement / design / plan） | 文書 / コード / artifacts / legacy discussions / 外部証跡（docs / code / artifacts / legacy discussions / external evidence） | なし / `artifacts/...` / legacy `discussions/...`（none / `artifacts/...` / legacy `discussions/...`） | 採用 / 部分採用 / 棄却 / 延期 / なし（adopted / partially_adopted / rejected / deferred / none） | 合格 / 不合格 / 利用不可 / 拒否 / waiver / provisional（passed / failed / unavailable / denied / waived / provisional） | はい / いいえ（yes / no） | 昇格 / clarification へ戻す / 再レビュー / フォローアップ（promote / return to clarification / re-review / follow-up） |
+| requirement | active Issue / parent Epic R/D/P / accepted ADR / provider source / existing tests / clarification artifacts / ChatGPT Pro draft | 利用者確認事項なし。assurance grade差分はD-001として保持 | partially_adopted | pending | yes | repository補正後に fresh review |
+| design | requirement trace / provider layered architecture / existing publisher・allocator・parser / ChatGPT Pro draft | requirement review完了前はpromotion不可 | partially_adopted | pending | yes | requirement gate後に compose・補正・fresh review |
+| plan | requirement/design trace / test surfaces / Issue 346 ownership / ChatGPT Pro draft | design review完了前はpromotion不可 | partially_adopted | pending | yes | design gate後に補正・fresh review |
 
 ## 委任ドラフト証跡（Delegated Draft Evidence / 必須）
 - 委任 authoring の使用:
-  - used / not used
+  - used（ChatGPT Use / Pro）
 - 未使用の場合:
   - manual authoring path / 委任ドラフトを昇格証跡として使っていない理由。
 - lifecycle state（契約値）:
@@ -107,7 +111,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 | ロール（created_by_role） | 範囲（scope_id） | ドラフトパス（artifact draft path） | 参照元（source_paths） | 予定反映先（intended_targets） | 採用状態（adoption_status） | 反映先（reflected_to） | 差分ガード結果（diff_guard_result） | 統合結果 | 採用しなかった部分 | ブロッカー | レビュー結果（reviewer result） | 昇格判断（promotion decision） |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 該当なし | 該当なし | 該当なし | 該当なし | 該当なし | 未使用（not used） | なし（[]） | 未実行（not_run） | 手動 authoring | 該当なし | なし（none） | 該当なし | 委任ドラフト昇格なし |
+| ChatGPT Pro | iss-00345 | authoring ZIP内 `requirement.md`, `design.md`, `plan.md`, `onboarding.md` | active Issue/Epic、accepted ADR、provider source、tests、clarification artifacts | canonical R/D/P、Issue onboarding artifact | partially_adopted | `requirement.md`, `design.md`, `plan.md`, `artifacts/20260730t014107z-issue-345-generic-single-file-artifact-import-onboarding-guide.md` | source-grounding review + pack review pass、repository corrections pending | 内容を補正採用 | transport-only encoded spellings、誤ったtest/CLI/path表現 | fresh spec review pending | pending | phase gate順に正本へ昇格 |
 
 ### 委任ドラフトの失敗モード（Delegated Draft Failure Modes）
 | 失敗モード | 期待される判定 | 許可される次アクション | レポート証跡の記録先（report evidence destination） | 昇格可否 |
