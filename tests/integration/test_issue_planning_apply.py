@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -178,6 +179,12 @@ def _sync_ok():
         write_result=None,
         active_update=None,
     )
+
+
+def _install_hook(repo: Path, name: str, body: str) -> None:
+    hook = repo / ".git" / "hooks" / name
+    hook.write_text(f"#!/bin/sh\nset -eu\n{body}\n")
+    hook.chmod(0o755)
 
 
 def test_output_replacement_before_fd_capture_is_rejected_without_evidence(
@@ -608,6 +615,115 @@ def test_archive_apply_rejects_canonical_edit_at_transaction_boundary(
     assert not (output / f"planning-apply-{operation.operation_id}" / "transaction").exists()
 
 
+def test_archive_apply_atomic_editor_swap_after_target_open_is_stale_and_preserved(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    before = {path: module.snapshot_regular_file(repo / path) for path in targets}
+    requirement_relative = next(path for path in targets if Path(path).name == "requirement.md")
+    requirement = repo / requirement_relative
+    editor_bytes = b"atomic editor replacement\n"
+    editor_identity: list[tuple[int, int]] = []
+    real_exchange = module._exchange_entries_at
+    injected = [False]
+
+    def exchange(source_fd: int, first: str, destination_fd: int, second: str) -> None:
+        if not injected[0] and second == "requirement.md":
+            injected[0] = True
+            editor = requirement.with_name("requirement.editor.tmp")
+            editor.write_bytes(editor_bytes)
+            editor.replace(requirement)
+            observed = requirement.stat()
+            editor_identity.append((observed.st_dev, observed.st_ino))
+        real_exchange(source_fd, first, destination_fd, second)
+
+    monkeypatch.setattr(module, "_exchange_entries_at", exchange)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("stale apply must not validate"),
+        sync_runner=lambda: pytest.fail("stale apply must not sync"),
+    )
+
+    assert (result.status, result.reason) == ("stale", "apply_target_changed")
+    observed = requirement.stat()
+    assert (observed.st_dev, observed.st_ino) == editor_identity[0]
+    assert requirement.read_bytes() == editor_bytes
+    for path, snapshot in before.items():
+        if path != requirement_relative:
+            assert module.snapshot_regular_file(repo / path) == snapshot
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    assert not (operation_dir / "transaction").exists()
+    assert not tuple(repo.rglob(".spec-dock-apply-*"))
+    assert json.loads((operation_dir / "state.json").read_bytes())["state"] == "OPERATION_RECORDED"
+
+
+def test_archive_apply_second_canonical_replacement_during_exchange_back_retains_recovery_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    requirement_relative = next(path for path in targets if Path(path).name == "requirement.md")
+    requirement = repo / requirement_relative
+    original_preimage = requirement.read_bytes()
+    attachment_b = b"first concurrent canonical attachment\n"
+    attachment_c = b"second concurrent canonical attachment\n"
+    real_exchange = module._exchange_entries_at
+    requirement_exchanges = [0]
+
+    def exchange(source_fd: int, first: str, destination_fd: int, second: str) -> None:
+        if second == "requirement.md":
+            requirement_exchanges[0] += 1
+            replacement = requirement.with_name(f"requirement.editor.{requirement_exchanges[0]}.tmp")
+            replacement.write_bytes(attachment_b if requirement_exchanges[0] == 1 else attachment_c)
+            replacement.replace(requirement)
+        real_exchange(source_fd, first, destination_fd, second)
+
+    monkeypatch.setattr(module, "_exchange_entries_at", exchange)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("contended apply must not validate"),
+        sync_runner=lambda: pytest.fail("contended apply must not sync"),
+    )
+
+    assert requirement_exchanges == [2]
+    assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+    assert requirement.read_bytes() == attachment_b
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    transaction = operation_dir / "transaction"
+    ledger = json.loads((transaction / "mutation-ledger.json").read_bytes())
+    requirement_entry = next(entry for entry in ledger["entries"] if entry["path"] == requirement_relative)
+    workspace = requirement.parent / requirement_entry["workspace_name"]
+    assert (workspace / requirement_entry["staged_name"]).read_bytes() == attachment_c
+    assert (
+        requirement_entry["after_sha256"]
+        == hashlib.sha256(operation.replacement_documents["requirement.md"]).hexdigest()
+    )
+    manifest = json.loads((transaction / "backup-manifest.json").read_bytes())
+    requirement_backup = next(entry for entry in manifest["files"] if entry["path"] == requirement_relative)
+    assert (transaction / "files" / requirement_backup["backup"]).read_bytes() == original_preimage
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert not (operation_dir / "commit.json").exists()
+    assert not (operation_dir / "publication.json").exists()
+
+
 def test_archive_apply_rejects_absent_companion_create_at_transaction_boundary(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -773,6 +889,1032 @@ def test_archive_apply_rechecks_absent_companion_after_operation_recorded(
     )
     assert (retry.status, retry.reason) == ("ready", "adoption_published")
     assert _git(origin, "rev-parse", "refs/heads/feature/issue") == _git(repo, "rev-parse", "HEAD")
+
+
+def test_canonical_replace_uses_captured_parent_after_ancestor_symlink_swap(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    issue = repo / Path(targets[0]).parent
+    issues = issue.parent
+    captured_issues = issues.with_name(f"{issues.name}-captured")
+    external_issues = tmp_path / "external-issues"
+    external_issue = external_issues / issue.name
+    (external_issue / "artifacts").mkdir(parents=True)
+    external_sentinels = {name: f"external {name}\n".encode() for name in ("design.md", "plan.md", "requirement.md")}
+    for name, data in external_sentinels.items():
+        (external_issue / name).write_bytes(data)
+    observed_external_requirement: list[bytes] = []
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_decision_write":
+            issues.rename(captured_issues)
+            issues.symlink_to(external_issues, target_is_directory=True)
+        elif checkpoint == "after_requirement_replace":
+            observed_external_requirement.append((external_issue / "requirement.md").read_bytes())
+            raise RuntimeError("injected")
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("swapped topology must not validate"),
+        sync_runner=lambda: pytest.fail("swapped topology must not sync"),
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+    assert observed_external_requirement == [external_sentinels["requirement.md"]]
+    assert {name: (external_issue / name).read_bytes() for name in external_sentinels} == external_sentinels
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_rollback_uses_captured_parents_after_ancestor_symlink_swap(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    issue = repo / Path(targets[0]).parent
+    issues = issue.parent
+    captured_issues = issues.with_name(f"{issues.name}-captured")
+    external_issues = tmp_path / "external-issues"
+    external_issue = external_issues / issue.name
+    (external_issue / "artifacts").mkdir(parents=True)
+    external_sentinels = {name: f"external {name}\n".encode() for name in ("design.md", "plan.md", "requirement.md")}
+    for name, data in external_sentinels.items():
+        (external_issue / name).write_bytes(data)
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_decision_write":
+            issues.rename(captured_issues)
+            issues.symlink_to(external_issues, target_is_directory=True)
+            raise RuntimeError("injected")
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("swapped topology must not validate"),
+        sync_runner=lambda: pytest.fail("swapped topology must not sync"),
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+    assert {name: (external_issue / name).read_bytes() for name in external_sentinels} == external_sentinels
+    assert not (external_issue / Path(operation.decision_artifact_path).name).exists()
+    assert not any(path.name.startswith(".") for path in external_issue.rglob("*"))
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_archive_apply_preserves_edit_injected_during_mutating_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    design = repo / next(path for path in targets if Path(path).name == "design.md")
+    concurrent = b"concurrent design during mutating state\n"
+    real_set_state = module._set_operation_state
+
+    def set_state(handle, current_operation, state: str) -> None:
+        real_set_state(handle, current_operation, state)
+        if state == "MUTATING":
+            design.write_bytes(concurrent)
+
+    monkeypatch.setattr(module, "_set_operation_state", set_state)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("drifted apply must not validate"),
+        sync_runner=lambda: pytest.fail("drifted apply must not sync"),
+    )
+
+    assert (result.status, result.reason) == ("stale", "apply_target_changed")
+    assert design.read_bytes() == concurrent
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    assert not (operation_dir / "transaction").exists()
+    assert json.loads((operation_dir / "state.json").read_bytes())["state"] == "OPERATION_RECORDED"
+
+
+def test_archive_apply_revalidates_each_canonical_replacement_boundary(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    requirement = repo / next(path for path in targets if Path(path).name == "requirement.md")
+    design = repo / next(path for path in targets if Path(path).name == "design.md")
+    requirement_before = requirement.read_bytes()
+    concurrent = b"concurrent design after requirement replacement\n"
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_requirement_replace":
+            design.write_bytes(concurrent)
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("drifted apply must not validate"),
+        sync_runner=lambda: pytest.fail("drifted apply must not sync"),
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == ("stale", "apply_target_changed")
+    assert requirement.read_bytes() == requirement_before
+    assert design.read_bytes() == concurrent
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_archive_apply_preserves_companion_created_after_canonical_replacements(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    before = {path: (repo / path).read_bytes() for path in targets}
+    companion = repo / operation.companion_target_path
+    concurrent = b"concurrent companion after plan replacement\n"
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_plan_replace":
+            companion.write_bytes(concurrent)
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("drifted apply must not validate"),
+        sync_runner=lambda: pytest.fail("drifted apply must not sync"),
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == ("stale", "apply_target_changed")
+    assert {path: (repo / path).read_bytes() for path in targets} == before
+    assert companion.read_bytes() == concurrent
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_apply_staged_name_replacement_before_exchange_preserves_repository_preimage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    requirement = repo / next(path for path in targets if Path(path).name == "requirement.md")
+    preimage = requirement.read_bytes()
+    unknown = b"unknown staged replacement\n"
+    real_exchange = module._exchange_entries_at
+    injected = [False]
+
+    def exchange(source_fd: int, first: str, destination_fd: int, second: str) -> None:
+        if not injected[0] and second == "requirement.md":
+            injected[0] = True
+            module.os.rename(
+                first,
+                f"{first}.owned",
+                src_dir_fd=source_fd,
+                dst_dir_fd=source_fd,
+            )
+            descriptor = module.os.open(
+                first,
+                module.os.O_WRONLY | module.os.O_CREAT | module.os.O_EXCL,
+                0o600,
+                dir_fd=source_fd,
+            )
+            try:
+                module.os.write(descriptor, unknown)
+            finally:
+                module.os.close(descriptor)
+        real_exchange(source_fd, first, destination_fd, second)
+
+    monkeypatch.setattr(module, "_exchange_entries_at", exchange)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("ambiguous exchange must not validate"),
+        sync_runner=lambda: pytest.fail("ambiguous exchange must not sync"),
+    )
+
+    assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+    available = [path.read_bytes() for path in (repo / Path(targets[0]).parent).rglob("*") if path.is_file()]
+    assert preimage in available
+    assert unknown in available
+    assert operation.replacement_documents["requirement.md"] in available
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert (output / f"planning-apply-{operation.operation_id}" / "transaction").is_dir()
+
+
+def test_crash_after_compare_replace_before_outer_return_recovers_recorded_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    before = {path: (repo / path).read_bytes() for path in targets}
+    real_compare = module._RepositoryTargetGuard.compare_replace
+
+    class ProcessCrash(BaseException):
+        pass
+
+    crashed = [False]
+
+    def compare(self, relative: str, **kwargs):
+        result = real_compare(self, relative, **kwargs)
+        if not crashed[0] and Path(relative).name == "requirement.md" and result is not None:
+            crashed[0] = True
+            raise ProcessCrash
+        return result
+
+    monkeypatch.setattr(module._RepositoryTargetGuard, "compare_replace", compare)
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("crash must precede validation"),
+            sync_runner=lambda: pytest.fail("crash must precede sync"),
+        )
+
+    recovered = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("recovery must precede validation"),
+        sync_runner=lambda: pytest.fail("recovery must precede sync"),
+    )
+
+    assert (recovered.status, recovered.reason) == (
+        "rolled_back",
+        "planning_commit_failed",
+    )
+    assert {path: (repo / path).read_bytes() for path in targets} == before
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_recovery_resolves_prepared_ledger_after_namespace_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    before = {path: (repo / path).read_bytes() for path in targets}
+    real_persist = module._persist_target_mutations
+
+    class ProcessCrash(BaseException):
+        pass
+
+    crashed = [False]
+
+    def crash_before_published_ledger(handle, current_operation, mutations, **kwargs) -> None:
+        if (
+            not crashed[0]
+            and mutations
+            and Path(mutations[-1].relative).name == "requirement.md"
+            and mutations[-1].phase == "published"
+        ):
+            crashed[0] = True
+            raise ProcessCrash
+        real_persist(handle, current_operation, mutations, **kwargs)
+
+    monkeypatch.setattr(
+        module,
+        "_persist_target_mutations",
+        crash_before_published_ledger,
+    )
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("crash must precede validation"),
+            sync_runner=lambda: pytest.fail("crash must precede sync"),
+        )
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    ledger = json.loads((operation_dir / "transaction" / "mutation-ledger.json").read_bytes())
+    assert ledger["entries"][-1]["phase"] == "prepared"
+
+    recovered = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("recovery must precede validation"),
+        sync_runner=lambda: pytest.fail("recovery must precede sync"),
+    )
+
+    assert (recovered.status, recovered.reason) == (
+        "rolled_back",
+        "planning_commit_failed",
+    )
+    assert {path: (repo / path).read_bytes() for path in targets} == before
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+@pytest.mark.parametrize("artifact", ["decision", "companion"])
+def test_recovery_resolves_prepared_absent_artifact_after_namespace_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    artifact: str,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    selected_relative = operation.decision_artifact_path if artifact == "decision" else operation.companion_target_path
+    selected = repo / selected_relative
+    real_persist = module._persist_target_mutations
+
+    class ProcessCrash(BaseException):
+        pass
+
+    crashed = [False]
+
+    def crash_before_published_ledger(handle, current_operation, mutations, **kwargs) -> None:
+        if (
+            not crashed[0]
+            and mutations
+            and mutations[-1].relative == selected_relative
+            and mutations[-1].phase == "published"
+        ):
+            crashed[0] = True
+            raise ProcessCrash
+        real_persist(handle, current_operation, mutations, **kwargs)
+
+    monkeypatch.setattr(
+        module,
+        "_persist_target_mutations",
+        crash_before_published_ledger,
+    )
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("crash must precede validation"),
+            sync_runner=lambda: pytest.fail("crash must precede sync"),
+        )
+
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    ledger = json.loads((operation_dir / "transaction" / "mutation-ledger.json").read_bytes())
+    assert ledger["entries"][-1]["path"] == selected_relative
+    assert ledger["entries"][-1]["phase"] == "prepared"
+    assert selected.exists()
+
+    recovered = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("recovery must precede validation"),
+        sync_runner=lambda: pytest.fail("recovery must precede sync"),
+    )
+
+    assert (recovered.status, recovered.reason) == (
+        "rolled_back",
+        "planning_commit_failed",
+    )
+    assert not selected.exists()
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_recovery_resumes_existing_restore_after_reverse_exchange_before_workspace_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    documents_before = {path: module.snapshot_regular_file(repo / path) for path in targets}
+    index_before = module.snapshot_git_index(repo)
+    managed_before = module.snapshot_managed_sync_state(repo)
+    real_exchange = module._exchange_entries_at
+    armed = [False]
+    crashed = [False]
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def crash_after_reverse_exchange(source_fd: int, first: str, destination_fd: int, second: str) -> None:
+        real_exchange(source_fd, first, destination_fd, second)
+        if armed[0] and not crashed[0]:
+            crashed[0] = True
+            raise ProcessCrash
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_index_stage":
+            raise RuntimeError("begin rollback")
+        if checkpoint == "during_restore":
+            armed[0] = True
+
+    monkeypatch.setattr(module, "_exchange_entries_at", crash_after_reverse_exchange)
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: SimpleNamespace(report=SimpleNamespace(errors=[])),
+            sync_runner=lambda: SimpleNamespace(
+                artifact_failure=None,
+                state=SimpleNamespace(deps_preflight_error=None),
+                write_result=None,
+                active_update=None,
+            ),
+            fault_hook=fault,
+        )
+
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    ledger = json.loads((operation_dir / "transaction" / "mutation-ledger.json").read_bytes())
+    affected = ledger["entries"][-1]
+    assert affected["phase"] == "rollback-prepared"
+    workspace = repo / Path(affected["path"]).parent / affected["workspace_name"]
+    assert workspace.is_dir()
+    assert (repo / affected["path"]).read_bytes() == documents_before[affected["path"]].data
+    assert (workspace / affected["staged_name"]).read_bytes() == operation.replacement_documents[
+        Path(affected["path"]).name
+    ]
+
+    recovered = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("recovery must precede validation"),
+        sync_runner=lambda: pytest.fail("recovery must precede sync"),
+    )
+
+    assert (recovered.status, recovered.reason) == (
+        "rolled_back",
+        "planning_commit_failed",
+    )
+    for path, before in documents_before.items():
+        assert module.snapshot_regular_file(repo / path) == before
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert module.snapshot_git_index(repo) == index_before
+    assert module.snapshot_managed_sync_state(repo) == managed_before
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert not tuple(repo.rglob(".spec-dock-apply-*"))
+    assert not (operation_dir / "transaction").exists()
+    state = json.loads((operation_dir / "state.json").read_bytes())
+    assert state["state"] == "ROLLED_BACK"
+
+
+def test_recovery_cleans_forward_workspace_crash_before_mutation_handoff(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    documents_before = {path: module.snapshot_regular_file(repo / path) for path in targets}
+    targets_before = {
+        **documents_before,
+        operation.decision_artifact_path: module.snapshot_regular_file(repo / operation.decision_artifact_path),
+        operation.companion_target_path: module.snapshot_regular_file(repo / operation.companion_target_path),
+    }
+    index_before = module.snapshot_git_index(repo)
+    managed_before = module.snapshot_managed_sync_state(repo)
+    real_persist = module._persist_target_mutations
+    crashed = [False]
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def crash_before_prepared_handoff(handle, current_operation, mutations, **kwargs) -> None:
+        if not crashed[0] and mutations and mutations[-1].phase == "prepared":
+            crashed[0] = True
+            raise ProcessCrash
+        real_persist(handle, current_operation, mutations, **kwargs)
+
+    monkeypatch.setattr(module, "_persist_target_mutations", crash_before_prepared_handoff)
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("crash must precede validation"),
+            sync_runner=lambda: pytest.fail("crash must precede sync"),
+        )
+
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    ledger = json.loads((operation_dir / "transaction" / "mutation-ledger.json").read_bytes())
+    assert ledger["entries"] == []
+    intent = ledger["workspace_intent"]
+    assert intent["purpose"] == "forward"
+    workspace = repo / Path(intent["path"]).parent / intent["workspace_name"]
+    staged = workspace / intent["staged_name"]
+    assert workspace.is_dir()
+    staged_stat = staged.stat()
+    assert (staged_stat.st_dev, staged_stat.st_ino) == (
+        intent["staged_device"],
+        intent["staged_inode"],
+    )
+    assert module.snapshot_regular_file(repo / intent["path"]) == targets_before[intent["path"]]
+
+    recovered = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("recovery must precede validation"),
+        sync_runner=lambda: pytest.fail("recovery must precede sync"),
+    )
+
+    assert (recovered.status, recovered.reason) == (
+        "rolled_back",
+        "planning_commit_failed",
+    )
+    for path, before in documents_before.items():
+        assert module.snapshot_regular_file(repo / path) == before
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert module.snapshot_git_index(repo) == index_before
+    assert module.snapshot_managed_sync_state(repo) == managed_before
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert not tuple(repo.rglob(".spec-dock-apply-*"))
+    assert not (operation_dir / "transaction").exists()
+    assert json.loads((operation_dir / "state.json").read_bytes())["state"] == "ROLLED_BACK"
+
+
+def test_recovery_cleans_existing_rollback_workspace_crash_before_reverse_handoff(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    documents_before = {path: module.snapshot_regular_file(repo / path) for path in targets}
+    index_before = module.snapshot_git_index(repo)
+    managed_before = module.snapshot_managed_sync_state(repo)
+    real_persist = module._persist_target_mutations
+    crashed = [False]
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def crash_before_reverse_handoff(handle, current_operation, mutations, **kwargs) -> None:
+        if not crashed[0] and mutations and mutations[-1].phase == "rollback-prepared" and mutations[-1].before.existed:
+            crashed[0] = True
+            raise ProcessCrash
+        real_persist(handle, current_operation, mutations, **kwargs)
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_index_stage":
+            raise RuntimeError("begin rollback")
+
+    monkeypatch.setattr(module, "_persist_target_mutations", crash_before_reverse_handoff)
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: SimpleNamespace(report=SimpleNamespace(errors=[])),
+            sync_runner=lambda: SimpleNamespace(
+                artifact_failure=None,
+                state=SimpleNamespace(deps_preflight_error=None),
+                write_result=None,
+                active_update=None,
+            ),
+            fault_hook=fault,
+        )
+
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    ledger = json.loads((operation_dir / "transaction" / "mutation-ledger.json").read_bytes())
+    outer = ledger["entries"][-1]
+    assert outer["phase"] == "published"
+    intent = ledger["workspace_intent"]
+    assert intent["purpose"] == "rollback-existing"
+    workspace = repo / Path(intent["path"]).parent / intent["workspace_name"]
+    staged = workspace / intent["staged_name"]
+    assert workspace.is_dir()
+    staged_stat = staged.stat()
+    assert (staged_stat.st_dev, staged_stat.st_ino) == (
+        intent["staged_device"],
+        intent["staged_inode"],
+    )
+    assert (repo / intent["path"]).read_bytes() == operation.replacement_documents[Path(intent["path"]).name]
+    assert staged.read_bytes() == documents_before[intent["path"]].data
+
+    recovered = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("recovery must precede validation"),
+        sync_runner=lambda: pytest.fail("recovery must precede sync"),
+    )
+
+    assert (recovered.status, recovered.reason) == (
+        "rolled_back",
+        "planning_commit_failed",
+    )
+    for path, before in documents_before.items():
+        assert module.snapshot_regular_file(repo / path) == before
+    assert not (repo / operation.companion_target_path).exists()
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert module.snapshot_git_index(repo) == index_before
+    assert module.snapshot_managed_sync_state(repo) == managed_before
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert not tuple(repo.rglob(".spec-dock-apply-*"))
+    assert not (operation_dir / "transaction").exists()
+    assert json.loads((operation_dir / "state.json").read_bytes())["state"] == "ROLLED_BACK"
+
+
+@pytest.mark.parametrize("artifact", ["decision", "companion"])
+def test_recovery_cleans_absent_rollback_workspace_crash_before_phase_handoff(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    artifact: str,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    documents_before = {path: module.snapshot_regular_file(repo / path) for path in targets}
+    index_before = module.snapshot_git_index(repo)
+    managed_before = module.snapshot_managed_sync_state(repo)
+    selected_relative = operation.decision_artifact_path if artifact == "decision" else operation.companion_target_path
+    selected_bytes = operation.human_decision_bytes if artifact == "decision" else operation.replacement_companion
+    assert selected_bytes is not None
+    checkpoint = "after_decision_write" if artifact == "decision" else "after_companion_write"
+    real_persist = module._persist_target_mutations
+    crashed = [False]
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def crash_before_absent_handoff(handle, current_operation, mutations, **kwargs) -> None:
+        if (
+            not crashed[0]
+            and mutations
+            and mutations[-1].relative == selected_relative
+            and mutations[-1].phase == "rollback-prepared"
+            and not mutations[-1].before.existed
+        ):
+            crashed[0] = True
+            raise ProcessCrash
+        real_persist(handle, current_operation, mutations, **kwargs)
+
+    def fault(observed: str) -> None:
+        if observed == checkpoint:
+            raise RuntimeError("begin rollback")
+
+    monkeypatch.setattr(module, "_persist_target_mutations", crash_before_absent_handoff)
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: SimpleNamespace(report=SimpleNamespace(errors=[])),
+            sync_runner=lambda: SimpleNamespace(
+                artifact_failure=None,
+                state=SimpleNamespace(deps_preflight_error=None),
+                write_result=None,
+                active_update=None,
+            ),
+            fault_hook=fault,
+        )
+
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    ledger = json.loads((operation_dir / "transaction" / "mutation-ledger.json").read_bytes())
+    outer = ledger["entries"][-1]
+    assert outer["path"] == selected_relative
+    assert outer["phase"] == "published"
+    intent = ledger["workspace_intent"]
+    assert intent["purpose"] == "rollback-absent"
+    assert intent["staged_name"] == "quarantine"
+    assert (intent["staged_device"], intent["staged_inode"]) == (
+        outer["after_device"],
+        outer["after_inode"],
+    )
+    workspace = repo / Path(intent["path"]).parent / intent["workspace_name"]
+    assert workspace.is_dir()
+    assert not tuple(workspace.iterdir())
+    assert (repo / selected_relative).read_bytes() == selected_bytes
+
+    recovered = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("recovery must precede validation"),
+        sync_runner=lambda: pytest.fail("recovery must precede sync"),
+    )
+
+    assert (recovered.status, recovered.reason) == (
+        "rolled_back",
+        "planning_commit_failed",
+    )
+    for path, before in documents_before.items():
+        assert module.snapshot_regular_file(repo / path) == before
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert not (repo / operation.companion_target_path).exists()
+    assert module.snapshot_git_index(repo) == index_before
+    assert module.snapshot_managed_sync_state(repo) == managed_before
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert not tuple(repo.rglob(".spec-dock-apply-*"))
+    assert not (operation_dir / "transaction").exists()
+    assert json.loads((operation_dir / "state.json").read_bytes())["state"] == "ROLLED_BACK"
+
+
+def test_recovery_retries_after_crash_between_target_restore_and_ledger_shrink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    before = {path: (repo / path).read_bytes() for path in targets}
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def initial_crash(checkpoint: str) -> None:
+        if checkpoint == "after_plan_replace":
+            raise ProcessCrash
+
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("crash must precede validation"),
+            sync_runner=lambda: pytest.fail("crash must precede sync"),
+            fault_hook=initial_crash,
+        )
+
+    real_restore = module._RepositoryTargetGuard.restore
+    crash_once = [True]
+
+    def restore_then_crash(self, mutation, **kwargs):
+        result = real_restore(self, mutation, **kwargs)
+        if crash_once[0]:
+            crash_once[0] = False
+            raise ProcessCrash
+        return result
+
+    monkeypatch.setattr(module._RepositoryTargetGuard, "restore", restore_then_crash)
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("recovery must not validate"),
+            sync_runner=lambda: pytest.fail("recovery must not sync"),
+        )
+    recovered = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("recovery must not validate"),
+        sync_runner=lambda: pytest.fail("recovery must not sync"),
+    )
+
+    assert (recovered.status, recovered.reason) == (
+        "rolled_back",
+        "planning_commit_failed",
+    )
+    assert {path: (repo / path).read_bytes() for path in targets} == before
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_recovery_resumes_from_durable_shortened_mutation_ledger(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    before = {path: (repo / path).read_bytes() for path in targets}
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def initial_crash(checkpoint: str) -> None:
+        if checkpoint == "after_plan_replace":
+            raise ProcessCrash
+
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("crash must precede validation"),
+            sync_runner=lambda: pytest.fail("crash must precede sync"),
+            fault_hook=initial_crash,
+        )
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    ledger = operation_dir / "transaction" / "mutation-ledger.json"
+    initial_count = len(json.loads(ledger.read_bytes())["entries"])
+    real_persist = module._persist_target_mutations
+    crash_once = [True]
+
+    def persist_then_crash(handle, current_operation, mutations, **kwargs) -> None:
+        real_persist(handle, current_operation, mutations, **kwargs)
+        if crash_once[0] and len(mutations) == initial_count - 1:
+            crash_once[0] = False
+            raise ProcessCrash
+
+    monkeypatch.setattr(module, "_persist_target_mutations", persist_then_crash)
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("recovery must not validate"),
+            sync_runner=lambda: pytest.fail("recovery must not sync"),
+        )
+    assert len(json.loads(ledger.read_bytes())["entries"]) == initial_count - 1
+    recovered = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("recovery must not validate"),
+        sync_runner=lambda: pytest.fail("recovery must not sync"),
+    )
+
+    assert (recovered.status, recovered.reason) == (
+        "rolled_back",
+        "planning_commit_failed",
+    )
+    assert {path: (repo / path).read_bytes() for path in targets} == before
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_recovery_resumes_absent_restore_after_quarantine_rename(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+
+    class ProcessCrash(BaseException):
+        pass
+
+    def initial_crash(checkpoint: str) -> None:
+        if checkpoint == "after_decision_write":
+            raise RuntimeError("begin rollback")
+
+    real_rename = module._rename_no_replace_at
+    crash_once = [True]
+
+    def rename_then_crash(
+        source_fd: int,
+        source_name: str,
+        destination_fd: int,
+        destination_name: str,
+    ) -> None:
+        real_rename(
+            source_fd,
+            source_name,
+            destination_fd,
+            destination_name,
+        )
+        if crash_once[0] and destination_name == "quarantine":
+            crash_once[0] = False
+            raise ProcessCrash
+
+    monkeypatch.setattr(module, "_rename_no_replace_at", rename_then_crash)
+    with pytest.raises(ProcessCrash):
+        module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("rollback must precede validation"),
+            sync_runner=lambda: pytest.fail("rollback must precede sync"),
+            fault_hook=initial_crash,
+        )
+
+    recovered = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("recovery must not validate"),
+        sync_runner=lambda: pytest.fail("recovery must not sync"),
+    )
+
+    assert (recovered.status, recovered.reason) == (
+        "rolled_back",
+        "planning_commit_failed",
+    )
+    assert not (repo / operation.decision_artifact_path).exists()
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+@pytest.mark.parametrize("artifact", ["decision", "companion"])
+def test_rollback_absent_artifact_race_preserves_concurrent_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    artifact: str,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    selected_relative = operation.decision_artifact_path if artifact == "decision" else operation.companion_target_path
+    selected = repo / selected_relative
+    expected = operation.human_decision_bytes if artifact == "decision" else operation.replacement_companion
+    assert expected is not None
+    sentinel = f"concurrent {artifact}\n".encode()
+    aside = selected.with_name(f"{selected.name}.transaction-owned")
+    armed = [False]
+    real_snapshot = module._RepositoryTargetGuard.snapshot
+
+    def snapshot(self, relative: str):
+        observed = real_snapshot(self, relative)
+        if armed[0] and relative == selected_relative and observed.existed and observed.data == expected:
+            armed[0] = False
+            selected.rename(aside)
+            selected.write_bytes(sentinel)
+        return observed
+
+    def fault(checkpoint: str) -> None:
+        trigger = "after_decision_write" if artifact == "decision" else "after_companion_write"
+        if checkpoint == trigger:
+            armed[0] = True
+            raise RuntimeError("begin rollback")
+
+    monkeypatch.setattr(module._RepositoryTargetGuard, "snapshot", snapshot)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("rollback race must not validate"),
+        sync_runner=lambda: pytest.fail("rollback race must not sync"),
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+    assert selected.read_bytes() == sentinel
+    assert aside.read_bytes() == expected
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert (output / f"planning-apply-{operation.operation_id}" / "transaction").is_dir()
 
 
 def test_backed_up_recovery_discards_without_overwriting_concurrent_bytes(
@@ -1392,6 +2534,382 @@ def test_validation_and_sync_failures_restore_exact_baseline(
     )
     assert (retry.status, retry.reason) == ("ready", "adoption_published")
     assert _git(origin, "rev-parse", "refs/heads/feature/issue") == _git(repo, "rev-parse", "HEAD")
+
+
+@pytest.mark.parametrize(
+    "selected_target",
+    ["design.md", "plan.md", "requirement.md", "companion", "decision"],
+)
+def test_staged_tree_proof_rejects_atomic_target_replacement_after_diff_proof(
+    tmp_path: Path,
+    selected_target: str,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    target_relative = {
+        **{Path(path).name: path for path in targets},
+        "companion": operation.companion_target_path,
+        "decision": operation.decision_artifact_path,
+    }[selected_target]
+    target = repo / target_relative
+    unauthorized = f"unauthorized {selected_target} bytes\n".encode()
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_diff_proof":
+            replacement = target.with_name(f".{target.name}.unauthorized")
+            replacement.write_bytes(unauthorized)
+            replacement.replace(target)
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+    assert target.read_bytes() == unauthorized
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    transaction = operation_dir / "transaction"
+    ledger = json.loads((transaction / "mutation-ledger.json").read_bytes())
+    selected_entry = next(entry for entry in ledger["entries"] if entry["path"] == target_relative)
+    authorized = {
+        **operation.replacement_documents,
+        "companion": operation.replacement_companion,
+        "decision": operation.human_decision_bytes,
+    }[selected_target]
+    assert authorized is not None
+    assert selected_entry["after_sha256"] == hashlib.sha256(authorized).hexdigest()
+    assert (transaction / "backup-manifest.json").is_file()
+    assert not (operation_dir / "commit.json").exists()
+    assert not (operation_dir / "publication.json").exists()
+
+
+def test_staged_tree_proof_rejects_index_only_poison_before_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    index_before = module.snapshot_git_index(repo)
+    worktree_before = {
+        path: module.snapshot_regular_file(repo / path)
+        for path in (
+            *targets,
+            operation.companion_target_path,
+            operation.decision_artifact_path,
+        )
+    }
+    poisoned_relative = next(path for path in targets if Path(path).name == "requirement.md")
+    unauthorized = b"unauthorized index-only blob\n"
+    real_run_git = module._run_git
+    injected = [False]
+
+    def run_git(repo_root: Path, argv: tuple[str, ...], *, check: bool = False):
+        result = real_run_git(repo_root, argv, check=check)
+        if not injected[0] and argv and argv[0] == "add" and result.returncode == 0:
+            injected[0] = True
+            hashed = subprocess.run(
+                ["git", "-C", repo.as_posix(), "hash-object", "-w", "--stdin"],
+                input=unauthorized,
+                check=True,
+                capture_output=True,
+            )
+            poisoned_oid = hashed.stdout.decode("ascii").strip()
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    repo.as_posix(),
+                    "update-index",
+                    "--cacheinfo",
+                    "100644",
+                    poisoned_oid,
+                    poisoned_relative,
+                ],
+                check=True,
+                capture_output=True,
+            )
+        return result
+
+    monkeypatch.setattr(module, "_run_git", run_git)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert injected == [True]
+    assert (result.status, result.reason) == ("rolled_back", "planning_commit_failed")
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert module.snapshot_git_index(repo) == index_before
+    for path, before in worktree_before.items():
+        assert module.snapshot_regular_file(repo / path) == before
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    assert not (operation_dir / "transaction").exists()
+    assert not (operation_dir / "commit.json").exists()
+    assert not (operation_dir / "publication.json").exists()
+
+
+def test_late_real_index_poison_stops_before_local_commit(tmp_path: Path) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    index_before = module.snapshot_git_index(repo)
+    poisoned_relative = next(path for path in targets if Path(path).name == "requirement.md")
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint != "after_index_stage":
+            return
+        poisoned_oid = (
+            subprocess
+            .run(
+                ["git", "-C", repo.as_posix(), "hash-object", "-w", "--stdin"],
+                input=b"unauthorized late index blob\n",
+                check=True,
+                capture_output=True,
+            )
+            .stdout.decode("ascii")
+            .strip()
+        )
+        _git(
+            repo,
+            "update-index",
+            "--cacheinfo",
+            "100644",
+            poisoned_oid,
+            poisoned_relative,
+        )
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == ("rolled_back", "planning_commit_failed")
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert module.snapshot_git_index(repo) == index_before
+    operation_dir = output / f"planning-apply-{operation.operation_id}"
+    assert not (operation_dir / "commit.json").exists()
+    assert not (operation_dir / "publication.json").exists()
+
+
+def test_final_real_index_race_installs_only_verified_tree(tmp_path: Path) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    poisoned_relative = next(path for path in targets if Path(path).name == "requirement.md")
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint != "after_final_index_proof":
+            return
+        poisoned_oid = (
+            subprocess
+            .run(
+                ["git", "-C", repo.as_posix(), "hash-object", "-w", "--stdin"],
+                input=b"unauthorized final-race index blob\n",
+                check=True,
+                capture_output=True,
+            )
+            .stdout.decode("ascii")
+            .strip()
+        )
+        _git(
+            repo,
+            "update-index",
+            "--cacheinfo",
+            "100644",
+            poisoned_oid,
+            poisoned_relative,
+        )
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == (
+        "recovery_required",
+        "post_commit_workspace_changed",
+    )
+    assert result.local_commit is not None
+    assert result.local_tree is not None
+    assert _git(repo, "rev-parse", "HEAD") == result.local_commit
+    assert _git(repo, "rev-parse", f"{result.local_commit}^") == head
+    assert _git(repo, "rev-parse", f"{result.local_commit}^{{tree}}") == result.local_tree
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    for relative in operation.canonical_target_paths:
+        expected = operation.replacement_documents[Path(relative).name]
+        observed = subprocess.run(
+            ["git", "-C", repo.as_posix(), "show", f"{result.local_commit}:{relative}"],
+            check=True,
+            capture_output=True,
+        ).stdout
+        assert observed == expected
+
+
+def test_operation_commit_runs_hooks_once_in_order_with_private_index(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    hook_log = tmp_path / "hook.log"
+    expected_tree = tmp_path / "expected-tree"
+    for name in ("pre-commit", "prepare-commit-msg", "commit-msg", "post-commit"):
+        body = (
+            f"printf '%s\\n' {shlex.quote(name)} >> {shlex.quote(hook_log.as_posix())}\n"
+            f"git write-tree >> {shlex.quote(expected_tree.as_posix())}"
+            if name == "pre-commit"
+            else f"printf '%s\\n' {shlex.quote(name)} >> {shlex.quote(hook_log.as_posix())}"
+        )
+        _install_hook(repo, name, body)
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert hook_log.read_text().splitlines() == [
+        "pre-commit",
+        "prepare-commit-msg",
+        "commit-msg",
+        "post-commit",
+    ]
+    assert expected_tree.read_text().strip() == result.local_tree
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == result.local_commit
+
+
+def test_rejecting_pre_commit_hook_rolls_back_before_commit(tmp_path: Path) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    _install_hook(repo, "pre-commit", "exit 42")
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert (result.status, result.reason) == ("rolled_back", "planning_commit_failed")
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert not (output / f"planning-apply-{operation.operation_id}" / "commit.json").exists()
+
+
+def test_private_index_mutating_pre_commit_hook_is_rejected(tmp_path: Path) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    poisoned_relative = next(path for path in targets if Path(path).name == "requirement.md")
+    _install_hook(
+        repo,
+        "pre-commit",
+        (
+            "oid=$(printf 'unauthorized hook blob\\n' | git hash-object -w --stdin)\n"
+            f'git update-index --cacheinfo 100644 "$oid" {shlex.quote(poisoned_relative)}'
+        ),
+    )
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert (result.status, result.reason) == ("rolled_back", "planning_commit_failed")
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_commit_message_hook_cannot_remove_operation_trailer(tmp_path: Path) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    _install_hook(repo, "commit-msg", "printf 'rewritten without trailer\\n' > \"$1\"")
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert (result.status, result.reason) == ("rolled_back", "planning_commit_failed")
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_post_commit_hook_workspace_mutation_preserves_recovery_gate(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    target = next(path for path in targets if Path(path).name == "requirement.md")
+    _install_hook(repo, "post-commit", f"printf 'post hook mutation\\n' > {shlex.quote(target)}")
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert (result.status, result.reason) == (
+        "recovery_required",
+        "post_commit_workspace_changed",
+    )
+    assert result.local_commit is not None
+    assert _git(repo, "rev-parse", "HEAD") == result.local_commit
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
 
 
 @pytest.mark.parametrize(

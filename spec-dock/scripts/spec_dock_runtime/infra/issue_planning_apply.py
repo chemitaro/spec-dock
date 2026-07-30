@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from contextlib import suppress
-from dataclasses import dataclass, field
+import ctypes
+from dataclasses import dataclass, field, replace as dataclass_replace
+import errno
 import hashlib
 import json
 import os
@@ -10,12 +12,16 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Literal
 
 from spec_dock_runtime.domain.issue_planning_candidate import DOCUMENT_NAMES
-from spec_dock_runtime.infra.issue_planning_candidate import OutputDirectoryGuard
+from spec_dock_runtime.infra.issue_planning_candidate import (
+    OutputDirectoryGuard,
+    open_safe_directory_descriptor,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -159,6 +165,1004 @@ class DurableTransactionBackup:
     files: Mapping[str, FileSnapshot]
     decision: FileSnapshot
     managed: Mapping[str, ManagedStateEntry]
+    target_parent_identities: Mapping[str, tuple[int, int]]
+
+
+@dataclass(frozen=True)
+class _GuardedRepositoryTarget:
+    relative: str
+    parent_fd: int
+    name: str
+    parent_device: int
+    parent_inode: int
+
+
+@dataclass(frozen=True)
+class _TargetMutation:
+    relative: str
+    before: FileSnapshot
+    after: FileSnapshot
+    phase: Literal["prepared", "published", "rollback-prepared"]
+    workspace_name: str
+    workspace_device: int
+    workspace_inode: int
+    staged_name: str
+    staged_device: int
+    staged_inode: int
+    before_device: int | None
+    before_inode: int | None
+    after_device: int
+    after_inode: int
+
+
+@dataclass(frozen=True)
+class _WorkspaceIntent:
+    relative: str
+    purpose: Literal["forward", "rollback-existing", "rollback-absent"]
+    workspace_name: str
+    workspace_device: int | None
+    workspace_inode: int | None
+    staged_name: str
+    staged_device: int | None
+    staged_inode: int | None
+
+
+@dataclass(frozen=True)
+class _MutationWorkspace:
+    name: str
+    descriptor: int
+    device: int
+    inode: int
+
+
+class _ApplyTargetDrift(RuntimeError):
+    def __init__(self, relative: str) -> None:
+        super().__init__(relative)
+        self.relative = relative
+
+
+class _RepositoryTargetGuard:
+    def __init__(self, repo_fd: int, targets: Mapping[str, _GuardedRepositoryTarget]) -> None:
+        self.repo_fd = repo_fd
+        self.targets = MappingProxyType(dict(targets))
+
+    @classmethod
+    def capture(
+        cls,
+        repo_root: Path,
+        relatives: tuple[str, ...],
+    ) -> _RepositoryTargetGuard:
+        repo_fd = open_safe_directory_descriptor(repo_root)
+        targets: dict[str, _GuardedRepositoryTarget] = {}
+        try:
+            for relative in relatives:
+                safe = _safe_repo_relative(relative)
+                parent_fd = os.dup(repo_fd)
+                try:
+                    for part in safe.parts[:-1]:
+                        next_fd = os.open(
+                            part,
+                            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+                            dir_fd=parent_fd,
+                        )
+                        opened = os.fstat(next_fd)
+                        if not stat.S_ISDIR(opened.st_mode):
+                            raise ValueError("repository target parent is unsafe")
+                        os.close(parent_fd)
+                        parent_fd = next_fd
+                    parent = os.fstat(parent_fd)
+                    targets[relative] = _GuardedRepositoryTarget(
+                        relative=relative,
+                        parent_fd=parent_fd,
+                        name=safe.name,
+                        parent_device=parent.st_dev,
+                        parent_inode=parent.st_ino,
+                    )
+                    parent_fd = -1
+                finally:
+                    if parent_fd >= 0:
+                        os.close(parent_fd)
+            return cls(repo_fd, targets)
+        except OSError:
+            for target in targets.values():
+                os.close(target.parent_fd)
+            os.close(repo_fd)
+            raise ValueError("directory traversal rejected") from None
+        except BaseException:
+            for target in targets.values():
+                os.close(target.parent_fd)
+            os.close(repo_fd)
+            raise
+
+    def close(self) -> None:
+        for target in self.targets.values():
+            os.close(target.parent_fd)
+        os.close(self.repo_fd)
+
+    @property
+    def parent_identities(self) -> Mapping[str, tuple[int, int]]:
+        return MappingProxyType({
+            relative: (target.parent_device, target.parent_inode) for relative, target in self.targets.items()
+        })
+
+    def snapshot(self, relative: str) -> FileSnapshot:
+        target = self.targets[relative]
+        return _snapshot_regular_file_at(target.parent_fd, target.name)
+
+    def read(self, relative: str) -> bytes:
+        snapshot = self.snapshot(relative)
+        if not snapshot.existed:
+            raise FileNotFoundError(relative)
+        return snapshot.data
+
+    @staticmethod
+    def _new_workspace_name() -> str:
+        return f".spec-dock-apply-{os.urandom(16).hex()}"
+
+    def _create_workspace(
+        self,
+        target: _GuardedRepositoryTarget,
+        name: str,
+    ) -> _MutationWorkspace:
+        os.mkdir(name, mode=0o700, dir_fd=target.parent_fd)
+        descriptor = -1
+        try:
+            descriptor = os.open(
+                name,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=target.parent_fd,
+            )
+            opened = os.fstat(descriptor)
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or opened.st_uid != os.geteuid()
+                or stat.S_IMODE(opened.st_mode) != 0o700
+            ):
+                raise PlanningApplyRestoreMismatch("transaction workspace is unsafe")
+            os.fsync(target.parent_fd)
+            return _MutationWorkspace(
+                name=name,
+                descriptor=descriptor,
+                device=opened.st_dev,
+                inode=opened.st_ino,
+            )
+        except BaseException:
+            if descriptor >= 0:
+                os.close(descriptor)
+            raise
+
+    def _open_workspace(
+        self,
+        target: _GuardedRepositoryTarget,
+        mutation: _TargetMutation,
+    ) -> _MutationWorkspace | None:
+        try:
+            descriptor = os.open(
+                mutation.workspace_name,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=target.parent_fd,
+            )
+        except FileNotFoundError:
+            return None
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISDIR(opened.st_mode)
+            or opened.st_uid != os.geteuid()
+            or stat.S_IMODE(opened.st_mode) != 0o700
+            or (opened.st_dev, opened.st_ino) != (mutation.workspace_device, mutation.workspace_inode)
+        ):
+            os.close(descriptor)
+            raise PlanningApplyRestoreMismatch("transaction workspace identity changed")
+        return _MutationWorkspace(
+            name=mutation.workspace_name,
+            descriptor=descriptor,
+            device=opened.st_dev,
+            inode=opened.st_ino,
+        )
+
+    @staticmethod
+    def _workspace_entry_identity(
+        workspace: _MutationWorkspace,
+        name: str,
+    ) -> tuple[int, int] | None:
+        try:
+            opened = os.stat(name, dir_fd=workspace.descriptor, follow_symlinks=False)
+        except FileNotFoundError:
+            return None
+        return opened.st_dev, opened.st_ino
+
+    @staticmethod
+    def _remove_workspace_if_empty(
+        target: _GuardedRepositoryTarget,
+        workspace: _MutationWorkspace,
+    ) -> None:
+        with os.scandir(workspace.descriptor) as entries:
+            if next(entries, None) is not None:
+                raise PlanningApplyRestoreMismatch("transaction workspace contains ambiguous entries")
+        os.rmdir(workspace.name, dir_fd=target.parent_fd)
+        os.close(workspace.descriptor)
+        os.fsync(target.parent_fd)
+
+    def cleanup_workspace(self, mutation: _TargetMutation) -> None:
+        target = self.targets[mutation.relative]
+        workspace = self._open_workspace(target, mutation)
+        if workspace is None:
+            return
+        try:
+            identity = self._workspace_entry_identity(workspace, mutation.staged_name)
+            if identity is not None:
+                if identity != (mutation.before_device, mutation.before_inode):
+                    raise PlanningApplyRestoreMismatch("transaction workspace entry identity changed")
+                if _snapshot_regular_file_at(workspace.descriptor, mutation.staged_name) != mutation.before:
+                    raise PlanningApplyRestoreMismatch("transaction workspace entry bytes changed")
+                os.unlink(mutation.staged_name, dir_fd=workspace.descriptor)
+                os.fsync(workspace.descriptor)
+            self._remove_workspace_if_empty(target, workspace)
+            workspace = None
+        finally:
+            if workspace is not None:
+                os.close(workspace.descriptor)
+
+    def resolve_workspace_intent(
+        self,
+        intent: _WorkspaceIntent,
+        mutations: list[_TargetMutation],
+    ) -> None:
+        if intent.purpose == "rollback-absent":
+            self._resolve_absent_workspace_intent(intent, mutations)
+            return
+        matching = [
+            mutation
+            for mutation in mutations
+            if mutation.relative == intent.relative
+            and mutation.workspace_name == intent.workspace_name
+            and mutation.workspace_device == intent.workspace_device
+            and mutation.workspace_inode == intent.workspace_inode
+            and mutation.staged_name == intent.staged_name
+            and mutation.staged_device == intent.staged_device
+            and mutation.staged_inode == intent.staged_inode
+            and (
+                (intent.purpose == "forward" and mutation.phase == "prepared")
+                or (intent.purpose == "rollback-existing" and mutation.phase == "rollback-prepared")
+            )
+        ]
+        if matching:
+            if len(matching) != 1:
+                raise PlanningApplyRestoreMismatch("workspace intent handoff is ambiguous")
+            return
+
+        target = self.targets[intent.relative]
+        try:
+            descriptor = os.open(
+                intent.workspace_name,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=target.parent_fd,
+            )
+        except FileNotFoundError:
+            if intent.staged_device is not None:
+                try:
+                    opened = os.stat(
+                        target.name,
+                        dir_fd=target.parent_fd,
+                        follow_symlinks=False,
+                    )
+                except FileNotFoundError:
+                    return
+                if (opened.st_dev, opened.st_ino) == (
+                    intent.staged_device,
+                    intent.staged_inode,
+                ):
+                    raise PlanningApplyRestoreMismatch("workspace intent may have been published") from None
+            return
+        except OSError:
+            raise PlanningApplyRestoreMismatch("workspace intent object is unsafe") from None
+        workspace: _MutationWorkspace | None = None
+        try:
+            opened = os.fstat(descriptor)
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or opened.st_uid != os.geteuid()
+                or stat.S_IMODE(opened.st_mode) != 0o700
+                or (
+                    intent.workspace_device is not None
+                    and (opened.st_dev, opened.st_ino) != (intent.workspace_device, intent.workspace_inode)
+                )
+            ):
+                raise PlanningApplyRestoreMismatch("workspace intent identity changed")
+            workspace = _MutationWorkspace(
+                name=intent.workspace_name,
+                descriptor=descriptor,
+                device=opened.st_dev,
+                inode=opened.st_ino,
+            )
+            descriptor = -1
+            with os.scandir(workspace.descriptor) as entries:
+                inventory = {entry.name for entry in entries}
+            if intent.workspace_device is None:
+                if inventory:
+                    raise PlanningApplyRestoreMismatch("unbound workspace intent is nonempty")
+            elif intent.staged_device is None:
+                if inventory:
+                    if inventory != {intent.staged_name}:
+                        raise PlanningApplyRestoreMismatch("workspace intent contains ambiguous entries")
+                    staged = os.stat(
+                        intent.staged_name,
+                        dir_fd=workspace.descriptor,
+                        follow_symlinks=False,
+                    )
+                    if (
+                        not stat.S_ISREG(staged.st_mode)
+                        or staged.st_uid != os.geteuid()
+                        or stat.S_IMODE(staged.st_mode) != 0o600
+                        or staged.st_size != 0
+                    ):
+                        raise PlanningApplyRestoreMismatch("unbound staged intent is unsafe")
+                    os.unlink(intent.staged_name, dir_fd=workspace.descriptor)
+                    os.fsync(workspace.descriptor)
+            elif inventory:
+                if inventory != {intent.staged_name}:
+                    raise PlanningApplyRestoreMismatch("workspace intent contains ambiguous entries")
+                staged = os.stat(
+                    intent.staged_name,
+                    dir_fd=workspace.descriptor,
+                    follow_symlinks=False,
+                )
+                if (staged.st_dev, staged.st_ino) != (
+                    intent.staged_device,
+                    intent.staged_inode,
+                ):
+                    raise PlanningApplyRestoreMismatch("workspace intent staged identity changed")
+                os.unlink(intent.staged_name, dir_fd=workspace.descriptor)
+                os.fsync(workspace.descriptor)
+            self._remove_workspace_if_empty(target, workspace)
+            workspace = None
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+            if workspace is not None:
+                os.close(workspace.descriptor)
+
+    def _resolve_absent_workspace_intent(
+        self,
+        intent: _WorkspaceIntent,
+        mutations: list[_TargetMutation],
+    ) -> None:
+        matching = [mutation for mutation in mutations if mutation.relative == intent.relative]
+        if len(matching) != 1:
+            raise PlanningApplyRestoreMismatch("absent rollback intent inventory changed")
+        mutation = matching[0]
+        if mutation.before.existed:
+            raise PlanningApplyRestoreMismatch("absent rollback intent preimage changed")
+        if mutation.phase == "rollback-prepared":
+            if (
+                mutation.workspace_name != intent.workspace_name
+                or mutation.workspace_device != intent.workspace_device
+                or mutation.workspace_inode != intent.workspace_inode
+                or mutation.staged_name != intent.staged_name
+                or mutation.staged_device != intent.staged_device
+                or mutation.staged_inode != intent.staged_inode
+            ):
+                raise PlanningApplyRestoreMismatch("absent rollback intent handoff changed")
+            return
+        if mutation.phase != "published":
+            raise PlanningApplyRestoreMismatch("absent rollback intent phase changed")
+        if intent.workspace_device is None:
+            if intent.staged_device is not None:
+                raise PlanningApplyRestoreMismatch("absent rollback intent binding changed")
+        elif (intent.staged_device, intent.staged_inode) != (
+            mutation.after_device,
+            mutation.after_inode,
+        ):
+            raise PlanningApplyRestoreMismatch("absent rollback target binding changed")
+        current = self.snapshot(intent.relative)
+        try:
+            opened_target = os.stat(
+                self.targets[intent.relative].name,
+                dir_fd=self.targets[intent.relative].parent_fd,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            raise PlanningApplyRestoreMismatch("absent rollback target disappeared") from None
+        if current != mutation.after or (opened_target.st_dev, opened_target.st_ino) != (
+            mutation.after_device,
+            mutation.after_inode,
+        ):
+            raise PlanningApplyRestoreMismatch("absent rollback target changed")
+
+        target = self.targets[intent.relative]
+        try:
+            descriptor = os.open(
+                intent.workspace_name,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=target.parent_fd,
+            )
+        except FileNotFoundError:
+            return
+        except OSError:
+            raise PlanningApplyRestoreMismatch("absent rollback workspace is unsafe") from None
+        workspace: _MutationWorkspace | None = None
+        try:
+            opened = os.fstat(descriptor)
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or opened.st_uid != os.geteuid()
+                or stat.S_IMODE(opened.st_mode) != 0o700
+                or (
+                    intent.workspace_device is not None
+                    and (opened.st_dev, opened.st_ino) != (intent.workspace_device, intent.workspace_inode)
+                )
+            ):
+                raise PlanningApplyRestoreMismatch("absent rollback workspace identity changed")
+            workspace = _MutationWorkspace(
+                name=intent.workspace_name,
+                descriptor=descriptor,
+                device=opened.st_dev,
+                inode=opened.st_ino,
+            )
+            descriptor = -1
+            with os.scandir(workspace.descriptor) as entries:
+                if next(entries, None) is not None:
+                    raise PlanningApplyRestoreMismatch("absent rollback workspace is nonempty")
+            self._remove_workspace_if_empty(target, workspace)
+            workspace = None
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+            if workspace is not None:
+                os.close(workspace.descriptor)
+
+    def compare_replace(
+        self,
+        relative: str,
+        *,
+        expected: FileSnapshot,
+        replacement: bytes,
+        mode: int,
+        prepare: Callable[[_TargetMutation], None] | None = None,
+        publish: Callable[[_TargetMutation], None] | None = None,
+        discard: Callable[[_TargetMutation], None] | None = None,
+        workspace_intent_update: Callable[[_WorkspaceIntent | None], None] | None = None,
+        workspace_purpose: Literal["forward", "rollback-existing"] = "forward",
+    ) -> _TargetMutation | None:
+        replacement_snapshot = FileSnapshot(
+            existed=True,
+            data=replacement,
+            mode=mode,
+            sha256=hashlib.sha256(replacement).hexdigest(),
+        )
+        if expected == replacement_snapshot:
+            if self.snapshot(relative) != expected:
+                raise _ApplyTargetDrift(relative)
+            return None
+        target = self.targets[relative]
+        workspace_name = self._new_workspace_name()
+        intent = _WorkspaceIntent(
+            relative=relative,
+            purpose=workspace_purpose,
+            workspace_name=workspace_name,
+            workspace_device=None,
+            workspace_inode=None,
+            staged_name="staged",
+            staged_device=None,
+            staged_inode=None,
+        )
+        if workspace_intent_update is not None:
+            if prepare is None:
+                raise PlanningApplyRestoreMismatch("workspace intent requires mutation handoff")
+            workspace_intent_update(intent)
+        workspace = self._create_workspace(target, workspace_name)
+        intent = dataclass_replace(
+            intent,
+            workspace_device=workspace.device,
+            workspace_inode=workspace.inode,
+        )
+        if workspace_intent_update is not None:
+            workspace_intent_update(intent)
+        workspace_to_close: _MutationWorkspace | None = workspace
+        staged_name = "staged"
+        staged_fd = -1
+        current_fd = -1
+        prepared: _TargetMutation | None = None
+        try:
+            staged_fd = os.open(
+                staged_name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
+                dir_fd=workspace.descriptor,
+            )
+            os.fsync(workspace.descriptor)
+            staged_identity = os.fstat(staged_fd)
+            intent = dataclass_replace(
+                intent,
+                staged_device=staged_identity.st_dev,
+                staged_inode=staged_identity.st_ino,
+            )
+            if workspace_intent_update is not None:
+                workspace_intent_update(intent)
+            os.fchmod(staged_fd, mode)
+            _write_all(staged_fd, replacement)
+            os.fsync(staged_fd)
+            before_device: int | None = None
+            before_inode: int | None = None
+            if expected.existed:
+                try:
+                    current_fd = os.open(
+                        target.name,
+                        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                        dir_fd=target.parent_fd,
+                    )
+                except OSError as error:
+                    if error.errno in {errno.ENOENT, errno.ELOOP, errno.ENOTDIR}:
+                        raise _ApplyTargetDrift(relative) from None
+                    raise
+                current_identity = os.fstat(current_fd)
+                if not stat.S_ISREG(current_identity.st_mode):
+                    raise PlanningApplyRestoreMismatch("transaction exchange ownership changed")
+                before_device = current_identity.st_dev
+                before_inode = current_identity.st_ino
+            prepared = _TargetMutation(
+                relative=relative,
+                before=expected,
+                after=replacement_snapshot,
+                phase="prepared",
+                workspace_name=workspace.name,
+                workspace_device=workspace.device,
+                workspace_inode=workspace.inode,
+                staged_name=staged_name,
+                staged_device=staged_identity.st_dev,
+                staged_inode=staged_identity.st_ino,
+                before_device=before_device,
+                before_inode=before_inode,
+                after_device=staged_identity.st_dev,
+                after_inode=staged_identity.st_ino,
+            )
+            if prepare is not None:
+                prepare(prepared)
+            if workspace_intent_update is not None:
+                workspace_intent_update(None)
+            if expected.existed:
+                _exchange_entries_at(
+                    workspace.descriptor,
+                    staged_name,
+                    target.parent_fd,
+                    target.name,
+                )
+                displaced_identity = os.stat(
+                    staged_name,
+                    dir_fd=workspace.descriptor,
+                    follow_symlinks=False,
+                )
+                displaced_snapshot = _snapshot_regular_file_at(workspace.descriptor, staged_name)
+                published_identity = os.stat(
+                    target.name,
+                    dir_fd=target.parent_fd,
+                    follow_symlinks=False,
+                )
+                published_snapshot = self.snapshot(relative)
+                target_is_staged = (
+                    published_identity.st_dev,
+                    published_identity.st_ino,
+                ) == (staged_identity.st_dev, staged_identity.st_ino)
+                displaced_is_opened = (
+                    displaced_identity.st_dev,
+                    displaced_identity.st_ino,
+                ) == (before_device, before_inode)
+                if not target_is_staged or published_snapshot != replacement_snapshot:
+                    raise PlanningApplyRestoreMismatch("transaction exchange ownership changed")
+                if not displaced_is_opened or displaced_snapshot != expected:
+                    current_published = os.stat(
+                        target.name,
+                        dir_fd=target.parent_fd,
+                        follow_symlinks=False,
+                    )
+                    current_displaced = os.stat(
+                        staged_name,
+                        dir_fd=workspace.descriptor,
+                        follow_symlinks=False,
+                    )
+                    if (
+                        (current_published.st_dev, current_published.st_ino)
+                        != (staged_identity.st_dev, staged_identity.st_ino)
+                        or self.snapshot(relative) != replacement_snapshot
+                        or (current_displaced.st_dev, current_displaced.st_ino)
+                        != (displaced_identity.st_dev, displaced_identity.st_ino)
+                        or _snapshot_regular_file_at(workspace.descriptor, staged_name) != displaced_snapshot
+                    ):
+                        raise PlanningApplyRestoreMismatch("transaction exchange continuity changed")
+                    _exchange_entries_at(
+                        workspace.descriptor,
+                        staged_name,
+                        target.parent_fd,
+                        target.name,
+                    )
+                    os.fsync(workspace.descriptor)
+                    os.fsync(target.parent_fd)
+                    restored = os.stat(
+                        target.name,
+                        dir_fd=target.parent_fd,
+                        follow_symlinks=False,
+                    )
+                    restored_staged = os.stat(
+                        staged_name,
+                        dir_fd=workspace.descriptor,
+                        follow_symlinks=False,
+                    )
+                    if (
+                        (restored.st_dev, restored.st_ino) != (displaced_identity.st_dev, displaced_identity.st_ino)
+                        or self.snapshot(relative) != displaced_snapshot
+                        or (restored_staged.st_dev, restored_staged.st_ino)
+                        != (staged_identity.st_dev, staged_identity.st_ino)
+                        or _snapshot_regular_file_at(workspace.descriptor, staged_name) != replacement_snapshot
+                    ):
+                        raise PlanningApplyRestoreMismatch("transaction exchange-back mismatch")
+                    os.unlink(staged_name, dir_fd=workspace.descriptor)
+                    os.fsync(workspace.descriptor)
+                    self._remove_workspace_if_empty(target, workspace)
+                    workspace_to_close = None
+                    if discard is not None:
+                        discard(prepared)
+                    raise _ApplyTargetDrift(relative)
+            else:
+                try:
+                    _rename_no_replace_at(
+                        workspace.descriptor,
+                        staged_name,
+                        target.parent_fd,
+                        target.name,
+                    )
+                except FileExistsError:
+                    staged_now = self._workspace_entry_identity(workspace, staged_name)
+                    if staged_now != (staged_identity.st_dev, staged_identity.st_ino):
+                        raise PlanningApplyRestoreMismatch("transaction staged identity changed") from None
+                    os.unlink(staged_name, dir_fd=workspace.descriptor)
+                    os.fsync(workspace.descriptor)
+                    self._remove_workspace_if_empty(target, workspace)
+                    workspace_to_close = None
+                    if discard is not None:
+                        discard(prepared)
+                    raise _ApplyTargetDrift(relative) from None
+            observed = os.stat(
+                target.name,
+                dir_fd=target.parent_fd,
+                follow_symlinks=False,
+            )
+            if (observed.st_dev, observed.st_ino) != (staged_identity.st_dev, staged_identity.st_ino) or self.snapshot(
+                relative
+            ) != replacement_snapshot:
+                raise PlanningApplyRestoreMismatch("transaction target publication mismatch")
+            published = dataclass_replace(prepared, phase="published")
+            if publish is not None:
+                publish(published)
+            if expected.existed:
+                if self._workspace_entry_identity(workspace, staged_name) != (before_device, before_inode):
+                    raise PlanningApplyRestoreMismatch("transaction displaced identity changed")
+                os.unlink(staged_name, dir_fd=workspace.descriptor)
+                os.fsync(workspace.descriptor)
+            self._remove_workspace_if_empty(target, workspace)
+            workspace_to_close = None
+            os.fsync(target.parent_fd)
+            return published
+        finally:
+            if current_fd >= 0:
+                os.close(current_fd)
+            if staged_fd >= 0:
+                os.close(staged_fd)
+            if workspace_to_close is not None:
+                os.close(workspace_to_close.descriptor)
+
+    def restore(
+        self,
+        mutation: _TargetMutation,
+        *,
+        phase_update: Callable[[_TargetMutation], None] | None = None,
+        workspace_intent_update: Callable[[_WorkspaceIntent | None], None] | None = None,
+    ) -> None:
+        target = self.targets[mutation.relative]
+        if mutation.phase == "rollback-prepared":
+            if mutation.before.existed:
+                self._resume_existing_restore(target, mutation)
+            else:
+                self._resume_absent_restore(target, mutation)
+            return
+        current_snapshot = self.snapshot(mutation.relative)
+        if current_snapshot == mutation.before:
+            return
+        try:
+            observed = os.stat(
+                target.name,
+                dir_fd=target.parent_fd,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            raise PlanningApplyRestoreMismatch("transaction-owned target disappeared") from None
+        if (observed.st_dev, observed.st_ino) != (mutation.after_device, mutation.after_inode) or self.snapshot(
+            mutation.relative
+        ) != mutation.after:
+            raise PlanningApplyRestoreMismatch("transaction-owned target changed")
+        if mutation.before.existed:
+
+            def prepare_reverse(reverse: _TargetMutation) -> None:
+                rollback = dataclass_replace(
+                    mutation,
+                    phase="rollback-prepared",
+                    workspace_name=reverse.workspace_name,
+                    workspace_device=reverse.workspace_device,
+                    workspace_inode=reverse.workspace_inode,
+                    staged_name=reverse.staged_name,
+                    staged_device=reverse.staged_device,
+                    staged_inode=reverse.staged_inode,
+                )
+                if phase_update is not None:
+                    phase_update(rollback)
+
+            def discard_reverse(_reverse: _TargetMutation) -> None:
+                if phase_update is not None:
+                    phase_update(mutation)
+
+            restored = self.compare_replace(
+                mutation.relative,
+                expected=mutation.after,
+                replacement=mutation.before.data,
+                mode=mutation.before.mode,
+                prepare=prepare_reverse,
+                discard=discard_reverse,
+                workspace_intent_update=workspace_intent_update,
+                workspace_purpose="rollback-existing",
+            )
+            if restored is None or self.snapshot(mutation.relative) != mutation.before:
+                raise PlanningApplyRestoreMismatch("transaction target restore mismatch")
+        else:
+            if (phase_update is None) != (workspace_intent_update is None):
+                raise PlanningApplyRestoreMismatch("absent rollback journal callbacks are incomplete")
+            workspace_name = self._new_workspace_name()
+            if workspace_intent_update is not None:
+                workspace_intent_update(
+                    _WorkspaceIntent(
+                        relative=mutation.relative,
+                        purpose="rollback-absent",
+                        workspace_name=workspace_name,
+                        workspace_device=None,
+                        workspace_inode=None,
+                        staged_name="quarantine",
+                        staged_device=None,
+                        staged_inode=None,
+                    )
+                )
+            workspace = self._create_workspace(target, workspace_name)
+            try:
+                if workspace_intent_update is not None:
+                    workspace_intent_update(
+                        _WorkspaceIntent(
+                            relative=mutation.relative,
+                            purpose="rollback-absent",
+                            workspace_name=workspace.name,
+                            workspace_device=workspace.device,
+                            workspace_inode=workspace.inode,
+                            staged_name="quarantine",
+                            staged_device=mutation.after_device,
+                            staged_inode=mutation.after_inode,
+                        )
+                    )
+                rollback = dataclass_replace(
+                    mutation,
+                    phase="rollback-prepared",
+                    workspace_name=workspace.name,
+                    workspace_device=workspace.device,
+                    workspace_inode=workspace.inode,
+                    staged_name="quarantine",
+                    staged_device=mutation.after_device,
+                    staged_inode=mutation.after_inode,
+                )
+                if phase_update is not None:
+                    phase_update(rollback)
+                if workspace_intent_update is not None:
+                    workspace_intent_update(None)
+            finally:
+                os.close(workspace.descriptor)
+            self._resume_absent_restore(target, rollback)
+
+    def _resume_existing_restore(
+        self,
+        target: _GuardedRepositoryTarget,
+        mutation: _TargetMutation,
+    ) -> None:
+        workspace = self._open_workspace(target, mutation)
+        try:
+            current = self.snapshot(mutation.relative)
+            try:
+                opened = os.stat(
+                    target.name,
+                    dir_fd=target.parent_fd,
+                    follow_symlinks=False,
+                )
+                current_identity = (opened.st_dev, opened.st_ino)
+            except FileNotFoundError:
+                current_identity = None
+            target_is_after = current == mutation.after and current_identity == (
+                mutation.after_device,
+                mutation.after_inode,
+            )
+            target_is_before = current == mutation.before and current_identity == (
+                mutation.staged_device,
+                mutation.staged_inode,
+            )
+            if workspace is None:
+                if target_is_before:
+                    return
+                raise PlanningApplyRestoreMismatch("rollback workspace disappeared")
+            active_workspace = workspace
+
+            def workspace_entries() -> set[str]:
+                with os.scandir(active_workspace.descriptor) as entries:
+                    return {entry.name for entry in entries}
+
+            staged_identity = self._workspace_entry_identity(workspace, mutation.staged_name)
+            if target_is_after:
+                if (
+                    staged_identity != (mutation.staged_device, mutation.staged_inode)
+                    or workspace_entries() != {mutation.staged_name}
+                    or _snapshot_regular_file_at(workspace.descriptor, mutation.staged_name) != mutation.before
+                ):
+                    raise PlanningApplyRestoreMismatch("rollback staged preimage changed")
+                _exchange_entries_at(
+                    workspace.descriptor,
+                    mutation.staged_name,
+                    target.parent_fd,
+                    target.name,
+                )
+                os.fsync(workspace.descriptor)
+                os.fsync(target.parent_fd)
+                current = self.snapshot(mutation.relative)
+                try:
+                    opened = os.stat(
+                        target.name,
+                        dir_fd=target.parent_fd,
+                        follow_symlinks=False,
+                    )
+                except FileNotFoundError:
+                    raise PlanningApplyRestoreMismatch("rollback target disappeared") from None
+                target_is_before = current == mutation.before and (opened.st_dev, opened.st_ino) == (
+                    mutation.staged_device,
+                    mutation.staged_inode,
+                )
+                staged_identity = self._workspace_entry_identity(workspace, mutation.staged_name)
+            if not target_is_before:
+                raise PlanningApplyRestoreMismatch("rollback target state is ambiguous")
+            if staged_identity is None:
+                if workspace_entries():
+                    raise PlanningApplyRestoreMismatch("rollback workspace contains ambiguous entries")
+                self._remove_workspace_if_empty(target, workspace)
+                workspace = None
+                return
+            if (
+                staged_identity != (mutation.after_device, mutation.after_inode)
+                or workspace_entries() != {mutation.staged_name}
+                or _snapshot_regular_file_at(workspace.descriptor, mutation.staged_name) != mutation.after
+            ):
+                raise PlanningApplyRestoreMismatch("rollback displaced target changed")
+            os.unlink(mutation.staged_name, dir_fd=workspace.descriptor)
+            os.fsync(workspace.descriptor)
+            if workspace_entries():
+                raise PlanningApplyRestoreMismatch("rollback workspace contains ambiguous entries")
+            self._remove_workspace_if_empty(target, workspace)
+            workspace = None
+        finally:
+            if workspace is not None:
+                os.close(workspace.descriptor)
+
+    def resolve_prepared(self, mutation: _TargetMutation) -> _TargetMutation | None:
+        if mutation.phase != "prepared":
+            return mutation
+        target = self.targets[mutation.relative]
+        target_snapshot = self.snapshot(mutation.relative)
+        workspace = self._open_workspace(target, mutation)
+        try:
+            staged_identity = (
+                None if workspace is None else self._workspace_entry_identity(workspace, mutation.staged_name)
+            )
+            if target_snapshot == mutation.before:
+                if workspace is None:
+                    return None
+                if staged_identity != (mutation.staged_device, mutation.staged_inode):
+                    raise PlanningApplyRestoreMismatch("prepared mutation workspace mismatch")
+                if _snapshot_regular_file_at(workspace.descriptor, mutation.staged_name) != mutation.after:
+                    raise PlanningApplyRestoreMismatch("prepared mutation staged bytes changed")
+                os.unlink(mutation.staged_name, dir_fd=workspace.descriptor)
+                os.fsync(workspace.descriptor)
+                self._remove_workspace_if_empty(target, workspace)
+                workspace = None
+                return None
+            try:
+                target_stat = os.stat(
+                    target.name,
+                    dir_fd=target.parent_fd,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                raise PlanningApplyRestoreMismatch("prepared mutation target disappeared") from None
+            if target_snapshot == mutation.after and (target_stat.st_dev, target_stat.st_ino) == (
+                mutation.staged_device,
+                mutation.staged_inode,
+            ):
+                if not mutation.before.existed:
+                    if workspace is None:
+                        raise PlanningApplyRestoreMismatch("prepared mutation workspace missing")
+                    if staged_identity is not None:
+                        raise PlanningApplyRestoreMismatch("prepared mutation workspace slot changed")
+                elif workspace is not None:
+                    if staged_identity != (mutation.before_device, mutation.before_inode):
+                        raise PlanningApplyRestoreMismatch("prepared mutation displaced identity changed")
+                    if _snapshot_regular_file_at(workspace.descriptor, mutation.staged_name) != mutation.before:
+                        raise PlanningApplyRestoreMismatch("prepared mutation displaced bytes changed")
+                return dataclass_replace(mutation, phase="published")
+            raise PlanningApplyRestoreMismatch("prepared mutation state is ambiguous")
+        finally:
+            if workspace is not None:
+                os.close(workspace.descriptor)
+
+    def _resume_absent_restore(
+        self,
+        target: _GuardedRepositoryTarget,
+        mutation: _TargetMutation,
+    ) -> None:
+        workspace = self._open_workspace(target, mutation)
+        if workspace is None:
+            if self.snapshot(mutation.relative) == mutation.before:
+                return
+            raise PlanningApplyRestoreMismatch("rollback workspace disappeared")
+        try:
+            current = self.snapshot(mutation.relative)
+            quarantined = self._workspace_entry_identity(workspace, mutation.staged_name)
+            if current == mutation.before:
+                if quarantined is None:
+                    self._remove_workspace_if_empty(target, workspace)
+                    workspace = None
+                    return
+                if quarantined != (mutation.after_device, mutation.after_inode):
+                    raise PlanningApplyRestoreMismatch("rollback quarantine identity changed")
+                if _snapshot_regular_file_at(workspace.descriptor, mutation.staged_name) != mutation.after:
+                    raise PlanningApplyRestoreMismatch("rollback quarantine bytes changed")
+            elif current == mutation.after:
+                _rename_no_replace_at(
+                    target.parent_fd,
+                    target.name,
+                    workspace.descriptor,
+                    mutation.staged_name,
+                )
+                current = self.snapshot(mutation.relative)
+                quarantined = self._workspace_entry_identity(workspace, mutation.staged_name)
+                if current != mutation.before:
+                    if quarantined == (mutation.after_device, mutation.after_inode):
+                        with suppress(FileExistsError):
+                            _rename_no_replace_at(
+                                workspace.descriptor,
+                                mutation.staged_name,
+                                target.parent_fd,
+                                target.name,
+                            )
+                    raise PlanningApplyRestoreMismatch("rollback absence was not established")
+                if quarantined != (mutation.after_device, mutation.after_inode):
+                    if quarantined is not None:
+                        with suppress(FileExistsError):
+                            _rename_no_replace_at(
+                                workspace.descriptor,
+                                mutation.staged_name,
+                                target.parent_fd,
+                                target.name,
+                            )
+                    raise PlanningApplyRestoreMismatch("rollback quarantine identity changed")
+                if _snapshot_regular_file_at(workspace.descriptor, mutation.staged_name) != mutation.after:
+                    raise PlanningApplyRestoreMismatch("rollback quarantine bytes changed")
+            else:
+                raise PlanningApplyRestoreMismatch("transaction-owned target changed")
+            os.unlink(mutation.staged_name, dir_fd=workspace.descriptor)
+            os.fsync(workspace.descriptor)
+            self._remove_workspace_if_empty(target, workspace)
+            workspace = None
+            os.fsync(target.parent_fd)
+        finally:
+            if workspace is not None:
+                os.close(workspace.descriptor)
 
 
 @dataclass(frozen=True)
@@ -423,6 +1427,214 @@ def snapshot_regular_file(path: Path) -> FileSnapshot:
         mode=stat.S_IMODE(opened.st_mode),
         sha256=hashlib.sha256(data).hexdigest(),
     )
+
+
+def _snapshot_regular_file_at(parent_fd: int, name: str) -> FileSnapshot:
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            name,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=parent_fd,
+        )
+    except FileNotFoundError:
+        return FileSnapshot(
+            existed=False,
+            data=b"",
+            mode=0,
+            sha256=hashlib.sha256(b"").hexdigest(),
+        )
+    try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode):
+            raise ValueError("transaction target must be a regular non-symlink file")
+        chunks: list[bytes] = []
+        while chunk := os.read(descriptor, 1024 * 1024):
+            chunks.append(chunk)
+        data = b"".join(chunks)
+        current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino):
+            raise ValueError("transaction target identity changed during snapshot")
+        return FileSnapshot(
+            existed=True,
+            data=data,
+            mode=stat.S_IMODE(opened.st_mode),
+            sha256=hashlib.sha256(data).hexdigest(),
+        )
+    finally:
+        os.close(descriptor)
+
+
+def _exchange_entries_at(
+    source_fd: int,
+    first: str,
+    destination_fd: int,
+    second: str,
+) -> None:
+    if sys.platform.startswith("linux"):
+        _exchange_entries_linux_at(source_fd, first, destination_fd, second)
+    elif sys.platform == "darwin":
+        _exchange_entries_darwin_at(source_fd, first, destination_fd, second)
+    else:
+        raise NotImplementedError("atomic exchange is unavailable")
+
+
+def _exchange_entries_linux_at(
+    source_fd: int,
+    first: str,
+    destination_fd: int,
+    second: str,
+) -> None:
+    library = ctypes.CDLL(None, use_errno=True)
+    rename = getattr(library, "renameat2", None)
+    if rename is None:
+        raise NotImplementedError("renameat2 is unavailable")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    result = rename(
+        source_fd,
+        os.fsencode(first),
+        destination_fd,
+        os.fsencode(second),
+        0x00000002,
+    )
+    if result != 0:
+        error_number = ctypes.get_errno()
+        raise OSError(error_number, os.strerror(error_number), second)
+
+
+def _exchange_entries_darwin_at(
+    source_fd: int,
+    first: str,
+    destination_fd: int,
+    second: str,
+) -> None:
+    library = ctypes.CDLL(None, use_errno=True)
+    rename = getattr(library, "renameatx_np", None)
+    if rename is None:
+        raise NotImplementedError("renameatx_np is unavailable")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    result = rename(
+        source_fd,
+        os.fsencode(first),
+        destination_fd,
+        os.fsencode(second),
+        0x00000002,
+    )
+    if result != 0:
+        error_number = ctypes.get_errno()
+        raise OSError(error_number, os.strerror(error_number), second)
+
+
+def _rename_no_replace_at(
+    source_fd: int,
+    source_name: str,
+    destination_fd: int,
+    destination_name: str,
+) -> None:
+    if sys.platform.startswith("linux"):
+        _rename_no_replace_linux_at(
+            source_fd,
+            source_name,
+            destination_fd,
+            destination_name,
+        )
+    elif sys.platform == "darwin":
+        _rename_no_replace_darwin_at(
+            source_fd,
+            source_name,
+            destination_fd,
+            destination_name,
+        )
+    else:
+        raise NotImplementedError("atomic no-replace rename is unavailable")
+
+
+def _rename_no_replace_linux_at(
+    source_fd: int,
+    source_name: str,
+    destination_fd: int,
+    destination_name: str,
+) -> None:
+    library = ctypes.CDLL(None, use_errno=True)
+    rename = getattr(library, "renameat2", None)
+    if rename is None:
+        raise NotImplementedError("renameat2 is unavailable")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    result = rename(
+        source_fd,
+        os.fsencode(source_name),
+        destination_fd,
+        os.fsencode(destination_name),
+        0x00000001,
+    )
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise FileExistsError(
+            error_number,
+            os.strerror(error_number),
+            destination_name,
+        )
+    raise OSError(error_number, os.strerror(error_number), destination_name)
+
+
+def _rename_no_replace_darwin_at(
+    source_fd: int,
+    source_name: str,
+    destination_fd: int,
+    destination_name: str,
+) -> None:
+    library = ctypes.CDLL(None, use_errno=True)
+    rename = getattr(library, "renameatx_np", None)
+    if rename is None:
+        raise NotImplementedError("renameatx_np is unavailable")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    result = rename(
+        source_fd,
+        os.fsencode(source_name),
+        destination_fd,
+        os.fsencode(destination_name),
+        0x00000004,
+    )
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise FileExistsError(
+            error_number,
+            os.strerror(error_number),
+            destination_name,
+        )
+    raise OSError(error_number, os.strerror(error_number), destination_name)
 
 
 def restore_regular_file(path: Path, snapshot: FileSnapshot) -> None:
@@ -782,7 +1994,13 @@ def _validate_existing_operation_evidence(handle: _ApplyEvidenceHandle) -> None:
     if _entry_exists_at(handle, "transaction"):
         if not _owned_private_directory_at(handle.operation_fd, "transaction"):
             raise PlanningApplyOutputRejected("transaction evidence is not private")
-        allowed_transaction = {"files", "managed-state", "git-index.bin", "backup-manifest.json"}
+        allowed_transaction = {
+            "files",
+            "managed-state",
+            "git-index.bin",
+            "backup-manifest.json",
+            "mutation-ledger.json",
+        }
         if not _list_directory_at(handle, "transaction") <= allowed_transaction:
             raise PlanningApplyOutputRejected("transaction evidence contains unexpected entries")
         transaction_fd = _open_directory_at(handle.operation_fd, "transaction")
@@ -795,7 +2013,7 @@ def _validate_existing_operation_evidence(handle: _ApplyEvidenceHandle) -> None:
                         raise PlanningApplyOutputRejected("transaction evidence is not private")
         finally:
             os.close(transaction_fd)
-        for filename in ("git-index.bin", "backup-manifest.json"):
+        for filename in ("git-index.bin", "backup-manifest.json", "mutation-ledger.json"):
             if not _owned_private_file_at(handle, f"transaction/{filename}"):
                 raise PlanningApplyOutputRejected("transaction evidence is not private")
 
@@ -881,6 +2099,53 @@ def _run_git(
     return result
 
 
+def _run_git_with_private_index(
+    repo_root: Path,
+    index_path: Path,
+    argv: tuple[str, ...],
+) -> GitCommandResult:
+    private_root = index_path.parent.resolve()
+    if not private_root.is_dir() or stat.S_IMODE(private_root.stat().st_mode) != 0o700:
+        raise PlanningApplyUnsafeGitCommand("private commit workspace is unsafe")
+    allowed = False
+    if (len(argv) == 2 and argv[0] == "read-tree" and _SHA40.fullmatch(argv[1])) or argv == ("write-tree",):
+        allowed = True
+    elif argv[:3] == ("hook", "run", "--ignore-missing"):
+        hook = argv[3:4]
+        if hook in (("pre-commit",), ("post-commit",)) and len(argv) == 4:
+            allowed = True
+        elif (hook == ("prepare-commit-msg",) and len(argv) == 7 and argv[4] == "--" and argv[6] == "message") or (
+            hook == ("commit-msg",) and len(argv) == 6 and argv[4] == "--"
+        ):
+            allowed = Path(argv[5]).parent.resolve() == private_root
+    elif (
+        len(argv) in (6, 7)
+        and argv[0] == "commit-tree"
+        and _SHA40.fullmatch(argv[1])
+        and argv[2] == "-p"
+        and _SHA40.fullmatch(argv[3])
+        and argv[4] == "-F"
+        and Path(argv[5]).parent.resolve() == private_root
+        and (len(argv) == 6 or argv[6] == "-S")
+    ):
+        allowed = True
+    if not allowed:
+        raise PlanningApplyUnsafeGitCommand("private-index Git argv is outside the fixed operation seam")
+    environment = os.environ.copy()
+    environment["GIT_INDEX_FILE"] = index_path.resolve().as_posix()
+    completed = subprocess.run(
+        ("git", "-C", repo_root.as_posix(), *argv),
+        check=False,
+        capture_output=True,
+        env=environment,
+    )
+    return GitCommandResult(
+        returncode=completed.returncode,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
+    )
+
+
 def _git_text(repo_root: Path, *argv: str) -> str | None:
     result = _run_git(repo_root, tuple(argv))
     if result.returncode != 0:
@@ -888,9 +2153,239 @@ def _git_text(repo_root: Path, *argv: str) -> str | None:
     return result.stdout.decode("utf-8", errors="strict").strip()
 
 
+def _operation_commit_is_proven(
+    operation: PlanningApplyOperation,
+    *,
+    repo_root: Path,
+    local_commit: str,
+    local_tree: str,
+    expected_paths: set[str],
+) -> bool:
+    parents = _git_text(repo_root, "rev-list", "--parents", "-n", "1", local_commit)
+    commit_tree = _git_text(repo_root, "rev-parse", f"{local_commit}^{{tree}}")
+    commit_paths = _git_text(
+        repo_root,
+        "diff-tree",
+        "--no-commit-id",
+        "--name-only",
+        "-r",
+        local_commit,
+    )
+    message = _git_text(repo_root, "show", "-s", "--format=%B", local_commit)
+    return (
+        _SHA40.fullmatch(local_commit) is not None
+        and parents == f"{local_commit} {operation.expected_head}"
+        and commit_tree == local_tree
+        and set(commit_paths.splitlines() if commit_paths else ()) == expected_paths
+        and message is not None
+        and f"SpecDock-Planning-Operation: {operation.operation_id}" in message
+    )
+
+
+def _create_verified_operation_commit(
+    operation: PlanningApplyOperation,
+    *,
+    repo_root: Path,
+    local_tree: str,
+    expected_paths: set[str],
+    subject: str,
+    fault_hook: Callable[[str], None] | None,
+) -> str:
+    with tempfile.TemporaryDirectory(prefix="spec-dock-planning-commit-") as temporary:
+        workspace = Path(temporary)
+        workspace.chmod(0o700)
+        index_path = workspace / "index"
+        message_path = workspace / "message"
+        message_path.write_bytes((f"{subject}\n\nSpecDock-Planning-Operation: {operation.operation_id}\n").encode())
+        message_path.chmod(0o600)
+        if _run_git_with_private_index(repo_root, index_path, ("read-tree", local_tree)).returncode != 0:
+            raise _ApplyFailure("planning_commit_failed")
+        private_tree = _run_git_with_private_index(repo_root, index_path, ("write-tree",))
+        if private_tree.returncode != 0 or private_tree.stdout.decode("ascii", errors="strict").strip() != local_tree:
+            raise _ApplyFailure("planning_commit_failed")
+        for hook_argv in (
+            ("hook", "run", "--ignore-missing", "pre-commit"),
+            (
+                "hook",
+                "run",
+                "--ignore-missing",
+                "prepare-commit-msg",
+                "--",
+                message_path.as_posix(),
+                "message",
+            ),
+            (
+                "hook",
+                "run",
+                "--ignore-missing",
+                "commit-msg",
+                "--",
+                message_path.as_posix(),
+            ),
+        ):
+            if _run_git_with_private_index(repo_root, index_path, hook_argv).returncode != 0:
+                raise _ApplyFailure("planning_commit_failed")
+        private_tree = _run_git_with_private_index(repo_root, index_path, ("write-tree",))
+        try:
+            message = message_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            raise _ApplyFailure("planning_commit_failed") from None
+        if (
+            private_tree.returncode != 0
+            or private_tree.stdout.decode("ascii", errors="strict").strip() != local_tree
+            or f"SpecDock-Planning-Operation: {operation.operation_id}" not in message
+            or _git_text(repo_root, "write-tree") != local_tree
+        ):
+            raise _ApplyFailure("planning_commit_failed")
+        if fault_hook is not None:
+            fault_hook("after_final_index_proof")
+        signing = _run_git(repo_root, ("config", "--type=bool", "--get", "commit.gpgsign"))
+        if signing.returncode not in (0, 1):
+            raise _ApplyFailure("planning_commit_failed")
+        signing_value = signing.stdout.decode("ascii", errors="strict").strip()
+        if signing.returncode == 0 and signing_value not in ("true", "false"):
+            raise _ApplyFailure("planning_commit_failed")
+        commit_argv: tuple[str, ...] = (
+            "commit-tree",
+            local_tree,
+            "-p",
+            operation.expected_head,
+            "-F",
+            message_path.as_posix(),
+        )
+        if signing_value == "true":
+            commit_argv = (*commit_argv, "-S")
+        created = _run_git_with_private_index(repo_root, index_path, commit_argv)
+        if created.returncode != 0:
+            raise _ApplyFailure("planning_commit_failed")
+        local_commit = created.stdout.decode("ascii", errors="strict").strip()
+        if not _operation_commit_is_proven(
+            operation,
+            repo_root=repo_root,
+            local_commit=local_commit,
+            local_tree=local_tree,
+            expected_paths=expected_paths,
+        ):
+            raise PlanningApplyRestoreMismatch("operation commit proof failed")
+        return local_commit
+
+
+def _install_operation_commit_cas(
+    operation: PlanningApplyOperation,
+    *,
+    repo_root: Path,
+    local_commit: str,
+    local_tree: str,
+    expected_paths: set[str],
+) -> None:
+    destination = f"refs/heads/{operation.branch}"
+    if (
+        _SHA40.fullmatch(local_commit) is None
+        or _SHA40.fullmatch(local_tree) is None
+        or _git_text(repo_root, "check-ref-format", "--branch", operation.branch) != operation.branch
+        or _git_text(repo_root, "symbolic-ref", "-q", "HEAD") != destination
+        or _git_text(repo_root, "rev-parse", "HEAD") != operation.expected_head
+        or not _operation_commit_is_proven(
+            operation,
+            repo_root=repo_root,
+            local_commit=local_commit,
+            local_tree=local_tree,
+            expected_paths=expected_paths,
+        )
+    ):
+        raise PlanningApplyRestoreMismatch("operation commit install proof failed")
+    completed = subprocess.run(
+        (
+            "git",
+            "-C",
+            repo_root.as_posix(),
+            "update-ref",
+            destination,
+            local_commit,
+            operation.expected_head,
+        ),
+        check=False,
+        capture_output=True,
+    )
+    if (
+        completed.returncode != 0
+        or _git_text(repo_root, "symbolic-ref", "-q", "HEAD") != destination
+        or _git_text(repo_root, "rev-parse", "HEAD") != local_commit
+    ):
+        raise PlanningApplyRestoreMismatch("operation commit install CAS failed")
+
+
 def _git_blob_oid(content: bytes) -> str:
     header = f"blob {len(content)}\0".encode("ascii")
     return hashlib.sha1(header + content).hexdigest()
+
+
+def _expected_staged_blob_oids(
+    operation: PlanningApplyOperation,
+    *,
+    expected_companion_oid: str | None,
+) -> Mapping[str, str | None]:
+    expected: dict[str, str | None] = {}
+    replace_canonical = operation.decision == "approved" and operation.mode == "archive-candidate"
+    for relative in operation.canonical_target_paths:
+        filename = PurePosixPath(relative).name
+        if replace_canonical:
+            replacement = operation.replacement_documents.get(filename)
+            if replacement is None:
+                raise ValueError("staged planning target cannot be proven")
+            expected[relative] = _git_blob_oid(replacement)
+        else:
+            oid = operation.pre_apply_target_blob_oids.get(relative)
+            if oid is None or _SHA40.fullmatch(oid) is None:
+                raise ValueError("staged planning target cannot be proven")
+            expected[relative] = oid
+    if operation.replacement_companion is not None:
+        expected[operation.companion_target_path] = _git_blob_oid(operation.replacement_companion)
+    else:
+        if expected_companion_oid is not None and _SHA40.fullmatch(expected_companion_oid) is None:
+            raise ValueError("staged planning target cannot be proven")
+        expected[operation.companion_target_path] = expected_companion_oid
+    expected[operation.decision_artifact_path] = _git_blob_oid(operation.human_decision_bytes)
+    if len(expected) != 5:
+        raise ValueError("staged planning target inventory is invalid")
+    return MappingProxyType(expected)
+
+
+def _tree_blob_oids(
+    repo_root: Path,
+    tree_oid: str,
+    relatives: tuple[str, ...],
+) -> Mapping[str, str | None] | None:
+    if _SHA40.fullmatch(tree_oid) is None or len(relatives) != len(set(relatives)):
+        return None
+    targets = set(relatives)
+    result = _run_git(
+        repo_root,
+        ("ls-tree", "-r", "-z", tree_oid, "--", *sorted(relatives)),
+    )
+    if result.returncode != 0 or (result.stdout and not result.stdout.endswith(b"\0")):
+        return None
+    observed: dict[str, str] = {}
+    for entry in result.stdout.split(b"\0"):
+        if not entry:
+            continue
+        try:
+            metadata, path_bytes = entry.split(b"\t", 1)
+            mode, object_type, oid_bytes = metadata.split(b" ")
+            path = path_bytes.decode("utf-8", errors="strict")
+            oid = oid_bytes.decode("ascii", errors="strict")
+        except (UnicodeDecodeError, ValueError):
+            return None
+        if (
+            path not in targets
+            or path in observed
+            or mode not in {b"100644", b"100755"}
+            or object_type != b"blob"
+            or _SHA40.fullmatch(oid) is None
+        ):
+            return None
+        observed[path] = oid
+    return MappingProxyType({relative: observed.get(relative) for relative in relatives})
 
 
 def load_expected_planning_targets(
@@ -1114,6 +2609,8 @@ def _apply_targets_match_snapshots(
     operation: PlanningApplyOperation,
     repo_root: Path,
     file_snapshots: Mapping[str, FileSnapshot],
+    *,
+    target_guard: _RepositoryTargetGuard | None = None,
 ) -> bool:
     if (
         _git_text(repo_root, "branch", "--show-current") != operation.branch
@@ -1125,7 +2622,12 @@ def _apply_targets_match_snapshots(
         if expected is None:
             return False
         try:
-            if snapshot_regular_file(repo_root / relative) != expected:
+            observed = (
+                target_guard.snapshot(relative)
+                if target_guard is not None
+                else snapshot_regular_file(repo_root / relative)
+            )
+            if observed != expected:
                 return False
         except (OSError, ValueError):
             return False
@@ -1167,6 +2669,351 @@ def _validate_no_transaction_state(
         raise PlanningApplyRestoreMismatch("operation state cannot start a transaction")
 
 
+def _apply_guarded_mutation(
+    target_guard: _RepositoryTargetGuard,
+    handle: _ApplyEvidenceHandle,
+    operation: PlanningApplyOperation,
+    mutations: list[_TargetMutation],
+    *,
+    relative: str,
+    expected: FileSnapshot,
+    replacement: bytes,
+    mode: int,
+) -> None:
+    def prepare(mutation: _TargetMutation) -> None:
+        mutations.append(mutation)
+        _persist_target_mutations(handle, operation, mutations)
+
+    def publish(mutation: _TargetMutation) -> None:
+        _replace_target_mutation(mutations, mutation)
+        _persist_target_mutations(handle, operation, mutations)
+
+    def discard(mutation: _TargetMutation) -> None:
+        _remove_target_mutation(mutations, mutation.relative)
+        _persist_target_mutations(handle, operation, mutations)
+
+    def workspace_intent_update(intent: _WorkspaceIntent | None) -> None:
+        _persist_workspace_intent(handle, operation, mutations, intent)
+
+    mutation = target_guard.compare_replace(
+        relative,
+        expected=expected,
+        replacement=replacement,
+        mode=mode,
+        prepare=prepare,
+        publish=publish,
+        discard=discard,
+        workspace_intent_update=workspace_intent_update,
+    )
+    if mutation is not None:
+        _replace_target_mutation(mutations, mutation)
+
+
+def _replace_target_mutation(
+    mutations: list[_TargetMutation],
+    mutation: _TargetMutation,
+) -> None:
+    matches = [index for index, current in enumerate(mutations) if current.relative == mutation.relative]
+    if len(matches) != 1:
+        raise PlanningApplyRestoreMismatch("transaction mutation ledger inventory changed")
+    mutations[matches[0]] = mutation
+
+
+def _remove_target_mutation(
+    mutations: list[_TargetMutation],
+    relative: str,
+) -> None:
+    matches = [index for index, current in enumerate(mutations) if current.relative == relative]
+    if len(matches) != 1:
+        raise PlanningApplyRestoreMismatch("transaction mutation ledger inventory changed")
+    mutations.pop(matches[0])
+
+
+_WORKSPACE_INTENT_UNCHANGED = object()
+
+
+def _workspace_intent_payload(intent: _WorkspaceIntent | None) -> dict[str, object] | None:
+    if intent is None:
+        return None
+    return {
+        "path": intent.relative,
+        "purpose": intent.purpose,
+        "workspace_name": intent.workspace_name,
+        "workspace_device": intent.workspace_device,
+        "workspace_inode": intent.workspace_inode,
+        "staged_name": intent.staged_name,
+        "staged_device": intent.staged_device,
+        "staged_inode": intent.staged_inode,
+    }
+
+
+def _read_mutation_ledger_value(
+    handle: _ApplyEvidenceHandle,
+    operation: PlanningApplyOperation,
+) -> dict[str, object]:
+    raw = _read_private_file_at(handle, "transaction/mutation-ledger.json")
+    try:
+        value = json.loads(raw)
+    except (ValueError, json.JSONDecodeError):
+        raise PlanningApplyRestoreMismatch("transaction mutation ledger is unreadable") from None
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"operation_id", "workspace_intent", "entries"}
+        or value.get("operation_id") != operation.operation_id
+        or not isinstance(value.get("entries"), list)
+        or _canonical_json_bytes(value) != raw
+    ):
+        raise PlanningApplyRestoreMismatch("transaction mutation ledger mismatch")
+    return value
+
+
+def _workspace_intent_from_value(
+    value: object,
+    operation: PlanningApplyOperation,
+) -> _WorkspaceIntent | None:
+    if value is None:
+        return None
+    allowed = {
+        *operation.canonical_target_paths,
+        operation.companion_target_path,
+        operation.decision_artifact_path,
+    }
+    purpose = value.get("purpose") if isinstance(value, dict) else None
+    expected_staged_name = "quarantine" if purpose == "rollback-absent" else "staged"
+    if (
+        not isinstance(value, dict)
+        or set(value)
+        != {
+            "path",
+            "purpose",
+            "workspace_name",
+            "workspace_device",
+            "workspace_inode",
+            "staged_name",
+            "staged_device",
+            "staged_inode",
+        }
+        or not isinstance(value.get("path"), str)
+        or value["path"] not in allowed
+        or purpose not in {"forward", "rollback-existing", "rollback-absent"}
+        or not isinstance(value.get("workspace_name"), str)
+        or re.fullmatch(r"\.spec-dock-apply-[0-9a-f]{32}", value["workspace_name"]) is None
+        or value.get("staged_name") != expected_staged_name
+    ):
+        raise PlanningApplyRestoreMismatch("transaction workspace intent mismatch")
+    workspace_device = value.get("workspace_device")
+    workspace_inode = value.get("workspace_inode")
+    staged_device = value.get("staged_device")
+    staged_inode = value.get("staged_inode")
+    workspace_bound = (
+        isinstance(workspace_device, int)
+        and not isinstance(workspace_device, bool)
+        and isinstance(workspace_inode, int)
+        and not isinstance(workspace_inode, bool)
+    )
+    staged_bound = (
+        isinstance(staged_device, int)
+        and not isinstance(staged_device, bool)
+        and isinstance(staged_inode, int)
+        and not isinstance(staged_inode, bool)
+    )
+    if (
+        (workspace_device is None) != (workspace_inode is None)
+        or (staged_device is None) != (staged_inode is None)
+        or (workspace_device is not None and not workspace_bound)
+        or (staged_device is not None and not staged_bound)
+        or (staged_bound and not workspace_bound)
+        or (purpose == "rollback-absent" and workspace_bound != staged_bound)
+    ):
+        raise PlanningApplyRestoreMismatch("transaction workspace intent mismatch")
+    return _WorkspaceIntent(
+        relative=value["path"],
+        purpose=value["purpose"],
+        workspace_name=value["workspace_name"],
+        workspace_device=workspace_device,
+        workspace_inode=workspace_inode,
+        staged_name=value["staged_name"],
+        staged_device=staged_device,
+        staged_inode=staged_inode,
+    )
+
+
+def _load_workspace_intent(
+    handle: _ApplyEvidenceHandle,
+    operation: PlanningApplyOperation,
+) -> _WorkspaceIntent | None:
+    value = _read_mutation_ledger_value(handle, operation)
+    return _workspace_intent_from_value(value["workspace_intent"], operation)
+
+
+def _persist_target_mutations(
+    handle: _ApplyEvidenceHandle,
+    operation: PlanningApplyOperation,
+    mutations: list[_TargetMutation],
+    *,
+    workspace_intent: _WorkspaceIntent | object | None = _WORKSPACE_INTENT_UNCHANGED,
+) -> None:
+    if workspace_intent is _WORKSPACE_INTENT_UNCHANGED:
+        current_intent = _load_workspace_intent(handle, operation)
+    else:
+        assert workspace_intent is None or isinstance(workspace_intent, _WorkspaceIntent)
+        current_intent = workspace_intent
+    _write_private_atomic_at(
+        handle,
+        "transaction/mutation-ledger.json",
+        _canonical_json_bytes({
+            "operation_id": operation.operation_id,
+            "workspace_intent": _workspace_intent_payload(current_intent),
+            "entries": [
+                {
+                    "path": mutation.relative,
+                    "phase": mutation.phase,
+                    "workspace_name": mutation.workspace_name,
+                    "workspace_device": mutation.workspace_device,
+                    "workspace_inode": mutation.workspace_inode,
+                    "staged_name": mutation.staged_name,
+                    "staged_device": mutation.staged_device,
+                    "staged_inode": mutation.staged_inode,
+                    "before_device": mutation.before_device,
+                    "before_inode": mutation.before_inode,
+                    "after_device": mutation.after_device,
+                    "after_inode": mutation.after_inode,
+                    "after_mode": mutation.after.mode,
+                    "after_sha256": mutation.after.sha256,
+                }
+                for mutation in mutations
+            ],
+        }),
+    )
+
+
+def _persist_workspace_intent(
+    handle: _ApplyEvidenceHandle,
+    operation: PlanningApplyOperation,
+    mutations: list[_TargetMutation],
+    intent: _WorkspaceIntent | None,
+) -> None:
+    _persist_target_mutations(
+        handle,
+        operation,
+        mutations,
+        workspace_intent=intent,
+    )
+
+
+def _load_target_mutations(
+    handle: _ApplyEvidenceHandle,
+    operation: PlanningApplyOperation,
+    *,
+    file_snapshots: Mapping[str, FileSnapshot],
+    decision_snapshot: FileSnapshot,
+) -> list[_TargetMutation]:
+    value = _read_mutation_ledger_value(handle, operation)
+    _workspace_intent_from_value(value["workspace_intent"], operation)
+    allowed = {
+        *operation.canonical_target_paths,
+        operation.companion_target_path,
+        operation.decision_artifact_path,
+    }
+    expected_replacements = {
+        operation.decision_artifact_path: operation.human_decision_bytes,
+        operation.companion_target_path: operation.replacement_companion,
+        **{
+            relative: operation.replacement_documents.get(PurePosixPath(relative).name)
+            for relative in operation.canonical_target_paths
+        },
+    }
+    snapshots = {
+        **file_snapshots,
+        operation.decision_artifact_path: decision_snapshot,
+    }
+    mutations: list[_TargetMutation] = []
+    seen: set[str] = set()
+    entries = value["entries"]
+    assert isinstance(entries, list)
+    for entry in entries:
+        if (
+            not isinstance(entry, dict)
+            or set(entry)
+            != {
+                "path",
+                "phase",
+                "workspace_name",
+                "workspace_device",
+                "workspace_inode",
+                "staged_name",
+                "staged_device",
+                "staged_inode",
+                "before_device",
+                "before_inode",
+                "after_device",
+                "after_inode",
+                "after_mode",
+                "after_sha256",
+            }
+            or not isinstance(entry.get("path"), str)
+            or entry["path"] not in allowed
+            or entry["path"] in seen
+            or entry.get("phase") not in {"prepared", "published", "rollback-prepared"}
+            or not isinstance(entry.get("workspace_name"), str)
+            or re.fullmatch(r"\.spec-dock-apply-[0-9a-f]{32}", entry["workspace_name"]) is None
+            or entry.get("staged_name") not in {"staged", "quarantine"}
+            or isinstance(entry.get("workspace_device"), bool)
+            or not isinstance(entry.get("workspace_device"), int)
+            or isinstance(entry.get("workspace_inode"), bool)
+            or not isinstance(entry.get("workspace_inode"), int)
+            or isinstance(entry.get("staged_device"), bool)
+            or not isinstance(entry.get("staged_device"), int)
+            or isinstance(entry.get("staged_inode"), bool)
+            or not isinstance(entry.get("staged_inode"), int)
+            or (
+                entry.get("before_device") is not None
+                and (isinstance(entry.get("before_device"), bool) or not isinstance(entry.get("before_device"), int))
+            )
+            or (
+                entry.get("before_inode") is not None
+                and (isinstance(entry.get("before_inode"), bool) or not isinstance(entry.get("before_inode"), int))
+            )
+            or isinstance(entry.get("after_device"), bool)
+            or not isinstance(entry.get("after_device"), int)
+            or isinstance(entry.get("after_inode"), bool)
+            or not isinstance(entry.get("after_inode"), int)
+            or isinstance(entry.get("after_mode"), bool)
+            or not isinstance(entry.get("after_mode"), int)
+            or not isinstance(entry.get("after_sha256"), str)
+            or _SHA256.fullmatch(entry["after_sha256"]) is None
+        ):
+            raise PlanningApplyRestoreMismatch("transaction mutation ledger mismatch")
+        replacement = expected_replacements[entry["path"]]
+        if replacement is None or hashlib.sha256(replacement).hexdigest() != entry["after_sha256"]:
+            raise PlanningApplyRestoreMismatch("transaction mutation ledger mismatch")
+        seen.add(entry["path"])
+        mutations.append(
+            _TargetMutation(
+                relative=entry["path"],
+                before=snapshots[entry["path"]],
+                after=FileSnapshot(
+                    existed=True,
+                    data=replacement,
+                    mode=entry["after_mode"],
+                    sha256=entry["after_sha256"],
+                ),
+                phase=entry["phase"],
+                workspace_name=entry["workspace_name"],
+                workspace_device=entry["workspace_device"],
+                workspace_inode=entry["workspace_inode"],
+                staged_name=entry["staged_name"],
+                staged_device=entry["staged_device"],
+                staged_inode=entry["staged_inode"],
+                before_device=entry["before_device"],
+                before_inode=entry["before_inode"],
+                after_device=entry["after_device"],
+                after_inode=entry["after_inode"],
+            )
+        )
+    return mutations
+
+
 def execute_planning_apply_transaction(
     operation: PlanningApplyOperation,
     *,
@@ -1190,16 +3037,35 @@ def execute_planning_apply_transaction(
             status="rejected",
             reason="apply_output_rejected",
         )
+    target_guard: _RepositoryTargetGuard | None = None
     try:
+        try:
+            target_guard = _RepositoryTargetGuard.capture(
+                repo_root,
+                (
+                    *operation.canonical_target_paths,
+                    operation.companion_target_path,
+                    operation.decision_artifact_path,
+                ),
+            )
+        except (OSError, ValueError):
+            return _operation_result(
+                operation,
+                status=("recovery_required" if _entry_exists_at(handle, "transaction") else "rejected"),
+                reason=("restore_mismatch" if _entry_exists_at(handle, "transaction") else "apply_output_rejected"),
+            )
         return _execute_planning_apply_transaction(
             operation,
             repo_root=repo_root,
             handle=handle,
+            target_guard=target_guard,
             validation_runner=validation_runner,
             sync_runner=sync_runner,
             fault_hook=fault_hook,
         )
     finally:
+        if target_guard is not None:
+            target_guard.close()
         handle.close()
 
 
@@ -1208,6 +3074,7 @@ def _execute_planning_apply_transaction(
     *,
     repo_root: Path,
     handle: _ApplyEvidenceHandle,
+    target_guard: _RepositoryTargetGuard,
     validation_runner: Callable[[], object],
     sync_runner: Callable[[], object],
     fault_hook: Callable[[str], None] | None,
@@ -1238,6 +3105,7 @@ def _execute_planning_apply_transaction(
             operation,
             repo_root=repo_root,
             handle=handle,
+            target_guard=target_guard,
         )
     if _git_text(repo_root, "rev-parse", "HEAD") != operation.expected_head:
         return _operation_result(operation, status="stale", reason="apply_target_changed")
@@ -1253,15 +3121,6 @@ def _execute_planning_apply_transaction(
             status="blocked",
             reason="git_preflight_blocked",
         )
-    companion_path = repo_root / operation.companion_target_path
-    decision_parent = (repo_root / operation.decision_artifact_path).parent
-    if not decision_parent.is_dir() or decision_parent.is_symlink():
-        return _operation_result(
-            operation,
-            status="rejected",
-            reason="apply_output_rejected",
-        )
-
     try:
         index_snapshot = snapshot_git_index(repo_root)
     except (OSError, ValueError):
@@ -1277,8 +3136,8 @@ def _execute_planning_apply_transaction(
     except OSError:
         return _operation_result(operation, status="blocked", reason="git_preflight_blocked")
     try:
-        file_snapshots = {path: snapshot_regular_file(repo_root / path) for path in operation.canonical_target_paths}
-        companion_snapshot = snapshot_regular_file(companion_path)
+        file_snapshots = {path: target_guard.snapshot(path) for path in operation.canonical_target_paths}
+        companion_snapshot = target_guard.snapshot(operation.companion_target_path)
         file_snapshots[operation.companion_target_path] = companion_snapshot
     except (OSError, ValueError):
         return _operation_result(
@@ -1316,8 +3175,7 @@ def _execute_planning_apply_transaction(
             reason="apply_target_changed",
         )
     try:
-        decision_path = repo_root / operation.decision_artifact_path
-        decision_snapshot = snapshot_regular_file(decision_path)
+        decision_snapshot = target_guard.snapshot(operation.decision_artifact_path)
         if decision_snapshot.existed:
             return _operation_result(
                 operation,
@@ -1331,6 +3189,7 @@ def _execute_planning_apply_transaction(
             file_snapshots=file_snapshots,
             decision_snapshot=decision_snapshot,
             managed_snapshot=managed_snapshot,
+            target_parent_identities=target_guard.parent_identities,
         )
         _set_operation_state(handle, operation, "BACKED_UP")
     except (OSError, ValueError):
@@ -1338,13 +3197,21 @@ def _execute_planning_apply_transaction(
 
     mutation_started = False
     failure_reason = "planning_commit_failed"
+    target_drift = False
+    preserved_drift_paths: set[str] = set()
     committed = False
     local_commit: str | None = None
     local_tree: str | None = None
+    mutations: list[_TargetMutation] = []
     try:
         if fault_hook is not None:
             fault_hook("after_operation_recorded")
-        if not _apply_targets_match_snapshots(operation, repo_root, file_snapshots):
+        if not _apply_targets_match_snapshots(
+            operation,
+            repo_root,
+            file_snapshots,
+            target_guard=target_guard,
+        ):
             try:
                 _discard_pre_mutation_backup(
                     handle,
@@ -1371,7 +3238,16 @@ def _execute_planning_apply_transaction(
                 reason="restore_mismatch",
             )
         mutation_started = True
-        _atomic_write_exact(decision_path, operation.human_decision_bytes, mode=0o600)
+        _apply_guarded_mutation(
+            target_guard,
+            handle,
+            operation,
+            mutations,
+            relative=operation.decision_artifact_path,
+            expected=decision_snapshot,
+            replacement=operation.human_decision_bytes,
+            mode=0o600,
+        )
         if fault_hook is not None:
             fault_hook("after_decision_write")
         if operation.decision == "approved" and operation.mode == "archive-candidate":
@@ -1385,23 +3261,37 @@ def _execute_planning_apply_transaction(
                     raise _ApplyFailure("adoption_semantic_mutation")
                 relative = _path_for_filename(operation.canonical_target_paths, filename)
                 mode = file_snapshots[relative].mode
-                _atomic_write_exact(repo_root / relative, replacement, mode=mode)
+                _apply_guarded_mutation(
+                    target_guard,
+                    handle,
+                    operation,
+                    mutations,
+                    relative=relative,
+                    expected=file_snapshots[relative],
+                    replacement=replacement,
+                    mode=mode,
+                )
                 if fault_hook is not None:
                     fault_hook(checkpoint)
             for relative in operation.canonical_target_paths:
                 filename = PurePosixPath(relative).name
-                if (repo_root / relative).read_bytes() != operation.replacement_documents[filename]:
+                if target_guard.read(relative) != operation.replacement_documents[filename]:
                     raise _ApplyFailure("candidate_parity_failed")
         if operation.replacement_companion is not None:
             if not companion_snapshot.existed:
-                _atomic_write_exact(
-                    companion_path,
-                    operation.replacement_companion,
+                _apply_guarded_mutation(
+                    target_guard,
+                    handle,
+                    operation,
+                    mutations,
+                    relative=operation.companion_target_path,
+                    expected=companion_snapshot,
+                    replacement=operation.replacement_companion,
                     mode=0o644,
                 )
             if fault_hook is not None:
                 fault_hook("after_companion_write")
-            if companion_path.read_bytes() != operation.replacement_companion:
+            if target_guard.read(operation.companion_target_path) != operation.replacement_companion:
                 raise _ApplyFailure("candidate_parity_failed")
             if fault_hook is not None:
                 fault_hook("after_companion_parity")
@@ -1435,7 +3325,7 @@ def _execute_planning_apply_transaction(
             expected_paths.update(
                 relative
                 for relative in operation.canonical_target_paths
-                if (repo_root / relative).read_bytes() != file_snapshots[relative].data
+                if target_guard.read(relative) != file_snapshots[relative].data
             )
         if operation.replacement_companion is not None and not companion_snapshot.existed:
             expected_paths.add(operation.companion_target_path)
@@ -1463,6 +3353,20 @@ def _execute_planning_apply_transaction(
         local_tree = _git_text(repo_root, "write-tree")
         if local_tree is None:
             raise _ApplyFailure("planning_commit_failed")
+        try:
+            expected_staged_oids = _expected_staged_blob_oids(
+                operation,
+                expected_companion_oid=expected_companion_oid,
+            )
+        except ValueError:
+            raise _ApplyFailure("planning_commit_failed") from None
+        staged_oids = _tree_blob_oids(
+            repo_root,
+            local_tree,
+            tuple(expected_staged_oids),
+        )
+        if staged_oids is None or staged_oids != expected_staged_oids:
+            raise _ApplyFailure("planning_commit_failed")
         if fault_hook is not None:
             fault_hook("after_index_stage")
             fault_hook("before_commit")
@@ -1473,42 +3377,23 @@ def _execute_planning_apply_transaction(
             if operation.decision == "approved"
             else f"docs({operation.issue_id}): record rejected planning decision"
         )
-        _run_git(
-            repo_root,
-            (
-                "commit",
-                "-m",
-                subject,
-                "-m",
-                f"SpecDock-Planning-Operation: {operation.operation_id}",
-            ),
+        local_commit = _create_verified_operation_commit(
+            operation,
+            repo_root=repo_root,
+            local_tree=local_tree,
+            expected_paths=expected_paths,
+            subject=subject,
+            fault_hook=fault_hook,
         )
-        current_head = _git_text(repo_root, "rev-parse", "HEAD")
-        if current_head == operation.expected_head:
-            raise _ApplyFailure("planning_commit_failed")
-        if current_head is None:
-            raise PlanningApplyRestoreMismatch("unexpected local HEAD")
-        local_commit = current_head
-        parent = _git_text(repo_root, "rev-parse", f"{local_commit}^")
-        commit_tree = _git_text(repo_root, "rev-parse", f"{local_commit}^{{tree}}")
-        commit_paths = _git_text(
-            repo_root,
-            "diff-tree",
-            "--no-commit-id",
-            "--name-only",
-            "-r",
-            local_commit,
+        _install_operation_commit_cas(
+            operation,
+            repo_root=repo_root,
+            local_commit=local_commit,
+            local_tree=local_tree,
+            expected_paths=expected_paths,
         )
-        trailer = _git_text(repo_root, "show", "-s", "--format=%B", local_commit)
-        if (
-            parent != operation.expected_head
-            or commit_tree != local_tree
-            or set(commit_paths.splitlines() if commit_paths else ()) != expected_paths
-            or trailer is None
-            or f"SpecDock-Planning-Operation: {operation.operation_id}" not in trailer
-        ):
-            raise PlanningApplyRestoreMismatch("operation commit proof failed")
         committed = True
+        _run_git(repo_root, ("hook", "run", "--ignore-missing", "post-commit"))
         _write_private_no_replace_at(
             handle,
             "commit.json",
@@ -1594,6 +3479,10 @@ def _execute_planning_apply_transaction(
             local_tree=local_tree,
             remote_commit=remote,
         )
+    except _ApplyTargetDrift as error:
+        failure_reason = "apply_target_changed"
+        target_drift = True
+        preserved_drift_paths.add(error.relative)
     except _ApplyFailure as error:
         failure_reason = error.reason
     except PlanningApplyRestoreMismatch:
@@ -1621,11 +3510,13 @@ def _execute_planning_apply_transaction(
         _restore_transaction(
             operation,
             repo_root=repo_root,
+            handle=handle,
             index_snapshot=index_snapshot,
-            file_snapshots=file_snapshots,
-            decision_snapshot=decision_snapshot,
             managed_snapshot=managed_snapshot,
             fault_hook=fault_hook,
+            target_guard=target_guard,
+            mutations=mutations,
+            preserved_drift_paths=preserved_drift_paths,
         )
     except (OSError, PlanningApplyRestoreMismatch, ValueError):
         return _operation_result(
@@ -1637,7 +3528,7 @@ def _execute_planning_apply_transaction(
         _finalize_transaction_cleanup(
             handle,
             operation,
-            final_state="ROLLED_BACK",
+            final_state=("OPERATION_RECORDED" if target_drift else "ROLLED_BACK"),
         )
     except (OSError, ValueError):
         return _operation_result(
@@ -1645,6 +3536,8 @@ def _execute_planning_apply_transaction(
             status="recovery_required",
             reason="restore_mismatch",
         )
+    if target_drift:
+        return _operation_result(operation, status="stale", reason="apply_target_changed")
     return _operation_result(operation, status="rolled_back", reason=failure_reason)
 
 
@@ -1653,6 +3546,7 @@ def _recover_interrupted_transaction(
     *,
     repo_root: Path,
     handle: _ApplyEvidenceHandle,
+    target_guard: _RepositoryTargetGuard,
 ) -> PlanningApplyExecution:
     try:
         state = _load_operation_state(handle, operation)
@@ -1685,7 +3579,18 @@ def _recover_interrupted_transaction(
                 status="recovery_required",
                 reason="restore_mismatch",
             )
-        if not _apply_targets_match_snapshots(operation, repo_root, backup.files):
+        if target_guard.parent_identities != backup.target_parent_identities:
+            return _operation_result(
+                operation,
+                status="recovery_required",
+                reason="restore_mismatch",
+            )
+        if not _apply_targets_match_snapshots(
+            operation,
+            repo_root,
+            backup.files,
+            target_guard=target_guard,
+        ):
             try:
                 _discard_pre_mutation_backup(
                     handle,
@@ -1741,14 +3646,23 @@ def _recover_interrupted_transaction(
             operation,
             repo_root=repo_root,
         )
+        if target_guard.parent_identities != backup.target_parent_identities:
+            raise PlanningApplyRestoreMismatch("repository target parent identity changed")
         _restore_transaction(
             operation,
             repo_root=repo_root,
+            handle=handle,
             index_snapshot=backup.index,
-            file_snapshots=backup.files,
-            decision_snapshot=backup.decision,
             managed_snapshot=backup.managed,
             fault_hook=None,
+            target_guard=target_guard,
+            mutations=_load_target_mutations(
+                handle,
+                operation,
+                file_snapshots=backup.files,
+                decision_snapshot=backup.decision,
+            ),
+            preserved_drift_paths=set(),
         )
         if _remote_head(repo_root, operation.branch) != operation.expected_head:
             raise PlanningApplyRestoreMismatch("remote changed during recovery")
@@ -1814,33 +3728,84 @@ def _git_bound_targets_are_stale(
     return False
 
 
+def _recover_workspace_intent(
+    target_guard: _RepositoryTargetGuard,
+    handle: _ApplyEvidenceHandle,
+    operation: PlanningApplyOperation,
+    mutations: list[_TargetMutation],
+) -> None:
+    intent = _load_workspace_intent(handle, operation)
+    if intent is None:
+        return
+    target_guard.resolve_workspace_intent(intent, mutations)
+    _persist_workspace_intent(handle, operation, mutations, None)
+
+
 def _restore_transaction(
     operation: PlanningApplyOperation,
     *,
     repo_root: Path,
+    handle: _ApplyEvidenceHandle,
     index_snapshot: GitIndexSnapshot,
-    file_snapshots: Mapping[str, FileSnapshot],
-    decision_snapshot: FileSnapshot,
     managed_snapshot: Mapping[str, ManagedStateEntry],
     fault_hook: Callable[[str], None] | None,
+    target_guard: _RepositoryTargetGuard,
+    mutations: list[_TargetMutation],
+    preserved_drift_paths: set[str],
 ) -> None:
     if fault_hook is not None:
         fault_hook("during_restore")
-    restore_managed_sync_state(repo_root, managed_snapshot)
-    restore_regular_file(
-        repo_root / operation.companion_target_path,
-        file_snapshots[operation.companion_target_path],
+    _recover_workspace_intent(
+        target_guard,
+        handle,
+        operation,
+        mutations,
     )
-    for relative in reversed(operation.canonical_target_paths):
-        restore_regular_file(repo_root / relative, file_snapshots[relative])
-    restore_regular_file(repo_root / operation.decision_artifact_path, decision_snapshot)
+    restore_managed_sync_state(repo_root, managed_snapshot)
+    while mutations:
+        mutation = mutations[-1]
+        resolved = target_guard.resolve_prepared(mutation)
+        if resolved is None:
+            mutations.pop()
+            _persist_target_mutations(handle, operation, mutations)
+            continue
+        if resolved != mutation:
+            mutations[-1] = resolved
+            _persist_target_mutations(handle, operation, mutations)
+
+        def phase_update(updated: _TargetMutation) -> None:
+            mutations[-1] = updated
+            _persist_target_mutations(handle, operation, mutations)
+
+        def workspace_intent_update(intent: _WorkspaceIntent | None) -> None:
+            _persist_workspace_intent(handle, operation, mutations, intent)
+
+        target_guard.restore(
+            resolved,
+            phase_update=phase_update,
+            workspace_intent_update=workspace_intent_update,
+        )
+        target_guard.cleanup_workspace(resolved)
+        mutations.pop()
+        _persist_target_mutations(handle, operation, mutations)
     restore_git_index(repo_root, index_snapshot)
     if fault_hook is not None:
         fault_hook("after_restore")
     if _git_text(repo_root, "rev-parse", "HEAD") != operation.expected_head:
         raise PlanningApplyRestoreMismatch("HEAD changed during rollback")
     status = _git_text(repo_root, "status", "--porcelain=v2", "-z")
-    if status != "":
+    changed = _changed_paths(repo_root)
+    untracked = _git_text(
+        repo_root,
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+        "-z",
+    )
+    actual = set() if changed is None else set(changed)
+    if untracked:
+        actual.update(item for item in untracked.split("\0") if item)
+    if status is None or actual != preserved_drift_paths:
         raise PlanningApplyRestoreMismatch("worktree changed during rollback")
     # Some Git builds refresh index stat data during a read-only status. Restore
     # the captured bytes once more so the transaction postcondition is byte-exact.
@@ -2049,6 +4014,7 @@ def _persist_transaction_backup(
     file_snapshots: Mapping[str, FileSnapshot],
     decision_snapshot: FileSnapshot,
     managed_snapshot: Mapping[str, ManagedStateEntry],
+    target_parent_identities: Mapping[str, tuple[int, int]],
 ) -> None:
     _mkdir_private_at(handle, "transaction")
     _mkdir_private_at(handle, "transaction/files")
@@ -2079,6 +4045,17 @@ def _persist_transaction_backup(
             "path": operation.decision_artifact_path,
             "existed": decision_snapshot.existed,
         },
+        "target_parents": [
+            {
+                "path": relative,
+                "device": identity[0],
+                "inode": identity[1],
+            }
+            for relative, identity in sorted(
+                target_parent_identities.items(),
+                key=lambda item: item[0].encode("utf-8"),
+            )
+        ],
         "managed_state": [],
     }
     managed_entries = manifest["managed_state"]
@@ -2104,6 +4081,15 @@ def _persist_transaction_backup(
         "transaction/backup-manifest.json",
         _canonical_json_bytes(manifest),
     )
+    _write_private_no_replace_at(
+        handle,
+        "transaction/mutation-ledger.json",
+        _canonical_json_bytes({
+            "operation_id": operation.operation_id,
+            "workspace_intent": None,
+            "entries": [],
+        }),
+    )
 
 
 def _load_transaction_backup(
@@ -2126,6 +4112,7 @@ def _load_transaction_backup(
             "index",
             "files",
             "decision_artifact",
+            "target_parents",
             "managed_state",
         }
         or manifest.get("operation_id") != operation.operation_id
@@ -2216,6 +4203,35 @@ def _load_transaction_backup(
         sha256=hashlib.sha256(b"").hexdigest(),
     )
 
+    parent_values = manifest["target_parents"]
+    allowed_parent_paths = {
+        *operation.canonical_target_paths,
+        operation.companion_target_path,
+        operation.decision_artifact_path,
+    }
+    if not isinstance(parent_values, list):
+        raise ValueError("transaction target parent backup mismatch")
+    target_parent_identities: dict[str, tuple[int, int]] = {}
+    for value in parent_values:
+        if (
+            not isinstance(value, dict)
+            or set(value) != {"path", "device", "inode"}
+            or not isinstance(value.get("path"), str)
+            or value["path"] not in allowed_parent_paths
+            or value["path"] in target_parent_identities
+            or isinstance(value.get("device"), bool)
+            or not isinstance(value.get("device"), int)
+            or isinstance(value.get("inode"), bool)
+            or not isinstance(value.get("inode"), int)
+        ):
+            raise ValueError("transaction target parent backup mismatch")
+        target_parent_identities[value["path"]] = (
+            value["device"],
+            value["inode"],
+        )
+    if set(target_parent_identities) != allowed_parent_paths:
+        raise ValueError("transaction target parent backup mismatch")
+
     managed_values = manifest["managed_state"]
     if not isinstance(managed_values, list):
         raise ValueError("transaction managed backup mismatch")
@@ -2263,6 +4279,7 @@ def _load_transaction_backup(
         files=MappingProxyType(file_snapshots),
         decision=decision_snapshot,
         managed=MappingProxyType(managed_snapshots),
+        target_parent_identities=MappingProxyType(target_parent_identities),
     )
 
 
@@ -2294,7 +4311,13 @@ def _remove_transaction_backup(handle: _ApplyEvidenceHandle) -> None:
     if not _owned_private_subdirectory_at(handle, "transaction"):
         raise PlanningApplyOutputRejected("transaction evidence is unsafe")
     root_entries = _list_directory_at(handle, "transaction")
-    allowed_root = {"files", "managed-state", "git-index.bin", "backup-manifest.json"}
+    allowed_root = {
+        "files",
+        "managed-state",
+        "git-index.bin",
+        "backup-manifest.json",
+        "mutation-ledger.json",
+    }
     if not root_entries <= allowed_root:
         raise PlanningApplyOutputRejected("transaction evidence contains unexpected entries")
     for directory in ("files", "managed-state"):
@@ -2308,7 +4331,7 @@ def _remove_transaction_backup(handle: _ApplyEvidenceHandle) -> None:
                     raise PlanningApplyOutputRejected("transaction evidence is unsafe")
                 _unlink_at(handle, child)
             _rmdir_at(handle, relative)
-    for filename in ("git-index.bin", "backup-manifest.json"):
+    for filename in ("git-index.bin", "backup-manifest.json", "mutation-ledger.json"):
         relative = f"transaction/{filename}"
         if _entry_exists_at(handle, relative):
             if not _owned_private_file_at(handle, relative):
