@@ -683,10 +683,10 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 
 | ゲート | 対象 | 観測結果 | 証跡 / 次アクション |
 |---|---|---|---|
-| Docs Impact S90 | docs、templates、README、workflow、skill、migration notes | not started | S01〜S09 closure後に判定 |
-| Final QA | issue-wide obligation coverage | not started | S90後にfresh qa-reviewer |
-| Final Code Review | integrated code and tests | not started | step-local review後にfresh issue-wide code-reviewer |
-| Final Spec Review | Requirement、Design、Plan、Report、implementation、tests、docs alignment | failed | latest: `artifacts/20260727t033431z-chatgpt-fresh-canonical-review-fail.md` against exact published HEAD `3fc0e61ef8425abc0b4a5488d51e7060b0ed03cc`; bounded correction後にnew exact HEADで別fresh review |
+| Docs Impact S90 | docs、templates、README、workflow、skill、migration notes | in progress | current onboarding companionのmilestone statusをfinal combined Review `SPEC-P1-001`に従って修正し、fresh exact-HEAD reviewで再確認する |
+| Final QA | issue-wide obligation coverage | failed | final combined Review `QA-P1-001`。S12のhermetic／full／distribution evidenceは保持するが、refreshed Human authorizationにbindしたlive create→Review→exact Human decision→apply／remote parityが未完了 |
+| Final Code Review | integrated code and tests | failed | final combined Review `CODE-P1-001`〜`003`。apply入口のarchive findings欠落、dangling symlink、application unit-test boundaryをbounded repairし、new exact HEADで再確認する |
+| Final Spec Review | Requirement、Design、Plan、Report、implementation、tests、docs alignment | failed | `artifacts/20260730t020224z-chatgpt-output-s14-final-combined-review-fail.json` against exact published HEAD `bb65257155a73b621b0d0b6fb3426393c46de712`。P0 0／P1 5をbounded repair後にnew exact HEADで別fresh reviewする |
 | Planning Amendment Spec Review | Oracle boundary amendmentのEpic／Issue五文書 | passed | `artifacts/20260729t020725z-review-oracle-boundary-planning-pass.json`。これは実装後のFinal Spec Reviewを代替しない |
 | Final Commit | final report ledger and issue-wide closure | blocked | S99とfresh final reviewsのpass後に実施 |
 
@@ -760,7 +760,7 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - canonical placement fresh `spec-reviewer`: PASS、P0/P1 0、P2 2件はReportの現行assurance hashとphase promotion記録へ反映済み。`artifacts/20260729t053100z-review-onboarding-canonical-placement-pass.json`。
 - Planning amendmentはPASS and adopted。製品実装はS08以降であり、`execution-ready`、Issue finish、PR merge、Epic completionを本amendmentでは主張しない。
 
-## 2026-07-30 — S12 closure and GPT-5.6 Prompt tuning
+## 2026-07-30 — S12 hermetic verification and GPT-5.6 Prompt tuning
 
 - S12 Blocker A〜Mは、通常文中の`transcript` marker誤認、checked-in snapshot drift、PR observation wait validation、外部heredoc transportに限定して修正した。provider／dogfood agent-tooling 5対はbyte-identicalである。
 - Blocker Nは`application/issue_planning.py`から具象infraを直接importする構造契約違反だった。application-owned `IssuePlanningDependencies`／gateway／structural views／normalized errors、bootstrap adapter、4 entrypointへのrequired dependency injectionへ修正し、全48 direct callを移行した。
@@ -776,3 +776,25 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - blind A/BはcandidateをPlanner 99、Reviewer 99、Revision 100として3/3選択し、candidate critical failureは0だった。baseline Revisionの`as Planner`外部参照によるcritical failureを解消した。
 - ChatGPT exact outputは`artifacts/20260730t011515z-chatgpt-output-gpt-5-6-prompt-tuning-work-packet.md`、評価は`artifacts/20260730t011516z-gpt-5-6-prompt-tuning-evaluation.md`へ保存した。artifact自体の追加ReviewはHuman指示により不要である。
 - `chatgpt-use` wrapperが自動挿入するdefault-branch fallback文言はexact-branch-only task Promptと競合し得る。今回の回答はexact branch／HEADとdefault branch未使用を明示したため採用したが、wrapper interface改善候補として残る。
+- 上記はS12のhermetic／full-regression／distribution／prompt-tuning evidenceであり、S12全体のclosureを意味しない。Plan §22が要求するrefreshed Human authorization、real PATH Oracle create、fresh Review、exact Human decision、`ready/adoption_published` apply、remote parityは未完了のため、S12はHuman gate pendingのまま保持する。
+
+## 2026-07-30 — S14 final combined Review failure and bounded repair
+
+- fresh ChatGPT final combined Reviewはexact pushed HEAD `bb65257155a73b621b0d0b6fb3426393c46de712`をspec／code／QAの三perspectiveで確認し、P0 0／P1 5、`FAIL`と判定した。reviewerはread-onlyで、default branch未使用、repository mutation 0、改善提案0である。
+- 正式Review結果は`artifacts/20260730t020224z-chatgpt-output-s14-final-combined-review-fail.json`、別Blue Teamによる修正作業票は`artifacts/20260730t020225z-chatgpt-output-s14-blue-repair-work-packet.md`へ保存した。
+- bounded repairはcurrent onboarding companion、apply入口のarchive rejection details、dangling symlink destination、application unit-test boundary、Report gate ledgerへ限定する。`CODE-P1-001`はcreate側catchではなく`run_issue_planning_apply()`のarchive Candidate load catchに残っていた`error.args[0]`推論で再現し、application-owned `IssuePlanningCandidateArchiveRejected.findings`をexact `details`へ保持する最小修正とcharacterization testで閉じる。
+- repair、focused／fast／full／distribution検証、fresh current-HEAD Human authorization、live acceptance、S13 commit／pushを完了するまでS14は未admit、merge-readyは未成立とする。
+
+## 2026-07-30 — S14 bounded repair verification and full-regression blockers
+
+- final Review 5 P1のbounded repair後、guide／application／apply infraのfocused 4-file suiteは168 passed、`make lint`はRuff check／formatとmypy 281 filesがPASSした。provider／dogfoodの`application/issue_planning.py`と`infra/issue_planning_apply.py`はbyte-identicalで、wheel／sdist内bytesもprovider sourceと一致した。
+- archive applyは`IssuePlanningCandidateArchiveRejected.findings`を`details`へ保持し、dangling symlink destinationはnon-following statでmutation前に拒否する。application unit testsはbootstrap／concrete infra importを持たないapplication-port準拠test doublesへ移行した。
+- onboarding companionはS08〜S11 closed、S12 open／refreshed Human authorizationとlive acceptance待ち、S13／S14 not admittedへ訂正した。4 PlantUML diagramはPlantUML 1.2026.6 `-checkonly`をPASSした。
+- exact-state full regressionはbranch／HEAD／tracked diff SHA-256を前後固定して実行し、`3 failed, 3140 passed, 76 skipped`、33分50秒だった。failureはcurrent checked-in graphに対するfrozen test snapshot 2件と、final snapshot timeout時に`polls == 2`を満たさないPR observation wait 1件で、3件ともfocused再現した。
+- 別Blue Team ChatGPTはexact branch／HEADをGitHub connectorで確認し、graph 2件をvalid authoritative growthに対するtest-data drift、timeout 1件をsub-second quiet-windowの整数切捨てによるruntime defectと判定した。作業票は`artifacts/20260730t031532z-chatgpt-output-s14-full-regression-repair-work-packet.md`へ保存した。
+- frozen constantsはEpic `epic-00343`、Issues `iss-00344`〜`iss-00346`、`iss-00346 -> [iss-00344, iss-00345]`だけを機械更新し、Red 2 failuresからGreen 2 passed、validate nodes=227、Ruff／format／diff checkをPASSした。checked-in metadataとassertionは変更していない。
+- PR observation waitはquiet-window eligibilityとfinal-timeout stable-state判定を同じabsolute monotonic deadlineへ修正した。unchanged testはRed `polls 1 != 2`からGreen 1 passed、S430／PR observation関連41 passed、provider／dogfood byte parity、Ruff／format／diff checkをPASSした。公開schema、status／reason、timing設定、zero-check grace、wrapperは変更していない。
+- 上記3 blockerを含む新しいexact-state full regressionを再実行してPASSするまで、S12 hermetic verificationとS14 final gateは未完了のまま保持する。
+- 全repairと上記Report記録を除くexact tracked diff SHA-256 `adaca4ea829bcb5529d82c44da405467dd1e5c6b701c01f06ef4e361c4786a48`を前後固定して再実行し、full regressionは`3143 passed, 76 skipped, 2 warnings`、30分15秒でPASSした。prior 3 blockersのexact nodesも`3 passed`、前後のbranch／HEAD／status／staged空／tracked diff SHAは一致し、QA reviewerはP0／P1 0、PASSと判定した。
+- S14 bounded production／projection／guide／test repairはcommit `666baaba`へ集約した。ReportとRed／Blue Team証跡は別のevidence-only commitとして追記し、次のlive authorizationとfresh final Reviewはそのpushed evidence HEADへbindする。
+- このPASSはhermetic／full-regression gateを閉じるが、Plan §22のrefreshed Human-authorized live acceptanceと、その後のexact pushed SHAに対するfresh final combined Reviewを代替しない。
