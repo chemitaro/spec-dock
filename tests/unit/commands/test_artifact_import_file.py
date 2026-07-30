@@ -140,3 +140,24 @@ def test_artifact_import_file_run_uses_separate_request_and_renderer() -> None:
     assert captured[0].target_value is None
     assert captured[0].source_path == Path("evidence.bin")
     assert '"canonical": false' in "\n".join(outcome.text.stdout_lines)
+
+
+def test_unknown_command_fault_is_redacted_without_fabricating_publication_state() -> None:
+    _cli_parser, _cli_registry, commands = _runtime_modules()
+    args = commands.ArtifactImportFileArgs(
+        target_kind="root",
+        target_value=None,
+        source_path="private-parent-sentinel/source.bin",
+        json=False,
+    )
+
+    def fail(_request):
+        raise ValueError("private-parent-sentinel body-hash-count-sentinel")
+
+    with pytest.raises(RuntimeError) as captured:
+        commands._run_file(args, SimpleNamespace(import_file_artifact=fail))
+
+    assert str(captured.value) == "artifact import file runtime contract violation"
+    assert "private-parent-sentinel" not in str(captured.value)
+    assert "not_committed" not in str(captured.value)
+    assert "retry" not in str(captured.value)

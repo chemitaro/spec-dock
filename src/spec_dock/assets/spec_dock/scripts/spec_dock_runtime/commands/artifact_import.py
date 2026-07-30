@@ -158,8 +158,6 @@ def _run_file(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
         renderer = render_file_artifact_import_error_json if args.json else render_file_artifact_import_error_text
         return CommandOutcome(exit_code=1, text=renderer(error))
     except Exception:
-        runtime_error = FileArtifactImportError(code="runtime_failed", cleanup_state="not_created")
-        renderer = render_file_artifact_import_error_json if args.json else render_file_artifact_import_error_text
-        return CommandOutcome(exit_code=1, text=renderer(runtime_error))
+        raise RuntimeError("artifact import file runtime contract violation") from None
     renderer = render_file_artifact_import_json if args.json else render_file_artifact_import_text
     return CommandOutcome(exit_code=0, text=renderer(result))

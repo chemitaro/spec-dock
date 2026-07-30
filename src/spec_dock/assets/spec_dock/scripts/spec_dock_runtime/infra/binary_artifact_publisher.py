@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import errno
 import hashlib
@@ -155,7 +156,7 @@ class FilesystemBinaryArtifactPublisher:
             ) from None
         finally:
             if source_fd is not None:
-                os.close(source_fd)
+                _close_descriptor_noexcept(source_fd)
 
     def publish(self, request: BinaryArtifactPublishRequest) -> BinaryArtifactPublishResult:
         guarded = self.guard_source(request.source)
@@ -208,6 +209,7 @@ class FilesystemBinaryArtifactPublisher:
             initial_status=guarded._initial_status,
             destination=destination,
             confirm_destination=False,
+            probe_capability=True,
         )
         return ExplicitFileArtifactPublishResult(
             source_visibility=guarded.source_visibility,
@@ -231,11 +233,13 @@ class FilesystemBinaryArtifactPublisher:
         initial_status: os.stat_result,
         destination: Path,
         confirm_destination: bool,
+        probe_capability: bool = False,
     ) -> BinaryArtifactPublishResult:
         destination_parent_fd: int | None = None
         destination_parent_identity: tuple[int, int] | None = None
         temp_fd: int | None = None
         temp_name: str | None = None
+        committed = False
         try:
             try:
                 self._inject("temp_create")
@@ -249,7 +253,10 @@ class FilesystemBinaryArtifactPublisher:
             except (_PublishFailure, FileNotFoundError, OSError, ValueError):
                 raise _PublishFailure("destination_ineligible") from None
             try:
-                temp_fd, temp_name = self._create_temp(destination_parent_fd)
+                temp_fd, temp_name = self._create_temp(
+                    destination_parent_fd,
+                    anonymous=probe_capability and sys.platform.startswith("linux"),
+                )
             except OSError:
                 raise _PublishFailure("temp_create_failed") from None
 
@@ -290,7 +297,27 @@ class FilesystemBinaryArtifactPublisher:
                 destination_parent_identity,
             ):
                 raise _PublishFailure("destination_ineligible")
-            self._publish_no_replace(temp_fd, destination_parent_fd, destination.name)
+            if probe_capability and not sys.platform.startswith("linux"):
+                if temp_name is None:
+                    raise _PublishFailure("publication_unsupported")
+                self._probe_no_replace_capability(
+                    temp_fd,
+                    destination_parent_fd,
+                    temp_name,
+                )
+                self._publish_no_replace(
+                    temp_fd,
+                    destination_parent_fd,
+                    destination.name,
+                    inject_capability=False,
+                )
+            else:
+                self._publish_no_replace(
+                    temp_fd,
+                    destination_parent_fd,
+                    destination.name,
+                )
+            committed = True
             warning_codes: list[BinaryArtifactPublishWarning] = []
             if not self._fsync_directory(destination_parent_fd):
                 warning_codes.append("directory_fsync_failed")
@@ -316,10 +343,13 @@ class FilesystemBinaryArtifactPublisher:
                     else:
                         if (destination_sha256, destination_count) != (staged_sha256, staged_count):
                             warning_codes.append("destination_mismatch")
-            cleanup_state = self._cleanup_temp(temp_name, temp_fd, destination_parent_fd)
+            if temp_name is None:
+                cleanup_state: BinaryArtifactCleanupState = "not_created"
+            else:
+                cleanup_state = self._cleanup_temp(temp_name, temp_fd, destination_parent_fd)
             if cleanup_state == "removed":
                 temp_name = None
-            else:
+            elif cleanup_state == "retained":
                 warning_codes.append("temp_cleanup_retained")
             return BinaryArtifactPublishResult(
                 source_path=source_path,
@@ -343,15 +373,29 @@ class FilesystemBinaryArtifactPublisher:
             cleanup_state = self._cleanup_after_failure(temp_name, temp_fd, destination_parent_fd)
             raise BinaryArtifactPublishError(code=exc.code, cleanup_state=cleanup_state) from None
         except OSError:
+            if committed:
+                raise
             cleanup_state = self._cleanup_after_failure(temp_name, temp_fd, destination_parent_fd)
             raise BinaryArtifactPublishError(code="filesystem_failed", cleanup_state=cleanup_state) from None
+        except Exception:
+            if committed:
+                raise
+            cleanup_state = self._cleanup_after_failure(temp_name, temp_fd, destination_parent_fd)
+            raise BinaryArtifactPublishError(code="runtime_failed", cleanup_state=cleanup_state) from None
         finally:
             if temp_fd is not None:
-                os.close(temp_fd)
+                self._close_noexcept(temp_fd, "temp_fd_close")
             if destination_parent_fd is not None:
-                os.close(destination_parent_fd)
+                self._close_noexcept(destination_parent_fd, "destination_parent_fd_close")
 
-    def _create_temp(self, destination_parent_fd: int) -> tuple[int, str]:
+    def _create_temp(
+        self,
+        destination_parent_fd: int,
+        *,
+        anonymous: bool = False,
+    ) -> tuple[int, str | None]:
+        if anonymous:
+            return self._create_linux_anonymous_temp(destination_parent_fd), None
         flags = os.O_RDWR | os.O_CREAT | os.O_EXCL
         if hasattr(os, "O_CLOEXEC"):
             flags |= os.O_CLOEXEC
@@ -363,6 +407,42 @@ class FilesystemBinaryArtifactPublisher:
                 return os.open(temp_name, flags, 0o600, dir_fd=destination_parent_fd), temp_name
             except FileExistsError:
                 continue
+
+    def _create_linux_anonymous_temp(self, destination_parent_fd: int) -> int:
+        if not hasattr(os, "O_TMPFILE"):
+            raise _PublishFailure("publication_unsupported")
+        flags = os.O_RDWR | os.O_TMPFILE
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        descriptor: int | None = None
+        try:
+            descriptor = os.open(
+                ".",
+                flags,
+                0o600,
+                dir_fd=destination_parent_fd,
+            )
+            descriptor_status = os.fstat(descriptor)
+            if not stat.S_ISREG(descriptor_status.st_mode):
+                raise _PublishFailure("publication_unsupported")
+            proc_reference = Path(f"/proc/self/fd/{descriptor}")
+            proc_status = proc_reference.stat()
+            if not stat.S_ISREG(proc_status.st_mode) or (proc_status.st_dev, proc_status.st_ino) != (
+                descriptor_status.st_dev,
+                descriptor_status.st_ino,
+            ):
+                raise _PublishFailure("publication_unsupported")
+            self._inject("linux_directory_durability")
+            os.fsync(destination_parent_fd)
+        except _PublishFailure:
+            if descriptor is not None:
+                _close_descriptor_noexcept(descriptor)
+            raise
+        except (OSError, TypeError):
+            if descriptor is not None:
+                _close_descriptor_noexcept(descriptor)
+            raise _PublishFailure("publication_unsupported") from None
+        return descriptor
 
     def _open_guarded_source(self, guarded: GuardedWorkbenchSource) -> tuple[int, os.stat_result]:
         flags = os.O_RDONLY
@@ -469,27 +549,20 @@ class FilesystemBinaryArtifactPublisher:
         temp_fd: int,
         destination_parent_fd: int,
         destination_name: str,
+        *,
+        inject_capability: bool = True,
     ) -> None:
+        if inject_capability:
+            try:
+                self._inject("publication_unsupported")
+            except OSError:
+                raise _PublishFailure("publication_unsupported") from None
         try:
-            self._inject("publication_unsupported")
-        except OSError:
-            raise _PublishFailure("publication_unsupported") from None
-        try:
-            if sys.platform == "darwin":
-                _clone_macos_descriptor(
-                    temp_fd,
-                    destination_parent_fd,
-                    destination_name,
-                )
-            elif sys.platform.startswith("linux"):
-                os.link(
-                    f"/proc/self/fd/{temp_fd}",
-                    destination_name,
-                    dst_dir_fd=destination_parent_fd,
-                    follow_symlinks=True,
-                )
-            else:
-                raise _PublishFailure("publication_unsupported")
+            _commit_descriptor_no_replace(
+                temp_fd,
+                destination_parent_fd,
+                destination_name,
+            )
         except FileExistsError:
             raise _PublishFailure("destination_exists") from None
         except (NotImplementedError, TypeError):
@@ -498,6 +571,37 @@ class FilesystemBinaryArtifactPublisher:
             if exc.errno in _UNSUPPORTED_PUBLICATION_ERRNOS:
                 raise _PublishFailure("publication_unsupported") from None
             raise _PublishFailure("publication_failed") from None
+
+    def _probe_no_replace_capability(
+        self,
+        temp_fd: int,
+        destination_parent_fd: int,
+        existing_temp_name: str,
+    ) -> None:
+        try:
+            self._inject("publication_unsupported")
+            self._inject("capability_probe")
+            _commit_descriptor_no_replace(
+                temp_fd,
+                destination_parent_fd,
+                existing_temp_name,
+            )
+        except OSError as exc:
+            if exc.errno != errno.EEXIST:
+                raise _PublishFailure("publication_unsupported") from None
+        except (NotImplementedError, TypeError):
+            raise _PublishFailure("publication_unsupported") from None
+        else:
+            raise _PublishFailure("publication_unsupported")
+        try:
+            self._inject("capability_probe_after_existing_check")
+        except OSError as exc:
+            raise _PublishFailure("publication_unsupported") from exc
+
+    def _close_noexcept(self, descriptor: int, point: str) -> None:
+        with contextlib.suppress(Exception):
+            self._inject(point)
+        _close_descriptor_noexcept(descriptor)
 
     def _hash_published_destination(
         self,
@@ -550,6 +654,7 @@ class FilesystemBinaryArtifactPublisher:
     ) -> BinaryArtifactCleanupState:
         if temp_fd is None or destination_parent_fd is None:
             return "retained"
+        observed_fd: int | None = None
         try:
             path_status = os.stat(
                 temp_name,
@@ -557,14 +662,41 @@ class FilesystemBinaryArtifactPublisher:
                 follow_symlinks=False,
             )
             descriptor_status = os.fstat(temp_fd)
-        except FileNotFoundError:
-            return "removed"
+            if not stat.S_ISREG(path_status.st_mode) or not stat.S_ISREG(descriptor_status.st_mode):
+                return "retained"
+            flags = os.O_RDONLY
+            if hasattr(os, "O_CLOEXEC"):
+                flags |= os.O_CLOEXEC
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            if hasattr(os, "O_NONBLOCK"):
+                flags |= os.O_NONBLOCK
+            observed_fd = os.open(
+                temp_name,
+                flags,
+                dir_fd=destination_parent_fd,
+            )
+            observed_status = os.fstat(observed_fd)
+            if not stat.S_ISREG(observed_status.st_mode):
+                return "retained"
+            self._inject("cleanup_before_final_path_check")
+            final_path_status = os.stat(
+                temp_name,
+                dir_fd=destination_parent_fd,
+                follow_symlinks=False,
+            )
         except OSError:
             return "retained"
-        if (path_status.st_dev, path_status.st_ino) != (
-            descriptor_status.st_dev,
-            descriptor_status.st_ino,
-        ):
+        finally:
+            if observed_fd is not None:
+                _close_descriptor_noexcept(observed_fd)
+        identities = {
+            (path_status.st_dev, path_status.st_ino),
+            (descriptor_status.st_dev, descriptor_status.st_ino),
+            (observed_status.st_dev, observed_status.st_ino),
+            (final_path_status.st_dev, final_path_status.st_ino),
+        }
+        if len(identities) != 1 or not stat.S_ISREG(final_path_status.st_mode):
             return "retained"
         try:
             self._inject("cleanup")
@@ -719,6 +851,33 @@ def _write_all(descriptor: int, body: bytes) -> None:
         if written <= 0:
             raise OSError("short binary write")
         view = view[written:]
+
+
+def _close_descriptor_noexcept(descriptor: int) -> None:
+    with contextlib.suppress(OSError):
+        os.close(descriptor)
+
+
+def _commit_descriptor_no_replace(
+    source_fd: int,
+    destination_parent_fd: int,
+    destination_name: str,
+) -> None:
+    if sys.platform == "darwin":
+        _clone_macos_descriptor(
+            source_fd,
+            destination_parent_fd,
+            destination_name,
+        )
+    elif sys.platform.startswith("linux"):
+        os.link(
+            f"/proc/self/fd/{source_fd}",
+            destination_name,
+            dst_dir_fd=destination_parent_fd,
+            follow_symlinks=True,
+        )
+    else:
+        raise OSError(errno.ENOSYS, "descriptor publication unavailable")
 
 
 def _clone_macos_descriptor(

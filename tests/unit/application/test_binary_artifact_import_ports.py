@@ -1,6 +1,8 @@
 from pathlib import Path
 import sys
 
+import pytest
+
 
 def _runtime_modules():
     runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
@@ -82,3 +84,36 @@ def test_explicit_file_guard_and_publisher_use_separate_narrow_ports(tmp_path):
     assert result.destination_path.read_bytes() == b"\x00\xffopaque"
     assert not hasattr(result, "destination_sha256")
     assert not hasattr(result, "destination_byte_count")
+
+
+def test_explicit_source_lease_close_failure_is_no_throw_and_idempotent(tmp_path, monkeypatch):
+    contracts, _ports, publisher_type = _runtime_modules()
+    source = tmp_path / "opaque.bin"
+    source.write_bytes(b"opaque")
+    guarded = publisher_type().guard_explicit_file_source(
+        contracts.ExplicitFileSourcePreflightRequest(
+            repo_root=tmp_path,
+            source_path=source,
+        )
+    )
+    descriptor = guarded._descriptor
+    original_close = contracts.os.close
+    calls = 0
+
+    def fail_selected_close(fd):
+        nonlocal calls
+        if fd == descriptor:
+            calls += 1
+            original_close(fd)
+            raise OSError("close sentinel")
+        return original_close(fd)
+
+    monkeypatch.setattr(contracts.os, "close", fail_selected_close)
+
+    guarded.close()
+    guarded.close()
+
+    assert calls == 1
+    assert guarded._closed is True
+    with pytest.raises(RuntimeError):
+        guarded.__enter__()

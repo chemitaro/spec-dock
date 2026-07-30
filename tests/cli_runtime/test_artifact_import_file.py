@@ -1,5 +1,7 @@
 import json
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 
 from tests.cli_runtime.harness import CliRuntimeHarness, main
@@ -164,3 +166,49 @@ class TestArtifactImportFile(CliRuntimeHarness):
                     assert deps_after == deps_before
 
             assert not (target / "spec-dock" / ".meta.json").exists()
+
+    def test_external_relative_source_from_nested_cwd_is_basename_only_and_content_free(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            target = base / "repo"
+            target.mkdir()
+            assert main(["init", str(target)]) == 0
+            self._write_runtime_clock(target)
+            private_parent = base / "private-parent-sentinel"
+            private_parent.mkdir()
+            source = private_parent / "visible.bin"
+            body = b"body-hash-count-sentinel\x00\xff"
+            source.write_bytes(body)
+            nested_cwd = target / "nested" / "cwd"
+            nested_cwd.mkdir(parents=True)
+            script = target / "spec-dock" / "scripts" / "spec-dock"
+            env = self._runtime_env(target, None)
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "artifact",
+                    "import",
+                    "file",
+                    "--root",
+                    "--file",
+                    "../private-parent-sentinel/visible.bin",
+                    "--json",
+                ],
+                cwd=nested_cwd,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+
+            assert completed.returncode == 0, completed.stdout + completed.stderr
+            payload = json.loads(completed.stdout)
+            assert payload["source_visibility"] == "basename_only"
+            assert payload["source"] == "visible.bin"
+            assert private_parent.name not in completed.stdout
+            assert "body-hash-count-sentinel" not in completed.stdout
+            assert "sha256" not in completed.stdout.lower()
+            assert "byte_count" not in completed.stdout.lower()
+            assert (target / payload["destination"]).read_bytes() == body
+            assert source.read_bytes() == body
