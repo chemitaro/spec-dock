@@ -18,6 +18,39 @@ def _runtime_modules():
     return source_manifest, github_sync_preflight
 
 
+def test_tc_s04_001_003_default_authoring_manifest_does_not_discover_generic_artifacts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_manifest, _preflight = _runtime_modules()
+    default_source = tmp_path / source_manifest.DEFAULT_SOURCE_PATHS[0]
+    default_source.parent.mkdir(parents=True, exist_ok=True)
+    default_source.write_text("provider source\n", encoding="utf-8")
+    generic = (
+        tmp_path
+        / "spec-dock"
+        / "initiatives"
+        / "init-00001"
+        / "artifacts"
+        / "20260730t010203z--accepted-adr-looking.md"
+    )
+    generic.parent.mkdir(parents=True, exist_ok=True)
+    generic.write_bytes(b"\xff\xfeauthority: accepted\nmirror_eligible: true\n")
+    original_open = Path.open
+
+    def guarded_open(path: Path, *args, **kwargs):
+        if path == generic:
+            raise AssertionError("default authoring discovery must not open generic artifacts")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guarded_open)
+
+    manifest = source_manifest.build_source_manifest(tmp_path, ())
+
+    assert default_source.relative_to(tmp_path).as_posix() in manifest.source_hashes
+    assert generic.relative_to(tmp_path).as_posix() not in manifest.source_hashes
+
+
 @pytest.mark.parametrize(
     "source_path",
     (

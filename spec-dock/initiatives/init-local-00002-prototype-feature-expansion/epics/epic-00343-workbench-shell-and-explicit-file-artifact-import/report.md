@@ -24,12 +24,13 @@ ID: "epic-00343"
   - README amendment後のrequirement、design、planはそれぞれfresh reviewで`pass`した。4 templateのtracked guidance、README以外のignore、no-backfill、evidence-only authority、package distribution contractが確定した。
   - team onboarding ArtifactもREADME contractへ更新した。
   - ユーザーが3 slicesを採用し、`iss-00344` / `iss-00345` / `iss-00346`をGitHub Issue #344 / #345 / #346として作成した。`iss-00346`から`iss-00344` / `iss-00345`へのdirect dependencyをruntime commandで登録した。
-  - `iss-00344`のChatGPT-first Issue planningとfresh reviewを完了し、S01を実装・focused検証・fresh review・Result Approvalまで閉じた。
-  - ユーザーのIssue-local PR要求を反映するdelivery amendmentを作成し、first fresh reviewの3件を限定修正中である。
+  - `iss-00344`は全実装・review・deliveryを完了し、GitHub Issue #344は2026-07-29T23:49:03Zにclosed、PR #350は2026-07-29T23:49:02Zにmergeされた（merge commit `a9871971481d77baa56e670163e1ae1ebf8ac4b4`）。
+  - `iss-00345`のfresh code reviewでLinux named staging cleanupのsame-UID replacement raceを検出した。macOS専用のaccepted waiverをLinuxへ拡張せず、ユーザー採用済みOption AによりLinux anonymous `O_TMPFILE` stagingを必須化するEpic amendmentを開始した。
 - 次のマイルストーン:
-  - delivery amendmentのfresh re-reviewを通過し、`iss-00344`のS02へ進む。
+  - Fresh Epic reviewのP1/P2を受け、Linux `linkat` capability / policy failureをactual commitでのみ検出する境界と、T3のLinux/macOS別probe / cleanup test契約を限定修正した。fresh Epic rereviewを通過後にIssue 345継承・fresh reviewを完了してからS02を再開する。
 - ブロッカー:
-  - `iss-00344` delivery amendmentはfirst fresh reviewのmajor finding 3件を修正中であり、re-review PASSまではS02 admissionを止める。Epic authoring / Issue creation blockerはない。
+  - Linux anonymous-staging amendmentはfresh Epic rereview待ちである。fresh reviewで検出されたP1（linkat capability / policy failureのpreflight境界）とP2（T3のplatform別probe / cleanup契約）は修正済みであり、pass後のIssue 345継承・fresh reviewまでS02 admissionを止める。実装上の未解決product decisionはない。
+  - Fresh rereview待ちの残余P1は、Linux gateがpreflight不足とactual `linkat` failureを混同しないことの再確認に限定される。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -83,6 +84,8 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-038 | partially_adopted | Issue 344 delivery-boundary amendment analysis | ChatGPT-Use advisory | Issue 344自身のprovider-first projection/default lane/ready PR/observationと、Issue 346の残余integration境界 | `plan.md`; Issue 344 canonical docs/report | Candidate 1 / 3 delivery、G2、rollout、final handoff | Candidate 1のIssue-local release closureを採用し、candidate wheel/integrated dogfood/opt-in full regression/Epic-wide review/残余Epic PRをCandidate 3へ維持。Issue 346 placeholder docsの先行編集は行わない | corroborated advisory | `issues/iss-00344-workbench-shell-scaffolding/artifacts/20260729t052200z-chatgpt-output-issue-344-delivery-boundary-amendment-analysis.md`; SHA-256 `db258ca6f56e4b0ba7803ddda3f10cfdf8d4b3b620465b58e75a7d2becdfbf82` | main orchestrator | fresh amendment spec review pending | yes | amendment commit/push後にIssue 344 docsと親planを同一exact SHAでreview |
 | EAL-039 | adopted | Issue 344 delivery-boundary first fresh review | ChatGPT-Use `spec-reviewer` responsibility | S90 dependency bypass、post-PR repair後のreview freshness、Epic progress summary drift | Issue 344 `plan.md`; this `report.md` | Candidate 1 S95/S99、current progress | major 3件をすべて限定採用し、S90→S95、branch mutation時のhead-bound gate再実行、S01 closed/amendment pending表示へ修正 | connected GitHub exact-commit review | Issue Artifact `artifacts/20260729t054516z-chatgpt-output-delivery-amendment-spec-review-59737280.md`; reviewed commit `59737280c085977d714797709ef0d9a6ade4412d` | main orchestrator | fresh re-review pending | yes | bounded fix commit/push後にre-review |
 | EAL-040 | adopted | Issue 344 delivery-boundary fresh re-review | ChatGPT-Use `spec-reviewer` responsibility | I344-AMEND-001〜003 closureとparent alignment | Issue 344 canonical docs; parent `plan.md` / `report.md` | Candidate 1 S95/S99、current progress、residual integration boundary | exact commit `7ae8a957b67805294d6716b19a18e2b45808c3dc`でfinding 0、scope expansionなし、`next_action=proceed`を確認 | connected GitHub exact-commit review | Issue Artifact `artifacts/20260729t055223z-chatgpt-output-delivery-amendment-spec-rereview-7ae8a957.md`; SHA-256 `2c88c761c8c1e60c84e913d84a6787a345b50706b6ba6885fcda1fe5fc5cd5c4` | main orchestrator | fresh re-review pass | no | Issue 344 assurance verify後にS02へ進む |
+| EAL-041 | adopted | macOS named-staging cleanup Option A | user | macOS clone-capable / cross-filesystem successを維持しつつ、named staging cleanupの最終identity check後から`unlink`までの意図的same-UID replacementだけを限定して保証対象外にする | accepted ADR `20260730t085831z-adr`; `requirement.md`; `design.md`; `plan.md` | E-RQ-017、E-AC-015、D-005 / D-008、Candidate 2 / 3 verification | userの2026-07-30明示判断としてOption Aを採用。包括的same-UID waiverにはせず、mandatory mitigations 1〜9、formal destination no-replace、source/privacy、parent identity、mismatch / uncertainty retainを維持する | primary | user instruction `Option Aを採用します`; Issue discussion `20260730t085614z-disc-macos-staging-cleanup-threat-model-decision.md` | main orchestrator | fresh Option A spec rereview pass | no | Issue 345 R/D/P amendment |
+| EAL-042 | adopted | Linux anonymous staging Option A | user; fresh Issue 345 code reviewer | Linux named staging cleanupのfinal identity check後からunlinkまでのsame-UID replacement riskを受容せず、`O_TMPFILE` anonymous stagingを必須化する。capability不足はformal destination前に`publication_unsupported`でfail closedする | `20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md`; `requirement.md`; `design.md`; `plan.md` | E-RQ-017、E-AC-015、D-005 / D-008、Candidate 2 / 3 verification | macOS専用waiverをLinuxへ拡張せず、held-FD publicationとcross-filesystem source successを維持しつつsupported Linux filesystem laneだけを縮小する。Issue visible-probe P1に続くfresh Epic review P1/P2を受け、linkat固有failureのactual-commit境界とplatform別T3 contractを親authorityへ追補した | primary user decision + independent code/spec-review findings | `issues/iss-00345-generic-single-file-artifact-import/report.md` のLinux P1 fresh code review / visible probe pathname rereview record; `artifacts/20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md`; fresh Epic review P1/P2; 2026-07-30 user decision `Option Aを採用します` | main orchestrator | fresh Epic review `fail` P1/P2を修正済み、fresh rereview pending | yes | Epic rereview pass後にIssue 345 R/D/Pへ継承しfresh review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -101,6 +104,8 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | requirement | 親Initiative、旧Epic interviews/research、current source/tests、README amendment user instruction | Workbench shell fileを`.workbench/README.md`へ確定 | README purpose / content / ignore / no-backfill ACを追加し、READMEだけをtracking例外へ統一 | second fresh amendment review `pass`、confidence 0.99 | no | design amendmentへpromote |
 | design | reviewed amended requirement、past system-architect draft、current source/tests、accepted ADR | first reviewでpackage exclusion、second reviewでexplicit source / canonical authority誤読を検出 | 4 README assets、fresh-only copy、README-only ignore、evidence-only guidance、byte parity、package-data broad exclusion限定化、4 surface exact allowlist、test/rollbackをcanonical designへ反映 | third fresh amendment review `pass`、confidence 0.92 | no | plan amendmentへpromote |
 | plan | 過去ChatGPT / implementation-planner evidenceと3 slices、reviewed README design amendment、Issue 344 delivery-boundary analysis | Candidate 1のIssue-local PRとCandidate 3の残余integration境界を更新 | 3 vertical slicesとdependency metadataを維持し、Candidate 1へ自身のprojection/default lane/PR observationだけを移す | fresh amendment re-review `pass`、finding 0 | no | Issue 344 S02へ進む |
+| macOS cleanup amendment | Issue 345のS02 code review、platform API制約、Issue discussion、Option A user decision | macOS named staging cleanupでabsolute no-non-owned-deleteとsuccess laneを同時に満たせない | Option AをADRとEpic requirement / design / planへ限定反映。fresh spec review前はIssue executionを再開しない | pass | no | Issue 345 inheritance |
+| Linux anonymous-staging amendment | Issue 345のfresh code review / visible probe pathname P1、Linux `open(2)` / `linkat(2)` capability制約、user Option A decision | Linux named staging cleanupのsame-UID waiverを受容せず、visible probe pathnameも作らない | `O_TMPFILE` anonymous staging、held-FD publication、完全anonymous preflight、formal destination前fail-closed、supported Linux filesystem lane縮小をEpic正本とaccepted ADRへ反映。fresh Epic reviewのP1（linkat capability / policy failureはactual commitでのみ検出）とP2（T3 platform別test contract）を限定修正 | fresh Epic review `fail` P1/P2を修正済み、fresh rereview pending | yes | fresh Epic rereview pass後にIssue 345継承とfresh reviewを実施 |
 
 ## ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 
@@ -157,15 +162,18 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 決定事項（ADRリンク） (必須)
 - [`20260728t100038z-adr Generic Imported File Identity And Privacy Boundary`](artifacts/20260728t100038z-adr-generic-imported-file-identity-and-privacy-boundary.md): generic `--` filename family、full destination basename identity、external source privacy、postcommit retry semanticsを固定するaccepted ADR。
+- [`20260730t085831z-adr macOS Generic Import Staging Cleanup Trust Boundary`](artifacts/20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md): Option AとしてmacOS clone-capable successを維持し、named staging cleanupの限定same-UID final-window exclusionとmandatory mitigationsを固定するADR。fresh Epic spec rereviewは`pass`済み。
+- [`20260730t102747z-adr Linux Generic Import Anonymous Staging Trust Boundary`](artifacts/20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md): Linuxではsame-UID cleanup waiverを受容せず、linkable `O_TMPFILE` anonymous stagingとheld-FD publicationを必須化するaccepted ADR。capability不足は`publication_unsupported` / `not_committed` / `safe_after_remediation`でformal destination前にfail closedし、supported Linux filesystem laneは縮小する。first fresh Epic reviewは4 findingで`fail`、限定修正後のrereview待ち。
 - 旧`epic-00312`のtemplate-free / byte-preserving publication ADRはimplementation evidenceとして参照できるが、generic importの新しいauthorityを自動付与しない。
 
 ## 完了した Issue / PR / Release (必須)
-- 完了したIssue / PR / Releaseはなし。
-- 作成済みIssue: `iss-00344` (#344)、`iss-00345` (#345)、`iss-00346` (#346)。
+- 完了: `iss-00344` / GitHub Issue #344（2026-07-29T23:49:03Z closed）、PR #350（2026-07-29T23:49:02Z merged、merge commit `a9871971481d77baa56e670163e1ae1ebf8ac4b4`）。
+- 進行中: `iss-00345` (#345)。planned: `iss-00346` (#346)。
 - GitHub Epic issue: #343。
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
-- E-AC-001〜020: 未着手。planning phaseのためimplementation完了を主張しない。
+- E-AC-001〜007: `iss-00344`の完了証跡あり。Candidate 3のEpic最終配布・dogfood verificationは未了のため、Epic全体のfinal closureは未主張。
+- E-AC-008〜020: 未完了。Candidate 2 / 3の実装・最終verification待ち。
 
 ## ロールアウト結果（必要なら） (任意)
 - 段階公開の状況:
