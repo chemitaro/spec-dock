@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass, field
 import hashlib
 import json
@@ -14,6 +15,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Literal
 
 from spec_dock_runtime.domain.issue_planning_candidate import DOCUMENT_NAMES
+from spec_dock_runtime.infra.issue_planning_candidate import OutputDirectoryGuard
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -98,6 +100,26 @@ class PlanningApplyUnsafeGitCommand(ValueError):
 
 class PlanningApplyRestoreMismatch(RuntimeError):
     pass
+
+
+@dataclass
+class _ApplyEvidenceHandle:
+    output_fd: int
+    operation_fd: int
+    logical_operation_path: Path
+
+    def close(self) -> None:
+        os.close(self.operation_fd)
+        os.close(self.output_fd)
+
+    def __truediv__(self, name: str) -> Path:
+        return self.logical_operation_path / name
+
+    def stat(self) -> os.stat_result:
+        return self.logical_operation_path.stat()
+
+    def iterdir(self):
+        return self.logical_operation_path.iterdir()
 
 
 @dataclass(frozen=True)
@@ -379,7 +401,7 @@ def _safe_repo_relative(value: str) -> PurePosixPath:
 def validate_planning_git_argv(argv: tuple[str, ...]) -> None:
     if not argv or argv[0] != "git":
         raise PlanningApplyUnsafeGitCommand("planning Git argv must start with git")
-    if any(word in _PROHIBITED_GIT_WORDS for word in argv[1:]):
+    if any(word in _PROHIBITED_GIT_WORDS or word.startswith("--force-with-lease") for word in argv[1:]):
         raise PlanningApplyUnsafeGitCommand("prohibited planning Git operation")
     if argv[1:2] == ("update-ref",):
         raise PlanningApplyUnsafeGitCommand("custom Git refs are prohibited")
@@ -472,79 +494,240 @@ def restore_git_index(repo_root: Path, snapshot: GitIndexSnapshot) -> None:
 def record_planning_apply_operation(
     operation: PlanningApplyOperation,
     *,
-    output_dir: Path,
-) -> Path:
-    output = output_dir.resolve(strict=True)
-    if output.is_symlink() or not output.is_dir():
-        raise PlanningApplyOutputRejected("apply output is unsafe")
-    operation_dir = output / f"planning-apply-{operation.operation_id}"
-    if operation_dir.exists():
-        if not _owned_private_directory(operation_dir):
-            raise PlanningApplyOutputRejected("operation identity collision")
-        _validate_existing_operation_evidence(operation_dir)
-        manifest = operation_dir / "operation.json"
-        if manifest.read_bytes() != operation.operation_core_bytes:
-            raise PlanningApplyOutputRejected("operation identity collision")
-        try:
-            state = json.loads((operation_dir / "state.json").read_bytes())
-        except (OSError, ValueError, json.JSONDecodeError):
-            raise PlanningApplyOutputRejected("operation evidence is incomplete") from None
-        if (
-            not isinstance(state, dict)
-            or set(state) != {"operation_id", "state"}
-            or state.get("operation_id") != operation.operation_id
-            or _canonical_json_bytes(state) != (operation_dir / "state.json").read_bytes()
-        ):
-            raise PlanningApplyOutputRejected("operation evidence is incomplete")
-        return operation_dir
-    operation_dir.mkdir(mode=0o700)
-    operation_dir.chmod(0o700)
-    _write_private_no_replace(operation_dir / "operation.json", operation.operation_core_bytes)
-    attempts = operation_dir / "attempts"
-    attempts.mkdir(mode=0o700)
-    attempts.chmod(0o700)
-    _set_operation_state(operation_dir, operation, "OPERATION_RECORDED")
-    return operation_dir
-
-
-def _write_private_no_replace(path: Path, data: bytes) -> None:
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    temporary_path = Path(temporary)
+    output_guard: OutputDirectoryGuard | None = None,
+    output_dir: Path | None = None,
+    capture_hook: Callable[[str], None] | None = None,
+) -> _ApplyEvidenceHandle:
+    output_guard = output_guard or _guard_from_current_output(output_dir)
+    output_fd = _open_guarded_output(output_guard)
+    operation_name = f"planning-apply-{operation.operation_id}"
     try:
-        os.fchmod(descriptor, 0o600)
-        with os.fdopen(descriptor, "wb", closefd=True) as stream:
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.link(temporary_path, path, follow_symlinks=False)
-        directory_descriptor = os.open(
-            path.parent,
-            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+        if capture_hook is not None:
+            capture_hook("after_output_capture")
+        try:
+            os.mkdir(operation_name, mode=0o700, dir_fd=output_fd)
+            created = True
+        except FileExistsError:
+            created = False
+        operation_fd = _open_directory_at(output_fd, operation_name)
+        handle = _ApplyEvidenceHandle(
+            output_fd=output_fd,
+            operation_fd=operation_fd,
+            logical_operation_path=output_guard.path / operation_name,
         )
         try:
-            os.fsync(directory_descriptor)
-        finally:
-            os.close(directory_descriptor)
-    finally:
-        if temporary_path.exists():
-            temporary_path.unlink()
+            if not _owned_private_directory_at(output_fd, operation_name):
+                raise PlanningApplyOutputRejected("operation identity collision")
+            if created:
+                _write_private_no_replace_at(handle, "operation.json", operation.operation_core_bytes)
+                _mkdir_private_at(handle, "attempts")
+                _set_operation_state(handle, operation, "OPERATION_RECORDED")
+                return handle
+            _validate_existing_operation_evidence(handle)
+            if _read_private_file_at(handle, "operation.json") != operation.operation_core_bytes:
+                raise PlanningApplyOutputRejected("operation identity collision")
+            state_bytes = _read_private_file_at(handle, "state.json")
+            try:
+                state = json.loads(state_bytes)
+            except (ValueError, json.JSONDecodeError):
+                raise PlanningApplyOutputRejected("operation evidence is incomplete") from None
+            if (
+                not isinstance(state, dict)
+                or set(state) != {"operation_id", "state"}
+                or state.get("operation_id") != operation.operation_id
+                or _canonical_json_bytes(state) != state_bytes
+            ):
+                raise PlanningApplyOutputRejected("operation evidence is incomplete")
+            return handle
+        except BaseException:
+            handle.close()
+            output_fd = -1
+            raise
+    except BaseException:
+        if output_fd >= 0:
+            with suppress(OSError):
+                os.close(output_fd)
+        raise
 
 
-def _write_private_atomic(path: Path, data: bytes) -> None:
-    _atomic_write_exact(path, data, mode=0o600)
+def _open_guarded_output(guard: OutputDirectoryGuard) -> int:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(guard.path, flags)
+    opened = os.fstat(descriptor)
+    if not stat.S_ISDIR(opened.st_mode) or (opened.st_dev, opened.st_ino) != (guard.device, guard.inode):
+        os.close(descriptor)
+        raise PlanningApplyOutputRejected("apply output identity changed")
+    return descriptor
 
 
-def _owned_private_directory(path: Path) -> bool:
+def _guard_from_current_output(output_dir: Path | None) -> OutputDirectoryGuard:
+    if output_dir is None:
+        raise PlanningApplyOutputRejected("apply output guard is required")
+    path = output_dir.resolve(strict=True)
+    opened = path.stat(follow_symlinks=False)
+    if not stat.S_ISDIR(opened.st_mode) or path.is_symlink():
+        raise PlanningApplyOutputRejected("apply output is unsafe")
+    return OutputDirectoryGuard(path=path, device=opened.st_dev, inode=opened.st_ino)
+
+
+def _open_directory_at(parent_fd: int, name: str) -> int:
+    descriptor = os.open(
+        name,
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+        dir_fd=parent_fd,
+    )
+    opened = os.fstat(descriptor)
+    if not stat.S_ISDIR(opened.st_mode) or opened.st_uid != os.geteuid() or stat.S_IMODE(opened.st_mode) != 0o700:
+        os.close(descriptor)
+        raise PlanningApplyOutputRejected("operation evidence is not private")
+    return descriptor
+
+
+def _parent_fd(handle: _ApplyEvidenceHandle, relative: str) -> tuple[int, str, list[int]]:
+    parts = PurePosixPath(relative).parts
+    if not parts or any(part in {"", ".", ".."} for part in parts):
+        raise PlanningApplyOutputRejected("operation evidence path is invalid")
+    parent = handle.operation_fd
+    opened: list[int] = []
+    for part in parts[:-1]:
+        parent = _open_directory_at(parent, part)
+        opened.append(parent)
+    return parent, parts[-1], opened
+
+
+def _close_opened(opened: list[int]) -> None:
+    for descriptor in reversed(opened):
+        os.close(descriptor)
+
+
+def _entry_stat_at(handle: _ApplyEvidenceHandle, relative: str) -> os.stat_result | None:
+    parent, name, opened = _parent_fd(handle, relative)
     try:
-        opened = path.stat(follow_symlinks=False)
+        try:
+            return os.stat(name, dir_fd=parent, follow_symlinks=False)
+        except FileNotFoundError:
+            return None
+    finally:
+        _close_opened(opened)
+
+
+def _entry_exists_at(handle: _ApplyEvidenceHandle, relative: str) -> bool:
+    return _entry_stat_at(handle, relative) is not None
+
+
+def _read_private_file_at(handle: _ApplyEvidenceHandle, relative: str) -> bytes:
+    parent, name, opened = _parent_fd(handle, relative)
+    descriptor = -1
+    try:
+        descriptor = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0), dir_fd=parent)
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+        ):
+            raise PlanningApplyOutputRejected("operation evidence is not private")
+        chunks: list[bytes] = []
+        while chunk := os.read(descriptor, 1024 * 1024):
+            chunks.append(chunk)
+        return b"".join(chunks)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        _close_opened(opened)
+
+
+def _write_all(descriptor: int, data: bytes) -> None:
+    offset = 0
+    while offset < len(data):
+        offset += os.write(descriptor, data[offset:])
+    os.fsync(descriptor)
+
+
+def _write_private_no_replace_at(
+    handle: _ApplyEvidenceHandle,
+    relative: str,
+    data: bytes,
+) -> None:
+    parent, name, opened = _parent_fd(handle, relative)
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+            dir_fd=parent,
+        )
+        os.fchmod(descriptor, 0o600)
+        _write_all(descriptor, data)
+        os.fsync(parent)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        _close_opened(opened)
+
+
+def _write_private_atomic_at(
+    handle: _ApplyEvidenceHandle,
+    relative: str,
+    data: bytes,
+) -> None:
+    parent, name, opened = _parent_fd(handle, relative)
+    temporary = f".{name}.{os.getpid()}.{os.urandom(8).hex()}"
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            temporary,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+            dir_fd=parent,
+        )
+        os.fchmod(descriptor, 0o600)
+        _write_all(descriptor, data)
+        os.close(descriptor)
+        descriptor = -1
+        os.replace(temporary, name, src_dir_fd=parent, dst_dir_fd=parent)
+        os.fsync(parent)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        with suppress(FileNotFoundError):
+            os.unlink(temporary, dir_fd=parent)
+        _close_opened(opened)
+
+
+def _mkdir_private_at(handle: _ApplyEvidenceHandle, relative: str) -> None:
+    parent, name, opened = _parent_fd(handle, relative)
+    try:
+        os.mkdir(name, mode=0o700, dir_fd=parent)
+        if not _owned_private_directory_at(parent, name):
+            raise PlanningApplyOutputRejected("operation evidence is not private")
+        os.fsync(parent)
+    finally:
+        _close_opened(opened)
+
+
+def _owned_private_directory_at(parent_fd: int, name: str) -> bool:
+    try:
+        opened = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
     except OSError:
         return False
-    return (
-        stat.S_ISDIR(opened.st_mode)
-        and not path.is_symlink()
-        and opened.st_uid == os.geteuid()
-        and stat.S_IMODE(opened.st_mode) == 0o700
-    )
+    return stat.S_ISDIR(opened.st_mode) and opened.st_uid == os.geteuid() and stat.S_IMODE(opened.st_mode) == 0o700
+
+
+def _owned_private_subdirectory_at(handle: _ApplyEvidenceHandle, relative: str) -> bool:
+    parent, name, opened = _parent_fd(handle, relative)
+    try:
+        return _owned_private_directory_at(parent, name)
+    finally:
+        _close_opened(opened)
+
+
+def _owned_private_file_at(handle: _ApplyEvidenceHandle, relative: str) -> bool:
+    opened = _entry_stat_at(handle, relative)
+    if opened is None:
+        return False
+    return stat.S_ISREG(opened.st_mode) and opened.st_uid == os.geteuid() and stat.S_IMODE(opened.st_mode) == 0o600
 
 
 def _owned_private_file(path: Path) -> bool:
@@ -560,7 +743,21 @@ def _owned_private_file(path: Path) -> bool:
     )
 
 
-def _validate_existing_operation_evidence(operation_dir: Path) -> None:
+def _list_directory_at(handle: _ApplyEvidenceHandle, relative: str = "") -> set[str]:
+    if relative:
+        parent, name, opened = _parent_fd(handle, relative)
+        descriptor = _open_directory_at(parent, name)
+    else:
+        opened = []
+        descriptor = os.dup(handle.operation_fd)
+    try:
+        return set(os.listdir(descriptor))  # noqa: PTH208 - descriptor-relative authority
+    finally:
+        os.close(descriptor)
+        _close_opened(opened)
+
+
+def _validate_existing_operation_evidence(handle: _ApplyEvidenceHandle) -> None:
     allowed = {
         "operation.json",
         "state.json",
@@ -569,44 +766,48 @@ def _validate_existing_operation_evidence(operation_dir: Path) -> None:
         "commit.json",
         "publication.json",
     }
-    try:
-        children = tuple(operation_dir.iterdir())
-    except OSError as error:
-        raise PlanningApplyOutputRejected("operation evidence is unreadable") from error
-    if any(child.name not in allowed for child in children):
+    if not _list_directory_at(handle) <= allowed:
         raise PlanningApplyOutputRejected("operation evidence contains unexpected entries")
     for required in ("operation.json", "state.json"):
-        if not _owned_private_file(operation_dir / required):
+        if not _owned_private_file_at(handle, required):
             raise PlanningApplyOutputRejected("operation evidence is not private")
-    attempts = operation_dir / "attempts"
-    if not _owned_private_directory(attempts):
+    if not _owned_private_directory_at(handle.operation_fd, "attempts"):
         raise PlanningApplyOutputRejected("operation attempts are not private")
-    for attempt in attempts.iterdir():
-        if not _owned_private_file(attempt):
+    for attempt in _list_directory_at(handle, "attempts"):
+        if not _owned_private_file_at(handle, f"attempts/{attempt}"):
             raise PlanningApplyOutputRejected("operation attempt is not private")
     for optional in ("commit.json", "publication.json"):
-        path = operation_dir / optional
-        if (path.exists() or path.is_symlink()) and not _owned_private_file(path):
+        if _entry_exists_at(handle, optional) and not _owned_private_file_at(handle, optional):
             raise PlanningApplyOutputRejected("operation evidence is not private")
-    transaction = operation_dir / "transaction"
-    if transaction.exists() or transaction.is_symlink():
-        if not _owned_private_directory(transaction):
+    if _entry_exists_at(handle, "transaction"):
+        if not _owned_private_directory_at(handle.operation_fd, "transaction"):
             raise PlanningApplyOutputRejected("transaction evidence is not private")
-        for entry in transaction.rglob("*"):
-            if entry.is_dir() and not entry.is_symlink():
-                if not _owned_private_directory(entry):
+        allowed_transaction = {"files", "managed-state", "git-index.bin", "backup-manifest.json"}
+        if not _list_directory_at(handle, "transaction") <= allowed_transaction:
+            raise PlanningApplyOutputRejected("transaction evidence contains unexpected entries")
+        transaction_fd = _open_directory_at(handle.operation_fd, "transaction")
+        try:
+            for directory in ("files", "managed-state"):
+                if not _owned_private_directory_at(transaction_fd, directory):
                     raise PlanningApplyOutputRejected("transaction directory is not private")
-            elif not _owned_private_file(entry):
+                for name in _list_directory_at(handle, f"transaction/{directory}"):
+                    if not _owned_private_file_at(handle, f"transaction/{directory}/{name}"):
+                        raise PlanningApplyOutputRejected("transaction evidence is not private")
+        finally:
+            os.close(transaction_fd)
+        for filename in ("git-index.bin", "backup-manifest.json"):
+            if not _owned_private_file_at(handle, f"transaction/{filename}"):
                 raise PlanningApplyOutputRejected("transaction evidence is not private")
 
 
 def _set_operation_state(
-    operation_dir: Path,
+    handle: _ApplyEvidenceHandle,
     operation: PlanningApplyOperation,
     state: str,
 ) -> None:
-    _write_private_atomic(
-        operation_dir / "state.json",
+    _write_private_atomic_at(
+        handle,
+        "state.json",
         _canonical_json_bytes({
             "operation_id": operation.operation_id,
             "state": state,
@@ -615,12 +816,12 @@ def _set_operation_state(
 
 
 def _load_operation_state(
-    operation_dir: Path,
+    handle: _ApplyEvidenceHandle,
     operation: PlanningApplyOperation,
 ) -> str:
-    path = operation_dir / "state.json"
     try:
-        state = json.loads(path.read_bytes())
+        state_bytes = _read_private_file_at(handle, "state.json")
+        state = json.loads(state_bytes)
     except (OSError, ValueError, json.JSONDecodeError):
         raise PlanningApplyRestoreMismatch("operation state is unreadable") from None
     if (
@@ -629,25 +830,25 @@ def _load_operation_state(
         or state.get("operation_id") != operation.operation_id
         or not isinstance(state.get("state"), str)
         or state.get("state") not in _DURABLE_OPERATION_STATES
-        or _canonical_json_bytes(state) != path.read_bytes()
+        or _canonical_json_bytes(state) != state_bytes
     ):
         raise PlanningApplyRestoreMismatch("operation state is invalid")
     return state["state"]
 
 
 def _record_operation_attempt(
-    operation_dir: Path,
+    handle: _ApplyEvidenceHandle,
     operation: PlanningApplyOperation,
 ) -> None:
-    attempts = operation_dir / "attempts"
-    if not attempts.is_dir() or attempts.is_symlink():
+    if not _owned_private_directory_at(handle.operation_fd, "attempts"):
         raise PlanningApplyOutputRejected("operation attempt evidence is unsafe")
     for number in range(1, 10_001):
-        path = attempts / f"{number:06d}.json"
-        if path.exists() or path.is_symlink():
+        relative = f"attempts/{number:06d}.json"
+        if _entry_exists_at(handle, relative):
             continue
-        _write_private_no_replace(
-            path,
+        _write_private_no_replace_at(
+            handle,
+            relative,
             _canonical_json_bytes({
                 "attempt": number,
                 "operation_id": operation.operation_id,
@@ -757,22 +958,125 @@ def _load_expected_companion_preimage(
 def planning_apply_resume_available(
     operation: PlanningApplyOperation,
     *,
-    output_dir: Path,
+    output_guard: OutputDirectoryGuard | None = None,
+    output_dir: Path | None = None,
 ) -> bool:
-    output = output_dir.resolve(strict=True)
-    operation_dir = output / f"planning-apply-{operation.operation_id}"
-    if not operation_dir.exists() and not operation_dir.is_symlink():
-        return False
-    validated = record_planning_apply_operation(operation, output_dir=output)
-    return (validated / "commit.json").exists() or (validated / "transaction").exists()
+    output_guard = output_guard or _guard_from_current_output(output_dir)
+    output_fd = _open_guarded_output(output_guard)
+    try:
+        try:
+            existing = os.stat(
+                f"planning-apply-{operation.operation_id}",
+                dir_fd=output_fd,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            return False
+        if not stat.S_ISDIR(existing.st_mode):
+            raise PlanningApplyOutputRejected("operation identity collision")
+    finally:
+        os.close(output_fd)
+    handle = record_planning_apply_operation(operation, output_guard=output_guard)
+    try:
+        return _entry_exists_at(handle, "commit.json") or _entry_exists_at(handle, "transaction")
+    finally:
+        handle.close()
+
+
+def _remote_head_observation(
+    repo_root: Path,
+    branch: str,
+) -> tuple[Literal["present", "absent", "unavailable"], str | None]:
+    result = _run_git(repo_root, ("ls-remote", "--heads", "origin", f"refs/heads/{branch}"))
+    if result.returncode != 0:
+        return "unavailable", None
+    text = result.stdout.decode("ascii", errors="strict").strip()
+    if not text:
+        return "absent", None
+    value = text.split()[0]
+    if _SHA40.fullmatch(value) is None:
+        return "unavailable", None
+    return "present", value
 
 
 def _remote_head(repo_root: Path, branch: str) -> str | None:
-    result = _run_git(repo_root, ("ls-remote", "--heads", "origin", f"refs/heads/{branch}"))
-    if result.returncode != 0:
-        return None
-    text = result.stdout.decode("ascii", errors="strict").strip()
-    return text.split()[0] if text else None
+    disposition, value = _remote_head_observation(repo_root, branch)
+    return value if disposition == "present" else None
+
+
+def _push_operation_commit_cas(
+    *,
+    repo_root: Path,
+    branch: str,
+    expected_remote_head: str,
+    local_commit: str,
+    local_tree: str,
+) -> GitCommandResult:
+    if (
+        _SHA40.fullmatch(expected_remote_head) is None
+        or _SHA40.fullmatch(local_commit) is None
+        or _SHA40.fullmatch(local_tree) is None
+        or not branch
+        or branch.startswith("-")
+        or any(character.isspace() for character in branch)
+        or _git_text(repo_root, "check-ref-format", "--branch", branch) != branch
+        or _git_text(repo_root, "rev-parse", "HEAD") != local_commit
+        or _git_text(repo_root, "rev-parse", f"{local_commit}^") != expected_remote_head
+        or _git_text(repo_root, "rev-parse", f"{local_commit}^{{tree}}") != local_tree
+    ):
+        raise PlanningApplyUnsafeGitCommand("planning publication CAS proof failed")
+    destination = f"refs/heads/{branch}"
+    lease = f"--force-with-lease={destination}:{expected_remote_head}"
+    refspec = f"{local_commit}:{destination}"
+    completed = subprocess.run(
+        ("git", "-C", repo_root.as_posix(), "push", lease, "origin", refspec),
+        check=False,
+        capture_output=True,
+    )
+    return GitCommandResult(
+        returncode=completed.returncode,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
+    )
+
+
+def _cas_failure_result(
+    operation: PlanningApplyOperation,
+    *,
+    repo_root: Path,
+    local_commit: str,
+    local_tree: str,
+) -> PlanningApplyExecution | None:
+    disposition, remote = _remote_head_observation(repo_root, operation.branch)
+    if disposition == "present" and remote == local_commit:
+        remote_tree = _git_text(repo_root, "rev-parse", f"{remote}^{{tree}}")
+        if remote_tree == local_tree:
+            return None
+    if disposition == "present" and remote == operation.expected_head:
+        return _operation_result(
+            operation,
+            status="publication_pending",
+            reason="push_failed",
+            local_commit=local_commit,
+            local_tree=local_tree,
+            remote_commit=remote,
+        )
+    if disposition in {"absent", "present"}:
+        return _operation_result(
+            operation,
+            status="blocked_remote_diverged",
+            reason="remote_diverged",
+            local_commit=local_commit,
+            local_tree=local_tree,
+            remote_commit=remote,
+        )
+    return _operation_result(
+        operation,
+        status="publication_pending",
+        reason="push_failed",
+        local_commit=local_commit,
+        local_tree=local_tree,
+    )
 
 
 def _changed_paths(repo_root: Path, *, cached: bool = False) -> set[str] | None:
@@ -829,45 +1133,37 @@ def _apply_targets_match_snapshots(
 
 
 def _finalize_transaction_cleanup(
-    operation_dir: Path,
+    handle: _ApplyEvidenceHandle,
     operation: PlanningApplyOperation,
     *,
     final_state: str,
 ) -> None:
-    transaction = operation_dir / "transaction"
-    _remove_transaction_backup(operation_dir)
-    if transaction.exists() or transaction.is_symlink():
+    _remove_transaction_backup(handle)
+    if _entry_exists_at(handle, "transaction"):
         raise ValueError("pre-mutation transaction backup was not removed")
-    descriptor = os.open(
-        operation_dir,
-        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
-    )
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-    _set_operation_state(operation_dir, operation, final_state)
+    os.fsync(handle.operation_fd)
+    _set_operation_state(handle, operation, final_state)
 
 
 def _discard_pre_mutation_backup(
-    operation_dir: Path,
+    handle: _ApplyEvidenceHandle,
     operation: PlanningApplyOperation,
     *,
     final_state: str,
 ) -> None:
     _finalize_transaction_cleanup(
-        operation_dir,
+        handle,
         operation,
         final_state=final_state,
     )
 
 
 def _validate_no_transaction_state(
-    operation_dir: Path,
+    handle: _ApplyEvidenceHandle,
     operation: PlanningApplyOperation,
 ) -> None:
-    state = _load_operation_state(operation_dir, operation)
-    if state not in _NO_TRANSACTION_START_STATES or (operation_dir / "publication.json").exists():
+    state = _load_operation_state(handle, operation)
+    if state not in _NO_TRANSACTION_START_STATES or _entry_exists_at(handle, "publication.json"):
         raise PlanningApplyRestoreMismatch("operation state cannot start a transaction")
 
 
@@ -875,26 +1171,52 @@ def execute_planning_apply_transaction(
     operation: PlanningApplyOperation,
     *,
     repo_root: Path,
-    output_dir: Path,
+    output_guard: OutputDirectoryGuard | None = None,
+    output_dir: Path | None = None,
     validation_runner: Callable[[], object],
     sync_runner: Callable[[], object],
     fault_hook: Callable[[str], None] | None = None,
 ) -> PlanningApplyExecution:
+    output_guard = output_guard or _guard_from_current_output(output_dir)
     try:
-        operation_dir = record_planning_apply_operation(operation, output_dir=output_dir)
+        handle = record_planning_apply_operation(
+            operation,
+            output_guard=output_guard,
+            capture_hook=fault_hook,
+        )
     except (OSError, PlanningApplyOutputRejected, ValueError):
         return _operation_result(
             operation,
             status="rejected",
             reason="apply_output_rejected",
         )
-    commit_record = operation_dir / "commit.json"
-    transaction = operation_dir / "transaction"
-    has_commit = commit_record.exists() or commit_record.is_symlink()
-    has_transaction = transaction.exists() or transaction.is_symlink()
+    try:
+        return _execute_planning_apply_transaction(
+            operation,
+            repo_root=repo_root,
+            handle=handle,
+            validation_runner=validation_runner,
+            sync_runner=sync_runner,
+            fault_hook=fault_hook,
+        )
+    finally:
+        handle.close()
+
+
+def _execute_planning_apply_transaction(
+    operation: PlanningApplyOperation,
+    *,
+    repo_root: Path,
+    handle: _ApplyEvidenceHandle,
+    validation_runner: Callable[[], object],
+    sync_runner: Callable[[], object],
+    fault_hook: Callable[[str], None] | None,
+) -> PlanningApplyExecution:
+    has_commit = _entry_exists_at(handle, "commit.json")
+    has_transaction = _entry_exists_at(handle, "transaction")
     if not has_commit and not has_transaction:
         try:
-            _validate_no_transaction_state(operation_dir, operation)
+            _validate_no_transaction_state(handle, operation)
         except PlanningApplyRestoreMismatch:
             return _operation_result(
                 operation,
@@ -902,7 +1224,7 @@ def execute_planning_apply_transaction(
                 reason="restore_mismatch",
             )
     try:
-        _record_operation_attempt(operation_dir, operation)
+        _record_operation_attempt(handle, operation)
     except (OSError, PlanningApplyOutputRejected):
         return _operation_result(
             operation,
@@ -910,12 +1232,12 @@ def execute_planning_apply_transaction(
             reason="apply_output_rejected",
         )
     if has_commit:
-        return _resume_publication(operation, repo_root=repo_root, operation_dir=operation_dir)
+        return _resume_publication(operation, repo_root=repo_root, handle=handle, fault_hook=fault_hook)
     if has_transaction:
         return _recover_interrupted_transaction(
             operation,
             repo_root=repo_root,
-            operation_dir=operation_dir,
+            handle=handle,
         )
     if _git_text(repo_root, "rev-parse", "HEAD") != operation.expected_head:
         return _operation_result(operation, status="stale", reason="apply_target_changed")
@@ -1003,14 +1325,14 @@ def execute_planning_apply_transaction(
                 reason="operation_identity_collision",
             )
         _persist_transaction_backup(
-            operation_dir,
+            handle,
             operation,
             index_snapshot=index_snapshot,
             file_snapshots=file_snapshots,
             decision_snapshot=decision_snapshot,
             managed_snapshot=managed_snapshot,
         )
-        _set_operation_state(operation_dir, operation, "BACKED_UP")
+        _set_operation_state(handle, operation, "BACKED_UP")
     except (OSError, ValueError):
         return _operation_result(operation, status="blocked", reason="git_preflight_blocked")
 
@@ -1025,7 +1347,7 @@ def execute_planning_apply_transaction(
         if not _apply_targets_match_snapshots(operation, repo_root, file_snapshots):
             try:
                 _discard_pre_mutation_backup(
-                    operation_dir,
+                    handle,
                     operation,
                     final_state="OPERATION_RECORDED",
                 )
@@ -1041,7 +1363,7 @@ def execute_planning_apply_transaction(
                 reason="apply_target_changed",
             )
         try:
-            _set_operation_state(operation_dir, operation, "MUTATING")
+            _set_operation_state(handle, operation, "MUTATING")
         except (OSError, ValueError):
             return _operation_result(
                 operation,
@@ -1094,7 +1416,7 @@ def execute_planning_apply_transaction(
             raise _ApplyFailure("specdock_validation_failed")
         if fault_hook is not None:
             fault_hook("after_validation")
-        _set_operation_state(operation_dir, operation, "VALIDATED")
+        _set_operation_state(handle, operation, "VALIDATED")
 
         sync = sync_runner()
         if (
@@ -1106,7 +1428,7 @@ def execute_planning_apply_transaction(
             raise _ApplyFailure("specdock_sync_failed")
         if fault_hook is not None:
             fault_hook("after_sync")
-        _set_operation_state(operation_dir, operation, "SYNCED")
+        _set_operation_state(handle, operation, "SYNCED")
 
         expected_paths = {operation.decision_artifact_path}
         if operation.decision == "approved" and operation.mode == "archive-candidate":
@@ -1144,7 +1466,7 @@ def execute_planning_apply_transaction(
         if fault_hook is not None:
             fault_hook("after_index_stage")
             fault_hook("before_commit")
-        _set_operation_state(operation_dir, operation, "STAGED")
+        _set_operation_state(handle, operation, "STAGED")
 
         subject = (
             f"docs({operation.issue_id}): adopt reviewed planning"
@@ -1187,8 +1509,9 @@ def execute_planning_apply_transaction(
         ):
             raise PlanningApplyRestoreMismatch("operation commit proof failed")
         committed = True
-        _write_private_no_replace(
-            commit_record,
+        _write_private_no_replace_at(
+            handle,
+            "commit.json",
             _canonical_json_bytes({
                 "operation_id": operation.operation_id,
                 "local_commit": local_commit,
@@ -1196,7 +1519,7 @@ def execute_planning_apply_transaction(
                 "decision": operation.decision,
             }),
         )
-        _set_operation_state(operation_dir, operation, "COMMITTED")
+        _set_operation_state(handle, operation, "COMMITTED")
         if fault_hook is not None:
             fault_hook("after_commit")
         post_commit_status = _git_text(repo_root, "status", "--porcelain=v2", "-z")
@@ -1208,24 +1531,28 @@ def execute_planning_apply_transaction(
                 local_commit=local_commit,
                 local_tree=local_tree,
             )
-        _remove_transaction_backup(operation_dir)
+        _remove_transaction_backup(handle)
         if fault_hook is not None:
             fault_hook("before_push")
-        push = _run_git(
-            repo_root,
-            ("push", "origin", f"HEAD:refs/heads/{operation.branch}"),
+        push = _push_operation_commit_cas(
+            repo_root=repo_root,
+            branch=operation.branch,
+            expected_remote_head=operation.expected_head,
+            local_commit=local_commit,
+            local_tree=local_tree,
         )
         if push.returncode != 0:
-            return _operation_result(
+            failure = _cas_failure_result(
                 operation,
-                status="publication_pending",
-                reason="push_failed",
+                repo_root=repo_root,
                 local_commit=local_commit,
                 local_tree=local_tree,
             )
+            if failure is not None:
+                return failure
         if fault_hook is not None:
             fault_hook("after_push")
-        _set_operation_state(operation_dir, operation, "PUSHED")
+        _set_operation_state(handle, operation, "PUSHED")
         remote = _remote_head(repo_root, operation.branch)
         if fault_hook is not None:
             fault_hook("after_fetch")
@@ -1248,8 +1575,8 @@ def execute_planning_apply_transaction(
                 local_tree=local_tree,
                 remote_commit=remote,
             )
-        _record_publication(operation_dir, operation, local_commit, local_tree)
-        _set_operation_state(operation_dir, operation, "REMOTE_PARITY")
+        _record_publication(handle, operation, local_commit, local_tree)
+        _set_operation_state(handle, operation, "REMOTE_PARITY")
         if operation.decision == "approved":
             return _operation_result(
                 operation,
@@ -1308,7 +1635,7 @@ def execute_planning_apply_transaction(
         )
     try:
         _finalize_transaction_cleanup(
-            operation_dir,
+            handle,
             operation,
             final_state="ROLLED_BACK",
         )
@@ -1325,10 +1652,10 @@ def _recover_interrupted_transaction(
     operation: PlanningApplyOperation,
     *,
     repo_root: Path,
-    operation_dir: Path,
+    handle: _ApplyEvidenceHandle,
 ) -> PlanningApplyExecution:
     try:
-        state = _load_operation_state(operation_dir, operation)
+        state = _load_operation_state(handle, operation)
     except PlanningApplyRestoreMismatch:
         return _operation_result(
             operation,
@@ -1337,8 +1664,8 @@ def _recover_interrupted_transaction(
         )
     if (
         state not in {"BACKED_UP", *_TRANSACTION_RESTORE_STATES}
-        or (operation_dir / "commit.json").exists()
-        or (operation_dir / "publication.json").exists()
+        or _entry_exists_at(handle, "commit.json")
+        or _entry_exists_at(handle, "publication.json")
     ):
         return _operation_result(
             operation,
@@ -1348,7 +1675,7 @@ def _recover_interrupted_transaction(
     if state == "BACKED_UP":
         try:
             backup = _load_transaction_backup(
-                operation_dir,
+                handle,
                 operation,
                 repo_root=repo_root,
             )
@@ -1361,7 +1688,7 @@ def _recover_interrupted_transaction(
         if not _apply_targets_match_snapshots(operation, repo_root, backup.files):
             try:
                 _discard_pre_mutation_backup(
-                    operation_dir,
+                    handle,
                     operation,
                     final_state="OPERATION_RECORDED",
                 )
@@ -1384,7 +1711,7 @@ def _recover_interrupted_transaction(
             )
         try:
             _discard_pre_mutation_backup(
-                operation_dir,
+                handle,
                 operation,
                 final_state="ROLLED_BACK",
             )
@@ -1410,7 +1737,7 @@ def _recover_interrupted_transaction(
         )
     try:
         backup = _load_transaction_backup(
-            operation_dir,
+            handle,
             operation,
             repo_root=repo_root,
         )
@@ -1433,7 +1760,7 @@ def _recover_interrupted_transaction(
         )
     try:
         _finalize_transaction_cleanup(
-            operation_dir,
+            handle,
             operation,
             final_state="ROLLED_BACK",
         )
@@ -1526,10 +1853,11 @@ def _resume_publication(
     operation: PlanningApplyOperation,
     *,
     repo_root: Path,
-    operation_dir: Path,
+    handle: _ApplyEvidenceHandle,
+    fault_hook: Callable[[str], None] | None,
 ) -> PlanningApplyExecution:
     try:
-        commit_bytes = (operation_dir / "commit.json").read_bytes()
+        commit_bytes = _read_private_file_at(handle, "commit.json")
         commit = json.loads(commit_bytes)
         if (
             not isinstance(commit, dict)
@@ -1579,8 +1907,16 @@ def _resume_publication(
             status="recovery_required",
             reason="restore_mismatch",
         )
-    remote = _remote_head(repo_root, operation.branch)
-    if remote is None:
+    remote_disposition, remote = _remote_head_observation(repo_root, operation.branch)
+    if remote_disposition == "absent":
+        return _operation_result(
+            operation,
+            status="blocked_remote_diverged",
+            reason="remote_diverged",
+            local_commit=local_commit,
+            local_tree=local_tree,
+        )
+    if remote_disposition == "unavailable" or remote is None:
         return _operation_result(
             operation,
             status="publication_pending",
@@ -1589,19 +1925,24 @@ def _resume_publication(
             local_tree=local_tree,
         )
     if remote == operation.expected_head:
-        push = _run_git(
-            repo_root,
-            ("push", "origin", f"HEAD:refs/heads/{operation.branch}"),
+        if fault_hook is not None:
+            fault_hook("before_push")
+        push = _push_operation_commit_cas(
+            repo_root=repo_root,
+            branch=operation.branch,
+            expected_remote_head=operation.expected_head,
+            local_commit=local_commit,
+            local_tree=local_tree,
         )
         if push.returncode != 0:
-            return _operation_result(
+            failure = _cas_failure_result(
                 operation,
-                status="publication_pending",
-                reason="push_failed",
+                repo_root=repo_root,
                 local_commit=local_commit,
                 local_tree=local_tree,
-                remote_commit=remote,
             )
+            if failure is not None:
+                return failure
         remote = _remote_head(repo_root, operation.branch)
     elif remote != local_commit:
         return _operation_result(
@@ -1621,9 +1962,9 @@ def _resume_publication(
             local_tree=local_tree,
             remote_commit=remote,
         )
-    _record_publication(operation_dir, operation, local_commit, local_tree)
-    _set_operation_state(operation_dir, operation, "REMOTE_PARITY")
-    _remove_transaction_backup(operation_dir)
+    _record_publication(handle, operation, local_commit, local_tree)
+    _set_operation_state(handle, operation, "REMOTE_PARITY")
+    _remove_transaction_backup(handle)
     return _operation_result(
         operation,
         status="ready" if operation.decision == "approved" else "rejected",
@@ -1682,27 +2023,26 @@ def _operation_documents_match_committed_state(
 
 
 def _record_publication(
-    operation_dir: Path,
+    handle: _ApplyEvidenceHandle,
     operation: PlanningApplyOperation,
     local_commit: str,
     local_tree: str,
 ) -> None:
-    path = operation_dir / "publication.json"
     data = _canonical_json_bytes({
         "operation_id": operation.operation_id,
         "local_commit": local_commit,
         "local_tree": local_tree,
         "remote_commit": local_commit,
     })
-    if path.exists():
-        if path.read_bytes() != data:
+    if _entry_exists_at(handle, "publication.json"):
+        if _read_private_file_at(handle, "publication.json") != data:
             raise PlanningApplyOutputRejected("publication evidence collision")
         return
-    _write_private_no_replace(path, data)
+    _write_private_no_replace_at(handle, "publication.json", data)
 
 
 def _persist_transaction_backup(
-    operation_dir: Path,
+    handle: _ApplyEvidenceHandle,
     operation: PlanningApplyOperation,
     *,
     index_snapshot: GitIndexSnapshot,
@@ -1710,23 +2050,17 @@ def _persist_transaction_backup(
     decision_snapshot: FileSnapshot,
     managed_snapshot: Mapping[str, ManagedStateEntry],
 ) -> None:
-    transaction = operation_dir / "transaction"
-    transaction.mkdir(mode=0o700)
-    transaction.chmod(0o700)
-    files_dir = transaction / "files"
-    files_dir.mkdir(mode=0o700)
-    files_dir.chmod(0o700)
-    managed_dir = transaction / "managed-state"
-    managed_dir.mkdir(mode=0o700)
-    managed_dir.chmod(0o700)
-    _write_private_no_replace(transaction / "git-index.bin", index_snapshot.data)
+    _mkdir_private_at(handle, "transaction")
+    _mkdir_private_at(handle, "transaction/files")
+    _mkdir_private_at(handle, "transaction/managed-state")
+    _write_private_no_replace_at(handle, "transaction/git-index.bin", index_snapshot.data)
     entries: list[dict[str, object]] = []
     for relative, snapshot in sorted(
         file_snapshots.items(),
         key=lambda item: item[0].encode("utf-8"),
     ):
         backup_name = f"{hashlib.sha256(relative.encode()).hexdigest()}.bin"
-        _write_private_no_replace(files_dir / backup_name, snapshot.data)
+        _write_private_no_replace_at(handle, f"transaction/files/{backup_name}", snapshot.data)
         entries.append({
             "path": relative,
             "backup": backup_name,
@@ -1757,7 +2091,7 @@ def _persist_transaction_backup(
         backup_data = (
             managed_entry.data if managed_entry.kind == "file" else (managed_entry.target or "").encode("utf-8")
         )
-        _write_private_no_replace(managed_dir / backup_name, backup_data)
+        _write_private_no_replace_at(handle, f"transaction/managed-state/{backup_name}", backup_data)
         managed_entries.append({
             "path": relative,
             "backup": backup_name,
@@ -1765,23 +2099,24 @@ def _persist_transaction_backup(
             "mode": managed_entry.mode,
             "sha256": hashlib.sha256(backup_data).hexdigest(),
         })
-    _write_private_no_replace(
-        transaction / "backup-manifest.json",
+    _write_private_no_replace_at(
+        handle,
+        "transaction/backup-manifest.json",
         _canonical_json_bytes(manifest),
     )
 
 
 def _load_transaction_backup(
-    operation_dir: Path,
+    handle: _ApplyEvidenceHandle,
     operation: PlanningApplyOperation,
     *,
     repo_root: Path,
 ) -> DurableTransactionBackup:
-    transaction = operation_dir / "transaction"
-    manifest_path = transaction / "backup-manifest.json"
-    if not _owned_private_directory(transaction) or not _owned_private_file(manifest_path):
+    if not _owned_private_directory_at(handle.operation_fd, "transaction") or not _owned_private_file_at(
+        handle, "transaction/backup-manifest.json"
+    ):
         raise ValueError("transaction backup is unsafe")
-    manifest_bytes = manifest_path.read_bytes()
+    manifest_bytes = _read_private_file_at(handle, "transaction/backup-manifest.json")
     manifest = json.loads(manifest_bytes)
     if (
         not isinstance(manifest, dict)
@@ -1799,7 +2134,6 @@ def _load_transaction_backup(
         raise ValueError("transaction backup manifest mismatch")
 
     index_value = manifest["index"]
-    index_path = transaction / "git-index.bin"
     if (
         not isinstance(index_value, dict)
         or set(index_value) != {"mode", "sha256"}
@@ -1807,10 +2141,10 @@ def _load_transaction_backup(
         or not isinstance(index_value.get("mode"), int)
         or not isinstance(index_value.get("sha256"), str)
         or _SHA256.fullmatch(index_value["sha256"]) is None
-        or not _owned_private_file(index_path)
+        or not _owned_private_file_at(handle, "transaction/git-index.bin")
     ):
         raise ValueError("transaction index backup mismatch")
-    index_bytes = index_path.read_bytes()
+    index_bytes = _read_private_file_at(handle, "transaction/git-index.bin")
     if hashlib.sha256(index_bytes).hexdigest() != index_value["sha256"]:
         raise ValueError("transaction index backup mismatch")
     index_snapshot = GitIndexSnapshot(
@@ -1825,7 +2159,6 @@ def _load_transaction_backup(
         raise ValueError("transaction file backup mismatch")
     file_snapshots: dict[str, FileSnapshot] = {}
     expected_file_backups: set[str] = set()
-    files_dir = transaction / "files"
     allowed_file_paths = {
         *operation.canonical_target_paths,
         operation.companion_target_path,
@@ -1848,10 +2181,10 @@ def _load_transaction_backup(
         expected_backup = f"{hashlib.sha256(value['path'].encode()).hexdigest()}.bin"
         if value.get("backup") != expected_backup:
             raise ValueError("transaction file backup mismatch")
-        backup_path = files_dir / expected_backup
-        if not _owned_private_file(backup_path):
+        backup_relative = f"transaction/files/{expected_backup}"
+        if not _owned_private_file_at(handle, backup_relative):
             raise ValueError("transaction file backup mismatch")
-        data = backup_path.read_bytes()
+        data = _read_private_file_at(handle, backup_relative)
         if hashlib.sha256(data).hexdigest() != value["sha256"]:
             raise ValueError("transaction file backup mismatch")
         expected_file_backups.add(expected_backup)
@@ -1863,8 +2196,8 @@ def _load_transaction_backup(
         )
     if (
         set(file_snapshots) != allowed_file_paths
-        or not _owned_private_directory(files_dir)
-        or {path.name for path in files_dir.iterdir()} != expected_file_backups
+        or not _owned_private_subdirectory_at(handle, "transaction/files")
+        or _list_directory_at(handle, "transaction/files") != expected_file_backups
     ):
         raise ValueError("transaction file backup inventory mismatch")
 
@@ -1888,7 +2221,6 @@ def _load_transaction_backup(
         raise ValueError("transaction managed backup mismatch")
     managed_snapshots: dict[str, ManagedStateEntry] = {}
     expected_managed_backups: set[str] = set()
-    managed_dir = transaction / "managed-state"
     for value in managed_values:
         if (
             not isinstance(value, dict)
@@ -1906,10 +2238,10 @@ def _load_transaction_backup(
         expected_backup = f"{hashlib.sha256(value['path'].encode()).hexdigest()}.bin"
         if value.get("backup") != expected_backup:
             raise ValueError("transaction managed backup mismatch")
-        backup_path = managed_dir / expected_backup
-        if not _owned_private_file(backup_path):
+        backup_relative = f"transaction/managed-state/{expected_backup}"
+        if not _owned_private_file_at(handle, backup_relative):
             raise ValueError("transaction managed backup mismatch")
-        data = backup_path.read_bytes()
+        data = _read_private_file_at(handle, backup_relative)
         if hashlib.sha256(data).hexdigest() != value["sha256"]:
             raise ValueError("transaction managed backup mismatch")
         kind = value["kind"]
@@ -1922,8 +2254,8 @@ def _load_transaction_backup(
         )
         expected_managed_backups.add(expected_backup)
     if (
-        not _owned_private_directory(managed_dir)
-        or {path.name for path in managed_dir.iterdir()} != expected_managed_backups
+        not _owned_private_subdirectory_at(handle, "transaction/managed-state")
+        or _list_directory_at(handle, "transaction/managed-state") != expected_managed_backups
     ):
         raise ValueError("transaction managed backup inventory mismatch")
     return DurableTransactionBackup(
@@ -1938,10 +2270,51 @@ def _managed_path_is_allowed(value: str) -> bool:
     return value in _MANAGED_SYNC_FILES or value == _MANAGED_SYNC_TREE or value.startswith(f"{_MANAGED_SYNC_TREE}/")
 
 
-def _remove_transaction_backup(operation_dir: Path) -> None:
-    transaction = operation_dir / "transaction"
-    if transaction.exists() and not transaction.is_symlink():
-        shutil.rmtree(transaction)
+def _unlink_at(handle: _ApplyEvidenceHandle, relative: str) -> None:
+    parent, name, opened = _parent_fd(handle, relative)
+    try:
+        os.unlink(name, dir_fd=parent)
+        os.fsync(parent)
+    finally:
+        _close_opened(opened)
+
+
+def _rmdir_at(handle: _ApplyEvidenceHandle, relative: str) -> None:
+    parent, name, opened = _parent_fd(handle, relative)
+    try:
+        os.rmdir(name, dir_fd=parent)
+        os.fsync(parent)
+    finally:
+        _close_opened(opened)
+
+
+def _remove_transaction_backup(handle: _ApplyEvidenceHandle) -> None:
+    if not _entry_exists_at(handle, "transaction"):
+        return
+    if not _owned_private_subdirectory_at(handle, "transaction"):
+        raise PlanningApplyOutputRejected("transaction evidence is unsafe")
+    root_entries = _list_directory_at(handle, "transaction")
+    allowed_root = {"files", "managed-state", "git-index.bin", "backup-manifest.json"}
+    if not root_entries <= allowed_root:
+        raise PlanningApplyOutputRejected("transaction evidence contains unexpected entries")
+    for directory in ("files", "managed-state"):
+        relative = f"transaction/{directory}"
+        if relative.split("/")[-1] in root_entries:
+            if not _owned_private_subdirectory_at(handle, relative):
+                raise PlanningApplyOutputRejected("transaction evidence is unsafe")
+            for name in _list_directory_at(handle, relative):
+                child = f"{relative}/{name}"
+                if not _owned_private_file_at(handle, child):
+                    raise PlanningApplyOutputRejected("transaction evidence is unsafe")
+                _unlink_at(handle, child)
+            _rmdir_at(handle, relative)
+    for filename in ("git-index.bin", "backup-manifest.json"):
+        relative = f"transaction/{filename}"
+        if _entry_exists_at(handle, relative):
+            if not _owned_private_file_at(handle, relative):
+                raise PlanningApplyOutputRejected("transaction evidence is unsafe")
+            _unlink_at(handle, relative)
+    _rmdir_at(handle, "transaction")
 
 
 def snapshot_managed_sync_state(

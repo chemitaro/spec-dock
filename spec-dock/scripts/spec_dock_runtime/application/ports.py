@@ -358,7 +358,7 @@ class IssuePlanningGateway(Protocol):
         self,
         operation: PlanningApplyOperationView,
         *,
-        output_dir: Path,
+        output_guard: IssuePlanningCandidateOutputGuard,
     ) -> bool: ...
 
     def create_planning_apply_operation(

@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from datetime import datetime, timezone
+import errno
 import hashlib
 import io
 import json
@@ -172,6 +173,130 @@ def test_atomic_publication_collision_preserves_existing_bytes(tmp_path: Path) -
     assert hashlib.sha256(destination.read_bytes()).hexdigest() == before
 
 
+@pytest.mark.parametrize(
+    ("backend_name", "symbol_name", "expected_call"),
+    [
+        (
+            "_link_exclusive_linux_at",
+            "linkat",
+            (-100, b"/proc/self/fd/11", 22, b"candidate.zip", 0x00000400),
+        ),
+        (
+            "_clone_exclusive_darwin_at",
+            "fclonefileat",
+            (11, 22, b"candidate.zip", 0),
+        ),
+    ],
+)
+def test_fd_publication_backends_pass_verified_descriptor_to_os_primitive(
+    monkeypatch: pytest.MonkeyPatch,
+    backend_name: str,
+    symbol_name: str,
+    expected_call: tuple[object, ...],
+) -> None:
+    infra = _infra()
+    calls: list[tuple[object, ...]] = []
+
+    class FakeFunction:
+        argtypes = None
+        restype = None
+
+        def __call__(self, *args):
+            calls.append(args)
+            return 0
+
+    class FakeLibrary:
+        pass
+
+    library = FakeLibrary()
+    setattr(library, symbol_name, FakeFunction())
+    monkeypatch.setattr(infra.ctypes, "CDLL", lambda *_args, **_kwargs: library)
+
+    getattr(infra, backend_name)(11, 22, "candidate.zip")
+
+    assert calls == [expected_call]
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux linkat contract")
+def test_linux_proc_fd_publication_is_real_unprivileged_descriptor_bound_and_no_replace(
+    tmp_path: Path,
+) -> None:
+    infra = _infra()
+    capability_status = Path("/proc/self/status").read_text()
+    effective_capabilities = int(
+        next(line.split(":", 1)[1].strip() for line in capability_status.splitlines() if line.startswith("CapEff:")),
+        16,
+    )
+    assert os.geteuid() != 0
+    assert effective_capabilities & (1 << 2) == 0
+
+    output = tmp_path / "output"
+    output.mkdir()
+    output_descriptor = os.open(output, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    staged_descriptor = -1
+    original_bytes = b"verified staged descriptor bytes"
+    replacement_bytes = b"replacement staged name bytes"
+    staged_name = "staged.zip"
+    renamed_name = "renamed-staged.zip"
+    final_name = "candidate.zip"
+    try:
+        staged_descriptor = os.open(
+            staged_name,
+            os.O_RDWR | os.O_CREAT | os.O_EXCL,
+            0o600,
+            dir_fd=output_descriptor,
+        )
+        os.write(staged_descriptor, original_bytes)
+        os.fsync(staged_descriptor)
+        staged_stat = os.fstat(staged_descriptor)
+
+        os.rename(
+            staged_name,
+            renamed_name,
+            src_dir_fd=output_descriptor,
+            dst_dir_fd=output_descriptor,
+        )
+        replacement_descriptor = os.open(
+            staged_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+            dir_fd=output_descriptor,
+        )
+        try:
+            os.write(replacement_descriptor, replacement_bytes)
+        finally:
+            os.close(replacement_descriptor)
+
+        infra._link_exclusive_linux_at(
+            staged_descriptor,
+            output_descriptor,
+            final_name,
+        )
+
+        assert (output / final_name).read_bytes() == original_bytes
+        final_stat = os.stat(
+            final_name,
+            dir_fd=output_descriptor,
+            follow_symlinks=False,
+        )
+        assert (final_stat.st_dev, final_stat.st_ino) == (
+            staged_stat.st_dev,
+            staged_stat.st_ino,
+        )
+
+        with pytest.raises(FileExistsError):
+            infra._link_exclusive_linux_at(
+                staged_descriptor,
+                output_descriptor,
+                final_name,
+            )
+        assert (output / final_name).read_bytes() == original_bytes
+    finally:
+        if staged_descriptor >= 0:
+            os.close(staged_descriptor)
+        os.close(output_descriptor)
+
+
 def _publish_setup(tmp_path: Path):
     repo = tmp_path / "repo"
     output = tmp_path / "output"
@@ -327,6 +452,58 @@ def test_candidate_publish_racing_collision_preserves_existing_entry(
     assert [path.name for path in output.iterdir()] == [material.logical_filename]
 
 
+def test_candidate_fd_publication_backend_collision_preserves_racing_entry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    existing = output / material.logical_filename
+
+    def collide(_staged_descriptor, _destination_descriptor, destination_name):
+        assert destination_name == material.logical_filename
+        existing.write_bytes(b"racing candidate")
+        raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), destination_name)
+
+    monkeypatch.setattr(infra, "_publish_verified_fd_no_replace_at", collide)
+
+    with pytest.raises(infra.CandidateCollision):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+        )
+
+    assert existing.read_bytes() == b"racing candidate"
+    assert [path.name for path in output.iterdir()] == [material.logical_filename]
+
+
+def test_candidate_fd_publication_backend_failure_fails_closed_without_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+
+    def fail_backend(_staged_descriptor, _destination_descriptor, _destination_name):
+        raise OSError(errno.ENOTSUP, os.strerror(errno.ENOTSUP))
+
+    monkeypatch.setattr(infra, "_publish_verified_fd_no_replace_at", fail_backend)
+    monkeypatch.setattr(
+        infra,
+        "_atomic_publish_no_replace_at",
+        lambda *_args, **_kwargs: pytest.fail("pathname publication fallback must not be used"),
+        raising=False,
+    )
+
+    with pytest.raises(infra.CandidatePublicationFailed):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+        )
+
+    assert list(output.iterdir()) == []
+
+
 def test_candidate_publish_unsupported_platform_fails_closed_and_cleans_stage(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -437,6 +614,57 @@ def test_candidate_atomic_staged_file_replacement_is_preserved_and_not_published
     assert (output / staged_names[0]).read_bytes() == sentinel
     assert (output / f"{staged_names[0]}.owned").is_file()
     assert not (output / material.logical_filename).exists()
+
+
+def test_candidate_post_match_staged_name_swap_publishes_verified_descriptor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    original_matches = infra._owned_entry_matches
+    sentinel = b"replacement staged ZIP"
+    swapped_names: list[str] = []
+
+    def match_then_swap(parent_descriptor, entry, *, expected_kind):
+        matches = original_matches(
+            parent_descriptor,
+            entry,
+            expected_kind=expected_kind,
+        )
+        if matches and not swapped_names:
+            swapped_names.append(entry.name)
+            os.rename(
+                entry.name,
+                f"{entry.name}.owned",
+                src_dir_fd=parent_descriptor,
+                dst_dir_fd=parent_descriptor,
+            )
+            replacement_descriptor = os.open(
+                entry.name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+                dir_fd=parent_descriptor,
+            )
+            try:
+                os.write(replacement_descriptor, sentinel)
+            finally:
+                os.close(replacement_descriptor)
+        return matches
+
+    monkeypatch.setattr(infra, "_owned_entry_matches", match_then_swap)
+
+    published = infra.build_and_publish_candidate(
+        output_guard=guard,
+        repo_root=repo,
+        material=material,
+    )
+
+    final_bytes = (output / material.logical_filename).read_bytes()
+    assert hashlib.sha256(final_bytes).hexdigest() == published.identity.zip_sha256
+    assert len(final_bytes) == published.zip_byte_count
+    assert len(swapped_names) == 1
+    assert (output / swapped_names[0]).read_bytes() == sentinel
+    assert (output / f"{swapped_names[0]}.owned").is_file()
 
 
 def test_candidate_random_staged_name_collision_retries_without_modifying_existing(

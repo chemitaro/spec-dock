@@ -7,8 +7,12 @@ import os
 from pathlib import Path, PurePath
 import sys
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
@@ -354,6 +358,9 @@ def _run(
     candidate_error: IssuePlanningCandidateArchiveRejected | None = None,
     preflight: object | None = None,
     execution: tuple[str, str] = ("ready", "adoption_published"),
+    dependencies: IssuePlanningDependencies | None = None,
+    resume_probe: Callable[..., bool] | None = None,
+    transaction_runner_override: Callable[..., _PlanningApplyExecution] | None = None,
 ):
     repo = tmp_path / "repo"
     repo.mkdir(parents=True)
@@ -385,6 +392,8 @@ def _run(
 
     def transaction_runner(operation, **kwargs):
         calls.append(operation)
+        if transaction_runner_override is not None:
+            return transaction_runner_override(operation, **kwargs)
         return _PlanningApplyExecution(
             status=execution[0],
             reason=execution[1],
@@ -417,7 +426,7 @@ def _run(
         return current_candidate[0]
 
     result = issue_planning.run_issue_planning_apply(
-        dependencies=PLANNING_DEPENDENCIES,
+        dependencies=dependencies or PLANNING_DEPENDENCIES,
         request=request,
         records=[record],
         repo_root=repo,
@@ -430,10 +439,51 @@ def _run(
         preflight_runner=run_preflight,
         candidate_loader=load_candidate,
         expected_target_loader=expected_target_loader,
-        resume_probe=lambda _operation, **_kwargs: False,
+        resume_probe=resume_probe or (lambda _operation, **_kwargs: False),
         transaction_runner=transaction_runner,
     )
     return result, calls, request, record
+
+
+def test_apply_propagates_validated_output_guard_by_identity(tmp_path: Path) -> None:
+    opaque_guard = object()
+    resume_guards: list[object] = []
+    transaction_guards: list[object] = []
+
+    class _OpaqueGuardGateway(_FakeIssuePlanningGateway):
+        def validate_candidate_output_directory(self, output_dir: Path, repo_root: Path) -> Path:
+            super().validate_candidate_output_directory(output_dir, repo_root)
+            return opaque_guard  # type: ignore[return-value]
+
+    def resume_probe(_operation: object, *, output_guard: object) -> bool:
+        resume_guards.append(output_guard)
+        return False
+
+    def transaction_runner(operation: object, *, output_guard: object, **_kwargs: object) -> _PlanningApplyExecution:
+        transaction_guards.append(output_guard)
+        return _PlanningApplyExecution(
+            status="ready",
+            reason="adoption_published",
+            operation_id=operation.operation_id,  # type: ignore[attr-defined]
+        )
+
+    result, calls, _, _ = _run(
+        tmp_path,
+        dependencies=IssuePlanningDependencies(
+            clock=_FakeClock(),
+            gateway=_OpaqueGuardGateway(),
+        ),
+        resume_probe=resume_probe,
+        transaction_runner_override=transaction_runner,
+    )
+
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert len(calls) == 1
+    assert len(resume_guards) == 1
+    assert len(transaction_guards) == 1
+    assert resume_guards[0] is opaque_guard
+    assert transaction_guards[0] is opaque_guard
+    assert resume_guards[0] is transaction_guards[0]
 
 
 def test_archive_apply_preserves_candidate_archive_findings_in_result_details(
