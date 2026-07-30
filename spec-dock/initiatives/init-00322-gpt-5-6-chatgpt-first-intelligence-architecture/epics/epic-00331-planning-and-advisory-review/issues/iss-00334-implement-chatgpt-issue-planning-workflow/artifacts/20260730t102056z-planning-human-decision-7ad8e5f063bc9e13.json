@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue_id": "iss-00334",
+  "reviewed_identity": {
+    "branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+    "canonical_target_paths": [
+      "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00334-implement-chatgpt-issue-planning-workflow/design.md",
+      "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00334-implement-chatgpt-issue-planning-workflow/plan.md",
+      "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00334-implement-chatgpt-issue-planning-workflow/requirement.md"
+    ],
+    "git_bound_operation_binding": {
+      "binding_sha256": "0a518163ba34447001bfc4b1e60d84b567a055a352f4dfbb51b1ee1f9fc0b187",
+      "branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+      "candidate_identity": {
+        "candidate_id": "iss-00334-v1-20260730t094713z",
+        "internal_root": "20260730t094713z-iss-00334-issue-planning-candidate-v1",
+        "issue_id": "iss-00334",
+        "logical_filename": "20260730t094713z-iss-00334-issue-planning-candidate-v1.zip",
+        "observed_transport_filename": "20260730t094713z-iss-00334-issue-planning-candidate-v1.zip",
+        "source_branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+        "source_head": "f488121e80fc93f01cb64fab70a06d306c903804",
+        "source_repository": "chemitaro/spec-dock",
+        "version": 1,
+        "zip_sha256": "ee0b3be840f1de1cb182db4ee9685acba7cc90d277ceffa2f628edc07a18350a"
+      },
+      "issue_id": "iss-00334",
+      "onboarding_companion": {
+        "path": "artifacts/20260730t094713z-guide-new-member-chatgpt-first-issue-planning.md",
+        "sha256": "e0a82473b99235105cb642d67a32cbbdf26b00bc6d1f2ee757fcd95470b8b1a0"
+      },
+      "repository": "chemitaro/spec-dock",
+      "schema_version": 1,
+      "source_head": "f488121e80fc93f01cb64fab70a06d306c903804"
+    },
+    "issue_id": "iss-00334",
+    "mode": "git-bound",
+    "repository": "chemitaro/spec-dock",
+    "source_head": "f488121e80fc93f01cb64fab70a06d306c903804"
+  },
+  "reviewed_identity_sha256": "be336298dd14b882285010097acf37afd52b61fc9789f775d7174f8d14d98b5b",
+  "review_result_sha256": "2a9c115c8ca6490d4b6e596ff805e72a140599976a5082eae9a59707bf41bc5c",
+  "decision": "approved",
+  "plan_adoption": true,
+  "implementation_start": true,
+  "decided_at": "2026-07-30T10:20:56Z"
+}
