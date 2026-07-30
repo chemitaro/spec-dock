@@ -21,13 +21,13 @@ reflected_to: []
 - Repository: `chemitaro/spec-dock`
 - Base branch: `main`
 - Head branch: `iss-00334-implement-chatgpt-issue-planning-workflow`
-- Latest observed head SHA: `91715eecf306bd0c978da922f87193151764cdcd`
+- Latest observed head SHA: `be0c84a6ec3d6404700c98aaa6e81d8cceab5ea2`
 - Observation command: `./.agents/skills/github-pr-observation/scripts/wait_pr_observation.sh --pr 351 --trigger-mode post-once`
-- Observation final JSON / evidence: `20260730t151634z-pr-351-observation-head-91715eec.json`; Review `4820348714`
+- Observation final JSON / evidence: `20260730t172342z-pr-351-observation-head-be0c84a6.json`; Review `4821379670`
 - Observation status: `human_gate/blocker_present`
 - Trigger comment id: recorded in the raw observation artifact
 - Trigger created_at: recorded in the raw observation artifact
-- Trigger boundary: `post-once` trigger for evidence head `91715eecf306bd0c978da922f87193151764cdcd`
+- Trigger boundary: `post-once` trigger for evidence head `be0c84a6ec3d6404700c98aaa6e81d8cceab5ea2`
 - Resume metadata: not applicable; explicit Review completed with current-head findings
 - New trigger approved: yes after a bounded P1 repair is committed and pushed
 - Observation limitation: none; `automation_stalled` reflects repeated stable blocker fingerprints, not missing evidence
@@ -71,18 +71,18 @@ separate follow-up tracking outside the current PR branch.
 
 | field | value |
 | --- | --- |
-| latest_head_sha | `91715eecf306bd0c978da922f87193151764cdcd` |
+| latest_head_sha | `be0c84a6ec3d6404700c98aaa6e81d8cceab5ea2` |
 | observation_status | `human_gate/blocker_present` |
 | required_ci_status | `passed` |
 | review_status | `completed/findings` |
 | p0_count | `0` |
 | p1_count | `3` |
-| p2_count | `1` |
+| p2_count | `2` |
 | p3_count | `0` |
 | required_ci_failure_count | `0` |
 | merge_blocker_count | `3` |
 | blocking_family_count | `3 locally repaired; awaiting new-head observation` |
-| non_blocking_family_count | `2` |
+| non_blocking_family_count | `4` |
 | terminal_non_blocking_only | no |
 | branch_mutation_required | yes |
 | ci_rerun_expected | yes |
@@ -105,6 +105,11 @@ priority separate from the final severity decision.
 | R006 | review | Review `4820348714` | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py` | N/A | initial and resume push lacked an exact expected-old remote-ref CAS | code-path/contract | `91715eecf306bd0c978da922f87193151764cdcd` | F006 | triaged |
 | R007 | review | Review `4820348714` | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_candidate.py` | N/A | verified staged identity could still be replaced before pathname-based final publication | code-path/contract | `91715eecf306bd0c978da922f87193151764cdcd` | F007 | triaged |
 | R008 | review | Review `4820348714` | P2 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py` | N/A | a crash after Git commit but before durable commit evidence can leave a manual recovery gap | contract | `91715eecf306bd0c978da922f87193151764cdcd` | F008 | triaged |
+| R009 | review | comment `3684744601`, Review `4821379670` | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_candidate.py` | N/A | descriptor-bound publication can succeed after the visible output path is detached, returning a path that does not identify the published Candidate | code-path/contract | `be0c84a6ec3d6404700c98aaa6e81d8cceab5ea2` | F009 | triaged |
+| R010 | review | comment `3684744608`, Review `4821379670` | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py` | N/A | a canonical preimage can change after the final global check and before its unconditional replacement | code-path/contract | `be0c84a6ec3d6404700c98aaa6e81d8cceab5ea2` | F010 | triaged |
+| R011 | review | comment `3684744611`, Review `4821379670` | P1 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py` | N/A | canonical mutation and rollback can follow a swapped ancestor symlink outside the repository | code-path/contract | `be0c84a6ec3d6404700c98aaa6e81d8cceab5ea2` | F011 | triaged |
+| R012 | review | comment `3684744618`, Review `4821379670` | P2 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/oracle_issue_planning.py` | N/A | Oracle session repository-boundary behavior lacks a stronger product-side invariant | contract | `be0c84a6ec3d6404700c98aaa6e81d8cceab5ea2` | F012 | triaged |
+| R013 | review | comment `3684744623`, Review `4821379670` | P2 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_candidate.py` | N/A | mechanical-revision meaning equivalence is not enforced beyond the current closed validation contract | contract | `be0c84a6ec3d6404700c98aaa6e81d8cceab5ea2` | F013 | triaged |
 
 Do not keep example rows as active inventory.
 
@@ -122,6 +127,11 @@ Group inventory items by shared root cause. Do not repair comments one-by-one.
 | F006 | `issue-planning-apply.remote-ref-cas` | Push can overwrite or recreate a concurrently changed/deleted remote ref | yes | remote publication must compare the exact expected old ref immediately at push | R006 | P1 | P1 | yes | fix-now | U005 | local-pass-awaiting-reobservation |
 | F007 | `issue-planning-candidate.staged-fd-publication` | Candidate final publication can switch away from the verified staged object | yes | final publication must derive from the already verified staged FD without pathname fallback | R007 | P1 | P1 | yes | fix-now | U006 | local-pass-awaiting-reobservation |
 | F008 | `issue-planning-apply.post-commit-record-gap` | Commit evidence can lag a successfully created Git commit | no | recovery should eventually classify a post-commit evidence interruption | R008 | P2 | P2 | no | follow-up | N/A | triaged |
+| F009 | `issue-planning-candidate.output-path-attachment` | Candidate success can return a visible path detached from the descriptor-published file | yes | a successful create result must identify the exact published Candidate through the visible output path | R009 | P1 | P1 | yes | fix-now | U007 | local-pass-awaiting-reobservation |
+| F010 | `issue-planning-apply.per-target-preimage-cas` | canonical or companion drift can occur after the global preflight check | yes | exact preimage comparison must be coupled atomically to each replacement boundary | R010 | P1 | P1 | yes | fix-now | U009 | local-pass-awaiting-reobservation |
+| F011 | `issue-planning-apply.repository-target-authority` | pathname mutation and rollback can escape through a replaced ancestor | yes | transaction-owned repository writes and rollback must remain bound to captured no-follow parent descriptors | R011 | P1 | P1 | yes | fix-now | U008 | local-pass-awaiting-reobservation |
+| F012 | `issue-planning-oracle.session-repository-boundary` | stronger repository-bound Oracle session assurance is desirable | no | external advisory sessions should remain attributable to the intended repository state | R012 | P2 | P2 | no | follow-up | N/A | triaged |
+| F013 | `issue-planning-review.mechanical-meaning-invariant` | mechanical revision meaning equivalence is not independently enforced | no | future assurance may strengthen semantic-preservation evidence without changing this safe success path | R013 | P2 | P2 | no | follow-up | N/A | triaged |
 
 ## Classification Values
 
@@ -421,6 +431,8 @@ instead.
 | --- | --- | --- | --- | --- | --- | --- |
 | NB001 | F004 | R004 | P2 | non-blocking incomplete-input recovery only; must not expand S002 | missing-information questions remain unavailable through the typed result | separate follow-up Issue after this PR |
 | NB002 | F008 | R008 | P2 | non-blocking recovery gap; branch mutation and another review cycle are prohibited solely for this item | a crash between commit creation and durable commit evidence may require manual recovery | separate follow-up Issue after this PR |
+| NB003 | F012 | R012 | P2 | current fixed-head observation classified this as non-blocking; S009 must not change the accepted local Oracle configuration boundary | repository attribution continues to rely on the existing explicit GitHub/branch/head prompt and Oracle evidence contract | later Epic work on stronger advisory-session assurance |
+| NB004 | F013 | R013 | P2 | current closed Review/Candidate validation contract has no unsafe success path requiring this PR to expand semantic analysis | a semantically different but mechanically valid revision may require Human detection under the current contract | later Epic work on mechanical-revision assurance |
 
 ## Quality Gate Plan
 
@@ -431,17 +443,21 @@ Define family-level gates, not comment-level checks.
 | G002 | F002 | adversarial output-dir rename/symlink race plus existing candidate publisher suite | no write outside original validated directory; closed failure; existing behavior preserved | R002 | yes |
 | G003 | F003 | archive preflight-to-mutation canonical edit and absent-companion create injections plus apply suite | reject before managed mutation and preserve concurrent bytes/existence | R003 | yes |
 | G004 | F002,F003 | `make lint`; ordinary fast pytest; explicit required integration; byte parity; validate | all pass | R002,R003 | yes |
+| G005 | F009 | visible output path symlink and ordinary-directory detachment tests plus Candidate suite | reject success, remove descriptor-published entry, preserve normal publication contract | R009 | yes |
+| G006 | F011 | ancestor swap during forward mutation and rollback plus target-guard unit tests | no external sentinel mutation; descriptor-bound writes only; fail closed on unverifiable recovery | R011 | yes |
+| G007 | F010 | per-target canonical edit and absent companion create injections plus apply suite | preserve concurrent bytes/existence, reverse only owned mutations, return existing stale result | R010 | yes |
+| G008 | F009,F010,F011 | focused Candidate/Application/Apply, explicit apply full-regression, ordinary fast pytest, lint, parity, validate | all pass | R009,R010,R011 | yes |
 
 ## Re-observation Plan
 
-- Latest head before repair: `6c9302ab08c7f352e85a199b65bdeb522376171c`
-- Expected head after repair: to be recorded after S002 commit/push
+- Latest head before repair: `be0c84a6ec3d6404700c98aaa6e81d8cceab5ea2`
+- Expected head after repair: to be recorded after S009 commit/push
 - Re-observation command: fixed `wait_pr_observation.sh` for PR #351 and the pushed S002 head
 - Trigger mode: `post-once`
 - Resume trigger comment id: N/A
 - Resume trigger created_at: N/A
 - New trigger approved: yes, as the required latest-head observation after bounded P1 repair
-- Re-observation required because: two current-head P1 families require branch mutation
+- Re-observation required because: three current-head P1 families require branch mutation
 - Re-observation skipped because: N/A
 
 ## Iteration Ledger
@@ -453,10 +469,106 @@ Define family-level gates, not comment-level checks.
 | 3 | `91715eecf306bd0c978da922f87193151764cdcd` | P1=3, P2=1, CI passed | F005,F006,F007,F008 | new families after S006 | S006 | S007 | descriptor-authoritative Candidate/apply publication and exact-old remote CAS | `iss00334-pr351-s007-p1-repair`/fresh | use F005/F006/F007; defer F008 | U004/U005/U006 locally implemented and verified | pending | pending | continue to fresh local review, commit/push, exact-head review and observation | none |
 | 4 | local S007 worktree after fresh review | local review P1=3 | F005,F006,F007 | bounded residual closure gaps | S007 | S008 | unprivileged Linux primitive, resume absent/unavailable split, application guard identity test | three fresh ChatGPT sessions/verified Pro | use all three bounded work packets | S008 implemented; full local gates and fresh Spec/Code/QA review PASS | pending | pending | continue to commit/push and exact-head assurance | none |
 | 5 | `7cc387201a48f5bd758c25fafa4df8cb20728df6` | fresh ChatGPT P0=0/P1=0; PR conflict detected afterward | F005,F006,F007 | S008 closure and base drift | S008 | S008 plus latest-main integration | no contract change; additive preservation of Issue Planning and explicit-file import ports | `iss00334-s008-final-review`/fresh PASS | use PASS; merge latest main as delivery prerequisite | exact code review PASS; merge commit `99374214ebf943ceb70dc186bf782993784eb481`; post-merge local gates PASS | `7cc387201a48f5bd758c25fafa4df8cb20728df6`, `99374214ebf943ceb70dc186bf782993784eb481` | pending final-head fixed observation | continue to evidence publication and final observation | none |
+| 6 | `be0c84a6ec3d6404700c98aaa6e81d8cceab5ea2` | P1=3, P2=2, required CI passed | F009,F010,F011,F012,F013 | new exact-head filesystem race families plus non-blocking assurance observations | S008 | S009 | visible Candidate path attachment proof, repository descriptor authority, per-target atomic preimage compare-and-replace | `iss00334-s009-three-p1`/fresh verified Pro | use F009/F010/F011; defer F012/F013 | U007/U008/U009 implemented; focused, fast, lint, parity and validate PASS | pending | pending | continue to fresh local review, commit/push, exact-head review and observation | none |
+| 7 | local S009〜S013 worktree | local P1 findings converged through fresh reviews | F014,F015,F016,F017,F018 | concrete cleanup, write-ahead, resumable rollback, and workspace ownership crash windows | S009 | S010〜S013 | ownership-safe quarantine plus durable mutation/workspace intent for all forward/reverse paths | `iss00334-s010-five-p1`; `iss00334-s011-existing-rollback-workspace`; `iss00334-s012-workspace-preledger-crash`; `iss00334-s013-absent-rollback-intent` / fresh verified Pro | use only confirmed P1 work packets; exclude P2/P3 and redesign | U010〜U014 implemented; S013 integrated gates PASS | pending | pending | continue to fresh local closure review | none |
 
 `iteration_index` is telemetry only; it does not authorize continuation or
 stopping. Each row records the evidence-driven semantic decision for that
 iteration.
+
+## S010-S012 Local Review Intake
+
+| item_id | source_type | reported_priority | raw_summary | family_id | disposition |
+| --- | --- | --- | --- | --- | --- |
+| R014 | fresh local review | P1 | Candidate rejection cleanup and absent rollback can delete a replacement entry after an identity check | F014 | fix-now |
+| R015 | fresh local review | P1 | staged slot ownership, mutation write-ahead, and rollback progress are not durably coupled to namespace mutation | F015 | fix-now |
+| R016 | fresh local review | P1 | existing-preimage reverse rollback can leave an untracked inner workspace after exchange | F016 | fix-now |
+| R017 | fresh local review | P1 | forward/reverse workspace creation can precede any durable ownership record | F017 | fix-now |
+| R018 | fresh local QA review | P1 | absent rollback alone bypasses the S012 workspace intent before `rollback-prepared` handoff | F018 | fix-now |
+| R019 | fresh local code review | P1 | same-UID adversary can replace entries inside private `0700` Candidate/Apply workspaces between final identity check and pathname operation | F019 | no-action |
+| R020 | fresh scope-limited code review | P1 | an open FD can write the displaced old inode after atomic replacement and before private cleanup | F019 | no-action |
+| R021 | fresh scope-limited code review | P1 | Candidate final path can be replaced after descriptor publication but before ownership capture | F020 | fix-now |
+| R022 | fresh scope-limited code review | P1 | canonical target can be atomically replaced after expected FD open but before exchange, leaving transaction bytes canonical | F021 | fix-now |
+| R023 | fresh S015 spec review | P1 | accepted repeated-contention fail-closed boundary lacked a direct regression proving bytes/evidence retention and no commit/push | F022 | fix-now |
+| R024 | fresh S015 code review | P1 | worktree bytes can change after diff proof and be staged, committed, and pushed without comparing index blobs to operation-authorized bytes | F023 | fix-now |
+| R025 | fresh S016 spec review | P1 | real index can change after verified `write-tree` and ordinary `git commit` can create an unauthorized local commit before the post-commit tree check | F024 | fix-now |
+
+| family_id | root_cause_family | invariant | repair_unit | local_status |
+| --- | --- | --- | --- | --- |
+| F014 | `issue-planning.cleanup-owned-entry-atomicity` | unknown Candidate/decision/companion bytes must never be deleted by check-then-unlink | U010 | local-pass |
+| F015 | `issue-planning.apply-durable-mutation-recovery` | mutation intent precedes publication and rollback is idempotent and durably drainable | U011 | local-pass |
+| F016 | `issue-planning.apply-existing-rollback-workspace` | reverse exchange workspace remains represented until displaced after bytes are removed and directory cleanup is durable | U012 | local-pass |
+| F017 | `issue-planning.apply-workspace-ownership-intent` | workspace name and owned objects become durable evidence before each worktree namespace/write boundary | U013 | local-pass |
+| F018 | `issue-planning.apply-absent-rollback-intent` | decision/companion absence rollback reserves and binds its workspace before namespace creation and phase handoff | U014 | local-pass |
+| F019 | `issue-planning.private-workspace.same-uid-adversary` | current canonical contract does not define same-UID private-namespace tampering as a security boundary | N/A | not-adopted-out-of-scope |
+| F020 | `issue-planning-candidate.prebound-publication-token` | Candidate cleanup authority must be bound before public publication can be concurrently replaced | U015 | local-pass |
+| F021 | `issue-planning-apply.actual-displaced-exchange-back` | CAS miss must restore the actual attachment displaced by exchange before reporting target drift | U016 | local-pass |
+| F022 | `issue-planning-apply.repeated-exchange-back-contention` | after a second concurrent replacement during compensation, preserve every observed attachment and stop without commit/push when restoration cannot be confirmed | U017 | local-pass |
+| F023 | `issue-planning-apply.staged-tree-content-binding` | before commit, all five controlled target entries in the immutable staged tree must equal operation-authorized OIDs or explicit absence | U018 | local-pass |
+| F024 | `issue-planning-apply.verified-tree-commit-binding` | any installed local operation commit must consume the already verified tree, have the expected parent/message/path set, and be installed by old-value CAS | U019 | local-pass |
+
+| unit_id | family_ids | allowed_scope | implemented_strategy | validation |
+| --- | --- | --- | --- | --- |
+| U010 | F014 | Candidate/Apply provider infra and focused tests | descriptor-relative private quarantine with no-replace move and owned-entry deletion only | Candidate native ABI/error tests; decision/companion race tests |
+| U011 | F015 | Apply provider infra and focused tests | private workspace, `prepared`/`published`/`rollback-prepared`, exact idempotence, per-entry ledger drain | forward/absent publication crash and rollback interruption tests |
+| U012 | F016 | Apply provider infra and focused tests | outer mutation retains reverse workspace/staged identity through all cleanup crash states | reverse exchange pre/post cleanup unit/integration tests |
+| U013 | F017 | Apply provider infra and focused tests | singleton `workspace_intent`; reserve before mkdir, bind before child/write, resolve before normal recovery | forward/reverse ordering, boundary classification, ambiguity retention tests |
+| U014 | F018 | Apply provider infra and focused tests | reuse singleton intent with purpose `rollback-absent` and staged name `quarantine` | decision/companion pre-handoff crash, boundary classification, ambiguity retention tests |
+| U015 | F020 | Candidate provider infra and focused tests | Linux staged-FD token; Darwin private-clone token before no-replace public rename | same-byte distinct-inode post-publication replacement; Linux/Darwin binding tests |
+| U016 | F021 | Apply provider infra and focused tests | capture actual displaced attachment and one-shot exchange-back on canonical CAS miss | byte-different/same-byte atomic editor unit tests and archive integration |
+| U017 | F022 | Apply integration tests only | inject a second atomic replacement immediately before exchange-back and prove A/B/C bytes, mutation evidence, `recovery_required/restore_mismatch`, and no commit/push | one explicit full-regression characterization PASS |
+| U018 | F023 | Apply provider infra and focused unit/integration tests | derive expected OIDs only from immutable operation authority; parse one `git ls-tree -r -z` result for five targets; compare immediately after `write-tree` and before `after_index_stage` | five atomic replacement variants plus index-only poison Red/Green |
+| U019 | F024 | Apply provider infra and focused unit/integration tests | run commit hooks against a private index bound to verified tree; use `commit-tree` with signing intent; prove object; install exact checked-out branch ref by fixed old-value CAS | late real-index poison, final-proof race, hook order/mutation/rejection/trailer, signing tests |
+
+### F022 `issue-planning-apply.repeated-exchange-back-contention`
+
+- Related inventory ID: R023
+- Reviewer priority: P1
+- Orchestrator decision: continuous-latest architectureは不採用のまま、accepted fail-closed boundaryを実証するtest-only修正を採用。
+- Evidence: `20260730t212559z-disc-s015-repeated-canonical-contention-boundary.md`
+- Concretization: `20260730t213150z-pr-351-s016-two-p1-chatgpt-concretization.md`
+- Rationale: 一回の通常並行置換はS015で閉じた。compensation中に第三の置換が発生した場合、実装は最新attachmentをprivate workspaceへ保持し、`recovery_required/restore_mismatch`でcommit／pushせず停止する。継続中multi-writer下のcontinuous-latest guaranteeはlocking／retained storage／retry authorityを必要とし、defect-only review範囲を超える。production behaviorを変えず、既存boundaryを直接実証するintegration regressionだけを追加した。
+- Residual risk: repeated contention中はcanonical pathnameが先に捕捉したattachmentを指し、最新attachmentがprivate workspaceへ保持される場合がある。Human recoveryが必要である。
+- CI rerun caused by F022 alone: yes。accepted safety boundaryのmissing closure testであったため。
+
+### F023 `issue-planning-apply.staged-tree-content-binding`
+
+- Related inventory ID: R024
+- Reviewer priority: P1
+- Orchestrator decision: current contract内のunauthorized commit/push defectとしてfix-now。
+- Concretization: `20260730t213150z-pr-351-s016-two-p1-chatgpt-concretization.md`
+- Red evidence: `after_diff_proof`で5 targetをunauthorized bytesへatomic replacementした5 casesは修正前`ready/adoption_published`まで到達した。index-only poisonは修正前にlocal commitを作成して`recovery_required/post_commit_workspace_changed`となった。
+- Green: operation authorityだけからexpected OID／absenceを導出し、`write-tree`直後／`after_index_stage`前にfive target tree entriesをexact比較する。mismatchはcommit前の`planning_commit_failed`として既存rollbackへ接続する。
+- Residual risk: Git object-format semanticsは既存repository contractに従う。本修正はpublic schema、status／reason、push CASを変更しない。
+
+### F024 `issue-planning-apply.verified-tree-commit-binding`
+
+- Related inventory ID: R025
+- Reviewer priority: P1
+- Orchestrator decision: stop-before-commit contract内のlocal commit authority defectとしてfix-now。
+- Concretization: `20260730t220930z-pr-351-s017-verified-tree-commit-binding-chatgpt-concretization.md`
+- Red evidence: S017追加testsは修正前`3 failed, 3 passed`。late poisonはunauthorized local commit生成後に`restore_mismatch`となり、final-proof後race checkpointは存在せず、private-index mutationもcommit後proofまで到達した。
+- Green: private indexでhooksを実行し、verified treeから`commit-tree`でobjectを生成する。tree、single parent、changed paths、operation trailerをref install前に証明し、exact checked-out branch refをexpected HEAD old-value CASで更新する。generic Git validatorの`update-ref`禁止は維持する。
+- Hook/signing: pre-install hooksはprivate indexを参照し、mutation／trailer removal／nonzeroをcommit install前に拒否する。`commit.gpgsign=true`は`commit-tree -S`へ反映し、post-commitはCAS install後に既存workspace gateへ接続する。
+- Residual risk: commit object生成後／ref install前のunreachable objectはGit object databaseに残り得るがauthorityを持たない。新journal schemaやcleanup scanは導入しない。
+
+### F019 `issue-planning.private-workspace.same-uid-adversary`
+
+- Related inventory IDs: R019, R020
+- Reviewer priority: P1
+- Orchestrator decision: current P0／P1として不採用、branch mutationなし。
+- Evidence: `20260730t202538z-pr-351-s014-private-entry-final-cas-chatgpt-concretization-not-adopted.md`
+- Decision: `20260730t202539z-disc-s014-private-same-uid-threat-scope-disposition.md`
+- Rationale: canonical Requirement／Designはprivate `0700` namespace内部を能動改変するsame-UID adversaryをsecurity boundaryとして定義していない。提案されたretained storage、same-device eligibility、capacity／purge lifecycleはarchitecture／operation policy追加であり、defect-only reviewの範囲を超える。
+- Residual risk: same-UID actorがprivate random namespaceを発見し最終pathname operationへ能動介入するrisk、およびatomic replacement後に旧open FDへ届くwriteが自動保全されないriskは残る。将来要件化する場合は独立threat／concurrency contract Issueで扱う。
+- CI rerun caused by F019 alone: no。
+
+S013 integrated validation is recorded in
+`20260730t192855z-review-pr-351-s009-s015-local-closure-evidence.md`:
+focused `153 passed, 1 skipped`; explicit Apply integration `89 passed`;
+ordinary fast `1332 passed, 2188 skipped`; lint, mypy, parity, validate, and
+`git diff --check` PASS. Fresh P0/P1-only closure review remains required before
+commit/push.
 
 ## Terminal Non-Blocking Report Boundary
 
