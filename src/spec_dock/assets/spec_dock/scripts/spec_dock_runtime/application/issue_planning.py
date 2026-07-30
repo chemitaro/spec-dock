@@ -19,6 +19,21 @@ from spec_dock_runtime.application.issue_planning_prompt import (
     synthesize_issue_planning_prompt,
     synthesize_planning_evidence_prompt,
 )
+from spec_dock_runtime.application.ports import (
+    ExpectedPlanningTargetsView,
+    IssuePlanningApplyOutputRejected,
+    IssuePlanningCandidateArchiveRejected,
+    IssuePlanningCandidateBuildFailed,
+    IssuePlanningCandidateCollision,
+    IssuePlanningCandidateOutputRejected,
+    IssuePlanningCandidatePublicationFailed,
+    IssuePlanningDependencies,
+    IssuePlanningGateway,
+    PlanningApplyExecutionView,
+    PublishedCandidateView,
+    PublishedPlanningReviewView,
+    VerifiedIssueCandidateView,
+)
 from spec_dock_runtime.domain.authoring_pack.authority_boundary import (
     private_absolute_path_finding,
     scan_constraint_sensitive_payload,
@@ -41,36 +56,6 @@ from spec_dock_runtime.domain.issue_planning_contracts import (
     PlanningSourceEvidence,
     ReviewedPlanningIdentity,
     raw_bytes_sha256,
-)
-from spec_dock_runtime.infra.clock import now_iso
-from spec_dock_runtime.infra.issue_planning_apply import (
-    ExpectedPlanningTargets,
-    PlanningApplyExecution,
-    PlanningApplyOperation,
-    PlanningApplyOutputRejected,
-    load_expected_planning_targets,
-    planning_apply_resume_available,
-)
-from spec_dock_runtime.infra.issue_planning_candidate import (
-    CandidateArchiveRejected,
-    CandidateBuildFailed,
-    CandidateCollision,
-    CandidateOutputRejected,
-    CandidatePublicationFailed,
-    PublishedCandidate,
-    VerifiedIssueCandidate,
-    build_and_publish_candidate,
-    load_validated_issue_authoring_payload,
-    load_verified_issue_candidate,
-    open_safe_directory_descriptor,
-    read_bounded_regular_file,
-    read_bounded_regular_file_at,
-    validate_candidate_output_directory,
-)
-from spec_dock_runtime.infra.issue_planning_review import (
-    PublishedPlanningReview,
-    publish_planning_review_evidence,
-    read_external_review_result,
 )
 from spec_dock_runtime.presentation.issue_planning import render_planning_review_summary
 
@@ -219,17 +204,20 @@ def run_issue_planning_apply(
     request: PlanningApplyRequest,
     records: Sequence[StoredMetaRecord],
     repo_root: Path,
+    dependencies: IssuePlanningDependencies,
     repo_slug_resolver: Callable[[Path], str | None],
     validation_runner: Callable[[], object],
     sync_runner: Callable[[], object],
     preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult] = run_github_sync_preflight,
-    candidate_loader: Callable[[Path, Path], VerifiedIssueCandidate] = load_verified_issue_candidate,
-    expected_target_loader: Callable[
-        [Path, str, tuple[str, str, str]], ExpectedPlanningTargets
-    ] = load_expected_planning_targets,
-    resume_probe: Callable[..., bool] = planning_apply_resume_available,
-    transaction_runner: Callable[..., PlanningApplyExecution],
+    candidate_loader: Callable[[Path, Path], VerifiedIssueCandidateView] | None = None,
+    expected_target_loader: Callable[[Path, str, tuple[str, str, str]], ExpectedPlanningTargetsView] | None = None,
+    resume_probe: Callable[..., bool] | None = None,
+    transaction_runner: Callable[..., PlanningApplyExecutionView],
 ) -> PlanningCommandResult:
+    gateway = dependencies.gateway
+    candidate_loader = candidate_loader or gateway.load_verified_issue_candidate
+    expected_target_loader = expected_target_loader or gateway.load_expected_planning_targets
+    resume_probe = resume_probe or gateway.planning_apply_resume_available
     issue_id = request.issue_id
     try:
         target = resolve_existing_issue_target(request.issue_id, records, repo_root)
@@ -253,8 +241,8 @@ def run_issue_planning_apply(
             issue_id=issue_id,
         )
     try:
-        validate_candidate_output_directory(request.output_dir, repo_root)
-    except (CandidateOutputRejected, OSError, ValueError):
+        gateway.validate_candidate_output_directory(request.output_dir, repo_root)
+    except (IssuePlanningCandidateOutputRejected, OSError, ValueError):
         return PlanningCommandResult(
             status="rejected",
             reason="apply_output_rejected",
@@ -276,6 +264,7 @@ def run_issue_planning_apply(
         review_bytes = _read_external_bounded_file(
             request.review_result_path,
             repo_root=repo_root,
+            gateway=gateway,
         )
     except OSError:
         return PlanningCommandResult(
@@ -293,6 +282,7 @@ def run_issue_planning_apply(
         human_bytes = _read_external_bounded_file(
             request.human_decision_path,
             repo_root=repo_root,
+            gateway=gateway,
         )
     except OSError:
         return PlanningCommandResult(
@@ -357,7 +347,7 @@ def run_issue_planning_apply(
             issue_id=issue_id,
         )
 
-    verified_candidate: VerifiedIssueCandidate | None = None
+    verified_candidate: VerifiedIssueCandidateView | None = None
     if request.mode == "archive-candidate":
         candidate_identity = identity.candidate_identity
         if (
@@ -373,7 +363,7 @@ def run_issue_planning_apply(
         assert request.candidate_path is not None
         try:
             verified_candidate = candidate_loader(request.candidate_path, repo_root)
-        except CandidateArchiveRejected as error:
+        except IssuePlanningCandidateArchiveRejected as error:
             return PlanningCommandResult(
                 status="rejected",
                 reason="archive_rejected",
@@ -401,7 +391,7 @@ def run_issue_planning_apply(
         assert request.candidate_path is not None
         try:
             verified_candidate = candidate_loader(request.candidate_path, repo_root)
-        except CandidateArchiveRejected as error:
+        except IssuePlanningCandidateArchiveRejected as error:
             return PlanningCommandResult(
                 status="rejected",
                 reason="operation_binding_rejected",
@@ -481,7 +471,7 @@ def run_issue_planning_apply(
         if human.decision == "approved":
             companion_bytes = verified_candidate.files[verified_candidate.onboarding_companion.path]
     try:
-        operation = PlanningApplyOperation.create(
+        operation = gateway.create_planning_apply_operation(
             issue_id=issue_id,
             mode=request.mode,
             repository=identity.repository,
@@ -521,7 +511,7 @@ def run_issue_planning_apply(
             operation,
             output_dir=request.output_dir,
         )
-    except (OSError, PlanningApplyOutputRejected, ValueError):
+    except (OSError, IssuePlanningApplyOutputRejected, ValueError):
         return PlanningCommandResult(
             status="rejected",
             reason="apply_output_rejected",
@@ -586,7 +576,7 @@ def run_issue_planning_apply(
     assert request.candidate_path is not None
     try:
         current_candidate = candidate_loader(request.candidate_path, repo_root)
-    except CandidateArchiveRejected:
+    except IssuePlanningCandidateArchiveRejected:
         return PlanningCommandResult(
             status="stale" if request.mode == "archive-candidate" else "rejected",
             reason=("apply_target_changed" if request.mode == "archive-candidate" else "operation_binding_mismatch"),
@@ -639,10 +629,10 @@ def run_issue_planning_apply(
 
 def _planning_result_from_execution(
     issue_id: str,
-    execution: PlanningApplyExecution,
+    execution: PlanningApplyExecutionView,
 ) -> PlanningCommandResult:
     return PlanningCommandResult(
-        status=execution.status,
+        status=cast("Any", execution.status),
         reason=execution.reason,
         issue_id=issue_id,
         output={key: value for key, value in execution.to_output().items() if value is not None},
@@ -817,6 +807,7 @@ def run_issue_planning_create(
     request: PlanningCreateRequest,
     records: Sequence[StoredMetaRecord],
     repo_root: Path,
+    dependencies: IssuePlanningDependencies,
     repo_slug_resolver: Callable[[Path], str | None],
     backend_invoker: Callable[..., PlanningInvocationResult],
     dependency_loader: Callable[[str], Sequence[DirectDependencyResolution]] | None = None,
@@ -826,10 +817,14 @@ def run_issue_planning_create(
     preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult] = run_github_sync_preflight,
     prompt_synthesizer: Callable[..., Any] = synthesize_issue_planning_prompt,
     transport_runner: Callable[..., PlanningInvocationResult] = run_issue_planning_transport,
-    authoring_loader: Callable[..., Any] = load_validated_issue_authoring_payload,
-    publisher: Callable[..., PublishedCandidate] = build_and_publish_candidate,
-    clock: Callable[[], str] = now_iso,
+    authoring_loader: Callable[..., Any] | None = None,
+    publisher: Callable[..., PublishedCandidateView] | None = None,
+    clock: Callable[[], str] | None = None,
 ) -> PlanningCommandResult:
+    gateway = dependencies.gateway
+    authoring_loader = authoring_loader or gateway.load_validated_issue_authoring_payload
+    publisher = publisher or gateway.build_and_publish_candidate
+    clock = clock or dependencies.clock.now_iso
     try:
         target = resolve_existing_issue_target(request.issue_id, records, repo_root)
         current_documents = {
@@ -851,8 +846,8 @@ def run_issue_planning_create(
             issue_id=request.issue_id,
         )
     try:
-        output_guard = validate_candidate_output_directory(request.output_dir, repo_root)
-    except CandidateOutputRejected:
+        output_guard = gateway.validate_candidate_output_directory(request.output_dir, repo_root)
+    except IssuePlanningCandidateOutputRejected:
         return PlanningCommandResult(
             status="rejected",
             reason="candidate_output_rejected",
@@ -933,12 +928,12 @@ def run_issue_planning_create(
             expected_companion_path=onboarding_companion_path,
             repo_root=repo_root,
         )
-    except (CandidateArchiveRejected, UnicodeError, ValueError) as error:
+    except (IssuePlanningCandidateArchiveRejected, UnicodeError, ValueError) as error:
         return PlanningCommandResult(
             status="rejected",
             reason="archive_rejected",
             issue_id=target.issue_id,
-            details=error.findings if isinstance(error, CandidateArchiveRejected) else (),
+            details=error.findings if isinstance(error, IssuePlanningCandidateArchiveRejected) else (),
         )
     try:
         dependencies = load_dependency_snapshot(target.issue_id)
@@ -983,32 +978,32 @@ def run_issue_planning_create(
             repo_root=repo_root,
             material=material,
         )
-    except CandidateCollision:
+    except IssuePlanningCandidateCollision:
         return PlanningCommandResult(
             status="rejected",
             reason="output_collision",
             issue_id=target.issue_id,
         )
-    except CandidateArchiveRejected as error:
+    except IssuePlanningCandidateArchiveRejected as error:
         return PlanningCommandResult(
             status="rejected",
             reason="archive_rejected",
             issue_id=target.issue_id,
             details=error.findings,
         )
-    except CandidateBuildFailed:
+    except IssuePlanningCandidateBuildFailed:
         return PlanningCommandResult(
             status="blocked",
             reason="candidate_build_failed",
             issue_id=target.issue_id,
         )
-    except CandidatePublicationFailed:
+    except IssuePlanningCandidatePublicationFailed:
         return PlanningCommandResult(
             status="blocked",
             reason="candidate_publication_failed",
             issue_id=target.issue_id,
         )
-    except CandidateOutputRejected:
+    except IssuePlanningCandidateOutputRejected:
         return PlanningCommandResult(
             status="rejected",
             reason="candidate_output_rejected",
@@ -1040,6 +1035,7 @@ def run_issue_planning_review(
     request: PlanningReviewRequest,
     records: Sequence[StoredMetaRecord],
     repo_root: Path,
+    dependencies: IssuePlanningDependencies,
     repo_slug_resolver: Callable[[Path], str | None],
     backend_invoker: Callable[..., PlanningInvocationResult],
     relevant_source_paths: Sequence[str] = (),
@@ -1047,10 +1043,14 @@ def run_issue_planning_review(
     timeout_seconds: float | None = None,
     preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult] = run_github_sync_preflight,
     transport_runner: Callable[..., PlanningInvocationResult] = run_issue_planning_transport,
-    candidate_loader: Callable[[Path, Path], VerifiedIssueCandidate] = load_verified_issue_candidate,
-    publisher: Callable[..., PublishedPlanningReview] = publish_planning_review_evidence,
-    clock: Callable[[], str] = now_iso,
+    candidate_loader: Callable[[Path, Path], VerifiedIssueCandidateView] | None = None,
+    publisher: Callable[..., PublishedPlanningReviewView] | None = None,
+    clock: Callable[[], str] | None = None,
 ) -> PlanningCommandResult:
+    gateway = dependencies.gateway
+    candidate_loader = candidate_loader or gateway.load_verified_issue_candidate
+    publisher = publisher or gateway.publish_planning_review_evidence
+    clock = clock or dependencies.clock.now_iso
     if request.mode == "git-bound" and request.candidate_path is None:
         return PlanningCommandResult(
             status="rejected",
@@ -1060,7 +1060,7 @@ def run_issue_planning_review(
     repository_descriptor: int | None = None
     try:
         target = resolve_existing_issue_target(request.issue_id, records, repo_root)
-        validate_candidate_output_directory(request.output_dir, repo_root)
+        gateway.validate_candidate_output_directory(request.output_dir, repo_root)
         if request.mode == "archive-candidate":
             if request.candidate_path is None or request.reviewed_head is not None:
                 raise ValueError("archive Review requires only a Candidate")
@@ -1077,8 +1077,8 @@ def run_issue_planning_review(
                 raise ValueError("Candidate Issue does not match Review target")
         else:
             raise ValueError("Review mode is invalid")
-        repository_descriptor = open_safe_directory_descriptor(repo_root.resolve(strict=True))
-    except CandidateArchiveRejected as error:
+        repository_descriptor = gateway.open_safe_directory_descriptor(repo_root.resolve(strict=True))
+    except IssuePlanningCandidateArchiveRejected as error:
         return PlanningCommandResult(
             status="rejected",
             reason=("operation_binding_rejected" if request.mode == "git-bound" else "archive_rejected"),
@@ -1143,7 +1143,7 @@ def run_issue_planning_review(
                     name=f"target-{Path(path).name}",
                     classification="review-target",
                     source_label=path,
-                    content=read_bounded_regular_file_at(
+                    content=gateway.read_bounded_regular_file_at(
                         repository_descriptor,
                         path,
                         max_bytes=MAX_REVIEW_SOURCE_FILE_BYTES,
@@ -1165,6 +1165,7 @@ def run_issue_planning_review(
         supplemental = _read_review_supplemental_attachments(
             context,
             repository_descriptor=repository_descriptor,
+            gateway=gateway,
         )
         captured_identity[:] = [identity]
         return synthesize_planning_evidence_prompt(
@@ -1258,7 +1259,7 @@ def run_issue_planning_review(
     if candidate is not None:
         try:
             current = candidate_loader(cast("Path", request.candidate_path), repo_root)
-        except CandidateArchiveRejected:
+        except IssuePlanningCandidateArchiveRejected:
             return PlanningCommandResult(
                 status="stale",
                 reason="review_target_changed",
@@ -1346,30 +1347,40 @@ def run_issue_planning_revise(
     review_evidence: PlanningRevisionEvidenceInput | None = None,
     records: Sequence[StoredMetaRecord],
     repo_root: Path,
+    dependencies: IssuePlanningDependencies,
     repo_slug_resolver: Callable[[Path], str | None],
     backend_invoker: Callable[..., PlanningInvocationResult],
     timeout_seconds: float | None = None,
     preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult] = run_github_sync_preflight,
     transport_runner: Callable[..., PlanningInvocationResult] = run_issue_planning_transport,
-    candidate_loader: Callable[[Path, Path], VerifiedIssueCandidate] = load_verified_issue_candidate,
-    authoring_loader: Callable[..., Any] = load_validated_issue_authoring_payload,
-    publisher: Callable[..., PublishedCandidate] = build_and_publish_candidate,
-    clock: Callable[[], str] = now_iso,
+    candidate_loader: Callable[[Path, Path], VerifiedIssueCandidateView] | None = None,
+    authoring_loader: Callable[..., Any] | None = None,
+    publisher: Callable[..., PublishedCandidateView] | None = None,
+    clock: Callable[[], str] | None = None,
 ) -> PlanningCommandResult:
+    gateway = dependencies.gateway
+    candidate_loader = candidate_loader or gateway.load_verified_issue_candidate
+    authoring_loader = authoring_loader or gateway.load_validated_issue_authoring_payload
+    publisher = publisher or gateway.build_and_publish_candidate
+    clock = clock or dependencies.clock.now_iso
     issue_id = "iss-00000"
     try:
         candidate = candidate_loader(request.candidate_path, repo_root)
         issue_id = candidate.identity.issue_id
         target = resolve_existing_issue_target(issue_id, records, repo_root)
-        output_guard = validate_candidate_output_directory(request.output_dir, repo_root)
-        request_bytes = _read_external_bounded_file(request.request_path, repo_root=repo_root)
+        output_guard = gateway.validate_candidate_output_directory(request.output_dir, repo_root)
+        request_bytes = _read_external_bounded_file(
+            request.request_path,
+            repo_root=repo_root,
+            gateway=gateway,
+        )
         revision = PlanningRevisionRequestV1.from_json_bytes(
             request_bytes,
             expected_companion_path=candidate.onboarding_companion.path,
         )
         if revision.candidate_identity != candidate.identity:
             raise ValueError("revision Candidate identity mismatch")
-    except CandidateArchiveRejected as error:
+    except IssuePlanningCandidateArchiveRejected as error:
         return PlanningCommandResult(
             status="rejected",
             reason="archive_rejected",
@@ -1394,13 +1405,14 @@ def run_issue_planning_revise(
             review_bytes = _read_external_bounded_file(
                 review_result_path,
                 repo_root=repo_root,
+                gateway=gateway,
             )
             review_evidence = PlanningRevisionEvidenceInput(
                 review_result_path=review_result_path,
                 review_result_sha256=hashlib.sha256(review_bytes).hexdigest(),
             )
         else:
-            review_bytes = read_external_review_result(
+            review_bytes = gateway.read_external_review_result(
                 review_evidence.review_result_path,
                 repo_root=repo_root,
                 expected_sha256=review_evidence.review_result_sha256,
@@ -1599,7 +1611,7 @@ def run_issue_planning_revise(
             onboarding_companion_bytes = authoring.onboarding_companion_bytes
             source_payload_sha256 = authoring.zip_sha256
             source_payload_size = authoring.zip_size_bytes
-        except (CandidateArchiveRejected, UnicodeError, ValueError):
+        except (IssuePlanningCandidateArchiveRejected, UnicodeError, ValueError):
             return PlanningCommandResult(
                 status="rejected",
                 reason="planner_response_rejected",
@@ -1632,7 +1644,7 @@ def run_issue_planning_revise(
     )
     try:
         current_candidate = candidate_loader(request.candidate_path, repo_root)
-    except CandidateArchiveRejected:
+    except IssuePlanningCandidateArchiveRejected:
         current_candidate = None
     if (
         isinstance(current_source, PlanningCommandResult)
@@ -1651,26 +1663,26 @@ def run_issue_planning_revise(
             repo_root=repo_root,
             material=material,
         )
-    except CandidateCollision:
+    except IssuePlanningCandidateCollision:
         return PlanningCommandResult(
             status="rejected",
             reason="output_collision",
             issue_id=issue_id,
         )
-    except CandidateArchiveRejected as error:
+    except IssuePlanningCandidateArchiveRejected as error:
         return PlanningCommandResult(
             status="rejected",
             reason="archive_rejected",
             issue_id=issue_id,
             details=error.findings,
         )
-    except CandidateBuildFailed:
+    except IssuePlanningCandidateBuildFailed:
         return PlanningCommandResult(
             status="blocked",
             reason="candidate_build_failed",
             issue_id=issue_id,
         )
-    except CandidatePublicationFailed:
+    except IssuePlanningCandidatePublicationFailed:
         return PlanningCommandResult(
             status="blocked",
             reason="candidate_publication_failed",
@@ -1736,7 +1748,7 @@ def _content_free_preflight_categories(blockers: Sequence[str]) -> tuple[str, ..
 
 def _revision_source_state(
     *,
-    candidate: VerifiedIssueCandidate,
+    candidate: VerifiedIssueCandidateView,
     target: ExistingIssueTarget,
     repo_root: Path,
     preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult],
@@ -1864,7 +1876,12 @@ def _source_evidence_is_current(
     )
 
 
-def _read_external_bounded_file(path: Path, *, repo_root: Path) -> bytes:
+def _read_external_bounded_file(
+    path: Path,
+    *,
+    repo_root: Path,
+    gateway: IssuePlanningGateway,
+) -> bytes:
     lexical = path.absolute()
     if not lexical.exists() or not lexical.is_file() or _contains_symlink(Path(lexical.anchor), lexical):
         raise ValueError("external input path is unsafe")
@@ -1873,7 +1890,7 @@ def _read_external_bounded_file(path: Path, *, repo_root: Path) -> bytes:
     if resolved == repository or resolved.is_relative_to(repository):
         raise ValueError("external input must be outside repository")
     try:
-        data = read_bounded_regular_file(resolved, max_bytes=1024 * 1024)
+        data = gateway.read_bounded_regular_file(resolved, max_bytes=1024 * 1024)
     except ValueError as error:
         if "bounded" in str(error):
             raise ValueError("external input exceeds bounded size") from None
@@ -1923,6 +1940,7 @@ def _read_review_supplemental_attachments(
     context: PlanningContext,
     *,
     repository_descriptor: int,
+    gateway: IssuePlanningGateway,
 ) -> tuple[tuple[str, str], ...]:
     for value in context.operator_context:
         if scan_constraint_sensitive_payload(value) or private_absolute_path_finding(value):
@@ -1936,7 +1954,7 @@ def _read_review_supplemental_attachments(
         )
     )
     for path in paths:
-        content = read_bounded_regular_file_at(
+        content = gateway.read_bounded_regular_file_at(
             repository_descriptor,
             path,
             max_bytes=MAX_REVIEW_SOURCE_FILE_BYTES,

@@ -13,6 +13,8 @@ RUNTIME_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "src" / "spec_dock" 
 sys.path.insert(0, str(RUNTIME_SCRIPTS_DIR))
 
 from spec_dock_runtime.application import issue_planning  # noqa: E402
+from spec_dock_runtime.application.ports import IssuePlanningDependencies  # noqa: E402
+from spec_dock_runtime.cli.bootstrap import _Clock, _IssuePlanningGateway  # noqa: E402
 from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
     GitBoundOperationBindingV1,
     IssueCandidateIdentity,
@@ -31,6 +33,7 @@ SOURCE_HASH = "c" * 64
 COMPANION_PATH = "artifacts/20260729t000000z-guide-new-member.md"
 COMPANION_BYTES = b"onboarding companion\n"
 COMPANION_SHA = hashlib.sha256(COMPANION_BYTES).hexdigest()
+PLANNING_DEPENDENCIES = IssuePlanningDependencies(clock=_Clock(), gateway=_IssuePlanningGateway())
 
 
 def _issue_tree(repo: Path) -> tuple[Path, StoredMetaRecord]:
@@ -306,6 +309,7 @@ def _run(
         return preflight or _preflight()
 
     result = issue_planning.run_issue_planning_apply(
+        dependencies=PLANNING_DEPENDENCIES,
         request=request,
         records=[record],
         repo_root=repo,
@@ -334,6 +338,7 @@ def test_pa_nf_01_archive_review_only_is_blocked(tmp_path: Path) -> None:
     result, _, request, record = _run(tmp_path)
     request.human_decision_path.unlink()
     result = issue_planning.run_issue_planning_apply(
+        dependencies=PLANNING_DEPENDENCIES,
         request=request,
         records=[record],
         repo_root=tmp_path / "repo",
@@ -349,6 +354,7 @@ def test_pa_nf_02_git_bound_review_only_is_blocked(tmp_path: Path) -> None:
     result, _, request, record = _run(tmp_path, mode="git-bound")
     request.human_decision_path.unlink()
     result = issue_planning.run_issue_planning_apply(
+        dependencies=PLANNING_DEPENDENCIES,
         request=request,
         records=[record],
         repo_root=tmp_path / "repo",
@@ -364,6 +370,7 @@ def test_pa_nf_03_human_decision_only_is_blocked(tmp_path: Path) -> None:
     _, _, request, record = _run(tmp_path)
     request.review_result_path.unlink()
     result = issue_planning.run_issue_planning_apply(
+        dependencies=PLANNING_DEPENDENCIES,
         request=request,
         records=[record],
         repo_root=tmp_path / "repo",
@@ -380,6 +387,7 @@ def test_pa_nf_04_parity_only_is_blocked(tmp_path: Path) -> None:
     request.review_result_path.unlink()
     request.human_decision_path.unlink()
     result = issue_planning.run_issue_planning_apply(
+        dependencies=PLANNING_DEPENDENCIES,
         request=request,
         records=[record],
         repo_root=tmp_path / "repo",
@@ -636,6 +644,7 @@ def test_unsafe_review_input_is_rejected_before_transaction(
     else:
         source.write_bytes(b"\xff")
     result = issue_planning.run_issue_planning_apply(
+        dependencies=PLANNING_DEPENDENCIES,
         request=request,
         records=[record],
         repo_root=tmp_path / "repo",
@@ -667,6 +676,7 @@ def test_unsafe_human_input_is_rejected_before_transaction(
     else:
         source.write_bytes(b"\xff")
     result = issue_planning.run_issue_planning_apply(
+        dependencies=PLANNING_DEPENDENCIES,
         request=request,
         records=[record],
         repo_root=tmp_path / "repo",

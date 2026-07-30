@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Protocol
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from datetime import datetime
     from pathlib import Path
 
     from spec_dock_runtime.application.contracts import (
@@ -18,6 +20,12 @@ if TYPE_CHECKING:
         SyncCommandResult,
         SyncRequest,
         WorkbenchSourceGuardRequest,
+    )
+    from spec_dock_runtime.domain.issue_planning_candidate import CandidateMaterial, ValidatedIssueAuthoringPayload
+    from spec_dock_runtime.domain.issue_planning_contracts import (
+        IssueCandidateIdentity,
+        OnboardingCompanionBindingV1,
+        ReviewedPlanningIdentity,
     )
     from spec_dock_runtime.domain.models import IssueSnapshot, SpecGraph
     from spec_dock_runtime.infra.contracts import (
@@ -211,6 +219,181 @@ class Clock(Protocol):
     def today(self) -> str: ...
 
 
+class VerifiedIssueCandidateView(Protocol):
+    identity: IssueCandidateIdentity
+    files: Mapping[str, bytes]
+    source_baseline: Mapping[str, object]
+    zip_bytes: bytes
+    onboarding_companion: OnboardingCompanionBindingV1
+
+
+class PublishedCandidateView(Protocol):
+    identity: IssueCandidateIdentity
+    zip_byte_count: int
+    candidate_path: Path
+    onboarding_companion: OnboardingCompanionBindingV1
+
+
+class PublishedPlanningReviewView(Protocol):
+    review_result_file: str
+    review_summary_file: str
+    review_result_sha256: str
+
+
+class ExpectedPlanningTargetsView(Protocol):
+    documents: Mapping[str, bytes]
+    blob_oids: Mapping[str, str]
+
+
+class PlanningApplyOperationView(Protocol):
+    operation_id: str
+
+
+class PlanningApplyExecutionView(Protocol):
+    status: str
+    reason: str
+    details: tuple[str, ...]
+
+    def to_output(self) -> dict[str, object]: ...
+
+
+class IssuePlanningCandidateOutputGuard(Protocol):
+    """Opaque token returned by the Issue Planning output guard."""
+
+
+class IssuePlanningCandidateArchiveRejected(ValueError):
+    def __init__(self, findings: tuple[str, ...]) -> None:
+        super().__init__("Issue Candidate archive validation failed")
+        self.findings = findings
+
+
+class IssuePlanningCandidateBuildFailed(OSError):
+    pass
+
+
+class IssuePlanningCandidateCollision(FileExistsError):
+    pass
+
+
+class IssuePlanningCandidateOutputRejected(ValueError):
+    pass
+
+
+class IssuePlanningCandidatePublicationFailed(OSError):
+    pass
+
+
+class IssuePlanningApplyOutputRejected(ValueError):
+    pass
+
+
+class IssuePlanningGateway(Protocol):
+    def validate_candidate_output_directory(
+        self,
+        output_dir: Path,
+        repo_root: Path,
+    ) -> IssuePlanningCandidateOutputGuard: ...
+
+    def load_verified_issue_candidate(
+        self,
+        candidate_path: Path,
+        repo_root: Path,
+    ) -> VerifiedIssueCandidateView: ...
+
+    def load_validated_issue_authoring_payload(
+        self,
+        snapshot: object,
+        *,
+        expected_companion_path: str,
+        repo_root: Path,
+    ) -> ValidatedIssueAuthoringPayload: ...
+
+    def build_and_publish_candidate(
+        self,
+        *,
+        output_guard: IssuePlanningCandidateOutputGuard,
+        repo_root: Path,
+        material: CandidateMaterial,
+    ) -> PublishedCandidateView: ...
+
+    def open_safe_directory_descriptor(self, path: Path) -> int: ...
+
+    def read_bounded_regular_file(self, path: Path, *, max_bytes: int) -> bytes: ...
+
+    def read_bounded_regular_file_at(
+        self,
+        root_descriptor: int,
+        relative_path: str,
+        *,
+        max_bytes: int,
+    ) -> bytes: ...
+
+    def read_external_review_result(
+        self,
+        path: Path,
+        *,
+        repo_root: Path,
+        expected_sha256: str,
+    ) -> bytes: ...
+
+    def publish_planning_review_evidence(
+        self,
+        *,
+        output_dir: Path,
+        repo_root: Path,
+        reviewed_identity_sha256: str,
+        review_result_bytes: bytes,
+        summary_bytes: bytes,
+        operation_time: datetime,
+    ) -> PublishedPlanningReviewView: ...
+
+    def load_expected_planning_targets(
+        self,
+        repo_root: Path,
+        expected_head: str,
+        canonical_target_paths: tuple[str, str, str],
+    ) -> ExpectedPlanningTargetsView: ...
+
+    def planning_apply_resume_available(
+        self,
+        operation: PlanningApplyOperationView,
+        *,
+        output_dir: Path,
+    ) -> bool: ...
+
+    def create_planning_apply_operation(
+        self,
+        *,
+        issue_id: str,
+        mode: Literal["archive-candidate", "git-bound"],
+        repository: str,
+        branch: str,
+        expected_head: str,
+        reviewed_identity: ReviewedPlanningIdentity,
+        reviewed_identity_sha256: str,
+        review_result_sha256: str,
+        human_decision_sha256: str,
+        decision: Literal["approved", "rejected"],
+        canonical_target_paths: tuple[str, str, str],
+        pre_apply_target_blob_oids: Mapping[str, str],
+        candidate_identity: IssueCandidateIdentity | None,
+        git_bound_operation_binding_sha256: str | None,
+        companion_target_path: str | None,
+        companion_sha256: str | None,
+        decision_artifact_path: str,
+        human_decision_bytes: bytes,
+        replacement_documents: Mapping[str, bytes],
+        replacement_companion: bytes | None,
+        pre_apply_document_bytes: Mapping[str, bytes],
+    ) -> PlanningApplyOperationView: ...
+
+
+@dataclass(frozen=True)
+class IssuePlanningDependencies:
+    clock: Clock
+    gateway: IssuePlanningGateway
+
+
 class SyncLegacyRunner(Protocol):
     def run_sync(
         self,
@@ -242,3 +425,4 @@ class Ports:
     filesystem_gateway: FilesystemGateway | None = None
     workbench_source_guard: WorkbenchSourceGuard | None = None
     binary_artifact_publisher: BinaryArtifactPublisher | None = None
+    issue_planning: IssuePlanningDependencies | None = None

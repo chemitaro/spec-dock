@@ -230,10 +230,12 @@ def test_build_runtime_configures_all_issue_planning_use_cases(
     specdock_dir = tmp_path / "spec-dock"
     specdock_dir.mkdir()
     calls: list[str] = []
+    planning_dependencies: list[object] = []
 
     def configured(name: str):
         def operation(**kwargs):
             calls.append(name)
+            planning_dependencies.append(kwargs["dependencies"])
             request = kwargs["request"]
             issue_id = getattr(request, "issue_id", "iss-00003")
             return PlanningCommandResult(
@@ -276,3 +278,5 @@ def test_build_runtime_configures_all_issue_planning_use_cases(
     )
 
     assert calls == ["create", "review", "revise", "apply"]
+    assert planning_dependencies[0] is not None
+    assert all(dependencies is planning_dependencies[0] for dependencies in planning_dependencies)
