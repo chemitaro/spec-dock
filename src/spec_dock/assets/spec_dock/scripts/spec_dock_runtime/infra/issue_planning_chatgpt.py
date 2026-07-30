@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import shutil
 import stat
 import subprocess
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Literal
+from urllib.parse import urlsplit
 
 from spec_dock_runtime.domain.issue_planning_contracts import (
     OracleAuthoringZipSnapshot,
@@ -36,6 +39,7 @@ if TYPE_CHECKING:
     )
 
 _PREFLIGHT_TIMEOUT_SECONDS = 10.0
+_MAX_CDP_VERSION_BYTES = 64 * 1024
 _DEFAULT_RUN_TIMEOUT_SECONDS = 2 * 60 * 60
 _DEFAULT_RECOVERY_TIMEOUT_SECONDS = 2 * 60
 _TERMINAL_STATUSES = frozenset({"completed"})
@@ -47,6 +51,9 @@ _ROOT_CAPABILITIES = (
     b"--wait",
     b"--prompt",
     b"--browser-attachments",
+    b"--model",
+    b"--browser-model-strategy",
+    b"--remote-chrome",
 )
 _SESSION_CAPABILITIES = (b"--harvest", b"--no-recover")
 _SAFE_ENVIRONMENT_KEYS = frozenset({
@@ -74,6 +81,9 @@ def invoke_issue_planning_chatgpt(
     expectation = synthesized.output_expectation
     if not _invocation_contract_is_valid(role, synthesized, expectation):
         return _result("rejected", "planning_context_rejected", source_evidence, None)
+    managed_chrome = _parse_managed_chrome_endpoint(os.environ.get("SPECDOCK_ORACLE_REMOTE_CHROME"))
+    if managed_chrome is None:
+        return _result("blocked", "oracle_unavailable", source_evidence, None)
     executable = _resolve_oracle_executable()
     if executable is None:
         return _result("blocked", "oracle_unavailable", source_evidence, None)
@@ -88,6 +98,8 @@ def invoke_issue_planning_chatgpt(
             source_evidence,
             None,
         )
+    if not _preflight_managed_chrome(managed_chrome):
+        return _result("blocked", "oracle_unavailable", source_evidence, None)
 
     with TemporaryDirectory(prefix="specdock-issue-planning-") as raw_temp:
         temp_root = Path(raw_temp)
@@ -114,6 +126,13 @@ def invoke_issue_planning_chatgpt(
             str(final_executable),
             "--engine",
             "browser",
+            "--model",
+            "Pro",
+            "--browser-model-strategy",
+            "select",
+            "--remote-chrome",
+            f"{managed_chrome[0]}:{managed_chrome[1]}",
+            "--browser-no-cookie-sync",
             "--wait",
             "--browser-attachments",
             "always",
@@ -182,6 +201,59 @@ def invoke_issue_planning_chatgpt(
             source_evidence=source_evidence,
             exit_code=exit_code,
         )
+
+
+def _parse_managed_chrome_endpoint(value: str | None) -> tuple[str, int] | None:
+    if value is None:
+        return None
+    match = re.fullmatch(r"(127\.0\.0\.1|localhost):([0-9]{1,5})", value)
+    if match is None:
+        return None
+    port = int(match.group(2))
+    if not 1 <= port <= 65535:
+        return None
+    return "127.0.0.1", port
+
+
+def _preflight_managed_chrome(endpoint: tuple[str, int]) -> bool:
+    host, port = endpoint
+    connection = http.client.HTTPConnection(
+        host,
+        port,
+        timeout=_PREFLIGHT_TIMEOUT_SECONDS,
+    )
+    try:
+        connection.request(
+            "GET",
+            "/json/version",
+            headers={"Connection": "close"},
+        )
+        response = connection.getresponse()
+        if response.status != 200:
+            return False
+        payload = response.read(_MAX_CDP_VERSION_BYTES + 1)
+        if len(payload) > _MAX_CDP_VERSION_BYTES:
+            return False
+        parsed_payload = json.loads(payload)
+        if not isinstance(parsed_payload, dict):
+            return False
+        debugger_url = parsed_payload.get("webSocketDebuggerUrl")
+        if not isinstance(debugger_url, str) or not debugger_url:
+            return False
+        parsed_url = urlsplit(debugger_url)
+        if (
+            parsed_url.scheme not in {"ws", "wss"}
+            or parsed_url.username is not None
+            or parsed_url.password is not None
+            or parsed_url.hostname not in {"127.0.0.1", "localhost"}
+            or parsed_url.port != port
+        ):
+            return False
+    except (OSError, ValueError, json.JSONDecodeError, http.client.HTTPException):
+        return False
+    finally:
+        connection.close()
+    return True
 
 
 def _resolve_oracle_executable() -> Path | None:

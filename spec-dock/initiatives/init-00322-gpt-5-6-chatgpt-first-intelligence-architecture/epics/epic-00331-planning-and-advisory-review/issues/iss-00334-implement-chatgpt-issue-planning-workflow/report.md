@@ -798,3 +798,14 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - 全repairと上記Report記録を除くexact tracked diff SHA-256 `adaca4ea829bcb5529d82c44da405467dd1e5c6b701c01f06ef4e361c4786a48`を前後固定して再実行し、full regressionは`3143 passed, 76 skipped, 2 warnings`、30分15秒でPASSした。prior 3 blockersのexact nodesも`3 passed`、前後のbranch／HEAD／status／staged空／tracked diff SHAは一致し、QA reviewerはP0／P1 0、PASSと判定した。
 - S14 bounded production／projection／guide／test repairはcommit `666baaba`へ集約した。ReportとRed／Blue Team証跡は別のevidence-only commitとして追記し、次のlive authorizationとfresh final Reviewはそのpushed evidence HEADへbindする。
 - このPASSはhermetic／full-regression gateを閉じるが、Plan §22のrefreshed Human-authorized live acceptanceと、その後のexact pushed SHAに対するfresh final combined Reviewを代替しない。
+
+## 2026-07-30 — S12 live Oracle boundary pre-submit failure and bounded repair
+
+- refreshed Human authorizationはclean／local-remote identical HEAD `d3473ee3d56b6f12a34952b4b426657b3269a0aa`、`git-bound`、repository外evidence root、canonical三文書byte-identical、merge／auto-merge／branch delete／Issue close／issue finish禁止へbindした。
+- 最初のpublic `planning create`は`blocked/oracle_session_recovery_required`を返したが、対応する`specdock-planner-*` session、ChatGPT turn、browser tab、Candidateは0件だった。sanitized direct Oracle reproductionはuser configの`gpt-5.6-pro`を`Unknown GPT-5.6 browser variant "pro"`としてsession作成前に拒否した。
+- explicit `Pro` recovery smokeは別Chrome起動を試み`ECONNREFUSED 127.0.0.1:61718`で停止した。session metadataは`promptSubmitted=null`、`chromeTargetId=null`、`conversationId=null`、`tabUrl=null`で、formal planning submissionは0件のままである。
+- operator-side `chatgpt-use`でexact GitHub branch／HEADとprovider adapter、tests、個人wrapper／Oracle sourceを参照資料として共有し、製品依存はPATH-resolved Oracleだけに維持するbounded work packetを作成した。正式artifactは`artifacts/20260730t041900z-chatgpt-output-s12-live-oracle-boundary-repair-work-packet.md`、dispositionは`GO_BOUNDED_REPAIR`である。
+- provider-owned adapterは`SPECDOCK_ORACLE_REMOTE_CHROME`を必須のclosed loopback endpoint contractとし、`localhost`を`127.0.0.1`へ正規化する。proxy非依存のbounded `GET /json/version`でCDP endpoint／portを検証し、この親process variableをOracle childへforwardしない。
+- formal Oracle argvは`--model Pro`、`--browser-model-strategy select`、`--remote-chrome <validated-loopback>`、`--browser-no-cookie-sync`を明示する。hidden `--browser-no-cookie-sync`はOracle 0.16.1のversion contractで保証し、help-visible capability集合には加えない。personal wrapper、profile path、cookie、credential、API fallbackは導入していない。
+- Redはfocused unit `53 failed`。Greenはunit `71 passed`、full-regression指定integration `4 passed`、`make lint`のRuff check／418 files format／mypy 281 files、provider／dogfood 2対byte parity、`git diff --check`がPASSした。
+- 修復後のexact pushed HEADでformal createを一度だけ再実行する。timeout／disconnect後にprompt submissionが確認された場合はsame-session recoveryだけを許可し、新しいslugで再送しない。Candidate／fresh Review／exact Human decision／apply／remote parityは引き続き未完了である。
