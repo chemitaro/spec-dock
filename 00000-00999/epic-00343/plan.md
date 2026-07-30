@@ -330,7 +330,7 @@ Candidate 1はreview済みmilestone、provider-first projection、default lane�
 | Candidate | Issue node | canonical requirement / design / plan | Current status |
 |---|---|---|---|
 | Candidate 1 | `issues/iss-00344-workbench-shell-scaffolding/` | present | completed / GitHub Issue #344 closed、PR #350 merged |
-| Candidate 2 | `issues/iss-00345-generic-single-file-artifact-import/` | present | S02 / S03 / S04 / S90 implemented, reviewed, and committed; S99 final review findings are under repair before fresh rereview |
+| Candidate 2 | `issues/iss-00345-generic-single-file-artifact-import/` | present | S02 / S03 / S04 / S90 implemented, reviewed, and committed; fresh code / QA / final spec rereviews pass（final spec confidence 0.99）。S99 local closure pass。final report ledger commit、push、PR gateが残る |
 | Candidate 3 | `issues/iss-00346-integration-distribution-and-final-quality/` | present | planned / not started |
 
 ### Handoff-ready
@@ -404,7 +404,9 @@ Candidate 1はreview済みmilestone、provider-first projection、default lane�
 - design amendment blocker: none。third fresh README design review `pass`、confidence 0.92。
 - plan amendment blocker: none。second fresh README plan review `pass`、confidence 0.99。
 - Issue creation blocker: none。人間承認済み、3 Issueとdependency edgeを作成済み。
+- Candidate 2 implementation blocker: none。fresh code review / QA rereviewはpass。
+- Candidate 2 closure blocker: none（S99 local closure pass、fresh final spec rereview `pass`、confidence 0.99）。final report ledger commit、push、PR gateが残る。
 - Issue nodes:
   - `iss-00344`、`iss-00345`、`iss-00346`。
 - next action:
-  - `iss-00345`のS99 final review findingsを限定修正し、fresh S99 rereviewをpassしてIssue closure evidenceを確定する。
+  - `iss-00345`のfinal report ledgerをcommitし、push後にPR gateへ進める。

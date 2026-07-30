@@ -172,7 +172,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ## 実装サマリー
 - planning artifactsの承認とreadiness確認後、S01のgeneric single-file import vertical tracerをprovider runtimeへ実装した。
 - S01のreview/commit gateを閉じた後、S02のsource eligibility、publication state、privacy hardeningをprovider runtimeへ実装した。
-- root / Initiative / Epic / Issue、opaque bytes、source survival、full-basename identity、generic result allowlistをfocused testsで確認済み。fresh step code reviewとcommitは未実施。
+- root / Initiative / Epic / Issue、opaque bytes、source survival、full-basename identity、generic result allowlistをfocused testsで確認し、S01〜S90のfresh step reviewとcommitを完了した。
 
 ## 実装記録（セッションログ） (必須)
 
@@ -218,7 +218,7 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 | S03 | Green | §10.6 focused verification | touched unit54、CLI full-regression46、full unit767/561 skip、focused32、typed/blank6、lint/format/mypy/diff-check pass | §10.6 + full touched files + full unit | pass | fresh code review待ち |
 | S03 | Refactor | existing family/Artifact migrationなし | name-only scanner、shared slot projection、bounded retry/cleanup mergeへ整理 | diff inspection + legacy tests | pass | existing Artifact rename/migration 0 |
 | S04 | Red / alternative | body-open spy / invalid UTF-8 required | 初回projection比較は揮発timestampでwrong-reason Red。timestamp正規化後、production変更前からno-read契約Green | deterministic projection normalization + deny spy | pass | covered-existing evidence、actual affected provider module 0 |
-| S04 | Green | §11.6 + nearest lifecycle tests | S04 CLI22、ADR/no-read2、domain10、authoring17、context5、deps1、generic lifecycle1、legacy4/8/5、typed/blank4、lint/diff-check pass | full-regression/focused suites | pass | generic body open 0、invalid UTF-8 decode errorなし、projection/mirror/provenance差分0。fresh review待ち |
+| S04 | Green | §11.6 + nearest lifecycle tests | S04 CLI22、ADR/no-read2、domain10、authoring17、context5、deps1、generic lifecycle1、legacy4/8/5、typed/blank4、lint/diff-check pass | full-regression/focused suites | pass | generic body open 0、invalid UTF-8 decode errorなし、projection/mirror/provenance差分0。fresh rereview findings `[]` |
 | S04 | Refactor | unnecessary production change禁止 | production change 0、test timestamp normalization helperのみ | diff inspection | pass | default explicit-selected authoring pathはscope外 |
 | S90 | Inspect / alternative | docs/root/parity coverage gap | root rulesとchanged docsが既存parity map外、exact symlink/opaque wording test不在を確認 | provider docs inspection + test inventory | pass | implementation済み状態のためbehavioral Redは不採用 |
 | S90 | Green | §12.6 docs/parity verification | root init/update新規node2 pass、docs/runtime parity込み4 pass、provider/docs=managed docs完全一致、runtimeは`__pycache__`以外一致、lint/diff-check pass | `--run-full-regression` focused + `diff -qr` | pass | fresh docs/spec review待ち |
@@ -249,6 +249,10 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 |---|---|---|---|---|---|
 | S01 | §8.2 listed closures | §8.10の全条件 | focused/legacy/full-unit/lint Green、mutation-free rejectionとroot graph/dependency不変、public exact-key snapshot、plan外decisionなしを確認 | pass | fresh code re-review findings `[]`; confidence `0.98`。commit gateのみ未完了 |
 | S02 | §9.2 listed closures | §9.9の全条件 | Linux anonymous-staging amendment、fresh Issue spec review、bounded implementation、Red/Green/Linux actual capability evidence、fresh code rereviewを完了 | pass | final focused rereview findings `[]`; confidence `0.99` |
+| S03 | §10.2 listed closures | §10.9の全条件 | naming/NAME_MAX/shared slot/concurrency、identity binding、extension chainを実装・検証 | pass | final rereview findings `[]`; confidence `0.99` |
+| S04 | §11.2 listed closures | §11.9の全条件 | opaque lifecycle/no-read/projection/legacy compatibilityをtests-onlyで固定 | pass | final rereview findings `[]`; confidence `0.99` |
+| S90 | §12.2 listed closures | §12.9の全条件 | provider docs、managed parity、root rules、init/update test、docs/spec reviewを完了 | pass | final rereview findings `[]`; confidence `0.99` |
+| S99 | §13.6 listed closures | §19 Final Exit Contract | exact integrated HEADのlocal/rollback evidence、fresh QA/code/spec rereviewを完了 | pass | findings `[]`; final report ledger commitのみ後続 |
 
 #### テスト契約の完了証跡（Test Contract Closure）
 | クロージャID / テストID（closure id / test id） | ステップ（step） | 必須 | 証跡レベル（evidence level） | 実装前証跡 | 検証コマンドまたは代替 path | 観測結果 | メモ（notes） |
@@ -258,6 +262,7 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 | `tc-s03-001`〜`tc-s03-007` | S03 | yes | red-required | domain12 fail、application race2 fail、parser characterization1 pass、extension-chain境界1 fail | touched unit54、CLI46、full unit767/561 skip、domain243、focused32、typed/blank6、lint pass | pass | parser/NAME_MAX/shared ledger/exhaustion/cooperative/non-cooperative raceと最長extension chainはGreen。final rereview findings `[]` |
 | `tc-s04-001`〜`tc-s04-005` | S04 | yes | red-required / covered-existing | material github.updated_at差分とdeny guard negative controlのRed、existing name gatesのno-read | CLI22、unit78、focused3、ADR2、domain10、authoring17、context5、deps1、legacy4/8/5、typed/blank4 | pass | body open 0、material provenanceを保持したprojection/ADR/deps/context/authoring同値。fresh rereview findings `[]` |
 | `tc-s90-001`〜`tc-s90-004` | S90 | yes | docs structural / alternative | provider/projection/root symlink/parity test coverage gap | new init/update2、parity total4、docs/runtime byte parity、token scan、lint | pass | provider-first update scoped。final docs/spec rereview findings `[]` |
+| `tc-s99-001`〜`tc-s99-004` | S99 | yes | integrated local / rollback | exact HEAD focused/default、pre/post rollout rehearsal、handoff/privacy scan | HEAD `f9b94d6...`: focused152/2skip、default781/2065skip、rollback58+post-rollout23、lint/validate/sync/diff exit0 | pass | fresh QA/code/spec review findings `[]`。opt-in full regressionはiss-00346へdefer |
 
 - `closure id / test id` は Spec-Locked Closure Index の `id` を指す。別 alias を使う場合は `Closure Delta` で対応を記録する。
 
@@ -269,6 +274,7 @@ S02 CLI + S04 compatibility full-regression -> 25 passed
 | §10.2 listed closures | S03 | `tc-s03-001`〜`tc-s03-007`、naming/slot/race matrix、legacy/new artifact regressions、lint | pass | final fresh rereview findings `[]`; confidence `0.99` |
 | §11.2 listed closures | S04 | `tc-s04-001`〜`tc-s04-005`、no-read/projection/legacy matrix、lint | pass | fresh rereview findings `[]`; confidence `0.99` |
 | §12.2 listed closures | S90 | `tc-s90-001`〜`tc-s90-004`、docs/root link/parity/token checks | pass | final docs/spec rereview findings `[]`; confidence `0.99` |
+| §13.6 listed closures | S99 | `tc-s99-001`〜`tc-s99-004`、focused/default、rollback、handoff、privacy、fresh QA/code/spec review | pass | findings `[]`。final report ledger commitのみ後続 |
 
 #### クロージャ差分（Closure Delta）
 | 変更種別（change） | クロージャID（closure id） | テストID alias（test id alias） | 解決先クロージャID（resolved closure id） | 理由 | 計画修正要否（plan amendment required） | 再レビュー要否（re-review required） |
@@ -301,9 +307,9 @@ Authorization source は、ユーザーによる SpecDock workflow 利用依頼�
 | S01 | dev-coder | generic file importをCLIからFSまで縦に通し、rootをnon-nodeのまま4 targetとopaque bytesを実装。初回review findingに対しtest evidenceを補強 | §8.4のprovider runtime/root rulesと新規S01 testsの16 files | required unit25/CLI4/legacy/full-unit/lint pass | pass | S02〜S04の計画済み範囲のみ | fresh re-review findings `[]`; confidence `0.98`; accepted for commit |
 | S02 | dev-coder | Option A cleanupをfinal pathname re-statまで狭め、precommit OSError/fault evidenceとportable socket fixtureを補完 | application/command/infra 3 filesとS02 tests 6 files | targeted17、publisher88/1 skip、関連unit29、CLI5、S04互換20、lint/format/mypy/diff-check pass | fail | Linux named-temp cleanupはmacOS限定Option Aの範囲外 | return to planning / parent decision routing |
 | S02 Linux amendment | dev-coder | Linux generic importをlinkable O_TMPFILE匿名ステージングへ変更し、visible staging/probe pathname・named fallback・pathname unlink・same-UID waiverを排除 | `infra/binary_artifact_publisher.py`、`test_binary_artifact_publisher.py`（既存S02候補9 files全体をreview） | Red 1 failed、publisher95/2 skip、関連unit29、security matrix7/1 skip、infra65/1 skip、application9、presentation4、CLI5、S04互換20、Docker Linux actual capability×2、lint/diff-check pass | pass | none within S02 scope | final rereview findings `[]`; confidence `0.99`; accept for commit |
-| S03 | dev-coder | basename最小正規化、NAME_MAX、全family共有slot、bounded race retry/cleanup mergeを実装 | domain/application 3 files、tests 4 files | Red domain12/app2、unit54、CLI46、full unit767/561 skip、focused32、typed/blank6、lint/diff-check pass | pending fresh | Linux primitiveはS02で検証済み、S03 raceはpublisher seam | fresh code reviewへ |
-| S04 | dev-coder | generic lifecycle no-read/projection equivalenceを固定し、既存S03 gateでproduction変更不要と実証 | tests 3 files、production 0 | CLI22、ADR2、domain10、authoring17、context5、deps1、legacy4/8/5、typed/blank4、lint/diff-check pass | pending fresh | explicit user-selected authoring sourceはdefault discovery scope外 | fresh code reviewへ |
-| S90 | doc-writer + dev-coder | provider docs/rulesを完成し、managed projectionとinit/update root parity testを追加 | provider docs8、managed docs/runtime、test1 | init/update2、parity4、docs/runtime diff、lint/diff-check pass | pending fresh | `__pycache__`はprojection対象外 | fresh docs/spec reviewへ |
+| S03 | dev-coder | basename最小正規化、NAME_MAX、全family共有slot、bounded race retry/cleanup mergeを実装 | domain/application 3 files、tests 4 files | Red domain12/app2、unit54、CLI46、full unit767/561 skip、focused32、typed/blank6、lint/diff-check pass | pass | Linux primitiveはS02で検証済み、S03 raceはpublisher seam | final rereview findings `[]`; confidence `0.99` |
+| S04 | dev-coder | generic lifecycle no-read/projection equivalenceを固定し、既存S03 gateでproduction変更不要と実証 | tests 3 files、production 0 | CLI22、ADR2、domain10、authoring17、context5、deps1、legacy4/8/5、typed/blank4、lint/diff-check pass | pass | explicit user-selected authoring sourceはdefault discovery scope外 | final rereview findings `[]`; confidence `0.99` |
+| S90 | doc-writer + dev-coder | provider docs/rulesを完成し、managed projectionとinit/update root parity testを追加 | provider docs8、managed docs/runtime、test1 | init/update2、parity4、docs/runtime diff、lint/diff-check pass | pass | `__pycache__`はprojection対象外 | final docs/spec rereview findings `[]`; confidence `0.99` |
 
 #### 親実装例外（Parent Implementation Exception）
 | ステップ（step） | 委任不可 / 不可能理由（delegation unavailable/impossible reason） | ユーザー承認 / risk acceptance（user approval / risk acceptance） | 許可ファイル（allowed files） | 許可操作（allowed operation） | ロールバック計画（rollback plan） | 変更後検証（post-change verification） | レビューゲート（reviewer gate） | 利用不可 / 拒否 / host conflict / waiver 対応（unavailable / denied / host conflict / waiver handling） |
@@ -343,7 +349,11 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed | provider runtime/root rules/S01 tests/report; `feat(artifact): 汎用単一ファイル import の縦切りを追加` | `79687a7acc6ac513cad3e6909d932dfed8a13a2c` | `git status --short` clean | not applicable | not applicable | not applicable | not applicable |
-| S02 | pending | `fix(artifact): 明示ファイル publish と privacy 境界を固定` | pending | pending | not applicable | not applicable | not applicable | not applicable |
+| S02 | committed | runtime/tests/report | `c5d6cc0d43d78b511fe72f5ff5aa8dea7f700cbf` | clean | not applicable | not applicable | not applicable | not applicable |
+| S03 | committed | naming/slot/concurrency runtime/tests/report | `113c288c9ad54f54b9639b82cae647d7d19c9247` | clean | not applicable | not applicable | not applicable | not applicable |
+| S04 | committed | opaque lifecycle tests/report | `6524e49b` | clean | not applicable | not applicable | not applicable | not applicable |
+| S90 | committed | provider docs、managed projection/runtime、init/update test、report | `cf15047e27bf9592a8abe403f1106986e838d5b5` | clean | not applicable | not applicable | not applicable | not applicable |
+| S99 | pending final fix | rollback test、final code/docs/report fix | pending final integrated commit | pending | not applicable | not applicable | not applicable | not applicable |
 
 #### 変更したファイル
 - provider runtime: `application`, `cli`, `commands`, `domain`, `infra`, `presentation`のS01対象10 files
@@ -510,6 +520,69 @@ spec-dock validate -> ok, nodes=217
 - generic Artifactはdefault lifecycleでbodyを読まず、ADR/spec/delegated draftへ昇格しない。
 - consumer E2E / integrated dogfood / full regressionはIssue 346へdeferし、本Issueの完了主張へ含めない。
 
+### Final Local Quality Gate
+
+- exact integrated code/test/docs HEAD: `f9b94d6adb1f99def916c40166e45f8c90103bc4`。未コミット差分は本reportのevidence同期だけで、runtime/test/provider docs差分はない。
+- focused: domain/application/command/publisher/presentation統合 `152 passed, 2 skipped`。CLI ordinary laneはpolicy skip。
+- default: `781 passed, 2065 skipped`、`make lint` pass、`git diff --check` pass。
+- `spec-dock validate`はnodes=217でpass、`sync --no-github`はactive unchangedでprojectionを書き出し、worktree差分なし。
+- opt-in full regressionはIssue 346へdeferし、本Issueでは実行していない。
+
+### Rollback Evidence
+
+- pre-rollout: detached disposable worktreeを`f8db4fd206bf11e6ca7b396914b7cfb52d13040b`へ作成し、legacy import/new-doc focused full-regression `58 passed`。generic `file` commandは未提供、migration/schema差分なし、temp worktree cleanup済み。
+- post-rollout: `UseCases.import_file_artifact`だけをdisabled callableへ差し替えたcompositionで、新規generic作成不能・artifact集合不変を確認。
+- grandfathered generic binary/Markdown/ADR-looking bodyはrename/delete/reclassifyされずbody open 0、validate/sync Green、ADR mirror増加なし。
+- 同timestampのgeneric/typed/blank占有slotを保持し、新blank/researchは`05`/`06`へ進む。S04 exact1、full23、lint/diff-check pass。
+
+### Linux Platform Capability Evidence
+
+- image: `python:3.12`、`docker run --rm`、repo read-only mount `/repo:ro`、通常権限。
+- tested implementation commit: `c5d6cc0d43d78b511fe72f5ff5aa8dea7f700cbf`。publisher blob `0d93efb82ef2b1c81740abc574142b45897e2f65`、SHA-256 `053b4780e66f7d6703e4c1c8fe552a46d874ee7595ac4bd808f40e07439f1e38`。
+- exact commands:
+
+```sh
+docker run --rm -v "$REPO_ROOT:/repo:ro" -w /repo python:3.12 python -c 'import sys,tempfile; from pathlib import Path; sys.path.insert(0,"/repo/src/spec_dock/assets/spec_dock/scripts"); from spec_dock_runtime.application.contracts import ExplicitFileSourcePreflightRequest,ExplicitFileArtifactPublishRequest; from spec_dock_runtime.infra.binary_artifact_publisher import FilesystemBinaryArtifactPublisher; d=tempfile.TemporaryDirectory(); repo=Path(d.name)/"repo"; artifacts=repo/"spec-dock"/"artifacts"; artifacts.mkdir(parents=True); source=repo/"source.bin"; source.write_bytes(b"source"); destination=artifacts/"formal.bin"; p=FilesystemBinaryArtifactPublisher(); g=p.guard_explicit_file_source(ExplicitFileSourcePreflightRequest(repo_root=repo,source_path=source)); r=p.publish_explicit_file(ExplicitFileArtifactPublishRequest(repo_root=repo,guarded_source=g,destination_path=destination)); g.close(); assert r.committed and r.cleanup_state=="not_created" and destination.read_bytes()==b"source" and not tuple(artifacts.glob(".spec-dock-import-*")); print("linux_o_tmpfile_success")'
+docker run --rm -v "$REPO_ROOT:/repo:ro" -w /repo python:3.12 python -c 'import sys,tempfile; from pathlib import Path; sys.path.insert(0,"/repo/src/spec_dock/assets/spec_dock/scripts"); from spec_dock_runtime.application.contracts import ExplicitFileSourcePreflightRequest,ExplicitFileArtifactPublishRequest; from spec_dock_runtime.infra.binary_artifact_publisher import FilesystemBinaryArtifactPublisher; d=tempfile.TemporaryDirectory(); root=Path(d.name)/"consumer"; artifacts=root/"spec-dock"/"artifacts"; artifacts.mkdir(parents=True); source=Path("/repo/pyproject.toml"); destination=artifacts/"formal.bin"; assert source.stat().st_dev != artifacts.stat().st_dev; p=FilesystemBinaryArtifactPublisher(); g=p.guard_explicit_file_source(ExplicitFileSourcePreflightRequest(repo_root=root,source_path=source)); r=p.publish_explicit_file(ExplicitFileArtifactPublishRequest(repo_root=root,guarded_source=g,destination_path=destination)); g.close(); assert r.committed and destination.read_bytes()==source.read_bytes(); print("linux_cross_filesystem_o_tmpfile_success")'
+```
+
+- stdoutは順に`linux_o_tmpfile_success`、`linux_cross_filesystem_o_tmpfile_success`、各exit `0`、skip/fallbackなし。
+- pytestのreal-capability testはnon-Linux、Pythonの`O_TMPFILE`欠落、filesystemの`publication_unsupported`だけをskipする。deterministic security/fault matrixはskipしない。
+- `REPO_ROOT`はcheckout rootを指す非追跡shell variableであり、利用者固有のhost pathを台帳へ残さない。
+- container IDとimage digestは当時のsession出力に保存されておらず、mutable tagを同一環境として再現できない残余リスクがある。Issue 346の再実行では`docker image inspect python:3.12 --format '{{index .RepoDigests 0}}'`のdigestを記録する。
+
+### Issue 346 Handoff
+
+- exact integrated SHA: `f9b94d6adb1f99def916c40166e45f8c90103bc4`（final report-only ledger commitは後続）。
+- provider changed-path manifest: `git diff --name-only main...f9b94d6adb1f99def916c40166e45f8c90103bc4 | sort`、64 paths。provider runtime/docs、managed projection、Issue/Epic docs/artifacts、focused testsに限定。
+- focused/default: integrated focused `152 passed, 2 skipped`、ordinary default `781 passed, 2065 skipped`、lint/validate/sync/diff-check pass。
+- platform capability/skips: macOS hostではLinux real O_TMPFILE/linkat testsを理由付きskip。hermetic syscall testsとDocker Linux通常権限evidenceをS02台帳に保持。
+- unresolved risk/waiver: accepted macOS ADR `20260730t085831z-adr`は、同一UID actorがinternal staging pathnameをfinal identity check後からunlink前に意図的置換する限定windowを保証対象外とする。Linuxへは拡張しない。Issue 346のplatform統合reviewで境界を再確認する。
+- rollback: pre-rollout baseline `f8db4fd206bf11e6ca7b396914b7cfb52d13040b`でlegacy58 pass、post-rollout write-disablement S04 23 pass。
+- public CLI: `./spec-dock/scripts/spec-dock artifact import file --file <path> (--root | --initiative <id> | --epic <id> | --issue <id>) [--json]`。
+- public tokens: `canonical=false`, `not_committed`, `committed`, `committed_with_warning`, `safe_after_remediation`, `not_needed`。
+- dependency state: Issue 344/PR 350 merged済み。Issue 346はdelivery candidateとしてopen/deferred。
+
+Issue 346で明示的にopenのまま扱う項目:
+
+- exact SHAからcandidate wheelをbuildする。
+- fresh consumer repoをそのwheelからinit/updateする。
+- root/Initiative/Epic/Issue、external/cross-FS、privacy、warning statesのconsumer E2Eを行う。
+- Issue 344 Workbench shellとIssue 345 generic importのintegrated dogfoodを行う。
+- `uv run pytest --run-full-regression`またはrepository-authorized equivalentを実行する。
+- Epic-wide spec/code/QA/decision reviewを行う。
+- residual Epic integration branch/PR、PR Delivery Gate、Merge Preparation Gateを閉じる。
+- humanがmergeを判断する。
+
+Issue 345はcandidate-wheel、fresh consumer、integrated dogfood、opt-in full regression、Epic-wide final、PR delivery、merge-readyのいずれも完了主張しない。
+
+### Final Authority and Privacy Self-Check
+
+- public resultはsource path/body/hash/count/MIME/encodingを公開しない。
+- `canonical=false`かつevidence-onlyであり、import receiptからadoption/readiness/mergeを推論しない。
+- generic bodyはdefault lifecycleでopaque、rootをgraph nodeへ追加しない。
+- assurance profileは`standard/normal`のまま変更していない。
+
 ---
 
 ## 最終品質ゲート（Final Quality Gate / 必須）
@@ -517,27 +590,32 @@ spec-dock validate -> ok, nodes=217
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | pending S90 assessment | doc-writer or N/A | pending | pending |
+| provider/managed docs、root rules、naming/worktree guide | updated | doc-writer + dev-coder | init/update2、parity4、byte parity、token/link checks | pass; final rereview findings `[]`, confidence `0.99` |
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | pending | pending | pending |
+| qa-reviewer initial | whole issue obligation coverage | fail | P1 exact-HEAD/handoff、P2 Linux再現性。限定修正済み | historical fail |
+| qa-reviewer fresh rereview | whole issue obligation coverage | pass | exact HEAD `f9b94d6...`、handoff/Linux台帳補完、findings `[]`、confidence `0.99` | pass |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | pending | 0 | pending |
+| code-reviewer initial | issue-wide integrated diff | P1 rules path mutation/report、P2 undecodable basename。限定修正済み | 0 | historical fail |
+| code-reviewer fresh rereview | exact integrated HEAD + report-only delta | findings `[]`。P2のCLI例を正式な`artifact import file --file <path> ...`構文へ限定修正 | 1 | pass; confidence `0.96` |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
 | ChatGPT Pro（spec-reviewer相当） | planning phaseのrequirement / design / plan / onboarding alignment | 前回P1×2/P2×3を修正し、fresh combined re-review findings `[]` | 1 | pass at `3a2e95b57154108aea260325d5c40829b01ccf4a` |
+| spec-reviewer initial final | implementation/final ledger alignment | P1 step/milestone/S90、exact HEAD、handoff、Epic status、P2 historical gaps。限定修正済み | 0 | historical fail |
+| spec-reviewer second final | exact integrated state | QA/codeのfresh passと親Epic状態が旧pendingのまま残ったP1×2。本台帳と親Epic planへ限定同期 | 1 | historical fail |
+| spec-reviewer fresh final | exact integrated state | findings `[]`。Option A、macOS限定境界、Issue 346 defer、S99 closure、Decision/Evidence ledgerの整合を確認 | 2 | pass; confidence `0.99` |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| pending | pending | final response / PR / issue comment | pending |
+| exact integrated code/test/docs HEAD `f9b94d6...`とfresh final gateを記録済み | Issue report + parent Epic Candidate 2 status-only delta | final response / PR / issue comment | commit pending |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
