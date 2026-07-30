@@ -809,3 +809,16 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - formal Oracle argvは`--model Pro`、`--browser-model-strategy select`、`--remote-chrome <validated-loopback>`、`--browser-no-cookie-sync`を明示する。hidden `--browser-no-cookie-sync`はOracle 0.16.1のversion contractで保証し、help-visible capability集合には加えない。personal wrapper、profile path、cookie、credential、API fallbackは導入していない。
 - Redはfocused unit `53 failed`。Greenはunit `71 passed`、full-regression指定integration `4 passed`、`make lint`のRuff check／418 files format／mypy 281 files、provider／dogfood 2対byte parity、`git diff --check`がPASSした。
 - 修復後のexact pushed HEADでformal createを一度だけ再実行する。timeout／disconnect後にprompt submissionが確認された場合はsame-session recoveryだけを許可し、新しいslugで再送しない。Candidate／fresh Review／exact Human decision／apply／remote parityは引き続き未完了である。
+
+## 2026-07-30 — First live authoring ZIP rejection and bounded Prompt repair
+
+- repaired direct Oracle boundaryをcommit `9855eda91d6f279ace07dfa3cd9ee261984476e3`としてpushし、clean／local-remote identical HEADでformal `planning create`を一度だけ実行した。
+- Oracle session `specdock-planner-017b25-18192b95`はmanaged Chrome `127.0.0.1:9223`、conversation／target各1件、`promptSubmitted=true`、`requested=Pro`／`resolved=Pro`／`verified=yes`でterminal `completed`となった。underlying numbered model versionは主張しない。
+- exactly one `iss-00334-issue-planning-documents.zip`を取得し、Oracle ZIP validationはPASSした。ZIP SHA-256は`d0dafe35cfe695b406a74df3f216339aa157c8ce3d6337ae50af7c249de09747`、single root内はcanonical三文書＋runtime-selected onboarding companionの4 filesだった。
+- RuntimeはCandidate publication前に`rejected/archive_rejected`、details `authoring_payload_invalid`で停止した。三文書frontmatter／framingはすべてvalidで、失敗はonboarding companionのrequired distinct section assignmentだけだった。repository mutation、Candidate、Review、Human decision、applyは0件である。
+- userが削除したbrowser tabはterminal後のUI tabであり、ZIPとtranscriptはOracle session artifactへ保存済みだった。同一Promptの盲目的再送は行わず、exact ZIPを元filenameのままfresh ChatGPT diagnosisへ渡した。
+- diagnosis session `iss00334-authoring-zip-contract-diagnosis`はexact branch／HEADをGitHub connectorで確認し、default branch未使用、`GO_BOUNDED_PROMPT_REPAIR`と判定した。正式artifactは`artifacts/20260730t052721z-chatgpt-output-authoring-zip-contract-diagnosis.md`である。
+- defectはprovider Promptがtopicsだけを列挙し、validatorの13 distinct nonempty sections／co-locationを明示しないことだった。実ZIPではCurrent／Target architectureの分割と、`ChatGPT First planning sequence`が`planning workflow`／`planning lifecycle`を含まないことが直接failureで、Purpose／Scopeはtable内tokenによる偶然の一致だった。
+- Planner／Semantic Revision resourceへ同一のexact 13-H2／no split-or-merge contractを追加し、Reviewer resourceとvalidatorは変更していない。official updateでprovider／projectionのPlanner SHA-256 `3538b8c8a28dc86c6ff448b0f377e460b41bb484a9b1247f726095c733751051`、Revision `03fd129fc68b2ecc4e95897006b39ac3ae55ad57486cf25672116d3b2d8dc1d2`をbyte-identicalに同期した。
+- RedはPrompt contract不在の2 failures／74 passed。GreenはPrompt＋domain unit 76 passed、Prompt budget 23 passed、full-regression指定integration 4 chains、Ruff／format／mypy、provider／projection parity、`git diff --check`がPASSした。既存character ceilingは増やしていない。
+- Prompt repairをcommit／pushした新しいexact HEADで、新しいformal createを一度だけ実行する。最初のterminal invalid ZIPはimmutable failure evidenceとして保持し、上書きやCandidate化をしない。
