@@ -8,7 +8,7 @@ ID: "20260729t044600z-guide-new-member-chatgpt-first-issue-planning"
 対象: ["init-00322", "epic-00331", "iss-00334"]
 source_repository: "chemitaro/spec-dock"
 source_branch: "iss-00334-implement-chatgpt-issue-planning-workflow"
-source_head: "bf9bc26c00664795842731f665def63a16a7b78c"
+source_head: "bb65257155a73b621b0d0b6fb3426393c46de712"
 candidate_id: "iss-00334-onboarding-companion-planning-amendment-v4"
 authority: "subordinate-explanatory-artifact"
 canonical_authorities: ["requirement.md", "design.md", "plan.md"]
@@ -32,7 +32,7 @@ canonical_authorities: ["requirement.md", "design.md", "plan.md"]
 | Epic | `epic-00331` | Planningとadvisory Reviewの製品能力。Issue／Epic／Initiative Candidate、Review、Human Gate、materializationの共通境界を定義する。 |
 | Issue | `iss-00334` | 最初のwalking skeleton。既存Issueを対象にcreate→revise→review→Human Gate→applyを一つのvertical sliceで実装する。 |
 
-このガイドのsource identityは、repository `chemitaro/spec-dock`、branch `iss-00334-implement-chatgpt-issue-planning-workflow`、HEAD `bf9bc26c00664795842731f665def63a16a7b78c`です。別branch、default branch、添付だけ、memoryだけから同じFormal Planning結果を作ってはいけません。
+このガイドのstatus reconciliation source/review baselineは、repository `chemitaro/spec-dock`、branch `iss-00334-implement-chatgpt-issue-planning-workflow`、HEAD `bb65257155a73b621b0d0b6fb3426393c46de712`です。これはWU-1修正入力のidentityであり、修正後のcurrent HEADを主張するものではありません。Formal Planningでは別branch、default branch、添付だけ、memoryだけから同じ結果を作ってはいけません。
 
 ## 2. System context
 
@@ -239,17 +239,17 @@ Formal runは次の三重gateを必要とします。
 2. Chat promptがChatGPTへ`@GitHub`で同一repositoryのexact current branchを直接開かせる。current branchを開けない場合はdefault branch、別branch、添付、memoryへfallbackしない。
 3. Oracle output受領後、Candidate／Review publication前にbranch、HEAD、source manifestを再検証する。
 
-このガイドのsource bindingは次の通りです。
+このガイドのstatus reconciliation source/review baselineは次の通りです。これはWU-1修正入力のidentityであり、修正後のcurrent HEADを主張するものではありません。
 
 ```text
 repository: chemitaro/spec-dock
 branch: iss-00334-implement-chatgpt-issue-planning-workflow
-HEAD: bf9bc26c00664795842731f665def63a16a7b78c
+HEAD: bb65257155a73b621b0d0b6fb3426393c46de712
 ```
 
 ## 8. 実装状態と残作業
 
-### 8.1 S01〜S07の履歴
+### 8.1 milestoneの履歴と現在状態
 
 | Step | 状態 | 今日の理解 |
 |---|---|---|
@@ -259,9 +259,16 @@ HEAD: bf9bc26c00664795842731f665def63a16a7b78c
 | S04 | closed、commit `6042553343225541709f71e74eeeca549ead2089` | archive／git-bound Review、Semantic／Mechanical revisionを実装。 |
 | S05 | closed、commit `5f2edb93ab3e9e607abecf169f8167b0bd545f38` | Human decision binding、apply transaction、rollback／publication semanticsを実装。 |
 | S06 | closed、commit `9206ab28d205b654603c8ecac2db7f89ee53bdeb` | provider、installed assets、dogfood projection、end-to-end regressionを整備。 |
-| S07 | historical step retained、live gate未通過 | execution packetとread-only preflightは完了。live create／review／applyはHuman authorization待ちで停止。旧wrapper transport evidenceは新Oracle境界のPASSへ流用しない。 |
+| S07 | historical step retained | execution packetとread-only preflightの履歴だけを保持する。S07のhistorical evidenceはnew-boundary S12 evidenceを代替しない。 |
+| S08 | closed | personal wrapper依存を除去し、PATH Oracle、direct argv、safe session artifact snapshotを実装済み。 |
+| S09 | closed | Prompt本文、exact current branch、no fallback、role別output、companion contractを実装済み。 |
+| S10 | closed | authoring ZIP、Candidate、same-Candidate Review／apply、managed companion transactionを実装済み。 |
+| S11 | closed | provider authority、installed assets、distribution、dogfood projectionを同期・検証済み。 |
+| S12 | open | refreshed Human authorization後のlive acceptance chainが未完了。新境界でのlive create／Review／Human decision／apply／publication evidenceを待つ。 |
+| S13 | not admitted | S12が閉じるまでcommit／push closureへ進まない。 |
+| S14 | not admitted | S13が閉じるまでexact pushed SHAのfinal reviewへ進まない。 |
 
-S01〜S07を未実施へ戻しません。残作業は既存walking skeletonを捨てる再実装ではなく、transport boundaryとauthoring inventoryを最小修復するものです。
+S01〜S11を未実施へ戻しません。現在の実行点はS12のHuman gateであり、S13／S14はまだadmitされていません。
 
 ### 8.2 effective roadmap
 
@@ -269,13 +276,13 @@ S01〜S07を未実施へ戻しません。残作業は既存walking skeletonを�
 @startuml
 title Remaining implementation roadmap
 left to right direction
-rectangle "S08 Direct Oracle adapter" as S08
-rectangle "S09 Prompt and companion contract" as S09
-rectangle "S10 ZIP Candidate review and apply" as S10
-rectangle "S11 Provider and projection" as S11
-rectangle "S12 Full verification" as S12
-rectangle "S13 Commit and push" as S13
-rectangle "S14 Final reviews" as S14
+rectangle "S08 Closed" as S08
+rectangle "S09 Closed" as S09
+rectangle "S10 Closed" as S10
+rectangle "S11 Closed" as S11
+rectangle "S12 Open: refreshed Human authorization\nand live acceptance chain pending" as S12
+rectangle "S13 Not admitted" as S13
+rectangle "S14 Not admitted" as S14
 
 S08 --> S09
 S09 --> S10
@@ -286,15 +293,15 @@ S13 --> S14
 @enduml
 ```
 
-| Step | 残る主要作業 |
-|---|---|
-| S08 | personal wrapperを除去し、PATH Oracle、direct argv、safe session artifact snapshotを実装する。 |
-| S09 | instructionをPrompt本文へ移し、exact current branch、no fallback、role別output、companion path／authority／required contentを固定する。 |
-| S10 | 三文書＋companionのdownloadable authoring ZIPをCandidate、Review／Human identity、managed apply／rollbackへ接続し、same Candidate由来`GitBoundOperationBindingV1`でseparate git-bound Review／applyを閉じる。 |
-| S11 | provider authority、installed assets、wheel／sdist、fresh init／update、dogfood projection、docs／testsを同一contractへ同期する。 |
-| S12 | current guideのdefect-only Review、PlantUML、hermetic／distribution／static、Human-approved live dogfoodで新境界を検証する。 |
-| S13 | approved repairだけをcommitし、non-force push、remote parityを証明する。 |
-| S14 | exact pushed SHAをfresh spec／code／QA reviewerが確認し、zero blocker時だけHumanへmerge-ready handoffする。 |
+| Step | 状態 | 現在の意味 |
+|---|---|---|
+| S08 | closed | direct Oracle adapterとsafe artifact snapshotの実装・検証が完了した。 |
+| S09 | closed | Prompt／companion contractとexact-branch failure semanticsの実装・検証が完了した。 |
+| S10 | closed | authoring ZIP、Candidate binding、Review／Human identity、managed apply／rollbackの実装・検証が完了した。 |
+| S11 | closed | provider／installed／distribution／dogfood projectionの同期・検証が完了した。 |
+| S12 | open | refreshed Human authorizationを取得し、新境界のlive acceptance chainを完了するまでopen。S07の旧evidenceは流用しない。 |
+| S13 | not admitted | S12 closure後にだけcommit、non-force push、remote parityへadmitする。 |
+| S14 | not admitted | S13 closure後にだけexact pushed SHAのfresh final reviewへadmitする。 |
 
 ## 9. provider authorityとdogfood projection
 
@@ -339,7 +346,7 @@ repository rootの`spec-dock/`はdogfood projectionです。そこを直接修�
 - [ ] formal Reviewerがadapter／PATH Oracle経由で起動し、exact current branchを独立確認してclosed JSONを同境界で返すことを確認した。
 - [ ] Review PASSだけでは`execution-ready`にならず、exact Human decision、parity、validation、publicationが必要と理解した。
 - [ ] live Oracle、canonical mutation、commit、pushの前にHuman authorization範囲を確認した。
-- [ ] S01〜S07のhistoryと、S08〜S14のremaining roadmapを区別した。
+- [ ] S01〜S11がclosed、S12がrefreshed Human authorizationとlive acceptance chain待ちでopen、S13／S14がnot admittedであり、S07のhistorical evidenceをS12へ流用できないと説明できる。
 - [ ] failure時にsilent fallback、duplicate submit、force push、approval推測をしない。
 
 ## 12. よくある誤解
