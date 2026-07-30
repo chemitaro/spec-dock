@@ -17,12 +17,21 @@ _STALE_BUILD_OUTPUT_PATTERNS = (
     "spec_dock/assets/spec_dock/templates/issue/discussions/_template.md",
     "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",
     "spec_dock/assets/spec_dock/templates/epic/issues/new-issue",
-    "spec_dock/assets/spec_dock/templates/*/**/README.md",
     "spec_dock/assets/spec_dock/templates/design.md",
     "spec_dock/assets/spec_dock/templates/plan.md",
     "spec_dock/assets/spec_dock/templates/report.md",
     "spec_dock/assets/spec_dock/templates/requirement.md",
 )
+
+_DISTRIBUTABLE_TEMPLATE_README_PATHS = (
+    "README.md",
+    "root/.workbench/README.md",
+    "initiative/.workbench/README.md",
+    "epic/.workbench/README.md",
+    "issue/.workbench/README.md",
+)
+_BUILD_TEMPLATE_ROOT = Path("spec_dock/assets/spec_dock/templates")
+_SOURCE_TEMPLATE_ROOT = Path("src/spec_dock/assets/spec_dock/templates")
 
 _GENERATED_PYTHON_CACHE_PATTERNS = (
     "spec_dock/**/__pycache__",
@@ -56,12 +65,29 @@ def _is_generated_python_cache_path(path: str) -> bool:
     return "__pycache__" in candidate.parts or candidate.suffix in {".pyc", ".pyo"}
 
 
+def _is_distributable_template_readme_source(path: str) -> bool:
+    candidate = Path(path)
+    if candidate.name != "README.md":
+        return True
+    try:
+        template_relative = candidate.relative_to(_SOURCE_TEMPLATE_ROOT).as_posix()
+    except ValueError:
+        return True
+    return template_relative in _DISTRIBUTABLE_TEMPLATE_README_PATHS
+
+
 def _prune_stale_build_outputs(build_lib: Path) -> None:
     stale_paths = {
         path
         for pattern in (*_GENERATED_PYTHON_CACHE_PATTERNS, *_STALE_BUILD_OUTPUT_PATTERNS)
         for path in build_lib.glob(pattern)
     }
+    template_root = build_lib / _BUILD_TEMPLATE_ROOT
+    stale_paths.update(
+        path
+        for path in template_root.rglob("README.md")
+        if path.relative_to(template_root).as_posix() not in _DISTRIBUTABLE_TEMPLATE_README_PATHS
+    )
     for stale_path in sorted(stale_paths, key=lambda path: len(path.parts), reverse=True):
         if stale_path.is_dir():
             shutil.rmtree(stale_path, ignore_errors=True)
@@ -88,9 +114,14 @@ def _write_pre_prune_snapshot(build_lib: Path) -> None:
         for fixture_relative_path in _SEEDED_STALE_OUTPUT_FIXTURE_PATHS
         if (build_lib / fixture_relative_path).is_file()
     ]
+    template_root = build_lib / _BUILD_TEMPLATE_ROOT
+    template_readmes_before_prune = sorted(
+        path.relative_to(template_root).as_posix() for path in template_root.rglob("README.md") if path.is_file()
+    )
     snapshot_payload = {
         "expected_seeded_stale_fixture_paths": list(_SEEDED_STALE_OUTPUT_FIXTURE_PATHS),
         "present_before_prune": present_before_prune,
+        "template_readmes_before_prune": template_readmes_before_prune,
     }
     snapshot_path.write_text(
         json.dumps(snapshot_payload, ensure_ascii=True, indent=2) + "\n",
@@ -110,7 +141,11 @@ class build_py(_build_py):
 
 class sdist(_sdist):
     def make_release_tree(self, base_dir: str, files: list[str]) -> None:
-        distributable_files = [path for path in files if not _is_generated_python_cache_path(path)]
+        distributable_files = [
+            path
+            for path in files
+            if not _is_generated_python_cache_path(path) and _is_distributable_template_readme_source(path)
+        ]
         super().make_release_tree(base_dir, distributable_files)
 
 

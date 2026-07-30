@@ -175,6 +175,10 @@ spec_dock = [
   "assets/install_root/.agents/**",
   "assets/install_root/.codex/**",
   "assets/install_root/.github/**",
+  "assets/spec_dock/templates/root/.workbench/README.md",
+  "assets/spec_dock/templates/initiative/.workbench/README.md",
+  "assets/spec_dock/templates/epic/.workbench/README.md",
+  "assets/spec_dock/templates/issue/.workbench/README.md",
 ]
 
 [tool.setuptools.exclude-package-data]
@@ -195,8 +199,6 @@ spec_dock = [
   "assets/spec_dock/templates/issue/discussions/_template.md",
   "assets/spec_dock/templates/initiative/epics/new-epic",
   "assets/spec_dock/templates/epic/issues/new-issue",
-  # v2 node templates should not proliferate README.md; keep only `templates/README.md`.
-  "assets/spec_dock/templates/*/**/README.md",
   "assets/spec_dock/templates/design.md",
   "assets/spec_dock/templates/plan.md",
   "assets/spec_dock/templates/report.md",

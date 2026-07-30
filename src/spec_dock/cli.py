@@ -62,8 +62,10 @@ _DEFAULT_SPEC_DOCK_GITIGNORE = (
     ".agent/\n"
     "# legacy v2 name (kept ignored for safe upgrades)\n"
     ".work/\n"
-    "# local disposable work areas (reserved exact directory name at any scope)\n"
-    ".workbench/\n"
+    "# local disposable work areas (README is the only tracking-eligible path)\n"
+    "**/.workbench/*\n"
+    "!**/.workbench/README.md\n"
+    "**/.workbench/README.md/**\n"
     "active/\n"
 )
 _MANAGED_NATIVE_SHIM_PREFIXES = (".codex/agents/", ".github/agents/")
@@ -710,10 +712,18 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
 
     templates_dir = specdock_dir / "templates"
 
-    # Defensive: node templates should not generate nested README.md files.
+    preserved_readmes = {
+        Path("README.md"),
+        Path("root/.workbench/README.md"),
+        Path("initiative/.workbench/README.md"),
+        Path("epic/.workbench/README.md"),
+        Path("issue/.workbench/README.md"),
+    }
+
+    # Defensive: node templates should not generate unrecognized nested README.md files.
     # These can reappear if a local clone has stale `build/` artifacts that get packaged.
     for p in templates_dir.rglob("README.md"):
-        if p == templates_dir / "README.md":
+        if p.relative_to(templates_dir) in preserved_readmes:
             continue
         p.unlink(missing_ok=True)
 
@@ -757,6 +767,7 @@ def _prune_legacy_scaffold(specdock_dir: Path) -> None:
 def _install_spec_dock(target_root: Path, *, force: bool) -> None:
     """Install/update `spec-dock/` scaffold into the target repository."""
     specdock_dir = _specdock_dir(target_root)
+    fresh_specdock = not os.path.lexists(specdock_dir)
     if specdock_dir.exists() and not force:
         raise RuntimeError(f"'{_SPEC_DOCK_DIRNAME}' already exists. Use 'spec-dock update' or re-run with '--force'.")
 
@@ -793,6 +804,12 @@ def _install_spec_dock(target_root: Path, *, force: bool) -> None:
             # Fallback: dotfiles may be missing in some packaged builds if glob patterns
             # exclude them. Keep `spec-dock/active/` and `spec-dock/.agent/` out of git.
             (specdock_dir / ".gitignore").write_text(_DEFAULT_SPEC_DOCK_GITIGNORE, encoding="utf-8")
+
+        if fresh_specdock:
+            _copy_file(
+                src_spec_dock / "templates" / "root" / ".workbench" / "README.md",
+                specdock_dir / ".workbench" / "README.md",
+            )
 
         # Spec tree root + generated directories.
         (specdock_dir / "initiatives").mkdir(parents=True, exist_ok=True)
@@ -1216,6 +1233,8 @@ def _build_scaffold_uninstall_sources(assets_dir: Path) -> tuple[tuple[Path, byt
     else:
         gitignore_bytes = _DEFAULT_SPEC_DOCK_GITIGNORE.encode("utf-8")
     sources.append((Path("spec-dock/.gitignore"), gitignore_bytes))
+    root_workbench_readme = src_spec_dock / "templates" / "root" / ".workbench" / "README.md"
+    sources.append((Path("spec-dock/.workbench/README.md"), root_workbench_readme.read_bytes()))
     sources.append((Path("spec-dock/spec-dock.version"), f"{_tool_version()}\n".encode()))
     return tuple(sources)
 
