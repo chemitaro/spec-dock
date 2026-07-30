@@ -172,11 +172,327 @@ def test_atomic_publication_collision_preserves_existing_bytes(tmp_path: Path) -
     assert hashlib.sha256(destination.read_bytes()).hexdigest() == before
 
 
-def _valid_candidate(
+def _publish_setup(tmp_path: Path):
+    repo = tmp_path / "repo"
+    output = tmp_path / "output"
+    repo.mkdir()
+    output.mkdir()
+    infra = _infra()
+    return (
+        infra,
+        repo,
+        output,
+        infra.validate_candidate_output_directory(output, repo),
+        _candidate_material(),
+    )
+
+
+def test_candidate_publish_rejects_pre_capture_path_replacement_before_any_write(
     tmp_path: Path,
-    *,
-    body: str = "Substantive content.",
-) -> tuple[Path, Path, "IssueCandidateIdentity"]:
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    original_output = tmp_path / "original-output"
+    redirected_output = tmp_path / "redirected-output"
+    redirected_output.mkdir()
+    original_open_safe = infra.open_safe_directory_descriptor
+    original_mkdtemp = infra.tempfile.mkdtemp
+    original_build = infra.build_deterministic_zip
+    writes: list[Path] = []
+    replaced = [False]
+
+    def replace_path() -> None:
+        if replaced[0]:
+            return
+        replaced[0] = True
+        output.rename(original_output)
+        output.symlink_to(redirected_output, target_is_directory=True)
+
+    def open_after_replacement(path: Path) -> int:
+        if path == output:
+            replace_path()
+        return original_open_safe(path)
+
+    def mkdtemp_after_replacement(*args, **kwargs):
+        directory = kwargs.get("dir", args[2] if len(args) > 2 else None)
+        if directory is not None and Path(directory) == output:
+            replace_path()
+        return original_mkdtemp(*args, **kwargs)
+
+    def observe_build(destination: Path, *args, **kwargs) -> None:
+        writes.append(destination)
+        original_build(destination, *args, **kwargs)
+
+    monkeypatch.setattr(infra, "open_safe_directory_descriptor", open_after_replacement)
+    monkeypatch.setattr(infra.tempfile, "mkdtemp", mkdtemp_after_replacement)
+    monkeypatch.setattr(infra, "build_deterministic_zip", observe_build)
+
+    with pytest.raises(infra.CandidateOutputRejected):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+        )
+
+    assert replaced == [True]
+    assert writes == []
+    assert list(original_output.iterdir()) == []
+    assert list(redirected_output.iterdir()) == []
+
+
+def test_candidate_publish_remains_bound_after_captured_path_is_replaced(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    original_output = tmp_path / "original-output"
+    redirected_output = tmp_path / "redirected-output"
+    redirected_output.mkdir()
+    original_open = infra.os.open
+    replaced = [False]
+
+    def replace_path() -> None:
+        if replaced[0]:
+            return
+        replaced[0] = True
+        output.rename(original_output)
+        output.symlink_to(redirected_output, target_is_directory=True)
+
+    def open_after_capture(path, flags, *args, **kwargs):
+        if (
+            kwargs.get("dir_fd") is not None
+            and str(path).startswith(".spec-dock-issue-candidate-")
+            and str(path).endswith(".zip")
+            and flags & os.O_CREAT
+        ):
+            replace_path()
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(infra.os, "open", open_after_capture)
+
+    published = infra.build_and_publish_candidate(
+        output_guard=guard,
+        repo_root=repo,
+        material=material,
+    )
+
+    assert replaced == [True]
+    assert (original_output / material.logical_filename).read_bytes()
+    assert list(redirected_output.iterdir()) == []
+    assert not any(path.name.startswith(".spec-dock-issue-candidate-") for path in original_output.iterdir())
+    assert published.identity.logical_filename == material.logical_filename
+
+
+def test_candidate_publish_collision_preserves_existing_entry_and_cleans_private_stage(
+    tmp_path: Path,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    existing = output / material.logical_filename
+    existing.write_bytes(b"existing candidate")
+
+    with pytest.raises(infra.CandidateCollision):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+        )
+
+    assert existing.read_bytes() == b"existing candidate"
+    assert [path.name for path in output.iterdir()] == [material.logical_filename]
+
+
+def test_candidate_publish_racing_collision_preserves_existing_entry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    existing = output / material.logical_filename
+    original_review = infra._review_candidate_snapshot
+
+    def review_then_collide(*args, **kwargs):
+        review = original_review(*args, **kwargs)
+        existing.write_bytes(b"racing candidate")
+        return review
+
+    monkeypatch.setattr(infra, "_review_candidate_snapshot", review_then_collide)
+
+    with pytest.raises(infra.CandidateCollision):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+        )
+
+    assert existing.read_bytes() == b"racing candidate"
+    assert [path.name for path in output.iterdir()] == [material.logical_filename]
+
+
+def test_candidate_publish_unsupported_platform_fails_closed_and_cleans_stage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    monkeypatch.setattr(infra.platform, "system", lambda: "unsupported")
+
+    with pytest.raises(infra.CandidatePublicationFailed):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+        )
+
+    assert list(output.iterdir()) == []
+
+
+def test_candidate_uses_atomic_hidden_staged_file_without_output_stage_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    original_open = infra.os.open
+    original_mkdir = infra.os.mkdir
+    staged_open_calls: list[tuple[str, int, int]] = []
+
+    def reject_output_stage_directory(path, mode=0o777, *, dir_fd=None):
+        if dir_fd is not None and str(path).startswith(".spec-dock-issue-candidate-"):
+            pytest.fail("Candidate staging directory must not be created")
+        return original_mkdir(path, mode, dir_fd=dir_fd)
+
+    def record_staged_open(path, flags, mode=0o777, *, dir_fd=None):
+        if (
+            dir_fd is not None
+            and str(path).startswith(".spec-dock-issue-candidate-")
+            and str(path).endswith(".zip")
+            and flags & os.O_CREAT
+        ):
+            staged_open_calls.append((str(path), flags, mode))
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(infra.os, "mkdir", reject_output_stage_directory)
+    monkeypatch.setattr(infra.os, "open", record_staged_open)
+
+    published = infra.build_and_publish_candidate(
+        output_guard=guard,
+        repo_root=repo,
+        material=material,
+    )
+
+    assert len(staged_open_calls) == 1
+    _name, flags, mode = staged_open_calls[0]
+    assert flags & os.O_RDWR
+    assert flags & os.O_CREAT
+    assert flags & os.O_EXCL
+    assert flags & getattr(os, "O_NOFOLLOW", 0)
+    assert flags & getattr(os, "O_NONBLOCK", 0)
+    assert mode == 0o600
+    assert [path.name for path in output.iterdir()] == [published.identity.logical_filename]
+
+
+def test_candidate_atomic_staged_file_replacement_is_preserved_and_not_published(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    original_open = infra.os.open
+    staged_names: list[str] = []
+    sentinel = b"replacement staged ZIP"
+
+    def replace_after_atomic_open(path, flags, mode=0o777, *, dir_fd=None):
+        descriptor = original_open(path, flags, mode, dir_fd=dir_fd)
+        if (
+            dir_fd is not None
+            and str(path).startswith(".spec-dock-issue-candidate-")
+            and str(path).endswith(".zip")
+            and flags & os.O_CREAT
+            and not staged_names
+        ):
+            staged_name = str(path)
+            staged_names.append(staged_name)
+            os.rename(
+                staged_name,
+                f"{staged_name}.owned",
+                src_dir_fd=dir_fd,
+                dst_dir_fd=dir_fd,
+            )
+            sentinel_descriptor = original_open(
+                staged_name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+                dir_fd=dir_fd,
+            )
+            os.write(sentinel_descriptor, sentinel)
+            os.close(sentinel_descriptor)
+        return descriptor
+
+    monkeypatch.setattr(infra.os, "open", replace_after_atomic_open)
+
+    with pytest.raises(infra.CandidatePublicationFailed):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+        )
+
+    assert len(staged_names) == 1
+    assert (output / staged_names[0]).read_bytes() == sentinel
+    assert (output / f"{staged_names[0]}.owned").is_file()
+    assert not (output / material.logical_filename).exists()
+
+
+def test_candidate_random_staged_name_collision_retries_without_modifying_existing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    tokens = iter(("a" * 32, "b" * 32))
+    first_name = f".spec-dock-issue-candidate-{'a' * 32}.zip"
+    sentinel = output / first_name
+    sentinel.write_bytes(b"existing random-name collision")
+    calls: list[int] = []
+
+    def next_token(size: int) -> str:
+        calls.append(size)
+        return next(tokens)
+
+    monkeypatch.setattr(infra.secrets, "token_hex", next_token)
+
+    published = infra.build_and_publish_candidate(
+        output_guard=guard,
+        repo_root=repo,
+        material=material,
+    )
+
+    assert calls == [16, 16]
+    assert sentinel.read_bytes() == b"existing random-name collision"
+    assert (output / published.identity.logical_filename).is_file()
+
+
+def test_candidate_all_random_staged_name_collisions_fail_and_preserve_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    tokens = tuple(f"{index:032x}" for index in range(32))
+    existing = {
+        f".spec-dock-issue-candidate-{token}.zip": f"sentinel-{index}".encode() for index, token in enumerate(tokens)
+    }
+    for name, payload in existing.items():
+        (output / name).write_bytes(payload)
+    sequence = iter(tokens)
+    monkeypatch.setattr(infra.secrets, "token_hex", lambda size: next(sequence))
+
+    with pytest.raises(infra.CandidateBuildFailed):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+        )
+
+    assert {path.name: path.read_bytes() for path in output.iterdir()} == existing
+    assert not (output / material.logical_filename).exists()
+
+
+def _candidate_material(*, body: str = "Substantive content."):
     domain = __import__(
         "spec_dock_runtime.domain.issue_planning_candidate",
         fromlist=["build_candidate_material"],
@@ -240,7 +556,7 @@ def _valid_candidate(
         snapshot_id="c" * 64,
         remote_head_disposition="fetched_remote_tracking_ref",
     )
-    material = domain.build_candidate_material(
+    return domain.build_candidate_material(
         planner_documents=documents,
         onboarding_companion_path=COMPANION_PATH,
         onboarding_companion_bytes=companion,
@@ -251,6 +567,14 @@ def _valid_candidate(
         source_payload_size=len(source_payload),
         operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
     )
+
+
+def _valid_candidate(
+    tmp_path: Path,
+    *,
+    body: str = "Substantive content.",
+) -> tuple[Path, Path, "IssueCandidateIdentity"]:
+    material = _candidate_material(body=body)
     repo = tmp_path / "repo"
     output = tmp_path / "output"
     repo.mkdir()
@@ -263,7 +587,7 @@ def _valid_candidate(
     with zipfile.ZipFile(output / published.identity.logical_filename) as archive:
         assert len(archive.namelist()) == 8
     assert published.onboarding_companion.path == COMPANION_PATH
-    assert published.onboarding_companion.sha256 == hashlib.sha256(companion).hexdigest()
+    assert published.onboarding_companion.sha256 == hashlib.sha256(_companion()).hexdigest()
     return repo, output / published.identity.logical_filename, published.identity
 
 
