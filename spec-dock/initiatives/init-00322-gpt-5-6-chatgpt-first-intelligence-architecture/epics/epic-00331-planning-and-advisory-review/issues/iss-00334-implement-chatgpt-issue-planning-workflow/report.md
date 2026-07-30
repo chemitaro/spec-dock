@@ -759,3 +759,20 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - immutable evidence: v2／v3／v4 ZIP、`20260729t034100z-review-onboarding-companion-v2-fail.json`、`20260729t044500z-review-onboarding-companion-v3-fail.json`、`20260729t052300z-review-onboarding-companion-v4-pass.json`。
 - canonical placement fresh `spec-reviewer`: PASS、P0/P1 0、P2 2件はReportの現行assurance hashとphase promotion記録へ反映済み。`artifacts/20260729t053100z-review-onboarding-canonical-placement-pass.json`。
 - Planning amendmentはPASS and adopted。製品実装はS08以降であり、`execution-ready`、Issue finish、PR merge、Epic completionを本amendmentでは主張しない。
+
+## 2026-07-30 — S12 closure and GPT-5.6 Prompt tuning
+
+- S12 Blocker A〜Mは、通常文中の`transcript` marker誤認、checked-in snapshot drift、PR observation wait validation、外部heredoc transportに限定して修正した。provider／dogfood agent-tooling 5対はbyte-identicalである。
+- Blocker Nは`application/issue_planning.py`から具象infraを直接importする構造契約違反だった。application-owned `IssuePlanningDependencies`／gateway／structural views／normalized errors、bootstrap adapter、4 entrypointへのrequired dependency injectionへ修正し、全48 direct callを移行した。
+- S12 focusedはA〜M＋wrapper 20 passed、Issue Planning 449 passed、Blocker N corrected 199 passed、構造境界 exact node 1 passed。`make lint`、installer/update 562 passed、wheel／sdist fresh install、provider／dogfood parity、validateがPASSした。
+- 明示full regressionは`3117 passed, 76 skipped`、29分47秒でPASSした。開始／終了のbranch、HEAD、dirty exact24は一致した。
+- repair commitは`8b3f90e1`と`f35fe4de`。その後`origin/main`をmerge commit `a50f9a1de7301f0c64f0f1d23092bd7ee888043e`で統合し、mainの新PR fast laneは`1092 passed, 2119 skipped`、`make lint`、wheel／sdist fresh install、provider／dogfood parityがPASSした。remote branchへpush済みである。
+- ChatGPT follow-up child sessionに対する`--harvest --write-output`がparent turnを取得した一方、child sessionの`artifacts/transcript.md`には正しい回答が存在した。Blocker N corrected outputはchild transcriptから直接回収した。これは製品runtime差分ではなくoperator-side wrapperのfollow-up harvest問題として記録する。
+- Blocker B〜Nとcorrected Nの各ChatGPT具体化結果は、`artifacts/20260730t011600z-chatgpt-output-s12-blocker-b.md`〜`artifacts/20260730t011613z-chatgpt-output-s12-blocker-n-corrected.md`へimmutable evidenceとして保存した。
+- GPT-5.6 Prompt tuningは、公式guideのlean prompt、instruction once、representative evaluation原則に従い、exact pushed HEADを指定`chatgpt-use`で具体化した。ChatGPTはexact branch／HEAD identical、default branch unused、`GO`を確認した。
+- role resourceをtask固有責務へ限定し、formal output、Human authority、mutation、sensitive-output境界をtransportへ一元化した。synthesizer、CLI、schema、adapter、canonical三文書は変更していない。
+- Prompt tuning Redは3 failures、Greenはfocused 23 passed、relevant 66 passed／4 skipped、ordinary 1096 passed／2119 skipped、Ruff、build、validate nodes=227、exact9 guard、provider／dogfood 4対parityがPASSした。
+- 合成PromptはPlanner 3,784→3,246、Reviewer 3,978→3,603、Revision 3,169→3,146、合計936文字（8.6%）削減した。
+- blind A/BはcandidateをPlanner 99、Reviewer 99、Revision 100として3/3選択し、candidate critical failureは0だった。baseline Revisionの`as Planner`外部参照によるcritical failureを解消した。
+- ChatGPT exact outputは`artifacts/20260730t011515z-chatgpt-output-gpt-5-6-prompt-tuning-work-packet.md`、評価は`artifacts/20260730t011516z-gpt-5-6-prompt-tuning-evaluation.md`へ保存した。artifact自体の追加ReviewはHuman指示により不要である。
+- `chatgpt-use` wrapperが自動挿入するdefault-branch fallback文言はexact-branch-only task Promptと競合し得る。今回の回答はexact branch／HEADとdefault branch未使用を明示したため採用したが、wrapper interface改善候補として残る。
