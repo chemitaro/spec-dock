@@ -372,16 +372,26 @@ def test_s10_onboarding_accepts_exact_thirteen_heading_contract() -> None:
             b"## Authority/responsibility",
             b"## System context and Authority/responsibility",
         ),
+        _exact_heading_companion()
+        .replace(b"title System Context", b"title system-context")
+        .replace(b"title Planning Sequence", b"title planning-sequence")
+        .replace(b"title Implementation Roadmap", b"title implementation-roadmap"),
     ],
     ids=(
         "split-purpose-scope",
         "split-current-target",
         "planning-sequence-without-workflow-or-lifecycle",
         "merged-required-sections",
+        "hyphen-roles",
     ),
 )
 def test_s10_onboarding_rejects_nonassignable_required_sections(payload: bytes) -> None:
-    with pytest.raises(ValueError, match="onboarding companion"):
+    expected_message = (
+        "onboarding companion PlantUML role is missing"
+        if b"title system-context" in payload
+        else "onboarding companion"
+    )
+    with pytest.raises(ValueError, match=expected_message):
         _candidate().validate_onboarding_companion(COMPANION_PATH, payload)
 
     assert _candidate().validate_issue_authoring_files(

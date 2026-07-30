@@ -302,11 +302,18 @@ def test_planner_prompt_contains_exact_zip_and_connector_contract(tmp_path: Path
     assert "13 nonempty distinct H2s, exact labels, no split/merge" in prompt
     for heading in ONBOARDING_HEADING_CONTRACT:
         assert prompt.count(heading) == 1
+    diagram_contract = (
+        "4+ valid `plantuml` fences: system context/responsibility boundary/planning sequence/implementation roadmap."
+    )
+    assert prompt.count(diagram_contract) == 1
+    assert (
+        "4+ valid `plantuml` fences: system-context/responsibility-boundary/planning-sequence/implementation-roadmap."
+    ) not in prompt
     for diagram_role in (
-        "system-context",
-        "responsibility-boundary",
-        "planning-sequence",
-        "implementation-roadmap",
+        "system context",
+        "responsibility boundary",
+        "planning sequence",
+        "implementation roadmap",
     ):
         assert diagram_role in prompt
 
@@ -427,6 +434,9 @@ def test_reviewer_prompt_has_one_attachment_authority() -> None:
     assert injected.decode("utf-8") not in synthesized.prompt
     assert synthesized.exact_attachments[0].content == injected
     assert "13 nonempty distinct H2s, exact labels, no split/merge" not in synthesized.prompt
+    assert (
+        "4+ valid `plantuml` fences: system context/responsibility boundary/planning sequence/implementation roadmap."
+    ) not in synthesized.prompt
     for heading in ONBOARDING_HEADING_CONTRACT:
         assert heading not in synthesized.prompt
 
@@ -467,11 +477,18 @@ def test_semantic_revision_companion_contract_is_self_contained() -> None:
     assert "13 nonempty distinct H2s, exact labels, no split/merge" in prompt
     for heading in ONBOARDING_HEADING_CONTRACT:
         assert prompt.count(heading) == 1
+    diagram_contract = (
+        "4+ valid `plantuml` fences: system context/responsibility boundary/planning sequence/implementation roadmap."
+    )
+    assert prompt.count(diagram_contract) == 1
+    assert (
+        "4+ valid `plantuml` fences: system-context/responsibility-boundary/planning-sequence/implementation-roadmap."
+    ) not in prompt
     for diagram_role in (
-        "system-context",
-        "responsibility-boundary",
-        "planning-sequence",
-        "implementation-roadmap",
+        "system context",
+        "responsibility boundary",
+        "planning sequence",
+        "implementation roadmap",
     ):
         assert diagram_role in prompt
 
