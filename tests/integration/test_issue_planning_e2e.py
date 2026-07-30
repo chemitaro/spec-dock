@@ -473,6 +473,27 @@ def _assert_oracle_submission(
     assert f'"source_head":"{head}"' in prompt
     assert "Never use the default branch" in prompt
     assert '"kind":"authoring_zip"' in prompt or '"kind":"review_json"' in prompt
+    onboarding_headings = (
+        "init-/epic-/iss- lineage",
+        "Purpose/scope",
+        "System context",
+        "Authority/responsibility",
+        "Current architecture/target architecture",
+        "ChatGPT First planning workflow",
+        "Provider-owned direct Oracle/reference-only chatgpt-use",
+        "Candidate/Review/Human/apply lifecycle",
+        "Exact branch failure",
+        "S01/S07/S08/S14 status/roadmap",
+        "Provider/projection",
+        "Failure modes",
+        "First-day checklist",
+    )
+    if '"kind":"authoring_zip"' in prompt:
+        assert "13 nonempty distinct H2s, exact labels, no split/merge" in prompt
+        assert all(prompt.count(heading) == 1 for heading in onboarding_headings)
+    else:
+        assert "13 nonempty distinct H2s, exact labels, no split/merge" not in prompt
+        assert all(heading not in prompt for heading in onboarding_headings)
     assert not any("instruction" in name.lower() for name in prompt_records[0]["pack_files"])
     assert str(oracle_home) not in prompt
 

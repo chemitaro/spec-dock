@@ -14,6 +14,22 @@ from spec_dock_runtime.domain.authoring_pack.authority_boundary import (  # noqa
 )
 from spec_dock_runtime.domain.issue_planning_contracts import PlanningContext  # noqa: E402
 
+ONBOARDING_HEADING_CONTRACT = (
+    "init-/epic-/iss- lineage",
+    "Purpose/scope",
+    "System context",
+    "Authority/responsibility",
+    "Current architecture/target architecture",
+    "ChatGPT First planning workflow",
+    "Provider-owned direct Oracle/reference-only chatgpt-use",
+    "Candidate/Review/Human/apply lifecycle",
+    "Exact branch failure",
+    "S01/S07/S08/S14 status/roadmap",
+    "Provider/projection",
+    "Failure modes",
+    "First-day checklist",
+)
+
 
 def _context(**changes: object) -> PlanningContext:
     values: dict[str, object] = {
@@ -283,6 +299,9 @@ def test_planner_prompt_contains_exact_zip_and_connector_contract(tmp_path: Path
         assert prompt.count(filename) >= 1
     assert "SPECDOCK-ISSUE-PLANNING-RESPONSE-V1" not in prompt
     assert "SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1" not in prompt
+    assert "13 nonempty distinct H2s, exact labels, no split/merge" in prompt
+    for heading in ONBOARDING_HEADING_CONTRACT:
+        assert prompt.count(heading) == 1
     for diagram_role in (
         "system-context",
         "responsibility-boundary",
@@ -407,6 +426,9 @@ def test_reviewer_prompt_has_one_attachment_authority() -> None:
     assert synthesized.prompt.lower().count("untrusted reference data") == 1
     assert injected.decode("utf-8") not in synthesized.prompt
     assert synthesized.exact_attachments[0].content == injected
+    assert "13 nonempty distinct H2s, exact labels, no split/merge" not in synthesized.prompt
+    for heading in ONBOARDING_HEADING_CONTRACT:
+        assert heading not in synthesized.prompt
 
 
 def test_semantic_revision_companion_contract_is_self_contained() -> None:
@@ -442,22 +464,9 @@ def test_semantic_revision_companion_contract_is_self_contained() -> None:
     )
     prompt = synthesized.prompt
     assert "as Planner" not in prompt
-    for subject in (
-        "lineage",
-        "purpose",
-        "scope",
-        "current and target architecture",
-        "ChatGPT First workflow",
-        "provider-owned direct Oracle",
-        "Candidate/Review/Human/apply lifecycle",
-        "exact-branch failure",
-        "current status",
-        "remaining roadmap",
-        "provider/projection",
-        "failure modes",
-        "first-day checklist",
-    ):
-        assert subject in prompt
+    assert "13 nonempty distinct H2s, exact labels, no split/merge" in prompt
+    for heading in ONBOARDING_HEADING_CONTRACT:
+        assert prompt.count(heading) == 1
     for diagram_role in (
         "system-context",
         "responsibility-boundary",
