@@ -187,11 +187,11 @@ S99 final local quality, rollback evidence, Issue 346 handoff
 | `CL-CON-010` | `I345-CON-010` | 346 obligations remain deferred | report handoff checklist | scope expansion | yes | inspection | S99 | `tc-s99-003` |
 | `CL-CON-011` | `I345-CON-011` | evidence-only/no authority claim | docs/output string scan | implicit adoption/readiness | yes | inspection + presentation | S01, S90, S99 | `tc-s90-003`, `tc-s99-004` |
 
-## 8. S01 — Public vertical tracer: commandからroot/Issueへ一件をcommitする
+## 8. S01 — Public vertical tracer: commandからroot/Initiative/Epic/Issueへ一件をcommitする
 
 ### 8.1 Behavior goal
 
-利用者が`artifact import file --file <path>`とvalid `--root`または`--issue`を指定すると、opaque source一件がfixed generic nameでtarget `artifacts/`へcommitされ、privacy-safe resultが返る。existing `chatgpt-output` code pathは変わらない。
+利用者が`artifact import file --file <path>`とvalidなroot/Initiative/Epic/Issue selectorを指定すると、opaque source一件がfixed generic nameでtarget `artifacts/`へcommitされ、privacy-safe resultが返る。existing `chatgpt-output` code pathは変わらない。
 
 ### 8.2 Trace
 
@@ -202,7 +202,7 @@ S99 final local quality, rollback evidence, Issue 346 handoff
 
 ### 8.3 Depends on / unblocks
 
-- Depends on: main workflowが本候補をcanonical `requirement.md` / `design.md` / `plan.md`へ採用し、fresh reviewとruntime-owned assurance/readiness evidenceを記録していること。本ZIP自体はその条件を満たさない。
+- Depends on: main workflowがcanonical `requirement.md` / `design.md` / `plan.md`を採用し、fresh reviewとruntime-owned assurance/readiness evidenceを記録していること。ChatGPT生成ZIP自体はその条件を満たさない。
 - Unblocks: S02 safety hardening、S03 identity/concurrency、S04 lifecycle tests。
 
 ### 8.4 Target files and symbols
@@ -217,6 +217,7 @@ S99 final local quality, rollback evidence, Issue 346 handoff
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py`: `guard_explicit_file_source` lease entryと、leaseをborrowする`publish_explicit_file` entry。
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py`: four generic renderers。
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py`: wiring。
+- `src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md` (new): root importをS01で成立させる最小provider rules source。generic evidence-only/opaque policyとrules symlink契約だけを含む。
 - tests: new command/application/presentation/CLI files plus narrow port test。
 
 ### 8.5 Planned contract
@@ -232,8 +233,8 @@ S99 final local quality, rollback evidence, Issue 346 handoff
 
 1. **Red 1**: command help/parser exact-key testsを追加し、`file` leaf不在でfailを確認。
 2. **Green 1**: parser/registry/args factoryだけを追加してparser testsをpass。
-3. **Red 2**: `FileArtifactImportRequest`→root/Issue→generic resultのapplication/CLI tracer testsを追加。
-4. **Green 2**: minimal target resolver、standard-slot formatter、explicit source guard/publish ports、renderer、bootstrapを縦に通す。source guardはsetup mutation前に呼ぶ。
+3. **Red 2**: `FileArtifactImportRequest`→root/Issue→generic resultのapplication/CLI tracer testsを追加し、root rules provider source不在のRedも保存する。
+4. **Green 2**: minimal root rules source、target resolver、standard-slot formatter、explicit source guard/publish ports、renderer、bootstrapを縦に通す。source guardはsetup mutation前に呼ぶ。
 5. **Red 3**: binary/invalid UTF-8とsource survival、exact JSON key、`canonical=false`を追加。
 6. **Green 3**: bounded staging coreをreuseし、generic public DTOからhash/countを除外。
 7. **Refactor**: Workbench-specific guardとshared staging coreをprivate boundaryへ分け、legacy testsを再実行。
@@ -245,7 +246,7 @@ uv run pytest tests/unit/commands/test_artifact_import_file.py
 uv run pytest tests/unit/application/test_import_file_artifact.py
 uv run pytest tests/unit/application/test_binary_artifact_import_ports.py
 uv run pytest tests/unit/presentation/test_artifact_import_file.py
-uv run pytest tests/cli_runtime/test_artifact_import_file.py -k 'help or root or issue or opaque'
+uv run pytest tests/cli_runtime/test_artifact_import_file.py -k 'help or root or initiative or epic or issue or target or opaque'
 uv run pytest tests/unit/commands/test_artifact_import_chatgpt_output.py
 ```
 
@@ -287,12 +288,12 @@ uv run pytest tests/unit/commands/test_artifact_import_chatgpt_output.py
   - 検証方法: application test + CLI runtime filesystem/graph snapshot。
   - 関連 closure id: `CL-AC-002`, `CL-AC-015`, `CL-EC-018`
 
-- `tc-s01-004` acceptance: Issue successはfull destination basenameをidentityにする
-  - 前提: Issue `iss-00345`相当fixture、fixed UTC clock、source `Report FINAL.PDF`がある。
-  - 操作: `artifact import file --issue 345 --file "fixtures/Report FINAL.PDF" --json`を実行する。
-  - 期待結果: destinationは`<timestamp>--Report FINAL.PDF`、`artifact_id`はそのfull basename、target kind/idはissue/canonical id。
-  - 失敗検出: typed `file` token、slugification、extension/case/space loss、stem-only identityを検出する。
-  - 検証方法: application + CLI exact JSON assertion。
+- `tc-s01-004` acceptance/negative: Initiative, Epic, Issue target matrix and full destination identity
+  - 前提: Initiative/Epic/Issueのcanonical fixtures、requested kindと異なる既存ID、missing ID、fixed UTC clock、source `Report FINAL.PDF`を用意する。
+  - 操作:三node kindそれぞれへsuccess importし、別caseでmissing nodeとkind mismatchをapplication/CLIから実行する。
+  - 期待結果:success destinationは各nodeの`artifacts/<timestamp>--Report FINAL.PDF`、`artifact_id`はfull basename、target kind/idはrequested kind/canonical id。missing/kind mismatchは`target_invalid`, `not_committed`でsource open 0、setup/formal destination mutationなし。
+  - 失敗検出:root/Issueだけのpartial support、kind coercion、wrong-scope write、typed `file` token、slugification、extension/case/space loss、stem-only identityを検出する。
+  - 検証方法:parameterized application + CLI exact JSON/filesystem mutation assertion。
   - 関連 closure id: `CL-AC-002`, `CL-AC-006`
 
 - `tc-s01-005` acceptance: opaque tracerはsourceを保持しpublic metadataを限定する
@@ -465,11 +466,11 @@ uv run pytest tests/cli_runtime/test_artifact_import_s04.py
   - 関連 closure id: `CL-AC-012`, `CL-EC-016`
 
 - `tc-s02-010` security: external source outputs are basename-only and content-free
-  - 前提: external parent/body/raw exception/hash sentinelを用意する。
+  - 前提: external parent/body/raw exception/hash sentinelに加え、basename / target title / artifact identityの動的文字列へspace、equals、double quote、backslash、LF、CR、tab、ESC、C0、DEL、bidi controls、non-ASCIIを個別または組合せで含める。
   - 操作:success、source failure、allocation failure、publication failure、postcommit warning、unexpected exceptionをtext/JSONで実行する。
-  - 期待結果:success sourceはbasenameのみ、failureはsource/destinationなし、全output/provenance diffにparent/body/hash/count/MIME/encoding/raw errorなし。
-  - 失敗検出:DTO/renderer/logger/error chainingからのprivacy leakを検出する。
-  - 検証方法: exact-key payload assertions、combined stdout/stderr/warnings scan、tracked diff scan。
+  - 期待結果:success sourceはbasenameのみ、failureはsource/destinationなし、全output/provenance diffにparent/body/hash/count/MIME/encoding/raw errorなし。text modeの動的stringはASCII-safeなdouble-quoted JSON string literal相当として一行に可逆escapeされ、raw control/bidiや偽の`key=value` tokenを生成しない。JSON modeは標準escapingを用いたvalid JSONで、parse後のallowlisted identity値が入力と一致する。
+  - 失敗検出:DTO/renderer/logger/error chainingからのprivacy leak、改行/control injection、quote/backslash/equalsによるtoken境界破壊、非可逆escapeを検出する。
+  - 検証方法:exact text assertions、text valueのJSON decoder round-trip、JSON parse + exact-key/value assertions、raw C0/DEL/ESC/bidi scan、combined stdout/stderr/warnings scan、tracked diff scan。
   - 関連 closure id: `CL-AC-013`, `CL-EC-003`, `CL-CON-002`, `CL-CON-003`
 
 ### 9.9 Step closure contract
@@ -778,7 +779,7 @@ shipped docs/rules/helpがimplemented contractを説明し、provider filesをau
 
 Provider first:
 
-- `src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md` (new)
+- `src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md`（S01で作成済み。S90では内容完成度とpublic docs linkを更新・検証）
 - `src/spec_dock/assets/spec_dock/docs/README.md`
 - `src/spec_dock/assets/spec_dock/docs/guide.md`
 - `src/spec_dock/assets/spec_dock/docs/reference_naming.md`
@@ -801,8 +802,8 @@ Managed projection after provider review:
 ### 12.5 Red → Green → Refactor / alternative evidence
 
 1. **Inspect-first**: current docs searchでmissing command/root/generic privacy termsをrecordする。
-2. **Red structural**: doc link/required heading/root rules source existence assertionsを追加またはscripted grepでfailを保存する。
-3. **Green**: provider docs/rulesを更新。
+2. **Red structural**: doc link/required heading/root rules内容・installer/update parity assertionsを追加またはscripted grepでfailを保存する。sourceの初回作成はS01で完了済みとする。
+3. **Green**: provider public docsとroot rulesの説明/linkを完成し、S01の機能契約を変えない。
 4. **Projection**: `spec-dock update .`等repository-approved flowでmanaged dogfood filesをrefreshし、changed-path parityを確認。
 5. **Refactor**: duplicated proseをreferenceへ集約し、help/example/token spellingをcodeと一致させる。
 
@@ -963,12 +964,15 @@ Epic-wide final review、consumer-wheel E2E、integrated dogfood、full regressi
   - 検証方法:command/stdout/exit/HEAD evidenceをreport Test Contract Closureへ記録。
   - 関連 closure id: `CL-AC-018`
 
-- `tc-s99-002` rollback: additive feature can be disabled without rewriting imported evidence
-  - 前提:generic imported file、legacy chatgpt-output/typed/blank baseline、step commit candidatesを用意する。
-  - 操作:additive generic changesをtest branch/worktreeでrevertまたはfeature removal diffとしてsimulateしlegacy focused testsを実行する。
-  - 期待結果:legacy flows Green、existing generic evidence filesはrename/deleteされず、commandだけunavailableになる。
-  - 失敗検出:rollback migration/data deletion、legacy core couplingを検出する。
-  - 検証方法:disposable worktree/revert rehearsalまたはreviewed inverse-diff inspection;実行不可なら理由と残riskをreport。
+- `tc-s99-002` rollback: pre-rollout full revert and post-rollout write-disable preserve their distinct contracts
+  - 前提A:generic identity未作成・public contract未利用のbaselineとstep commit candidatesを用意する。
+  - 操作A:additive generic changesをdisposable worktreeで全面revertし、legacy chatgpt-output/typed/blank focused testsを実行する。
+  - 期待結果A:legacy flows Green、generic command/parser/ledger/root rulesを含むfull revertが可能でdata migrationなし。
+  - 前提B:generic Markdown/binary evidence、ADR-looking generic body、typed/blank entriesとsame timestamp slotを持つpost-rollout fixtureを用意する。
+  - 操作B:新規generic write command/use caseだけをdisableし、minimal generic recognizer、lifecycle exclusions、shared-slot reservationを残す。`validate`、`sync --no-github`、body-open deny spy、typed/blank allocationを実行する。
+  - 期待結果B:commandは新規作成不可だが、grandfathered filesはrename/delete/reclassifyされず、validate/sync Green、body未読、typed/blankはgeneric occupied slotを避ける。
+  - 失敗検出:post-rollout parser/ledger全面撤去、malformed誤認、body read、slot再利用、rollback migration/data deletion、legacy core couplingを検出する。
+  - 検証方法:pre-rollout disposable full-revert rehearsal + post-rollout compatibility-layer disablement test。実行不可なら理由と残riskをreport。
   - 関連 closure id: `CL-AC-016`, `CL-AC-017`
 
 - `tc-s99-003` handoff: Issue 346 obligations remain open and explicit

@@ -7,9 +7,9 @@ ID: "iss-00345"
 最終更新: "2026-07-30"
 依存: ["requirement.md", "epic-00343/design.md", "20260728t100038z-adr"]
 親: ["epic-00343", "init-local-00002"]
-authorized_profile_observed: "strict"
+authorized_profile_observed: "standard"
 parent_recommended_grade: "critical"
-classification_status: "pending_runtime_owned_decision"
+classification_status: "runtime_classified"
 ---
 
 # iss-00345 Generic Single-File Artifact Import — Issue 設計書（Standard）
@@ -530,12 +530,14 @@ legacy renderer names/bodiesは変更しない。
 
 rendererはDTOのallowlisted fieldsだけを出す。generic resultにhash/count fieldsが存在しないため、誤ってserializeできない。JSONはexplicit dict constructionを使い、`dataclasses.asdict`や`__dict__`でfuture/internal fieldを漏らさない。
 
+text rendererでは、`source`、`destination`、`artifact_id`、`target_id`等の全動的string fieldをASCII-safeなJSON string literal相当（double quote、`ensure_ascii=True`、backslash/quote/control escape）として一行出力する。space、equals、quote、backslash、LF、CR、tab、ESC、C0/DEL、bidi controls、non-ASCIIをraw key/value構造へ出さず、decode可能なreversible表現にする。固定enum/bool tokenだけをunquotedで出す。JSON modeは標準JSON serializerのstring escapingを使い、値を構造外へ連結しない。
+
 #### Text examples
 
 成功概念形:
 
 ```text
-spec-dock: ok (artifact import file) import_kind=file storage_identity=generic target_kind=issue target_id=iss-00345 artifact_id=20260730t010203z--Report FINAL.PDF source_visibility=basename_only source=Report FINAL.PDF destination=spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00345-generic-single-file-artifact-import/artifacts/20260730t010203z--Report FINAL.PDF committed=true publication_state=committed retry_disposition=not_needed canonical=false warning_codes=-
+spec-dock: ok (artifact import file) import_kind=file storage_identity=generic target_kind=issue target_id="iss-00345" artifact_id="20260730t010203z--Report FINAL.PDF" source_visibility=basename_only source="Report FINAL.PDF" destination="spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00345-generic-single-file-artifact-import/artifacts/20260730t010203z--Report FINAL.PDF" committed=true publication_state=committed retry_disposition=not_needed canonical=false warning_codes=-
 ```
 
 pre-commit failure概念形:
