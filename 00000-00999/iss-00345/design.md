@@ -181,7 +181,8 @@ end note
 - `FileArtifactImportError`だけをknown errorとしてrenderする。
 - command handlerはunknown `Exception`からpublication stateを推測しない。`runtime_failed / not_committed`をrenderできるのは、applicationがcommit point未到達を確認して生成した`FileArtifactImportError`だけとする。
 - application/publisherのphase-aware finalizerは、commit前のunknown faultだけをprivacy-safeな`runtime_failed / not_committed`へ変換する。
-- commit後に許容するfallible operationは`directory_fsync`、identity-confirmed owned-temp cleanup、create-lock releaseの三つだけで、それぞれ既定のwarning codeへ変換する。result identity、source display、destination display、JSON/text用fieldはcommit前に構築・検証し、commit後にpath resolutionや汎用result constructionを行わない。
+- commit後にpublic stateへ影響し得るfallible operationは`directory_fsync`、identity-confirmed owned-temp cleanup、create-lock releaseの三つだけで、それぞれ既定のwarning codeへ変換する。result identity、source display、destination display、JSON/text用fieldはcommit前に構築・検証し、commit後にpath resolutionや汎用result constructionを行わない。
+- source lease、staged-temp FD、destination-parent FD等のdescriptor closeがcommit後に不可避な場合は`close_noexcept`相当のno-throw finalizationを使い、close errorをinternal diagnostic/fault-injection evidenceにだけ残す。close errorはcommitted resultを置換せず、新しいpublic warning codeも追加しない。
 - この三seam以外のexception escapeはinternal contract violationであり、新しいgeneric post-commit warningへ丸めない。command layerはraw message/contextをredactするが、`not_committed`やretry safetyを捏造しない。新しいpost-commit fault classが必要ならrequirement/ADR amendmentへ戻す。
 - post-commit warning resultをexceptionへ変えない。
 - current `ArtifactImportChatGptOutputArgs`, `_run`, renderer callsは既存契約のまま保持する。
@@ -464,12 +465,20 @@ public application port:
 
 `import_file_artifact`は`workbench_source_guard`を参照しない。same concrete adapter instanceをbootstrapで両portへwireしても、application dependencyは別Protocolである。
 
+#### Descriptor ownership and close semantics
+
+- source FD / lease: applicationがretry loop全体で所有し、publisherはborrowする。全exit pathでapplication finalizerが一度だけcloseする。
+- staged-temp FD: publisherが所有し、formal commit前に不要ならcommit前にcloseする。commit primitiveがopened temp FDを必要とするplatformではcommit後に`close_noexcept`で閉じる。
+- destination-parent FD: publisherがidentity-bound commit/directory fsyncまで所有し、その後`close_noexcept`で閉じる。
+- capability-probe FD: probeがformal commit前に所有・cleanup・closeを完了し、不確実ならpublicationへ進まない。
+- commit後のdescriptor/lease close failureはformal identity、`committed=true`、exit success、retry not-neededを変更しない。public warning allowlistへ追加せず、test-only fault recorderで観測する。
+
 #### Generic source guard
 
 1. relative pathを`repo_root`基準でlexical absoluteへする。`resolve()`でancestor symlink targetやprivate parent pathをpublic identityへ固定しない。
-2. raw leafを`lstat`し、symlinkならreject。
-3. `os.open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)`。permission/read errorは`source_ineligible`。
-4. `fstat`がregular fileであることを確認する。
+2. raw leafを`lstat`し、symlinkを含む全non-regular entryをopen前にrejectする。
+3. leafが`lstat`後にFIFO等へ置換されてもblockingしないplatform-safe acquisitionを使う。Linux/macOSのgeneric adapterでは`O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW`相当でopenし、flag/capability unavailableなら`source_guard_unsupported`としてfail closedする。regular FDではnonblocking flagにsemantic effectを与えない。
+4. `fstat`がregular fileであることを最終確認し、raceでFIFO/socket/deviceへ変わっていれば直ちにno-throw closeして`source_ineligible`とする。
 5. open後のleaf `lstat`とFDのdevice/inode/modeを一致させる。
 6. ancestor symlink自体は拒否しない。
 7. stage後にFD hash/count、size/mtime/ctime、leaf path identityを再確認する。ancestor retargetやreplaceは`source_changed`。
@@ -743,6 +752,8 @@ warningにはpath/body/hash/count/raw errorを付けない。operator guidance�
 
 fault injectionはcommit後の三つの許可seamを個別に注入し、`directory_fsync_failed`、`temp_cleanup_retained`、`create_lock_release_failed`へのexact mappingと、committed identity、exit success、`retry_disposition=not_needed`を検証する。その他の汎用`post_commit_runtime` warningは追加せず、command handlerが任意exceptionを`not_committed`へ変換する経路も持たない。
 
+source lease、staged-temp FD、destination-parent FDのcommit後close failureも個別に注入するが、これらはno-throw resource finalizationとして扱う。public warning/stateは追加・変更せず、committed resultをそのまま返し、internal test evidenceだけでclose attemptを確認する。
+
 ## 8. Concurrency and TOCTOU model
 
 ### 8.1 Cooperative writers
@@ -877,10 +888,12 @@ lifecycle consumersがgeneric entryを認識する必要がある場合、`parse
 
 - repo-relative/absolute/`..` external/cross-filesystem。
 - regular/special/symlink/unreadable matrix。
+- direct FIFOをopen前に拒否し、regular `lstat`後からopen前のFIFO置換でもblockingせず拒否する。
 - bounded opaque copy。
 - source mutation/ancestor retarget。
 - capability probe/fail-closed。
 - precommit fault and postcommit warning injection。
+- source lease、staged-temp FD、destination-parent FDのpost-commit close faultがcommitted resultを置換せず、新しいpublic warningを増やさない。
 - no-replace concurrency。
 
 ### T345-4 Presentation
