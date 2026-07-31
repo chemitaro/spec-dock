@@ -1018,4 +1018,27 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - S017 Redは`3 failed, 3 passed`。late real-index poisonは修正前unauthorized local commit生成後`restore_mismatch`、final-proof race checkpoint不在、private-index mutationの検出遅延を確認した。Greenはfocused `7 passed`、Apply unit `83 passed`、Apply full unit＋integration `186 passed`、Ruff check／format、scoped `git diff --check`がPASSした。
 - S017はOracle configuration behaviorを変更していない。PATH-resolved local Oracleの通常native configを尊重し、formal必須値だけをdirect argvへ渡すHuman boundaryを維持する。
 - S017後のfresh Spec／Code／QA reviewersはすべてP0／P1 0でPASSした。Main final verificationはordinary fast lane `1346 passed, 2202 skipped`、explicit Apply full regression `103 passed`、`make lint`（Ruff／format／mypy）、provider／dogfood Apply byte parity、validate `nodes=227`、`git diff --check`がPASSした。正式local closure evidenceは`artifacts/20260730t192855z-review-pr-351-s009-s015-local-closure-evidence.md`である。
-- 残存gateはcommit／push、exact pushed code HEADへのfresh ChatGPT defect-only review、最終evidence publicationとfixed PR observationである。
+- S009〜S017 closureはcommit `2ff5c4bda05d80d68f56510b56500c88a4ce3302`としてcurrent branchへpushし、clean worktree、local／remote parity `0/0`を確認した。
+- exact pushed HEADへのfresh ChatGPT Pro defect-only reviewはsession `iss00334-s017-final-review-2ff5c4bd`、`requested=Pro`／`resolved=Pro`／`verified=yes`、default branch substitution 0である。verdictはP0 0／P1 3のFAILで、正式artifactは`artifacts/20260730t231321z-review-pr-351-s017-exact-head-chatgpt-fail.json`である。
+- `FINAL-P1-001`はchecked-out branch identityがref installとresume／pushへCAS-boundされず、branch switch後にoperation branchへlocal commitをinstallしたままevidenceなしで停止し得る。`FINAL-P1-002`はoperation trailer proofがsubstringでnear-match／body-only／duplicateを許す。`FINAL-P1-003`はmutable `origin` aliasのretargetによりreviewed repository以外へpushして`ready`になり得る。3件ともcurrent authority contract内のunauthorized commit／push defectとして採用する。
+- Red Team sessionはread-onlyのまま終了し、修正へ再利用しない。次の修正は別fresh Blue Team sessionでこの3 findingだけを具体化する。
+- 残存gateはFINAL-P1-001〜003のbounded repair、fresh local Spec／Code／QA、repair commit／push、exact repaired HEADのfresh ChatGPT review、最終evidence publicationとfixed PR observationである。
+
+## 2026-07-31 — S018 three-P1 Blue Team具体化
+
+- fresh Blue Teamの初回session `iss00334-final-p1-blue`は6添付のready待機が5分でtimeoutした。Oracle metadataで`promptSubmitted=false`を確認してからのみ再試行し、ChatGPTへの重複送信はない。
+- 添付をtask brief、正式Red JSON、provider Apply実装の3件へ縮小し、fresh session `iss00334-final-p1-blue-retry`を実行した。model evidenceは`requested=Pro`／`resolved=Pro`／`verified=yes`で、GitHub connectorからrepository `chemitaro/spec-dock`、current branch、exact HEAD `2ff5c4bda05d80d68f56510b56500c88a4ce3302`を確認し、default branchを参照していない。
+- Blue TeamはFINAL-P1-001〜003だけを、atomic checked-out branch/ref binding、single exact Git trailer proof、`operation.repository`へbindしたimmutable publication endpointとして具体化した。新しいpublic status／reason／schema、Human binding変更、Candidate／canonical bytes変更、Oracle configuration変更、S014／S015 scope再開、P2／P3提案は含まない。
+- 正式work packetは`artifacts/20260730t233742z-pr-351-s018-three-p1-chatgpt-concretization.md`へbyte-preservingで保存した。修正はprovider authorityとfocused testsへ限定し、dogfoodは実装後に機械投影する。
+
+## 2026-07-31 — S018 three-P1 implementation
+
+- `FINAL-P1-001`はcurrent branch refのold-value CASに、Git自身がprepared phase中に保持する`.git/HEAD.lock`、raw symbolic HEAD、exact prepared inventoryの検証を結合した。ローカルGit 2.54.0では`HEAD`の`symref-verify`とreferent branch updateを同一transactionへqueueするとmultiple-updateとして拒否されるため、Git所有lock下でchecked-out branch identityを固定する方式を採用した。
+- foreign `.git/HEAD.lock`はtransaction開始前にfail closedし、prepared native `reference-transaction` hook内のbranch switchはGit lock conflictで拒否する。既存native hookはprepared／committed／abortedの各phaseで1回だけ委譲し、branch／HEAD／ref proofをresume、push直前、push後、publication記録前に再証明する。
+- `FINAL-P1-002`は`git interpret-trailers --parse --no-divider`を用いる単一strict parserへ統一した。terminal trailer blockにcase-sensitive exact key／exact operation IDが1件だけ存在する場合のみ許可し、near-match key／value、duplicate、body-onlyをpre-install、immutable commit proof、resumeの全経路で拒否する。
+- `FINAL-P1-003`はorigin fetch／push URLが同じnormalized GitHub repositoryであり`operation.repository`と一致することを一度だけ確認し、captured exact push endpointをprivate publication authorityとした。push、CAS failure observation、post-push parity、resumeはmutable `origin` aliasを使用せず、endpointをevidence／log／public resultへ永続化しない。
+- S018実装前focused Redは`13 failed, 81 deselected`。最終GreenはApply unit＋application＋explicit full integration `256 passed`、ordinary fast lane `1362 passed, 2220 skipped`、`make lint`（Ruff check／425 files format／mypy 287 files）、validate `nodes=227`、`git diff --check`がPASSした。
+- official `spec-dock update .`はdirty dogfood Applyと新規`git_cli`変更をbyte-identicalに投影しなかったため、provider正本2ファイルを対応するdogfood先へwhole-file copyした。Apply SHA-256は両側`8e1502a581a2a6de3337557e3161bd3295c1e5f998d22210781bafd013fda374`、Git CLIは両側`5ace7228bb2e422922f38a101d05b0d635c60e75a468b61c1a7c94bce97f38c3`である。
+- Oracle configuration behaviorは変更していない。PATH-resolved local Oracleと通常native personal／project configの利用を許容し、SpecDockはそれらを上書き・無効化・隔離・配布・fallback契約化しない。workflow必須値だけを明示fieldからdirect argvへ渡すHuman boundaryを維持する。
+- fresh local Spec／Code／QA reviewはすべてP0／P1 0でPASSした。QAはS018重点35件を再実行して全件成功した。正式closure evidenceは`artifacts/20260731t001100z-review-pr-351-s018-local-closure-pass.md`である。
+- 残存gateはrepair commit／push、exact repaired HEADのfresh ChatGPT defect-only review、最終evidence publicationとfixed PR observationである。
