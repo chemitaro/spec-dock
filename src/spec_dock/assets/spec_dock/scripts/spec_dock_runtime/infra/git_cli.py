@@ -171,7 +171,7 @@ def _parse_github_repo_slug(remote_url: str) -> str | None:
     return f"{owner}/{repo}"
 
 
-def origin_github_repo_slug(repo_root: Path) -> str | None:
+def origin_github_publication_endpoint(repo_root: Path) -> tuple[str, str]:
     fetch_url = _remote_get_url(repo_root, push=False)
     push_url = _remote_get_url(repo_root, push=True)
     fetch_slug = _parse_github_repo_slug(fetch_url)
@@ -186,7 +186,12 @@ def origin_github_repo_slug(repo_root: Path) -> str | None:
             "origin remote fetch/push mismatch; cannot resolve canonical repo scope: "
             f"fetch={fetch_slug} push={push_slug}"
         )
-    return fetch_slug
+    return fetch_slug, push_url
+
+
+def origin_github_repo_slug(repo_root: Path) -> str | None:
+    slug, _push_url = origin_github_publication_endpoint(repo_root)
+    return slug
 
 
 def worktree_list(repo_root: Path) -> list[GitWorktreeRecord]:

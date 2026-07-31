@@ -1,0 +1,45 @@
+{
+  "artifact_type": "review",
+  "authority": "advisory",
+  "session": "iss00334-s017-final-review-2ff5c4bd",
+  "model_evidence": {
+    "requested": "Pro",
+    "resolved": "Pro",
+    "verified": true
+  },
+  "reviewed_repository": "chemitaro/spec-dock",
+  "reviewed_branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+  "reviewed_head": "2ff5c4bda05d80d68f56510b56500c88a4ce3302",
+  "verdict": "FAIL",
+  "p0_count": 0,
+  "p1_count": 3,
+  "findings": [
+    {
+      "id": "FINAL-P1-001",
+      "severity": "P1",
+      "title": "Checked-out branch identity is sampled rather than CAS-bound through commit installation and resume",
+      "evidence": "In spec-dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py:2275-2317, _install_operation_commit_cas() verifies symbolic-ref HEAD and HEAD, then performs a separate git update-ref. A concurrent switch to another branch at the same expected_head between those operations leaves refs/heads/<operation.branch> advanced even though that branch is no longer checked out; the post-check then fails. Lines 3390-3397 set committed = True only after the helper returns, while lines 3490-3497 classify this as recovery_required/restore_mismatch without commit evidence or rollback, so an unauthorized local branch commit remains installed. The same identity gap persists on retry: application/issue_planning.py:509-529 enters the resume path before Git preflight, and issue_planning_apply.py:3847-3872 plus 2504-2537 verify only the commit SHA, not the symbolic branch and its local ref. The byte-identical dogfood projection contains the same behavior.",
+      "required_minimum_fix": "Install the commit with one atomic ref transaction that verifies both the HEAD symref target and the operation branch old value while updating that branch. Treat a successful ref transaction as an installed commit before any fallible post-check. On publication resume and before push/ready, require HEAD to be the exact operation branch and refs/heads/<operation.branch> to equal the proved local commit. Add races for a branch switch immediately before ref installation and a retry from an alternate branch at the same commit."
+    },
+    {
+      "id": "FINAL-P1-002",
+      "severity": "P1",
+      "title": "Operation-trailer proof accepts near-match text instead of the required Git trailer",
+      "evidence": "In spec-dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py:2158-2184, 2187-2272, and 3847-3868, all pre-install, immutable-commit, and resume proofs use substring membership for SpecDock-Planning-Operation: <operation_id>. A commit-msg hook can replace the real trailer with a line such as Not-SpecDock-Planning-Operation: <operation_id> or place the text outside the trailer block; every current proof still succeeds, allowing the commit to be installed, pushed, and reported ready without the required operation trailer. The focused hook test only covers complete removal of the text, not a near-match, duplicate, or body-only occurrence.",
+      "required_minimum_fix": "Use one strict trailer parser in the pre-commit message check, immutable commit proof, and resume proof. Require exactly one SpecDock-Planning-Operation trailer whose complete value is the exact operation ID. Add negative tests for prefixed or suffixed keys and values, duplicate trailers, and an exact-looking line outside the trailer block."
+    },
+    {
+      "id": "FINAL-P1-003",
+      "severity": "P1",
+      "title": "The mutable origin alias can redirect publication to an unreviewed repository",
+      "evidence": "In spec-dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py:2483-2537, both remote observation and push use the mutable remote name origin; _push_operation_commit_cas() receives no operation.repository or immutable remote endpoint. The initial path at lines 3398-3467 and the resume path at lines 3877-3923 use this same seam after the earlier application-level repository check. If another process or hook runs git remote set-url origin <other-repository> after preflight, and the other repository has the operation branch at expected_head, the lease succeeds there and the subsequent ls-remote origin confirms that same wrong repository. The implementation can therefore record remote parity and return ready/adoption_published while the reviewed GitHub repository remains unchanged.",
+      "required_minimum_fix": "For initial publication and resume, resolve and validate the exact push endpoint against operation.repository, capture it as private publication authority, and use that explicit immutable endpoint for both push and remote-parity observation instead of the mutable origin alias. Add tests that retarget origin after commit creation to a second repository at the expected old head and prove that no push or ready result is possible."
+    }
+  ],
+  "scope_confirmation": {
+    "default_branch_used": false,
+    "improvement_proposals_excluded": true,
+    "accepted_boundaries_reopened": false
+  },
+  "summary": "The exact branch remained identical to the required HEAD throughout review. Candidate publication ownership and cleanup, descriptor-bound canonical mutation and recovery, repeated-contention evidence retention, five-target staged-tree proof, signing-intent propagation, and provider/dogfood byte parity are present. The final verdict is FAIL because three P1 authority gaps remain in checked-out-branch binding, exact operation-trailer proof, and reviewed-repository publication routing."
+}

@@ -152,6 +152,12 @@ class GitCommandResult:
 
 
 @dataclass(frozen=True)
+class _PublicationAuthority:
+    repository: str
+    push_endpoint: str = field(repr=False)
+
+
+@dataclass(frozen=True)
 class ManagedStateEntry:
     kind: Literal["file", "directory", "symlink"]
     mode: int
@@ -2153,6 +2159,45 @@ def _git_text(repo_root: Path, *argv: str) -> str | None:
     return result.stdout.decode("utf-8", errors="strict").strip()
 
 
+def _operation_trailer_is_proven(
+    repo_root: Path,
+    *,
+    message: bytes,
+    operation_id: str,
+) -> bool:
+    try:
+        message.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return False
+    completed = subprocess.run(
+        (
+            "git",
+            "-C",
+            repo_root.as_posix(),
+            "interpret-trailers",
+            "--parse",
+            "--no-divider",
+        ),
+        input=message,
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        return False
+    try:
+        parsed = completed.stdout.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return False
+    target_values: list[str] = []
+    for line in parsed.splitlines():
+        key, separator, value = line.partition(": ")
+        if not separator:
+            return False
+        if key == "SpecDock-Planning-Operation":
+            target_values.append(value)
+    return target_values == [operation_id]
+
+
 def _operation_commit_is_proven(
     operation: PlanningApplyOperation,
     *,
@@ -2171,14 +2216,18 @@ def _operation_commit_is_proven(
         "-r",
         local_commit,
     )
-    message = _git_text(repo_root, "show", "-s", "--format=%B", local_commit)
+    message = _run_git(repo_root, ("show", "-s", "--format=%B", local_commit))
     return (
         _SHA40.fullmatch(local_commit) is not None
         and parents == f"{local_commit} {operation.expected_head}"
         and commit_tree == local_tree
         and set(commit_paths.splitlines() if commit_paths else ()) == expected_paths
-        and message is not None
-        and f"SpecDock-Planning-Operation: {operation.operation_id}" in message
+        and message.returncode == 0
+        and _operation_trailer_is_proven(
+            repo_root,
+            message=message.stdout,
+            operation_id=operation.operation_id,
+        )
     )
 
 
@@ -2233,7 +2282,11 @@ def _create_verified_operation_commit(
         if (
             private_tree.returncode != 0
             or private_tree.stdout.decode("ascii", errors="strict").strip() != local_tree
-            or f"SpecDock-Planning-Operation: {operation.operation_id}" not in message
+            or not _operation_trailer_is_proven(
+                repo_root,
+                message=message.encode("utf-8"),
+                operation_id=operation.operation_id,
+            )
             or _git_text(repo_root, "write-tree") != local_tree
         ):
             raise _ApplyFailure("planning_commit_failed")
@@ -2283,8 +2336,6 @@ def _install_operation_commit_cas(
         _SHA40.fullmatch(local_commit) is None
         or _SHA40.fullmatch(local_tree) is None
         or _git_text(repo_root, "check-ref-format", "--branch", operation.branch) != operation.branch
-        or _git_text(repo_root, "symbolic-ref", "-q", "HEAD") != destination
-        or _git_text(repo_root, "rev-parse", "HEAD") != operation.expected_head
         or not _operation_commit_is_proven(
             operation,
             repo_root=repo_root,
@@ -2294,25 +2345,113 @@ def _install_operation_commit_cas(
         )
     ):
         raise PlanningApplyRestoreMismatch("operation commit install proof failed")
-    completed = subprocess.run(
-        (
-            "git",
-            "-C",
-            repo_root.as_posix(),
-            "update-ref",
-            destination,
-            local_commit,
-            operation.expected_head,
-        ),
-        check=False,
-        capture_output=True,
+    native_hook_text = _git_text(
+        repo_root,
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "hooks/reference-transaction",
     )
-    if (
-        completed.returncode != 0
-        or _git_text(repo_root, "symbolic-ref", "-q", "HEAD") != destination
-        or _git_text(repo_root, "rev-parse", "HEAD") != local_commit
-    ):
+    head_path_text = _git_text(
+        repo_root,
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "HEAD",
+    )
+    if native_hook_text is None or head_path_text is None:
+        raise PlanningApplyRestoreMismatch("operation commit install hook resolution failed")
+    native_hook = Path(native_hook_text)
+    head_path = Path(head_path_text)
+    head_lock = head_path.with_name(f"{head_path.name}.lock")
+    with tempfile.TemporaryDirectory(prefix="spec-dock-planning-ref-") as temporary:
+        hook_root = Path(temporary)
+        hook_root.chmod(0o700)
+        hook = hook_root / "reference-transaction"
+        hook.write_text(
+            f"#!{sys.executable}\n"
+            "import os\n"
+            "from pathlib import Path\n"
+            "import stat\n"
+            "import subprocess\n"
+            "import sys\n"
+            "payload = sys.stdin.buffer.read()\n"
+            "phase = sys.argv[1] if len(sys.argv) == 2 else ''\n"
+            "head_path = Path(os.environ['SPECDOCK_HEAD_PATH'])\n"
+            "head_lock = head_path.with_name(head_path.name + '.lock')\n"
+            "def run_native():\n"
+            "    native = os.environ.get('SPECDOCK_NATIVE_REFERENCE_TRANSACTION')\n"
+            "    if native and Path(native).is_file() and os.access(native, os.X_OK):\n"
+            "        return subprocess.run([native, phase], input=payload, check=False).returncode\n"
+            "    return 0\n"
+            "if phase == 'prepared':\n"
+            "    try:\n"
+            "        lock_metadata = head_lock.lstat()\n"
+            "        if not stat.S_ISREG(lock_metadata.st_mode):\n"
+            "            raise SystemExit(97)\n"
+            "        observed_update = payload.decode('ascii').strip()\n"
+            "        observed_head = head_path.read_bytes()\n"
+            "        if (\n"
+            "            observed_update != os.environ['SPECDOCK_EXPECTED_REF_UPDATE']\n"
+            "            or observed_head != os.environ['SPECDOCK_EXPECTED_HEAD'].encode('ascii')\n"
+            "        ):\n"
+            "            raise SystemExit(97)\n"
+            "    except (OSError, UnicodeDecodeError):\n"
+            "        raise SystemExit(97)\n"
+            "    native_result = run_native()\n"
+            "    raise SystemExit(native_result)\n"
+            "native_result = run_native()\n"
+            "raise SystemExit(native_result)\n",
+            encoding="utf-8",
+        )
+        hook.chmod(0o700)
+        environment = os.environ.copy()
+        environment["SPECDOCK_EXPECTED_REF_UPDATE"] = f"{operation.expected_head} {local_commit} {destination}"
+        environment["SPECDOCK_EXPECTED_HEAD"] = f"ref: {destination}\n"
+        environment["SPECDOCK_HEAD_PATH"] = head_path.as_posix()
+        if native_hook.is_file() and os.access(native_hook, os.X_OK):
+            environment["SPECDOCK_NATIVE_REFERENCE_TRANSACTION"] = native_hook.as_posix()
+        else:
+            environment.pop("SPECDOCK_NATIVE_REFERENCE_TRANSACTION", None)
+        try:
+            head_lock.lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            raise PlanningApplyRestoreMismatch("operation commit HEAD lock failed") from None
+        completed = subprocess.run(
+            (
+                "git",
+                "-C",
+                repo_root.as_posix(),
+                "-c",
+                f"core.hooksPath={hook_root.as_posix()}",
+                "update-ref",
+                "--no-deref",
+                destination,
+                local_commit,
+                operation.expected_head,
+            ),
+            check=False,
+            capture_output=True,
+            env=environment,
+        )
+    if completed.returncode != 0:
         raise PlanningApplyRestoreMismatch("operation commit install CAS failed")
+
+
+def _operation_branch_commit_is_proven(
+    operation: PlanningApplyOperation,
+    repo_root: Path,
+    local_commit: str,
+) -> bool:
+    destination = f"refs/heads/{operation.branch}"
+    return (
+        _SHA40.fullmatch(local_commit) is not None
+        and _git_text(repo_root, "symbolic-ref", "-q", "HEAD") == destination
+        and _git_text(repo_root, "rev-parse", destination) == local_commit
+        and _git_text(repo_root, "rev-parse", "HEAD") == local_commit
+    )
 
 
 def _git_blob_oid(content: bytes) -> str:
@@ -2478,11 +2617,34 @@ def planning_apply_resume_available(
         handle.close()
 
 
+def _capture_publication_authority(
+    operation: PlanningApplyOperation,
+    repo_root: Path,
+) -> _PublicationAuthority:
+    from spec_dock_runtime.infra.git_cli import origin_github_publication_endpoint
+
+    try:
+        repository, push_endpoint = origin_github_publication_endpoint(repo_root)
+    except RuntimeError:
+        raise PlanningApplyRestoreMismatch("publication authority is unavailable") from None
+    expected_repository = operation.repository.strip().lower()
+    if repository != expected_repository or not push_endpoint:
+        raise PlanningApplyRestoreMismatch("publication authority does not match operation")
+    return _PublicationAuthority(
+        repository=repository,
+        push_endpoint=push_endpoint,
+    )
+
+
 def _remote_head_observation(
     repo_root: Path,
+    authority: _PublicationAuthority,
     branch: str,
 ) -> tuple[Literal["present", "absent", "unavailable"], str | None]:
-    result = _run_git(repo_root, ("ls-remote", "--heads", "origin", f"refs/heads/{branch}"))
+    result = _run_git(
+        repo_root,
+        ("ls-remote", "--heads", authority.push_endpoint, f"refs/heads/{branch}"),
+    )
     if result.returncode != 0:
         return "unavailable", None
     text = result.stdout.decode("ascii", errors="strict").strip()
@@ -2494,19 +2656,25 @@ def _remote_head_observation(
     return "present", value
 
 
-def _remote_head(repo_root: Path, branch: str) -> str | None:
-    disposition, value = _remote_head_observation(repo_root, branch)
+def _remote_head(
+    repo_root: Path,
+    authority: _PublicationAuthority,
+    branch: str,
+) -> str | None:
+    disposition, value = _remote_head_observation(repo_root, authority, branch)
     return value if disposition == "present" else None
 
 
 def _push_operation_commit_cas(
+    operation: PlanningApplyOperation,
     *,
     repo_root: Path,
-    branch: str,
+    authority: _PublicationAuthority,
     expected_remote_head: str,
     local_commit: str,
     local_tree: str,
 ) -> GitCommandResult:
+    branch = operation.branch
     if (
         _SHA40.fullmatch(expected_remote_head) is None
         or _SHA40.fullmatch(local_commit) is None
@@ -2514,8 +2682,10 @@ def _push_operation_commit_cas(
         or not branch
         or branch.startswith("-")
         or any(character.isspace() for character in branch)
+        or authority.repository != operation.repository.strip().lower()
+        or not authority.push_endpoint
         or _git_text(repo_root, "check-ref-format", "--branch", branch) != branch
-        or _git_text(repo_root, "rev-parse", "HEAD") != local_commit
+        or not _operation_branch_commit_is_proven(operation, repo_root, local_commit)
         or _git_text(repo_root, "rev-parse", f"{local_commit}^") != expected_remote_head
         or _git_text(repo_root, "rev-parse", f"{local_commit}^{{tree}}") != local_tree
     ):
@@ -2524,7 +2694,15 @@ def _push_operation_commit_cas(
     lease = f"--force-with-lease={destination}:{expected_remote_head}"
     refspec = f"{local_commit}:{destination}"
     completed = subprocess.run(
-        ("git", "-C", repo_root.as_posix(), "push", lease, "origin", refspec),
+        (
+            "git",
+            "-C",
+            repo_root.as_posix(),
+            "push",
+            lease,
+            authority.push_endpoint,
+            refspec,
+        ),
         check=False,
         capture_output=True,
     )
@@ -2539,10 +2717,15 @@ def _cas_failure_result(
     operation: PlanningApplyOperation,
     *,
     repo_root: Path,
+    authority: _PublicationAuthority,
     local_commit: str,
     local_tree: str,
 ) -> PlanningApplyExecution | None:
-    disposition, remote = _remote_head_observation(repo_root, operation.branch)
+    disposition, remote = _remote_head_observation(
+        repo_root,
+        authority,
+        operation.branch,
+    )
     if disposition == "present" and remote == local_commit:
         remote_tree = _git_text(repo_root, "rev-parse", f"{remote}^{{tree}}")
         if remote_tree == local_tree:
@@ -3098,14 +3281,29 @@ def _execute_planning_apply_transaction(
             status="rejected",
             reason="apply_output_rejected",
         )
+    try:
+        publication_authority = _capture_publication_authority(operation, repo_root)
+    except PlanningApplyRestoreMismatch:
+        return _operation_result(
+            operation,
+            status=("recovery_required" if has_commit or has_transaction else "stale"),
+            reason=("restore_mismatch" if has_commit or has_transaction else "apply_target_changed"),
+        )
     if has_commit:
-        return _resume_publication(operation, repo_root=repo_root, handle=handle, fault_hook=fault_hook)
+        return _resume_publication(
+            operation,
+            repo_root=repo_root,
+            handle=handle,
+            authority=publication_authority,
+            fault_hook=fault_hook,
+        )
     if has_transaction:
         return _recover_interrupted_transaction(
             operation,
             repo_root=repo_root,
             handle=handle,
             target_guard=target_guard,
+            authority=publication_authority,
         )
     if _git_text(repo_root, "rev-parse", "HEAD") != operation.expected_head:
         return _operation_result(operation, status="stale", reason="apply_target_changed")
@@ -3419,9 +3617,18 @@ def _execute_planning_apply_transaction(
         _remove_transaction_backup(handle)
         if fault_hook is not None:
             fault_hook("before_push")
+        if not _operation_branch_commit_is_proven(operation, repo_root, local_commit):
+            return _operation_result(
+                operation,
+                status="publication_pending",
+                reason="remote_parity_unconfirmed",
+                local_commit=local_commit,
+                local_tree=local_tree,
+            )
         push = _push_operation_commit_cas(
+            operation=operation,
             repo_root=repo_root,
-            branch=operation.branch,
+            authority=publication_authority,
             expected_remote_head=operation.expected_head,
             local_commit=local_commit,
             local_tree=local_tree,
@@ -3430,6 +3637,7 @@ def _execute_planning_apply_transaction(
             failure = _cas_failure_result(
                 operation,
                 repo_root=repo_root,
+                authority=publication_authority,
                 local_commit=local_commit,
                 local_tree=local_tree,
             )
@@ -3437,8 +3645,16 @@ def _execute_planning_apply_transaction(
                 return failure
         if fault_hook is not None:
             fault_hook("after_push")
+        if not _operation_branch_commit_is_proven(operation, repo_root, local_commit):
+            return _operation_result(
+                operation,
+                status="publication_pending",
+                reason="remote_parity_unconfirmed",
+                local_commit=local_commit,
+                local_tree=local_tree,
+            )
         _set_operation_state(handle, operation, "PUSHED")
-        remote = _remote_head(repo_root, operation.branch)
+        remote = _remote_head(repo_root, publication_authority, operation.branch)
         if fault_hook is not None:
             fault_hook("after_fetch")
         if remote != local_commit:
@@ -3452,6 +3668,15 @@ def _execute_planning_apply_transaction(
             )
         remote_tree = _git_text(repo_root, "rev-parse", f"{remote}^{{tree}}")
         if remote_tree != local_tree:
+            return _operation_result(
+                operation,
+                status="publication_pending",
+                reason="remote_parity_unconfirmed",
+                local_commit=local_commit,
+                local_tree=local_tree,
+                remote_commit=remote,
+            )
+        if not _operation_branch_commit_is_proven(operation, repo_root, local_commit):
             return _operation_result(
                 operation,
                 status="publication_pending",
@@ -3547,6 +3772,7 @@ def _recover_interrupted_transaction(
     repo_root: Path,
     handle: _ApplyEvidenceHandle,
     target_guard: _RepositoryTargetGuard,
+    authority: _PublicationAuthority,
 ) -> PlanningApplyExecution:
     try:
         state = _load_operation_state(handle, operation)
@@ -3608,7 +3834,7 @@ def _recover_interrupted_transaction(
                 status="stale",
                 reason="apply_target_changed",
             )
-        if _remote_head(repo_root, operation.branch) != operation.expected_head:
+        if _remote_head(repo_root, authority, operation.branch) != operation.expected_head:
             return _operation_result(
                 operation,
                 status="recovery_required",
@@ -3664,7 +3890,7 @@ def _recover_interrupted_transaction(
             ),
             preserved_drift_paths=set(),
         )
-        if _remote_head(repo_root, operation.branch) != operation.expected_head:
+        if _remote_head(repo_root, authority, operation.branch) != operation.expected_head:
             raise PlanningApplyRestoreMismatch("remote changed during recovery")
     except (OSError, ValueError, PlanningApplyRestoreMismatch):
         return _operation_result(
@@ -3819,6 +4045,7 @@ def _resume_publication(
     *,
     repo_root: Path,
     handle: _ApplyEvidenceHandle,
+    authority: _PublicationAuthority,
     fault_hook: Callable[[str], None] | None,
 ) -> PlanningApplyExecution:
     try:
@@ -3842,26 +4069,19 @@ def _resume_publication(
             status="rejected",
             reason="operation_identity_collision",
         )
-    commit_paths = _git_text(
-        repo_root,
-        "diff-tree",
-        "--no-commit-id",
-        "--name-only",
-        "-r",
-        local_commit,
-    )
-    trailer = _git_text(repo_root, "show", "-s", "--format=%B", local_commit)
     expected_paths = _expected_operation_commit_paths(operation, repo_root)
     decision_path = repo_root / operation.decision_artifact_path
     if (
         _SHA40.fullmatch(local_commit) is None
         or _SHA40.fullmatch(local_tree) is None
-        or _git_text(repo_root, "rev-parse", "HEAD") != local_commit
-        or _git_text(repo_root, "rev-parse", f"{local_commit}^") != operation.expected_head
-        or _git_text(repo_root, "rev-parse", f"{local_commit}^{{tree}}") != local_tree
-        or set(commit_paths.splitlines() if commit_paths else ()) != expected_paths
-        or trailer is None
-        or f"SpecDock-Planning-Operation: {operation.operation_id}" not in trailer
+        or not _operation_branch_commit_is_proven(operation, repo_root, local_commit)
+        or not _operation_commit_is_proven(
+            operation,
+            repo_root=repo_root,
+            local_commit=local_commit,
+            local_tree=local_tree,
+            expected_paths=expected_paths,
+        )
         or not _owned_private_file(decision_path)
         or decision_path.read_bytes() != operation.human_decision_bytes
         or _git_text(repo_root, "status", "--porcelain=v2", "-z") != ""
@@ -3872,7 +4092,11 @@ def _resume_publication(
             status="recovery_required",
             reason="restore_mismatch",
         )
-    remote_disposition, remote = _remote_head_observation(repo_root, operation.branch)
+    remote_disposition, remote = _remote_head_observation(
+        repo_root,
+        authority,
+        operation.branch,
+    )
     if remote_disposition == "absent":
         return _operation_result(
             operation,
@@ -3892,9 +4116,18 @@ def _resume_publication(
     if remote == operation.expected_head:
         if fault_hook is not None:
             fault_hook("before_push")
+        if not _operation_branch_commit_is_proven(operation, repo_root, local_commit):
+            return _operation_result(
+                operation,
+                status="publication_pending",
+                reason="remote_parity_unconfirmed",
+                local_commit=local_commit,
+                local_tree=local_tree,
+            )
         push = _push_operation_commit_cas(
+            operation=operation,
             repo_root=repo_root,
-            branch=operation.branch,
+            authority=authority,
             expected_remote_head=operation.expected_head,
             local_commit=local_commit,
             local_tree=local_tree,
@@ -3903,12 +4136,13 @@ def _resume_publication(
             failure = _cas_failure_result(
                 operation,
                 repo_root=repo_root,
+                authority=authority,
                 local_commit=local_commit,
                 local_tree=local_tree,
             )
             if failure is not None:
                 return failure
-        remote = _remote_head(repo_root, operation.branch)
+        remote = _remote_head(repo_root, authority, operation.branch)
     elif remote != local_commit:
         return _operation_result(
             operation,
@@ -3918,7 +4152,11 @@ def _resume_publication(
             local_tree=local_tree,
             remote_commit=remote,
         )
-    if remote != local_commit or _git_text(repo_root, "rev-parse", f"{remote}^{{tree}}") != local_tree:
+    if (
+        remote != local_commit
+        or _git_text(repo_root, "rev-parse", f"{remote}^{{tree}}") != local_tree
+        or not _operation_branch_commit_is_proven(operation, repo_root, local_commit)
+    ):
         return _operation_result(
             operation,
             status="publication_pending",
