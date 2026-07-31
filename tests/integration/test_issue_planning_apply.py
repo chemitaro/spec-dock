@@ -26,6 +26,23 @@ def _module():
     )
 
 
+@pytest.fixture
+def _bind_local_publication_authority(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _module()
+
+    def capture(operation, repo_root: Path):
+        endpoint = _git(repo_root, "remote", "get-url", "--push", "origin")
+        return module._PublicationAuthority(
+            repository=operation.repository.lower(),
+            push_endpoint=endpoint,
+        )
+
+    monkeypatch.setattr(module, "_capture_publication_authority", capture)
+
+
+pytestmark = pytest.mark.usefixtures("_bind_local_publication_authority")
+
+
 def _git(repo: Path, *args: str, check: bool = True) -> str:
     completed = subprocess.run(
         ["git", "-C", repo.as_posix(), *args],
@@ -460,7 +477,7 @@ def test_resume_publication_remote_observation_unavailable_stays_pending_without
     monkeypatch.setattr(
         module,
         "_remote_head_observation",
-        lambda _repo, _branch: ("unavailable", None),
+        lambda _repo, _authority, _branch: ("unavailable", None),
     )
     monkeypatch.setattr(
         module,
@@ -2863,13 +2880,32 @@ def test_private_index_mutating_pre_commit_hook_is_rejected(tmp_path: Path) -> N
     assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
 
 
-def test_commit_message_hook_cannot_remove_operation_trailer(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "replacement",
+    [
+        "Not-SpecDock-Planning-Operation: {operation_id}",
+        "SpecDock-Planning-Operation-Extra: {operation_id}",
+        "SpecDock-Planning-Operation: prefix-{operation_id}",
+        "SpecDock-Planning-Operation: {operation_id}-suffix",
+        ("SpecDock-Planning-Operation: {operation_id}\nSpecDock-Planning-Operation: {operation_id}"),
+        "SpecDock-Planning-Operation: {operation_id}\n\nnot a trailer",
+    ],
+)
+def test_commit_message_hook_cannot_forge_operation_trailer(
+    tmp_path: Path,
+    replacement: str,
+) -> None:
     module = _module()
     repo, origin, head, targets = _repository(tmp_path)
     output = tmp_path / "output"
     output.mkdir()
     operation = _operation(repo, head, targets)
-    _install_hook(repo, "commit-msg", "printf 'rewritten without trailer\\n' > \"$1\"")
+    message = replacement.format(operation_id=operation.operation_id)
+    _install_hook(
+        repo,
+        "commit-msg",
+        f"printf '%s\\n' {shlex.quote(message)} > \"$1\"",
+    )
 
     result = module.execute_planning_apply_transaction(
         operation,
@@ -2882,6 +2918,489 @@ def test_commit_message_hook_cannot_remove_operation_trailer(tmp_path: Path) -> 
     assert (result.status, result.reason) == ("rolled_back", "planning_commit_failed")
     assert _git(repo, "rev-parse", "HEAD") == head
     assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_commit_message_hook_may_append_unrelated_trailer(tmp_path: Path) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    _install_hook(repo, "commit-msg", "printf 'Reviewed-by: Human\\n' >> \"$1\"")
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    message = _git(repo, "show", "-s", "--format=%B", result.local_commit)
+    assert message.count(f"SpecDock-Planning-Operation: {operation.operation_id}") == 1
+    assert "Reviewed-by: Human" in message
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == result.local_commit
+
+
+@pytest.mark.parametrize(
+    "forged_message",
+    [
+        ("subject\n\nSpecDock-Planning-Operation: {operation_id}\nSpecDock-Planning-Operation: {operation_id}\n"),
+        "subject\n\nSpecDock-Planning-Operation: {operation_id}\n\nnot a trailer\n",
+    ],
+)
+def test_resume_rejects_commit_without_one_exact_operation_trailer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    forged_message: str,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    monkeypatch.setattr(
+        module,
+        "_push_operation_commit_cas",
+        lambda **_kwargs: module.GitCommandResult(
+            returncode=1,
+            stdout=b"",
+            stderr=b"injected",
+        ),
+    )
+    pending = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+    assert pending.local_commit is not None
+    assert pending.local_tree is not None
+    message_path = tmp_path / "forged-message"
+    message_path.write_text(
+        forged_message.format(operation_id=operation.operation_id),
+        encoding="utf-8",
+    )
+    forged = _git(
+        repo,
+        "commit-tree",
+        pending.local_tree,
+        "-p",
+        head,
+        "-F",
+        message_path.as_posix(),
+    )
+    _git(
+        repo,
+        "update-ref",
+        "refs/heads/feature/issue",
+        forged,
+        pending.local_commit,
+    )
+    evidence = output / f"planning-apply-{operation.operation_id}"
+    (evidence / "commit.json").write_bytes(
+        module._canonical_json_bytes({
+            "operation_id": operation.operation_id,
+            "local_commit": forged,
+            "local_tree": pending.local_tree,
+            "decision": operation.decision,
+        })
+    )
+    monkeypatch.setattr(
+        module,
+        "_remote_head_observation",
+        lambda *_args: pytest.fail("invalid resume commit must not observe remote"),
+    )
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("resume must not validate"),
+        sync_runner=lambda: pytest.fail("resume must not sync"),
+    )
+
+    assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_branch_switch_at_commit_install_is_rejected_without_advancing_either_branch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    original_install = module._install_operation_commit_cas
+
+    def switch_then_install(*args, **kwargs):
+        _git(repo, "checkout", "-qb", "alternate", head)
+        return original_install(*args, **kwargs)
+
+    monkeypatch.setattr(module, "_install_operation_commit_cas", switch_then_install)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+    assert _git(repo, "rev-parse", "refs/heads/feature/issue") == head
+    assert _git(repo, "rev-parse", "refs/heads/alternate") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    evidence = output / f"planning-apply-{operation.operation_id}"
+    assert not (evidence / "commit.json").exists()
+    assert not (evidence / "publication.json").exists()
+
+
+def test_branch_switch_before_push_blocks_publication(tmp_path: Path) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "before_push":
+            _git(repo, "checkout", "-qb", "alternate")
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == (
+        "publication_pending",
+        "remote_parity_unconfirmed",
+    )
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert not (output / f"planning-apply-{operation.operation_id}" / "publication.json").exists()
+
+
+def test_resume_from_alternate_branch_at_local_commit_fails_before_push(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    monkeypatch.setattr(
+        module,
+        "_push_operation_commit_cas",
+        lambda **_kwargs: module.GitCommandResult(
+            returncode=1,
+            stdout=b"",
+            stderr=b"injected",
+        ),
+    )
+    pending = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+    assert pending.local_commit is not None
+    _git(repo, "checkout", "-qb", "alternate", pending.local_commit)
+    monkeypatch.setattr(
+        module,
+        "_push_operation_commit_cas",
+        lambda **_kwargs: pytest.fail("alternate-branch resume must not push"),
+    )
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("resume must not validate"),
+        sync_runner=lambda: pytest.fail("resume must not sync"),
+    )
+
+    assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert not (output / f"planning-apply-{operation.operation_id}" / "publication.json").exists()
+
+
+def test_branch_switch_after_push_prevents_terminal_ready(tmp_path: Path) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_push":
+            _git(repo, "checkout", "-qb", "alternate")
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == (
+        "publication_pending",
+        "remote_parity_unconfirmed",
+    )
+    assert result.local_commit is not None
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == result.local_commit
+    assert not (output / f"planning-apply-{operation.operation_id}" / "publication.json").exists()
+
+
+def test_captured_publication_endpoint_ignores_origin_retarget_before_push(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    secondary = tmp_path / "secondary.git"
+    subprocess.run(["git", "init", "--bare", "-q", secondary.as_posix()], check=True)
+    _git(
+        repo,
+        "push",
+        "-q",
+        secondary.as_posix(),
+        f"{head}:refs/heads/feature/issue",
+    )
+    hook = origin / "hooks" / "pre-receive"
+    hook.write_text("#!/bin/sh\nexit 1\n")
+    hook.chmod(0o700)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "before_push":
+            _git(repo, "remote", "set-url", "origin", secondary.as_posix())
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == ("publication_pending", "push_failed")
+    assert _git(secondary, "rev-parse", "refs/heads/feature/issue") == head
+    assert not (output / f"planning-apply-{operation.operation_id}" / "publication.json").exists()
+
+
+def test_post_push_parity_uses_captured_endpoint_after_origin_retarget(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    secondary = tmp_path / "secondary.git"
+    subprocess.run(["git", "init", "--bare", "-q", secondary.as_posix()], check=True)
+    _git(
+        repo,
+        "push",
+        "-q",
+        secondary.as_posix(),
+        f"{head}:refs/heads/feature/issue",
+    )
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+
+    def fault(checkpoint: str) -> None:
+        if checkpoint == "after_push":
+            _git(repo, "remote", "set-url", "origin", secondary.as_posix())
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+        fault_hook=fault,
+    )
+
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert result.local_commit is not None
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == result.local_commit
+    assert _git(secondary, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_resume_rejects_retargeted_origin_before_remote_observation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    secondary = tmp_path / "secondary.git"
+    subprocess.run(["git", "init", "--bare", "-q", secondary.as_posix()], check=True)
+    _git(
+        repo,
+        "push",
+        "-q",
+        secondary.as_posix(),
+        f"{head}:refs/heads/feature/issue",
+    )
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    primary_endpoint = origin.as_posix()
+
+    def strict_capture(current_operation, repo_root: Path):
+        endpoint = _git(repo_root, "remote", "get-url", "--push", "origin")
+        if endpoint != primary_endpoint:
+            raise module.PlanningApplyRestoreMismatch("retargeted")
+        return module._PublicationAuthority(
+            repository=current_operation.repository.lower(),
+            push_endpoint=endpoint,
+        )
+
+    monkeypatch.setattr(module, "_capture_publication_authority", strict_capture)
+    monkeypatch.setattr(
+        module,
+        "_push_operation_commit_cas",
+        lambda **_kwargs: module.GitCommandResult(
+            returncode=1,
+            stdout=b"",
+            stderr=b"injected",
+        ),
+    )
+    pending = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+    _git(repo, "remote", "set-url", "origin", secondary.as_posix())
+    monkeypatch.setattr(
+        module,
+        "_remote_head_observation",
+        lambda *_args: pytest.fail("retargeted resume must not observe a remote"),
+    )
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("resume must not validate"),
+        sync_runner=lambda: pytest.fail("resume must not sync"),
+    )
+
+    assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert _git(secondary, "rev-parse", "refs/heads/feature/issue") == head
+
+
+def test_reference_transaction_hook_is_delegated_once_per_phase(tmp_path: Path) -> None:
+    module = _module()
+    repo, _origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    hook_log = tmp_path / "reference-hook.log"
+    _install_hook(
+        repo,
+        "reference-transaction",
+        f"printf '%s\\n' \"$1\" >> {shlex.quote(hook_log.as_posix())}\ncat >/dev/null",
+    )
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    phases = hook_log.read_text().splitlines()
+    assert phases.count("prepared") == 1
+    assert phases.count("committed") == 1
+
+
+def test_prepared_reference_hook_cannot_switch_checked_out_branch(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, _origin, head, targets = _repository(tmp_path)
+    _git(repo, "branch", "alternate", head)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    switch_result = tmp_path / "switch-result"
+    _install_hook(
+        repo,
+        "reference-transaction",
+        (
+            'if [ "$1" = prepared ]; then\n'
+            "  set +e\n"
+            f"  git -C {shlex.quote(repo.as_posix())} symbolic-ref HEAD refs/heads/alternate\n"
+            "  switch_status=$?\n"
+            "  set -e\n"
+            f"  printf '%s\\n' \"$switch_status\" > {shlex.quote(switch_result.as_posix())}\n"
+            "fi\n"
+            "cat >/dev/null"
+        ),
+    )
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert switch_result.read_text().strip() != "0"
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert _git(repo, "symbolic-ref", "-q", "HEAD") == "refs/heads/feature/issue"
+
+
+def test_existing_foreign_head_lock_aborts_install_without_ref_change(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    head_lock = repo / ".git" / "HEAD.lock"
+    foreign_lock = b"foreign-git-operation\n"
+    head_lock.write_bytes(foreign_lock)
+    head_lock.chmod(0o600)
+
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+    assert _git(repo, "symbolic-ref", "-q", "HEAD") == "refs/heads/feature/issue"
+    assert _git(repo, "rev-parse", "refs/heads/feature/issue") == head
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+    assert head_lock.read_bytes() == foreign_lock
+    evidence = output / f"planning-apply-{operation.operation_id}"
+    assert not (evidence / "commit.json").exists()
+    assert not (evidence / "publication.json").exists()
 
 
 def test_post_commit_hook_workspace_mutation_preserves_recovery_gate(

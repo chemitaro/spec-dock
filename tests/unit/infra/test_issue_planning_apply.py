@@ -443,6 +443,67 @@ def test_verified_commit_preserves_repository_signing_intent(
     assert (commit_tree_argv[-1] == "-S") is expected_signed
 
 
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        (b"subject\n\nSpecDock-Planning-Operation: operation-1\n", True),
+        (
+            b"subject\n\nSpecDock-Planning-Operation: operation-1\nReviewed-by: Human\n",
+            True,
+        ),
+        (b"subject\n\nNot-SpecDock-Planning-Operation: operation-1\n", False),
+        (b"subject\n\nSpecDock-Planning-Operation-Extra: operation-1\n", False),
+        (b"subject\n\nSpecDock-Planning-Operation: prefix-operation-1\n", False),
+        (b"subject\n\nSpecDock-Planning-Operation: operation-1-suffix\n", False),
+        (
+            b"subject\n\nSpecDock-Planning-Operation: operation-1\nSpecDock-Planning-Operation: operation-1\n",
+            False,
+        ),
+        (
+            b"subject\n\nSpecDock-Planning-Operation: operation-1\nSpecDock-Planning-Operation: another\n",
+            False,
+        ),
+        (
+            b"subject\n\nSpecDock-Planning-Operation: operation-1\n\nnot a trailer\n",
+            False,
+        ),
+    ],
+)
+def test_operation_trailer_proof_requires_one_exact_terminal_trailer(
+    tmp_path: Path,
+    message: bytes,
+    expected: bool,
+) -> None:
+    module = _module()
+    assert (
+        module._operation_trailer_is_proven(
+            tmp_path,
+            message=message,
+            operation_id="operation-1",
+        )
+        is expected
+    )
+
+
+def test_operation_branch_commit_proof_binds_symbolic_head_and_branch_ref(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    operation = _operation()
+    local_commit = "c" * 40
+    values = {
+        ("symbolic-ref", "-q", "HEAD"): "refs/heads/feature/issue",
+        ("rev-parse", "refs/heads/feature/issue"): local_commit,
+        ("rev-parse", "HEAD"): local_commit,
+    }
+    monkeypatch.setattr(module, "_git_text", lambda _repo, *argv: values.get(argv))
+
+    assert module._operation_branch_commit_is_proven(operation, tmp_path, local_commit)
+    values["symbolic-ref", "-q", "HEAD"] = "refs/heads/alternate"
+    assert not module._operation_branch_commit_is_proven(operation, tmp_path, local_commit)
+
+
 def test_dedicated_push_uses_exact_expected_old_lease(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -457,6 +518,10 @@ def test_dedicated_push_uses_exact_expected_old_lease(
             return "feature/issue"
         if argv == ("rev-parse", "HEAD"):
             return local_commit
+        if argv == ("symbolic-ref", "-q", "HEAD"):
+            return "refs/heads/feature/issue"
+        if argv == ("rev-parse", "refs/heads/feature/issue"):
+            return local_commit
         if argv == ("rev-parse", f"{local_commit}^"):
             return HEAD
         if argv == ("rev-parse", f"{local_commit}^{{tree}}"):
@@ -469,9 +534,15 @@ def test_dedicated_push_uses_exact_expected_old_lease(
 
     monkeypatch.setattr(module, "_git_text", git_text)
     monkeypatch.setattr(module.subprocess, "run", run)
+    operation = _operation()
+    authority = module._PublicationAuthority(
+        repository="owner/repo",
+        push_endpoint="git@github.com:owner/repo.git",
+    )
     result = module._push_operation_commit_cas(
+        operation,
         repo_root=tmp_path,
-        branch="feature/issue",
+        authority=authority,
         expected_remote_head=HEAD,
         local_commit=local_commit,
         local_tree=local_tree,
@@ -485,10 +556,103 @@ def test_dedicated_push_uses_exact_expected_old_lease(
             tmp_path.as_posix(),
             "push",
             f"--force-with-lease=refs/heads/feature/issue:{HEAD}",
-            "origin",
+            "git@github.com:owner/repo.git",
             f"{local_commit}:refs/heads/feature/issue",
         )
     ]
+
+
+def test_publication_authority_requires_reviewed_repository(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    git_cli = __import__(
+        "spec_dock_runtime.infra.git_cli",
+        fromlist=["origin_github_publication_endpoint"],
+    )
+    monkeypatch.setattr(
+        git_cli,
+        "origin_github_publication_endpoint",
+        lambda _repo: ("owner/repo", "https://github.com/owner/repo.git"),
+    )
+    authority = module._capture_publication_authority(_operation(), tmp_path)
+    assert authority == module._PublicationAuthority(
+        repository="owner/repo",
+        push_endpoint="https://github.com/owner/repo.git",
+    )
+
+    monkeypatch.setattr(
+        git_cli,
+        "origin_github_publication_endpoint",
+        lambda _repo: ("other/repo", "https://github.com/other/repo.git"),
+    )
+    with pytest.raises(module.PlanningApplyRestoreMismatch):
+        module._capture_publication_authority(_operation(), tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("fetch_url", "push_url", "expected"),
+    [
+        (
+            "https://github.com/Owner/Repo.git",
+            "https://github.com/Owner/Repo.git",
+            ("owner/repo", "https://github.com/Owner/Repo.git"),
+        ),
+        (
+            "git@github.com:Owner/Repo.git",
+            "ssh://git@github.com/Owner/Repo.git",
+            ("owner/repo", "ssh://git@github.com/Owner/Repo.git"),
+        ),
+    ],
+)
+def test_git_cli_captures_exact_github_push_endpoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fetch_url: str,
+    push_url: str,
+    expected: tuple[str, str],
+) -> None:
+    git_cli = __import__(
+        "spec_dock_runtime.infra.git_cli",
+        fromlist=["origin_github_publication_endpoint"],
+    )
+    monkeypatch.setattr(
+        git_cli,
+        "_remote_get_url",
+        lambda _repo, *, push: push_url if push else fetch_url,
+    )
+
+    assert git_cli.origin_github_publication_endpoint(tmp_path) == expected
+    assert git_cli.origin_github_repo_slug(tmp_path) == expected[0]
+
+
+@pytest.mark.parametrize(
+    ("fetch_url", "push_url"),
+    [
+        ("https://github.com/owner/repo.git", "https://github.com/other/repo.git"),
+        ("https://example.com/owner/repo.git", "https://example.com/owner/repo.git"),
+        ("malformed", "malformed"),
+    ],
+)
+def test_git_cli_rejects_unprovable_publication_endpoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fetch_url: str,
+    push_url: str,
+) -> None:
+    git_cli = __import__(
+        "spec_dock_runtime.infra.git_cli",
+        fromlist=["origin_github_publication_endpoint"],
+    )
+    monkeypatch.setattr(
+        git_cli,
+        "_remote_get_url",
+        lambda _repo, *, push: push_url if push else fetch_url,
+    )
+
+    with pytest.raises(RuntimeError):
+        git_cli.origin_github_publication_endpoint(tmp_path)
 
 
 def test_cas_failure_with_unavailable_remote_preserves_push_failed(
@@ -499,12 +663,16 @@ def test_cas_failure_with_unavailable_remote_preserves_push_failed(
     monkeypatch.setattr(
         module,
         "_remote_head_observation",
-        lambda _repo, _branch: ("unavailable", None),
+        lambda _repo, _authority, _branch: ("unavailable", None),
     )
 
     result = module._cas_failure_result(
         _operation(),
         repo_root=tmp_path,
+        authority=module._PublicationAuthority(
+            repository="owner/repo",
+            push_endpoint="git@github.com:owner/repo.git",
+        ),
         local_commit="c" * 40,
         local_tree="d" * 40,
     )
