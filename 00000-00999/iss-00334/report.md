@@ -1140,3 +1140,21 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - SPEC／CODE／QAを分離した同一のP0／P1限定promptで確認し、各視点のP0=0／P1=0、overall `PASS`となった。正式read-only outputは`artifacts/20260801t195145z-pr-351-s020-lock-mode-combined-review-pass.md`で、SHA-256は`4468fa1bfac25b6d79030580e78589606d0f522d2341be7246301a80bcf37f2f`である。
 - Red Teamは前回P1（Gitの`0666` request＋umaskで生成される`0644` `HEAD.lock`を固定`0600`判定で拒否する互換性・可用性欠陥）が、実mode capture・完全一致検証とnormal／full regression coverageで閉じたと判定した。shared-ref prepared transaction lifetime、foreign／replaced／disappeared fail-closed、public status／reason／schema、Oracle boundary、provider／dogfood parityに新たなP0／P1はない。
 - exact-head review後の残存gateは、formal PASS artifact／reportのevidence commit、GitHub PR observation、CIの最新commit成功、merge-ready状態の再確認である。merge、auto-merge、branch削除、Issue close、`issue finish`は行わない。
+
+## 2026-08-02 — PR observation current blockers and Blue Team repair packet
+
+- PR #351をhead `97798b93bf8bf0e1b6793f3567fc1976ef2556ac`に固定して、GitHub Actionsの観測を実施した。Actions checksは成功したが、current triggerでP0×1／P1×3のレビューコメントが検出され、状態は`human_gate`となった。観測証跡は`/private/tmp/iss-00334-pr351-observation/result.json`に保存されている。既存のcarryover unresolved threadとは分離し、今回のcurrent findingsだけを修正対象とする。
+- current findingsは、(1) apply時の非GitHub origin resolver例外に含まれるURL／資格情報の漏えい（P0）、(2)深いJSONの`RecursionError`が構造化`rejected`へ正規化されない（P1）、(3)review staging directoryを閉じた後にpathname renameするidentity TOCTOU（P1）、(4)Create／Review／mechanical Reviseのpublication完了後にsource guardがない（P1）である。レビューは設計の再構築やP2／P3提案ではなく、この4件に限定する。
+- 最初のBlue送信はdetached workerがcapture前に終了する`incomplete-capture`となった。prompt送信・ターン生成を確認した上で、重複送信せず、fresh session `iss-00334-pr351-blue-repair`を`ORACLE_NO_DETACH=1`／`requested=Pro`でforeground再送した。GitHub connectorでrepository、current branch、exact HEAD、PR #351を確認し、default branch fallbackは0件だった。ChatGPT-Use側の回答は実装・patch・ZIP生成を行わないread-only work packetとして採用した。
+- 正式Blue Team work packetは`artifacts/20260802t202000z-pr-351-observation-blue-chatgpt-work-packet.md`（SHA-256: `2012c19246b7329cf4f52ab06f6b4a1040bc9f6ad31d7248e3e7e94f9b15e4d8`）である。最小修正方針は、apply resolverをcontent-freeな`blocked/github_upstream_required`へ正規化し、共有JSON parserで`RecursionError`を`ValueError("invalid JSON")`へ変換し、publication portへ必須のcompletion guardを追加し、所有権を証明できる新規publicationだけをstale時に削除することである。Review stagingはdescriptor／device・inode／子ファイル内容を保持して検証し、置換された未知エントリは削除しない。provider／dogfood whole-file parity、既存collision／output guard／public schema、Git-bound exact branch/HEADは維持する。
+- 次の作業はこの4件だけを実装し、providerからdogfoodへwhole-file projectionし、focused／complete Apply／ordinary tests、lint、validate、diff checkを実行する。実装commit／push後は、新HEADのfresh Red Team（read-only、P0／P1 concrete defects only）を行い、PASS後にPR observationを再実行する。merge、auto-merge、branch削除、Issue close、`issue finish`は行わない。
+
+## 2026-08-02 — PR observation current blockers implementation
+
+- applyのorigin解決で`RuntimeError`または解決不能値を受けた場合、例外本文やorigin URLを返さず、`blocked/github_upstream_required`へ正規化した。GitHub originと一致しない解決結果は従来どおり`stale/apply_target_changed`として扱う。
+- 共通のstrict JSON object parserで`RecursionError`を`ValueError("invalid JSON")`へ正規化し、深い入力が構造化された計画拒否経路を迂回しないようにした。
+- Candidate／Review publication portに必須のcompletion guardを追加し、最終的なatomic publicationと内容検証の後にsource freshnessを一度だけ再確認する。guard例外はcontent-freeなpublication failureへ、falseはsource-staleへ写像する。
+- Candidate publicationのstale cleanupは、今回のpublicationで所有権を証明できる正確なファイルだけを削除し、同名置換や未知のentryを保持する。Review stagingは開いたdirectory descriptor、device／inode、子ファイルidentity、期待bytesをrename前後で検証し、置換されたディレクトリ・子ファイルを削除しない。
+- provider authorityの5ファイルをdogfoodへwhole-file projectionし、provider／dogfoodのbyte parityを確認した。既存のpublic status／reason／schema、Candidate／canonical bytes、Git-bound branch／HEAD契約は変更していない。
+- 追加・更新テストはapply origin情報秘匿、JSON recursion正規化、Candidate／Review publication guard、staging identity／cleanup、source drift mappingを対象とした。検証結果は、通常テスト`1381 passed, 2235 skipped`、`make lint` pass、`spec-dock validate` `nodes=227`、`git diff --check` passである。
+- 次のgateはこの実装をcommit／pushした後の新HEADに対するfresh Red Team（read-only、P0／P1の具体的欠陥のみ）とPR observationである。Red TeamがPASSするまでmerge-readyとは扱わない。merge、auto-merge、branch削除、Issue close、`issue finish`は行わない。
