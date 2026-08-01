@@ -43,6 +43,11 @@ _STALE_WHEEL_PATTERNS = (
     "spec_dock/assets/spec_dock/templates/report.md",
     "spec_dock/assets/spec_dock/templates/requirement.md",
 )
+_S04_MANAGED_PROJECTION_ROOTS = ("docs", "templates", "scripts", "system")
+_S04_UPDATE_EXPECTED_STATUS = {
+    "spec-dock/scripts/spec_dock_runtime/application/import_file_artifact.py",
+    "spec-dock/scripts/spec_dock_runtime/domain/artifacts.py",
+}
 
 
 @dataclass(frozen=True)
@@ -383,9 +388,90 @@ def _assert_s03_privacy_output(
     assert source.name.lower() in f"{output.stdout}\n{output.stderr}".lower()
 
 
+def _flatten_s04_scalars(value: object) -> tuple[object, ...]:
+    if isinstance(value, dict):
+        return tuple(scalar for nested in value.values() for scalar in _flatten_s04_scalars(nested))
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return tuple(scalar for nested in value for scalar in _flatten_s04_scalars(nested))
+    return (value,)
+
+
+def _assert_s04_dogfood_privacy_output(
+    output: subprocess.CompletedProcess[str],
+    *,
+    checkout: Path,
+    source: Path,
+    body: bytes,
+    payload: dict[str, object],
+    destination: Path,
+) -> None:
+    expected_relative_source = source.relative_to(checkout).as_posix()
+    assert payload.get("source") in {expected_relative_source, source.name}
+    observed = [f"{output.stdout}\n{output.stderr}"]
+    observed.extend(_flatten_s03_public_values(payload))
+    public_root = checkout / "spec-dock" / ".agent"
+    for path in public_root.rglob("*") if public_root.is_dir() else ():
+        if path.is_file() and path != destination:
+            observed.append(path.read_bytes().decode("utf-8", errors="ignore"))
+    combined = "\n".join(observed).lower()
+    digest = hashlib.sha256(body).hexdigest().lower()
+    derived = f"derived-{hashlib.sha1(body).hexdigest()[:16]}"
+    forbidden_text = (
+        str(checkout.resolve()).lower(),
+        str(source.resolve()).lower(),
+        str(source.parent.resolve()).lower(),
+        body.decode("ascii", errors="ignore").lower(),
+        digest,
+        derived,
+        "sha256",
+        "byte_count",
+        "mime",
+        "encoding",
+        "content_id",
+    )
+    for sentinel in forbidden_text:
+        assert sentinel not in combined, f"dogfood privacy sentinel leaked: {sentinel!r}"
+    assert all(scalar != len(body) for scalar in _flatten_s04_scalars(payload))
+
+
 def _wheel_asset_bytes(candidate_wheel: CandidateWheel, relative_path: str) -> bytes:
     with zipfile.ZipFile(candidate_wheel.wheel_path) as wheel_zip:
         return wheel_zip.read(relative_path)
+
+
+def _s04_wheel_managed_manifest(candidate_wheel: CandidateWheel) -> dict[str, bytes]:
+    prefix = "spec_dock/assets/spec_dock/"
+    with zipfile.ZipFile(candidate_wheel.wheel_path) as wheel_zip:
+        return {
+            member.removeprefix(prefix): wheel_zip.read(member)
+            for member in wheel_zip.namelist()
+            if member.startswith(prefix)
+            and any(member.removeprefix(prefix).startswith(f"{root}/") for root in _S04_MANAGED_PROJECTION_ROOTS)
+            and not member.endswith("/")
+            and "__pycache__" not in Path(member).parts
+            and not member.endswith((".pyc", ".pyo"))
+        }
+
+
+def _s04_projected_managed_manifest(target: Path) -> dict[str, bytes]:
+    specdock_dir = target / "spec-dock"
+    return {
+        path.relative_to(specdock_dir).as_posix(): path.read_bytes()
+        for root in _S04_MANAGED_PROJECTION_ROOTS
+        for path in (specdock_dir / root).rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts and not path.name.endswith((".pyc", ".pyo"))
+    }
+
+
+def _assert_s04_provider_projection_parity(candidate_wheel: CandidateWheel, target: Path) -> None:
+    expected = _s04_wheel_managed_manifest(candidate_wheel)
+    observed = _s04_projected_managed_manifest(target)
+    assert set(observed) == set(expected)
+    assert observed == expected
+
+
+def _assert_exact_status_manifest(target: Path, expected: set[str]) -> None:
+    assert set(_git_status_paths(target)) == expected
 
 
 def _snapshot_tree(root: Path) -> FileSnapshot:
@@ -652,8 +738,8 @@ def _git_status_paths(target: Path) -> tuple[str, ...]:
     status = _git(target, "status", "--short", "--untracked-files=all")
     paths: list[str] = []
     for line in status.splitlines():
-        if len(line) >= 4:
-            paths.append(line[3:])
+        if len(line) >= 3:
+            paths.append(line[2:].strip())
     return tuple(sorted(paths))
 
 
@@ -1169,9 +1255,10 @@ def test_tc_346_s04_004_disposable_exact_dogfood_update_keeps_epic_00343_unbackf
         assert update_result.returncode == 0, update_result.stdout + update_result.stderr
         assert _git(checkout, "rev-parse", "HEAD") == candidate_wheel.post_head
         _assert_epic_00343_unbackfilled(checkout)
+        _assert_s04_provider_projection_parity(candidate_wheel, checkout)
         assert _snapshot_tree(checkout / "spec-dock" / "initiatives") == canonical_before
         assert _snapshot_tree(checkout / "src" / "spec_dock" / "assets" / "spec_dock") == provider_before
-        assert not any(path.startswith("src/spec_dock/assets/spec_dock/") for path in _git_status_paths(checkout))
+        _assert_exact_status_manifest(checkout, _S04_UPDATE_EXPECTED_STATUS)
 
         forbidden_readme = _epic_00343_readme(checkout)
         forbidden_readme.parent.mkdir(parents=True, exist_ok=True)
@@ -1208,6 +1295,7 @@ def test_tc_346_s04_005_disposable_dogfood_future_shell_and_generic_import(
         )
         assert update_result.returncode == 0, update_result.stdout + update_result.stderr
         _assert_epic_00343_unbackfilled(checkout)
+        _assert_s04_provider_projection_parity(candidate_wheel, checkout)
         future_number = _next_unused_github_issue_number(checkout)
         create_result = _run_installed_runtime(
             candidate_wheel.venv_python,
@@ -1283,6 +1371,14 @@ def test_tc_346_s04_005_disposable_dogfood_future_shell_and_generic_import(
         assert str(checkout.resolve()) not in f"{import_result.stdout}\n{import_result.stderr}"
         destination = checkout / str(payload["destination"])
         assert destination.parent == future_node / "artifacts"
+        _assert_s04_dogfood_privacy_output(
+            import_result,
+            checkout=checkout,
+            source=payload_source,
+            body=payload_body,
+            payload=payload,
+            destination=destination,
+        )
         assert destination.read_bytes() == payload_body
         assert payload_source.read_bytes() == payload_body
 
@@ -1305,8 +1401,19 @@ def test_tc_346_s04_005_disposable_dogfood_future_shell_and_generic_import(
             ).returncode
             == 0
         )
-        assert not any(path.startswith("src/spec_dock/assets/spec_dock/") for path in _git_status_paths(checkout))
-        assert payload_relative not in _git_status_paths(checkout)
+        future_relative = future_node.relative_to(checkout).as_posix()
+        expected_status = {
+            *_S04_UPDATE_EXPECTED_STATUS,
+            f"{future_relative}/.meta.json",
+            f"{future_relative}/.workbench/README.md",
+            f"{future_relative}/design.md",
+            f"{future_relative}/plan.md",
+            f"{future_relative}/report.md",
+            f"{future_relative}/requirement.md",
+            f"{future_relative}/artifacts/rules.md",
+            f"{future_relative}/artifacts/{destination.name}",
+        }
+        _assert_exact_status_manifest(checkout, expected_status)
         assert _git(checkout, "rev-parse", "HEAD") == candidate_wheel.post_head
     finally:
         if checkout is not None:
