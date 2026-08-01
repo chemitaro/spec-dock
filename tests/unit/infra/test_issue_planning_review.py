@@ -85,7 +85,14 @@ def test_review_publication_rejects_staging_directory_name_replacement(
     assert not any(path.name.startswith("review-") for path in output.iterdir())
 
 
-def test_review_publication_guard_false_removes_only_new_directory(tmp_path: Path) -> None:
+@pytest.mark.parametrize("guard_mode", ["false", "exception"])
+@pytest.mark.parametrize("destructive_operation", ["unlink", "rmdir"])
+def test_review_cleanup_without_conditional_remove_preserves_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    guard_mode: str,
+    destructive_operation: str,
+) -> None:
     review = __import__(
         "spec_dock_runtime.infra.issue_planning_review",
         fromlist=["publish_planning_review_evidence"],
@@ -97,62 +104,17 @@ def test_review_publication_guard_false_removes_only_new_directory(tmp_path: Pat
     repo.mkdir()
     sentinel.write_bytes(b"keep")
 
-    with pytest.raises(review.ReviewSourceStale):
-        review.publish_planning_review_evidence(
-            output_dir=output,
-            repo_root=repo,
-            reviewed_identity_sha256="a" * 64,
-            review_result_bytes=b'{"verdict":"pass"}',
-            summary_bytes=b"# Planning Review\n",
-            operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
-            publication_guard=lambda: False,
-        )
+    def forbidden_destructive_operation(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        pytest.fail(f"cleanup attempted unsafe {destructive_operation}")
 
-    assert sentinel.read_bytes() == b"keep"
-    assert tuple(path.name for path in output.iterdir()) == ("sentinel.txt",)
-
-
-@pytest.mark.parametrize("guard_mode", ["false", "exception"])
-def test_review_cleanup_namespace_swap_preserves_unknown_entry(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    guard_mode: str,
-) -> None:
-    review = __import__(
-        "spec_dock_runtime.infra.issue_planning_review",
-        fromlist=["publish_planning_review_evidence"],
-    )
-    output = tmp_path / "output"
-    repo = tmp_path / "repo"
-    output.mkdir()
-    repo.mkdir()
-    armed = [False]
-    swapped = [False]
-    original_fsync = review.os.fsync
-
-    def swap_quarantine_after_guard(fd: int) -> None:
-        original_fsync(fd)
-        if not armed[0] or swapped[0]:
-            return
-        quarantine = next(
-            (path for path in output.iterdir() if path.name.startswith(".spec-dock-planning-review-quarantine-")),
-            None,
-        )
-        if quarantine is None:
-            return
-        displaced = output / f"{quarantine.name}.owned"
-        quarantine.rename(displaced)
-        quarantine.mkdir()
-        (quarantine / "caller-owned").write_bytes(b"must remain")
-        swapped[0] = True
+    monkeypatch.setattr(review.os, destructive_operation, forbidden_destructive_operation)
 
     def publication_guard() -> bool:
-        armed[0] = True
         if guard_mode == "exception":
             raise RuntimeError("guard detail must not escape")
         return False
 
-    monkeypatch.setattr(review.os, "fsync", swap_quarantine_after_guard)
     with pytest.raises(OSError) as error:
         review.publish_planning_review_evidence(
             output_dir=output,
@@ -165,16 +127,10 @@ def test_review_cleanup_namespace_swap_preserves_unknown_entry(
         )
 
     assert not isinstance(error.value, review.ReviewSourceStale)
-    assert swapped == [True]
-    replacement = next(
-        path
-        for path in output.iterdir()
-        if path.name.startswith(".spec-dock-planning-review-quarantine-") and (path / "caller-owned").is_file()
-    )
-    displaced = output / f"{replacement.name}.owned"
-    assert (replacement / "caller-owned").read_bytes() == b"must remain"
-    assert displaced.is_dir()
-    assert not any(path.name.startswith("review-") for path in output.iterdir())
+    assert sentinel.read_bytes() == b"keep"
+    published = next(path for path in output.iterdir() if path.name.startswith("review-"))
+    assert (published / "planning-review-result.json").read_bytes() == b'{"verdict":"pass"}'
+    assert (published / "planning-review-summary.md").read_bytes() == b"# Planning Review\n"
 
 
 def test_review_publication_rejects_staging_child_replacement_without_deleting_it(
@@ -319,7 +275,8 @@ def test_review_publication_never_stages_through_swapped_output_path(
         )
     assert repo_write_observed == [False]
     assert list(repo.iterdir()) == []
-    assert list(backup.iterdir()) == []
+    staging = next(path for path in backup.iterdir() if path.name.startswith(".spec-dock-planning-review-"))
+    assert (staging / "planning-review-result.json").is_file()
 
 
 def test_review_publication_never_renames_through_swapped_output_path(
@@ -357,7 +314,7 @@ def test_review_publication_never_renames_through_swapped_output_path(
         )
 
     monkeypatch.setattr(review, "_revalidate_output_guard", swap_after_final_revalidation)
-    with pytest.raises(ValueError, match=r"identity|output"):
+    with pytest.raises(OSError, match=r"publication failed"):
         review.publish_planning_review_evidence(
             output_dir=output,
             repo_root=repo,
@@ -370,8 +327,10 @@ def test_review_publication_never_renames_through_swapped_output_path(
     assert [
         (str(path.relative_to(repo)), path.read_bytes()) for path in repo.rglob("*") if path.is_file()
     ] == repo_baseline
-    assert not any(path.name.startswith("review-") for path in repo.iterdir())
-    assert list(backup.iterdir()) == []
+    assert any(path.name.startswith(".spec-dock-planning-review-") for path in repo.iterdir())
+    staging = next(path for path in backup.iterdir() if path.name.startswith("review-"))
+    assert staging.is_dir()
+    assert (staging / "planning-review-result.json").is_file()
 
 
 @pytest.mark.parametrize("swap_kind", ["fifo", "symlink"])
