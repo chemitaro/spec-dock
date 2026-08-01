@@ -37,10 +37,11 @@ from spec_dock_runtime.domain.issue_planning_contracts import (
     IssueCandidateIdentity,
     OnboardingCompanionBindingV1,
     OracleAuthoringZipSnapshot,
+    PlanningPublicationSourceStale,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
     from datetime import datetime
 
 
@@ -63,6 +64,10 @@ class CandidateBuildFailed(OSError):
 
 
 class CandidatePublicationFailed(OSError):
+    pass
+
+
+class CandidateSourceStale(PlanningPublicationSourceStale):
     pass
 
 
@@ -456,6 +461,7 @@ def build_and_publish_candidate(
     output_guard: OutputDirectoryGuard,
     repo_root: Path,
     material: CandidateMaterial,
+    publication_guard: Callable[[], bool],
 ) -> PublishedCandidate:
     final_path = output_guard.path / material.logical_filename
     output_descriptor = -1
@@ -529,6 +535,14 @@ def build_and_publish_candidate(
                 output_descriptor,
                 published_entry,
             )
+            try:
+                current = publication_guard()
+            except Exception as error:
+                raise CandidatePublicationFailed("Candidate publication failed") from error
+            if not current:
+                if _cleanup_rejected_published_candidate(output_descriptor, published_entry):
+                    raise CandidateSourceStale("Candidate source changed during publication")
+                raise CandidatePublicationFailed("Candidate publication failed")
         except FileExistsError as error:
             raise CandidateCollision(material.logical_filename) from error
         except (NotImplementedError, OSError) as error:
@@ -702,13 +716,13 @@ def _create_private_cleanup_directory(output_descriptor: int) -> _OwnedEntry:
 def _cleanup_rejected_published_candidate(
     output_descriptor: int,
     published_entry: _OwnedEntry,
-) -> None:
+) -> bool:
     if not _owned_entry_matches(
         output_descriptor,
         published_entry,
         expected_kind="file",
     ):
-        return
+        return False
     cleanup = _create_private_cleanup_directory(output_descriptor)
     retain_cleanup = False
     try:
@@ -720,7 +734,7 @@ def _cleanup_rejected_published_candidate(
                 published_entry.name,
             )
         except (FileNotFoundError, FileExistsError, NotImplementedError, OSError):
-            return
+            return False
         os.fsync(output_descriptor)
         os.fsync(cleanup.descriptor)
         if _owned_entry_matches(
@@ -731,7 +745,7 @@ def _cleanup_rejected_published_candidate(
             os.unlink(published_entry.name, dir_fd=cleanup.descriptor)
             os.fsync(cleanup.descriptor)
             os.fsync(output_descriptor)
-            return
+            return True
         try:
             _rename_exclusive_at(
                 cleanup.descriptor,
@@ -756,6 +770,7 @@ def _cleanup_rejected_published_candidate(
             with suppress(OSError):
                 os.rmdir(cleanup.name, dir_fd=output_descriptor)
                 os.fsync(output_descriptor)
+    return False
 
 
 def _open_owned_regular_file(parent_descriptor: int, name: str) -> _OwnedEntry:

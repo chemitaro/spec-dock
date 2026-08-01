@@ -44,6 +44,12 @@ _SUCCESS_PAIRS = {
     ("ok", "review_completed"),
     ("ready", "adoption_published"),
 }
+
+
+class PlanningPublicationSourceStale(ValueError):
+    """Raised when a newly published planning artifact no longer matches its source."""
+
+
 _STATUSES = {
     "ok",
     "ready",
@@ -80,7 +86,7 @@ def _strict_json_object(data: bytes) -> dict[str, Any]:
             object_pairs_hook=reject_duplicates,
             parse_constant=reject_constant,
         )
-    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as error:
         raise ValueError("invalid JSON") from error
     if not isinstance(value, dict):
         raise ValueError("JSON root must be an object")

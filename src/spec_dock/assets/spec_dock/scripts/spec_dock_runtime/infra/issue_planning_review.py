@@ -9,12 +9,18 @@ import os
 from pathlib import Path
 import platform
 import secrets
+import stat
+from typing import TYPE_CHECKING
 
+from spec_dock_runtime.domain.issue_planning_contracts import PlanningPublicationSourceStale
 from spec_dock_runtime.infra.issue_planning_candidate import (
     OutputDirectoryGuard,
     read_bounded_regular_file,
     validate_candidate_output_directory,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 MAX_REVIEW_RESULT_BYTES = 1024 * 1024
 
@@ -24,6 +30,19 @@ class PublishedPlanningReview:
     review_result_file: str
     review_summary_file: str
     review_result_sha256: str
+
+
+class ReviewSourceStale(PlanningPublicationSourceStale):
+    pass
+
+
+@dataclass
+class _OwnedReviewDirectory:
+    name: str
+    descriptor: int
+    device: int
+    inode: int
+    file_identities: dict[str, tuple[int, int]]
 
 
 def read_external_review_result(
@@ -62,6 +81,7 @@ def publish_planning_review_evidence(
     review_result_bytes: bytes,
     summary_bytes: bytes,
     operation_time: datetime,
+    publication_guard: Callable[[], bool],
 ) -> PublishedPlanningReview:
     guard = validate_candidate_output_directory(output_dir, repo_root)
     if len(reviewed_identity_sha256) != 64 or any(
@@ -76,42 +96,65 @@ def publish_planning_review_evidence(
     token = instant.strftime("%Y%m%dt%H%M%Sz")
     directory_name = f"review-{token}-{reviewed_identity_sha256}"
     output_descriptor = _open_guarded_output_directory(guard)
-    temporary_name: str | None = None
-    cleanup_name: str | None = None
+    staged: _OwnedReviewDirectory | None = None
     published = False
     try:
         _ensure_relative_name_absent(output_descriptor, directory_name)
         _revalidate_output_guard(guard, repo_root)
         temporary_name = _create_temporary_directory_at(output_descriptor)
-        cleanup_name = temporary_name
         temporary_descriptor = _open_directory_at(output_descriptor, temporary_name)
-        try:
-            _write_exact_at(
-                temporary_descriptor,
-                "planning-review-result.json",
-                review_result_bytes,
-            )
-            _write_exact_at(
-                temporary_descriptor,
-                "planning-review-summary.md",
-                summary_bytes,
-            )
-            os.fsync(temporary_descriptor)
-        finally:
-            os.close(temporary_descriptor)
+        opened = os.fstat(temporary_descriptor)
+        staged = _OwnedReviewDirectory(
+            name=temporary_name,
+            descriptor=temporary_descriptor,
+            device=opened.st_dev,
+            inode=opened.st_ino,
+            file_identities={},
+        )
+        _write_exact_at(
+            temporary_descriptor,
+            "planning-review-result.json",
+            review_result_bytes,
+        )
+        _write_exact_at(
+            temporary_descriptor,
+            "planning-review-summary.md",
+            summary_bytes,
+        )
+        os.fsync(temporary_descriptor)
+        _verify_review_directory_contents(
+            staged,
+            {
+                "planning-review-result.json": review_result_bytes,
+                "planning-review-summary.md": summary_bytes,
+            },
+        )
         _revalidate_output_guard(guard, repo_root)
         _atomic_publish_no_replace_at(
             output_descriptor,
-            temporary_name,
+            staged,
             directory_name,
+            expected_files={
+                "planning-review-result.json": review_result_bytes,
+                "planning-review-summary.md": summary_bytes,
+            },
         )
-        cleanup_name = directory_name
         os.fsync(output_descriptor)
         _revalidate_output_guard(guard, repo_root)
+        try:
+            current = publication_guard()
+        except Exception as error:
+            raise OSError("review publication failed") from error
+        if not current:
+            if _remove_evidence_directory_at(output_descriptor, staged):
+                raise ReviewSourceStale("Review source changed during publication")
+            raise OSError("review publication cleanup failed")
         published = True
     finally:
-        if not published and cleanup_name is not None:
-            _remove_evidence_directory_at(output_descriptor, cleanup_name)
+        if staged is not None:
+            if not published:
+                _remove_evidence_directory_at(output_descriptor, staged)
+            os.close(staged.descriptor)
         os.close(output_descriptor)
     return PublishedPlanningReview(
         review_result_file=f"{directory_name}/planning-review-result.json",
@@ -192,9 +235,14 @@ def _create_temporary_directory_at(directory_descriptor: int) -> str:
 
 def _atomic_publish_no_replace_at(
     directory_descriptor: int,
-    source_name: str,
+    source: _OwnedReviewDirectory,
     destination_name: str,
+    *,
+    expected_files: dict[str, bytes],
 ) -> None:
+    if not _owned_review_directory_matches(directory_descriptor, source):
+        raise ValueError("review staging directory identity changed")
+    _verify_review_directory_contents(source, expected_files)
     if platform.system() == "Darwin":
         library = ctypes.CDLL(None, use_errno=True)
         rename = getattr(library, "renameatx_np", None)
@@ -217,12 +265,16 @@ def _atomic_publish_no_replace_at(
     rename.restype = ctypes.c_int
     result = rename(
         directory_descriptor,
-        os.fsencode(source_name),
+        os.fsencode(source.name),
         directory_descriptor,
         os.fsencode(destination_name),
         0x00000004 if platform.system() == "Darwin" else 0x00000001,
     )
     if result == 0:
+        source.name = destination_name
+        if not _owned_review_directory_matches(directory_descriptor, source):
+            raise ValueError("review published directory identity changed")
+        _verify_review_directory_contents(source, expected_files)
         return
     error_number = ctypes.get_errno()
     if error_number == errno.EEXIST:
@@ -230,18 +282,96 @@ def _atomic_publish_no_replace_at(
     raise OSError(error_number, os.strerror(error_number), destination_name)
 
 
-def _remove_evidence_directory_at(directory_descriptor: int, name: str) -> None:
+def _remove_evidence_directory_at(
+    directory_descriptor: int,
+    evidence: _OwnedReviewDirectory,
+) -> bool:
+    if not _owned_review_directory_matches(directory_descriptor, evidence):
+        return False
+    names = tuple(sorted(os.listdir(evidence.descriptor)))  # noqa: PTH208 - directory fd is the guard
+    if names != tuple(sorted(evidence.file_identities)):
+        return False
+    for name, (device, inode) in evidence.file_identities.items():
+        try:
+            current = os.stat(name, dir_fd=evidence.descriptor, follow_symlinks=False)
+        except OSError:
+            return False
+        if (current.st_dev, current.st_ino) != (device, inode) or not stat.S_ISREG(current.st_mode):
+            return False
+    for child in os.listdir(evidence.descriptor):  # noqa: PTH208 - directory fd is the guard
+        os.unlink(child, dir_fd=evidence.descriptor)
+    os.fsync(evidence.descriptor)
     try:
-        evidence_descriptor = _open_directory_at(directory_descriptor, name)
-    except FileNotFoundError:
-        return
-    try:
-        for child in os.listdir(evidence_descriptor):  # noqa: PTH208 - directory fd is the guard
-            os.unlink(child, dir_fd=evidence_descriptor)
-    finally:
-        os.close(evidence_descriptor)
-    try:
-        os.rmdir(name, dir_fd=directory_descriptor)
+        os.rmdir(evidence.name, dir_fd=directory_descriptor)
         os.fsync(directory_descriptor)
     except OSError:
-        raise ValueError("review output directory cleanup failed") from None
+        return False
+    return True
+
+
+def _owned_review_directory_matches(
+    parent_descriptor: int,
+    entry: _OwnedReviewDirectory,
+) -> bool:
+    try:
+        opened = os.fstat(entry.descriptor)
+        current = os.stat(entry.name, dir_fd=parent_descriptor, follow_symlinks=False)
+    except OSError:
+        return False
+    return (
+        stat.S_ISDIR(opened.st_mode)
+        and stat.S_ISDIR(current.st_mode)
+        and (opened.st_dev, opened.st_ino) == (entry.device, entry.inode)
+        and (current.st_dev, current.st_ino) == (entry.device, entry.inode)
+    )
+
+
+def _verify_review_directory_contents(
+    directory: _OwnedReviewDirectory,
+    expected_files: dict[str, bytes],
+) -> None:
+    names = tuple(sorted(os.listdir(directory.descriptor)))  # noqa: PTH208 - directory fd is the guard
+    if names != tuple(sorted(expected_files)):
+        raise ValueError("review staging directory contents changed")
+    identities: dict[str, tuple[int, int]] = {}
+    for name, expected in expected_files.items():
+        descriptor = os.open(
+            name,
+            os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=directory.descriptor,
+        )
+        try:
+            opened = os.fstat(descriptor)
+            if not stat.S_ISREG(opened.st_mode):
+                raise ValueError("review staging file is unsafe")
+            identities[name] = (opened.st_dev, opened.st_ino)
+        finally:
+            os.close(descriptor)
+        actual = _read_exact_file_at(directory.descriptor, name, max_bytes=len(expected))
+        if actual != expected:
+            raise ValueError("review staging file contents changed")
+    if directory.file_identities and directory.file_identities != identities:
+        raise ValueError("review staging file identity changed")
+    directory.file_identities = identities
+
+
+def _read_exact_file_at(directory_descriptor: int, name: str, *, max_bytes: int) -> bytes:
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(name, flags, dir_fd=directory_descriptor)
+    try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode) or opened.st_size > max_bytes:
+            raise ValueError("review staging file is unsafe")
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(descriptor, min(64 * 1024, max_bytes + 1 - total))
+            if not chunk:
+                return b"".join(chunks)
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > max_bytes:
+                raise ValueError("review staging file exceeds the bounded size")
+    finally:
+        os.close(descriptor)

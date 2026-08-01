@@ -359,6 +359,7 @@ def _run(
     preflight: object | None = None,
     execution: tuple[str, str] = ("ready", "adoption_published"),
     dependencies: IssuePlanningDependencies | None = None,
+    repo_slug_resolver: Callable[[Path], str | None] | None = None,
     resume_probe: Callable[..., bool] | None = None,
     transaction_runner_override: Callable[..., _PlanningApplyExecution] | None = None,
 ):
@@ -430,7 +431,7 @@ def _run(
         request=request,
         records=[record],
         repo_root=repo,
-        repo_slug_resolver=lambda _root: "owner/repo",
+        repo_slug_resolver=repo_slug_resolver or (lambda _root: "owner/repo"),
         validation_runner=lambda: SimpleNamespace(report=SimpleNamespace(errors=[])),
         sync_runner=lambda: SimpleNamespace(
             artifact_failure=None,
@@ -569,6 +570,23 @@ def test_pa_nf_04_parity_only_is_blocked(tmp_path: Path) -> None:
         transaction_runner=lambda *_args, **_kwargs: pytest.fail("must not mutate"),
     )
     _assert_not_ready(result, ("blocked", "review_result_unavailable"))
+
+
+def test_pa_nf_origin_resolution_failure_is_content_free_and_blocked(tmp_path: Path) -> None:
+    private_url = "https://token:secret@example.invalid/owner/repo.git"
+
+    def reject_origin(_root: Path) -> str:
+        raise RuntimeError(f"origin fetch/push mismatch: {private_url}")
+
+    result, _, _, _ = _run(
+        tmp_path,
+        repo_slug_resolver=reject_origin,
+        transaction_runner_override=lambda *_args, **_kwargs: pytest.fail("must not mutate"),
+    )
+
+    _assert_not_ready(result, ("blocked", "github_upstream_required"))
+    assert private_url not in repr(result)
+    assert private_url not in str(result.to_dict())
 
 
 @pytest.mark.parametrize(

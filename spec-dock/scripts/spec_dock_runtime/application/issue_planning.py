@@ -51,6 +51,7 @@ from spec_dock_runtime.domain.issue_planning_contracts import (
     PlanningContext,
     PlanningHumanDecisionV1,
     PlanningInvocationResult,
+    PlanningPublicationSourceStale,
     PlanningReviewResult,
     PlanningRevisionRequestV1,
     PlanningSourceEvidence,
@@ -418,8 +419,21 @@ def run_issue_planning_apply(
                 issue_id=issue_id,
             )
 
-    repository = repo_slug_resolver(repo_root)
-    if repository is None or repository != identity.repository:
+    try:
+        repository = repo_slug_resolver(repo_root)
+    except RuntimeError:
+        return PlanningCommandResult(
+            status="blocked",
+            reason="github_upstream_required",
+            issue_id=issue_id,
+        )
+    if repository is None:
+        return PlanningCommandResult(
+            status="blocked",
+            reason="github_upstream_required",
+            issue_id=issue_id,
+        )
+    if repository != identity.repository:
         return PlanningCommandResult(
             status="stale",
             reason="apply_target_changed",
@@ -975,6 +989,19 @@ def run_issue_planning_create(
             output_guard=output_guard,
             repo_root=repo_root,
             material=material,
+            publication_guard=lambda: _source_evidence_is_current(
+                target=target,
+                relevant_source_paths=relevant_source_paths,
+                repo_root=repo_root,
+                evidence=transport.source_evidence,
+                preflight_runner=preflight_runner,
+            ),
+        )
+    except PlanningPublicationSourceStale:
+        return PlanningCommandResult(
+            status="stale",
+            reason="planning_source_stale",
+            issue_id=target.issue_id,
         )
     except IssuePlanningCandidateCollision:
         return PlanningCommandResult(
@@ -1307,6 +1334,22 @@ def run_issue_planning_review(
             review_result_bytes=payload,
             summary_bytes=render_planning_review_summary(parsed).encode("utf-8"),
             operation_time=datetime.fromisoformat(clock().replace("Z", "+00:00")),
+            publication_guard=lambda: _review_publication_is_current(
+                target=target,
+                relevant_source_paths=relevant_source_paths,
+                repo_root=repo_root,
+                evidence=evidence,
+                preflight_runner=preflight_runner,
+                candidate_path=request.candidate_path,
+                candidate=candidate,
+                candidate_loader=candidate_loader,
+            ),
+        )
+    except PlanningPublicationSourceStale:
+        return PlanningCommandResult(
+            status="stale",
+            reason="review_target_changed",
+            issue_id=target.issue_id,
         )
     except FileExistsError:
         return PlanningCommandResult(
@@ -1660,6 +1703,21 @@ def run_issue_planning_revise(
             output_guard=output_guard,
             repo_root=repo_root,
             material=material,
+            publication_guard=lambda: _revision_publication_is_current(
+                candidate=candidate,
+                current_candidate_loader=candidate_loader,
+                candidate_path=request.candidate_path,
+                target=target,
+                repo_root=repo_root,
+                source_evidence=source_evidence,
+                preflight_runner=preflight_runner,
+            ),
+        )
+    except PlanningPublicationSourceStale:
+        return PlanningCommandResult(
+            status="stale",
+            reason="revision_source_stale",
+            issue_id=issue_id,
         )
     except IssuePlanningCandidateCollision:
         return PlanningCommandResult(
@@ -1872,6 +1930,59 @@ def _source_evidence_is_current(
         and repository.remote_head_disposition == evidence.remote_head_disposition
         and repository.source_manifest.source_manifest_hash == evidence.source_manifest_hash
     )
+
+
+def _review_publication_is_current(
+    *,
+    target: ExistingIssueTarget,
+    relevant_source_paths: Sequence[str],
+    repo_root: Path,
+    evidence: PlanningSourceEvidence,
+    preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult],
+    candidate_path: Path | None,
+    candidate: VerifiedIssueCandidateView | None,
+    candidate_loader: Callable[[Path, Path], VerifiedIssueCandidateView],
+) -> bool:
+    if not _source_evidence_is_current(
+        target=target,
+        relevant_source_paths=relevant_source_paths,
+        repo_root=repo_root,
+        evidence=evidence,
+        preflight_runner=preflight_runner,
+    ):
+        return False
+    if candidate is None or candidate_path is None:
+        return True
+    try:
+        current = candidate_loader(candidate_path, repo_root)
+    except (IssuePlanningCandidateArchiveRejected, OSError, ValueError):
+        return False
+    return current.identity == candidate.identity and current.zip_bytes == candidate.zip_bytes
+
+
+def _revision_publication_is_current(
+    *,
+    candidate: VerifiedIssueCandidateView,
+    current_candidate_loader: Callable[[Path, Path], VerifiedIssueCandidateView],
+    candidate_path: Path,
+    target: ExistingIssueTarget,
+    repo_root: Path,
+    source_evidence: PlanningSourceEvidence,
+    preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult],
+) -> bool:
+    if not _source_evidence_is_current(
+        target=target,
+        relevant_source_paths=tuple(cast("Sequence[str]", candidate.source_baseline.get("relevant_paths", ()))),
+        repo_root=repo_root,
+        evidence=source_evidence,
+        preflight_runner=preflight_runner,
+    ):
+        return False
+    try:
+        current = current_candidate_loader(candidate_path, repo_root)
+    except (IssuePlanningCandidateArchiveRejected, OSError, ValueError):
+        return False
+    return current.identity == candidate.identity and current.zip_bytes == candidate.zip_bytes
 
 
 def _read_external_bounded_file(
