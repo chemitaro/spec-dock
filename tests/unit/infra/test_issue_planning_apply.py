@@ -499,7 +499,17 @@ def test_operation_branch_commit_proof_binds_symbolic_head_and_branch_ref(
     }
     monkeypatch.setattr(module, "_git_text", lambda _repo, *argv: values.get(argv))
 
-    branch_lock = object()
+    branch_lock = module._OperationBranchLock(
+        path=tmp_path / "HEAD.lock",
+        descriptor=-1,
+        device=0,
+        inode=0,
+        destination="refs/heads/feature/issue",
+        expected_commit=local_commit,
+        ref_process=object(),
+        hook_root=tmp_path,
+    )
+    monkeypatch.setattr(branch_lock, "assert_held", lambda: None)
     assert module._operation_branch_commit_is_proven(
         operation,
         tmp_path,
@@ -513,6 +523,20 @@ def test_operation_branch_commit_proof_binds_symbolic_head_and_branch_ref(
         local_commit,
         branch_lock=branch_lock,
     )
+
+
+def test_operation_branch_commit_proof_rejects_unbound_lock_object(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    operation = _operation()
+    with pytest.raises(module.PlanningApplyRestoreMismatch):
+        module._operation_branch_commit_is_proven(
+            operation,
+            tmp_path,
+            "c" * 40,
+            branch_lock=object(),
+        )
 
 
 def test_dedicated_push_uses_exact_expected_old_lease(
@@ -550,6 +574,17 @@ def test_dedicated_push_uses_exact_expected_old_lease(
         repository="owner/repo",
         push_endpoint="git@github.com:owner/repo.git",
     )
+    branch_lock = module._OperationBranchLock(
+        path=tmp_path / "HEAD.lock",
+        descriptor=-1,
+        device=0,
+        inode=0,
+        destination="refs/heads/feature/issue",
+        expected_commit=local_commit,
+        ref_process=object(),
+        hook_root=tmp_path,
+    )
+    monkeypatch.setattr(branch_lock, "assert_held", lambda: None)
     result = module._push_operation_commit_cas(
         operation,
         repo_root=tmp_path,
@@ -557,7 +592,7 @@ def test_dedicated_push_uses_exact_expected_old_lease(
         expected_remote_head=HEAD,
         local_commit=local_commit,
         local_tree=local_tree,
-        branch_lock=object(),
+        branch_lock=branch_lock,
     )
 
     assert result.returncode == 0
