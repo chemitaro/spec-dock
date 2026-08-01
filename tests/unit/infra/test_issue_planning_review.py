@@ -112,6 +112,71 @@ def test_review_publication_guard_false_removes_only_new_directory(tmp_path: Pat
     assert tuple(path.name for path in output.iterdir()) == ("sentinel.txt",)
 
 
+@pytest.mark.parametrize("guard_mode", ["false", "exception"])
+def test_review_cleanup_namespace_swap_preserves_unknown_entry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    guard_mode: str,
+) -> None:
+    review = __import__(
+        "spec_dock_runtime.infra.issue_planning_review",
+        fromlist=["publish_planning_review_evidence"],
+    )
+    output = tmp_path / "output"
+    repo = tmp_path / "repo"
+    output.mkdir()
+    repo.mkdir()
+    armed = [False]
+    swapped = [False]
+    original_fsync = review.os.fsync
+
+    def swap_quarantine_after_guard(fd: int) -> None:
+        original_fsync(fd)
+        if not armed[0] or swapped[0]:
+            return
+        quarantine = next(
+            (path for path in output.iterdir() if path.name.startswith(".spec-dock-planning-review-quarantine-")),
+            None,
+        )
+        if quarantine is None:
+            return
+        displaced = output / f"{quarantine.name}.owned"
+        quarantine.rename(displaced)
+        quarantine.mkdir()
+        (quarantine / "caller-owned").write_bytes(b"must remain")
+        swapped[0] = True
+
+    def publication_guard() -> bool:
+        armed[0] = True
+        if guard_mode == "exception":
+            raise RuntimeError("guard detail must not escape")
+        return False
+
+    monkeypatch.setattr(review.os, "fsync", swap_quarantine_after_guard)
+    with pytest.raises(OSError) as error:
+        review.publish_planning_review_evidence(
+            output_dir=output,
+            repo_root=repo,
+            reviewed_identity_sha256="a" * 64,
+            review_result_bytes=b'{"verdict":"pass"}',
+            summary_bytes=b"# Planning Review\n",
+            operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            publication_guard=publication_guard,
+        )
+
+    assert not isinstance(error.value, review.ReviewSourceStale)
+    assert swapped == [True]
+    replacement = next(
+        path
+        for path in output.iterdir()
+        if path.name.startswith(".spec-dock-planning-review-quarantine-") and (path / "caller-owned").is_file()
+    )
+    displaced = output / f"{replacement.name}.owned"
+    assert (replacement / "caller-owned").read_bytes() == b"must remain"
+    assert displaced.is_dir()
+    assert not any(path.name.startswith("review-") for path in output.iterdir())
+
+
 def test_review_publication_rejects_staging_child_replacement_without_deleting_it(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
