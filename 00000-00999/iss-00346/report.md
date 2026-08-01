@@ -207,12 +207,12 @@ valid pre-step Artifact取得後、提案したtest-only completionを反映し�
 | 項目 | 観測値 |
 |---|---|
 | ブランチ | `iss-00346-integration-distribution-and-final-quality` |
-| local HEAD | `035c45f849b05895a654f92aea23f672ef9da818`（S01 test correction commit） |
-| remote HEAD | `035c45f849b05895a654f92aea23f672ef9da818`（一致） |
+| local HEAD | `ab34700409d132f1c9cd39a2471ff6645cecca49`（S01 test correction後のreport/Artifact successor） |
+| remote HEAD | `ab34700409d132f1c9cd39a2471ff6645cecca49`（一致） |
 | working tree | clean（`git status --short` 空、dist/buildはignored生成物） |
 | candidate wheel | pytest-managed temporary wheel（このwheelをinventory・install・origin probe・fresh consumerで共用） |
 | package version | `0.2.3` |
-| wheel SHA-256 | `95293f84d286596460348aa2a266dee85dba375ce6599a4a3624e3a579248448`（install対象と同一pathをfixtureで固定） |
+| wheel SHA-256 | `850705a88ad8e10cf9183489384ab724ed62a138e6b993cc42f1bc398f58d539`（install対象と同一pathをfixtureで固定） |
 | sorted ZIP inventory | 322 non-directory file entries、5 README allowlist、stale/cache denylist pass |
 | production repair | なし。test-only bounded completion |
 
@@ -220,7 +220,7 @@ valid pre-step Artifact取得後、提案したtest-only completionを反映し�
 
 ```text
 uv run pytest tests/integration/test_epic_00343_distribution.py --run-full-regression -q
-4 passed in 5.70s
+4 passed in 6.36s
 
 uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py -k 'workbench or readme' --run-full-regression -q
 1 passed, 34 deselected in 0.11s
@@ -254,7 +254,7 @@ S01 focused suite was intentionally rerun only after commit/push; the worker's p
 - candidate basename: `spec_dock-0.2.3-py3-none-any.whl`
 - deterministic selection: pytest fixtureがbuild出力ディレクトリをglobし、sorted結果が1件であることを検証して選択する（`len(wheel_paths) == 1`）。選択した同一pathをSHA-256計算、installer requirements、inventory、origin probe、fresh consumer、generic import、installed `validate`へ渡す。
 - exact node IDs: `test_tc_346_s01_001_candidate_wheel_receipt`, `test_tc_346_s01_002_candidate_wheel_inventory`, `test_tc_346_s01_003_isolated_wheel_origin_rejects_checkout_fallback`, `test_tc_346_s01_004_fresh_consumer_installed_shell_and_generic_import`
-- physical handoff: S01再検証時に `.workbench/s01-candidate-wheel/spec_dock-0.2.3-py3-none-any.whl` へ同一wheelをコピーして保持し、S02 pre-stepでそのbasename/digestを再確認する。保持wheelはWorkbench内のignoredファイルでありGit管理対象外。
+- physical handoff: S01再検証時に `.workbench/s01-candidate-wheel/spec_dock-0.2.3-py3-none-any.whl` へ同一wheelをコピーして保持した。保持wheelのSHA-256は `850705a88ad8e10cf9183489384ab724ed62a138e6b993cc42f1bc398f58d539`、inventoryは322 non-directory file entries、S01全4ノードは `4 passed in 6.36s`。保持wheelはWorkbench内のignoredファイルでありGit管理対象外で、S02 pre-stepでbasename/digestを再確認する。
 
 ## 実装記録（セッションログ） (必須)
 
