@@ -292,6 +292,25 @@ The single unit failure is the pre-existing `test_shipped_docs_describe_workbenc
 
 The worker did not edit canonical reports or provider code. S02 remains pending the current pushed-head ChatGPT Pro implementation review. The review must focus on synthetic fixture validity, no-backfill sensitivity, canonical/metadata/payload preservation, wheel-template equality, future-node tracking, controlled negative specificity, and scope boundedness. S03 must not start until this review returns zero unresolved P0/P1 findings.
 
+### S02 implementation review finding and remediation
+
+- 初回Pro review Artifact `20260801t184027z`（SHA-256 `e331fd69772aced3a6ddd25ab4da181e48c200457eb031d1c3db25c5e84d5493`）はP1を3件検出した。`deps-raw.puml`がgraph snapshotにない、root-managed install assetsのsnapshotが不足、report ledgerがsuccessor HEAD/closure rowsへ束縛されていない、という証跡上の指摘であり、production defectではない。
+- `dfee5a4d54a880f0d5ca5fd57bb699540cb3eb9c` でintegration test onlyの補正を適用し、`_snapshot_graph`へ`deps-raw.puml`を追加、`_snapshot_managed_assets`へinstallerが管理するroot `.agents/**`・`.codex/**`・`.github/**`を相対path+bytesで追加した。
+- 現在のpushed HEADは `dfee5a4d54a880f0d5ca5fd57bb699540cb3eb9c`（local/remote一致）。report-only successorはimplementation commitと区別して記録する。
+- `historical_option_used: no`。synthetic current-runtime fixtureを使用し、historical SHA/feature-absence fixtureは使用していない。
+
+#### S02 closure ledger (fresh review pending)
+
+| Closure / contract | Evidence | Result |
+|---|---|---|
+| `CL-346-AC-004` / `CL-346-EC-004` | 既存4 scope README absent、update後もabsent、candidate wheel guideのみmanaged delta | pass（test evidence） |
+| `CL-346-AC-005` / `CL-346-EC-005` | future `init-00501` / `epic-00502` / `iss-00503` README template byte equality・tracked | pass（test evidence） |
+| `CL-346-CON-006` / `CL-346-EC-006` | payload bytes/ignored/untracked、canonical/graph snapshot equality、path-specific illegal README negative | pass（test evidence） |
+| Step Contract Closure / S02 | 4 cards、candidate-wheel installed runtime、test-only bounded paths、historical option `no` | pass（implementation evidence） |
+| Test Contract Closure / S02 | focused 4 passed、full integration 8 passed、ruff/diff-check pass | pass（implementation evidence） |
+| Delegated Worker Evidence / S02 | worker changed integration test only、production repair `false`、no material implementation decisions | pass |
+| ChatGPT Pro implementation review | current pushed HEAD `dfee5a4d...`でP0/P1 unresolved 0が必要 | pending |
+
 ## 実装記録（セッションログ） (必須)
 
 ### セッションログ（2026-07-29 HH:MM - HH:MM）
