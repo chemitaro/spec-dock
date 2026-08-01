@@ -164,6 +164,7 @@ class _OperationBranchLock:
     descriptor: int
     device: int
     inode: int
+    mode: int
     destination: str
     expected_commit: str
     ref_process: subprocess.Popen[bytes]
@@ -188,6 +189,7 @@ class _OperationBranchLock:
                         self.descriptor,
                         self.device,
                         self.inode,
+                        self.mode,
                     )
                 except PlanningApplyRestoreMismatch as exc:
                     failure = exc
@@ -209,10 +211,10 @@ class _OperationBranchLock:
         if (
             not stat.S_ISREG(descriptor_stat.st_mode)
             or descriptor_stat.st_uid != os.geteuid()
-            or stat.S_IMODE(descriptor_stat.st_mode) != 0o600
+            or stat.S_IMODE(descriptor_stat.st_mode) != self.mode
             or not stat.S_ISREG(current.st_mode)
             or current.st_uid != os.geteuid()
-            or stat.S_IMODE(current.st_mode) != 0o600
+            or stat.S_IMODE(current.st_mode) != self.mode
             or (descriptor_stat.st_dev, descriptor_stat.st_ino) != (self.device, self.inode)
             or (current.st_dev, current.st_ino) != (self.device, self.inode)
         ):
@@ -277,6 +279,7 @@ def _remove_captured_operation_head_lock(
     descriptor: int,
     device: int,
     inode: int,
+    mode: int,
 ) -> None:
     try:
         descriptor_stat = os.fstat(descriptor)
@@ -287,7 +290,7 @@ def _remove_captured_operation_head_lock(
     if (
         not stat.S_ISREG(descriptor_stat.st_mode)
         or descriptor_stat.st_uid != os.geteuid()
-        or stat.S_IMODE(descriptor_stat.st_mode) != 0o600
+        or stat.S_IMODE(descriptor_stat.st_mode) != mode
         or (descriptor_stat.st_dev, descriptor_stat.st_ino) != (device, inode)
     ):
         raise PlanningApplyRestoreMismatch("operation branch HEAD lock was replaced")
@@ -302,7 +305,7 @@ def _remove_captured_operation_head_lock(
     if (
         not stat.S_ISREG(current.st_mode)
         or current.st_uid != os.geteuid()
-        or stat.S_IMODE(current.st_mode) != 0o600
+        or stat.S_IMODE(current.st_mode) != mode
         or (current.st_dev, current.st_ino) != (device, inode)
     ):
         raise PlanningApplyRestoreMismatch("operation branch HEAD lock was replaced")
@@ -326,6 +329,10 @@ def _read_operation_ref_ack(
     ready, _, _ = select.select([stdout], [], [], 5)
     if not ready or stdout.readline() != expected + b"\n":
         raise PlanningApplyRestoreMismatch("operation branch ref transaction acknowledgement failed")
+
+
+def _git_ref_lock_mode_is_compatible(mode: int) -> bool:
+    return (mode & ~0o666) == 0
 
 
 @dataclass(frozen=True)
@@ -2640,6 +2647,7 @@ def _acquire_operation_branch_lock(
     ref_process: subprocess.Popen[bytes] | None = None
     descriptor: int | None = None
     captured_identity: tuple[int, int] | None = None
+    captured_mode: int | None = None
     try:
         hook_root = Path(tempfile.mkdtemp(prefix="spec-dock-planning-ref-"))
         hook_root.chmod(0o700)
@@ -2673,7 +2681,7 @@ def _acquire_operation_branch_lock(
             raise PlanningApplyRestoreMismatch("operation branch ref transaction prepare failed")
         flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
         try:
-            descriptor = os.open(lock_path, flags, 0o600)
+            descriptor = os.open(lock_path, flags)
         except OSError:
             raise PlanningApplyRestoreMismatch("operation branch HEAD lock failed") from None
         opened = os.fstat(descriptor)
@@ -2681,24 +2689,28 @@ def _acquire_operation_branch_lock(
             current = lock_path.lstat()
         except OSError:
             raise PlanningApplyRestoreMismatch("operation branch HEAD lock failed") from None
+        opened_mode = stat.S_IMODE(opened.st_mode)
+        current_mode = stat.S_IMODE(current.st_mode)
         if (
             not stat.S_ISREG(opened.st_mode)
             or opened.st_uid != os.geteuid()
-            or stat.S_IMODE(opened.st_mode) != 0o600
+            or not _git_ref_lock_mode_is_compatible(opened_mode)
             or not stat.S_ISREG(current.st_mode)
             or current.st_uid != os.geteuid()
-            or stat.S_IMODE(current.st_mode) != 0o600
+            or current_mode != opened_mode
             or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
             or ref_process.poll() is not None
         ):
             raise PlanningApplyRestoreMismatch("operation branch HEAD lock is unsafe")
         os.fsync(descriptor)
         captured_identity = (opened.st_dev, opened.st_ino)
+        captured_mode = opened_mode
         return _OperationBranchLock(
             path=lock_path,
             descriptor=descriptor,
             device=opened.st_dev,
             inode=opened.st_ino,
+            mode=opened_mode,
             destination=destination,
             expected_commit=local_commit,
             ref_process=ref_process,
@@ -2707,7 +2719,7 @@ def _acquire_operation_branch_lock(
     except BaseException:
         cleanup_failure: PlanningApplyRestoreMismatch | None = None
         if ref_process is not None:
-            if captured_identity is None or descriptor is None:
+            if captured_identity is None or captured_mode is None or descriptor is None:
                 try:
                     _abandon_operation_ref_transaction(ref_process)
                 except PlanningApplyRestoreMismatch as exc:
@@ -2720,6 +2732,7 @@ def _acquire_operation_branch_lock(
                         descriptor,
                         captured_identity[0],
                         captured_identity[1],
+                        captured_mode,
                     )
                 except PlanningApplyRestoreMismatch as exc:
                     cleanup_failure = exc

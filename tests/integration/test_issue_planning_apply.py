@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import shlex
+import stat
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -3788,8 +3790,14 @@ def test_operation_branch_lock_foreign_head_lock_prepare_failure_preserves_inode
         head_lock.unlink(missing_ok=True)
 
 
+@pytest.mark.parametrize(
+    ("umask", "expected_mode"),
+    [(0o022, 0o644), (0o077, 0o600)],
+)
 def test_operation_branch_lock_successful_teardown_releases_prepared_locks(
     tmp_path: Path,
+    umask: int,
+    expected_mode: int,
 ) -> None:
     module = _module()
     repo, _origin, head, targets = _repository(tmp_path)
@@ -3798,15 +3806,196 @@ def test_operation_branch_lock_successful_teardown_releases_prepared_locks(
     head_lock = repo / ".git" / "HEAD.lock"
     ref_lock = repo / ".git" / "refs" / "heads" / "feature" / "issue.lock"
 
-    with module._acquire_operation_branch_lock(repo, operation, head) as branch_lock:
-        assert branch_lock.path == head_lock
-        assert head_lock.exists()
-        assert ref_lock.exists()
-        assert _attempt_linked_operation_ref_update(attacker, head, attacker_commit) == 128
+    previous_umask = os.umask(umask)
+    try:
+        with module._acquire_operation_branch_lock(repo, operation, head) as branch_lock:
+            assert branch_lock.path == head_lock
+            assert branch_lock.mode == expected_mode
+            assert stat.S_IMODE(head_lock.stat().st_mode) == expected_mode
+            assert head_lock.exists()
+            assert ref_lock.exists()
+            assert _attempt_linked_operation_ref_update(attacker, head, attacker_commit) == 128
+    finally:
+        os.umask(previous_umask)
 
     assert not head_lock.exists()
     assert not ref_lock.exists()
     assert _attempt_linked_operation_ref_update(attacker, head, attacker_commit) == 0
+
+
+def test_initial_publication_succeeds_with_git_lock_mode_from_umask_0022(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    observed_modes: list[int] = []
+    real_acquire = module._acquire_operation_branch_lock
+
+    def acquire(*args: object, **kwargs: object):
+        branch_lock = real_acquire(*args, **kwargs)
+        observed_modes.append(branch_lock.mode)
+        return branch_lock
+
+    monkeypatch.setattr(module, "_acquire_operation_branch_lock", acquire)
+    previous_umask = os.umask(0o022)
+    try:
+        result = module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=_validation_ok,
+            sync_runner=_sync_ok,
+        )
+    finally:
+        os.umask(previous_umask)
+
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert observed_modes == [0o644]
+    local_commit = _git(repo, "rev-parse", "HEAD")
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == local_commit
+    evidence = output / f"planning-apply-{operation.operation_id}"
+    assert json.loads((evidence / "state.json").read_bytes())["state"] == "REMOTE_PARITY"
+    assert (evidence / "publication.json").exists()
+    assert not (repo / ".git" / "HEAD.lock").exists()
+    assert not (repo / ".git" / "refs" / "heads" / "feature" / "issue.lock").exists()
+
+
+def test_resume_publication_succeeds_with_git_lock_mode_from_umask_0022(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    real_push = module._push_operation_commit_cas
+    fail_once = [True]
+
+    def fail_first_push(**kwargs):
+        if fail_once[0]:
+            fail_once[0] = False
+            return module.GitCommandResult(returncode=1, stdout=b"", stderr=b"injected")
+        return real_push(**kwargs)
+
+    monkeypatch.setattr(module, "_push_operation_commit_cas", fail_first_push)
+    first_umask = os.umask(0o077)
+    try:
+        pending = module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=_validation_ok,
+            sync_runner=_sync_ok,
+        )
+    finally:
+        os.umask(first_umask)
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+    local_commit = _git(repo, "rev-parse", "HEAD")
+    commit_count = _git(repo, "rev-list", "--count", "HEAD")
+    observed_modes: list[int] = []
+    real_acquire = module._acquire_operation_branch_lock
+
+    def acquire(*args: object, **kwargs: object):
+        branch_lock = real_acquire(*args, **kwargs)
+        observed_modes.append(branch_lock.mode)
+        return branch_lock
+
+    monkeypatch.setattr(module, "_acquire_operation_branch_lock", acquire)
+    second_umask = os.umask(0o022)
+    try:
+        ready = module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("resume must not validate"),
+            sync_runner=lambda: pytest.fail("resume must not sync"),
+        )
+    finally:
+        os.umask(second_umask)
+
+    assert (ready.status, ready.reason) == ("ready", "adoption_published")
+    assert observed_modes == [0o644]
+    assert _git(repo, "rev-parse", "HEAD") == local_commit
+    assert _git(repo, "rev-list", "--count", "HEAD") == commit_count
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == local_commit
+    evidence = output / f"planning-apply-{operation.operation_id}"
+    assert json.loads((evidence / "state.json").read_bytes())["state"] == "REMOTE_PARITY"
+    assert (evidence / "publication.json").exists()
+    assert not (repo / ".git" / "HEAD.lock").exists()
+    assert not (repo / ".git" / "refs" / "heads" / "feature" / "issue.lock").exists()
+
+
+def test_already_remote_publication_succeeds_with_git_lock_mode_from_umask_0022(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    real_push = module._push_operation_commit_cas
+    fail_once = [True]
+
+    def fail_first_push(**kwargs):
+        if fail_once[0]:
+            fail_once[0] = False
+            return module.GitCommandResult(returncode=1, stdout=b"", stderr=b"injected")
+        return real_push(**kwargs)
+
+    monkeypatch.setattr(module, "_push_operation_commit_cas", fail_first_push)
+    first_umask = os.umask(0o077)
+    try:
+        pending = module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=_validation_ok,
+            sync_runner=_sync_ok,
+        )
+    finally:
+        os.umask(first_umask)
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+    local_commit = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "push", "-q", "origin", f"{local_commit}:refs/heads/feature/issue")
+    observed_modes: list[int] = []
+    real_acquire = module._acquire_operation_branch_lock
+
+    def acquire(*args: object, **kwargs: object):
+        branch_lock = real_acquire(*args, **kwargs)
+        observed_modes.append(branch_lock.mode)
+        return branch_lock
+
+    def fail_if_called(**_kwargs):
+        pytest.fail("already-remote publication must not push")
+
+    monkeypatch.setattr(module, "_acquire_operation_branch_lock", acquire)
+    monkeypatch.setattr(module, "_push_operation_commit_cas", fail_if_called)
+    second_umask = os.umask(0o022)
+    try:
+        ready = module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("resume must not validate"),
+            sync_runner=lambda: pytest.fail("resume must not sync"),
+        )
+    finally:
+        os.umask(second_umask)
+
+    assert (ready.status, ready.reason) == ("ready", "adoption_published")
+    assert observed_modes == [0o644]
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == local_commit
+    evidence = output / f"planning-apply-{operation.operation_id}"
+    assert json.loads((evidence / "state.json").read_bytes())["state"] == "REMOTE_PARITY"
+    assert (evidence / "publication.json").exists()
+    assert not (repo / ".git" / "HEAD.lock").exists()
+    assert not (repo / ".git" / "refs" / "heads" / "feature" / "issue.lock").exists()
 
 
 def test_initial_publication_guard_acquire_preserves_foreign_head_lock(

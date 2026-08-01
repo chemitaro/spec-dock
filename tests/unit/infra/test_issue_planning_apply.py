@@ -8,6 +8,7 @@ from pathlib import Path
 import stat
 import subprocess
 import sys
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -504,6 +505,7 @@ def test_operation_branch_commit_proof_binds_symbolic_head_and_branch_ref(
         descriptor=-1,
         device=0,
         inode=0,
+        mode=0o600,
         destination="refs/heads/feature/issue",
         expected_commit=local_commit,
         ref_process=object(),
@@ -537,6 +539,50 @@ def test_operation_branch_commit_proof_rejects_unbound_lock_object(
             "c" * 40,
             branch_lock=object(),
         )
+
+
+@pytest.mark.parametrize(
+    ("umask", "expected_mode"),
+    [(0o022, 0o644), (0o077, 0o600)],
+)
+def test_operation_branch_lock_captures_real_git_created_mode_for_normal_umask(
+    tmp_path: Path,
+    umask: int,
+    expected_mode: int,
+) -> None:
+    module = _module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "-C", repo.as_posix(), "init", "-q"], check=True)
+    subprocess.run(
+        ["git", "-C", repo.as_posix(), "config", "user.name", "Tester"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", repo.as_posix(), "config", "user.email", "tester@example.com"],
+        check=True,
+    )
+    (repo / "initial.txt").write_text("initial\n", encoding="utf-8")
+    subprocess.run(["git", "-C", repo.as_posix(), "add", "--", "initial.txt"], check=True)
+    subprocess.run(["git", "-C", repo.as_posix(), "commit", "-qm", "initial"], check=True)
+    subprocess.run(["git", "-C", repo.as_posix(), "branch", "-M", "feature/issue"], check=True)
+    local_commit = subprocess.run(
+        ["git", "-C", repo.as_posix(), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+    operation = SimpleNamespace(branch="feature/issue")
+    previous_umask = os.umask(umask)
+    try:
+        with module._acquire_operation_branch_lock(repo, operation, local_commit) as branch_lock:
+            assert branch_lock.mode == expected_mode
+            assert stat.S_IMODE(branch_lock.path.stat().st_mode) == expected_mode
+    finally:
+        os.umask(previous_umask)
+
+    assert not (repo / ".git" / "HEAD.lock").exists()
+    assert not (repo / ".git" / "refs" / "heads" / "feature" / "issue.lock").exists()
 
 
 class _FakeOperationRefStream:
@@ -581,11 +627,12 @@ def _operation_branch_lock_fixture(
     tmp_path: Path,
     *,
     returncode: int = 0,
+    mode: int = 0o600,
 ):
     module = _module()
     path = tmp_path / "HEAD.lock"
     path.write_bytes(b"owned\n")
-    path.chmod(0o600)
+    path.chmod(mode)
     descriptor = os.open(path, os.O_RDONLY)
     opened = os.fstat(descriptor)
     hook_root = tmp_path / "hooks"
@@ -597,6 +644,7 @@ def _operation_branch_lock_fixture(
         descriptor=descriptor,
         device=opened.st_dev,
         inode=opened.st_ino,
+        mode=mode,
         destination="refs/heads/feature/issue",
         expected_commit="c" * 40,
         ref_process=process,
@@ -605,11 +653,13 @@ def _operation_branch_lock_fixture(
     return module, lock, path, events
 
 
+@pytest.mark.parametrize("mode", [0o600, 0o644])
 def test_operation_branch_lock_teardown_aborts_before_owned_head_lock_fallback_unlink(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    mode: int,
 ) -> None:
-    module, lock, path, events = _operation_branch_lock_fixture(tmp_path)
+    module, lock, path, events = _operation_branch_lock_fixture(tmp_path, mode=mode)
     real_remove = module._remove_captured_operation_head_lock
 
     def remove(*args):
@@ -624,10 +674,12 @@ def test_operation_branch_lock_teardown_aborts_before_owned_head_lock_fallback_u
     assert not path.exists()
 
 
+@pytest.mark.parametrize("mode", [0o600, 0o644])
 def test_operation_branch_lock_abort_failure_does_not_unlink_captured_head_lock(
     tmp_path: Path,
+    mode: int,
 ) -> None:
-    module, lock, path, _events = _operation_branch_lock_fixture(tmp_path, returncode=1)
+    module, lock, path, _events = _operation_branch_lock_fixture(tmp_path, returncode=1, mode=mode)
     before = path.stat()
 
     with pytest.raises(module.PlanningApplyRestoreMismatch), lock:
@@ -641,6 +693,54 @@ def test_operation_branch_lock_abort_failure_does_not_unlink_captured_head_lock(
         before.st_mode,
         before.st_uid,
     )
+
+
+def test_operation_branch_lock_mode_change_is_preserved_without_protocol_abort(
+    tmp_path: Path,
+) -> None:
+    module, lock, path, events = _operation_branch_lock_fixture(tmp_path, mode=0o644)
+    path.chmod(0o600)
+    before = path.stat()
+
+    with pytest.raises(module.PlanningApplyRestoreMismatch), lock:
+        pass
+
+    after = path.stat()
+    assert (after.st_dev, after.st_ino, after.st_mode, after.st_uid) == (
+        before.st_dev,
+        before.st_ino,
+        before.st_mode,
+        before.st_uid,
+    )
+    assert "write" not in events
+    assert "kill" in events
+
+
+def test_operation_branch_lock_mode_change_after_abort_is_preserved_without_fallback_unlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module, lock, path, events = _operation_branch_lock_fixture(tmp_path, mode=0o644)
+    real_abort = module._abort_operation_ref_transaction
+
+    def abort_and_change(process) -> None:
+        real_abort(process)
+        path.chmod(0o600)
+
+    monkeypatch.setattr(module, "_abort_operation_ref_transaction", abort_and_change)
+    before = path.stat()
+    with pytest.raises(module.PlanningApplyRestoreMismatch), lock:
+        pass
+
+    after = path.stat()
+    assert path.exists()
+    assert (after.st_dev, after.st_ino, after.st_uid) == (
+        before.st_dev,
+        before.st_ino,
+        before.st_uid,
+    )
+    assert stat.S_IMODE(after.st_mode) == 0o600
+    assert "write" in events
 
 
 def test_operation_branch_lock_replaced_head_lock_is_preserved_without_protocol_abort(
@@ -714,6 +814,7 @@ def test_dedicated_push_uses_exact_expected_old_lease(
         descriptor=-1,
         device=0,
         inode=0,
+        mode=0o600,
         destination="refs/heads/feature/issue",
         expected_commit=local_commit,
         ref_process=object(),
