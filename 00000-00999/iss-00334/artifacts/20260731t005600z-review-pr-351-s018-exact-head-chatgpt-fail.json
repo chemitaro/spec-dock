@@ -1,0 +1,20 @@
+{
+"reviewed_repository": "chemitaro/spec-dock",
+"reviewed_branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+"reviewed_head": "e1ae20d96400520d5c80168d0d799b9109853dd9",
+"default_branch_used": false,
+"verdict": "FAIL",
+"p0_count": 0,
+"p1_count": 1,
+"findings": [
+{
+"id": "FINAL-P1-001",
+"severity": "P1",
+"title": "Sequential branch proof can pass after a same-commit branch switch and still permit push or ready",
+"evidence": "In spec-dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py, _operation_branch_commit_is_proven() separately runs symbolic-ref -q HEAD, rev-parse refs/heads/<operation.branch>, and rev-parse HEAD. A concurrent checkout to an alternate branch at the same local_commit immediately after the first read leaves both later rev-parse results equal to local_commit, so the helper returns true even though HEAD now names the alternate branch. This helper gates _push_operation_commit_cas(), resume, and the final _record_publication()/ready path. The push may therefore execute after the operation branch stopped being checked out, and the final proof may record publication and return ready in that state. The focused unit test changes the symbolic-ref result only before the complete helper call, while the integration tests switch only at outer before_push or after_push checkpoints; neither covers the inter-command race.",
+"minimum_required_fix": "Make checked-out HEAD identity and the operation branch ref one coherent, lock- or transaction-bound proof, holding that binding through push completion and, separately, through publication evidence and terminal-result construction. Fail closed on contention. Add deterministic initial-publication, resume, and final-ready tests that switch to an alternate branch at the same commit immediately after the symbolic-HEAD observation and assert no push, no publication evidence, and no ready result."
+}
+],
+"scope_confirmation": "Reviewed only FINAL-P1-001 through FINAL-P1-003 at the exact required branch and HEAD. The default branch was not used. The accepted private-workspace, stale-FD, and repeated-contention exclusions and the Oracle native-configuration boundary were preserved.",
+"summary": "FAIL. S018 closes the strict operation-trailer proof and captured publication-endpoint defects, but FINAL-P1-001 remains open because the push, resume, and terminal-ready branch proof is a raceable sequence of independent Git observations."
+}
