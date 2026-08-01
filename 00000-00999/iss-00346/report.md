@@ -5,7 +5,7 @@ ID: "iss-00346"
 関連GitHub: ["#346"]
 状態: "draft"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-31"
+最終更新: "2026-08-02"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00343", "init-local-00002"]
 ---
@@ -50,6 +50,7 @@ Disposition ごとの必須証跡:
 | 識別子（ID） | 状態（Status） | 種別（Type） | 起票元（Raised By） | 契機 / 差分（Gap） | 検討した選択肢 | 判断 / 解釈 | 根拠（Rationale） | 処置（Disposition） | 証跡（Evidence） | フォローアップ（Follow-up） |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | interpretation | orchestrator | `pre-feature existing consumer`を歴史的revisionに固定すべきか不明瞭 | READMEなしvalid synthetic fixture; historical SHA固定 | 標準はREADMEなしvalid synthetic fixtureとし、歴史的revisionを使う場合だけfeature非搭載の実証とexact SHAを要求する | 親Epic E-AC-004とCandidate 3 verificationは観測対象の状態を規定し、特定revisionを必須化していない | promoted_to_plan | clarification research §4、`requirement.md` I346-ASM-002 / I346-ASM-003 / I346-RQ-004 / I346-AC-004、`design.md` §7.3、`plan.md` S02 | plan fresh reviewでclosureを確認 |
+| D-002 | resolved | operation | operator | Luna・Max実装を補助するstep具体化と、sub-agent reviewerに代わるChatGPT Pro reviewのIssue-local運用が未定義 | 既定SpecDock reviewer pathを維持; Issue 346だけChatGPT Proへ置換 | Issue 346では各step開始前にcommit/push済みheadをChatGPT Proで具体化しArtifact保存する。implementation reviewはcurrent reviewer Developer Instructionsを1つのChatGPT threadへ統合する | 2026-08-02 operator instruction。製品要件・設計・ACを変えず、低authority Artifactとcanonical planに実行手続きだけを固定する | promoted_to_plan | `artifacts/20260801t152944z-disc-chatgpt-assisted-execution-agreement.md`; `plan.md` §2.3、各step §x.0、S99 | Issue 346 execution中に適用。他Issue/全体workflowへ波及させない |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -65,6 +66,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 |---|---|---|---|---|---|---|
 | EAL-001 | `adopted` | `research`: Issue 346 source-grounded clarification | `requirement.md`全体、`design.md` fixture/platform boundary、`plan.md` closure boundary | 親Epic、Issue 344/345、accepted ADR、現行testsを照合したIssue-local evidenceであり、追加のowner判断を必要としない | `artifacts/20260730t155742z-research-issue-346-requirement-clarification-source-grounded-synthesis.md`; adopter: main orchestrator; reviewer: fresh `spec-reviewer`; blocking: no | canonical R/D/Pへの反映とphase review完了。実装時は判断D-001を維持 |
 | EAL-002 | `partially_adopted` | external ChatGPT Pro github-synced planning evidence | `requirement.md`、`design.md`、`plan.md`、オンボーディングartifact | GitHub planning baseline `2217889c31e1a8a83732c446264dec00dde77be6`を参照した4資料を、ローカルsourceとworkflow contractに照合して採用した。安定ID、scope、scenario、検証観点、説明構造は採用し、候補用frontmatter、evidence-only自己claim、candidate revisionをplanning baselineへ固定する記述、曖昧pathは不採用 | `artifacts/20260730t173917z--specdock-iss-00346-authoring-pack-corrected.zip`; onboarding `artifacts/20260730t182546z-research-issue-346-onboarding-guide-for-new-team-members.md`; pack review `pass`; tree SHA-256 `7b01a12ac95b13bcfdf4a3a60774d16c3dc666d49152658b95c2435e112b1e12`; adopter: main orchestrator; reviewer: fresh `spec-reviewer`; reflected_to: [`requirement.md`, `design.md`, `plan.md`, onboarding artifact]; blocking: no | implementation時はcanonical R/D/Pをauthorityとし、ZIPはadvisory evidenceとして保持 |
+| EAL-003 | `adopted` | 2026-08-02 operator instruction and main-orchestrator synthesis | `plan.md` execution procedure、`report.md` review evidence slots | Luna・Maxの実装品質を補助しつつ過剰指定を避けるため、push先行のstep具体化、Artifact低authority、single-thread複合review、main orchestrator裁定をIssue 346限定で採用した | `artifacts/20260801t152944z-disc-chatgpt-assisted-execution-agreement.md`; adopter: main orchestrator; review exclusion: explicit operator instruction; blocking: no | 各stepでplan §2.3と§x.0を実行し、observed receipt/head/review結果を本reportへ記録 |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -263,17 +265,17 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| qa-reviewer | whole issue obligation coverage | added / already sufficient / not applicable | ... | pass / fail / blocked |
+| ChatGPT Pro with current `qa-reviewer` Developer Instructions | whole issue obligation coverage | added / already sufficient / not applicable | session/thread id + pushed head + structured QA findings | pass / fail / blocked |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| code-reviewer | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| ChatGPT Pro with current `code-reviewer` Developer Instructions | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| spec-reviewer | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| ChatGPT Pro with current `spec-reviewer` Developer Instructions | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
@@ -291,4 +293,5 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 - ...
 
 ## 省略/例外メモ (必須)
-- 該当なし
+- 2026-08-02 operator instructionにより、Issue 346のimplementation reviewはnamed reviewer sub-agent invocationではなく、current reviewer Developer Instructionsを渡したformal `chatgpt-use`によるsingle-thread ChatGPT Pro reviewを用いる。各呼び出し前にcommit/pushとlocal/remote head一致を必須とする。
+- `artifacts/20260801t152944z-disc-chatgpt-assisted-execution-agreement.md`と、このIssue-local手続きを追加する`plan.md`/`report.md`差分はreview対象外とする。canonical requirement/design/acceptanceは変更していない。
