@@ -77,6 +77,46 @@ def _repository(tmp_path: Path) -> tuple[Path, Path, str, tuple[str, str, str]]:
     return repo, origin, _git(repo, "rev-parse", "HEAD"), tuple(sorted(relative))  # type: ignore[return-value]
 
 
+def _linked_worktree_with_next_commit(
+    repo: Path,
+    tmp_path: Path,
+    head: str,
+) -> tuple[Path, str]:
+    worktree = tmp_path / "linked-attacker"
+    subprocess.run(
+        ["git", "-C", repo.as_posix(), "worktree", "add", "--detach", "-q", worktree.as_posix(), head],
+        check=True,
+        capture_output=True,
+    )
+    _git(worktree, "config", "user.name", "Attacker")
+    _git(worktree, "config", "user.email", "attacker@example.com")
+    (worktree / "attacker.txt").write_text("attacker\n", encoding="utf-8")
+    _git(worktree, "add", "--", "attacker.txt")
+    _git(worktree, "commit", "-qm", "attacker")
+    return worktree, _git(worktree, "rev-parse", "HEAD")
+
+
+def _attempt_linked_operation_ref_update(
+    worktree: Path,
+    old_commit: str,
+    new_commit: str,
+) -> int:
+    completed = subprocess.run(
+        [
+            "git",
+            "-C",
+            worktree.as_posix(),
+            "update-ref",
+            "refs/heads/feature/issue",
+            new_commit,
+            old_commit,
+        ],
+        check=False,
+        capture_output=True,
+    )
+    return completed.returncode
+
+
 def _operation(
     repo: Path,
     head: str,
@@ -3307,6 +3347,149 @@ def test_final_ready_branch_switch_after_symbolic_head_observation_is_locked(
     assert _git(origin, "rev-parse", "refs/heads/feature/issue") == result.local_commit
 
 
+def test_initial_linked_worktree_ref_update_after_proof_is_locked_before_push(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    attacker, attacker_commit = _linked_worktree_with_next_commit(repo, tmp_path, head)
+    attempted: list[int] = []
+    original_proof = module._operation_branch_commit_is_proven_locked
+
+    def proof_then_ref_update(operation, repo_root, local_commit):
+        proven = original_proof(operation, repo_root, local_commit)
+        if proven and not attempted:
+            attempted.append(_attempt_linked_operation_ref_update(attacker, local_commit, attacker_commit))
+        return proven
+
+    monkeypatch.setattr(module, "_operation_branch_commit_is_proven_locked", proof_then_ref_update)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert attempted == [128]
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert result.local_commit is not None
+    assert _git(repo, "rev-parse", "refs/heads/feature/issue") == result.local_commit
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == result.local_commit
+
+
+def test_resume_linked_worktree_ref_update_after_proof_is_locked_before_push(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    original_push = module._push_operation_commit_cas
+    fail_once = [True]
+
+    def fail_first_push(**kwargs):
+        if fail_once[0]:
+            fail_once[0] = False
+            return module.GitCommandResult(returncode=1, stdout=b"", stderr=b"injected")
+        return original_push(**kwargs)
+
+    monkeypatch.setattr(module, "_push_operation_commit_cas", fail_first_push)
+    pending = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+    assert pending.local_commit is not None
+    attacker, attacker_commit = _linked_worktree_with_next_commit(repo, tmp_path, head)
+    monkeypatch.setattr(module, "_push_operation_commit_cas", original_push)
+    attempted: list[int] = []
+    original_proof = module._operation_branch_commit_is_proven_locked
+
+    def proof_then_ref_update(operation, repo_root, local_commit):
+        proven = original_proof(operation, repo_root, local_commit)
+        if proven and not attempted:
+            attempted.append(_attempt_linked_operation_ref_update(attacker, local_commit, attacker_commit))
+        return proven
+
+    monkeypatch.setattr(module, "_operation_branch_commit_is_proven_locked", proof_then_ref_update)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("resume must not validate"),
+        sync_runner=lambda: pytest.fail("resume must not sync"),
+    )
+
+    assert attempted == [128]
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert result.local_commit == pending.local_commit
+    assert _git(repo, "rev-parse", "refs/heads/feature/issue") == pending.local_commit
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == pending.local_commit
+
+
+def test_already_remote_parity_linked_worktree_ref_update_is_locked_before_publication_ready(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    original_push = module._push_operation_commit_cas
+    monkeypatch.setattr(
+        module,
+        "_push_operation_commit_cas",
+        lambda **_kwargs: module.GitCommandResult(returncode=1, stdout=b"", stderr=b"injected"),
+    )
+    pending = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+    assert pending.local_commit is not None
+    _git(repo, "push", "-q", origin.as_posix(), f"{pending.local_commit}:refs/heads/feature/issue")
+    attacker, attacker_commit = _linked_worktree_with_next_commit(repo, tmp_path, head)
+    monkeypatch.setattr(module, "_push_operation_commit_cas", original_push)
+    attempted: list[int] = []
+    original_proof = module._operation_branch_commit_is_proven_locked
+
+    def proof_then_ref_update(operation, repo_root, local_commit):
+        proven = original_proof(operation, repo_root, local_commit)
+        if proven and not attempted:
+            attempted.append(_attempt_linked_operation_ref_update(attacker, local_commit, attacker_commit))
+        return proven
+
+    monkeypatch.setattr(module, "_operation_branch_commit_is_proven_locked", proof_then_ref_update)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("resume must not validate"),
+        sync_runner=lambda: pytest.fail("resume must not sync"),
+    )
+
+    assert attempted == [128]
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert result.local_commit == pending.local_commit
+    assert _git(repo, "rev-parse", "refs/heads/feature/issue") == pending.local_commit
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == pending.local_commit
+    assert (output / f"planning-apply-{operation.operation_id}" / "publication.json").exists()
+
+
 def test_branch_switch_after_push_prevents_terminal_ready(tmp_path: Path) -> None:
     module = _module()
     repo, origin, head, targets = _repository(tmp_path)
@@ -3573,6 +3756,20 @@ def test_existing_foreign_head_lock_aborts_install_without_ref_change(
     evidence = output / f"planning-apply-{operation.operation_id}"
     assert not (evidence / "commit.json").exists()
     assert not (evidence / "publication.json").exists()
+
+
+def test_operation_branch_ref_prepare_mismatch_fails_closed_without_locks(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, _origin, head, targets = _repository(tmp_path)
+    operation = _operation(repo, head, targets)
+
+    with pytest.raises(module.PlanningApplyRestoreMismatch):
+        module._acquire_operation_branch_lock(repo, operation, "f" * 40)
+
+    assert not (repo / ".git" / "HEAD.lock").exists()
+    assert not (repo / ".git" / "refs" / "heads" / "feature" / "issue.lock").exists()
 
 
 def test_post_commit_hook_workspace_mutation_preserves_recovery_gate(

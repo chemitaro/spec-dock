@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import select
 import shutil
 import stat
 import subprocess
@@ -163,21 +164,91 @@ class _OperationBranchLock:
     descriptor: int
     device: int
     inode: int
+    destination: str
+    expected_commit: str
+    ref_process: subprocess.Popen[bytes]
+    hook_root: Path
 
     def __enter__(self) -> _OperationBranchLock:
         return self
 
     def __exit__(self, _exc_type, _exc_value, _traceback) -> None:
+        failure: PlanningApplyRestoreMismatch | None = None
         try:
             try:
                 current = self.path.lstat()
             except FileNotFoundError:
-                raise PlanningApplyRestoreMismatch("operation branch HEAD lock disappeared") from None
-            if (current.st_dev, current.st_ino) != (self.device, self.inode):
-                raise PlanningApplyRestoreMismatch("operation branch HEAD lock was replaced")
-            self.path.unlink()
+                failure = PlanningApplyRestoreMismatch("operation branch HEAD lock disappeared")
+            else:
+                if (current.st_dev, current.st_ino) != (self.device, self.inode):
+                    failure = PlanningApplyRestoreMismatch("operation branch HEAD lock was replaced")
+                else:
+                    self.path.unlink()
         finally:
-            os.close(self.descriptor)
+            try:
+                if not _stop_operation_ref_transaction(self.ref_process):
+                    failure = PlanningApplyRestoreMismatch(
+                        "operation branch ref transaction abort failed",
+                    )
+            except (OSError, subprocess.TimeoutExpired):
+                failure = PlanningApplyRestoreMismatch(
+                    "operation branch ref transaction cleanup failed",
+                )
+            with suppress(OSError):
+                os.close(self.descriptor)
+            for stream in (self.ref_process.stdout, self.ref_process.stderr):
+                if stream is not None:
+                    with suppress(OSError):
+                        stream.close()
+            with suppress(OSError):
+                self.hook_root.rmdir()
+        if failure is not None:
+            raise failure
+
+    def assert_held(self) -> None:
+        try:
+            current = self.path.lstat()
+        except FileNotFoundError:
+            raise PlanningApplyRestoreMismatch("operation branch HEAD lock disappeared") from None
+        if (current.st_dev, current.st_ino) != (self.device, self.inode):
+            raise PlanningApplyRestoreMismatch("operation branch HEAD lock was replaced")
+        if self.ref_process.poll() is not None:
+            raise PlanningApplyRestoreMismatch("operation branch ref transaction ended")
+
+
+def _stop_operation_ref_transaction(process: subprocess.Popen[bytes]) -> bool:
+    try:
+        stdin = process.stdin
+        if process.poll() is None and stdin is not None:
+            stdin.write(b"abort\n")
+            stdin.flush()
+        if stdin is not None:
+            stdin.close()
+        returncode = process.wait(timeout=5)
+        return returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        with suppress(OSError):
+            process.kill()
+        with suppress(OSError, subprocess.TimeoutExpired):
+            process.wait(timeout=5)
+        raise
+    finally:
+        for stream in (process.stdout, process.stderr):
+            if stream is not None:
+                with suppress(OSError):
+                    stream.close()
+
+
+def _read_operation_ref_ack(
+    process: subprocess.Popen[bytes],
+    expected: bytes,
+) -> None:
+    stdout = process.stdout
+    if stdout is None:
+        raise PlanningApplyRestoreMismatch("operation branch ref transaction acknowledgement failed")
+    ready, _, _ = select.select([stdout], [], [], 5)
+    if not ready or stdout.readline() != expected + b"\n":
+        raise PlanningApplyRestoreMismatch("operation branch ref transaction acknowledgement failed")
 
 
 @dataclass(frozen=True)
@@ -2463,7 +2534,20 @@ def _install_operation_commit_cas(
         raise PlanningApplyRestoreMismatch("operation commit install CAS failed")
 
 
-def _acquire_operation_branch_lock(repo_root: Path) -> _OperationBranchLock:
+def _acquire_operation_branch_lock(
+    repo_root: Path,
+    operation: PlanningApplyOperation,
+    local_commit: str,
+) -> _OperationBranchLock:
+    destination = f"refs/heads/{operation.branch}"
+    if (
+        _SHA40.fullmatch(local_commit) is None
+        or not operation.branch
+        or operation.branch.startswith("-")
+        or any(character.isspace() for character in operation.branch)
+        or _git_text(repo_root, "check-ref-format", "--branch", operation.branch) != operation.branch
+    ):
+        raise PlanningApplyRestoreMismatch("operation branch ref lock failed")
     head_path_text = _git_text(
         repo_root,
         "rev-parse",
@@ -2475,12 +2559,45 @@ def _acquire_operation_branch_lock(repo_root: Path) -> _OperationBranchLock:
         raise PlanningApplyRestoreMismatch("operation branch HEAD lock failed")
     head_path = Path(head_path_text)
     lock_path = head_path.with_name(f"{head_path.name}.lock")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    hook_root: Path | None = None
+    ref_process: subprocess.Popen[bytes] | None = None
+    descriptor: int | None = None
     try:
-        descriptor = os.open(lock_path, flags, 0o600)
-    except OSError:
-        raise PlanningApplyRestoreMismatch("operation branch HEAD lock failed") from None
-    try:
+        hook_root = Path(tempfile.mkdtemp(prefix="spec-dock-planning-ref-"))
+        hook_root.chmod(0o700)
+        ref_process = subprocess.Popen(
+            (
+                "git",
+                "-C",
+                repo_root.as_posix(),
+                "-c",
+                f"core.hooksPath={hook_root.as_posix()}",
+                "update-ref",
+                "--no-deref",
+                "--stdin",
+            ),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if ref_process.stdin is None:
+            raise PlanningApplyRestoreMismatch("operation branch ref transaction failed")
+        try:
+            ref_process.stdin.write(
+                f"start\nverify {destination} {local_commit}\nprepare\n".encode("ascii"),
+            )
+            ref_process.stdin.flush()
+        except OSError:
+            raise PlanningApplyRestoreMismatch("operation branch ref transaction prepare failed") from None
+        _read_operation_ref_ack(ref_process, b"start: ok")
+        _read_operation_ref_ack(ref_process, b"prepare: ok")
+        if ref_process.poll() is not None:
+            raise PlanningApplyRestoreMismatch("operation branch ref transaction prepare failed")
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        try:
+            descriptor = os.open(lock_path, flags, 0o600)
+        except OSError:
+            raise PlanningApplyRestoreMismatch("operation branch HEAD lock failed") from None
         opened = os.fstat(descriptor)
         if not stat.S_ISREG(opened.st_mode) or opened.st_uid != os.geteuid() or stat.S_IMODE(opened.st_mode) != 0o600:
             raise PlanningApplyRestoreMismatch("operation branch HEAD lock is unsafe")
@@ -2490,12 +2607,37 @@ def _acquire_operation_branch_lock(repo_root: Path) -> _OperationBranchLock:
             descriptor=descriptor,
             device=opened.st_dev,
             inode=opened.st_ino,
+            destination=destination,
+            expected_commit=local_commit,
+            ref_process=ref_process,
+            hook_root=hook_root,
         )
     except BaseException:
-        os.close(descriptor)
+        if ref_process is not None:
+            with suppress(OSError, subprocess.TimeoutExpired):
+                _stop_operation_ref_transaction(ref_process)
+        if hook_root is not None:
+            with suppress(OSError):
+                hook_root.rmdir()
+        if descriptor is not None:
+            with suppress(OSError):
+                os.close(descriptor)
         with suppress(FileNotFoundError):
             lock_path.unlink()
         raise
+
+
+def _require_operation_branch_lock(
+    operation: PlanningApplyOperation,
+    local_commit: str,
+    branch_lock: _OperationBranchLock,
+) -> None:
+    destination = f"refs/heads/{operation.branch}"
+    if not isinstance(branch_lock, _OperationBranchLock):
+        raise PlanningApplyRestoreMismatch("operation branch ref lock is invalid")
+    if branch_lock.destination != destination or branch_lock.expected_commit != local_commit:
+        raise PlanningApplyRestoreMismatch("operation branch ref lock binding mismatch")
+    branch_lock.assert_held()
 
 
 def _operation_branch_commit_is_proven_locked(
@@ -2520,8 +2662,9 @@ def _operation_branch_commit_is_proven(
     branch_lock: _OperationBranchLock | None = None,
 ) -> bool:
     if branch_lock is not None:
+        _require_operation_branch_lock(operation, local_commit, branch_lock)
         return _operation_branch_commit_is_proven_locked(operation, repo_root, local_commit)
-    with _acquire_operation_branch_lock(repo_root):
+    with _acquire_operation_branch_lock(repo_root, operation, local_commit):
         return _operation_branch_commit_is_proven_locked(
             operation,
             repo_root,
@@ -2751,7 +2894,7 @@ def _push_operation_commit_cas(
     branch_lock: _OperationBranchLock | None = None,
 ) -> GitCommandResult:
     if branch_lock is None:
-        with _acquire_operation_branch_lock(repo_root) as acquired:
+        with _acquire_operation_branch_lock(repo_root, operation, local_commit) as acquired:
             return _push_operation_commit_cas(
                 operation=operation,
                 repo_root=repo_root,
@@ -2761,6 +2904,7 @@ def _push_operation_commit_cas(
                 local_tree=local_tree,
                 branch_lock=acquired,
             )
+    _require_operation_branch_lock(operation, local_commit, branch_lock)
     branch = operation.branch
     if (
         _SHA40.fullmatch(expected_remote_head) is None
@@ -2782,6 +2926,7 @@ def _push_operation_commit_cas(
         or _git_text(repo_root, "rev-parse", f"{local_commit}^{{tree}}") != local_tree
     ):
         raise PlanningApplyUnsafeGitCommand("planning publication CAS proof failed")
+    branch_lock.assert_held()
     destination = f"refs/heads/{branch}"
     lease = f"--force-with-lease={destination}:{expected_remote_head}"
     refspec = f"{local_commit}:{destination}"
@@ -3354,7 +3499,7 @@ def _publish_initial_operation_commit(
     local_tree: str,
     fault_hook: Callable[[str], None] | None,
 ) -> PlanningApplyExecution:
-    with _acquire_operation_branch_lock(repo_root) as branch_lock:
+    with _acquire_operation_branch_lock(repo_root, operation, local_commit) as branch_lock:
         if fault_hook is not None:
             fault_hook("before_push")
         if not _operation_branch_commit_is_proven(
@@ -4222,7 +4367,7 @@ def _resume_publication(
             reason="restore_mismatch",
         )
     try:
-        with _acquire_operation_branch_lock(repo_root) as branch_lock:
+        with _acquire_operation_branch_lock(repo_root, operation, local_commit) as branch_lock:
             if not _operation_branch_commit_is_proven(
                 operation,
                 repo_root,
