@@ -348,6 +348,31 @@ The worker did not edit canonical reports or provider code. S02 implementation r
 - required host evidence: actual Linux supported publication、actual macOS clone-capable publication、`st_dev`が異なるactual cross-FS sourceを各content-free receiptへ記録する。host-local path、payload、user-file digest/count、UID/username、mutable container tagを保存しない。Linux preflightとformal link commitを分離し、macOS cleanup uncertaintyはretain/no-unlinkとし、same-UID exclusionを超える保証を主張しない。
 - worker handoff: allowed pathsはplan §10.3のintegration/host probe/unit/CLI/presentation testsと列挙されたrepair-only runtime pathsに限定する。workerはcanonical report/R/D/Pを編集せず、S03 focused/host結果・changed paths・privacy matrix・production repair有無を返す。S03はhermetic Greenだけではcloseできず、全host条件とexact pushed-head ChatGPT Pro reviewが必要。
 
+### S03 implementation evidence (current cycle)
+
+- executable commit: `5d6f1f88583ca138caa7fe9a29475560e5446b44`。変更は`tests/integration/test_epic_00343_distribution.py`（tc-346-s03-001〜003、4 target/external privacy/actual cross-FS）と`tests/integration/iss346_platform_probe.py`（Linux/macOS named probes）のtest-onlyで、provider/runtime sourceは変更していない。
+- candidate wheel receipt: current-cycle integration fixtureで`pre_head=5d6f1f88`、`post_head=5d6f1f88`、clean state。wheel basename `spec_dock-0.2.3-py3-none-any.whl`、SHA-256 `9f58865222456747ff5eb4a4d9e22408dda6f6a31b25b8ba69d45677f473727e`。candidateは同一wheelをisolated venvへinstallしている。
+- focused verification: `uv run pytest tests/integration/test_epic_00343_distribution.py -k 's03' --run-full-regression -q` → `3 passed, 8 deselected in 9.33s`。`uv run ruff check tests/integration/test_epic_00343_distribution.py tests/integration/iss346_platform_probe.py` → `All checks passed!`。`git diff --check` → pass。
+
+#### S03 actual host/platform receipt (content-free)
+
+| Probe | Execution | Result | Evidence |
+|---|---|---|---|
+| `macos-capability-preflight` | actual macOS 15.5 arm64, ordinary user, Python 3.12.11, destination on `/Volumes` and source on `/private/tmp` | pass | `fclonefileat_available=true`, `destination_clone_capable=true`, `stage_is_destination_side=true`, `stage_opened_exclusive_nofollow=true`, `parent_identity_stable=true`, `source_destination_same_device=false`, exit 0 |
+| `macos-clone-publication` | same actual macOS lane and candidate wheel | pass | `formal_no_replace_clone_succeeds=true`, `copy_or_rename_fallback_absent=true`, `stage_device_matches_destination=true`, `owned_stage_cleanup_verified=true`, `uncertain_stage_retained_without_unlink=true`, `same_uid_exclusion_acknowledged=true`, `bytes_matched=true`, `source_unchanged=true`, exit 0 |
+| `linux-capability-preflight` | Docker image `python@sha256:77a36ff63e657d8ec7cd4e86e452f4cd23b6c92811696b0735226fbc0660a5b8`, ordinary user `501:20`, tmpfs destination, Python 3.12.11 | pass | `o_tmpfile_openable=true`, `anonymous_stage_regular=true`, `procfs_identity_matches_held_fd=true`, `destination_directory_fsync_succeeds=true`, `formal_no_replace_link_succeeds=false` (deferred to formal probe), exit 0 |
+| `linux-supported-publication` | same pinned Linux container and candidate wheel | pass | `formal_no_replace_link_succeeds=true`, `first_link_target_is_formal_destination=true`, `visible_stage_or_probe_absent=true`, `pathname_cleanup_absent=true`, `existing_destination_preserved=true`, `bytes_matched=true`, `source_unchanged=true`, exit 0 |
+| `linux-capability-insufficient` | same pinned Linux container with `linux_directory_durability` fault injection | pass | `formal_destination_absent=true`, `fallback_absent=true`, `visible_stage_or_probe_absent=true`, `pathname_cleanup_absent=true`, exit 0 |
+
+All receipts are content-free: no host-local absolute path, hostname, UID/username, payload, user-file digest/count, or device number is recorded. `unavailable` was not used for the required lanes; macOS cross-FS and pinned Linux actual-host/container evidence both have `source_destination_same_device=false`.
+
+#### S03 closure state
+
+- target/source matrix and external privacy cards are Green; source bytes remain unchanged, destination bytes match, existing destination bytes are preserved, and `canonical=false` is asserted for all four target selectors.
+- Linux preflight/formal commit are separated; no named/visible stage or pathname cleanup is observed, and capability insufficiency fails closed before formal destination creation.
+- macOS clone and cleanup trust boundary are Green; copy/rename fallback is absent and same-UID exclusion is recorded without overclaiming.
+- production repair: `false`。S03 remains pending only the fresh exact-head ChatGPT Pro implementation review and report transcription; no provider/runtime change is justified by current evidence.
+
 ## 実装記録（セッションログ） (必須)
 
 ### セッションログ（2026-07-29 HH:MM - HH:MM）
