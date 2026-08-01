@@ -1042,3 +1042,22 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - Oracle configuration behaviorは変更していない。PATH-resolved local Oracleと通常native personal／project configの利用を許容し、SpecDockはそれらを上書き・無効化・隔離・配布・fallback契約化しない。workflow必須値だけを明示fieldからdirect argvへ渡すHuman boundaryを維持する。
 - fresh local Spec／Code／QA reviewはすべてP0／P1 0でPASSした。QAはS018重点35件を再実行して全件成功した。正式closure evidenceは`artifacts/20260731t001100z-review-pr-351-s018-local-closure-pass.md`である。
 - 残存gateはrepair commit／push、exact repaired HEADのfresh ChatGPT defect-only review、最終evidence publicationとfixed PR observationである。
+
+## 2026-07-31 — S018 exact-head Red Team review
+
+- S018 closureはcommit `e1ae20d96400520d5c80168d0d799b9109853dd9`としてpushし、local／remote parity `0/0`を確認した。
+- fresh Red Team初回session `iss00334-s018-exact-review`はChatGPT conversation作成前にmanaged Chrome connectionが切断された。Oracle metadataで`promptSubmitted=false`を確認してからのみ、fresh session `iss00334-s018-exact-review-retry`へ同一入力を再送した。
+- retry sessionは`requested=Pro`／`resolved=Pro`／`verified=yes`で、GitHub connectorからrepository、branch、exact HEAD `e1ae20d96400520d5c80168d0d799b9109853dd9`を確認し、default branchを参照していない。
+- verdictはP0 0／P1 1のFAIL。strict trailer proofとimmutable publication endpointはclosedと判定したが、push／resume／ready gateの`_operation_branch_commit_is_proven()`がsymbolic HEAD、operation branch ref、resolved HEADを独立して読むため、最初の観測直後にsame-commit alternate branchへ切り替わるとtrueを返し得る。
+- このfindingはoptional hardeningではなくunauthorized push／publication evidence／readyを許し得るcurrent authority contract違反として採用する。正式artifactは`artifacts/20260731t005600z-review-pr-351-s018-exact-head-chatgpt-fail.json`である。
+- Red Team sessionはread-onlyのまま終了し、修正へ再利用しない。次の修正は別fresh Blue Team sessionでこの1件だけを具体化する。
+
+## 2026-08-02 — S019 branch-proof repair
+
+- S019 Blue Teamのfresh ChatGPT session `iss00334-s019-blue-pro-aug2e`は`requested=Pro`／`resolved=Pro`／`verified=yes`および`promptSubmitted=true`まで到達したが、約7分の生成後にmanaged Chromeの接続が切断され、実装work packetを取得できなかった。同一会話の再オープンはstalled statusのみを返した。
+- 同じBlue Team会話で行ったrecovery follow-up `iss00334-s019-blue-pro-followup`は`prompt-commit-timeout`（`userMatched=false`／`hasNewTurn=false`／`resolved=(unavailable)`）となった。fresh Red/Blue roleを混在させず、ChatGPT outputは採用していない。wrapper/browserの問題と証跡を`artifacts/20260802t005500z-pr-351-s019-branch-proof-blue-chatgpt-recovery.md`に保存した。
+- formal Red finding `FINAL-P1-001`と現行sourceに基づき、`.git/HEAD.lock`を`O_EXCL`で取得する`_OperationBranchLock`を追加した。symbolic HEAD、operation branch ref、resolved HEADのcoherent proofからCAS push、remote parity、publication evidence、terminal resultまで同一lockを保持し、foreign/replaced/disappeared lockはfail closedにした。
+- `_operation_branch_commit_is_proven`と`_push_operation_commit_cas`は既存lockを受け渡し、resume publicationもbranch proof前からfinal evidence/resultまでlock下で実行する。既存のpublic status/reason/schemaとOracle configuration boundaryは変更していない。
+- initial／resume／already-remote-parityの3つのintegration testで、symbolic HEAD観測直後の`git checkout`が非ゼロで拒否され、operation branchとpublicationの安全性が維持されることを確認した。
+- verification: explicit Apply unit/application/integration `259 passed`; ordinary fast lane `1362 passed, 2223 skipped`; `make lint`（Ruff check/format, mypy）pass; `spec-dock validate` `nodes=227`; `git diff --check` pass; provider/dogfood `issue_planning_apply.py` byte-identical。
+- 次のgateはこのrepairのcommit／push、exact repaired HEADに対するfresh ChatGPT複合Spec/Code/QA review、PR observationである。merge、auto-merge、branch削除、Issue close、issue finishは行わない。

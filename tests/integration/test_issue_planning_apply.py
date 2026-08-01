@@ -3088,6 +3088,47 @@ def test_branch_switch_before_push_blocks_publication(tmp_path: Path) -> None:
     assert not (output / f"planning-apply-{operation.operation_id}" / "publication.json").exists()
 
 
+def test_branch_switch_after_symbolic_head_observation_is_locked_before_push(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    switch_result = tmp_path / "switch-result"
+    real_git_text = module._git_text
+    attempted = False
+
+    def observe_then_switch(repo_root: Path, *argv: str) -> str | None:
+        nonlocal attempted
+        observed = real_git_text(repo_root, *argv)
+        if argv == ("symbolic-ref", "-q", "HEAD") and not attempted:
+            attempted = True
+            switched = subprocess.run(
+                ["git", "-C", repo.as_posix(), "checkout", "-qb", "alternate"],
+                check=False,
+                capture_output=True,
+            )
+            switch_result.write_text(str(switched.returncode), encoding="ascii")
+        return observed
+
+    monkeypatch.setattr(module, "_git_text", observe_then_switch)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+
+    assert switch_result.read_text(encoding="ascii") != "0"
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert _git(repo, "symbolic-ref", "-q", "HEAD") == "refs/heads/feature/issue"
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == result.local_commit
+
+
 def test_resume_from_alternate_branch_at_local_commit_fails_before_push(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -3133,6 +3174,137 @@ def test_resume_from_alternate_branch_at_local_commit_fails_before_push(
     assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
     assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
     assert not (output / f"planning-apply-{operation.operation_id}" / "publication.json").exists()
+
+
+def test_resume_branch_switch_after_symbolic_head_observation_is_locked_before_push(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    original_push = module._push_operation_commit_cas
+    monkeypatch.setattr(
+        module,
+        "_push_operation_commit_cas",
+        lambda **_kwargs: module.GitCommandResult(
+            returncode=1,
+            stdout=b"",
+            stderr=b"injected",
+        ),
+    )
+    pending = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+    assert pending.local_commit is not None
+    monkeypatch.setattr(module, "_push_operation_commit_cas", original_push)
+
+    switch_result = tmp_path / "switch-result"
+    real_git_text = module._git_text
+    attempted = False
+
+    def observe_then_switch(repo_root: Path, *argv: str) -> str | None:
+        nonlocal attempted
+        observed = real_git_text(repo_root, *argv)
+        if argv == ("symbolic-ref", "-q", "HEAD") and not attempted:
+            attempted = True
+            switched = subprocess.run(
+                ["git", "-C", repo.as_posix(), "checkout", "-qb", "alternate"],
+                check=False,
+                capture_output=True,
+            )
+            switch_result.write_text(str(switched.returncode), encoding="ascii")
+        return observed
+
+    monkeypatch.setattr(module, "_git_text", observe_then_switch)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("resume must not validate"),
+        sync_runner=lambda: pytest.fail("resume must not sync"),
+    )
+
+    assert switch_result.read_text(encoding="ascii") != "0"
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert _git(repo, "symbolic-ref", "-q", "HEAD") == "refs/heads/feature/issue"
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == result.local_commit
+
+
+def test_final_ready_branch_switch_after_symbolic_head_observation_is_locked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    original_push = module._push_operation_commit_cas
+    monkeypatch.setattr(
+        module,
+        "_push_operation_commit_cas",
+        lambda **_kwargs: module.GitCommandResult(
+            returncode=1,
+            stdout=b"",
+            stderr=b"injected",
+        ),
+    )
+    pending = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+    assert pending.local_commit is not None
+    _git(
+        repo,
+        "push",
+        "-q",
+        origin.as_posix(),
+        f"{pending.local_commit}:refs/heads/feature/issue",
+    )
+    monkeypatch.setattr(module, "_push_operation_commit_cas", original_push)
+
+    switch_result = tmp_path / "switch-result"
+    real_git_text = module._git_text
+    attempted = False
+
+    def observe_then_switch(repo_root: Path, *argv: str) -> str | None:
+        nonlocal attempted
+        observed = real_git_text(repo_root, *argv)
+        if argv == ("symbolic-ref", "-q", "HEAD") and not attempted:
+            attempted = True
+            switched = subprocess.run(
+                ["git", "-C", repo.as_posix(), "checkout", "-qb", "alternate"],
+                check=False,
+                capture_output=True,
+            )
+            switch_result.write_text(str(switched.returncode), encoding="ascii")
+        return observed
+
+    monkeypatch.setattr(module, "_git_text", observe_then_switch)
+    result = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=lambda: pytest.fail("resume must not validate"),
+        sync_runner=lambda: pytest.fail("resume must not sync"),
+    )
+
+    assert switch_result.read_text(encoding="ascii") != "0"
+    assert (result.status, result.reason) == ("ready", "adoption_published")
+    assert _git(repo, "symbolic-ref", "-q", "HEAD") == "refs/heads/feature/issue"
+    assert _git(origin, "rev-parse", "refs/heads/feature/issue") == result.local_commit
 
 
 def test_branch_switch_after_push_prevents_terminal_ready(tmp_path: Path) -> None:

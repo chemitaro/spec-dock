@@ -157,6 +157,29 @@ class _PublicationAuthority:
     push_endpoint: str = field(repr=False)
 
 
+@dataclass
+class _OperationBranchLock:
+    path: Path
+    descriptor: int
+    device: int
+    inode: int
+
+    def __enter__(self) -> _OperationBranchLock:
+        return self
+
+    def __exit__(self, _exc_type, _exc_value, _traceback) -> None:
+        try:
+            try:
+                current = self.path.lstat()
+            except FileNotFoundError:
+                raise PlanningApplyRestoreMismatch("operation branch HEAD lock disappeared") from None
+            if (current.st_dev, current.st_ino) != (self.device, self.inode):
+                raise PlanningApplyRestoreMismatch("operation branch HEAD lock was replaced")
+            self.path.unlink()
+        finally:
+            os.close(self.descriptor)
+
+
 @dataclass(frozen=True)
 class ManagedStateEntry:
     kind: Literal["file", "directory", "symlink"]
@@ -2440,7 +2463,42 @@ def _install_operation_commit_cas(
         raise PlanningApplyRestoreMismatch("operation commit install CAS failed")
 
 
-def _operation_branch_commit_is_proven(
+def _acquire_operation_branch_lock(repo_root: Path) -> _OperationBranchLock:
+    head_path_text = _git_text(
+        repo_root,
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "HEAD",
+    )
+    if head_path_text is None:
+        raise PlanningApplyRestoreMismatch("operation branch HEAD lock failed")
+    head_path = Path(head_path_text)
+    lock_path = head_path.with_name(f"{head_path.name}.lock")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(lock_path, flags, 0o600)
+    except OSError:
+        raise PlanningApplyRestoreMismatch("operation branch HEAD lock failed") from None
+    try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode) or opened.st_uid != os.geteuid() or stat.S_IMODE(opened.st_mode) != 0o600:
+            raise PlanningApplyRestoreMismatch("operation branch HEAD lock is unsafe")
+        os.fsync(descriptor)
+        return _OperationBranchLock(
+            path=lock_path,
+            descriptor=descriptor,
+            device=opened.st_dev,
+            inode=opened.st_ino,
+        )
+    except BaseException:
+        os.close(descriptor)
+        with suppress(FileNotFoundError):
+            lock_path.unlink()
+        raise
+
+
+def _operation_branch_commit_is_proven_locked(
     operation: PlanningApplyOperation,
     repo_root: Path,
     local_commit: str,
@@ -2452,6 +2510,23 @@ def _operation_branch_commit_is_proven(
         and _git_text(repo_root, "rev-parse", destination) == local_commit
         and _git_text(repo_root, "rev-parse", "HEAD") == local_commit
     )
+
+
+def _operation_branch_commit_is_proven(
+    operation: PlanningApplyOperation,
+    repo_root: Path,
+    local_commit: str,
+    *,
+    branch_lock: _OperationBranchLock | None = None,
+) -> bool:
+    if branch_lock is not None:
+        return _operation_branch_commit_is_proven_locked(operation, repo_root, local_commit)
+    with _acquire_operation_branch_lock(repo_root):
+        return _operation_branch_commit_is_proven_locked(
+            operation,
+            repo_root,
+            local_commit,
+        )
 
 
 def _git_blob_oid(content: bytes) -> str:
@@ -2673,7 +2748,19 @@ def _push_operation_commit_cas(
     expected_remote_head: str,
     local_commit: str,
     local_tree: str,
+    branch_lock: _OperationBranchLock | None = None,
 ) -> GitCommandResult:
+    if branch_lock is None:
+        with _acquire_operation_branch_lock(repo_root) as acquired:
+            return _push_operation_commit_cas(
+                operation=operation,
+                repo_root=repo_root,
+                authority=authority,
+                expected_remote_head=expected_remote_head,
+                local_commit=local_commit,
+                local_tree=local_tree,
+                branch_lock=acquired,
+            )
     branch = operation.branch
     if (
         _SHA40.fullmatch(expected_remote_head) is None
@@ -2685,7 +2772,12 @@ def _push_operation_commit_cas(
         or authority.repository != operation.repository.strip().lower()
         or not authority.push_endpoint
         or _git_text(repo_root, "check-ref-format", "--branch", branch) != branch
-        or not _operation_branch_commit_is_proven(operation, repo_root, local_commit)
+        or not _operation_branch_commit_is_proven(
+            operation,
+            repo_root,
+            local_commit,
+            branch_lock=branch_lock,
+        )
         or _git_text(repo_root, "rev-parse", f"{local_commit}^") != expected_remote_head
         or _git_text(repo_root, "rev-parse", f"{local_commit}^{{tree}}") != local_tree
     ):
@@ -3252,6 +3344,124 @@ def execute_planning_apply_transaction(
         handle.close()
 
 
+def _publish_initial_operation_commit(
+    operation: PlanningApplyOperation,
+    *,
+    repo_root: Path,
+    handle: _ApplyEvidenceHandle,
+    authority: _PublicationAuthority,
+    local_commit: str,
+    local_tree: str,
+    fault_hook: Callable[[str], None] | None,
+) -> PlanningApplyExecution:
+    with _acquire_operation_branch_lock(repo_root) as branch_lock:
+        if fault_hook is not None:
+            fault_hook("before_push")
+        if not _operation_branch_commit_is_proven(
+            operation,
+            repo_root,
+            local_commit,
+            branch_lock=branch_lock,
+        ):
+            return _operation_result(
+                operation,
+                status="publication_pending",
+                reason="remote_parity_unconfirmed",
+                local_commit=local_commit,
+                local_tree=local_tree,
+            )
+        push = _push_operation_commit_cas(
+            operation=operation,
+            repo_root=repo_root,
+            authority=authority,
+            expected_remote_head=operation.expected_head,
+            local_commit=local_commit,
+            local_tree=local_tree,
+            branch_lock=branch_lock,
+        )
+        if push.returncode != 0:
+            failure = _cas_failure_result(
+                operation,
+                repo_root=repo_root,
+                authority=authority,
+                local_commit=local_commit,
+                local_tree=local_tree,
+            )
+            if failure is not None:
+                return failure
+        if fault_hook is not None:
+            fault_hook("after_push")
+        if not _operation_branch_commit_is_proven(
+            operation,
+            repo_root,
+            local_commit,
+            branch_lock=branch_lock,
+        ):
+            return _operation_result(
+                operation,
+                status="publication_pending",
+                reason="remote_parity_unconfirmed",
+                local_commit=local_commit,
+                local_tree=local_tree,
+            )
+        _set_operation_state(handle, operation, "PUSHED")
+        remote = _remote_head(repo_root, authority, operation.branch)
+        if fault_hook is not None:
+            fault_hook("after_fetch")
+        if remote != local_commit:
+            return _operation_result(
+                operation,
+                status="publication_pending",
+                reason="remote_parity_unconfirmed",
+                local_commit=local_commit,
+                local_tree=local_tree,
+                remote_commit=remote,
+            )
+        remote_tree = _git_text(repo_root, "rev-parse", f"{remote}^{{tree}}")
+        if remote_tree != local_tree:
+            return _operation_result(
+                operation,
+                status="publication_pending",
+                reason="remote_parity_unconfirmed",
+                local_commit=local_commit,
+                local_tree=local_tree,
+                remote_commit=remote,
+            )
+        if not _operation_branch_commit_is_proven(
+            operation,
+            repo_root,
+            local_commit,
+            branch_lock=branch_lock,
+        ):
+            return _operation_result(
+                operation,
+                status="publication_pending",
+                reason="remote_parity_unconfirmed",
+                local_commit=local_commit,
+                local_tree=local_tree,
+                remote_commit=remote,
+            )
+        _record_publication(handle, operation, local_commit, local_tree)
+        _set_operation_state(handle, operation, "REMOTE_PARITY")
+        if operation.decision == "approved":
+            return _operation_result(
+                operation,
+                status="ready",
+                reason="adoption_published",
+                local_commit=local_commit,
+                local_tree=local_tree,
+                remote_commit=remote,
+            )
+        return _operation_result(
+            operation,
+            status="rejected",
+            reason="plan_rejected",
+            local_commit=local_commit,
+            local_tree=local_tree,
+            remote_commit=remote,
+        )
+
+
 def _execute_planning_apply_transaction(
     operation: PlanningApplyOperation,
     *,
@@ -3615,94 +3825,14 @@ def _execute_planning_apply_transaction(
                 local_tree=local_tree,
             )
         _remove_transaction_backup(handle)
-        if fault_hook is not None:
-            fault_hook("before_push")
-        if not _operation_branch_commit_is_proven(operation, repo_root, local_commit):
-            return _operation_result(
-                operation,
-                status="publication_pending",
-                reason="remote_parity_unconfirmed",
-                local_commit=local_commit,
-                local_tree=local_tree,
-            )
-        push = _push_operation_commit_cas(
-            operation=operation,
-            repo_root=repo_root,
-            authority=publication_authority,
-            expected_remote_head=operation.expected_head,
-            local_commit=local_commit,
-            local_tree=local_tree,
-        )
-        if push.returncode != 0:
-            failure = _cas_failure_result(
-                operation,
-                repo_root=repo_root,
-                authority=publication_authority,
-                local_commit=local_commit,
-                local_tree=local_tree,
-            )
-            if failure is not None:
-                return failure
-        if fault_hook is not None:
-            fault_hook("after_push")
-        if not _operation_branch_commit_is_proven(operation, repo_root, local_commit):
-            return _operation_result(
-                operation,
-                status="publication_pending",
-                reason="remote_parity_unconfirmed",
-                local_commit=local_commit,
-                local_tree=local_tree,
-            )
-        _set_operation_state(handle, operation, "PUSHED")
-        remote = _remote_head(repo_root, publication_authority, operation.branch)
-        if fault_hook is not None:
-            fault_hook("after_fetch")
-        if remote != local_commit:
-            return _operation_result(
-                operation,
-                status="publication_pending",
-                reason="remote_parity_unconfirmed",
-                local_commit=local_commit,
-                local_tree=local_tree,
-                remote_commit=remote,
-            )
-        remote_tree = _git_text(repo_root, "rev-parse", f"{remote}^{{tree}}")
-        if remote_tree != local_tree:
-            return _operation_result(
-                operation,
-                status="publication_pending",
-                reason="remote_parity_unconfirmed",
-                local_commit=local_commit,
-                local_tree=local_tree,
-                remote_commit=remote,
-            )
-        if not _operation_branch_commit_is_proven(operation, repo_root, local_commit):
-            return _operation_result(
-                operation,
-                status="publication_pending",
-                reason="remote_parity_unconfirmed",
-                local_commit=local_commit,
-                local_tree=local_tree,
-                remote_commit=remote,
-            )
-        _record_publication(handle, operation, local_commit, local_tree)
-        _set_operation_state(handle, operation, "REMOTE_PARITY")
-        if operation.decision == "approved":
-            return _operation_result(
-                operation,
-                status="ready",
-                reason="adoption_published",
-                local_commit=local_commit,
-                local_tree=local_tree,
-                remote_commit=remote,
-            )
-        return _operation_result(
+        return _publish_initial_operation_commit(
             operation,
-            status="rejected",
-            reason="plan_rejected",
+            repo_root=repo_root,
+            handle=handle,
+            authority=publication_authority,
             local_commit=local_commit,
             local_tree=local_tree,
-            remote_commit=remote,
+            fault_hook=fault_hook,
         )
     except _ApplyTargetDrift as error:
         failure_reason = "apply_target_changed"
@@ -4074,7 +4204,6 @@ def _resume_publication(
     if (
         _SHA40.fullmatch(local_commit) is None
         or _SHA40.fullmatch(local_tree) is None
-        or not _operation_branch_commit_is_proven(operation, repo_root, local_commit)
         or not _operation_commit_is_proven(
             operation,
             repo_root=repo_root,
@@ -4092,90 +4221,111 @@ def _resume_publication(
             status="recovery_required",
             reason="restore_mismatch",
         )
-    remote_disposition, remote = _remote_head_observation(
-        repo_root,
-        authority,
-        operation.branch,
-    )
-    if remote_disposition == "absent":
-        return _operation_result(
-            operation,
-            status="blocked_remote_diverged",
-            reason="remote_diverged",
-            local_commit=local_commit,
-            local_tree=local_tree,
-        )
-    if remote_disposition == "unavailable" or remote is None:
-        return _operation_result(
-            operation,
-            status="publication_pending",
-            reason="remote_parity_unconfirmed",
-            local_commit=local_commit,
-            local_tree=local_tree,
-        )
-    if remote == operation.expected_head:
-        if fault_hook is not None:
-            fault_hook("before_push")
-        if not _operation_branch_commit_is_proven(operation, repo_root, local_commit):
+    try:
+        with _acquire_operation_branch_lock(repo_root) as branch_lock:
+            if not _operation_branch_commit_is_proven(
+                operation,
+                repo_root,
+                local_commit,
+                branch_lock=branch_lock,
+            ):
+                return _operation_result(
+                    operation,
+                    status="recovery_required",
+                    reason="restore_mismatch",
+                    local_commit=local_commit,
+                    local_tree=local_tree,
+                )
+            remote_disposition, remote = _remote_head_observation(
+                repo_root,
+                authority,
+                operation.branch,
+            )
+            if remote_disposition == "absent":
+                return _operation_result(
+                    operation,
+                    status="blocked_remote_diverged",
+                    reason="remote_diverged",
+                    local_commit=local_commit,
+                    local_tree=local_tree,
+                )
+            if remote_disposition == "unavailable" or remote is None:
+                return _operation_result(
+                    operation,
+                    status="publication_pending",
+                    reason="remote_parity_unconfirmed",
+                    local_commit=local_commit,
+                    local_tree=local_tree,
+                )
+            if remote == operation.expected_head:
+                if fault_hook is not None:
+                    fault_hook("before_push")
+                push = _push_operation_commit_cas(
+                    operation=operation,
+                    repo_root=repo_root,
+                    authority=authority,
+                    expected_remote_head=operation.expected_head,
+                    local_commit=local_commit,
+                    local_tree=local_tree,
+                    branch_lock=branch_lock,
+                )
+                if push.returncode != 0:
+                    failure = _cas_failure_result(
+                        operation,
+                        repo_root=repo_root,
+                        authority=authority,
+                        local_commit=local_commit,
+                        local_tree=local_tree,
+                    )
+                    if failure is not None:
+                        return failure
+                remote = _remote_head(repo_root, authority, operation.branch)
+            elif remote != local_commit:
+                return _operation_result(
+                    operation,
+                    status="blocked_remote_diverged",
+                    reason="remote_diverged",
+                    local_commit=local_commit,
+                    local_tree=local_tree,
+                    remote_commit=remote,
+                )
+            if (
+                remote != local_commit
+                or _git_text(repo_root, "rev-parse", f"{remote}^{{tree}}") != local_tree
+                or not _operation_branch_commit_is_proven(
+                    operation,
+                    repo_root,
+                    local_commit,
+                    branch_lock=branch_lock,
+                )
+            ):
+                return _operation_result(
+                    operation,
+                    status="publication_pending",
+                    reason="remote_parity_unconfirmed",
+                    local_commit=local_commit,
+                    local_tree=local_tree,
+                    remote_commit=remote,
+                )
+            _record_publication(handle, operation, local_commit, local_tree)
+            _set_operation_state(handle, operation, "REMOTE_PARITY")
+            _remove_transaction_backup(handle)
             return _operation_result(
                 operation,
-                status="publication_pending",
-                reason="remote_parity_unconfirmed",
+                status="ready" if operation.decision == "approved" else "rejected",
+                reason="adoption_published" if operation.decision == "approved" else "plan_rejected",
                 local_commit=local_commit,
                 local_tree=local_tree,
+                remote_commit=remote,
             )
-        push = _push_operation_commit_cas(
-            operation=operation,
-            repo_root=repo_root,
-            authority=authority,
-            expected_remote_head=operation.expected_head,
-            local_commit=local_commit,
-            local_tree=local_tree,
-        )
-        if push.returncode != 0:
-            failure = _cas_failure_result(
-                operation,
-                repo_root=repo_root,
-                authority=authority,
-                local_commit=local_commit,
-                local_tree=local_tree,
-            )
-            if failure is not None:
-                return failure
-        remote = _remote_head(repo_root, authority, operation.branch)
-    elif remote != local_commit:
+    except PlanningApplyRestoreMismatch:
         return _operation_result(
             operation,
-            status="blocked_remote_diverged",
-            reason="remote_diverged",
+            status="recovery_required",
+            reason="restore_mismatch",
             local_commit=local_commit,
             local_tree=local_tree,
-            remote_commit=remote,
         )
-    if (
-        remote != local_commit
-        or _git_text(repo_root, "rev-parse", f"{remote}^{{tree}}") != local_tree
-        or not _operation_branch_commit_is_proven(operation, repo_root, local_commit)
-    ):
-        return _operation_result(
-            operation,
-            status="publication_pending",
-            reason="remote_parity_unconfirmed",
-            local_commit=local_commit,
-            local_tree=local_tree,
-            remote_commit=remote,
-        )
-    _record_publication(handle, operation, local_commit, local_tree)
-    _set_operation_state(handle, operation, "REMOTE_PARITY")
-    _remove_transaction_backup(handle)
-    return _operation_result(
-        operation,
-        status="ready" if operation.decision == "approved" else "rejected",
-        reason="adoption_published" if operation.decision == "approved" else "plan_rejected",
-        local_commit=local_commit,
-        local_tree=local_tree,
-        remote_commit=remote,
-    )
 
 
 def _expected_operation_commit_paths(
