@@ -499,9 +499,20 @@ def test_operation_branch_commit_proof_binds_symbolic_head_and_branch_ref(
     }
     monkeypatch.setattr(module, "_git_text", lambda _repo, *argv: values.get(argv))
 
-    assert module._operation_branch_commit_is_proven(operation, tmp_path, local_commit)
+    branch_lock = object()
+    assert module._operation_branch_commit_is_proven(
+        operation,
+        tmp_path,
+        local_commit,
+        branch_lock=branch_lock,
+    )
     values["symbolic-ref", "-q", "HEAD"] = "refs/heads/alternate"
-    assert not module._operation_branch_commit_is_proven(operation, tmp_path, local_commit)
+    assert not module._operation_branch_commit_is_proven(
+        operation,
+        tmp_path,
+        local_commit,
+        branch_lock=branch_lock,
+    )
 
 
 def test_dedicated_push_uses_exact_expected_old_lease(
@@ -546,6 +557,7 @@ def test_dedicated_push_uses_exact_expected_old_lease(
         expected_remote_head=HEAD,
         local_commit=local_commit,
         local_tree=local_tree,
+        branch_lock=object(),
     )
 
     assert result.returncode == 0
