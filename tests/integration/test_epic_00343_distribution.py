@@ -200,6 +200,14 @@ def test_tc_346_s01_002_candidate_wheel_inventory(candidate_wheel: CandidateWhee
     with pytest.raises(AssertionError, match="missing required assets"):
         _assert_candidate_inventory(inventory - {missing_readme})
 
+    forbidden_nested_readme = "spec_dock/assets/spec_dock/templates/issue/legacy/README.md"
+    with pytest.raises(AssertionError, match="allowlist mismatch"):
+        _assert_candidate_inventory(inventory | {forbidden_nested_readme})
+
+    forbidden_cache = "spec_dock/assets/spec_dock/scripts/spec_dock_runtime/__pycache__/probe.pyc"
+    with pytest.raises(AssertionError, match="denied stale assets"):
+        _assert_candidate_inventory(inventory | {forbidden_cache})
+
 
 def test_tc_346_s01_003_isolated_wheel_origin_rejects_checkout_fallback(candidate_wheel: CandidateWheel) -> None:
     helper = _Issue69Harness()
@@ -304,3 +312,6 @@ def test_tc_346_s01_004_fresh_consumer_installed_shell_and_generic_import(candid
     destination = target / payload["destination"]
     assert destination.read_bytes() == body
     assert source.read_bytes() == body
+
+    validate_result = _run_installed_runtime(candidate_wheel.venv_python, target, ["validate"], env=env)
+    assert validate_result.returncode == 0, validate_result.stdout + validate_result.stderr
