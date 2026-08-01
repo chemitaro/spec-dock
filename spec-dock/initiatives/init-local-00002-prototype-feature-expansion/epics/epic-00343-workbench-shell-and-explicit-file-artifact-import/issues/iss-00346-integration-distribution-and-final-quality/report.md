@@ -51,7 +51,7 @@ Disposition ごとの必須証跡:
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | interpretation | orchestrator | `pre-feature existing consumer`を歴史的revisionに固定すべきか不明瞭 | READMEなしvalid synthetic fixture; historical SHA固定 | 標準はREADMEなしvalid synthetic fixtureとし、歴史的revisionを使う場合だけfeature非搭載の実証とexact SHAを要求する | 親Epic E-AC-004とCandidate 3 verificationは観測対象の状態を規定し、特定revisionを必須化していない | promoted_to_plan | clarification research §4、`requirement.md` I346-ASM-002 / I346-ASM-003 / I346-RQ-004 / I346-AC-004、`design.md` §7.3、`plan.md` S02 | plan fresh reviewでclosureを確認 |
 | D-002 | resolved | operation | operator | Luna・Max実装を補助するstep具体化と、sub-agent reviewerに代わるChatGPT Pro reviewのIssue-local運用が未定義 | 既定SpecDock reviewer pathを維持; Issue 346だけChatGPT Proへ置換 | Issue 346では各step開始前にcommit/push済みheadをChatGPT Proで具体化しArtifact保存する。implementation reviewはcurrent reviewer Developer Instructionsを1つのChatGPT threadへ統合する | 2026-08-02 operator instruction。製品要件・設計・ACを変えず、低authority Artifactとcanonical planに実行手続きだけを固定する | promoted_to_plan | `artifacts/20260801t152944z-disc-chatgpt-assisted-execution-agreement.md`; `plan.md` §2.3、各step §x.0、S99 | Issue 346 execution中に適用。他Issue/全体workflowへ波及させない |
-| D-003 | resolved | operation | operator / orchestrator | Cheetah指定の品質ゲートとS01前段ChatGPT具体化が、正式wrapperの現行モデル選択・ブラウザ状態で実行可能か未確定 | Cheetahを実行して品質ゲートとする; formal Pro laneで代替; 失敗出力を採用せずローカル証跡を先行 | Cheetahはformal wrapperのdry-runで`gpt-5.2`へ正規化され、S01の新規sessionは送信前にworker detached/incomplete-captureとなったため、Cheetahを品質証跡として使用せず、無関係なstale出力も採用しない。S01レビューはfreshなPro証跡取得まで保留する | `plan.md` §2.3のmodel-evidence境界を維持し、モデル名・レビューpassを未確認のまま主張しないため | deferred | `oracle-browser-recovery` diagnostics、S01 attempted slugs (`iss346-s01-pre-step`, `iss346-s01-prestep-aug2`, `iss346-s01-followup`, `iss346-s01-prestep-tty`, `iss346-s01-wrapper-smoke`)、Cheetah dry-run、stale `iss00334` harvestの不採用記録 | fresh Pro pre-step/reviewを再試行し、取得できなければblockerとして最終gateへ引き継ぐ |
+| D-003 | resolved | operation | operator / orchestrator | Cheetah指定の品質ゲートとS01前段ChatGPT具体化が、正式wrapperの現行モデル選択・ブラウザ状態で実行可能か未確定 | Cheetahを実行して品質ゲートとする; formal Pro laneで代替; 失敗出力を採用せずローカル証跡を先行 | Cheetahはformal wrapperのdry-runで`gpt-5.2`へ正規化され、品質証跡として使用しない。前段具体化は前景実行へ復旧後にProで取得できたため、S01の補助Artifactを採用する。以前のdetached/incomplete-capture出力と無関係なstale出力は引き続き不採用とする | `plan.md` §2.3のmodel-evidence境界を維持し、モデル名・レビューpassを未確認のまま主張しないため | partially_adopted | `iss346-s01-prestep-aug2e`（`requested=Pro; resolved=Pro; verified=yes`）、Artifact import receipt、過去slugs (`iss346-s01-pre-step`, `iss346-s01-prestep-aug2`, `iss346-s01-followup`, `iss346-s01-prestep-tty`, `iss346-s01-wrapper-smoke`)、Cheetah dry-run、stale `iss00334` harvestの不採用記録 | S01実装をcurrent HEADで再受領し、current-head code reviewを取得する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -69,6 +69,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-002 | `partially_adopted` | external ChatGPT Pro github-synced planning evidence | `requirement.md`、`design.md`、`plan.md`、オンボーディングartifact | GitHub planning baseline `2217889c31e1a8a83732c446264dec00dde77be6`を参照した4資料を、ローカルsourceとworkflow contractに照合して採用した。安定ID、scope、scenario、検証観点、説明構造は採用し、候補用frontmatter、evidence-only自己claim、candidate revisionをplanning baselineへ固定する記述、曖昧pathは不採用 | `artifacts/20260730t173917z--specdock-iss-00346-authoring-pack-corrected.zip`; onboarding `artifacts/20260730t182546z-research-issue-346-onboarding-guide-for-new-team-members.md`; pack review `pass`; tree SHA-256 `7b01a12ac95b13bcfdf4a3a60774d16c3dc666d49152658b95c2435e112b1e12`; adopter: main orchestrator; reviewer: fresh `spec-reviewer`; reflected_to: [`requirement.md`, `design.md`, `plan.md`, onboarding artifact]; blocking: no | implementation時はcanonical R/D/Pをauthorityとし、ZIPはadvisory evidenceとして保持 |
 | EAL-003 | `adopted` | 2026-08-02 operator instruction and main-orchestrator synthesis | `plan.md` execution procedure、`report.md` review evidence slots | Luna・Maxの実装品質を補助しつつ過剰指定を避けるため、push先行のstep具体化、Artifact低authority、single-thread複合review、main orchestrator裁定をIssue 346限定で採用した | `artifacts/20260801t152944z-disc-chatgpt-assisted-execution-agreement.md`; adopter: main orchestrator; review exclusion: explicit operator instruction; blocking: no | 各stepでplan §2.3と§x.0を実行し、observed receipt/head/review結果を本reportへ記録 |
 | EAL-004 | `rejected` | failed/stale formal ChatGPT sessions for S01 pre-step | Issue 346 S01 pre-step elaboration artifact | 新規sessionが`promptSubmitted:null`のままdetached/incomplete-captureとなり、harvestで得られた回答は別Issue 00334の内容だったため、S01の作業具体化として保存・採用しない | session diagnosticsとstale outputの内容・scope不一致を確認。Workbenchの誤出力は削除済みで、正本R/D/Pは変更していない | fresh ChatGPT Pro sessionを再取得し、成功時のみ単一MarkdownをArtifact importする | blocker: S01 review gate; adopter: main orchestrator; reviewer: pending |
+| EAL-005 | `adopted` | formal ChatGPT Pro S01 pre-step elaboration (`iss346-s01-prestep-aug2e`) | S01 test implementation aid | GitHub connectorでcurrent branch/HEADを確認し、canonical plan §8のtest cards・allowed pathsと整合する限定的な再受領、denylist negativeとinstalled `validate`確認を提案した。新APIやproduction repairを要求せず、R/D/Pを上書きしないため補助evidenceとして採用する | `artifacts/20260801t164728z-chatgpt-output-s01-chatgpt-pre-step-elaboration.md`; source SHA-256 `283c7854120a945c9432fae36848c6966bc1ee92a83eaf39b0c335b94f36d37b`; session model evidence `requested=Pro; resolved=Pro; verified=yes`; pushed head `75ba8f1fdec2b9cee5624dbdd2741614b4755778` | current HEADをcandidateとして再ビルド・再検証し、提案採否を本reportへ記録。implementation reviewとは別gate | blocking: no; adopter: main orchestrator; reviewer: pending |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -187,15 +188,18 @@ pass
 
 ### ChatGPT-assisted gate status
 
-- Pre-step prompt: `spec-dock/active/issue/.workbench/20260802-s01-chatgpt-prestep-prompt.md`を作成したが、formal wrapperの新規sessionは送信前にdetached/incomplete-captureとなった。
+- Pre-step prompt: `spec-dock/active/issue/.workbench/20260802-s01-chatgpt-prestep-prompt.md`を作成した。初回formal wrapperの新規sessionは送信前にdetached/incomplete-captureとなった。
+- Recovery後のvalid pre-step: `iss346-s01-prestep-aug2e`。`requested=Pro; resolved=Pro; status=already-selected; strategy=select; verified=yes`、GitHub connector-confirmed remote HEAD `75ba8f1fdec2b9cee5624dbdd2741614b4755778`。
+- 採用Artifact: `artifacts/20260801t164728z-chatgpt-output-s01-chatgpt-pre-step-elaboration.md`（SHA-256 `283c7854120a945c9432fae36848c6966bc1ee92a83eaf39eaf39b0c335b94f36d37b`、13,484 bytes、`committed=true`）。
+- ChatGPTは現HEADで旧S01 wheel証跡をstaleと判定し、denylist controlled negativeとinstalled `validate`確認を、既存test-only範囲内のbounded completionとして提案した。canonical plan §8.3/§8.5と照合して採否を判断する。
 - Attempted session slugs: `iss346-s01-pre-step`, `iss346-s01-prestep-aug2`, `iss346-s01-followup`, `iss346-s01-prestep-tty`, `iss346-s01-wrapper-smoke`。
 - `harvest`で得られた旧回答はIssue 00334のS019内容であり、Issue 346へscope外のため採用・importしていない。
 - Cheetah指定はdry-runで`gpt-5.2`へ正規化されたため、品質ゲートのモデル証跡として使用していない。
-- S01 implementation ChatGPT Pro review: `blocked/pending`。freshなPro sessionの送信・回答・pushed HEAD bindingを取得するまでS01をclosed扱いにしない。
+- S01 implementation ChatGPT Pro review: `blocked/pending`。前段具体化は取得済みだが、current HEADの再実装・再検証後にpushed-head bindingで取得するreviewまでS01をclosed扱いにしない。
 
 ### S01 closure decision
 
-ローカル実装・テスト・scope guardはGreenで、test-only差分をcommit/push済みである。一方、plan §8.6のChatGPT Pro review条件は未充足のため、S01は「実装済み・レビュー待ち」とし、S02の実装開始を停止する。
+旧candidate HEADでのローカル実装・テスト・scope guardはGreenで、test-only差分をcommit/push済みである。valid pre-step Artifactは取得済みだが、ChatGPTが指摘したcurrent HEADへの再受領と、plan §8.6のChatGPT Pro implementation review条件は未充足のため、S01は「実装済み・current-cycle再検証／レビュー待ち」とし、S02の実装開始を停止する。
 
 ## 実装記録（セッションログ） (必須)
 
