@@ -113,10 +113,12 @@ def candidate_wheel(tmp_path_factory: pytest.TempPathFactory) -> CandidateWheel:
         wheel_dir=wheel_dir,
         sdist_dir=sdist_dir,
     )
+    install_wheel = wheel_path
+    install_wheel_sha256 = hashlib.sha256(install_wheel.read_bytes()).hexdigest()
     helper._issue_69_install_target_packages(
         python_executable=venv_python,
         target_dir=helper._issue_69_site_packages_dir(helper._issue_69_env_root(venv_python)),
-        requirements=[str(wheel_path)],
+        requirements=[str(install_wheel)],
         wheelhouse=helper._issue_69_resolve_wheelhouse(repo_root),
     )
     helper._issue_69_ensure_spec_dock_wrapper(venv_python)
@@ -124,7 +126,8 @@ def candidate_wheel(tmp_path_factory: pytest.TempPathFactory) -> CandidateWheel:
     post_head = _git(repo_root, "rev-parse", "HEAD")
     post_status = _git(repo_root, "status", "--porcelain=v1")
     inventory = frozenset(helper._issue_69_collect_wheel_file_inventory(wheel_path))
-    digest = hashlib.sha256(wheel_path.read_bytes()).hexdigest()
+    digest = hashlib.sha256(install_wheel.read_bytes()).hexdigest()
+    assert digest == install_wheel_sha256
     return CandidateWheel(
         repo_root=repo_root,
         wheel_path=wheel_path,
@@ -134,7 +137,7 @@ def candidate_wheel(tmp_path_factory: pytest.TempPathFactory) -> CandidateWheel:
         pre_status=pre_status,
         post_status=post_status,
         inventory=inventory,
-        sha256=digest,
+        sha256=install_wheel_sha256,
     )
 
 
@@ -308,10 +311,42 @@ def test_tc_346_s01_004_fresh_consumer_installed_shell_and_generic_import(candid
     assert payload["canonical"] is False
     assert payload["target_kind"] == "issue"
     assert payload["source"] == source_rel
-    assert str(target) not in import_result.stdout
     destination = target / payload["destination"]
+    assert destination.is_file()
     assert destination.read_bytes() == body
     assert source.read_bytes() == body
 
     validate_result = _run_installed_runtime(candidate_wheel.venv_python, target, ["validate"], env=env)
     assert validate_result.returncode == 0, validate_result.stdout + validate_result.stderr
+
+    assert source.is_file()
+    assert source.read_bytes() == body
+    assert destination.is_file()
+    assert destination.read_bytes() == body
+    ignored_after_validate = subprocess.run(
+        ["git", "check-ignore", "--no-index", source_rel],
+        cwd=target,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ignored_after_validate.returncode == 0, ignored_after_validate.stdout + ignored_after_validate.stderr
+    tracked_source = subprocess.run(
+        ["git", "ls-files", "--", source_rel],
+        cwd=target,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert tracked_source.returncode == 0, tracked_source.stdout + tracked_source.stderr
+    assert tracked_source.stdout.strip() == ""
+
+    private_paths = (str(target.resolve()), str(source.resolve()))
+    for output_name, output in (
+        ("import stdout", import_result.stdout),
+        ("import stderr", import_result.stderr),
+        ("validate stdout", validate_result.stdout),
+        ("validate stderr", validate_result.stderr),
+    ):
+        for private_path in private_paths:
+            assert private_path not in output, f"{output_name} leaked private path: {private_path}"
