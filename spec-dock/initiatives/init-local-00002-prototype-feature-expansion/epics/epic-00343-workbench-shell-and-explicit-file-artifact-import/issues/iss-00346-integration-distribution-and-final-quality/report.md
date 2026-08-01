@@ -256,6 +256,13 @@ S01 focused suite was intentionally rerun only after commit/push; the worker's p
 - exact node IDs: `test_tc_346_s01_001_candidate_wheel_receipt`, `test_tc_346_s01_002_candidate_wheel_inventory`, `test_tc_346_s01_003_isolated_wheel_origin_rejects_checkout_fallback`, `test_tc_346_s01_004_fresh_consumer_installed_shell_and_generic_import`
 - physical handoff: S01再検証時に `.workbench/s01-candidate-wheel/spec_dock-0.2.3-py3-none-any.whl` へ同一wheelをコピーして保持した。保持wheelのSHA-256は `850705a88ad8e10cf9183489384ab724ed62a138e6b993cc42f1bc398f58d539`、inventoryは322 non-directory file entries、S01全4ノードは `4 passed in 6.36s`。保持wheelはWorkbench内のignoredファイルでありGit管理対象外で、S02 pre-stepでbasename/digestを再確認する。
 
+### S02 ChatGPT pre-step evidence
+
+- pre-step session: `iss346-s02-prestep-aug2`、`requested=Pro; resolved=Pro; status=already-selected; strategy=select; verified=yes`。
+- Artifact: `20260801t181356z-chatgpt-output-s02-chatgpt-pro-pre-step-elaboration.md`（SHA-256 `acef67c55e96ba6f484ccabbd96f8b7e361565a8086ba3e25da405d01f0cad7b`、6,490 bytes）。
+- advisory conclusion: S02はtest-only characterizationから開始し、S01のcandidate wheel/installed helpersを再利用する。valid synthetic existing hierarchy（README absent matrix、ignored payload、candidateと異なるmanaged guide）を作り、update後のno-backfill、future node shell、illegal preexisting README negativeを4カードで検証する。production repairはcandidate-wheel上の再現可能な欠陥が出た場合に限る。
+- canonical plan §9.0–§9.6を優先し、ChatGPT出力はテストカード・receipt項目・停止条件の補助資料として扱う。workerはcanonical reportを編集しない。
+
 ## 実装記録（セッションログ） (必須)
 
 ### セッションログ（2026-07-29 HH:MM - HH:MM）
