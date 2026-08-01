@@ -300,29 +300,87 @@ def _assert_s03_json_payload(payload: dict[str, object], *, target_kind: str, ta
     assert payload["canonical"] is False
 
 
-def _assert_s03_privacy_output(
-    output: subprocess.CompletedProcess[str],
-    *,
-    source: Path,
-    body: bytes,
-) -> None:
-    combined = f"{output.stdout}\n{output.stderr}".lower()
-    forbidden = (
+def _s03_privacy_forbidden_values(source: Path, body: bytes) -> tuple[str, ...]:
+    body_text = body.decode("ascii", errors="ignore").lower()
+    digest = hashlib.sha256(body).hexdigest().lower()
+    derived = f"derived-{hashlib.sha1(body).hexdigest()[:16]}"
+    return (
         str(source).lower(),
         str(source.parent).lower(),
         source.parent.name.lower(),
-        body.decode("ascii", errors="ignore").lower(),
-        hashlib.sha256(body).hexdigest().lower(),
+        body_text,
+        digest,
         str(len(body)),
+        derived,
         "sha256",
         "byte_count",
         "mime",
         "encoding",
         "content_id",
     )
+
+
+def _s03_import_owned_public_files(target: Path, destination: Path) -> tuple[Path, ...]:
+    """Return the bounded public/tracked surfaces owned by this import fixture.
+
+    The generic artifact body is deliberately excluded. Canonical docs, planning
+    reports, and wheel receipts are outside this oracle's authority boundary.
+    """
+    public_root = target / "spec-dock" / ".agent"
+    paths = {
+        path
+        for path in public_root.rglob("*")
+        if path.is_file()
+    }
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=target,
+        capture_output=True,
+        check=False,
+    )
+    assert tracked.returncode == 0, tracked.stdout + tracked.stderr
+    paths.update(
+        target / relative
+        for raw in tracked.stdout.split(b"\0")
+        if raw
+        for relative in (Path(os.fsdecode(raw)),)
+        if (target / relative).is_file()
+    )
+    return tuple(sorted(path for path in paths if path != destination))
+
+
+def _flatten_s03_public_values(value: object) -> tuple[str, ...]:
+    if isinstance(value, dict):
+        return tuple(
+            item
+            for key, nested in value.items()
+            for item in (str(key), *_flatten_s03_public_values(nested))
+        )
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return tuple(item for nested in value for item in _flatten_s03_public_values(nested))
+    return (str(value),)
+
+
+def _assert_s03_privacy_output(
+    output: subprocess.CompletedProcess[str],
+    *,
+    source: Path,
+    body: bytes,
+    payload: object | None = None,
+    public_files: tuple[Path, ...] = (),
+) -> None:
+    forbidden = _s03_privacy_forbidden_values(source, body)
+    observed = [f"{output.stdout}\n{output.stderr}"]
+    if payload is not None:
+        observed.extend(_flatten_s03_public_values(payload))
+    for path in public_files:
+        assert path != source
+        assert path.is_file(), f"privacy scan target disappeared: {path}"
+        observed.append(path.read_bytes().decode("utf-8", errors="ignore"))
+    combined = "\n".join(observed).lower()
     for value in forbidden:
-        assert value not in combined, f"privacy sentinel leaked in import output: {value!r}"
-    assert source.name.lower() in combined
+        assert value not in combined, f"privacy sentinel leaked in import public surface: {value!r}"
+    assert source.name.lower() in f"{output.stdout}\n{output.stderr}".lower()
 
 
 def _wheel_asset_bytes(candidate_wheel: CandidateWheel, relative_path: str) -> bytes:
@@ -891,6 +949,7 @@ def test_tc_346_s03_002_external_and_nested_cwd_privacy(candidate_wheel: Candida
             env=env,
         )
         assert result.returncode == 0, result.stdout + result.stderr
+        payload: object | None = None
         if output_mode == "json":
             payload = json.loads(result.stdout)
             _assert_s03_json_payload(payload, target_kind=target_kind, target_id=target_id)
@@ -909,15 +968,78 @@ def test_tc_346_s03_002_external_and_nested_cwd_privacy(candidate_wheel: Candida
         assert destination.is_file()
         assert destination.read_bytes() == body
         assert source.read_bytes() == body
-        _assert_s03_privacy_output(result, source=source, body=body)
+        _assert_s03_privacy_output(
+            result,
+            source=source,
+            body=body,
+            payload=payload,
+            public_files=_s03_import_owned_public_files(target, destination),
+        )
+
+    # Keep the privacy oracle sensitive to every forbidden-value class. Each
+    # injected sentinel retains a valid basename in the captured output so a
+    # failure cannot be attributed to an unrelated shape check.
+    probe_source = cases[0][4]
+    probe_body = b"s03 privacy oracle body sentinel\x00\xff"
+    allowed_output = f'source="{probe_source.name}"'
+    for sentinel in _s03_privacy_forbidden_values(probe_source, probe_body):
+        injected = subprocess.CompletedProcess(
+            args=["privacy-negative"],
+            returncode=0,
+            stdout=f"{allowed_output} injected={sentinel}",
+            stderr="",
+        )
+        with pytest.raises(AssertionError, match="privacy sentinel leaked"):
+            _assert_s03_privacy_output(injected, source=probe_source, body=probe_body)
+
+    injected_payload = {"derived": _s03_privacy_forbidden_values(probe_source, probe_body)[-1]}
+    with pytest.raises(AssertionError, match="privacy sentinel leaked"):
+        _assert_s03_privacy_output(
+            subprocess.CompletedProcess(
+                args=["privacy-negative-json"],
+                returncode=0,
+                stdout=allowed_output,
+                stderr="",
+            ),
+            source=probe_source,
+            body=probe_body,
+            payload=injected_payload,
+        )
+
+    public_probe = target / "spec-dock" / ".agent" / "s03-privacy-negative.txt"
+    public_probe.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        public_probe.write_text(
+            _s03_privacy_forbidden_values(probe_source, probe_body)[0],
+            encoding="utf-8",
+        )
+        with pytest.raises(AssertionError, match="privacy sentinel leaked"):
+            _assert_s03_privacy_output(
+                subprocess.CompletedProcess(
+                    args=["privacy-negative-public"],
+                    returncode=0,
+                    stdout=allowed_output,
+                    stderr="",
+                ),
+                source=probe_source,
+                body=probe_body,
+                public_files=(public_probe,),
+            )
+    finally:
+        public_probe.unlink(missing_ok=True)
     assert _snapshot_tree(target / "spec-dock" / ".agent") == agent_before
 
 
 def test_tc_346_s03_003_actual_cross_filesystem_source(candidate_wheel: CandidateWheel) -> None:
     helper = _Issue69Harness()
-    target = Path(tempfile.mkdtemp(prefix=".iss346-cross-fs-", dir=str(candidate_wheel.repo_root)))
-    source_parent = Path(tempfile.mkdtemp(prefix="iss346-cross-fs-source-", dir="/private/tmp"))
+    target: Path | None = None
+    source_parent: Path | None = None
     try:
+        target = Path(tempfile.mkdtemp(prefix=".iss346-cross-fs-", dir=str(candidate_wheel.repo_root)))
+        source_root = Path("/private/tmp") if Path("/private/tmp").is_dir() else Path("/tmp")
+        if not source_root.is_dir() or not os.access(source_root, os.W_OK):
+            pytest.skip("portable temporary source root is unavailable")
+        source_parent = Path(tempfile.mkdtemp(prefix="iss346-cross-fs-source-", dir=str(source_root)))
         helper._init_origin_repo(target)
         env = _runtime_env(helper, candidate_wheel.wheel_path.parent)
         installed_cli = helper._issue_69_venv_spec_dock(candidate_wheel.venv_python)
@@ -954,7 +1076,15 @@ def test_tc_346_s03_003_actual_cross_filesystem_source(candidate_wheel: Candidat
         assert source.read_bytes() == body
         assert destination.parent.stat().st_dev == destination_root_device
         assert source.stat().st_dev != destination.parent.stat().st_dev
-        _assert_s03_privacy_output(result, source=source, body=body)
+        _assert_s03_privacy_output(
+            result,
+            source=source,
+            body=body,
+            payload=payload,
+            public_files=_s03_import_owned_public_files(target, destination),
+        )
     finally:
-        shutil.rmtree(target, ignore_errors=True)
-        shutil.rmtree(source_parent, ignore_errors=True)
+        if target is not None:
+            shutil.rmtree(target, ignore_errors=True)
+        if source_parent is not None:
+            shutil.rmtree(source_parent, ignore_errors=True)
