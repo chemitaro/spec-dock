@@ -539,6 +539,141 @@ def test_operation_branch_commit_proof_rejects_unbound_lock_object(
         )
 
 
+class _FakeOperationRefStream:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    def write(self, _data: bytes) -> int:
+        self.events.append("write")
+        return 6
+
+    def flush(self) -> None:
+        self.events.append("flush")
+
+    def close(self) -> None:
+        self.events.append("close")
+
+
+class _FakeOperationRefProcess:
+    def __init__(self, events: list[str], *, returncode: int = 0) -> None:
+        self.events = events
+        self.returncode = returncode
+        self.stdin = _FakeOperationRefStream(events)
+        self.stdout = None
+        self.stderr = None
+        self._status: int | None = None
+
+    def poll(self) -> int | None:
+        return self._status
+
+    def wait(self, *, timeout: int) -> int:
+        assert timeout == 5
+        self.events.append("wait")
+        self._status = self.returncode
+        return self.returncode
+
+    def kill(self) -> None:
+        self.events.append("kill")
+        self._status = -9
+
+
+def _operation_branch_lock_fixture(
+    tmp_path: Path,
+    *,
+    returncode: int = 0,
+):
+    module = _module()
+    path = tmp_path / "HEAD.lock"
+    path.write_bytes(b"owned\n")
+    path.chmod(0o600)
+    descriptor = os.open(path, os.O_RDONLY)
+    opened = os.fstat(descriptor)
+    hook_root = tmp_path / "hooks"
+    hook_root.mkdir()
+    events: list[str] = []
+    process = _FakeOperationRefProcess(events, returncode=returncode)
+    lock = module._OperationBranchLock(
+        path=path,
+        descriptor=descriptor,
+        device=opened.st_dev,
+        inode=opened.st_ino,
+        destination="refs/heads/feature/issue",
+        expected_commit="c" * 40,
+        ref_process=process,
+        hook_root=hook_root,
+    )
+    return module, lock, path, events
+
+
+def test_operation_branch_lock_teardown_aborts_before_owned_head_lock_fallback_unlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module, lock, path, events = _operation_branch_lock_fixture(tmp_path)
+    real_remove = module._remove_captured_operation_head_lock
+
+    def remove(*args):
+        events.append("remove")
+        return real_remove(*args)
+
+    monkeypatch.setattr(module, "_remove_captured_operation_head_lock", remove)
+    with lock:
+        pass
+
+    assert events.index("wait") < events.index("remove")
+    assert not path.exists()
+
+
+def test_operation_branch_lock_abort_failure_does_not_unlink_captured_head_lock(
+    tmp_path: Path,
+) -> None:
+    module, lock, path, _events = _operation_branch_lock_fixture(tmp_path, returncode=1)
+    before = path.stat()
+
+    with pytest.raises(module.PlanningApplyRestoreMismatch), lock:
+        pass
+
+    after = path.stat()
+    assert path.read_bytes() == b"owned\n"
+    assert (after.st_dev, after.st_ino, after.st_mode, after.st_uid) == (
+        before.st_dev,
+        before.st_ino,
+        before.st_mode,
+        before.st_uid,
+    )
+
+
+def test_operation_branch_lock_replaced_head_lock_is_preserved_without_protocol_abort(
+    tmp_path: Path,
+) -> None:
+    module, lock, path, events = _operation_branch_lock_fixture(tmp_path)
+    path.unlink()
+    path.write_bytes(b"foreign\n")
+    path.chmod(0o600)
+    foreign = path.read_bytes()
+
+    with pytest.raises(module.PlanningApplyRestoreMismatch), lock:
+        pass
+
+    assert path.read_bytes() == foreign
+    assert "write" not in events
+    assert "kill" in events
+
+
+def test_operation_branch_lock_disappeared_head_lock_is_abandoned_without_unlink(
+    tmp_path: Path,
+) -> None:
+    module, lock, path, events = _operation_branch_lock_fixture(tmp_path)
+    path.unlink()
+
+    with pytest.raises(module.PlanningApplyRestoreMismatch), lock:
+        pass
+
+    assert not path.exists()
+    assert "write" not in events
+    assert "kill" in events
+
+
 def test_dedicated_push_uses_exact_expected_old_lease(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

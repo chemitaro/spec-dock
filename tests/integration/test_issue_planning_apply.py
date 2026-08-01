@@ -3758,6 +3758,169 @@ def test_existing_foreign_head_lock_aborts_install_without_ref_change(
     assert not (evidence / "publication.json").exists()
 
 
+def test_operation_branch_lock_foreign_head_lock_prepare_failure_preserves_inode(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, _origin, head, targets = _repository(tmp_path)
+    operation = _operation(repo, head, targets)
+    head_lock = repo / ".git" / "HEAD.lock"
+    foreign_lock = b"foreign-publication-lock\n"
+    head_lock.write_bytes(foreign_lock)
+    head_lock.chmod(0o600)
+    before = head_lock.stat()
+    try:
+        with pytest.raises(module.PlanningApplyRestoreMismatch):
+            module._acquire_operation_branch_lock(repo, operation, head)
+
+        after = head_lock.stat()
+        assert head_lock.read_bytes() == foreign_lock
+        assert (after.st_dev, after.st_ino, after.st_mode, after.st_uid) == (
+            before.st_dev,
+            before.st_ino,
+            before.st_mode,
+            before.st_uid,
+        )
+        assert _git(repo, "rev-parse", "HEAD") == head
+        assert _git(repo, "rev-parse", "refs/heads/feature/issue") == head
+        assert not (repo / ".git" / "refs" / "heads" / "feature" / "issue.lock").exists()
+    finally:
+        head_lock.unlink(missing_ok=True)
+
+
+def test_operation_branch_lock_successful_teardown_releases_prepared_locks(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, _origin, head, targets = _repository(tmp_path)
+    operation = _operation(repo, head, targets)
+    attacker, attacker_commit = _linked_worktree_with_next_commit(repo, tmp_path, head)
+    head_lock = repo / ".git" / "HEAD.lock"
+    ref_lock = repo / ".git" / "refs" / "heads" / "feature" / "issue.lock"
+
+    with module._acquire_operation_branch_lock(repo, operation, head) as branch_lock:
+        assert branch_lock.path == head_lock
+        assert head_lock.exists()
+        assert ref_lock.exists()
+        assert _attempt_linked_operation_ref_update(attacker, head, attacker_commit) == 128
+
+    assert not head_lock.exists()
+    assert not ref_lock.exists()
+    assert _attempt_linked_operation_ref_update(attacker, head, attacker_commit) == 0
+
+
+def test_initial_publication_guard_acquire_preserves_foreign_head_lock(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    head_lock = repo / ".git" / "HEAD.lock"
+    foreign_lock = b"foreign-initial-publication-lock\n"
+    before = None
+
+    def fault(checkpoint: str) -> None:
+        nonlocal before
+        if checkpoint == "after_commit":
+            head_lock.write_bytes(foreign_lock)
+            head_lock.chmod(0o600)
+            before = head_lock.stat()
+
+    try:
+        result = module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=_validation_ok,
+            sync_runner=_sync_ok,
+            fault_hook=fault,
+        )
+
+        assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+        assert result.local_commit is not None
+        assert _git(repo, "rev-parse", "HEAD") == result.local_commit
+        assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+        evidence = output / f"planning-apply-{operation.operation_id}"
+        assert (evidence / "commit.json").exists()
+        assert not (evidence / "publication.json").exists()
+        assert head_lock.read_bytes() == foreign_lock
+        after = head_lock.stat()
+        assert before is not None
+        assert (after.st_dev, after.st_ino, after.st_mode, after.st_uid) == (
+            before.st_dev,
+            before.st_ino,
+            before.st_mode,
+            before.st_uid,
+        )
+    finally:
+        head_lock.unlink(missing_ok=True)
+
+
+def test_resume_publication_guard_acquire_preserves_foreign_head_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _module()
+    repo, origin, head, targets = _repository(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    operation = _operation(repo, head, targets)
+    original_push = module._push_operation_commit_cas
+    fail_once = [True]
+
+    def fail_first_push(**kwargs):
+        if fail_once[0]:
+            fail_once[0] = False
+            return module.GitCommandResult(returncode=1, stdout=b"", stderr=b"injected")
+        return original_push(**kwargs)
+
+    monkeypatch.setattr(module, "_push_operation_commit_cas", fail_first_push)
+    pending = module.execute_planning_apply_transaction(
+        operation,
+        repo_root=repo,
+        output_dir=output,
+        validation_runner=_validation_ok,
+        sync_runner=_sync_ok,
+    )
+    assert (pending.status, pending.reason) == ("publication_pending", "push_failed")
+    assert pending.local_commit is not None
+    local_commit = pending.local_commit
+    commit_count = _git(repo, "rev-list", "--count", "HEAD")
+    head_lock = repo / ".git" / "HEAD.lock"
+    foreign_lock = b"foreign-resume-publication-lock\n"
+    head_lock.write_bytes(foreign_lock)
+    head_lock.chmod(0o600)
+    before = head_lock.stat()
+    try:
+        result = module.execute_planning_apply_transaction(
+            operation,
+            repo_root=repo,
+            output_dir=output,
+            validation_runner=lambda: pytest.fail("resume must not validate"),
+            sync_runner=lambda: pytest.fail("resume must not sync"),
+        )
+
+        assert (result.status, result.reason) == ("recovery_required", "restore_mismatch")
+        assert result.local_commit == local_commit
+        assert _git(repo, "rev-list", "--count", "HEAD") == commit_count
+        assert _git(origin, "rev-parse", "refs/heads/feature/issue") == head
+        evidence = output / f"planning-apply-{operation.operation_id}"
+        assert (evidence / "commit.json").exists()
+        assert not (evidence / "publication.json").exists()
+        assert head_lock.read_bytes() == foreign_lock
+        after = head_lock.stat()
+        assert (after.st_dev, after.st_ino, after.st_mode, after.st_uid) == (
+            before.st_dev,
+            before.st_ino,
+            before.st_mode,
+            before.st_uid,
+        )
+    finally:
+        head_lock.unlink(missing_ok=True)
+
+
 def test_operation_branch_ref_prepare_mismatch_fails_closed_without_locks(
     tmp_path: Path,
 ) -> None:
