@@ -339,6 +339,15 @@ The worker did not edit canonical reports or provider code. S02 implementation r
 - Artifact: `20260801t193534z-chatgpt-output-20260802t-s02-chatgpt-pro-remediation-review.md`（SHA-256 `37ed32f9adb3740d81cd5c5549161452576d7b516afd88498b96a18a92dd3f78`、5,748 bytes、`import_kind=chatgpt-output`、`storage_identity=blank`）。
 - verdict: `pass`。P0/P1/P2/P3はすべて0件。初回のP1（`deps-raw.puml` graph snapshot、root-managed asset snapshot、successor head/closure ledger）はすべて解消され、S02の4カードはbounded test-only scopeとして有効と判定された。S02をcloseし、S03を開始できる。
 
+### S03 ChatGPT pre-step evidence
+
+- pre-step session: `iss346-s03-prestep-aug2`、`requested=Pro; resolved=Pro; status=already-selected; strategy=select; verified=yes`。
+- reviewed pushed head: `d8079e71a6e951b31d506840c3a4a130e3bdcb73`。S02 passのArtifact/report転記後のheadであり、S03開始前に確認した。実装開始時にHEAD/local/remote/working-treeを再確認し、移動していればこのbindingをstaleとして再取得する。
+- Artifact: `20260801t195402z-chatgpt-output-20260801t-s03-chatgpt-pro-prestep-elaboration.md`（SHA-256 `503839b645ba0b83fe8ddeac5e8616d3cf28d9cb403e6f33a46d7f6acd188cc9`、43,682 bytes、`import_kind=chatgpt-output`、`storage_identity=blank`）。
+- advisory decision: current-cycle candidate wheelをS01/S02 helperで再構成し、4 target generic import、absolute/nested-CWD privacy、actual cross-filesystem、Linux anonymous/no-replace、macOS clone/cleanupを順に検証する。production修正はcandidate wheelまたはactual hostで再現するcontract defectがある場合のみ許可し、既存コードが契約を満たせばtest/probe-onlyで完了する。`unavailable`・skip・hermetic simulationはactual host successに数えない。
+- required host evidence: actual Linux supported publication、actual macOS clone-capable publication、`st_dev`が異なるactual cross-FS sourceを各content-free receiptへ記録する。host-local path、payload、user-file digest/count、UID/username、mutable container tagを保存しない。Linux preflightとformal link commitを分離し、macOS cleanup uncertaintyはretain/no-unlinkとし、same-UID exclusionを超える保証を主張しない。
+- worker handoff: allowed pathsはplan §10.3のintegration/host probe/unit/CLI/presentation testsと列挙されたrepair-only runtime pathsに限定する。workerはcanonical report/R/D/Pを編集せず、S03 focused/host結果・changed paths・privacy matrix・production repair有無を返す。S03はhermetic Greenだけではcloseできず、全host条件とexact pushed-head ChatGPT Pro reviewが必要。
+
 ## 実装記録（セッションログ） (必須)
 
 ### セッションログ（2026-07-29 HH:MM - HH:MM）
