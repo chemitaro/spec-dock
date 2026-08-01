@@ -196,7 +196,7 @@ pass
 - Attempted session slugs: `iss346-s01-pre-step`, `iss346-s01-prestep-aug2`, `iss346-s01-followup`, `iss346-s01-prestep-tty`, `iss346-s01-wrapper-smoke`。
 - `harvest`で得られた旧回答はIssue 00334のS019内容であり、Issue 346へscope外のため採用・importしていない。
 - Cheetah指定はdry-runで`gpt-5.2`へ正規化されたため、品質ゲートのモデル証跡として使用していない。
-- S01 implementation ChatGPT Pro review: `blocked/pending`。前段具体化は取得済みだが、current HEADの再実装・再検証後にpushed-head bindingで取得するreviewまでS01をclosed扱いにしない。
+- S01 implementation ChatGPT Pro review: 初回レビュー `iss346-s01-review-aug2b` は `requested=Pro; resolved=Pro; verified=yes` で実行され、P1を3件検出して `fail`。テスト修正を反映後、同一のPro品質ゲートを現行HEADで再実行するまでS01をclosed扱いにしない。Cheetahは正式ラッパーの対応対象外であり、品質ゲート証跡には使用していない。
 
 ### S01 closure decision
 
@@ -207,13 +207,13 @@ valid pre-step Artifact取得後、提案したtest-only completionを反映し�
 | 項目 | 観測値 |
 |---|---|
 | ブランチ | `iss-00346-integration-distribution-and-final-quality` |
-| local HEAD | `9c721d50eb0e4b2ca5bf16fd6f7e3b0f4a9e1c9c6` |
-| remote HEAD | `9c721d50eb0e4b2ca5bf16fd6f7e3b0f4a9e1c9c6`（一致） |
+| local HEAD | `035c45f849b05895a654f92aea23f672ef9da818`（S01 test correction commit） |
+| remote HEAD | `035c45f849b05895a654f92aea23f672ef9da818`（一致） |
 | working tree | clean（`git status --short` 空、dist/buildはignored生成物） |
-| candidate wheel | `dist/spec_dock-0.2.3-py3-none-any.whl` |
+| candidate wheel | pytest-managed temporary wheel（このwheelをinventory・install・origin probe・fresh consumerで共用） |
 | package version | `0.2.3` |
-| wheel SHA-256 | `19fa672f90a08e1bdd93da6665a59ac2b800022625ab214258fcece2b506d893` |
-| sorted ZIP inventory | 323 entries、5 README allowlist、stale/cache denylist pass |
+| wheel SHA-256 | `95293f84d286596460348aa2a266dee85dba375ce6599a4a3624e3a579248448`（install対象と同一pathをfixtureで固定） |
+| sorted ZIP inventory | 322 non-directory file entries、5 README allowlist、stale/cache denylist pass |
 | production repair | なし。test-only bounded completion |
 
 #### Current-cycle verification
@@ -235,7 +235,17 @@ git diff --check
 pass
 ```
 
-S01 focused suite was intentionally rerun only after commit/push; the worker's pre-commit run recorded `1 failed, 3 passed` solely because the strict receipt observes the in-progress `M` test file. The post-commit current-cycle run is the closure evidence. The candidate wheel inventory assertion was independently rerun against the exact wheel and returned `inventory_entries=323`.
+S01 focused suite was intentionally rerun only after commit/push; the worker's pre-commit run recorded `1 failed, 3 passed` solely because the strict receipt observes the in-progress `M` test file. The post-commit current-cycle run is the closure evidence. The receipt digest and inventory above are emitted by the pytest fixture for the exact wheel path passed to the installer; no separately built `dist/` wheel is used for this candidate.
+
+### S01 initial implementation review finding and remediation
+
+初回のChatGPT Pro実装レビュー（Artifact `20260801t172841z`、SHA-256 `02005f833935b5f4de0b070e5aecc4761cb920db66f4db7107cfb839d7379ae4`）は、現行実装に対して次のP1を指摘した。
+
+1. `report.md` のwheel receiptが現行pushed HEADに紐付いていない。
+2. receiptの `dist/` wheelと、pytestがinstall・実行したtemporary wheelの同一性が証明されていない。
+3. import/validate後のignored・untracked確認と、stdout/stderr双方のprivate path漏えい確認が不足している。
+
+これを受け、`035c45f8` で `tests/integration/test_epic_00343_distribution.py` のみを修正した。単一のinstall対象wheel pathのSHA-256をfixtureで固定し、import/validate後のsource・destination byte保持、ignored・Git index非掲載、import/validateのstdout・stderr全経路のprivate path検査を追加した。初回レビュー回答はArtifactとして保存済みで、再レビューはこの修正後HEADに対して実施する。
 
 ## 実装記録（セッションログ） (必須)
 
