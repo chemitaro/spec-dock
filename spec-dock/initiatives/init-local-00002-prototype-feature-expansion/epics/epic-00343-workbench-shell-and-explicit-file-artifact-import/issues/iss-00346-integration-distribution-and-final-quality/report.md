@@ -196,11 +196,11 @@ pass
 - Attempted session slugs: `iss346-s01-pre-step`, `iss346-s01-prestep-aug2`, `iss346-s01-followup`, `iss346-s01-prestep-tty`, `iss346-s01-wrapper-smoke`。
 - `harvest`で得られた旧回答はIssue 00334のS019内容であり、Issue 346へscope外のため採用・importしていない。
 - Cheetah指定はdry-runで`gpt-5.2`へ正規化されたため、品質ゲートのモデル証跡として使用していない。
-- S01 implementation ChatGPT Pro review: 初回レビュー `iss346-s01-review-aug2b` は `requested=Pro; resolved=Pro; verified=yes` で実行され、P1を3件検出して `fail`。テスト修正を反映後、同一のPro品質ゲートを現行HEADで再実行するまでS01をclosed扱いにしない。Cheetahは正式ラッパーの対応対象外であり、品質ゲート証跡には使用していない。
+- S01 implementation ChatGPT Pro review: 初回レビュー `iss346-s01-review-aug2b` は `requested=Pro; resolved=Pro; verified=yes` で実行され、P1を3件検出して `fail`。修正後の再レビュー `iss346-s01-review-remediatio-aug2` も同じPro選択証跡で実行され、P0/P1なしの `pass`。再レビューArtifact `20260801t174834z`（SHA-256 `358037ebc3a0699b151004fd67a9a187ceffeee03631fe936b35137fc88f94c4`）を保存した。Cheetahは正式ラッパーの対応対象外であり、品質ゲート証跡には使用していない。
 
 ### S01 closure decision
 
-valid pre-step Artifact取得後、提案したtest-only completionを反映してcurrent HEADで再build・再検証した。実装、focused/full S01、関連Workbench/readme、ruff、diff-checkはGreenである。一方、plan §8.6のcurrent-head ChatGPT Pro implementation review条件は未充足のため、S01は「current-cycle実装・再検証済み／レビュー待ち」とし、S02の実装開始を停止する。
+valid pre-step Artifact取得後、提案したtest-only completionを反映してcurrent HEADで再build・再検証した。実装、focused/full S01、関連Workbench/readme、ruff、diff-checkはGreenである。修正後のcurrent-head ChatGPT Pro implementation reviewはP0/P1なしの `pass` で、S01をクローズしS02のpre-step gateへ進める。
 
 ### S01 current-cycle candidate receipt（2026-08-02）
 
@@ -245,7 +245,16 @@ S01 focused suite was intentionally rerun only after commit/push; the worker's p
 2. receiptの `dist/` wheelと、pytestがinstall・実行したtemporary wheelの同一性が証明されていない。
 3. import/validate後のignored・untracked確認と、stdout/stderr双方のprivate path漏えい確認が不足している。
 
-これを受け、`035c45f8` で `tests/integration/test_epic_00343_distribution.py` のみを修正した。単一のinstall対象wheel pathのSHA-256をfixtureで固定し、import/validate後のsource・destination byte保持、ignored・Git index非掲載、import/validateのstdout・stderr全経路のprivate path検査を追加した。初回レビュー回答はArtifactとして保存済みで、再レビューはこの修正後HEADに対して実施する。
+これを受け、`035c45f8` で `tests/integration/test_epic_00343_distribution.py` のみを修正した。単一のinstall対象wheel pathのSHA-256をfixtureで固定し、import/validate後のsource・destination byte保持、ignored・Git index非掲載、import/validateのstdout・stderr全経路のprivate path検査を追加した。初回レビュー回答と再レビュー回答はArtifactとして保存済みで、再レビューは `2ad7071b`（report/Artifactのみの後続コミット）を現行pushed HEADとして確認し、S01 closure `pass` を返した。
+
+### S01 reviewer-gate handoff to S02
+
+再レビューが指摘したP2のwheel引き渡し条件は、S02開始前に次のreceiptを追加して解消する。S02で別のprovider source/test変更が入る場合は、その変更後に候補wheelを再生成し、S02固有のreceiptへ切り替える。
+
+- candidate basename: `spec_dock-0.2.3-py3-none-any.whl`
+- deterministic selection: pytest fixtureがbuild出力ディレクトリをglobし、sorted結果が1件であることを検証して選択する（`len(wheel_paths) == 1`）。選択した同一pathをSHA-256計算、installer requirements、inventory、origin probe、fresh consumer、generic import、installed `validate`へ渡す。
+- exact node IDs: `test_tc_346_s01_001_candidate_wheel_receipt`, `test_tc_346_s01_002_candidate_wheel_inventory`, `test_tc_346_s01_003_isolated_wheel_origin_rejects_checkout_fallback`, `test_tc_346_s01_004_fresh_consumer_installed_shell_and_generic_import`
+- physical handoff: S01再検証時に `.workbench/s01-candidate-wheel/spec_dock-0.2.3-py3-none-any.whl` へ同一wheelをコピーして保持し、S02 pre-stepでそのbasename/digestを再確認する。保持wheelはWorkbench内のignoredファイルでありGit管理対象外。
 
 ## 実装記録（セッションログ） (必須)
 
