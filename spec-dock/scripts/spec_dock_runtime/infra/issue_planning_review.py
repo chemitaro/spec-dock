@@ -308,65 +308,17 @@ def _remove_evidence_directory_at(
     directory_descriptor: int,
     evidence: _OwnedReviewDirectory,
 ) -> bool:
-    if not _owned_review_directory_matches(directory_descriptor, evidence):
-        return False
-    try:
-        names = tuple(sorted(os.listdir(evidence.descriptor)))  # noqa: PTH208 - directory fd is the guard
-    except OSError:
-        return False
-    if names != tuple(sorted(evidence.file_identities)):
-        return False
-    for name, (device, inode) in evidence.file_identities.items():
-        try:
-            current = os.stat(name, dir_fd=evidence.descriptor, follow_symlinks=False)
-        except OSError:
-            return False
-        if (current.st_dev, current.st_ino) != (device, inode) or not stat.S_ISREG(current.st_mode):
-            return False
-    for _ in range(100):
-        quarantine_name = f".spec-dock-planning-review-quarantine-{secrets.token_hex(16)}"
-        try:
-            _rename_no_replace_at(directory_descriptor, evidence.name, quarantine_name)
-        except FileExistsError:
-            continue
-        except (NotImplementedError, OSError):
-            return False
-        evidence.name = quarantine_name
-        break
-    else:
-        return False
+    """Report that cleanup is unavailable without deleting any pathname.
 
-    if not _owned_review_directory_matches(directory_descriptor, evidence):
-        return False
-    try:
-        quarantine_descriptor = _open_directory_at(directory_descriptor, evidence.name)
-    except OSError:
-        return False
-    try:
-        quarantine_opened = os.fstat(quarantine_descriptor)
-        if (quarantine_opened.st_dev, quarantine_opened.st_ino) != (evidence.device, evidence.inode):
-            return False
-        names = tuple(sorted(os.listdir(quarantine_descriptor)))  # noqa: PTH208 - directory fd is the guard
-        if names != tuple(sorted(evidence.file_identities)):
-            return False
-        for name, (device, inode) in evidence.file_identities.items():
-            current = os.stat(name, dir_fd=quarantine_descriptor, follow_symlinks=False)
-            if (current.st_dev, current.st_ino) != (device, inode) or not stat.S_ISREG(current.st_mode):
-                return False
-        for name in tuple(sorted(evidence.file_identities)):
-            os.unlink(name, dir_fd=quarantine_descriptor)
-        os.fsync(quarantine_descriptor)
-        if os.listdir(quarantine_descriptor):  # noqa: PTH208 - directory fd is the guard
-            return False
-        if not _owned_review_directory_matches(directory_descriptor, evidence):
-            return False
-        os.rmdir(evidence.name, dir_fd=directory_descriptor)
-        os.fsync(directory_descriptor)
-        return True
-    except (OSError, ValueError):
-        return False
-    finally:
-        os.close(quarantine_descriptor)
+    POSIX pathname removal does not provide an expected-device/inode
+    precondition.  A prior identity check followed by ``unlink`` or ``rmdir``
+    would therefore be a destructive TOCTOU window.  The publication caller
+    treats ``False`` as an ambiguous cleanup and returns the content-free
+    blocked result while preserving the published evidence for inspection.
+    """
+
+    del directory_descriptor, evidence
+    return False
 
 
 def _owned_review_directory_matches(
