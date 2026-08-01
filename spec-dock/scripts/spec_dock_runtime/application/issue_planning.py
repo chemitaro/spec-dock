@@ -1943,21 +1943,20 @@ def _review_publication_is_current(
     candidate: VerifiedIssueCandidateView | None,
     candidate_loader: Callable[[Path, Path], VerifiedIssueCandidateView],
 ) -> bool:
-    if not _source_evidence_is_current(
+    if candidate is not None and candidate_path is not None:
+        try:
+            current = candidate_loader(candidate_path, repo_root)
+        except (IssuePlanningCandidateArchiveRejected, OSError, ValueError):
+            return False
+        if current.identity != candidate.identity or current.zip_bytes != candidate.zip_bytes:
+            return False
+    return _source_evidence_is_current(
         target=target,
         relevant_source_paths=relevant_source_paths,
         repo_root=repo_root,
         evidence=evidence,
         preflight_runner=preflight_runner,
-    ):
-        return False
-    if candidate is None or candidate_path is None:
-        return True
-    try:
-        current = candidate_loader(candidate_path, repo_root)
-    except (IssuePlanningCandidateArchiveRejected, OSError, ValueError):
-        return False
-    return current.identity == candidate.identity and current.zip_bytes == candidate.zip_bytes
+    )
 
 
 def _revision_publication_is_current(
@@ -1970,19 +1969,19 @@ def _revision_publication_is_current(
     source_evidence: PlanningSourceEvidence,
     preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult],
 ) -> bool:
-    if not _source_evidence_is_current(
+    try:
+        current = current_candidate_loader(candidate_path, repo_root)
+    except (IssuePlanningCandidateArchiveRejected, OSError, ValueError):
+        return False
+    if current.identity != candidate.identity or current.zip_bytes != candidate.zip_bytes:
+        return False
+    return _source_evidence_is_current(
         target=target,
         relevant_source_paths=tuple(cast("Sequence[str]", candidate.source_baseline.get("relevant_paths", ()))),
         repo_root=repo_root,
         evidence=source_evidence,
         preflight_runner=preflight_runner,
-    ):
-        return False
-    try:
-        current = current_candidate_loader(candidate_path, repo_root)
-    except (IssuePlanningCandidateArchiveRejected, OSError, ValueError):
-        return False
-    return current.identity == candidate.identity and current.zip_bytes == candidate.zip_bytes
+    )
 
 
 def _read_external_bounded_file(
