@@ -266,7 +266,7 @@ S01 focused suite was intentionally rerun only after commit/push; the worker's p
 ### S02 implementation evidence (current cycle)
 
 - executable implementation commit: `1650c73c53f7397cc5f29d5262479f860125c9d6`、snapshot remediation commit: `dfee5a4d54a880f0d5ca5fd57bb699540cb3eb9c`（いずれも`tests/integration/test_epic_00343_distribution.py`のtest-only、provider/plan/reportは変更なし）。
-- verification-bound pushed HEAD: `8e2ff88af676709f4d18eab30d36e29013e715c1`、local/remote一致。`8e2ff88a`は`dfee5a4d`後のreport/Artifact-only successor。以降の`d4ce6625`および後続のreport-only evidence successorもprovider/test codeを変更していないため、current reviewはGitHub connectorで解決した最新tipを対象にし、実行commit・verification-bound head・successor chainを分離して判定する。実装差分の変更パスはintegration test 1ファイルのみ。
+- verification-bound pushed HEAD: `8e2ff88af676709f4d18eab30d36e29013e715c1`、local/remote一致。`8e2ff88a`は`dfee5a4d`後のreport/Artifact-only successorである。以降の`d4ce6625`、`369200ff`および後続のreport-only evidence successorもprovider/test codeを変更していないため、実行commit・verification-bound head・report-only successor chainを分離して記録する。今回のreport-only correctionを含む新しいpushed successorを、次回ChatGPT Pro reviewの対象としてGitHub connectorで解決する。実装差分の変更パスはintegration test 1ファイルのみ。
 - S02 candidate wheelはS01のinstalled fixtureを再利用し、wheel ZIPからguide/template bytesを読み込む。synthetic existing hierarchyは `init-00401` / `epic-00402` / `iss-00403`、future hierarchyは `init-00501` / `epic-00502` / `iss-00503`。
 - 4つのS02 test cardは、README absent preflight、update no-backfill、future shell、path-specific illegal preexisting README negativeを検証する。production repairは不要（`production_repair_justified=false`）。
 
@@ -290,7 +290,7 @@ The single unit failure is the pre-existing `test_shipped_docs_describe_workbenc
 
 #### Post-remediation verification receipt
 
-The following commands were rerun after the `dfee5a4d` test-oracle remediation, at verification-bound pushed HEAD `8e2ff88a` (the only later change before this report correction is report/Artifact evidence). The current review target is the report-only successor `d4ce6625`; no provider or test code changed after the recorded verification.
+The following commands were rerun after the `dfee5a4d` test-oracle remediation, at verification-bound pushed HEAD `8e2ff88a`. `d4ce6625` and `369200ff` are report-only successors; no provider or test code changed after the recorded verification. A fresh review is requested against the exact pushed successor created by this report-only correction, with that SHA recorded in the follow-up review Artifact and closure row.
 
 ```text
 uv run pytest tests/integration/test_epic_00343_distribution.py \
@@ -316,7 +316,7 @@ The worker did not edit canonical reports or provider code. S02 remains pending 
 
 - 初回Pro review Artifact `20260801t184027z`（SHA-256 `e331fd69772aced3a6ddd25ab4da181e48c200457eb031d1c3db25c5e84d5493`）はP1を3件検出した。`deps-raw.puml`がgraph snapshotにない、root-managed install assetsのsnapshotが不足、report ledgerがsuccessor HEAD/closure rowsへ束縛されていない、という証跡上の指摘であり、production defectではない。
 - `dfee5a4d54a880f0d5ca5fd57bb699540cb3eb9c` でintegration test onlyの補正を適用し、`_snapshot_graph`へ`deps-raw.puml`を追加、`_snapshot_managed_assets`へinstallerが管理するroot `.agents/**`・`.codex/**`・`.github/**`を相対path+bytesで追加した。
-- 現在のpushed HEADは `dfee5a4d54a880f0d5ca5fd57bb699540cb3eb9c`（local/remote一致）。report-only successorはimplementation commitと区別して記録する。
+- `dfee5a4d54a880f0d5ca5fd57bb699540cb3eb9c` はsnapshot remediationの実装commitである。`8e2ff88a`、`d4ce6625`、`369200ff`はreport/Artifact-only successorとして扱い、今回のreport-only correction後に作成する新しいpushed successorは、次回レビューの実対象として別途記録する。implementation commit・verification-bound head・report-only successorを混同しない。
 - `historical_option_used: no`。synthetic current-runtime fixtureを使用し、historical SHA/feature-absence fixtureは使用していない。
 
 #### S02 closure ledger (fresh review pending)
@@ -330,7 +330,7 @@ The worker did not edit canonical reports or provider code. S02 remains pending 
 | Step Contract Closure / S02 | 4 cards、candidate-wheel installed runtime、test-only bounded paths、historical option `no` | pass（implementation evidence） |
 | Test Contract Closure / S02 | focused 4 passed、full integration 8 passed、ruff/diff-check pass | pass（implementation evidence） |
 | Delegated Worker Evidence / S02 | worker changed integration test only、production repair `false`、no material implementation decisions | pass |
-| ChatGPT Pro implementation review | GitHub connectorで解決した最新report-only successor tip（`8e2ff88a`後、`d4ce6625`を含む）を対象にP0/P1 unresolved 0が必要 | pending |
+| ChatGPT Pro implementation review | 今回のreport-only correction後にGitHub connectorで解決する新しいpushed successorを対象に、P0/P1 unresolved 0が必要 | pending |
 
 ## 実装記録（セッションログ） (必須)
 
