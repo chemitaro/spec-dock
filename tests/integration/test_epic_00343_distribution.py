@@ -238,6 +238,7 @@ def _snapshot_graph(target: Path) -> FileSnapshot:
         "tree-all.puml",
         "tree.puml",
         "deps-issues.puml",
+        "deps-raw.puml",
         "dashboard.md",
     ):
         path = specdock_dir / relative_path
@@ -260,6 +261,18 @@ def _snapshot_managed_assets(target: Path) -> FileSnapshot:
         path = specdock_dir / relative_path
         if path.is_file():
             entries.append((relative_path, path.read_bytes()))
+    # `_install_skill` applies every provider `install_root` file to these
+    # bounded repository-root trees. Keep the update oracle scoped to this
+    # managed surface, excluding unrelated root files and canonical specs.
+    for directory_name in (".agents", ".codex", ".github"):
+        root = target / directory_name
+        if not root.is_dir():
+            continue
+        entries.extend(
+            (f"{directory_name}/{path.relative_to(root).as_posix()}", path.read_bytes())
+            for path in sorted(root.rglob("*"))
+            if path.is_file()
+        )
     return tuple(sorted(entries))
 
 
