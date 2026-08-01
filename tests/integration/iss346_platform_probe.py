@@ -191,6 +191,7 @@ def _linux_supported_publication(probe: str) -> int:
 
     publisher._publish_no_replace = record_commit
     try:
+        source_before = source.read_bytes()
         result = _publish_once(contracts, publisher, workspace, source, destination)
         existing = workspace / "existing.bin"
         existing_body = b"existing destination"
@@ -201,8 +202,23 @@ def _linux_supported_publication(probe: str) -> int:
             collision_preserved = error.code == "destination_exists" and existing.read_bytes() == existing_body
         else:
             collision_preserved = False
-        if not result.committed or destination.read_bytes() != source.read_bytes():
-            return _failure(probe, "publication_contract_failed")
+        bytes_matched = result.committed and destination.read_bytes() == source_before
+        source_unchanged = source.read_bytes() == source_before
+        first_link_target_is_formal_destination = commit_names[:1] == [destination.name]
+        visible_stage_or_probe_absent = not visible_stages
+        pathname_cleanup_absent = result.cleanup_state == "not_created"
+        formal_no_replace_link_succeeds = result.committed
+        safety_values = (
+            bytes_matched,
+            source_unchanged,
+            first_link_target_is_formal_destination,
+            visible_stage_or_probe_absent,
+            pathname_cleanup_absent,
+            formal_no_replace_link_succeeds,
+            collision_preserved,
+        )
+        if not all(safety_values):
+            return _failure(probe, "publication_safety_contract_failed")
         return _emit(
             probe=probe,
             result="pass",
@@ -211,14 +227,14 @@ def _linux_supported_publication(probe: str) -> int:
             anonymous_stage_regular=True,
             procfs_identity_matches_held_fd=True,
             destination_directory_fsync_succeeds=True,
-            formal_no_replace_link_succeeds=True,
-            first_link_target_is_formal_destination=commit_names[:1] == [destination.name],
-            visible_stage_or_probe_absent=not visible_stages,
-            pathname_cleanup_absent=result.cleanup_state == "not_created",
+            formal_no_replace_link_succeeds=formal_no_replace_link_succeeds,
+            first_link_target_is_formal_destination=first_link_target_is_formal_destination,
+            visible_stage_or_probe_absent=visible_stage_or_probe_absent,
+            pathname_cleanup_absent=pathname_cleanup_absent,
             existing_destination_preserved=collision_preserved,
             source_destination_same_device=source_parent.stat().st_dev == workspace.stat().st_dev,
-            bytes_matched=True,
-            source_unchanged=True,
+            bytes_matched=bytes_matched,
+            source_unchanged=source_unchanged,
         )
     except contracts.BinaryArtifactPublishError as error:
         if error.code == "publication_unsupported":
@@ -257,14 +273,20 @@ def _linux_capability_insufficient(probe: str) -> int:
         except contracts.BinaryArtifactPublishError as error:
             formal_destination_absent = not destination.exists()
             visible_stage_or_probe_absent = not tuple(workspace.glob(".spec-dock-import-*"))
+            pathname_cleanup_absent = visible_stage_or_probe_absent
+            fault_injected = "linux_directory_durability" in points
             failed_closed = (
                 error.code == "publication_unsupported"
                 and formal_destination_absent
                 and visible_stage_or_probe_absent
+                and pathname_cleanup_absent
+                and fault_injected
             )
         else:
             formal_destination_absent = False
             visible_stage_or_probe_absent = not tuple(workspace.glob(".spec-dock-import-*"))
+            pathname_cleanup_absent = visible_stage_or_probe_absent
+            fault_injected = "linux_directory_durability" in points
             failed_closed = False
         return _emit(
             probe=probe,
@@ -272,9 +294,9 @@ def _linux_capability_insufficient(probe: str) -> int:
             exit_status=0 if failed_closed else 1,
             formal_destination_absent=formal_destination_absent,
             visible_stage_or_probe_absent=visible_stage_or_probe_absent,
-            pathname_cleanup_absent=True,
+            pathname_cleanup_absent=pathname_cleanup_absent,
             fallback_absent=failed_closed,
-            fault_injected="linux_directory_durability" in points,
+            fault_injected=fault_injected,
             source_destination_same_device=source_parent.stat().st_dev == workspace.stat().st_dev,
         )
     finally:
@@ -351,12 +373,22 @@ def _macos_clone_publication(probe: str) -> int:
     destination = workspace / "formal.bin"
     stage_devices: list[int] = []
     commit_names: list[str] = []
+    stage_flags: list[int] = []
 
     def observe(point: str) -> None:
         if point == "before_publication":
             stage_devices.extend(path.stat().st_dev for path in workspace.glob(".spec-dock-import-*"))
 
     publisher = publisher_module.FilesystemBinaryArtifactPublisher(fault_injector=observe)
+    original_open = publisher_module.os.open
+
+    def observe_stage_open(path: Any, flags: int, *args: Any, **kwargs: Any) -> int:
+        path_name = os.fsdecode(path)
+        if path_name.startswith(".spec-dock-import-"):
+            stage_flags.append(flags)
+        return original_open(path, flags, *args, **kwargs)
+
+    publisher_module.os.open = observe_stage_open
     original_publish = publisher._publish_no_replace
 
     def record_commit(*args: Any, **kwargs: Any) -> None:
@@ -366,9 +398,10 @@ def _macos_clone_publication(probe: str) -> int:
     publisher._publish_no_replace = record_commit
     try:
         source_before = source.read_bytes()
+        parent_before = workspace.stat()
         result = _publish_once(contracts, publisher, workspace, source, destination)
-        if not result.committed or destination.read_bytes() != source_before:
-            return _failure(probe, "publication_contract_failed")
+        bytes_matched = result.committed and destination.read_bytes() == source_before
+        source_unchanged = source.read_bytes() == source_before
         existing = workspace / "existing.bin"
         existing_body = b"existing destination"
         existing.write_bytes(existing_body)
@@ -379,25 +412,56 @@ def _macos_clone_publication(probe: str) -> int:
         else:
             collision_preserved = False
         destination_device = workspace.stat().st_dev
+        parent_after = workspace.stat()
+        parent_identity_stable = (parent_before.st_dev, parent_before.st_ino) == (
+            parent_after.st_dev,
+            parent_after.st_ino,
+        )
+        stage_is_destination_side = bool(stage_devices)
+        stage_opened_exclusive_nofollow = any(
+            bool(flags & getattr(os, "O_EXCL", 0)) and bool(flags & getattr(os, "O_NOFOLLOW", 0))
+            for flags in stage_flags
+        )
+        formal_no_replace_clone_succeeds = commit_names[:1] == [destination.name]
+        copy_or_rename_fallback_absent = formal_no_replace_clone_succeeds
+        owned_stage_cleanup_verified = result.cleanup_state == "removed" and not tuple(
+            workspace.glob(".spec-dock-import-*")
+        )
+        stage_device_matches_destination = stage_is_destination_side and all(
+            device == destination_device for device in stage_devices
+        )
+        safety_values = (
+            bytes_matched,
+            source_unchanged,
+            stage_is_destination_side,
+            stage_opened_exclusive_nofollow,
+            formal_no_replace_clone_succeeds,
+            copy_or_rename_fallback_absent,
+            owned_stage_cleanup_verified,
+            collision_preserved,
+            stage_device_matches_destination,
+            parent_identity_stable,
+        )
+        if not all(safety_values):
+            return _failure(probe, "publication_safety_contract_failed")
         return _emit(
             probe=probe,
             result="pass",
             exit_status=0,
             fclonefileat_available=True,
             destination_clone_capable=True,
-            stage_is_destination_side=bool(stage_devices),
-            stage_opened_exclusive_nofollow=bool(stage_devices),
-            parent_identity_stable=True,
-            formal_no_replace_clone_succeeds=True,
-            copy_or_rename_fallback_absent=commit_names[:1] == [destination.name],
-            owned_stage_cleanup_verified=result.cleanup_state == "removed"
-            and not tuple(workspace.glob(".spec-dock-import-*")),
+            stage_is_destination_side=stage_is_destination_side,
+            stage_opened_exclusive_nofollow=stage_opened_exclusive_nofollow,
+            parent_identity_stable=parent_identity_stable,
+            formal_no_replace_clone_succeeds=formal_no_replace_clone_succeeds,
+            copy_or_rename_fallback_absent=copy_or_rename_fallback_absent,
+            owned_stage_cleanup_verified=owned_stage_cleanup_verified,
             same_uid_exclusion_acknowledged=True,
             existing_destination_preserved=collision_preserved,
-            stage_device_matches_destination=bool(stage_devices) and all(device == destination_device for device in stage_devices),
+            stage_device_matches_destination=stage_device_matches_destination,
             source_destination_same_device=source_parent.stat().st_dev == destination_device,
-            bytes_matched=True,
-            source_unchanged=source.read_bytes() == source_before,
+            bytes_matched=bytes_matched,
+            source_unchanged=source_unchanged,
         )
     except contracts.BinaryArtifactPublishError as error:
         if error.code == "publication_unsupported":
@@ -406,6 +470,7 @@ def _macos_clone_publication(probe: str) -> int:
     except (OSError, RuntimeError):
         return _failure(probe, "publication_contract_failed")
     finally:
+        publisher_module.os.open = original_open
         shutil.rmtree(workspace, ignore_errors=True)
         shutil.rmtree(source_parent, ignore_errors=True)
 
