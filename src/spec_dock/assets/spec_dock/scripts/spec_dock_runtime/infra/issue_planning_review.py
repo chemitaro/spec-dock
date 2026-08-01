@@ -98,6 +98,9 @@ def publish_planning_review_evidence(
     output_descriptor = _open_guarded_output_directory(guard)
     staged: _OwnedReviewDirectory | None = None
     published = False
+    cleanup_attempted = False
+    cleanup_proven = False
+    failure: BaseException | None = None
     try:
         _ensure_relative_name_absent(output_descriptor, directory_name)
         _revalidate_output_guard(guard, repo_root)
@@ -146,16 +149,25 @@ def publish_planning_review_evidence(
         except Exception as error:
             raise OSError("review publication failed") from error
         if not current:
-            if _remove_evidence_directory_at(output_descriptor, staged):
+            cleanup_attempted = True
+            cleanup_proven = _remove_evidence_directory_at(output_descriptor, staged)
+            if cleanup_proven:
                 raise ReviewSourceStale("Review source changed during publication")
             raise OSError("review publication cleanup failed")
         published = True
+    except BaseException as error:
+        failure = error
     finally:
         if staged is not None:
-            if not published:
-                _remove_evidence_directory_at(output_descriptor, staged)
+            if not published and not cleanup_attempted:
+                cleanup_attempted = True
+                cleanup_proven = _remove_evidence_directory_at(output_descriptor, staged)
             os.close(staged.descriptor)
         os.close(output_descriptor)
+    if failure is not None:
+        if staged is not None and staged.name == directory_name and cleanup_attempted and not cleanup_proven:
+            raise OSError("review publication failed") from failure
+        raise failure
     return PublishedPlanningReview(
         review_result_file=f"{directory_name}/planning-review-result.json",
         review_summary_file=f"{directory_name}/planning-review-summary.md",
@@ -243,18 +255,32 @@ def _atomic_publish_no_replace_at(
     if not _owned_review_directory_matches(directory_descriptor, source):
         raise ValueError("review staging directory identity changed")
     _verify_review_directory_contents(source, expected_files)
+    _rename_no_replace_at(directory_descriptor, source.name, destination_name)
+    source.name = destination_name
+    if not _owned_review_directory_matches(directory_descriptor, source):
+        raise ValueError("review published directory identity changed")
+    _verify_review_directory_contents(source, expected_files)
+
+
+def _rename_no_replace_at(
+    directory_descriptor: int,
+    source_name: str,
+    destination_name: str,
+) -> None:
     if platform.system() == "Darwin":
         library = ctypes.CDLL(None, use_errno=True)
         rename = getattr(library, "renameatx_np", None)
         if rename is None:
             raise NotImplementedError("renameatx_np is unavailable")
+        flag = 0x00000004
     elif platform.system() == "Linux":
         library = ctypes.CDLL(None, use_errno=True)
         rename = getattr(library, "renameat2", None)
         if rename is None:
             raise NotImplementedError("renameat2 is unavailable")
+        flag = 0x00000001
     else:
-        raise NotImplementedError("atomic no-replace publication is unsupported")
+        raise NotImplementedError("atomic no-replace rename is unsupported")
     rename.argtypes = (
         ctypes.c_int,
         ctypes.c_char_p,
@@ -265,19 +291,15 @@ def _atomic_publish_no_replace_at(
     rename.restype = ctypes.c_int
     result = rename(
         directory_descriptor,
-        os.fsencode(source.name),
+        os.fsencode(source_name),
         directory_descriptor,
         os.fsencode(destination_name),
-        0x00000004 if platform.system() == "Darwin" else 0x00000001,
+        flag,
     )
     if result == 0:
-        source.name = destination_name
-        if not _owned_review_directory_matches(directory_descriptor, source):
-            raise ValueError("review published directory identity changed")
-        _verify_review_directory_contents(source, expected_files)
         return
     error_number = ctypes.get_errno()
-    if error_number == errno.EEXIST:
+    if error_number in (errno.EEXIST, errno.ENOTEMPTY):
         raise FileExistsError(error_number, os.strerror(error_number), destination_name)
     raise OSError(error_number, os.strerror(error_number), destination_name)
 
@@ -288,7 +310,10 @@ def _remove_evidence_directory_at(
 ) -> bool:
     if not _owned_review_directory_matches(directory_descriptor, evidence):
         return False
-    names = tuple(sorted(os.listdir(evidence.descriptor)))  # noqa: PTH208 - directory fd is the guard
+    try:
+        names = tuple(sorted(os.listdir(evidence.descriptor)))  # noqa: PTH208 - directory fd is the guard
+    except OSError:
+        return False
     if names != tuple(sorted(evidence.file_identities)):
         return False
     for name, (device, inode) in evidence.file_identities.items():
@@ -298,15 +323,50 @@ def _remove_evidence_directory_at(
             return False
         if (current.st_dev, current.st_ino) != (device, inode) or not stat.S_ISREG(current.st_mode):
             return False
-    for child in os.listdir(evidence.descriptor):  # noqa: PTH208 - directory fd is the guard
-        os.unlink(child, dir_fd=evidence.descriptor)
-    os.fsync(evidence.descriptor)
+    for _ in range(100):
+        quarantine_name = f".spec-dock-planning-review-quarantine-{secrets.token_hex(16)}"
+        try:
+            _rename_no_replace_at(directory_descriptor, evidence.name, quarantine_name)
+        except FileExistsError:
+            continue
+        except (NotImplementedError, OSError):
+            return False
+        evidence.name = quarantine_name
+        break
+    else:
+        return False
+
+    if not _owned_review_directory_matches(directory_descriptor, evidence):
+        return False
     try:
-        os.rmdir(evidence.name, dir_fd=directory_descriptor)
-        os.fsync(directory_descriptor)
+        quarantine_descriptor = _open_directory_at(directory_descriptor, evidence.name)
     except OSError:
         return False
-    return True
+    try:
+        quarantine_opened = os.fstat(quarantine_descriptor)
+        if (quarantine_opened.st_dev, quarantine_opened.st_ino) != (evidence.device, evidence.inode):
+            return False
+        names = tuple(sorted(os.listdir(quarantine_descriptor)))  # noqa: PTH208 - directory fd is the guard
+        if names != tuple(sorted(evidence.file_identities)):
+            return False
+        for name, (device, inode) in evidence.file_identities.items():
+            current = os.stat(name, dir_fd=quarantine_descriptor, follow_symlinks=False)
+            if (current.st_dev, current.st_ino) != (device, inode) or not stat.S_ISREG(current.st_mode):
+                return False
+        for name in tuple(sorted(evidence.file_identities)):
+            os.unlink(name, dir_fd=quarantine_descriptor)
+        os.fsync(quarantine_descriptor)
+        if os.listdir(quarantine_descriptor):  # noqa: PTH208 - directory fd is the guard
+            return False
+        if not _owned_review_directory_matches(directory_descriptor, evidence):
+            return False
+        os.rmdir(evidence.name, dir_fd=directory_descriptor)
+        os.fsync(directory_descriptor)
+        return True
+    except (OSError, ValueError):
+        return False
+    finally:
+        os.close(quarantine_descriptor)
 
 
 def _owned_review_directory_matches(
