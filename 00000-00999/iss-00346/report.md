@@ -388,6 +388,106 @@ The macOS cleanup uncertainty behavior is covered by the current-head hermetic p
 - implementation cautions adopted for execution: import generic fixtures through the public projected command before lifecycle spying; keep a fresh empty guard for the measured window and intercept `Path.open`, `builtins.open`, and `io.open`; do not read/hash generic destinations while the guard is active; normalize only named generated timestamp fields; use a fresh disposable exact-revision checkout and dynamically selected future node identifier; bind all final wheel, test, report, and review evidence to the later pushed S04 head rather than this pre-step head.
 - uncertainty retained: tests were not executed by the consultation; if a required repair falls outside plan §11.3 or a legacy public contract must change, stop and return to amendment/clarification.
 
+### S04 implementation evidence (exact pushed head)
+
+#### Source Revision and S04 Candidate Receipt
+
+| 項目 | 観測値 |
+|---|---|
+| ブランチ | `iss-00346-integration-distribution-and-final-quality` |
+| candidate HEAD | `0c510e2137a6b211dd7a0d881f0c7d2190fdff97` |
+| remote HEAD | `0c510e2137a6b211dd7a0d881f0c7d2190fdff97`（一致） |
+| working tree | clean（`git status --short` 空） |
+| candidate wheel | `spec_dock-0.2.3-py3-none-any.whl` |
+| wheel SHA-256 / size | `7fba9d9c90322d4f996c1c3ac843d23959bafbe239af9f13ef3e3528530df593` / 967,319 bytes |
+| installed origin | integration fixtureのisolated venvへcandidate wheelをinstall（source checkout fallbackなし） |
+| production repair | `false`（S04 remediationは許可された2 test pathのみ） |
+
+#### Opaque Lifecycle Matrix
+
+| Fixture | Generic target | Import | Lifecycle body-open attempts | Decode errors | Typed promotion | ADR mirror promotion |
+|---|---|---:|---:|---:|---:|---:|
+| binary | root | pass | 0 | 0 | false | false |
+| ZIP | Initiative | pass | 0 | 0 | false | false |
+| invalid UTF-8 `.md` | Epic | pass | 0 | 0 | false | false |
+| NUL-bearing `.md` | Issue | pass | 0 | 0 | false | false |
+| ADR-looking generic `.md` | Issue | pass | 0 | 0 | false | false |
+
+The fixtures are imported through the projected public `artifact import file` command before measurement. The measured guard is a fresh instance after a separate sensitivity negative and intercepts `Path.open`, `Path.read_text`, `Path.read_bytes`, `builtins.open`, and `io.open`. Generic destinations are not read, hashed, decoded, or ZIP-inspected while the lifecycle guard is active. `validate`, dependency check, `sync`, active-manifest loading, and context-pack generation completed with no generic body access; ADR mirror contains only the typed baseline.
+
+#### Projection and Context Equivalence
+
+- Required projection path set was asserted complete: `.agent/index-all.json`, `.agent/index.json`, `.agent/tree-all.json`, `.agent/tree.json`, `.agent/deps-issues.json`, `tree-all.puml`, `tree.puml`, `deps-issues.puml`, `deps-raw.puml`, `dashboard.md`, and `active/context-pack.md`.
+- Before/after generic import snapshots, dependency JSON output, context pack, typed/blank artifact names, and ADR mirror entries were equal. Only the named JSON `generated_at` field is normalized; non-JSON projections and context/deps text are exact comparisons.
+- Generic filenames and body sentinels were absent from generated projections; no generic artifact became typed, blank, canonical, or an ADR mirror source.
+
+#### Compatibility Regression Evidence
+
+| Suite / collected nodes | Result |
+|---|---|
+| `tests/cli_runtime/test_artifact_import_s04.py` (including `tc-346-s04-003` generic-versus-legacy barrier race) | 26 passed / 54.35s |
+| `tests/cli_runtime/test_artifact_import_chatgpt_output.py` | 4 passed / 11.76s |
+| `tests/cli_runtime/test_workbench.py` | 18 passed / 32.53s |
+| `tests/cli_runtime/test_artifact_import_file.py` | 7 passed / 7.34s |
+| `tests/cli_runtime/test_runtime_new_doc_s09.py -k artifact` (6 collected nodes) | 6 passed / 0.24s |
+| `tests/unit/application/test_import_file_artifact.py tests/unit/presentation/test_artifact_import_file.py` | 34 passed / 0.27s |
+| `tests/integration/test_epic_00343_distribution.py -k 'dogfood or opaque or compatibility'` | 2 passed / 17.40s |
+| full integration distribution file | 13 passed / 36.64s |
+
+No existing public filename, result field, selector, digest/count contract, or Workbench source-wins expectation was changed. Shared-slot concurrency now includes generic import versus a legacy blank creator under a fixed clock; both outputs receive distinct slots and preserve the sentinel/source bytes.
+
+#### Fresh-Update-Dogfood Matrix / dogfood
+
+| Check | Result |
+|---|---|
+| exact disposable checkout revision | candidate HEAD above, detached and clean before update |
+| existing `epic-00343/.workbench/README.md` before/after update | absent / absent |
+| installed CLI update | pass |
+| provider source and canonical Initiative/Epic/Issue bytes | unchanged |
+| future Issue shell | pass; README byte-equal to wheel Issue template and tracked |
+| generic import | pass; `storage_identity=generic`, `canonical=false`, source ignored/untracked and bytes preserved |
+| projected `validate` / `sync --no-github` | pass / pass |
+| exact expected status manifest | pass; only known managed runtime update paths for update-only and future node tracked subtree plus generic destination for future flow |
+| disposable cleanup / real provider worktree | pass / removed; HEAD and status unchanged |
+
+The no-backfill negative injects the forbidden Epic README in the disposable checkout and observes a path-specific assertion failure before removing it. The future-flow privacy oracle scans stdout/stderr, flattened JSON values, and bounded `.agent` provenance files; expected repository-relative source is allowed while absolute checkout/source paths, body text, digest, byte count, derived marker, and sensitive field names are rejected.
+
+#### Provider-to-Dogfood Projection Manifest
+
+- Wheel/provider managed roots `docs`, `templates`, `scripts`, and `system` were compared byte-for-byte with the projected `spec-dock/{docs,templates,scripts,system}` tree after update.
+- Projection parity: pass. Unexpected managed files: none.
+- Update-only status manifest: `spec-dock/scripts/spec_dock_runtime/application/import_file_artifact.py` and `spec-dock/scripts/spec_dock_runtime/domain/artifacts.py` only (known provider-managed refresh paths).
+- Future-flow status manifest: the same two managed refresh paths plus the dynamically created future Issue subtree (`.meta.json`, Workbench README, requirement/design/plan/report, `artifacts/rules.md`, and imported generic destination).
+- Provider source writes from the consumer: zero; real provider source tree and status remained unchanged.
+
+#### Step Contract Closure / S04
+
+| Closure / test ID | Evidence | Result |
+|---|---|---|
+| `tc-346-s04-001` / `CL-346-AC-009` / `CL-346-EC-013` | five public generic imports, fresh lifecycle body-open spy, zero opens/decode errors, no ADR promotion | pass |
+| `tc-346-s04-002` / `CL-346-AC-009` | complete projection/context/deps/ADR/typed set equivalence with named timestamp normalization | pass |
+| `tc-346-s04-003` / `CL-346-AC-013` / `CL-346-EC-014` | compatibility suites and generic-versus-legacy shared-slot barrier race | pass |
+| `tc-346-s04-004` / `CL-346-AC-006` / `CL-346-CON-004` | exact disposable update, provider→projection parity, no-backfill negative, exact status/cleanup | pass |
+| `tc-346-s04-005` / `CL-346-AC-006` | future shell + ignored generic import through projected runtime, privacy scan, validate/sync, expected diff | pass |
+| S04 step contract | allowed test-only paths, production repair false, real worktree clean | pass pending fresh exact-head review |
+
+#### Test Contract Closure / S04
+
+- Red/alternative evidence: pre-existing S04 lifecycle tests were Green before remediation; initial ChatGPT review identified missing closure sensitivity rather than a production failure. The remediation tests are bounded negatives for body access, no-backfill, privacy, and cross-command slot races.
+- Green evidence: commands and counts are recorded above; `uv run ruff check tests/cli_runtime/test_artifact_import_s04.py tests/integration/test_epic_00343_distribution.py` and `git diff --check` passed; `./spec-dock/scripts/spec-dock validate` reported `nodes=217`; `sync --no-github` completed with active unchanged.
+- Refactor guardrail: no production code, generic body classifier, new snapshot framework, or canonical dogfood data was changed.
+
+#### Delegated Worker Evidence / S04
+
+| Role | Changed paths | Verification | Parent integration decision |
+|---|---|---|---|
+| `dev-coder` | `tests/cli_runtime/test_artifact_import_s04.py`, `tests/integration/test_epic_00343_distribution.py` | S04 26 passed; dogfood 2 passed; compatibility 29 passed; nearest artifact 6 passed; units 34 passed; full integration 13 passed; ruff/diff-check pass | accepted; test-only remediation, no material production decision beyond approved plan |
+
+#### S04 ChatGPT Pro review gates
+
+- Initial code review session: `iss346-s04-code-review-aug2`, exact head `89480b1ef37fa433d398ccc983dd60c716599079`, `requested=Pro; resolved=Pro; verified=yes`; Artifact `artifacts/20260801t230138z-chatgpt-output-20260802t-s04-code-review-initial.md` (SHA-256 `11a5b3627834ccfa606cde85ddcb5074861a650db2cfab2a01bd9b650a92ba49`). Verdict `FAIL` with P0=0/P1=3/P2=1/P3=0. Findings were limited to report exact-head evidence, provider projection/expected diff, generic-versus-legacy slot race, and projected dogfood privacy scan; no production defect or public contract change was identified.
+- Remediation commit: `0c510e2137a6b211dd7a0d881f0c7d2190fdff97`; this report section binds the observed tests and matrices to that successor head. A fresh exact-head ChatGPT Pro review is required before S04 closure.
+
 ## 実装記録（セッションログ） (必須)
 
 ### セッションログ（2026-07-29 HH:MM - HH:MM）
