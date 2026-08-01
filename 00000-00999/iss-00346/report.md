@@ -380,6 +380,14 @@ The macOS cleanup uncertainty behavior is covered by the current-head hermetic p
 - macOS clone and cleanup trust boundary are Green; copy/rename fallback is absent, parent/stage identity and cleanup are observed, and same-UID exclusion is recorded without overclaiming.
 - production repair: `false`。S03のexact-head ChatGPT Pro binding-correction reviewはpass（P0/P1/P2/P3=0）し、test/probe/reportのbounded scopeでcloseした。provider/runtime変更はなく、S04はpre-step head-binding gate後に開始できる。
 
+### S04 ChatGPT pre-step evidence
+
+- pre-step session: `iss346-s04-prestep-aug2`。formal wrapper model evidence: `requested=Pro; resolved=Pro; status=already-selected; strategy=select; verified=yes`。GitHub connector inspection succeeded for `chemitaro/spec-dock`; current branch `iss-00346-integration-distribution-and-final-quality` resolved to pushed HEAD `c3da337ad10f51b75943f4856484467bb53f1272` and attached blobs matched that revision.
+- Artifact: `artifacts/20260801t222431z-chatgpt-output-20260802t-s04-chatgpt-pro-prestep.md`（SHA-256 `3473f23ece7fd5a2fc1a42c8c204edd5de9c43d538e0034d405914628dcbe4da`、26,553 bytes、`import_kind=chatgpt-output`、`storage_identity=blank`）。Artifactは補助evidenceであり、canonical plan §11を上書きしない。
+- advisory conclusion: current production code is provisionally a no-op for S04; bounded test-only additions should close the missing opaque fixture matrix, fresh body-open spy, complete projection/context equivalence, and disposable dogfood no-backfill/future-shell plus generic import cards. Existing compatibility suites should remain unchanged; production repair is allowed only after an exact-head test reproduces a contract defect in a plan-listed repair path.
+- implementation cautions adopted for execution: import generic fixtures through the public projected command before lifecycle spying; keep a fresh empty guard for the measured window and intercept `Path.open`, `builtins.open`, and `io.open`; do not read/hash generic destinations while the guard is active; normalize only named generated timestamp fields; use a fresh disposable exact-revision checkout and dynamically selected future node identifier; bind all final wheel, test, report, and review evidence to the later pushed S04 head rather than this pre-step head.
+- uncertainty retained: tests were not executed by the consultation; if a required repair falls outside plan §11.3 or a legacy public contract must change, stop and return to amendment/clarification.
+
 ## 実装記録（セッションログ） (必須)
 
 ### セッションログ（2026-07-29 HH:MM - HH:MM）
