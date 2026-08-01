@@ -46,6 +46,19 @@ def _failure(probe: str, reason: str) -> int:
     return _emit(probe=probe, result="fail", exit_status=1, reason=reason)
 
 
+def _linux_container_image_digest() -> str | None:
+    value = os.environ.get("ISS346_CONTAINER_IMAGE_DIGEST", "").strip()
+    if value == "not_applicable":
+        return value
+    if value.startswith("sha256:") and len(value) == len("sha256:") + 64:
+        try:
+            int(value.removeprefix("sha256:"), 16)
+        except ValueError:
+            return None
+        return value
+    return None
+
+
 def _destination_root() -> Path | None:
     raw = os.environ.get("ISS346_PLATFORM_DEST", "").strip()
     if not raw:
@@ -108,6 +121,9 @@ def _publish_once(contracts: Any, publisher: Any, workspace: Path, source: Path,
 def _linux_preflight(probe: str) -> int:
     if not sys.platform.startswith("linux"):
         return _unavailable(probe, "linux_host_required")
+    container_image_digest = _linux_container_image_digest()
+    if container_image_digest is None:
+        return _failure(probe, "container_image_digest_missing")
     destination_root = _destination_root()
     if destination_root is None:
         return _unavailable(probe, "destination_unavailable")
@@ -149,6 +165,7 @@ def _linux_preflight(probe: str) -> int:
             destination_directory_fsync_succeeds=directory_fsync,
             source_destination_same_device=source_parent.stat().st_dev == workspace.stat().st_dev,
             formal_no_replace_link_succeeds=False,
+            container_image_digest=container_image_digest,
             note="formal_link_deferred_to_linux-supported-publication",
         )
     except OSError:
@@ -165,6 +182,9 @@ def _linux_preflight(probe: str) -> int:
 def _linux_supported_publication(probe: str) -> int:
     if not sys.platform.startswith("linux"):
         return _unavailable(probe, "linux_host_required")
+    container_image_digest = _linux_container_image_digest()
+    if container_image_digest is None:
+        return _failure(probe, "container_image_digest_missing")
     destination_root = _destination_root()
     runtime = _load_runtime()
     if destination_root is None:
@@ -235,6 +255,7 @@ def _linux_supported_publication(probe: str) -> int:
             source_destination_same_device=source_parent.stat().st_dev == workspace.stat().st_dev,
             bytes_matched=bytes_matched,
             source_unchanged=source_unchanged,
+            container_image_digest=container_image_digest,
         )
     except contracts.BinaryArtifactPublishError as error:
         if error.code == "publication_unsupported":
@@ -250,6 +271,9 @@ def _linux_supported_publication(probe: str) -> int:
 def _linux_capability_insufficient(probe: str) -> int:
     if not sys.platform.startswith("linux"):
         return _unavailable(probe, "linux_host_required")
+    container_image_digest = _linux_container_image_digest()
+    if container_image_digest is None:
+        return _failure(probe, "container_image_digest_missing")
     destination_root = _destination_root()
     runtime = _load_runtime()
     if destination_root is None:
@@ -260,6 +284,8 @@ def _linux_capability_insufficient(probe: str) -> int:
     workspace, source_parent, source = _workspace(destination_root)
     destination = workspace / "formal.bin"
     points: list[str] = []
+    visible_stage_open_calls: list[str] = []
+    pathname_cleanup_calls: list[str] = []
 
     def inject(point: str) -> None:
         points.append(point)
@@ -267,13 +293,30 @@ def _linux_capability_insufficient(probe: str) -> int:
             raise OSError(errno.EPERM, "injected capability fault")
 
     publisher = publisher_module.FilesystemBinaryArtifactPublisher(fault_injector=inject)
+    original_open = publisher_module.os.open
+    original_unlink = publisher_module.os.unlink
+
+    def observe_open(path: Any, flags: int, *args: Any, **kwargs: Any) -> int:
+        path_name = os.fsdecode(path)
+        if path_name.startswith(".spec-dock-import-"):
+            visible_stage_open_calls.append(path_name)
+        return original_open(path, flags, *args, **kwargs)
+
+    def observe_unlink(path: Any, *args: Any, **kwargs: Any) -> None:
+        pathname_cleanup_calls.append(os.fsdecode(path))
+        return original_unlink(path, *args, **kwargs)
+
+    publisher_module.os.open = observe_open
+    publisher_module.os.unlink = observe_unlink
     try:
         try:
             _publish_once(contracts, publisher, workspace, source, destination)
         except contracts.BinaryArtifactPublishError as error:
             formal_destination_absent = not destination.exists()
-            visible_stage_or_probe_absent = not tuple(workspace.glob(".spec-dock-import-*"))
-            pathname_cleanup_absent = visible_stage_or_probe_absent
+            visible_stage_or_probe_absent = not visible_stage_open_calls and not tuple(
+                workspace.glob(".spec-dock-import-*")
+            )
+            pathname_cleanup_absent = not pathname_cleanup_calls
             fault_injected = "linux_directory_durability" in points
             failed_closed = (
                 error.code == "publication_unsupported"
@@ -284,10 +327,14 @@ def _linux_capability_insufficient(probe: str) -> int:
             )
         else:
             formal_destination_absent = False
-            visible_stage_or_probe_absent = not tuple(workspace.glob(".spec-dock-import-*"))
-            pathname_cleanup_absent = visible_stage_or_probe_absent
+            visible_stage_or_probe_absent = not visible_stage_open_calls and not tuple(
+                workspace.glob(".spec-dock-import-*")
+            )
+            pathname_cleanup_absent = not pathname_cleanup_calls
             fault_injected = "linux_directory_durability" in points
             failed_closed = False
+        publisher_module.os.open = original_open
+        publisher_module.os.unlink = original_unlink
         return _emit(
             probe=probe,
             result="pass" if failed_closed else "fail",
@@ -295,11 +342,16 @@ def _linux_capability_insufficient(probe: str) -> int:
             formal_destination_absent=formal_destination_absent,
             visible_stage_or_probe_absent=visible_stage_or_probe_absent,
             pathname_cleanup_absent=pathname_cleanup_absent,
+            visible_stage_open_calls=len(visible_stage_open_calls),
+            pathname_cleanup_calls=len(pathname_cleanup_calls),
             fallback_absent=failed_closed,
             fault_injected=fault_injected,
             source_destination_same_device=source_parent.stat().st_dev == workspace.stat().st_dev,
+            container_image_digest=container_image_digest,
         )
     finally:
+        publisher_module.os.open = original_open
+        publisher_module.os.unlink = original_unlink
         shutil.rmtree(workspace, ignore_errors=True)
         shutil.rmtree(source_parent, ignore_errors=True)
 
@@ -346,6 +398,7 @@ def _macos_preflight(probe: str) -> int:
             stage_opened_exclusive_nofollow=stage_regular,
             parent_identity_stable=parent_stable,
             source_destination_same_device=source_parent.stat().st_dev == workspace.stat().st_dev,
+            container_image_digest="not_applicable",
         )
     except OSError:
         return _unavailable(probe, "macos_stage_unavailable")
@@ -374,6 +427,8 @@ def _macos_clone_publication(probe: str) -> int:
     stage_devices: list[int] = []
     commit_names: list[str] = []
     stage_flags: list[int] = []
+    clone_calls: list[str] = []
+    fallback_calls: list[str] = []
 
     def observe(point: str) -> None:
         if point == "before_publication":
@@ -381,6 +436,10 @@ def _macos_clone_publication(probe: str) -> int:
 
     publisher = publisher_module.FilesystemBinaryArtifactPublisher(fault_injector=observe)
     original_open = publisher_module.os.open
+    original_rename = publisher_module.os.rename
+    original_replace = publisher_module.os.replace
+    original_link = publisher_module.os.link
+    original_clone = publisher_module._clone_macos_descriptor
 
     def observe_stage_open(path: Any, flags: int, *args: Any, **kwargs: Any) -> int:
         path_name = os.fsdecode(path)
@@ -388,7 +447,27 @@ def _macos_clone_publication(probe: str) -> int:
             stage_flags.append(flags)
         return original_open(path, flags, *args, **kwargs)
 
+    def observe_clone(*args: Any, **kwargs: Any) -> None:
+        clone_calls.append("fclonefileat")
+        return original_clone(*args, **kwargs)
+
+    def observe_rename(*args: Any, **kwargs: Any) -> Any:
+        fallback_calls.append("rename")
+        return original_rename(*args, **kwargs)
+
+    def observe_replace(*args: Any, **kwargs: Any) -> Any:
+        fallback_calls.append("replace")
+        return original_replace(*args, **kwargs)
+
+    def observe_link(*args: Any, **kwargs: Any) -> Any:
+        fallback_calls.append("link")
+        return original_link(*args, **kwargs)
+
     publisher_module.os.open = observe_stage_open
+    publisher_module.os.rename = observe_rename
+    publisher_module.os.replace = observe_replace
+    publisher_module.os.link = observe_link
+    publisher_module._clone_macos_descriptor = observe_clone
     original_publish = publisher._publish_no_replace
 
     def record_commit(*args: Any, **kwargs: Any) -> None:
@@ -423,7 +502,8 @@ def _macos_clone_publication(probe: str) -> int:
             for flags in stage_flags
         )
         formal_no_replace_clone_succeeds = commit_names[:1] == [destination.name]
-        copy_or_rename_fallback_absent = formal_no_replace_clone_succeeds
+        clone_primitive_succeeds = len(clone_calls) >= 2
+        copy_or_rename_fallback_absent = not fallback_calls
         owned_stage_cleanup_verified = result.cleanup_state == "removed" and not tuple(
             workspace.glob(".spec-dock-import-*")
         )
@@ -436,6 +516,7 @@ def _macos_clone_publication(probe: str) -> int:
             stage_is_destination_side,
             stage_opened_exclusive_nofollow,
             formal_no_replace_clone_succeeds,
+            clone_primitive_succeeds,
             copy_or_rename_fallback_absent,
             owned_stage_cleanup_verified,
             collision_preserved,
@@ -454,7 +535,10 @@ def _macos_clone_publication(probe: str) -> int:
             stage_opened_exclusive_nofollow=stage_opened_exclusive_nofollow,
             parent_identity_stable=parent_identity_stable,
             formal_no_replace_clone_succeeds=formal_no_replace_clone_succeeds,
+            clone_primitive_calls=len(clone_calls),
+            clone_primitive_succeeds=clone_primitive_succeeds,
             copy_or_rename_fallback_absent=copy_or_rename_fallback_absent,
+            copy_rename_fallback_calls=len(fallback_calls),
             owned_stage_cleanup_verified=owned_stage_cleanup_verified,
             same_uid_exclusion_acknowledged=True,
             existing_destination_preserved=collision_preserved,
@@ -462,6 +546,7 @@ def _macos_clone_publication(probe: str) -> int:
             source_destination_same_device=source_parent.stat().st_dev == destination_device,
             bytes_matched=bytes_matched,
             source_unchanged=source_unchanged,
+            container_image_digest="not_applicable",
         )
     except contracts.BinaryArtifactPublishError as error:
         if error.code == "publication_unsupported":
@@ -471,6 +556,10 @@ def _macos_clone_publication(probe: str) -> int:
         return _failure(probe, "publication_contract_failed")
     finally:
         publisher_module.os.open = original_open
+        publisher_module.os.rename = original_rename
+        publisher_module.os.replace = original_replace
+        publisher_module.os.link = original_link
+        publisher_module._clone_macos_descriptor = original_clone
         shutil.rmtree(workspace, ignore_errors=True)
         shutil.rmtree(source_parent, ignore_errors=True)
 
