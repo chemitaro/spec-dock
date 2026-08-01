@@ -52,6 +52,7 @@ Disposition ごとの必須証跡:
 | D-001 | resolved | interpretation | orchestrator | `pre-feature existing consumer`を歴史的revisionに固定すべきか不明瞭 | READMEなしvalid synthetic fixture; historical SHA固定 | 標準はREADMEなしvalid synthetic fixtureとし、歴史的revisionを使う場合だけfeature非搭載の実証とexact SHAを要求する | 親Epic E-AC-004とCandidate 3 verificationは観測対象の状態を規定し、特定revisionを必須化していない | promoted_to_plan | clarification research §4、`requirement.md` I346-ASM-002 / I346-ASM-003 / I346-RQ-004 / I346-AC-004、`design.md` §7.3、`plan.md` S02 | plan fresh reviewでclosureを確認 |
 | D-002 | resolved | operation | operator | Luna・Max実装を補助するstep具体化と、sub-agent reviewerに代わるChatGPT Pro reviewのIssue-local運用が未定義 | 既定SpecDock reviewer pathを維持; Issue 346だけChatGPT Proへ置換 | Issue 346では各step開始前にcommit/push済みheadをChatGPT Proで具体化しArtifact保存する。implementation reviewはcurrent reviewer Developer Instructionsを1つのChatGPT threadへ統合する | 2026-08-02 operator instruction。製品要件・設計・ACを変えず、低authority Artifactとcanonical planに実行手続きだけを固定する | promoted_to_plan | `artifacts/20260801t152944z-disc-chatgpt-assisted-execution-agreement.md`; `plan.md` §2.3、各step §x.0、S99 | Issue 346 execution中に適用。他Issue/全体workflowへ波及させない |
 | D-003 | resolved | operation | operator / orchestrator | Cheetah指定の品質ゲートとS01前段ChatGPT具体化が、正式wrapperの現行モデル選択・ブラウザ状態で実行可能か未確定 | Cheetahを実行して品質ゲートとする; formal Pro laneで代替; 失敗出力を採用せずローカル証跡を先行 | Cheetahはformal wrapperのdry-runで`gpt-5.2`へ正規化され、品質証跡として使用しない。前段具体化は前景実行へ復旧後にProで取得できたため、S01の補助Artifactを採用する。以前のdetached/incomplete-capture出力と無関係なstale出力は引き続き不採用とする | `plan.md` §2.3のmodel-evidence境界を維持し、モデル名・レビューpassを未確認のまま主張しないため | partially_adopted | `iss346-s01-prestep-aug2e`（`requested=Pro; resolved=Pro; verified=yes`）、Artifact import receipt、過去slugs (`iss346-s01-pre-step`, `iss346-s01-prestep-aug2`, `iss346-s01-followup`, `iss346-s01-prestep-tty`, `iss346-s01-wrapper-smoke`)、Cheetah dry-run、stale `iss00334` harvestの不採用記録 | S01実装をcurrent HEADで再受領し、current-head code reviewを取得する |
+| D-004 | resolved | test-strategy | ChatGPT Pro pre-step / orchestrator | current HEADに対して既存S01のwheel receiptがstaleになり、sensitivity evidenceがallowlist missingだけに限定されていた | production/package repair; test-only denylist negative + installed validate; broad inventory/metadata framework | package/installer変更は行わず、allowed test pathだけにforbidden nested README・cache entryのcontrolled negativeとfresh consumer後のinstalled `validate` assertionを追加した。strict clean receiptはcanonical contractどおり維持し、コミット後にcurrent HEADで再実行した | ChatGPT Artifact EAL-005、plan §8.3/§8.5、worker diff、current focused/full test results | applied | `tests/integration/test_epic_00343_distribution.py`; commit `9c721d50eb0e4b2ca5bf16fd6f7e3b0f4a9e1c9c6`; S01 current-cycle test output | current-head ChatGPT Pro implementation reviewでscopeとtest sensitivityを確認する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -199,7 +200,42 @@ pass
 
 ### S01 closure decision
 
-旧candidate HEADでのローカル実装・テスト・scope guardはGreenで、test-only差分をcommit/push済みである。valid pre-step Artifactは取得済みだが、ChatGPTが指摘したcurrent HEADへの再受領と、plan §8.6のChatGPT Pro implementation review条件は未充足のため、S01は「実装済み・current-cycle再検証／レビュー待ち」とし、S02の実装開始を停止する。
+valid pre-step Artifact取得後、提案したtest-only completionを反映してcurrent HEADで再build・再検証した。実装、focused/full S01、関連Workbench/readme、ruff、diff-checkはGreenである。一方、plan §8.6のcurrent-head ChatGPT Pro implementation review条件は未充足のため、S01は「current-cycle実装・再検証済み／レビュー待ち」とし、S02の実装開始を停止する。
+
+### S01 current-cycle candidate receipt（2026-08-02）
+
+| 項目 | 観測値 |
+|---|---|
+| ブランチ | `iss-00346-integration-distribution-and-final-quality` |
+| local HEAD | `9c721d50eb0e4b2ca5bf16fd6f7e3b0f4a9e1c9c6` |
+| remote HEAD | `9c721d50eb0e4b2ca5bf16fd6f7e3b0f4a9e1c9c6`（一致） |
+| working tree | clean（`git status --short` 空、dist/buildはignored生成物） |
+| candidate wheel | `dist/spec_dock-0.2.3-py3-none-any.whl` |
+| package version | `0.2.3` |
+| wheel SHA-256 | `19fa672f90a08e1bdd93da6665a59ac2b800022625ab214258fcece2b506d893` |
+| sorted ZIP inventory | 323 entries、5 README allowlist、stale/cache denylist pass |
+| production repair | なし。test-only bounded completion |
+
+#### Current-cycle verification
+
+```text
+uv run pytest tests/integration/test_epic_00343_distribution.py --run-full-regression -q
+4 passed in 5.70s
+
+uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py -k 'workbench or readme' --run-full-regression -q
+1 passed, 34 deselected in 0.11s
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_69 or workbench_readme_distribution or workbench_readme_build_prune or isolated_wheel_install_runs_init_update or fresh_init_creates_only_tracked_root_workbench_readme' --run-full-regression -q
+16 passed, 550 deselected in 33.86s
+
+uv run ruff check tests/integration/test_epic_00343_distribution.py
+All checks passed
+
+git diff --check
+pass
+```
+
+S01 focused suite was intentionally rerun only after commit/push; the worker's pre-commit run recorded `1 failed, 3 passed` solely because the strict receipt observes the in-progress `M` test file. The post-commit current-cycle run is the closure evidence. The candidate wheel inventory assertion was independently rerun against the exact wheel and returned `inventory_entries=323`.
 
 ## 実装記録（セッションログ） (必須)
 
