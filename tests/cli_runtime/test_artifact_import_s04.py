@@ -78,6 +78,21 @@ def _post_rollout_modules():
     return artifact_import_commands, ArtifactImportFileArgs
 
 
+def _file_import_modules():
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from importlib import import_module
+
+        from spec_dock_runtime.application.contracts import FileArtifactImportRequest
+
+        import_file_module = import_module("spec_dock_runtime.application.import_file_artifact")
+        create_module = import_module("spec_dock_runtime.application.create_artifact_doc")
+    finally:
+        sys.path.pop(0)
+    return FileArtifactImportRequest, import_file_module, create_module
+
+
 class _FixedClock:
     def now_iso(self) -> str:
         return "2026-07-14T01:02:03Z"
@@ -348,6 +363,79 @@ class TestArtifactImportS04(CliRuntimeHarness):
                 "20260714t010203z-01-chatgpt-output-collision.md",
                 "20260714t010203z-chatgpt-output-collision.md",
             ]
+            assert sentinel.read_bytes() == b"sentinel bytes"
+
+    def test_tc_346_s04_003_generic_file_races_legacy_creator_without_overwrite(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        (
+            _import_module,
+            _ArtifactImportError,
+            _ArtifactImportRequest,
+            CreateArtifactDocRequest,
+            _Ports,
+            bootstrap,
+            _Publisher,
+        ) = _runtime_modules()
+        FileArtifactImportRequest, import_file_module, create_module = _file_import_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            issue_dir = self._prepare_target(target)
+            source = target / "spec-dock" / ".workbench" / "concurrent-generic.bin"
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source_body = b"generic concurrent body\x00\xff"
+            source.write_bytes(source_body)
+            sentinel = issue_dir / "artifacts" / "20260714t010203z-99--sentinel.bin"
+            sentinel.write_bytes(b"sentinel bytes")
+
+            monkeypatch.setattr(bootstrap.infra_clock, "now_iso", _FixedClock().now_iso)
+            context = bootstrap.build_runtime(target / "spec-dock", repo_root=target)
+            barrier = threading.Barrier(2)
+            original_import_acquire = import_file_module._acquire_create_lock
+            original_create_acquire = create_module._acquire_create_lock
+
+            def import_acquire_after_barrier(specdock_dir):
+                barrier.wait(timeout=5)
+                return original_import_acquire(specdock_dir)
+
+            def create_acquire_after_barrier(specdock_dir):
+                barrier.wait(timeout=5)
+                return original_create_acquire(specdock_dir)
+
+            monkeypatch.setattr(import_file_module, "_acquire_create_lock", import_acquire_after_barrier)
+            monkeypatch.setattr(create_module, "_acquire_create_lock", create_acquire_after_barrier)
+            generic_request = FileArtifactImportRequest(
+                target_kind="issue",
+                target_value="317",
+                source_path=source,
+            )
+            legacy_request = CreateArtifactDocRequest(
+                artifact_type="blank",
+                scope_node_id="317",
+                scope_kind="issue",
+                title="Legacy concurrent notes",
+                slug="legacy-concurrent-notes",
+            )
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                generic_future = executor.submit(context.use_cases.import_file_artifact, generic_request)
+                legacy_future = executor.submit(context.use_cases.create_artifact_doc, legacy_request)
+                generic_result = generic_future.result(timeout=10)
+                legacy_result = legacy_future.result(timeout=10)
+
+            generic_path = target / generic_result.destination
+            legacy_path = target / legacy_result.path
+            assert generic_path.is_file()
+            assert legacy_path.is_file()
+            assert generic_path != legacy_path
+            assert generic_path.name.endswith("--concurrent-generic.bin")
+            assert legacy_path.name.endswith("-legacy-concurrent-notes.md")
+            assert generic_path.name != legacy_path.name
+            assert generic_path.name.startswith("20260714t010203z")
+            assert generic_path.read_bytes() == source_body
+            assert legacy_path.read_bytes()
+            assert source.read_bytes() == source_body
             assert sentinel.read_bytes() == b"sentinel bytes"
 
     def test_tc317_s04_02_exact_path_eexist_rescans_then_uses_next_slot(self) -> None:
