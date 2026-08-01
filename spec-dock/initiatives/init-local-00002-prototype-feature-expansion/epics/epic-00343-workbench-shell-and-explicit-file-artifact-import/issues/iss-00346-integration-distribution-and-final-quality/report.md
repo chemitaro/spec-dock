@@ -265,8 +265,8 @@ S01 focused suite was intentionally rerun only after commit/push; the worker's p
 
 ### S02 implementation evidence (current cycle)
 
-- implementation commit: `1650c73c53f7397cc5f29d5262479f860125c9d6`（`tests/integration/test_epic_00343_distribution.py` のtest-only追加、provider/plan/reportは変更なし）。
-- current pushed HEAD: `1650c73c53f7397cc5f29d5262479f860125c9d6`、local/remote一致、実装差分の変更パスはintegration test 1ファイルのみ。
+- executable implementation commit: `1650c73c53f7397cc5f29d5262479f860125c9d6`、snapshot remediation commit: `dfee5a4d54a880f0d5ca5fd57bb699540cb3eb9c`（いずれも`tests/integration/test_epic_00343_distribution.py`のtest-only、provider/plan/reportは変更なし）。
+- review-bound pushed HEAD before this evidence update: `8e2ff88af676709f4d18eab30d36e29013e715c1`、local/remote一致。`8e2ff88a`は`dfee5a4d`後のreport/Artifact-only successorで、実装差分の変更パスはintegration test 1ファイルのみ。
 - S02 candidate wheelはS01のinstalled fixtureを再利用し、wheel ZIPからguide/template bytesを読み込む。synthetic existing hierarchyは `init-00401` / `epic-00402` / `iss-00403`、future hierarchyは `init-00501` / `epic-00502` / `iss-00503`。
 - 4つのS02 test cardは、README absent preflight、update no-backfill、future shell、path-specific illegal preexisting README negativeを検証する。production repairは不要（`production_repair_justified=false`）。
 
@@ -288,6 +288,26 @@ uv run pytest tests/unit/infra/test_init_update.py \
 
 The single unit failure is the pre-existing `test_shipped_docs_describe_workbench_readme_boundary`: it reports missing Issue 345 planned/unimplemented generic-import claims in `docs/README.md` and `docs/reference_worktree.md`. S02 changed neither provider docs nor those assertions, so it is recorded as an unrelated existing failure and not repaired in this vertical slice. `uv run ruff check tests/integration/test_epic_00343_distribution.py` and `git diff --check` passed.
 
+#### Post-remediation verification receipt
+
+The following commands were rerun after the `dfee5a4d` test-oracle remediation, at review-bound pushed HEAD `8e2ff88a` (the only later change is report/Artifact evidence):
+
+```text
+uv run pytest tests/integration/test_epic_00343_distribution.py \
+  -k 'existing_consumer or no_backfill or future_node' --run-full-regression -q
+4 passed, 4 deselected in 13.42s
+
+uv run pytest tests/integration/test_epic_00343_distribution.py \
+  --run-full-regression -q
+8 passed in 15.03s
+
+uv run ruff check tests/integration/test_epic_00343_distribution.py
+All checks passed!
+
+git diff --check
+pass
+```
+
 #### S02 scope and gate state
 
 The worker did not edit canonical reports or provider code. S02 remains pending the current pushed-head ChatGPT Pro implementation review. The review must focus on synthetic fixture validity, no-backfill sensitivity, canonical/metadata/payload preservation, wheel-template equality, future-node tracking, controlled negative specificity, and scope boundedness. S03 must not start until this review returns zero unresolved P0/P1 findings.
@@ -303,13 +323,14 @@ The worker did not edit canonical reports or provider code. S02 remains pending 
 
 | Closure / contract | Evidence | Result |
 |---|---|---|
-| `CL-346-AC-004` / `CL-346-EC-004` | 既存4 scope README absent、update後もabsent、candidate wheel guideのみmanaged delta | pass（test evidence） |
-| `CL-346-AC-005` / `CL-346-EC-005` | future `init-00501` / `epic-00502` / `iss-00503` README template byte equality・tracked | pass（test evidence） |
-| `CL-346-CON-006` / `CL-346-EC-006` | payload bytes/ignored/untracked、canonical/graph snapshot equality、path-specific illegal README negative | pass（test evidence） |
+| `tc-346-s02-001` → `CL-346-CON-006`, `CL-346-EC-004`, `CL-346-EC-005`, `CL-346-EC-006` | valid synthetic fixture、4 scope README absent、payload/graph/canonical snapshot preflight、stale guide differs from wheel | pass（test evidence） |
+| `tc-346-s02-002` → `CL-346-AC-004`, `CL-346-EC-005`, `CL-346-EC-006` | update後のexisting no-backfill、payload/metadata/deps/canonical equality、managed delta guide-only | pass（test evidence） |
+| `tc-346-s02-003` → `CL-346-AC-005` | future `init-00501` / `epic-00502` / `iss-00503` README template byte equality・tracked、既存scope absent維持 | pass（test evidence） |
+| `tc-346-s02-004` → `CL-346-AC-004`, `CL-346-EC-004` | preexisting Issue READMEを1件injectし、relative path-specific AssertionErrorを確認 | pass（negative sensitivity） |
 | Step Contract Closure / S02 | 4 cards、candidate-wheel installed runtime、test-only bounded paths、historical option `no` | pass（implementation evidence） |
 | Test Contract Closure / S02 | focused 4 passed、full integration 8 passed、ruff/diff-check pass | pass（implementation evidence） |
 | Delegated Worker Evidence / S02 | worker changed integration test only、production repair `false`、no material implementation decisions | pass |
-| ChatGPT Pro implementation review | current pushed HEAD `dfee5a4d...`でP0/P1 unresolved 0が必要 | pending |
+| ChatGPT Pro implementation review | review-bound pushed HEAD `8e2ff88a...`でP0/P1 unresolved 0が必要 | pending |
 
 ## 実装記録（セッションログ） (必須)
 
