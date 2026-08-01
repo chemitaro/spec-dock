@@ -51,6 +51,7 @@ Disposition ごとの必須証跡:
 |---|---|---|---|---|---|---|---|---|---|---|
 | D-001 | resolved | interpretation | orchestrator | `pre-feature existing consumer`を歴史的revisionに固定すべきか不明瞭 | READMEなしvalid synthetic fixture; historical SHA固定 | 標準はREADMEなしvalid synthetic fixtureとし、歴史的revisionを使う場合だけfeature非搭載の実証とexact SHAを要求する | 親Epic E-AC-004とCandidate 3 verificationは観測対象の状態を規定し、特定revisionを必須化していない | promoted_to_plan | clarification research §4、`requirement.md` I346-ASM-002 / I346-ASM-003 / I346-RQ-004 / I346-AC-004、`design.md` §7.3、`plan.md` S02 | plan fresh reviewでclosureを確認 |
 | D-002 | resolved | operation | operator | Luna・Max実装を補助するstep具体化と、sub-agent reviewerに代わるChatGPT Pro reviewのIssue-local運用が未定義 | 既定SpecDock reviewer pathを維持; Issue 346だけChatGPT Proへ置換 | Issue 346では各step開始前にcommit/push済みheadをChatGPT Proで具体化しArtifact保存する。implementation reviewはcurrent reviewer Developer Instructionsを1つのChatGPT threadへ統合する | 2026-08-02 operator instruction。製品要件・設計・ACを変えず、低authority Artifactとcanonical planに実行手続きだけを固定する | promoted_to_plan | `artifacts/20260801t152944z-disc-chatgpt-assisted-execution-agreement.md`; `plan.md` §2.3、各step §x.0、S99 | Issue 346 execution中に適用。他Issue/全体workflowへ波及させない |
+| D-003 | resolved | operation | operator / orchestrator | Cheetah指定の品質ゲートとS01前段ChatGPT具体化が、正式wrapperの現行モデル選択・ブラウザ状態で実行可能か未確定 | Cheetahを実行して品質ゲートとする; formal Pro laneで代替; 失敗出力を採用せずローカル証跡を先行 | Cheetahはformal wrapperのdry-runで`gpt-5.2`へ正規化され、S01の新規sessionは送信前にworker detached/incomplete-captureとなったため、Cheetahを品質証跡として使用せず、無関係なstale出力も採用しない。S01レビューはfreshなPro証跡取得まで保留する | `plan.md` §2.3のmodel-evidence境界を維持し、モデル名・レビューpassを未確認のまま主張しないため | deferred | `oracle-browser-recovery` diagnostics、S01 attempted slugs (`iss346-s01-pre-step`, `iss346-s01-prestep-aug2`, `iss346-s01-followup`, `iss346-s01-prestep-tty`, `iss346-s01-wrapper-smoke`)、Cheetah dry-run、stale `iss00334` harvestの不採用記録 | fresh Pro pre-step/reviewを再試行し、取得できなければblockerとして最終gateへ引き継ぐ |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -67,6 +68,7 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-001 | `adopted` | `research`: Issue 346 source-grounded clarification | `requirement.md`全体、`design.md` fixture/platform boundary、`plan.md` closure boundary | 親Epic、Issue 344/345、accepted ADR、現行testsを照合したIssue-local evidenceであり、追加のowner判断を必要としない | `artifacts/20260730t155742z-research-issue-346-requirement-clarification-source-grounded-synthesis.md`; adopter: main orchestrator; reviewer: fresh `spec-reviewer`; blocking: no | canonical R/D/Pへの反映とphase review完了。実装時は判断D-001を維持 |
 | EAL-002 | `partially_adopted` | external ChatGPT Pro github-synced planning evidence | `requirement.md`、`design.md`、`plan.md`、オンボーディングartifact | GitHub planning baseline `2217889c31e1a8a83732c446264dec00dde77be6`を参照した4資料を、ローカルsourceとworkflow contractに照合して採用した。安定ID、scope、scenario、検証観点、説明構造は採用し、候補用frontmatter、evidence-only自己claim、candidate revisionをplanning baselineへ固定する記述、曖昧pathは不採用 | `artifacts/20260730t173917z--specdock-iss-00346-authoring-pack-corrected.zip`; onboarding `artifacts/20260730t182546z-research-issue-346-onboarding-guide-for-new-team-members.md`; pack review `pass`; tree SHA-256 `7b01a12ac95b13bcfdf4a3a60774d16c3dc666d49152658b95c2435e112b1e12`; adopter: main orchestrator; reviewer: fresh `spec-reviewer`; reflected_to: [`requirement.md`, `design.md`, `plan.md`, onboarding artifact]; blocking: no | implementation時はcanonical R/D/Pをauthorityとし、ZIPはadvisory evidenceとして保持 |
 | EAL-003 | `adopted` | 2026-08-02 operator instruction and main-orchestrator synthesis | `plan.md` execution procedure、`report.md` review evidence slots | Luna・Maxの実装品質を補助しつつ過剰指定を避けるため、push先行のstep具体化、Artifact低authority、single-thread複合review、main orchestrator裁定をIssue 346限定で採用した | `artifacts/20260801t152944z-disc-chatgpt-assisted-execution-agreement.md`; adopter: main orchestrator; review exclusion: explicit operator instruction; blocking: no | 各stepでplan §2.3と§x.0を実行し、observed receipt/head/review結果を本reportへ記録 |
+| EAL-004 | `rejected` | failed/stale formal ChatGPT sessions for S01 pre-step | Issue 346 S01 pre-step elaboration artifact | 新規sessionが`promptSubmitted:null`のままdetached/incomplete-captureとなり、harvestで得られた回答は別Issue 00334の内容だったため、S01の作業具体化として保存・採用しない | session diagnosticsとstale outputの内容・scope不一致を確認。Workbenchの誤出力は削除済みで、正本R/D/Pは変更していない | fresh ChatGPT Pro sessionを再取得し、成功時のみ単一MarkdownをArtifact importする | blocker: S01 review gate; adopter: main orchestrator; reviewer: pending |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -130,7 +132,70 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | reviewer 利用不可 / 拒否 / waiver / provisional（reviewer unavailable/denied/waived/provisional） | blocked / incomplete | fresh な passed reviewer を取得する、または昇格なしの risk acceptance を記録する | レビューゲート証跡（Reviewer Gate Status / Final Spec Review Gate） | ineligible |
 
 ## 実装サマリー (任意)
-- [実装した内容の概要を2-3文で記載]
+- S01では、candidate wheelの受領・inventory・isolated origin・fresh consumer tracerを検証する4件の統合テストを追加した。既存のpackage/setup実装にproduction repairは不要で、wheel-installed consumerからWorkbench README配布とgeneric artifact importを確認できる。
+- S01のローカル品質証跡はGreenだが、Issue固有のChatGPT Pro review gateはfresh session送信失敗のため未完了であり、S02開始前に解消する。
+
+## S01 実装証跡（2026-08-02）
+
+### Source Revision and Candidate Wheel Receipt
+
+| 項目 | 観測値 |
+|---|---|
+| ブランチ | `iss-00346-integration-distribution-and-final-quality` |
+| candidate HEAD | `3d5b0ad6f675f79b8b9c3a569091c327b8bb2295` |
+| remote HEAD | `3d5b0ad6f675f79b8b9c3a569091c327b8bb2295`（一致） |
+| working tree | `git status --short` 空（clean） |
+| production repair | なし（test-only） |
+| changed path | `tests/integration/test_epic_00343_distribution.py` |
+
+### 実装したテストカード
+
+| Test ID | 検証内容 | 観測結果 |
+|---|---|---|
+| `tc-346-s01-001` | candidate revision、clean build、pre/post HEAD同一 | pass |
+| `tc-346-s01-002` | 5 README allowlist、stale/cache denylist、missing README controlled negative | pass |
+| `tc-346-s01-003` | isolated wheel install、console/module origin、PYTHONPATH source fallback negative | pass |
+| `tc-346-s01-004` | fresh installed shell、README byte equality、ignored payload、generic import (`canonical=false`) | pass |
+
+### 実行コマンドと結果
+
+```text
+uv run pytest tests/integration/test_epic_00343_distribution.py --run-full-regression -q
+4 passed in 5.57s
+
+uv run pytest tests/cli_runtime/test_runtime_new_doc_s09.py -k 'workbench or readme' --run-full-regression
+1 passed, 34 deselected
+
+uv run pytest tests/unit/infra/test_init_update.py -k 'issue_69 or workbench_readme_distribution or workbench_readme_build_prune or isolated_wheel_install_runs_init_update' --run-full-regression -q
+15 passed, 551 deselected in 33.53s
+
+uv run ruff check tests/integration/test_epic_00343_distribution.py
+All checks passed
+
+git diff --check
+pass
+```
+
+### S01 closure mapping
+
+| Closure | Evidence | Result |
+|---|---|---|
+| `CL-346-AC-001` / `CL-346-CON-001` / `CL-346-EC-001` | test receipt pre/post HEAD assertion、clean commit/push、candidate HEAD/remote一致 | pass |
+| `CL-346-AC-002` / `CL-346-EC-002` | zip inventory allowlist/denylistとmissing-entry negative | pass |
+| `CL-346-AC-003` / `CL-346-EC-003` | isolated venvのinstalled originとfresh shell/import tracer | pass |
+| `CL-346-CON-004` | provider templateとfresh consumerのREADME byte equality、source不変、`canonical=false` | pass |
+
+### ChatGPT-assisted gate status
+
+- Pre-step prompt: `spec-dock/active/issue/.workbench/20260802-s01-chatgpt-prestep-prompt.md`を作成したが、formal wrapperの新規sessionは送信前にdetached/incomplete-captureとなった。
+- Attempted session slugs: `iss346-s01-pre-step`, `iss346-s01-prestep-aug2`, `iss346-s01-followup`, `iss346-s01-prestep-tty`, `iss346-s01-wrapper-smoke`。
+- `harvest`で得られた旧回答はIssue 00334のS019内容であり、Issue 346へscope外のため採用・importしていない。
+- Cheetah指定はdry-runで`gpt-5.2`へ正規化されたため、品質ゲートのモデル証跡として使用していない。
+- S01 implementation ChatGPT Pro review: `blocked/pending`。freshなPro sessionの送信・回答・pushed HEAD bindingを取得するまでS01をclosed扱いにしない。
+
+### S01 closure decision
+
+ローカル実装・テスト・scope guardはGreenで、test-only差分をcommit/push済みである。一方、plan §8.6のChatGPT Pro review条件は未充足のため、S01は「実装済み・レビュー待ち」とし、S02の実装開始を停止する。
 
 ## 実装記録（セッションログ） (必須)
 
