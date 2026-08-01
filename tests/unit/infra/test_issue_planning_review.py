@@ -26,6 +26,7 @@ def test_review_evidence_directory_publishes_atomically_no_replace(tmp_path: Pat
         review_result_bytes=b'{"verdict":"pass"}',
         summary_bytes=b"# Planning Review\n",
         operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+        publication_guard=lambda: True,
     )
     assert (output / published.review_result_file).read_bytes() == b'{"verdict":"pass"}'
     assert (output / published.review_summary_file).read_bytes() == b"# Planning Review\n"
@@ -37,8 +38,131 @@ def test_review_evidence_directory_publishes_atomically_no_replace(tmp_path: Pat
             review_result_bytes=b"changed",
             summary_bytes=b"changed",
             operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            publication_guard=lambda: True,
         )
     assert (output / published.review_result_file).read_bytes() == b'{"verdict":"pass"}'
+
+
+def test_review_publication_rejects_staging_directory_name_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    review = __import__(
+        "spec_dock_runtime.infra.issue_planning_review",
+        fromlist=["publish_planning_review_evidence"],
+    )
+    output = tmp_path / "output"
+    repo = tmp_path / "repo"
+    output.mkdir()
+    repo.mkdir()
+    replaced: list[Path] = []
+    original_publish = review._atomic_publish_no_replace_at
+
+    def replace_staging(parent, staged, destination, *, expected_files):
+        displaced_name = f"{staged.name}.owned"
+        os.rename(staged.name, displaced_name, src_dir_fd=parent, dst_dir_fd=parent)
+        replacement = output / staged.name
+        replacement.mkdir()
+        (replacement / "attacker-controlled").write_bytes(b"must remain")
+        replaced.append(replacement)
+        original_publish(parent, staged, destination, expected_files=expected_files)
+
+    monkeypatch.setattr(review, "_atomic_publish_no_replace_at", replace_staging)
+    with pytest.raises(ValueError, match=r"identity|staging|publication"):
+        review.publish_planning_review_evidence(
+            output_dir=output,
+            repo_root=repo,
+            reviewed_identity_sha256="a" * 64,
+            review_result_bytes=b'{"verdict":"pass"}',
+            summary_bytes=b"# Planning Review\n",
+            operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            publication_guard=lambda: True,
+        )
+
+    assert replaced
+    assert (replaced[0] / "attacker-controlled").read_bytes() == b"must remain"
+    assert (output / f"{replaced[0].name}.owned" / "planning-review-result.json").is_file()
+    assert not any(path.name.startswith("review-") for path in output.iterdir())
+
+
+def test_review_publication_guard_false_removes_only_new_directory(tmp_path: Path) -> None:
+    review = __import__(
+        "spec_dock_runtime.infra.issue_planning_review",
+        fromlist=["publish_planning_review_evidence"],
+    )
+    output = tmp_path / "output"
+    repo = tmp_path / "repo"
+    sentinel = output / "sentinel.txt"
+    output.mkdir()
+    repo.mkdir()
+    sentinel.write_bytes(b"keep")
+
+    with pytest.raises(review.ReviewSourceStale):
+        review.publish_planning_review_evidence(
+            output_dir=output,
+            repo_root=repo,
+            reviewed_identity_sha256="a" * 64,
+            review_result_bytes=b'{"verdict":"pass"}',
+            summary_bytes=b"# Planning Review\n",
+            operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            publication_guard=lambda: False,
+        )
+
+    assert sentinel.read_bytes() == b"keep"
+    assert tuple(path.name for path in output.iterdir()) == ("sentinel.txt",)
+
+
+def test_review_publication_rejects_staging_child_replacement_without_deleting_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    review = __import__(
+        "spec_dock_runtime.infra.issue_planning_review",
+        fromlist=["publish_planning_review_evidence"],
+    )
+    output = tmp_path / "output"
+    repo = tmp_path / "repo"
+    output.mkdir()
+    repo.mkdir()
+    original_verify = review._verify_review_directory_contents
+    calls = [0]
+
+    def replace_child_after_capture(directory, expected_files):
+        original_verify(directory, expected_files)
+        calls[0] += 1
+        if calls[0] == 1:
+            os.rename(
+                "planning-review-result.json",
+                "planning-review-result.json.owned",
+                src_dir_fd=directory.descriptor,
+                dst_dir_fd=directory.descriptor,
+            )
+            descriptor = os.open(
+                "planning-review-result.json",
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+                dir_fd=directory.descriptor,
+            )
+            try:
+                os.write(descriptor, b"attacker-controlled")
+            finally:
+                os.close(descriptor)
+
+    monkeypatch.setattr(review, "_verify_review_directory_contents", replace_child_after_capture)
+    with pytest.raises(ValueError, match=r"identity|contents|publication"):
+        review.publish_planning_review_evidence(
+            output_dir=output,
+            repo_root=repo,
+            reviewed_identity_sha256="a" * 64,
+            review_result_bytes=b'{"verdict":"pass"}',
+            summary_bytes=b"# Planning Review\n",
+            operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            publication_guard=lambda: True,
+        )
+
+    staging = next(path for path in output.iterdir() if path.name.startswith(".spec-dock-planning-review-"))
+    assert (staging / "planning-review-result.json").read_bytes() == b"attacker-controlled"
+    assert (staging / "planning-review-result.json.owned").is_file()
 
 
 @pytest.mark.parametrize("swap_kind", ["symlink", "replacement"])
@@ -79,6 +203,7 @@ def test_review_publication_rejects_output_directory_identity_swap(
             review_result_bytes=b'{"verdict":"pass"}',
             summary_bytes=b"# Planning Review\n",
             operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            publication_guard=lambda: True,
         )
     assert list(repo.iterdir()) == []
     if output.is_dir() and not output.is_symlink():
@@ -125,6 +250,7 @@ def test_review_publication_never_stages_through_swapped_output_path(
             review_result_bytes=b'{"verdict":"pass"}',
             summary_bytes=b"# Planning Review\n",
             operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            publication_guard=lambda: True,
         )
     assert repo_write_observed == [False]
     assert list(repo.iterdir()) == []
@@ -174,6 +300,7 @@ def test_review_publication_never_renames_through_swapped_output_path(
             review_result_bytes=b'{"verdict":"pass"}',
             summary_bytes=b"# Planning Review\n",
             operation_time=datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc),
+            publication_guard=lambda: True,
         )
     assert [
         (str(path.relative_to(repo)), path.read_bytes()) for path in repo.rglob("*") if path.is_file()

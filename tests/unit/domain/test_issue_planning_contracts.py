@@ -257,6 +257,17 @@ def test_strict_json_rejects_duplicates_nonstandard_numbers_and_non_object_roots
         IssueCandidateIdentity.from_json_bytes(payload)
 
 
+def test_strict_json_normalizes_recursion_error() -> None:
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["_strict_json_object"],
+    )
+    payload = b'{"nested":' + (b"[" * 10000) + b"0" + (b"]" * 10000) + b"}"
+
+    with pytest.raises(ValueError, match=r"^invalid JSON$"):
+        contracts._strict_json_object(payload)
+
+
 def test_strict_json_rejects_unknown_top_level_and_nested_keys() -> None:
     candidate = _candidate().to_dict()
     candidate["unknown"] = True

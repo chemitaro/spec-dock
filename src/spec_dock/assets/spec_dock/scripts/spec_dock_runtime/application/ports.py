@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Protocol
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
     from datetime import datetime
     from pathlib import Path
 
@@ -332,6 +332,7 @@ class IssuePlanningGateway(Protocol):
         output_guard: IssuePlanningCandidateOutputGuard,
         repo_root: Path,
         material: CandidateMaterial,
+        publication_guard: Callable[[], bool],
     ) -> PublishedCandidateView: ...
 
     def open_safe_directory_descriptor(self, path: Path) -> int: ...
@@ -363,6 +364,7 @@ class IssuePlanningGateway(Protocol):
         review_result_bytes: bytes,
         summary_bytes: bytes,
         operation_time: datetime,
+        publication_guard: Callable[[], bool],
     ) -> PublishedPlanningReviewView: ...
 
     def load_expected_planning_targets(

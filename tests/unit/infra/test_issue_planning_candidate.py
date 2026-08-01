@@ -682,6 +682,7 @@ def test_candidate_publish_rejects_pre_capture_path_replacement_before_any_write
             output_guard=guard,
             repo_root=repo,
             material=material,
+            publication_guard=lambda: True,
         )
 
     assert replaced == [True]
@@ -730,6 +731,7 @@ def test_candidate_publish_rejects_detached_public_path_and_removes_published_en
             output_guard=guard,
             repo_root=repo,
             material=material,
+            publication_guard=lambda: True,
         )
 
     assert replaced == [True]
@@ -737,6 +739,48 @@ def test_candidate_publish_rejects_detached_public_path_and_removes_published_en
     assert list(redirected_output.iterdir()) == []
     if replacement_kind == "directory":
         assert list(output.iterdir()) == []
+
+
+def test_candidate_publication_guard_false_removes_only_new_file(tmp_path: Path) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    sentinel = output / "sentinel.zip"
+    sentinel.write_bytes(b"keep")
+
+    with pytest.raises(infra.CandidateSourceStale):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+            publication_guard=lambda: False,
+        )
+
+    assert sentinel.read_bytes() == b"keep"
+    assert tuple(path.name for path in output.iterdir()) == ("sentinel.zip",)
+
+
+def test_candidate_publication_guard_cleanup_preserves_replaced_final_name(
+    tmp_path: Path,
+) -> None:
+    infra, repo, output, guard, material = _publish_setup(tmp_path)
+    final_path = output / material.logical_filename
+    replacement = b"replacement must remain"
+    moved = output / "moved-owned.zip"
+
+    def replace_then_reject() -> bool:
+        final_path.rename(moved)
+        final_path.write_bytes(replacement)
+        return False
+
+    with pytest.raises(infra.CandidatePublicationFailed):
+        infra.build_and_publish_candidate(
+            output_guard=guard,
+            repo_root=repo,
+            material=material,
+            publication_guard=replace_then_reject,
+        )
+
+    assert final_path.read_bytes() == replacement
+    assert moved.is_file()
 
 
 def test_candidate_rejection_cleanup_post_match_swap_preserves_unknown_final(
@@ -788,6 +832,7 @@ def test_candidate_rejection_cleanup_post_match_swap_preserves_unknown_final(
             output_guard=guard,
             repo_root=repo,
             material=material,
+            publication_guard=lambda: True,
         )
 
     assert swapped == [True]
@@ -845,6 +890,7 @@ def test_candidate_post_publication_pre_capture_same_bytes_replacement_is_preser
             output_guard=guard,
             repo_root=repo,
             material=material,
+            publication_guard=lambda: True,
         )
 
     assert published_inode[0] != replacement_inode[0]
@@ -913,6 +959,7 @@ def test_candidate_cleanup_missing_native_primitive_fails_closed(
             output_guard=guard,
             repo_root=repo,
             material=material,
+            publication_guard=lambda: True,
         )
 
     assert swapped == [True]
@@ -932,6 +979,7 @@ def test_candidate_publish_collision_preserves_existing_entry_and_cleans_private
             output_guard=guard,
             repo_root=repo,
             material=material,
+            publication_guard=lambda: True,
         )
 
     assert existing.read_bytes() == b"existing candidate"
@@ -958,6 +1006,7 @@ def test_candidate_publish_racing_collision_preserves_existing_entry(
             output_guard=guard,
             repo_root=repo,
             material=material,
+            publication_guard=lambda: True,
         )
 
     assert existing.read_bytes() == b"racing candidate"
@@ -983,6 +1032,7 @@ def test_candidate_fd_publication_backend_collision_preserves_racing_entry(
             output_guard=guard,
             repo_root=repo,
             material=material,
+            publication_guard=lambda: True,
         )
 
     assert existing.read_bytes() == b"racing candidate"
@@ -1011,6 +1061,7 @@ def test_candidate_fd_publication_backend_failure_fails_closed_without_fallback(
             output_guard=guard,
             repo_root=repo,
             material=material,
+            publication_guard=lambda: True,
         )
 
     assert list(output.iterdir()) == []
@@ -1028,6 +1079,7 @@ def test_candidate_publish_unsupported_platform_fails_closed_and_cleans_stage(
             output_guard=guard,
             repo_root=repo,
             material=material,
+            publication_guard=lambda: True,
         )
 
     assert list(output.iterdir()) == []
@@ -1064,6 +1116,7 @@ def test_candidate_uses_atomic_hidden_staged_file_without_output_stage_directory
         output_guard=guard,
         repo_root=repo,
         material=material,
+        publication_guard=lambda: True,
     )
 
     assert len(staged_open_calls) == 1
@@ -1120,6 +1173,7 @@ def test_candidate_atomic_staged_file_replacement_is_preserved_and_not_published
             output_guard=guard,
             repo_root=repo,
             material=material,
+            publication_guard=lambda: True,
         )
 
     assert len(staged_names) == 1
@@ -1169,6 +1223,7 @@ def test_candidate_post_match_staged_name_swap_publishes_verified_descriptor(
         output_guard=guard,
         repo_root=repo,
         material=material,
+        publication_guard=lambda: True,
     )
 
     final_bytes = (output / material.logical_filename).read_bytes()
@@ -1200,6 +1255,7 @@ def test_candidate_random_staged_name_collision_retries_without_modifying_existi
         output_guard=guard,
         repo_root=repo,
         material=material,
+        publication_guard=lambda: True,
     )
 
     assert calls == [16, 16]
@@ -1226,6 +1282,7 @@ def test_candidate_all_random_staged_name_collisions_fail_and_preserve_entries(
             output_guard=guard,
             repo_root=repo,
             material=material,
+            publication_guard=lambda: True,
         )
 
     assert {path.name: path.read_bytes() for path in output.iterdir()} == existing
@@ -1323,6 +1380,7 @@ def _valid_candidate(
         output_guard=_infra().validate_candidate_output_directory(output, repo),
         repo_root=repo,
         material=material,
+        publication_guard=lambda: True,
     )
     with zipfile.ZipFile(output / published.identity.logical_filename) as archive:
         assert len(archive.namelist()) == 8

@@ -49,6 +49,7 @@ from spec_dock_runtime.domain.issue_planning_contracts import (  # noqa: E402
     IssueCandidateIdentity,
     OnboardingCompanionBindingV1,
     OracleAuthoringZipSnapshot,
+    PlanningPublicationSourceStale,
     ReviewedPlanningIdentity,
 )
 
@@ -164,8 +165,9 @@ class _FakeIssuePlanningGateway:
         output_guard: Path,
         repo_root: Path,
         material: object,
+        publication_guard: object,
     ) -> _PublishedCandidate:
-        del repo_root
+        del repo_root, publication_guard
         candidate_material = cast("CandidateMaterial", material)
         if not self._publication_supported:
             raise IssuePlanningCandidatePublicationFailed("publication unsupported")
@@ -293,8 +295,9 @@ class _FakeIssuePlanningGateway:
         review_result_bytes: bytes,
         summary_bytes: bytes,
         operation_time: datetime,
+        publication_guard: object,
     ) -> _PublishedPlanningReview:
-        del repo_root
+        del repo_root, publication_guard
         timestamp = operation_time.astimezone(timezone.utc).strftime("%Y%m%dt%H%M%Sz")
         result_name = f"{timestamp}-planning-review-result.json"
         summary_name = f"{timestamp}-planning-review-summary.md"
@@ -1000,6 +1003,49 @@ def test_create_rejects_post_oracle_source_drift_before_publication(
 
     assert (result.status, result.reason) == ("stale", "planning_source_stale")
     assert publisher_calls == []
+    assert list(output.iterdir()) == []
+
+
+def test_create_publication_guard_maps_source_drift_to_stale(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "output"
+    output.mkdir()
+    target = resolve_existing_issue_target("iss-00003", [_record(issue_dir)], repo)
+    before = build_source_manifest(repo, target.canonical_issue_paths)
+    changed = issue_dir / "plan.md"
+    changed.write_bytes(changed.read_bytes() + b"changed\n")
+    after = build_source_manifest(repo, target.canonical_issue_paths)
+    preflights = iter((_preflight(source_manifest=before), _preflight(source_manifest=after)))
+    publisher_calls: list[object] = []
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    )
+
+    def publisher(**kwargs):
+        publisher_calls.append(kwargs)
+        assert kwargs["publication_guard"]() is False
+        raise PlanningPublicationSourceStale("source changed")
+
+    result = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
+        request=module.PlanningCreateRequest("iss-00003", output),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda _root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=lambda **kwargs: _successful_transport(
+            source_manifest_hash=before.source_manifest_hash,
+        ),
+        preflight_runner=lambda _request: next(preflights),
+        publisher=publisher,
+        clock=lambda: "2026-07-28T12:00:00+00:00",
+    )
+
+    assert (result.status, result.reason) == ("stale", "planning_source_stale")
+    assert len(publisher_calls) == 1
     assert list(output.iterdir()) == []
 
 
