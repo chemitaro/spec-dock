@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import zipfile
 
 import pytest
 
@@ -53,6 +54,29 @@ class CandidateWheel:
     post_status: str
     inventory: frozenset[str]
     sha256: str
+
+
+FileSnapshot = tuple[tuple[str, bytes], ...]
+PayloadState = tuple[bool, bytes | None, bool, str]
+
+
+@dataclass(frozen=True)
+class ExistingConsumer:
+    target: Path
+    env: dict[str, str]
+    installed_cli: Path
+    existing_readmes: tuple[Path, ...]
+    existing_nodes: tuple[Path, ...]
+    payload_path: Path
+    payload_body: bytes
+    payload_before: PayloadState
+    guide_path: Path
+    guide_stale: bytes
+    guide_asset: bytes
+    canonical_before: FileSnapshot
+    existing_scope_before: FileSnapshot
+    graph_before: FileSnapshot
+    managed_before: FileSnapshot
 
 
 def _git(repo_root: Path, *args: str) -> str:
@@ -175,6 +199,211 @@ def _find_node(target: Path, node_id: str) -> Path:
         if payload.get("id") == node_id:
             return meta_path.parent
     raise AssertionError(f"node not found: {node_id}")
+
+
+def _wheel_asset_bytes(candidate_wheel: CandidateWheel, relative_path: str) -> bytes:
+    with zipfile.ZipFile(candidate_wheel.wheel_path) as wheel_zip:
+        return wheel_zip.read(relative_path)
+
+
+def _snapshot_tree(root: Path) -> FileSnapshot:
+    if not root.is_dir():
+        return ()
+    return tuple(
+        (path.relative_to(root).as_posix(), path.read_bytes())
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    )
+
+
+def _snapshot_existing_scopes(existing_nodes: tuple[Path, ...]) -> FileSnapshot:
+    entries: list[tuple[str, bytes]] = []
+    for node in existing_nodes:
+        for relative_path, payload in _snapshot_tree(node):
+            entries.append((f"{node.name}/{relative_path}", payload))
+    return tuple(sorted(entries))
+
+
+def _snapshot_graph(target: Path) -> FileSnapshot:
+    specdock_dir = target / "spec-dock"
+    entries: list[tuple[str, bytes]] = []
+    agent_root = specdock_dir / ".agent"
+    if agent_root.is_dir():
+        entries.extend(
+            (f".agent/{path.relative_to(agent_root).as_posix()}", path.read_bytes())
+            for path in sorted(agent_root.rglob("*"))
+            if path.is_file()
+        )
+    for relative_path in (
+        "tree-all.puml",
+        "tree.puml",
+        "deps-issues.puml",
+        "dashboard.md",
+    ):
+        path = specdock_dir / relative_path
+        if path.is_file():
+            entries.append((relative_path, path.read_bytes()))
+    return tuple(sorted(entries))
+
+
+def _snapshot_managed_assets(target: Path) -> FileSnapshot:
+    specdock_dir = target / "spec-dock"
+    entries: list[tuple[str, bytes]] = []
+    for directory_name in ("docs", "templates", "scripts", "system"):
+        root = specdock_dir / directory_name
+        entries.extend(
+            (f"{directory_name}/{path.relative_to(root).as_posix()}", path.read_bytes())
+            for path in sorted(root.rglob("*"))
+            if path.is_file()
+        )
+    for relative_path in (".gitignore", "spec-dock.version"):
+        path = specdock_dir / relative_path
+        if path.is_file():
+            entries.append((relative_path, path.read_bytes()))
+    return tuple(sorted(entries))
+
+
+def _payload_state(target: Path, payload_path: Path) -> PayloadState:
+    relative_path = payload_path.relative_to(target).as_posix()
+    ignored = subprocess.run(
+        ["git", "check-ignore", "--no-index", relative_path],
+        cwd=target,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    tracked = subprocess.run(
+        ["git", "ls-files", "--", relative_path],
+        cwd=target,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert tracked.returncode == 0, tracked.stdout + tracked.stderr
+    return (
+        payload_path.is_file(),
+        payload_path.read_bytes() if payload_path.is_file() else None,
+        ignored.returncode == 0,
+        tracked.stdout.strip(),
+    )
+
+
+def _existing_readme_paths(target: Path) -> tuple[Path, ...]:
+    return (
+        target / "spec-dock" / ".workbench" / "README.md",
+        _find_node(target, "init-00401") / ".workbench" / "README.md",
+        _find_node(target, "epic-00402") / ".workbench" / "README.md",
+        _find_node(target, "iss-00403") / ".workbench" / "README.md",
+    )
+
+
+def _assert_existing_fixture_preflight(consumer: ExistingConsumer) -> None:
+    present = [
+        path.relative_to(consumer.target).as_posix()
+        for path in consumer.existing_readmes
+        if path.exists()
+    ]
+    assert not present, f"existing consumer fixture has preexisting README: {present}"
+    assert consumer.payload_before == (
+        True,
+        consumer.payload_body,
+        True,
+        "",
+    )
+    assert consumer.guide_path.read_bytes() == consumer.guide_stale
+    assert consumer.guide_stale != consumer.guide_asset
+
+
+def _prepare_existing_consumer(candidate_wheel: CandidateWheel, suffix: str) -> ExistingConsumer:
+    helper = _Issue69Harness()
+    temp_root = candidate_wheel.wheel_path.parent
+    target = temp_root / suffix
+    target.mkdir()
+    helper._init_origin_repo(target)
+    env = _runtime_env(helper, temp_root)
+    installed_cli = helper._issue_69_venv_spec_dock(candidate_wheel.venv_python)
+    assert installed_cli.is_file()
+
+    init_result = subprocess.run(
+        [str(installed_cli), "init", str(target)],
+        cwd=temp_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert init_result.returncode == 0, init_result.stdout + init_result.stderr
+    for args in (
+        ["new", "initiative", "--title", "Existing platform", "--github-issue", "401"],
+        ["new", "epic", "--initiative", "401", "--title", "Existing update", "--github-issue", "402"],
+        ["new", "issue", "--epic", "402", "--title", "Existing consumer", "--github-issue", "403"],
+    ):
+        result = _run_installed_runtime(candidate_wheel.venv_python, target, args, env=env)
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    existing_nodes = tuple(
+        _find_node(target, node_id) for node_id in ("init-00401", "epic-00402", "iss-00403")
+    )
+    existing_readmes = _existing_readme_paths(target)
+    for readme in existing_readmes:
+        assert readme.is_file(), f"synthetic consumer did not create expected README: {readme}"
+        readme.unlink()
+        assert not readme.exists()
+
+    payload_path = existing_nodes[-1] / ".workbench" / "s02-opaque.bin"
+    payload_body = b"S02 existing ignored payload\x00\xff\n"
+    payload_path.write_bytes(payload_body)
+    assert payload_path.is_file()
+
+    guide_path = target / "spec-dock" / "docs" / "guide.md"
+    guide_asset = _wheel_asset_bytes(candidate_wheel, "spec_dock/assets/spec_dock/docs/guide.md")
+    guide_stale = b"# S02 pre-candidate guide fixture\n"
+    assert guide_stale != guide_asset
+    guide_path.write_bytes(guide_stale)
+
+    preflight_validate = _run_installed_runtime(candidate_wheel.venv_python, target, ["validate"], env=env)
+    assert preflight_validate.returncode == 0, preflight_validate.stdout + preflight_validate.stderr
+    preflight_sync = _run_installed_runtime(
+        candidate_wheel.venv_python,
+        target,
+        ["sync", "--no-github"],
+        env=env,
+    )
+    assert preflight_sync.returncode == 0, preflight_sync.stdout + preflight_sync.stderr
+
+    consumer = ExistingConsumer(
+        target=target,
+        env=env,
+        installed_cli=installed_cli,
+        existing_readmes=existing_readmes,
+        existing_nodes=existing_nodes,
+        payload_path=payload_path,
+        payload_body=payload_body,
+        payload_before=_payload_state(target, payload_path),
+        guide_path=guide_path,
+        guide_stale=guide_stale,
+        guide_asset=guide_asset,
+        canonical_before=_snapshot_tree(target / "spec-dock" / "initiatives"),
+        existing_scope_before=_snapshot_existing_scopes(existing_nodes),
+        graph_before=_snapshot_graph(target),
+        managed_before=_snapshot_managed_assets(target),
+    )
+    _assert_existing_fixture_preflight(consumer)
+    assert consumer.graph_before
+    assert consumer.canonical_before
+    return consumer
+
+
+def _update_existing_consumer(candidate_wheel: CandidateWheel, consumer: ExistingConsumer) -> None:
+    update_result = subprocess.run(
+        [str(consumer.installed_cli), "update", str(consumer.target)],
+        cwd=candidate_wheel.wheel_path.parent,
+        env=consumer.env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert update_result.returncode == 0, update_result.stdout + update_result.stderr
 
 
 def test_tc_346_s01_001_candidate_wheel_receipt(candidate_wheel: CandidateWheel) -> None:
@@ -350,3 +579,98 @@ def test_tc_346_s01_004_fresh_consumer_installed_shell_and_generic_import(candid
     ):
         for private_path in private_paths:
             assert private_path not in output, f"{output_name} leaked private path: {private_path}"
+
+
+def test_tc_346_s02_001_existing_consumer_fixture_is_valid_without_readmes(
+    candidate_wheel: CandidateWheel,
+) -> None:
+    consumer = _prepare_existing_consumer(candidate_wheel, "s02-existing-001")
+
+    _assert_existing_fixture_preflight(consumer)
+    assert all(not path.exists() for path in consumer.existing_readmes)
+    assert consumer.payload_before == (True, consumer.payload_body, True, "")
+    assert consumer.guide_path.read_bytes() == consumer.guide_stale
+    assert consumer.guide_stale != consumer.guide_asset
+    assert consumer.canonical_before
+    assert consumer.graph_before
+
+
+def test_tc_346_s02_002_existing_consumer_update_preserves_data_without_backfill(
+    candidate_wheel: CandidateWheel,
+) -> None:
+    consumer = _prepare_existing_consumer(candidate_wheel, "s02-existing-002")
+    _update_existing_consumer(candidate_wheel, consumer)
+
+    assert all(not path.exists() for path in consumer.existing_readmes)
+    assert _payload_state(consumer.target, consumer.payload_path) == consumer.payload_before
+    assert _snapshot_tree(consumer.target / "spec-dock" / "initiatives") == consumer.canonical_before
+    assert _snapshot_graph(consumer.target) == consumer.graph_before
+    assert consumer.guide_path.read_bytes() == consumer.guide_asset
+
+    before = dict(consumer.managed_before)
+    after = dict(_snapshot_managed_assets(consumer.target))
+    changed_paths = sorted(
+        path
+        for path in set(before) | set(after)
+        if before.get(path) != after.get(path)
+    )
+    assert changed_paths == ["docs/guide.md"]
+
+
+def test_tc_346_s02_003_existing_consumer_future_nodes_receive_workbench_shell(
+    candidate_wheel: CandidateWheel,
+) -> None:
+    consumer = _prepare_existing_consumer(candidate_wheel, "s02-existing-003")
+    _update_existing_consumer(candidate_wheel, consumer)
+
+    for args in (
+        ["new", "initiative", "--title", "Future platform", "--github-issue", "501"],
+        ["new", "epic", "--initiative", "501", "--title", "Future update", "--github-issue", "502"],
+        ["new", "issue", "--epic", "502", "--title", "Future consumer", "--github-issue", "503"],
+    ):
+        result = _run_installed_runtime(candidate_wheel.venv_python, consumer.target, args, env=consumer.env)
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    future_readmes = (
+        (_find_node(consumer.target, "init-00501") / ".workbench" / "README.md", "initiative"),
+        (_find_node(consumer.target, "epic-00502") / ".workbench" / "README.md", "epic"),
+        (_find_node(consumer.target, "iss-00503") / ".workbench" / "README.md", "issue"),
+    )
+    for readme, scope in future_readmes:
+        assert readme.read_bytes() == _wheel_asset_bytes(
+            candidate_wheel,
+            f"spec_dock/assets/spec_dock/templates/{scope}/.workbench/README.md",
+        )
+        ignored = subprocess.run(
+            ["git", "check-ignore", "--no-index", readme.relative_to(consumer.target).as_posix()],
+            cwd=consumer.target,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert ignored.returncode == 1, ignored.stdout + ignored.stderr
+        status = subprocess.run(
+            ["git", "status", "--short", "--untracked-files=all"],
+            cwd=consumer.target,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert status.returncode == 0, status.stdout + status.stderr
+        assert f"?? {readme.relative_to(consumer.target).as_posix()}" in status.stdout
+
+    assert all(not path.exists() for path in consumer.existing_readmes)
+    assert _payload_state(consumer.target, consumer.payload_path) == consumer.payload_before
+    assert _snapshot_existing_scopes(consumer.existing_nodes) == consumer.existing_scope_before
+
+
+def test_tc_346_s02_004_existing_consumer_illegal_preexisting_readme_is_rejected(
+    candidate_wheel: CandidateWheel,
+) -> None:
+    consumer = _prepare_existing_consumer(candidate_wheel, "s02-existing-004")
+    illegal_readme = consumer.existing_readmes[-1]
+    illegal_readme.write_bytes(b"preexisting README fixture\n")
+    relative_path = illegal_readme.relative_to(consumer.target).as_posix()
+
+    with pytest.raises(AssertionError, match=re.escape(relative_path)):
+        _assert_existing_fixture_preflight(consumer)
