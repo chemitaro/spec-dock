@@ -6,7 +6,7 @@ planning_method: "Spec-Locked Micro-Batch TDD"
 関連GitHub: ["#346"]
 状態: "approved"
 作成者: "iwasawayuuta"
-最終更新: "2026-07-31"
+最終更新: "2026-08-02"
 依存: ["requirement.md", "design.md", "epic-00343/plan.md"]
 親: ["epic-00343", "init-local-00002"]
 authorized_profile_observed: "standard"
@@ -21,6 +21,8 @@ classification_status: "runtime_classified"
 
 実行時は `plan.md` を planned contract、target Issue `report.md` を observed evidence ledger とする。Red/Green/Refactor、test output、discovered test、decision、reviewer verdict、commit/no-op、PR observation を本書へ書き戻さない。
 
+Issue 346固有の実行補助契約として、[`artifacts/20260801t152944z-disc-chatgpt-assisted-execution-agreement.md`](artifacts/20260801t152944z-disc-chatgpt-assisted-execution-agreement.md)を参照する。このArtifactは各stepのChatGPT具体化とreview運用を説明する`evidence_only`資料であり、本書、`requirement.md`、`design.md`、accepted ADRを上書きしない。2026-08-02のoperator instructionにより追加された手続きであり、製品要件・設計・受け入れ条件を変更しないため、この手続き追加自体はreview対象外とする。
+
 ## 1. 実行前の hard gate
 
 次をすべて満たせない場合、S01 を開始しない。
@@ -30,8 +32,9 @@ classification_status: "runtime_classified"
 3. target report の Evidence Adoption Ledger に、candidate claim ごとの disposition がある。
 4. fresh spec review、Spec Authoring Gate、runtime `guidance issue-execution` の report-evidence gate を確認する。
 5. `deps check iss-00346` で Issue 344/345 dependency state を確認する。
-6. named worker/reviewer、host/platform lane、temporary workspace、wheel build tool が利用可能である。
+6. named worker、ChatGPT Pro review lane、host/platform lane、temporary workspace、wheel build tool が利用可能である。
 7. working tree の既存変更を inventory し、Issue 346 diff と混在させない。
+8. 上記Issue固有ArtifactのGitHub同期、ChatGPT具体化、Artifact保存、review置換の契約を実行担当へ共有する。
 
 実行中に requirement/design/ADR/cross-Issue ownership の変更が必要になった場合は、`I346-CON-002` / `I346-CON-003` に従い停止し、Epic planning repair へ戻る。
 
@@ -52,10 +55,19 @@ classification_status: "runtime_classified"
 - runtime/CLI/infra/tests/scaffold behavior: `dev-coder`。
 - shipped docs/templates/skills/workflow text: `doc-writer`。
 - Codex orchestrator: inspect、step handoff、diff integration、verification、report/EAL、review coordination、commit/push/PR preparation。
-- `qa-reviewer`、`code-reviewer`、`spec-reviewer` は implementation worker と独立した fresh evidence を使う。
+- Issue 346のimplementation reviewは、実行時点の`qa-reviewer`、`code-reviewer`、`spec-reviewer` Developer Instructionsをpromptへ統合し、formal `chatgpt-use` wrapper経由のcurrent ChatGPT Proで行う。review targetが同じなら複数観点を1つのconversation/threadと1つの統合promptにまとめる。
 - worker は canonical requirement/design/plan/report を直接編集しない。worker は report 転記用 evidence と `Ledger Note` を返す。
 
-### 2.3 Repair boundary
+### 2.3 ChatGPT-assisted pre-step and review gate
+
+- S01、S02、S03、S04、S90、S99の各step開始前に、current intended stateをcommit/pushし、local/remote head一致を確認してからformal `chatgpt-use` wrapperを実行する。
+- ChatGPTにはGitHub connectorでcurrent branchを先に確認させ、GPT-5.6 Luna・推論レベルMax向けに、必須test、negative/error/regression境界、最小作業順、stop conditionをMarkdownで整理させる。
+- 出力はapproved Workbenchの単一Markdownから`artifact import chatgpt-output --issue iss-00346`でIssue Artifactへ保存する。具体化Artifactはreview対象外で、canonical R/D/Pより常に低い補助evidenceとする。
+- review前にも対象変更をcommit/pushし、reviewed head SHAを固定する。repair/re-reviewでもpushを先行し、可能な限り同じChatGPT threadを`--followup`で継続する。
+- ChatGPT提案を機械的に採用しない。main orchestratorが正本、current code、testsに照らしてfindingを裁定し、P2/P3だけを理由とするscope expansionや過剰実装を拒否する。
+- 詳細なprompt、保存、model evidence、review output、停止条件はIssue固有Artifactを正とする。wrapperが確認できるのはcurrent `Pro`選択であり、追加証跡なしに基盤モデルの版番号を検証済みと主張しない。
+
+### 2.4 Repair boundary
 
 Allowed:
 
@@ -123,7 +135,7 @@ S01 の wheel は S02〜S04 の共通 input である。production/package repai
 | `S03` | installed generic import が target/privacy/platform boundary を守る | S01 | `dev-coder` + actual host evidence | S04, S99 |
 | `S04` | opaque lifecycle、legacy compatibility、dogfood projection が一体で動く | S01〜S03 | `dev-coder` | S90, S99 |
 | `S90` | docs impact、provider→dogfood parity、Issue/Epic report trace を解決する | S01〜S04 | `doc-writer` + orchestrator | S99 |
-| `S99` | independent final quality、full regression、review、commit/push、PR gates | all | orchestrator + reviewers | human merge decision |
+| `S99` | independent final quality、full regression、review、commit/push、PR gates | all | orchestrator + ChatGPT Pro review | human merge decision |
 
 ## 6. 要件 ↔ step 対応
 
@@ -164,7 +176,7 @@ S01 の wheel は S02〜S04 の共通 input である。production/package repai
 | `CL-346-AC-014` | `I346-AC-014` | lint + ordinary pytest の結果と policy skip を独立記録 | fast lane regression / full claim inflation | yes | local final gate | S99 |
 | `CL-346-AC-015` | `I346-AC-015` | final candidate revision で explicit full regression body を実行 | hidden heavy regression | yes | full suite | S99 |
 | `CL-346-AC-016` | `I346-AC-016` | shipped docs/provider projection/Issue-Epic trace が一致 | docs drift / untraceable closure | yes | docs + diff + reports | S90, S99 |
-| `CL-346-AC-017` | `I346-AC-017` | fresh QA/code/spec review、未解決 blocker 0 | self-review / stale review | yes | independent review | S99 |
+| `CL-346-AC-017` | `I346-AC-017` | pushed headに対するChatGPT Pro統合QA/code/spec review、未解決 blocker 0 | self-review / stale review | yes | single-thread combined review | S99 |
 | `CL-346-AC-018` | `I346-AC-018` | final commit/push、pull-request handoff/Merge Preparation records、human merge stop | unpushed/stale PR / agent merge | yes | git + PR observation | S99 |
 | `CL-346-AC-019` | `I346-AC-019` | changed paths は strict repair boundary 内、spec/ADR gap は Epic repairへ | scope theft / decision smuggling | yes | diff + decision ledger | all, S99 |
 
@@ -202,6 +214,10 @@ S01 の wheel は S02〜S04 の共通 input である。production/package repai
 | `CL-346-EC-016` | `I346-EC-016` | docs/review/PR observation bind latest pushed head | stale final evidence | yes | freshness checks | S90, S99 |
 
 ## 8. S01 — Exact-source candidate wheel and fresh installed tracer
+
+### 8.0 ChatGPT pre-step elaboration gate
+
+S01を始める前に§2.3とIssue固有Artifactの手順を実行し、pushed headをGitHub connectorで確認したChatGPT Proから、Luna・Max向けのS01具体化Markdownを取得・importする。重点はcandidate wheelのsource binding、inventoryのsensitivity negative、isolated origin、fresh shell/import tracer、最小package repair境界である。既存の§8.3〜§8.5を再生成させず、矛盾時は本書を優先する。
 
 ### 8.1 Behavior goal
 
@@ -361,7 +377,7 @@ Close only when:
 - exact wheel receipt is complete。
 - fresh installed tracer is Green。
 - all changed paths are allowed/repair-only justified。
-- fresh `code-reviewer` reviews packaging/test diff and reports no unresolved blocker。
+- pushed headに対し、current `code-reviewer` Developer Instructionsを渡したChatGPT Pro reviewがpackaging/test diffを確認し、未解決blocker 0を返す。
 - `git diff --check` succeeds。
 
 Commit candidate:
@@ -373,6 +389,10 @@ test(distribution): candidate wheel の fresh consumer 証跡を追加
 Production repair が必要なら scope を明示した別 commit candidate にする。差分が test-only または no-op でも reviewer-approved closure evidence を report に残す。
 
 ## 9. S02 — Existing consumer update, no-backfill, and future-only shell
+
+### 9.0 ChatGPT pre-step elaboration gate
+
+S02を始める前に§2.3とIssue固有Artifactの手順を実行し、pushed headを確認したChatGPT ProからS02具体化Markdownを取得・importする。重点はsynthetic pre-feature fixtureの真正性、managed asset updateの観測、existing scope no-backfill、future node shell、ignored payload/canonical data不変である。fixtureやtest countを根拠なく増やさない。
 
 ### 9.1 Behavior goal
 
@@ -518,7 +538,7 @@ git diff --check
 - S02 cards Green and negative sensitivity proven。
 - historical option usage is explicitly yes/no; yesなら exact SHA/method/absence proof exists。
 - no unexpected canonical node diff。
-- fresh `code-reviewer` verifies installer/test scope and no-backfill semantics。
+- pushed headに対し、current `code-reviewer` Developer Instructionsを渡したChatGPT Pro reviewがinstaller/test scopeとno-backfill semanticsを確認し、未解決blocker 0を返す。
 - step report rows complete。
 
 Commit candidate:
@@ -534,6 +554,10 @@ fix(update): existing scope の Workbench shell backfill を防止
 ```
 
 ## 10. S03 — Distributed target, privacy, cross-filesystem, and platform publication
+
+### 10.0 ChatGPT pre-step elaboration gate
+
+S03を始める前に§2.3とIssue固有Artifactの手順を実行し、pushed headを確認したChatGPT ProからS03具体化Markdownを取得・importする。重点は4 target、external/nested-CWD privacy、actual cross-filesystem evidence、Linux no-replace commit、macOS clone/cleanup trust boundary、capability不足時のfail-closedである。actual host evidenceをhermetic simulationで代替する提案は採用しない。
 
 ### 10.1 Behavior goal
 
@@ -770,7 +794,7 @@ ISS346_PLATFORM_DEST="$ISS346_MACOS_DEST" "$ISS346_VENV/bin/python" \
 - actual macOS clone-capable lane evidence exists。
 - cross-FS actual evidence exists on at least one required capable host; unavailable cases are explicitly non-success。
 - privacy scan is content-free and leaks zero forbidden values。
-- fresh security/platform-focused `code-reviewer` has no unresolved blocker。
+- pushed headに対し、current `code-reviewer` Developer Instructionsとsecurity/platform focusを渡したChatGPT Pro reviewが未解決blocker 0を返す。
 - accepted ADR wording unchanged unless Epic repair occurred first。
 
 Commit candidate:
@@ -782,6 +806,10 @@ test(artifact): 配布後の platform と privacy 統合証跡を追加
 Observed defect repairs are separate `fix(artifact): ...` candidates, one root-cause family per reviewable batch where practical。
 
 ## 11. S04 — Opaque lifecycle, compatibility, and integrated dogfood projection
+
+### 11.0 ChatGPT pre-step elaboration gate
+
+S04を始める前に§2.3とIssue固有Artifactの手順を実行し、pushed headを確認したChatGPT ProからS04具体化Markdownを取得・importする。重点はfilter-before-read、opaque body、legacy/generic slot allocation、provider-first projection、dogfood no-backfill、generic import統合である。body classifierやauthority昇格など正本にない意味解釈を追加しない。
 
 ### 11.1 Behavior goal
 
@@ -961,7 +989,7 @@ Nearest new-artifact focused test path/node discovered at execution is added to 
 - opaque lifecycle/body-open/projection closures Green。
 - all legacy compatibility suites Green without unjustified expectation changes。
 - disposable dogfood closure Green and real working tree remains attributable/clean except planned changes。
-- fresh `code-reviewer` evaluates Issue/Epic interaction and no-backfill/provider-first boundary。
+- pushed headに対し、current `code-reviewer` Developer Instructionsを渡したChatGPT Pro reviewがIssue/Epic interactionとno-backfill/provider-first boundaryを確認し、未解決blocker 0を返す。
 - S04 report sections complete。
 
 Commit candidate:
@@ -973,6 +1001,10 @@ test(epic): Workbench と generic import の dogfood 統合証跡を追加
 Interaction repair is a separate bounded `fix(...)` commit candidate if needed。
 
 ## 12. S90 — Documentation impact resolution, provider parity, and report trace
+
+### 12.0 ChatGPT pre-step elaboration gate
+
+S90を始める前に§2.3とIssue固有Artifactの手順を実行し、pushed headを確認したChatGPT ProからS90具体化Markdownを取得・importする。重点はdocs impactの有無、provider→dogfood parity、no-backfillを壊さないprojection、Issue/Epic report/EAL trace、過剰なprose churn回避である。canonical R/D/Pの変更が必要ならS90内で補わずamendmentへ戻る。
 
 ### 12.1 Behavior goal
 
@@ -1127,7 +1159,7 @@ Provider docs変更が不要なら、上記candidate-wheel-installed commandでd
 - docs impact resolved as bounded change or reviewed no-op。
 - provider/projection parity verified without unrelated canonical mutation。
 - Issue/Epic report/EAL/decision entries current through S04。
-- fresh `spec-reviewer` reviews docs/spec/report alignment; code-facing doc tests receive `code-reviewer` if changed。
+- pushed headに対し、current `spec-reviewer` Developer Instructionsと、code-facing doc test変更時はcurrent `code-reviewer` Developer Instructionsを1つのpromptへ統合したChatGPT Pro reviewがdocs/spec/report alignmentを確認し、未解決blocker 0を返す。
 - diff check/validate/sync evidence recorded。
 
 Commit candidate:
@@ -1137,6 +1169,10 @@ docs(epic): 統合配布と final quality の証跡を同期
 ```
 
 ## 13. S99 — Independent final quality, full regression, review, and delivery gates
+
+### 13.0 ChatGPT pre-step elaboration gate
+
+S99を始める前に§2.3とIssue固有Artifactの手順を実行し、final candidateのpushed headを確認したChatGPT ProからS99具体化Markdownを取得・importする。重点はfast/full laneの区別、platform evidence freshness、`review_content_hash` freeze、単一thread統合review、限定repair、re-push/re-review、PR delivery、human merge stopである。final gateを弱める短縮案は採用しない。
 
 ### 13.1 Behavior goal
 
@@ -1186,11 +1222,9 @@ S99 is not a production TDD slice. Its negative condition is any failed command,
 - all required platform host evidence fresh enough for final head; rerun if affected code changed。
 - all report decision/EAL rows resolved/non-blocking with rationale。
 - reviewer evidence欄を空に正規化したIssue/Epic report ledgerを閉じ、sorted repo-relative path + bytesから`review_content_hash`を計算してcandidate content/diffをfreezeする。
-- fresh `qa-reviewer` against acceptance/evidence matrix。
-- fresh Issue/Epic-wide `code-reviewer` against final diff and prior Issues interaction。
-- fresh `spec-reviewer` against parent/ADR/Issue docs/report。
+- current `qa-reviewer`、`code-reviewer`、`spec-reviewer` Developer Instructionsを1つのpromptへ統合した、pushed headに対するsingle-thread ChatGPT Pro final review。
 - bounded repair/fix/re-review loop for P0/P1/required CI only。
-- 三者pass後、外部review出力からrole、task/session id、status、findings count、scope、observed_at、機械的gate stateだけを転記し、同じ正規化で`review_content_hash`一致を確認する。それ以外の変更またはhash不一致はfreezeを無効化しfresh reviewへ戻す。
+- QA/code/specの全観点pass後、外部review出力からrole perspectives、ChatGPT session/thread id、status、findings count、scope、observed_at、機械的gate stateだけを転記し、同じ正規化で`review_content_hash`一致を確認する。それ以外の変更またはhash不一致はfreezeを無効化し、commit/push後に同じthreadでfresh reviewへ戻す。
 - final commit/push and remote head confirmation。
 - pull-request handoff and Merge Preparation records for latest head。
 - human merge stop。
@@ -1239,29 +1273,31 @@ Focused step tests are rerun before or as part of full suite when their result m
 - required host/reviewer/check unavailable without approved workflow fallback。
 - PR base/branch/issue linkage conflicts cannot be resolved from authoritative source。
 
-### 13.4 Delegation and reviewer contract
+### 13.4 Delegation and ChatGPT review contract
 
-#### QA review
+QA/code/specは独立したsub-agent invocationに分けず、実行時点の3 reviewer roleのDeveloper Instructionsを1つのreview promptへ統合し、同一ChatGPT conversation/threadで同時に評価する。各観点は独立status/findingsを持ち、統合`review_status`は全必須観点がpassの場合だけpassとする。review前、repair後のfollow-up前には毎回commit/pushとlocal/remote head一致を確認する。
 
-- **role**: fresh `qa-reviewer`。
+#### QA review perspective
+
+- **role contract source**: current `qa-reviewer` Developer InstructionsをChatGPT Pro promptへ添付する。
 - **inputs**: final candidate revision、AC/closure index、test/host evidence、fresh/update/dogfood matrices、reviewer verdict欄以外を閉じたreport。
 - **acceptance**: each required closure has valid current evidence; no skipped/unavailable requirement counted as success。
 - **focus**: end-to-end distribution truth、failure semantics、test sensitivity、platform evidence、rollback/observability。
 - **stop**: stale/missing evidence、unreproducible fixture、full suite not executed。
 - **output**: verdict、findings severity/evidence/action、coverage gaps、confidence、report-ready summary。
 
-#### Code review
+#### Code review perspective
 
-- **role**: fresh Issue/Epic-wide `code-reviewer`。
+- **role contract source**: current Issue/Epic-wide `code-reviewer` Developer Instructionsを同じChatGPT Pro promptへ添付する。
 - **inputs**: final diff against base、Issue344/345 interaction surfaces、accepted ADRs、all tests/reports。
 - **acceptance**: no unresolved P0/P1; strict repair boundary; no unsafe fallback/privacy leak/no-backfill regression。
 - **focus**: package/update/runtime/platform/lifecycle/compatibility、test validity、overimplementation。
 - **stop**: head changes during review、missing diff context、required host evidence absent。
 - **output**: exact findings and scope classification, report-ready summary。
 
-#### Spec review
+#### Spec review perspective
 
-- **role**: fresh `spec-reviewer`。
+- **role contract source**: current `spec-reviewer` Developer Instructionsを同じChatGPT Pro promptへ添付する。
 - **inputs**: parent Epic R/D/P/report、accepted ADRs、canonical Issue346 R/D/P/report、Issue344/345 completion evidence、final implementation evidence。
 - **acceptance**: no unresolved spec blocker; docs/report do not overclaim; delivery boundary correct。
 - **focus**: parent boundary、no-backfill interpretation、platform trust boundaries、repair routing、human merge stop。
@@ -1270,10 +1306,10 @@ Focused step tests are rerun before or as part of full suite when their result m
 
 #### Blocking repair
 
-- **role**: fresh bounded `dev-coder` or `doc-writer` according to finding root cause。
+- **role**: fresh bounded `dev-coder` or `doc-writer` according to an orchestrator-adopted finding root cause。
 - **preconditions**: integrated finding batch、current-head observation、fresh consultation evidence when PR workflow requires it、orchestrator disposition、strategy delta、allowed paths。
 - **forbidden**: P2/P3-only mutation、scope expansion、policy/check weakening、merge。
-- **verification**: finding-specific tests + affected focused/full/validate/sync + re-review/re-observe。
+- **verification**: finding-specific tests + affected focused/full/validate/sync + commit/push + same-thread ChatGPT Pro re-review/re-observe。
 
 ### 13.5 Concrete test-case cards — final gates
 
@@ -1304,13 +1340,13 @@ Focused step tests are rerun before or as part of full suite when their result m
 - **検証方法**: commands + report manual/schema review。
 - **関連 closure IDs**: `CL-346-AC-016`, `CL-346-CON-012`, `CL-346-EC-016`。
 
-#### `tc-346-s99-004` — independent final reviews
+#### `tc-346-s99-004` — single-thread combined final review
 
 - **前提**: final candidate revisionと、reviewer evidence欄を空に正規化したcomplete evidence packageの`review_content_hash`がfreeze済み。
-- **操作**: fresh QA, Issue/Epic-wide code, spec review in independent contexts。
-- **期待結果**: all required reviewers return frozen-content/hash-bound verdicts; no unresolved blockers; unavailable/skipped is not pass。pass後のreport追記は許可されたreview-evidence fieldsだけで、転記後の正規化hashが一致する。
+- **操作**: current QA/code/spec reviewer Developer Instructionsを統合した1つのpromptで、pushed headを同一ChatGPT threadからreviewする。
+- **期待結果**: QA/code/spec各観点と統合verdictがfrozen content/hashへbindingされ、未解決blockerがない。unavailable/skippedはpassではない。pass後のreport追記は許可されたreview-evidence fieldsだけで、転記後の正規化hashが一致する。
 - **失敗検出**: self-review、stale review、missing scope、waiver masquerading as verdict。
-- **検証方法**: reviewer receipts/findings + head/diff binding。
+- **検証方法**: ChatGPT session/thread receipt、統合prompt、structured findings + head/diff binding。
 - **関連 closure IDs**: `CL-346-AC-017`。
 
 #### `tc-346-s99-005` — commit/push and pull-request handoff Gate
@@ -1347,7 +1383,7 @@ S99 can close only when:
 - all required closure rows have current evidence。
 - lint、fast、full、validate、sync、diff/clean requirements are met。
 - required Linux/macOS evidence is current for affected code。
-- fresh QA/code/spec review has no unresolved blocker。
+- pushed headに対するsingle-thread ChatGPT Pro QA/code/spec reviewが全観点passで、未解決blockerがない。
 - report/EAL/decision ledgers are complete and current。
 - final commit and push are confirmed。
 - pull-request handoff Gate and Merge Preparation Gate records bind latest head。
