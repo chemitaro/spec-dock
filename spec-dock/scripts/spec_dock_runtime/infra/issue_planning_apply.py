@@ -176,30 +176,25 @@ class _OperationBranchLock:
         failure: PlanningApplyRestoreMismatch | None = None
         try:
             try:
-                current = self.path.lstat()
-            except FileNotFoundError:
-                failure = PlanningApplyRestoreMismatch("operation branch HEAD lock disappeared")
+                self.assert_held()
+            except PlanningApplyRestoreMismatch as exc:
+                failure = exc
+                _abandon_operation_ref_transaction(self.ref_process)
             else:
-                if (current.st_dev, current.st_ino) != (self.device, self.inode):
-                    failure = PlanningApplyRestoreMismatch("operation branch HEAD lock was replaced")
-                else:
-                    self.path.unlink()
-        finally:
-            try:
-                if not _stop_operation_ref_transaction(self.ref_process):
-                    failure = PlanningApplyRestoreMismatch(
-                        "operation branch ref transaction abort failed",
+                try:
+                    _abort_operation_ref_transaction(self.ref_process)
+                    _remove_captured_operation_head_lock(
+                        self.path,
+                        self.descriptor,
+                        self.device,
+                        self.inode,
                     )
-            except (OSError, subprocess.TimeoutExpired):
-                failure = PlanningApplyRestoreMismatch(
-                    "operation branch ref transaction cleanup failed",
-                )
+                except PlanningApplyRestoreMismatch as exc:
+                    failure = exc
+        finally:
             with suppress(OSError):
                 os.close(self.descriptor)
-            for stream in (self.ref_process.stdout, self.ref_process.stderr):
-                if stream is not None:
-                    with suppress(OSError):
-                        stream.close()
+            _close_operation_ref_streams(self.ref_process)
             with suppress(OSError):
                 self.hook_root.rmdir()
         if failure is not None:
@@ -207,36 +202,118 @@ class _OperationBranchLock:
 
     def assert_held(self) -> None:
         try:
+            descriptor_stat = os.fstat(self.descriptor)
             current = self.path.lstat()
-        except FileNotFoundError:
+        except (FileNotFoundError, OSError, ValueError):
             raise PlanningApplyRestoreMismatch("operation branch HEAD lock disappeared") from None
-        if (current.st_dev, current.st_ino) != (self.device, self.inode):
+        if (
+            not stat.S_ISREG(descriptor_stat.st_mode)
+            or descriptor_stat.st_uid != os.geteuid()
+            or stat.S_IMODE(descriptor_stat.st_mode) != 0o600
+            or not stat.S_ISREG(current.st_mode)
+            or current.st_uid != os.geteuid()
+            or stat.S_IMODE(current.st_mode) != 0o600
+            or (descriptor_stat.st_dev, descriptor_stat.st_ino) != (self.device, self.inode)
+            or (current.st_dev, current.st_ino) != (self.device, self.inode)
+        ):
             raise PlanningApplyRestoreMismatch("operation branch HEAD lock was replaced")
         if self.ref_process.poll() is not None:
             raise PlanningApplyRestoreMismatch("operation branch ref transaction ended")
 
 
-def _stop_operation_ref_transaction(process: subprocess.Popen[bytes]) -> bool:
+def _close_operation_ref_streams(process: subprocess.Popen[bytes]) -> None:
+    for stream in (process.stdin, process.stdout, process.stderr):
+        if stream is not None:
+            with suppress(OSError, ValueError):
+                stream.close()
+
+
+def _abandon_operation_ref_transaction(process: subprocess.Popen[bytes]) -> None:
+    failure: PlanningApplyRestoreMismatch | None = None
     try:
-        stdin = process.stdin
-        if process.poll() is None and stdin is not None:
-            stdin.write(b"abort\n")
-            stdin.flush()
-        if stdin is not None:
-            stdin.close()
-        returncode = process.wait(timeout=5)
-        return returncode == 0
+        if process.poll() is None:
+            with suppress(OSError, ProcessLookupError):
+                process.kill()
+        process.wait(timeout=5)
     except (OSError, subprocess.TimeoutExpired):
-        with suppress(OSError):
-            process.kill()
-        with suppress(OSError, subprocess.TimeoutExpired):
-            process.wait(timeout=5)
-        raise
+        failure = PlanningApplyRestoreMismatch(
+            "operation branch ref transaction abandonment failed",
+        )
     finally:
-        for stream in (process.stdout, process.stderr):
-            if stream is not None:
-                with suppress(OSError):
-                    stream.close()
+        _close_operation_ref_streams(process)
+    if failure is not None:
+        raise failure
+
+
+def _abort_operation_ref_transaction(process: subprocess.Popen[bytes]) -> None:
+    try:
+        if process.poll() is not None or process.stdin is None:
+            raise PlanningApplyRestoreMismatch(
+                "operation branch ref transaction abort failed",
+            )
+        process.stdin.write(b"abort\n")
+        process.stdin.flush()
+        process.stdin.close()
+        returncode = process.wait(timeout=5)
+    except PlanningApplyRestoreMismatch:
+        _abandon_operation_ref_transaction(process)
+        raise
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        with suppress(PlanningApplyRestoreMismatch):
+            _abandon_operation_ref_transaction(process)
+        raise PlanningApplyRestoreMismatch(
+            "operation branch ref transaction abort failed",
+        ) from exc
+    finally:
+        _close_operation_ref_streams(process)
+    if returncode != 0:
+        raise PlanningApplyRestoreMismatch(
+            "operation branch ref transaction abort failed",
+        )
+
+
+def _remove_captured_operation_head_lock(
+    path: Path,
+    descriptor: int,
+    device: int,
+    inode: int,
+) -> None:
+    try:
+        descriptor_stat = os.fstat(descriptor)
+    except (OSError, ValueError) as exc:
+        raise PlanningApplyRestoreMismatch(
+            "operation branch HEAD lock ownership failed",
+        ) from exc
+    if (
+        not stat.S_ISREG(descriptor_stat.st_mode)
+        or descriptor_stat.st_uid != os.geteuid()
+        or stat.S_IMODE(descriptor_stat.st_mode) != 0o600
+        or (descriptor_stat.st_dev, descriptor_stat.st_ino) != (device, inode)
+    ):
+        raise PlanningApplyRestoreMismatch("operation branch HEAD lock was replaced")
+    try:
+        current = path.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise PlanningApplyRestoreMismatch(
+            "operation branch HEAD lock ownership failed",
+        ) from exc
+    if (
+        not stat.S_ISREG(current.st_mode)
+        or current.st_uid != os.geteuid()
+        or stat.S_IMODE(current.st_mode) != 0o600
+        or (current.st_dev, current.st_ino) != (device, inode)
+    ):
+        raise PlanningApplyRestoreMismatch("operation branch HEAD lock was replaced")
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise PlanningApplyRestoreMismatch(
+            "operation branch HEAD lock cleanup failed",
+        ) from exc
 
 
 def _read_operation_ref_ack(
@@ -2562,6 +2639,7 @@ def _acquire_operation_branch_lock(
     hook_root: Path | None = None
     ref_process: subprocess.Popen[bytes] | None = None
     descriptor: int | None = None
+    captured_identity: tuple[int, int] | None = None
     try:
         hook_root = Path(tempfile.mkdtemp(prefix="spec-dock-planning-ref-"))
         hook_root.chmod(0o700)
@@ -2599,9 +2677,23 @@ def _acquire_operation_branch_lock(
         except OSError:
             raise PlanningApplyRestoreMismatch("operation branch HEAD lock failed") from None
         opened = os.fstat(descriptor)
-        if not stat.S_ISREG(opened.st_mode) or opened.st_uid != os.geteuid() or stat.S_IMODE(opened.st_mode) != 0o600:
+        try:
+            current = lock_path.lstat()
+        except OSError:
+            raise PlanningApplyRestoreMismatch("operation branch HEAD lock failed") from None
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_uid != os.geteuid()
+            or stat.S_IMODE(opened.st_mode) != 0o600
+            or not stat.S_ISREG(current.st_mode)
+            or current.st_uid != os.geteuid()
+            or stat.S_IMODE(current.st_mode) != 0o600
+            or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
+            or ref_process.poll() is not None
+        ):
             raise PlanningApplyRestoreMismatch("operation branch HEAD lock is unsafe")
         os.fsync(descriptor)
+        captured_identity = (opened.st_dev, opened.st_ino)
         return _OperationBranchLock(
             path=lock_path,
             descriptor=descriptor,
@@ -2613,17 +2705,32 @@ def _acquire_operation_branch_lock(
             hook_root=hook_root,
         )
     except BaseException:
+        cleanup_failure: PlanningApplyRestoreMismatch | None = None
         if ref_process is not None:
-            with suppress(OSError, subprocess.TimeoutExpired):
-                _stop_operation_ref_transaction(ref_process)
+            if captured_identity is None or descriptor is None:
+                try:
+                    _abandon_operation_ref_transaction(ref_process)
+                except PlanningApplyRestoreMismatch as exc:
+                    cleanup_failure = exc
+            else:
+                try:
+                    _abort_operation_ref_transaction(ref_process)
+                    _remove_captured_operation_head_lock(
+                        lock_path,
+                        descriptor,
+                        captured_identity[0],
+                        captured_identity[1],
+                    )
+                except PlanningApplyRestoreMismatch as exc:
+                    cleanup_failure = exc
         if hook_root is not None:
             with suppress(OSError):
                 hook_root.rmdir()
         if descriptor is not None:
             with suppress(OSError):
                 os.close(descriptor)
-        with suppress(FileNotFoundError):
-            lock_path.unlink()
+        if cleanup_failure is not None:
+            raise cleanup_failure from None
         raise
 
 
