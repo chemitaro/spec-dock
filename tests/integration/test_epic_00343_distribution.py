@@ -601,6 +601,62 @@ def _update_existing_consumer(candidate_wheel: CandidateWheel, consumer: Existin
     assert update_result.returncode == 0, update_result.stdout + update_result.stderr
 
 
+def _clone_exact_candidate_checkout(
+    candidate_wheel: CandidateWheel,
+    suffix: str,
+) -> tuple[Path, dict[str, str], Path]:
+    checkout = candidate_wheel.wheel_path.parent / suffix
+    source_repo = candidate_wheel.repo_root.resolve()
+    clone_result = subprocess.run(
+        ["git", "clone", "--no-hardlinks", "--no-checkout", str(source_repo), str(checkout)],
+        cwd=candidate_wheel.wheel_path.parent,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert clone_result.returncode == 0, clone_result.stdout + clone_result.stderr
+    assert _git(checkout, "checkout", "--detach", candidate_wheel.post_head) == ""
+    assert _git(checkout, "remote", "set-url", "origin", "https://github.com/chemitaro/spec-dock.git") == ""
+    assert _git(checkout, "rev-parse", "HEAD") == candidate_wheel.post_head
+    assert _git(checkout, "status", "--porcelain=v1") == ""
+    helper = _Issue69Harness()
+    env = _runtime_env(helper, candidate_wheel.wheel_path.parent)
+    installed_cli = helper._issue_69_venv_spec_dock(candidate_wheel.venv_python)
+    assert installed_cli.is_file()
+    return checkout, env, installed_cli
+
+
+def _epic_00343_readme(target: Path) -> Path:
+    return _find_node(target, "epic-00343") / ".workbench" / "README.md"
+
+
+def _assert_epic_00343_unbackfilled(target: Path) -> None:
+    readme = _epic_00343_readme(target)
+    assert not readme.exists(), f"existing epic-00343 received a Workbench README: {readme}"
+
+
+def _next_unused_github_issue_number(target: Path) -> int:
+    observed: set[int] = set()
+    for meta_path in (target / "spec-dock" / "initiatives").rglob(".meta.json"):
+        payload = json.loads(meta_path.read_text(encoding="utf-8"))
+        github = payload.get("github")
+        if isinstance(github, dict) and isinstance(github.get("issue_number"), int):
+            observed.add(int(github["issue_number"]))
+    candidate = max(observed, default=0) + 1
+    while candidate in observed:
+        candidate += 1
+    return candidate
+
+
+def _git_status_paths(target: Path) -> tuple[str, ...]:
+    status = _git(target, "status", "--short", "--untracked-files=all")
+    paths: list[str] = []
+    for line in status.splitlines():
+        if len(line) >= 4:
+            paths.append(line[3:])
+    return tuple(sorted(paths))
+
+
 def test_tc_346_s01_001_candidate_wheel_receipt(candidate_wheel: CandidateWheel) -> None:
     assert candidate_wheel.pre_head == candidate_wheel.post_head
     assert candidate_wheel.pre_status == candidate_wheel.post_status == ""
@@ -1088,3 +1144,173 @@ def test_tc_346_s03_003_actual_cross_filesystem_source(candidate_wheel: Candidat
             shutil.rmtree(target, ignore_errors=True)
         if source_parent is not None:
             shutil.rmtree(source_parent, ignore_errors=True)
+
+
+def test_tc_346_s04_004_disposable_exact_dogfood_update_keeps_epic_00343_unbackfilled(
+    candidate_wheel: CandidateWheel,
+) -> None:
+    provider_head = _git(candidate_wheel.repo_root, "rev-parse", "HEAD")
+    provider_status = _git(candidate_wheel.repo_root, "status", "--porcelain=v1")
+    checkout: Path | None = None
+    try:
+        checkout, env, installed_cli = _clone_exact_candidate_checkout(candidate_wheel, "s04-dogfood-no-backfill")
+        assert _git(checkout, "rev-parse", "HEAD") == candidate_wheel.post_head
+        _assert_epic_00343_unbackfilled(checkout)
+        canonical_before = _snapshot_tree(checkout / "spec-dock" / "initiatives")
+        provider_before = _snapshot_tree(checkout / "src" / "spec_dock" / "assets" / "spec_dock")
+        update_result = subprocess.run(
+            [str(installed_cli), "update", str(checkout)],
+            cwd=candidate_wheel.wheel_path.parent,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert update_result.returncode == 0, update_result.stdout + update_result.stderr
+        assert _git(checkout, "rev-parse", "HEAD") == candidate_wheel.post_head
+        _assert_epic_00343_unbackfilled(checkout)
+        assert _snapshot_tree(checkout / "spec-dock" / "initiatives") == canonical_before
+        assert _snapshot_tree(checkout / "src" / "spec_dock" / "assets" / "spec_dock") == provider_before
+        assert not any(path.startswith("src/spec_dock/assets/spec_dock/") for path in _git_status_paths(checkout))
+
+        forbidden_readme = _epic_00343_readme(checkout)
+        forbidden_readme.parent.mkdir(parents=True, exist_ok=True)
+        forbidden_readme.write_bytes(b"forbidden backfill fixture\n")
+        with pytest.raises(AssertionError, match=re.escape(forbidden_readme.as_posix())):
+            _assert_epic_00343_unbackfilled(checkout)
+        forbidden_readme.unlink()
+        _assert_epic_00343_unbackfilled(checkout)
+    finally:
+        if checkout is not None:
+            shutil.rmtree(checkout, ignore_errors=True)
+            assert not checkout.exists()
+        assert _git(candidate_wheel.repo_root, "rev-parse", "HEAD") == provider_head
+        assert _git(candidate_wheel.repo_root, "status", "--porcelain=v1") == provider_status
+
+
+def test_tc_346_s04_005_disposable_dogfood_future_shell_and_generic_import(
+    candidate_wheel: CandidateWheel,
+) -> None:
+    provider_head = _git(candidate_wheel.repo_root, "rev-parse", "HEAD")
+    provider_status = _git(candidate_wheel.repo_root, "status", "--porcelain=v1")
+    checkout: Path | None = None
+    try:
+        checkout, env, installed_cli = _clone_exact_candidate_checkout(candidate_wheel, "s04-dogfood-future-import")
+        assert _git(checkout, "rev-parse", "HEAD") == candidate_wheel.post_head
+        _assert_epic_00343_unbackfilled(checkout)
+        update_result = subprocess.run(
+            [str(installed_cli), "update", str(checkout)],
+            cwd=candidate_wheel.wheel_path.parent,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert update_result.returncode == 0, update_result.stdout + update_result.stderr
+        _assert_epic_00343_unbackfilled(checkout)
+        future_number = _next_unused_github_issue_number(checkout)
+        create_result = _run_installed_runtime(
+            candidate_wheel.venv_python,
+            checkout,
+            [
+                "new",
+                "issue",
+                "--epic",
+                "343",
+                "--title",
+                "S04 future dogfood",
+                "--github-issue",
+                str(future_number),
+            ],
+            env=env,
+        )
+        assert create_result.returncode == 0, create_result.stdout + create_result.stderr
+        future_meta = next(
+            meta_path
+            for meta_path in (checkout / "spec-dock" / "initiatives").rglob(".meta.json")
+            if json.loads(meta_path.read_text(encoding="utf-8")).get("github", {}).get("issue_number") == future_number
+        )
+        future_node = future_meta.parent
+        future_payload = json.loads(future_meta.read_text(encoding="utf-8"))
+        future_id = str(future_payload["id"])
+        future_readme = future_node / ".workbench" / "README.md"
+        assert future_readme.read_bytes() == _wheel_asset_bytes(
+            candidate_wheel,
+            "spec_dock/assets/spec_dock/templates/issue/.workbench/README.md",
+        )
+        readme_relative = future_readme.relative_to(checkout).as_posix()
+        ignored_readme = subprocess.run(
+            ["git", "check-ignore", "--no-index", readme_relative],
+            cwd=checkout,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert ignored_readme.returncode == 1, ignored_readme.stdout + ignored_readme.stderr
+        payload_source = future_node / ".workbench" / "s04-opaque.bin"
+        payload_body = b"S04 dogfood generic payload\x00\xff\n"
+        payload_source.write_bytes(payload_body)
+        payload_relative = payload_source.relative_to(checkout).as_posix()
+        ignored_source = subprocess.run(
+            ["git", "check-ignore", "--no-index", payload_relative],
+            cwd=checkout,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert ignored_source.returncode == 0, ignored_source.stdout + ignored_source.stderr
+        tracked_source = subprocess.run(
+            ["git", "ls-files", "--", payload_relative],
+            cwd=checkout,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert tracked_source.returncode == 0, tracked_source.stdout + tracked_source.stderr
+        assert tracked_source.stdout.strip() == ""
+
+        import_result = _run_installed_runtime(
+            candidate_wheel.venv_python,
+            checkout,
+            ["artifact", "import", "file", "--issue", future_id, "--file", payload_relative, "--json"],
+            env=env,
+        )
+        assert import_result.returncode == 0, import_result.stdout + import_result.stderr
+        payload = json.loads(import_result.stdout)
+        _assert_s03_json_payload(payload, target_kind="issue", target_id=future_id)
+        assert "sha256" not in import_result.stdout.lower()
+        assert "byte_count" not in import_result.stdout.lower()
+        assert str(checkout.resolve()) not in f"{import_result.stdout}\n{import_result.stderr}"
+        destination = checkout / str(payload["destination"])
+        assert destination.parent == future_node / "artifacts"
+        assert destination.read_bytes() == payload_body
+        assert payload_source.read_bytes() == payload_body
+
+        for args in (("validate",), ("sync", "--no-github")):
+            result = _run_installed_runtime(candidate_wheel.venv_python, checkout, list(args), env=env)
+            assert result.returncode == 0, result.stdout + result.stderr
+        _assert_epic_00343_unbackfilled(checkout)
+        assert future_readme.read_bytes() == _wheel_asset_bytes(
+            candidate_wheel,
+            "spec_dock/assets/spec_dock/templates/issue/.workbench/README.md",
+        )
+        assert payload_source.read_bytes() == payload_body
+        assert (
+            subprocess.run(
+                ["git", "check-ignore", "--no-index", payload_relative],
+                cwd=checkout,
+                capture_output=True,
+                text=True,
+                check=False,
+            ).returncode
+            == 0
+        )
+        assert not any(path.startswith("src/spec_dock/assets/spec_dock/") for path in _git_status_paths(checkout))
+        assert payload_relative not in _git_status_paths(checkout)
+        assert _git(checkout, "rev-parse", "HEAD") == candidate_wheel.post_head
+    finally:
+        if checkout is not None:
+            shutil.rmtree(checkout, ignore_errors=True)
+            assert not checkout.exists()
+        assert _git(candidate_wheel.repo_root, "rev-parse", "HEAD") == provider_head
+        assert _git(candidate_wheel.repo_root, "status", "--porcelain=v1") == provider_status
