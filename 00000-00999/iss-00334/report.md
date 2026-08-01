@@ -1061,3 +1061,11 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - initial／resume／already-remote-parityの3つのintegration testで、symbolic HEAD観測直後の`git checkout`が非ゼロで拒否され、operation branchとpublicationの安全性が維持されることを確認した。
 - verification: explicit Apply unit/application/integration `259 passed`; ordinary fast lane `1362 passed, 2223 skipped`; `make lint`（Ruff check/format, mypy）pass; `spec-dock validate` `nodes=227`; `git diff --check` pass; provider/dogfood `issue_planning_apply.py` byte-identical。
 - 次のgateはこのrepairのcommit／push、exact repaired HEADに対するfresh ChatGPT複合Spec/Code/QA review、PR observationである。merge、auto-merge、branch削除、Issue close、issue finishは行わない。
+
+## 2026-08-02 — S019 exact-head combined ChatGPT review FAIL
+
+- fresh read-only combined review session `iss00334-s019-combined-review-aug2-luna` は `requested=Pro`／`resolved=Pro`／`verified=yes` で実行され、GitHub connectorで repository `chemitaro/spec-dock`、current branch `iss-00334-implement-chatgpt-issue-planning-workflow`、exact HEAD `caa419afac594d445030e5b28d4f599bbbdfd892` を確認した。default branch fallbackは0件で、PR #351のHEADとlocal／remote parity `0/0`も一致した。
+- SPEC／CODE／QAの3 perspectiveを一つのプロンプトで分離して確認した結果、各視点が同一のP1を1件ずつ検出し、overall `FAIL`となった。正式read-only outputは`artifacts/20260802t034500z-pr-351-s019-combined-review-fail.md`で、SHA-256は`2d9db86cb4c7987aef3a9981e17739f3c24912aff7e02c036ef2405848b60287`である。Red Teamはpatch、replacement ZIP、repository modificationを行っていない。
+- `SPEC-P1-001`／`CODE-P1-001`／`QA-P1-001`の共通findingは、`_OperationBranchLock`が`--git-path HEAD`のper-worktree `HEAD.lock`だけを保護し、shared `refs/heads/<operation.branch>`を別linked worktreeから`git update-ref`で変更できる点である。proof後のliteral commit push、final proof後のpublication／readyが、branch refの変更を検出せずcurrent authority contractに反する可能性がある。
+- S019 integration testsは同一worktreeの`git checkout`拒否を検証しているが、別linked worktreeからshared operation branch refを変更するred pathを検証していない。これは任意の追加confidence testではなく、記録されたS019 closure claimを反証する直接のP1再現である。
+- 本FAILはS019修正の最小範囲へ限定する。仕様／アーキテクチャの再設計、P2／P3、Oracle configuration boundary、Candidate／canonical bytes、public schemaは変更しない。次はfresh Blue Team ChatGPTでこのshared-ref binding P1だけを具体化し、そのbounded修正後に新HEADで再度fresh combined reviewを行う。
