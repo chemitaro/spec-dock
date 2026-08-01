@@ -7,7 +7,9 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
+import tempfile
 import zipfile
 
 import pytest
@@ -58,6 +60,24 @@ class CandidateWheel:
 
 FileSnapshot = tuple[tuple[str, bytes], ...]
 PayloadState = tuple[bool, bytes | None, bool, str]
+
+_FILE_IMPORT_PUBLIC_KEYS = {
+    "status",
+    "import_kind",
+    "storage_identity",
+    "target_kind",
+    "target_id",
+    "artifact_id",
+    "source_visibility",
+    "source",
+    "destination",
+    "committed",
+    "publication_state",
+    "cleanup_state",
+    "warning_codes",
+    "retry_disposition",
+    "canonical",
+}
 
 
 @dataclass(frozen=True)
@@ -193,12 +213,116 @@ def _run_installed_runtime(
     )
 
 
+def _run_installed_runtime_at_cwd(
+    venv_python: Path,
+    target: Path,
+    cwd: Path,
+    args: list[str],
+    *,
+    env: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    script = target / "spec-dock" / "scripts" / "spec-dock"
+    assert script.is_file(), f"projected runtime script is missing: {script}"
+    return subprocess.run(
+        [str(venv_python), str(script), *args],
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 def _find_node(target: Path, node_id: str) -> Path:
     for meta_path in sorted((target / "spec-dock" / "initiatives").rglob(".meta.json")):
         payload = json.loads(meta_path.read_text(encoding="utf-8"))
         if payload.get("id") == node_id:
             return meta_path.parent
     raise AssertionError(f"node not found: {node_id}")
+
+
+def _write_s03_runtime_clock(target: Path) -> None:
+    clock_path = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "infra" / "clock.py"
+    clock_path.write_text(
+        (
+            "from __future__ import annotations\n\n"
+            "def now_iso() -> str:\n    return '2026-07-30T01:02:03+00:00'\n\n"
+            "def today() -> str:\n    return '2026-07-30'\n"
+        ),
+        encoding="utf-8",
+    )
+
+
+def _prepare_s03_consumer(
+    candidate_wheel: CandidateWheel,
+    suffix: str,
+    *,
+    hierarchy: bool = True,
+) -> tuple[Path, dict[str, str]]:
+    helper = _Issue69Harness()
+    temp_root = candidate_wheel.wheel_path.parent
+    target = temp_root / suffix
+    target.mkdir()
+    helper._init_origin_repo(target)
+    env = _runtime_env(helper, temp_root)
+    installed_cli = helper._issue_69_venv_spec_dock(candidate_wheel.venv_python)
+    assert installed_cli.is_file()
+    init_result = subprocess.run(
+        [str(installed_cli), "init", str(target)],
+        cwd=temp_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert init_result.returncode == 0, init_result.stdout + init_result.stderr
+    if hierarchy:
+        for args in (
+            ["new", "initiative", "--title", "S03 platform", "--github-issue", "601"],
+            ["new", "epic", "--initiative", "601", "--title", "S03 import", "--github-issue", "612"],
+            ["new", "issue", "--epic", "612", "--title", "S03 payload", "--github-issue", "645"],
+        ):
+            result = _run_installed_runtime(candidate_wheel.venv_python, target, args, env=env)
+            assert result.returncode == 0, result.stdout + result.stderr
+    _write_s03_runtime_clock(target)
+    return target, env
+
+
+def _assert_s03_json_payload(payload: dict[str, object], *, target_kind: str, target_id: str) -> None:
+    assert set(payload) == _FILE_IMPORT_PUBLIC_KEYS
+    assert payload["status"] == "ok"
+    assert payload["import_kind"] == "file"
+    assert payload["storage_identity"] == "generic"
+    assert payload["target_kind"] == target_kind
+    assert payload["target_id"] == target_id
+    assert payload["committed"] is True
+    assert payload["publication_state"] in {"committed", "committed_with_warning"}
+    assert payload["canonical"] is False
+
+
+def _assert_s03_privacy_output(
+    output: subprocess.CompletedProcess[str],
+    *,
+    source: Path,
+    body: bytes,
+) -> None:
+    combined = f"{output.stdout}\n{output.stderr}".lower()
+    forbidden = (
+        str(source).lower(),
+        str(source.parent).lower(),
+        source.parent.name.lower(),
+        body.decode("ascii", errors="ignore").lower(),
+        hashlib.sha256(body).hexdigest().lower(),
+        str(len(body)),
+        "sha256",
+        "byte_count",
+        "mime",
+        "encoding",
+        "content_id",
+    )
+    for value in forbidden:
+        assert value not in combined, f"privacy sentinel leaked in import output: {value!r}"
+    assert source.name.lower() in combined
 
 
 def _wheel_asset_bytes(candidate_wheel: CandidateWheel, relative_path: str) -> bytes:
@@ -687,3 +811,150 @@ def test_tc_346_s02_004_existing_consumer_illegal_preexisting_readme_is_rejected
 
     with pytest.raises(AssertionError, match=re.escape(relative_path)):
         _assert_existing_fixture_preflight(consumer)
+
+
+def test_tc_346_s03_001_wheel_installed_four_target_import(candidate_wheel: CandidateWheel) -> None:
+    target, env = _prepare_s03_consumer(candidate_wheel, "s03-four-target")
+    target_nodes = (
+        ("root", None, "root", target / "spec-dock" / "artifacts"),
+        ("initiative", "601", "init-00601", _find_node(target, "init-00601") / "artifacts"),
+        ("epic", "612", "epic-00612", _find_node(target, "epic-00612") / "artifacts"),
+        ("issue", "645", "iss-00645", _find_node(target, "iss-00645") / "artifacts"),
+    )
+    collision_path = target / "spec-dock" / "artifacts" / "20260730t010203z--root-opaque.bin"
+    collision_path.parent.mkdir(parents=True, exist_ok=True)
+    rules_source = target / "spec-dock" / "docs" / "rules" / "root" / "artifacts.md"
+    (collision_path.parent / "rules.md").symlink_to(os.path.relpath(rules_source, start=collision_path.parent))
+    collision_body = b"existing collision bytes\x00\xff"
+    collision_path.write_bytes(collision_body)
+
+    for target_kind, target_value, target_id, artifacts_dir in target_nodes:
+        source = target / f"{target_kind}-opaque.bin"
+        body = (f"s03-{target_kind}-opaque-body-" + "x" * 47).encode() + b"\x00\xff"
+        source.write_bytes(body)
+        before = source.read_bytes()
+        command = ["artifact", "import", "file", f"--{target_kind}"]
+        if target_value is not None:
+            command.append(target_value)
+        command.extend(["--file", source.name, "--json"])
+        result = _run_installed_runtime(candidate_wheel.venv_python, target, command, env=env)
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        _assert_s03_json_payload(payload, target_kind=target_kind, target_id=target_id)
+        assert payload["source_visibility"] == "repo_relative"
+        assert payload["source"] == source.name
+        destination = target / str(payload["destination"])
+        assert destination.parent == artifacts_dir
+        assert destination.read_bytes() == body
+        assert source.read_bytes() == before
+        assert source.read_bytes() == body
+        assert "sha256" not in result.stdout.lower()
+        assert "byte_count" not in result.stdout.lower()
+        if target_kind == "root":
+            assert destination != collision_path
+            assert collision_path.read_bytes() == collision_body
+
+
+def test_tc_346_s03_002_external_and_nested_cwd_privacy(candidate_wheel: CandidateWheel) -> None:
+    target, env = _prepare_s03_consumer(candidate_wheel, "s03-external-privacy")
+    temp_root = candidate_wheel.wheel_path.parent
+    external_parent = temp_root / "s03-private-parent-sentinel"
+    external_parent.mkdir()
+    nested_cwd = target / "nested" / "cwd"
+    nested_cwd.mkdir(parents=True)
+    agent_before = _snapshot_tree(target / "spec-dock" / ".agent")
+    cases = (
+        ("root", None, "root", "text", external_parent / "path-hash-count-text.bin", target),
+        ("initiative", "601", "init-00601", "json", external_parent / "path-hash-count-json.bin", target),
+        ("epic", "612", "epic-00612", "text", external_parent / "path-hash-count-nested-text.bin", nested_cwd),
+        ("issue", "645", "iss-00645", "json", external_parent / "path-hash-count-nested-json.bin", nested_cwd),
+    )
+    for index, (target_kind, target_value, target_id, output_mode, source, cwd) in enumerate(cases):
+        body = (f"s03-body-hash-count-sentinel-{index}-" + "y" * 49).encode() + b"\x00\xff"
+        source.write_bytes(body)
+        selected = source
+        if cwd == nested_cwd:
+            # The installed runtime resolves relative sources from the
+            # consumer repository root even when the process CWD is nested.
+            selected = Path(os.path.relpath(source, start=target))
+        command = ["artifact", "import", "file", f"--{target_kind}"]
+        if target_value is not None:
+            command.append(target_value)
+        command.extend(["--file", str(selected)])
+        if output_mode == "json":
+            command.append("--json")
+        result = _run_installed_runtime_at_cwd(
+            candidate_wheel.venv_python,
+            target,
+            cwd,
+            command,
+            env=env,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        if output_mode == "json":
+            payload = json.loads(result.stdout)
+            _assert_s03_json_payload(payload, target_kind=target_kind, target_id=target_id)
+            assert payload["source_visibility"] == "basename_only"
+            assert payload["source"] == source.name
+            destination = target / str(payload["destination"])
+        else:
+            assert f'source="{source.name}"' in result.stdout
+            assert "canonical=true" not in result.stdout
+            destination_text = next(
+                field.removeprefix("destination=").strip('"')
+                for field in result.stdout.split()
+                if field.startswith("destination=")
+            )
+            destination = target / destination_text
+        assert destination.is_file()
+        assert destination.read_bytes() == body
+        assert source.read_bytes() == body
+        _assert_s03_privacy_output(result, source=source, body=body)
+    assert _snapshot_tree(target / "spec-dock" / ".agent") == agent_before
+
+
+def test_tc_346_s03_003_actual_cross_filesystem_source(candidate_wheel: CandidateWheel) -> None:
+    helper = _Issue69Harness()
+    target = Path(tempfile.mkdtemp(prefix=".iss346-cross-fs-", dir=str(candidate_wheel.repo_root)))
+    source_parent = Path(tempfile.mkdtemp(prefix="iss346-cross-fs-source-", dir="/private/tmp"))
+    try:
+        helper._init_origin_repo(target)
+        env = _runtime_env(helper, candidate_wheel.wheel_path.parent)
+        installed_cli = helper._issue_69_venv_spec_dock(candidate_wheel.venv_python)
+        init_result = subprocess.run(
+            [str(installed_cli), "init", str(target)],
+            cwd=candidate_wheel.wheel_path.parent,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert init_result.returncode == 0, init_result.stdout + init_result.stderr
+        source = source_parent / "cross-filesystem.bin"
+        body = b"s03 cross-filesystem body sentinel\x00\xff\n"
+        source.write_bytes(body)
+        source_device = source.stat().st_dev
+        destination_root_device = target.stat().st_dev
+        if source_device == destination_root_device:
+            pytest.skip("actual cross-filesystem source is unavailable")
+        result = _run_installed_runtime(
+            candidate_wheel.venv_python,
+            target,
+            ["artifact", "import", "file", "--root", "--file", str(source), "--json"],
+            env=env,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        _assert_s03_json_payload(payload, target_kind="root", target_id="root")
+        assert payload["source_visibility"] == "basename_only"
+        assert payload["source"] == source.name
+        destination = target / str(payload["destination"])
+        assert destination.is_file()
+        assert destination.read_bytes() == body
+        assert source.read_bytes() == body
+        assert destination.parent.stat().st_dev == destination_root_device
+        assert source.stat().st_dev != destination.parent.stat().st_dev
+        _assert_s03_privacy_output(result, source=source, body=body)
+    finally:
+        shutil.rmtree(target, ignore_errors=True)
+        shutil.rmtree(source_parent, ignore_errors=True)
