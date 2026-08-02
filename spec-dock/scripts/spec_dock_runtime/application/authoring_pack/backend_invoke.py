@@ -25,6 +25,7 @@ from spec_dock_runtime.domain.authoring_pack.backend_invoke_contract import (
     BackendCommandResolution,
     BackendInvokeRequest,
     BackendInvokeResult,
+    BackendStreamCapture,
     PromptPackValidation,
 )
 from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
@@ -38,6 +39,23 @@ SUMMARY_FILENAME = "invocation-summary.json"
 
 
 def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | None = None) -> BackendInvokeResult:
+    result, _ = _invoke_backend_core(request, env=env)
+    return result
+
+
+def invoke_backend_with_capture(
+    request: BackendInvokeRequest,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> tuple[BackendInvokeResult, BackendStreamCapture]:
+    return _invoke_backend_core(request, env=env)
+
+
+def _invoke_backend_core(
+    request: BackendInvokeRequest,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> tuple[BackendInvokeResult, BackendStreamCapture]:
     environment = env if env is not None else os.environ
     resolution = resolve_backend_command(request.backend_command, environment)
     pack = validate_prompt_pack(request.prompt_pack)
@@ -54,7 +72,7 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
         )
         if not unsafe_output_blockers:
             _write_summary(request.output_dir, result)
-        return result
+        return result, BackendStreamCapture()
 
     slug = request.slug or _default_slug(request.prompt_pack, pack.source_manifest_hash)
     prompt = request.prompt or DEFAULT_BACKEND_PROMPT
@@ -77,14 +95,16 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
             invocation_argv=invocation_argv,
         )
         _write_summary(request.output_dir, result)
-        return result
+        return result, BackendStreamCapture()
 
+    cwd = str(request.working_dir.resolve(strict=True)) if request.working_dir is not None else None
     try:
         completed = subprocess.run(
             list(invocation_argv),
             check=False,
             capture_output=True,
             timeout=request.timeout_seconds if request.timeout_seconds and request.timeout_seconds > 0 else None,
+            cwd=cwd,
         )
     except FileNotFoundError:
         result = _result(
@@ -98,7 +118,7 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
             invocation_argv=invocation_argv,
         )
         _write_summary(request.output_dir, result)
-        return result
+        return result, BackendStreamCapture()
     except OSError as error:
         result = _result(
             request,
@@ -111,7 +131,7 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
             invocation_argv=invocation_argv,
         )
         _write_summary(request.output_dir, result)
-        return result
+        return result, BackendStreamCapture()
     except subprocess.TimeoutExpired as error:
         result = _result(
             request,
@@ -126,7 +146,10 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
             stderr=_decode_stream(error.stderr),
         )
         _write_summary(request.output_dir, result)
-        return result
+        return result, BackendStreamCapture(
+            stdout=_stream_bytes(error.stdout),
+            stderr=_stream_bytes(error.stderr),
+        )
 
     status = "pass" if completed.returncode == 0 else "blocked"
     blockers = () if completed.returncode == 0 else (f"backend_exit_code:{completed.returncode}",)
@@ -149,7 +172,10 @@ def invoke_backend(request: BackendInvokeRequest, *, env: Mapping[str, str] | No
         stderr=_decode_stream(completed.stderr),
     )
     _write_summary(request.output_dir, result)
-    return result
+    return result, BackendStreamCapture(
+        stdout=_stream_bytes(completed.stdout),
+        stderr=_stream_bytes(completed.stderr),
+    )
 
 
 def resolve_backend_command(backend_command: str | None, env: Mapping[str, str]) -> BackendCommandResolution:
@@ -420,6 +446,14 @@ def _decode_stream(value: str | bytes | None) -> str:
     if isinstance(value, str):
         return value
     return value.decode("utf-8", errors="replace")
+
+
+def _stream_bytes(value: str | bytes | None) -> bytes:
+    if value is None:
+        return b""
+    if isinstance(value, bytes):
+        return value
+    return value.encode("utf-8")
 
 
 def _default_slug(prompt_pack: Path, source_manifest_hash: str | None) -> str:

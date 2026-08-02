@@ -589,7 +589,10 @@ def _rollback_bound_rules_link(
         )
         if _rules_link_identity(current) != created_rules_identity or not stat.S_ISLNK(current.st_mode):
             return
-        os.unlink("rules.md", dir_fd=artifacts_directory_fd)
+        # The captured tuple cannot prove ownership at the unlink instant.  A
+        # replacement may legally have the same observable identity, so retain
+        # the current entry and fail closed through the existing setup error.
+        return
     except OSError:
         return
 

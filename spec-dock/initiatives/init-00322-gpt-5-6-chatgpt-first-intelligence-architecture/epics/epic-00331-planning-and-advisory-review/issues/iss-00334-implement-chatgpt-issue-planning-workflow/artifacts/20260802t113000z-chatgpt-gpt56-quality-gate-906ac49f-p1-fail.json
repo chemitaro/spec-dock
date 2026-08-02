@@ -1,0 +1,80 @@
+{
+"source_repository": "chemitaro/spec-dock",
+"source_branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+"source_head": "906ac49f820a2b131bef6a9092789b40896579d9",
+"head_match": true,
+"default_branch_fallback": false,
+"spec": {
+"review_status": "pass",
+"findings": []
+},
+"code": {
+"review_status": "fail",
+"findings": [
+{
+"id": "CODE-P1-001",
+"severity": "P1",
+"path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py",
+"line": 54,
+"problem": "PlanningOutputExpectation removes the required '-issue-planning-documents.zip' suffix without first proving that it is present. A bare canonical ID such as 'iss-00001', paired with internal_root='iss-00001' and the expected inventory, therefore passes validation even though it is not the required authoring ZIP logical filename.",
+"impact": "The role-output contract is not closed over the exact filename and same-stem ZIP identity required by REQ-019 and AC-019. A malformed non-ZIP logical filename can be admitted into synthesized prompt or adapter expectations instead of being rejected.",
+"required_fix": "Require logical_filename to end with exactly '-issue-planning-documents.zip' before extracting the Issue-ID segment. Normalize that non-empty segment with normalize_id_input, require byte-for-byte canonical equality, and derive the required internal root only from the validated full filename.",
+"required_test": "Add direct negative contract tests rejecting a bare canonical Issue ID, a missing '.zip' suffix, a wrong suffix, uppercase or otherwise noncanonical IDs, and malformed stems, while retaining positive local-ID and six-or-more-digit numeric-ID cases."
+},
+{
+"id": "CODE-P1-002",
+"severity": "P1",
+"path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_apply.py",
+"line": 2570,
+"problem": "The generated reference-transaction hook parses payload.decode('ascii').splitlines() and discards empty lines before comparison. This normalizes missing terminal newlines, CRLF or other splitlines separators, and leading, trailing, or inter-record blank lines into an otherwise accepted branch-only or branch-plus-HEAD record tuple.",
+"impact": "The direct branch CAS proof can accept malformed or extra-record payload bytes outside the exact supported Git payload shapes, violating the required fail-closed reference-transaction boundary even though mismatched non-empty records are rejected.",
+"required_fix": "Validate the raw ASCII payload against a closed set of exact byte strings, including the required newline after every record. Permit only the proven branch-only payload and the exact supported branch-plus-HEAD ordering or orderings; do not strip, filter, or normalize separators. Preserve the existing symbolic-HEAD, HEAD.lock ownership, CAS, and native-hook checks.",
+"required_test": "Exercise the actual generated hook or an extracted byte-exact validator with accepted branch-only and supported branch-plus-HEAD payloads, then reject missing final LF, CRLF, leading or trailing blank records, an inter-record blank line, duplicate records, extra records, malformed fields, and old/new/ref mismatches. Retain real-Git initial, resume, already-remote, HEAD.lock, and native-hook delegation regressions."
+}
+]
+},
+"qa": {
+"review_status": "fail",
+"findings": [
+{
+"id": "QA-P1-001",
+"severity": "P1",
+"path": "tests/unit/application/test_issue_planning_prompt.py",
+"line": 63,
+"problem": "The repair adds only positive coverage for local and six-digit Issue IDs through authoring_output_expectation. It does not directly test that PlanningOutputExpectation rejects filenames lacking the mandatory '-issue-planning-documents.zip' shape, allowing the bare-ID acceptance defect to pass the full suite.",
+"impact": "The required negative half of the canonical filename contract is unprotected, so a deterministic contract violation remains green in exact-head CI.",
+"required_fix": "Add a negative filename-shape matrix at the PlanningOutputExpectation validation boundary and correct the implementation so every negative case fails before prompt synthesis or backend work.",
+"required_test": "Assert ValueError for logical_filename='iss-00001' with a matching bare internal root, missing or altered suffixes, noncanonical case or padding, and malformed local IDs; retain successful cases for 'iss-local-00001-issue-planning-documents.zip' and six-or-more-digit numeric IDs."
+},
+{
+"id": "QA-P1-002",
+"severity": "P1",
+"path": "tests/unit/infra/test_issue_planning_apply.py",
+"line": 543,
+"problem": "The existing real-Git branch-lock tests verify lock mode and ownership behavior but do not exercise the generated reference-transaction hook's accepted payload bytes. No test rejects blank records, normalized line endings, or a missing terminal newline.",
+"impact": "Provider CI can pass while the CAS hook accepts malformed payload shapes that the quality-gate contract explicitly requires it to reject. Exact-head CI also skips the integration suite, so that omission is not covered indirectly there.",
+"required_fix": "Introduce a testable byte-exact payload-validation seam or execute the generated hook under controlled payload input, without replacing the real-Git lock and publication tests.",
+"required_test": "Cover both accepted payload forms and independently reject missing, extra, mismatched, and malformed records, including empty-record and line-ending variants; then retain initial publication, resume, already-remote, symbolic-HEAD, HEAD.lock, CAS, and native-hook delegation tests."
+}
+]
+},
+"quality_gate": {
+"status": "fail",
+"p0_count": 0,
+"p1_count": 4
+},
+"verified_checks": [
+"The GitHub connector opened chemitaro/spec-dock, the required branch, PR #351, and exact HEAD 906ac49f820a2b131bef6a9092789b40896579d9.",
+"The required branch resolved identically to the specified HEAD; default-branch fallback was not used.",
+"Deep context-manifest JSON recursion is converted to ValueError and maps to rejected/planning_context_rejected before backend work, with a bounded regression test.",
+"UTC-unrepresentable timezone-aware Human decision timestamps are rejected by PlanningHumanDecisionV1 and map to rejected/human_decision_rejected before transaction execution, with domain and application tests.",
+"The four changed provider runtime files and their dogfood projection counterparts have matching GitHub blob identities.",
+"The canonical Requirement, Design, and Plan retain the structured-result, exact authoring-ZIP, Candidate, Human Gate, apply, rollback, and publication contracts without an unrelated public-schema expansion in this repair commit.",
+"Exact-head CI and Provider CI completed successfully; provider static analysis passed and the provider unit suite reported 1411 passed and 2239 skipped."
+],
+"known_deferred": [
+"Exact-head Provider CI skipped the integration test files, so repository-local claims about normal initial, resume, and already-remote publication execution were not independently re-executed by this gate.",
+"P2, P3, and historical carryover observations are outside this defect-only P0/P1 gate."
+],
+"confidence": 0.98
+}

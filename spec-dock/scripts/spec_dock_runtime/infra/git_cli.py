@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+from urllib.parse import urlsplit
 
 from spec_dock_runtime.application.contracts import GitWorktreeRecord
 
@@ -161,6 +162,8 @@ def _remote_get_url(repo_root: Path, *, push: bool) -> str:
 
 
 def _parse_github_repo_slug(remote_url: str) -> str | None:
+    if _remote_has_userinfo(remote_url):
+        return None
     match = _HTTPS_GH_REMOTE_RE.fullmatch(remote_url) or _SSH_GH_REMOTE_RE.fullmatch(remote_url)
     if match is None:
         return None
@@ -171,7 +174,21 @@ def _parse_github_repo_slug(remote_url: str) -> str | None:
     return f"{owner}/{repo}"
 
 
-def origin_github_repo_slug(repo_root: Path) -> str | None:
+def _remote_has_userinfo(remote_url: str) -> bool:
+    if not remote_url.lower().startswith(("http://", "https://")):
+        return False
+    try:
+        parsed = urlsplit(remote_url)
+    except ValueError:
+        return True
+    return parsed.username is not None or parsed.password is not None
+
+
+def _redact_remote_url(remote_url: str) -> str:
+    return "<credential-bearing remote>" if _remote_has_userinfo(remote_url) else remote_url
+
+
+def origin_github_publication_endpoint(repo_root: Path) -> tuple[str, str]:
     fetch_url = _remote_get_url(repo_root, push=False)
     push_url = _remote_get_url(repo_root, push=True)
     fetch_slug = _parse_github_repo_slug(fetch_url)
@@ -179,14 +196,19 @@ def origin_github_repo_slug(repo_root: Path) -> str | None:
     if fetch_slug is None or push_slug is None:
         raise RuntimeError(
             "origin remote is not a GitHub repository; cannot resolve canonical repo scope: "
-            f"fetch={fetch_url} push={push_url}"
+            f"fetch={_redact_remote_url(fetch_url)} push={_redact_remote_url(push_url)}"
         )
     if fetch_slug != push_slug:
         raise RuntimeError(
             "origin remote fetch/push mismatch; cannot resolve canonical repo scope: "
             f"fetch={fetch_slug} push={push_slug}"
         )
-    return fetch_slug
+    return fetch_slug, push_url
+
+
+def origin_github_repo_slug(repo_root: Path) -> str | None:
+    slug, _push_url = origin_github_publication_endpoint(repo_root)
+    return slug
 
 
 def worktree_list(repo_root: Path) -> list[GitWorktreeRecord]:

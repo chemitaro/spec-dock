@@ -2,26 +2,25 @@
 set -euo pipefail
 
 usage() {
-  cat >&2 <<'USAGE'
-usage: wait_pr_observation.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA [options]
-
-Options:
-  --timeout-seconds NUMBER
-  --poll-interval-seconds NUMBER
-  --quiet-seconds NUMBER
-  --same-fingerprint-count NUMBER
-  --zero-check-grace-polls NUMBER
-  --trigger-mode post-once|resume
-  --trigger-comment-id NUMBER
-  --trigger-created-at ISO8601
-  --body-mode none|trigger-window-truncated|trigger-window-full|out-only
-  --progress stderr-summary|none
-  --out DIR
-
-The script accepts only the fixed PR observation contract. It does not accept
-caller-provided endpoints, methods, GraphQL queries, headers, bodies, jq
-expressions, or raw gh arguments.
-USAGE
+  builtin printf '%s\n' \
+    'usage: wait_pr_observation.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA [options]' \
+    '' \
+    'Options:' \
+    '  --timeout-seconds NUMBER' \
+    '  --poll-interval-seconds NUMBER' \
+    '  --quiet-seconds NUMBER' \
+    '  --same-fingerprint-count NUMBER' \
+    '  --zero-check-grace-polls NUMBER' \
+    '  --trigger-mode post-once|resume' \
+    '  --trigger-comment-id NUMBER' \
+    '  --trigger-created-at ISO8601' \
+    '  --body-mode none|trigger-window-truncated|trigger-window-full|out-only' \
+    '  --progress stderr-summary|none' \
+    '  --out DIR' \
+    '' \
+    'The script accepts only the fixed PR observation contract. It does not accept' \
+    'caller-provided endpoints, methods, GraphQL queries, headers, bodies, jq' \
+    'expressions, or raw gh arguments.' >&2
 }
 
 fail_usage() {

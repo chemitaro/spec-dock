@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
@@ -57,6 +58,119 @@ def _raise(exc: BaseException):
         raise exc
 
     return _raiser
+
+
+def _run_bounded_process(
+    argv: list[str],
+    *,
+    env: dict[str, str],
+    stdin: int | None = None,
+    timeout_seconds: float = 5.0,
+) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(
+        argv,
+        env=env,
+        stdin=stdin,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        os.killpg(process.pid, signal.SIGTERM)
+        try:
+            process.communicate(timeout=1)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.communicate()
+        pytest.fail(f"subprocess timed out after {timeout_seconds}s: {argv!r}")
+        raise AssertionError("unreachable") from exc
+    return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)
+
+
+def _managed_tree_bytes(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file() and "__pycache__" not in path.parts and not path.name.endswith(".pyc")
+    }
+
+
+def test_issue_334_init_and_update_install_chatgpt_assets_byte_exact(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    provider_scripts = repo_root / "src/spec_dock/assets/spec_dock/scripts"
+    provider_skill = repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning"
+    provider_docs = repo_root / "src/spec_dock/assets/spec_dock/docs"
+    target = tmp_path / "target"
+    target.mkdir()
+
+    assert main(["init", str(target)]) == 0
+    assert os.access(target / "spec-dock/scripts/spec-dock", os.X_OK)
+    assert os.access(target / "spec-dock/scripts/spec-dock-chatgpt", os.X_OK)
+    assert _managed_tree_bytes(target / "spec-dock/scripts") == _managed_tree_bytes(provider_scripts)
+    assert _managed_tree_bytes(target / ".agents/skills/spec-dock-issue-planning") == _managed_tree_bytes(
+        provider_skill
+    )
+    for name in ("README.md", "workflow_issue.md"):
+        assert (target / "spec-dock/docs" / name).read_bytes() == (provider_docs / name).read_bytes()
+
+    (target / "spec-dock/scripts/spec-dock-chatgpt").write_text(
+        "stale\n",
+        encoding="utf-8",
+    )
+    assert main(["update", str(target)]) == 0
+    assert (target / "spec-dock/scripts/spec-dock-chatgpt").read_bytes() == (
+        provider_scripts / "spec-dock-chatgpt"
+    ).read_bytes()
+    assert os.access(target / "spec-dock/scripts/spec-dock-chatgpt", os.X_OK)
+
+
+def test_issue_334_update_restores_managed_assets_and_preserves_unmanaged_content(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "target"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+    initiative_sentinel = target / "spec-dock/initiatives/preservation/value.txt"
+    initiative_sentinel.parent.mkdir(parents=True)
+    initiative_sentinel.write_bytes(b"persistent\n")
+    unmanaged_sentinel = target / "unmanaged-s06-sentinel.txt"
+    unmanaged_sentinel.write_bytes(b"unmanaged\n")
+    (target / ".agents/skills/spec-dock-issue-planning/SKILL.md").write_bytes(b"stale\n")
+
+    assert main(["update", str(target)]) == 0
+
+    assert initiative_sentinel.read_bytes() == b"persistent\n"
+    assert unmanaged_sentinel.read_bytes() == b"unmanaged\n"
+    provider_skill = (
+        Path(__file__).resolve().parents[3]
+        / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
+    )
+    assert (target / ".agents/skills/spec-dock-issue-planning/SKILL.md").read_bytes() == provider_skill.read_bytes()
+
+
+def test_issue_334_checked_in_dogfood_projection_matches_provider() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    comparisons = (
+        (
+            repo_root / "src/spec_dock/assets/spec_dock/scripts",
+            repo_root / "spec-dock/scripts",
+        ),
+        (
+            repo_root / "src/spec_dock/assets/spec_dock/docs",
+            repo_root / "spec-dock/docs",
+        ),
+        (
+            repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning",
+            repo_root / ".agents/skills/spec-dock-issue-planning",
+        ),
+    )
+    for provider, dogfood in comparisons:
+        assert _managed_tree_bytes(dogfood) == _managed_tree_bytes(provider)
 
 
 _ISS_00031_STALE_WHEEL_PATHS = (
@@ -1099,6 +1213,16 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00160-reduce-test-runtime-followup/.meta.json",
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00342-reduce-unit-test-and-provider-ci-runtime/.meta.json",
         "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00334-implement-chatgpt-issue-planning-workflow/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00335-implement-initiative-epic-portfolio-planning-workflow/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00336-implement-targeted-review-and-planning-surface-cutover/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00332-issue-execution-and-per-issue-delivery/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00332-issue-execution-and-per-issue-delivery/issues/iss-00337-analysis-guided-issue-execution-and-per-issue-delivery/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/issues/iss-00338-multi-issue-epic-coordination-and-finish/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/issues/iss-00339-official-global-cutover-and-rollback-activation/.meta.json",
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/issues/iss-00340-post-cutover-evaluation-release-and-closure/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json",
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json",
@@ -1318,6 +1442,33 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00160-reduce-test-runtime-followup/.meta.json": [],
         "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00342-reduce-unit-test-and-provider-ci-runtime/.meta.json": [],
         "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/.meta.json": [],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/.meta.json": [],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00334-implement-chatgpt-issue-planning-workflow/.meta.json": [],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00335-implement-initiative-epic-portfolio-planning-workflow/.meta.json": [
+            "iss-00334",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00336-implement-targeted-review-and-planning-surface-cutover/.meta.json": [
+            "iss-00334",
+            "iss-00335",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00332-issue-execution-and-per-issue-delivery/.meta.json": [
+            "epic-00331",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00332-issue-execution-and-per-issue-delivery/issues/iss-00337-analysis-guided-issue-execution-and-per-issue-delivery/.meta.json": [
+            "epic-00331",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/.meta.json": [
+            "epic-00332",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/issues/iss-00338-multi-issue-epic-coordination-and-finish/.meta.json": [
+            "epic-00332",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/issues/iss-00339-official-global-cutover-and-rollback-activation/.meta.json": [
+            "iss-00338",
+        ],
+        "spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00333-epic-completion-and-global-cutover/issues/iss-00340-post-cutover-evaluation-release-and-closure/.meta.json": [
+            "iss-00339",
+        ],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00048-agent-facing-interface-hardening-and-host-adapter-scaffolding/issues/iss-00049-protocol-contract-and-runtime-alignment/.meta.json": [],
@@ -1345,6 +1496,13 @@ class TestInitUpdate(CliRuntimeHarness):
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00143-manage-external-git-worktrees/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00153-worktree-remove-default-full-delete/.meta.json": [],
         "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00107-worktree-provisioning/issues/iss-00225-configure-ruff-mypy-static-analysis/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00344-workbench-shell-scaffolding/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00345-generic-single-file-artifact-import/.meta.json": [],
+        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00346-integration-distribution-and-final-quality/.meta.json": [
+            "iss-00344",
+            "iss-00345",
+        ],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/.meta.json": [],
         "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00001-multilayer-specification-foundation/issues/iss-00007-child-node-scripts-and-supplements/.meta.json": [],
@@ -1696,13 +1854,6 @@ class TestInitUpdate(CliRuntimeHarness):
             "iss-00317",
             "iss-00318",
         ],
-        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/.meta.json": [],
-        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00344-workbench-shell-scaffolding/.meta.json": [],
-        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00345-generic-single-file-artifact-import/.meta.json": [],
-        "spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00346-integration-distribution-and-final-quality/.meta.json": [
-            "iss-00344",
-            "iss-00345",
-        ],
     }
     _CHECKED_IN_DOGFOODING_NON_EMPTY_ISSUE_DEPENDS_ON_MAP: ClassVar[dict[str, object]] = {
         "iss-00035": ["iss-00036"],
@@ -1767,6 +1918,12 @@ class TestInitUpdate(CliRuntimeHarness):
         "iss-00317": ["iss-00315"],
         "iss-00318": ["iss-00317"],
         "iss-00319": ["iss-00315", "iss-00316", "iss-00317", "iss-00318"],
+        "iss-00335": ["iss-00334"],
+        "iss-00336": ["iss-00334", "iss-00335"],
+        "iss-00337": ["iss-00334", "iss-00335", "iss-00336"],
+        "iss-00338": ["iss-00337"],
+        "iss-00339": ["iss-00337", "iss-00338"],
+        "iss-00340": ["iss-00337", "iss-00339"],
         "iss-00346": ["iss-00344", "iss-00345"],
     }
     _NATIVE_SHIM_STATE_PAYLOAD_PATTERN = (
@@ -2335,21 +2492,25 @@ class TestInitUpdate(CliRuntimeHarness):
         planning_fragments = (
             "This is the primary planning route and it is ChatGPT-first.",
             "does not split the workflow into separate planning modes",
-            "./spec-dock/scripts/spec-dock guidance issue-planning",
+            "./spec-dock/scripts/spec-dock-chatgpt --help",
             "spec-dock/docs/workflow_issue.md",
-            "spec-dock/docs/workflow_spec_authoring.md",
-            "spec-dock/docs/phase_plan_issue.md",
-            "spec-dock/docs/authoring/issue-plan.md",
             "spec-dock/docs/authoring/decision-routing.md",
             "Issue Planning has one workflow",
             "requirement-heavy",
             "draft-heavy",
             "context-heavy",
             "information_insufficient",
-            "spec-dock-chatgpt-authoring",
-            "Evidence Adoption Ledger",
-            "fresh `spec-reviewer` pass after canonical changes",
-            "ChatGPT output is evidence only",
+            "planning create",
+            "review planning",
+            "planning revise",
+            "planning apply",
+            "planning-review-result.json",
+            "planning-revision-request.json",
+            "planning-human-decision.json",
+            "fixed sibling",
+            "fresh conversation",
+            "Candidate and Review output are evidence only",
+            "ready/adoption_published",
         )
         for fragment in planning_fragments:
             assert fragment in planning_text, f"{source} planning skill missing ChatGPT-first fragment: {fragment}"
@@ -5775,7 +5936,6 @@ class TestInitUpdate(CliRuntimeHarness):
         for dogfood_path in (
             ".agents/skills/spec-dock-initiative-planning/SKILL.md",
             ".agents/skills/spec-dock-epic-planning/SKILL.md",
-            ".agents/skills/spec-dock-issue-planning/SKILL.md",
         ):
             caller = (repo_root / dogfood_path).read_text(encoding="utf-8")
             assert (
@@ -5801,6 +5961,13 @@ class TestInitUpdate(CliRuntimeHarness):
                 "weaken existing ZIP safety checks",
             ):
                 assert forbidden_matrix_token not in caller
+        issue_planning = (repo_root / ".agents/skills/spec-dock-issue-planning/SKILL.md").read_text(encoding="utf-8")
+        assert "./spec-dock/scripts/spec-dock-chatgpt planning create" in issue_planning
+        assert "./spec-dock/scripts/spec-dock-chatgpt review planning" in issue_planning
+        assert "preserving immutable Candidate and fresh Review evidence outside the repository" in issue_planning
+        assert "planning-review-result.json" in issue_planning
+        assert "planning-human-decision.json" in issue_planning
+        assert "Candidate and Review output are evidence only" in issue_planning
 
         workflow = (repo_root / "spec-dock/docs/workflow_spec_authoring.md").read_text(encoding="utf-8")
         assert (
@@ -11637,20 +11804,26 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
         )
         assert authoring_text.startswith("---\nname: spec-dock-chatgpt-authoring\n")
 
-        for planning_text in (initiative_planning_text, epic_planning_text, issue_planning_text):
+        for planning_text in (initiative_planning_text, epic_planning_text):
             assert "This is the primary planning route and it is ChatGPT-first." in planning_text
             assert "Wait, retry, or recover" in planning_text
             assert "Manual Backup" in planning_text
             assert "information_insufficient" in planning_text
 
+        assert "This is the primary planning route and it is ChatGPT-first." in issue_planning_text
+        assert "Manual Backup" in issue_planning_text
+        assert "information_insufficient" in issue_planning_text
         assert "Issue Planning has one workflow" in issue_planning_text
         for context_type in ("requirement-heavy", "draft-heavy", "context-heavy"):
             assert context_type in issue_planning_text
         for removed_mode_name in ("zero-base", "requirement-first"):
             assert removed_mode_name not in issue_planning_text
         assert "Do not create separate workflow modes" in issue_planning_text
-        assert "Evidence Adoption Ledger" in issue_planning_text
-        assert "fresh `spec-reviewer` pass after canonical changes" in issue_planning_text
+        assert "./spec-dock/scripts/spec-dock-chatgpt planning create" in issue_planning_text
+        assert "./spec-dock/scripts/spec-dock-chatgpt review planning" in issue_planning_text
+        assert "planning-review-result.json" in issue_planning_text
+        assert "planning-human-decision.json" in issue_planning_text
+        assert "ready/adoption_published" in issue_planning_text
 
         assert "evidence-only" in authoring_text
         assert "Failure Classification" in authoring_text
@@ -13023,18 +13196,23 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
 
         for fragment in (
             "workflow_issue.md",
-            "workflow_spec_authoring.md",
-            "phase_plan_issue.md",
-            "authoring/issue-plan.md",
             "primary planning route and it is ChatGPT-first",
             "Issue Planning has one workflow",
             "requirement-heavy",
             "draft-heavy",
             "context-heavy",
             "information_insufficient",
-            "Evidence Adoption Ledger",
-            "fresh `spec-reviewer` pass after canonical changes",
-            "ChatGPT output is evidence only",
+            "./spec-dock/scripts/spec-dock-chatgpt",
+            "planning create",
+            "review planning",
+            "planning revise",
+            "planning apply",
+            "planning-review-result.json",
+            "fixed sibling",
+            "fresh conversation",
+            "planning-human-decision.json",
+            "Candidate and Review output are evidence only",
+            "ready/adoption_published",
         ):
             assert fragment in issue_planning_text
 
@@ -13176,8 +13354,11 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
             "draft-heavy",
             "context-heavy",
             "information_insufficient",
-            "Evidence Adoption Ledger",
-            "fresh `spec-reviewer` pass after canonical changes",
+            "immutable Candidate",
+            "fresh Review evidence",
+            "planning apply",
+            "exact Human approval",
+            "ready/adoption_published",
             "human-approved emergency backup",
         ):
             assert fragment in issue_planning_text
@@ -15039,19 +15220,130 @@ exit 44
                 ),
                 ("--repo", "owner/repo", "--pr", "13", "--head-sha", "a" * 40, "--endpoint", "x"),
             )
-            for args in invalid_wait_args:
-                with _case(args=args):
-                    if gh_log.exists():
-                        gh_log.unlink()
-                    result = subprocess.run(
-                        [str(wait_script_path), *args],
+            wait_usage = """usage: wait_pr_observation.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA [options]
+
+Options:
+  --timeout-seconds NUMBER
+  --poll-interval-seconds NUMBER
+  --quiet-seconds NUMBER
+  --same-fingerprint-count NUMBER
+  --zero-check-grace-polls NUMBER
+  --trigger-mode post-once|resume
+  --trigger-comment-id NUMBER
+  --trigger-created-at ISO8601
+  --body-mode none|trigger-window-truncated|trigger-window-full|out-only
+  --progress stderr-summary|none
+  --out DIR
+
+The script accepts only the fixed PR observation contract. It does not accept
+caller-provided endpoints, methods, GraphQL queries, headers, bodies, jq
+expressions, or raw gh arguments.
+"""
+            stdin_modes = (("inherited", None), ("devnull", subprocess.DEVNULL))
+            for stdin_name, stdin in stdin_modes:
+                with _case(stdin=stdin_name, args=("--help",)):
+                    result = _run_bounded_process(
+                        [str(wait_script_path), "--help"],
                         env=env,
-                        capture_output=True,
-                        text=True,
-                        check=False,
+                        stdin=stdin,
+                    )
+                    assert result.returncode == 0, result.stdout + result.stderr
+                    assert result.stdout == ""
+                    assert result.stderr == wait_usage
+                    assert not gh_log.exists()
+
+                for args in invalid_wait_args:
+                    with _case(stdin=stdin_name, args=args):
+                        if gh_log.exists():
+                            gh_log.unlink()
+                        result = _run_bounded_process(
+                            [str(wait_script_path), *args],
+                            env=env,
+                            stdin=stdin,
+                        )
+                        assert result.returncode == 64, result.stdout + result.stderr
+                        assert result.stdout == ""
+                        assert result.stderr == wait_usage
+                        assert not gh_log.exists(), "unsafe wait input reached fake gh api"
+
+    def test_issue_75_pr_observation_wait_engine_rejects_invalid_environment_before_helpers(
+        self,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        engine_path = (
+            repo_root
+            / "src/spec_dock/assets/install_root/.agents/skills/github-pr-observation/scripts/lib/pr_observation_wait.py"
+        )
+        usage_line = "usage: wait_pr_observation.sh --repo OWNER/REPO --pr NUMBER --head-sha SHA [options]"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            trigger_log = tmp_path / "trigger.log"
+            snapshot_log = tmp_path / "snapshot.log"
+            out_dir = tmp_path / "out"
+            trigger_script = tmp_path / "trigger.sh"
+            snapshot_script = tmp_path / "snapshot.sh"
+            trigger_script.write_text(
+                '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$TRIGGER_FAKE_LOG"\nexit 44\n',
+                encoding="utf-8",
+            )
+            snapshot_script.write_text(
+                '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$SNAPSHOT_FAKE_LOG"\nexit 44\n',
+                encoding="utf-8",
+            )
+            trigger_script.chmod(0o755)
+            snapshot_script.chmod(0o755)
+
+            base_env = {
+                **os.environ,
+                "OBS_SNAPSHOT_SCRIPT": str(snapshot_script),
+                "OBS_TRIGGER_SCRIPT": str(trigger_script),
+                "OBS_REPO": "owner/repo",
+                "OBS_PR": "13",
+                "OBS_HEAD_SHA": "a" * 40,
+                "OBS_TIMEOUT_SECONDS": "30",
+                "OBS_POLL_INTERVAL_SECONDS": "1",
+                "OBS_QUIET_SECONDS": "1",
+                "OBS_SAME_FINGERPRINT_COUNT": "1",
+                "OBS_ZERO_CHECK_GRACE_POLLS": "1",
+                "OBS_TRIGGER_MODE": "post-once",
+                "OBS_TRIGGER_COMMENT_ID": "",
+                "OBS_TRIGGER_CREATED_AT": "",
+                "OBS_BODY_MODE": "trigger-window-truncated",
+                "OBS_PROGRESS": "none",
+                "OBS_OUT_DIR": str(out_dir),
+                "TRIGGER_FAKE_LOG": str(trigger_log),
+                "SNAPSHOT_FAKE_LOG": str(snapshot_log),
+            }
+            invalid_cases = (
+                ("head-sha", {"OBS_HEAD_SHA": "not-a-sha"}),
+                ("pr", {"OBS_PR": "0"}),
+                ("progress", {"OBS_PROGRESS": "verbose"}),
+                ("timeout", {"OBS_TIMEOUT_SECONDS": "0"}),
+                (
+                    "trigger-created-at",
+                    {
+                        "OBS_TRIGGER_MODE": "resume",
+                        "OBS_TRIGGER_COMMENT_ID": "1",
+                        "OBS_TRIGGER_CREATED_AT": "2026-06-08T01:02:03not-iso",
+                    },
+                ),
+            )
+            for case_name, overrides in invalid_cases:
+                with _case(case_name=case_name):
+                    trigger_log.unlink(missing_ok=True)
+                    snapshot_log.unlink(missing_ok=True)
+                    shutil.rmtree(out_dir, ignore_errors=True)
+                    result = _run_bounded_process(
+                        [sys.executable, str(engine_path)],
+                        env={**base_env, **overrides},
                     )
                     assert result.returncode == 64, result.stdout + result.stderr
-                    assert not gh_log.exists(), "unsafe wait input reached fake gh api"
+                    assert result.stdout == ""
+                    assert usage_line in result.stderr
+                    assert not trigger_log.exists()
+                    assert not snapshot_log.exists()
+                    assert not out_dir.exists()
 
     def _issue_176_write_trigger_fake_gh(
         self,
@@ -16015,37 +16307,37 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
-python3 - "$trigger_id" "$trigger_created_at" <<'PY'
-import json
-import sys
-
-trigger_id = int(sys.argv[1]) if sys.argv[1] else None
-trigger_created_at = sys.argv[2] or None
-payload = {
-    "script": "fetch_pr_observation_snapshot.sh",
-    "status": "failed",
-    "overall_status": "failed",
-    "normalized_status": "failed",
-    "observation_complete": False,
-    "repo": "owner/repo",
-    "pr": 13,
-    "expected_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "current_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "head_matches_expected": True,
-    "summary": {"ci": "failed", "review": "none", "head": "match"},
-    "limitations": [],
-    "recommended_next_action": "fix_ci",
-    "ci": {
-        "status": "failed",
-        "failures": [{"name": "test"}],
-        "check_runs": {"total": 1, "success": 0, "skipped": 0, "neutral": 0, "failed": 1, "running": 0, "pending": 0, "other": 0, "stale": 0},
-    },
-    "review": {"status": "none", "signals": [], "review_requests": [], "threads": {"total": 0, "unresolved": 0}},
-    "trigger": {"source": "explicit", "comment_id": trigger_id, "created_at": trigger_created_at},
-    "artifacts": {},
-}
-print(json.dumps(payload, separators=(",", ":")))
-PY
+builtin printf -v python_source '%s\\n' \\
+  'import json' \\
+  'import sys' \\
+  '' \\
+  'trigger_id = int(sys.argv[1]) if sys.argv[1] else None' \\
+  'trigger_created_at = sys.argv[2] or None' \\
+  'payload = {' \\
+  '    "script": "fetch_pr_observation_snapshot.sh",' \\
+  '    "status": "failed",' \\
+  '    "overall_status": "failed",' \\
+  '    "normalized_status": "failed",' \\
+  '    "observation_complete": False,' \\
+  '    "repo": "owner/repo",' \\
+  '    "pr": 13,' \\
+  '    "expected_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",' \\
+  '    "current_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",' \\
+  '    "head_matches_expected": True,' \\
+  '    "summary": {"ci": "failed", "review": "none", "head": "match"},' \\
+  '    "limitations": [],' \\
+  '    "recommended_next_action": "fix_ci",' \\
+  '    "ci": {' \\
+  '        "status": "failed",' \\
+  '        "failures": [{"name": "test"}],' \\
+  '        "check_runs": {"total": 1, "success": 0, "skipped": 0, "neutral": 0, "failed": 1, "running": 0, "pending": 0, "other": 0, "stale": 0},' \\
+  '    },' \\
+  '    "review": {"status": "none", "signals": [], "review_requests": [], "threads": {"total": 0, "unresolved": 0}},' \\
+  '    "trigger": {"source": "explicit", "comment_id": trigger_id, "created_at": trigger_created_at},' \\
+  '    "artifacts": {},' \\
+  '}' \\
+  'print(json.dumps(payload, separators=(",", ":")))'
+python3 -c "$python_source" "$trigger_id" "$trigger_created_at"
 """,
             encoding="utf-8",
         )
@@ -21854,9 +22146,8 @@ esac
             checks_script = lib_dir / "fetch_pr_checks_snapshot.sh"
             checks_script.write_text(
                 """#!/usr/bin/env bash
-cat <<'JSON'
-{"ci":{"status":"passed","progress_status":"passed","checks":[],"failures":[],"required_check_state":{"available":false,"collection_policy":"forbidden"},"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}]}},"limitations":[],"decision":{"status":"passed","recommended_next_action":"merge_prepared","observation_complete":true}}
-JSON
+builtin printf '%s\\n' \\
+  '{"ci":{"status":"passed","progress_status":"passed","checks":[],"failures":[],"required_check_state":{"available":false,"collection_policy":"forbidden"},"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":1,"neutral":0,"skipped":0,"failed":0,"running":0,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"completed","conclusion":"success","html_url":"https://example.test/job/303"}]}},"limitations":[],"decision":{"status":"passed","recommended_next_action":"merge_prepared","observation_complete":true}}'
 """,
                 encoding="utf-8",
             )
@@ -21946,9 +22237,8 @@ esac
             snapshot_script = script_dir / "fetch_pr_observation_snapshot.sh"
             snapshot_script.write_text(
                 """#!/usr/bin/env bash
-cat <<'JSON'
-{"script":"fetch_pr_observation_snapshot.sh","status":"running","overall_status":"running","normalized_status":"running","observation_complete":false,"repo":"owner/repo","pr":13,"expected_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","current_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","head_matches_expected":true,"fingerprint":"issue-187-running","summary":{"ci":"running","review":"pending","head":"matched"},"limitations":[],"recommended_next_action":"wait","ci":{"status":"running","progress_status":"running","required_check_state":{"available":false,"collection_policy":"forbidden"},"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}]}},"review":{"status":"pending","signals":[]},"decision":{"status":"running","status_reason":"ci_pending","recommended_next_action":"wait","observation_complete":false}}
-JSON
+builtin printf '%s\\n' \\
+  '{"script":"fetch_pr_observation_snapshot.sh","status":"running","overall_status":"running","normalized_status":"running","observation_complete":false,"repo":"owner/repo","pr":13,"expected_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","current_head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","head_matches_expected":true,"fingerprint":"issue-187-running","summary":{"ci":"running","review":"pending","head":"matched"},"limitations":[],"recommended_next_action":"wait","ci":{"status":"running","progress_status":"running","required_check_state":{"available":false,"collection_policy":"forbidden"},"actions":{"available":true,"workflow_runs":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0}},"jobs":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}],"jobs_summary":{"total":1,"counts":{"success":0,"neutral":0,"skipped":0,"failed":0,"running":1,"pending":0,"unknown":0},"collection":{"successful_runs":1,"failed_runs":0}},"jobs_detail":[{"id":303,"run_id":202,"name":"test","status":"in_progress","conclusion":null,"html_url":"https://example.test/job/303"}]}},"review":{"status":"pending","signals":[]},"decision":{"status":"running","status_reason":"ci_pending","recommended_next_action":"wait","observation_complete":false}}'
 """,
                 encoding="utf-8",
             )
@@ -27850,9 +28140,7 @@ JSON
             review_script = lib_dir / "fetch_pr_review_snapshot.sh"
             review_script.write_text(
                 f"""#!/usr/bin/env bash
-cat <<'JSON'
-{json.dumps(review_wrapper_payload, sort_keys=True, separators=(",", ":"))}
-JSON
+builtin printf '%s\\n' {shlex.quote(json.dumps(review_wrapper_payload, sort_keys=True, separators=(",", ":")))}
 """,
                 encoding="utf-8",
             )
@@ -29025,11 +29313,9 @@ case "$*" in
 JSON
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
-    cat <<'JSON'
-[{"id":201,"user":{"login":"alice"},"state":"CHANGES_REQUESTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"please fix this old-trigger-free review body"},{"id":202,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:07:00Z","body":"codex review comment body """
+    builtin printf '%s\\n' '[{"id":201,"user":{"login":"alice"},"state":"CHANGES_REQUESTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:06:00Z","body":"please fix this old-trigger-free review body"},{"id":202,"user":{"login":"codex"},"state":"COMMENTED","commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","submitted_at":"2026-06-08T01:07:00Z","body":"codex review comment body """
                 + ("x" * 12050)
-                + """"}]
-JSON
+                + """"}]'
     ;;
   "api repos/owner/repo/pulls/13/comments --paginate")
     cat <<'JSON'
@@ -29042,9 +29328,7 @@ JSON
 JSON
     ;;
   api\\ graphql*)
-    cat <<'JSON'
-{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_kw_unresolved","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_1","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:08:00Z","body":"thread body should not duplicate old bodies"}]}},{"id":"RT_kw_resolved","isResolved":true,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T01:09:00Z","body":"resolved thread body"}]}},{"id":"RT_kw_outdated","isResolved":false,"isOutdated":true,"comments":{"nodes":[{"id":"RTC_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T01:10:00Z","body":"outdated thread body"}]}}]}}}}}
-JSON
+    builtin printf '%s\\n' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_kw_unresolved","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_1","databaseId":301,"author":{"login":"codex"},"createdAt":"2026-06-08T01:08:00Z","body":"thread body should not duplicate old bodies"}]}},{"id":"RT_kw_resolved","isResolved":true,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T01:09:00Z","body":"resolved thread body"}]}},{"id":"RT_kw_outdated","isResolved":false,"isOutdated":true,"comments":{"nodes":[{"id":"RTC_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T01:10:00Z","body":"outdated thread body"}]}}]}}}}}'
     ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
@@ -31611,9 +31895,7 @@ JSON
 JSON
     ;;
   api\\ graphql*)
-    cat <<'JSON'
-{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_human","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_human","databaseId":777,"author":{"login":"alice"},"createdAt":"2026-06-08T01:06:00Z","body":"human unresolved thread"}]}},{"id":"RT_codex_unrelated","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_302","databaseId":302,"author":{"login":"codex"},"createdAt":"2026-06-08T01:07:00Z","body":"unrelated codex thread"}]}}]}}}}}
-JSON
+    builtin printf '%s\\n' '{"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewThreads":{"nodes":[{"id":"RT_human","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_human","databaseId":777,"author":{"login":"alice"},"createdAt":"2026-06-08T01:06:00Z","body":"human unresolved thread"}]}},{"id":"RT_codex_unrelated","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_302","databaseId":302,"author":{"login":"codex"},"createdAt":"2026-06-08T01:07:00Z","body":"unrelated codex thread"}]}}]}}}}}'
     ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
@@ -32845,9 +33127,7 @@ esac
 printf '%s\n' "$*" >> "$GH_FAKE_LOG"
 if [[ "$*" == api\\ graphql* ]]; then
   if [[ "$*" == *"comments(last: 100)"* ]]; then
-    cat <<'JSON'
-{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_more_than_20_comments","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_old_1","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T00:01:00Z","updatedAt":"2026-06-08T00:01:00Z","body":"old pre-trigger thread comment 1"},{"id":"RTC_old_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T00:02:00Z","updatedAt":"2026-06-08T00:02:00Z","body":"old pre-trigger thread comment 2"},{"id":"RTC_old_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T00:03:00Z","updatedAt":"2026-06-08T00:03:00Z","body":"old pre-trigger thread comment 3"},{"id":"RTC_old_4","databaseId":304,"author":{"login":"alice"},"createdAt":"2026-06-08T00:04:00Z","updatedAt":"2026-06-08T00:04:00Z","body":"old pre-trigger thread comment 4"},{"id":"RTC_old_5","databaseId":305,"author":{"login":"alice"},"createdAt":"2026-06-08T00:05:00Z","updatedAt":"2026-06-08T00:05:00Z","body":"old pre-trigger thread comment 5"},{"id":"RTC_old_6","databaseId":306,"author":{"login":"alice"},"createdAt":"2026-06-08T00:06:00Z","updatedAt":"2026-06-08T00:06:00Z","body":"old pre-trigger thread comment 6"},{"id":"RTC_old_7","databaseId":307,"author":{"login":"alice"},"createdAt":"2026-06-08T00:07:00Z","updatedAt":"2026-06-08T00:07:00Z","body":"old pre-trigger thread comment 7"},{"id":"RTC_old_8","databaseId":308,"author":{"login":"alice"},"createdAt":"2026-06-08T00:08:00Z","updatedAt":"2026-06-08T00:08:00Z","body":"old pre-trigger thread comment 8"},{"id":"RTC_old_9","databaseId":309,"author":{"login":"alice"},"createdAt":"2026-06-08T00:09:00Z","updatedAt":"2026-06-08T00:09:00Z","body":"old pre-trigger thread comment 9"},{"id":"RTC_old_10","databaseId":310,"author":{"login":"alice"},"createdAt":"2026-06-08T00:10:00Z","updatedAt":"2026-06-08T00:10:00Z","body":"old pre-trigger thread comment 10"},{"id":"RTC_old_11","databaseId":311,"author":{"login":"alice"},"createdAt":"2026-06-08T00:11:00Z","updatedAt":"2026-06-08T00:11:00Z","body":"old pre-trigger thread comment 11"},{"id":"RTC_old_12","databaseId":312,"author":{"login":"alice"},"createdAt":"2026-06-08T00:12:00Z","updatedAt":"2026-06-08T00:12:00Z","body":"old pre-trigger thread comment 12"},{"id":"RTC_old_13","databaseId":313,"author":{"login":"alice"},"createdAt":"2026-06-08T00:13:00Z","updatedAt":"2026-06-08T00:13:00Z","body":"old pre-trigger thread comment 13"},{"id":"RTC_old_14","databaseId":314,"author":{"login":"alice"},"createdAt":"2026-06-08T00:14:00Z","updatedAt":"2026-06-08T00:14:00Z","body":"old pre-trigger thread comment 14"},{"id":"RTC_old_15","databaseId":315,"author":{"login":"alice"},"createdAt":"2026-06-08T00:15:00Z","updatedAt":"2026-06-08T00:15:00Z","body":"old pre-trigger thread comment 15"},{"id":"RTC_old_16","databaseId":316,"author":{"login":"alice"},"createdAt":"2026-06-08T00:16:00Z","updatedAt":"2026-06-08T00:16:00Z","body":"old pre-trigger thread comment 16"},{"id":"RTC_old_17","databaseId":317,"author":{"login":"alice"},"createdAt":"2026-06-08T00:17:00Z","updatedAt":"2026-06-08T00:17:00Z","body":"old pre-trigger thread comment 17"},{"id":"RTC_old_18","databaseId":318,"author":{"login":"alice"},"createdAt":"2026-06-08T00:18:00Z","updatedAt":"2026-06-08T00:18:00Z","body":"old pre-trigger thread comment 18"},{"id":"RTC_old_19","databaseId":319,"author":{"login":"alice"},"createdAt":"2026-06-08T00:19:00Z","updatedAt":"2026-06-08T00:19:00Z","body":"old pre-trigger thread comment 19"},{"id":"RTC_old_20","databaseId":320,"author":{"login":"alice"},"createdAt":"2026-06-08T00:20:00Z","updatedAt":"2026-06-08T00:20:00Z","body":"old pre-trigger thread comment 20"},{"id":"RTC_latest_21","databaseId":321,"author":{"login":"bob"},"createdAt":"2026-06-08T01:30:00Z","updatedAt":"2026-06-08T01:31:00Z","body":"latest reply after trigger"}]}}]}}}}}
-JSON
+    builtin printf '%s\\n' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_more_than_20_comments","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_old_1","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T00:01:00Z","updatedAt":"2026-06-08T00:01:00Z","body":"old pre-trigger thread comment 1"},{"id":"RTC_old_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T00:02:00Z","updatedAt":"2026-06-08T00:02:00Z","body":"old pre-trigger thread comment 2"},{"id":"RTC_old_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T00:03:00Z","updatedAt":"2026-06-08T00:03:00Z","body":"old pre-trigger thread comment 3"},{"id":"RTC_old_4","databaseId":304,"author":{"login":"alice"},"createdAt":"2026-06-08T00:04:00Z","updatedAt":"2026-06-08T00:04:00Z","body":"old pre-trigger thread comment 4"},{"id":"RTC_old_5","databaseId":305,"author":{"login":"alice"},"createdAt":"2026-06-08T00:05:00Z","updatedAt":"2026-06-08T00:05:00Z","body":"old pre-trigger thread comment 5"},{"id":"RTC_old_6","databaseId":306,"author":{"login":"alice"},"createdAt":"2026-06-08T00:06:00Z","updatedAt":"2026-06-08T00:06:00Z","body":"old pre-trigger thread comment 6"},{"id":"RTC_old_7","databaseId":307,"author":{"login":"alice"},"createdAt":"2026-06-08T00:07:00Z","updatedAt":"2026-06-08T00:07:00Z","body":"old pre-trigger thread comment 7"},{"id":"RTC_old_8","databaseId":308,"author":{"login":"alice"},"createdAt":"2026-06-08T00:08:00Z","updatedAt":"2026-06-08T00:08:00Z","body":"old pre-trigger thread comment 8"},{"id":"RTC_old_9","databaseId":309,"author":{"login":"alice"},"createdAt":"2026-06-08T00:09:00Z","updatedAt":"2026-06-08T00:09:00Z","body":"old pre-trigger thread comment 9"},{"id":"RTC_old_10","databaseId":310,"author":{"login":"alice"},"createdAt":"2026-06-08T00:10:00Z","updatedAt":"2026-06-08T00:10:00Z","body":"old pre-trigger thread comment 10"},{"id":"RTC_old_11","databaseId":311,"author":{"login":"alice"},"createdAt":"2026-06-08T00:11:00Z","updatedAt":"2026-06-08T00:11:00Z","body":"old pre-trigger thread comment 11"},{"id":"RTC_old_12","databaseId":312,"author":{"login":"alice"},"createdAt":"2026-06-08T00:12:00Z","updatedAt":"2026-06-08T00:12:00Z","body":"old pre-trigger thread comment 12"},{"id":"RTC_old_13","databaseId":313,"author":{"login":"alice"},"createdAt":"2026-06-08T00:13:00Z","updatedAt":"2026-06-08T00:13:00Z","body":"old pre-trigger thread comment 13"},{"id":"RTC_old_14","databaseId":314,"author":{"login":"alice"},"createdAt":"2026-06-08T00:14:00Z","updatedAt":"2026-06-08T00:14:00Z","body":"old pre-trigger thread comment 14"},{"id":"RTC_old_15","databaseId":315,"author":{"login":"alice"},"createdAt":"2026-06-08T00:15:00Z","updatedAt":"2026-06-08T00:15:00Z","body":"old pre-trigger thread comment 15"},{"id":"RTC_old_16","databaseId":316,"author":{"login":"alice"},"createdAt":"2026-06-08T00:16:00Z","updatedAt":"2026-06-08T00:16:00Z","body":"old pre-trigger thread comment 16"},{"id":"RTC_old_17","databaseId":317,"author":{"login":"alice"},"createdAt":"2026-06-08T00:17:00Z","updatedAt":"2026-06-08T00:17:00Z","body":"old pre-trigger thread comment 17"},{"id":"RTC_old_18","databaseId":318,"author":{"login":"alice"},"createdAt":"2026-06-08T00:18:00Z","updatedAt":"2026-06-08T00:18:00Z","body":"old pre-trigger thread comment 18"},{"id":"RTC_old_19","databaseId":319,"author":{"login":"alice"},"createdAt":"2026-06-08T00:19:00Z","updatedAt":"2026-06-08T00:19:00Z","body":"old pre-trigger thread comment 19"},{"id":"RTC_old_20","databaseId":320,"author":{"login":"alice"},"createdAt":"2026-06-08T00:20:00Z","updatedAt":"2026-06-08T00:20:00Z","body":"old pre-trigger thread comment 20"},{"id":"RTC_latest_21","databaseId":321,"author":{"login":"bob"},"createdAt":"2026-06-08T01:30:00Z","updatedAt":"2026-06-08T01:31:00Z","body":"latest reply after trigger"}]}}]}}}}}'
   else
     cat <<'JSON'
 {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_more_than_20_comments","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_old_1","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T00:01:00Z","updatedAt":"2026-06-08T00:01:00Z","body":"old pre-trigger thread comment 1"},{"id":"RTC_old_2","databaseId":302,"author":{"login":"alice"},"createdAt":"2026-06-08T00:02:00Z","updatedAt":"2026-06-08T00:02:00Z","body":"old pre-trigger thread comment 2"},{"id":"RTC_old_3","databaseId":303,"author":{"login":"alice"},"createdAt":"2026-06-08T00:03:00Z","updatedAt":"2026-06-08T00:03:00Z","body":"old pre-trigger thread comment 3"},{"id":"RTC_old_4","databaseId":304,"author":{"login":"alice"},"createdAt":"2026-06-08T00:04:00Z","updatedAt":"2026-06-08T00:04:00Z","body":"old pre-trigger thread comment 4"},{"id":"RTC_old_5","databaseId":305,"author":{"login":"alice"},"createdAt":"2026-06-08T00:05:00Z","updatedAt":"2026-06-08T00:05:00Z","body":"old pre-trigger thread comment 5"},{"id":"RTC_old_6","databaseId":306,"author":{"login":"alice"},"createdAt":"2026-06-08T00:06:00Z","updatedAt":"2026-06-08T00:06:00Z","body":"old pre-trigger thread comment 6"},{"id":"RTC_old_7","databaseId":307,"author":{"login":"alice"},"createdAt":"2026-06-08T00:07:00Z","updatedAt":"2026-06-08T00:07:00Z","body":"old pre-trigger thread comment 7"},{"id":"RTC_old_8","databaseId":308,"author":{"login":"alice"},"createdAt":"2026-06-08T00:08:00Z","updatedAt":"2026-06-08T00:08:00Z","body":"old pre-trigger thread comment 8"},{"id":"RTC_old_9","databaseId":309,"author":{"login":"alice"},"createdAt":"2026-06-08T00:09:00Z","updatedAt":"2026-06-08T00:09:00Z","body":"old pre-trigger thread comment 9"},{"id":"RTC_old_10","databaseId":310,"author":{"login":"alice"},"createdAt":"2026-06-08T00:10:00Z","updatedAt":"2026-06-08T00:10:00Z","body":"old pre-trigger thread comment 10"},{"id":"RTC_old_11","databaseId":311,"author":{"login":"alice"},"createdAt":"2026-06-08T00:11:00Z","updatedAt":"2026-06-08T00:11:00Z","body":"old pre-trigger thread comment 11"},{"id":"RTC_old_12","databaseId":312,"author":{"login":"alice"},"createdAt":"2026-06-08T00:12:00Z","updatedAt":"2026-06-08T00:12:00Z","body":"old pre-trigger thread comment 12"},{"id":"RTC_old_13","databaseId":313,"author":{"login":"alice"},"createdAt":"2026-06-08T00:13:00Z","updatedAt":"2026-06-08T00:13:00Z","body":"old pre-trigger thread comment 13"},{"id":"RTC_old_14","databaseId":314,"author":{"login":"alice"},"createdAt":"2026-06-08T00:14:00Z","updatedAt":"2026-06-08T00:14:00Z","body":"old pre-trigger thread comment 14"},{"id":"RTC_old_15","databaseId":315,"author":{"login":"alice"},"createdAt":"2026-06-08T00:15:00Z","updatedAt":"2026-06-08T00:15:00Z","body":"old pre-trigger thread comment 15"},{"id":"RTC_old_16","databaseId":316,"author":{"login":"alice"},"createdAt":"2026-06-08T00:16:00Z","updatedAt":"2026-06-08T00:16:00Z","body":"old pre-trigger thread comment 16"},{"id":"RTC_old_17","databaseId":317,"author":{"login":"alice"},"createdAt":"2026-06-08T00:17:00Z","updatedAt":"2026-06-08T00:17:00Z","body":"old pre-trigger thread comment 17"},{"id":"RTC_old_18","databaseId":318,"author":{"login":"alice"},"createdAt":"2026-06-08T00:18:00Z","updatedAt":"2026-06-08T00:18:00Z","body":"old pre-trigger thread comment 18"},{"id":"RTC_old_19","databaseId":319,"author":{"login":"alice"},"createdAt":"2026-06-08T00:19:00Z","updatedAt":"2026-06-08T00:19:00Z","body":"old pre-trigger thread comment 19"},{"id":"RTC_old_20","databaseId":320,"author":{"login":"alice"},"createdAt":"2026-06-08T00:20:00Z","updatedAt":"2026-06-08T00:20:00Z","body":"old pre-trigger thread comment 20"}]}}]}}}}}
@@ -33559,27 +33839,19 @@ esac
                 """#!/usr/bin/env bash
 case "$*" in
   "api repos/owner/repo/issues/13/comments --paginate")
-    cat <<'JSON'
-[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]
-JSON
+    builtin printf '%s\\n' '[{"id":99,"user":{"login":"codex"},"created_at":"2026-06-08T01:00:00Z","body":"@codex review"}]'
     ;;
   "api repos/owner/repo/pulls/13/reviews --paginate")
     printf '[]\\n'
     ;;
   "api repos/owner/repo/pulls/13/comments --paginate")
-    cat <<'JSON'
-[{"id":301,"user":{"login":"alice"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"resolved inline body"},{"id":302,"user":{"login":"bob"},"pull_request_review_id":202,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:07:00Z","path":"app.py","line":13,"body":"outdated inline body"}]
-JSON
+    builtin printf '%s\\n' '[{"id":301,"user":{"login":"alice"},"pull_request_review_id":201,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:06:00Z","path":"app.py","line":12,"body":"resolved inline body"},{"id":302,"user":{"login":"bob"},"pull_request_review_id":202,"commit_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","created_at":"2026-06-08T01:07:00Z","path":"app.py","line":13,"body":"outdated inline body"}]'
     ;;
   "api repos/owner/repo/pulls/13 --paginate")
-    cat <<'JSON'
-{"requested_reviewers":[],"requested_teams":[]}
-JSON
+    builtin printf '%s\\n' '{"requested_reviewers":[],"requested_teams":[]}'
     ;;
   api\\ graphql*)
-    cat <<'JSON'
-{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_resolved","isResolved":true,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T01:06:00Z","updatedAt":"2026-06-08T01:06:00Z","body":"resolved inline body"}]}},{"id":"RT_outdated","isResolved":false,"isOutdated":true,"comments":{"nodes":[{"id":"RTC_302","databaseId":302,"author":{"login":"bob"},"createdAt":"2026-06-08T01:07:00Z","updatedAt":"2026-06-08T01:07:00Z","body":"outdated inline body"}]}}]}}}}}
-JSON
+    builtin printf '%s\\n' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"RT_resolved","isResolved":true,"isOutdated":false,"comments":{"nodes":[{"id":"RTC_301","databaseId":301,"author":{"login":"alice"},"createdAt":"2026-06-08T01:06:00Z","updatedAt":"2026-06-08T01:06:00Z","body":"resolved inline body"}]}},{"id":"RT_outdated","isResolved":false,"isOutdated":true,"comments":{"nodes":[{"id":"RTC_302","databaseId":302,"author":{"login":"bob"},"createdAt":"2026-06-08T01:07:00Z","updatedAt":"2026-06-08T01:07:00Z","body":"outdated inline body"}]}}]}}}}}'
     ;;
   *)
     printf 'unexpected gh call: %s\\n' "$*" >&2
@@ -40867,3 +41139,431 @@ assert "Recovery: rerun" not in stderr_text, stderr_text
             assert self._read_active_pointer_text(target, "initiative", "README.md") == placeholder.read_text(
                 encoding="utf-8"
             )
+
+
+_ISSUE_334_SKILL_RELATIVE_PATHS = (
+    ".agents/skills/spec-dock-issue-planning/SKILL.md",
+    ".agents/skills/spec-dock-issue-planning/resources/planner-prompt.md",
+    ".agents/skills/spec-dock-issue-planning/resources/reviewer-prompt.md",
+    ".agents/skills/spec-dock-issue-planning/resources/revision-prompt.md",
+    ".agents/skills/spec-dock-issue-planning/resources/transport-output-contract.md",
+)
+
+_ISSUE_334_SPECDOCK_RELATIVE_PATHS = (
+    "docs/README.md",
+    "docs/workflow_issue.md",
+    "scripts/spec-dock-chatgpt",
+    "scripts/spec_dock_runtime/application/issue_planning.py",
+    "scripts/spec_dock_runtime/application/issue_planning_prompt.py",
+    "scripts/spec_dock_runtime/commands/issue_planning.py",
+    "scripts/spec_dock_runtime/domain/authoring_pack/authority_boundary.py",
+    "scripts/spec_dock_runtime/domain/authoring_pack/zip_contract.py",
+    "scripts/spec_dock_runtime/domain/issue_planning_candidate.py",
+    "scripts/spec_dock_runtime/domain/issue_planning_contracts.py",
+    "scripts/spec_dock_runtime/infra/issue_planning_apply.py",
+    "scripts/spec_dock_runtime/infra/issue_planning_candidate.py",
+    "scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py",
+    "scripts/spec_dock_runtime/infra/issue_planning_oracle_artifact.py",
+    "scripts/spec_dock_runtime/infra/issue_planning_review.py",
+    "scripts/spec_dock_runtime/presentation/issue_planning.py",
+)
+
+_ISSUE_334_RUNTIME_RELATIVE_PATHS = tuple(
+    path for path in _ISSUE_334_SPECDOCK_RELATIVE_PATHS if path.startswith("scripts/")
+)
+
+
+def _issue_334_provider_path(repo_root: Path, managed_relative_path: str) -> Path:
+    if managed_relative_path.startswith(".agents/"):
+        return repo_root / "src/spec_dock/assets/install_root" / managed_relative_path
+    return repo_root / "src/spec_dock/assets/spec_dock" / managed_relative_path.removeprefix("spec-dock/")
+
+
+def _issue_334_provider_managed_paths() -> tuple[str, ...]:
+    return _ISSUE_334_SKILL_RELATIVE_PATHS + tuple(
+        f"spec-dock/{relative_path}" for relative_path in _ISSUE_334_SPECDOCK_RELATIVE_PATHS
+    )
+
+
+def _issue_334_tree_snapshot(
+    root: Path,
+    relative_paths: tuple[str, ...],
+) -> dict[str, tuple[bytes, int]]:
+    snapshot: dict[str, tuple[bytes, int]] = {}
+    for relative_path in relative_paths:
+        path = root / relative_path
+        assert path.is_file(), f"missing S11 managed file: {path}"
+        snapshot[relative_path] = (path.read_bytes(), path.stat().st_mode & 0o777)
+    return snapshot
+
+
+def _issue_334_assert_skill_contract(skill_text: str, *, surface: str) -> None:
+    required_fragments = (
+        "./spec-dock/scripts/spec-dock-chatgpt",
+        "`oracle` through `PATH`",
+        "only external product execution dependency",
+        "exact current repository",
+        "named branch",
+        "HEAD",
+        "Do not substitute a default branch",
+        "exactly one Planner or Semantic Revision authoring ZIP",
+        "canonical `requirement.md`, `design.md`, and `plan.md`",
+        "exactly one runtime-selected onboarding companion",
+        "closed Reviewer JSON",
+        "subordinate evidence, not a fourth canonical specification",
+        "exact same Candidate created by `planning create`",
+        "exact Human approval may make managed writes",
+    )
+    for fragment in required_fragments:
+        assert fragment in skill_text, f"{surface} official Skill is missing S11 contract fragment: {fragment}"
+
+    forbidden_fragments = (
+        "/Users/",
+        ".agents/skills/chatgpt-use",
+        "oracle-chatgpt",
+        "SPECDOCK_CHATGPT_COMMAND",
+        "invoke_backend_with_capture",
+        "--write-output",
+        "SPECDOCK-ISSUE-PLANNING-RESPONSE-V1",
+        "SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1",
+    )
+    for fragment in forbidden_fragments:
+        assert fragment not in skill_text, f"{surface} official Skill retains forbidden active dependency: {fragment}"
+
+    if "chatgpt-use" in skill_text:
+        normalized = skill_text.lower()
+        assert any(
+            qualifier in normalized
+            for qualifier in (
+                "reference-only",
+                "operator-local",
+                "not a product dependency",
+                "not a shipped dependency",
+            )
+        ), f"{surface} official Skill mentions chatgpt-use without a reference-only qualifier"
+
+
+def _issue_334_artifact_member_bytes(
+    *,
+    artifact_path: Path,
+    artifact_kind: str,
+    package_relative_paths: tuple[str, ...],
+) -> dict[str, bytes]:
+    if artifact_kind == "wheel":
+        with zipfile.ZipFile(artifact_path) as archive:
+            return {relative_path: archive.read(relative_path) for relative_path in package_relative_paths}
+
+    assert artifact_kind == "sdist"
+    members: dict[str, bytes] = {}
+    with tarfile.open(artifact_path, "r:gz") as archive:
+        by_relative_path: dict[str, tarfile.TarInfo] = {}
+        for member in archive.getmembers():
+            _, separator, relative_path = member.name.partition("/")
+            if separator and member.isfile():
+                by_relative_path[relative_path] = member
+        for package_relative_path in package_relative_paths:
+            source_relative_path = f"src/{package_relative_path}"
+            member = by_relative_path.get(source_relative_path)
+            assert member is not None, f"sdist is missing S11 member: {source_relative_path}"
+            extracted = archive.extractfile(member)
+            assert extracted is not None
+            members[package_relative_path] = extracted.read()
+    return members
+
+
+def _issue_334_install_artifact_and_init(
+    *,
+    harness: TestInitUpdate,
+    repo_root: Path,
+    artifact_path: Path,
+    environment_root: Path,
+) -> Path:
+    venv_result = subprocess.run(
+        [sys.executable, "-m", "venv", str(environment_root)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert venv_result.returncode == 0, (
+        f"S11 isolated environment creation failed:\nstdout:\n{venv_result.stdout}\nstderr:\n{venv_result.stderr}"
+    )
+    venv_python = harness._issue_69_venv_python(environment_root)
+    wheelhouse = harness._issue_69_resolve_wheelhouse(repo_root)
+    harness._issue_69_install_target_packages(
+        python_executable=venv_python,
+        target_dir=harness._issue_69_site_packages_dir(environment_root),
+        requirements=list(harness._ISSUE_69_BUILD_BACKEND_REQUIREMENTS),
+        wheelhouse=wheelhouse,
+    )
+    harness._issue_69_install_target_packages(
+        python_executable=venv_python,
+        target_dir=harness._issue_69_site_packages_dir(environment_root),
+        requirements=[str(artifact_path)],
+        wheelhouse=wheelhouse,
+    )
+    spec_dock_command = harness._issue_69_ensure_spec_dock_wrapper(venv_python)
+    target = environment_root.parent / f"{environment_root.name}-target"
+    target.mkdir()
+    harness._issue_69_run_subprocess_capture(
+        [str(spec_dock_command), "init", str(target)],
+        cwd=environment_root.parent,
+        env=harness._issue_69_runtime_env_without_checkout_fallback(),
+    )
+    return target
+
+
+@pytest.fixture(scope="module")
+def _issue_334_distribution_surfaces(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
+    repo_root = Path(__file__).resolve().parents[3]
+    temp_root = tmp_path_factory.mktemp("issue-334-distribution")
+    build_context = temp_root / "build-context"
+    wheel_dir = temp_root / "wheel"
+    sdist_dir = temp_root / "sdist"
+    harness = TestInitUpdate()
+    harness._issue_69_prepare_build_context(repo_root, build_context)
+    wheel_path, sdist_path, _ = harness._issue_69_build_artifacts_with_local_wheelhouse(
+        repo_root=repo_root,
+        build_context=build_context,
+        wheel_dir=wheel_dir,
+        sdist_dir=sdist_dir,
+    )
+    wheel_target = _issue_334_install_artifact_and_init(
+        harness=harness,
+        repo_root=repo_root,
+        artifact_path=wheel_path,
+        environment_root=temp_root / "wheel-venv",
+    )
+    sdist_target = _issue_334_install_artifact_and_init(
+        harness=harness,
+        repo_root=repo_root,
+        artifact_path=sdist_path,
+        environment_root=temp_root / "sdist-venv",
+    )
+    return {
+        "repo_root": repo_root,
+        "wheel_path": wheel_path,
+        "sdist_path": sdist_path,
+        "wheel_target": wheel_target,
+        "sdist_target": sdist_target,
+    }
+
+
+def test_issue_334_s11_provider_and_dogfood_selected_assets_are_byte_exact() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    for managed_relative_path in _issue_334_provider_managed_paths():
+        provider_path = _issue_334_provider_path(repo_root, managed_relative_path)
+        dogfood_path = repo_root / managed_relative_path
+        assert provider_path.is_file(), f"missing S11 provider authority: {provider_path}"
+        assert dogfood_path.is_file(), f"missing S11 dogfood projection: {dogfood_path}"
+        assert dogfood_path.read_bytes() == provider_path.read_bytes(), (
+            f"S11 provider/dogfood byte parity failed: {managed_relative_path}"
+        )
+
+    provider_executable = repo_root / "src/spec_dock/assets/spec_dock/scripts/spec-dock-chatgpt"
+    dogfood_executable = repo_root / "spec-dock/scripts/spec-dock-chatgpt"
+    assert provider_executable.stat().st_mode & 0o111
+    assert dogfood_executable.stat().st_mode & 0o111
+
+
+def test_issue_334_s11_built_inventory_and_fresh_init_match_provider(
+    _issue_334_distribution_surfaces: dict[str, object],
+) -> None:
+    repo_root = _issue_334_distribution_surfaces["repo_root"]
+    assert isinstance(repo_root, Path)
+    package_relative_paths = tuple(
+        (
+            f"spec_dock/assets/install_root/{managed_relative_path}"
+            if managed_relative_path.startswith(".agents/")
+            else f"spec_dock/assets/spec_dock/{managed_relative_path.removeprefix('spec-dock/')}"
+        )
+        for managed_relative_path in _issue_334_provider_managed_paths()
+    )
+
+    for artifact_kind in ("wheel", "sdist"):
+        artifact_path = _issue_334_distribution_surfaces[f"{artifact_kind}_path"]
+        target = _issue_334_distribution_surfaces[f"{artifact_kind}_target"]
+        assert isinstance(artifact_path, Path)
+        assert isinstance(target, Path)
+        artifact_members = _issue_334_artifact_member_bytes(
+            artifact_path=artifact_path,
+            artifact_kind=artifact_kind,
+            package_relative_paths=package_relative_paths,
+        )
+        assert set(artifact_members) == set(package_relative_paths)
+
+        for managed_relative_path, package_relative_path in zip(
+            _issue_334_provider_managed_paths(),
+            package_relative_paths,
+            strict=True,
+        ):
+            provider_bytes = _issue_334_provider_path(repo_root, managed_relative_path).read_bytes()
+            assert artifact_members[package_relative_path] == provider_bytes, (
+                f"{artifact_kind} bytes differ from provider authority: {managed_relative_path}"
+            )
+            assert (target / managed_relative_path).read_bytes() == provider_bytes, (
+                f"{artifact_kind} fresh init differs from provider authority: {managed_relative_path}"
+            )
+
+        assert os.access(target / "spec-dock/scripts/spec-dock-chatgpt", os.X_OK)
+        assert not (target / "unmanaged-user-file.txt").exists()
+
+
+def test_issue_334_s11_update_migrates_stale_assets_and_second_update_is_noop(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    target = tmp_path / "target"
+    target.mkdir()
+    assert main(["init", str(target)]) == 0
+
+    user_spec = target / "spec-dock/initiatives/user-owned/specification.md"
+    user_spec.parent.mkdir(parents=True)
+    user_spec.write_bytes(b"user specification\n")
+    unmanaged = target / "unmanaged-user-file.txt"
+    unmanaged.write_bytes(b"unmanaged\n")
+    stale_files = {
+        ".agents/skills/spec-dock-issue-planning/resources/planner-prompt.md": (
+            b"SPECDOCK-ISSUE-PLANNING-RESPONSE-V1\n"
+        ),
+        ".agents/skills/spec-dock-issue-planning/resources/transport-output-contract.md": (
+            b"SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1\n"
+        ),
+        "spec-dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py": (
+            b"/Users/example/.agents/skills/chatgpt-use/scripts/oracle-chatgpt --write-output\n"
+        ),
+    }
+    for relative_path, stale_bytes in stale_files.items():
+        (target / relative_path).write_bytes(stale_bytes)
+
+    assert main(["update", str(target)]) == 0
+    for relative_path in stale_files:
+        assert (target / relative_path).read_bytes() == _issue_334_provider_path(
+            repo_root,
+            relative_path,
+        ).read_bytes()
+    assert user_spec.read_bytes() == b"user specification\n"
+    assert unmanaged.read_bytes() == b"unmanaged\n"
+
+    managed_snapshot = _issue_334_tree_snapshot(target, _issue_334_provider_managed_paths())
+    assert main(["update", str(target)]) == 0
+    assert _issue_334_tree_snapshot(target, _issue_334_provider_managed_paths()) == managed_snapshot
+    assert user_spec.read_bytes() == b"user specification\n"
+    assert unmanaged.read_bytes() == b"unmanaged\n"
+
+
+def test_issue_334_s11_official_skill_contract_matches_all_distribution_surfaces(
+    _issue_334_distribution_surfaces: dict[str, object],
+    tmp_path: Path,
+) -> None:
+    repo_root = _issue_334_distribution_surfaces["repo_root"]
+    assert isinstance(repo_root, Path)
+    source_skill = repo_root / "src/spec_dock/assets/install_root/.agents/skills/spec-dock-issue-planning/SKILL.md"
+    update_target = tmp_path / "update-target"
+    update_target.mkdir()
+    assert main(["init", str(update_target)]) == 0
+    (update_target / ".agents/skills/spec-dock-issue-planning/SKILL.md").write_bytes(b"stale\n")
+    assert main(["update", str(update_target)]) == 0
+
+    surfaces = {
+        "provider": source_skill,
+        "dogfood": repo_root / ".agents/skills/spec-dock-issue-planning/SKILL.md",
+        "wheel fresh init": Path(_issue_334_distribution_surfaces["wheel_target"])
+        / ".agents/skills/spec-dock-issue-planning/SKILL.md",
+        "sdist fresh init": Path(_issue_334_distribution_surfaces["sdist_target"])
+        / ".agents/skills/spec-dock-issue-planning/SKILL.md",
+        "update target": update_target / ".agents/skills/spec-dock-issue-planning/SKILL.md",
+    }
+    for surface, skill_path in surfaces.items():
+        assert skill_path.read_bytes() == source_skill.read_bytes(), f"{surface} Skill bytes differ from provider"
+        _issue_334_assert_skill_contract(skill_path.read_text(encoding="utf-8"), surface=surface)
+
+
+def test_issue_334_s11_active_dependency_denylist_covers_distribution_surfaces(
+    _issue_334_distribution_surfaces: dict[str, object],
+) -> None:
+    repo_root = _issue_334_distribution_surfaces["repo_root"]
+    assert isinstance(repo_root, Path)
+    runtime_managed_paths = tuple(f"spec-dock/{path}" for path in _ISSUE_334_RUNTIME_RELATIVE_PATHS)
+    resource_managed_paths = tuple(path for path in _ISSUE_334_SKILL_RELATIVE_PATHS if "/resources/" in path)
+    scanned_managed_paths = runtime_managed_paths + resource_managed_paths
+    package_relative_paths = tuple(
+        (
+            f"spec_dock/assets/install_root/{managed_relative_path}"
+            if managed_relative_path.startswith(".agents/")
+            else f"spec_dock/assets/spec_dock/{managed_relative_path.removeprefix('spec-dock/')}"
+        )
+        for managed_relative_path in scanned_managed_paths
+    )
+    surface_texts: dict[str, dict[str, str]] = {
+        "provider": {
+            path: _issue_334_provider_path(repo_root, path).read_text(encoding="utf-8")
+            for path in scanned_managed_paths
+        },
+        "dogfood": {path: (repo_root / path).read_text(encoding="utf-8") for path in scanned_managed_paths},
+    }
+    for artifact_kind in ("wheel", "sdist"):
+        artifact_path = _issue_334_distribution_surfaces[f"{artifact_kind}_path"]
+        target = _issue_334_distribution_surfaces[f"{artifact_kind}_target"]
+        assert isinstance(artifact_path, Path)
+        assert isinstance(target, Path)
+        artifact_members = _issue_334_artifact_member_bytes(
+            artifact_path=artifact_path,
+            artifact_kind=artifact_kind,
+            package_relative_paths=package_relative_paths,
+        )
+        surface_texts[artifact_kind] = {
+            managed_relative_path: artifact_members[package_relative_path].decode("utf-8")
+            for managed_relative_path, package_relative_path in zip(
+                scanned_managed_paths,
+                package_relative_paths,
+                strict=True,
+            )
+        }
+        surface_texts[f"{artifact_kind} fresh init"] = {
+            path: (target / path).read_text(encoding="utf-8") for path in scanned_managed_paths
+        }
+
+    update_target = Path(_issue_334_distribution_surfaces["wheel_target"])
+    assert main(["update", str(update_target)]) == 0
+    surface_texts["update target"] = {
+        path: (update_target / path).read_text(encoding="utf-8") for path in scanned_managed_paths
+    }
+
+    forbidden_literals = (
+        "/Users/",
+        ".agents/skills/chatgpt-use",
+        "oracle-chatgpt",
+        "SPECDOCK_CHATGPT_COMMAND",
+        "invoke_backend_with_capture",
+        "--write-output",
+        "SPECDOCK-ISSUE-PLANNING-RESPONSE-V1",
+        "SPECDOCK-ISSUE-PLANNING-DOCUMENT-V1",
+    )
+    runtime_only_forbidden_literals = (
+        "--project",
+        "--profile",
+        "--host",
+        "LaunchAgent",
+        "arbitrary backend command",
+    )
+    negative_security_literals = {
+        (
+            "spec-dock/scripts/spec_dock_runtime/domain/authoring_pack/authority_boundary.py",
+            "/Users/",
+        ),
+    }
+    for surface, files in surface_texts.items():
+        for relative_path, text in files.items():
+            for forbidden_literal in forbidden_literals:
+                if (relative_path, forbidden_literal) in negative_security_literals:
+                    continue
+                assert forbidden_literal not in text, (
+                    f"S11 active dependency denylist failed: "
+                    f"surface={surface} path={relative_path} literal={forbidden_literal}"
+                )
+            if relative_path in runtime_managed_paths:
+                for forbidden_literal in runtime_only_forbidden_literals:
+                    assert forbidden_literal not in text, (
+                        f"S11 runtime argv denylist failed: "
+                        f"surface={surface} path={relative_path} literal={forbidden_literal}"
+                    )

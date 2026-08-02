@@ -2,21 +2,20 @@
 set -euo pipefail
 
 usage() {
-  cat >&2 <<'USAGE'
-usage: fetch_pr_review_snapshot.sh --repo OWNER/REPO --pr NUMBER [options]
-
-Options:
-  --head-sha SHA
-  --trigger-comment-id NUMBER
-  --trigger-created-at ISO8601
-  --body-mode none|trigger-window-truncated|trigger-window-full|out-only
-  --out DIR
-
-Collects issue comments, pull reviews, inline review comments, review requests,
-and fixed GraphQL review thread state. The script accepts only this fixed
-read-only contract and does not accept caller-provided API endpoints, GraphQL
-queries, gh arguments, jq expressions, headers, bodies, or methods.
-USAGE
+  builtin printf '%s\n' \
+    'usage: fetch_pr_review_snapshot.sh --repo OWNER/REPO --pr NUMBER [options]' \
+    '' \
+    'Options:' \
+    '  --head-sha SHA' \
+    '  --trigger-comment-id NUMBER' \
+    '  --trigger-created-at ISO8601' \
+    '  --body-mode none|trigger-window-truncated|trigger-window-full|out-only' \
+    '  --out DIR' \
+    '' \
+    'Collects issue comments, pull reviews, inline review comments, review requests,' \
+    'and fixed GraphQL review thread state. The script accepts only this fixed' \
+    'read-only contract and does not accept caller-provided API endpoints, GraphQL' \
+    'queries, gh arguments, jq expressions, headers, bodies, or methods.' >&2
 }
 
 fail_usage() {
