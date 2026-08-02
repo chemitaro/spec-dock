@@ -50,8 +50,9 @@ class PlanningOutputExpectation:
     def __post_init__(self) -> None:
         if self.kind == "authoring_zip":
             issue_id: str | None = None
-            if self.logical_filename:
-                stem = self.logical_filename.removesuffix("-issue-planning-documents.zip")
+            required_suffix = "-issue-planning-documents.zip"
+            if self.logical_filename and self.logical_filename.endswith(required_suffix):
+                stem = self.logical_filename.removesuffix(required_suffix)
                 try:
                     normalized = normalize_id_input(stem, prefix="iss", field="logical_filename")
                 except (RuntimeError, ValueError):
