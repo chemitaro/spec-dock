@@ -2501,6 +2501,31 @@ def _create_verified_operation_commit(
         return local_commit
 
 
+def _reference_transaction_payloads(
+    expected_branch_update: str,
+    expected_head_update: str,
+) -> tuple[bytes, ...]:
+    try:
+        branch = expected_branch_update.encode("ascii")
+        head = expected_head_update.encode("ascii")
+    except UnicodeEncodeError:
+        return ()
+    return (
+        branch + b"\n",
+        head + b"\n" + branch + b"\n",
+        branch + b"\n" + head + b"\n",
+    )
+
+
+def _reference_transaction_payload_is_expected(
+    payload: bytes,
+    *,
+    expected_branch_update: str,
+    expected_head_update: str,
+) -> bool:
+    return payload in _reference_transaction_payloads(expected_branch_update, expected_head_update)
+
+
 def _install_operation_commit_cas(
     operation: PlanningApplyOperation,
     *,
@@ -2567,23 +2592,18 @@ def _install_operation_commit_cas(
             "        lock_metadata = head_lock.lstat()\n"
             "        if not stat.S_ISREG(lock_metadata.st_mode):\n"
             "            raise SystemExit(97)\n"
-            "        observed_updates = tuple(\n"
-            "            line for line in payload.decode('ascii').splitlines() if line\n"
-            "        )\n"
-            "        expected_branch_update = os.environ['SPECDOCK_EXPECTED_REF_UPDATE']\n"
-            "        expected_head_update = os.environ['SPECDOCK_EXPECTED_HEAD_UPDATE']\n"
             "        observed_head = head_path.read_bytes()\n"
+            "        expected_payloads = tuple(\n"
+            "            bytes.fromhex(value)\n"
+            "            for value in os.environ['SPECDOCK_EXPECTED_REF_PAYLOADS'].split(',')\n"
+            "            if value\n"
+            "        )\n"
             "        if (\n"
-            "            observed_updates\n"
-            "            not in (\n"
-            "                (expected_branch_update,),\n"
-            "                (expected_head_update, expected_branch_update),\n"
-            "                (expected_branch_update, expected_head_update),\n"
-            "            )\n"
+            "            payload not in expected_payloads\n"
             "            or observed_head != os.environ['SPECDOCK_EXPECTED_HEAD'].encode('ascii')\n"
             "        ):\n"
             "            raise SystemExit(97)\n"
-            "    except (OSError, UnicodeDecodeError):\n"
+            "    except (OSError, UnicodeError, ValueError):\n"
             "        raise SystemExit(97)\n"
             "    native_result = run_native()\n"
             "    raise SystemExit(native_result)\n"
@@ -2593,8 +2613,10 @@ def _install_operation_commit_cas(
         )
         hook.chmod(0o700)
         environment = os.environ.copy()
-        environment["SPECDOCK_EXPECTED_REF_UPDATE"] = f"{operation.expected_head} {local_commit} {destination}"
-        environment["SPECDOCK_EXPECTED_HEAD_UPDATE"] = f"{operation.expected_head} {local_commit} HEAD"
+        expected_branch_update = f"{operation.expected_head} {local_commit} {destination}"
+        expected_head_update = f"{operation.expected_head} {local_commit} HEAD"
+        expected_payloads = _reference_transaction_payloads(expected_branch_update, expected_head_update)
+        environment["SPECDOCK_EXPECTED_REF_PAYLOADS"] = ",".join(payload.hex() for payload in expected_payloads)
         environment["SPECDOCK_EXPECTED_HEAD"] = f"ref: {destination}\n"
         environment["SPECDOCK_HEAD_PATH"] = head_path.as_posix()
         if native_hook.is_file() and os.access(native_hook, os.X_OK):

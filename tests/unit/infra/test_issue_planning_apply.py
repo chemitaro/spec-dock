@@ -42,6 +42,52 @@ def _module():
     )
 
 
+def test_reference_transaction_payloads_are_byte_exact_and_closed() -> None:
+    module = _module()
+    branch = f"{HEAD} {'b' * 40} refs/heads/feature/issue"
+    head = f"{HEAD} {'b' * 40} HEAD"
+    allowed = module._reference_transaction_payloads(branch, head)
+
+    assert allowed == (
+        f"{branch}\n".encode("ascii"),
+        f"{head}\n{branch}\n".encode("ascii"),
+        f"{branch}\n{head}\n".encode("ascii"),
+    )
+    for payload in allowed:
+        assert module._reference_transaction_payload_is_expected(
+            payload,
+            expected_branch_update=branch,
+            expected_head_update=head,
+        )
+
+    rejected = (
+        branch.encode("ascii"),
+        f"{branch}\r\n".encode("ascii"),
+        f"\n{branch}\n".encode("ascii"),
+        f"{branch}\n\n".encode("ascii"),
+        f"{branch}\n{branch}\n".encode("ascii"),
+        f"{branch}\n{head}\n{branch}\n".encode("ascii"),
+        f"{HEAD} {'c' * 40} refs/heads/feature/issue\n".encode("ascii"),
+        f"{branch} extra\n".encode("ascii"),
+    )
+    for payload in rejected:
+        assert not module._reference_transaction_payload_is_expected(
+            payload,
+            expected_branch_update=branch,
+            expected_head_update=head,
+        )
+
+
+def test_reference_transaction_payloads_fail_closed_for_non_ascii_records() -> None:
+    module = _module()
+    assert module._reference_transaction_payloads("refs/heads/é", "HEAD") == ()
+    assert not module._reference_transaction_payload_is_expected(
+        b"refs/heads/\xff\n",
+        expected_branch_update="refs/heads/é",
+        expected_head_update="HEAD",
+    )
+
+
 def _identity() -> ReviewedPlanningIdentity:
     candidate = IssueCandidateIdentity(
         issue_id="iss-00003",

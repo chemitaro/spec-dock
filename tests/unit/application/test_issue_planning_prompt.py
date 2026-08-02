@@ -71,6 +71,30 @@ def test_authoring_output_expectation_accepts_canonical_issue_id_widths(issue_id
     assert expectation.internal_root == f"{issue_id}-issue-planning-documents"
 
 
+@pytest.mark.parametrize(
+    "logical_filename",
+    [
+        "iss-00001",
+        "iss-00001-issue-planning-documents",
+        "iss-00001-other.zip",
+        "ISS-00001-issue-planning-documents.zip",
+        "iss-01-issue-planning-documents.zip",
+        "-issue-planning-documents.zip",
+        "iss-local-issue-planning-documents.zip",
+    ],
+)
+def test_authoring_output_expectation_rejects_noncanonical_filename_shapes(logical_filename: str) -> None:
+    companion = "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md"
+    with pytest.raises(ValueError):
+        issue_planning_prompt.PlanningOutputExpectation(
+            kind="authoring_zip",
+            logical_filename=logical_filename,
+            internal_root=logical_filename.removesuffix(".zip"),
+            exact_inventory=("requirement.md", "design.md", "plan.md", companion),
+            onboarding_companion_path=companion,
+        )
+
+
 def test_constraint_scan_accepts_transcript_marker_mentions_without_complete_turn_pair() -> None:
     fixtures = (
         "The term raw transcript names an evidence class.",
