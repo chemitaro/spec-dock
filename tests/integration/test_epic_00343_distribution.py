@@ -416,11 +416,20 @@ def _assert_s04_dogfood_privacy_output(
     combined = "\n".join(observed).lower()
     digest = hashlib.sha256(body).hexdigest().lower()
     derived = f"derived-{hashlib.sha1(body).hexdigest()[:16]}"
+    printable_body = "".join(
+        character for character in body.decode("utf-8", errors="ignore") if character.isprintable()
+    ).lower()
+    count_tokens = (
+        f"count={len(body)}",
+        f"byte-count={len(body)}",
+        f"byte_count={len(body)}",
+    )
     forbidden_text = (
         str(checkout.resolve()).lower(),
         str(source.resolve()).lower(),
         str(source.parent.resolve()).lower(),
         body.decode("ascii", errors="ignore").lower(),
+        printable_body,
         digest,
         derived,
         "sha256",
@@ -428,6 +437,7 @@ def _assert_s04_dogfood_privacy_output(
         "mime",
         "encoding",
         "content_id",
+        *count_tokens,
     )
     for sentinel in forbidden_text:
         assert sentinel not in combined, f"dogfood privacy sentinel leaked: {sentinel!r}"
@@ -1379,6 +1389,24 @@ def test_tc_346_s04_005_disposable_dogfood_future_shell_and_generic_import(
             payload=payload,
             destination=destination,
         )
+        printable_body = "".join(
+            character for character in payload_body.decode("utf-8", errors="ignore") if character.isprintable()
+        )
+        for leaked_token in (printable_body, f"count={len(payload_body)}", f"byte-count={len(payload_body)}"):
+            with pytest.raises(AssertionError, match="dogfood privacy sentinel leaked"):
+                _assert_s04_dogfood_privacy_output(
+                    subprocess.CompletedProcess(
+                        args=["synthetic-privacy-negative"],
+                        returncode=0,
+                        stdout=leaked_token,
+                        stderr="",
+                    ),
+                    checkout=checkout,
+                    source=payload_source,
+                    body=payload_body,
+                    payload=payload,
+                    destination=destination,
+                )
         assert destination.read_bytes() == payload_body
         assert payload_source.read_bytes() == payload_body
 
