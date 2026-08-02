@@ -8,7 +8,7 @@ ID: "iss-00346-s99-review-content-freeze"
 # S99 review content freeze
 
 - Candidate branch: `iss-00346-integration-distribution-and-final-quality`
-- Candidate head: `PENDING_FREEZE_COMMIT`
+- Candidate head: `d7a73d48592274691ae3089afccfbc210af5420e`
 - Base: `origin/main` (resolved before freeze)
 - `review_content_hash`: `26201290c13add93e3dc6b7dabf4f3f4cc2dcc7a4e68d9f9e77b75e658b07896`
 - Hash algorithm: sorted manifest TSV bytes; each line is `repo-relative-path<TAB>sha256(file-bytes)\n`; the SHA-256 above is over the complete manifest bytes.
@@ -41,4 +41,3 @@ tests/unit/infra/test_init_update.py	1e02a1262c73d6f7dc0eb35c93277d28d2742087460
 spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/issues/iss-00346-integration-distribution-and-final-quality/report.md	4d2a13ca839c63892b933351b76110588a2bad3e98fbe9d659b87042f09458c8
 spec-dock/initiatives/init-local-00002-prototype-feature-expansion/epics/epic-00343-workbench-shell-and-explicit-file-artifact-import/report.md	68a139186176da15b0910e61a7eae345e632664106d0005063562faadd46e740
 ```
-
