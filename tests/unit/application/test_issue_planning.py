@@ -927,6 +927,75 @@ def test_current_front_matter_inconsistency_short_circuits_backend(tmp_path: Pat
     assert backend_calls == []
 
 
+def test_invalid_issue_id_rejections_keep_structured_result_contract(tmp_path: Path) -> None:
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=[
+            "PlanningApplyRequest",
+            "PlanningCreateRequest",
+            "PlanningReviewRequest",
+            "run_issue_planning_apply",
+            "run_issue_planning_create",
+            "run_issue_planning_review",
+        ],
+    )
+
+    def no_backend(**kwargs):
+        pytest.fail("invalid Issue ID must short-circuit before backend work")
+
+    create = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
+        request=module.PlanningCreateRequest("nope", tmp_path),
+        records=[],
+        repo_root=tmp_path,
+        repo_slug_resolver=lambda _root: "owner/repo",
+        backend_invoker=no_backend,
+    )
+    review = module.run_issue_planning_review(
+        dependencies=PLANNING_DEPENDENCIES,
+        request=module.PlanningReviewRequest(
+            "nope",
+            "git-bound",
+            tmp_path,
+            candidate_path=tmp_path / "candidate.zip",
+            reviewed_head="a" * 40,
+        ),
+        records=[],
+        repo_root=tmp_path,
+        repo_slug_resolver=lambda _root: "owner/repo",
+        backend_invoker=no_backend,
+    )
+    apply = module.run_issue_planning_apply(
+        dependencies=PLANNING_DEPENDENCIES,
+        request=module.PlanningApplyRequest(
+            issue_id="nope",
+            mode="git-bound",
+            review_result_path=tmp_path / "review.json",
+            human_decision_path=tmp_path / "decision.json",
+            expected_head="a" * 40,
+            output_dir=tmp_path,
+            candidate_path=tmp_path / "candidate.zip",
+            reviewed_head="a" * 40,
+        ),
+        records=[],
+        repo_root=tmp_path,
+        repo_slug_resolver=lambda _root: "owner/repo",
+        candidate_loader=lambda *_args: pytest.fail("invalid Issue ID must short-circuit before candidate work"),
+        expected_target_loader=lambda *_args: pytest.fail("invalid Issue ID must short-circuit before target work"),
+        resume_probe=lambda *_args, **_kwargs: pytest.fail("invalid Issue ID must short-circuit before resume work"),
+        validation_runner=lambda: None,
+        sync_runner=lambda: None,
+        transaction_runner=no_backend,
+    )
+
+    assert [(result.status, result.reason, result.issue_id) for result in (create, review, apply)] == [
+        ("rejected", "planning_context_rejected", "iss-00000"),
+        ("rejected", "review_request_rejected", "iss-00000"),
+        ("rejected", "apply_request_rejected", "iss-00000"),
+    ]
+    assert all(result.to_dict()["issue_id"] == "iss-00000" for result in (create, review, apply))
+
+
 def test_create_maps_s02_nonpass_without_candidate_work(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
