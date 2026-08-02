@@ -25,19 +25,19 @@ ID: "epic-00343"
   - team onboarding ArtifactもREADME contractへ更新した。
   - ユーザーが3 slicesを採用し、`iss-00344` / `iss-00345` / `iss-00346`をGitHub Issue #344 / #345 / #346として作成した。`iss-00346`から`iss-00344` / `iss-00345`へのdirect dependencyをruntime commandで登録した。
 - `iss-00344`は全実装・review・deliveryを完了し、GitHub Issue #344は2026-07-29T23:49:03Zにclosed、PR #350は2026-07-29T23:49:02Zにmergeされた（merge commit `a9871971481d77baa56e670163e1ae1ebf8ac4b4`）。
-- Candidate 3の`iss-00345`（#345）はGitHub上で2026-07-30T15:37:18Zにclosedし、`iss-00346`（#346）はS01〜S04の実装・ChatGPT Pro code gateを完了した。Issue 346 reportのS04 final reviewはP0〜P3=0であり、S90ではprovider docsとmanaged projection parityを更新した。S90のfirst exact-head spec reviewはP1=3でfailし、現在はbounded remediation後のfresh review待ちである。
+- Candidate 3の`iss-00345`（#345）はGitHub上で2026-07-30T15:37:18Zにclosedし、`iss-00346`（#346）はS01〜S04の実装・ChatGPT Pro code gateを完了した。Issue 346 reportのS04 final reviewはP0〜P3=0であり、S90ではprovider docsとmanaged projection parityを更新した。S90のfirst exact-head spec reviewはP1=3でfailしたが、bounded remediation後のexact-head combined code/spec review（`feedff647f`）はP0/P1なしでpassした。S99は未完了である。
   - `iss-00345`のfresh code reviewでLinux named staging cleanupのsame-UID replacement raceを検出した。macOS専用のaccepted waiverをLinuxへ拡張せず、ユーザー採用済みOption AによりLinux anonymous `O_TMPFILE` stagingを必須化するEpic amendmentを開始した。
 - 次のマイルストーン:
-  - Issue 346のS90 docs/spec reviewを完了し、S99のfast/full regression、single-thread QA/code/spec review、PR handoffを最新headで実施する。
+- Issue 346のS90 combined code/spec reviewをpassし、S99のfast/full regression、single-thread QA/code/spec review、PR handoffを最新headで実施する。
 - ブロッカー:
-- Candidate 3のS90 fresh spec reviewとS99（fast/full、統合review、PR handoff）が未完了である。S90 docs更新は既存のaccepted Linux/macOS trust boundaryを説明する範囲に限定し、runtime mirrorはS04のprovider-to-dogfood projection correctionとしてD-005/Issue EAL-013へ明示した。新しいproduct decisionやruntime fallbackは導入していない。
+- Candidate 3のS90 combined reviewはpassしたが、S99（fast/full、統合review、PR handoff）が未完了である。S90 docs更新は既存のaccepted Linux/macOS trust boundaryを説明する範囲に限定し、runtime mirrorはS04のprovider-to-dogfood projection correctionとしてD-005/Issue EAL-013/EAL-014へ明示した。新しいproduct decisionやruntime fallbackは導入していない。
 
 ### Candidate 3 trace（Issue 346）
 
 - `iss-00344`（#344）はPR #350のmergeで完了し、`iss-00345`（#345）はGitHubでclosed済みである。両Issueの実装を前提に、`iss-00346`（#346）はS01 candidate wheel/fresh consumer、S02 no-backfill/update、S03 platform/privacy、S04 opaque lifecycle/projection/compatibilityを順に完了した。
 - Issue 346 S04のChatGPT Pro exact-head code gateは reviewed head `2af3a145ec1a29e05f677d13ee20d53e55f38e3f`、P0/P1/P2/P3=0、`review_status=pass`。詳細とArtifactはIssue reportのS04 review ledgerを参照する。
-- S90ではprovider docsを更新し、candidate-wheel updateでconsumer docs/runtime mirrorとstatus manifestを同期した。provider/projection parity、docs token checks、`validate nodes=217`、`sync --no-github`はpassしたが、first exact-head ChatGPT Pro spec review（session `iss346-s90-spec-review`、reviewed head `1364d62ca7a3e0ff42e7fe771b8a869cf54697bb`）はP1=3でfailした。Issue reportのS90 section、EAL-006〜013、Artifact `20260802t011550z-chatgpt-output-s90-docs-spec-review.md`が一次 traceである。
-- S90 remediation/re-review後にS99（ordinary/explicit-full test lane、single-thread ChatGPT Pro QA/code/spec review、latest-head PR handoff、Merge Preparation、human merge stop）を同一candidateへ束ねる。ここではS90 pass、S99完了、Epic final closureを主張しない。
+- S90ではprovider docsを更新し、candidate-wheel updateでconsumer docs/runtime mirrorとstatus manifestを同期した。provider/projection parity、docs token checks、`validate nodes=217`、`sync --no-github`はpassした。first exact-head ChatGPT Pro spec review（session `iss346-s90-spec-review`、reviewed head `1364d62ca7a3e0ff42e7fe771b8a869cf54697bb`）はP1=3でfailしたが、remediation後のcombined code/spec review（session `iss346-s90-combined-review`、reviewed head `feedff647f5153cd2dc951445943e4d98830131a`、Artifact `20260802t015002z-chatgpt-output-s90-combined-code-spec-review.md`）はcode/specともfindings 0・passとなった。Issue reportのS90 section、D-005/D-006、EAL-006〜014が一次 traceである。
+- S90 pass後にS99（ordinary/explicit-full test lane、single-thread ChatGPT Pro QA/code/spec review、latest-head PR handoff、Merge Preparation、human merge stop）を同一candidateへ束ねる。ここではS99完了、PR mergeability、Epic final closureを主張しない。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 

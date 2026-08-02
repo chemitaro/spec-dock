@@ -636,21 +636,26 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| provider docs / managed projection / status manifest / Issue・Epic trace | yes | doc-writer + main orchestrator | pre-step Artifact `artifacts/20260802t004508z-chatgpt-output-20260802t-s90-docs-prestep.md`; provider commit `fa05765177c6cee71d0cea09cb1b1a8285a89702`; projection commit `870846fda494f7ab76af0d1e913a7a508bd14099`; status manifest commit `6b815c9c`; `cmp` parity、required-token scan、docs parity unit 1 passed、`validate nodes=217`、`sync --no-github` pass; first exact-head review Artifact `artifacts/20260802t011550z-chatgpt-output-s90-docs-spec-review.md` | first review fail（P1=3）。D-005/plan §12.3、EAL-007〜013、Epic stateをboundedに補正してfresh reviewへ戻す |
+| provider docs / managed projection / status manifest / Issue・Epic trace | yes | doc-writer + main orchestrator | pre-step Artifact `artifacts/20260802t004508z-chatgpt-output-20260802t-s90-docs-prestep.md`; provider commit `fa05765177c6cee71d0cea09cb1b1a8285a89702`; projection commit `870846fda494f7ab76af0d1e913a7a508bd14099`; status manifest commit `6b815c9c`; `cmp` parity、required-token scan、docs parity unit 1 passed、`validate nodes=217`、`sync --no-github` pass; first exact-head review Artifact `artifacts/20260802t011550z-chatgpt-output-s90-docs-spec-review.md`; formal combined re-review Artifact `artifacts/20260802t015002z-chatgpt-output-s90-combined-code-spec-review.md`（SHA-256 `c30909c04d5367b519c5680c06644a39d99d4d9d9d0a90313a2d73b9fd8010ee`） | first review fail（P1=3）をD-005/D-006/EAL-006/EAL-013/EAL-014へ限定反映し、exact HEAD `feedff647f5153cd2dc951445943e4d98830131a`のcombined code/spec reviewはP0/P1なしでpass。S99は未完了 |
 
 #### S90 documentation-impact resolution
 
 - 調査時点のpushed HEADは`ef467c1b84d9d7dfce64c6c4d98bcea5c560fc81`。S90 pre-stepは既存Workbench/no-backfill/privacy/opaque文言を維持しつつ、(1) Linux `O_TMPFILE` fail-closed/no named-temp fallback、(2) macOS staged descriptor/`fclonefileat`/cleanup warningとaccepted same-UID exclusion、(3) ordinary fast laneとexplicit `--run-full-regression` lane、(4) staleなIssue/Epic EAL traceの補正を要求した。
-- provider-firstで変更したファイルは`src/spec_dock/assets/spec_dock/docs/README.md`と`guide.md`のみ（`fa05765177c6cee71d0cea09cb1b1a8285a89702`）。provider→consumer updateで`spec-dock/docs/README.md`、`spec-dock/docs/guide.md`および既存provider runtimeのmanaged mirror `spec-dock/scripts/spec_dock_runtime/application/import_file_artifact.py`、`spec-dock/scripts/spec_dock_runtime/domain/artifacts.py`を同期した（`870846fda494f7ab76af0d1e913a7a508bd14099`）。S04 expected status manifestはdocs 2 pathを追加した（`6b815c9c`）。consumer docsを手編集していない。
+- provider-firstで変更したファイルは`src/spec_dock/assets/spec_dock/docs/README.md`と`guide.md`のみ（`fa05765177c6cee71d0cea09cb1b1a8285a89702`）。provider→consumer updateで`spec-dock/docs/README.md`、`spec-dock/docs/guide.md`および既存provider runtimeのmanaged mirror `spec-dock/scripts/spec_dock_runtime/application/import_file_artifact.py`、`spec-dock/scripts/spec_dock_runtime/domain/artifacts.py`を同期した（`870846fda494f7ab76af0d1e913a7a508bd14099`）。S04 expected status manifestはdocs 2 pathを追加した（`6b815c9c`）。これはS04 originating-stepのstatus-only補正としてD-006/EAL-014で明示認可し、S90で新しいtest oracleやproduction behaviorは追加していない。consumer docsを手編集していない。
 - S04 reportのcandidate-wheel status manifestが先に示していたruntime mirrorは、S90で新規修復したものではなく、S04のaccepted provider sourceをチェックイン済みdogfoodへ遅れて同期したprojection correctionである。D-005とplan §12.3でこの境界を明示し、runtime behaviorの新規変更・production repair=falseを維持する。
 - `README.md`/`guide.md`/`reference_naming.md`/`rules/root/artifacts.md`のproviderとprojectionはbyte-identical、stale `deferred.*Issue #346`文言は除去、required safety/test-lane tokensは存在する。`uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_docs_match_provider_assets -q` は1 passed、`./spec-dock/scripts/spec-dock validate` は`nodes=217`、`sync --no-github` はactive unchangedで完了した。
-- S90時点ではS99を完了済みとは主張しない。S90 fresh docs/spec review後に、S99のfast/full、validate/sync、single-thread QA/code/spec review、PR handoffを実施する。
+- S90 combined code/spec reviewは完了したが、S99を完了済みとは主張しない。S99のfast/full、validate/sync、single-thread QA/code/spec review、PR handoffを実施する。
 
 #### S90 first exact-head review disposition
 
 - Session `iss346-s90-spec-review`は`requested=Pro; resolved=Pro; status=already-selected; strategy=select; verified=yes`で、GitHub connector経由のbranch/HEAD確認後に実行された。reviewed HEADは`1364d62ca7a3e0ff42e7fe771b8a869cf54697bb`、Artifactは`artifacts/20260802t011550z-chatgpt-output-s90-docs-spec-review.md`（SHA-256 `08f443a5430d0adadd717a92cc62593752ab5f7c1803bc9539d4c2b8ea36f762`、4,585 bytes）。
 - `review_status=fail`、P1=3。指摘は、S04 projection correctionをS90非コード差分から区別するplan/report trace不足、S02〜S04 ChatGPT evidence EAL不足、S90 pendingを飛び越したEpic Candidate 3状態の矛盾であり、provider docsの文言自体はbyte/content parityを満たすと確認された。
 - 3件はD-005、plan §12.3 clarification、EAL-007〜013、Epic current-state correctionでboundedに対応する。runtime behaviorやproduct contractを拡張せず、fresh exact-head S90 reviewを取得するまでS90をcloseしない。
+
+#### S90 combined code/spec re-review disposition
+
+- Session `iss346-s90-combined-review`は`requested=Pro; resolved=Pro; status=already-selected; strategy=select; verified=yes`で、GitHub connector経由のcurrent branch確認後に実行された。reviewed HEADは`feedff647f5153cd2dc951445943e4d98830131a`、Artifactは`artifacts/20260802t015002z-chatgpt-output-s90-combined-code-spec-review.md`（SHA-256 `c30909c04d5367b519c5680c06644a39d99d4d9d9d0a90313a2d73b9fd8010ee`、2,039 bytes）。
+- code-reviewer / spec-reviewerの両JSONで`findings=[]`、`review_status=pass`、P0/P1なし。plan §12.3/§12.4のexact test-path authorization、Issue 345 provider provenance、`production_repair=false`、EAL-006 partial adoption、EAL-013/EAL-014 bindingを確認した。S99、full regression、PR mergeability、Epic closureは主張していない。
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
@@ -660,12 +665,12 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| ChatGPT Pro with current `code-reviewer` Developer Instructions | S04 exact-head code/evidence gate | S04 final review PASS（P0〜P3=0）をArtifact化済み。S90 docs影響は別spec reviewで確認 | `iss346-s04-final-code-review`; reviewed head `2af3a145ec1a29e05f677d13ee20d53e55f38e3f`; Artifact `artifacts/20260802t003003z-chatgpt-output-20260802t-s04-code-review-final.md`; final report successor `ef467c1b` | pass（S04） |
+| ChatGPT Pro with current `code-reviewer` Developer Instructions | S04 exact-head code/evidence gate + S90 status-manifest scope | S04 final review PASS（P0〜P3=0）に加え、S90 combined reviewでstatus-only test pathとprojection provenanceを確認 | `iss346-s04-final-code-review`; reviewed head `2af3a145ec1a29e05f677d13ee20d53e55f38e3f`; Artifact `artifacts/20260802t003003z-chatgpt-output-20260802t-s04-code-review-final.md`; S90 Artifact `artifacts/20260802t015002z-chatgpt-output-s90-combined-code-spec-review.md`; S90 reviewed head `feedff647f5153cd2dc951445943e4d98830131a` | pass（S04/S90） |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| ChatGPT Pro with current `spec-reviewer` Developer Instructions | S90 docs/spec/report alignment | first exact-head review FAIL（P1=3）をD-005/plan/EAL/Epic traceへ限定反映し、fresh reviewへ戻る | session `iss346-s90-spec-review`; reviewed head `1364d62ca7a3e0ff42e7fe771b8a869cf54697bb`; Artifact `artifacts/20260802t011550z-chatgpt-output-s90-docs-spec-review.md`; pre-step Artifact `artifacts/20260802t004508z-chatgpt-output-20260802t-s90-docs-prestep.md` | fail; re-review required |
+| ChatGPT Pro with current `spec-reviewer` Developer Instructions | S90 docs/spec/report alignment | first exact-head review FAIL（P1=3）をD-005/D-006/EAL/Epic traceへ限定反映し、combined exact-head re-reviewでfindings 0を確認 | initial session `iss346-s90-spec-review`; initial reviewed head `1364d62ca7a3e0ff42e7fe771b8a869cf54697bb`; initial Artifact `artifacts/20260802t011550z-chatgpt-output-s90-docs-spec-review.md`; combined session `iss346-s90-combined-review`; combined Artifact `artifacts/20260802t015002z-chatgpt-output-s90-combined-code-spec-review.md`; combined reviewed head `feedff647f5153cd2dc951445943e4d98830131a` | pass（initial failはhistorical） |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
