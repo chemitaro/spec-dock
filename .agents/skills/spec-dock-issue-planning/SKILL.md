@@ -69,6 +69,21 @@ The required Planner/Semantic Revision output is exactly one authoring ZIP conta
      --issue <iss-id> --output <external-output-dir>
    ```
 
+   When additional repository context is required, pass one external JSON
+   context manifest. The manifest is provider-owned and closed to exactly the
+   following two arrays; paths remain repository-relative and operator context
+   remains bounded and non-sensitive:
+
+   ```json
+   {"relevant_source_paths":["src/example.py"],"operator_context":["preserve approved scope"]}
+   ```
+
+   ```bash
+   ./spec-dock/scripts/spec-dock-chatgpt planning create \
+     --issue <iss-id> --output <external-output-dir> \
+     --context-manifest <external-context-manifest.json>
+   ```
+
 3. Review the exact Candidate with the default archive mode:
 
    ```bash

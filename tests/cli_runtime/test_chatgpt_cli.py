@@ -76,7 +76,7 @@ def test_top_level_and_group_help_expose_only_closed_command_family() -> None:
 @pytest.mark.parametrize(
     ("args", "required_options"),
     [
-        (("planning", "create", "--help"), ("--issue", "--output", "--format")),
+        (("planning", "create", "--help"), ("--issue", "--output", "--context-manifest", "--format")),
         (("planning", "revise", "--help"), ("--candidate", "--request", "--output", "--format")),
         (
             ("review", "planning", "--help"),

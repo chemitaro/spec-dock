@@ -692,6 +692,18 @@ def verify_issue_candidate_files(
     ).encode("ascii")
     if files["CHECKSUMS.sha256"] != expected_checksums:
         findings.append("checksum_mismatch")
+    try:
+        document_baseline = parse_current_front_matter_baseline({name: files[name] for name in DOCUMENT_NAMES})
+        for name in DOCUMENT_NAMES:
+            _fields, body = _parse_document(name, files[name])
+            _validate_completeness(body, document_baseline)
+        if document_baseline.issue_id != baseline.get("issue_id") or document_baseline.parents != (
+            baseline.get("parent_epic_id"),
+            baseline.get("parent_initiative_id"),
+        ):
+            raise ValueError("canonical document identity does not match the source baseline")
+    except (KeyError, UnicodeError, ValueError):
+        findings.append("canonical_document_mismatch")
     findings.extend(placeholder_findings)
     return tuple(dict.fromkeys(findings))
 

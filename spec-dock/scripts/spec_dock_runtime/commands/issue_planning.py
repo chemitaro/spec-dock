@@ -30,6 +30,7 @@ class PlanningCreateArgs(CommandArgs):
     issue_id: str
     output_dir: Path
     output_format: OutputFormat
+    context_manifest_path: Path | None
 
 
 @dataclass(frozen=True)
@@ -97,6 +98,10 @@ def _add_format(parser: argparse.ArgumentParser) -> None:
 def _add_create_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--issue", required=True, help="Existing Issue ID")
     parser.add_argument("--output", required=True, help="Existing external output directory")
+    parser.add_argument(
+        "--context-manifest",
+        help="Optional external JSON manifest with relevant_source_paths and operator_context",
+    )
     _add_format(parser)
 
 
@@ -149,6 +154,7 @@ def _create_args(ns: argparse.Namespace) -> CommandArgs:
         issue_id=ns.issue,
         output_dir=Path(ns.output),
         output_format=_output_format(ns),
+        context_manifest_path=Path(ns.context_manifest) if ns.context_manifest is not None else None,
     )
 
 
@@ -229,7 +235,13 @@ def _validate_mode_options(
 
 def _run_create(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_args(args, PlanningCreateArgs, "planning create")
-    result = use_cases.planning_create(PlanningCreateRequest(issue_id=typed.issue_id, output_dir=typed.output_dir))
+    result = use_cases.planning_create(
+        PlanningCreateRequest(
+            issue_id=typed.issue_id,
+            output_dir=typed.output_dir,
+            context_manifest_path=typed.context_manifest_path,
+        )
+    )
     return _outcome(result, typed.output_format)
 
 

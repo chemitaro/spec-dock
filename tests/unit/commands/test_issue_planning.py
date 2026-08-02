@@ -182,6 +182,30 @@ def test_each_leaf_dispatches_exactly_one_typed_request(argv, use_case_name, req
     assert isinstance(calls[0], request_type)
 
 
+def test_planning_create_forwards_external_context_manifest_path() -> None:
+    calls = []
+
+    def fake(request):
+        calls.append(request)
+        return PlanningCommandResult(status="ok", reason="candidate_created", issue_id="iss-00003")
+
+    registry = build_registry()
+    namespace = build_parser(registry).parse_args([
+        "planning",
+        "create",
+        "--issue",
+        "iss-00003",
+        "--output",
+        "/tmp/out",
+        "--context-manifest",
+        "/tmp/context.json",
+    ])
+    with contextlib.redirect_stdout(io.StringIO()):
+        assert dispatch(namespace, registry, _use_cases(planning_create=fake)) == 0
+    assert len(calls) == 1
+    assert calls[0].context_manifest_path == Path("/tmp/context.json")
+
+
 @pytest.mark.parametrize(
     "argv",
     [

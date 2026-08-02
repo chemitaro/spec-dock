@@ -927,6 +927,47 @@ def test_current_front_matter_inconsistency_short_circuits_backend(tmp_path: Pat
     assert backend_calls == []
 
 
+def test_context_manifest_is_bounded_and_loaded_outside_repository(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    manifest = tmp_path / "context.json"
+    manifest.write_text(
+        '{"relevant_source_paths":["src/example.py"],"operator_context":["preserve approved scope"]}\n',
+        encoding="utf-8",
+    )
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["_load_planning_context_manifest"],
+    )
+
+    assert module._load_planning_context_manifest(
+        manifest,
+        repo_root=repo,
+        gateway=PLANNING_DEPENDENCIES.gateway,
+    ) == (("src/example.py",), ("preserve approved scope",))
+
+
+def test_context_manifest_rejects_unknown_keys_without_backend_work(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    manifest = tmp_path / "context.json"
+    manifest.write_text(
+        '{"relevant_source_paths":[],"operator_context":[],"unexpected":true}\n',
+        encoding="utf-8",
+    )
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["_load_planning_context_manifest"],
+    )
+
+    with pytest.raises(ValueError, match="schema"):
+        module._load_planning_context_manifest(
+            manifest,
+            repo_root=repo,
+            gateway=PLANNING_DEPENDENCIES.gateway,
+        )
+
+
 def test_invalid_issue_id_rejections_keep_structured_result_contract(tmp_path: Path) -> None:
     module = __import__(
         "spec_dock_runtime.application.issue_planning",
@@ -1026,6 +1067,46 @@ def test_create_maps_s02_nonpass_without_candidate_work(tmp_path: Path) -> None:
     )
     assert (result.status, result.reason) == ("blocked", "backend_timeout")
     assert publisher_calls == []
+
+
+def test_create_forwards_context_manifest_values_to_transport(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "output"
+    output.mkdir()
+    manifest = tmp_path / "context.json"
+    manifest.write_text(
+        '{"relevant_source_paths":["src/example.py"],"operator_context":["preserve approved scope"]}\n',
+        encoding="utf-8",
+    )
+    contracts = __import__(
+        "spec_dock_runtime.domain.issue_planning_contracts",
+        fromlist=["PlanningInvocationResult"],
+    )
+    captured: dict[str, object] = {}
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["run_issue_planning_create"],
+    )
+
+    def transport(**kwargs):
+        captured.update(kwargs)
+        return contracts.PlanningInvocationResult(status="blocked", reason="backend_timeout")
+
+    result = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
+        request=module.PlanningCreateRequest("iss-00003", output, manifest),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda root: "owner/repo",
+        backend_invoker=lambda **kwargs: pytest.fail("transport runner owns this fixture"),
+        transport_runner=transport,
+    )
+
+    assert (result.status, result.reason) == ("blocked", "backend_timeout")
+    assert captured["relevant_source_paths"] == ("src/example.py",)
+    assert captured["operator_context"] == ("preserve approved scope",)
 
 
 def test_create_rejects_post_oracle_source_drift_before_publication(

@@ -916,6 +916,8 @@ def test_git_cli_captures_exact_github_push_endpoint(
         ("https://github.com/owner/repo.git", "https://github.com/other/repo.git"),
         ("https://example.com/owner/repo.git", "https://example.com/owner/repo.git"),
         ("malformed", "malformed"),
+        ("https://token:secret@github.com/owner/repo.git", "https://github.com/owner/repo.git"),
+        ("https://github.com/owner/repo.git", "https://token:secret@github.com/owner/repo.git"),
     ],
 )
 def test_git_cli_rejects_unprovable_publication_endpoint(
@@ -934,8 +936,10 @@ def test_git_cli_rejects_unprovable_publication_endpoint(
         lambda _repo, *, push: push_url if push else fetch_url,
     )
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError) as error:
         git_cli.origin_github_publication_endpoint(tmp_path)
+    assert "token" not in str(error.value)
+    assert "secret" not in str(error.value)
 
 
 def test_cas_failure_with_unavailable_remote_preserves_push_failed(
