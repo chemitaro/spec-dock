@@ -1,0 +1,49 @@
+{
+  "artifact_type": "chatgpt_p1_followup_advisory",
+  "status": "advisory",
+  "created_at": "2026-08-02T01:09:00Z",
+  "provider": "ChatGPT Use",
+  "model": {
+    "requested": "GPT-5.5 Instant",
+    "resolved": "Instant5.5",
+    "selection_status": "switched",
+    "verified": true
+  },
+  "source": {
+    "repository": "chemitaro/spec-dock",
+    "branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+    "head": "cb046165004daf60e66beb463982f2c49887002b",
+    "head_match": true,
+    "pull_request": 351,
+    "prompt_sha256": "bf68e7a04c0b2d39a59c3a84a8deb0b5a53009e8097a84bc3ba0e7c2d5264bd7"
+  },
+  "recommendation": {
+    "status": "minimal-fix",
+    "p1_a": {
+      "files": [
+        "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_oracle_artifact.py"
+      ],
+      "tests": [
+        "tests/unit/infra/test_issue_planning_oracle_artifact.py: add a focused oversized-integer metadata rejection test"
+      ],
+      "reason": "Add ValueError only to the _read_metadata json.loads exception tuple so oversized integers normalize to oracle_artifact_rejected while existing metadata validation remains unchanged."
+    },
+    "p1_b": {
+      "files": [
+        "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning.py"
+      ],
+      "tests": [
+        "tests/unit/application/test_issue_planning.py: cover malformed-ID early rejection for create, review, and apply with no side effects",
+        "tests/cli_runtime/test_chatgpt_cli.py: cover parseable JSON rejection for all three commands with --issue nope"
+      ],
+      "reason": "Use a private helper that normalizes valid Issue IDs and returns the canonical content-free sentinel iss-00000 only when normalization fails; apply it to create/review/apply rejection paths before ExistingIssueTarget is available, while continuing to use target.issue_id after successful resolution."
+    }
+  },
+  "out_of_scope": [
+    "Do not alter PlanningCommandResult canonical issue_id validation.",
+    "Do not change Candidate ZIPs, canonical documents, repository structure, or design decisions.",
+    "Do not broaden JSON exception handling outside the metadata decoding boundary.",
+    "Do not redesign CLI parsing, result schemas, ID normalization, or unrelated failure contracts.",
+    "Do not modify repository files or generate a patch."
+  ]
+}
