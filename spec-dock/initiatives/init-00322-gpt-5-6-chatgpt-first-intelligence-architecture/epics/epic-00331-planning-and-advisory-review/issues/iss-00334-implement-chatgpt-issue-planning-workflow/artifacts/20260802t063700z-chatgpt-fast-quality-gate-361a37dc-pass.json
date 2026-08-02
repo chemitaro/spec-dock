@@ -1,0 +1,71 @@
+{
+  "review_identity": {
+    "repository": "chemitaro/spec-dock",
+    "branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+    "pull_request": 351,
+    "source_head": "361a37dca57728e6af04fa9c80675d5cbf6840a8",
+    "default_branch_fallback_used": false
+  },
+  "model_evidence": {
+    "requested": "GPT-5.5 Instant",
+    "resolved": "Instant5.5",
+    "status": "switched",
+    "strategy": "select",
+    "verified": true,
+    "engine": "browser",
+    "session_slug": "iss-334-chatgpt-fast-final",
+    "duration": "1m26s"
+  },
+  "review_contract": {
+    "mode": "chatgpt-fast-final-quality-gate",
+    "scope": "defect-only; P0/P1 blocking; P2/P3 non-blocking",
+    "prompt_file": "prompt-iss-00334-chatgpt-fast-final-gate-361a37dc.md",
+    "prompt_sha256": "054c64c2c3939aac25db2140e8965fa4c1c526b48f60ef6d233afb338fb74a6d"
+  },
+  "attachments": [
+    "requirement.md",
+    "design.md",
+    "plan.md",
+    "report.md",
+    "20260802t210000z-chatgpt-gpt56-quality-gate-30c2eb57-pass.json",
+    "20260802t233000z-chatgpt-gpt56-observation-6a31f1bc-triage.json",
+    "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/issue_planning_candidate.py",
+    "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning.py",
+    "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/issue_planning.py"
+  ],
+  "spec_review": {
+    "findings": [],
+    "review_scope_summary": "Reviewed the exact GitHub branch and HEAD, canonical requirement.md, design.md, append-only plan.md and report.md, plus the two evidence-only commits after the previously accepted implementation HEAD. The later PlantUML observation was re-evaluated against the explicit Runtime-versus-acceptance ownership boundary.",
+    "review_status": "pass",
+    "review_status_reason": "The current HEAD is exactly two commits ahead of the prior accepted implementation and changes only review/triage artifacts plus append-only report entries. No material contradiction, authority drift, incorrect status, acceptance gap, or P0/P1 specification defect was found.",
+    "overall_confidence_score": 0.98
+  },
+  "code_review": {
+    "findings": [],
+    "overall_correctness": "patch is correct",
+    "overall_explanation": "The exact branch diff from the prior accepted implementation HEAD to the current HEAD contains no production or test code changes, only evidence artifacts and append-only report updates. The full branch comparison and surrounding implementation reveal no concrete introduced P0/P1 bug, and the PlantUML parser observation is not introduced by these commits and does not violate the approved Runtime dependency boundary.",
+    "review_status": "pass",
+    "review_status_reason": "The exact branch and HEAD were reliably evaluated, and no introduced P0/P1 correctness, security, reliability, or maintainability defect was identified.",
+    "overall_confidence_score": 0.98
+  },
+  "qa_review": {
+    "findings": [],
+    "overall_correctness": "patch is correct",
+    "overall_explanation": "The two commits after the previously gated implementation do not change executable behavior or tests, so they introduce no new behavior requiring regression coverage. Existing exact-head GitHub Actions CI and Provider CI completed successfully, and the reviewed evidence does not contain a materially misleading test claim.",
+    "review_status": "pass",
+    "review_status_reason": "Test adequacy could be evaluated reliably for the current evidence-only delta, and no P0/P1 missing coverage or misleading-test defect was found.",
+    "overall_confidence_score": 0.97
+  },
+  "quality_gate": {
+    "status": "PASS",
+    "p0_count": 0,
+    "p1_count": 0,
+    "decision": "PASS"
+  },
+  "mutation": {
+    "repository_changed_by_reviewer": false,
+    "candidate_or_zip_generated": false,
+    "patch_generated": false,
+    "pr_or_issue_mutated": false
+  }
+}
