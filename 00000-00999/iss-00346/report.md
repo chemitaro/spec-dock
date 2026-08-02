@@ -55,7 +55,7 @@ Disposition ごとの必須証跡:
 | D-004 | resolved | test-strategy | ChatGPT Pro pre-step / orchestrator | current HEADに対して既存S01のwheel receiptがstaleになり、sensitivity evidenceがallowlist missingだけに限定されていた | production/package repair; test-only denylist negative + installed validate; broad inventory/metadata framework | package/installer変更は行わず、allowed test pathだけにforbidden nested README・cache entryのcontrolled negativeとfresh consumer後のinstalled `validate` assertionを追加した。strict clean receiptはcanonical contractどおり維持し、コミット後にcurrent HEADで再実行した | ChatGPT Artifact EAL-005、plan §8.3/§8.5、worker diff、current focused/full test results | applied | `tests/integration/test_epic_00343_distribution.py`; commit `9c721d50eb0e4b2ca5bf16fd6f7e3b0f4a9e1c9c6`; S01 current-cycle test output | current-head ChatGPT Pro implementation reviewでscopeとtest sensitivityを確認する |
 | D-005 | resolved | scope / operation | S90 ChatGPT Pro review / orchestrator | S04でaccepted provider runtime sourceがcandidate-wheel disposable consumerへ投影済みだが、チェックイン済みdogfood mirrorが遅れており、S90で同期した4 pathsが「runtime repair」と誤認され得た | revert mirror and accept stale checked-in dogfood; plan amendmentで既存provider差分のmanaged projection correctionを明示; new runtime repair | candidate-wheel updateが実測で出力する既存managed mirrorだけをprovider-firstに同期し、production repair=false・originating step=S04・status manifestを保持する。S90はruntime挙動を変更せず、projection parityとreport traceだけを完了する。Issue 345のprovider source provenanceは`1e276af98cfad7a1b3bcf82d569c44dab4dad2a7`、`f9b94d6adb1f99def916c40166e45f8c90103bc4`、`e001c404ca33bf337255d46b3c16d64fb0df7fdf`で固定する | S04 `I346-AC-006` / `Provider-to-Dogfood Projection Manifest`、`870846fd`、`6b815c9c`、Issue 345 provider commits、ChatGPT S90 finding P1-1 | promoted_to_plan | `plan.md` §12.3 clarification、Issue EAL-013（EAL-014はS99でrejected）、S04 report projection receipt | fresh S90 combined code/spec reviewでexact-head scopeを再確認する |
 | D-006 | superseded | scope / test-strategy | S90 ChatGPT Pro re-review / orchestrator | S04 projectionで生成されたdocs pathを期待status manifestへ反映したテスト差分が、S90 docs-only allowlist外に見える状態だった | status-manifest editを残す; revertしてS99実測へ戻す | 当時のS90判断では`6b815c9c`の4 path追加をS04 originating projection receiptとして認可したが、S99 full regressionでcurrent candidate updateの実測がその4 pathを生成しないことを確認したため、その期待値認可を撤回する。S90は新しいtest oracleを追加しない。 | `6b815c9c`、S99 full-regression failure、D-007、plan §12.3/§13.3 amendment | superseded | D-007、Issue EAL-015 | S99で実測statusとfocused/full rerunを記録する |
-| D-007 | resolved | test-strategy / scope | S99 full regression / orchestrator | current candidate updateはprovider/consumer projection済みのためS04 status manifestを空に戻す必要があり、現行root rules見出し・dogfooding snapshot・docs assertionも更新が必要だった | 失敗を無視; 旧期待値を維持; 実測に合わせたbounded test/docs修復 | full regressionで露出した失敗を、production behaviorではなく現行テスト期待値・provider-first docs見出し・checked-in metadata snapshotの陳腐化として分類する。status manifestはprovider/consumer byte parity後の空集合を正とし、snapshot/docs assertionを現在のEpic 343 / Issue 346状態へ更新する。新しいruntime behavior、workflow policy、canonical requirement/designは追加しない。 | S99 full regression `2786 passed, 77 skipped, 1 failed, 2 warnings` の失敗内容、S04 focused rerun、Issue 346 plan §13.3 amendment | promoted_to_plan | `plan.md` §13.3、Issue EAL-015、S99 test receipt | dirty-tree clean commit後にfull regression再実行、lint、通常テスト、fresh ChatGPT Pro統合review |
+| D-007 | resolved | test-strategy / scope | S99 full regression / orchestrator | current candidate updateはprovider/consumer projection済みのためS04 status manifestを空に戻す必要があり、現行root rules見出し・dogfooding snapshot・docs assertionも更新が必要だった | 失敗を無視; 旧期待値を維持; 実測に合わせたbounded test/docs修復 | full regressionで露出した失敗を、production behaviorではなく現行テスト期待値・provider-first docs見出し・checked-in metadata snapshotの陳腐化として分類する。status manifestはprovider/consumer byte parity後の空集合を正とし、snapshot/docs assertionを現在のEpic 343 / Issue 346状態へ更新する。新しいruntime behavior、workflow policy、canonical requirement/designは追加しない。 | S99初回dirty-tree full regression `2786 passed, 77 skipped, 1 failed, 2 warnings`、失敗内容、S04 focused rerun、Issue 346 plan §13.3 amendment、clean HEAD `4f92201c36c8a5508f94c43b3c65a16a0033cb09`での再実行 `2787 passed, 77 skipped, 2 warnings` | promoted_to_plan | `plan.md` §13.3、Issue EAL-015、S99 test receipt | clean HEADでfull regression、lint、通常テストを完了。fresh ChatGPT Pro統合reviewとPR handoffを実施する |
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -661,14 +661,14 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 #### S99 full-regression repair receipt
 
-- 現行candidateに対する初回S99 full regressionは `2786 passed, 77 skipped, 1 failed, 2 warnings`（31:08）だった。唯一の失敗は `test_tc_346_s01_001_candidate_wheel_receipt` の clean-candidate preconditionであり、S99のtest/docs/plan/report差分が未コミットのままcandidate wheelへ入ったためで、production behavior failureではない。
-- S04 focused rerunは `2 passed`、current docs/snapshot focused rerunは `4 passed`、`make lint` はruff/format/mypy全てpass、通常laneは `782 passed, 2082 skipped`。この後、全変更をコミットしてclean HEADを作り、同じ明示full laneを再実行する。
-- S99 pre-step Artifact `artifacts/20260802t020611z-chatgpt-output-s99-prestep-elaboration.md` は正式Pro wrapperで取得済み。CheetahはD-003のとおり品質証跡として利用しない。
+- 現行candidateに対する初回S99 full regressionは `2786 passed, 77 skipped, 1 failed, 2 warnings`（31:08）だった。唯一の失敗は `test_tc_346_s01_001_candidate_wheel_receipt` の clean-candidate preconditionであり、S99のtest/docs/plan/report差分が未コミットのままcandidate wheelへ入ったためで、production behavior failureではない。この結果は履歴上のdirty-tree receiptとして保持する。
+- boundedなtest/docs修正をコミットしたclean HEAD `4f92201c36c8a5508f94c43b3c65a16a0033cb09`で `uv run pytest --run-full-regression` を再実行し、`2787 passed, 77 skipped, 2 warnings in 1982.33s (0:33:02)`。S04 focused rerunは `2 passed`、current docs/snapshot focused rerunは `4 passed`、`make lint` はruff/format/mypy全てpass、通常laneは `782 passed, 2082 skipped`。
+- S99 pre-step Artifact `artifacts/20260802t020611z-chatgpt-output-s99-prestep-elaboration.md` は正式Pro wrapperで取得済み。CheetahはD-003のとおり現行wrapperで品質証跡として利用できないため実行・採用していない。
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| ChatGPT Pro with current `qa-reviewer` Developer Instructions | whole issue obligation coverage | S99で実施予定 | S99 final candidateへfresh push後にsingle-thread統合review | pending |
+| ChatGPT Pro with current `qa-reviewer` Developer Instructions | whole issue obligation coverage | clean full regression `2787 passed, 77 skipped, 2 warnings`、ordinary `782 passed, 2082 skipped`、lint passを確認 | S99 final candidateへfresh push後にsingle-thread統合review | pending |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
@@ -683,7 +683,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| S01〜S04実装・S90 docs/projection更新 | S99 final bounded report + PR handoff | latest pushed headのPRとMerge Preparation記録へ転記 | pending S99 final candidate; human merge stop | pending |
+| S01〜S04実装・S90 docs/projection更新 | S99 final bounded report + PR handoff | latest pushed headのPRとMerge Preparation記録へ転記 | clean full regression完了、ChatGPT Pro統合reviewとPR作成を残す; human merge stop | pending |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
