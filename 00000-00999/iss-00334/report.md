@@ -1246,3 +1246,9 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - provider authorityの3ファイルをdogfoodへwhole-file projectionし、SHA-256は`issue_planning.py=af3a1c3b597729572a5d45c6de44203554d3c3074c4880b6327b1b0c4165b47b`、`issue_planning_prompt.py=2e3bb3cae4274d6df1482a1d413916d4cdcacb68da6c9ad2ffe2525319619759`、`import_file_artifact.py=824f4f664fe410fa3b3a06cadc831a4f149d3f673df050f6b9360189cd015211`でprovider／dogfood一致した。
 - verification: focused `test_issue_planning.py` `79 passed`、`test_issue_planning_prompt.py` `25 passed`、`test_import_file_artifact.py` `31 passed`、application全体`243 passed`、関連lane `200 passed, 5 skipped`、ordinary `uv run pytest -q` `1397 passed, 2235 skipped`、`make lint`（Ruff check／format、mypy 287 files）pass、`spec-dock validate` `nodes=227`、`git diff --check` pass。full-regression laneは未実施で、既存post-merge／manual gateに委ねる。
 - 次のgateはこのP1-A/B/C実装、Blue packet、観測JSON、report追記のcommit／push後に、新しいRed Team threadでfresh read-only reviewを実施することである。P0／P1=0になるまでmerge-readyとは扱わない。merge、auto-merge、branch削除、Issue close、`issue finish`は行わない。
+
+## 2026-08-03 — P1 fail-closed residual hardening before fresh Red review
+
+- P1-Aのsource preflight runnerが`RuntimeError`等を返す場合も、`_source_evidence_is_current()`が例外本文を公開せずfalseへ閉じることをReview／semantic revision双方のテストで固定した。既存のstatus／reason mappingは変更していない。
+- P1-Bのrepository root `lstat()`とdirectory判定をdescriptor-openのfail-closed try boundaryへ含め、root消失・replacement等の`OSError`がpathname例外として漏れずcontent-free `ValueError`へ正規化されるようにした。provider／dogfood parityを維持した。
+- residual hardening verification: application planning/prompt `106 passed`、`make lint` pass、`git diff --check` pass。これらの差分を含む最終commit／push後に、新しいRed Team threadでexact final HEADをfresh reviewする。
