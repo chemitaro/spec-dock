@@ -2829,4 +2829,126 @@ def test_publication_guard_validates_candidate_then_source_without_drift(revisio
     result, events = _source_guard_probe(revision=revision, mutate_source=False)
 
     assert result is True
-    assert events == ["candidate_loader", "source_preflight"]
+    assert events == ["candidate_loader", "source_preflight", "candidate_loader"]
+
+
+@pytest.mark.parametrize("revision", [False, True])
+@pytest.mark.parametrize("drift", ["identity", "zip"])
+def test_publication_guard_rechecks_candidate_after_source_preflight(
+    revision: bool,
+    drift: str,
+) -> None:
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["_review_publication_is_current", "_revision_publication_is_current"],
+    )
+    events: list[str] = []
+    candidate = SimpleNamespace(
+        identity="candidate-identity",
+        zip_bytes=b"candidate-zip",
+        source_baseline={"relevant_paths": ()},
+    )
+    replacement = SimpleNamespace(
+        identity=("replacement-identity" if drift == "identity" else candidate.identity),
+        zip_bytes=(b"replacement-zip" if drift == "zip" else candidate.zip_bytes),
+        source_baseline={"relevant_paths": ()},
+    )
+    candidates = iter((candidate, replacement))
+
+    def candidate_loader(_path: Path, _repo_root: Path) -> SimpleNamespace:
+        events.append("candidate_loader")
+        return next(candidates)
+
+    def preflight_runner(_request: object) -> PreflightResult:
+        events.append("source_preflight")
+        return _preflight(source_manifest=SimpleNamespace(source_manifest_hash="a" * 64))
+
+    target = SimpleNamespace(canonical_issue_paths=("requirement.md", "design.md", "plan.md"))
+    evidence = SimpleNamespace(
+        branch="feature/issue",
+        upstream="origin/feature/issue",
+        local_head="a" * 40,
+        remote_head="a" * 40,
+        remote_head_disposition="fetched_remote_tracking_ref",
+        source_manifest_hash="a" * 64,
+    )
+    if revision:
+        result = module._revision_publication_is_current(
+            candidate=candidate,
+            current_candidate_loader=candidate_loader,
+            candidate_path=Path("candidate.zip"),
+            target=target,
+            repo_root=Path("/repo"),
+            source_evidence=evidence,
+            preflight_runner=preflight_runner,
+        )
+    else:
+        result = module._review_publication_is_current(
+            target=target,
+            relevant_source_paths=(),
+            repo_root=Path("/repo"),
+            evidence=evidence,
+            preflight_runner=preflight_runner,
+            candidate_path=Path("candidate.zip"),
+            candidate=candidate,
+            candidate_loader=candidate_loader,
+        )
+
+    assert result is False
+    assert events == ["candidate_loader", "source_preflight", "candidate_loader"]
+
+
+@pytest.mark.parametrize("revision", [False, True])
+def test_publication_guard_revalidates_candidate_around_source_without_drift(revision: bool) -> None:
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["_review_publication_is_current", "_revision_publication_is_current"],
+    )
+    events: list[str] = []
+    candidate = SimpleNamespace(
+        identity="candidate-identity",
+        zip_bytes=b"candidate-zip",
+        source_baseline={"relevant_paths": ()},
+    )
+
+    def candidate_loader(_path: Path, _repo_root: Path) -> SimpleNamespace:
+        events.append("candidate_loader")
+        return candidate
+
+    def preflight_runner(_request: object) -> PreflightResult:
+        events.append("source_preflight")
+        return _preflight(source_manifest=SimpleNamespace(source_manifest_hash="a" * 64))
+
+    target = SimpleNamespace(canonical_issue_paths=("requirement.md", "design.md", "plan.md"))
+    evidence = SimpleNamespace(
+        branch="feature/issue",
+        upstream="origin/feature/issue",
+        local_head="a" * 40,
+        remote_head="a" * 40,
+        remote_head_disposition="fetched_remote_tracking_ref",
+        source_manifest_hash="a" * 64,
+    )
+    if revision:
+        result = module._revision_publication_is_current(
+            candidate=candidate,
+            current_candidate_loader=candidate_loader,
+            candidate_path=Path("candidate.zip"),
+            target=target,
+            repo_root=Path("/repo"),
+            source_evidence=evidence,
+            preflight_runner=preflight_runner,
+        )
+    else:
+        result = module._review_publication_is_current(
+            target=target,
+            relevant_source_paths=(),
+            repo_root=Path("/repo"),
+            evidence=evidence,
+            preflight_runner=preflight_runner,
+            candidate_path=Path("candidate.zip"),
+            candidate=candidate,
+            candidate_loader=candidate_loader,
+        )
+
+    assert result is True
+    assert events == ["candidate_loader", "source_preflight", "candidate_loader"]

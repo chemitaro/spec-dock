@@ -153,7 +153,8 @@ def test_existing_artifacts_rules_creation_is_bound_to_opened_directory(
     assert captured.value.publication_state == "not_committed"
     assert publisher_calls == 0
     assert not os.path.lexists(artifacts_dir / "rules.md")
-    assert not os.path.lexists(displaced_artifacts / "rules.md")
+    assert os.path.lexists(displaced_artifacts / "rules.md")
+    assert (displaced_artifacts / "rules.md").readlink() == Path("../docs/rules/root/artifacts.md")
     assert source.read_bytes() == b"source"
 
 
@@ -935,3 +936,38 @@ def test_rules_link_rollback_preserves_reused_inode_replacement_with_new_ctime(
         os.close(artifacts_directory_fd)
 
     assert rules_link.readlink() == replacement_target
+
+
+def test_rules_link_rollback_preserves_same_identity_replacement_without_unlink(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _contracts, module, _ports_module, _publisher_type = _runtime_modules()
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    replacement_target = tmp_path / "replacement.md"
+    replacement_target.write_text("# Replacement\n", encoding="utf-8")
+    rules_link = artifacts_dir / "rules.md"
+    rules_link.symlink_to(replacement_target)
+    replacement_status = rules_link.lstat()
+    created_identity = module._rules_link_identity(replacement_status)
+    artifacts_directory_fd = os.open(artifacts_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    unlink_calls = 0
+
+    def reject_unlink(*_args, **_kwargs):
+        nonlocal unlink_calls
+        unlink_calls += 1
+        raise AssertionError("rollback must not unlink an entry it cannot prove owns")
+
+    monkeypatch.setattr(module.os, "unlink", reject_unlink)
+    try:
+        module._rollback_bound_rules_link(
+            artifacts_directory_fd=artifacts_directory_fd,
+            created_rules_identity=created_identity,
+        )
+    finally:
+        os.close(artifacts_directory_fd)
+
+    assert unlink_calls == 0
+    assert rules_link.readlink() == replacement_target
+    assert replacement_target.read_text(encoding="utf-8") == "# Replacement\n"
