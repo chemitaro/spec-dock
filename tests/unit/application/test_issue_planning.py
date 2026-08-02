@@ -968,6 +968,36 @@ def test_context_manifest_rejects_unknown_keys_without_backend_work(tmp_path: Pa
         )
 
 
+def test_create_rejects_deeply_nested_context_manifest_without_backend_work(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue_dir = _planning_tree(repo)
+    output = tmp_path / "output"
+    output.mkdir()
+    manifest = tmp_path / "context.json"
+    nested = "[" * 10000 + "0" + "]" * 10000
+    manifest.write_text(
+        '{"relevant_source_paths":' + nested + ',"operator_context":[]}',
+        encoding="utf-8",
+    )
+    module = __import__(
+        "spec_dock_runtime.application.issue_planning",
+        fromlist=["PlanningCreateRequest", "run_issue_planning_create"],
+    )
+    backend_calls: list[object] = []
+    result = module.run_issue_planning_create(
+        dependencies=PLANNING_DEPENDENCIES,
+        request=module.PlanningCreateRequest("iss-00003", output, manifest),
+        records=[_record(issue_dir)],
+        repo_root=repo,
+        repo_slug_resolver=lambda _root: "owner/repo",
+        backend_invoker=lambda **kwargs: backend_calls.append(kwargs),
+    )
+
+    assert (result.status, result.reason) == ("rejected", "planning_context_rejected")
+    assert backend_calls == []
+
+
 def test_invalid_issue_id_rejections_keep_structured_result_contract(tmp_path: Path) -> None:
     module = __import__(
         "spec_dock_runtime.application.issue_planning",

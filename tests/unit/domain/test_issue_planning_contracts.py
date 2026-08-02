@@ -503,6 +503,22 @@ def test_human_decision_truth_table(decision, plan_adoption, implementation_star
             PlanningHumanDecisionV1(**kwargs)
 
 
+def test_human_decision_rejects_timestamp_that_cannot_be_normalized_to_utc() -> None:
+    identity = _archive_identity()
+    with pytest.raises(ValueError, match="UTC"):
+        PlanningHumanDecisionV1(
+            schema_version=1,
+            issue_id=identity.issue_id,
+            reviewed_identity=identity,
+            reviewed_identity_sha256=identity.sha256,
+            review_result_sha256="c" * 64,
+            decision="approved",
+            plan_adoption=True,
+            implementation_start=True,
+            decided_at="9999-12-31T23:59:59-23:59",
+        )
+
+
 def test_human_decision_binds_identity_and_exact_review_bytes() -> None:
     identity = _archive_identity()
     review = _review(identity=identity)

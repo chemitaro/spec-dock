@@ -2567,10 +2567,19 @@ def _install_operation_commit_cas(
             "        lock_metadata = head_lock.lstat()\n"
             "        if not stat.S_ISREG(lock_metadata.st_mode):\n"
             "            raise SystemExit(97)\n"
-            "        observed_update = payload.decode('ascii').strip()\n"
+            "        observed_updates = tuple(\n"
+            "            line for line in payload.decode('ascii').splitlines() if line\n"
+            "        )\n"
+            "        expected_branch_update = os.environ['SPECDOCK_EXPECTED_REF_UPDATE']\n"
+            "        expected_head_update = os.environ['SPECDOCK_EXPECTED_HEAD_UPDATE']\n"
             "        observed_head = head_path.read_bytes()\n"
             "        if (\n"
-            "            observed_update != os.environ['SPECDOCK_EXPECTED_REF_UPDATE']\n"
+            "            observed_updates\n"
+            "            not in (\n"
+            "                (expected_branch_update,),\n"
+            "                (expected_head_update, expected_branch_update),\n"
+            "                (expected_branch_update, expected_head_update),\n"
+            "            )\n"
             "            or observed_head != os.environ['SPECDOCK_EXPECTED_HEAD'].encode('ascii')\n"
             "        ):\n"
             "            raise SystemExit(97)\n"
@@ -2585,6 +2594,7 @@ def _install_operation_commit_cas(
         hook.chmod(0o700)
         environment = os.environ.copy()
         environment["SPECDOCK_EXPECTED_REF_UPDATE"] = f"{operation.expected_head} {local_commit} {destination}"
+        environment["SPECDOCK_EXPECTED_HEAD_UPDATE"] = f"{operation.expected_head} {local_commit} HEAD"
         environment["SPECDOCK_EXPECTED_HEAD"] = f"ref: {destination}\n"
         environment["SPECDOCK_HEAD_PATH"] = head_path.as_posix()
         if native_hook.is_file() and os.access(native_hook, os.X_OK):

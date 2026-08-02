@@ -60,6 +60,17 @@ def _write_context_files(repo_root: Path) -> None:
         target.write_text(f"content:{path}\n", encoding="utf-8")
 
 
+@pytest.mark.parametrize("issue_id", ["iss-local-00001", "iss-100000"])
+def test_authoring_output_expectation_accepts_canonical_issue_id_widths(issue_id: str) -> None:
+    expectation = issue_planning_prompt.authoring_output_expectation(
+        issue_id,
+        "artifacts/20260729t044600z-guide-new-member-chatgpt-first-issue-planning.md",
+    )
+
+    assert expectation.logical_filename == f"{issue_id}-issue-planning-documents.zip"
+    assert expectation.internal_root == f"{issue_id}-issue-planning-documents"
+
+
 def test_constraint_scan_accepts_transcript_marker_mentions_without_complete_turn_pair() -> None:
     fixtures = (
         "The term raw transcript names an evidence class.",

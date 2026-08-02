@@ -876,3 +876,27 @@ def test_unsafe_human_input_is_rejected_before_transaction(
         transaction_runner=lambda *_args, **_kwargs: pytest.fail("must not mutate"),
     )
     _assert_not_ready(result, ("rejected", "human_decision_rejected"))
+
+
+def test_unrepresentable_human_decision_timestamp_is_rejected_before_transaction(
+    tmp_path: Path,
+) -> None:
+    _, _, request, record = _run(tmp_path)
+    payload = json.loads(request.human_decision_path.read_bytes())
+    payload["decided_at"] = "9999-12-31T23:59:59-23:59"
+    request.human_decision_path.write_bytes(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(),
+    )
+
+    result = issue_planning.run_issue_planning_apply(
+        dependencies=PLANNING_DEPENDENCIES,
+        request=request,
+        records=[record],
+        repo_root=tmp_path / "repo",
+        repo_slug_resolver=lambda _root: "owner/repo",
+        validation_runner=lambda: None,
+        sync_runner=lambda: None,
+        transaction_runner=lambda *_args, **_kwargs: pytest.fail("must not mutate"),
+    )
+
+    _assert_not_ready(result, ("rejected", "human_decision_rejected"))

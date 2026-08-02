@@ -17,6 +17,7 @@ from spec_dock_runtime.domain.authoring_pack.authority_boundary import (
     private_absolute_path_finding,
     scan_constraint_sensitive_payload,
 )
+from spec_dock_runtime.domain.ids import normalize_id_input
 
 if TYPE_CHECKING:
     from spec_dock_runtime.domain.issue_planning_contracts import PlanningContext
@@ -48,9 +49,18 @@ class PlanningOutputExpectation:
 
     def __post_init__(self) -> None:
         if self.kind == "authoring_zip":
+            issue_id: str | None = None
+            if self.logical_filename:
+                stem = self.logical_filename.removesuffix("-issue-planning-documents.zip")
+                try:
+                    normalized = normalize_id_input(stem, prefix="iss", field="logical_filename")
+                except (RuntimeError, ValueError):
+                    normalized = None
+                if normalized == stem:
+                    issue_id = normalized
             if (
                 not self.logical_filename
-                or not re.fullmatch(r"iss-[0-9]{5}-issue-planning-documents\.zip", self.logical_filename)
+                or issue_id is None
                 or not self.internal_root
                 or self.internal_root != self.logical_filename.removesuffix(".zip")
                 or not self.onboarding_companion_path
