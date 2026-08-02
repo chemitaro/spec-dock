@@ -1035,9 +1035,7 @@ Projection:
 - `spec-dock/docs/reference_naming.md`
 - `spec-dock/docs/rules/root/artifacts.md`
 - S01〜S04で既にaccepted provider sourceに反映済みの変更がcandidate-wheel updateで管理対象へ投影される場合に限り、対応するrelative pathの`spec-dock/scripts/spec_dock_runtime/` mirror。これは新しいproduction repairではなく、originating stepのprovider-to-dogfood projection correctionとして記録する。provider sourceに新しい差分がなく、candidate updateがそのpathを出力しない場合はruntime mirrorを変更しない。
-- `tests/integration/test_epic_00343_distribution.py` は、S04のcandidate-wheel projectionが出力するdocs pathを`_S04_UPDATE_EXPECTED_STATUS`へ反映するstatus-manifest補正に限って許可する。S90で新しい挙動・assertion・test oracleを追加してはならず、S04 originating-stepのprojection receiptとして記録し、`dev-coder`への明示委任とS90/S99のcombined code/spec gateを要する。
-
-S04で実装・review済みのprovider sourceが、disposable consumerではcandidate-wheel updateによって投影される一方、チェックイン済みdogfood mirrorだけ古い場合、S90はその差分をprovider-firstのmanaged projection correctionとして取り込める。この場合、S90の変更一覧・EAL・reportでoriginating step、source commit、candidate updateのstatus manifest、production repair=falseを明記し、runtime behaviorの新規変更として扱わない。S90 pre-stepの「runtime mirror非該当」提案は、candidate updateの実測がこの条件を満たす場合は部分採用に留める。
+S04で実装・review済みのprovider sourceが、disposable consumerではcandidate-wheel updateによって投影される一方、チェックイン済みdogfood mirrorだけ古い場合、S90はその差分をprovider-firstのmanaged projection correctionとして取り込める。この場合、S90の変更一覧・EAL・reportでoriginating step、source commit、candidate updateの実測manifest、production repair=falseを明記し、runtime behaviorの新規変更として扱わない。期待statusのtest oracleをS90で先回りして固定してはならず、実際のcandidate update結果はS99の再現可能なテスト修復判断へ戻す。S90 pre-stepの「runtime mirror非該当」提案は、candidate updateの実測がこの条件を満たす場合は部分採用に留める。
 
 Evidence targets controlled by orchestrator:
 
@@ -1120,8 +1118,8 @@ Provider docs変更が不要なら、上記candidate-wheel-installed commandでd
 
 - **delegated role**: `doc-writer` for shipped provider docs; orchestrator owns report/EAL and projection command; `dev-coder` only if structural doc test code is required。
 - **inputs**: final S01〜S04 behavior/evidence、canonical R/D/P、accepted ADRs、current provider docs/help、Issue/Epic reports、workflow reporting contract。
-- **allowed paths**: §12.3 exact docs subset; projected counterparts via command; `tests/integration/test_epic_00343_distribution.py`のS04 status-manifest補正のみ; report paths by orchestrator only。
-- **forbidden paths**: 上記status-manifest補正以外のruntime/tests、assurance/profile、unrelated docs、canonical requirements/design/plan without amendment。
+- **allowed paths**: §12.3 exact docs subset; projected counterparts via command; report paths by orchestrator only。
+- **forbidden paths**: runtime/tests、status-manifestの先回り補正、assurance/profile、unrelated docs、canonical requirements/design/plan without amendment。
 - **acceptance**: docs/code/ADR parity、provider-first projection、Issue/Epic trace、no unsupported authority claim。
 - **verification**: inspect/search/link/token checks、update/diff/validate/sync、fresh docs/spec review。
 - **reviewer focus**: no-backfill clarity、privacy wording、Linux no fallback、macOS exclusion honesty、fast/full distinction、evidence-only language。
@@ -1193,6 +1191,10 @@ all planned closures を final candidate revision で再検証し、ordinary/ful
 #### Scope and allowed paths
 
 - tests and implementation already justified by closed steps
+- S99で実測されたfull-regression failureの再現に直接必要なtest-only/doc-parity修復:
+  - `tests/integration/test_epic_00343_distribution.py` の candidate update status manifest
+  - `tests/unit/infra/test_init_update.py` の現行docs契約・dogfooding snapshot
+  - provider-firstで対応する `src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md` と `spec-dock/docs/rules/root/artifacts.md`
 - target Issue `report.md`
 - parent Epic `report.md`
 - final bounded reviewer-finding repairs within `I346-CON-003`
