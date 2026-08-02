@@ -1266,3 +1266,10 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - current trigger boundaryのCodex reviewはP0=0、P1=0、P2=1（root test environmentでdescriptor capability testをroot実行時にskipする提案）だった。review本文はP2を明示的にnon-blockingとし、PR branchを更新する理由にしてはいけないと指定しているため、今回のP1修正へ再取り込みしない。
 - スクリプトのtop-level normalized statusは、current P2 threadと既存carryover unresolved threadsが残るため`human_gate`となったが、blocker policyは`non_blocking_only`でP0／P1 blockerは0件である。観測証跡は`artifacts/20260803t080000z-pr-351-observation-final-p1-abc-human-gate.json`で、SHA-256は`4f6b83b0a2cba7ea8d975c8bec11de35ec081eeaf253441b618527f62d13284d`である。
 - P2／carryoverの解消、merge、auto-merge、branch削除、Issue close、`issue finish`はこのIssueの完了条件や今回の修正範囲に含めず、HumanのPR判断へ委ねる。P1-A/B/Cについてはfresh Red PASS、CI success、provider／dogfood parity、ordinary／related testsがそろっている。
+
+## 2026-08-02 — ChatGPT Fast combined final quality gate PASS
+
+- `chatgpt-use` wrapperを用いたfresh read-only review `iss-334-final-quality-gate`を実行した。モデル選択は`requested=GPT-5.5 Instant`／`resolved=Instant5.5`／`status=switched`／`verified=yes`で、GitHub connectorは`chemitaro/spec-dock`、branch `iss-00334-implement-chatgpt-issue-planning-workflow`、PR #351、HEAD `569e0fd784d84fdad2a2f5b3811edf7c2a203732`を確認し、default-branch fallbackは使用しなかった。
+- `.github/agents/spec-reviewer.agent.md`、`code-reviewer.agent.md`、`qa-reviewer.agent.md`のDeveloper's Instructionを同一のcombined quality-gate promptへ束ね、Spec／Code／QAの3観点を独立に適用した。3つすべてが`review_status=pass`、findingsは空、P0=0、P1=0、combined `quality_gate.status=pass`となった。レビューは具体的な欠陥・契約不整合・検証不足に限定し、設計変更や任意の改善提案は行っていない。
+- 正式read-only証跡は`artifacts/20260802t004708z-pr-351-chatgpt-fast-final-three-perspective-quality-gate-pass.json`で、SHA-256は`b6bc54211b44a54133a9185a0af370eed516b8a311d1b2c16a51a7ceb72d728f`。combined promptのSHA-256は`6acae41fec3dc1691e4fdc9ac59b3ee01a4a5572ace835331a8a63be8ca729bb`である。ChatGPTはrepository、branch、PR、HEADを変更していない。
+- このquality gateで新たなP0／P1は発生しなかったため、provider／dogfoodコード、canonical三文書、テストへの追加修正は行わない。P2／carryover、merge、auto-merge、branch削除、Issue close、`issue finish`は従来どおりHuman gateへ委ねる。
