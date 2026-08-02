@@ -1426,3 +1426,11 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - Spec／Code／QAの三観点はすべて`review_status=pass`、findings空、quality gateは`status=PASS`、P0=0、P1=0だった。30c2以降の実装差分がreview／triage artifactsとappend-only reportだけであること、PlantUML observationがS10 Runtime structural validationとS12 PlantUML acceptanceの境界を越えるP1ではないこと、現行branchに新規の仕様矛盾・コード不具合・QA欠落がないことを確認した。P2／P3の任意提案、アーキテクチャ再設計、パッチ生成は採用していない。
 - 正式read-only成果物は`artifacts/20260802t063700z-chatgpt-fast-quality-gate-361a37dc-pass.json`で、SHA-256は`9cdab9a7bbfa69bc0384192a41d68064343d33d543a896e2946eae6de5c39220`、prompt SHA-256は`054c64c2c3939aac25db2140e8965fa4c1c526b48f60ef6d233afb338fb74a6d`である。ChatGPTはrepository、branch、Candidate、artifact、source、PR、Issueを変更していない。
 - 次はこのPASS証跡をcommit／pushし、current HEADのCIとPR状態を再確認する。P0／P1=0、CI success、branch／HEAD parityを確認できた場合、merge-readyのHuman handoffで停止する。merge、auto-merge、branch削除、Issue close、`issue finish`は行わない。
+
+## 2026-08-02 — 現行実装の新メンバー向け説明資料を追加
+
+- ChatGPT Fastへ、repository `chemitaro/spec-dock`、branch `iss-00334-implement-chatgpt-issue-planning-workflow`、PR #351、source HEAD `9ea4f1fee2b5180b6ec56ae8da2cc777b00b40d7`を明示し、Issueのcanonical三文書とprovider authorityの主要実装を参照させた。出力は日本語中心、識別子・コマンド・パスは正確なまま、PlantUML 3件とMermaid 2件を含む単一Markdownとした。
+- 正式artifactは`artifacts/20260802t114500z-guide-new-member-iss-00334-implementation-overview.md`である。SHA-256は`3ebc6803ae5231c6d7f0cfd8cd190b4eae25317b0132709b04a43ce1a217b962`。既存の旧source HEAD向けガイドは上書きせず、immutableな履歴として保持した。
+- ChatGPT Useのmodel evidenceは`requested=GPT-5.5 Instant`／`resolved=Instant5.5`／`verified=yes`、engineはbrowser、sessionは`iss-334-current-implementa-explanatio`、prompt SHA-256は`dfa22c38e7b0695b07130371d5615ea635c274b31dda86326b4e97b1ab1acde9`である。添付は10件でbrowser bundleを使用していない。
+- artifactの構造確認として、376行・19,197 bytes、PlantUML開始／終了3組、Mermaid fence 2件、`git diff --check`、`spec-dock validate`（nodes=227）を確認した。この資料作成セッションではpytest、build、PlantUML実行、実Oracle dogfoodを新規実行していないため、既存report／artifactの検証結果と独立再実行を混同しない。
+- 生成後の同一ChatGPT session follow-upを試みたが、Oracle側で元sessionを継続せず新規短文脈sessionが起動したため、未完了の再生成結果は採用していない。正式artifactは最初のexact-branch生成結果である。
