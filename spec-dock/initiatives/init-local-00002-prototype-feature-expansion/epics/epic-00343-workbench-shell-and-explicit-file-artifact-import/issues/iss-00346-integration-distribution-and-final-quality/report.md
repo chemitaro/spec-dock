@@ -399,6 +399,7 @@ The macOS cleanup uncertainty behavior is covered by the current-head hermetic p
 | remote executable/test HEAD | `8ef9aab38d92165e865a7336f2b385126e979da3`（一致） |
 | report-only successor before remediation | `4565f183`（`0c510e21` の後続。`report.md` のみ変更） |
 | fresh review target before remediation | `4565f183`（report-only successor、下記 Artifact は FAIL を記録） |
+| current evidence successor | `39ea603cee09a6340515959d1541869ffd53cf9b`（report + fresh-review Artifact のみ。executable/test inputsは不変） |
 | working tree | executable/test evidence commit時点は clean（Artifact/report更新中の一時差分を除く） |
 | candidate wheel | `spec_dock-0.2.3-py3-none-any.whl` |
 | wheel SHA-256 / size | `7fba9d9c90322d4f996c1c3ac843d23959bafbe239af9f13ef3e3528530df593` / 967,319 bytes |
@@ -434,7 +435,7 @@ The fixtures are imported through the projected public `artifact import file` co
 | `tests/cli_runtime/test_runtime_new_doc_s09.py -k artifact` (6 collected nodes) | 6 passed / 0.24s |
 | `tests/unit/application/test_import_file_artifact.py tests/unit/presentation/test_artifact_import_file.py` | 34 passed / 0.27s |
 | `tests/integration/test_epic_00343_distribution.py -k 'dogfood or opaque or compatibility'` | 2 passed / 17.40s |
-| full integration distribution file | `8ef9aab38d92165e865a7336f2b385126e979da3`後のclean worktreeで再実行予定（既知の自己検査を含む） |
+| full integration distribution file | 13 passed / 33.68s（`39ea603cee09a6340515959d1541869ffd53cf9b`のclean worktree） |
 
 No existing public filename, result field, selector, digest/count contract, or Workbench source-wins expectation was changed. Shared-slot concurrency now includes generic import versus a legacy blank creator under a fixed clock; both outputs receive distinct slots and preserve the sentinel/source bytes.
 
@@ -483,7 +484,7 @@ The no-backfill negative injects the forbidden Epic README in the disposable che
 
 | Role | Changed paths | Verification | Parent integration decision |
 |---|---|---|---|
-| `dev-coder` | `tests/cli_runtime/test_artifact_import_s04.py`, `tests/integration/test_epic_00343_distribution.py` | S04 27 passed; dogfood 2 passed; compatibility 29 passed; nearest artifact 6 passed; units 34 passed; full integration clean rerun pending; ruff/diff-check pass | accepted; test-only remediation, no material production decision beyond approved plan |
+| `dev-coder` | `tests/cli_runtime/test_artifact_import_s04.py`, `tests/integration/test_epic_00343_distribution.py` | S04 27 passed; dogfood 2 passed; compatibility 29 passed; nearest artifact 6 passed; units 34 passed; full integration 13 passed / 33.68s; ruff/diff-check pass | accepted; test-only remediation, no material production decision beyond approved plan |
 
 #### S04 ChatGPT Pro review gates
 
