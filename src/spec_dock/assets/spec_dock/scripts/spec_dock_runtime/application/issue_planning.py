@@ -1917,7 +1917,7 @@ def _source_evidence_is_current(
                 expected_source_hash=evidence.source_manifest_hash,
             )
         )
-    except (OSError, ValueError):
+    except Exception:
         return False
     if preflight.status != "pass" or preflight.repository is None:
         return False
@@ -1943,19 +1943,34 @@ def _review_publication_is_current(
     candidate: VerifiedIssueCandidateView | None,
     candidate_loader: Callable[[Path, Path], VerifiedIssueCandidateView],
 ) -> bool:
-    if candidate is not None and candidate_path is not None:
-        try:
-            current = candidate_loader(candidate_path, repo_root)
-        except (IssuePlanningCandidateArchiveRejected, OSError, ValueError):
-            return False
-        if current.identity != candidate.identity or current.zip_bytes != candidate.zip_bytes:
-            return False
-    return _source_evidence_is_current(
+    if candidate is None or candidate_path is None:
+        return _source_evidence_is_current(
+            target=target,
+            relevant_source_paths=relevant_source_paths,
+            repo_root=repo_root,
+            evidence=evidence,
+            preflight_runner=preflight_runner,
+        )
+    if not _candidate_view_is_current(
+        candidate=candidate,
+        candidate_path=candidate_path,
+        repo_root=repo_root,
+        candidate_loader=candidate_loader,
+    ):
+        return False
+    if not _source_evidence_is_current(
         target=target,
         relevant_source_paths=relevant_source_paths,
         repo_root=repo_root,
         evidence=evidence,
         preflight_runner=preflight_runner,
+    ):
+        return False
+    return _candidate_view_is_current(
+        candidate=candidate,
+        candidate_path=candidate_path,
+        repo_root=repo_root,
+        candidate_loader=candidate_loader,
     )
 
 
@@ -1969,19 +1984,41 @@ def _revision_publication_is_current(
     source_evidence: PlanningSourceEvidence,
     preflight_runner: Callable[[GitHubSyncPreflightRequest], PreflightResult],
 ) -> bool:
-    try:
-        current = current_candidate_loader(candidate_path, repo_root)
-    except (IssuePlanningCandidateArchiveRejected, OSError, ValueError):
+    if not _candidate_view_is_current(
+        candidate=candidate,
+        candidate_path=candidate_path,
+        repo_root=repo_root,
+        candidate_loader=current_candidate_loader,
+    ):
         return False
-    if current.identity != candidate.identity or current.zip_bytes != candidate.zip_bytes:
-        return False
-    return _source_evidence_is_current(
+    if not _source_evidence_is_current(
         target=target,
         relevant_source_paths=tuple(cast("Sequence[str]", candidate.source_baseline.get("relevant_paths", ()))),
         repo_root=repo_root,
         evidence=source_evidence,
         preflight_runner=preflight_runner,
+    ):
+        return False
+    return _candidate_view_is_current(
+        candidate=candidate,
+        candidate_path=candidate_path,
+        repo_root=repo_root,
+        candidate_loader=current_candidate_loader,
     )
+
+
+def _candidate_view_is_current(
+    *,
+    candidate: VerifiedIssueCandidateView,
+    candidate_path: Path,
+    repo_root: Path,
+    candidate_loader: Callable[[Path, Path], VerifiedIssueCandidateView],
+) -> bool:
+    try:
+        current = candidate_loader(candidate_path, repo_root)
+    except Exception:
+        return False
+    return current.identity == candidate.identity and current.zip_bytes == candidate.zip_bytes
 
 
 def _read_external_bounded_file(

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 from typing import TYPE_CHECKING, Literal
 
 from spec_dock_runtime.domain.authoring_pack.authority_boundary import (
@@ -180,8 +183,12 @@ def synthesize_issue_planning_prompt(
     relevant_bytes = 0
     for relative in sorted(set(paths), key=lambda item: item.encode("utf-8")):
         is_relevant = relative in context.relevant_source_paths
-        target = _safe_source_file(root, relative)
-        raw = target.read_bytes()
+        _safe_source_file(root, relative)
+        raw = _read_source_file_descriptor_relative(
+            root,
+            relative,
+            max_bytes=(MAX_RELEVANT_FILE_BYTES if is_relevant else None),
+        )
         if is_relevant:
             relevant_bytes += len(raw)
             if len(raw) > MAX_RELEVANT_FILE_BYTES or relevant_bytes > MAX_RELEVANT_TOTAL_BYTES:
@@ -382,6 +389,70 @@ def _safe_source_file(root: Path, relative: str) -> Path:
     if not resolved.is_relative_to(root) or not resolved.is_file():
         raise ValueError("relevant source path is outside repository or not a file")
     return resolved
+
+
+def _read_source_file_descriptor_relative(
+    root: Path,
+    relative: str,
+    *,
+    max_bytes: int | None,
+) -> bytes:
+    required_flags = ("O_DIRECTORY", "O_NOFOLLOW", "O_CLOEXEC", "O_NONBLOCK")
+    if any(not getattr(os, name, 0) for name in required_flags) or not getattr(os, "supports_dir_fd", ()):
+        raise ValueError("repository descriptor reads are unavailable")
+    path = PurePosixPath(relative)
+    parts = path.parts
+    if not parts:
+        raise ValueError("relevant source path is unsafe")
+    root_before = root.lstat()
+    if not stat.S_ISDIR(root_before.st_mode):
+        raise ValueError("repository root is not a directory")
+    root_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    descriptor_fds: list[int] = []
+    try:
+        root_fd = os.open(root, root_flags)
+        descriptor_fds.append(root_fd)
+        root_opened = os.fstat(root_fd)
+        root_after = root.lstat()
+        root_identity = (root_before.st_dev, root_before.st_ino, root_before.st_mode)
+        if (root_opened.st_dev, root_opened.st_ino, root_opened.st_mode) != root_identity or (
+            root_after.st_dev,
+            root_after.st_ino,
+            root_after.st_mode,
+        ) != root_identity:
+            raise ValueError("repository root identity changed")
+
+        parent_fd = root_fd
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+        for part in parts[:-1]:
+            parent_fd = os.open(part, directory_flags, dir_fd=parent_fd)
+            descriptor_fds.append(parent_fd)
+        final_flags = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC
+        final_fd = os.open(parts[-1], final_flags, dir_fd=parent_fd)
+        descriptor_fds.append(final_fd)
+        final_status = os.fstat(final_fd)
+        if not stat.S_ISREG(final_status.st_mode):
+            raise ValueError("relevant source path is not a regular file")
+        return _read_descriptor_bytes(final_fd, max_bytes=max_bytes)
+    except (OSError, TypeError):
+        raise ValueError("relevant source path is unavailable") from None
+    finally:
+        for descriptor in reversed(descriptor_fds):
+            with suppress(OSError):
+                os.close(descriptor)
+
+
+def _read_descriptor_bytes(descriptor: int, *, max_bytes: int | None) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = os.read(descriptor, 64 * 1024)
+        if not chunk:
+            return b"".join(chunks)
+        total += len(chunk)
+        if max_bytes is not None and total > max_bytes:
+            raise ValueError("relevant source bytes exceed bounded limit")
+        chunks.append(chunk)
 
 
 def _reject_sensitive(text: str) -> None:

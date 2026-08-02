@@ -210,6 +210,70 @@ def test_synthesize_prompt_is_deterministic_and_contains_source_identity(tmp_pat
     assert first.attachments == tuple(sorted(first.attachments, key=lambda item: item[0].encode("utf-8")))
 
 
+def test_prompt_source_ancestor_swap_fails_closed_without_outside_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_context_files(tmp_path)
+    issue_directory = tmp_path / "spec-dock" / "initiatives" / "i" / "epics" / "e" / "issues" / "x"
+    owned_directory = tmp_path / "owned-issue"
+    outside_directory = tmp_path.parent / "outside-issue"
+    outside_directory.mkdir()
+    (outside_directory / "requirement.md").write_bytes(b"OUTSIDE-SENTINEL")
+    original_safe_source_file = issue_planning_prompt._safe_source_file
+    swapped = False
+
+    def swap_ancestor_after_validation(root: Path, relative: str) -> Path:
+        nonlocal swapped
+        result = original_safe_source_file(root, relative)
+        if not swapped and relative.endswith("/requirement.md"):
+            issue_directory.rename(owned_directory)
+            issue_directory.symlink_to(outside_directory, target_is_directory=True)
+            swapped = True
+        return result
+
+    monkeypatch.setattr(issue_planning_prompt, "_safe_source_file", swap_ancestor_after_validation)
+    with pytest.raises(ValueError) as captured:
+        issue_planning_prompt.synthesize_issue_planning_prompt(
+            role="planner",
+            context=_context(),
+            repo_root=tmp_path,
+            upstream="origin/feature/issue",
+            remote_head="a" * 40,
+        )
+
+    assert swapped
+    assert b"OUTSIDE-SENTINEL" not in str(captured.value).encode()
+
+
+def test_prompt_source_descriptor_read_preserves_names_order_and_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_context_files(tmp_path)
+    expected = {
+        relative: (tmp_path / relative).read_bytes()
+        for relative in (*_context().canonical_issue_paths, *_context().relevant_source_paths)
+    }
+
+    def reject_pathname_read(_path: Path) -> bytes:
+        raise AssertionError("prompt source used pathname read")
+
+    monkeypatch.setattr(Path, "read_bytes", reject_pathname_read)
+    synthesized = issue_planning_prompt.synthesize_issue_planning_prompt(
+        role="planner",
+        context=_context(),
+        repo_root=tmp_path,
+        upstream="origin/feature/issue",
+        remote_head="a" * 40,
+    )
+
+    assert tuple(path for path, _ in synthesized.attachments) == tuple(
+        sorted(expected, key=lambda value: value.encode("utf-8"))
+    )
+    assert {path: content.encode("utf-8") for path, content in synthesized.attachments} == expected
+
+
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
