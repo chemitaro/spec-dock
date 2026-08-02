@@ -1,0 +1,52 @@
+{
+"reviewed_identity": {
+"repository": "chemitaro/spec-dock",
+"branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+"pull_request": 351,
+"reviewed_head": "ceb775deb2ecedf54dd2e08fa278bd29c60a9e32",
+"head_match": true,
+"default_branch_fallback": false,
+"repository_access": "pass"
+},
+"spec_review": {
+"findings": [
+{
+"title": "[P2] Align the public create syntax with --context-manifest",
+"body": "`planning create` now exposes and documents `--context-manifest`, but Design §2 still defines the public create syntax with only `--issue` and `--output`, while Plan §5 requires command arguments and the public interface to match Design §2. The implementation is aligned with the requirement to carry relevant source and operator context, so this does not block the A/B/C repair, but the canonical Design and Plan should record the bounded option, or explicitly state that the command synopsis is non-exhaustive, to restore contract auditability.",
+"confidence_score": 0.98,
+"priority": 2,
+"artifact_location": {
+"absolute_file_path": "/chemitaro/spec-dock/spec-dock/initiatives/init-00322-gpt-5-6-chatgpt-first-intelligence-architecture/epics/epic-00331-planning-and-advisory-review/issues/iss-00334-implement-chatgpt-issue-planning-workflow/design.md",
+"section_or_line": "§2 Public Commands, lines 73-108"
+}
+}
+],
+"review_scope_summary": "Reviewed the bounded P1-A/B/C remediation at exact pushed HEAD ceb775deb2ecedf54dd2e08fa278bd29c60a9e32 against the canonical Requirement, Design, Plan, prior triage evidence, changed provider and dogfood surfaces, tests, and PR diff. Repository, branch, PR head, and provider/dogfood projection identities were independently confirmed through GitHub without default-branch fallback.",
+"review_status": "pass",
+"review_status_reason": "The three blocking defects are consistently addressed and no P0/P1 specification defect remains. The public-command documentation mismatch is a concrete but non-blocking P2 correction for the next canonical document revision.",
+"overall_confidence_score": 0.98
+},
+"code_review": {
+"findings": [],
+"overall_correctness": "patch is correct",
+"overall_explanation": "Reviewed the single remediation commit from b03a41bc4dcd19b3d999c3aec870032d973e130a to ceb775deb2ecedf54dd2e08fa278bd29c60a9e32 for HTTP(S) userinfo rejection and redaction, Candidate canonical-document revalidation, and bounded context-manifest forwarding. The affected provider and dogfood blobs match, the unsafe paths fail closed, and no concrete correctness, security, or reliability regression remains.",
+"review_status": "pass",
+"review_status_reason": "P1-A, P1-B, and P1-C are closed by the reviewed implementation, with no priority 0, priority 1, indeterminate, or otherwise actionable code finding.",
+"overall_confidence_score": 0.98
+},
+"qa_review": {
+"findings": [],
+"overall_correctness": "patch is correct",
+"overall_explanation": "The regression suite covers credential-bearing fetch and push endpoints with diagnostic redaction, malformed canonical documents whose controls are recomputed, CLI request forwarding, bounded external manifest loading, and the existing prompt path, sensitivity, size, and symlink gates. Exact-head Provider CI passed static analysis and the full pytest lane with 1406 passed and 2239 skipped, and the separate workspace validation workflow also passed.",
+"review_status": "pass",
+"review_status_reason": "The tests provide meaningful regression protection for all three repaired failure modes, and no missing high-value scenario or misleading test meets the finding threshold.",
+"overall_confidence_score": 0.98
+},
+"quality_gate": {
+"blocking_findings": 0,
+"p0_count": 0,
+"p1_count": 0,
+"status": "pass",
+"reason": "All three nested review_status values are pass and no nested finding has priority 0 or 1; the specification-only P2 finding is non-blocking under the gate rule."
+}
+}
