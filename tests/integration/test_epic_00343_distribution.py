@@ -334,11 +334,7 @@ def _s03_import_owned_public_files(target: Path, destination: Path) -> tuple[Pat
     reports, and wheel receipts are outside this oracle's authority boundary.
     """
     public_root = target / "spec-dock" / ".agent"
-    paths = {
-        path
-        for path in public_root.rglob("*")
-        if path.is_file()
-    }
+    paths = {path for path in public_root.rglob("*") if path.is_file()}
     tracked = subprocess.run(
         ["git", "ls-files", "-z"],
         cwd=target,
@@ -358,11 +354,7 @@ def _s03_import_owned_public_files(target: Path, destination: Path) -> tuple[Pat
 
 def _flatten_s03_public_values(value: object) -> tuple[str, ...]:
     if isinstance(value, dict):
-        return tuple(
-            item
-            for key, nested in value.items()
-            for item in (str(key), *_flatten_s03_public_values(nested))
-        )
+        return tuple(item for key, nested in value.items() for item in (str(key), *_flatten_s03_public_values(nested)))
     if isinstance(value, (list, tuple, set, frozenset)):
         return tuple(item for nested in value for item in _flatten_s03_public_values(nested))
     return (str(value),)
@@ -490,9 +482,7 @@ def _snapshot_tree(root: Path) -> FileSnapshot:
     if not root.is_dir():
         return ()
     return tuple(
-        (path.relative_to(root).as_posix(), path.read_bytes())
-        for path in sorted(root.rglob("*"))
-        if path.is_file()
+        (path.relative_to(root).as_posix(), path.read_bytes()) for path in sorted(root.rglob("*")) if path.is_file()
     )
 
 
@@ -591,11 +581,7 @@ def _existing_readme_paths(target: Path) -> tuple[Path, ...]:
 
 
 def _assert_existing_fixture_preflight(consumer: ExistingConsumer) -> None:
-    present = [
-        path.relative_to(consumer.target).as_posix()
-        for path in consumer.existing_readmes
-        if path.exists()
-    ]
+    present = [path.relative_to(consumer.target).as_posix() for path in consumer.existing_readmes if path.exists()]
     assert not present, f"existing consumer fixture has preexisting README: {present}"
     assert consumer.payload_before == (
         True,
@@ -634,9 +620,7 @@ def _prepare_existing_consumer(candidate_wheel: CandidateWheel, suffix: str) -> 
         result = _run_installed_runtime(candidate_wheel.venv_python, target, args, env=env)
         assert result.returncode == 0, result.stdout + result.stderr
 
-    existing_nodes = tuple(
-        _find_node(target, node_id) for node_id in ("init-00401", "epic-00402", "iss-00403")
-    )
+    existing_nodes = tuple(_find_node(target, node_id) for node_id in ("init-00401", "epic-00402", "iss-00403"))
     existing_readmes = _existing_readme_paths(target)
     for readme in existing_readmes:
         assert readme.is_file(), f"synthetic consumer did not create expected README: {readme}"
@@ -958,11 +942,7 @@ def test_tc_346_s02_002_existing_consumer_update_preserves_data_without_backfill
 
     before = dict(consumer.managed_before)
     after = dict(_snapshot_managed_assets(consumer.target))
-    changed_paths = sorted(
-        path
-        for path in set(before) | set(after)
-        if before.get(path) != after.get(path)
-    )
+    changed_paths = sorted(path for path in set(before) | set(after) if before.get(path) != after.get(path))
     assert changed_paths == ["docs/guide.md"]
 
 
@@ -1105,11 +1085,13 @@ def test_tc_346_s03_002_external_and_nested_cwd_privacy(candidate_wheel: Candida
         assert result.returncode == 0, result.stdout + result.stderr
         payload: object | None = None
         if output_mode == "json":
-            payload = json.loads(result.stdout)
-            _assert_s03_json_payload(payload, target_kind=target_kind, target_id=target_id)
-            assert payload["source_visibility"] == "basename_only"
-            assert payload["source"] == source.name
-            destination = target / str(payload["destination"])
+            decoded = json.loads(result.stdout)
+            assert isinstance(decoded, dict)
+            payload = decoded
+            _assert_s03_json_payload(decoded, target_kind=target_kind, target_id=target_id)
+            assert decoded["source_visibility"] == "basename_only"
+            assert decoded["source"] == source.name
+            destination = target / str(decoded["destination"])
         else:
             assert f'source="{source.name}"' in result.stdout
             assert "canonical=true" not in result.stdout

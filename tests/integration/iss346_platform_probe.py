@@ -197,11 +197,11 @@ def _linux_supported_publication(probe: str) -> int:
     visible_stages: list[str] = []
     commit_names: list[str] = []
     publisher = publisher_module.FilesystemBinaryArtifactPublisher(
-        fault_injector=lambda point: visible_stages.extend(
-            path.name for path in workspace.glob(".spec-dock-import-*")
+        fault_injector=lambda point: (
+            visible_stages.extend(path.name for path in workspace.glob(".spec-dock-import-*"))
+            if point == "before_publication"
+            else None
         )
-        if point == "before_publication"
-        else None
     )
     original_publish = publisher._publish_no_replace
 

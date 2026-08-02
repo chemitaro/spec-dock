@@ -164,8 +164,13 @@ def _normalize_top_level_generated_at(content: bytes) -> bytes:
 def test_tc_346_s04_projection_snapshot_preserves_raw_json_except_generated_at() -> None:
     raw = b'{\n  "nested": { "generated_at": "inner" },\n  "b": 2,\n  "generated_at" : "2026-07-14T01:02:03Z"\n}\n'
     normalized = _normalize_top_level_generated_at(raw)
-    assert normalized == b'{\n  "nested": { "generated_at": "inner" },\n  "b": 2,\n  "generated_at" : "<generated_at>"\n}\n'
-    reordered = b'{\n  "generated_at" : "2026-07-14T01:02:03Z",\n  "nested": { "generated_at": "inner" },\n  "b": 2\n}\n'
+    assert (
+        normalized
+        == b'{\n  "nested": { "generated_at": "inner" },\n  "b": 2,\n  "generated_at" : "<generated_at>"\n}\n'
+    )
+    reordered = (
+        b'{\n  "generated_at" : "2026-07-14T01:02:03Z",\n  "nested": { "generated_at": "inner" },\n  "b": 2\n}\n'
+    )
     assert _normalize_top_level_generated_at(reordered) != normalized
 
 
@@ -272,24 +277,22 @@ class TestArtifactImportS04(CliRuntimeHarness):
         [issue_dir] = list((target / "spec-dock" / "initiatives").rglob("iss-00317-opaque-lifecycle"))
         baseline_adr = issue_dir / "artifacts" / "20260713t010203z-adr-baseline.md"
         baseline_adr.write_text(
-            "\n".join(
-                (
-                    "---",
-                    "\u7a2e\u5225: ADR\uff08Architecture Decision Record\uff09",
-                    'ID: "20260713t010203z-adr"',
-                    'タイトル: "Baseline"',
-                    '状態: "accepted"',
-                    '作成者: "Tester"',
-                    '最終更新: "2026-07-13"',
-                    '親: ["iss-00317"]',
-                    'authority: "accepted"',
-                    "mirror_eligible: true",
-                    "---",
-                    "",
-                    "# Baseline",
-                    "",
-                )
-            ),
+            "\n".join((
+                "---",
+                "\u7a2e\u5225: ADR\uff08Architecture Decision Record\uff09",
+                'ID: "20260713t010203z-adr"',
+                'タイトル: "Baseline"',
+                '状態: "accepted"',
+                '作成者: "Tester"',
+                '最終更新: "2026-07-13"',
+                '親: ["iss-00317"]',
+                'authority: "accepted"',
+                "mirror_eligible: true",
+                "---",
+                "",
+                "# Baseline",
+                "",
+            )),
             encoding="utf-8",
         )
         self._run_runtime(target, ["active", "set", "--id", "iss-00317"])
@@ -309,20 +312,18 @@ class TestArtifactImportS04(CliRuntimeHarness):
         nul_bearing.write_bytes(b"S04 NUL body\x00sentinel")
         adr_looking = sources_dir / "accepted-adr-looking.md"
         adr_looking.write_text(
-            "\n".join(
-                (
-                    "---",
-                    "\u7a2e\u5225: ADR\uff08Architecture Decision Record\uff09",
-                    'ID: "s04-generic-adr-looking"',
-                    '\u89aa: ["iss-00317"]',
-                    'authority: "accepted"',
-                    "mirror_eligible: true",
-                    "---",
-                    "",
-                    "# This body remains opaque",
-                    "",
-                )
-            ),
+            "\n".join((
+                "---",
+                "\u7a2e\u5225: ADR\uff08Architecture Decision Record\uff09",
+                'ID: "s04-generic-adr-looking"',
+                '\u89aa: ["iss-00317"]',
+                'authority: "accepted"',
+                "mirror_eligible: true",
+                "---",
+                "",
+                "# This body remains opaque",
+                "",
+            )),
             encoding="utf-8",
         )
         return issue_dir, (binary, archive, invalid_utf8, nul_bearing, adr_looking)
@@ -967,7 +968,15 @@ class TestArtifactImportS04(CliRuntimeHarness):
                 build_context_pack_text,
                 load_active_manifest,
             ) = _lifecycle_modules()
-            _import_module, _ArtifactImportError, _ArtifactImportRequest, _CreateArtifactDocRequest, _Ports, bootstrap, _Publisher = _runtime_modules()
+            (
+                _import_module,
+                _ArtifactImportError,
+                _ArtifactImportRequest,
+                _CreateArtifactDocRequest,
+                _Ports,
+                bootstrap,
+                _Publisher,
+            ) = _runtime_modules()
             specdock_dir = target / "spec-dock"
             context = bootstrap.build_runtime(specdock_dir, repo_root=target)
             generic_paths = {path.absolute() for path in destinations}
