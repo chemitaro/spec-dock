@@ -147,6 +147,33 @@ def test_metadata_identity_and_integrity_fail_closed(tmp_path: Path, failure: st
         )
 
 
+def test_metadata_oversized_integer_is_rejected_at_json_boundary(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    zip_path = session / "artifacts" / "candidate.zip"
+    _write_zip(zip_path)
+    entry = _artifact("file", zip_path)
+    metadata = (
+        '{"id":'
+        + json.dumps(session.name)
+        + ',"status":"completed","mode":"browser","oversized":'
+        + ("9" * 5000)
+        + ',"artifacts":'
+        + json.dumps([entry], separators=(",", ":"))
+        + "}"
+    )
+    (session / "meta.json").write_text(metadata, encoding="utf-8")
+
+    with pytest.raises(artifact_reader.OracleArtifactError) as error:
+        artifact_reader.snapshot_authoring_zip(
+            session,
+            session_id=session.name,
+            oracle_version="0.16.1",
+            staging_dir=tmp_path / "staging",
+        )
+
+    assert error.value.code == "oracle_artifact_rejected"
+
+
 @pytest.mark.parametrize("failure", ["source-mutation", "staging-rehash"])
 def test_snapshot_rejects_mutation_or_staging_rehash(
     monkeypatch,

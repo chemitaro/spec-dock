@@ -62,6 +62,7 @@ from spec_dock_runtime.presentation.issue_planning import render_planning_review
 
 MAX_REVIEW_SOURCE_FILE_BYTES = 2_000_000
 MAX_REVIEW_SOURCE_TOTAL_BYTES = 10_000_000
+_INVALID_ISSUE_ID = "iss-00000"
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -122,6 +123,13 @@ class ExistingIssueTarget:
     parent_epic_id: str
     parent_initiative_id: str
     canonical_issue_paths: tuple[str, str, str]
+
+
+def _result_issue_id(value: str) -> str:
+    try:
+        return normalize_id_input(value, prefix="iss", field="issue")
+    except (AttributeError, RuntimeError, ValueError):
+        return _INVALID_ISSUE_ID
 
 
 def resolve_existing_issue_target(
@@ -219,7 +227,7 @@ def run_issue_planning_apply(
     candidate_loader = candidate_loader or gateway.load_verified_issue_candidate
     expected_target_loader = expected_target_loader or gateway.load_expected_planning_targets
     resume_probe = resume_probe or gateway.planning_apply_resume_available
-    issue_id = request.issue_id
+    issue_id = _result_issue_id(request.issue_id)
     try:
         target = resolve_existing_issue_target(request.issue_id, records, repo_root)
     except ValueError:
@@ -855,7 +863,7 @@ def run_issue_planning_create(
         return PlanningCommandResult(
             status="rejected",
             reason="planning_context_rejected",
-            issue_id=request.issue_id,
+            issue_id=_result_issue_id(request.issue_id),
         )
     try:
         output_guard = gateway.validate_candidate_output_directory(request.output_dir, repo_root)
@@ -1076,11 +1084,12 @@ def run_issue_planning_review(
     candidate_loader = candidate_loader or gateway.load_verified_issue_candidate
     publisher = publisher or gateway.publish_planning_review_evidence
     clock = clock or dependencies.clock.now_iso
+    result_issue_id = _result_issue_id(request.issue_id)
     if request.mode == "git-bound" and request.candidate_path is None:
         return PlanningCommandResult(
             status="rejected",
             reason="operation_candidate_required",
-            issue_id=request.issue_id,
+            issue_id=result_issue_id,
         )
     repository_descriptor: int | None = None
     try:
@@ -1107,14 +1116,14 @@ def run_issue_planning_review(
         return PlanningCommandResult(
             status="rejected",
             reason=("operation_binding_rejected" if request.mode == "git-bound" else "archive_rejected"),
-            issue_id=request.issue_id,
+            issue_id=result_issue_id,
             details=error.findings,
         )
     except (OSError, UnicodeError, ValueError):
         return PlanningCommandResult(
             status="rejected",
             reason="review_request_rejected",
-            issue_id=request.issue_id,
+            issue_id=result_issue_id,
         )
 
     captured_identity: list[ReviewedPlanningIdentity] = []
@@ -1404,7 +1413,7 @@ def run_issue_planning_revise(
     authoring_loader = authoring_loader or gateway.load_validated_issue_authoring_payload
     publisher = publisher or gateway.build_and_publish_candidate
     clock = clock or dependencies.clock.now_iso
-    issue_id = "iss-00000"
+    issue_id = _INVALID_ISSUE_ID
     try:
         candidate = candidate_loader(request.candidate_path, repo_root)
         issue_id = candidate.identity.issue_id

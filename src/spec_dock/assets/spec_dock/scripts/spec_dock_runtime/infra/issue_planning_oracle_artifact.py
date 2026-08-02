@@ -192,7 +192,7 @@ def _read_metadata(
     )
     try:
         value = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, ValueError):
         raise OracleArtifactError("oracle_artifact_rejected") from None
     if not isinstance(value, dict) or value.get("id") != session_id:
         raise OracleArtifactError("oracle_artifact_rejected")
