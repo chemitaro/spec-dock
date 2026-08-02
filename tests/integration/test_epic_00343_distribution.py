@@ -45,6 +45,8 @@ _STALE_WHEEL_PATTERNS = (
 )
 _S04_MANAGED_PROJECTION_ROOTS = ("docs", "templates", "scripts", "system")
 _S04_UPDATE_EXPECTED_STATUS = {
+    "spec-dock/docs/README.md",
+    "spec-dock/docs/guide.md",
     "spec-dock/scripts/spec_dock_runtime/application/import_file_artifact.py",
     "spec-dock/scripts/spec_dock_runtime/domain/artifacts.py",
 }
