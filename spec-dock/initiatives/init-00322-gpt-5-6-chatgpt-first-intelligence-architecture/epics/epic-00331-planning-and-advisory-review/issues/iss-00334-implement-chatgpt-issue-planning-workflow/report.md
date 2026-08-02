@@ -1259,3 +1259,10 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - P1-AはReview／semantic revisionの両方でCandidate初回検証→source preflight→Candidate再検証、identity／exact ZIP drift、loader／preflight exceptionのfail-closedを確認した。P1-Bはroot／ancestor descriptor-relative no-follow traversal、regular-file／bounded read、capability不在fail-closed、outside bytes不混入、attachment names/order/bytes維持を確認した。P1-Cはsame identity／ctime replacementを含むrules link rollbackでdestructive unlinkがなく、既存setup failure envelope、normal positive、他のsafe rollbackを維持することを確認した。
 - provider／dogfood blob parity、focused tests、canonical契約、public mapping/schema、Oracle boundary、P2 blocker vocabularyの除外を確認し、P0=0、P1=0、overall `PASS`となった。正式read-only成果物は`artifacts/20260803t070000z-pr-351-red-final-p1-abc-review-pass.md`で、SHA-256は`9d440d47d29c5852921120fa8b5c65570bdc6dcf6ed4f85191c03f171a32743a`である。
 - 次のgateはこのPASS証跡のcommit／push、PR #351のcurrent-head observation／CI確認、merge-ready状態の再確認である。merge、auto-merge、branch削除、Issue close、`issue finish`は行わない。
+
+## 2026-08-03 — Final PR observation: CI success, no current P0/P1
+
+- 最終commit `02ec9d569f6a41f15abfc52ea16fb050a3838333`をheadに固定して`wait_pr_observation.sh`を`post-once`実行した。GitHub Actions／Provider CIは3 runすべてsuccessで、head matchも確認された。
+- current trigger boundaryのCodex reviewはP0=0、P1=0、P2=1（root test environmentでdescriptor capability testをroot実行時にskipする提案）だった。review本文はP2を明示的にnon-blockingとし、PR branchを更新する理由にしてはいけないと指定しているため、今回のP1修正へ再取り込みしない。
+- スクリプトのtop-level normalized statusは、current P2 threadと既存carryover unresolved threadsが残るため`human_gate`となったが、blocker policyは`non_blocking_only`でP0／P1 blockerは0件である。観測証跡は`artifacts/20260803t080000z-pr-351-observation-final-p1-abc-human-gate.json`で、SHA-256は`4f6b83b0a2cba7ea8d975c8bec11de35ec081eeaf253441b618527f62d13284d`である。
+- P2／carryoverの解消、merge、auto-merge、branch削除、Issue close、`issue finish`はこのIssueの完了条件や今回の修正範囲に含めず、HumanのPR判断へ委ねる。P1-A/B/Cについてはfresh Red PASS、CI success、provider／dogfood parity、ordinary／related testsがそろっている。
