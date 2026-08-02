@@ -1317,3 +1317,18 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - Spec／Code／QAの3観点はすべて`review_status=pass`、quality gateは`status=pass`、P0=0、P1=0だった。Spec観点では公開コマンド記述へ`--context-manifest`を追記するP2が1件だけ示されたが、今回のP1-A/B/C修正のブロッカーではなく、任意の設計拡張として採用しない。Code／QAにはblocking findingがない。
 - 正式read-only成果物は`artifacts/20260802t023400z-chatgpt-gpt56-final-three-perspective-quality-gate-p1-abc-pass.json`で、SHA-256は`934d1970162b5b7bbf809eab7cb6d19fe648e1bc177859cea012269a2c995fc1`である。ChatGPTはrepository、branch、PR、Candidate、canonical三文書、artifactを変更していない。
 - 次はこのPASS証跡をcommit／pushし、同じexact HEADでPR observationを取得する。P0／P1=0とCI successを確認できた場合、P2／carryoverはHuman gateへ残したままmerge-ready状態で停止する。merge、auto-merge、branch削除、Issue close、`issue finish`は行わない。
+
+## 2026-08-02 — PR observation f273 exact-head P1 findings
+
+- PR #351のexact HEAD `f2734247e41dec47bad6707de97c13e2559b284d`に対して`wait_pr_observation.sh`を`post-once`で実行した。GitHub Actionsは3 runすべてsuccess、branch／PR head一致、default-branch fallback未使用だった。正式証跡は`artifacts/20260802t045000z-pr-351-observation-f273-p1-human-gate.json`で、SHA-256は`09230bcf8b5437cdf5786d81a8584acfb3c060198ca1da27941df1701b115d3e`である。
+- current trigger boundaryでP1を4件選択した。Aはbounded context manifestの深いJSONによる`RecursionError`未正規化、BはUTC変換不能なHuman decision timestamp、Cはdirect branch CASのreference-transaction payloadと期待値の不一致、Dはauthoring filename validatorの5桁Issue ID固定である。P0は0件、carryover threadは今回のcurrent findingと分離した。
+- fresh GPT-5.6 triage session `iss-334-observation-triage`は、repository `chemitaro/spec-dock`、branch、PR #351、exact HEADをGitHub connectorで確認し、4件すべてをintroduced-by-PR・scope内・deterministicなP1 blockerと判定した。model evidenceは`requested=GPT-5.6 Sol`／`resolved=Pro`／`status=already-selected`／`strategy=current`／`verified=no`である。正式advisoryは`artifacts/20260802t051500z-chatgpt-gpt56-observation-f273-p1-triage.json`で、SHA-256は`91ef202ddb540b0fc9e81427185b39c364b4c27c5b7821eeb6aaa34addf6b84b`である。
+
+## 2026-08-02 — Observation f273 P1 bounded repair
+
+- A: `_load_planning_context_manifest()`のJSON boundaryで`RecursionError`を`ValueError`へ正規化し、`planning create`が`rejected/planning_context_rejected`を返してbackendへ到達しないbounded deep-manifest regressionを追加した。
+- B: `PlanningHumanDecisionV1`でISO-8601 timestampのUTC normalizabilityを契約検証へ含め、`OverflowError`を`ValueError`へ閉じた。applicationの既存`human_decision_rejected` mappingを通る回帰テストを追加し、operation作成・transaction実行前に拒否されることを固定した。
+- C: direct branch CASのreference-transaction hookを、現在のGit実装差異を許容しつつ、expected branch record単独またはexpected branch／HEAD recordだけの閉じたpayloadとして検証するようにした。余分なrecord、値不一致、symbolic HEAD不一致、HEAD.lock不在／置換は従来どおり拒否し、既存CAS・HEAD.lock所有・native hook delegationは維持した。通常apply、resume、remote parity、native delegationのfull-regression integration testsを確認した。
+- D: authoring output filenameのIssue ID検証を共有`normalize_id_input()`へ接続し、`iss-local-00001`および6桁以上のnumeric IDをcanonical filenameとして受理する回帰テストを追加した。非canonical入力を受理する緩和は行っていない。
+- provider authorityの4 runtime filesをdogfood projectionへwhole-file copyし、provider／dogfood SHA-256 parityを確認した。canonical三文書、Candidate ZIP、public status／reason／schema、Oracle／Git-bound boundaryは変更していない。
+- verification: focused provider tests `351 passed`、Issue Planning integration full-regression `146 passed`（初回3-file実行で既存のrewindケースが一時的に1件失敗したが、同一テスト単独およびapply integration全体`136 passed`で再確認）、`git diff --check`は次のcommit前に実行する。次はこの修正と証跡をcommit／pushし、新HEADへbindしたfresh ChatGPT quality gateおよびPR observationを実施する。P0／P1=0になるまでmerge-readyとは扱わない。merge、auto-merge、branch削除、Issue close、`issue finish`は行わない。

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import InitVar, dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import json
 import math
@@ -1248,10 +1248,15 @@ class PlanningHumanDecisionV1:
         decided_at = _non_empty(self.decided_at, field_name="decided_at")
         try:
             parsed = datetime.fromisoformat(decided_at.replace("Z", "+00:00"))
-        except ValueError as error:
+            offset = parsed.utcoffset()
+        except (ValueError, OverflowError) as error:
             raise ValueError("decided_at must be ISO-8601") from error
-        if parsed.tzinfo is None or parsed.utcoffset() is None:
+        if parsed.tzinfo is None or offset is None:
             raise ValueError("decided_at must include a timezone")
+        try:
+            parsed.astimezone(timezone.utc)
+        except (OverflowError, ValueError) as error:
+            raise ValueError("decided_at must be normalizable to UTC") from error
 
     @classmethod
     def from_json_bytes(

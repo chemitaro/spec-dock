@@ -2086,7 +2086,10 @@ def _load_planning_context_manifest(
             result[key] = value
         return result
 
-    value = json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicates)
+    try:
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicates)
+    except RecursionError as error:
+        raise ValueError("context manifest JSON is too deeply nested") from error
     if not isinstance(value, dict) or set(value) != {"relevant_source_paths", "operator_context"}:
         raise ValueError("context manifest schema is invalid")
     relevant = _manifest_string_values(value["relevant_source_paths"], "relevant_source_paths")
