@@ -217,6 +217,14 @@ def _material():
     )
 
 
+def test_parse_canonical_control_json_normalizes_recursive_input_failure() -> None:
+    module = _candidate()
+    payload = (b'{"nested":' * 2000) + b"null" + (b"}" * 2000) + b"\n"
+
+    with pytest.raises(ValueError, match="canonical control JSON"):
+        module.parse_canonical_control_json(payload)
+
+
 def test_revision_candidate_uses_prior_version_plus_one() -> None:
     module = _candidate()
     documents = _documents()

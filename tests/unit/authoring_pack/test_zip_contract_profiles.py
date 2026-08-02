@@ -182,6 +182,40 @@ def test_issue_candidate_profile_rejects_structured_transcript_payload(tmp_path:
     assert str(tmp_path) not in repr(result.findings)
 
 
+@pytest.mark.parametrize(
+    ("sensitive_payload", "finding"),
+    [
+        ("Reference /Users/alice/private/customer-plan.md", "private_absolute_path"),
+        ("Reference /tmp/oracle-session/transcript.md", "private_absolute_path"),
+        ("Synthetic token ghp_" + "a" * 32, "secret_like_payload"),
+    ],
+)
+def test_issue_candidate_profile_rejects_private_paths_and_bare_known_tokens(
+    tmp_path: Path,
+    sensitive_payload: str,
+    finding: str,
+) -> None:
+    path = tmp_path / "candidate.zip"
+    with zipfile.ZipFile(path, "w") as archive:
+        for name in CANDIDATE_INVENTORY:
+            info = zipfile.ZipInfo(f"candidate/{name}")
+            info.create_system = 3
+            info.external_attr = (stat.S_IFREG | 0o644) << 16
+            archive.writestr(info, sensitive_payload if name == "design.md" else "{}\n")
+    module = _zip_contract()
+    profile = module.issue_candidate_v1_profile(
+        expected_root="candidate",
+        expected_companion_path=COMPANION_PATH,
+        cross_file_validator=lambda files, root: (),
+    )
+    result = module.review_pack_input(path, profile=profile)
+
+    assert result.status == "rejected"
+    assert finding in result.findings
+    assert sensitive_payload not in repr(result.findings)
+    assert str(tmp_path) not in repr(result.findings)
+
+
 def test_issue_candidate_profile_rejects_tree_input(tmp_path: Path) -> None:
     module = _zip_contract()
     profile = module.issue_candidate_v1_profile(

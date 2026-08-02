@@ -59,6 +59,11 @@ PRIVATE_KEY_NAMES: tuple[str, ...] = (
     "id_ed25519",
 )
 
+_KNOWN_TOKEN_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?:github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|"
+    r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|akia[0-9A-Z]{16,})(?![A-Za-z0-9])",
+)
+
 
 def scan_authoring_payload(text: str) -> tuple[str, ...]:
     lowered = text.lower()
@@ -90,6 +95,16 @@ def scan_constraint_sensitive_payload(text: str) -> tuple[str, ...]:
         findings.append("secret_like_payload:private key")
     findings.extend(_scan_structured_secret_fields(lowered, require_secret_like_value=True))
     findings.extend(_raw_transcript_findings(text, lowered))
+    return tuple(dict.fromkeys(findings))
+
+
+def scan_issue_candidate_sensitive_payload(text: str) -> tuple[str, ...]:
+    findings = list(scan_constraint_sensitive_payload(text))
+    private_path = private_absolute_path_finding(text)
+    if private_path is not None:
+        findings.append(private_path)
+    if _KNOWN_TOKEN_RE.search(text) is not None:
+        findings.append("secret_like_payload:token")
     return tuple(dict.fromkeys(findings))
 
 
