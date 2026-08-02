@@ -93,6 +93,82 @@ def _file_import_modules():
     return FileArtifactImportRequest, import_file_module, create_module
 
 
+def _artifact_domain_modules():
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.domain.artifacts import (
+            ArtifactSlot,
+            parse_artifact_filename,
+            parse_generic_imported_artifact_filename,
+            scan_artifact_slot_ledger,
+        )
+    finally:
+        sys.path.pop(0)
+    return ArtifactSlot, parse_artifact_filename, parse_generic_imported_artifact_filename, scan_artifact_slot_ledger
+
+
+def _normalize_top_level_generated_at(content: bytes) -> bytes:
+    """Normalize only a top-level generated_at value while preserving raw JSON bytes."""
+
+    try:
+        payload = json.loads(content)
+    except (TypeError, UnicodeDecodeError, json.JSONDecodeError):
+        return content
+    if not isinstance(payload, dict) or not isinstance(payload.get("generated_at"), str):
+        return content
+
+    def consume_string(start: int) -> int:
+        index = start + 1
+        escaped = False
+        while index < len(content):
+            byte = content[index]
+            if escaped:
+                escaped = False
+            elif byte == ord("\\"):
+                escaped = True
+            elif byte == ord('"'):
+                return index + 1
+            index += 1
+        return len(content)
+
+    depth = 0
+    index = 0
+    while index < len(content):
+        byte = content[index]
+        if byte == ord('"'):
+            string_end = consume_string(index)
+            if depth == 1 and json.loads(content[index:string_end]) == "generated_at":
+                value_start = string_end
+                while value_start < len(content) and content[value_start] in b" \t\r\n":
+                    value_start += 1
+                if value_start >= len(content) or content[value_start] != ord(":"):
+                    return content
+                value_start += 1
+                while value_start < len(content) and content[value_start] in b" \t\r\n":
+                    value_start += 1
+                if value_start >= len(content) or content[value_start] != ord('"'):
+                    return content
+                value_end = consume_string(value_start)
+                return content[:value_start] + b'"<generated_at>"' + content[value_end:]
+            index = string_end
+            continue
+        if byte in (ord("{"), ord("[")):
+            depth += 1
+        elif byte in (ord("}"), ord("]")):
+            depth -= 1
+        index += 1
+    return content
+
+
+def test_tc_346_s04_projection_snapshot_preserves_raw_json_except_generated_at() -> None:
+    raw = b'{\n  "nested": { "generated_at": "inner" },\n  "b": 2,\n  "generated_at" : "2026-07-14T01:02:03Z"\n}\n'
+    normalized = _normalize_top_level_generated_at(raw)
+    assert normalized == b'{\n  "nested": { "generated_at": "inner" },\n  "b": 2,\n  "generated_at" : "<generated_at>"\n}\n'
+    reordered = b'{\n  "generated_at" : "2026-07-14T01:02:03Z",\n  "nested": { "generated_at": "inner" },\n  "b": 2\n}\n'
+    assert _normalize_top_level_generated_at(reordered) != normalized
+
+
 class _FixedClock:
     def now_iso(self) -> str:
         return "2026-07-14T01:02:03Z"
@@ -149,16 +225,7 @@ class TestArtifactImportS04(CliRuntimeHarness):
                 continue
             content = path.read_bytes()
             if path.suffix == ".json":
-                payload = json.loads(content)
-                if isinstance(payload, dict):
-                    payload.pop("generated_at", None)
-
-                content = json.dumps(
-                    payload,
-                    ensure_ascii=False,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                ).encode("utf-8")
+                content = _normalize_top_level_generated_at(content)
             snapshot[relative] = content
         return snapshot
 
@@ -379,6 +446,9 @@ class TestArtifactImportS04(CliRuntimeHarness):
             _Publisher,
         ) = _runtime_modules()
         FileArtifactImportRequest, import_file_module, create_module = _file_import_modules()
+        ArtifactSlot, parse_artifact_filename, parse_generic_imported_artifact_filename, scan_artifact_slot_ledger = (
+            _artifact_domain_modules()
+        )
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             issue_dir = self._prepare_target(target)
@@ -437,6 +507,31 @@ class TestArtifactImportS04(CliRuntimeHarness):
             assert legacy_path.read_bytes()
             assert source.read_bytes() == source_body
             assert sentinel.read_bytes() == b"sentinel bytes"
+
+            generic_parsed = parse_generic_imported_artifact_filename(generic_path.name)
+            legacy_parsed = parse_artifact_filename(legacy_path.name)
+            assert generic_parsed is not None
+            assert legacy_parsed is not None
+            assert generic_parsed.original_basename == source.name
+            assert legacy_parsed.artifact_type == "blank"
+            fixed_timestamp = "20260714t010203z"
+            expected_slots = {
+                ArtifactSlot(fixed_timestamp, None),
+                ArtifactSlot(fixed_timestamp, 1),
+            }
+            observed_slots = {
+                ArtifactSlot(generic_parsed.timestamp, generic_parsed.suffix),
+                ArtifactSlot(legacy_parsed.timestamp, legacy_parsed.suffix),
+            }
+            assert observed_slots == expected_slots
+            duplicate_error, ledger = scan_artifact_slot_ledger(issue_dir / "artifacts")
+            assert duplicate_error is None
+            assert expected_slots <= ledger.used_slots
+            assert {generic_parsed.artifact_id, legacy_parsed.artifact_id} <= ledger.artifact_ids
+
+            # Keep the oracle sensitive to a missing suffix assignment without coupling it to winner order.
+            with pytest.raises(AssertionError):
+                assert {ArtifactSlot(fixed_timestamp, None)} == expected_slots
 
     def test_tc317_s04_02_exact_path_eexist_rescans_then_uses_next_slot(self) -> None:
         (
