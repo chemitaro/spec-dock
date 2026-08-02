@@ -395,9 +395,11 @@ The macOS cleanup uncertainty behavior is covered by the current-head hermetic p
 | 項目 | 観測値 |
 |---|---|
 | ブランチ | `iss-00346-integration-distribution-and-final-quality` |
-| candidate HEAD | `0c510e2137a6b211dd7a0d881f0c7d2190fdff97` |
-| remote HEAD | `0c510e2137a6b211dd7a0d881f0c7d2190fdff97`（一致） |
-| working tree | clean（`git status --short` 空） |
+| S04 executable/test HEAD | `8ef9aab38d92165e865a7336f2b385126e979da3`（`test(iss-00346): S04再レビュー指摘分のテストを追加`） |
+| remote executable/test HEAD | `8ef9aab38d92165e865a7336f2b385126e979da3`（一致） |
+| report-only successor before remediation | `4565f183`（`0c510e21` の後続。`report.md` のみ変更） |
+| fresh review target before remediation | `4565f183`（report-only successor、下記 Artifact は FAIL を記録） |
+| working tree | executable/test evidence commit時点は clean（Artifact/report更新中の一時差分を除く） |
 | candidate wheel | `spec_dock-0.2.3-py3-none-any.whl` |
 | wheel SHA-256 / size | `7fba9d9c90322d4f996c1c3ac843d23959bafbe239af9f13ef3e3528530df593` / 967,319 bytes |
 | installed origin | integration fixtureのisolated venvへcandidate wheelをinstall（source checkout fallbackなし） |
@@ -425,14 +427,14 @@ The fixtures are imported through the projected public `artifact import file` co
 
 | Suite / collected nodes | Result |
 |---|---|
-| `tests/cli_runtime/test_artifact_import_s04.py` (including `tc-346-s04-003` generic-versus-legacy barrier race) | 26 passed / 54.35s |
+| `tests/cli_runtime/test_artifact_import_s04.py` (including `tc-346-s04-003` generic-versus-legacy barrier race) | 27 passed（`8ef9aab38d92165e865a7336f2b385126e979da3`） |
 | `tests/cli_runtime/test_artifact_import_chatgpt_output.py` | 4 passed / 11.76s |
 | `tests/cli_runtime/test_workbench.py` | 18 passed / 32.53s |
 | `tests/cli_runtime/test_artifact_import_file.py` | 7 passed / 7.34s |
 | `tests/cli_runtime/test_runtime_new_doc_s09.py -k artifact` (6 collected nodes) | 6 passed / 0.24s |
 | `tests/unit/application/test_import_file_artifact.py tests/unit/presentation/test_artifact_import_file.py` | 34 passed / 0.27s |
 | `tests/integration/test_epic_00343_distribution.py -k 'dogfood or opaque or compatibility'` | 2 passed / 17.40s |
-| full integration distribution file | 13 passed / 36.64s |
+| full integration distribution file | `8ef9aab38d92165e865a7336f2b385126e979da3`後のclean worktreeで再実行予定（既知の自己検査を含む） |
 
 No existing public filename, result field, selector, digest/count contract, or Workbench source-wins expectation was changed. Shared-slot concurrency now includes generic import versus a legacy blank creator under a fixed clock; both outputs receive distinct slots and preserve the sentinel/source bytes.
 
@@ -469,7 +471,7 @@ The no-backfill negative injects the forbidden Epic README in the disposable che
 | `tc-346-s04-003` / `CL-346-AC-013` / `CL-346-EC-014` | compatibility suites and generic-versus-legacy shared-slot barrier race | pass |
 | `tc-346-s04-004` / `CL-346-AC-006` / `CL-346-CON-004` | exact disposable update, provider→projection parity, no-backfill negative, exact status/cleanup | pass |
 | `tc-346-s04-005` / `CL-346-AC-006` | future shell + ignored generic import through projected runtime, privacy scan, validate/sync, expected diff | pass |
-| S04 step contract | allowed test-only paths, production repair false, real worktree clean | pass pending fresh exact-head review |
+| S04 step contract | allowed test-only paths, production repair false, real worktree clean at `8ef9aab38d92165e865a7336f2b385126e979da3` | pass pending fresh exact-head review |
 
 #### Test Contract Closure / S04
 
@@ -481,12 +483,13 @@ The no-backfill negative injects the forbidden Epic README in the disposable che
 
 | Role | Changed paths | Verification | Parent integration decision |
 |---|---|---|---|
-| `dev-coder` | `tests/cli_runtime/test_artifact_import_s04.py`, `tests/integration/test_epic_00343_distribution.py` | S04 26 passed; dogfood 2 passed; compatibility 29 passed; nearest artifact 6 passed; units 34 passed; full integration 13 passed; ruff/diff-check pass | accepted; test-only remediation, no material production decision beyond approved plan |
+| `dev-coder` | `tests/cli_runtime/test_artifact_import_s04.py`, `tests/integration/test_epic_00343_distribution.py` | S04 27 passed; dogfood 2 passed; compatibility 29 passed; nearest artifact 6 passed; units 34 passed; full integration clean rerun pending; ruff/diff-check pass | accepted; test-only remediation, no material production decision beyond approved plan |
 
 #### S04 ChatGPT Pro review gates
 
 - Initial code review session: `iss346-s04-code-review-aug2`, exact head `89480b1ef37fa433d398ccc983dd60c716599079`, `requested=Pro; resolved=Pro; verified=yes`; Artifact `artifacts/20260801t230138z-chatgpt-output-20260802t-s04-code-review-initial.md` (SHA-256 `11a5b3627834ccfa606cde85ddcb5074861a650db2cfab2a01bd9b650a92ba49`). Verdict `FAIL` with P0=0/P1=3/P2=1/P3=0. Findings were limited to report exact-head evidence, provider projection/expected diff, generic-versus-legacy slot race, and projected dogfood privacy scan; no production defect or public contract change was identified.
-- Remediation commit: `0c510e2137a6b211dd7a0d881f0c7d2190fdff97`; this report section binds the observed tests and matrices to that successor head. A fresh exact-head ChatGPT Pro review is required before S04 closure.
+- Remediation commit: `0c510e2137a6b211dd7a0d881f0c7d2190fdff97`; the first report correction `4565f183` was report-only and was the target of fresh review session `iss346-s04-fresh-review-aug2`. That review Artifact `artifacts/20260802t001217z-chatgpt-output-20260802t-s04-code-review-remediation.md`（SHA-256 `2f6b10d05d07ae0844cce3b4ff1a92e104523983bcaddc341139b3e79f8d33a0`、10,545 bytes）はP0=0、P1=2、P2=2、P3=0でFAILし、(a) reportのexecutable/test headとreviewed report-only successorの分離、(b) generic/legacy実共有slotの厳密検証、(c) JSON raw formatting保持、(d) printable body/count漏洩sentinelを要求した。
+- 第二 remediation commit `8ef9aab38d92165e865a7336f2b385126e979da3` は許可された2つのtest pathだけを変更し、production parserと`scan_artifact_slot_ledger`によるslot集合検証、top-level `generated_at`だけのraw byte置換、printable body/count sentinelとcontrolled negativeを追加した。`8ef9aab38d92165e865a7336f2b385126e979da3` が現在のS04 executable/test evidence headであり、`4565f183` はその前段のreport-only successorである。`8ef9aab38d92165e865a7336f2b385126e979da3` を対象にfresh exact-head ChatGPT Pro reviewを取得し、P0〜P3全て0であることを確認するまでS04 closureを完了しない。
 
 ## 実装記録（セッションログ） (必須)
 
