@@ -1034,7 +1034,9 @@ Projection:
 - `spec-dock/docs/guide.md`
 - `spec-dock/docs/reference_naming.md`
 - `spec-dock/docs/rules/root/artifacts.md`
-- S01〜S04の列挙済みprovider runtime pathと同じrelative pathの`spec-dock/scripts/spec_dock_runtime/` mirror（該当stepでproduction repairがあった場合だけ）
+- S01〜S04で既にaccepted provider sourceに反映済みの変更がcandidate-wheel updateで管理対象へ投影される場合に限り、対応するrelative pathの`spec-dock/scripts/spec_dock_runtime/` mirror。これは新しいproduction repairではなく、originating stepのprovider-to-dogfood projection correctionとして記録する。provider sourceに新しい差分がなく、candidate updateがそのpathを出力しない場合はruntime mirrorを変更しない。
+
+S04で実装・review済みのprovider sourceが、disposable consumerではcandidate-wheel updateによって投影される一方、チェックイン済みdogfood mirrorだけ古い場合、S90はその差分をprovider-firstのmanaged projection correctionとして取り込める。この場合、S90の変更一覧・EAL・reportでoriginating step、source commit、candidate updateのstatus manifest、production repair=falseを明記し、runtime behaviorの新規変更として扱わない。S90 pre-stepの「runtime mirror非該当」提案は、candidate updateの実測がこの条件を満たす場合は部分採用に留める。
 
 Evidence targets controlled by orchestrator:
 
