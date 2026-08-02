@@ -44,9 +44,9 @@ _STALE_WHEEL_PATTERNS = (
     "spec_dock/assets/spec_dock/templates/requirement.md",
 )
 _S04_MANAGED_PROJECTION_ROOTS = ("docs", "templates", "scripts", "system")
-# The candidate wheel includes the provider-side language-only heading repair;
-# update therefore changes only the corresponding managed consumer document.
-_S04_UPDATE_EXPECTED_STATUS: set[str] = {"spec-dock/docs/rules/root/artifacts.md"}
+# Provider and checked-in consumer assets are aligned at the candidate
+# revision, so the disposable update is intentionally diff-clean.
+_S04_UPDATE_EXPECTED_STATUS: set[str] = set()
 
 
 @dataclass(frozen=True)
