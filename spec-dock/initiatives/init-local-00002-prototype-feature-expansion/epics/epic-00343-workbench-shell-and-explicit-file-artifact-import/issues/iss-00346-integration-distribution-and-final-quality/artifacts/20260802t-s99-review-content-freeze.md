@@ -8,7 +8,7 @@ ID: "iss-00346-s99-review-content-freeze"
 # S99 review content freeze
 
 - Candidate branch: `iss-00346-integration-distribution-and-final-quality`
-- Candidate head: `d7a73d48592274691ae3089afccfbc210af5420e`
+- Freeze source head: `cf9104fd6ee353603044aa2533b894f18db7358c`
 - Base: `origin/main` (resolved before freeze)
 - `review_content_hash`: `26201290c13add93e3dc6b7dabf4f3f4cc2dcc7a4e68d9f9e77b75e658b07896`
 - Hash algorithm: sorted manifest TSV bytes; each line is `repo-relative-path<TAB>sha256(file-bytes)\n`; the SHA-256 above is over the complete manifest bytes.
