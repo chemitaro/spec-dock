@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "type": "issue",
+  "id": "iss-00354",
+  "title": "Define ChatGPT Context and Attachment Contract",
+  "slug": "define-chatgpt-context-and-attachment-contract",
+  "created_at": "2026-08-03T00:28:23+09:00",
+  "updated_at": "2026-08-03T00:28:23+09:00",
+  "parent_id": "epic-00331",
+  "initiative_id": "init-00322",
+  "epic_id": "epic-00331",
+  "_spec_dock": {
+    "managed": true,
+    "do_not_edit": true,
+    "edit_via": "spec-dock"
+  },
+  "github": {
+    "issue_number": 354,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  }
+}
