@@ -1486,6 +1486,43 @@ def test_load_verified_candidate_rejects_invalid_companion_binding(
         _infra().load_verified_issue_candidate(candidate, repo)
 
 
+@pytest.mark.parametrize("document", ["requirement.md", "design.md", "plan.md"])
+def test_load_verified_candidate_rejects_malformed_canonical_document(
+    tmp_path: Path,
+    document: str,
+) -> None:
+    repo, candidate, _ = _valid_candidate(tmp_path)
+
+    def mutate(entries: dict[str, bytes]) -> None:
+        root = candidate.stem
+        entries[f"{root}/{document}"] = b"malformed document\n"
+        checksums_name = f"{root}/CHECKSUMS.sha256"
+        checksum_paths = tuple(
+            sorted(
+                (name.split("/", 1)[1] for name in entries if name.startswith(f"{root}/") and name != checksums_name),
+                key=lambda value: value.encode("utf-8"),
+            )
+        )
+        entries[checksums_name] = "".join(
+            f"{hashlib.sha256(entries[f'{root}/{path}']).hexdigest()}  {path}\n" for path in checksum_paths
+        ).encode("ascii")
+
+    with zipfile.ZipFile(candidate) as source:
+        original_entries = {name.split("/", 1)[1]: source.read(name) for name in source.namelist()}
+    mutate_entries = {f"{candidate.stem}/{path}": payload for path, payload in original_entries.items()}
+    mutate(mutate_entries)
+    relative_entries = {name.split("/", 1)[1]: payload for name, payload in mutate_entries.items()}
+    assert "canonical_document_mismatch" in _infra().verify_issue_candidate_files(
+        relative_entries,
+        candidate.stem,
+    )
+
+    _rewrite_candidate(candidate, mutate)
+    with pytest.raises(_infra().CandidateArchiveRejected) as error:
+        _infra().load_verified_issue_candidate(candidate, repo)
+    assert error.value.findings
+
+
 @pytest.mark.parametrize("renamed", ["candidate-copy.zip", "candidate (0).zip", "candidate.zip.bak"])
 def test_load_verified_candidate_rejects_fuzzy_and_unauthorized_rename(
     tmp_path: Path,

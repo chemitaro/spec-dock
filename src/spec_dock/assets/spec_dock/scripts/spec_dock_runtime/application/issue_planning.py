@@ -75,6 +75,7 @@ if TYPE_CHECKING:
 class PlanningCreateRequest:
     issue_id: str
     output_dir: Path
+    context_manifest_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -864,6 +865,20 @@ def run_issue_planning_create(
             status="rejected",
             reason="planning_context_rejected",
             issue_id=_result_issue_id(request.issue_id),
+        )
+    try:
+        manifest_relevant_paths, manifest_operator_context = _load_planning_context_manifest(
+            request.context_manifest_path,
+            repo_root=repo_root,
+            gateway=gateway,
+        )
+        relevant_source_paths = _merge_context_values(relevant_source_paths, manifest_relevant_paths)
+        operator_context = _merge_context_values(operator_context, manifest_operator_context)
+    except (OSError, UnicodeError, ValueError):
+        return PlanningCommandResult(
+            status="rejected",
+            reason="planning_context_rejected",
+            issue_id=target.issue_id,
         )
     try:
         output_guard = gateway.validate_candidate_output_directory(request.output_dir, repo_root)
@@ -2051,6 +2066,51 @@ def _read_external_bounded_file(
         raise ValueError("external input path is unsafe") from None
     data.decode("utf-8", errors="strict")
     return data
+
+
+def _load_planning_context_manifest(
+    path: Path | None,
+    *,
+    repo_root: Path,
+    gateway: IssuePlanningGateway,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    if path is None:
+        return (), ()
+    raw = _read_external_bounded_file(path, repo_root=repo_root, gateway=gateway)
+
+    def reject_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("context manifest contains duplicate keys")
+            result[key] = value
+        return result
+
+    value = json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicates)
+    if not isinstance(value, dict) or set(value) != {"relevant_source_paths", "operator_context"}:
+        raise ValueError("context manifest schema is invalid")
+    relevant = _manifest_string_values(value["relevant_source_paths"], "relevant_source_paths")
+    operator = _manifest_string_values(value["operator_context"], "operator_context")
+    return _merge_context_values((), relevant), _merge_context_values((), operator)
+
+
+def _manifest_string_values(value: object, field_name: str) -> tuple[str, ...]:
+    if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
+        raise ValueError(f"context manifest {field_name} must be a non-empty string array")
+    if len(value) > 16 or len(set(value)) != len(value):
+        raise ValueError(f"context manifest {field_name} exceeds its bounded limit")
+    if any(
+        len(item.encode("utf-8")) > (256 * 1024 if field_name == "relevant_source_paths" else 4 * 1024)
+        for item in value
+    ):
+        raise ValueError(f"context manifest {field_name} exceeds its bounded entry size")
+    if field_name == "operator_context" and sum(len(item.encode("utf-8")) for item in value) > 32 * 1024:
+        raise ValueError("context manifest operator_context exceeds its bounded total size")
+    return tuple(value)
+
+
+def _merge_context_values(existing: Sequence[str], supplied: Sequence[str]) -> tuple[str, ...]:
+    return tuple(sorted({*existing, *supplied}, key=lambda value: value.encode("utf-8")))
 
 
 def _attachments_match_source_manifest(
