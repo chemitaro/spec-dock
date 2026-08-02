@@ -4314,60 +4314,41 @@ class TestInitUpdate(CliRuntimeHarness):
             ),
         )
 
-        # The docs entrance owns the transitional sibling-Issue availability note.
+        # Generic import is implemented in the current projected runtime.  The
+        # old Issue 345/346 transitional note must not be resurrected.
         require(
             "docs/README.md",
-            "Issue #345 planned and unimplemented generic file import",
+            "implemented generic file import lane",
             (
                 (
-                    artifact_import_command,
-                    "Issue #345",
-                    "planned",
-                    "unimplemented",
-                ),
-                (
-                    artifact_import_command,
-                    "iss-00345",
-                    "計画",
-                    "未実装",
+                    "artifact import file",
+                    "generic lane",
+                    "opaque generic Artifact",
                 ),
             ),
         )
         require(
             "docs/README.md",
-            "repo-local generic import is not a global-installer dispatch",
+            "generic import privacy and canonical boundary",
             (
-                ("repo-local runtime", "global installer", "not available"),
-                ("repo-local runtime", "global installer", "dispatch はない"),
-                ("repo-local runtime", "global installer", "未提供"),
-            ),
-        )
-        require(
-            "docs/README.md",
-            "Issue #346 consumer E2E and full-regression handoff",
-            (
-                (
-                    "Issue #346",
-                    "consumer E2E",
-                    "full regression",
-                    "deferred",
-                ),
-                (
-                    "iss-00346",
-                    "consumer E2E",
-                    "full regression",
-                    "責務",
-                ),
+                ("source は変更・削除しません", "canonical=false"),
+                ("source", "canonical=false", "evidence-only"),
             ),
         )
         require(
             "docs/reference_worktree.md",
-            "root durable-file route remains planned under Issue #345",
+            "root generic import route",
             (
-                (artifact_import_command, "Issue #345", "unimplemented"),
-                (artifact_import_command, "iss-00345", "未実装"),
+                (
+                    "artifact import file --root --file <path>",
+                    "opaque generic Artifact",
+                    "source を変更しない",
+                ),
             ),
         )
+        for path in ("docs/README.md", "docs/reference_worktree.md"):
+            for stale_marker in ("Issue #345", "iss-00345", "Issue #346", "iss-00346"):
+                forbid(path, "stale transitional Issue reference", stale_marker)
 
         # Context-specific migration guards, not a global ban on these words.
         forbid(
