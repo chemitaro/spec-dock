@@ -404,12 +404,12 @@ def _read_source_file_descriptor_relative(
     parts = path.parts
     if not parts:
         raise ValueError("relevant source path is unsafe")
-    root_before = root.lstat()
-    if not stat.S_ISDIR(root_before.st_mode):
-        raise ValueError("repository root is not a directory")
-    root_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
     descriptor_fds: list[int] = []
     try:
+        root_before = root.lstat()
+        if not stat.S_ISDIR(root_before.st_mode):
+            raise ValueError("repository root is not a directory")
+        root_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
         root_fd = os.open(root, root_flags)
         descriptor_fds.append(root_fd)
         root_opened = os.fstat(root_fd)

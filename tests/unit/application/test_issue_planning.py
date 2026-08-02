@@ -2760,7 +2760,12 @@ def _preflight(
     )
 
 
-def _source_guard_probe(*, revision: bool, mutate_source: bool) -> tuple[bool, list[str]]:
+def _source_guard_probe(
+    *,
+    revision: bool,
+    mutate_source: bool,
+    preflight_error: BaseException | None = None,
+) -> tuple[bool, list[str]]:
     module = __import__(
         "spec_dock_runtime.application.issue_planning",
         fromlist=["_review_publication_is_current", "_revision_publication_is_current"],
@@ -2790,6 +2795,8 @@ def _source_guard_probe(*, revision: bool, mutate_source: bool) -> tuple[bool, l
 
     def preflight_runner(_request: object) -> PreflightResult:
         events.append("source_preflight")
+        if preflight_error is not None:
+            raise preflight_error
         return _preflight(source_manifest=SimpleNamespace(source_manifest_hash=source_hash[0]))
 
     if revision:
@@ -2819,6 +2826,18 @@ def _source_guard_probe(*, revision: bool, mutate_source: bool) -> tuple[bool, l
 @pytest.mark.parametrize("revision", [False, True])
 def test_publication_guard_rechecks_source_after_candidate_loader(revision: bool) -> None:
     result, events = _source_guard_probe(revision=revision, mutate_source=True)
+
+    assert result is False
+    assert events == ["candidate_loader", "source_preflight"]
+
+
+@pytest.mark.parametrize("revision", [False, True])
+def test_publication_guard_closes_source_preflight_exceptions(revision: bool) -> None:
+    result, events = _source_guard_probe(
+        revision=revision,
+        mutate_source=False,
+        preflight_error=RuntimeError("private preflight detail"),
+    )
 
     assert result is False
     assert events == ["candidate_loader", "source_preflight"]
