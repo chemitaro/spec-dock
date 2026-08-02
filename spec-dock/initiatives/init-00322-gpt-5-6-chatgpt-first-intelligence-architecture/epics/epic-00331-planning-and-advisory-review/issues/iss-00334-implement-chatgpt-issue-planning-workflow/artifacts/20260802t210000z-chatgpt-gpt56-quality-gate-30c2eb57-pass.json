@@ -1,0 +1,86 @@
+{
+"review_identity": {
+"repository": "chemitaro/spec-dock",
+"branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+"pull_request": 351,
+"source_head": "30c2eb579ae2f405f89df8a1f4b6e60d49d22684",
+"default_branch_fallback_used": false
+},
+"spec_review": {
+"status": "PASS",
+"findings": []
+},
+"code_review": {
+"status": "PASS",
+"findings": []
+},
+"qa_review": {
+"status": "PASS",
+"findings": []
+},
+"quality_gate": {
+"status": "PASS",
+"p0_count": 0,
+"p1_count": 0,
+"decision": "PASS"
+},
+"verification": [
+{
+"area": "review_contract",
+"result": "PASS",
+"evidence": "The attached task contract fixes the exact repository, branch, PR, source HEAD, P0/P1-only threshold, required repair checks, and JSON output schema. 
+
+attachments-bundle
+
+"
+},
+{
+"area": "repository_identity",
+"result": "PASS",
+"evidence": "GitHub connector access succeeded for chemitaro/spec-dock. PR #351 is open with base main, head branch iss-00334-implement-chatgpt-issue-planning-workflow, and head SHA 30c2eb579ae2f405f89df8a1f4b6e60d49d22684. The exact commit was retrievable and no default-branch fallback was used."
+},
+{
+"area": "spec_alignment",
+"result": "PASS",
+"evidence": "The exact-head Requirement, Design, and append-only Plan consistently require structured rejected results for malformed or unsafe input, Candidate secret and private-path rejection, provider-first ownership, projection parity, and the existing closed status/reason set. No P0/P1 contradiction, Human-authority bypass, implementation-blocking omission, or security-boundary conflict was found."
+},
+{
+"area": "candidate_control_json_recursion",
+"result": "PASS",
+"evidence": "In src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/issue_planning_candidate.py, parse_canonical_control_json wraps JSON decoding, recursive validate_control_value validation, and canonical_control_json_bytes reserialization in one bounded RecursionError normalization boundary and raises ValueError. It does not add a broad Exception catch. Existing Candidate verification converts that ValueError to invalid_control_json and the application returns rejected/archive_rejected. The domain regression uses a deeply nested control object and asserts ValueError rather than an escaping RecursionError."
+},
+{
+"area": "conditional_mode_options",
+"result": "PASS",
+"evidence": "In commands/issue_planning.py, review_args and apply_args now construct requests without conditional-mode RuntimeError validation. Application validation preserves operation_candidate_required for missing git-bound Candidates and returns review_request_rejected or apply_request_rejected for other missing, forbidden, or cross-mode values. Command regressions exercise --format json, assert a parseable structured rejected result on stdout, empty stderr, and continued dispatch of valid archive and git-bound invocations."
+},
+{
+"area": "candidate_sensitive_scan",
+"result": "PASS",
+"evidence": "The Candidate-only scan composes the existing constraint scanner with private_absolute_path_finding and a bare known-token detector. The private-path expression covers /Users/, /private/, /tmp/, and /var/folders; the token expression covers github_pat, ghp/related GitHub prefixes, sk-/sk-proj-, xox token families, and uppercase AKIA. Findings are reduced to closed categories such as private_absolute_path and secret_like_payload, so matched paths and token values are not emitted. The generic no-profile authoring-pack path remains separate."
+},
+{
+"area": "sensitive_scan_regression_tests",
+"result": "PASS",
+"evidence": "The exact-head focused matrix rejects /Users/, /private/, /tmp/, ghp, github_pat_, sk-, xoxb-, and uppercase AKIA payloads and verifies that neither the matched value nor the temporary path appears in findings. The /var/folders branch is directly present in the reviewed production expression; its absence as a separate matrix row does not establish a P0/P1 defect."
+},
+{
+"area": "existing_boundary_regressions",
+"result": "PASS",
+"evidence": "Deep context-manifest recursion is normalized to rejected/planning_context_rejected before backend work; Human decided_at UTC overflow is normalized to ValueError; reference-transaction input is accepted only as one of three exact LF-terminated byte sequences and rejects CRLF, missing LF, blank, duplicate, extra, or mismatched records; authoring logical filenames require the exact -issue-planning-documents.zip suffix and canonical Issue ID."
+},
+{
+"area": "provider_dogfood_parity",
+"result": "PASS",
+"evidence": "Exact-head provider and dogfood projection blobs match for authority_boundary.py, commands/issue_planning.py, issue_planning_candidate.py, and authoring_pack/zip_contract.py. The reviewed implementation continues to treat src/spec_dock/assets as authority and root spec-dock as the managed projection."
+},
+{
+"area": "automated_verification",
+"result": "PASS",
+"evidence": "The exact-head report records focused Candidate-profile tests as 36 passed, ordinary regression as 1433 passed and 2235 skipped, Issue Planning integration regression as 147 passed, plus lint, validate with nodes=227, provider/dogfood parity, and git diff --check passing. GitHub Actions CI and Provider CI for source HEAD 30c2eb579ae2f405f89df8a1f4b6e60d49d22684 both completed successfully."
+}
+],
+"uncertainty": [
+"Repository-local pytest, lint, validate, parity, and diff-check commands were not independently re-executed in this read-only review session. Their counts and outcomes were verified from exact-head repository evidence and supplemented by successful exact-head GitHub Actions runs and direct source/test inspection."
+]
+}

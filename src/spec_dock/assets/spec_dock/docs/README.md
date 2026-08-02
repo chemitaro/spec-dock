@@ -4,7 +4,7 @@
 Agent の operational entrypoint / first-read spine は導入済み skill です。まず skill で実行順序、停止条件、reviewer gate を確認し、docs は detail / reference layer として artifact semantics、policy detail、hard cases を調べるために参照します。
 全体像は `guide.md`、曖昧さの明確化の bridge/reference は `workflow_clarification.md`、仕様書作成の phase promotion semantics は `workflow_spec_authoring.md`、scope 固有の lifecycle / governance detail は対象 scope の `workflow_*.md` を参照してください。
 plan だけは `phase_plan.md` の shared axiom と `phase_plan_<scope>.md` の scope-specific playbook を合わせて参照します。
-runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` です。
+Core runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...`、Issue Planning command の現行 contract は `./spec-dock/scripts/spec-dock-chatgpt ...` です。
 
 ## エージェント起点
 
@@ -63,6 +63,14 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 ./spec-dock/scripts/spec-dock issue start --id <issue-id>
 ./spec-dock/scripts/spec-dock issue finish
 
+# Issue Planning（外部 output directory が必須）
+./spec-dock/scripts/spec-dock-chatgpt planning create --issue <issue-id> --output <external-dir>
+./spec-dock/scripts/spec-dock-chatgpt review planning --issue <issue-id> --mode archive-candidate --candidate <candidate.zip> --output <external-review-dir>
+./spec-dock/scripts/spec-dock-chatgpt review planning --issue <issue-id> --mode git-bound --candidate <candidate.zip> --reviewed-head <sha> --output <external-review-dir>
+./spec-dock/scripts/spec-dock-chatgpt planning revise --candidate <candidate.zip> --request <external-review-dir>/planning-revision-request.json --output <external-dir>
+./spec-dock/scripts/spec-dock-chatgpt planning apply --issue <issue-id> --mode archive-candidate --review-result <review.json> --human-decision <decision.json> --expected-head <sha> --output <external-dir> --candidate <candidate.zip> --logical-filename <name> --zip-sha256 <sha256>
+./spec-dock/scripts/spec-dock-chatgpt planning apply --issue <issue-id> --mode git-bound --review-result <review.json> --human-decision <decision.json> --expected-head <sha> --output <external-dir> --candidate <candidate.zip> --reviewed-head <sha>
+
 ./spec-dock/scripts/spec-dock active set <id|#num|url>
 ./spec-dock/scripts/spec-dock active set --id <node-id>
 ./spec-dock/scripts/spec-dock active set --github-issue <n>
@@ -97,6 +105,10 @@ runtime command の現行 contract は `./spec-dock/scripts/spec-dock ...` で�
 - Initiative / Epic は `new` / `import` の前に既存ノード再利用を確認する
 - Requirement / design / plan 作成は対応 planning skill を operational entrypoint にし、`workflow_spec_authoring.md` の phase promotion detail を参照して、fresh `spec-reviewer` の `review_status: pass` まで次 phase へ進めない
 - ChatGPT / Oracle を使う planning では `spec-dock-chatgpt-authoring` skill と [workflow_chatgpt_authoring_pack.md](workflow_chatgpt_authoring_pack.md) を参照する。ChatGPT-first planning route が非自明な planning の正規 route であり、ChatGPT output、ZIP/tree、staged evidence、validation `pass` は evidence-only で、canonical adoption / reviewer pass / execution-ready / PR-ready ではない
+- Issue Planning は repo-local `./spec-dock/scripts/spec-dock-chatgpt` から `PATH` 上の `oracle` だけを実行依存として使う。Oracle が未導入または非対応なら personal wrapper、arbitrary backend、API fallback を使わず block し、GitHub 上で exact current repository / branch / HEAD を確認できなければ default branchへfallbackしない
+- Planner と Semantic Revision は canonical `requirement.md` / `design.md` / `plan.md` と runtime-selected の exactly-one onboarding companion を含む exactly-one authoring ZIP を返し、Reviewer は closed JSON を返す。companion は第四のcanonical specificationではなく subordinate evidence である
+- Issue Planning の `planning revise` は request と同じ directory の exact `planning-review-result.json` だけを使う。archive と git-bound は別 identity であり、fresh PASS Review と exact Human approvalを満たして `planning apply` が `ready` を返すまで canonical adoption ではない。PR、Issue finish、merge は別 workflow である
+- archive と git-bound の Review/apply は、`planning create` が生成した exact same Candidate を必須とする。Human approval 前に managed write は行わない
 - manual planning backups は hard / unrecoverable ChatGPT route failure と human-approved emergency backup evidence がある場合だけ使う。queued tabs、retryable timeout、recoverable browser/backend setup は wait / retry / recover の対象であり、自動 fallback ではない
 - 仕様書作成前後の曖昧さ、用語衝突、責務境界、正式質問は `spec-dock-clarification` skill を operational entrypoint にし、`workflow_clarification.md` を bridge/reference として一問ずつ扱う
 - plan は shared `phase_plan.md` の後に対象 scope の `phase_plan_<scope>.md` を読む

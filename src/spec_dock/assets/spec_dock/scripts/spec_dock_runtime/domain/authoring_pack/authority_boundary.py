@@ -59,6 +59,11 @@ PRIVATE_KEY_NAMES: tuple[str, ...] = (
     "id_ed25519",
 )
 
+_KNOWN_TOKEN_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?:github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|"
+    r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16,})(?![A-Za-z0-9])",
+)
+
 
 def scan_authoring_payload(text: str) -> tuple[str, ...]:
     lowered = text.lower()
@@ -89,10 +94,61 @@ def scan_constraint_sensitive_payload(text: str) -> tuple[str, ...]:
     if "private key" in lowered and ("-----begin" in lowered or "block" in lowered):
         findings.append("secret_like_payload:private key")
     findings.extend(_scan_structured_secret_fields(lowered, require_secret_like_value=True))
-    for marker in RAW_TRANSCRIPT_MARKERS:
-        if marker in lowered:
-            findings.append(f"raw_transcript:{marker}")
+    findings.extend(_raw_transcript_findings(text, lowered))
     return tuple(dict.fromkeys(findings))
+
+
+def scan_issue_candidate_sensitive_payload(text: str) -> tuple[str, ...]:
+    findings = list(scan_constraint_sensitive_payload(text))
+    private_path = private_absolute_path_finding(text)
+    if private_path is not None:
+        findings.append(private_path)
+    if _KNOWN_TOKEN_RE.search(text) is not None:
+        findings.append("secret_like_payload:token")
+    return tuple(dict.fromkeys(findings))
+
+
+def _raw_transcript_findings(text: str, lowered: str) -> tuple[str, ...]:
+    present_markers = tuple(marker for marker in RAW_TRANSCRIPT_MARKERS if marker in lowered)
+    if not present_markers:
+        return ()
+
+    colon_field = re.compile(
+        r"^\s*(?:>\s*)*(?:[-*+]\s+)?(?:>\s*)*"
+        r"(user|assistant|prompt|answer)\s*[:\uff1a]",
+        re.IGNORECASE,
+    )
+    atx_heading = re.compile(
+        r"^\s*#{1,6}\s+(user|assistant|prompt|answer)(?:\s+#+)?\s*$",
+        re.IGNORECASE,
+    )
+    seen_user = False
+    seen_prompt = False
+    has_complete_pair = False
+    for line in text.splitlines():
+        match = colon_field.match(line) or atx_heading.match(line)
+        if match is None:
+            continue
+        label = match.group(1).lower()
+        if (label == "assistant" and seen_user) or (label == "answer" and seen_prompt):
+            has_complete_pair = True
+            break
+        if label == "user":
+            seen_user = True
+        elif label == "prompt":
+            seen_prompt = True
+    if not has_complete_pair:
+        return ()
+    return tuple(f"raw_transcript:{marker}" for marker in present_markers)
+
+
+def private_absolute_path_finding(text: str) -> str | None:
+    if re.search(
+        r"(^|[\s'\"=])(?:/Users/[^/\s]+/|/private/|/var/folders(?:/|$)|/tmp(?:/|$))",
+        text,
+    ):
+        return "private_absolute_path"
+    return None
 
 
 def is_credential_like_path(value: str) -> bool:
