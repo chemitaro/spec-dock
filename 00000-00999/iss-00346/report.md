@@ -400,6 +400,7 @@ The macOS cleanup uncertainty behavior is covered by the current-head hermetic p
 | report-only successor before remediation | `4565f183`（`0c510e21` の後続。`report.md` のみ変更） |
 | fresh review target before remediation | `4565f183`（report-only successor、下記 Artifact は FAIL を記録） |
 | current evidence successor | `39ea603cee09a6340515959d1541869ffd53cf9b`（report + fresh-review Artifact のみ。executable/test inputsは不変） |
+| final review Artifact successor | `afe911770bf6ea97e4abb244dc7f9f2d1f886933`（final review Artifactのみ。reviewed executable/report headは下記`2af3a145`） |
 | working tree | executable/test evidence commit時点は clean（Artifact/report更新中の一時差分を除く） |
 | candidate wheel | `spec_dock-0.2.3-py3-none-any.whl` |
 | wheel SHA-256 / size | `7fba9d9c90322d4f996c1c3ac843d23959bafbe239af9f13ef3e3528530df593` / 967,319 bytes |
@@ -472,7 +473,7 @@ The no-backfill negative injects the forbidden Epic README in the disposable che
 | `tc-346-s04-003` / `CL-346-AC-013` / `CL-346-EC-014` | compatibility suites and generic-versus-legacy shared-slot barrier race | pass |
 | `tc-346-s04-004` / `CL-346-AC-006` / `CL-346-CON-004` | exact disposable update, provider→projection parity, no-backfill negative, exact status/cleanup | pass |
 | `tc-346-s04-005` / `CL-346-AC-006` | future shell + ignored generic import through projected runtime, privacy scan, validate/sync, expected diff | pass |
-| S04 step contract | allowed test-only paths, production repair false, real worktree clean at `8ef9aab38d92165e865a7336f2b385126e979da3` | pass pending fresh exact-head review |
+| S04 step contract | allowed test-only paths, production repair false, real worktree clean at `8ef9aab38d92165e865a7336f2b385126e979da3` | pass（final ChatGPT Pro exact-head review PASS） |
 
 #### Test Contract Closure / S04
 
@@ -491,6 +492,7 @@ The no-backfill negative injects the forbidden Epic README in the disposable che
 - Initial code review session: `iss346-s04-code-review-aug2`, exact head `89480b1ef37fa433d398ccc983dd60c716599079`, `requested=Pro; resolved=Pro; verified=yes`; Artifact `artifacts/20260801t230138z-chatgpt-output-20260802t-s04-code-review-initial.md` (SHA-256 `11a5b3627834ccfa606cde85ddcb5074861a650db2cfab2a01bd9b650a92ba49`). Verdict `FAIL` with P0=0/P1=3/P2=1/P3=0. Findings were limited to report exact-head evidence, provider projection/expected diff, generic-versus-legacy slot race, and projected dogfood privacy scan; no production defect or public contract change was identified.
 - Remediation commit: `0c510e2137a6b211dd7a0d881f0c7d2190fdff97`; the first report correction `4565f183` was report-only and was the target of fresh review session `iss346-s04-fresh-review-aug2`. That review Artifact `artifacts/20260802t001217z-chatgpt-output-20260802t-s04-code-review-remediation.md`（SHA-256 `2f6b10d05d07ae0844cce3b4ff1a92e104523983bcaddc341139b3e79f8d33a0`、10,545 bytes）はP0=0、P1=2、P2=2、P3=0でFAILし、(a) reportのexecutable/test headとreviewed report-only successorの分離、(b) generic/legacy実共有slotの厳密検証、(c) JSON raw formatting保持、(d) printable body/count漏洩sentinelを要求した。
 - 第二 remediation commit `8ef9aab38d92165e865a7336f2b385126e979da3` は許可された2つのtest pathだけを変更し、production parserと`scan_artifact_slot_ledger`によるslot集合検証、top-level `generated_at`だけのraw byte置換、printable body/count sentinelとcontrolled negativeを追加した。`8ef9aab38d92165e865a7336f2b385126e979da3` が現在のS04 executable/test evidence headであり、`4565f183` はその前段のreport-only successorである。`8ef9aab38d92165e865a7336f2b385126e979da3` を対象にfresh exact-head ChatGPT Pro reviewを取得し、P0〜P3全て0であることを確認するまでS04 closureを完了しない。
+- final exact-head review session `iss346-s04-final-code-review` は `requested=Pro; resolved=Pro; status=already-selected; strategy=select; verified=yes`、reviewed head `2af3a145ec1a29e05f677d13ee20d53e55f38e3f`、executable/test head `8ef9aab38d92165e865a7336f2b385126e979da3`、report/evidence successor `39ea603cee09a6340515959d1541869ffd53cf9b` を確認し、P0=0、P1=0、P2=0、P3=0、`review_status=pass` を返した。Artifact `artifacts/20260802t003003z-chatgpt-output-20260802t-s04-code-review-final.md`（SHA-256 `38bad4e4b17b5ddb16542ce8566f8f63dd47fd5d1ba89413aecebf96ed2ba7be`、8,797 bytes）へ保存した。`afe911770bf6ea97e4abb244dc7f9f2d1f886933` はこのArtifactだけを追加したevidence successorであり、executable/provider/test inputsは不変である。
 
 ## 実装記録（セッションログ） (必須)
 
