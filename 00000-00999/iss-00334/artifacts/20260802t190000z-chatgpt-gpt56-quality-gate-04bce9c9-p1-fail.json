@@ -1,0 +1,100 @@
+{
+"review_identity": {
+"repository": "chemitaro/spec-dock",
+"branch": "iss-00334-implement-chatgpt-issue-planning-workflow",
+"pull_request": 351,
+"source_head": "04bce9c9aeb360fc4b7123edc1802f8eaf300433",
+"default_branch_fallback_used": false
+},
+"spec_review": {
+"status": "PASS",
+"findings": []
+},
+"code_review": {
+"status": "FAIL",
+"findings": [
+{
+"id": "CODE-P1-001",
+"severity": "P1",
+"area": "Candidate sensitive-payload scan",
+"file": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/authoring_pack/authority_boundary.py",
+"line_or_symbol": "_KNOWN_TOKEN_RE, lines 62-64",
+"evidence": "The case-sensitive known-token expression contains the AWS branch as lowercase `akia[0-9A-Z]{16,}`, while scan_issue_candidate_sensitive_payload() searches the original, non-normalized text. The required uppercase `AKIA` prefix therefore does not match.",
+"reproduction_or_reason": "scan_issue_candidate_sensitive_payload("AKIA" + "A" * 16) produces no finding: the unlabeled value does not enter structured-field detection, is not a private path or transcript, and fails the lowercase `akia` regex branch. An otherwise valid Candidate ZIP can consequently admit an uppercase AKIA credential-shaped value, violating REQ-012, AC-011, and the explicit C repair boundary.",
+"required_fix": "Match the canonical uppercase `AKIA` prefix, or apply case normalization only in a way that preserves the intended suffix and token-boundary constraints. Update the provider authority first, regenerate the dogfood projection, and retain content-free finding output."
+}
+]
+},
+"qa_review": {
+"status": "FAIL",
+"findings": [
+{
+"id": "QA-P1-001",
+"severity": "P1",
+"area": "Candidate token-prefix regression coverage",
+"file": "tests/unit/authoring_pack/test_zip_contract_profiles.py",
+"line_or_symbol": "test_issue_candidate_profile_rejects_private_paths_and_bare_known_tokens, lines 185-216",
+"evidence": "The parameterized regression covers `/Users/...`, `/tmp/...`, and a bare `ghp_` value only. It omits the explicitly required `/private/`, `github_pat_`, `sk-`, `xox`, and uppercase `AKIA` cases, so the lowercase-AKIA implementation defect remains green.",
+"reproduction_or_reason": "Adding `(\"Synthetic token AKIA\" + \"A\" * 16, \"secret_like_payload\")` to the existing matrix fails because review_pack_input() returns a passing profile result rather than the required rejection.",
+"required_fix": "Extend the Candidate-profile matrix to cover every explicitly required private-path and bare-token class, including uppercase AKIA. For each fixture, assert rejection, the expected content-free finding category, and absence of the matched path or token value from diagnostics; retain the generic authoring-pack characterization test."
+}
+]
+},
+"quality_gate": {
+"status": "FAIL",
+"p0_count": 0,
+"p1_count": 2,
+"decision": "FAIL"
+},
+"verification": [
+{
+"area": "Exact repository identity",
+"result": "PASS",
+"evidence": "The GitHub connector opened chemitaro/spec-dock, the required branch, PR #351, and commit 04bce9c9aeb360fc4b7123edc1802f8eaf300433. PR #351 and the required branch both resolve to that exact source HEAD, with main as the base and no default-branch fallback."
+},
+{
+"area": "A: Candidate control JSON recursion",
+"result": "PASS",
+"evidence": "parse_canonical_control_json() places JSON decoding, recursive value validation, and canonical reserialization in one guarded block and translates only UnicodeDecodeError, JSONDecodeError, and RecursionError to ValueError. verify_issue_candidate_files() converts that ValueError to invalid_control_json; Candidate loading and application handling then preserve the structured archive_rejected path. No broad Exception catch was added at this boundary."
+},
+{
+"area": "B: Conditional mode-option JSON contract",
+"result": "PASS",
+"evidence": "The command argument factories no longer raise RuntimeError for mode-dependent options. Review and apply requests reach the application validators, which return review_request_rejected, apply_request_rejected, or operation_candidate_required through the normal PlanningCommandResult renderer. Command tests verify representative JSON rejection paths and empty stderr while valid invocations remain dispatched."
+},
+{
+"area": "C: Candidate sensitive-payload scan",
+"result": "FAIL",
+"evidence": "Private-path and content-free finding handling are present, and the no-profile generic authoring-pack path remains separate. However, the case-sensitive lowercase `akia` regex branch does not reject the explicitly required uppercase AKIA credential prefix."
+},
+{
+"area": "Planning-context recursion and Human timestamp overflow",
+"result": "PASS",
+"evidence": "Deep context-manifest recursion is normalized to ValueError and returned as rejected/planning_context_rejected before backend work. UTC-unrepresentable Human decision timestamps are rejected as human_decision_rejected before transaction execution."
+},
+{
+"area": "Reference-transaction raw-byte boundary",
+"result": "PASS",
+"evidence": "The validator compares the raw payload against three exact ASCII byte sequences, each with mandatory terminal LF. Tests reject missing LF, CRLF, leading, trailing or inter-record blanks, duplicate or extra records, and old/new/ref mismatches."
+},
+{
+"area": "Authoring logical filename contract",
+"result": "PASS",
+"evidence": "PlanningOutputExpectation first requires the exact `-issue-planning-documents.zip` suffix, then normalizes the extracted Issue ID and requires byte-for-byte canonical equality. Negative filename-shape tests and positive extended-ID tests are present."
+},
+{
+"area": "Provider and dogfood parity",
+"result": "PASS",
+"evidence": "The exact-head GitHub blob identities match between provider authority and dogfood projection for commands/issue_planning.py, authority_boundary.py, zip_contract.py, and issue_planning_candidate.py."
+},
+{
+"area": "Exact-head automation evidence",
+"result": "PASS",
+"evidence": "GitHub Actions runs associated with the exact source HEAD completed successfully for both CI and Provider CI, including workspace validation, provider static analysis, and the provider pytest suite. These green runs do not exercise the omitted uppercase AKIA fixture."
+}
+],
+"uncertainty": [
+"The repository-local commands reported in the task brief—184 focused tests, 147 integration tests, 1428 passed with 2235 skipped, make lint, SpecDock validation, provider/dogfood parity, and git diff --check—were not independently rerun in this connector-only review; they remain supplied evidence.",
+"A complete Candidate ZIP containing the uppercase AKIA fixture was not executed locally. The rejection bypass is nevertheless deterministic from the exact-head scanner: the regex is case-sensitive, uses lowercase `akia`, and is applied to the original text."
+]
+}
