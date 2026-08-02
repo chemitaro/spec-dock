@@ -186,8 +186,13 @@ def test_issue_candidate_profile_rejects_structured_transcript_payload(tmp_path:
     ("sensitive_payload", "finding"),
     [
         ("Reference /Users/alice/private/customer-plan.md", "private_absolute_path"),
+        ("Reference /private/oracle-session/transcript.md", "private_absolute_path"),
         ("Reference /tmp/oracle-session/transcript.md", "private_absolute_path"),
         ("Synthetic token ghp_" + "a" * 32, "secret_like_payload"),
+        ("Synthetic token github_pat_" + "a" * 24, "secret_like_payload"),
+        ("Synthetic token sk-" + "a" * 24, "secret_like_payload"),
+        ("Synthetic token xoxb-" + "a" * 24, "secret_like_payload"),
+        ("Synthetic token AKIA" + "A" * 16, "secret_like_payload"),
     ],
 )
 def test_issue_candidate_profile_rejects_private_paths_and_bare_known_tokens(

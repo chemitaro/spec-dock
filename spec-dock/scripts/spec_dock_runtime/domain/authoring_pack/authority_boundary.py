@@ -61,7 +61,7 @@ PRIVATE_KEY_NAMES: tuple[str, ...] = (
 
 _KNOWN_TOKEN_RE = re.compile(
     r"(?<![A-Za-z0-9])(?:github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|"
-    r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|akia[0-9A-Z]{16,})(?![A-Za-z0-9])",
+    r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16,})(?![A-Za-z0-9])",
 )
 
 
