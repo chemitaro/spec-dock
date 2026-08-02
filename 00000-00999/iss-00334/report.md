@@ -1252,3 +1252,10 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - P1-Aのsource preflight runnerが`RuntimeError`等を返す場合も、`_source_evidence_is_current()`が例外本文を公開せずfalseへ閉じることをReview／semantic revision双方のテストで固定した。既存のstatus／reason mappingは変更していない。
 - P1-Bのrepository root `lstat()`とdirectory判定をdescriptor-openのfail-closed try boundaryへ含め、root消失・replacement等の`OSError`がpathname例外として漏れずcontent-free `ValueError`へ正規化されるようにした。provider／dogfood parityを維持した。
 - residual hardening verification: application planning/prompt `106 passed`、`make lint` pass、`git diff --check` pass。これらの差分を含む最終commit／push後に、新しいRed Team threadでexact final HEADをfresh reviewする。
+
+## 2026-08-03 — Final P1-A/B/C exact-head Red Team review PASS
+
+- fresh read-only Red Team session `iss-00334-pr351-red-final` は、`requested=Pro`／`resolved=Pro`／`status=already-selected`／`verified=yes`で実行された。GitHub connectorで repository `chemitaro/spec-dock`、required branch `iss-00334-implement-chatgpt-issue-planning-workflow`、PR #351、exact source HEAD `cccd79263cfed9ba8f05c9861c1cf22d6f825fff`を確認し、branch／PR head SHA一致、default-branch fallback未使用を確認した。Red Teamはrepository、branch、PR、artifact、ZIP、source、testsを変更していない。
+- P1-AはReview／semantic revisionの両方でCandidate初回検証→source preflight→Candidate再検証、identity／exact ZIP drift、loader／preflight exceptionのfail-closedを確認した。P1-Bはroot／ancestor descriptor-relative no-follow traversal、regular-file／bounded read、capability不在fail-closed、outside bytes不混入、attachment names/order/bytes維持を確認した。P1-Cはsame identity／ctime replacementを含むrules link rollbackでdestructive unlinkがなく、既存setup failure envelope、normal positive、他のsafe rollbackを維持することを確認した。
+- provider／dogfood blob parity、focused tests、canonical契約、public mapping/schema、Oracle boundary、P2 blocker vocabularyの除外を確認し、P0=0、P1=0、overall `PASS`となった。正式read-only成果物は`artifacts/20260803t070000z-pr-351-red-final-p1-abc-review-pass.md`で、SHA-256は`9d440d47d29c5852921120fa8b5c65570bdc6dcf6ed4f85191c03f171a32743a`である。
+- 次のgateはこのPASS証跡のcommit／push、PR #351のcurrent-head observation／CI確認、merge-ready状態の再確認である。merge、auto-merge、branch削除、Issue close、`issue finish`は行わない。
