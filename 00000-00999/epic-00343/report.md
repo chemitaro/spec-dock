@@ -25,19 +25,19 @@ ID: "epic-00343"
   - team onboarding ArtifactもREADME contractへ更新した。
   - ユーザーが3 slicesを採用し、`iss-00344` / `iss-00345` / `iss-00346`をGitHub Issue #344 / #345 / #346として作成した。`iss-00346`から`iss-00344` / `iss-00345`へのdirect dependencyをruntime commandで登録した。
 - `iss-00344`は全実装・review・deliveryを完了し、GitHub Issue #344は2026-07-29T23:49:03Zにclosed、PR #350は2026-07-29T23:49:02Zにmergeされた（merge commit `a9871971481d77baa56e670163e1ae1ebf8ac4b4`）。
-- Candidate 3の`iss-00345`（#345）はGitHub上で2026-07-30T15:37:18Zにclosedし、`iss-00346`（#346）はS01〜S04の実装・ChatGPT Pro code gateを完了した。Issue 346 reportのS04 final reviewはP0〜P3=0であり、S90ではprovider docsとmanaged projection parityを更新した。
+- Candidate 3の`iss-00345`（#345）はGitHub上で2026-07-30T15:37:18Zにclosedし、`iss-00346`（#346）はS01〜S04の実装・ChatGPT Pro code gateを完了した。Issue 346 reportのS04 final reviewはP0〜P3=0であり、S90ではprovider docsとmanaged projection parityを更新した。S90のfirst exact-head spec reviewはP1=3でfailし、現在はbounded remediation後のfresh review待ちである。
   - `iss-00345`のfresh code reviewでLinux named staging cleanupのsame-UID replacement raceを検出した。macOS専用のaccepted waiverをLinuxへ拡張せず、ユーザー採用済みOption AによりLinux anonymous `O_TMPFILE` stagingを必須化するEpic amendmentを開始した。
 - 次のマイルストーン:
   - Issue 346のS90 docs/spec reviewを完了し、S99のfast/full regression、single-thread QA/code/spec review、PR handoffを最新headで実施する。
 - ブロッカー:
-  - Candidate 3のS99が未完了であることだけが残課題である。S90 docs更新は既存のaccepted Linux/macOS trust boundaryを説明する範囲に限定し、新しいproduct decisionやruntime fallbackは導入していない。
+- Candidate 3のS90 fresh spec reviewとS99（fast/full、統合review、PR handoff）が未完了である。S90 docs更新は既存のaccepted Linux/macOS trust boundaryを説明する範囲に限定し、runtime mirrorはS04のprovider-to-dogfood projection correctionとしてD-005/Issue EAL-013へ明示した。新しいproduct decisionやruntime fallbackは導入していない。
 
 ### Candidate 3 trace（Issue 346）
 
 - `iss-00344`（#344）はPR #350のmergeで完了し、`iss-00345`（#345）はGitHubでclosed済みである。両Issueの実装を前提に、`iss-00346`（#346）はS01 candidate wheel/fresh consumer、S02 no-backfill/update、S03 platform/privacy、S04 opaque lifecycle/projection/compatibilityを順に完了した。
 - Issue 346 S04のChatGPT Pro exact-head code gateは reviewed head `2af3a145ec1a29e05f677d13ee20d53e55f38e3f`、P0/P1/P2/P3=0、`review_status=pass`。詳細とArtifactはIssue reportのS04 review ledgerを参照する。
-- S90ではprovider docsを更新し、candidate-wheel updateでconsumer docs/runtime mirrorとstatus manifestを同期した。provider/projection parity、docs token checks、`validate nodes=217`、`sync --no-github`はpass。Issue reportのS90 sectionとEAL-006が一次 traceである。
-- 残りはS99のみであり、ordinary/explicit-full test lane、single-thread ChatGPT Pro QA/code/spec review、latest-head PR handoff、Merge Preparation、human merge stopを同一candidateへ束ねる。ここではS99完了やEpic final closureを主張しない。
+- S90ではprovider docsを更新し、candidate-wheel updateでconsumer docs/runtime mirrorとstatus manifestを同期した。provider/projection parity、docs token checks、`validate nodes=217`、`sync --no-github`はpassしたが、first exact-head ChatGPT Pro spec review（session `iss346-s90-spec-review`、reviewed head `1364d62ca7a3e0ff42e7fe771b8a869cf54697bb`）はP1=3でfailした。Issue reportのS90 section、EAL-006〜013、Artifact `20260802t011550z-chatgpt-output-s90-docs-spec-review.md`が一次 traceである。
+- S90 remediation/re-review後にS99（ordinary/explicit-full test lane、single-thread ChatGPT Pro QA/code/spec review、latest-head PR handoff、Merge Preparation、human merge stop）を同一candidateへ束ねる。ここではS90 pass、S99完了、Epic final closureを主張しない。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -112,7 +112,7 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 | design | reviewed amended requirement、past system-architect draft、current source/tests、accepted ADR | first reviewでpackage exclusion、second reviewでexplicit source / canonical authority誤読を検出 | 4 README assets、fresh-only copy、README-only ignore、evidence-only guidance、byte parity、package-data broad exclusion限定化、4 surface exact allowlist、test/rollbackをcanonical designへ反映 | third fresh amendment review `pass`、confidence 0.92 | no | plan amendmentへpromote |
 | plan | 過去ChatGPT / implementation-planner evidenceと3 slices、reviewed README design amendment、Issue 344 delivery-boundary analysis | Candidate 1のIssue-local PRとCandidate 3の残余integration境界を更新 | 3 vertical slicesとdependency metadataを維持し、Candidate 1へ自身のprojection/default lane/PR observationだけを移す | fresh amendment re-review `pass`、finding 0 | no | Issue 344 S02へ進む |
 | macOS cleanup amendment | Issue 345のS02 code review、platform API制約、Issue discussion、Option A user decision | macOS named staging cleanupでabsolute no-non-owned-deleteとsuccess laneを同時に満たせない | Option AをADRとEpic requirement / design / planへ限定反映。fresh spec review前はIssue executionを再開しない | pass | no | Issue 345 inheritance |
-| Linux anonymous-staging amendment | Issue 345のfresh code review / visible probe pathname P1、Linux `open(2)` / `linkat(2)` capability制約、user Option A decision | Linux named staging cleanupのsame-UID waiverを受容せず、visible probe pathnameも作らない | `O_TMPFILE` anonymous staging、held-FD publication、完全anonymous preflight、formal destination前fail-closed、supported Linux filesystem lane縮小をEpic正本とaccepted ADRへ反映。fresh Epic reviewのP1（linkat capability / policy failureはactual commitでのみ検出）とP2（T3 platform別test contract）を限定修正 | fresh Epic review `fail` P1/P2を修正済み、fresh rereview pending | yes | fresh Epic rereview pass後にIssue 345継承とfresh reviewを実施 |
+| Linux anonymous-staging amendment | Issue 345のfresh code review / visible probe pathname P1、Linux `open(2)` / `linkat(2)` capability制約、user Option A decision | Linux named staging cleanupのsame-UID waiverを受容せず、visible probe pathnameも作らない | `O_TMPFILE` anonymous staging、held-FD publication、完全anonymous preflight、formal destination前fail-closed、supported Linux filesystem lane縮小をEpic正本とaccepted ADRへ反映。fresh Epic reviewのP1（linkat capability / policy failureはactual commitでのみ検出）とP2（T3 platform別test contract）を限定修正し、Issue 345 final reviewで受容境界を確認した | Issue 345 final review / EAL-042でpass、#345 closed。初回Epic reviewはhistorical evidenceとして保持し、現行blockingではない | no | Issue 346 S90 docsとS99でaccepted boundaryを再確認 |
 
 ## ワークフロー単位の named role 許可（Workflow-Scoped Authorization）
 
@@ -170,16 +170,16 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 ## 決定事項（ADRリンク） (必須)
 - [`20260728t100038z-adr Generic Imported File Identity And Privacy Boundary`](artifacts/20260728t100038z-adr-generic-imported-file-identity-and-privacy-boundary.md): generic `--` filename family、full destination basename identity、external source privacy、postcommit retry semanticsを固定するaccepted ADR。
 - [`20260730t085831z-adr macOS Generic Import Staging Cleanup Trust Boundary`](artifacts/20260730t085831z-adr-macos-generic-import-staging-cleanup-trust-boundary.md): Option AとしてmacOS clone-capable successを維持し、named staging cleanupの限定same-UID final-window exclusionとmandatory mitigationsを固定するADR。fresh Epic spec rereviewは`pass`済み。
-- [`20260730t102747z-adr Linux Generic Import Anonymous Staging Trust Boundary`](artifacts/20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md): Linuxではsame-UID cleanup waiverを受容せず、linkable `O_TMPFILE` anonymous stagingとheld-FD publicationを必須化するaccepted ADR。capability不足は`publication_unsupported` / `not_committed` / `safe_after_remediation`でformal destination前にfail closedし、supported Linux filesystem laneは縮小する。first fresh Epic reviewは4 findingで`fail`、限定修正後のrereview待ち。
+- [`20260730t102747z-adr Linux Generic Import Anonymous Staging Trust Boundary`](artifacts/20260730t102747z-adr-linux-anonymous-staging-trust-boundary.md): Linuxではsame-UID cleanup waiverを受容せず、linkable `O_TMPFILE` anonymous stagingとheld-FD publicationを必須化するaccepted ADR。capability不足は`publication_unsupported` / `not_committed` / `safe_after_remediation`でformal destination前にfail closedし、supported Linux filesystem laneは縮小する。first fresh Epic reviewの4 findingはIssue 345の限定修正後のfinal reviewで解消され、#345はclosed済み。初回レビュー失敗はhistorical evidenceとして残すが、現行blockingではない。
 - 旧`epic-00312`のtemplate-free / byte-preserving publication ADRはimplementation evidenceとして参照できるが、generic importの新しいauthorityを自動付与しない。
 
 ## 完了した Issue / PR / Release (必須)
 - 完了: `iss-00344` / GitHub Issue #344（2026-07-29T23:49:03Z closed）、PR #350（2026-07-29T23:49:02Z merged、merge commit `a9871971481d77baa56e670163e1ae1ebf8ac4b4`）。
-- 完了: `iss-00345` (#345、GitHub closed 2026-07-30T15:37:18Z)。実施中: `iss-00346` (#346、S01〜S04完了、S90実装済み、S99 pending)。
+- 完了: `iss-00345` (#345、GitHub closed 2026-07-30T15:37:18Z)。実施中: `iss-00346` (#346、S01〜S04実装・S04 code gate完了、S90 docs/projection実装済み、S90 re-reviewとS99 pending)。
 - GitHub Epic issue: #343。
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
-- E-AC-001〜016: `iss-00344` / `iss-00345`の完了証跡と`iss-00346` S01〜S04/S90 evidenceで達成。S99のfast/full、統合review、PR handoffは未完了。
+- E-AC-001〜016: `iss-00344` / `iss-00345`の完了証跡と`iss-00346` S01〜S04/S90 implementation evidenceで実装到達。S90 exact-head spec reviewはfail後のre-review待ちであり、レビューpassによる達成確定は未了。S99のfast/full、統合review、PR handoffも未完了。
 - E-AC-017〜020: S99 final quality、PR handoff、Merge Preparation、human merge stopの証跡待ち。
 
 ## ロールアウト結果（必要なら） (任意)
