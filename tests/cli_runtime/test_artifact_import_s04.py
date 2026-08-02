@@ -1,11 +1,14 @@
+import builtins
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 import hashlib
+import io
 import json
 from pathlib import Path
 import sys
 import tempfile
 import threading
+import zipfile
 
 import pytest
 
@@ -75,6 +78,102 @@ def _post_rollout_modules():
     return artifact_import_commands, ArtifactImportFileArgs
 
 
+def _file_import_modules():
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from importlib import import_module
+
+        from spec_dock_runtime.application.contracts import FileArtifactImportRequest
+
+        import_file_module = import_module("spec_dock_runtime.application.import_file_artifact")
+        create_module = import_module("spec_dock_runtime.application.create_artifact_doc")
+    finally:
+        sys.path.pop(0)
+    return FileArtifactImportRequest, import_file_module, create_module
+
+
+def _artifact_domain_modules():
+    runtime_scripts_dir = Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+    sys.path.insert(0, str(runtime_scripts_dir))
+    try:
+        from spec_dock_runtime.domain.artifacts import (
+            ArtifactSlot,
+            parse_artifact_filename,
+            parse_generic_imported_artifact_filename,
+            scan_artifact_slot_ledger,
+        )
+    finally:
+        sys.path.pop(0)
+    return ArtifactSlot, parse_artifact_filename, parse_generic_imported_artifact_filename, scan_artifact_slot_ledger
+
+
+def _normalize_top_level_generated_at(content: bytes) -> bytes:
+    """Normalize only a top-level generated_at value while preserving raw JSON bytes."""
+
+    try:
+        payload = json.loads(content)
+    except (TypeError, UnicodeDecodeError, json.JSONDecodeError):
+        return content
+    if not isinstance(payload, dict) or not isinstance(payload.get("generated_at"), str):
+        return content
+
+    def consume_string(start: int) -> int:
+        index = start + 1
+        escaped = False
+        while index < len(content):
+            byte = content[index]
+            if escaped:
+                escaped = False
+            elif byte == ord("\\"):
+                escaped = True
+            elif byte == ord('"'):
+                return index + 1
+            index += 1
+        return len(content)
+
+    depth = 0
+    index = 0
+    while index < len(content):
+        byte = content[index]
+        if byte == ord('"'):
+            string_end = consume_string(index)
+            if depth == 1 and json.loads(content[index:string_end]) == "generated_at":
+                value_start = string_end
+                while value_start < len(content) and content[value_start] in b" \t\r\n":
+                    value_start += 1
+                if value_start >= len(content) or content[value_start] != ord(":"):
+                    return content
+                value_start += 1
+                while value_start < len(content) and content[value_start] in b" \t\r\n":
+                    value_start += 1
+                if value_start >= len(content) or content[value_start] != ord('"'):
+                    return content
+                value_end = consume_string(value_start)
+                return content[:value_start] + b'"<generated_at>"' + content[value_end:]
+            index = string_end
+            continue
+        if byte in (ord("{"), ord("[")):
+            depth += 1
+        elif byte in (ord("}"), ord("]")):
+            depth -= 1
+        index += 1
+    return content
+
+
+def test_tc_346_s04_projection_snapshot_preserves_raw_json_except_generated_at() -> None:
+    raw = b'{\n  "nested": { "generated_at": "inner" },\n  "b": 2,\n  "generated_at" : "2026-07-14T01:02:03Z"\n}\n'
+    normalized = _normalize_top_level_generated_at(raw)
+    assert (
+        normalized
+        == b'{\n  "nested": { "generated_at": "inner" },\n  "b": 2,\n  "generated_at" : "<generated_at>"\n}\n'
+    )
+    reordered = (
+        b'{\n  "generated_at" : "2026-07-14T01:02:03Z",\n  "nested": { "generated_at": "inner" },\n  "b": 2\n}\n'
+    )
+    assert _normalize_top_level_generated_at(reordered) != normalized
+
+
 class _FixedClock:
     def now_iso(self) -> str:
         return "2026-07-14T01:02:03Z"
@@ -131,16 +230,7 @@ class TestArtifactImportS04(CliRuntimeHarness):
                 continue
             content = path.read_bytes()
             if path.suffix == ".json":
-                payload = json.loads(content)
-                if isinstance(payload, dict):
-                    payload.pop("generated_at", None)
-
-                content = json.dumps(
-                    payload,
-                    ensure_ascii=False,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                ).encode("utf-8")
+                content = _normalize_top_level_generated_at(content)
             snapshot[relative] = content
         return snapshot
 
@@ -166,6 +256,77 @@ class TestArtifactImportS04(CliRuntimeHarness):
                 for path in adrs_dir.iterdir()
             )
         )
+
+    def _strict_projection_snapshot(self, specdock_dir: Path) -> dict[str, bytes]:
+        snapshot = self._projection_snapshot(specdock_dir)
+        assert set(snapshot) == set(self._PROJECTION_PATHS)
+        return snapshot
+
+    def _prepare_opaque_import_consumer(self, target: Path) -> tuple[Path, tuple[Path, ...]]:
+        assert main(["init", str(target)]) == 0
+        self._write_runtime_clock(target)
+        self._create_same_repo_linked_hierarchy(
+            target,
+            initiative_issue_number=301,
+            epic_issue_number=312,
+            issue_issue_number=317,
+            initiative_title="Architecture",
+            epic_title="Workbench",
+            issue_title="Opaque lifecycle",
+        )
+        [issue_dir] = list((target / "spec-dock" / "initiatives").rglob("iss-00317-opaque-lifecycle"))
+        baseline_adr = issue_dir / "artifacts" / "20260713t010203z-adr-baseline.md"
+        baseline_adr.write_text(
+            "\n".join((
+                "---",
+                "\u7a2e\u5225: ADR\uff08Architecture Decision Record\uff09",
+                'ID: "20260713t010203z-adr"',
+                'タイトル: "Baseline"',
+                '状態: "accepted"',
+                '作成者: "Tester"',
+                '最終更新: "2026-07-13"',
+                '親: ["iss-00317"]',
+                'authority: "accepted"',
+                "mirror_eligible: true",
+                "---",
+                "",
+                "# Baseline",
+                "",
+            )),
+            encoding="utf-8",
+        )
+        self._run_runtime(target, ["active", "set", "--id", "iss-00317"])
+        self._run_runtime(target, ["validate"])
+        self._run_runtime(target, ["sync", "--no-github"])
+
+        sources_dir = target / "spec-dock" / ".workbench"
+        sources_dir.mkdir(parents=True, exist_ok=True)
+        binary = sources_dir / "opaque-binary.bin"
+        binary.write_bytes(b"S04 binary body\x00\xff")
+        archive = sources_dir / "opaque-archive.zip"
+        with zipfile.ZipFile(archive, "w") as archive_file:
+            archive_file.writestr("payload.txt", "S04 ZIP body sentinel")
+        invalid_utf8 = sources_dir / "opaque-invalid.md"
+        invalid_utf8.write_bytes(b"S04 invalid UTF-8\xff\xfe\x00")
+        nul_bearing = sources_dir / "opaque-nul.md"
+        nul_bearing.write_bytes(b"S04 NUL body\x00sentinel")
+        adr_looking = sources_dir / "accepted-adr-looking.md"
+        adr_looking.write_text(
+            "\n".join((
+                "---",
+                "\u7a2e\u5225: ADR\uff08Architecture Decision Record\uff09",
+                'ID: "s04-generic-adr-looking"',
+                '\u89aa: ["iss-00317"]',
+                'authority: "accepted"',
+                "mirror_eligible: true",
+                "---",
+                "",
+                "# This body remains opaque",
+                "",
+            )),
+            encoding="utf-8",
+        )
+        return issue_dir, (binary, archive, invalid_utf8, nul_bearing, adr_looking)
 
     def _request(self, contracts, source: Path, *, slug: str = "collision"):
         return contracts(
@@ -271,6 +432,107 @@ class TestArtifactImportS04(CliRuntimeHarness):
                 "20260714t010203z-chatgpt-output-collision.md",
             ]
             assert sentinel.read_bytes() == b"sentinel bytes"
+
+    def test_tc_346_s04_003_generic_file_races_legacy_creator_without_overwrite(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        (
+            _import_module,
+            _ArtifactImportError,
+            _ArtifactImportRequest,
+            CreateArtifactDocRequest,
+            _Ports,
+            bootstrap,
+            _Publisher,
+        ) = _runtime_modules()
+        FileArtifactImportRequest, import_file_module, create_module = _file_import_modules()
+        ArtifactSlot, parse_artifact_filename, parse_generic_imported_artifact_filename, scan_artifact_slot_ledger = (
+            _artifact_domain_modules()
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            issue_dir = self._prepare_target(target)
+            source = target / "spec-dock" / ".workbench" / "concurrent-generic.bin"
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source_body = b"generic concurrent body\x00\xff"
+            source.write_bytes(source_body)
+            sentinel = issue_dir / "artifacts" / "20260714t010203z-99--sentinel.bin"
+            sentinel.write_bytes(b"sentinel bytes")
+
+            monkeypatch.setattr(bootstrap.infra_clock, "now_iso", _FixedClock().now_iso)
+            context = bootstrap.build_runtime(target / "spec-dock", repo_root=target)
+            barrier = threading.Barrier(2)
+            original_import_acquire = import_file_module._acquire_create_lock
+            original_create_acquire = create_module._acquire_create_lock
+
+            def import_acquire_after_barrier(specdock_dir):
+                barrier.wait(timeout=5)
+                return original_import_acquire(specdock_dir)
+
+            def create_acquire_after_barrier(specdock_dir):
+                barrier.wait(timeout=5)
+                return original_create_acquire(specdock_dir)
+
+            monkeypatch.setattr(import_file_module, "_acquire_create_lock", import_acquire_after_barrier)
+            monkeypatch.setattr(create_module, "_acquire_create_lock", create_acquire_after_barrier)
+            generic_request = FileArtifactImportRequest(
+                target_kind="issue",
+                target_value="317",
+                source_path=source,
+            )
+            legacy_request = CreateArtifactDocRequest(
+                artifact_type="blank",
+                scope_node_id="317",
+                scope_kind="issue",
+                title="Legacy concurrent notes",
+                slug="legacy-concurrent-notes",
+            )
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                generic_future = executor.submit(context.use_cases.import_file_artifact, generic_request)
+                legacy_future = executor.submit(context.use_cases.create_artifact_doc, legacy_request)
+                generic_result = generic_future.result(timeout=10)
+                legacy_result = legacy_future.result(timeout=10)
+
+            generic_path = target / generic_result.destination
+            legacy_path = target / legacy_result.path
+            assert generic_path.is_file()
+            assert legacy_path.is_file()
+            assert generic_path != legacy_path
+            assert generic_path.name.endswith("--concurrent-generic.bin")
+            assert legacy_path.name.endswith("-legacy-concurrent-notes.md")
+            assert generic_path.name != legacy_path.name
+            assert generic_path.name.startswith("20260714t010203z")
+            assert generic_path.read_bytes() == source_body
+            assert legacy_path.read_bytes()
+            assert source.read_bytes() == source_body
+            assert sentinel.read_bytes() == b"sentinel bytes"
+
+            generic_parsed = parse_generic_imported_artifact_filename(generic_path.name)
+            legacy_parsed = parse_artifact_filename(legacy_path.name)
+            assert generic_parsed is not None
+            assert legacy_parsed is not None
+            assert generic_parsed.original_basename == source.name
+            assert legacy_parsed.artifact_type == "blank"
+            fixed_timestamp = "20260714t010203z"
+            expected_slots = {
+                ArtifactSlot(fixed_timestamp, None),
+                ArtifactSlot(fixed_timestamp, 1),
+            }
+            observed_slots = {
+                ArtifactSlot(generic_parsed.timestamp, generic_parsed.suffix),
+                ArtifactSlot(legacy_parsed.timestamp, legacy_parsed.suffix),
+            }
+            assert observed_slots == expected_slots
+            duplicate_error, ledger = scan_artifact_slot_ledger(issue_dir / "artifacts")
+            assert duplicate_error is None
+            assert expected_slots <= ledger.used_slots
+            assert {generic_parsed.artifact_id, legacy_parsed.artifact_id} <= ledger.artifact_ids
+
+            # Keep the oracle sensitive to a missing suffix assignment without coupling it to winner order.
+            with pytest.raises(AssertionError):
+                assert {ArtifactSlot(fixed_timestamp, None)} == expected_slots
 
     def test_tc317_s04_02_exact_path_eexist_rescans_then_uses_next_slot(self) -> None:
         (
@@ -661,6 +923,231 @@ class TestArtifactImportS04(CliRuntimeHarness):
             assert result.byte_count == len(body)
             assert (target / result.destination_path).read_bytes() == body
             assert source.read_bytes() == body
+
+    def test_tc_346_s04_001_opaque_body_open_denial_matrix(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            _issue_dir, sources = self._prepare_opaque_import_consumer(target)
+            source_bodies = {source: source.read_bytes() for source in sources}
+            target_specs = (
+                ("root", None, sources[0]),
+                ("initiative", "301", sources[1]),
+                ("epic", "312", sources[2]),
+                ("issue", "317", sources[3]),
+                ("issue", "317", sources[4]),
+            )
+            destinations: list[Path] = []
+            for target_kind, target_id, source in target_specs:
+                command = ["artifact", "import", "file", f"--{target_kind}"]
+                if target_id is not None:
+                    command.append(target_id)
+                command.extend(["--file", source.relative_to(target).as_posix(), "--json"])
+                result = self._run_runtime_capture(target, command)
+                assert result.returncode == 0, result.stdout + result.stderr
+                payload = json.loads(result.stdout)
+                assert payload["import_kind"] == "file"
+                assert payload["storage_identity"] == "generic"
+                assert payload["canonical"] is False
+                assert "sha256" not in payload
+                assert "byte_count" not in payload
+                assert "mime" not in payload
+                assert "encoding" not in payload
+                destination = target / payload["destination"]
+                assert destination.is_file()
+                assert destination.name.split("--", 1)[0].startswith("202")
+                destinations.append(destination)
+
+            (
+                CheckDepsRequest,
+                SyncRequest,
+                TargetRef,
+                ValidateTreeRequest,
+                build_context_pack_text,
+                load_active_manifest,
+            ) = _lifecycle_modules()
+            (
+                _import_module,
+                _ArtifactImportError,
+                _ArtifactImportRequest,
+                _CreateArtifactDocRequest,
+                _Ports,
+                bootstrap,
+                _Publisher,
+            ) = _runtime_modules()
+            specdock_dir = target / "spec-dock"
+            context = bootstrap.build_runtime(specdock_dir, repo_root=target)
+            generic_paths = {path.absolute() for path in destinations}
+
+            def install_open_guard(guard: pytest.MonkeyPatch) -> list[Path]:
+                opened: list[Path] = []
+
+                def canonical(candidate: object) -> set[Path]:
+                    if isinstance(candidate, int):
+                        return set()
+                    try:
+                        path = Path(candidate)  # type: ignore[arg-type]
+                    except (TypeError, ValueError):
+                        return set()
+                    return {path.absolute(), path.resolve()}
+
+                def deny(candidate: object) -> None:
+                    if generic_paths.intersection(canonical(candidate)):
+                        path = Path(candidate)  # type: ignore[arg-type]
+                        opened.append(path)
+                        raise AssertionError(f"generic body must remain unopened: {path.name}")
+
+                original_path_open = Path.open
+                original_read_text = Path.read_text
+                original_read_bytes = Path.read_bytes
+                original_builtin_open = builtins.open
+                original_io_open = io.open
+
+                def guarded_path_open(path: Path, *args, **kwargs):
+                    deny(path)
+                    return original_path_open(path, *args, **kwargs)
+
+                def guarded_read_text(path: Path, *args, **kwargs):
+                    deny(path)
+                    return original_read_text(path, *args, **kwargs)
+
+                def guarded_read_bytes(path: Path, *args, **kwargs):
+                    deny(path)
+                    return original_read_bytes(path, *args, **kwargs)
+
+                def guarded_builtin_open(file, *args, **kwargs):
+                    deny(file)
+                    return original_builtin_open(file, *args, **kwargs)
+
+                def guarded_io_open(file, *args, **kwargs):
+                    deny(file)
+                    return original_io_open(file, *args, **kwargs)
+
+                guard.setattr(Path, "open", guarded_path_open)
+                guard.setattr(Path, "read_text", guarded_read_text)
+                guard.setattr(Path, "read_bytes", guarded_read_bytes)
+                guard.setattr(builtins, "open", guarded_builtin_open)
+                guard.setattr(io, "open", guarded_io_open)
+                return opened
+
+            # First guard is an explicit sensitivity check. The measured guard
+            # below is a fresh instance and therefore cannot inherit this read.
+            with monkeypatch.context() as sensitivity_guard:
+                sensitivity_opened = install_open_guard(sensitivity_guard)
+                with pytest.raises(AssertionError, match="generic body must remain unopened"):
+                    destinations[0].read_bytes()
+                assert len(sensitivity_opened) == 1
+
+            with monkeypatch.context() as lifecycle_guard:
+                lifecycle_opened = install_open_guard(lifecycle_guard)
+                validation = context.use_cases.validate_tree(ValidateTreeRequest())
+                deps = context.use_cases.check_deps(
+                    CheckDepsRequest(
+                        target=TargetRef(kind="node_id", node_id="iss-00317", github_issue_number=None),
+                        use_github=False,
+                        issue_limit=10000,
+                    )
+                )
+                sync_result = context.use_cases.sync(
+                    SyncRequest(
+                        force=False,
+                        github_enabled=False,
+                        issue_limit=10000,
+                        update_active_from_branch=False,
+                    )
+                )
+                active = load_active_manifest(specdock_dir)
+                assert active.manifest is not None
+                context_pack = build_context_pack_text(active.manifest, repo_root=target)
+                assert validation.report.errors == []
+                assert deps.target.node_id == "iss-00317"
+                assert sync_result.artifact_failure is None
+                assert "# Context Pack (generated)" in context_pack
+                assert lifecycle_opened == []
+
+            adr_mirror = self._adr_mirror_snapshot(specdock_dir)
+            assert len(adr_mirror) == 1
+            assert adr_mirror[0][0] == "20260713t010203z-adr-baseline.md"
+            assert all(destination.name not in {name for name, _target in adr_mirror} for destination in destinations)
+            assert all(source.read_bytes() == source_bodies[source] for source in sources)
+            assert all(
+                destination.read_bytes() == source_bodies[source]
+                for destination, source in zip(destinations, sources, strict=True)
+            )
+
+    def test_tc_346_s04_002_projection_and_context_equivalence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            _issue_dir, sources = self._prepare_opaque_import_consumer(target)
+            specdock_dir = target / "spec-dock"
+            baseline_projection = self._strict_projection_snapshot(specdock_dir)
+            baseline_mirror = self._adr_mirror_snapshot(specdock_dir)
+            baseline_context = (specdock_dir / "active" / "context-pack.md").read_bytes()
+            baseline_deps = self._run_runtime_capture(
+                target,
+                ["deps", "check", "--id", "iss-00317", "--no-github", "--json"],
+            )
+            assert baseline_deps.returncode == 0, baseline_deps.stdout + baseline_deps.stderr
+            baseline_typed = tuple(
+                sorted(
+                    path.name
+                    for path in specdock_dir.rglob("artifacts/*")
+                    if path.suffix == ".md" and path.name != "rules.md" and "--" not in path.name
+                )
+            )
+
+            target_specs = (
+                ("root", None, sources[0]),
+                ("initiative", "301", sources[1]),
+                ("epic", "312", sources[2]),
+                ("issue", "317", sources[3]),
+                ("issue", "317", sources[4]),
+            )
+            imported: list[Path] = []
+            for target_kind, target_id, source in target_specs:
+                command = ["artifact", "import", "file", f"--{target_kind}"]
+                if target_id is not None:
+                    command.append(target_id)
+                command.extend(["--file", source.relative_to(target).as_posix(), "--json"])
+                result = self._run_runtime_capture(target, command)
+                assert result.returncode == 0, result.stdout + result.stderr
+                imported.append(target / json.loads(result.stdout)["destination"])
+
+            self._run_runtime(target, ["validate"])
+            self._run_runtime(target, ["sync", "--no-github"])
+            after_projection = self._strict_projection_snapshot(specdock_dir)
+            after_deps = self._run_runtime_capture(
+                target,
+                ["deps", "check", "--id", "iss-00317", "--no-github", "--json"],
+            )
+            assert after_deps.returncode == 0, after_deps.stdout + after_deps.stderr
+            assert after_projection == baseline_projection
+            assert (specdock_dir / "active" / "context-pack.md").read_bytes() == baseline_context
+            assert after_deps.stdout == baseline_deps.stdout
+            assert self._adr_mirror_snapshot(specdock_dir) == baseline_mirror
+            after_typed = tuple(
+                sorted(
+                    path.name
+                    for path in specdock_dir.rglob("artifacts/*")
+                    if path.suffix == ".md" and path.name != "rules.md" and "--" not in path.name
+                )
+            )
+            assert after_typed == baseline_typed
+            projection_text = b"\n".join(after_projection.values())
+            assert all(path.name.encode() not in projection_text for path in imported)
+            assert all(
+                marker not in projection_text
+                for marker in (
+                    b"opaque-binary.bin",
+                    b"opaque-archive.zip",
+                    b"opaque-invalid.md",
+                    b"opaque-nul.md",
+                    b"accepted-adr-looking.md",
+                    b"This body remains opaque",
+                )
+            )
 
     def test_tc_s04_001_002_003_generic_bodies_do_not_change_default_lifecycle_projections(
         self,
