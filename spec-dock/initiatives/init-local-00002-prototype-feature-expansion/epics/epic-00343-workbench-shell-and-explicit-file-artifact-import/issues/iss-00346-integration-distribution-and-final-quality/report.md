@@ -670,7 +670,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 
 - `review_content_hash`: `4d22fd2f39d8281181ebf434fd02eba73033bde29aca320cc8265c96942b3113`
 - `freeze_source_head`: `09172310ff57e6fa28e97b0bb08b1c63297eac22`
-- 正規化対象: このIssue reportのS99レビュー証跡ブロック、`EAL-015`のreviewer/next_action列、親Epic reportの現行S99レビュー状態を空欄化したledgerと、GitHub上のcurrent branchに含まれる実装・テスト・配布ドキュメントのsorted path/bytes manifest。
+- 正規化対象: このIssue reportのS99レビュー証跡ブロック、`EAL-015`のreviewer/next_action列、親Epic reportの記録時ファイルバイトをそのまま含むledgerと、GitHub上のcurrent branchに含まれる実装・テスト・配布ドキュメントのsorted path/bytes manifest。
 - 正規化規則: `S99_REVIEW_CONTENT_FREEZE_BEGIN`〜`END`、`S99_REVIEW_EVIDENCE_BEGIN`〜`END`のブロックを除外し、`EAL-015`行はID列と採用状態以外を空欄化する。advisory `artifacts/`（canonical reportを除く）と`.workbench/`はmanifest対象外とする。残りの各ファイルをrepo-relative path順に`path<TAB>sha256(bytes)\n`で並べたmanifest TSVのUTF-8バイト列をSHA-256する。このreceiptとIssue reportで同じTSV規則を用いる。
 - reviewer evidenceはこのfreeze後に外部JSONから転記できるが、上記正規化結果とhashが一致しない変更は新しいcandidateとして再レビューする。
 - manifest receipt: `artifacts/20260802t-s99-review-content-freeze.md`（このブロック自体はhash対象外）
