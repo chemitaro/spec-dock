@@ -69,8 +69,9 @@ Delegated draft、worker note、research、reviewer finding、discussion、comma
 | EAL-001 | `adopted` | `research`: Issue 346 source-grounded clarification | `requirement.md`全体、`design.md` fixture/platform boundary、`plan.md` closure boundary | 親Epic、Issue 344/345、accepted ADR、現行testsを照合したIssue-local evidenceであり、追加のowner判断を必要としない | `artifacts/20260730t155742z-research-issue-346-requirement-clarification-source-grounded-synthesis.md`; adopter: main orchestrator; reviewer: fresh `spec-reviewer`; blocking: no | canonical R/D/Pへの反映とphase review完了。実装時は判断D-001を維持 |
 | EAL-002 | `partially_adopted` | external ChatGPT Pro github-synced planning evidence | `requirement.md`、`design.md`、`plan.md`、オンボーディングartifact | GitHub planning baseline `2217889c31e1a8a83732c446264dec00dde77be6`を参照した4資料を、ローカルsourceとworkflow contractに照合して採用した。安定ID、scope、scenario、検証観点、説明構造は採用し、候補用frontmatter、evidence-only自己claim、candidate revisionをplanning baselineへ固定する記述、曖昧pathは不採用 | `artifacts/20260730t173917z--specdock-iss-00346-authoring-pack-corrected.zip`; onboarding `artifacts/20260730t182546z-research-issue-346-onboarding-guide-for-new-team-members.md`; pack review `pass`; tree SHA-256 `7b01a12ac95b13bcfdf4a3a60774d16c3dc666d49152658b95c2435e112b1e12`; adopter: main orchestrator; reviewer: fresh `spec-reviewer`; reflected_to: [`requirement.md`, `design.md`, `plan.md`, onboarding artifact]; blocking: no | implementation時はcanonical R/D/Pをauthorityとし、ZIPはadvisory evidenceとして保持 |
 | EAL-003 | `adopted` | 2026-08-02 operator instruction and main-orchestrator synthesis | `plan.md` execution procedure、`report.md` review evidence slots | Luna・Maxの実装品質を補助しつつ過剰指定を避けるため、push先行のstep具体化、Artifact低authority、single-thread複合review、main orchestrator裁定をIssue 346限定で採用した | `artifacts/20260801t152944z-disc-chatgpt-assisted-execution-agreement.md`; adopter: main orchestrator; review exclusion: explicit operator instruction; blocking: no | 各stepでplan §2.3と§x.0を実行し、observed receipt/head/review結果を本reportへ記録 |
-| EAL-004 | `rejected` | failed/stale formal ChatGPT sessions for S01 pre-step | Issue 346 S01 pre-step elaboration artifact | 新規sessionが`promptSubmitted:null`のままdetached/incomplete-captureとなり、harvestで得られた回答は別Issue 00334の内容だったため、S01の作業具体化として保存・採用しない | session diagnosticsとstale outputの内容・scope不一致を確認。Workbenchの誤出力は削除済みで、正本R/D/Pは変更していない | fresh ChatGPT Pro sessionを再取得し、成功時のみ単一MarkdownをArtifact importする | blocker: S01 review gate; adopter: main orchestrator; reviewer: pending |
-| EAL-005 | `adopted` | formal ChatGPT Pro S01 pre-step elaboration (`iss346-s01-prestep-aug2e`) | S01 test implementation aid | GitHub connectorでcurrent branch/HEADを確認し、canonical plan §8のtest cards・allowed pathsと整合する限定的な再受領、denylist negativeとinstalled `validate`確認を提案した。新APIやproduction repairを要求せず、R/D/Pを上書きしないため補助evidenceとして採用する | `artifacts/20260801t164728z-chatgpt-output-s01-chatgpt-pre-step-elaboration.md`; source SHA-256 `283c7854120a945c9432fae36848c6966bc1ee92a83eaf39b0c335b94f36d37b`; session model evidence `requested=Pro; resolved=Pro; verified=yes`; pushed head `75ba8f1fdec2b9cee5624dbdd2741614b4755778` | current HEADをcandidateとして再ビルド・再検証し、提案採否を本reportへ記録。implementation reviewとは別gate | blocking: no; adopter: main orchestrator; reviewer: pending |
+| EAL-004 | `rejected` | failed/stale formal ChatGPT sessions for S01 pre-step | Issue 346 S01 pre-step elaboration artifact | 新規sessionが`promptSubmitted:null`のままdetached/incomplete-captureとなり、harvestで得られた回答は別Issue 00334の内容だったため、S01の作業具体化として保存・採用しない | session diagnosticsとstale outputの内容・scope不一致を確認。Workbenchの誤出力は削除済みで、正本R/D/Pは変更していない | no further action。無関係なstale outputを採用しない判断は確定し、成功したEAL-005で置換した | blocking: no; adopter: main orchestrator; reviewer: not applicable; superseded by EAL-005 |
+| EAL-005 | `adopted` | formal ChatGPT Pro S01 pre-step elaboration (`iss346-s01-prestep-aug2e`) | S01 test implementation aid | GitHub connectorでcurrent branch/HEADを確認し、canonical plan §8のtest cards・allowed pathsと整合する限定的な再受領、denylist negativeとinstalled `validate`確認を提案した。新APIやproduction repairを要求せず、R/D/Pを上書きしないため補助evidenceとして採用する | `artifacts/20260801t164728z-chatgpt-output-s01-chatgpt-pre-step-elaboration.md`; source SHA-256 `283c7854120a945c9432fae36848c6966bc1ee92a83eaf39b0c335b94f36d37b`; session model evidence `requested=Pro; resolved=Pro; verified=yes`; pushed head `75ba8f1fdec2b9cee5624dbdd2741614b4755778` | S01 current-cycle evidence、review、report bindingは完了。追加のS01作業は不要 | blocking: no; adopter: main orchestrator; reviewer: S01 ChatGPT Pro implementation review; next_action: no open action |
+| EAL-006 | `adopted` | formal ChatGPT Pro S90 docs pre-step (`iss346-s90-docs-prestep`) | S90 provider docs/projection/report trace | pushed HEAD `ef467c1b84d9d7dfce64c6c4d98bcea5c560fc81`のdocs gap（Linux/macOS publication wording、fast/full lane、stale report/EAL trace）を特定し、plan §12のallowlist内で最小更新を提案した。S99完了やcanonical R/D/P変更は主張していない | `artifacts/20260802t004508z-chatgpt-output-20260802t-s90-docs-prestep.md`; SHA-256 `6a50d4a294c81ae7467ff25ae2e7956e9075bc8f0ae075670f0bfc5ba60eaec4`; 15,616 bytes; `requested=Pro; resolved=Pro; verified=yes` | provider docs、projection、status manifestを更新し、S90 fresh docs/spec reviewへ進む | blocking: no; adopter: main orchestrator; reviewer: pending; next_action: S90 review |
 
 ## 目的整合台帳（Objective Alignment Ledger / 必須）
 
@@ -588,11 +589,14 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 | ステップ（step） | ゲート名（gate name） | レビュアーロール（reviewer role） | 鮮度（freshness） | 状態（state） | リスク受容（risk acceptance） | 昇格 / 完了判断（promotion / completion decision） | メモ（notes） |
 |---|---|---|---|---|---|---|---|
 | planning | final deliverables gate | spec-reviewer | fresh | pass | no | execute approved plan | `iss346_final_deliverables_rereview`; findings 0; canonical R/D/P/report and completed onboarding reviewed |
+| S04 | exact-head implementation gate | ChatGPT Pro with current `code-reviewer` Developer Instructions | fresh | pass | no | close S04 | `iss346-s04-final-code-review`; reviewed head `2af3a145ec1a29e05f677d13ee20d53e55f38e3f`; P0/P1/P2/P3=0 |
+| S90 | documentation/spec alignment gate | ChatGPT Pro with current `spec-reviewer` Developer Instructions | pending | pending | no | obtain fresh S90 review | provider/projection/report changes are pushed through `870846fda494f7ab76af0d1e913a7a508bd14099`; review must bind the subsequent report head |
 
 #### マイルストーン / commit 候補ゲート（Milestone / Commit Candidate Gate）
 | マイルストーン / step | クロージャ状態（closure state） | コミット候補 / コミット範囲（commit candidate / scope） | コミットハッシュ / 最終台帳（commit hash / final ledger） | コミット後 clean 確認（post-commit clean check） | 差分なし根拠（no-op rationale） | 差分なし確認済み契約 / ファイル（no-op checked contracts / files） | 差分なし diff-clean コマンド（no-op diff-clean command） | 差分なし read-only 確認（no-op read-only confirmation） |
 |---|---|---|---|---|---|---|---|---|
 | S01 | committed / approved-no-op | ... | <hash or final ledger reference> | `git status --short` -> clean | ... | ... | ... | ... |
+| S90 | implementation committed / review pending | provider docs + managed projection + status manifest | `fa05765177c6cee71d0cea09cb1b1a8285a89702`, `6b815c9c`, `870846fda494f7ab76af0d1e913a7a508bd14099` | each commit clean; current report update pending | docs gap resolved within allowlist; S99 not claimed | docs/projection parity, token scan, validate/sync | `git diff --check`; `cmp`; focused docs parity test | fresh S90 ChatGPT Pro spec review required |
 
 #### 変更したファイル
 - `path/to/file1` - ...
@@ -622,27 +626,34 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### ドキュメント影響の解消ステップ S90（Docs Impact Resolution）
 | 対象 | 更新要否 | 担当（owner） | 証跡（evidence） | 仕様レビュアー結果（spec-reviewer result） |
 |---|---|---|---|---|
-| docs / templates / README / workflow / skill / migration notes | yes / no | doc-writer / N/A | ... | pass / fail / blocked |
+| provider docs / managed projection / status manifest / Issue・Epic trace | yes | doc-writer + main orchestrator | pre-step Artifact `artifacts/20260802t004508z-chatgpt-output-20260802t-s90-docs-prestep.md`; provider commit `fa05765177c6cee71d0cea09cb1b1a8285a89702`; projection commit `870846fda494f7ab76af0d1e913a7a508bd14099`; status manifest commit `6b815c9c`; `cmp` parity、required-token scan、docs parity unit 1 passed、`validate nodes=217`、`sync --no-github` pass | pending fresh S90 ChatGPT Pro docs/spec review |
+
+#### S90 documentation-impact resolution
+
+- 調査時点のpushed HEADは`ef467c1b84d9d7dfce64c6c4d98bcea5c560fc81`。S90 pre-stepは既存Workbench/no-backfill/privacy/opaque文言を維持しつつ、(1) Linux `O_TMPFILE` fail-closed/no named-temp fallback、(2) macOS staged descriptor/`fclonefileat`/cleanup warningとaccepted same-UID exclusion、(3) ordinary fast laneとexplicit `--run-full-regression` lane、(4) staleなIssue/Epic EAL traceの補正を要求した。
+- provider-firstで変更したファイルは`src/spec_dock/assets/spec_dock/docs/README.md`と`guide.md`のみ（`fa05765177c6cee71d0cea09cb1b1a8285a89702`）。provider→consumer updateで`spec-dock/docs/README.md`、`spec-dock/docs/guide.md`および既存provider runtimeのmanaged mirror `spec-dock/scripts/spec_dock_runtime/application/import_file_artifact.py`、`spec-dock/scripts/spec_dock_runtime/domain/artifacts.py`を同期した（`870846fda494f7ab76af0d1e913a7a508bd14099`）。S04 expected status manifestはdocs 2 pathを追加した（`6b815c9c`）。consumer docsを手編集していない。
+- `README.md`/`guide.md`/`reference_naming.md`/`rules/root/artifacts.md`のproviderとprojectionはbyte-identical、stale `deferred.*Issue #346`文言は除去、required safety/test-lane tokensは存在する。`uv run pytest tests/unit/infra/test_init_update.py::TestInitUpdate::test_checked_in_dogfooding_mirror_docs_match_provider_assets -q` は1 passed、`./spec-dock/scripts/spec-dock validate` は`nodes=217`、`sync --no-github` はactive unchangedで完了した。
+- S90時点ではS99を完了済みとは主張しない。S90 fresh docs/spec review後に、S99のfast/full、validate/sync、single-thread QA/code/spec review、PR handoffを実施する。
 
 ### 最終 QA ゲート（Final QA Gate）
 | レビュアー（reviewer） | 範囲 | 統合テスト判断（integration test decision） | 証跡（evidence） | 結果（result） |
 |---|---|---|---|---|
-| ChatGPT Pro with current `qa-reviewer` Developer Instructions | whole issue obligation coverage | added / already sufficient / not applicable | session/thread id + pushed head + structured QA findings | pass / fail / blocked |
+| ChatGPT Pro with current `qa-reviewer` Developer Instructions | whole issue obligation coverage | S99で実施予定 | S99 final candidateへfresh push後にsingle-thread統合review | pending |
 
 ### 最終コードレビューゲート（Final Code Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| ChatGPT Pro with current `code-reviewer` Developer Instructions | issue-wide integrated diff | ... | 0 | pass / fail / blocked |
+| ChatGPT Pro with current `code-reviewer` Developer Instructions | S04 exact-head code/evidence gate | S04 final review PASS（P0〜P3=0）をArtifact化済み。S90 docs影響は別spec reviewで確認 | `iss346-s04-final-code-review`; reviewed head `2af3a145ec1a29e05f677d13ee20d53e55f38e3f`; Artifact `artifacts/20260802t003003z-chatgpt-output-20260802t-s04-code-review-final.md`; final report successor `ef467c1b` | pass（S04） |
 
 ### 最終 spec review ゲート（Final Spec Review Gate）
 | レビュアー（reviewer） | 範囲 | 指摘 / 修正（findings / fixes） | 再 review 回数（re-review count） | 結果（result） |
 |---|---|---|---|---|
-| ChatGPT Pro with current `spec-reviewer` Developer Instructions | requirement / design / plan / report / implementation / tests / docs alignment | ... | 0 | pass / fail / blocked |
+| ChatGPT Pro with current `spec-reviewer` Developer Instructions | S90 docs/spec/report alignment | S90 fresh reviewを取得後にS90 closureへ反映 | pre-step Artifact `artifacts/20260802t004508z-chatgpt-output-20260802t-s90-docs-prestep.md`; target pushed head after docs/report update | pending |
 
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| ... | ... | final response / PR / issue comment / other external delivery evidence | ready / blocked |
+| S01〜S04実装・S90 docs/projection更新 | S99 final bounded report + PR handoff | latest pushed headのPRとMerge Preparation記録へ転記 | pending S99 final candidate; human merge stop | pending |
 
 ## 遭遇した問題と解決 (任意)
 - 問題: ...
