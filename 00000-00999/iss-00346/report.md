@@ -695,7 +695,7 @@ Lite は specialist / fallback evidence を必須化しないが、not applicabl
 ### 最終 commit（Final Commit）
 | 最終 report 台帳（final report ledger） | 最終 commit 範囲（final commit scope） | コミット後の外部証跡送付先（post-commit external evidence destination） | 結果（result） |
 |---|---|---|---|
-| S01〜S04実装・S90 docs/projection更新 | S99 final bounded report + evidence artifacts + PR handoff | reviewed head `e56427beb55d0ee3c09ad467b48baff375495100`へ外部review evidenceを束縛。PR作成後にPR URL/最新headを追記する | clean full regression完了、ChatGPT Pro統合review pass、PR handoff準備完了; human merge stop | pass（PR作成待ち） |
+| S01〜S04実装・S90 docs/projection更新 | S99 final bounded report + evidence artifacts + PR handoff | reviewed head `e56427beb55d0ee3c09ad467b48baff375495100`へ外部review evidenceを束縛。PR #353 (`https://github.com/chemitaro/spec-dock/pull/353`) は最新head `2d8bd3b020b5303f3d82577f5ac75d2eec5af61b`でopen/non-draft、base `main`、CI checks pass、mergeable/CLEAN | clean full regression完了、ChatGPT Pro統合review pass、PR handoff完了; human merge stop | pass（PR #353 ready、mergeは未実施） |
 <!-- S99_REVIEW_EVIDENCE_END -->
 
 ## 遭遇した問題と解決 (任意)
