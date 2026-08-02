@@ -1,4 +1,4 @@
-# root の成果物ルール（artifacts/rules.md）
+# ルートの成果物ルール（root / artifacts/rules.md）
 
 `artifact import file --root --file <path>` は、一件の明示 regular file を
 root の `spec-dock/artifacts/` へ generic Artifact として保存する経路です。

@@ -89,7 +89,11 @@ def normalize_generic_artifact_basename(
     normalized = _replace_unsafe_basename_characters(name)
     if normalized in ("", ".", ".."):
         raise RuntimeError("Invalid generic artifact basename")
-    if len(normalized.encode("utf-8")) <= budget:
+    try:
+        normalized_bytes = normalized.encode("utf-8")
+    except UnicodeEncodeError:
+        raise RuntimeError("Invalid generic artifact basename") from None
+    if len(normalized_bytes) <= budget:
         return normalized
 
     stem, extension_chain = _split_extension_chain(normalized)
