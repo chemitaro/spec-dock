@@ -25,19 +25,19 @@ ID: "epic-00343"
   - team onboarding ArtifactもREADME contractへ更新した。
   - ユーザーが3 slicesを採用し、`iss-00344` / `iss-00345` / `iss-00346`をGitHub Issue #344 / #345 / #346として作成した。`iss-00346`から`iss-00344` / `iss-00345`へのdirect dependencyをruntime commandで登録した。
 - `iss-00344`は全実装・review・deliveryを完了し、GitHub Issue #344は2026-07-29T23:49:03Zにclosed、PR #350は2026-07-29T23:49:02Zにmergeされた（merge commit `a9871971481d77baa56e670163e1ae1ebf8ac4b4`）。
-- Candidate 3の`iss-00345`（#345）はGitHub上で2026-07-30T15:37:18Zにclosedし、`iss-00346`（#346）はS01〜S04の実装・ChatGPT Pro code gateを完了した。Issue 346 reportのS04 final reviewはP0〜P3=0であり、S90ではprovider docsとmanaged projection parityを更新した。S90のfirst exact-head spec reviewはP1=3でfailしたが、bounded remediation後のexact-head combined code/spec review（`feedff647f`）はP0/P1なしでpassした。S99は未完了である。
+- Candidate 3の`iss-00345`（#345）はGitHub上で2026-07-30T15:37:18Zにclosedし、`iss-00346`（#346）はS01〜S04の実装・ChatGPT Pro code gateを完了した。Issue 346 reportのS04 final reviewはP0〜P3=0であり、S90ではprovider docsとmanaged projection parityを更新した。S90のfirst exact-head spec reviewはP1=3でfailしたが、bounded remediation後のexact-head combined code/spec review（`feedff647f`）はP0/P1なしでpassした。S99のlint、ordinary lane（`782 passed, 2082 skipped`）、explicit full lane（`2787 passed, 77 skipped, 2 warnings`）は完了したが、S99統合reviewの仕様証跡修正とPR handoffは未完了である。
   - `iss-00345`のfresh code reviewでLinux named staging cleanupのsame-UID replacement raceを検出した。macOS専用のaccepted waiverをLinuxへ拡張せず、ユーザー採用済みOption AによりLinux anonymous `O_TMPFILE` stagingを必須化するEpic amendmentを開始した。
 - 次のマイルストーン:
-- Issue 346のS90 combined code/spec reviewはpass済み。S99のfast/full regression、single-thread QA/code/spec review、PR handoffを最新headで実施する。
+- Issue 346のS90 combined code/spec reviewとS99のlint/fast/full regressionは完了済み。S99統合QA/code/spec reviewの再レビュー、PR handoff、Merge Preparationを最新headで実施する。
 - ブロッカー:
-- Candidate 3のS90 combined reviewはpassしたが、S99（fast/full、統合review、PR handoff）が未完了である。S90 docs更新は既存のaccepted Linux/macOS trust boundaryを説明する範囲に限定し、runtime mirrorはS04のprovider-to-dogfood projection correctionとしてD-005/Issue EAL-013/EAL-014へ明示した。新しいproduct decisionやruntime fallbackは導入していない。
+- Candidate 3のS90 combined reviewとS99 fast/full regressionはpassした。S99の初回統合reviewはQA/codeがpass、specがP1=3でfailしたため、親Epicの現行S99 trace、Issue assurance binding、review freeze serializationをboundedに修正してfresh exact-head reviewへ戻る。PR handoff、Merge Preparation、human merge decisionは未完了である。S90 docs更新は既存のaccepted Linux/macOS trust boundaryを説明する範囲に限定し、runtime mirrorはS04のprovider-to-dogfood projection correctionとしてD-005/Issue EAL-013/EAL-014へ明示した。新しいproduct decisionやruntime fallbackは導入していない。
 
 ### Candidate 3 trace（Issue 346）
 
 - `iss-00344`（#344）はPR #350のmergeで完了し、`iss-00345`（#345）はGitHubでclosed済みである。両Issueの実装を前提に、`iss-00346`（#346）はS01 candidate wheel/fresh consumer、S02 no-backfill/update、S03 platform/privacy、S04 opaque lifecycle/projection/compatibilityを順に完了した。
 - Issue 346 S04のChatGPT Pro exact-head code gateは reviewed head `2af3a145ec1a29e05f677d13ee20d53e55f38e3f`、P0/P1/P2/P3=0、`review_status=pass`。詳細とArtifactはIssue reportのS04 review ledgerを参照する。
 - S90ではprovider docsを更新し、candidate-wheel updateでconsumer docs/runtime mirrorとstatus manifestを同期した。provider/projection parity、docs token checks、`validate nodes=217`、`sync --no-github`はpassした。first exact-head ChatGPT Pro spec review（session `iss346-s90-spec-review`、reviewed head `1364d62ca7a3e0ff42e7fe771b8a869cf54697bb`）はP1=3でfailしたが、remediation後のcombined code/spec review（session `iss346-s90-combined-review`、reviewed head `feedff647f5153cd2dc951445943e4d98830131a`、Artifact `20260802t015002z-chatgpt-output-s90-combined-code-spec-review.md`）はcode/specともfindings 0・passとなった。Issue reportのS90 section、D-005/D-006、EAL-006〜014が一次 traceである。
-- S90 pass後にS99（ordinary/explicit-full test lane、single-thread ChatGPT Pro QA/code/spec review、latest-head PR handoff、Merge Preparation、human merge stop）を同一candidateへ束ねる。ここではS99完了、PR mergeability、Epic final closureを主張しない。
+- S90 pass後、S99のordinary/explicit-full test laneはそれぞれ `782 passed, 2082 skipped` と `2787 passed, 77 skipped, 2 warnings` で完了した。初回single-thread ChatGPT Pro reviewはQA/code pass・spec fail（P1=3）だったため、Epic report更新、assurance再binding、freeze serialization統一後にfresh reviewを実施する。PR mergeability、Epic final closure、human merge decisionはまだ主張しない。
 
 ## 証跡採用台帳（Evidence Adoption Ledger / 必須）
 
@@ -175,11 +175,11 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 完了した Issue / PR / Release (必須)
 - 完了: `iss-00344` / GitHub Issue #344（2026-07-29T23:49:03Z closed）、PR #350（2026-07-29T23:49:02Z merged、merge commit `a9871971481d77baa56e670163e1ae1ebf8ac4b4`）。
-- 完了: `iss-00345` (#345、GitHub closed 2026-07-30T15:37:18Z)。実施中: `iss-00346` (#346、S01〜S04実装・S04 code gate完了、S90 docs/projection実装済み、S90 combined re-review pass済み、S99 pending)。
+- 完了: `iss-00345` (#345、GitHub closed 2026-07-30T15:37:18Z)。実施中: `iss-00346` (#346、S01〜S04実装・S04 code gate完了、S90 docs/projection実装済み、S90 combined re-review pass済み、S99 lint/ordinary/full regression済み、統合review修正とPR handoff pending)。
 - GitHub Epic issue: #343。
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
-- E-AC-001〜016: `iss-00344` / `iss-00345`の完了証跡と`iss-00346` S01〜S04/S90 implementation evidenceで実装到達。S90 exact-head spec reviewはhistorical first fail後のcombined re-reviewでpass済み。S99のfast/full、統合review、PR handoffは未完了。
+- E-AC-001〜016: `iss-00344` / `iss-00345`の完了証跡と`iss-00346` S01〜S04/S90 implementation evidenceで実装到達。S90 exact-head spec reviewはhistorical first fail後のcombined re-reviewでpass済み。S99 lint、ordinary/full regressionはpass済みで、統合reviewの証跡修正とPR handoffが残る。
 - E-AC-017〜020: S99 final quality、PR handoff、Merge Preparation、human merge stopの証跡待ち。
 
 ## ロールアウト結果（必要なら） (任意)
