@@ -28,7 +28,7 @@ ID: "epic-00343"
 - Candidate 3の`iss-00345`（#345）はGitHub上で2026-07-30T15:37:18Zにclosedし、`iss-00346`（#346）はS01〜S04の実装・ChatGPT Pro code gateを完了した。Issue 346 reportのS04 final reviewはP0〜P3=0であり、S90ではprovider docsとmanaged projection parityを更新した。S90のfirst exact-head spec reviewはP1=3でfailしたが、bounded remediation後のexact-head combined code/spec review（`feedff647f`）はP0/P1なしでpassした。S99は未完了である。
   - `iss-00345`のfresh code reviewでLinux named staging cleanupのsame-UID replacement raceを検出した。macOS専用のaccepted waiverをLinuxへ拡張せず、ユーザー採用済みOption AによりLinux anonymous `O_TMPFILE` stagingを必須化するEpic amendmentを開始した。
 - 次のマイルストーン:
-- Issue 346のS90 combined code/spec reviewをpassし、S99のfast/full regression、single-thread QA/code/spec review、PR handoffを最新headで実施する。
+- Issue 346のS90 combined code/spec reviewはpass済み。S99のfast/full regression、single-thread QA/code/spec review、PR handoffを最新headで実施する。
 - ブロッカー:
 - Candidate 3のS90 combined reviewはpassしたが、S99（fast/full、統合review、PR handoff）が未完了である。S90 docs更新は既存のaccepted Linux/macOS trust boundaryを説明する範囲に限定し、runtime mirrorはS04のprovider-to-dogfood projection correctionとしてD-005/Issue EAL-013/EAL-014へ明示した。新しいproduct decisionやruntime fallbackは導入していない。
 
@@ -175,11 +175,11 @@ Requirement / design / plan の phase promotion ごとに、調査、未確定�
 
 ## 完了した Issue / PR / Release (必須)
 - 完了: `iss-00344` / GitHub Issue #344（2026-07-29T23:49:03Z closed）、PR #350（2026-07-29T23:49:02Z merged、merge commit `a9871971481d77baa56e670163e1ae1ebf8ac4b4`）。
-- 完了: `iss-00345` (#345、GitHub closed 2026-07-30T15:37:18Z)。実施中: `iss-00346` (#346、S01〜S04実装・S04 code gate完了、S90 docs/projection実装済み、S90 re-reviewとS99 pending)。
+- 完了: `iss-00345` (#345、GitHub closed 2026-07-30T15:37:18Z)。実施中: `iss-00346` (#346、S01〜S04実装・S04 code gate完了、S90 docs/projection実装済み、S90 combined re-review pass済み、S99 pending)。
 - GitHub Epic issue: #343。
 
 ## 受け入れ条件（E-AC）の達成状況 (必須)
-- E-AC-001〜016: `iss-00344` / `iss-00345`の完了証跡と`iss-00346` S01〜S04/S90 implementation evidenceで実装到達。S90 exact-head spec reviewはfail後のre-review待ちであり、レビューpassによる達成確定は未了。S99のfast/full、統合review、PR handoffも未完了。
+- E-AC-001〜016: `iss-00344` / `iss-00345`の完了証跡と`iss-00346` S01〜S04/S90 implementation evidenceで実装到達。S90 exact-head spec reviewはhistorical first fail後のcombined re-reviewでpass済み。S99のfast/full、統合review、PR handoffは未完了。
 - E-AC-017〜020: S99 final quality、PR handoff、Merge Preparation、human merge stopの証跡待ち。
 
 ## ロールアウト結果（必要なら） (任意)
