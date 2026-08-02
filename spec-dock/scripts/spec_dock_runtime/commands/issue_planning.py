@@ -171,12 +171,6 @@ def _review_args(ns: argparse.Namespace) -> CommandArgs:
     mode: PlanningMode = ns.mode
     candidate = getattr(ns, "candidate", None)
     reviewed_head = getattr(ns, "reviewed_head", None)
-    _validate_mode_options(
-        mode,
-        candidate=candidate,
-        reviewed_head=reviewed_head,
-        archive_extras=(),
-    )
     return PlanningReviewArgs(
         issue_id=ns.issue,
         mode=mode,
@@ -193,12 +187,6 @@ def _apply_args(ns: argparse.Namespace) -> CommandArgs:
     reviewed_head = getattr(ns, "reviewed_head", None)
     logical_filename = getattr(ns, "logical_filename", None)
     zip_sha256 = getattr(ns, "zip_sha256", None)
-    _validate_mode_options(
-        mode,
-        candidate=candidate,
-        reviewed_head=reviewed_head,
-        archive_extras=(logical_filename, zip_sha256),
-    )
     return PlanningApplyArgs(
         issue_id=ns.issue,
         mode=mode,
@@ -212,25 +200,6 @@ def _apply_args(ns: argparse.Namespace) -> CommandArgs:
         zip_sha256=zip_sha256,
         reviewed_head=reviewed_head,
     )
-
-
-def _validate_mode_options(
-    mode: PlanningMode,
-    *,
-    candidate: str | None,
-    reviewed_head: str | None,
-    archive_extras: tuple[str | None, ...],
-) -> None:
-    if mode == "archive-candidate":
-        if candidate is None or any(value is None for value in archive_extras):
-            raise RuntimeError("archive-candidate mode requires all archive identity options")
-        if reviewed_head is not None:
-            raise RuntimeError("archive-candidate mode forbids --reviewed-head")
-        return
-    if reviewed_head is None:
-        raise RuntimeError("git-bound mode requires --reviewed-head")
-    if any(value is not None for value in archive_extras):
-        raise RuntimeError("git-bound mode forbids archive-only identity options")
 
 
 def _run_create(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:

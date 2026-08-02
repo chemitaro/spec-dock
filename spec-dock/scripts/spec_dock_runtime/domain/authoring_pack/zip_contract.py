@@ -12,6 +12,7 @@ import zipfile
 from spec_dock_runtime.domain.authoring_pack.authority_boundary import (
     scan_authoring_payload,
     scan_constraint_sensitive_payload,
+    scan_issue_candidate_sensitive_payload,
 )
 from spec_dock_runtime.domain.authoring_pack.prompt_pack_contract import (
     ADOPTION_STATUS,
@@ -269,7 +270,7 @@ def _review_profile_zip(input_path: Path, profile: ZipReviewProfile) -> PackRevi
         findings.append("inventory_mismatch")
     if not findings:
         for content in payloads.values():
-            findings.extend(_safe_profile_findings(scan_constraint_sensitive_payload(content.decode("utf-8"))))
+            findings.extend(_safe_profile_findings(scan_issue_candidate_sensitive_payload(content.decode("utf-8"))))
         findings.extend(_safe_profile_findings(profile.cross_file_validator(payloads, profile.expected_root)))
     unique_findings = tuple(dict.fromkeys(findings))
     return PackReviewResult(

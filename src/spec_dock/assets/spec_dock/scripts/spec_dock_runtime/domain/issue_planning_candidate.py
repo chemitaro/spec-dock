@@ -348,13 +348,13 @@ def parse_canonical_control_json(data: bytes) -> dict[str, Any]:
                 ValueError(f"canonical control JSON number is invalid: {value}")
             ),
         )
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        if not isinstance(value, dict):
+            raise ValueError("canonical control JSON root must be an object")
+        _validate_control_value(value, field_name="control")
+        if canonical_control_json_bytes(value) != data:
+            raise ValueError("canonical control JSON bytes are not canonical")
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
         raise ValueError("canonical control JSON is invalid") from error
-    if not isinstance(value, dict):
-        raise ValueError("canonical control JSON root must be an object")
-    _validate_control_value(value, field_name="control")
-    if canonical_control_json_bytes(value) != data:
-        raise ValueError("canonical control JSON bytes are not canonical")
     return cast("dict[str, Any]", value)
 
 

@@ -207,63 +207,77 @@ def test_planning_create_forwards_external_context_manifest_path() -> None:
 
 
 @pytest.mark.parametrize(
-    "argv",
+    ("argv", "use_case_name", "reason"),
     [
-        [
-            "review",
-            "planning",
-            "--issue",
-            "iss-00003",
-            "--mode",
-            "archive-candidate",
-            "--candidate",
-            "/tmp/candidate.zip",
-            "--reviewed-head",
-            "a" * 40,
-            "--output",
-            "/tmp/out",
-        ],
-        [
-            "planning",
-            "apply",
-            "--issue",
-            "iss-00003",
-            "--mode",
-            "archive-candidate",
-            "--review-result",
-            "/tmp/review.json",
-            "--human-decision",
-            "/tmp/decision.json",
-            "--expected-head",
-            "a" * 40,
-            "--output",
-            "/tmp/out",
-            "--candidate",
-            "/tmp/candidate.zip",
-            "--logical-filename",
-            "candidate.zip",
-        ],
+        (
+            [
+                "review",
+                "planning",
+                "--issue",
+                "iss-00003",
+                "--mode",
+                "archive-candidate",
+                "--candidate",
+                "/tmp/candidate.zip",
+                "--reviewed-head",
+                "a" * 40,
+                "--output",
+                "/tmp/out",
+                "--format",
+                "json",
+            ],
+            "planning_review",
+            "review_request_rejected",
+        ),
+        (
+            [
+                "planning",
+                "apply",
+                "--issue",
+                "iss-00003",
+                "--mode",
+                "archive-candidate",
+                "--review-result",
+                "/tmp/review.json",
+                "--human-decision",
+                "/tmp/decision.json",
+                "--expected-head",
+                "a" * 40,
+                "--output",
+                "/tmp/out",
+                "--candidate",
+                "/tmp/candidate.zip",
+                "--logical-filename",
+                "candidate.zip",
+                "--format",
+                "json",
+            ],
+            "planning_apply",
+            "apply_request_rejected",
+        ),
     ],
 )
-def test_cross_mode_or_partial_identity_options_fail_before_use_case(argv) -> None:
+def test_cross_mode_or_partial_identity_options_reach_structured_use_case(argv, use_case_name, reason) -> None:
     calls = []
 
     def spy(request):
         calls.append(request)
-        raise AssertionError("must not be called")
+        return PlanningCommandResult(status="rejected", reason=reason, issue_id="iss-00003")
 
     registry = build_registry()
     namespace = build_parser(registry).parse_args(argv)
+    stdout = io.StringIO()
     stderr = io.StringIO()
-    with contextlib.redirect_stderr(stderr):
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
         exit_code = dispatch(
             namespace,
             registry,
-            _use_cases(planning_review=spy, planning_apply=spy),
+            _use_cases(**{use_case_name: spy}),
         )
     assert exit_code == 1
-    assert calls == []
-    assert "error:" in stderr.getvalue()
+    assert len(calls) == 1
+    assert f'"reason":"{reason}"' in stdout.getvalue()
+    assert stderr.getvalue() == ""
 
 
 @pytest.mark.parametrize(
