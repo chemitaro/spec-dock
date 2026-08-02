@@ -1332,3 +1332,24 @@ planning repairではClosure Indexのschemaとownerを確定した。実装closu
 - D: authoring output filenameのIssue ID検証を共有`normalize_id_input()`へ接続し、`iss-local-00001`および6桁以上のnumeric IDをcanonical filenameとして受理する回帰テストを追加した。非canonical入力を受理する緩和は行っていない。
 - provider authorityの4 runtime filesをdogfood projectionへwhole-file copyし、provider／dogfood SHA-256 parityを確認した。canonical三文書、Candidate ZIP、public status／reason／schema、Oracle／Git-bound boundaryは変更していない。
 - verification: focused provider tests `351 passed`、Issue Planning integration full-regression `146 passed`（初回3-file実行で既存のrewindケースが一時的に1件失敗したが、同一テスト単独およびapply integration全体`136 passed`で再確認）、`git diff --check`は次のcommit前に実行する。次はこの修正と証跡をcommit／pushし、新HEADへbindしたfresh ChatGPT quality gateおよびPR observationを実施する。P0／P1=0になるまでmerge-readyとは扱わない。merge、auto-merge、branch削除、Issue close、`issue finish`は行わない。
+
+## 2026-08-02 — Fresh GPT-5.6 quality gate for 906ac49f FAIL (bounded C/D residuals)
+
+- fresh read-only ChatGPT session `iss-334-gpt56-final-quality`はGitHub connectorでrepository `chemitaro/spec-dock`、required branch、PR #351、exact HEAD `906ac49f820a2b131bef6a9092789b40896579d9`を確認し、default-branch fallback未使用、head match=trueを返した。model evidenceは`requested=GPT-5.6 Sol`／`resolved=Pro`／`status=already-selected`／`strategy=current`／`verified=no`である。
+- SpecはPASS、CodeとQAはP1を各2件検出し、quality gateはP0=0／P1=4でFAILとなった。A（deep manifest recursion）とB（UTC overflow）は修正済みと確認された。残るCはreference-transaction payloadを`splitlines()`と空行フィルタで正規化しているため、CRLF、欠落末尾LF、空recordを受理し得ること、Dは必須`-issue-planning-documents.zip` suffixの存在確認前に`removesuffix()`を使うためbare Issue IDを受理し得ることである。これらは今回の修正で導入された契約境界内のP1であり、P2／アーキテクチャ提案ではない。
+- 正式read-only成果物は`artifacts/20260802t113000z-chatgpt-gpt56-quality-gate-906ac49f-p1-fail.json`で、SHA-256は`9c6d573454ff06c96f06b17c3b7fa5a1b9db421a95cd9664705d9350e446c199`である。ChatGPTはrepository、branch、PR、artifact、sourceを変更していない。
+- 次はC/Dだけを、exact raw bytesのreference payload検証と必須suffix先行検証へ限定して修正する。provider→dogfood parity、negative回帰テスト、focused／ordinary／lint／validateを再実施し、new HEADでfresh ChatGPT quality gateとPR observationを繰り返す。
+
+## 2026-08-02 — GPT-5.6 bounded C/D repair triage
+
+- fresh Blue Team advisory `iss-334-cd-triage-906ac49f`は、repository、required branch、PR #351、exact HEAD `906ac49f820a2b131bef6a9092789b40896579d9`をGitHub connectorで確認し、C／Dをvalid P1として再確認した。model evidenceは`requested=GPT-5.6 Sol`／`resolved=Pro`／`status=already-selected`／`strategy=current`／`verified=no`である。
+- Cの最小修正は、production generated hookへraw bytesのclosed-set比較を導入し、branch-only payloadおよびbranch／HEADの2順序だけを末尾LF込みで受理し、CRLF・欠落LF・空record・duplicate・extra・field／SHA／ref mismatchをexit 97で拒否すること。HEAD.lock、symbolic HEAD、CAS、native delegation、real-Git lifecycle testsは維持する。Dはexact suffixを先に検証し、その後だけIssue IDを共有normalizerで検証する。
+- 正式advisoryは`artifacts/20260802t123000z-chatgpt-gpt56-cd-triage-906ac49f.json`で、SHA-256は`ab4349e3804f769945680401d2f0b91b54bd397e6a0bfa8b523c02bd5108760b`である。scope guardはno architecture redesign／no public schema change／no patch or ZIPである。
+
+## 2026-08-02 — C/D residual repair implementation
+
+- C: productionのreference-transaction hookが親processで生成したclosed-setのraw payload bytesを受け取り、branch record単独またはbranch／HEADの2順序だけを末尾LF込みでbyte-exact比較するprivate seamを追加した。`splitlines()`、空行フィルタ、CRLF／末尾LFの正規化を廃止し、payload、record、old/new SHA、refの不一致はprepared phaseでexit 97へ閉じる。HEAD.lock、symbolic HEAD、CAS、native hook delegationは維持した。
+- Cのprivate seamに対し、受理3形（branch-only、HEAD→branch、branch→HEAD）と、欠落LF、CRLF、先頭／中間／末尾blank、duplicate／extra、old/new/ref mismatch、非ASCIIを拒否する回帰テストを追加した。既存のreal-Git initial／resume／already-remote／native delegation integration testは維持し、4件すべてpassした。
+- D: `PlanningOutputExpectation`でexact `-issue-planning-documents.zip` suffixを先に要求し、suffix確認後にだけIssue IDを共有`normalize_id_input()`でcanonical equality検証するようにした。bare ID、suffix欠落／改変、uppercase、padding不一致、空／不正local stemのnegative matrixを追加し、local IDと6桁numeric IDのpositiveケースを維持した。
+- provider authorityのprompt／apply runtime filesをdogfoodへwhole-file projectionし、provider／dogfood parityを確認した。canonical三文書、Candidate ZIP、public schema、Oracle boundaryは変更していない。
+- verification: C/D focused tests `11 passed`、Issue Planning focused suite `360 passed`、selected integration `4 passed`、ordinary `1424 passed, 2235 skipped`、`make lint`（Ruff／mypy）pass、`spec-dock validate` `nodes=227`、`git diff --check` pass、provider／dogfood parity pass。次はこの修正とFAIL／triage証跡をcommit／pushし、新HEADでfresh ChatGPT quality gateを行う。P0／P1=0までPR observationは完了扱いにしない。merge、auto-merge、branch削除、Issue close、`issue finish`は行わない。
