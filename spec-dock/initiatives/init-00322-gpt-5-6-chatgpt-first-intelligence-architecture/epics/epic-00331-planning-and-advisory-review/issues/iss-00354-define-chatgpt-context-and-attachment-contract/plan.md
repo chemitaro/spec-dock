@@ -2,7 +2,6 @@
 種別: 実装計画書（Issue）
 ID: "iss-00354"
 タイトル: "Define ChatGPT Context and Attachment Contract"
-関連GitHub: ["#354"]
 状態: "approved"
 作成者: "iwasawayuuta"
 最終更新: "2026-08-03"
