@@ -15,7 +15,7 @@
 * S03/S04 の片側だけを Green、commit candidate、closure、rollback 対象にしてはならない。
 * S05 以降は、この atomic change-set の同一 resulting HEAD に必要証跡が揃うまで開始しない。
 
-この境界は、minimal body、opaque attachment directory、dynamic original paths、no generated input pack を定める要件・設計と、S03/S04 atomic amendment の実行境界に従う。
+この境界は、minimal body、opaque attachment directory、dynamic original paths、no generated input pack を定める要件・設計と、S03/S04 atomic amendment の実行境界に従う。   
 
 ## 2. 固定 identity
 
