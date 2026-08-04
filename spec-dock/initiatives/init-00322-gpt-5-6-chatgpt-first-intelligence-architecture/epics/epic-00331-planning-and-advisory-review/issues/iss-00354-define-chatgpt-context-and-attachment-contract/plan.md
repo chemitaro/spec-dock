@@ -140,7 +140,7 @@ directory、multiple path、continuationのいずれかがunsupportedならS02�
 
 ## 7. Retained Milestone S03 — Input model をbytesからpathへ
 
-**Status:** retained / unverified complete。
+**Status:** retained / atomic S03-S04 boundary pending implementation。
 
 - 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S03 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s03-input-path-model.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
 
@@ -159,7 +159,7 @@ directory、multiple path、continuationのいずれかがunsupportedならS02�
 
 ## 8. Retained Milestone S04 — Direct Oracle attachment transport
 
-**Status:** retained / unverified complete。
+**Status:** retained / atomic S03-S04 boundary pending implementation。
 
 - 実装開始前に ChatGPT-Use（GPT-5.6 Luna / Reasoning Effort Max）で S04 専用の実装ブリーフを作成し、`artifacts/implementation-briefs/s04-direct-attachment-transport.md` に配置する。Codex はブリーフを参照して実装し、実測結果は `report.md` に記録する。
 
@@ -176,6 +176,21 @@ directory、multiple path、continuationのいずれかがunsupportedならS02�
 - pure argv builderでdirect pathsを追加する。
 - output snapshot private stagingだけを残す。
 - prompt submission one-shotを維持する。
+
+### 8.1 S03/S04 Atomic Cutover Amendment (2026-08-04)
+
+S03 と S04 は、bytes/materialization 契約から original path の direct Oracle transport へ移行する一つの deployable change-set、rollback unit、fresh review target として実施する。これは要件・設計の変更ではなく、現行コードの producer / contract / consumer の依存関係を既承認の target architecture に合わせるための実行境界補正である。
+
+- `cl-s03-path-input` / `tc-s03-001` は application 側の path-only synthesized contract、Planning/Review/Revision caller、source-preflight state と attachment-transport state の分離を所有する。
+- `cl-s04-direct-transport` / `tc-s04-001` は infra 側の repeated `--file` operands、generated input pack の廃止、transport regression を所有する。
+- Red は責務別に先行作成してよいが、Green、commit candidate、review-ready、closure は同一 resulting HEAD でのみ成立する。片方だけを close してはならない。
+- compatibility property、dual-write、path-to-bytes 再構成、一時 pack、inline fallback、attachment drop、alternate backend は追加しない。
+- S03/S04 の production write allowlist は次の3ファイル、test write allowlist は次の4ファイルとする。
+  - production: `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py`
+  - tests: `tests/unit/application/test_issue_planning_prompt.py`, `tests/unit/application/test_issue_planning.py`, `tests/unit/infra/test_issue_planning_chatgpt.py`, `tests/integration/test_issue_planning_chatgpt_transport.py`
+- `domain/issue_planning_contracts.py`、domain tests、CLI/commands、Oracle artifact reader、resource files、installed/dogfood projection は read/run-only とし、この cutover で直接変更しない。必要になった場合は停止して計画を再補正する。
+- S03/S04 の実装前に `artifacts/implementation-briefs/s03-s04-atomic-cutover-plan-clarification.md` を参照し、plan/report の atomic boundary 採用を記録する。
+- S03/S04 の両 closure が同じ HEAD で成立するまで、S05 を開始しない。
 
 ## 9. Retained Milestone S05 — Orchestration / CLI cutover
 
@@ -601,6 +616,8 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 | `cl-s12-artifact-reader` | S12 | REQ-029, REQ-030 | versioned reader が exact capture と strict artifact validation を行う | fixture tests、integration output、report |
 | `cl-s13-closure` | S13 | REQ-018, REQ-020, REQ-031–033 | projection、docs、quality、review、adoption の最終ゲートが一致する | parity、quality commands、final report |
 
+`cl-s03-path-input` と `cl-s04-direct-transport` は atomic S03/S04 cutover の責務別 closure である。両者は同じ resulting implementation HEAD、同じ pushed branch、同じ fresh review target に結び付く場合のみ closed とする。片方だけの Green、commit candidate、review-ready、closure は不許可であり、S05 は両 closure の完了後に開始する。
+
 ### 17.6.3 ステップ別実行カード
 
 #### S01 — Capability characterization
@@ -619,21 +636,21 @@ opt-in browser smokeのactual commandはrepository-owned scriptとしてdocument
 - step closure contract: resource diff、minimal body snapshot、fresh ChatGPT-Use brief review を記録する。
 - step gate / report destination: unknown operation や registry edit が必要なら停止。docs/worker evidence と closure を `report.md` に記録する。
 
-#### S03 — Path input model
+#### S03 — Path input model (atomic S03/S04 boundary)
 
-- 振る舞いスライス: synthesized bytes/classification を path input に置換し、operator path text を保持する。
-- delegation contract: delegated role=`dev-coder`; input docs=S03 brief, `requirement.md`, `design.md`, application contracts, scanner tests; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/issue_planning_contracts.py`, `tests/unit/application/test_issue_planning_prompt.py`, `tests/unit/domain/test_issue_planning_contracts.py`; forbidden changes=symlink/FIFO traversal, path materialization, new content hashing, transport adapter; acceptance criteria=`cl-s03-path-input` proves original paths and limits survive with zero tree/content inspection; required verification=unit tests with read/rglob/stat spies and argv assertions; reviewer focus=`code-reviewer` checks path-only contract and input immutability; stop conditions=any required materialization or new inspection rule; output required=contract diff, spy result, tests, risks, and report Ledger Note.
-- 具体テストケース: `tc-s03-001` は nested/hidden/symlink/FIFO fixture に対して tree API spy が 0 のまま argv assembly が成功することを確認する。前提は path-only request、操作は synthesize request、期待結果は original paths と limits のみが保持される、失敗検出は read_bytes/rglob/stat の呼び出し、検証方法は unit test と spy assertion。
-- step closure contract: input contract diff と spy pass を `cl-s03-path-input` に紐付ける。
-- step gate / report destination: path materialization が必要になったら S03 を閉じず report から plan amendment へ戻す。
+- 振る舞いスライス: synthesized bytes/classification を path input に置換し、Planning/Review/Revision caller が original path の順序と identity を保持する。source preflight evidence と attachment transport state を分離する。
+- delegation contract: delegated role=`dev-coder`; input docs=S03 brief、S03/S04 atomic cutover clarification、`requirement.md`、`design.md`、application contracts、scanner tests; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning_prompt.py`, `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/issue_planning.py`, `tests/unit/application/test_issue_planning_prompt.py`, `tests/unit/application/test_issue_planning.py`, `tests/integration/test_issue_planning_chatgpt_transport.py`; forbidden changes=domain contract、symlink/FIFO traversal、path materialization、new content hashing、CLI、Oracle profile/recovery、output validators、resource wording; acceptance criteria=`cl-s03-path-input` proves path-only application contract and callers on the same resulting HEAD as S04, with zero tree/content inspection; required verification=unit tests with read/rglob/stat/resolve spies、path order/object identity assertions、application regression; reviewer focus=`code-reviewer` checks path-only contract and caller immutability; stop conditions=compatibility bridge、generated identity file、new inspection rule、or any S04 consumer mismatch; output required=contract/caller diff、spy result、tests、risks、and report Ledger Note.
+- 具体テストケース: `tc-s03-001` は nested/hidden/symlink/FIFO fixture に対して tree API spy が 0 のまま path assembly が成功し、Planning/Review/Revision の original paths と既存 source-context limits が保持されることを確認する。前提は path-only request、操作は synthesize/caller request、期待結果は bytes/classification/SHA を保持しない immutable tuple、失敗検出は read_bytes/rglob/stat/resolve と payload field の残存、検証方法は application unit test と spy/assertion。
+- step closure contract: input contract diff、caller matrix、spy pass、`tc-s03-001` を `cl-s03-path-input` に紐付け、S04 と同一 resulting HEAD を記録する。
+- step gate / report destination: path materialization、caller/transport の分離不能、または S04 と同一 HEAD での Green 不成立があれば両ステップを閉じず report から plan amendment へ戻す。
 
-#### S04 — Direct attachment transport
+#### S04 — Direct attachment transport (atomic S03/S04 boundary)
 
-- 振る舞いスライス: static directory と dynamic evidence を original `--file` operands として Oracle へ渡す。
-- delegation contract: delegated role=`dev-coder`; input docs=S04 brief, `requirement.md`, `design.md`, Oracle transport adapter, CLI tests; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py`, `tests/unit/infra/test_issue_planning_chatgpt.py`, `tests/integration/test_issue_planning_chatgpt_transport.py`; forbidden changes=generated pack, copy, ZIP, exclusion, retry policy, Oracle wrapper; acceptance criteria=`cl-s04-direct-transport` proves original paths are direct `--file` operands and no generated input pack is created; required verification=argv equality test, no-tree spy, and transport CLI smoke; reviewer focus=`code-reviewer` checks direct Oracle boundary and one-shot semantics; stop conditions=direct capability unsupported or generated context appears; output required=adapter diff, argv receipt, tests, risks, and report Ledger Note.
-- 具体テストケース: `tc-s04-001` は required direct path を渡したとき argv に同一 path が現れ、tree/copy/ZIP API が 0 であることを確認する。前提は static directory と dynamic evidence file、操作は direct command build、期待結果は one-shot submission argv、失敗検出は generated context file、検証方法は argv equality test と CLI smoke。
-- step closure contract: direct argv、no-tree spy、CLI regression を `cl-s04-direct-transport` に紐付ける。
-- step gate / report destination: direct capability が無ければ inline を勝手に追加せず S01 receipt を参照して停止する。
+- 振る舞いスライス: S03 が構成した static directory と dynamic original paths を、infra が各一つの repeated `--file` operand として Oracle へ渡す。generated prompt-pack、context files、manifest、copy、ZIP、hash、tree traversal は作成しない。
+- delegation contract: delegated role=`dev-coder`; input docs=S04 brief、S03/S04 atomic cutover clarification、`requirement.md`、`design.md`、Oracle transport adapter、CLI/integration tests; allowed paths=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/issue_planning_chatgpt.py`, `tests/unit/infra/test_issue_planning_chatgpt.py`, `tests/integration/test_issue_planning_chatgpt_transport.py`, および S03 の union allowlist; forbidden changes=generated pack、copy、ZIP、exclusion、retry/inline policy、Oracle wrapper、profile/stage/recovery、output validators; acceptance criteria=`cl-s04-direct-transport` proves exact repeated `--file` operands and no generated input pack on the same resulting HEAD as S03; required verification=argv equality test、no-tree/copy/archive/hash spy、transport CLI smoke、one-prompt/output regression; reviewer focus=`code-reviewer` checks direct Oracle boundary and one-shot semantics; stop conditions=direct capability unsupported、generated context appears、or S03 contract mismatch; output required=adapter diff、argv receipt、tests、risks、and report Ledger Note.
+- 具体テストケース: `tc-s04-001` は required direct paths を渡したとき argv に同一 path が順序どおり現れ、`--prompt` は一つ、tree/copy/ZIP/hash/write API が 0、private output staging と既存 validators が維持されることを確認する。前提は static directory と dynamic evidence paths、操作は direct command build、期待結果は one-shot submission argv、失敗検出は generated context file/pack、検証方法は unit/integration test と CLI smoke。
+- step closure contract: direct argv、no-tree/no-pack spy、CLI regression、`tc-s04-001` を `cl-s04-direct-transport` に紐付け、S03 と同じ resulting HEAD を記録する。
+- step gate / report destination: direct capability が無ければ inline を勝手に追加せず S01 receipt を参照して両ステップを停止する。片側だけの Green/close は report に記録しない。
 
 #### S05 — Orchestration / CLI cutover
 
